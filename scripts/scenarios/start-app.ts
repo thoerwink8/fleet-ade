@@ -115,7 +115,7 @@ const start = Effect.fn("startApp.start")(function* (input: {
 });
 
 const startApp = Effect.fn("startApp")(function* (input: {
-  readonly surface: "web" | "mobile";
+  readonly surface: string;
   readonly home: string;
   readonly ports: ReadonlyArray<string>;
 }) {
@@ -197,53 +197,18 @@ const startApp = Effect.fn("startApp")(function* (input: {
     return yield* Effect.raceAll([server.exitCode, web.exitCode, boundElsewhere]);
   }
 
-  // The device is another machine: the server listens on every interface, and Metro serves the
-  // dev client its JavaScript. Tests mint their own pairing links, so the startup one is dropped.
-  const [serverPort = "", metroPort = "", host = ""] = input.ports;
-  const server = yield* start({
-    cwd: checkout,
-    command: node,
-    args: devRunner("dev:server", ["--host", "0.0.0.0", "--port", serverPort]),
-    env,
-    onLine: (line) => (line.includes("pairingUrl:") ? Effect.void : Console.log(line)),
-  });
-  yield* net.hasListenerOnHost(Number(serverPort), "127.0.0.1").pipe(
-    Effect.filterOrFail(
-      (listening) => listening,
-      () => new ScenarioError({ message: "The server is not listening yet." }),
-    ),
-    Effect.retry({ schedule: Schedule.spaced("500 millis"), times: 600 }),
-  );
-  const metro = yield* start({
-    cwd: path.join(checkout, "apps/mobile"),
-    command: "npx",
-    args: ["expo", "start", "--dev-client", "--scheme", "t3code-dev", "--lan", "--port", metroPort],
-    env: {
-      ...env,
-      APP_VARIANT: "development",
-      CI: "1",
-      // Lazily fetched chunks sometimes arrive broken on pool devices.
-      EXPO_NO_METRO_LAZY: "1",
-      REACT_NATIVE_PACKAGER_HOSTNAME: host,
-    },
-    onLine: Console.log,
-  });
-  return yield* Effect.raceFirst(server.exitCode, metro.exitCode);
+  return yield* new ScenarioError({ message: `Unknown surface: ${input.surface}` });
 });
 
 const command = Command.make(
   "start-app",
   {
-    surface: Argument.Literals("surface", ["web", "mobile"]).pipe(
-      Argument.withDescription(
-        "web: server and Vite. mobile: server on every interface and Metro.",
-      ),
+    surface: Argument.Literals("surface", ["web"]).pipe(
+      Argument.withDescription("web: server and Vite."),
     ),
     home: Argument.String("t3-home").pipe(Argument.withDescription("T3 home to recreate.")),
     ports: Argument.String("port").pipe(
-      Argument.withDescription(
-        "web: <host> <web-port>. mobile: <server-port> <metro-port> <host>.",
-      ),
+      Argument.withDescription("web: <host> <web-port>."),
       Argument.variadic(),
     ),
   },

@@ -170,7 +170,7 @@ export function formatHostedThreadLink(
   return cleaned ? `[${cleaned}](${href})` : href;
 }
 
-export function hasThreadLinks(markdown: string, hostedOrigin?: string | null): boolean {
+function hasThreadLinks(markdown: string, hostedOrigin?: string | null): boolean {
   return (
     markdown.includes(`${THREAD_LINK_PROTOCOL}://v`) ||
     (Boolean(hostedOrigin) && markdown.includes("/threads/"))
