@@ -426,10 +426,10 @@ const bootedSimulatorReady: DeviceHost.DeviceHostAgentReady = {
 };
 const bootedSimulatorHost = DeviceHost.DeviceHost.of({
   id: "local",
-  label: "Local",
+  label: "本地",
   summary: Effect.succeed({
     id: "local",
-    label: "Local",
+    label: "本地",
     kind: "local",
     hubInstalled: true,
     agentDeviceInstalled: true,
@@ -1787,7 +1787,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
             updatedAt: now,
             requestId,
             questions: [
-              { id: "color", header: "Color", question: "Which color?", options: [] },
+              { id: "color", header: "颜色", question: "Which color?", options: [] },
               {
                 id: "sizes",
                 header: "Sizes",
@@ -1797,7 +1797,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
               },
               {
                 id: "note",
-                header: "Note",
+                header: "注意",
                 question: "Anything else?",
                 options: [],
                 required: false,
@@ -1916,9 +1916,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
                 threadId: nativeThreadId,
                 runId: null,
                 requestId: nativeRequestId,
-                questions: [
-                  { id: "color", header: "Color", question: "Which color?", options: [] },
-                ],
+                questions: [{ id: "color", header: "颜色", question: "Which color?", options: [] }],
               },
             },
           ],
@@ -2948,7 +2946,7 @@ const writeHtmlRenderRun = Effect.fn("test.writeHtmlRenderRun")(function* (input
           output: [
             {
               type: "text",
-              text: JSON.stringify({ htmlRender: { attachmentId, title: "Page", height: 300 } }),
+              text: JSON.stringify({ htmlRender: { attachmentId, title: "页", height: 300 } }),
             },
           ],
         },
@@ -3626,7 +3624,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           watch: { ...recorded, wakes: 2 },
           wake: {
             messageId: MessageId.make("pr-watch-late-wake"),
-            text: "Update",
+            text: "更新",
             notification: { source: { kind: "monitor" }, outcome: "updated", summary: "#7" },
           },
         })
@@ -3692,7 +3690,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         undefined,
         {
           messageId: MessageId.make(`pr-watch-settle-late-wake-${mode}`),
-          text: "Update",
+          text: "更新",
           notification: {
             source: { kind: "monitor" as const },
             outcome: "updated" as const,
@@ -5413,7 +5411,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
                   return Effect.fail(
                     new PullRequestOperationError({
                       operation: "threadComments",
-                      detail: "Page unavailable",
+                      detail: "页面不可用",
                     }),
                   );
                 }
@@ -6427,7 +6425,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         commandId: CommandId.make("settle-automatic-active"),
         threadId,
         messageId: MessageId.make("settle-automatic-active"),
-        text: "Active",
+        text: "活跃",
         attachments: [],
         modelSelection,
         dispatchMode: { type: "start_immediately" },
@@ -6801,7 +6799,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           commandId: CommandId.make(`runtime-layer-serialized-queue-active-${automatic}`),
           threadId,
           messageId: MessageId.make(`runtime-layer-serialized-queue-active-${automatic}`),
-          text: "Active",
+          text: "活跃",
           attachments: [],
           modelSelection,
           dispatchMode: { type: "start_immediately" },
@@ -7336,7 +7334,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
             commandId: CommandId.make(`${threadId}:message:${index}`),
             threadId,
             messageId: MessageId.make(`${threadId}:message:${index}`),
-            text: index === 0 ? "Active" : "Queued",
+            text: index === 0 ? "活跃" : "排队中",
             attachments: [],
             modelSelection,
             dispatchMode: { type: index === 0 ? "start_immediately" : "queue_after_active" },
@@ -7774,7 +7772,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
               updatedAt: now,
               failure: {
                 class: "usage_limit",
-                message: "Usage limit reached",
+                message: "已达到用量上限",
                 code: "usage_limit",
                 retryable: null,
               },
@@ -7939,7 +7937,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
                 updatedAt: now,
                 failure: {
                   class: "usage_limit",
-                  message: "Usage limit reached",
+                  message: "已达到用量上限",
                   code: "usage_limit",
                   retryable: null,
                   resetAt: DateTime.formatIso(DateTime.add(now, { hours: 1 })),
@@ -9448,7 +9446,7 @@ it.layer(layerTest)("snooze queued runs", (it) => {
           commandId: CommandId.make(`wake:${threadId}`),
           threadId,
           messageId: MessageId.make(`wake:${threadId}`),
-          text: "Continue",
+          text: "继续",
           attachments: [],
           modelSelection,
           dispatchMode: { type: "queue_after_active" },
@@ -9497,7 +9495,7 @@ it.layer(layerScratchPromotionTest)("turning a No project thread into a project"
       yield* projects.create({
         commandId: CommandId.make("promotion-scratch-create"),
         projectId: SCRATCH_PROJECT_ID,
-        title: "No project",
+        title: "无项目",
         workspaceRoot: SCRATCH_ROOT,
       });
     }
@@ -9979,7 +9977,7 @@ it.layer(layerSharedApplicationDataPlaneTest)("visited projection", (it) => {
         worktreePath: null,
       });
       const runs = [
-        { text: "Continue", at: turnCompletedAt },
+        { text: "继续", at: turnCompletedAt },
         {
           text: "/compact",
           idleCompaction: "beforeCacheExpires" as const,
@@ -10423,7 +10421,7 @@ it.layer(layerTest)("usage-limit recovery", (it) => {
                   parentItemId: null,
                   ordinal: 2,
                   status: "failed",
-                  title: "Usage limit reached",
+                  title: "已达到用量上限",
                   startedAt: now,
                   completedAt: now,
                   updatedAt: now,
@@ -10585,7 +10583,7 @@ it.layer(layerTest)("usage-limit recovery", (it) => {
               parentItemId: null,
               ordinal: 2,
               status: "failed",
-              title: "Usage limit reached",
+              title: "已达到用量上限",
               startedAt: now,
               completedAt: now,
               updatedAt: now,
@@ -11206,7 +11204,7 @@ it.layer(layerQueueResumeDisabledInstanceTest)(
             commandId: CommandId.make(`${threadId}:message:active`),
             threadId,
             messageId: MessageId.make(`${threadId}:message:active`),
-            text: "Active",
+            text: "活跃",
             attachments: [],
             dispatchMode: { type: "defer_start" },
           });
@@ -11217,7 +11215,7 @@ it.layer(layerQueueResumeDisabledInstanceTest)(
             commandId: CommandId.make(`${threadId}:message:queued`),
             threadId,
             messageId: MessageId.make(`${threadId}:message:queued`),
-            text: "Queued",
+            text: "排队中",
             attachments: [],
             modelSelection: queuedModelSelection,
             dispatchMode: { type: "queue_after_active" },

@@ -27,11 +27,11 @@ describe("userFacingDispatchErrorMessage", () => {
         cause: toPersistenceSqlError("OrchestrationEventStore.append:query")(cause),
       });
 
-      assert.include(message, "server could not open a database file (SQLITE_CANTOPEN)");
-      assert.include(message, "machine running the server");
-      assert.include(message, "free disk space");
-      assert.include(message, "data and temporary directories exist and are writable");
-      assert.include(message, "then retry");
+      assert.include(message, "无法打开数据库文件（SQLITE_CANTOPEN）");
+      assert.include(message, "运行服务器的机器");
+      assert.include(message, "磁盘空间");
+      assert.include(message, "数据和临时目录存在且可写");
+      assert.include(message, "然后重试");
       assert.notInclude(message, directory);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
@@ -44,9 +44,9 @@ describe("userFacingDispatchErrorMessage", () => {
       const cause = yield* sql`INSERT INTO entries VALUES (zeroblob(16384))`.pipe(Effect.flip);
       const message = userFacingDispatchErrorMessage({ cause });
 
-      assert.include(message, "database or disk is full (SQLITE_FULL)");
-      assert.include(message, "Free space on the machine running the server, then retry");
-      assert.include(message, "database size limit");
+      assert.include(message, "数据库或磁盘已满（SQLITE_FULL）");
+      assert.include(message, "运行服务器的机器上腾出空间，然后重试");
+      assert.include(message, "数据库大小限制");
 
       yield* sql`PRAGMA max_page_count = 100`;
       yield* sql`INSERT INTO entries VALUES (zeroblob(16384))`;
@@ -63,8 +63,8 @@ describe("userFacingDispatchErrorMessage", () => {
       const cause = yield* sql`INSERT INTO entries VALUES ('private-message')`.pipe(Effect.flip);
       const message = userFacingDispatchErrorMessage(cause);
 
-      assert.include(message, "server database is read-only (SQLITE_READONLY)");
-      assert.include(message, "data directory is writable");
+      assert.include(message, "数据库是只读的（SQLITE_READONLY）");
+      assert.include(message, "数据目录可写");
       assert.notInclude(message, "private-message");
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
@@ -76,8 +76,8 @@ describe("userFacingDispatchErrorMessage", () => {
       cause: toPersistenceSqlError("OrchestrationEventStore.append:query")(error),
     });
 
-    assert.include(message, "server could not complete this database request");
-    assert.include(message, "server logs");
+    assert.include(message, "无法完成这次数据库请求");
+    assert.include(message, "服务器日志");
     assert.notInclude(message, "private-query-data");
   });
 });

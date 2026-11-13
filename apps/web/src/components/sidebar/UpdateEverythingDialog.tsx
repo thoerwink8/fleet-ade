@@ -87,9 +87,9 @@ export function UpdateEverythingDialog({
 }
 
 const APP_LABELS = {
-  "this-app": "This app",
+  "this-app": "此应用",
   server: "Server",
-  "desktop-app": "Desktop app",
+  "desktop-app": "桌面应用",
 } as const;
 
 function UpdateEverythingDialogContent({
@@ -159,9 +159,9 @@ function UpdateEverythingDialogContent({
           {/* Machine names truncate first. Provider lists wrap between names, never inside one. */}
           <div className="grid grid-cols-[minmax(4rem,max-content)_max-content_minmax(min-content,1fr)_max-content] gap-x-4 text-sm">
             <div className="col-span-full grid grid-cols-subgrid border-b pb-1.5 text-muted-foreground text-xs">
-              <span>Machine</span>
+              <span>机器</span>
               <span>T3 Code</span>
-              <span>Providers</span>
+              <span>智能体提供方</span>
               <span />
             </div>
             {updating.map((row) => (
@@ -175,10 +175,10 @@ function UpdateEverythingDialogContent({
                 <span>
                   {row.app !== null ? APP_LABELS[row.app] : null}
                   {row.app === null && row.skipped !== null ? (
-                    <span className="text-muted-foreground">Skipped</span>
+                    <span className="text-muted-foreground">已跳过</span>
                   ) : null}
                   {row.app === "this-app" ? (
-                    <span className="block text-muted-foreground text-xs">restarts last</span>
+                    <span className="block text-muted-foreground text-xs">最后重启</span>
                   ) : null}
                 </span>
                 <span>
@@ -201,7 +201,7 @@ function UpdateEverythingDialogContent({
             <Collapsible>
               <CollapsibleTrigger className="flex items-center gap-1 text-muted-foreground text-xs hover:text-foreground data-panel-open:[&_svg]:rotate-90">
                 <ChevronRightIcon className="size-3.5 transition-transform" aria-hidden />
-                {skipped.length} skipped
+                {skipped.length} 已跳过
               </CollapsibleTrigger>
               <CollapsiblePanel>
                 <div className="grid grid-cols-[minmax(0,max-content)_1fr] gap-x-3 gap-y-0.5 pt-1.5 ps-4.5 text-muted-foreground text-xs">
@@ -234,7 +234,7 @@ function UpdateEverythingDialogContent({
           </p>
         ) : null}
         <AlertDialogClose ref={cancelRef} render={<Button variant="outline" disabled={busy} />}>
-          Cancel
+          取消
         </AlertDialogClose>
         <Button disabled={disabledReason !== null || busy} onClick={onConfirm}>
           {confirmLabel}

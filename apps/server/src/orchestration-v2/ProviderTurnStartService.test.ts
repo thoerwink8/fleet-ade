@@ -121,7 +121,7 @@ function startWithMissingWorktree(
     nodes: [{ id: rootNodeId, checkpointScopeId }],
     attempts: [{ id: attemptId }],
     providerThreads: [{ id: providerThreadId, providerSessionId }],
-    messages: [{ id: messageId, text: "Continue", attachments: [] }],
+    messages: [{ id: messageId, text: "继续", attachments: [] }],
     checkpointScopes: [{ id: checkpointScopeId }],
     contextHandoffs: [],
     contextTransfers: [],
@@ -1176,7 +1176,7 @@ effectIt.effect(
           yield* git(workspaceRoot, ["branch", "-D", "feature/restore"]);
         }
         const harness = makeLocalCommandHarness({
-          text: "Continue",
+          text: "继续",
           workspaceRoot,
           worktreePath,
           worktreesDir,
@@ -1231,7 +1231,7 @@ effectIt.effect(
       });
       const worktreePath = path.join(worktreesDir, "project", "restore");
       const harness = makeLocalCommandHarness({
-        text: "Continue",
+        text: "继续",
         worktreesDir,
         worktreePath,
         fileSystem,
@@ -1285,7 +1285,7 @@ effectIt.effect(
 effectIt.effect("recovers an abandoned failed turn before continuing its native conversation", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       previousTurn: { runStatus: "failed", turnStatus: "running" },
     });
 
@@ -1413,7 +1413,7 @@ effectIt.effect.each([
   { runStatus: "failed", turnStatus: "interrupted", interruptFailure: true },
 ] as const)("continues without interrupting when recovery does not apply: %j", (previousTurn) =>
   Effect.gen(function* () {
-    const harness = makeLocalCommandHarness({ text: "Continue", previousTurn });
+    const harness = makeLocalCommandHarness({ text: "继续", previousTurn });
 
     yield* harness.start;
 
@@ -1425,7 +1425,7 @@ effectIt.effect.each([
 effectIt.effect("does not start another turn when abandoned-turn cleanup fails", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       previousTurn: { runStatus: "failed", turnStatus: "running", interruptFailure: true },
     });
 
@@ -1440,7 +1440,7 @@ effectIt.effect("does not start another turn when abandoned-turn cleanup fails",
 effectIt.effect("retries abandoned-turn cleanup without failing the continuation early", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       previousTurn: { runStatus: "failed", turnStatus: "running", interruptFailure: true },
     });
 
@@ -1455,7 +1455,7 @@ effectIt.effect("retries abandoned-turn cleanup without failing the continuation
 effectIt.effect("does not start the continuation if recording recovery fails", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       previousTurn: { runStatus: "failed", turnStatus: "running" },
       writeFailure: new Error("database unavailable"),
     });
@@ -1472,7 +1472,7 @@ effectIt.effect("does not start the continuation if recording recovery fails", (
 effectIt.effect("does not resume a continuation stopped while recovery was in flight", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       previousTurn: { runStatus: "failed", turnStatus: "running", interruptCurrentRun: true },
     });
 
@@ -1495,7 +1495,7 @@ effectIt.effect.each(["cleanup-first", "startup-first"])(
       const release = yield* Deferred.make<void>();
       const openEntered = yield* Deferred.make<void>();
       const harness = makeLocalCommandHarness({
-        text: "Continue",
+        text: "继续",
         worktreePath,
         worktreesDir: workspaceRoot,
         fileSystem,
@@ -1625,7 +1625,7 @@ effectIt.effect.each([
             : Effect.succeed((realPaths as Record<string, string>)[candidate] ?? candidate),
       });
       const harness = makeLocalCommandHarness({
-        text: "Continue",
+        text: "继续",
         ...(worktreePath === undefined ? {} : { worktreePath }),
         fileSystem,
         failReadsAfterRunning: true,
@@ -1660,7 +1660,7 @@ effectIt.effect("reads current startup state after waiting for the workspace lea
     const release = yield* Deferred.make<void>();
     const readEntered = yield* Deferred.make<void>();
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       worktreePath,
       failReadsAfterRunning: true,
     });
@@ -1695,7 +1695,7 @@ effectIt.effect.each([
     const entered = yield* Deferred.make<void>();
     const release = yield* Deferred.make<void>();
     const gate = Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release)));
-    const harness = makeLocalCommandHarness({ text: "Continue" });
+    const harness = makeLocalCommandHarness({ text: "继续" });
     const projection = harness.projection();
     const providerThread = projection.providerThreads[0]!;
     const ensureThread = vi.fn(() => Effect.succeed(providerThread));
@@ -1754,12 +1754,12 @@ effectIt.effect("starts another provider in the same checkout while a turn is pe
     const turnEntered = yield* Deferred.make<void>();
     const releaseTurn = yield* Deferred.make<void>();
     const first = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       worktreePath,
       failReadsAfterRunning: true,
     });
     const second = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       worktreePath,
       failReadsAfterRunning: true,
     });
@@ -1779,7 +1779,7 @@ effectIt.effect("starts another provider in the same checkout while a turn is pe
 effectIt.effect("fails a starting run when its recovery state cannot be read", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       recoveryReadFailure: "stored turn item no longer decodes",
     });
 
@@ -1798,7 +1798,7 @@ effectIt.effect("fails a starting run when its recovery state cannot be read", (
 effectIt.effect("terminalizes a starting run when its provider session cannot open", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       openFailure: new Error("DESCRIPTION is not valid ACP JSON"),
     });
 
@@ -1833,7 +1833,7 @@ effectIt.effect("terminalizes a starting run when its provider session cannot op
 effectIt.effect("leaves the run starting when a session-open failure will be retried", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       openFailure: new Error("provider session rejected"),
     });
 
@@ -1848,7 +1848,7 @@ effectIt.effect("leaves the run starting when a session-open failure will be ret
 effectIt.effect("fails the run without a retry when the provider needs sign-in", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       openFailure: new ProviderAdapter.ProviderAdapterOpenSessionError({
         driver: ProviderDriverKind.make("antigravity"),
         providerSessionId: ProviderSessionId.make("new-provider-session"),
@@ -1875,7 +1875,7 @@ effectIt.effect("fails the run without a retry when the provider needs sign-in",
 
 effectIt.effect("does not terminalize a provider-session open interruption", () =>
   Effect.gen(function* () {
-    const harness = makeLocalCommandHarness({ text: "Continue", interruptOpen: true });
+    const harness = makeLocalCommandHarness({ text: "继续", interruptOpen: true });
 
     const exit = yield* Effect.exit(harness.start);
 
@@ -1893,7 +1893,7 @@ effectIt.effect("does not terminalize a provider-session open interruption", () 
 effectIt.effect("does not overwrite a run interrupted while its provider session opens", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       openFailure: new Error("provider session rejected"),
       interruptRunBeforeOpenFailure: true,
     });
@@ -1915,7 +1915,7 @@ effectIt.effect("does not overwrite a run interrupted while its provider session
 effectIt.effect("checks the run's status without loading the thread's history", () =>
   Effect.gen(function* () {
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       previousTurn: { runStatus: "completed", turnStatus: "completed" },
     });
 
@@ -1939,7 +1939,7 @@ effectIt.effect("fails the run instead of replacing a native thread another clie
   Effect.gen(function* () {
     const detail = "This conversation is open in another Codex client.";
     const harness = makeLocalCommandHarness({
-      text: "Continue",
+      text: "继续",
       resumeFailure: new ProviderAdapter.ProviderAdapterThreadInUseError({
         driver: ProviderDriverKind.make("codex"),
         providerThreadId: ProviderThreadId.make("new-provider-thread"),
@@ -1971,7 +1971,7 @@ effectIt.effect("fails the run instead of replacing a native thread another clie
 
 effectIt.effect("does not mistake a failed state read for a superseded run", () =>
   Effect.gen(function* () {
-    const harness = makeLocalCommandHarness({ text: "Continue", failReadsAfterRunning: true });
+    const harness = makeLocalCommandHarness({ text: "继续", failReadsAfterRunning: true });
 
     yield* harness.start;
 

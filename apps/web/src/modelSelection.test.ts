@@ -760,7 +760,7 @@ describe("instance-scoped model selection", () => {
             optionDescriptors: [
               {
                 id: "effort",
-                label: "Effort",
+                label: "推理强度",
                 type: "select" as const,
                 options: [
                   { id: "medium", label: "Medium", isDefault: true },
@@ -1022,10 +1022,10 @@ describe("resolveAppModelSelectionState with the opencode plan agent", () => {
           optionDescriptors: [
             {
               id: "agent",
-              label: "Agent",
+              label: "智能体",
               type: "select",
               options: [
-                { id: "build", label: "Build", isDefault: true },
+                { id: "build", label: "构建", isDefault: true },
                 { id: "plan", label: "Plan" },
               ],
               currentValue: "build",
@@ -1069,7 +1069,7 @@ describe("default model settings and new-thread composer parity", () => {
             optionDescriptors: [
               {
                 id: "effort",
-                label: "Effort",
+                label: "推理强度",
                 type: "select",
                 options: (index === 0 ? ["medium", "high"] : ["high", "max"]).map(
                   (id, optionIndex) => ({ id, label: id, isDefault: optionIndex === 0 }),
@@ -1129,7 +1129,7 @@ describe("composer fallback to another instance of the same driver", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Effort",
+            label: "推理强度",
             type: "select",
             options: ["medium", "high", "xhigh"].map((id) => ({
               id,

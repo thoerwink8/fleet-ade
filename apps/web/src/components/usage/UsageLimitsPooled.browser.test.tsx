@@ -58,8 +58,6 @@ describe("UsageLimitsPooled ChatGPT usage card", () => {
     await expect
       .element(screen.getByText("ChatGPT Work on Desk, ChatGPT Personal on Desk"))
       .toBeVisible();
-    await expect
-      .element(screen.getByText("View usage in ChatGPT with your connected account."))
-      .toBeVisible();
+    await expect.element(screen.getByText("用已连接的账户在 ChatGPT 中查看用量。")).toBeVisible();
   });
 });

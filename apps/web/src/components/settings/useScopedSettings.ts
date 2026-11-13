@@ -53,7 +53,7 @@ function useRunScopedPlan() {
     if (plan.unavailableReason) {
       toastManager.add({
         type: "warning",
-        title: "Setting not saved",
+        title: "设置未保存",
         description: plan.unavailableReason,
       });
       onFailed?.();
@@ -70,7 +70,7 @@ function useRunScopedPlan() {
             Cause.fail(
               new EnvironmentAuthorizationError({
                 requiredScope: missing,
-                message: "This connection lacks permission to change these settings.",
+                message: "此连接无权修改这些设置。",
               }),
             ),
           );
@@ -82,14 +82,11 @@ function useRunScopedPlan() {
       onFailed?.();
       toastManager.add({
         type: "error",
-        title:
-          savedEnvironmentCount > 0 ? "Setting saved on some environments" : "Setting not saved",
+        title: savedEnvironmentCount > 0 ? "部分环境已保存设置" : "设置未保存",
         description: [
-          ...failedEnvironments.map(
-            ({ label, message }) => `Could not save on ${label}: ${message}`,
-          ),
+          ...failedEnvironments.map(({ label, message }) => `无法在 ${label} 上保存：${message}`),
           ...(savedEnvironmentCount > 0
-            ? [`Saved on ${savedEnvironments.map(({ label }) => label).join(", ")}.`]
+            ? [`已保存到 ${savedEnvironments.map(({ label }) => label).join(", ")}。`]
             : []),
         ].join("\n"),
       });

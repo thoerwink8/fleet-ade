@@ -10,8 +10,8 @@ export function PullRequestMoreReplies({
     <div className="flex flex-wrap items-baseline gap-2 py-1 text-xs text-muted-foreground">
       <span>
         {moreReplies > 0
-          ? `${moreReplies.toLocaleString()} more ${moreReplies === 1 ? "reply" : "replies"}`
-          : "More replies"}
+          ? `${moreReplies.toLocaleString("zh-CN")} more ${moreReplies === 1 ? "reply" : "replies"}`
+          : "更多回复"}
       </span>
       {url ? (
         <a
@@ -20,7 +20,7 @@ export function PullRequestMoreReplies({
           rel="noopener noreferrer"
           className="hover:text-foreground hover:underline"
         >
-          View on host
+          在托管平台上查看
         </a>
       ) : null}
     </div>

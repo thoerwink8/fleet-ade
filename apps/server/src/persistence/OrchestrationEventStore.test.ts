@@ -335,7 +335,7 @@ layer("OrchestrationEventStore", (it) => {
             payload: {
               id: threadId,
               projectId,
-              title: "Thread",
+              title: "会话",
               providerInstanceId,
               modelSelection: { instanceId: providerInstanceId, model: "gpt-5.4" },
               runtimeMode: "full-access",

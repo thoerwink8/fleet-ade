@@ -65,7 +65,7 @@ class FakeBus extends NodeEvents.EventEmitter {
         [
           this.boundId,
           {
-            description: new Variant("s", "Capture a window"),
+            description: new Variant("s", "截取窗口"),
             trigger_description: new Variant("s", this.actualLabel),
           },
         ],
@@ -145,7 +145,7 @@ it("accepts Hyprland's action-only binding without claiming the keys are reserve
   });
   expect(bus.boundId).toBe("capture-window");
   expect(bus.calls.find((call) => call.member === "BindShortcuts")?.body[1]).toEqual([
-    ["capture-window", { description: new Variant("s", "Capture a window") }],
+    ["capture-window", { description: new Variant("s", "截取窗口") }],
   ]);
   bus.activate("wrong");
   bus.activate(bus.boundId, bus.session, ":1.999");
@@ -207,7 +207,7 @@ it("binds only the requested shortcut with a stable ID across sessions", async (
     [
       bus.boundId,
       {
-        description: new Variant("s", "Capture a window"),
+        description: new Variant("s", "截取窗口"),
         preferred_trigger: new Variant("s", "CTRL+SHIFT+2"),
       },
     ],
@@ -239,7 +239,7 @@ it("replaces a binding without restarting the application and stops the old call
     [
       next.bus.boundId,
       {
-        description: new Variant("s", "Capture a window"),
+        description: new Variant("s", "截取窗口"),
         preferred_trigger: new Variant("s", "CTRL+SHIFT+8"),
       },
     ],
@@ -304,7 +304,7 @@ it("captures on older portals without offering an unsupported permission dialog"
   expect(client.state).toMatchObject({
     shortcutRegistered: false,
     shortcutCanRetry: false,
-    shortcutMessage: "No shortcut is assigned. Choose one in your desktop's shortcut settings.",
+    shortcutMessage: "尚未分配快捷键。请在桌面系统的快捷键设置中选择。",
   });
   bus.signal("org.freedesktop.portal.Session", "Closed", bus.session, []);
   expect(client.hasSession).toBe(false);

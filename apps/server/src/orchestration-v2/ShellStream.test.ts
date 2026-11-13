@@ -632,7 +632,7 @@ describe("skipUnchangedThreadShells", () => {
   ): OrchestrationV2ThreadShell => ({
     id: ThreadId.make(id),
     projectId: ProjectId.make("project-a"),
-    title: "Thread",
+    title: "会话",
     providerInstanceId: ProviderInstanceId.make("codex"),
     modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
     runtimeMode: "full-access",

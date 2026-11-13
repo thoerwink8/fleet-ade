@@ -28,7 +28,7 @@ function formatReleaseAge(releasedAt: string): string {
   const days = Math.round(
     (today - Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]))) / 86_400_000,
   );
-  return days <= 0 ? "today" : `${days}d ago`;
+  return days <= 0 ? "today" : `${days} 天前`;
 }
 
 function ReleaseLink({
@@ -77,9 +77,7 @@ export function SidebarUpdateReleaseNotes({
       <div className="shrink-0 px-1">
         {state.status === "available" ? (
           <div>
-            <div className="whitespace-nowrap text-sm leading-5 font-medium">
-              Update ready to download
-            </div>
+            <div className="whitespace-nowrap text-sm leading-5 font-medium">更新已可下载</div>
             {state.availableVersion ? (
               <div className="mt-0.5 text-xs leading-4 text-muted-foreground">
                 {releasedAt
@@ -99,7 +97,7 @@ export function SidebarUpdateReleaseNotes({
           const linkLabel =
             releaseNote.stats ??
             (omittedItemCount === 0
-              ? "View release on GitHub"
+              ? "在 GitHub 上查看发行说明"
               : `${omittedItemCount} more ${omittedItemCount === 1 ? "change" : "changes"} on GitHub`);
 
           const generated = releaseNote.stats !== undefined || releaseNote.intro !== undefined;
@@ -115,7 +113,7 @@ export function SidebarUpdateReleaseNotes({
                 )
               ) : (
                 <h3 className="mb-2 text-foreground text-xs leading-4 font-semibold">
-                  {index === 0 ? "What's changed" : `Changes in ${releaseNote.version}`}
+                  {index === 0 ? "更新内容" : `${releaseNote.version} 的变更`}
                 </h3>
               )}
               {releaseNote.intro ? (

@@ -50,7 +50,7 @@ describe("markdown copy without the async clipboard", () => {
       <MarkdownTable>
         <thead>
           <tr>
-            <th>Name</th>
+            <th>名称</th>
           </tr>
         </thead>
         <tbody>

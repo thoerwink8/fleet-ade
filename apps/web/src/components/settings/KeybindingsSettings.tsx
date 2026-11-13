@@ -137,8 +137,8 @@ function KeybindingsSearchInput({
             onChange("");
           } else event.currentTarget.blur();
         }}
-        placeholder="Search keybindings"
-        aria-label="Search keybindings"
+        placeholder="搜索快捷键"
+        aria-label="搜索快捷键"
         size="sm"
       />
     </InputGroup>
@@ -250,13 +250,12 @@ function UnknownWhenVariableWarning({
   if (identifiers.length === 0) return null;
   const label =
     identifiers.length === 1
-      ? `Unknown condition: ${identifiers[0]}`
-      : `Unknown conditions: ${identifiers.join(", ")}`;
+      ? `未知条件：${identifiers[0]}`
+      : `未知条件：${identifiers.join(", ")}`;
 
   return (
     <WarningTooltipIcon label={label} focusable={focusable} className="size-4.5">
-      T3 Code does not recognize this condition yet. It can still be saved, but it may not match
-      unless the runtime provides it.
+      T3 Code 尚不识别此条件。仍可保存，但只有运行时提供该条件时才可能匹配。
     </WarningTooltipIcon>
   );
 }
@@ -265,12 +264,12 @@ function KeybindingConflictWarning({ labels }: { labels: ReadonlyArray<string> }
   if (labels.length === 0) return null;
   const description =
     labels.length === 1
-      ? `Conflicts with ${labels[0]}.`
+      ? `与 ${labels[0]} 冲突。`
       : `Conflicts with ${labels.slice(0, 3).join(", ")}${labels.length > 3 ? ", and more" : ""}.`;
 
   return (
     <WarningTooltipIcon label={description}>
-      {description} The most recent matching binding wins when both conditions can apply.
+      {description} 当两个条件都适用时，最近添加的匹配绑定优先。
     </WarningTooltipIcon>
   );
 }
@@ -293,7 +292,7 @@ function WhenVariableSelect({
   return (
     <Select value={value} onValueChange={(nextValue) => nextValue && onChange(nextValue)}>
       <SelectTrigger size="compact" className="min-w-0 flex-1">
-        <SelectValue placeholder="Condition" />
+        <SelectValue placeholder="条件" />
         {unknownIdentifiers && unknownIdentifiers.length > 0 ? (
           <UnknownWhenVariableWarning identifiers={unknownIdentifiers} focusable={false} />
         ) : null}
@@ -365,12 +364,12 @@ function WhenExpressionNodeEditor({
         <Toggle
           pressed={condition.negated}
           onPressedChange={(pressed) => onChange(setConditionNegated(node, pressed))}
-          aria-label={`Negate ${condition.identifier}`}
+          aria-label={`对 ${condition.identifier} 取反`}
           variant="outline"
           size="compact"
           className="min-w-10"
         >
-          Not
+          非
         </Toggle>
         <WhenVariableSelect
           value={condition.identifier}
@@ -400,12 +399,12 @@ function WhenExpressionNodeEditor({
           <Toggle
             pressed
             onPressedChange={(pressed) => onChange(pressed ? node : node.node)}
-            aria-label="Negate group"
+            aria-label="对条件组取反"
             variant="outline"
             size="compact"
             className="min-w-10"
           >
-            Not
+            非
           </Toggle>
           {onRemove ? (
             <WhenExpressionRemoveButton
@@ -504,17 +503,17 @@ function WhenExpressionNodeEditor({
             <SelectValue />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false} matchTriggerWidth={false}>
-            <SelectItem value="and">and</SelectItem>
-            <SelectItem value="or">or</SelectItem>
+            <SelectItem value="and">且</SelectItem>
+            <SelectItem value="or">或</SelectItem>
           </SelectContent>
         </Select>
         <Button type="button" variant="outline" size="compact" onClick={addCondition}>
           <PlusIcon className="size-3.5" />
-          Condition
+          条件
         </Button>
         <Button type="button" variant="outline" size="compact" onClick={addGroup}>
           <PlusIcon className="size-3.5" />
-          Group
+          条件组
         </Button>
         {onRemove ? (
           <WhenExpressionRemoveButton
@@ -613,11 +612,11 @@ function WhenExpressionBuilder({
         <div className="flex shrink-0 items-center gap-2">
           <Button type="button" variant="outline" size="compact" onClick={addRootCondition}>
             <PlusIcon className="size-3.5" />
-            Condition
+            条件
           </Button>
           <Button type="button" variant="outline" size="compact" onClick={addRootGroup}>
             <PlusIcon className="size-3.5" />
-            Group
+            条件组
           </Button>
         </div>
       </div>
@@ -627,9 +626,9 @@ function WhenExpressionBuilder({
           <InputGroupInput
             value={expressionDraft}
             onChange={(event) => updateExpressionDraft(event.currentTarget.value)}
-            placeholder="Always"
+            placeholder="始终"
             aria-invalid={Boolean(parseError)}
-            aria-label="When expression"
+            aria-label="生效条件表达式"
             size="compact"
             font="mono"
           />
@@ -660,18 +659,18 @@ function WhenExpressionBuilder({
             <div className="flex flex-wrap gap-2">
               <Button type="button" size="compact" onClick={addRootCondition}>
                 <PlusIcon className="size-3.5" />
-                Condition
+                条件
               </Button>
               <Button type="button" variant="outline" size="compact" onClick={addRootGroup}>
                 <PlusIcon className="size-3.5" />
-                Group
+                条件组
               </Button>
             </div>
           </div>
         )}
         {parseError ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive backdrop-blur-xs">
-            Fix the expression above to continue editing visually.
+            请先修正上方表达式，再继续可视化编辑。
           </div>
         ) : null}
       </div>
@@ -821,7 +820,7 @@ function KeybindingKeyControl({
           disabled={isSaving || keyDraft.trim().length === 0 || !isWhenDraftValid}
           onClick={save}
         >
-          {isSaving ? "Saving" : "Save"}
+          {isSaving ? "正在保存" : "保存"}
         </Button>
       ) : null}
       {showPill ? (
@@ -829,7 +828,7 @@ function KeybindingKeyControl({
           ref={pillRef}
           type="button"
           onClick={() => setDraft({ isRecording: true })}
-          aria-label={`Edit shortcut for ${commandLabel(row.command)}: ${formatShortcutLabel(row.binding.shortcut)}`}
+          aria-label={`编辑 ${commandLabel(row.command)} 的快捷键：${formatShortcutLabel(row.binding.shortcut)}`}
           className={cn(
             "inline-flex h-8 cursor-pointer items-center rounded-md border border-transparent px-1.5 sm:h-7 outline-none transition-colors hover:border-border/70 hover:bg-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/24",
             pillClassName,
@@ -841,9 +840,9 @@ function KeybindingKeyControl({
         <Input
           data-keybinding-capture=""
           autoFocus={isRecording}
-          aria-label={`Keybinding for ${commandLabel(row.command)}`}
+          aria-label={`${commandLabel(row.command)} 的快捷键`}
           value={isRecording ? "" : keyDraft}
-          placeholder={isRecording ? "Press shortcut" : "Unassigned"}
+          placeholder={isRecording ? "按下快捷键" : "未分配"}
           size="sm"
           font="mono"
           className="w-44"
@@ -887,9 +886,9 @@ function WhenClauseControl({
             className="min-w-0 shrink"
           />
         }
-        aria-label={`Edit when clause for ${label}`}
+        aria-label={`编辑 ${label} 的生效条件`}
       >
-        <span className="truncate font-mono">{expression || "Always"}</span>
+        <span className="truncate font-mono">{expression || "始终"}</span>
         <ChevronDownIcon className="size-3.5 shrink-0 opacity-60" />
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={6}>
@@ -928,7 +927,7 @@ function KeybindingRowMenu({
             variant="ghost-muted"
             size="icon-sm"
             disabled={isSaving}
-            aria-label={`Actions for ${commandLabel(row.command)}`}
+            aria-label={`${commandLabel(row.command)} 的操作`}
           />
         }
       >
@@ -937,12 +936,12 @@ function KeybindingRowMenu({
       <MenuPopup align="end">
         {canReset ? (
           <MenuItem disabled={isSaving} onClick={() => onReset(row)}>
-            Reset to default
+            恢复默认值
           </MenuItem>
         ) : null}
         {canRemove ? (
           <MenuItem variant="destructive" disabled={isSaving} onClick={() => onRemove(row)}>
-            Remove
+            移除
           </MenuItem>
         ) : null}
       </MenuPopup>
@@ -1060,7 +1059,7 @@ function useNewKeybindingDraft({
     key: keyDraft,
     when: whenDraftExpression,
   });
-  const commandLabelText = commandDraft ? commandLabel(commandDraft) : "new keybinding";
+  const commandLabelText = commandDraft ? commandLabel(commandDraft) : "新建快捷键";
   const canSave = Boolean(commandDraft) && keyDraft.trim().length > 0 && isWhenDraftValid;
 
   const save = () => {
@@ -1131,7 +1130,7 @@ function NewKeybindingCommandSelect({
       onValueChange={(value) => draft.setCommandDraft(value as KeybindingCommand)}
     >
       <SelectTrigger size="sm" className={className}>
-        <SelectValue placeholder="Command" />
+        <SelectValue placeholder="命令" />
       </SelectTrigger>
       <SelectContent alignItemWithTrigger={false} matchTriggerWidth={false} className="max-h-72">
         {commandOptions.map((command) => (
@@ -1157,9 +1156,9 @@ function NewKeybindingKeyInput({
     <Input
       data-keybinding-capture=""
       autoFocus={autoFocus}
-      aria-label={`Keybinding for ${draft.commandLabelText}`}
+      aria-label={`${draft.commandLabelText} 的快捷键`}
       value={draft.isRecording ? "" : draft.keyDraft}
-      placeholder={draft.isRecording ? "Press shortcut" : "Unassigned"}
+      placeholder={draft.isRecording ? "按下快捷键" : "未分配"}
       size="sm"
       font="mono"
       className={className}
@@ -1206,14 +1205,14 @@ function NewKeybindingCancelIcon({
             variant="ghost-muted"
             size="icon-sm"
             disabled={isSaving}
-            aria-label="Cancel new keybinding"
+            aria-label="取消新建快捷键"
             onClick={onCancel}
           />
         }
       >
         <XIcon className="size-3.5" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Cancel</TooltipPopup>
+      <TooltipPopup side="top">取消</TooltipPopup>
     </Tooltip>
   );
 }
@@ -1225,7 +1224,7 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
   return (
     <SettingsRow
       className="bg-muted/15"
-      title="New keybinding"
+      title="新建快捷键"
       description={
         <span className="flex h-6 items-center gap-1.5">
           <span className="text-xs leading-none text-muted-foreground/70">When</span>
@@ -1242,7 +1241,7 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
           <KeybindingConflictWarning labels={draft.conflictLabels} />
           <NewKeybindingKeyInput draft={draft} className="w-44" />
           <Button size="sm" disabled={isSaving || !draft.canSave} onClick={draft.save}>
-            {isSaving ? "Saving" : "Save"}
+            {isSaving ? "正在保存" : "保存"}
           </Button>
           <NewKeybindingCancelIcon isSaving={isSaving} onCancel={onCancel} />
         </div>
@@ -1275,7 +1274,7 @@ function KeybindingsGroups(props: KeybindingsGroupsProps) {
 }
 
 function BrowserKeybindingNotice() {
-  const message = "The browser may claim some shortcuts first. The desktop app receives them all.";
+  const message = "浏览器可能优先拦截部分快捷键。桌面应用可以接收所有快捷键。";
   return (
     <Tooltip>
       <TooltipTrigger
@@ -1367,9 +1366,8 @@ export function KeybindingsSettingsPanel() {
       }
       const error = squashAtomCommandFailure(result);
       toastManager.add({
-        title: "Unable to open keybindings file",
-        description:
-          error instanceof Error ? error.message : "The keybindings file was not opened.",
+        title: "无法打开快捷键文件",
+        description: error instanceof Error ? error.message : "未能打开快捷键文件。",
         type: "error",
       });
     })();
@@ -1405,8 +1403,8 @@ export function KeybindingsSettingsPanel() {
       if (!isAtomCommandInterrupted(failed)) {
         const error = squashAtomCommandFailure(failed);
         toastManager.add({
-          title: "Unable to save keybinding",
-          description: error instanceof Error ? error.message : "The keybinding was not saved.",
+          title: "无法保存快捷键",
+          description: error instanceof Error ? error.message : "未能保存快捷键。",
           type: "error",
         });
       }
@@ -1436,8 +1434,8 @@ export function KeybindingsSettingsPanel() {
       if (result?._tag === "Failure" && !isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
         toastManager.add({
-          title: "Unable to remove keybinding",
-          description: error instanceof Error ? error.message : "The keybinding was not removed.",
+          title: "无法移除快捷键",
+          description: error instanceof Error ? error.message : "未能移除快捷键。",
           type: "error",
         });
       }
@@ -1483,7 +1481,7 @@ export function KeybindingsSettingsPanel() {
             onClick={() => setIsAddingBinding(true)}
           >
             <PlusIcon aria-hidden className="size-4" />
-            Add keybinding
+            添加快捷键
           </Button>
           <Tooltip>
             <TooltipTrigger
@@ -1494,13 +1492,13 @@ export function KeybindingsSettingsPanel() {
                   size="icon"
                   disabled={!keybindingsConfigPath || !canOpenKeybindingsFile}
                   onClick={openKeybindingsFile}
-                  aria-label="Open keybindings.json"
+                  aria-label="打开 keybindings.json"
                 >
                   <FileJsonIcon aria-hidden className="size-4" />
                 </Button>
               }
             />
-            <TooltipPopup side="top">Open keybindings.json</TooltipPopup>
+            <TooltipPopup side="top">打开 keybindings.json</TooltipPopup>
           </Tooltip>
         </div>
       </SettingsSection>
@@ -1508,8 +1506,8 @@ export function KeybindingsSettingsPanel() {
       {!canWriteSettings ? (
         <p className="text-xs text-muted-foreground">
           {connectedEnvironments.length === 0
-            ? "Connect an environment to change keybindings."
-            : "This connection can view keybindings but cannot change them."}
+            ? "请连接一个环境以修改快捷键。"
+            : "此连接可查看快捷键，但无权修改。"}
         </p>
       ) : null}
       <div inert={!canWriteSettings} className="flex flex-col gap-8">
@@ -1536,7 +1534,7 @@ export function KeybindingsSettingsPanel() {
         ) : (
           <SettingsGroup>
             <div className="px-4 py-12 text-center text-sm text-muted-foreground">
-              No keybindings match your search.
+              没有匹配的快捷键。
             </div>
           </SettingsGroup>
         )}

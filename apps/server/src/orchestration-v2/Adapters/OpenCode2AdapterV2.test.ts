@@ -315,7 +315,7 @@ const colorForm = {
       title: "Color preference",
       description: "Which color do you prefer?",
       type: "string",
-      options: [{ value: "Red", label: "Red" }],
+      options: [{ value: "Red", label: "红色" }],
       custom: true,
     },
   ],
@@ -2076,7 +2076,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           event("session.tool.called", {
             ...toolOf(SESSION, "call-other"),
             name: "subagent",
-            input: { description: "Other", prompt: "again" },
+            input: { description: "其他", prompt: "again" },
             executed: false,
           }),
           event("session.tool.progress", {
@@ -3501,7 +3501,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           ...Array.from({ length: tries }, () => [
             out("event.subscribe"),
             out("session.active"),
-            reply("session.active", { status, body: { message: "Unavailable" } }),
+            reply("session.active", { status, body: { message: "不可用" } }),
           ]).flat(),
         ],
         {
@@ -4465,7 +4465,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
       const updates = [
         [
           { content: " Inspect code ", status: "completed" },
-          { content: "Implement", status: "in_progress" },
+          { content: "执行计划", status: "in_progress" },
           { content: "Verify", status: "pending" },
           { content: "Abandoned", status: "cancelled" },
         ],
@@ -4503,7 +4503,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           {
             ...tool("call-malformed"),
             content: [{ type: "text", text: "Unrecognized todo result" }],
-            metadata: { todos: [{ content: "Unknown", status: "new-status" }] },
+            metadata: { todos: [{ content: "未知", status: "new-status" }] },
             executed: false,
           },
           undefined,
@@ -5464,7 +5464,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           {
             id: rows[0]!.id,
             status: "failed",
-            title: "Usage limit reached",
+            title: "已达到用量上限",
             failure: failed,
             retry: lastRetry,
           },

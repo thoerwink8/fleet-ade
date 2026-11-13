@@ -68,13 +68,13 @@ export function LinkedEnvironmentsSettings({
       headerAction={canLink ? <LinkEnvironmentAction environmentId={environmentId} /> : null}
     >
       {links.error ? (
-        <SettingsRow title="Could not load linked environments" description={links.error} />
+        <SettingsRow title="无法加载已关联的环境" description={links.error} />
       ) : !links.data ? (
-        <SettingsRow title="Loading linked environments…" role="status" />
+        <SettingsRow title="正在加载已关联的环境…" role="status" />
       ) : links.data.links.length === 0 ? (
         <SettingsRow
-          title="No linked environments"
-          description="Link another machine running T3 Code, such as a VPS, so agents here can launch and drive threads there."
+          title="没有已关联的环境"
+          description="关联另一台运行 T3 Code 的机器（例如 VPS），让这里的智能体能够在那台机器上启动和操作会话。"
         />
       ) : (
         links.data.links.map((link) => (
@@ -98,7 +98,7 @@ function LinkedEnvironmentRow({
 }) {
   const nowMinute = useNowMinute();
   const health = peerLinkHealth(link, DateTime.makeUnsafe(nowMinute));
-  const unlink = useAtomCommand(peerLinkEnvironment.unlink, { label: "unlink environment" });
+  const unlink = useAtomCommand(peerLinkEnvironment.unlink, { label: "取消关联环境" });
   const canUnlink = useAtomValue(peerLinkEnvironment.unlink.permissionAtom(environmentId));
   const [busy, setBusy] = useState(false);
   const forget = async () => {
@@ -111,19 +111,19 @@ function LinkedEnvironmentRow({
     const result = await unlink({ environmentId, input: { environmentId: link.environmentId } });
     setBusy(false);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      failureToast("Could not forget the link", String(squashAtomCommandFailure(result)));
+      failureToast("无法移除关联", String(squashAtomCommandFailure(result)));
     }
   };
   const status =
     health.kind === "expired"
-      ? "Expired. Link it again with a new pairing code."
+      ? "已过期。请使用新的配对码重新关联。"
       : health.kind === "unreachable"
-        ? (health.detail ?? "Not answering right now.")
+        ? (health.detail ?? "暂时没有响应。")
         : health.kind === "failing"
           ? health.detail
           : health.expiresInDays !== null
-            ? `Expires in ${health.expiresInDays} ${health.expiresInDays === 1 ? "day" : "days"}. Link it again to renew.`
-            : "Reachable";
+            ? `${health.expiresInDays} 天后过期。重新关联即可续期。`
+            : "可访问";
   return (
     <div className={ITEM_ROW_CLASSNAME}>
       <div className={ITEM_ROW_INNER_CLASSNAME}>
@@ -157,7 +157,7 @@ function LinkedEnvironmentRow({
               disabled={busy}
               onClick={() => void forget()}
             >
-              {busy ? "Forgetting…" : "Forget"}
+              {busy ? "正在移除…" : "移除"}
             </Button>
           </div>
         ) : null}
@@ -180,7 +180,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
   // Enter then a click can both run before a re-render; this guard is synchronous.
   const inFlight = useRef(false);
   const formId = useId();
-  const link = useAtomCommand(peerLinkEnvironment.link, { label: "link environment" });
+  const link = useAtomCommand(peerLinkEnvironment.link, { label: "关联环境" });
   const selected = choice ?? (machines.length === 0 ? ANOTHER_ADDRESS : null);
   const machine = machines.find((candidate) => candidate.environmentId === selected) ?? null;
   const targetId = machine?.environmentId ?? null;
@@ -217,7 +217,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
     const minted = await mintPairingCodeOn(targetId, access);
     if (Result.isSuccess(minted)) return minted.success;
     setMintFailed((failed) => new Set(failed).add(targetId));
-    failureToast("Could not link the environment", linkRequestFailureMessage(minted.failure));
+    failureToast("无法关联环境", linkRequestFailureMessage(minted.failure));
     return null;
   };
   const submit = async () => {
@@ -247,10 +247,10 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
     setBusy(false);
     if (result === null) return;
     if (result._tag === "Success") {
-      toastManager.add({ type: "success", title: `Linked ${result.value.label}` });
+      toastManager.add({ type: "success", title: `已关联 ${result.value.label}` });
       handleOpenChange(false);
     } else if (!isAtomCommandInterrupted(result)) {
-      failureToast("Could not link the environment", String(squashAtomCommandFailure(result)));
+      failureToast("无法关联环境", String(squashAtomCommandFailure(result)));
     }
   };
   return (
@@ -265,13 +265,13 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         render={
           <Button size="xs" variant="default">
             <PlusIcon className="size-3" />
-            Link
+            关联
           </Button>
         }
       />
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Link an environment</DialogTitle>
+          <DialogTitle>关联环境</DialogTitle>
           <DialogDescription>
             Agents here can then launch, message and wait on threads there. It appears under
             Authorized clients in that environment's Sharing & access, where it can be revoked.
@@ -297,12 +297,12 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
             ) : null}
             {machine?.linked ? (
               <p className="text-xs text-muted-foreground">
-                Already linked. Linking again renews it with the access you pick.
+                已关联。再次关联将使用你选择的访问权限续期。
               </p>
             ) : null}
             {needsAddress ? (
               <label className="block space-y-1.5">
-                <span className="block text-xs font-medium text-foreground">Address</span>
+                <span className="block text-xs font-medium text-foreground">地址</span>
                 <Input
                   value={address}
                   onChange={(event) => {
@@ -327,12 +327,12 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
             {needsAddress && address.trim() ? <LinkAddressWarning address={address} /> : null}
             {selected === null || canMint ? null : (
               <label className="block space-y-1.5">
-                <span className="block text-xs font-medium text-foreground">Pairing code</span>
+                <span className="block text-xs font-medium text-foreground">配对码</span>
                 <Input
                   value={pairingCode}
                   onChange={(event) => setPairingCode(event.target.value)}
                   placeholder={
-                    machine === null ? "From Sharing & access there, or t3 pair" : "Paste the code"
+                    machine === null ? "From Sharing & access there, or t3 pair" : "粘贴配对码"
                   }
                   disabled={busy}
                   autoComplete="one-time-code"
@@ -352,10 +352,10 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         </DialogPanel>
         <DialogFooter variant="bare">
           <DialogClose disabled={busy} render={<Button variant="outline" type="button" />}>
-            Cancel
+            取消
           </DialogClose>
           <Button form={formId} type="submit" disabled={busy || !ready}>
-            {busy ? "Linking…" : "Link"}
+            {busy ? "正在关联…" : "关联"}
           </Button>
         </DialogFooter>
       </DialogPopup>

@@ -227,7 +227,7 @@ function formatCloudStatus(status: CloudCliStatus, options?: { readonly json?: b
               `✓ Other devices can reach this machine · ${formatConnectReachable(status.reachability)}`,
             ]
           : ["", formatReachabilityFailure(status.reachability)]),
-    ...(nextStep ? ["", `Next: ${nextStep}`] : []),
+    ...(nextStep ? ["", `下一步：${nextStep}`] : []),
   ].join("\n");
 }
 
@@ -250,13 +250,13 @@ function relayClientInstallProgressMessage(stage: RelayClientInstallProgressStag
     case "downloading":
       return "Downloading";
     case "verifying":
-      return "Verifying download";
+      return "正在校验下载内容";
     case "installing":
       return "Installing";
     case "validating":
-      return "Validating executable";
+      return "正在验证可执行文件";
     case "activating":
-      return "Activating installation";
+      return "正在启用中继客户端";
   }
 }
 

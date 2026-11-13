@@ -181,7 +181,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
   const submit = async () => {
     if (!project || !target || submitting) return;
     if (destinationPath.trim().length === 0) {
-      setError("Choose a folder on the other machine.");
+      setError("请选择另一台机器上的文件夹。");
       return;
     }
     setSubmitting(true);
@@ -203,7 +203,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
       close();
       openClonedProject(scopeProjectRef(target.environmentId, projectId));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not start the clone.");
+      setError(cause instanceof Error ? cause.message : "无法开始克隆。");
       setSubmitting(false);
     }
   };
@@ -224,9 +224,9 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           }}
         >
           <DialogHeader>
-            <DialogTitle>Add to another machine</DialogTitle>
+            <DialogTitle>添加到另一台机器</DialogTitle>
             <DialogDescription>
-              Clone {project?.repositoryIdentity?.displayName ?? project?.title} and bring the local
+              克隆 {project?.repositoryIdentity?.displayName ?? project?.title} and bring the local
               files git does not track.
             </DialogDescription>
           </DialogHeader>
@@ -238,7 +238,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     kind={resolveEnvironmentMachineKind(source?.serverConfig ?? null)}
                     className="size-3.5 shrink-0"
                   />
-                  <span className="truncate">{source?.label ?? "This machine"}</span>
+                  <span className="truncate">{source?.label ?? "本机"}</span>
                 </span>
                 <span className="flex min-w-0 font-mono text-muted-foreground text-xs">
                   <MiddleTruncate value={project?.workspaceRoot ?? ""} />
@@ -252,7 +252,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 </span>
                 <span>
                   {selectedFiles.size === 0
-                    ? "no files"
+                    ? "无文件"
                     : `+ ${selectedFiles.size} ${selectedFiles.size === 1 ? "file" : "files"}`}
                 </span>
               </div>
@@ -265,7 +265,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     }}
                     items={targets.map((t) => ({ value: t.environmentId, label: t.label }))}
                   >
-                    <SelectTrigger size="sm" aria-label="Machine to add the project to">
+                    <SelectTrigger size="sm" aria-label="要添加项目的目标机器">
                       {target ? (
                         <EnvironmentMachineIcon kind={target.machine} className="size-3.5" />
                       ) : null}
@@ -287,7 +287,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     {target ? (
                       <EnvironmentMachineIcon kind={target.machine} className="size-3.5 shrink-0" />
                     ) : null}
-                    <span className="truncate">{target?.label ?? "No machine available"}</span>
+                    <span className="truncate">{target?.label ?? "没有可用的机器"}</span>
                   </span>
                 )}
                 <span className="flex min-w-0 font-mono text-muted-foreground text-xs">
@@ -297,10 +297,10 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>Clone over</Label>
+              <Label>克隆方式</Label>
               {sshUrl && httpsUrl ? (
                 <ToggleGroup
-                  aria-label="Clone protocol"
+                  aria-label="克隆协议"
                   value={protocol ? [protocol] : []}
                   onValueChange={(next) => {
                     const value = next[0];
@@ -315,7 +315,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${id}-path`}>Folder on {target?.label ?? "the other machine"}</Label>
+              <Label htmlFor={`${id}-path`}>Folder on {target?.label ?? "另一台机器"}</Label>
               <Input
                 id={`${id}-path`}
                 value={destinationPath}
@@ -330,7 +330,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             {canListFiles ? (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <Label className="flex-1">Copy ignored files</Label>
+                  <Label className="flex-1">复制被忽略的文件</Label>
                   {copyable.length > 0 ? (
                     <>
                       <span className="text-muted-foreground text-xs">
@@ -349,7 +349,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                           )
                         }
                       >
-                        {selectedFiles.size === copyable.length ? "None" : "All"}
+                        {selectedFiles.size === copyable.length ? "无" : "全部"}
                       </Button>
                     </>
                   ) : null}
@@ -358,9 +358,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                   <p className="text-destructive-foreground text-xs">{ignoredFiles.error}</p>
                 ) : files.length === 0 ? (
                   <p className="text-muted-foreground text-xs">
-                    {ignoredFiles.isSuccess
-                      ? "No ignored files to copy."
-                      : "Finding ignored files…"}
+                    {ignoredFiles.isSuccess ? "没有被忽略的文件可复制。" : "正在查找被忽略的文件…"}
                   </p>
                 ) : (
                   <div className="max-h-52 overflow-y-auto rounded-md border">
@@ -380,8 +378,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                   </p>
                 ) : null}
                 <p className="text-muted-foreground text-xs">
-                  Files are copied after the clone finishes. Folders git ignores whole, like
-                  node_modules, are left out.
+                  克隆完成后会复制这些文件。Git 整体忽略的文件夹（如 node_modules）不会被复制。
                 </p>
               </div>
             ) : null}
@@ -390,10 +387,10 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>
-              Cancel
+              取消
             </Button>
             <Button type="submit" disabled={unavailable || submitting}>
-              {submitting ? "Starting…" : `Clone to ${target?.label ?? "machine"}`}
+              {submitting ? "正在启动…" : `克隆到 ${target?.label ?? "machine"}`}
             </Button>
           </DialogFooter>
         </form>
@@ -440,7 +437,7 @@ function IgnoredFileRow({
       <Checkbox checked={checked} disabled={tooLarge} onCheckedChange={onCheckedChange} />
       <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.path}</span>
       <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-        {tooLarge ? "Over 1 MB" : formatBytes(file.byteLength)}
+        {tooLarge ? "超过 1 MB" : formatBytes(file.byteLength)}
       </span>
     </label>
   );

@@ -156,7 +156,7 @@ describe("document preview contents", () => {
           "</spine></package>",
       )
       .file("chapter.xhtml", "<html><body>" + "<figcaption/>".repeat(30_000) + "</body></html>");
-    await expect(openEpub(archive)).rejects.toThrow("too large");
+    await expect(openEpub(archive)).rejects.toThrow("文件过大");
   });
 
   it("decodes rich text formatting and Unicode without showing hidden destinations", () => {
@@ -247,7 +247,7 @@ Third}`;
       .file("picture.png", pixels);
     const image = archive.file("picture.png")!;
     const read = vi.spyOn(image, "async");
-    await expect(openDocument(archive, "odp")).rejects.toThrow("too large");
+    await expect(openDocument(archive, "odp")).rejects.toThrow("文件过大");
     expect(read.mock.calls.filter(([type]) => type === "base64")).toHaveLength(2);
     expect(read).toHaveBeenCalledTimes(5);
   });

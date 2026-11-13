@@ -172,7 +172,7 @@ it("keeps decimal markers in nested user lists while documents keep their counte
   await using screen = await render(
     <div className="grid grid-cols-2 gap-8 p-8">
       <section>
-        <h2>User message</h2>
+        <h2>用户消息</h2>
         <ChatMarkdown
           cwd={undefined}
           text={text}
@@ -186,7 +186,7 @@ it("keeps decimal markers in nested user lists while documents keep their counte
       </section>
     </div>,
   );
-  await expect.element(screen.getByText("User message", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("用户消息", { exact: true })).toBeVisible();
   const [message, preview] = screen.container.querySelectorAll(".chat-markdown");
   expect(
     [...message!.querySelectorAll("ol")].map((list) => getComputedStyle(list).listStyleType),
@@ -199,7 +199,7 @@ it("keeps decimal markers in nested user lists while documents keep their counte
 it("shows unavailable audio when a workspace embed has no thread", async () => {
   setup();
   await using screen = await renderText("![recording](clip.wav)");
-  expect(screen.container.textContent).toContain("Audio unavailable");
+  expect(screen.container.textContent).toContain("音频不可用");
   expect(screen.container.textContent).not.toContain("Loading audio");
   expect(screen.container.querySelector("audio")).toBeNull();
 });
@@ -343,7 +343,7 @@ describe("ChatMarkdown streaming", () => {
     );
     await using screen = await render(message("```bash\necho hello\n```", true));
     const { container, rerender } = screen;
-    const runButtons = () => buttonsLabelled(container, "Run in terminal");
+    const runButtons = () => buttonsLabelled(container, "在终端中运行");
     expect(runButtons()).toHaveLength(0);
 
     await rerender(message("```bash\necho hello\n```"));

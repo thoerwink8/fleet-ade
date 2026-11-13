@@ -91,7 +91,7 @@ function AccessScopeSummary({
         render={
           <button
             type="button"
-            aria-label={`${label}: show ${scopeCountLabel}`}
+            aria-label={`${label}：显示 ${scopeCountLabel}`}
             className="cursor-help underline decoration-border underline-offset-2 outline-hidden hover:text-foreground focus-visible:text-foreground"
           />
         }
@@ -104,7 +104,7 @@ function AccessScopeSummary({
         tooltipStyle
         className="w-max max-w-80 whitespace-normal"
       >
-        <p className="mb-1 font-medium">Granted scopes</p>
+        <p className="mb-1 font-medium">已授予的权限范围</p>
         <div className="flex flex-col gap-0.5">
           {scopes.map((scope) => (
             <code key={scope} className="font-mono text-foreground/85">
@@ -221,16 +221,16 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         type: "success",
         title:
           kind === "hosted-link"
-            ? "Hosted app link copied"
+            ? "已复制托管版应用链接"
             : kind === "link"
-              ? "Pairing URL copied"
-              : "Pairing code copied",
+              ? "已复制配对 URL"
+              : "已复制配对码",
         description:
           kind === "hosted-link"
-            ? "Open it in the browser on the device you want to connect."
+            ? "在要连接的设备上，用浏览器打开此链接。"
             : kind === "link"
-              ? "Open it in the client you want to pair to this environment."
-              : "Paste it into another client to finish pairing.",
+              ? "在要与此环境配对的客户端中打开此链接。"
+              : "粘贴到另一个客户端中完成配对。",
       });
     },
     onError: (error, { value, kind }) => {
@@ -243,12 +243,12 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
           type: "error",
           title: canCopyToClipboard
             ? kind === "hosted-link"
-              ? "Could not copy hosted app link"
+              ? "无法复制托管版应用链接"
               : kind === "link"
-                ? "Could not copy pairing URL"
-                : "Could not copy pairing code"
-            : "Clipboard copy unavailable",
-          description: canCopyToClipboard ? error.message : "Showing the full value instead.",
+                ? "无法复制配对 URL"
+                : "无法复制配对码"
+            : "无法复制到剪贴板",
+          description: canCopyToClipboard ? error.message : "已显示完整内容，请手动复制。",
         }),
       );
     },
@@ -267,7 +267,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
 
   const expiresAbsolute = formatAccessTimestamp(pairingLink.expiresAt);
 
-  const primaryLabel = pairingLink.label ?? "Pairing link";
+  const primaryLabel = pairingLink.label ?? "配对链接";
   const selectedQrOption = selectQrEndpointOption(
     endpointCopyOptions,
     qrEndpointId,
@@ -285,7 +285,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-h-5 items-center gap-1.5">
             <ConnectionStatusDot
-              tooltipText={`Link created at ${formatAccessTimestamp(pairingLink.createdAt)}`}
+              tooltipText={`链接创建于 ${formatAccessTimestamp(pairingLink.createdAt)}`}
               dotClassName="bg-warning"
             />
             <h3 className="text-sm font-medium text-foreground">{primaryLabel}</h3>
@@ -298,12 +298,10 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
               <TooltipPopup side="top">{expiresAbsolute}</TooltipPopup>
             </Tooltip>
             <span aria-hidden> · </span>
-            <AccessScopeSummary scopes={pairingLink.scopes} label="Pairing link scopes" />
+            <AccessScopeSummary scopes={pairingLink.scopes} label="配对链接权限范围" />
           </p>
           {!credential ? (
-            <p className="text-2xs text-muted-foreground/70">
-              Create a new link to share from this client.
-            </p>
+            <p className="text-2xs text-muted-foreground/70">创建新链接，即可从此客户端分享。</p>
           ) : shareablePairingUrl === null ? (
             <p className="text-2xs text-muted-foreground/70">
               Copy the token and pair from another client using this backend&apos;s reachable host.
@@ -320,7 +318,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
               onClick={() => setIsQrPanelOpen((open) => !open)}
             >
               <QrCodeIcon aria-hidden />
-              Share
+              分享
             </Button>
           ) : null}
           <Dialog
@@ -333,12 +331,12 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             {!credential ? null : canCopyToClipboard ? (
               shareablePairingUrl ? null : (
                 <Button size="xs" variant="outline" onClick={handleCopyCode}>
-                  Copy code
+                  复制代码
                 </Button>
               )
             ) : (
               <DialogTrigger render={<Button size="xs" variant="outline" />}>
-                {shareablePairingUrl ? "Show link" : "Show code"}
+                {shareablePairingUrl ? "显示链接" : "显示配对码"}
               </DialogTrigger>
             )}
             <DialogPopup className="max-w-md">
@@ -346,16 +344,16 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 <DialogTitle>
                   {isRevealValueUrl
                     ? isRevealValueHostedAppPairingUrl
-                      ? "Hosted app pairing link"
-                      : "Pairing link"
-                    : "Pairing code"}
+                      ? "托管版应用配对链接"
+                      : "配对链接"
+                    : "配对码"}
                 </DialogTitle>
                 <DialogDescription>
                   {isRevealValueUrl
                     ? isRevealValueHostedAppPairingUrl
-                      ? "Clipboard copy is unavailable here. Open or manually copy this hosted app link on the device you want to connect."
-                      : "Clipboard copy is unavailable here. Open or manually copy this full pairing URL on the device you want to connect."
-                    : "Clipboard copy is unavailable here. Manually copy this code into another client."}
+                      ? "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此托管版应用链接。"
+                      : "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此完整配对 URL。"
+                    : "这里无法复制到剪贴板。请手动将此配对码复制到另一个客户端。"}
                 </DialogDescription>
               </DialogHeader>
               <DialogPanel>
@@ -373,18 +371,18 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                       size={132}
                       level="M"
                       marginSize={2}
-                      title="Pairing link. Scan to open on another device"
+                      title="配对链接。在其他设备上扫描即可打开"
                     />
                   </div>
                 ) : null}
               </DialogPanel>
               <DialogFooter variant="bare">
                 <Button variant="outline" onClick={() => setIsRevealDialogOpen(false)}>
-                  Done
+                  完成
                 </Button>
                 {canCopyToClipboard ? (
                   <Button variant="outline" onClick={handleCopyCode}>
-                    Copy code
+                    复制代码
                   </Button>
                 ) : null}
               </DialogFooter>
@@ -396,7 +394,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             disabled={!canRevoke || revokingPairingLinkId === pairingLink.id}
             onClick={() => void onRevoke(pairingLink.id)}
           >
-            {revokingPairingLinkId === pairingLink.id ? "Revoking…" : "Revoke"}
+            {revokingPairingLinkId === pairingLink.id ? "正在撤销授权…" : "撤销授权"}
           </Button>
         </div>
       </div>
@@ -410,9 +408,9 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
               <div
                 className="space-y-1.5"
                 role="radiogroup"
-                aria-label="Endpoint the pairing QR code and URL use"
+                aria-label="配对二维码和 URL 使用的端点"
               >
-                <p className="text-2xs text-muted-foreground/70">Reach this machine via</p>
+                <p className="text-2xs text-muted-foreground/70">访问本机的方式</p>
                 {endpointCopyOptions.map((option) => {
                   const isSelected = option.id === selectedQrOption?.id;
                   return (
@@ -462,11 +460,11 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 className="shrink-0"
                 onClick={() => copyPairingValue(qrPairingUrl, copyKindForUrl(qrPairingUrl))}
               >
-                Copy link
+                复制链接
               </Button>
             </div>
             <Button size="xs" variant="ghost" onClick={handleCopyCode}>
-              Copy code only
+              仅复制配对码
             </Button>
           </div>
           {canRenderQrForSelection ? (
@@ -476,14 +474,13 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 size={168}
                 level="M"
                 marginSize={1}
-                title="Pairing link. Scan to open on another device"
+                title="配对链接。在其他设备上扫描即可打开"
               />
             </div>
           ) : (
             <div className="flex size-[192px] shrink-0 items-center justify-center self-center rounded-xl border border-border/50 p-4 sm:self-start">
               <p className="text-center text-2xs text-muted-foreground/70">
-                No QR for this endpoint. Another device scanning a loopback link would dial itself;
-                copy the URL for use on this machine instead.
+                此端点不提供二维码。其他设备扫描回环链接会连接到自身；请复制 URL，在本机上使用。
               </p>
             </div>
           )}
@@ -511,11 +508,11 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
   const lastConnectedAt = clientSession.lastConnectedAt;
   const statusTooltip = isLive
     ? lastConnectedAt
-      ? `Connected for ${formatElapsedDurationLabel(lastConnectedAt, nowMs)}`
-      : "Connected"
+      ? `已连接 ${formatElapsedDurationLabel(lastConnectedAt, nowMs)}`
+      : "已连接"
     : lastConnectedAt
-      ? `Last connected at ${formatAccessTimestamp(lastConnectedAt)}`
-      : "Not connected yet.";
+      ? `上次连接于 ${formatAccessTimestamp(lastConnectedAt)}`
+      : "尚未连接。";
   const deviceInfoBits = [
     clientSession.client.deviceType !== "unknown"
       ? clientSession.client.deviceType[0]?.toUpperCase() + clientSession.client.deviceType.slice(1)
@@ -542,7 +539,7 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
             <h3 className="text-sm font-medium text-foreground">{primaryLabel}</h3>
             {clientSession.current ? (
               <span className="text-3xs text-muted-foreground/80 rounded-md border border-border/50 bg-muted/50 px-1 py-0.5">
-                This device
+                此设备
               </span>
             ) : null}
           </div>
@@ -553,7 +550,7 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
                 <span aria-hidden> · </span>
               </>
             ) : null}
-            <AccessScopeSummary scopes={clientSession.scopes} label="Client scopes" />
+            <AccessScopeSummary scopes={clientSession.scopes} label="客户端权限范围" />
           </p>
         </div>
         <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
@@ -564,7 +561,7 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
               disabled={!canRevoke || revokingClientSessionId === clientSession.sessionId}
               onClick={() => void onRevokeSession(clientSession.sessionId)}
             >
-              {revokingClientSessionId === clientSession.sessionId ? "Revoking…" : "Revoke"}
+              {revokingClientSessionId === clientSession.sessionId ? "正在撤销授权…" : "撤销授权"}
             </Button>
           ) : null}
         </div>
@@ -624,11 +621,11 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
       setDialogOpen(false);
     } else if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
-      const message = error instanceof Error ? error.message : "Failed to create pairing URL.";
+      const message = error instanceof Error ? error.message : "无法创建配对 URL。";
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not create pairing URL",
+          title: "无法创建配对 URL",
           description: message,
         }),
       );
@@ -652,13 +649,13 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
         disabled={isRevokingOtherClients || !canRevokeOtherClients(clientSessions)}
         onClick={() => void onRevokeOtherClients()}
       >
-        {isRevokingOtherClients ? "Revoking…" : "Revoke others"}
+        {isRevokingOtherClients ? "正在撤销授权…" : "撤销其他客户端的访问权限"}
       </Button>
       {pairingDenial !== undefined ? (
         <ManagedControl reason={pairingDenial}>
           <Button size="xs" variant="default" disabled>
             <PlusIcon className="size-3" />
-            Create link
+            创建链接
           </Button>
         </ManagedControl>
       ) : null}
@@ -679,28 +676,27 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
             render={
               <Button size="xs" variant="default">
                 <PlusIcon className="size-3" />
-                Create link
+                创建链接
               </Button>
             }
           />
         ) : null}
         <DialogPopup className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create pairing link</DialogTitle>
+            <DialogTitle>创建配对链接</DialogTitle>
             <DialogDescription>
-              Generate a one-time link that another device can use to pair with this backend as an
-              authorized client.
+              生成一次性链接，让其他设备与此后端配对，成为已授权的客户端。
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <label className="block">
               <span className="mb-1.5 block text-xs font-medium text-foreground">
-                Client label (optional)
+                客户端名称（可选）
               </span>
               <Input
                 value={pairingLabel}
                 onChange={(event) => setPairingLabel(event.target.value)}
-                placeholder="e.g. Living room iPad"
+                placeholder="例如：客厅的 iPad"
                 disabled={isCreatingPairingLink}
                 autoFocus
               />
@@ -708,10 +704,8 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-medium text-foreground">Permissions</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Limit what the paired client can do.
-                  </p>
+                  <h3 className="text-xs font-medium text-foreground">权限</h3>
+                  <p className="text-xs text-muted-foreground">限制已配对客户端可以执行的操作。</p>
                 </div>
                 <div className="flex gap-1">
                   <Button
@@ -729,7 +723,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                       )
                     }
                   >
-                    Read only
+                    只读
                   </Button>
                   <Button
                     size="xs"
@@ -743,7 +737,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                       )
                     }
                   >
-                    Standard
+                    标准
                   </Button>
                 </div>
               </div>
@@ -771,11 +765,9 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                 )}
               </div>
               {selectedScopes.length === 0 ? (
-                <p className="text-xs text-destructive">Select at least one permission.</p>
+                <p className="text-xs text-destructive">请至少选择一项权限。</p>
               ) : selectedScopes.includes(AuthAccessWriteScope) ? (
-                <p className="text-xs text-warning">
-                  This client can create or revoke access for other devices.
-                </p>
+                <p className="text-xs text-warning">此客户端可以为其他设备创建或撤销访问权限。</p>
               ) : null}
             </section>
           </DialogPanel>
@@ -785,13 +777,13 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
               disabled={isCreatingPairingLink}
               onClick={() => setDialogOpen(false)}
             >
-              Cancel
+              取消
             </Button>
             <Button
               disabled={isCreatingPairingLink || selectedScopes.length === 0}
               onClick={() => void handleCreatePairingLink()}
             >
-              {isCreatingPairingLink ? "Creating…" : "Create link"}
+              {isCreatingPairingLink ? "正在创建…" : "创建链接"}
             </Button>
           </DialogFooter>
         </DialogPopup>
@@ -863,7 +855,7 @@ export const PairingClientsList = memo(function PairingClientsList({
 
       {pairingLinks.length === 0 && clientSessions.length === 0 && !isLoading ? (
         <div className={ITEM_ROW_CLASSNAME}>
-          <p className="text-xs text-muted-foreground/60">No pairing links or client sessions.</p>
+          <p className="text-xs text-muted-foreground/60">没有配对链接或客户端会话。</p>
         </div>
       ) : null}
     </>
@@ -917,14 +909,14 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
           ) : null}
           {!isAvailable ? (
             <span className="inline-flex h-6 shrink-0 items-center rounded-md border border-border/70 px-1.5 text-3xs text-muted-foreground">
-              Setup required
+              需要设置
             </span>
           ) : null}
         </div>
         <div className="ml-auto flex min-h-7 shrink-0 items-center justify-end gap-2">
           {isDefault ? (
             <span className="inline-flex h-6 items-center rounded-md border border-primary/30 bg-primary/10 px-1.5 text-3xs text-primary">
-              Default
+              默认
             </span>
           ) : null}
           {needsTailscaleSetup ? (
@@ -935,7 +927,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
                 onClick={() => onSetupTailscaleServe(endpoint)}
                 disabled={isUpdatingTailscaleServe || remoteDenial !== undefined}
               >
-                {isUpdatingTailscaleServe ? "Restarting…" : "Setup"}
+                {isUpdatingTailscaleServe ? "正在重启…" : "设置"}
               </Button>
             </ManagedControl>
           ) : null}
@@ -946,12 +938,12 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
               onClick={() => onDisableTailscaleServe(endpoint)}
               disabled={isUpdatingTailscaleServe}
             >
-              {isUpdatingTailscaleServe ? "Restarting…" : "Disable"}
+              {isUpdatingTailscaleServe ? "正在重启…" : "停用"}
             </Button>
           ) : null}
           {!needsTailscaleSetup && !isDefault ? (
             <Button size="xs" variant="outline" onClick={() => onSetDefault(endpoint)}>
-              Set as default
+              设为默认
             </Button>
           ) : null}
         </div>
@@ -982,7 +974,7 @@ export function NetworkAccessDescription({
       <span className="min-w-0 truncate">{endpoint.httpBaseUrl}</span>
       {hiddenEndpointCount > 0 ? (
         <span className="shrink-0 text-xs font-medium">
-          {expanded ? "Hide" : `+${hiddenEndpointCount}`}
+          {expanded ? "隐藏" : `+${hiddenEndpointCount}`}
         </span>
       ) : null}
     </>
@@ -990,7 +982,7 @@ export function NetworkAccessDescription({
 
   return (
     <span className="inline-flex min-w-0 max-w-full items-baseline gap-1">
-      <span className="shrink-0">Reachable at</span>
+      <span className="shrink-0">访问地址</span>
       {hiddenEndpointCount > 0 ? (
         <button
           type="button"

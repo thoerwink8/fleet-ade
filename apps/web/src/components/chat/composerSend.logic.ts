@@ -19,8 +19,8 @@ export function loadBalancingSendWarning(input: {
 }) {
   if (input.pending) {
     return {
-      title: "Checking machine resources",
-      description: "Resource checks are still running. You can choose a machine in the composer.",
+      title: "正在检查机器资源",
+      description: "资源检查仍在进行，你可以在输入框中手动选择机器。",
     };
   }
   const noMachineReadsEveryThread =
@@ -29,10 +29,10 @@ export function loadBalancingSendWarning(input: {
       input.threadContexts.every((record) => record.environmentId === environmentId),
     );
   return {
-    title: "Choose a machine to continue",
+    title: "请选择一台机器以继续",
     description: noMachineReadsEveryThread
-      ? "No machine can read every attached thread. Choose a machine in the composer or remove the threads."
-      : "No eligible machine has available resources. Choose a machine in the composer to override.",
+      ? "没有一台机器能读取全部附加的会话。请在输入框中选择机器，或移除这些会话。"
+      : "没有符合条件且资源充足的机器。请在输入框中手动选择机器。",
   };
 }
 
@@ -68,14 +68,14 @@ export function approvalRedirectNotice(input: {
 }): string | null {
   if (input.draftChanged) {
     return input.declined
-      ? "Approval declined. Your message changed, so it wasn't sent."
-      : "Your message changed, so it wasn't sent.";
+      ? "已拒绝审批。由于你的消息有改动，所以没有发送。"
+      : "你的消息有改动，所以没有发送。";
   }
   if (input.approvalResponding) {
-    return "An approval is already being answered, so your message wasn't sent.";
+    return "正在回应另一个审批，所以你的消息没有发送。";
   }
   if (input.declined && input.approvalArrived) {
-    return "Another approval arrived, so your message wasn't sent.";
+    return "又来了一个审批，所以你的消息没有发送。";
   }
   return null;
 }

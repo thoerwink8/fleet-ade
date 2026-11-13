@@ -1826,7 +1826,7 @@ describe("AcpAdapterV2", () => {
     description: "Which reply format?",
     oneOf: [
       { const: "option_0", title: "JSON" },
-      { const: "option_1", title: "Plain text" },
+      { const: "option_1", title: "纯文本" },
       { const: "other", title: "Other answer" },
     ],
   };
@@ -1846,7 +1846,7 @@ describe("AcpAdapterV2", () => {
     question: "Which reply format?",
     options: [
       { label: "JSON", description: "JSON", value: "option_0" },
-      { label: "Plain text", description: "Plain text", value: "option_1" },
+      { label: "纯文本", description: "纯文本", value: "option_1" },
     ],
   }));
 
@@ -1859,8 +1859,8 @@ describe("AcpAdapterV2", () => {
         title: "Color preference",
         description: "Which color do you prefer?",
         oneOf: [
-          { const: "red", title: "Red", description: "Choose the color red" },
-          { const: "blue", title: "Blue" },
+          { const: "red", title: "红色", description: "Choose the color red" },
+          { const: "blue", title: "蓝色" },
         ],
         default: "red",
       },
@@ -1878,8 +1878,8 @@ describe("AcpAdapterV2", () => {
       header: "Color preference",
       question: "Which color do you prefer?",
       options: [
-        { label: "Red", description: "Choose the color red", value: "red" },
-        { label: "Blue", description: "Blue", value: "blue" },
+        { label: "红色", description: "Choose the color red", value: "red" },
+        { label: "蓝色", description: "蓝色", value: "blue" },
       ],
       allowCustomAnswer: true,
     },
@@ -1905,8 +1905,8 @@ describe("AcpAdapterV2", () => {
             title: "Approve this exact code-only commit?",
             description: "Safety-hook false positive",
             oneOf: [
-              { const: "Approve", title: "Approve", description: "Commit the verified fix." },
-              { const: "Hold", title: "Hold" },
+              { const: "Approve", title: "批准", description: "Commit the verified fix." },
+              { const: "Hold", title: "长按" },
             ],
             default: "Approve",
           },
@@ -1919,8 +1919,8 @@ describe("AcpAdapterV2", () => {
           header: "Safety-hook false positive",
           question: "Approve this exact code-only commit?",
           options: [
-            { label: "Approve", value: "Approve", description: "Commit the verified fix." },
-            { label: "Hold", value: "Hold", description: "Hold" },
+            { label: "批准", value: "Approve", description: "Commit the verified fix." },
+            { label: "长按", value: "Hold", description: "长按" },
           ],
         },
       ],
@@ -2601,7 +2601,7 @@ describe("AcpAdapterV2", () => {
               event.type === "turn_item.updated" &&
               event.turnItem.type === "compaction" &&
               event.turnItem.status === "completed" &&
-              event.turnItem.title === (structured ? "Compact context" : "Context compacted"),
+              event.turnItem.title === (structured ? "压缩上下文" : "上下文已压缩"),
           ),
         );
         assert.lengthOf(
@@ -3110,7 +3110,7 @@ describe("AcpAdapterV2", () => {
           plan: {
             type: "items",
             planId: "plan-1",
-            entries: [{ content: "Continue", priority: "medium", status: "in_progress" }],
+            entries: [{ content: "继续", priority: "medium", status: "in_progress" }],
           },
         },
       });
@@ -3431,7 +3431,7 @@ describe("AcpAdapterV2", () => {
                     {
                       sessionUpdate: "tool_call",
                       toolCallId: "child-mcp-fallback",
-                      title: "Ran command",
+                      title: "已运行命令",
                       kind: "execute",
                       status: "completed",
                       content: [{ type: "terminal", terminalId: fallbackTerminal.terminalId }],
@@ -6537,7 +6537,7 @@ describe("AcpAdapterV2", () => {
       });
       assert.deepEqual(agentDescriptor, {
         id: "agent",
-        label: "Agent",
+        label: "智能体",
         type: "select",
         options: [
           { id: ACP_EMPTY_OPTION_VALUE, label: "Copilot" },
@@ -7011,12 +7011,12 @@ describe("AcpAdapterV2", () => {
         requestedSchema: {
           type: "object",
           properties: {
-            color: { type: "string", title: "Color", enum: ["red", "green"] },
+            color: { type: "string", title: "颜色", enum: ["red", "green"] },
             size: {
               type: "string",
               oneOf: [
                 { const: "m", title: "Medium" },
-                { const: "l", title: "Large" },
+                { const: "l", title: "大" },
               ],
             },
             tags: { type: "array", items: { type: "string", enum: ["a", "b", "c"] } },
@@ -7025,7 +7025,7 @@ describe("AcpAdapterV2", () => {
               items: {
                 anyOf: [
                   { const: "api", title: "API", description: "Server routes" },
-                  { const: "ui", title: "Interface" },
+                  { const: "ui", title: "界面" },
                 ],
               },
             },
@@ -9917,7 +9917,7 @@ describe("AcpAdapterV2", () => {
           yield* update({
             sessionUpdate: "tool_call",
             toolCallId: taskId,
-            title: `Run ${taskId}`,
+            title: `运行 ${taskId}`,
             kind: "execute",
             status: "completed",
             rawInput: { command: `echo ${taskId}` },

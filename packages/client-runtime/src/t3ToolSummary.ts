@@ -136,7 +136,7 @@ export function summarizeT3ToolCalls(
       const object = targetsKnown
         ? messages === threads && messages > 1
           ? `messages to ${quantity(threads, "thread")}`
-          : `${quantity(messages, "message")} to ${quantity(threads, "thread")}`
+          : `${quantity(messages, "message")} 至 ${quantity(threads, "thread")}`
         : quantity(messages, "message");
       label = phrase("Sent", "send", object);
       break;
@@ -157,7 +157,7 @@ export function summarizeT3ToolCalls(
           });
         });
       label = resultsKnown
-        ? `Created ${quantity(new Set(createdIds).size, "thread")}`
+        ? `已创建 ${quantity(new Set(createdIds).size, "thread")}`
         : `Requested thread creation ${times}`;
       break;
     }
@@ -447,7 +447,7 @@ export function summarizeT3ToolCalls(
           `review guides${selected.length === 1 ? "" : ` ${times}`}`,
         );
       } else if (started === 0) {
-        label = `Could not start ${quantity(failed, "review guide")}`;
+        label = `无法启动 ${quantity(failed, "review guide")}`;
       } else {
         label = phrase(
           "Started",
@@ -467,10 +467,10 @@ export function summarizeT3ToolCalls(
       label = phrase("Used", "use", `device controls ${times}`);
       break;
     case "html-preview":
-      label = phrase("Previewed", "preview", quantity(selected.length, "HTML page"));
+      label = phrase("Previewed", "preview", quantity(selected.length, "HTML 页面"));
       break;
     case "html-render":
-      label = phrase("Rendered", "render", quantity(selected.length, "HTML page"));
+      label = phrase("Rendered", "render", quantity(selected.length, "HTML 页面"));
       break;
     case "capabilities":
       label = phrase("Checked", "check", `orchestration capabilities ${times}`);

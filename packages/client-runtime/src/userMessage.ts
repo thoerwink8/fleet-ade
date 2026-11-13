@@ -19,14 +19,14 @@ import { videoMimeType } from "@t3tools/shared/video";
 
 /** The working row while T3 Code's own compaction runs. */
 export const IDLE_COMPACTING_LABELS = {
-  beforeCacheExpires: "Compacting before the cache expires…",
-  onReturn: "Compacting…",
+  beforeCacheExpires: "正在缓存过期前压缩…",
+  onReturn: "正在压缩…",
 } satisfies Record<OrchestrationV2IdleCompaction, string>;
 
 /** Leads the finished compaction's token counts, in place of "Context compacted". */
 export const IDLE_COMPACTION_TITLES = {
-  beforeCacheExpires: "Context automatically compacted before cache expiry",
-  onReturn: "Context compacted before sending",
+  beforeCacheExpires: "已在缓存过期前自动压缩上下文",
+  onReturn: "已在发送前压缩上下文",
 } satisfies Record<OrchestrationV2IdleCompaction, string>;
 
 const LEGACY_AUTOMATION_PREFIX = /^\[Triggered by schedule task: [^\r\n]+\]\r?\n\r?\n/;

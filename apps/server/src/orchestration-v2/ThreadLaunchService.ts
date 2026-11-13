@@ -642,7 +642,7 @@ const make = Effect.gen(function* () {
           branch,
           stages: snapshot.stages.map((stage) =>
             stage.id === "submodules" && stage.status === "pending"
-              ? { ...stage, status: "skipped", detail: "none" }
+              ? { ...stage, status: "skipped", detail: "无" }
               : stage,
           ),
         }));

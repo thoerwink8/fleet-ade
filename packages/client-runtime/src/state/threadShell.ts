@@ -168,7 +168,7 @@ export function childThreadInputsTitle(
   const noun =
     sideChats === children.length ? "side chat" : sideChats === 0 ? "subagent" : "thread";
   return children.length === 1
-    ? `${noun === "side chat" ? "Side chat" : "Subagent"} needs ${need}`
+    ? `${noun === "side chat" ? "侧聊" : "Subagent"} needs ${need}`
     : `${children.length} ${noun}s need ${need}`;
 }
 

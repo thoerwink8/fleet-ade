@@ -54,7 +54,7 @@ export function checkZipDirectory(bytes: ArrayBuffer, entryLimit = 2048) {
       directoryOffset = Number(start);
       directoryEnd = record;
     }
-    if (count > entryLimit) throw new Error("This archive contains more than 2,048 entries.");
+    if (count > entryLimit) throw new Error("此压缩包包含超过 2,048 个条目。");
     if (directoryOffset > directoryEnd - directorySize)
       throw new Error("This ZIP directory is damaged.");
     break;
@@ -65,7 +65,7 @@ export function checkZipDirectory(bytes: ArrayBuffer, entryLimit = 2048) {
   for (let offset = directoryEnd - directorySize; offset < directoryEnd;) {
     if (offset + 46 > directoryEnd || view.getUint32(offset, true) !== 0x02014b50)
       throw new Error("This ZIP directory is damaged.");
-    if (++records > entryLimit) throw new Error("This archive contains more than 2,048 entries.");
+    if (++records > entryLimit) throw new Error("此压缩包包含超过 2,048 个条目。");
     const nameLength = view.getUint16(offset + 28, true);
     if (nameLength > 1024) throw new Error("An archive path is too long to preview.");
     offset +=

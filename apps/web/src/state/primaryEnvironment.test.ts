@@ -50,7 +50,7 @@ it("recognizes the desktop host service and direct browser loopback, excluding r
   const target = (httpBaseUrl: string) =>
     new PrimaryConnectionTarget({
       environmentId: PRIMARY,
-      label: "Local",
+      label: "本地",
       httpBaseUrl,
       wsBaseUrl: "ws://localhost/ws",
     });

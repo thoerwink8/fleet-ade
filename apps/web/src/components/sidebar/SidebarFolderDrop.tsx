@@ -37,8 +37,8 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
       toastManager.add(
         stackedThreadToast({
           type: "info",
-          title: "Dropping folders needs the desktop app",
-          description: "Browsers do not share folder paths. Use Add project to choose a folder.",
+          title: "放入文件夹需要桌面应用",
+          description: "浏览器不会提供文件夹路径。请使用“添加项目”选择文件夹。",
         }),
       );
       return;
@@ -49,7 +49,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
         stackedThreadToast({
           type: "error",
           title: "This computer's server is not connected yet",
-          description: "Try again when it connects.",
+          description: "等它连上后再试。",
         }),
       );
       return;
@@ -110,8 +110,8 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
           toastManager.add(
             stackedThreadToast({
               type: "info",
-              title: "Only folders can be added as projects",
-              description: "Drop files on a thread to attach them.",
+              title: "只能把文件夹添加为项目",
+              description: "把文件放到会话上即可附加。",
             }),
           );
         }
@@ -124,9 +124,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
           className="pointer-events-none absolute inset-1.5 z-30 flex flex-col items-center justify-center gap-2 rounded-lg px-4 text-center bg-sidebar/90 text-sm text-sidebar-foreground ring-1 ring-inset ring-primary/70"
         >
           <FolderPlusIcon className="size-5 text-sidebar-muted-foreground" />
-          {bridge === undefined
-            ? "Dropping folders needs the desktop app"
-            : "Drop folders to add projects"}
+          {bridge === undefined ? "放入文件夹需要桌面应用" : "Drop folders to add projects"}
         </div>
       ) : null}
     </div>

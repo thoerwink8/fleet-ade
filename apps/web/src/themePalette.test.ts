@@ -329,7 +329,7 @@ describe("theme files", () => {
     const collection = { id: "open-vsx:demo.theme", label: "Demo Theme" };
     const personalTheme = {
       id: "personal",
-      label: "Personal",
+      label: "个人",
       appearance: "dark",
       colors: { canvas: "#111111", futureRole: "hsl(10 20% 30%)" },
       futureMetadata: { version: 2 },
@@ -546,7 +546,7 @@ describe("theme files", () => {
           colors: { accent: "#5b6cff" },
         }),
       ),
-    ).toThrow(`Failed to read the theme library from ${CUSTOM_THEMES_STORAGE_KEY}.`);
+    ).toThrow(`无法从 ${CUSTOM_THEMES_STORAGE_KEY} 读取主题库。`);
     expect(setItem).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
@@ -739,7 +739,7 @@ describe("stored theme preferences", () => {
         variants: { dark: { canvas: "rgb(16 24 39)" } },
       },
       { id: "light", label: "Reserved", appearance: "light", colors: {} },
-      { id: "aurora", label: "Duplicate", appearance: "dark", colors: {} },
+      { id: "aurora", label: "重复", appearance: "dark", colors: {} },
     ]);
     const setItem = vi.fn();
     vi.stubGlobal("window", {

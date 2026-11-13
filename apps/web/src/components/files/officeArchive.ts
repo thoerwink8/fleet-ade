@@ -38,7 +38,7 @@ export const WORD_LIMITS = {
 function xmlParser() {
   const parser = new SaxesParser({ xmlns: true });
   parser.on("doctype", () => {
-    throw new Error("This document contains unsupported XML declarations.");
+    throw new Error("此文档包含不受支持的 XML 声明。");
   });
   return parser;
 }
@@ -84,7 +84,7 @@ function wordSections() {
   parser.on("opentag", (tag) => {
     names.push(tag.local);
     namespaceScopes.push(tag.ns);
-    if (names.length > 64) throw new Error("This Word document has excessive XML nesting.");
+    if (names.length > 64) throw new Error("此 Word 文档的 XML 嵌套过深。");
     const body = names.length === 3 && names[1] === "body";
     if (
       tag.local === "sectPr" &&
@@ -99,7 +99,7 @@ function wordSections() {
           namespaces += ` ${name}="${escape(scope[prefix]!)}"`;
       }
       const start = window.lastIndexOf("<", parser.position - offset - 1);
-      if (start < 0) throw new Error("This Word document has too much section markup.");
+      if (start < 0) throw new Error("此 Word 文档的节标记过多。");
       capture = {
         start: start + offset,
         insert: parser.position - (tag.isSelfClosing ? 2 : 1),
@@ -108,8 +108,7 @@ function wordSections() {
         depth: names.length,
       };
     }
-    if (capture && ++tags > 2_000)
-      throw new Error("Preview limited: this Word document has too much section markup.");
+    if (capture && ++tags > 2_000) throw new Error("预览受限：此 Word 文档的节标记过多。");
   });
   parser.on("closetag", (tag) => {
     if (capture && tag.local === "sectPr" && names.length === capture.depth) {
@@ -118,8 +117,7 @@ function wordSections() {
         capture.namespaces +
         window.slice(capture.insert - offset, parser.position - offset);
       bytes += xml.length;
-      if (bytes > 128 * 1024)
-        throw new Error("Preview limited: this Word document has too much section markup.");
+      if (bytes > 128 * 1024) throw new Error("预览受限：此 Word 文档的节标记过多。");
       sections.push({ end: parser.position, xml, body: capture.body });
       paragraphSection = !capture.body;
       if (!capture.body && parser.position > 4 * 1024 * 1024) nextParagraph = true;
@@ -137,7 +135,7 @@ function wordSections() {
       window += chunk;
       parser.write(chunk);
       if (capture && parser.position - capture.start > 128 * 1024)
-        throw new Error("Preview limited: this Word document has too much section markup.");
+        throw new Error("预览受限：此 Word 文档的节标记过多。");
       const keep = capture?.start ?? Math.max(offset, parser.position - 128 * 1024);
       window = window.slice(keep - offset);
       offset = keep;
@@ -222,7 +220,7 @@ function wordDocuments(
     if (cause !== limit) throw cause;
     truncated = true;
   }
-  if (!prefix) throw new Error("This Word document has no readable body.");
+  if (!prefix) throw new Error("此 Word 文档没有可读取的正文。");
   if (boundary > batchStart || batches.length === 0)
     batches.push({ content: xml.slice(batchStart, boundary), end: boundary });
   const documents: string[] = [];
@@ -239,7 +237,7 @@ function wordDocuments(
     }
     documents.push(document);
   }
-  if (documents.length === 0) throw new Error("This Word document has too much section markup.");
+  if (documents.length === 0) throw new Error("此 Word 文档的节标记过多。");
   return { documents, truncated };
 }
 
@@ -291,23 +289,22 @@ function boundedWorksheet(
   let truncated = false;
   const coordinate = (ref: string) => {
     const match = /^([A-Z]{1,3})([1-9]\d{0,6})$/.exec(ref);
-    if (!match) throw new Error("This workbook contains invalid cell coordinates.");
+    if (!match) throw new Error("此工作簿包含无效的单元格坐标。");
     let col = 0;
     for (const letter of match[1]!) col = col * 26 + letter.charCodeAt(0) - 64;
     const line = Number(match[2]);
-    if (col > 16384 || line > 1048576)
-      throw new Error("This workbook contains invalid worksheet dimensions.");
+    if (col > 16384 || line > 1048576) throw new Error("此工作簿包含无效的工作表尺寸。");
     return { col, line };
   };
   parser.on("opentag", (tag) => {
     depth++;
-    if (depth > 64) throw new Error("This workbook contains excessive XML nesting.");
+    if (depth > 64) throw new Error("此工作簿的 XML 嵌套过深。");
     if (
       (tag.local === "row" && depth !== 3) ||
       (tag.local === "c" && depth !== 4) ||
       ((tag.local === "dimension" || tag.local === "sheetData") && depth !== 2)
     )
-      throw new Error("This workbook contains invalid worksheet structure.");
+      throw new Error("此工作簿的工作表结构无效。");
     const attribute = (name: string) => tag.attributes[name]?.value;
     if (["dimension", "mergeCell", "col"].includes(tag.local))
       metadataAttributes.set(
@@ -356,21 +353,19 @@ function boundedWorksheet(
       explicitRow = attribute("r") !== undefined;
       row = attribute("r") === undefined ? row + 1 : Number(attribute("r"));
       if (!Number.isInteger(row) || row < 1 || row > 1048576)
-        throw new Error("This workbook contains invalid row coordinates.");
+        throw new Error("此工作簿包含无效的行坐标。");
       rowTag = xml
         .slice(xml.lastIndexOf("<", parser.position - 1), parser.position)
         .replace(/\/>$/, ">");
       column = 0;
       cells = rows.get(row) ?? new Map<number, string>();
-      if (row > OFFICE_PREVIEW_MAX_ROWS)
-        throw new Error("This workbook exceeds the preview limit: 250,000 rows.");
+      if (row > OFFICE_PREVIEW_MAX_ROWS) throw new Error("此工作簿超出预览限制：最多 250,000 行。");
     } else if (depth === 4 && tag.local === "c") {
       const ref = attribute("r");
       const position = ref ? coordinate(ref) : { col: column + 1, line: row };
       if (!explicitRow && column === 0) row = position.line;
       column = position.col;
-      if (row < 1 || position.line !== row)
-        throw new Error("This workbook contains inconsistent cell rows.");
+      if (row < 1 || position.line !== row) throw new Error("此工作簿的单元格行不一致。");
       if (row > OFFICE_PREVIEW_MAX_ROWS || column > OFFICE_PREVIEW_MAX_COLUMNS) {
         truncated = true;
         return;
@@ -378,9 +373,7 @@ function boundedWorksheet(
       maxRow = Math.max(maxRow, row);
       maxColumn = Math.max(maxColumn, column);
       if (++budget.cells > 2_000_000 || maxRow * maxColumn > 8_000_000)
-        throw new Error(
-          "This workbook exceeds the preview limit: 2 million cells or 8 million grid positions.",
-        );
+        throw new Error("此工作簿超出预览限制：200 万个单元格或 800 万个网格位置。");
       // Explicit coordinates also bound sheets whose rows/cells omit r.
       let letters = "";
       for (let value = column; value > 0; value = Math.floor((value - 1) / 26))
@@ -388,7 +381,7 @@ function boundedWorksheet(
       const style = attribute("s");
       const type = attribute("t");
       if ((style && !/^\d{1,6}$/.test(style)) || (type && !/^[a-zA-Z]+$/.test(type)))
-        throw new Error("This workbook contains invalid cell metadata.");
+        throw new Error("此工作簿包含无效的单元格元数据。");
       cell = {
         start: parser.position,
         opening: xml
@@ -443,7 +436,7 @@ function boundedWorksheet(
     depth--;
   });
   parser.write(xml).close();
-  if (!dataStart) throw new Error("This workbook has no worksheet data.");
+  if (!dataStart) throw new Error("此工作簿没有工作表数据。");
   const boundRange = (ref: string) => {
     const [a, b = a] = ref.split(":");
     const first = coordinate(a!);
@@ -537,7 +530,7 @@ function engineStyles(xml: string) {
   const parser = xmlParser();
   let depth = 0;
   parser.on("opentag", (tag) => {
-    if (++depth > 64) throw new Error("This workbook contains excessive XML nesting.");
+    if (++depth > 64) throw new Error("此工作簿的 XML 嵌套过深。");
     if (depth !== 2 || !["numFmts", "cellStyleXfs", "cellXfs"].includes(tag.local)) return;
     if (blocks.has(tag.local))
       throw new Error("This workbook contains duplicate stylesheet blocks.");
@@ -630,8 +623,7 @@ async function boundWorkbook(archive: JSZip) {
       return;
     }
     const path = paths.get(id ?? "");
-    if (!path || sheetPaths.length === 100)
-      throw new Error("This workbook has invalid or too many sheets.");
+    if (!path || sheetPaths.length === 100) throw new Error("此工作簿的工作表无效或过多。");
     sheetPaths.push(path);
     sheetOrder.push(path);
   });
@@ -672,7 +664,7 @@ async function boundWorkbook(archive: JSZip) {
   const bounded = new Map<string, { truncated: boolean; gridlines: boolean }>();
   for (const path of new Set(sheetPaths)) {
     const file = archive.file(path);
-    if (!file) throw new Error("This workbook has a missing worksheet.");
+    if (!file) throw new Error("此工作簿缺少工作表。");
     const sheet = boundedWorksheet(await file.async("string"), strings, budget);
     archive.file(path, sheet.xml);
     bounded.set(path, sheet);
@@ -784,11 +776,9 @@ function wordPartTypes() {
           if (!refs.has(attr("Id"))) refs.set(attr("Id"), target);
           relationships.set(owner, refs);
           if (target === "word/document.xml" && role !== "officeDocument")
-            throw new Error("Preview limited: this Word document has an aliased document part.");
+            throw new Error("预览受限：此 Word 文档包含通过别名引用的文档部件。");
           if (type === WORD_RELATIONSHIP + "officeDocument" && target !== "word/document.xml")
-            throw new Error(
-              "Preview limited: this Word document has an unsupported document relationship.",
-            );
+            throw new Error("预览受限：此 Word 文档包含不受支持的文档关系。");
         }
         if (
           (external && !(role === "hyperlink" && externalUrl(attr("Target")))) ||
@@ -839,8 +829,7 @@ function wordXmlCost(xml: string, roles: Set<string> | undefined) {
   const pictures: { start: number; end: number }[] = [];
   let picture: { start: number; depth: number } | null = null;
   parser.on("opentag", (tag) => {
-    if (++depth > 64)
-      throw new Error("Preview limited: this Word document has excessive XML nesting.");
+    if (++depth > 64) throw new Error("预览受限：此 Word 文档的 XML 嵌套过深。");
     markup++;
     const attr = (name: string) =>
       Object.values(tag.attributes).find((a) => a.local === name)?.value ?? "";
@@ -1147,21 +1136,19 @@ async function wordExpansion(
 export async function boundedArchive(input: Extract<OfficeWorkerRequest, { type: "open" }>) {
   const { bytes } = input;
   const spreadsheet = input.kind === "xlsx";
-  if (bytes.byteLength > OFFICE_PREVIEW_MAX_BYTES)
-    throw new Error("Preview limited to files under 50 MB.");
+  if (bytes.byteLength > OFFICE_PREVIEW_MAX_BYTES) throw new Error("预览仅支持小于 50 MB 的文件。");
   checkZipDirectory(bytes);
   const source = await JSZip.loadAsync(bytes).catch(() => {
-    throw new Error("This file is damaged, encrypted, or not a valid Office document.");
+    throw new Error("此文件已损坏、已加密，或不是有效的 Office 文档。");
   });
   const allEntries = Object.values(source.files);
-  if (allEntries.length > 2048)
-    throw new Error("This file contains too many archive entries to preview.");
+  if (allEntries.length > 2048) throw new Error("此文件包含的压缩包条目过多，无法预览。");
   const entries = allEntries.filter((entry) => !entry.dir);
   if (
     input.kind === "docx" &&
     entries.some((entry) => entry.name.includes("\\") || entry.name.startsWith("/"))
   )
-    throw new Error("Preview limited: this Word document has unsupported archive paths.");
+    throw new Error("预览受限：此 Word 文档包含不受支持的压缩包路径。");
   const archive = new JSZip();
   const partTypes = wordPartTypes();
   // Metadata must be bounded and classified before any payload gets a media exemption.
@@ -1197,7 +1184,7 @@ export async function boundedArchive(input: Extract<OfficeWorkerRequest, { type:
           length += chunk.length;
           if (total > (spreadsheet ? 128 * 1024 * 1024 : OFFICE_PREVIEW_MAX_BYTES)) {
             stream.pause();
-            reject(new Error("The expanded document is too large to preview safely."));
+            reject(new Error("解压后的文档过大，无法安全预览。"));
             return;
           }
           try {
@@ -1225,9 +1212,7 @@ export async function boundedArchive(input: Extract<OfficeWorkerRequest, { type:
               wordAuxiliaryMarkup > WORD_LIMITS.auxiliaryMarkup
             ) {
               stream.pause();
-              reject(
-                new Error("Preview limited: this Word document has too much auxiliary markup."),
-              );
+              reject(new Error("预览受限：此 Word 文档的辅助标记过多。"));
               return;
             }
           }
@@ -1239,7 +1224,7 @@ export async function boundedArchive(input: Extract<OfficeWorkerRequest, { type:
               length > (spreadsheet ? 64 * 1024 * 1024 : 8 * 1024 * 1024))
           ) {
             stream.pause();
-            reject(new Error("The expanded document is too large to preview safely."));
+            reject(new Error("解压后的文档过大，无法安全预览。"));
           } else chunks.push(chunk);
         })
         .on("error", reject)
@@ -1325,8 +1310,7 @@ export async function boundedArchive(input: Extract<OfficeWorkerRequest, { type:
       for (const path of batchImages) usedImages.add(path);
       documents.push(document);
     }
-    if (documents.length === 0)
-      throw new Error("Preview limited: this Word document has too much expanded markup.");
+    if (documents.length === 0) throw new Error("预览受限：此 Word 文档展开后的标记过多。");
     word.truncated ||= wordInputTruncated || documents.length < word.documents.length;
     word.documents = documents;
     for (const path of mediaSizes.keys()) if (!usedImages.has(path)) archive.remove(path);
@@ -1348,7 +1332,7 @@ export async function prepareOffice(
         ? "xl/workbook.xml"
         : "ppt/presentation.xml";
   if (!result.archive.file(root))
-    throw new Error("This is not a valid Office Open XML file. Encrypted files are not supported.");
+    throw new Error("这不是有效的 Office Open XML 文件。不支持加密文件。");
   if (result.word) {
     const references = new Map<string, string>();
     const relationships = xmlParser();

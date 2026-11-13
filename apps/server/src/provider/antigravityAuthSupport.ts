@@ -111,11 +111,11 @@ export function antigravityAuthUsesBrowser(authMethod: AntigravityAuthMethod): b
 export function antigravityAuthLabel(authMethod: AntigravityAuthMethod): string {
   switch (authMethod) {
     case "oauth-personal":
-      return "Google account";
+      return "Google 账户";
     case "oauth-business":
       return "Gemini Enterprise";
     case "gemini-api-key":
-      return "Gemini API key";
+      return "Gemini API 密钥";
     case "agent-platform":
       return "Agent Platform";
   }

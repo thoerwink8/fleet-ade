@@ -228,7 +228,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     if (sendResult._tag === "Failure") {
       const error = squashAtomCommandFailure(sendResult);
       failedSelections.push(...selections);
-      setThreadError(threadId, error instanceof Error ? error.message : "Failed to send messages.");
+      setThreadError(threadId, error instanceof Error ? error.message : "无法发送消息。");
     }
     const restoreFailedDraft = () => {
       appAtomRegistry.set(fanoutSelectionsAtom, failedSelections);
@@ -254,12 +254,11 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
         const recoveryToastId = toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "A background prompt could not be sent",
-            description:
-              "Your newer draft is unchanged. Restore the failed prompt when this composer is empty.",
+            title: "有一条后台提示词没能发送",
+            description: "你较新的草稿没有变化。等输入框为空时，可以恢复这条发送失败的提示词。",
             timeout: 0,
             actionProps: {
-              children: "Restore prompt",
+              children: "恢复提示词",
               onClick: () => {
                 if (
                   !draftId ||
@@ -270,8 +269,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                   )
                 ) {
                   toastManager.update(recoveryToastId, {
-                    description:
-                      "Return to the original draft and send or clear its current prompt before restoring.",
+                    description: "请回到原来的草稿，先发送或清空当前提示词，再进行恢复。",
                   });
                   return;
                 }

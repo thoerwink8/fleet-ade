@@ -25,10 +25,10 @@ export function resolveEnvironmentIconPickerLock(input: {
   readonly operateAccess: "granted" | "denied" | "pending";
 }): string | null {
   if (input.serverConfig === null) {
-    return "Connect to this environment to change its icon.";
+    return "连接此环境后即可更改图标。";
   }
   if (input.operateAccess !== "granted") {
-    return "Your session on this environment cannot change its settings.";
+    return "你在此环境中的会话无法更改其设置。";
   }
   return null;
 }
@@ -52,7 +52,7 @@ export function EnvironmentIconMenu({
     <MenuSub>
       <MenuSubTrigger>
         <EnvironmentMachineIcon kind={resolved} />
-        Icon
+        图标
       </MenuSubTrigger>
       <MenuSubPopup>
         {lock !== null ? (
@@ -79,7 +79,7 @@ export function EnvironmentIconMenu({
                 </span>
                 {kind === detected ? (
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {serverConfig?.environment.platform.machine ? "detected" : "default"}
+                    {serverConfig?.environment.platform.machine ? "已检测到" : "默认"}
                   </span>
                 ) : null}
               </span>

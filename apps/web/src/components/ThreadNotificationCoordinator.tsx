@@ -143,16 +143,16 @@ export function startThreadNotifications(
     const active = activeThread();
     const title =
       kind === "completion"
-        ? "Thread completed"
+        ? "会话已完成"
         : status === "approval"
-          ? "Approval needed"
+          ? "需要批准"
           : status === "limited"
-            ? "Usage limit reached"
+            ? "已达到用量上限"
             : status === "failed"
-              ? "Thread failed"
+              ? "会话失败"
               : status === "request"
-                ? "Guest request"
-                : "Input needed";
+                ? "访客请求"
+                : "需要输入";
     if (hasNotificationSound(mode)) {
       void playNotificationSound(kind, () =>
         hasNotificationSound(getClientSettings().notificationMode),
@@ -186,7 +186,7 @@ export function startThreadNotifications(
             ),
         },
         actionProps: {
-          children: "Open thread",
+          children: "打开会话",
           onClick: () => {
             toastManager.close(toastId);
             void router.navigate({

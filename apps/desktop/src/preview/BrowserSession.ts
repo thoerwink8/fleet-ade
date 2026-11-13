@@ -324,8 +324,10 @@ export const make = Effect.gen(function* BrowserSessionMake() {
       requester,
       {
         buttons: ["Open", "Cancel"],
-        message: `Open this ${new URL(url).protocol.slice(0, -1)} link?`,
-        detail: `A page in the browser wants to open another application:\n\n${truncateForPrompt(url)}`,
+        message: `要打开此 ${new URL(url).protocol.slice(0, -1)} 链接吗？`,
+        detail: `浏览器中的页面想打开另一个应用：
+
+${truncateForPrompt(url)}`,
       },
       (answer) => callback(answer === true),
     );
@@ -606,7 +608,7 @@ export const make = Effect.gen(function* BrowserSessionMake() {
               requester,
               {
                 buttons: ["Allow", "Block"],
-                message: `${truncateForPrompt(origin)} wants to see text and images copied to the clipboard`,
+                message: `${truncateForPrompt(origin)} 想查看复制到剪贴板的文字和图片`,
               },
               (answer) => {
                 if (answer !== undefined) clipboardReadDecisions.set(origin, answer);

@@ -141,7 +141,7 @@ describe("resolveMcpGate", () => {
           status: "unreachable",
           checkedAt: "2026-11-08T00:00:00.000Z",
           cause: "no_connector",
-          reason: "Cloudflare has no live connection from this machine for the tunnel.",
+          reason: "Cloudflare 没有来自本机的可用隧道连接。",
           hint: null,
           fix: "Restart T3 Code.",
         },

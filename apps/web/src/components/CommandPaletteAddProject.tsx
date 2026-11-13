@@ -102,7 +102,7 @@ export function NewProjectPublishHostPicker(props: {
           if (kind !== null) props.onValueChange(kind);
         }}
       >
-        <SelectTrigger size="xs" variant="ghost" aria-label="Host for the new repository">
+        <SelectTrigger size="xs" variant="ghost" aria-label="新仓库的托管平台">
           <SelectValue>
             {(kind: SourceControlProviderKind) => sourceControlClients.get(kind).label}
           </SelectValue>
@@ -136,13 +136,11 @@ export function NewProjectSummary(props: {
         </CommandPaletteTitleIcon>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-foreground text-sm">
-            {props.name.length > 0 ? props.name : "New project"}
+            {props.name.length > 0 ? props.name : "新建项目"}
           </span>
           <span className="truncate text-muted-foreground/85 text-xs">
-            {props.name.length > 0
-              ? `Creates ${props.pathPreview}`
-              : `Goes in ${props.projectsRoot}`}
-            {props.environmentLabel === null ? null : ` on ${props.environmentLabel}`}
+            {props.name.length > 0 ? `将创建 ${props.pathPreview}` : `位于 ${props.projectsRoot}`}
+            {props.environmentLabel === null ? null : `在 ${props.environmentLabel} 上`}
           </span>
         </span>
       </div>
@@ -157,7 +155,7 @@ export function RemoteRepositorySummary(props: {
 }) {
   return (
     <div className="shrink-0 p-2 pb-0">
-      <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Repository</div>
+      <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">仓库</div>
       <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
         <CommandPaletteTitleIcon>
           {remoteProjectSourceIcon(props.source, ITEM_ICON_CLASS)}

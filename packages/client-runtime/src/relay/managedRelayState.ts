@@ -130,7 +130,7 @@ export function createManagedRelaySession(input: ManagedRelaySessionInput): Mana
           try: () => readCachedClerkToken(nowMillis),
           catch: (cause) =>
             new ManagedRelaySessionError({
-              message: "Could not obtain the T3 Connect session token.",
+              message: "无法获取 T3 Connect 会话 token。",
               cause,
             }),
         }).pipe(Effect.timeoutOption(CLERK_TOKEN_READ_TIMEOUT_MS));
@@ -192,7 +192,7 @@ function readSessionClerkToken(
       (token): token is string => Boolean(token),
       () =>
         new ManagedRelaySessionError({
-          message: "The T3 Connect session token is unavailable.",
+          message: "T3 Connect 会话 token 不可用。",
         }),
     ),
   );
@@ -256,7 +256,7 @@ function requireClerkToken(
   if (!session || session.accountId !== accountId) {
     return Effect.fail(
       new ManagedRelaySessionError({
-        message: "Sign in to T3 Connect before loading relay data.",
+        message: "请先登录 T3 Connect，再加载中继数据。",
       }),
     );
   }
@@ -274,7 +274,7 @@ function describeManagedRelayFailure(cause: Cause.Cause<unknown>): {
         ? relayProtectedErrorMessage(error.relayError)
         : error instanceof Error
           ? error.message
-          : "Could not load T3 Connect data.",
+          : "无法加载 T3 Connect 数据。",
     traceId: findErrorTraceId(error),
   };
 }

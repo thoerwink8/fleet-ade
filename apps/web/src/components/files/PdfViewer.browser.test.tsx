@@ -161,7 +161,7 @@ it("jumps to the first hit while still counting and keeps later manual navigatio
     await expect.element(screen.getByText("1 / 4 pages")).toBeVisible();
     await screen.getByRole("searchbox", { name: "Find in PDF" }).fill("needle");
     await expect.element(screen.getByText("2 / 4 pages")).toBeVisible();
-    await expect.element(screen.getByRole("status")).toHaveTextContent("Searching…");
+    await expect.element(screen.getByRole("status")).toHaveTextContent("正在搜索…");
 
     await screen.getByRole("button", { name: "Next page", exact: true }).click();
     await expect.element(screen.getByText("3 / 4 pages")).toBeVisible();
@@ -219,7 +219,7 @@ it("restores page, within-page offset and zoom after a remount", async () => {
 
     await screen.rerender(viewer(4, "restore:b"));
     await expect.element(screen.getByText("1 / 2 pages")).toBeVisible();
-    await expect.element(screen.getByText("Fit width")).toBeVisible();
+    await expect.element(screen.getByText("适应宽度")).toBeVisible();
   } finally {
     URL.revokeObjectURL(url);
   }

@@ -148,8 +148,7 @@ export const loadOrCreateProofKey = Effect.fn("dpop.loadOrCreateProofKey")(funct
         .sign(privateKey, signingInput)
         .pipe(
           Effect.mapError(
-            (cause) =>
-              new DpopProof.DpopProofError({ message: "Could not sign DPoP proof.", cause }),
+            (cause) => new DpopProof.DpopProofError({ message: "无法签名 DPoP 证明。", cause }),
           ),
         ),
   } satisfies DpopProof.DpopProofKey;

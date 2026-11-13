@@ -62,14 +62,14 @@ export interface ThreadPendingApproval {
   readonly supportsFeedback?: boolean;
 }
 
-export const FULL_ACCESS_OVERRIDE_QUESTION = "Why am I being asked this?";
+export const FULL_ACCESS_OVERRIDE_QUESTION = "为什么要问我这个？";
 
 export function fullAccessOverrideExplanation(
   override: ProviderApprovalFullAccessOverride,
 ): string {
   return override === "ask_rule"
-    ? "Full access skips approvals, but an ask rule in the agent's own settings matches this action, so it still asks. Remove or narrow that rule to stop these prompts."
-    : "Full access skips approvals, but the agent still stops for a few safety checks of its own that no setting can skip, such as a delete whose path it can't verify. T3 Code can't turn these off, so check the request and approve it if it's what you expect.";
+    ? "完全访问会跳过审批，但智能体自身设置里有一条“询问”规则匹配了这个操作，所以它仍会询问。删除或缩小这条规则即可不再提示。"
+    : "完全访问会跳过审批，但智能体仍会因少数自带的安全检查而暂停，任何设置都无法跳过，例如无法确认路径的删除操作。T3 Code 无法关闭这些检查，请核对请求，符合预期再批准。";
 }
 
 export interface ThreadUserInputQuestion extends Omit<

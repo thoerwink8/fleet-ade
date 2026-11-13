@@ -70,7 +70,7 @@ export function useOpenLocalWorkspace() {
         });
         if (result._tag === "Failure") {
           const error = squashAtomCommandFailure(result);
-          throw error instanceof Error ? error : new Error("T3 Code could not add the project.");
+          throw error instanceof Error ? error : new Error("T3 Code 无法添加该项目。");
         }
         return projectId;
       },
@@ -88,7 +88,7 @@ export function useOpenLocalWorkspace() {
           void updateProject({
             environmentId: projectRef.environmentId,
             input: { projectId: projectRef.projectId, archived: false },
-          }).then((result) => reportProjectFailure("Failed to unarchive project", result));
+          }).then((result) => reportProjectFailure("无法取消归档项目", result));
         }
         return openThread(projectRef);
       },

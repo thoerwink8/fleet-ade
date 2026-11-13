@@ -159,9 +159,9 @@ const formatWslShellTransportFailureReason = (
     case "timeout":
       return `WSL backend preflight timed out while probing for ${subject}. WSL may be slow to start; retry, or check that the distro is healthy.`;
     case "spawn":
-      return `WSL backend preflight could not start wsl.exe to probe for ${subject}. Check that WSL is installed and the distro is accessible.`;
+      return `WSL 后端预检无法启动 wsl.exe 以探测 ${subject}。请确认已安装 WSL 且发行版可访问。`;
     case "process":
-      return `WSL backend preflight lost communication with wsl.exe while probing for ${subject}. Retry, or check that the distro is healthy.`;
+      return `WSL 后端预检在探测 ${subject} 时与 wsl.exe 失去连接。请重试，或检查发行版是否正常。`;
     case null:
       return null;
   }
@@ -421,7 +421,7 @@ const NODE_PTY_BINARY_MISSING_EXIT_CODE = 4;
 
 const formatNodePtyProbeFailureReason = (exitCode: number): string | null =>
   exitCode === NODE_PTY_BINARY_MISSING_EXIT_CODE
-    ? "WSL support is missing from this T3 Code build: the packaged Linux node-pty binary was not included. Install a build that includes WSL support."
+    ? "此 T3 Code 版本缺少 WSL 支持：未包含打包的 Linux node-pty 二进制文件。请安装支持 WSL 的版本。"
     : null;
 
 // Capture login-shell PATH because the server launches provider CLIs by name.
@@ -571,7 +571,7 @@ const formatMissingToolsReason = (
     );
   }
 
-  return `WSL distro is missing required tools: ${issues.join(", ")}. Install ${remediations.join(" and ")}, then retry.`;
+  return `WSL 发行版缺少必要工具：${issues.join(", ")}。请运行 ${remediations.join(" and ")} 安装后重试。`;
 };
 
 const probeWslRuntimeImpl = Effect.fn("DesktopWslEnvironment.probeWslRuntimeImpl")(function* (
@@ -604,7 +604,7 @@ const probeWslRuntimeImpl = Effect.fn("DesktopWslEnvironment.probeWslRuntimeImpl
   if (resolvedPath === null) {
     return {
       ok: false,
-      reason: "WSL login-shell PATH could not be resolved during backend preflight.",
+      reason: "后端预检无法解析 WSL 登录 shell 的 PATH。",
     } as const;
   }
   return { ok: true, resolvedPath } as const;
@@ -658,14 +658,14 @@ const ensureNodePtyImpl = Effect.fn("DesktopWslEnvironment.ensureNodePtyImpl")(f
     const report = parseToolchainReport(toolchainCheck.stdout);
     const reason =
       formatMissingToolsReason(report, options.nodeEngineRange?.trim() || null) ??
-      "Node.js was not found in the WSL distro. Install it (e.g. via nvm) and restart the desktop app.";
+      "WSL 发行版中未找到 Node.js。请安装（例如通过 nvm）后重启桌面应用。";
     return { ok: false, reason, fatal: true } as const;
   }
 
   if (resolvedPath === null) {
     return {
       ok: false,
-      reason: "WSL login-shell PATH could not be resolved during backend preflight.",
+      reason: "后端预检无法解析 WSL 登录 shell 的 PATH。",
       fatal: true,
     } as const;
   }
@@ -674,7 +674,7 @@ const ensureNodePtyImpl = Effect.fn("DesktopWslEnvironment.ensureNodePtyImpl")(f
     return {
       ok: false,
       reason:
-        'WSL server dependencies could not be loaded (for example "node-pty"). The native packages the server needs are not unpacked where the WSL distro\'s Node can read them. This is a packaging problem with this build. Please report it.',
+        "无法加载 WSL 服务器依赖（例如“node-pty”）。服务器所需的原生软件包未解压到 WSL 发行版的 Node 可读取的位置。这是此版本的打包问题，请报告。",
       fatal: true,
     } as const;
   }
@@ -689,7 +689,7 @@ const ensureNodePtyImpl = Effect.fn("DesktopWslEnvironment.ensureNodePtyImpl")(f
       const range = options.nodeEngineRange.trim();
       return {
         ok: false,
-        reason: `WSL Node.js ${rawVersion} does not satisfy the server's required engine range (${range}). Install a compatible version, and restart the desktop app.`,
+        reason: `WSL Node.js ${rawVersion} 不符合服务器要求的版本范围（${range}）。请安装兼容版本后重启桌面应用。`,
         fatal: true,
       } as const;
     }
@@ -802,15 +802,15 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
       ok: false,
       reason:
         install.transportFailure === "timeout"
-          ? "WSL runtime installation timed out. Check that the distro has free disk space, then retry."
-          : "WSL runtime installation lost communication with wsl.exe. Retry, or check that the distro is healthy.",
+          ? "WSL 运行时安装超时。请确认发行版有可用磁盘空间后重试。"
+          : "WSL 运行时安装过程中与 wsl.exe 失去连接。请重试，或检查发行版是否正常。",
     } as const;
   }
   if (install.exitCode !== 0) {
     const trimmedTail = `${install.stdout}${install.stderr}`.trim().slice(-500);
     return {
       ok: false,
-      reason: `WSL runtime installation failed (exit ${install.exitCode}): ${trimmedTail || "no stderr captured"}`,
+      reason: `WSL 运行时安装失败（退出码 ${install.exitCode}）：${trimmedTail || "no stderr captured"}`,
     } as const;
   }
 
@@ -818,7 +818,7 @@ const prepareWslRuntimeImpl = Effect.fn("desktop.wsl.prepareRuntimeImpl")(functi
   return linuxAppRoot === null
     ? {
         ok: false,
-        reason: "WSL runtime installation completed without reporting its cache path.",
+        reason: "WSL 运行时安装已完成，但未报告缓存路径。",
       }
     : { ok: true, linuxAppRoot };
 });
@@ -892,7 +892,7 @@ const probeWslDistros: Effect.Effect<
     isDesktopWslDistroListError(error)
       ? error
       : new DesktopWslDistroListError({
-          reason: `Failed to run wsl.exe --list --verbose: ${error.message}`,
+          reason: `运行 wsl.exe --list --verbose 失败：${error.message}`,
         }),
   ),
   Effect.timeoutOption(LIST_TIMEOUT),

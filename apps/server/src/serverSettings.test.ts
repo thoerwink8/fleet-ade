@@ -307,7 +307,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
     Effect.gen(function* () {
       const settings = yield* decodeServerSettings({
         secretProviders: {
-          personal: { kind: "one_password", label: "Personal", config: { account: "my" } },
+          personal: { kind: "one_password", label: "个人", config: { account: "my" } },
           vault: { kind: "openbao", label: "Vault", config: { token: "bao-token" } },
         },
       });
@@ -315,7 +315,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         ServerSettingsModule.redactServerSettingsForClient(settings, { secretReferences: true })
           .secretProviders,
         {
-          personal: { kind: "one_password", label: "Personal", config: { account: "my" } },
+          personal: { kind: "one_password", label: "个人", config: { account: "my" } },
           vault: { kind: "openbao", label: "Vault" },
         },
       );
@@ -331,8 +331,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           Effect.flip,
         );
       for (const entry of [
-        { kind: "one_password", label: "Personal", config: { account: "--help" } },
-        { kind: "one_password", label: "Personal" },
+        { kind: "one_password", label: "个人", config: { account: "--help" } },
+        { kind: "one_password", label: "个人" },
         { kind: "openbao", label: "Vault", config: { address: "https://x" } },
       ]) {
         assert.deepInclude(yield* write(entry), { operation: "write-secret-provider" });
@@ -1469,7 +1469,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
             {
               kind: "eas",
               id: "eas",
-              label: "EAS Simulator",
+              label: "EAS 模拟器",
               accessToken: "expo-secret",
               maxSessionMinutes: 30,
               idleMinutes: 10,
@@ -1786,7 +1786,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
             {
               kind: "eas",
               id: "eas",
-              label: "EAS Simulator",
+              label: "EAS 模拟器",
               accessToken: easReference,
               maxSessionMinutes: 30,
               idleMinutes: 10,
@@ -1874,7 +1874,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       const hub = UsageLimitSourceId.make("hub");
       yield* decodeServerSettingsPatch({
         secretProviders: {
-          personal: { kind: "one_password", label: "Personal", config: { account: "my" } },
+          personal: { kind: "one_password", label: "个人", config: { account: "my" } },
           work: { kind: "one_password", label: "Work", config: { account: "work" } },
         },
       }).pipe(Effect.flatMap(service.updateSettings));
@@ -1906,7 +1906,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           {
             kind: "eas",
             id: "eas",
-            label: "EAS Simulator",
+            label: "EAS 模拟器",
             accessToken: personal("Expo/token"),
             maxSessionMinutes: 30,
             idleMinutes: 10,
@@ -2973,7 +2973,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
         yield* withPolicy(undefined, (service) =>
           decodeServerSettingsPatch({
             secretProviders: {
-              personal: { kind: "one_password", label: "Personal", config: { account: "my" } },
+              personal: { kind: "one_password", label: "个人", config: { account: "my" } },
             },
           }).pipe(
             Effect.flatMap(service.updateSettings),

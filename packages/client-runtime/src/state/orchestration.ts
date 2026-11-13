@@ -104,7 +104,7 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
         if (Option.isNone(session)) {
           return yield* new EnvironmentRpcUnavailableError({
             environmentId: supervisor.target.environmentId,
-            message: "The environment has no session.",
+            message: "此环境没有会话。",
           });
         }
         const config = yield* session.value.initialConfig;
@@ -130,7 +130,7 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
         if (Option.isNone(prepared)) {
           return yield* new EnvironmentRpcUnavailableError({
             environmentId: supervisor.target.environmentId,
-            message: "The source environment is not connected.",
+            message: "来源环境未连接。",
           });
         }
         return yield* fetchEnvironmentThreadTranscript({

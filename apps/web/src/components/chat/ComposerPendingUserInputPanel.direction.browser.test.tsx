@@ -67,7 +67,7 @@ it("reads a mostly Hebrew question set right to left", async () => {
     .toHaveStyle({ direction: "rtl" });
   await expect.element(text("Keep it on React 18")).toHaveStyle({ direction: "ltr" });
 
-  await screen.getByTitle("Hide the question and its options").click();
+  await screen.getByTitle("隐藏问题及其选项").click();
   await expect.element(text("איך לבצע את המיגרציה?")).toHaveStyle({ direction: "rtl" });
 });
 
@@ -106,11 +106,11 @@ it("shows an option's preview so the user can see what they are approving", asyn
       question: "Approve this issue title and body?",
       options: [
         {
-          label: "Approve",
+          label: "批准",
           description: "File it as drafted.",
           preview: "Title: Login fails\n\nBody: A quote in the password breaks login.",
         },
-        { label: "Cancel", description: "Do not file it." },
+        { label: "取消", description: "Do not file it." },
       ],
     },
   ]);

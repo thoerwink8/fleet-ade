@@ -126,7 +126,7 @@ function UserFileCard({
         </span>
         <span className="block text-xs text-muted-foreground tabular-nums">
           {file.downloadable === false ? (
-            "Sending…"
+            "正在发送…"
           ) : (
             <>
               {!pastedText && `${extension} · `}
@@ -145,7 +145,7 @@ function UserFileCard({
       {file.downloadable === false ? (
         <>
           <div className="flex min-w-0 flex-1 items-center gap-3">{identity}</div>
-          <Button size="icon-xs" variant="ghost-muted" disabled aria-label="Sending attachment">
+          <Button size="icon-xs" variant="ghost-muted" disabled aria-label="正在发送附件">
             <DownloadIcon />
           </Button>
         </>
@@ -153,7 +153,7 @@ function UserFileCard({
         <>
           <button
             type="button"
-            aria-label={`Preview ${label}`}
+            aria-label={`预览 ${label}`}
             onClick={() => ctx.onFileOpen(file)}
             className="group/file focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
           >
@@ -165,14 +165,14 @@ function UserFileCard({
                 <Button
                   size="icon-xs"
                   variant="ghost-muted"
-                  aria-label={`Download ${label}`}
+                  aria-label={`下载 ${label}`}
                   onClick={() => ctx.onFileDownload(file)}
                 />
               }
             >
               <DownloadIcon />
             </TooltipTrigger>
-            <TooltipPopup side="top">Download {label}</TooltipPopup>
+            <TooltipPopup side="top">下载 {label}</TooltipPopup>
           </Tooltip>
         </>
       )}
@@ -314,10 +314,10 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
           expanded && "w-full",
         )}
       >
-        <MessageAuthorHeading>Automation</MessageAuthorHeading>
+        <MessageAuthorHeading>自动化</MessageAuthorHeading>
         <FoldedMessageHeader
           icon={CalendarClockIcon}
-          label="Automation"
+          label="自动化"
           summary={summary}
           expanded={expanded}
           onToggle={() => setExpanded((value) => !value)}
@@ -344,7 +344,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
                 search={{ environmentId: ctx.activeThreadEnvironmentId, taskId: scheduledTaskId }}
                 className="rounded-sm text-xs text-muted-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
               >
-                Open automation
+                打开自动化
               </Link>
             ) : null}
             <TimelineRowTimestamp
@@ -360,7 +360,7 @@ function AutomationMessageRow({ row }: { row: Extract<TimelineRow, { kind: "mess
               {promptLink !== null && (
                 <MessageCopyButton
                   text={promptLink}
-                  label="Copy prompt link"
+                  label="复制提示词链接"
                   icon={LinkIcon}
                   variant="ghost"
                 />
@@ -471,7 +471,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   const revealFoldRef = findRevealRef(() => setExpanded(true));
   const senderShell = useQuietThreadShell(folded ? senderRef : null);
   const senderLabel =
-    senderShell?.title.trim() || row.message.linkedSender?.title.trim() || "Agent";
+    senderShell?.title.trim() || row.message.linkedSender?.title.trim() || "智能体";
   // Only an environment this client is connected to can open the sender's thread there.
   const linkedSenderEnvironment = useEnvironment(row.message.linkedSender?.environmentId ?? null);
   const canOpenSender =
@@ -734,7 +734,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
               <button
                 type="button"
                 className="block h-full w-full cursor-zoom-in"
-                aria-label={`Preview ${image.name}`}
+                aria-label={`预览 ${image.name}`}
                 onClick={() => {
                   const preview = buildExpandedImagePreview(regularImages, image.id);
                   if (!preview) return;
@@ -803,7 +803,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           onClick={() => ctx.onOpenThread(senderRef.threadId, senderRef.environmentId)}
           tone="muted"
         >
-          Open thread
+          打开会话
         </InlineButton>
       ) : null}
       <Tooltip>
@@ -834,7 +834,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
         {promptLink !== null && (
           <MessageCopyButton
             text={promptLink}
-            label="Copy prompt link"
+            label="复制提示词链接"
             icon={LinkIcon}
             variant="ghost"
           />
@@ -852,7 +852,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           className="me-1 text-2xs text-muted-foreground/70"
           data-user-message-attribution="t3code"
         >
-          Sent by T3 Code
+          由 T3 Code 发送
         </p>
       ) : null}
       {/* The row's heading already names the guest for screen readers. */}
@@ -872,7 +872,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
       {mediaAboveText ? (
         <div className="flex max-w-[80%] justify-end">
           {/* The heading leads the media so screen readers reach it before the images. */}
-          <MessageAuthorHeading>You</MessageAuthorHeading>
+          <MessageAuthorHeading>你</MessageAuthorHeading>
           {mediaBlock}
         </div>
       ) : null}
@@ -895,8 +895,8 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             {folded
               ? senderLabel
               : userMessage.guestName === undefined
-                ? "You"
-                : `${userMessage.guestName} (guest)`}
+                ? "你"
+                : `${userMessage.guestName}（访客）`}
           </MessageAuthorHeading>
         )}
         {folded ? (
@@ -970,7 +970,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                         <span className="block truncate">{label}</span>
                         {file.downloadable === false || pastedText ? (
                           <span className="block text-xs text-muted-foreground tabular-nums">
-                            {file.downloadable === false ? "Sending…" : formatBytes(file.sizeBytes)}
+                            {file.downloadable === false
+                              ? "正在发送…"
+                              : formatBytes(file.sizeBytes)}
                           </span>
                         ) : null}
                       </span>
@@ -981,7 +983,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                       <div key={file.id} className="flex min-w-0 items-center gap-1">
                         <button
                           type="button"
-                          aria-label={`Preview ${label}`}
+                          aria-label={`预览 ${label}`}
                           onClick={() => ctx.onFileOpen(file)}
                           className="focus-visible:ring-ring/70 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 text-left text-sm hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:outline-none"
                         >
@@ -994,14 +996,14 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                               <Button
                                 size="icon-xs"
                                 variant="ghost-muted"
-                                aria-label={`Download ${label}`}
+                                aria-label={`下载 ${label}`}
                                 onClick={() => ctx.onFileDownload(file)}
                               />
                             }
                           >
                             <DownloadIcon />
                           </TooltipTrigger>
-                          <TooltipPopup side="top">Download {label}</TooltipPopup>
+                          <TooltipPopup side="top">下载 {label}</TooltipPopup>
                         </Tooltip>
                       </div>
                     );
@@ -1086,14 +1088,14 @@ function UserMessageIntentMarker({
         }
       >
         <Redo2Icon aria-hidden="true" className="size-3" />
-        {unread ? "Steer · waiting to be read" : "Steer"}
+        {unread ? "引导 · 等待读取" : "引导"}
       </TooltipTrigger>
       <TooltipPopup side="top">
         {unread
-          ? "Waiting for the agent to read this. It reads steers between steps, after a running command finishes."
+          ? "正在等待智能体读取。它会在步骤之间读取引导消息，也就是正在运行的命令结束之后。"
           : intent === "promoted_queued_to_steer"
-            ? "Originally queued, then promoted to steer the active turn"
-            : "Steered the active turn"}
+            ? "原本在排队，随后改为引导当前这一轮"
+            : "引导了当前这一轮"}
       </TooltipPopup>
     </Tooltip>
   );
@@ -1119,13 +1121,13 @@ function RevertUserMessageButton({
             variant="ghost"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
-            aria-label="Edit from here"
+            aria-label="从这里编辑"
           />
         }
       >
         <PencilIcon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Edit from here</TooltipPopup>
+      <TooltipPopup side="top">从这里编辑</TooltipPopup>
     </Tooltip>
   );
 }
@@ -1194,7 +1196,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
               onClick={() => setExpanded((value) => !value)}
               className="-ml-1"
             >
-              {expanded ? "Show less" : "Show full message"}
+              {expanded ? "收起" : "显示完整消息"}
             </Button>
           ) : null}
         </div>

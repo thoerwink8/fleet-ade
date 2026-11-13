@@ -81,8 +81,8 @@ async function resizeBrowserViewport(
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: "Unable to resize browser viewport",
-      description: error instanceof Error ? error.message : "An error occurred.",
+      title: "无法调整浏览器视口大小",
+      description: error instanceof Error ? error.message : "发生错误。",
     });
     throw error;
   }

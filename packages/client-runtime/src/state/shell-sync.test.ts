@@ -225,7 +225,7 @@ describe("environment shell synchronization", () => {
               rowVisits += 1;
               return ThreadId.make(`thread-${index}`);
             },
-            title: "Updated",
+            title: "已更新",
           },
         })),
       );

@@ -95,7 +95,7 @@ const layerWithPolicy = (policy?: ManagedPolicySummary) =>
         get: () =>
           Effect.succeedSome({
             projectId,
-            title: "Project",
+            title: "项目",
             workspaceRoot: "/project-root",
             defaultModelSelection: null,
             defaultThreadEnvMode: null,

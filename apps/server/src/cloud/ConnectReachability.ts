@@ -84,21 +84,21 @@ export function classifyReachability(
     fix: string,
     hint: string | null = null,
   ): Unreachable => ({ status: "unreachable", checkedAt, cause, reason, hint, fix });
-  const restart = "Restart T3 Code. If it stays, run `t3 connect` again.";
+  const restart = "请重启 T3 Code。如果仍然如此，请重新运行 `t3 connect`。";
 
   if (!facts.managedTunnelConfigured) {
     // A running server reads the link `t3 connect` stores only at startup.
     return fail(
       "not_linked",
-      "The server has not set up a T3 Connect tunnel.",
-      "Run `t3 connect`, then restart T3 Code so it applies the link.",
+      "服务器尚未设置 T3 Connect 隧道。",
+      "请运行 `t3 connect`，然后重启 T3 Code 以应用关联。",
     );
   }
   if (connector === null) {
     return fail(
       "connector_not_running",
-      "The tunnel client (cloudflared) is not running.",
-      "Restart T3 Code. If it stays down, check the server log for relay client errors.",
+      "隧道客户端（cloudflared）未运行。",
+      "请重启 T3 Code。如果仍无法运行，请检查服务器日志中的中继客户端错误。",
     );
   }
   const status = endpoint?.kind === "status" ? endpoint.status : null;
@@ -120,36 +120,32 @@ export function classifyReachability(
   ) {
     return fail(
       "edge_unreachable",
-      `Cloudflare's tunnel port (${TUNNEL_EDGE_PORT}) times out from this machine.`,
+      `本机连接 Cloudflare 隧道端口（${TUNNEL_EDGE_PORT}）时超时。`,
       exitNode
-        ? `tailscale set --exit-node=   (or allow outbound ${TUNNEL_EDGE_PORT} on that network)`
-        : `Allow outbound TCP and UDP port ${TUNNEL_EDGE_PORT}, or turn off the VPN or firewall that blocks it.`,
-      exitNodeHint(exitNode) ?? "A VPN, proxy, or firewall may block it.",
+        ? `tailscale set --exit-node=   （或允许该网络上端口 ${TUNNEL_EDGE_PORT} 的出站连接）`
+        : `请允许 TCP 和 UDP 端口 ${TUNNEL_EDGE_PORT} 的出站连接，或关闭阻止连接的 VPN 或防火墙。`,
+      exitNodeHint(exitNode) ?? "VPN、代理或防火墙可能会阻止连接。",
     );
   }
   if (status === 502) {
     return fail(
       "origin_unreachable",
-      "The tunnel is up, but it cannot reach the T3 server on this machine.",
-      "Restart T3 Code so the tunnel uses the port the server listens on.",
+      "隧道已运行，但无法访问本机上的 T3 服务器。",
+      "请重启 T3 Code，让隧道使用服务器监听的端口。",
     );
   }
   if (endpoint === null || connector.readyConnections === 0) {
     return fail(
       "connector_not_ready",
-      "cloudflared has not connected to Cloudflare yet.",
-      "Wait a minute. If it stays, check the network and the server log.",
+      "cloudflared 尚未连接到 Cloudflare。",
+      "请稍等片刻。如果仍然如此，请检查网络和服务器日志。",
     );
   }
   const cloudflareError = endpoint.kind === "status" ? endpoint.cloudflareError : undefined;
   // Cloudflare answers 530 with error 1033 when the tunnel has no live connector. Other
   // codes, such as 1016 for a broken DNS record, are not fixed by restarting cloudflared.
   if (status === 530 && (cloudflareError === undefined || cloudflareError === "1033")) {
-    return fail(
-      "no_connector",
-      "Cloudflare has no live connection from this machine for the tunnel.",
-      restart,
-    );
+    return fail("no_connector", "Cloudflare 没有来自本机的可用隧道连接。", restart);
   }
   if (status !== null) {
     const code = cloudflareError === undefined ? "" : ` (Cloudflare error ${cloudflareError})`;
@@ -179,15 +175,15 @@ export function classifyReachability(
     }
     return fail(
       "dns_failed",
-      "The T3 Connect address does not resolve from this machine.",
-      "Check the DNS settings on this machine or its VPN.",
+      "本机无法解析 T3 Connect 地址。",
+      "请检查本机或 VPN 的 DNS 设置。",
       exitNodeHint(exitNode),
     );
   }
   return fail(
     "timeout",
-    "The T3 Connect address did not answer from this machine.",
-    "Check the network, VPN, or proxy on this machine.",
+    "本机访问 T3 Connect 地址时未收到响应。",
+    "请检查本机的网络、VPN 或代理。",
     exitNodeHint(exitNode),
   );
 }

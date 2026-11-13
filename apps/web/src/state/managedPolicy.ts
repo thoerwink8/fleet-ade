@@ -62,6 +62,6 @@ export function managedInstanceLocks(
     configKeys: fieldsUnder("config."),
     environmentNames: fieldsUnder("environment."),
     wholeEnvironment: paths.includes("environment"),
-    reason: `Managed by ${policy.organization}.`,
+    reason: `由 ${policy.organization} 管理。`,
   };
 }

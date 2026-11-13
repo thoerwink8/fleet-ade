@@ -91,7 +91,7 @@ export function collectServerUpdateTargets(
       skipped.push({ environmentId: machine.environmentId, label: machine.label, reason });
     const unavailable = unavailableReason(machine);
     if (config === null || unavailable !== null) {
-      skip(unavailable ?? "not connected");
+      skip(unavailable ?? "未连接");
       continue;
     }
     const selfUpdate = resolveServerSelfUpdateCapability(config);
@@ -105,11 +105,11 @@ export function collectServerUpdateTargets(
     }
     const desktopAppUpdate = supportsDesktopAppUpdate(config);
     if (selfUpdate === null) {
-      skip("needs a manual update");
+      skip("需要手动更新");
       continue;
     }
     if (selfUpdate === "desktop-managed" && !desktopAppUpdate) {
-      skip("needs a newer desktop app");
+      skip("需要更高版本的桌面应用");
       continue;
     }
     const serverVersion = config.environment.serverVersion;
@@ -117,7 +117,7 @@ export function collectServerUpdateTargets(
       selfUpdate !== "desktop-managed" &&
       cliReleaseChannelOf(serverVersion) !== cliReleaseChannelOf(targetVersion)
     ) {
-      skip(`on the ${cliReleaseChannelOf(serverVersion)} channel`);
+      skip(`使用 ${cliReleaseChannelOf(serverVersion)} 通道`);
       continue;
     }
     const target: ServerUpdateTarget = {
@@ -134,9 +134,9 @@ export function collectServerUpdateTargets(
 }
 
 function unavailableReason(machine: UpdateEverythingMachine): string | null {
-  if (machine.serverConfig === null || !machine.connected) return "not connected";
-  if (!machine.canMaintain) return "no permission";
-  if (machine.updateState.status === "running") return "already updating";
+  if (machine.serverConfig === null || !machine.connected) return "未连接";
+  if (!machine.canMaintain) return "没有权限";
+  if (machine.updateState.status === "running") return "正在更新";
   return null;
 }
 
@@ -164,13 +164,13 @@ function channelSwitchBlockReason(
   const from = channelSwitchLabel(desktopUpdateChannelOf(fromVersion));
   // Servers and releases from before this check report no migration number.
   if (currentMigration === undefined) {
-    return `its server predates database checks; update it on ${from} first`;
+    return `服务器版本过旧，不支持数据库检查；请先在 ${from} 通道上更新`;
   }
   if (release.databaseMigration === undefined) {
-    return `${release.version} predates database checks; wait for a newer ${channelSwitchLabel(release.channel)} release`;
+    return `${release.version} 不支持数据库检查；请等待 ${channelSwitchLabel(release.channel)} 通道发布更新版本`;
   }
   return currentMigration > release.databaseMigration
-    ? `its database has changes ${release.version} does not support yet; stay on ${from} until ${channelSwitchLabel(release.channel)} has them`
+    ? `数据库包含 ${release.version} 尚不支持的更改；请继续使用 ${from}，直到 ${channelSwitchLabel(release.channel)} 通道支持这些更改`
     : null;
 }
 
@@ -192,7 +192,7 @@ export function localSwitchBlockReason(
     hosted.length < backendCount ||
     hosted.some((server) => !server.connected)
   ) {
-    return "its server is not connected, so its database cannot be checked";
+    return "服务器未连接，无法检查数据库";
   }
   return (
     hosted
@@ -269,7 +269,7 @@ export function collectChannelSwitchTargets(
     }
     const unavailable = unavailableReason(machine);
     if (config === null || serverVersion === undefined || unavailable !== null) {
-      skip(unavailable ?? "not connected");
+      skip(unavailable ?? "未连接");
       continue;
     }
     const managedDenial = managedMachineUpdateDenial(config, release.version);
@@ -330,17 +330,17 @@ function trackSwitchMove(
   sameTrack: boolean,
 ): { readonly selfUpdate: ServerSelfUpdateCapability } | { readonly skip: string } {
   if (cliReleaseChannelOf(config.environment.serverVersion) === "preview") {
-    return { skip: "runs a preview build" };
+    return { skip: "运行的是预览版" };
   }
   const selfUpdate = resolveServerSelfUpdateCapability(config);
-  if (selfUpdate === null) return { skip: "needs a manual update" };
+  if (selfUpdate === null) return { skip: "需要手动更新" };
   if (selfUpdate !== "desktop-managed") return { selfUpdate };
   if (config.environment.capabilities.desktopAppChannelSwitch !== true) {
-    return { skip: "needs a newer desktop app" };
+    return { skip: "需要更高版本的桌面应用" };
   }
   // Squirrel.Mac renames the bundle for the new track and then cannot relaunch it.
   if (!sameTrack && config.environment.platform.os === "darwin") {
-    return { skip: "switch the Mac app on that Mac" };
+    return { skip: "需要在那台 Mac 上切换 Mac 应用" };
   }
   return { selfUpdate };
 }
@@ -429,8 +429,8 @@ const UPDATE_SLOW_AFTER_MS = 3 * 60 * 1000;
 export function formatUpdateElapsed(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
   if (minutes < 1) return "<1m";
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  if (minutes < 60) return `${minutes} 分钟`;
+  return `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`;
 }
 
 export interface UpdateRunMachineView {
@@ -460,10 +460,10 @@ export function describeUpdateCapsule(
 ): UpdateCapsuleView {
   if (run.phase === "countdown" && run.restartAt !== null) {
     const seconds = Math.max(0, Math.ceil((run.restartAt - now) / 1000));
-    return { tone: "default", label: `Restart in ${seconds}s`, action: "later" };
+    return { tone: "default", label: `${seconds} 秒后重启`, action: "later" };
   }
   if (run.phase === "installing") {
-    return { tone: "default", label: "Restarting…", action: null };
+    return { tone: "default", label: "正在重启…", action: null };
   }
   const active = machines.filter(({ status }) => isActive(status) && status !== "waiting");
   const slowest = active.toSorted((a, b) => a.machine.startedAt - b.machine.startedAt)[0];
@@ -480,7 +480,7 @@ export function describeUpdateCapsule(
   }
   const done = machines.filter(({ status }) => status === "done").length;
   if (machines.some(({ status }) => isActive(status))) {
-    return { tone: "default", label: `${done} of ${machines.length} updated`, action: null };
+    return { tone: "default", label: `已更新 ${done}/${machines.length}`, action: null };
   }
   if (local?.status === "downloading") {
     return {
@@ -493,18 +493,18 @@ export function describeUpdateCapsule(
   if (failed.length > 0) {
     return {
       tone: "failed",
-      label: failed.length === 1 ? `${failed[0]!.machine.label} failed` : `${failed.length} failed`,
+      label: failed.length === 1 ? `${failed[0]!.machine.label} 失败` : `${failed.length} 失败`,
       action:
         !run.trackSwitch && failed.some(({ machine }) => machine.server !== null)
           ? "retry"
           : "dismiss",
     };
   }
-  return { tone: "default", label: `${done} of ${machines.length} updated`, action: null };
+  return { tone: "default", label: `已更新 ${done}/${machines.length}`, action: null };
 }
 
 export const RUN_STATUS_LABELS: Record<UpdateRunMachineStatus, string> = {
-  providers: "updating providers",
+  providers: "正在更新智能体提供方",
   waiting: "waiting",
   downloading: "downloading",
   restarting: "restarting",
@@ -538,7 +538,7 @@ export function collectUpdateEverythingResult(input: {
     updatedProviders: input.providers.filter((outcome) => outcome.status === "updated").length,
     restarting: [],
     failures: [
-      ...input.localFailures.map((failure) => `This app: ${failure}`),
+      ...input.localFailures.map((failure) => `此应用：${failure}`),
       ...input.servers.flatMap(({ label, outcome }) =>
         outcome.status === "failed" ? [`${label}: ${outcome.message}`] : [],
       ),
@@ -556,7 +556,7 @@ export function getUpdateEverythingToastView(
   readonly description?: string;
 } | null {
   const parts = [
-    result.localVersion !== null && result.localVersion === appVersion ? "this app" : null,
+    result.localVersion !== null && result.localVersion === appVersion ? "此应用" : null,
     countLabel(result.updatedServers, "server"),
     countLabel(result.updatedProviders, "provider"),
   ].filter((part) => part !== null);
@@ -570,13 +570,13 @@ export function getUpdateEverythingToastView(
     if (parts.length === 0) return null;
     return {
       type: "success",
-      title: `Updated ${joinList(parts)}`,
+      title: `已更新 ${joinList(parts)}`,
       ...(restarting.length === 0 ? {} : { description: restarting.join("\n") }),
     };
   }
   return {
     type: "error",
-    title: parts.length === 0 ? "Update failed" : `Updated ${joinList(parts)}`,
+    title: parts.length === 0 ? "更新失败" : `已更新 ${joinList(parts)}`,
     description: [...result.failures, ...restarting].join("\n"),
   };
 }
@@ -627,9 +627,9 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
     (count, machine) => count + machine.providers.length,
     0,
   );
-  const summary = `Update ${joinList(
+  const summary = `更新 ${joinList(
     [
-      plan.localVersion ? "this app" : null,
+      plan.localVersion ? "此应用" : null,
       countLabel(plan.servers.length, "server"),
       countLabel(providerCount, "provider"),
     ].filter((part) => part !== null),
@@ -651,7 +651,7 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
     rows.set(environmentId, { ...row, ...change });
   };
   if (plan.localVersion) {
-    if (plan.localMachines.length === 0) update(null, "This app", { app: "this-app" });
+    if (plan.localMachines.length === 0) update(null, "此应用", { app: "this-app" });
     for (const machine of plan.localMachines) {
       update(machine.environmentId, machine.label, { app: "this-app" });
     }

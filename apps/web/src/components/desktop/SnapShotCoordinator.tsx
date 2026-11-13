@@ -374,8 +374,8 @@ export function SnapShotCoordinator() {
               "missing-project",
               stackedThreadToast({
                 type: "error",
-                title: "Snapshot taken, but no project is available",
-                description: "Add a project, then capture the window again.",
+                title: "已截图，但没有可用的项目",
+                description: "请先添加项目，再重新截取窗口。",
               }),
             );
             continue;
@@ -398,9 +398,9 @@ export function SnapShotCoordinator() {
               "delivery",
               stackedThreadToast({
                 type: "error",
-                title: "Snapshot failed",
+                title: "截图失败",
                 description: `Capture ${item.id}: ${
-                  error instanceof Error ? error.message : "Try the capture again."
+                  error instanceof Error ? error.message : "请重试截图。"
                 }`,
               }),
             );
@@ -414,8 +414,8 @@ export function SnapShotCoordinator() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Snapshot failed",
-            description: error instanceof Error ? error.message : "Try the capture again.",
+            title: "截图失败",
+            description: error instanceof Error ? error.message : "请重试截图。",
           }),
         );
       })
@@ -483,8 +483,8 @@ export function SnapShotCoordinator() {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Snapshot failed",
-                description: state.message ?? "Try the capture again.",
+                title: "截图失败",
+                description: state.message ?? "请重试截图。",
               }),
             );
           });

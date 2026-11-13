@@ -221,7 +221,7 @@ it.effect("keeps complete review metadata visible while a refresh is held", () =
                 {
                   id: "working-tree",
                   kind: "working-tree" as const,
-                  title: "Uncommitted",
+                  title: "未提交的更改",
                   baseRef: "HEAD",
                   headRef: null,
                   diff: "",
@@ -1186,7 +1186,7 @@ describe("environment query lifecycle", () => {
           initialConfig: Effect.succeed({ threadLinkMetadata: supported }),
           client: {
             [tag]: () =>
-              Effect.succeed(supported ? { fork: { title: "Fork", projectId } } : { fork: "Fork" }),
+              Effect.succeed(supported ? { fork: { title: "分叉", projectId } } : { fork: "Fork" }),
           },
         } as unknown as RpcSession.RpcSession,
       });
@@ -1199,7 +1199,7 @@ describe("environment query lifecycle", () => {
       });
       const registry = yield* mountEnvironmentQuery(atom);
       expect(yield* readEnvironmentQuery(registry, atom)).toEqual({
-        fork: { title: "Fork", projectId: supported ? projectId : null },
+        fork: { title: "分叉", projectId: supported ? projectId : null },
       });
     }),
   );
@@ -1643,7 +1643,7 @@ describe("persisted environment queries", () => {
   it.effect("keeps cached content available when revalidation fails", () =>
     Effect.gen(function* () {
       const harness = yield* makeEnvironmentQueryHarness(
-        Effect.fail(new TestQueryError({ message: "failed" })),
+        Effect.fail(new TestQueryError({ message: "失败" })),
         {
           persistence: { load: () => Effect.succeedSome("cached"), save: () => Effect.void },
         },

@@ -6,9 +6,9 @@ export async function readBoundedDocument(
 ) {
   const response = await fetch(src, { signal, cache });
   if (!response.ok || Number(response.headers.get("content-length")) > limit)
-    throw new Error("This file is unavailable or too large to preview.");
+    throw new Error("此文件不可用，或太大而无法预览。");
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("This file is unavailable.");
+  if (!reader) throw new Error("此文件不可用。");
   const chunks: Uint8Array<ArrayBuffer>[] = [];
   let size = 0;
   try {
@@ -16,7 +16,7 @@ export async function readBoundedDocument(
       const { done, value } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > limit) throw new Error("This file is too large to preview.");
+      if (size > limit) throw new Error("此文件太大，无法预览。");
       chunks.push(value);
     }
   } finally {

@@ -118,7 +118,7 @@ function previewProfileName(
   profiles: ReadonlyArray<{ readonly id: string; readonly name: string }>,
   profileId: string,
 ): string {
-  return profiles.find((profile) => profile.id === profileId)?.name ?? "Removed profile";
+  return profiles.find((profile) => profile.id === profileId)?.name ?? "已移除的配置";
 }
 
 const localApi = typeof window === "undefined" ? null : ensureLocalApi();
@@ -190,7 +190,7 @@ export function PreviewView({
   const environmentHttpBaseUrl = useEnvironmentHttpBaseUrl(threadRef.environmentId);
   const open = useAtomCommand(previewEnvironment.open);
   const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
-  const environmentLabel = useEnvironment(threadRef.environmentId)?.label ?? "the environment";
+  const environmentLabel = useEnvironment(threadRef.environmentId)?.label ?? "此环境";
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const serverBrowser = useEnvironmentSupportsServerBrowser(threadRef.environmentId);
   const adjust = useAtomCommand(previewEnvironment.adjust, "preview appearance or zoom");
@@ -274,7 +274,7 @@ export function PreviewView({
       if (isBrowserSettingsReadError(error)) {
         toastManager.add({
           type: "error",
-          title: "Unable to open browser",
+          title: "无法打开浏览器",
           description: error.message,
         });
       }
@@ -297,12 +297,12 @@ export function PreviewView({
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not open this address",
+        title: "无法打开此地址",
         description: isPreviewUrlNormalizationError(error)
-          ? "Enter an http or https URL."
+          ? "请输入 http 或 https URL。"
           : error instanceof Error
             ? error.message
-            : "An error occurred.",
+            : "发生错误。",
       });
     }
   };
@@ -319,12 +319,12 @@ export function PreviewView({
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not open this address",
+        title: "无法打开此地址",
         description: isPreviewUrlNormalizationError(error)
-          ? "Enter an http or https URL."
+          ? "请输入 http 或 https URL。"
           : error instanceof Error
             ? error.message
-            : "An error occurred.",
+            : "发生错误。",
       });
     }
   };
@@ -344,8 +344,8 @@ export function PreviewView({
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "Unable to change the browser tab",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: "无法切换浏览器标签页",
+        description: error instanceof Error ? error.message : "发生错误。",
       });
       return;
     }
@@ -376,7 +376,7 @@ export function PreviewView({
     !isUnreachable;
   const handleFind = () => {
     if (!canFindInPage) {
-      toastManager.add({ type: "info", title: "Find on page isn't available for this page" });
+      toastManager.add({ type: "info", title: "此页面不支持在页面上查找" });
       return;
     }
     setFind((previous) => ({ tabId: runtimeTabId, requestId: (previous?.requestId ?? 0) + 1 }));
@@ -446,7 +446,7 @@ export function PreviewView({
     snapshot,
   );
   const moveLabel =
-    moveTarget === "server" ? `Open in ${environmentLabel}'s browser` : "Open on this computer";
+    moveTarget === "server" ? `在 ${environmentLabel} 的浏览器中打开` : "在本机打开";
   const handleMoveTab = async () => {
     if (!moveTarget || !tabId || !snapshot) return;
     const result = await openPreviewSession({
@@ -469,8 +469,8 @@ export function PreviewView({
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "Unable to move the browser tab",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: "无法移动浏览器标签页",
+        description: error instanceof Error ? error.message : "发生错误。",
       });
       return;
     }
@@ -540,8 +540,8 @@ export function PreviewView({
     void operation(runtimeTabId).catch((error) => {
       toastManager.add({
         type: "error",
-        title: "Unable to update popped-out preview",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: "无法更新弹出的预览",
+        description: error instanceof Error ? error.message : "发生错误。",
       });
     });
   };
@@ -562,8 +562,8 @@ export function PreviewView({
                 toastId,
                 stackedThreadToast({
                   type: "error",
-                  title: "Unable to copy recording path",
-                  description: "Clipboard API unavailable.",
+                  title: "无法复制录制文件路径",
+                  description: "剪贴板 API 不可用。",
                   actionProps: revealAction,
                 }),
               );
@@ -584,8 +584,8 @@ export function PreviewView({
                   toastId,
                   stackedThreadToast({
                     type: "error",
-                    title: "Unable to copy recording path",
-                    description: error instanceof Error ? error.message : "An error occurred.",
+                    title: "无法复制录制文件路径",
+                    description: error instanceof Error ? error.message : "发生错误。",
                     actionProps: revealAction,
                   }),
                 );
@@ -602,11 +602,11 @@ export function PreviewView({
               toastId,
               stackedThreadToast({
                 type: "success",
-                title: "Recording saved",
+                title: "录制已保存",
                 actionProps: revealAction,
                 data: {
                   secondaryActionProps: {
-                    children: pathCopied ? "Copied!" : "Copy path",
+                    children: pathCopied ? "已复制！" : "复制路径",
                     disabled: pathCopied,
                     onClick: copyPath,
                   },
@@ -619,11 +619,11 @@ export function PreviewView({
           toastId = toastManager.add(
             stackedThreadToast({
               type: "success",
-              title: "Recording saved",
+              title: "录制已保存",
               actionProps: revealAction,
               data: {
                 secondaryActionProps: {
-                  children: "Copy path",
+                  children: "复制路径",
                   onClick: copyPath,
                 },
                 secondaryActionVariant: "outline",
@@ -634,8 +634,8 @@ export function PreviewView({
         (error) => {
           toastManager.add({
             type: "error",
-            title: "Unable to stop recording",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "无法停止录制",
+            description: error instanceof Error ? error.message : "发生错误。",
           });
         },
       );
@@ -643,11 +643,11 @@ export function PreviewView({
     }
     if (record) {
       void startBrowserRecording(runtimeTabId, threadRef, tabId).catch((error) => {
-        const description = error instanceof Error ? error.message : "An error occurred.";
+        const description = error instanceof Error ? error.message : "发生错误。";
         if (isBrowserRecordingStartCancelledError(error)) return;
         toastManager.add({
           type: "error",
-          title: "Unable to start recording",
+          title: "无法开始录制",
           description,
         });
       });
@@ -665,7 +665,7 @@ export function PreviewView({
 
         const updateScreenshotToast = (
           type: "success" | "error" = "success",
-          title = "Screenshot saved",
+          title = "截图已保存",
           description?: string,
         ) => {
           toastManager.update(
@@ -675,7 +675,7 @@ export function PreviewView({
               title,
               description,
               actionProps: {
-                children: imageCopied ? "Copied!" : "Copy image",
+                children: imageCopied ? "已复制！" : "复制图片",
                 disabled: imageCopied,
                 onClick: copyImage,
               },
@@ -684,7 +684,7 @@ export function PreviewView({
                   {
                     id: "copy-path",
                     props: {
-                      children: pathCopied ? "Copied!" : "Copy path",
+                      children: pathCopied ? "已复制！" : "复制路径",
                       disabled: pathCopied,
                       onClick: copyPath,
                     },
@@ -701,11 +701,7 @@ export function PreviewView({
 
         const copyPath = () => {
           if (!navigator.clipboard?.writeText) {
-            updateScreenshotToast(
-              "error",
-              "Unable to copy screenshot path",
-              "Clipboard API unavailable.",
-            );
+            updateScreenshotToast("error", "无法复制截图路径", "剪贴板 API 不可用。");
             return;
           }
 
@@ -721,8 +717,8 @@ export function PreviewView({
             (error) => {
               updateScreenshotToast(
                 "error",
-                "Unable to copy screenshot path",
-                error instanceof Error ? error.message : "An error occurred.",
+                "无法复制截图路径",
+                error instanceof Error ? error.message : "发生错误。",
               );
             },
           );
@@ -741,8 +737,8 @@ export function PreviewView({
             (error) => {
               updateScreenshotToast(
                 "error",
-                "Unable to copy screenshot",
-                error instanceof Error ? error.message : "An error occurred.",
+                "无法复制截图",
+                error instanceof Error ? error.message : "发生错误。",
               );
             },
           );
@@ -751,9 +747,9 @@ export function PreviewView({
         toastId = toastManager.add(
           stackedThreadToast({
             type: "success",
-            title: "Screenshot saved",
+            title: "截图已保存",
             actionProps: {
-              children: "Copy image",
+              children: "复制图片",
               onClick: copyImage,
             },
             data: {
@@ -761,7 +757,7 @@ export function PreviewView({
                 {
                   id: "copy-path",
                   props: {
-                    children: "Copy path",
+                    children: "复制路径",
                     onClick: copyPath,
                   },
                 },
@@ -777,8 +773,8 @@ export function PreviewView({
       (error) => {
         toastManager.add({
           type: "error",
-          title: "Unable to capture screenshot",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: "无法截取屏幕截图",
+          description: error instanceof Error ? error.message : "发生错误。",
         });
       },
     );
@@ -855,8 +851,8 @@ export function PreviewView({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not capture the picked element",
-            description: "The annotation was kept without the screenshot.",
+            title: "无法截取所选元素",
+            description: "标注已保留，但不含截图。",
           }),
         );
       }
@@ -999,9 +995,7 @@ export function PreviewView({
         onPickElement={previewBridge && tabId && !isServerTab ? handlePickElement : undefined}
         pickActive={pickActive}
         pickDisabled={!tabId || isUnreachable}
-        pickDisabledReason={
-          isUnreachable ? "Page didn't load. Pick is unavailable until the page renders" : undefined
-        }
+        pickDisabledReason={isUnreachable ? "页面未加载。在页面渲染前无法选取元素" : undefined}
         leadingActions={
           activeProfileId !== browserDefaults.profileId ? (
             <Tooltip>
@@ -1103,7 +1097,7 @@ export function PreviewView({
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center">
               <p className="max-w-sm text-sm text-muted-foreground">
-                This tab is open in the T3 Code desktop app.
+                此标签页已在 T3 Code 桌面应用中打开。
               </p>
             </div>
           )

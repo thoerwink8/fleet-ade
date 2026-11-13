@@ -109,21 +109,21 @@ export function getProviderStatusMessage(status: ServerProvider): string {
   if (status.message) return status.message;
   const providerName = status.displayName?.trim() || formatProviderDriverKindLabel(status.driver);
   if (!status.installed && hasProviderSetup(status)) {
-    return `Open provider setup to install ${formatProviderDriverKindLabel(status.driver)} on this environment.`;
+    return `打开提供方设置，在此环境中安装 ${formatProviderDriverKindLabel(status.driver)}。`;
   }
   if (status.auth.status === "unauthenticated") {
     if (hasProviderSetup(status)) {
       return status.driver === "antigravity"
-        ? "Open provider setup to sign in with Google."
-        : "Open provider setup to sign in.";
+        ? "打开提供方设置，使用 Google 登录。"
+        : "打开提供方设置进行登录。";
     }
-    return "Sign in via the CLI to authenticate again.";
+    return "请通过 CLI 重新登录认证。";
   }
   return status.status === "ready"
-    ? "No models are available for this provider."
+    ? "这个提供方没有可用的模型。"
     : status.status === "error"
-      ? `${providerName} provider is unavailable.`
-      : `${providerName} provider has limited availability.`;
+      ? `提供方 ${providerName} 不可用。`
+      : `提供方 ${providerName} 部分可用。`;
 }
 
 export const ProviderStatusBanner = memo(function ProviderStatusBanner({
@@ -139,7 +139,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
 }) {
   const canRefresh = useAtomValue(serverEnvironment.refreshProviders.permissionAtom(environmentId));
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
-    label: "Refresh provider status",
+    label: "刷新提供方状态",
   });
   const refreshingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -164,10 +164,10 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   const isUnauthenticated = status.status === "error" && status.auth.status === "unauthenticated";
   const incompatible = getIncompatibleVersion(status);
   const title = isUnauthenticated
-    ? `${providerName} is unauthenticated`
+    ? `${providerName} 未登录`
     : incompatible
       ? `${providerName} ${status.version ?? ""} is ${incompatible.status === "broken" ? "known to be broken" : "unsupported"}`
-      : `${providerName} provider status`;
+      : `提供方 ${providerName} 状态`;
   const message = incompatible?.message ?? getProviderStatusMessage(status);
   const isWarning =
     incompatible?.status !== "broken" && (status.status === "warning" || incompatible !== null);
@@ -193,25 +193,25 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
             <div className="flex flex-wrap items-center justify-end gap-3">
               {onOpenProviderSetup && hasProviderSetup(status) ? (
                 <InlineButton onClick={() => onOpenProviderSetup(status.instanceId)}>
-                  Open provider setup
+                  打开提供方设置
                 </InlineButton>
               ) : null}
               <Button
-                aria-label={`Refresh ${providerName} provider status`}
+                aria-label={`刷新提供方 ${providerName} 的状态`}
                 disabled={!canRefresh || isRefreshing}
                 onClick={() => void refresh()}
                 size="xs"
                 variant="outline"
               >
                 <RefreshIcon />
-                {isRefreshing ? "Refreshing..." : "Refresh"}
+                {isRefreshing ? "正在刷新…" : "刷新"}
               </Button>
             </div>
           </div>
         </AlertDescription>
         <AlertAction>
           <Button
-            aria-label={`Dismiss ${providerName} provider ${status.status}`}
+            aria-label={`关闭提供方 ${providerName} 的提示（${status.status}）`}
             onClick={onDismiss}
             size="icon-xs"
             variant="ghost-muted"

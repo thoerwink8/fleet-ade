@@ -43,16 +43,16 @@ interface Policy {
 }
 
 const RUNTIME_MODES = [
-  { value: "approval-required", label: "Supervised" },
-  { value: "auto-accept-edits", label: "Auto-accept edits" },
-  { value: "auto", label: "Auto" },
-  { value: "full-access", label: "Full access" },
+  { value: "approval-required", label: "需审批" },
+  { value: "auto-accept-edits", label: "自动接受编辑" },
+  { value: "auto", label: "自动" },
+  { value: "full-access", label: "完全访问" },
 ];
 
 const policies = (): ReadonlyArray<Policy> => [
   {
     id: "Organization",
-    title: "Organization",
+    title: "组织",
     help: 'Required whenever any other T3 Code policy is set: T3 Code will not start with policies that do not name an organization.\n\nUsers see the name as "Managed by <organization>" beside every control the policy locks. The support URL is optional.',
     elements: [
       { kind: "text", name: "Organization", label: "Organization name" },
@@ -139,16 +139,16 @@ const policies = (): ReadonlyArray<Policy> => [
   },
   {
     id: "Updates",
-    title: "Updates",
+    title: "更新",
     help: "Off stops T3 Code from checking for updates, for machines that receive T3 Code through device management.\n\nA feed URL makes the desktop app update from your own mirror of the release feed instead of GitHub; it must be https. Unchecking nightly makes the nightly channel unavailable.\n\nDisabled or Not Configured: no restriction.",
     elements: [
       {
         kind: "enum",
         name: "UpdatesMode",
-        label: "Updates",
+        label: "更新",
         items: [
-          { value: "auto", label: "Automatic" },
-          { value: "off", label: "Off" },
+          { value: "auto", label: "自动" },
+          { value: "off", label: "关闭" },
         ],
         defaultItem: 0,
       },

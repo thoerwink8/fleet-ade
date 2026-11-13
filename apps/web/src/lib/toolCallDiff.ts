@@ -69,8 +69,8 @@ export function toolCallDiff(
     content: diff.text?.trim()
       ? []
       : [
-          { label: "Recorded content before", text: before.text },
-          { label: "Recorded content after", text: after.text },
+          { label: "记录的内容（之前）", text: before.text },
+          { label: "记录的内容（之后）", text: after.text },
         ].filter((entry): entry is { label: string; text: string } => entry.text !== undefined),
     truncated: diff.truncated || before.truncated || after.truncated,
   };

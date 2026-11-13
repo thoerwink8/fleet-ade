@@ -97,7 +97,7 @@ export function deviceToolVersionLabels(tools: DeviceToolVersions | undefined) {
   if (!tools) return ["Device tool versions have not been checked."];
   return (
     [
-      ["Device hub", tools.hub],
+      ["设备中心", tools.hub],
       ["Agent tools", tools.agent],
     ] as const
   ).map(([name, tool]) => {

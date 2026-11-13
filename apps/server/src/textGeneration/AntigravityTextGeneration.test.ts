@@ -352,7 +352,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
       Effect.gen(function* () {
         const fixture = yield* makeFixture({
           prompt: ({ emit }) =>
-            emit({ sessionUpdate, toolCallId: "tool-1", title: "Read files" }).pipe(
+            emit({ sessionUpdate, toolCallId: "tool-1", title: "读取文件" }).pipe(
               Effect.andThen(Effect.never),
             ),
         });

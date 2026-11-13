@@ -1925,7 +1925,7 @@ describe("EnvironmentSupervisor routes", () => {
         checkRoute: () => Effect.succeed("answered"),
         prepare: (_attempt, target) =>
           target._tag === "BearerConnectionTarget"
-            ? Effect.fail(blocked("The environment credential is invalid."))
+            ? Effect.fail(blocked("环境凭据无效。"))
             : Effect.succeed(preparedFor(target)),
       });
       const supervisor = yield* EnvironmentSupervisor.make(LAN_THEN_RELAY_ENTRY, {

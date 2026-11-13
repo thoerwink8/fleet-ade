@@ -804,7 +804,7 @@ export function createEnvironmentQueryAtomFamily<R, ER, Input, A, E>(
                 new EnvironmentRpcUnavailableError({
                   environmentId: target.environmentId,
                   message: `Environment ${target.environmentId} is ${
-                    connectionState.phase === "available" ? "not connected" : connectionState.phase
+                    connectionState.phase === "available" ? "未连接" : connectionState.phase
                   }.`,
                 }),
               );

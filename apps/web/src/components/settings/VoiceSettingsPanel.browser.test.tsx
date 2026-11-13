@@ -147,8 +147,8 @@ it.each([{ cpu: null, accelerated: 2.1 }, { cpu: 5, accelerated: null }, { accel
         secondsPer30s,
       },
     };
-    const cpuBenchmark = `Speed: ${secondsPer30s.cpu === undefined ? "update server" : secondsPer30s.cpu === null ? "not benchmarked" : `${secondsPer30s.cpu} s / 30 s`}`;
-    const gpuBenchmark = `Speed: ${secondsPer30s.accelerated === null ? "not benchmarked" : `${secondsPer30s.accelerated} s / 30 s`}`;
+    const cpuBenchmark = `Speed: ${secondsPer30s.cpu === undefined ? "请更新服务器" : secondsPer30s.cpu === null ? "未做基准测试" : `${secondsPer30s.cpu} s / 30 s`}`;
+    const gpuBenchmark = `Speed: ${secondsPer30s.accelerated === null ? "未做基准测试" : `${secondsPer30s.accelerated} s / 30 s`}`;
     const fetch = globalThis.fetch;
     using _network = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = new URL(input instanceof Request ? input.url : input, window.location.href);
@@ -334,7 +334,7 @@ it("tests the selected model after download and preserves its transcript across 
 
           const search = screen.getByRole("searchbox", { name: "Search transcription models" });
           await userEvent.fill(search, "no matching model");
-          await expect.element(screen.getByText("No models match.")).toBeVisible();
+          await expect.element(screen.getByText("没有匹配的模型。")).toBeVisible();
           await userEvent.clear(search);
           const languages = screen.getByRole("button", { name: /^Filter by language/ });
           await userEvent.click(languages);
@@ -506,9 +506,7 @@ it("recovers from a failed download progress poll without notifying, but reports
       expect(notify).not.toHaveBeenCalled();
       await screen.rerender(panel("reopened"));
       await vi.waitFor(() =>
-        expect(notify).toHaveBeenCalledWith(
-          expect.objectContaining({ title: "Could not load transcription models" }),
-        ),
+        expect(notify).toHaveBeenCalledWith(expect.objectContaining({ title: "无法加载转写模型" })),
       );
     },
   );
@@ -553,7 +551,7 @@ it("keeps a missing destination selected without claiming it cannot transcribe",
   );
   await expect
     .element(screen.getByRole("combobox", { name: "Transcribe with" }))
-    .toHaveTextContent("Chosen environment (unavailable)");
+    .toHaveTextContent("已选择的环境（不可用）");
   await expect.element(screen.getByText(/can’t transcribe audio/)).not.toBeInTheDocument();
 });
 
@@ -641,15 +639,15 @@ it("records from the first connected microphone in the saved order", async () =>
     .mockResolvedValue([yeti, airpods]);
   const saved = () =>
     getClientSettings().voiceMicrophones.map((entry) =>
-      entry.kind === "default" ? "System default" : entry.label,
+      entry.kind === "default" ? "系统默认" : entry.label,
     );
   await using screen = await render(
     <SettingsScopeProvider search={{}} onChange={() => {}}>
       <VoiceSettingsPanel />
     </SettingsScopeProvider>,
   );
-  const list = screen.getByRole("list", { name: "Microphones, preferred first" });
-  await expect.poll(saved).toEqual(["Blue Yeti", "System default", "AirPods Pro"]);
+  const list = screen.getByRole("列表", { name: "Microphones, preferred first" });
+  await expect.poll(saved).toEqual(["Blue Yeti", "系统默认", "AirPods Pro"]);
   const row = (index: number) => list.getByRole("listitem").nth(index);
   await expect.element(row(0)).toHaveTextContent("1Blue YetiIn use");
   expect(await chooseRecordingMicrophone()).toBe("yeti");
@@ -662,12 +660,12 @@ it("records from the first connected microphone in the saved order", async () =>
 
   await userEvent.click(screen.getByRole("button", { name: "Move AirPods Pro up" }));
   await userEvent.click(screen.getByRole("button", { name: "Move AirPods Pro up" }));
-  expect(saved()).toEqual(["AirPods Pro", "Blue Yeti", "System default"]);
+  expect(saved()).toEqual(["AirPods Pro", "Blue Yeti", "系统默认"]);
   await expect.element(screen.getByRole("button", { name: "Move AirPods Pro up" })).toBeDisabled();
   expect(await chooseRecordingMicrophone()).toBe("airpods");
 
   await userEvent.click(screen.getByRole("button", { name: "Forget Blue Yeti" }));
-  expect(saved()).toEqual(["AirPods Pro", "System default"]);
+  expect(saved()).toEqual(["AirPods Pro", "系统默认"]);
   await expect
     .element(screen.getByRole("button", { name: "Forget System default" }))
     .not.toBeInTheDocument();

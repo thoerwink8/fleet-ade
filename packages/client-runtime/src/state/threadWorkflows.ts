@@ -161,7 +161,7 @@ export function deriveThreadQueueWorkflowState(projection: Projection): ThreadQu
     return {
       run,
       // A queued guest message shows the guest's words; the agent still gets the attributed text.
-      text: message?.context?.guest?.text ?? message?.text ?? "Queued message",
+      text: message?.context?.guest?.text ?? message?.text ?? "排队消息",
       attachments: message?.attachments ?? [],
       messageId: run.userMessageId,
       ...(message?.context ? { context: message.context } : {}),

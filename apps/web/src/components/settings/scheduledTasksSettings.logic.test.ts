@@ -30,8 +30,8 @@ import {
 const laptopId = EnvironmentId.make("laptop");
 const serverId = EnvironmentId.make("server");
 const environments = [
-  { environmentId: laptopId, label: "Laptop" },
-  { environmentId: serverId, label: "Server" },
+  { environmentId: laptopId, label: "笔记本电脑" },
+  { environmentId: serverId, label: "服务器" },
 ];
 
 function member(id: string, environmentId: EnvironmentId): SidebarProjectGroupMember {
@@ -415,5 +415,5 @@ it("appends the server zone only to fixed-time schedule labels", () => {
   );
   expect(scheduleLabel({ type: "fixed_time", timeOfDay: "09:00" })).toBe("Daily at 09:00");
   expect(scheduleLabel({ type: "interval", everyMs: 60_000 }, "Etc/UTC")).toBe("Every 1 min");
-  expect(scheduleLabel({ type: "webhook", signature: null }, "Etc/UTC")).toBe("On webhook");
+  expect(scheduleLabel({ type: "webhook", signature: null }, "Etc/UTC")).toBe("收到 webhook 时");
 });

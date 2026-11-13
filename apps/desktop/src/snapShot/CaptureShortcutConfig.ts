@@ -73,9 +73,7 @@ const defaultTools = {
         maxBuffer: 64 * 1024,
       });
     } catch {
-      throw new Error(
-        "Niri couldn't validate the proposed config. Nothing was changed. Check your config in Advanced.",
-      );
+      throw new Error("Niri 无法验证待保存的配置，未做任何更改。请在“高级”中检查配置。");
     }
   },
   hyprlandBindings: async () =>
@@ -114,9 +112,7 @@ export class CaptureShortcutConfig {
   private async checkHyprlandKeys(appId: string, shortcut: string) {
     const keys = captureConfigKeys(shortcut);
     const bindings = await this.tools.hyprlandBindings().catch(() => {
-      throw new Error(
-        "Couldn't check Hyprland's current shortcuts. Try again from your Hyprland session.",
-      );
+      throw new Error("无法检查 Hyprland 当前的快捷键。请在 Hyprland 桌面会话中重试。");
     });
     if (
       bindings.some(
@@ -187,10 +183,7 @@ export class CaptureShortcutConfig {
               missing.push(path);
               continue;
             }
-            throw new Error(
-              "Couldn't read an included Niri config. Check its location in Advanced.",
-              { cause: error },
-            );
+            throw new Error("无法读取引用的 Niri 配置。请在“高级”中检查其位置。", { cause: error });
           }
           if (files.some((item) => item.resolvedPath === child.resolvedPath)) continue;
           files.push(child);
@@ -246,9 +239,7 @@ export class CaptureShortcutConfig {
               (error: NodeJS.ErrnoException) => error.code !== "ENOENT",
             )
           )
-            throw new Error(
-              "Your config changed since this preview. Review changes again before saving.",
-            );
+            throw new Error("配置在预览后发生了变化。请重新审查更改后再保存。");
         }
         for (const original of files) {
           const current = await readSnapshot(original.path).catch(() => undefined);
@@ -259,9 +250,7 @@ export class CaptureShortcutConfig {
             current.stat.mode !== original.stat.mode ||
             !current.bytes.equals(original.bytes)
           )
-            throw new Error(
-              "Your config changed since this preview. Nothing was saved. Review changes again before saving.",
-            );
+            throw new Error("配置在预览后发生了变化，未保存任何内容。请重新审查更改后再保存。");
         }
       };
       await unchanged();
@@ -302,7 +291,7 @@ export class CaptureShortcutConfig {
           await this.tools.reloadHyprland();
         } catch {
           warning =
-            "Config saved, but Hyprland couldn't reload it cleanly. Check hyprctl configerrors, then run hyprctl reload.";
+            "配置已保存，但 Hyprland 无法正常重新加载。请检查 hyprctl configerrors，然后运行 hyprctl reload。";
         }
       }
       return { backupPath, warning };

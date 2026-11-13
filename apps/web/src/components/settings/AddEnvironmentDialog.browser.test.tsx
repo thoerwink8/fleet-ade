@@ -88,7 +88,7 @@ describe("AddEnvironmentDialog", () => {
     await using _screen = await render(<Owner />);
 
     await openDialogOnSsh();
-    await userEvent.fill(page.getByPlaceholder("Search hosts or type devbox"), "devbox");
+    await userEvent.fill(page.getByPlaceholder("搜索主机或输入 devbox"), "devbox");
     await userEvent.click(
       page.getByRole("dialog").getByRole("button", { name: "Add environment" }),
     );
@@ -106,7 +106,7 @@ describe("AddEnvironmentDialog", () => {
     await userEvent.fill(page.getByPlaceholder("backend.example.com"), "devbox.example.com");
     await userEvent.fill(page.getByPlaceholder("PAIRCODE"), "PAIRCODE");
     await userEvent.click(sshCard());
-    await userEvent.fill(page.getByPlaceholder("Search hosts or type devbox"), "devbox");
+    await userEvent.fill(page.getByPlaceholder("搜索主机或输入 devbox"), "devbox");
     await userEvent.fill(page.getByPlaceholder("root"), "maria");
     await userEvent.fill(page.getByPlaceholder("22"), "2222");
     await userEvent.keyboard("{Escape}");
@@ -115,7 +115,7 @@ describe("AddEnvironmentDialog", () => {
     await expect.element(page.getByPlaceholder("backend.example.com")).toHaveValue("");
     await expect.element(page.getByPlaceholder("PAIRCODE")).toHaveValue("");
     await userEvent.click(sshCard());
-    await expect.element(page.getByPlaceholder("Search hosts or type devbox")).toHaveValue("");
+    await expect.element(page.getByPlaceholder("搜索主机或输入 devbox")).toHaveValue("");
     await expect.element(page.getByPlaceholder("root")).toHaveValue("");
     await expect.element(page.getByPlaceholder("22")).toHaveValue("");
 
@@ -124,7 +124,7 @@ describe("AddEnvironmentDialog", () => {
       finishConnection = resolve;
     });
     mocks.connectSshEnvironment.mockImplementationOnce(() => pending);
-    await userEvent.fill(page.getByPlaceholder("Search hosts or type devbox"), "devbox");
+    await userEvent.fill(page.getByPlaceholder("搜索主机或输入 devbox"), "devbox");
     await userEvent.click(
       page.getByRole("dialog").getByRole("button", { name: "Add environment" }),
     );

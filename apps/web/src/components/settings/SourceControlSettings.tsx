@@ -81,21 +81,21 @@ function authPresentation(auth: SourceControlProviderAuth): {
   readonly badge: "secondary" | null;
 } {
   if (auth.status === "authenticated") {
-    return { label: "Authenticated", badge: null };
+    return { label: "已认证", badge: null };
   }
   if (auth.status === "unauthenticated") {
-    return { label: "Not authenticated", badge: "secondary" };
+    return { label: "未认证", badge: "secondary" };
   }
-  return { label: "Status unknown", badge: null };
+  return { label: "状态未知", badge: null };
 }
 
 function RedactedAccount(props: { readonly account: string | null }) {
   return (
     <RedactedSensitiveText
       value={props.account}
-      ariaLabel="Toggle source control account visibility"
-      revealTooltip="Click to reveal account"
-      hideTooltip="Click to hide account"
+      ariaLabel="显示或隐藏版本控制账户"
+      revealTooltip="点击显示账户"
+      hideTooltip="点击隐藏账户"
     />
   );
 }
@@ -169,10 +169,10 @@ function itemSummary({
       const authDetail = optionLabel(auth.detail);
       return (
         <>
-          <span>Authenticated</span>
+          <span>已认证</span>
           {authAccount ? (
             <>
-              <span aria-hidden>as</span>
+              <span aria-hidden>账户</span>
               <RedactedAccount account={authAccount} />
             </>
           ) : null}
@@ -186,7 +186,7 @@ function itemSummary({
     }
 
     if (auth.status === "unauthenticated" && auth.accounts?.some((entry) => entry.authenticated)) {
-      return <span>{optionLabel(auth.detail) ?? `Every ${item.label} host is turned off.`}</span>;
+      return <span>{optionLabel(auth.detail) ?? `所有 ${item.label} 托管平台均已关闭。`}</span>;
     }
 
     if (auth.status === "unauthenticated") {
@@ -206,7 +206,7 @@ function itemSummary({
     );
   }
 
-  return <span>Available</span>;
+  return <span>可用</span>;
 }
 
 function DiscoveryItemRow({
@@ -253,7 +253,7 @@ function DiscoveryItemRow({
               {version ? <code className="text-xs text-muted-foreground">{version}</code> : null}
               {isVcsNotReady(item) ? (
                 <Badge variant="warning" size="sm">
-                  Coming Soon
+                  即将推出
                 </Badge>
               ) : null}
               {authStatus?.badge ? (
@@ -273,7 +273,7 @@ function DiscoveryItemRow({
                 variant="ghost-muted"
                 onClick={() => setIsExpanded((open) => !open)}
                 aria-expanded={isExpanded}
-                aria-label={`Toggle ${item.label} details`}
+                aria-label={`展开或收起 ${item.label} 详情`}
               >
                 <ChevronDownIcon
                   className={cn("size-3.5 transition-transform", isExpanded && "rotate-180")}
@@ -292,13 +292,13 @@ function DiscoveryItemRow({
                     />
                   }
                 />
-                <TooltipPopup side="top">Offer when adding or publishing a project</TooltipPopup>
+                <TooltipPopup side="top">添加或发布项目时提供</TooltipPopup>
               </Tooltip>
             ) : !isVcsNotReady(item) ? (
               <Switch
                 checked={item.status === "available"}
                 disabled
-                aria-label={`${item.label} availability`}
+                aria-label={`${item.label} 可用性`}
               />
             ) : null}
           </div>
@@ -366,25 +366,23 @@ function EmptySourceControlDiscovery({
   const hasError = error !== null;
 
   return (
-    <SettingsSection id={searchableSetting("source-control").id} title="Server environment">
+    <SettingsSection id={searchableSetting("source-control").id} title="服务器环境">
       <Empty>
         <EmptyMedia variant="icon">
           <PullRequestGlyph.pullRequest />
         </EmptyMedia>
         <EmptyHeader>
-          <EmptyTitle>
-            {hasError ? "Could not scan the server environment" : "Nothing detected yet"}
-          </EmptyTitle>
+          <EmptyTitle>{hasError ? "无法扫描服务器环境" : "尚未检测到任何内容"}</EmptyTitle>
           <EmptyDescription>
             {hasError
               ? error
-              : "Install Git on the server, add optional hosting integrations or credentials your workspace needs, then rescan."}
+              : "在服务器上安装 Git，添加工作区所需的可选托管集成或凭据，然后重新扫描。"}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button size="sm" variant="outline" onClick={onScan} disabled={isPending}>
             <RefreshIcon size="sm" refreshing={isPending} />
-            Scan
+            扫描
           </Button>
         </EmptyContent>
       </Empty>
@@ -442,7 +440,7 @@ export function SourceControlSettingsPanel() {
             {credentials.appSignIn && item.appSignIn === true ? (
               <div className="flex items-center gap-3 text-2xs text-muted-foreground">
                 <span aria-hidden className="h-px flex-1 bg-border" />
-                Or use your own credentials
+                或使用你自己的凭据
                 <span aria-hidden className="h-px flex-1 bg-border" />
               </div>
             ) : null}
@@ -487,13 +485,13 @@ export function SourceControlSettingsPanel() {
             variant="ghost-muted"
             onClick={handleScan}
             disabled={discovery.isPending}
-            aria-label="Rescan server environment"
+            aria-label="重新扫描服务器环境"
           >
             <RefreshIcon refreshing={discovery.isPending} />
           </Button>
         }
       />
-      <TooltipPopup side="top">Rescan Git and hosting integrations</TooltipPopup>
+      <TooltipPopup side="top">重新扫描 Git 和托管集成</TooltipPopup>
     </Tooltip>
   );
 
@@ -501,25 +499,25 @@ export function SourceControlSettingsPanel() {
     <SettingsPageContainer>
       <ProjectDefaultsSettings category="source-control" />
       {environmentId === null ? (
-        <SettingsSection id={searchableSetting("source-control").id} title="Server environment">
+        <SettingsSection id={searchableSetting("source-control").id} title="服务器环境">
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            Connect an environment to inspect its version control tools and hosting integrations.
+            连接一个环境以查看其版本控制工具和托管集成。
           </p>
         </SettingsSection>
       ) : isInitialScanPending ? (
         <>
           <SourceControlSectionSkeleton
-            title={`Version Control${environmentSuffix}`}
+            title={`版本控制${environmentSuffix}`}
             headerAction={scanButton}
           />
-          <SourceControlSectionSkeleton title="Source control providers" />
+          <SourceControlSectionSkeleton title="版本控制提供方" />
         </>
       ) : hasDiscoveryItems ? (
         <>
           {hasVersionControlSystems ? (
             <SettingsSection
               id={searchableSetting("source-control").id}
-              title={`Version Control${environmentSuffix}`}
+              title={`版本控制${environmentSuffix}`}
               headerAction={scanButton}
             >
               {result.versionControlSystems.map((item) => (
@@ -532,9 +530,7 @@ export function SourceControlSettingsPanel() {
             <SettingsSection
               id={hasVersionControlSystems ? undefined : searchableSetting("source-control").id}
               title={
-                hasVersionControlSystems
-                  ? "Source control providers"
-                  : `Source control providers${environmentSuffix}`
+                hasVersionControlSystems ? "版本控制提供方" : `版本控制提供方${environmentSuffix}`
               }
               headerAction={hasVersionControlSystems ? null : scanButton}
             >

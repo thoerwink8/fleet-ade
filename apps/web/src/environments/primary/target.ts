@@ -64,7 +64,7 @@ export class PrimaryEnvironmentDisabledError extends Schema.TaggedError<PrimaryE
   {},
 ) {
   override get message(): string {
-    return "The local environment is disabled.";
+    return "本地环境已禁用。";
   }
 }
 

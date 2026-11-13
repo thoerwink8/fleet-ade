@@ -4638,7 +4638,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             question: nonEmptyText(question.question, "Choose an answer."),
             options:
               question.options?.map((option, optionIndex) => ({
-                label: nonEmptyText(option.label, `Option ${optionIndex + 1}`),
+                label: nonEmptyText(option.label, `选项 ${optionIndex + 1}`),
                 description: nonEmptyText(option.description, option.label),
               })) ?? [],
           }));
@@ -5163,12 +5163,12 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               status,
               title:
                 status === "running"
-                  ? "Compacting context"
+                  ? "正在压缩上下文"
                   : status === "completed"
-                    ? "Context compacted"
+                    ? "上下文已压缩"
                     : status === "failed"
-                      ? "Context compaction failed"
-                      : "Context compaction stopped",
+                      ? "上下文压缩失败"
+                      : "上下文压缩已停止",
               startedAt,
               completedAt: status === "running" ? null : updatedAt,
               updatedAt,

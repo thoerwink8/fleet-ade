@@ -33,7 +33,7 @@ describe("loadBalancingSendWarning", () => {
         threadContexts: [localThread, remoteThread],
         candidateEnvironmentIds: [],
       }).title,
-    ).toBe("Checking machine resources");
+    ).toBe("正在检查机器资源");
   });
 
   it("blames the attached threads when no machine can read all of them", () => {
@@ -100,10 +100,10 @@ describe("approvalRedirectNotice", () => {
 
   it("says the decline went through when the draft changed after it", () => {
     expect(approvalRedirectNotice({ ...settled, draftChanged: true })).toBe(
-      "Approval declined. Your message changed, so it wasn't sent.",
+      "已拒绝审批。由于你的消息有改动，所以没有发送。",
     );
     expect(approvalRedirectNotice({ ...settled, draftChanged: true, declined: false })).toBe(
-      "Your message changed, so it wasn't sent.",
+      "你的消息有改动，所以没有发送。",
     );
   });
 

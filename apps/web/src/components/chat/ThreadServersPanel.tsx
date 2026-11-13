@@ -65,7 +65,7 @@ function ThreadServersList(props: ThreadServersPanelProps) {
   const [visibleCount, setVisibleCount] = useState(SERVER_PAGE_COUNT);
 
   if (servers.length === 0) return null;
-  const externalClickLabel = isMacPlatform(navigator.platform) ? "⌘-click" : "Ctrl-click";
+  const externalClickLabel = isMacPlatform(navigator.platform) ? "⌘+点击" : "Ctrl+点击";
   const threadRef = scopeThreadRef(props.environmentId, props.threadId);
   const hiddenCount = Math.max(0, servers.length - visibleCount);
 
@@ -87,12 +87,12 @@ function ThreadServersList(props: ThreadServersPanelProps) {
       const url = resolveDiscoveredServerUrl(props.environmentId, server.url);
       await readLocalApi()
         ?.shell.openExternal(url)
-        .catch((error: unknown) => reportFailure("Unable to open in browser", error));
+        .catch((error: unknown) => reportFailure("无法在浏览器中打开", error));
       return;
     }
     const result = await openDiscoveredPort({ threadRef, port: server, openPreview });
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure("Unable to open preview", squashAtomCommandFailure(result));
+      reportFailure("无法打开预览", squashAtomCommandFailure(result));
     }
   };
 
@@ -105,12 +105,12 @@ function ThreadServersList(props: ThreadServersPanelProps) {
     });
     setStoppingKey(null);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure("Could not stop server", squashAtomCommandFailure(result));
+      reportFailure("无法停止服务器", squashAtomCommandFailure(result));
     }
   };
 
   return (
-    <ThreadDetailsSection headingId="thread-details-servers-heading" title="Servers">
+    <ThreadDetailsSection headingId="thread-details-servers-heading" title="服务器">
       <ul className="m-0 list-none p-0">
         {servers.slice(0, visibleCount).map((server, index) => {
           const key = serverKey(server);
@@ -163,7 +163,7 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                           variant="ghost"
                           part="icon"
                           tone="destructive"
-                          aria-label={`Stop localhost:${server.port}`}
+                          aria-label={`停止 localhost:${server.port}`}
                           disabled={stoppingKey !== null}
                           onClick={() => void stop(server)}
                         />
@@ -175,7 +175,7 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                         <SquareIcon aria-hidden className="size-3 fill-current" />
                       )}
                     </TooltipTrigger>
-                    <TooltipPopup side="left">Stop server</TooltipPopup>
+                    <TooltipPopup side="left">停止服务器</TooltipPopup>
                   </Tooltip>
                 </div>
               ) : null}
@@ -199,7 +199,7 @@ function ThreadServersList(props: ThreadServersPanelProps) {
           ) : (
             <ChevronUpIcon aria-hidden className="size-4 shrink-0" />
           )}
-          {hiddenCount > 0 ? `Show ${Math.min(hiddenCount, SERVER_PAGE_COUNT)} more` : "Show less"}
+          {hiddenCount > 0 ? `再显示 ${Math.min(hiddenCount, SERVER_PAGE_COUNT)} 个` : "收起"}
         </ThreadDetailsControl>
       ) : null}
     </ThreadDetailsSection>

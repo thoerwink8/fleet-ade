@@ -94,7 +94,7 @@ export function PreviewChromeRow({
         className="flex h-10 min-h-10 shrink-0 items-center gap-1 border-b border-border/60 bg-background px-2 in-data-[preview-panel-mode=inline]:mb-3 in-data-[preview-panel-mode=inline]:h-7 in-data-[preview-panel-mode=inline]:min-h-7 in-data-[preview-panel-mode=inline]:border-b-transparent"
         data-surface-subheader
       >
-        <div className="flex items-center gap-0.5" role="group" aria-label="Navigation">
+        <div className="flex items-center gap-0.5" role="group" aria-label="导航">
           <Tooltip>
             <TooltipTrigger
               render={
@@ -103,14 +103,14 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={canGoBack ? onBack : NOOP}
                   disabled={!canGoBack}
-                  aria-label="Back"
+                  aria-label="返回"
                   type="button"
                 />
               }
             >
               <ArrowLeft />
             </TooltipTrigger>
-            <TooltipPopup>Back</TooltipPopup>
+            <TooltipPopup>返回</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -120,14 +120,14 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={canGoForward ? onForward : NOOP}
                   disabled={!canGoForward}
-                  aria-label="Forward"
+                  aria-label="前进"
                   type="button"
                 />
               }
             >
               <ArrowRight />
             </TooltipTrigger>
-            <TooltipPopup>Forward</TooltipPopup>
+            <TooltipPopup>前进</TooltipPopup>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -137,14 +137,14 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={refreshDisabled ? NOOP : onRefresh}
                   disabled={refreshDisabled}
-                  aria-label={loading ? "Stop" : "Refresh"}
+                  aria-label={loading ? "停止" : "刷新"}
                   type="button"
                 />
               }
             >
               <RefreshIcon refreshing={loading} />
             </TooltipTrigger>
-            <TooltipPopup>{loading ? "Loading…" : "Refresh"}</TooltipPopup>
+            <TooltipPopup>{loading ? "加载中" : "刷新"}</TooltipPopup>
           </Tooltip>
         </div>
 
@@ -179,8 +179,8 @@ export function PreviewChromeRow({
                       inputRef.current?.blur();
                     }
                   }}
-                  placeholder="Search or enter URL"
-                  aria-label="Search or enter URL"
+                  placeholder="搜索或输入 URL"
+                  aria-label="搜索或输入 URL"
                   data-workspace-focus-default
                   spellCheck={false}
                   disabled={inputDisabled}
@@ -201,14 +201,14 @@ export function PreviewChromeRow({
                         variant="ghost"
                         size="icon-xs"
                         onClick={onOpenInBrowser}
-                        aria-label="Open in system browser"
+                        aria-label="在系统浏览器中打开"
                         type="button"
                       />
                     }
                   >
                     <ExternalLink />
                   </TooltipTrigger>
-                  <TooltipPopup>Open in system browser</TooltipPopup>
+                  <TooltipPopup>在系统浏览器中打开</TooltipPopup>
                 </Tooltip>
               </span>
             </InputGroupAddon>
@@ -224,7 +224,7 @@ export function PreviewChromeRow({
                   size="icon-xs"
                   onClick={onPickElement}
                   disabled={pickDisabled}
-                  aria-label={pickActive ? "Cancel annotation" : "Annotate preview"}
+                  aria-label={pickActive ? "取消标注" : "标注预览"}
                   aria-pressed={pickActive ? "true" : "false"}
                   type="button"
                 />
@@ -236,8 +236,8 @@ export function PreviewChromeRow({
               {pickDisabled && pickDisabledReason
                 ? pickDisabledReason
                 : pickActive
-                  ? "Cancel annotation (Esc)"
-                  : "Annotate elements, regions, and drawings"}
+                  ? "取消标注（Esc）"
+                  : "标注元素、区域和图形"}
             </TooltipPopup>
           </Tooltip>
         ) : null}
@@ -249,7 +249,7 @@ export function PreviewChromeRow({
                   variant={recording ? "secondary" : "ghost"}
                   size="icon-xs"
                   onClick={(event) => onCapture(event.shiftKey)}
-                  aria-label={recording ? "Stop recording" : "Capture screenshot"}
+                  aria-label={recording ? "停止录制" : "截取屏幕截图"}
                   type="button"
                   className="relative"
                   disabled={captureDisabled}
@@ -261,9 +261,7 @@ export function PreviewChromeRow({
                 <span className="absolute right-0.5 top-0.5 size-1.5 motion-safe:animate-status-pulse rounded-full bg-destructive" />
               ) : null}
             </TooltipTrigger>
-            <TooltipPopup>
-              {recording ? "Stop recording" : "Screenshot · Shift-click to record"}
-            </TooltipPopup>
+            <TooltipPopup>{recording ? "停止录制" : "截图 · 按住 Shift 点击可录制"}</TooltipPopup>
           </Tooltip>
         ) : null}
         {onPictureInPicture ? (
@@ -274,9 +272,7 @@ export function PreviewChromeRow({
                   variant={pictureInPicture ? "secondary" : "ghost"}
                   size="icon-xs"
                   onClick={onPictureInPicture}
-                  aria-label={
-                    pictureInPicture ? "Close floating preview" : "Float preview over chat"
-                  }
+                  aria-label={pictureInPicture ? "关闭悬浮预览" : "让预览悬浮在对话上方"}
                   aria-pressed={pictureInPicture ? "true" : "false"}
                   type="button"
                   disabled={pictureInPictureDisabled}
@@ -286,7 +282,7 @@ export function PreviewChromeRow({
               <PictureInPicture2 className={cn(pictureInPicture && "text-primary")} />
             </TooltipTrigger>
             <TooltipPopup>
-              {pictureInPicture ? "Close floating preview" : "Float preview over chat"}
+              {pictureInPicture ? "关闭悬浮预览" : "让预览悬浮在对话上方"}
             </TooltipPopup>
           </Tooltip>
         ) : null}

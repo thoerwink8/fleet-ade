@@ -270,7 +270,7 @@ describe("compact bounded snapshots", () => {
       id: TurnItemId.make("interrupt-request"),
       type: "run_interrupt_request",
       ordinal: 0,
-      message: "Stop",
+      message: "停止",
     } as unknown as OrchestrationV2TurnItem;
     return {
       ...base,

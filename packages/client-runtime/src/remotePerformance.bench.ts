@@ -108,7 +108,7 @@ const delta: Extract<OrchestrationV2DomainEvent, { type: "message.updated" }> = 
   type: "message.updated",
   threadId: thread.thread.id,
   occurredAt: v2Now,
-  payload: { ...thread.messages[99]!, text: " next", streaming: true },
+  payload: { ...thread.messages[99]!, text: "下次运行", streaming: true },
 };
 
 describe("remote message replay", () => {

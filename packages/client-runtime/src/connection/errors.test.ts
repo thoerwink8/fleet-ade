@@ -26,7 +26,7 @@ describe("mapManagedRelayError", () => {
     );
     expect(mapped).toMatchObject({
       reason: "timeout",
-      detail: "Relay timed out while contacting the environment endpoint.",
+      detail: "中继连接环境端点超时。",
       traceId: "trace-server-timeout",
     });
   });
@@ -50,7 +50,7 @@ describe("mapManagedRelayError", () => {
     expect(mapConnectRefusal("managed_endpoint_allocation_not_ready")).toMatchObject({
       _tag: "ConnectionTransientError",
       reason: "endpoint-unavailable",
-      detail: "The environment's T3 Connect tunnel is still being set up.",
+      detail: "此环境的 T3 Connect 隧道仍在设置中。",
       traceId: "trace-connect-refused",
     });
     expect(mapConnectRefusal("endpoint_provider_not_managed")).toMatchObject({

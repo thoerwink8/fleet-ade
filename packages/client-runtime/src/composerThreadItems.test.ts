@@ -69,7 +69,7 @@ it("also offers threads on linked machines, naming the machine, but no other mac
     now: Date.parse("2026-10-23T00:00:00.000Z"),
   });
   expect(items.map(({ thread, label, description }) => ({ thread, label, description }))).toEqual([
-    { thread: { environmentId, threadId: "here" }, label: "Deploy script", description: "Thread" },
+    { thread: { environmentId, threadId: "here" }, label: "Deploy script", description: "会话" },
     {
       thread: { environmentId: vps, threadId: "there" },
       label: "Deploy script",
@@ -99,7 +99,7 @@ describe("matchComposerEnvironmentItems", () => {
         environmentId: "env-vps",
         machine: "cloud",
         label: "Hetzner VPS",
-        description: "Machine",
+        description: "机器",
       },
     ]);
     expect(

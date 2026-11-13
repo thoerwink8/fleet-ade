@@ -109,7 +109,7 @@ export function SourceControlAppSignInSettings({
   const wait = useAtomCommand(sourceControlEnvironment.waitForSignIn, { reportFailure: false });
   const cancel = useAtomCommand(sourceControlEnvironment.cancelSignIn, { reportFailure: false });
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: `sign out of ${appSignIn.appName}`,
+    label: `退出 ${appSignIn.appName} 登录`,
   });
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     timeout: 1500,
@@ -160,26 +160,26 @@ export function SourceControlAppSignInSettings({
     subtitle =
       account !== null && !tokenOverrides ? (
         <span className="flex min-w-0 items-center gap-1">
-          Signed in as
+          已登录账户
           <RedactedSensitiveText
             value={account}
-            ariaLabel="Signed-in GitHub account"
-            revealTooltip="Show account"
-            hideTooltip="Hide account"
+            ariaLabel="已登录的 GitHub 账户"
+            revealTooltip="显示账户"
+            hideTooltip="隐藏账户"
           />
         </span>
       ) : tokenOverrides ? (
-        "Signed in, but the token saved below is used while it can be read."
+        "已登录，但只要下方保存的 token 可读取，就会优先使用该 token。"
       ) : (
-        "Signed in"
+        "已登录"
       );
     action = (
       <Button size="xs" variant="outline" disabled={!canSignIn} onClick={() => void signOut()}>
-        Sign out
+        退出登录
       </Button>
     );
   } else if (waiting !== null) {
-    subtitle = "Approve the app on GitHub to finish signing in.";
+    subtitle = "在 GitHub 上授权此应用以完成登录。";
     action = (
       <Button
         size="xs"
@@ -189,11 +189,11 @@ export function SourceControlAppSignInSettings({
           void cancel({ environmentId, input: { provider: definition.kind, host } });
         }}
       >
-        Cancel
+        取消
       </Button>
     );
   } else {
-    subtitle = "A far higher GitHub API rate limit than a personal token or gh login.";
+    subtitle = "GitHub API 请求额度远高于个人 token 或 gh 登录。";
     action = (
       <Button
         size="xs"
@@ -201,7 +201,7 @@ export function SourceControlAppSignInSettings({
         onClick={() => void signIn()}
       >
         {state.status === "starting" ? <Spinner /> : null}
-        {state.status === "failed" ? "Try again" : "Sign in with GitHub"}
+        {state.status === "failed" ? "重试" : "使用 GitHub 登录"}
       </Button>
     );
   }
@@ -229,7 +229,7 @@ export function SourceControlAppSignInSettings({
             <Button
               size="icon-xs"
               variant="ghost"
-              aria-label="Copy code"
+              aria-label="复制代码"
               onClick={() => copyToClipboard(waiting.userCode, undefined)}
             >
               {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
@@ -243,7 +243,7 @@ export function SourceControlAppSignInSettings({
               }
               onClick={() => copyToClipboard(waiting.userCode, undefined)}
             >
-              Copy code & open GitHub
+              复制验证码并打开 GitHub
               <ExternalLinkIcon aria-hidden className="size-3.5" />
             </Button>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -256,11 +256,9 @@ export function SourceControlAppSignInSettings({
 
       {signedIn ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          <span className="min-w-0 flex-1">
-            Reaches repositories in accounts and organizations that installed the app.
-          </span>
-          <ExternalLink href={appSignIn.installUrl}>Install on an organization</ExternalLink>
-          <ExternalLink href={appSignIn.revokeUrl}>Manage on GitHub</ExternalLink>
+          <span className="min-w-0 flex-1">可访问已安装此应用的账户和组织中的仓库。</span>
+          <ExternalLink href={appSignIn.installUrl}>为组织安装</ExternalLink>
+          <ExternalLink href={appSignIn.revokeUrl}>在 GitHub 上管理</ExternalLink>
         </div>
       ) : null}
 

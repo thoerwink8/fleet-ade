@@ -89,7 +89,7 @@ export default function WordDocument(props: {
         while (!controller.signal.aborted) {
           const step = await engine.call("layout", undefined, { signal: controller.signal });
           if (!step.done) continue;
-          if (step.pages.length > 1000) throw new Error("Preview limited to 1,000 pages.");
+          if (step.pages.length > 1000) throw new Error("预览仅限 1,000 页。");
           setOpened({ pages: step.pages, paint, engine });
           onDetails(`${step.pages.length} page${step.pages.length === 1 ? "" : "s"}`);
           break;
@@ -118,7 +118,7 @@ export default function WordDocument(props: {
     <OfficePages
       pages={opened.pages}
       paint={opened.paint}
-      label="Page"
+      label="页"
       scrollRef={scroll}
       onError={onError}
       overlay={(index) => (

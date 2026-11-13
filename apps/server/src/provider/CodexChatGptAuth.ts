@@ -914,7 +914,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     yield* remove;
     return confirmed
       ? undefined
-      : "Signed out locally. Remote revocation could not be confirmed. Disconnect the app in ChatGPT Settings.";
+      : "已在本地退出登录。无法确认远程授权是否已撤销。请在 ChatGPT 设置中断开此应用的连接。";
   });
   if (options.reconnectProfile) {
     const { idTokenHint: _hint, ...registration } = options.reconnectProfile;

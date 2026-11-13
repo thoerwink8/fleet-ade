@@ -515,7 +515,7 @@ const MAX_ARGUMENT_NAME_CHARS = 64;
 const advertisedArgumentsOnly = (tool: Tool.Any) => {
   const { properties } = advertisedJsonSchema(tool);
   const accepted = new Set(Predicate.isObject(properties) ? Object.keys(properties) : []);
-  const acceptedText = [...accepted].join(", ") || "none";
+  const acceptedText = [...accepted].join(", ") || "无";
   return Schema.Record(Schema.String, Schema.Unknown).check(
     Schema.makeFilter((input) => {
       const unknown = Object.keys(input).filter((key) => !accepted.has(key));
@@ -760,7 +760,7 @@ const imageToolFailure =
       content: [
         {
           type: "text",
-          text: typeof failureText === "string" ? failureText : (message ?? `${toolName} failed.`),
+          text: typeof failureText === "string" ? failureText : (message ?? `${toolName} 失败。`),
         },
       ],
     });

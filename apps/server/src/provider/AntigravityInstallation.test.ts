@@ -322,7 +322,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
         });
         expect(yield* restarted.installation.start).toMatchObject({
           phase: "verifying",
-          message: "Checking the installed runtime.",
+          message: "正在检查已安装的运行环境。",
         });
         expect(yield* terminalState(restarted.installation)).toMatchObject({
           phase: "succeeded",

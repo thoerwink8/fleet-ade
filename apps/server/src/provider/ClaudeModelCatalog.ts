@@ -80,9 +80,7 @@ export function withUltracodeToggle(
   // Ultracode ran at xhigh, so a model that offered it keeps xhigh, and its default moves there.
   const options = effort.options.flatMap(({ isDefault, ...option }) => {
     if (option.id === "ultracode") {
-      return hasXhigh
-        ? []
-        : [{ id: "xhigh", label: "Extra High", ...(isDefault ? { isDefault } : {}) }];
+      return hasXhigh ? [] : [{ id: "xhigh", label: "超高", ...(isDefault ? { isDefault } : {}) }];
     }
     if (ultracodeByDefault && option.id === "xhigh") return [{ ...option, isDefault: true }];
     return [isDefault && !ultracodeByDefault ? { ...option, isDefault } : option];
@@ -165,7 +163,7 @@ const CLAUDE_EFFORT_LABELS: Readonly<Record<string, string>> = {
   low: "Low",
   medium: "Medium",
   high: "High",
-  xhigh: "Extra High",
+  xhigh: "超高",
   max: "Max",
 };
 
@@ -205,11 +203,11 @@ export function claudeReportedModels(
           ? [
               {
                 id: "effort",
-                label: "Reasoning",
+                label: "推理",
                 type: "select",
                 // `default` is not an effort, so choosing it sends none and Claude Code picks.
                 options: [
-                  { id: "default", label: "Default", isDefault: true },
+                  { id: "default", label: "默认", isDefault: true },
                   ...efforts.map((id) => ({ id, label: CLAUDE_EFFORT_LABELS[id] ?? id })),
                 ],
               },

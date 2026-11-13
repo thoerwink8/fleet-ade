@@ -52,7 +52,7 @@ it.effect("refuses a preferences update when the caller's turn ends while it wai
       Layer.mock(Environment.ServerEnvironment)({
         getDescriptor: Effect.succeed({
           environmentId,
-          label: "Test",
+          label: "测试",
           platform: { os: "linux", arch: "x64" },
           serverVersion: "0.0.0",
           capabilities: { repositoryIdentity: false },

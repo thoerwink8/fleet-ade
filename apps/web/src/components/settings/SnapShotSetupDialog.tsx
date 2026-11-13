@@ -22,43 +22,43 @@ import {
 } from "./SnapShotSetupDialog.logic";
 
 const SETUP_STEPS = [
-  { id: "access", label: "Access" },
-  { id: "shortcut", label: "Shortcut" },
+  { id: "access", label: "访问权限" },
+  { id: "shortcut", label: "快捷键" },
 ] as const;
 
 const GNOME_ACCESS_COPY = {
   "not-installed": {
-    title: "Install the extension",
+    title: "安装扩展",
     description:
-      "The T3 Code GNOME extension lets you capture other windows and bring them into your draft. Sign out once after installing.",
+      "T3 Code 的 GNOME 扩展可截取其他窗口并将截图添加到草稿。安装后需退出系统并重新登录一次。",
   },
   "restart-required": {
-    title: "Extension installed",
-    description: "Save your work, then sign out and back in. Your setup will be waiting here.",
+    title: "扩展已安装",
+    description: "保存工作后，退出系统并重新登录。回来后可在此继续设置。",
   },
   "update-required": {
-    title: "Update the extension",
-    description: "Install the update, then sign out and back in.",
+    title: "更新扩展",
+    description: "安装更新后，退出系统并重新登录。",
   },
   "extensions-disabled": {
-    title: "Allow GNOME extensions",
-    description: "Open GNOME Extensions and turn on extensions, then check again.",
+    title: "允许 GNOME 扩展",
+    description: "打开 GNOME 扩展应用并开启扩展，然后重新检查。",
   },
   disabled: {
-    title: "Enable the extension",
-    description: "Enable T3 Code SnapShots to start capturing windows.",
+    title: "启用扩展",
+    description: "启用 T3 Code SnapShots 扩展，即可开始截取窗口。",
   },
   enabled: {
-    title: "Capture is ready",
-    description: "Next, choose your shortcut.",
+    title: "截图已就绪",
+    description: "接下来，选择快捷键。",
   },
   unsupported: {
-    title: "Automatic capture isn't available",
-    description: "Use Take snapshot from the command palette to choose a window.",
+    title: "无法自动截图",
+    description: "在命令面板中选择“拍摄快照”，然后选择窗口。",
   },
   error: {
-    title: "Couldn't set up the extension",
-    description: "Check T3 Code SnapShots in GNOME Extensions, then try again.",
+    title: "无法设置扩展",
+    description: "在 GNOME 扩展应用中检查 T3 Code SnapShots 扩展，然后重试。",
   },
 };
 
@@ -114,7 +114,7 @@ export function SnapShotSetupDialog({
   const permissionStatus = usePermissionStatus(
     async () => {
       const refreshed = await onRefresh();
-      if (!refreshed?.macPermissions) throw new Error("Permission status unavailable");
+      if (!refreshed?.macPermissions) throw new Error("无法获取权限状态");
       return refreshed.macPermissions;
     },
     state.macPermissions ?? { screenRecording: false, accessibility: false },
@@ -144,66 +144,62 @@ export function SnapShotSetupDialog({
   const accessCopy =
     state.message && !macPermissions
       ? {
-          title: "Let's try that again",
-          description: "Couldn't check snapshots. Try again to continue.",
+          title: "再试一次",
+          description: "无法检查快照，请重试后继续。",
         }
       : backend === "gnome" && extension
         ? extension.status === "enabled" && !accessReady
           ? {
-              title: "Check capture access",
-              description: "The extension isn't ready yet. Try again in a moment.",
+              title: "检查截图权限",
+              description: "扩展尚未就绪，请稍后重试。",
             }
           : GNOME_ACCESS_COPY[extension.status]
         : helperBackend
           ? helper?.status === "ready"
             ? {
-                title: "Capture is ready",
-                description: "Next, choose your shortcut.",
+                title: "截图已就绪",
+                description: "接下来，选择快捷键。",
               }
             : helper?.status === "error"
               ? {
-                  title: "Let's fix capture access",
-                  description: "Try reinstalling the capture helper, then check again.",
+                  title: "修复截图权限",
+                  description: "请重新安装截图辅助程序，然后重新检查。",
                 }
               : {
-                  title:
-                    helper?.status === "update-required"
-                      ? "Update the capture helper"
-                      : "Allow snapshots",
+                  title: helper?.status === "update-required" ? "更新截图辅助程序" : "允许快照",
                   description:
-                    "T3 Code's capture helper lets you capture other apps and return to your draft. It's included with T3 Code.",
+                    "T3 Code 的截图辅助程序可截取其他应用的窗口，再返回草稿。辅助程序已随 T3 Code 提供。",
                 }
           : backend === "niri"
             ? {
-                title: "Capture is ready",
-                description: "Next, choose your shortcut.",
+                title: "截图已就绪",
+                description: "接下来，选择快捷键。",
               }
             : backend === "picker"
               ? {
-                  title: "Choose a window each time",
-                  description:
-                    "Your desktop doesn't support automatic capture. You'll choose the window to capture instead.",
+                  title: "每次选择窗口",
+                  description: "你的桌面不支持自动截图，需要手动选择要截图的窗口。",
                 }
               : {
-                  title: "Allow snapshots",
+                  title: "允许快照",
                   description:
                     backend === "portal"
-                      ? "Your desktop may ask for permission when you first capture."
+                      ? "首次截图时，桌面可能会请求权限。"
                       : macPermissions
                         ? macPermissionsReady
-                          ? "Test a snapshot of the current window. If macOS asks to bypass its window picker, choose Allow. The test image is discarded."
-                          : "Allow each permission, then continue."
-                        : "Allow access when prompted to start capturing windows.",
+                          ? "测试当前窗口的快照。如果 macOS 询问是否绕过窗口选择器，请选择“允许”。测试图片会丢弃。"
+                          : "允许各项权限后继续。"
+                        : "收到提示时允许访问，即可开始截取窗口。",
                 };
-  const title = step === "access" ? accessCopy.title : "Choose your shortcut";
+  const title = step === "access" ? accessCopy.title : "选择快捷键";
   const description =
     step === "access"
       ? accessCopy.description
       : configShortcut
-        ? "Click the shortcut, then press the keys you want."
+        ? "点击快捷键，然后按下你想使用的按键。"
         : state.mode === "portal"
-          ? "Choose your keys, then approve the permission prompt if asked."
-          : "Use both Shift keys, or record a different shortcut.";
+          ? "选择按键，出现权限提示时允许访问。"
+          : "使用左右两个 Shift 键，或录制其他快捷键。";
   const stepIndex = SETUP_STEPS.findIndex(({ id }) => id === step);
   const details = [
     ...new Set(
@@ -231,7 +227,7 @@ export function SnapShotSetupDialog({
       }}
     >
       <WizardPopup showCloseButton={!busy}>
-        <WizardHeader title={desktop ? `Set up snapshots for ${desktop}` : "Set up snapshots"}>
+        <WizardHeader title={desktop ? `为 ${desktop} 设置快照` : "设置快照"}>
           <WizardSteps
             steps={SETUP_STEPS.map((item) => item.label)}
             currentStep={stepIndex}
@@ -266,18 +262,18 @@ export function SnapShotSetupDialog({
                       {
                         id: "screenRecording",
                         icon: <MacScreenRecordingIcon className="size-8 shrink-0 drop-shadow-sm" />,
-                        title: "Screen Recording",
-                        description: "Capture the window you're using.",
+                        title: "屏幕录制",
+                        description: "截取当前使用的窗口。",
                         granted: macPermissions.screenRecording,
                         onAllow: () => void onAction("allow-screen-recording"),
                       },
                       {
                         id: "accessibility",
                         icon: <MacAccessibilityIcon className="size-8 shrink-0 drop-shadow-sm" />,
-                        title: "Accessibility",
+                        title: "辅助功能",
                         description: includeAccessibility
-                          ? "Include text and controls from the captured app."
-                          : "Optional. Include text and controls from the captured app.",
+                          ? "包含所截取应用中的文本和控件。"
+                          : "可选。包含所截取应用中的文本和控件。",
                         granted: macPermissions.accessibility,
                         onAllow: () => void onAction("allow-accessibility"),
                       },
@@ -296,7 +292,7 @@ export function SnapShotSetupDialog({
                     disabled={busy}
                     onClick={() => void onAction(installHelper)}
                   >
-                    Reinstall helper
+                    重新安装辅助程序
                   </Button>
                 ) : null}
               </>
@@ -327,24 +323,24 @@ export function SnapShotSetupDialog({
                     disabled={busy}
                     onClick={() => void onAction("retry-shortcut")}
                   >
-                    {state.mode === "portal" ? "Shortcut permissions" : "Try again"}
+                    {state.mode === "portal" ? "快捷键权限" : "重试"}
                   </Button>
                 ) : null}
               </div>
             )}
             {step === "shortcut" && !accessReady ? (
               <p role="alert" className="text-destructive">
-                Capture needs attention. Go back to check access.
+                截图需要处理，请返回检查权限。
               </p>
             ) : null}
             {error ? (
               <p role="alert" className="text-destructive">
-                Couldn't finish this step. Try again or check Advanced for help.
+                无法完成此步骤。请重试，或展开“高级”查看帮助。
               </p>
             ) : null}
             {details.length > 0 || (step === "access" && (backend === "gnome" || helperBackend)) ? (
               <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">Advanced</summary>
+                <summary className="cursor-pointer">高级</summary>
                 <div className="mt-3 space-y-3">
                   {details.map((detail) => (
                     <p key={detail} className="break-words">
@@ -352,7 +348,7 @@ export function SnapShotSetupDialog({
                     </p>
                   ))}
                   {step === "access" && (backend === "gnome" || helperBackend) ? (
-                    <p>Included with T3 Code. No download needed.</p>
+                    <p>已随 T3 Code 提供，无需下载。</p>
                   ) : null}
                   {step === "access" && backend === "gnome" && extension?.status === "enabled" ? (
                     <Button
@@ -361,7 +357,7 @@ export function SnapShotSetupDialog({
                       disabled={busy}
                       onClick={() => void onAction("disable-extension")}
                     >
-                      Disable extension
+                      停用扩展
                     </Button>
                   ) : null}
                   {step === "access" && helperBackend && helper?.status !== "not-installed" ? (
@@ -371,7 +367,7 @@ export function SnapShotSetupDialog({
                       disabled={busy}
                       onClick={() => void onAction(removeHelper)}
                     >
-                      Remove capture helper
+                      移除截图辅助程序
                     </Button>
                   ) : null}
                 </div>
@@ -382,11 +378,11 @@ export function SnapShotSetupDialog({
         <WizardFooter>
           {step !== "access" ? (
             <Button variant="ghost" disabled={busy} onClick={() => changeStep("access")}>
-              Back
+              返回
             </Button>
           ) : null}
           <Button variant="ghost" disabled={busy} onClick={() => void onClose(false)}>
-            {wasEnabled ? "Close" : "Finish later"}
+            {wasEnabled ? "关闭" : "稍后完成"}
           </Button>
           {step === "access" ? (
             helperBackend && !accessReady && helper?.status !== "ready" ? (
@@ -398,14 +394,14 @@ export function SnapShotSetupDialog({
                 }
               >
                 {checking
-                  ? "Checking…"
+                  ? "正在检查…"
                   : busy
-                    ? "Installing…"
+                    ? "正在安装…"
                     : helper?.status === "error"
-                      ? "Check again"
+                      ? "重新检查"
                       : helper?.status === "update-required"
-                        ? "Update helper"
-                        : "Install helper"}
+                        ? "更新辅助程序"
+                        : "安装辅助程序"}
               </Button>
             ) : backend === "gnome" && !accessReady && extension?.status !== "enabled" ? (
               <Button
@@ -420,20 +416,20 @@ export function SnapShotSetupDialog({
                 }
               >
                 {checking
-                  ? "Checking…"
+                  ? "正在检查…"
                   : busy
                     ? install
-                      ? "Installing…"
+                      ? "正在安装…"
                       : enable
-                        ? "Enabling…"
-                        : "Working…"
+                        ? "正在启用…"
+                        : "运行中…"
                     : install
                       ? extension?.status === "update-required"
-                        ? "Update extension"
-                        : "Install extension"
+                        ? "更新扩展"
+                        : "安装扩展"
                       : enable
-                        ? "Enable extension"
-                        : "Check again"}
+                        ? "启用扩展"
+                        : "重新检查"}
               </Button>
             ) : (
               <PermissionContinueButton
@@ -444,14 +440,14 @@ export function SnapShotSetupDialog({
                 }}
               >
                 {busy
-                  ? "Working…"
+                  ? "运行中…"
                   : macPermissions
-                    ? "Test capture and continue"
+                    ? "测试截图并继续"
                     : backend === "direct"
-                      ? "Allow capture"
+                      ? "允许截图"
                       : !accessReady && !macPermissions
-                        ? "Try again"
-                        : "Continue"}
+                        ? "重试"
+                        : "继续"}
               </PermissionContinueButton>
             )
           ) : !configShortcut ? (
@@ -463,7 +459,7 @@ export function SnapShotSetupDialog({
                 if (!shortcutChanged || (await onSaveShortcut())) await onClose(true);
               }}
             >
-              {busy ? "Saving…" : shortcutChanged ? "Save and finish" : "Done"}
+              {busy ? "Saving…" : shortcutChanged ? "保存并完成" : "完成"}
             </Button>
           ) : null}
         </WizardFooter>

@@ -13,7 +13,7 @@ export function formatAppDisplayName(input: {
 
 export function resolveHostedAppChannelLabel(channel: string | null | undefined): string | null {
   const normalized = channel?.trim().toLowerCase();
-  return normalized === "nightly" ? "Nightly" : normalized === "latest" ? "Latest" : null;
+  return normalized === "nightly" ? "Nightly 版" : normalized === "latest" ? "最新版" : null;
 }
 
 /** Stage label of a web build. vite.config.ts stamps it into index.html's title too. */
@@ -22,7 +22,7 @@ export function resolveWebAppStageLabel(input: {
   readonly development: boolean;
 }): string {
   return (
-    resolveHostedAppChannelLabel(input.hostedAppChannel) ?? (input.development ? "Dev" : "Beta")
+    resolveHostedAppChannelLabel(input.hostedAppChannel) ?? (input.development ? "Dev" : "测试版")
   );
 }
 
@@ -32,7 +32,7 @@ export function resolveServerBackedAppStageLabel(input: {
 }): string {
   return input.primaryServerVersion &&
     NIGHTLY_SERVER_VERSION_PATTERN.test(input.primaryServerVersion)
-    ? "Nightly"
+    ? "Nightly 版"
     : input.fallbackStageLabel;
 }
 

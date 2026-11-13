@@ -29,19 +29,17 @@ import {
 } from "./ClerkUserProfilePage";
 import { useT3ChatLink } from "./useT3ChatLink";
 
-const linkedAtFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+const linkedAtFormatter = new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" });
 
 function linkedAtLabel(value: string): string {
   const linkedAt = new Date(value);
   return Number.isNaN(linkedAt.getTime())
-    ? "Link date unavailable"
-    : `Linked ${linkedAtFormatter.format(linkedAt)}`;
+    ? "关联日期不可用"
+    : `关联于 ${linkedAtFormatter.format(linkedAt)}`;
 }
 
 function endpointLabel(environment: RelayClientEnvironmentRecord): string {
-  return environment.endpoint.providerKind === "cloudflare_tunnel"
-    ? "Managed tunnel"
-    : "Activity publishing only";
+  return environment.endpoint.providerKind === "cloudflare_tunnel" ? "托管隧道" : "仅发布活动";
 }
 
 function T3ConnectEnvironmentRow(props: {
@@ -67,7 +65,7 @@ function T3ConnectEnvironmentRow(props: {
           <CollapsibleTrigger
             render={
               <Button size="sm" variant="destructive-outline" disabled={props.mutationPending}>
-                Deregister
+                注销
               </Button>
             }
           />
@@ -78,17 +76,15 @@ function T3ConnectEnvironmentRow(props: {
             <div
               className="rounded-lg border border-input bg-muted/32 px-5 py-4 shadow-xs/5"
               role="group"
-              aria-label={`Confirm deregistration of ${environment.label}`}
+              aria-label={`确认注销 ${environment.label}`}
             >
-              <h4 className="text-sm leading-4.5 font-semibold text-foreground">
-                Deregister server
-              </h4>
+              <h4 className="text-sm leading-4.5 font-semibold text-foreground">注销服务器</h4>
               <p className="mt-1 text-xs leading-4.5 text-muted-foreground">
                 “{environment.label}” will be removed from this account.
               </p>
               <p className="mt-4 max-w-xl text-xs leading-4.5 text-muted-foreground">
-                T3 Connect access will be revoked, any managed tunnel will be removed, and a host
-                space will become available. Local connections on your devices are not changed.
+                将撤销 T3 Connect
+                访问权限、移除托管隧道，并释放一个主机名额。你设备上的本地连接不受影响。
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <Button
@@ -97,7 +93,7 @@ function T3ConnectEnvironmentRow(props: {
                   disabled={props.mutationPending}
                   onClick={() => props.onConfirmationChange(false)}
                 >
-                  Cancel
+                  取消
                 </Button>
                 <Button
                   size="sm"
@@ -105,7 +101,7 @@ function T3ConnectEnvironmentRow(props: {
                   disabled={props.mutationPending}
                   onClick={() => props.onDeregister(environment)}
                 >
-                  {props.mutationPending ? "Deregistering…" : "Deregister"}
+                  {props.mutationPending ? "正在注销…" : "注销"}
                 </Button>
               </div>
             </div>
@@ -143,7 +139,7 @@ function T3ConnectTunnelUsage() {
               {tunnelUpgradeCopy(usage.upgrade)}{" "}
               {usage.upgrade === "link" ? (
                 <InlineButton disabled={t3Chat.pending !== null} onClick={() => void t3Chat.link()}>
-                  {t3Chat.pending === "link" ? "Opening…" : "Link T3 Chat"}
+                  {t3Chat.pending === "link" ? "正在打开…" : "关联 T3 Chat"}
                 </InlineButton>
               ) : (
                 <a
@@ -152,7 +148,7 @@ function T3ConnectTunnelUsage() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Upgrade on T3 Chat
+                  在 T3 Chat 升级
                 </a>
               )}
             </>
@@ -206,8 +202,8 @@ export function T3ConnectUserProfilePage() {
       void refreshRelayEnvironments();
       toastManager.add({
         type: "success",
-        title: "Server deregistered",
-        description: "T3 Connect access was revoked and a host space is now available.",
+        title: "已注销服务器",
+        description: "已撤销 T3 Connect 访问权限，并释放了一个主机名额。",
       });
       return;
     }
@@ -216,7 +212,7 @@ export function T3ConnectUserProfilePage() {
     // The relay may have removed it before failing.
     environmentsState.refresh();
     const cause = squashAtomCommandFailure(result);
-    const message = cause instanceof Error ? cause.message : "Could not deregister the server.";
+    const message = cause instanceof Error ? cause.message : "无法注销服务器。";
     const traceId = findErrorTraceId(cause);
     console.error("[t3-connect] Could not deregister environment", {
       environmentId: environment.environmentId,
@@ -227,12 +223,12 @@ export function T3ConnectUserProfilePage() {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not deregister server",
+        title: "无法注销服务器",
         description: relayFailureReason(cause) ?? message,
         ...(traceId
           ? {
               actionProps: {
-                children: "Copy trace ID",
+                children: "复制追踪 ID",
                 onClick: () => void navigator.clipboard?.writeText(traceId),
               },
               actionVariant: "outline",
@@ -259,7 +255,7 @@ export function T3ConnectUserProfilePage() {
   return (
     <ClerkUserProfilePage
       title="T3 Connect"
-      description="Environments registered to your account. Connections on this device are managed in Settings."
+      description="已注册到你账户的环境。此设备上的连接请在“设置”中管理。"
       action={
         <ClerkUserProfileRefreshButton
           disabled={deregisteringEnvironmentId !== null}
@@ -272,16 +268,14 @@ export function T3ConnectUserProfilePage() {
         <T3ConnectTunnelUsage />
         {environmentsState.error ? (
           <div className="mb-4 border-t border-destructive/35 py-3 text-xs" role="alert">
-            <p className="font-medium text-destructive-foreground">
-              Could not load T3 Connect environments
-            </p>
+            <p className="font-medium text-destructive-foreground">无法加载 T3 Connect 环境</p>
             <p className="mt-1 text-xs text-muted-foreground">{environmentsState.error}</p>
           </div>
         ) : null}
 
         {isInitialLoad ? (
           <p className="border-t py-4 text-xs text-muted-foreground" role="status">
-            Loading environments…
+            正在加载环境…
           </p>
         ) : environments.length > 0 ? (
           <ul className="border-t">
@@ -305,10 +299,9 @@ export function T3ConnectUserProfilePage() {
                 <ServerIcon />
               </EmptyMedia>
               <EmptyHeader>
-                <EmptyTitle>No T3 Connect environments</EmptyTitle>
+                <EmptyTitle>没有 T3 Connect 环境</EmptyTitle>
                 <EmptyDescription>
-                  Link an environment from its local Settings to make it available through T3
-                  Connect.
+                  在环境本地的“设置”中关联它，即可通过 T3 Connect 访问。
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

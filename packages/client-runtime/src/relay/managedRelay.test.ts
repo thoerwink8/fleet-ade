@@ -56,7 +56,7 @@ describe("ManagedRelayClient", () => {
       expect(error).toMatchObject({
         _tag: "ManagedRelayUrlInvalidError",
         relayUrl: "http://relay.example.test",
-        message: "Relay URL must be a secure absolute HTTPS origin.",
+        message: "中继 URL 必须是安全的绝对 HTTPS 源地址。",
       });
       expect(requestCount).toBe(0);
     }).pipe(Effect.provide(layerManagedRelayTest(fetchFn, "http://relay.example.test")));
@@ -197,7 +197,7 @@ describe("ManagedRelayClient", () => {
           checkedAt: "2026-06-05T20:00:00.000Z",
           descriptor: {
             environmentId: "env-1",
-            label: "Desktop",
+            label: "桌面端",
             platform: { os: "darwin", arch: "arm64" },
             serverVersion: "0.0.0-test",
             capabilities: { repositoryIdentity: true },
@@ -296,7 +296,7 @@ describe("ManagedRelayClient", () => {
           checkedAt: "2026-06-05T20:00:00.000Z",
           descriptor: {
             environmentId: "env-1",
-            label: "Desktop",
+            label: "桌面端",
             platform: { os: "darwin", arch: "arm64" },
             serverVersion: "0.0.0-test",
             capabilities: { repositoryIdentity: true },
@@ -359,7 +359,7 @@ describe("ManagedRelayClient", () => {
           checkedAt: "2026-06-05T20:00:00.000Z",
           descriptor: {
             environmentId: "env-1",
-            label: "Desktop",
+            label: "桌面端",
             platform: { os: "darwin", arch: "arm64" },
             serverVersion: "0.0.0-test",
             capabilities: { repositoryIdentity: true },

@@ -73,8 +73,7 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
     await response.body?.cancel();
     response = new Response(new Blob([]));
   }
-  if (!response.ok || !response.body)
-    throw new Error("The file could not be loaded. Close it and try again.");
+  if (!response.ok || !response.body) throw new Error("无法加载文件。请关闭后重试。");
   const total = Number(
     response.headers.get("content-range")?.split("/")[1] ?? response.headers.get("content-length"),
   );
@@ -178,12 +177,12 @@ self.addEventListener("message", (event: MessageEvent<TextPreviewRequest>) => {
         ? page(input.index)
         : complete
           ? read(0, size).then((text) => reply({ type: "copy", text }))
-          : Promise.reject(new Error("Wait for the file to finish loading before copying."))
+          : Promise.reject(new Error("请等待文件加载完成后再复制。"))
   ).catch((cause: unknown) =>
     reply({
       type: "error",
       operation: input.type,
-      message: cause instanceof Error ? cause.message : "Could not read this file.",
+      message: cause instanceof Error ? cause.message : "无法读取此文件。",
     }),
   );
 });

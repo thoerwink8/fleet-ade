@@ -79,7 +79,7 @@ export function useProjectScriptEditing(input: {
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthSettingsWriteScope,
-            message: "This connection cannot change keyboard shortcuts.",
+            message: "此连接无法修改快捷键。",
           }),
         ),
       );
@@ -124,8 +124,8 @@ export function useProjectScriptEditing(input: {
           new EnvironmentAuthorizationError({
             requiredScope: AuthSettingsWriteScope,
             message: isDeletingScript
-              ? "The script was deleted, but its keyboard shortcut could not be removed because permission changed."
-              : "The script was saved, but this connection can no longer change keyboard shortcuts.",
+              ? "脚本已删除，但由于权限变化，无法移除它的快捷键。"
+              : "脚本已保存，但此连接已无法修改快捷键。",
           }),
         ),
       );
@@ -213,7 +213,7 @@ export function useProjectScriptEditing(input: {
     }
     const existingScript = scripts.find((script) => script.id === scriptId);
     if (!existingScript) {
-      return AsyncResult.failure(Cause.fail(new Error("Script not found.")));
+      return AsyncResult.failure(Cause.fail(new Error("找不到脚本。")));
     }
 
     const updatedScript = buildProjectScript(existingScript.id, input);
@@ -251,15 +251,15 @@ export function useProjectScriptEditing(input: {
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: `Deleted action "${deletedName ?? "Unknown"}"`,
+        title: `已删除操作“${deletedName ?? "Unknown"}”`,
       });
     } else if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not delete action",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          title: "无法删除操作",
+          description: error instanceof Error ? error.message : "发生了意外错误。",
         }),
       );
     }

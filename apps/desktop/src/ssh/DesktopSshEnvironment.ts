@@ -97,23 +97,23 @@ function toSshPasswordPromptError(
   let message: string;
   switch (cause._tag) {
     case "DesktopSshPromptRequestIdGenerationError":
-      message = "Secure randomness is unavailable.";
+      message = "无法获取安全随机数。";
       break;
     case "DesktopSshPromptWindowUnavailableError":
     case "DesktopSshPromptPresentationError":
-      message = "T3 Code window is not available for SSH authentication.";
+      message = "T3 Code 窗口不可用，无法进行 SSH 身份验证。";
       break;
     case "DesktopSshPromptTimedOutError":
-      message = `SSH authentication timed out for ${cause.destination}.`;
+      message = `${cause.destination} 的 SSH 身份验证超时。`;
       break;
     case "DesktopSshPromptCancelledError":
-      message = `SSH authentication cancelled for ${cause.destination}.`;
+      message = `${cause.destination} 的 SSH 身份验证已取消。`;
       break;
     case "DesktopSshPromptWindowClosedError":
-      message = "SSH authentication was cancelled because the app window closed.";
+      message = "应用窗口已关闭，SSH 身份验证已取消。";
       break;
     case "DesktopSshPromptServiceStoppedError":
-      message = "SSH password prompt service stopped.";
+      message = "SSH 密码提示服务已停止。";
       break;
     default:
       return unexpectedPasswordPromptError(cause);

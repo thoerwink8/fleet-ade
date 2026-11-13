@@ -9,7 +9,7 @@ import VirtualTablePreview from "./VirtualTablePreview";
 const FIRST_SCREEN_BYTES = 16 * 1024;
 
 function countLabel(count: number, noun: string) {
-  return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+  return `${count.toLocaleString("zh-CN")} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 function firstScreen(text: string, delimiter: "," | "\t" | null, complete: boolean) {
@@ -132,7 +132,7 @@ export default function LargeTextViewer(props: {
       engine.addEventListener("error", () => {
         copyPending.current?.reject(new Error("The text viewer stopped."));
         copyPending.current = null;
-        setError("Could not load the text viewer. Close the file and try again.");
+        setError("无法加载文本查看器。请关闭文件后重试。");
       });
       engine.postMessage(
         {
@@ -196,7 +196,7 @@ export default function LargeTextViewer(props: {
     () => () =>
       new Promise<string>((resolve, reject) => {
         if (!worker.current) {
-          reject(new Error("The file is unavailable."));
+          reject(new Error("文件不可用。"));
           return;
         }
         if (copyPending.current) {
@@ -229,13 +229,11 @@ export default function LargeTextViewer(props: {
       </div>
       {!meta.complete ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
-          <FileSurfaceNotice>Loading the rest of the file…</FileSurfaceNotice>
+          <FileSurfaceNotice>正在加载文件的其余部分…</FileSurfaceNotice>
         </div>
       ) : null}
       {meta.columns === 1024 ? (
-        <FileSurfaceNotice>
-          Showing the first 1,024 columns. Source and Save retain every column.
-        </FileSurfaceNotice>
+        <FileSurfaceNotice>仅显示前 1,024 列。查看源码或保存文件时会保留所有列。</FileSurfaceNotice>
       ) : null}
       {meta.count > 0 ? (
         <VirtualTablePreview
@@ -256,7 +254,7 @@ export default function LargeTextViewer(props: {
         />
       ) : (
         <div className="flex flex-1 items-center justify-center p-6 text-xs text-muted-foreground">
-          This file is empty.
+          此文件为空。
         </div>
       )}
     </div>

@@ -114,7 +114,7 @@ function providerStartingLabel(
     (session) => session.providerInstanceId === run.providerInstanceId,
   )?.driver;
   const name = driver === undefined ? undefined : PROVIDER_DISPLAY_NAMES[driver];
-  return name === undefined ? "Starting" : `Starting ${name}`;
+  return name === undefined ? "正在启动" : `Starting ${name}`;
 }
 
 function summarizeThreadRun(
@@ -569,7 +569,7 @@ export interface PendingBackgroundWorkPresentation {
 
 function joinWithAnd(parts: ReadonlyArray<string>): string {
   if (parts.length <= 1) return parts.join("");
-  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+  return `${parts.slice(0, -1).join(", ")} 和 ${parts.at(-1)}`;
 }
 
 // The Claude adapter forces a stuck query closed after 10 seconds.
@@ -651,19 +651,19 @@ export interface ProviderGoalPresentation {
 }
 
 const PROVIDER_GOAL_TITLES: Record<OrchestrationV2ProviderGoal["status"], string> = {
-  active: "Pursuing goal",
-  paused: "Goal paused",
-  blocked: "Goal blocked",
-  usage_limited: "Goal hit a usage limit",
-  budget_limited: "Goal reached its token budget",
-  complete: "Goal complete",
+  active: "正在执行目标",
+  paused: "目标已暂停",
+  blocked: "目标受阻",
+  usage_limited: "目标已达到用量上限",
+  budget_limited: "目标已达到 token 预算",
+  complete: "目标已完成",
 };
 
 function formatGoalTokens(tokens: number): string {
   if (tokens < 1_000) return `${tokens}`;
   const thousands = Math.round(tokens / 1_000);
   if (thousands < 1_000) return `${thousands}k`;
-  return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}m`;
+  return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")} 分钟`;
 }
 
 export function presentProviderGoal(
@@ -685,7 +685,7 @@ export function presentProviderGoal(
     usage.push(`${goal.checks} ${goal.checks === 1 ? "check" : "checks"}`);
   }
   return {
-    title: goal.status === "active" && !working ? "Goal set" : PROVIDER_GOAL_TITLES[goal.status],
+    title: goal.status === "active" && !working ? "已设置目标" : PROVIDER_GOAL_TITLES[goal.status],
     objective: goal.objective,
     usage: usage.length === 0 ? null : usage.join(" · "),
     canResume: goal.status !== "active" && goal.status !== "complete",

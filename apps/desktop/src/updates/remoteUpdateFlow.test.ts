@@ -60,7 +60,7 @@ describe("nextRemoteDesktopUpdateStep", () => {
     assert.deepEqual(nextRemoteDesktopUpdateStep(state, NO_ATTEMPTS, null), {
       action: "done",
       outcome: "failed",
-      reason: "Automatic updates are disabled on this machine.",
+      reason: "此机器已停用自动更新。",
     });
   });
 
@@ -129,7 +129,7 @@ describe("nextRemoteDesktopUpdateStep", () => {
       {
         action: "done",
         outcome: "failed",
-        reason: "The desktop app failed to download the update.",
+        reason: "桌面应用下载更新失败。",
       },
     );
     assert.deepEqual(
@@ -178,7 +178,7 @@ describe("nextRemoteDesktopUpdateStep", () => {
     assert.deepEqual(nextRemoteDesktopUpdateStep(makeState({ status: "error" }), checked, null), {
       action: "done",
       outcome: "failed",
-      reason: "The desktop app update failed.",
+      reason: "桌面应用更新失败。",
     });
   });
 });

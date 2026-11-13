@@ -49,12 +49,12 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 describe("environment grouping", () => {
   it("opens physical scratch settings from the merged filter, including a remote thread target", () => {
     const local = makeProject({
-      title: "No project",
+      title: "无项目",
       workspaceRoot: "/local/scratch",
       isScratch: true,
     });
     const remote = makeProject({
-      title: "No project",
+      title: "无项目",
       id: ProjectId.make("remote-scratch"),
       environmentId: remoteEnvironmentId,
       workspaceRoot: "/remote/scratch",

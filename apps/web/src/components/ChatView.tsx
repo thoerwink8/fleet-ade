@@ -640,8 +640,8 @@ export default function ChatView(props: ChatViewProps) {
     if (!inserted) {
       toastManager.add({
         type: "warning",
-        title: "The composer is not ready",
-        description: "Try citing the selection after the connection or pending input is resolved.",
+        title: "输入框尚未就绪",
+        description: "请等连接恢复或待处理的输入完成后，再引用选中内容。",
       });
     }
     return inserted;
@@ -652,8 +652,8 @@ export default function ChatView(props: ChatViewProps) {
     if (!accepted) {
       toastManager.add({
         type: "warning",
-        title: "The composer is not ready",
-        description: "Try replying after the connection or pending input is resolved.",
+        title: "输入框尚未就绪",
+        description: "请等连接或待处理的输入解决后再回复。",
       });
     }
     return accepted;
@@ -736,7 +736,7 @@ export default function ChatView(props: ChatViewProps) {
   ] = useState<Record<string, boolean>>({});
   const legendListRef = useRef<LegendListRef | null>(null);
   const conversationArea = workspaceAreaProps("conversation", 1, "Conversation");
-  const composerArea = workspaceAreaProps("composer", 2, "Message input");
+  const composerArea = workspaceAreaProps("composer", 2, "消息输入框");
   const [composerOverlayElement, setComposerOverlayElement] = useState<HTMLDivElement | null>(null);
   const [composerTimelineInset, setComposerTimelineInset] = useState(0);
   const composerTimelineInsetRef = useRef(0);
@@ -898,7 +898,7 @@ export default function ChatView(props: ChatViewProps) {
   const sideChatParent = useQuietThreadShell(sideChatParentRef);
   const parentThreadLink = (() => {
     if (sideChatParentRef !== null) {
-      const title = sideChatParent?.title ?? "Parent thread";
+      const title = sideChatParent?.title ?? "父会话";
       // Embedded, the parent is the view around it.
       if (embedded) return { title, sideChat: true };
       return {
@@ -914,7 +914,7 @@ export default function ChatView(props: ChatViewProps) {
     }
     if (parentSubagentThreadRef !== null) {
       return {
-        title: parentSubagentThread?.title ?? "Parent thread",
+        title: parentSubagentThread?.title ?? "父会话",
         open: (): void => {
           void navigate({
             to: "/$environmentId/$threadId",
@@ -947,7 +947,7 @@ export default function ChatView(props: ChatViewProps) {
       ? null
       : {
           threadId: parentSubagentThreadRef.threadId,
-          title: parentSubagentThread?.title ?? "Parent thread",
+          title: parentSubagentThread?.title ?? "父会话",
         };
   const threadError = isServerThread
     ? (localServerError ?? serverRuntime?.lastError ?? null)
@@ -1500,7 +1500,7 @@ export default function ChatView(props: ChatViewProps) {
   const downloadFileAttachment = async (attachment: ChatFileAttachment) => {
     const connection = readPreparedConnection(environmentId);
     if (!connection) {
-      toastManager.add({ type: "error", title: "The environment is not connected." });
+      toastManager.add({ type: "error", title: "环境未连接。" });
       return;
     }
 
@@ -1518,8 +1518,8 @@ export default function ChatView(props: ChatViewProps) {
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not download " + attachment.name,
-        description: error instanceof Error ? error.message : "The attachment is unavailable.",
+        title: "无法下载" + attachment.name,
+        description: error instanceof Error ? error.message : "附件不可用。",
       });
     }
   };
@@ -1853,7 +1853,7 @@ export default function ChatView(props: ChatViewProps) {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThread.id,
-        error instanceof Error ? error.message : "Failed to interrupt the current turn.",
+        error instanceof Error ? error.message : "无法中断当前这一轮。",
       );
     }
   };
@@ -1879,8 +1879,8 @@ export default function ChatView(props: ChatViewProps) {
     if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
       toastManager.add({
         type: "error",
-        title: "Unable to add to chat",
-        description: "The composer is busy; try again once it is ready.",
+        title: "无法添加到对话",
+        description: "输入框正忙，请在就绪后重试。",
       });
       return;
     }
@@ -2823,21 +2823,21 @@ export default function ChatView(props: ChatViewProps) {
   // Main-thread surfaces show this reason; `/side` sent anyway gets it as a toast.
   const sideChatDisabledReason =
     activeThread?.lineage.sideChat === true
-      ? "Side chats cannot start side chats."
+      ? "侧聊中不能再开始侧聊。"
       : isSubagentThread
-        ? "Subagent threads cannot start side chats."
+        ? "子智能体会话不能开始侧聊。"
         : serverConfig === null
-          ? "Side chats are not ready yet. Try again in a moment."
+          ? "侧聊尚未就绪，请稍后重试。"
           : serverConfig.environment.capabilities.sideChats !== true
-            ? "Update this environment's T3 Code server to use side chats."
+            ? "请更新此环境的 T3 Code 服务器后再使用侧聊。"
             : sideChatsOffered && !isServerThread
-              ? "Side chats start after the first message."
+              ? "发送第一条消息后才能开始侧聊。"
               : sideChat.available &&
                   orchestrationV2WorktreePending(
                     activeThread?.worktreePath ?? null,
                     serverProjection?.runs ?? [],
                   )
-                ? "Available once the thread's worktree is set up."
+                ? "会话的工作树设置完成后可用。"
                 : null;
   const openSideChatStable = useStableCallback(() => void sideChat.open());
   const sendSideChatStable = useStableCallback((prompt: string) => sideChat.open(prompt));
@@ -2863,7 +2863,7 @@ export default function ChatView(props: ChatViewProps) {
     });
   const onCompactContext = () => {
     if (compactDisabled) return;
-    void sendStandaloneCommand("/compact", "Failed to compact context.");
+    void sendStandaloneCommand("/compact", "无法压缩上下文。");
   };
 
   const {
@@ -3648,17 +3648,17 @@ export default function ChatView(props: ChatViewProps) {
                                 isRevertingCheckpoint={isRevertingCheckpoint}
                                 sendDisabledReason={
                                   !canOperateThread
-                                    ? "This connection cannot change threads."
+                                    ? "此连接无法修改会话。"
                                     : isEnvironmentChanging
-                                      ? "Preparing machine"
+                                      ? "正在准备机器"
                                       : isRevertingCheckpoint
-                                        ? "Rewinding conversation"
+                                        ? "正在回退对话"
                                         : feedbackUploading
-                                          ? "Sending feedback"
+                                          ? "正在发送反馈"
                                           : threadDetailLoading
-                                            ? "Messages loading"
+                                            ? "正在加载消息"
                                             : worktreeSetupBlocksSend
-                                              ? "Preparing worktree"
+                                              ? "正在准备工作树"
                                               : projectCloneSendBlockReason
                                 }
                                 isPreparingWorktree={isPreparingWorktree && !sendQueuesBehindSetup}

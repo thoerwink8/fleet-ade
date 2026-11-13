@@ -827,7 +827,7 @@ function useSidebarLookups() {
     projectGroups.map((project) => [project.projectKey, project] as const),
   );
   const projectScopeItems = [
-    { value: "all", label: "All projects" },
+    { value: "all", label: "所有项目" },
     ...pickableProjectGroups(projectGroups).map((project) => ({
       value: project.projectKey,
       label: project.displayName,
@@ -873,8 +873,8 @@ function checkThreadOperations(
   if (canOperateThreads(threads)) return true;
   toastManager.add({
     type: "error",
-    title: "Thread action unavailable",
-    description: "This connection cannot change one or more selected threads.",
+    title: "无法执行会话操作",
+    description: "此连接无法修改选中的部分会话。",
   });
   return false;
 }
@@ -945,7 +945,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     onCopy: ({ path }) => {
       toastManager.add({
         type: "success",
-        title: "Path copied",
+        title: "路径已复制",
         description: path,
       });
     },
@@ -953,8 +953,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to copy path",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: "复制路径失败",
+          description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
     },
@@ -964,7 +964,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     onCopy: ({ branch }) => {
       toastManager.add({
         type: "success",
-        title: "Branch copied",
+        title: "分支名已复制",
         description: branch,
       });
     },
@@ -972,8 +972,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to copy branch",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: "复制分支名失败",
+          description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
     },
@@ -982,7 +982,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     onCopy: ({ threadId }) => {
       toastManager.add({
         type: "success",
-        title: "Thread ID copied",
+        title: "会话 ID 已复制",
         description: threadId,
       });
     },
@@ -990,8 +990,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to copy thread ID",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: "复制会话 ID 失败",
+          description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
     },
@@ -1281,16 +1281,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             [
-              { id: "new-thread", label: "New thread" },
-              { id: "copy-path", label: "Copy path" },
+              { id: "new-thread", label: "新建会话" },
+              { id: "copy-path", label: "复制路径" },
               ...(canPinProject(group)
                 ? [
                     group.pinned
-                      ? { id: "unpin", label: "Unpin project", icon: "pin-off" }
-                      : { id: "pin", label: "Pin project", icon: "pin" },
+                      ? { id: "unpin", label: "取消置顶项目", icon: "pin-off" }
+                      : { id: "pin", label: "置顶项目", icon: "pin" },
                   ]
                 : []),
-              { id: "project-settings", label: "Project settings", icon: "settings" },
+              { id: "project-settings", label: "项目设置", icon: "settings" },
             ],
             position,
           ),
@@ -1559,7 +1559,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       const trimmed = title.trim();
       setRenamingThreadRef(null);
       if (trimmed.length === 0) {
-        toastManager.add({ type: "warning", title: "Thread title cannot be empty" });
+        toastManager.add({ type: "warning", title: "会话标题不能为空" });
         return;
       }
       if (trimmed === originalTitle) return;
@@ -1572,8 +1572,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to rename thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "重命名会话失败",
+            description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
       }
@@ -1643,8 +1643,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Failed to settle thread",
-              description: error instanceof Error ? error.message : "An error occurred.",
+              title: "收尾会话失败",
+              description: error instanceof Error ? error.message : "发生错误。",
             }),
           );
         }
@@ -1681,8 +1681,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to un-settle thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "取消会话收尾失败",
+            description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
       }
@@ -1696,8 +1696,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to wake thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "唤醒会话失败",
+            description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
       }
@@ -1795,7 +1795,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     restoreDragScroll();
     const threads = contextDragThreads();
     const threadRef = parseScopedThreadKey(contextDragKeyRef.current ?? "");
-    const title = (threadRef && readThreadShell(threadRef)?.title.trim()) || "Thread";
+    const title = (threadRef && readThreadShell(threadRef)?.title.trim()) || "会话";
     moveThreadContextDragGhost(point, { title, count: threads.length });
     return true;
   };
@@ -1898,8 +1898,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to pin thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "置顶会话失败",
+            description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
       }
@@ -1913,8 +1913,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to unpin thread",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "取消置顶会话失败",
+            description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
       }
@@ -2182,7 +2182,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             stackedThreadToast({
               type: "error",
               title,
-              description: error instanceof Error ? error.message : "An error occurred.",
+              description: error instanceof Error ? error.message : "发生错误。",
             }),
           );
         }
@@ -2192,8 +2192,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         case "settle": {
           settlingThreadKeysRef.current.add(activeKey);
           const navigateAfterSettle = planForwardNavigation(activeKey);
-          const settled = await run(settleThread(threadRef), "Failed to settle thread").finally(
-            () => settlingThreadKeysRef.current.delete(activeKey),
+          const settled = await run(settleThread(threadRef), "收尾会话失败").finally(() =>
+            settlingThreadKeysRef.current.delete(activeKey),
           );
           if (
             settled &&
@@ -2209,20 +2209,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           return;
         }
         case "move-active":
-          if (plan.unpin && !(await run(unpinThread(threadRef), "Failed to unpin thread"))) return;
-          if (
-            plan.unsettle &&
-            !(await run(unsettleThread(threadRef), "Failed to un-settle thread"))
-          )
-            return;
-          if (plan.unsnooze && !(await run(unsnoozeThread(threadRef), "Failed to wake thread")))
-            return;
+          if (plan.unpin && !(await run(unpinThread(threadRef), "取消置顶会话失败"))) return;
+          if (plan.unsettle && !(await run(unsettleThread(threadRef), "取消会话收尾失败"))) return;
+          if (plan.unsnooze && !(await run(unsnoozeThread(threadRef), "唤醒会话失败"))) return;
           break;
         case "pin":
           if (
             !(await run(
               pinThread(threadRef, plan.orderKey === undefined ? {} : { orderKey: plan.orderKey }),
-              "Failed to pin thread",
+              "置顶会话失败",
             ))
           )
             return;
@@ -2240,9 +2235,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               scopeThreadRef(thread.environmentId, thread.id),
               assignment.orderKey,
             ),
-            plan.kind === "move-active"
-              ? "Failed to reorder active threads"
-              : "Failed to reorder pinned threads",
+            plan.kind === "move-active" ? "调整活跃会话顺序失败" : "调整置顶会话顺序失败",
           ))
         )
           return;
@@ -2292,9 +2285,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Failed to snooze thread",
-              description:
-                outcome.error instanceof Error ? outcome.error.message : "An error occurred.",
+              title: "暂缓会话失败",
+              description: outcome.error instanceof Error ? outcome.error.message : "发生错误。",
             }),
           );
           return;
@@ -2357,14 +2349,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               : []),
             {
               id: "settle",
-              label: `Settle (${count})`,
+              label: `收尾（${count}）`,
               disabled: settlingThreads.length === 0 || !canOperateThreads(settlingThreads),
             },
             ...(canSnoozeSelection
               ? [
                   {
                     id: "snooze",
-                    label: `Snooze (${count})`,
+                    label: `暂缓（${count}）`,
                     disabled: !canOperateThreads(selectedThreads),
                     children: [
                       ...snoozePresets.map((preset) => ({
@@ -2375,7 +2367,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       })),
                       {
                         id: "snooze:custom",
-                        label: "Custom…",
+                        label: "自定义…",
                         separatorBefore: snoozePresets.length > 0,
                         disabled: !canOperateThreads(selectedThreads),
                       },
@@ -2393,10 +2385,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   },
                 ]
               : []),
-            { id: "mark-unread", label: `Mark unread (${count})` },
+            { id: "mark-unread", label: `标为未读（${count}）` },
             {
               id: "delete",
-              label: `Delete (${count})`,
+              label: `删除（${count}）`,
               destructive: true,
               disabled: !canOperateThreads(selectedThreads),
             },
@@ -2455,9 +2447,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 title:
                   snoozedThreadRefs.length > 0
                     ? `Failed to snooze ${failures.length} thread${failures.length === 1 ? "" : "s"}`
-                    : "Failed to snooze threads",
-                description:
-                  firstError instanceof Error ? firstError.message : "An error occurred.",
+                    : "暂缓会话失败",
+                description: firstError instanceof Error ? firstError.message : "发生错误。",
               }),
             );
           }
@@ -2509,7 +2500,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           api.dialogs.confirm(
             [
               `Delete ${count} thread${count === 1 ? "" : "s"}?`,
-              "This permanently clears conversation history for these threads.",
+              "这将永久清除这些会话的对话历史。",
             ].join("\n"),
             { variant: "destructive" },
           ),
@@ -2540,8 +2531,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to delete threads",
-            description: firstError instanceof Error ? firstError.message : "An error occurred.",
+            title: "删除会话失败",
+            description: firstError instanceof Error ? firstError.message : "发生错误。",
           }),
         );
       }
@@ -2728,8 +2719,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "Could not create thread",
-                  description: error instanceof Error ? error.message : "An error occurred.",
+                  title: "无法创建会话",
+                  description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
             }
@@ -2755,7 +2746,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             if (result._tag === "Success") {
               toastManager.add({
                 type: "success",
-                title: "Project created",
+                title: "项目已创建",
                 description: thread.title,
               });
             } else if (!isAtomCommandInterrupted(result)) {
@@ -2763,8 +2754,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "Could not turn thread into a project",
-                  description: error instanceof Error ? error.message : "An error occurred.",
+                  title: "无法将会话转换为项目",
+                  description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
             }
@@ -2781,8 +2772,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "Failed to update auto-settle",
-                  description: error instanceof Error ? error.message : "An error occurred.",
+                  title: "更新自动收尾设置失败",
+                  description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
             }
@@ -2813,8 +2804,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "Path unavailable",
-                  description: "This thread does not have a workspace path to copy.",
+                  title: "路径不可用",
+                  description: "此会话没有可复制的工作区路径。",
                 }),
               );
               return;
@@ -2837,7 +2828,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           case "archive": {
             if (confirmThreadArchive) {
               const confirmed = await settlePromise(() =>
-                api.dialogs.confirm(`Archive thread "${thread.title}"?`),
+                api.dialogs.confirm(`归档会话“${thread.title}”？`),
               );
               if (confirmed._tag === "Failure" || !confirmed.value) return;
             }
@@ -2852,10 +2843,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: didArchive
-                    ? "Thread archived, but navigation failed"
-                    : "Failed to archive thread",
-                  description: error instanceof Error ? error.message : "An error occurred.",
+                  title: didArchive ? "会话已归档，但页面跳转失败" : "归档会话失败",
+                  description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
               return;
@@ -2866,10 +2855,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             if (confirmThreadDelete) {
               const confirmed = await settlePromise(() =>
                 api.dialogs.confirm(
-                  [
-                    `Delete thread "${thread.title}"?`,
-                    "This permanently clears conversation history for this thread.",
-                  ].join("\n"),
+                  [`删除会话“${thread.title}”？`, "这将永久清除此会话的对话历史。"].join("\n"),
                   { variant: "destructive" },
                 ),
               );
@@ -2881,8 +2867,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "Failed to delete thread",
-                  description: error instanceof Error ? error.message : "An error occurred.",
+                  title: "删除会话失败",
+                  description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
               return;
@@ -3025,8 +3011,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       <SidebarHeaderIconButton
                         label={
                           scopedProjectGroups.length > 0
-                            ? `Filter threads by project: ${scopedProjectGroups.map((project) => project.displayName).join(", ")}`
-                            : "Filter threads by project"
+                            ? `按项目筛选会话：${scopedProjectGroups.map((project) => project.displayName).join(", ")}`
+                            : "按项目筛选会话"
                         }
                       />
                     }
@@ -3062,8 +3048,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     finalFocus={(closeType) => closeType === "keyboard"}
                   >
                     <ComboboxSearchInput
-                      aria-label="Search projects"
-                      placeholder="Search projects..."
+                      aria-label="搜索项目"
+                      placeholder="搜索项目..."
                       value={projectScopeMenuState.query}
                       onKeyDown={(event) => {
                         if (
@@ -3108,7 +3094,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         })
                       }
                     />
-                    <ComboboxEmpty>No matching projects.</ComboboxEmpty>
+                    <ComboboxEmpty>没有匹配的项目。</ComboboxEmpty>
                     <ComboboxList aria-multiselectable>
                       {(item: (typeof projectScopeItems)[number]) => {
                         const project = projectGroupByScopeKey.get(item.value) ?? null;
@@ -3163,7 +3149,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                     variant="ghost-muted"
                                     tabIndex={-1}
                                     aria-hidden="true"
-                                    title={`Project settings for ${project.displayName}`}
+                                    title={`${project.displayName} 的项目设置`}
                                     onPointerDown={(event) => event.stopPropagation()}
                                     onClick={(event) => {
                                       void handleProjectSettings(event, project);
@@ -3231,7 +3217,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     ref={searchResultsListRef}
                     id="sidebar-thread-search-results"
                     role="listbox"
-                    aria-label="Thread search results"
+                    aria-label="会话搜索结果"
                     className="flex flex-col gap-px"
                   >
                     {threadSearchResults.map((thread, index) => {
@@ -3286,7 +3272,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 role="status"
                 className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
               >
-                {threadSearch.isPending ? "Searching thread messages…" : "No threads found"}
+                {threadSearch.isPending ? "正在搜索会话消息…" : "未找到会话"}
               </p>
             )
           ) : null}
@@ -3303,14 +3289,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
-                  <span>No projects yet</span>
+                  <span>暂无项目</span>
                   <button
                     type="button"
                     onClick={openAddProjectCommandPalette}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
                   >
                     <PlusIcon className="-mx-0.5 size-3" />
-                    Add project
+                    添加项目
                   </button>
                 </>
               ) : scopedProjectGroups.length > 0 ? (
@@ -3327,11 +3313,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     onClick={() => setProjectScopeKeys([])}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-2xs font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
                   >
-                    Show all projects
+                    显示所有项目
                   </button>
                 </>
               ) : (
-                "No threads yet"
+                "暂无会话"
               )}
             </div>
           ) : null}
@@ -3537,7 +3523,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarDragBoundary
                                 key="pinned-header"
                                 marker="pinned-header"
-                                label="Pinned"
+                                label="已置顶"
                                 visible={from !== null}
                                 isDropTarget={dragTargetSection === "pinned"}
                               />,
@@ -3548,7 +3534,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarDragBoundary
                                 key="pinned-divider"
                                 marker="pinned-divider"
-                                label="Active"
+                                label="活跃"
                                 visible={from !== null}
                                 isDropTarget={dragTargetSection === "active"}
                               />,
@@ -3559,7 +3545,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="active-placeholder"
                                 marker="active-placeholder"
-                                label="Active"
+                                label="活跃"
                                 showHint={
                                   from !== null &&
                                   (activeThreads.length === 0 ||
@@ -3578,7 +3564,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key="working-shelf-header"
                                 marker="working-header"
                                 className="mt-auto"
-                                label="Working"
+                                label="运行中"
                                 count={workingThreads.length}
                                 toggle={{
                                   expanded: workingShelfExpanded,
@@ -3593,7 +3579,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key="snoozed-shelf-header"
                                 marker="snoozed-header"
                                 className={cn(workingThreads.length === 0 && "mt-auto")}
-                                label="Snoozed"
+                                label="已暂缓"
                                 count={snoozedThreads.length}
                                 toggle={{
                                   expanded: snoozedShelfExpanded,
@@ -3610,7 +3596,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 className={cn(
                                   workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
                                 )}
-                                label="Settled"
+                                label="已收尾"
                                 count={settledCount}
                                 dragging={from !== null}
                                 isDropTarget={dragTargetSection === "settled"}
@@ -3626,7 +3612,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="settled-placeholder"
                                 marker="settled-placeholder"
-                                label="Settled"
+                                label="已收尾"
                                 showHint={
                                   from !== null &&
                                   (renderedSettledThreads.length === 0 ||
@@ -3662,8 +3648,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           {olderSettledShelf.loading
                             ? "Loading"
                             : olderSettledShelf.failed
-                              ? "Could not load older threads. Retry"
-                              : `Show ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)} more`}
+                              ? "无法加载更早的会话，点击重试"
+                              : `再显示 ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)} 个`}
                         </button>
                       </li>
                     ) : null}

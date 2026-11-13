@@ -52,7 +52,7 @@ export function resolveDefaultModelSettingsPresentation(input: {
 }
 
 function providerNote(entry: ProviderInstanceEntry | undefined): string {
-  if (!entry) return "This provider is not available on this environment.";
-  if (!entry.enabled) return `${entry.displayName} is turned off.`;
-  return `${entry.displayName} is unavailable.`;
+  if (!entry) return "此环境上没有这个提供方。";
+  if (!entry.enabled) return `${entry.displayName} 已关闭。`;
+  return `${entry.displayName} 不可用。`;
 }

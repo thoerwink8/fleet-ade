@@ -520,7 +520,7 @@ function summarizeGitActionResult(
     return withDescription(title, truncateText(result.commit.subject));
   }
 
-  return { title: "Done" };
+  return { title: "完成" };
 }
 
 function sanitizeCommitMessage(generated: {
@@ -2047,7 +2047,7 @@ export const make = Effect.gen(function* () {
       result.action === "commit" && result.commit.status === "created"
         ? {
             kind: "run_action" as const,
-            label: "Push",
+            label: "推送",
             action: { kind: "push" as const },
           }
         : (result.action === "push" ||
@@ -2068,7 +2068,7 @@ export const make = Effect.gen(function* () {
               !currentBranchIsDefault
             ? {
                 kind: "run_action" as const,
-                label: `Create ${terms.shortLabel}`,
+                label: `创建 ${terms.shortLabel}`,
                 action: { kind: "create_pr" as const },
               }
             : {

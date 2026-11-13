@@ -59,23 +59,16 @@ function run(executable: string, args: string[], signal?: AbortSignal): Promise<
         if (executable === "kbuildsycoca6") {
           reject(
             new Error(
-              "KDE couldn't register the capture helper. Make sure KDE's service tools (kbuildsycoca6) are installed, then reinstall the helper.",
+              "KDE 无法注册截图辅助程序。请确认已安装 KDE 服务工具（kbuildsycoca6），然后重新安装辅助程序。",
             ),
           );
           return;
         }
         if (stderr.includes("NoAuthorized")) {
-          reject(
-            new Error(
-              "KDE hasn't granted capture access. Reinstall the capture helper in setup, then try again.",
-            ),
-          );
+          reject(new Error("KDE 尚未授予截图权限。请在设置中重新安装截图辅助程序后重试。"));
         } else
           reject(
-            new Error(
-              stderr.trim() ||
-                "The KDE capture helper did not respond. Reopen capture setup and check access.",
-            ),
+            new Error(stderr.trim() || "KDE 截图辅助程序未响应。请重新打开截图设置并检查权限。"),
           );
       },
     );
@@ -89,9 +82,7 @@ async function regularFile(path: string): Promise<Buffer | undefined> {
   });
   if (!stat) return undefined;
   if (!stat.isFile() || stat.isSymbolicLink())
-    throw new Error(
-      "Capture helper files must be regular files. Remove the conflicting link before trying again.",
-    );
+    throw new Error("截图辅助程序文件必须是普通文件。请移除冲突的链接后重试。");
   return NodeFSP.readFile(path);
 }
 
@@ -108,30 +99,29 @@ export class KdeCaptureSetup {
       if (!installed || !entry)
         return {
           status: "not-installed",
-          message:
-            "Install the bundled helper to capture the window you're using without a picker.",
+          message: "安装内置辅助程序，即可直接截取当前使用的窗口，无需选择窗口。",
         };
       const bundle = await regularFile(this.paths.bundle);
       if (!bundle)
         return {
           status: "error",
-          message: "The capture helper is missing from this build. Update or reinstall T3 Code.",
+          message: "此版本缺少截图辅助程序。请更新或重新安装 T3 Code。",
         };
       if (!installed.equals(bundle) || entry.toString() !== kdeCaptureDesktopEntry(executable))
         return {
           status: "update-required",
-          message: "Update the bundled capture helper to continue.",
+          message: "请更新内置截图辅助程序以继续。",
         };
       const capabilities = decodeCapabilities(await run(executable, ["check"]));
       return {
         status: "ready",
-        message: "KDE capture access is ready. Next, choose your shortcut.",
+        message: "KDE 截图权限已就绪。接下来请选择快捷键。",
         feedbackAvailable: capabilities.feedbackAvailable ?? false,
       };
     } catch (error) {
       return {
         status: "error",
-        message: error instanceof Error ? error.message : "Couldn't check KDE capture access.",
+        message: error instanceof Error ? error.message : "无法检查 KDE 截图权限。",
       };
     }
   }
@@ -140,9 +130,7 @@ export class KdeCaptureSetup {
     const { executable, desktop } = kdeCapturePaths(this.paths);
     const entry = await regularFile(desktop);
     if (entry && !entry.toString().split("\n").includes(MARKER))
-      throw new Error(
-        "Another desktop entry uses the capture helper's name. Rename it before continuing.",
-      );
+      throw new Error("另一个桌面条目使用了截图辅助程序的名称。请先将其重命名再继续。");
     const directory = NodePath.dirname(executable);
     const existing = await NodeFSP.lstat(directory).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error;
@@ -158,10 +146,7 @@ export class KdeCaptureSetup {
       });
     } else {
       const bundle = await regularFile(this.paths.bundle);
-      if (!bundle)
-        throw new Error(
-          "The capture helper is missing from this build. Update or reinstall T3 Code.",
-        );
+      if (!bundle) throw new Error("此版本缺少截图辅助程序。请更新或重新安装 T3 Code。");
       await NodeFSP.mkdir(directory, { recursive: true });
       await NodeFSP.mkdir(NodePath.dirname(desktop), { recursive: true });
       const staging = await NodeFSP.mkdtemp(NodePath.join(directory, ".install-"));

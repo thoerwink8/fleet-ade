@@ -463,8 +463,8 @@ export function useUpdateEnvironmentModelPreferences(environmentId: EnvironmentI
     } catch {
       toastManager.add({
         type: "error",
-        title: "Model preferences not saved",
-        description: "Could not load saved model preferences. Try again.",
+        title: "模型偏好未保存",
+        description: "无法加载已保存的模型偏好，请重试。",
       });
       return;
     }
@@ -490,8 +490,8 @@ export function useToggleEnvironmentModelFavorite(environmentId: EnvironmentId |
       } catch {
         toastManager.add({
           type: "error",
-          title: "Favorites not saved",
-          description: "Could not load saved model preferences. Try again.",
+          title: "收藏未保存",
+          description: "无法加载已保存的模型偏好，请重试。",
         });
         return;
       }
@@ -572,7 +572,7 @@ export function usePrimarySettings<T = UnifiedSettings>(
 }
 
 export const PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE =
-  "This setting is saved on a server, and the hosted app is not anchored to one. Change it from the desktop app or from the server's own address.";
+  "此设置保存在服务器上，而托管应用未固定连接某台服务器。请从桌面应用或服务器自身的地址修改。";
 
 /** Hosted clients have no primary: usePrimarySettings reads defaults and cannot write. */
 export function usePrimarySettingsAvailable(): boolean {
@@ -619,8 +619,8 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "Setting not saved",
-        description: `Could not save on ${label}: ${error instanceof Error ? error.message : "The save failed. Try reconnecting and saving again."}`,
+        title: "设置未保存",
+        description: `无法在 ${label} 上保存：${error instanceof Error ? error.message : "保存失败，请重新连接后再保存。"}`,
       });
     }
     return result;
@@ -641,8 +641,8 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
       options?.onFailed?.();
       toastManager.add({
         type: "warning",
-        title: "Setting not saved",
-        description: `This connection lacks permission to change settings on ${environments.find((target) => target.environmentId === environmentId)?.label ?? "the selected environment"}.`,
+        title: "设置未保存",
+        description: `此连接没有权限更改 ${environments.find((target) => target.environmentId === environmentId)?.label ?? "所选环境"} 的设置。`,
       });
     }
     if (Object.keys(serverPatch).length > 0 && canWriteServerPatch) {
@@ -652,7 +652,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
         options?.onFailed?.();
         return toastManager.add({
           type: "warning",
-          title: "Setting not saved",
+          title: "设置未保存",
           description,
         });
       };
@@ -704,9 +704,9 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
         if (writes.length === 0) {
           warnUnsaved(
             deniedLabels.length > 0
-              ? `This connection lacks permission to change settings on ${deniedLabels.join(", ")}.`
+              ? `此连接没有权限更改 ${deniedLabels.join(", ")} 的设置。`
               : targets.size > 0
-                ? "Update older servers to save this setting."
+                ? "请更新旧版服务器后再保存此设置。"
                 : undefined,
           );
         } else {
@@ -728,7 +728,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
               if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return [];
               const error = squashAtomCommandFailure(result);
               return [
-                `Could not save on ${label}: ${error instanceof Error ? error.message : "The save failed. Try reconnecting and saving again."}`,
+                `无法在 ${label} 上保存：${error instanceof Error ? error.message : "保存失败，请重新连接后再保存。"}`,
               ];
             });
             if (
@@ -743,10 +743,10 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
               .map(({ label }) => label);
             toastManager.add({
               type: "error",
-              title: saved.length > 0 ? "Setting saved on some environments" : "Setting not saved",
+              title: saved.length > 0 ? "部分环境已保存设置" : "设置未保存",
               description: [
                 ...failures,
-                ...(saved.length > 0 ? [`Saved on ${saved.join(", ")}.`] : []),
+                ...(saved.length > 0 ? [`已保存到 ${saved.join(", ")}。`] : []),
               ].join("\n"),
             });
           });

@@ -16,8 +16,8 @@ export function stopFilePaths(stop: PullRequestReviewGuideStop): ReadonlyArray<s
 
 export function stopSubline(stop: PullRequestReviewGuideStop): string {
   const count = stopFilePaths(stop).length;
-  if (count === 0) return "Context, no code";
-  return count === 1 ? "1 file" : `${count} files`;
+  if (count === 0) return "背景说明，无代码";
+  return count === 1 ? "1 个文件" : `${count} 文件`;
 }
 
 function noteMarker(index: number): string {

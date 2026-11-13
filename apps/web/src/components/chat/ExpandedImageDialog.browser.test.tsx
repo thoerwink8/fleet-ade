@@ -107,10 +107,10 @@ describe("ExpandedImageDialog", () => {
     );
 
     await userEvent.click(screen.getByRole("button", { name: "No accessibility data" }));
-    await expect.element(screen.getByText("Accessibility data")).toBeVisible();
+    await expect.element(screen.getByText("无障碍数据")).toBeVisible();
 
     await userEvent.keyboard("{Escape}");
-    await expect.element(screen.getByText("Accessibility data")).not.toBeInTheDocument();
+    await expect.element(screen.getByText("无障碍数据")).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     // Focus returns to the popup's trigger and opens its tooltip; leave it for a plain control.

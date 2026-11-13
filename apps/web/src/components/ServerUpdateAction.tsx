@@ -38,9 +38,9 @@ import { toastManager } from "./ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 const UPDATE_STAGE_LABELS: Record<ServerUpdateStage, string> = {
-  downloading: "Downloading…",
-  installing: "Downloading…",
-  resuming: "Restarting…",
+  downloading: "正在下载…",
+  installing: "正在下载…",
+  resuming: "正在重启…",
 };
 const pendingUpdateEnvironmentIds = new Set<EnvironmentId>();
 
@@ -56,7 +56,7 @@ function readUpdatesDenial(environmentId: EnvironmentId): string | undefined {
   );
 }
 
-const CROSS_TRACK_NOTE = "Switch tracks in About → Update track";
+const CROSS_TRACK_NOTE = "在“关于 → 更新通道”中切换通道";
 
 /** Hosts refuse a Stable/Nightly crossing outside a track switch, which checks the database first. */
 function refusedCrossing(
@@ -80,7 +80,7 @@ function CrossTrackNote() {
 }
 
 function updateFailureMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Server update failed.";
+  return error instanceof Error ? error.message : "服务器更新失败。";
 }
 
 export interface ServerUpdateTarget {
@@ -149,7 +149,7 @@ export function useServerUpdate() {
       if (!quiet) {
         toastManager.add({
           type: "error",
-          title: `${serverLabel} update failed`,
+          title: `${serverLabel} 更新失败`,
           description: message,
         });
       }
@@ -158,11 +158,11 @@ export function useServerUpdate() {
     if (!quiet) {
       toastManager.add({
         type: "success",
-        title: `${serverLabel} updated`,
+        title: `${serverLabel} 已更新`,
         description:
           selfUpdate === "desktop-managed"
-            ? `Desktop app relaunched on ${result.value.targetVersion}.`
-            : `Reconnected on t3@${result.value.targetVersion}.`,
+            ? `桌面应用已重新启动，版本为 ${result.value.targetVersion}。`
+            : `已重新连接到 t3@${result.value.targetVersion}。`,
       });
     }
     return { status: "updated" };
@@ -171,7 +171,7 @@ export function useServerUpdate() {
 
 export function ServerUpdatesAction({
   targets,
-  label = "Update all",
+  label = "全部更新",
   variant = "outline",
   size = "xs",
   className,
@@ -201,7 +201,7 @@ export function ServerUpdatesAction({
       if (desktopTargets.length > 0) {
         const confirmed =
           (await requestConfirmDialog(
-            `Update the T3 Code desktop apps on ${desktopTargets.map((target) => target.serverLabel).join(", ")}? They will close and relaunch on those machines.`,
+            `要更新 ${desktopTargets.map((target) => target.serverLabel).join(", ")} 上的 T3 Code 桌面应用吗？它们会在那些机器上关闭并重新启动。`,
             { initialFocus: "confirm" },
           )) ?? true;
         if (!confirmed) return;
@@ -283,16 +283,16 @@ export function ServerUpdateAction({
     onCopy: ({ command }) => {
       toastManager.add({
         type: "success",
-        title: updatesInstall ? "Update command copied" : "Relaunch command copied",
+        title: updatesInstall ? "已复制更新命令" : "已复制重启命令",
         description: updatesInstall
-          ? `Run \`${command}\` on ${serverLabel}, then restart t3 with your usual options.`
-          : `Stop t3 on ${serverLabel}, then relaunch with \`${command}\` using the same subcommand and options. This does not update an installed t3 command.`,
+          ? `在 ${command} 上运行 \`${serverLabel}\`，然后按你常用的选项重启 t3。`
+          : `先停止 ${serverLabel} 上的 t3，再用相同的子命令和选项通过 \`${command}\` 重新启动。这不会更新已安装的 t3 命令。`,
       });
     },
     onError: (error) => {
       toastManager.add({
         type: "error",
-        title: "Could not copy update command",
+        title: "无法复制更新命令",
         description: error.message,
       });
     },
@@ -308,7 +308,7 @@ export function ServerUpdateAction({
     if (isDesktopAppUpdate) {
       const confirmed =
         (await requestConfirmDialog(
-          `Update the T3 Code desktop app that runs the ${serverLabel}? It will close and relaunch on that machine.`,
+          `要更新运行 ${serverLabel} 的 T3 Code 桌面应用吗？它会在那台机器上关闭并重新启动。`,
           { initialFocus: "confirm" },
         )) ?? true;
       if (!confirmed) {
@@ -340,7 +340,7 @@ export function ServerUpdateAction({
   if (selfUpdate === "desktop-managed" && !desktopAppUpdate) {
     return (
       <span className="text-muted-foreground text-xs">
-        Update the desktop app on that machine to update this server.
+        请在那台机器上更新桌面应用以更新此服务器。
       </span>
     );
   }
@@ -352,11 +352,7 @@ export function ServerUpdateAction({
   const manualCommand =
     selfUpdate === null ? manualServerUpdateCommand(targetVersion, installation) : null;
   const actionLabel =
-    manualCommand !== null
-      ? updatesInstall
-        ? "Copy update command"
-        : "Copy relaunch command"
-      : label;
+    manualCommand !== null ? (updatesInstall ? "复制更新命令" : "复制重启命令") : label;
   const onClick =
     manualCommand !== null
       ? () => copyToClipboard(manualCommand, { command: manualCommand })
@@ -425,15 +421,15 @@ export function OutdatedServerUpdateAction({
       if (isAtomCommandInterrupted(result)) return;
       toastManager.add({
         type: "error",
-        title: `${serverLabel} update failed`,
+        title: `${serverLabel} 更新失败`,
         description: updateFailureMessage(squashAtomCommandFailure(result)),
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: `${serverLabel} updated`,
-      description: `Reconnected on t3@${result.value.targetVersion}.`,
+      title: `${serverLabel} 已更新`,
+      description: `已重新连接到 t3@${result.value.targetVersion}。`,
     });
   };
   if (fromVersion !== undefined && crossesReleaseTrack(fromVersion, targetVersion)) {

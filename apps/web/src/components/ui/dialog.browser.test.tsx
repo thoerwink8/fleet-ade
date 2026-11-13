@@ -48,8 +48,8 @@ describe("dialog initial focus", () => {
         <DialogTrigger>Open retry</DialogTrigger>
         <DialogPopup ref={popup}>
           <DialogTitle>Import failed</DialogTitle>
-          <DialogClose>Cancel</DialogClose>
-          <DialogAction>Try again</DialogAction>
+          <DialogClose>取消</DialogClose>
+          <DialogAction>重试</DialogAction>
         </DialogPopup>
       </Dialog>,
     );
@@ -69,9 +69,9 @@ describe("dialog initial focus", () => {
           <DialogPopup {...(reason === "caller initialFocus" ? { initialFocus: cancel } : {})}>
             <DialogTitle>Install update?</DialogTitle>
             <DialogClose ref={cancel} render={<Button variant="outline" />}>
-              Cancel
+              取消
             </DialogClose>
-            <DialogAction disabled={reason === "disabled action"}>Install</DialogAction>
+            <DialogAction disabled={reason === "disabled action"}>安装</DialogAction>
           </DialogPopup>
         </Dialog>,
       );
@@ -86,8 +86,8 @@ describe("dialog initial focus", () => {
         <DialogTrigger>Open installer</DialogTrigger>
         <DialogPopup>
           <DialogTitle>Install relay client</DialogTitle>
-          <DialogClose>Cancel</DialogClose>
-          <DialogAction>Install</DialogAction>
+          <DialogClose>取消</DialogClose>
+          <DialogAction>安装</DialogAction>
         </DialogPopup>
       </Dialog>,
     );

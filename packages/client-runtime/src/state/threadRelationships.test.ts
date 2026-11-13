@@ -165,7 +165,7 @@ describe("thread relationships", () => {
         },
         {
           id: child,
-          title: "Subagent",
+          title: "子智能体",
           status: "completed",
           archivedAt: "2026-06-24T00:00:00.000Z",
           forkedFrom: null,

@@ -304,7 +304,7 @@ export const runMigrations = Effect.fn("runMigrations")(function* ({
       yield* Effect.log(DATABASE_MIGRATION_PROGRESS_MESSAGE).pipe(
         Effect.annotateLogs({
           migration: `${id}_${name}`,
-          progress: `${index + 1} of ${pending.length}`,
+          progress: `已选 ${index + 1} / 共 ${pending.length}`,
         }),
       );
     }

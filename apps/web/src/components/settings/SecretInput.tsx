@@ -19,9 +19,7 @@ export function SecretInput({
     type: "password" as const,
     autoComplete: "off",
     spellCheck: false,
-    placeholder: configured
-      ? "Stored secret, enter a new value to replace"
-      : (placeholder ?? "Not set"),
+    placeholder: configured ? "已保存凭据，输入新值可替换" : (placeholder ?? "未设置"),
   };
   if (onCommit) {
     return (

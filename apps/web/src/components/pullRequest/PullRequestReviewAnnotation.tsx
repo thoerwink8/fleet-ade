@@ -100,12 +100,12 @@ export function PendingReviewCommentCard({
     >
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <MessageSquareIcon className="size-3.5" />
-        <span>Pending. Sent when you submit the review</span>
+        <span>待提交。提交审查时会一并发送</span>
         <Button
           size="icon-xs"
           variant="ghost"
           className="ml-auto"
-          aria-label="Discard this comment"
+          aria-label="放弃此评论"
           onClick={onRemove}
         >
           <Trash2Icon className="size-3.5" />
@@ -137,8 +137,7 @@ export function InlineReviewThreads({
     authors.set(comment.author?.login ?? "ghost", comment.author);
   }
   if (authors.size === 0) authors.set("ghost", null);
-  const label =
-    resolved.length === 1 ? "Resolved conversation" : `${resolved.length} resolved conversations`;
+  const label = resolved.length === 1 ? "已解决的讨论" : `${resolved.length} 个已解决的讨论`;
   return (
     <>
       {resolved.length > 0 ? (
@@ -187,7 +186,7 @@ export function ReviewThreadCard({
   completionScope,
   pending,
   fixPending,
-  fixLabel = "Fix in a thread",
+  fixLabel = "在会话中修复",
   onFix,
   onAddToChat,
   onReply,
@@ -317,10 +316,10 @@ export function ReviewThreadCard({
           aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
-          {thread.isResolved ? "Resolved" : "Open"} · {commentCount}{" "}
-          {commentCount === 1 ? "comment" : "comments"}
+          {thread.isResolved ? "已解决" : "打开"} · {commentCount}{" "}
+          {commentCount === 1 ? "条评论" : "条评论"}
         </button>
-        {thread.isOutdated ? <span>outdated</span> : null}
+        {thread.isOutdated ? <span>已过时</span> : null}
         {onFix ? (
           <Button
             size="compact"
@@ -330,7 +329,7 @@ export function ReviewThreadCard({
             onClick={onFix}
           >
             <HammerIcon className="size-3" />
-            {fixPending ? "Preparing..." : fixLabel}
+            {fixPending ? "正在准备…" : fixLabel}
           </Button>
         ) : null}
         {onAddToChat && comments.some((comment) => visibleBody(comment.body) !== null) ? (
@@ -341,7 +340,7 @@ export function ReviewThreadCard({
             onClick={() => onAddToChat({ ...thread, comments })}
           >
             <MessageSquarePlusIcon className="size-3" />
-            Add to chat
+            添加到对话
           </Button>
         ) : null}
         {canResolve ? (
@@ -352,7 +351,7 @@ export function ReviewThreadCard({
             disabled={pending}
             onClick={onToggleResolved}
           >
-            {thread.isResolved ? "Unresolve" : "Resolve"}
+            {thread.isResolved ? "标记为未解决" : "解决"}
           </Button>
         ) : null}
       </div>
@@ -384,7 +383,7 @@ export function ReviewThreadCard({
                     cwd={workspaceRoot}
                     environmentId={environmentId}
                     completionScope={completionScope}
-                    label="Edit comment"
+                    label="编辑评论"
                     saving={savingEdit}
                     onSave={(body) => void saveEdit(comment.id, body)}
                     onCancel={() => setEditingId(null)}
@@ -399,7 +398,7 @@ export function ReviewThreadCard({
                     />
                     {canEditComment(comment) ? (
                       <PullRequestEditButton
-                        aria-label="Edit comment"
+                        aria-label="编辑评论"
                         onClick={() => setEditingId(comment.id)}
                       />
                     ) : null}
@@ -416,7 +415,7 @@ export function ReviewThreadCard({
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
               >
-                {loadingMore ? "Loading..." : "Load more comments"}
+                {loadingMore ? "加载中…" : "加载更多评论"}
               </Button>
             </div>
           ) : null}
@@ -441,8 +440,8 @@ export function ReviewThreadCard({
                       size="sm"
                       completionScope={completionScope}
                       value={reply}
-                      placeholder="Reply"
-                      aria-label="Reply to this conversation"
+                      placeholder="回复"
+                      aria-label="回复此对话"
                       onValueChange={setReply}
                       onKeyDown={submitKeys({
                         value: reply,
@@ -456,7 +455,7 @@ export function ReviewThreadCard({
                     <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
                       <TextFieldSpeechControls speech={speech} disabled={pending} />
                       <Button size="xs" variant="ghost" onClick={() => setReplying(false)}>
-                        Cancel
+                        取消
                       </Button>
                       <Button
                         size="xs"
@@ -467,7 +466,7 @@ export function ReviewThreadCard({
                         }
                         onClick={() => speech.submitAfterDictation((text) => void send(text))}
                       >
-                        Reply
+                        回复
                       </Button>
                     </div>
                   </div>
@@ -475,7 +474,7 @@ export function ReviewThreadCard({
               </SpeechTextField>
             ) : (
               <Button size="xs" variant="ghost" className="mt-2" onClick={() => setReplying(true)}>
-                Reply
+                回复
               </Button>
             )
           ) : null}

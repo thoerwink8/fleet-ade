@@ -67,7 +67,7 @@ export function createBrowserVoiceInputPlatform(input: {
         if (isVoiceTranscriptionError(cause)) throw cause;
         throw new VoiceTranscriptionError({
           code: "transcription-failed",
-          message: "Voice transcription failed. Check the destination in Settings → Voice.",
+          message: "语音转写失败。请检查“设置 → 语音”中的目标。",
           cause,
         });
       }
@@ -76,7 +76,7 @@ export function createBrowserVoiceInputPlatform(input: {
       if (input.cloudProvider === "openrouter" && !input.cloudModel)
         throw new VoiceTranscriptionError({
           code: "unavailable",
-          message: "Choose an OpenRouter model in Settings → Voice.",
+          message: "请在“设置 → 语音”中选择 OpenRouter 模型。",
         });
       await runEnvironmentSpeech(
         requireCloudSpeechKey(input.prepared, input.cloudProvider),

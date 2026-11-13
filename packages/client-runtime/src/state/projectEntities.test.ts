@@ -15,10 +15,10 @@ function makeHarness(withConfig = true) {
     Atom.make({
       ...v2ShellSnapshot,
       projects: [
-        { ...v2Project, title: "No project" },
+        { ...v2Project, title: "无项目" },
         {
           ...v2Project,
-          title: "No project",
+          title: "无项目",
           id: ProjectId.make("ordinary"),
           workspaceRoot: "/repo",
         },

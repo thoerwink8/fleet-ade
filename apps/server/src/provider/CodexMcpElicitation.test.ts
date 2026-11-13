@@ -36,11 +36,11 @@ describe("Codex MCP elicitation approvals", () => {
     NodeAssert.deepStrictEqual(describeMcpElicitation(request), {
       appName: "Safari",
       options: [
-        { decision: "cancel", label: "Cancel" },
-        { decision: "decline", label: "Decline" },
+        { decision: "cancel", label: "取消" },
+        { decision: "decline", label: "拒绝" },
         { decision: "acceptForSession", label: "Allow for this session" },
         { decision: "acceptAlways", label: "Always allow Safari" },
-        { decision: "accept", label: "Approve" },
+        { decision: "accept", label: "批准" },
       ],
     });
   });
@@ -183,9 +183,9 @@ describe("Codex MCP elicitation approvals", () => {
     } satisfies EffectCodexSchema.McpServerElicitationRequestParams;
 
     NodeAssert.deepStrictEqual(describeMcpElicitation(onceOnlyRequest).options, [
-      { decision: "cancel", label: "Cancel" },
-      { decision: "decline", label: "Decline" },
-      { decision: "accept", label: "Approve" },
+      { decision: "cancel", label: "取消" },
+      { decision: "decline", label: "拒绝" },
+      { decision: "accept", label: "批准" },
     ]);
   });
 });

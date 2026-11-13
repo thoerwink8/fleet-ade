@@ -234,7 +234,7 @@ const bootstrap = Effect.gen(function* () {
       owner: Option.getOrNull(owner),
     });
     yield* (yield* ElectronDialog.ElectronDialog).showErrorBox(
-      "This T3 home is unavailable",
+      "此 T3 主目录不可用",
       DesktopHomeOwner.homeOwnedMessage(owner),
     );
     return yield* (yield* ElectronApp.ElectronApp).quit;

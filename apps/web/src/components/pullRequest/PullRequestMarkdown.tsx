@@ -54,7 +54,7 @@ function PullRequestHostVideo({
     <MediaVideoPlayer
       src={src === null ? null : src + markdownImageSourceFragment(url)}
       originalUrl={url}
-      label="Pull request video"
+      label="PR 视频"
       className="w-full"
       videoClassName="rounded-lg border border-border/60"
       onRetry={refreshAssetUrl}
@@ -156,7 +156,7 @@ function PullRequestBodySegmentView({
         key={`${segment.id}:${segment.url}`}
         src={segment.url}
         originalUrl={segment.url}
-        label="Pull request video"
+        label="PR 视频"
         className="w-full"
         videoClassName="rounded-lg border border-border/60"
       />

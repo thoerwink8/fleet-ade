@@ -28,13 +28,13 @@ const models: ReadonlyArray<ServerProviderModel> = [
           currentValue: "bypass",
           options: [
             { id: "code", label: "Code" },
-            { id: "plan", label: "Plan" },
+            { id: "plan", label: "计划" },
             { id: "bypass", label: "Bypass Permissions" },
           ],
         },
         {
           id: "thought_level",
-          label: "Thinking",
+          label: "正在思考",
           type: "select",
           role: "reasoning",
           currentValue: "medium",
@@ -46,12 +46,12 @@ const models: ReadonlyArray<ServerProviderModel> = [
         },
         {
           id: "speed",
-          label: "Speed",
+          label: "速度",
           type: "select",
           currentValue: "standard",
           options: [
-            { id: "standard", label: "Standard" },
-            { id: "fast", label: "Fast" },
+            { id: "standard", label: "标准" },
+            { id: "fast", label: "快速" },
           ],
         },
         { id: "auto_approve", label: "Auto-approve tools", type: "boolean", currentValue: false },

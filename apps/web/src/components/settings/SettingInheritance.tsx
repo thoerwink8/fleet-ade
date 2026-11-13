@@ -32,33 +32,33 @@ interface InheritanceLayer {
 }
 
 const WRITING_STYLE_LABELS: Record<string, string> = {
-  repo_conventions: "Repository conventions",
-  conventional_commits: "Conventional Commits",
-  custom: "Custom instructions",
+  repo_conventions: "仓库规范",
+  conventional_commits: "约定式提交",
+  custom: "自定义指令",
 };
 
 const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<string, string> = {
   balanced: "Balanced",
   performance: "Performance",
-  "battery-saver": "Battery saver",
+  "battery-saver": "省电",
   custom: "Advanced",
 };
 
 function formatValue(key: keyof ServerSettings, value: unknown): string {
   if (value === null || value === undefined) {
     return key === "pullRequestMergeMethod"
-      ? "Last selected"
+      ? "上次选择"
       : key === "sidebarAutoSettleAfterDays"
         ? "Never"
         : key === "defaultModelSelection"
           ? "Automatic"
           : key === "sourceControlWriterModelSelection"
-            ? "Text generation model"
+            ? "文本生成模型"
             : key === "reviewGuideModelSelection"
-              ? "Source control writer model"
+              ? "版本控制文案模型"
               : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
                 ? "Inherit"
-                : "Not set";
+                : "未设置";
   }
   if (typeof value === "boolean") return value ? "On" : "Off";
   if (typeof value === "number") {
@@ -110,7 +110,7 @@ export function settingInheritanceLayers(
   if (target.projectId !== null && isProjectScopedSettingKey(key)) {
     layers.push({
       key: "project",
-      label: "Project",
+      label: "项目",
       value: source === "project" ? formatValue(key, target.settings[key]) : "Inherits",
       effective: source === "project",
       set: source === "project",
@@ -138,7 +138,7 @@ export function settingInheritanceLayers(
     : DEFAULT_SERVER_SETTINGS[key];
   layers.push({
     key: "built-in",
-    label: "Default",
+    label: "默认",
     value: formatValue(key, builtIn),
     effective: source === "environment" && !environmentSet,
     set: true,
@@ -252,7 +252,7 @@ export function SettingInheritance({
                 <Button
                   size="icon-micro"
                   variant="ghost-muted"
-                  aria-label={`${overrideSummary}. Show where this value comes from`}
+                  aria-label={`${overrideSummary}。查看此值的来源`}
                 />
               }
             />
@@ -290,7 +290,7 @@ export function SettingInheritance({
                         layer.effective ? "font-medium text-foreground" : "text-muted-foreground",
                       )}
                     >
-                      {layer.key === "environment" ? "Environment" : layer.label}
+                      {layer.key === "environment" ? "环境" : layer.label}
                     </span>
                     <span
                       className={cn(
@@ -342,9 +342,7 @@ export function SettingInheritance({
                             {winningLayer?.value}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {winningLayer?.key === "environment"
-                              ? "Environment"
-                              : winningLayer?.label}
+                            {winningLayer?.key === "environment" ? "环境" : winningLayer?.label}
                           </span>
                           <ChevronRightIcon
                             aria-hidden
@@ -377,7 +375,7 @@ export function SettingInheritance({
                     {chain}
                     {hasMultipleEnvironments ? (
                       <p className="px-2 pt-1.5 text-xs text-muted-foreground">
-                        Same on all machines
+                        所有机器上的设置相同
                       </p>
                     ) : null}
                   </>
@@ -396,14 +394,14 @@ export function SettingInheritance({
                             aria-hidden
                             className="size-3 [[data-panel-open]_&]:rotate-90"
                           />
-                          Overridden by
+                          被以下项目覆盖
                         </CollapsibleTrigger>
                       ) : (
-                        <span>Overridden by</span>
+                        <span>被以下项目覆盖</span>
                       )}
                       {onClearOverrides ? (
                         <InlineButton onClick={() => onClearOverrides(overriding)}>
-                          Reset {overriding.length === 1 ? "it" : "all"}
+                          重置 {overriding.length === 1 ? "it" : "all"}
                         </InlineButton>
                       ) : null}
                     </div>

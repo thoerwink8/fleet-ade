@@ -7,7 +7,7 @@ import { act, render } from "../../../test/render";
 import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { ThemeColorField } from "./ThemeColorPicker";
 
-const HUE = "Accent color hue";
+const HUE = "强调色色相";
 const PLANE = "Accent color saturation and brightness";
 
 async function renderPicker(ui: ReactNode) {
@@ -143,7 +143,7 @@ describe("provider accent color picker", () => {
     );
 
     await open("Add accent color for Example provider");
-    expect(byLabel<HTMLInputElement>("Custom hex accent color").value).toBe("#2563eb");
+    expect(byLabel<HTMLInputElement>("自定义十六进制强调色").value).toBe("#2563eb");
     expect(onCommit).not.toHaveBeenCalled();
     await userEvent.keyboard("{Escape}");
     expect(onCommit).not.toHaveBeenCalled();
@@ -232,26 +232,26 @@ describe("provider accent color picker", () => {
   it("saves a change back to the saved color while the first change is still saving", async () => {
     await using screen = await renderAccentPicker("#ff0000");
 
-    await userEvent.fill(byLabel("Custom hex accent color"), "#00ff00");
-    await userEvent.fill(byLabel("Custom hex accent color"), "#ff0000");
+    await userEvent.fill(byLabel("自定义十六进制强调色"), "#00ff00");
+    await userEvent.fill(byLabel("自定义十六进制强调色"), "#ff0000");
 
     expect(screen.onCommit).toHaveBeenLastCalledWith("#ff0000");
-    await userEvent.fill(byLabel("Custom hex accent color"), "#00FF00");
+    await userEvent.fill(byLabel("自定义十六进制强调色"), "#00FF00");
     await screen.echo("#00FF00");
-    expect(byLabel<HTMLInputElement>("Custom hex accent color").value).toBe("#00FF00");
+    expect(byLabel<HTMLInputElement>("自定义十六进制强调色").value).toBe("#00FF00");
   });
 
   it("shows the saved color again when it is reverted outside the picker", async () => {
     await using screen = await renderAccentPicker("#ff0000");
 
-    await userEvent.fill(byLabel("Custom hex accent color"), "#00ff00");
+    await userEvent.fill(byLabel("自定义十六进制强调色"), "#00ff00");
     expect(screen.onCommit).toHaveBeenLastCalledWith("#00ff00");
     await screen.echo("#00ff00");
     await screen.echo("#ff0000");
 
-    expect(byLabel<HTMLInputElement>("Custom hex accent color").value).toBe("#ff0000");
+    expect(byLabel<HTMLInputElement>("自定义十六进制强调色").value).toBe("#ff0000");
     await screen.echo("");
-    expect(byLabel<HTMLInputElement>("Custom hex accent color").value).toBe("#2563eb");
+    expect(byLabel<HTMLInputElement>("自定义十六进制强调色").value).toBe("#2563eb");
     await userEvent.click(page.getByRole("button", { name: "Add color", exact: true }));
     expect(screen.onCommit).toHaveBeenLastCalledWith("#2563eb");
 

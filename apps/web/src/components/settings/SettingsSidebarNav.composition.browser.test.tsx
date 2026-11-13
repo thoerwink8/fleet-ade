@@ -8,7 +8,7 @@ import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS } from "./settingsSearch";
 
 vi.mock("./useAvailableSettingsSearchItems", () => ({
   useAvailableSettingsSearchItems: () => [
-    { id: "theme", title: "Theme", to: "/settings/appearance" },
+    { id: "theme", title: "主题", to: "/settings/appearance" },
   ],
 }));
 

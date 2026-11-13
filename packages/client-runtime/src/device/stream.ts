@@ -507,7 +507,7 @@ export function createDeviceStreamClient(
     firstFrame = false;
     if (frameTimer === null) {
       frameTimer = setTimeout(
-        () => fail("No video received from the device. Reconnect to try again."),
+        () => fail("未收到来自设备的视频，请重新连接后重试。"),
         FIRST_FRAME_TIMEOUT_MS,
       );
     }
@@ -540,7 +540,7 @@ export function createDeviceStreamClient(
     };
     const error = () => {
       if (released) return;
-      const failure = "Could not receive the device stream. Reconnect to try again.";
+      const failure = "无法接收设备画面，请重新连接后重试。";
       // An <img> cannot read the 409 that a WebRTC-only serve-sim answers with.
       if (typeof RTCPeerConnection === "undefined") fail(failure);
       else void switchToWebRtc(failure, false);
@@ -584,7 +584,7 @@ export function createDeviceStreamClient(
       events.onScreen(screen);
     }
     if (!sink.present(source, width, height)) {
-      fail("Could not display the device stream. Reconnect to try again.");
+      fail("无法显示设备画面，请重新连接后重试。");
       return;
     }
     frameReceived();
@@ -607,7 +607,7 @@ export function createDeviceStreamClient(
     } else if (platform === "ios") fallBackToMjpeg();
     else {
       closeDecoder();
-      connecting("Video decoder restarted.");
+      connecting("视频解码器已重启。");
       requestKeyframe();
     }
   };
@@ -643,7 +643,7 @@ export function createDeviceStreamClient(
     const support = await VideoDecoder.isConfigSupported(full).catch(() => ({ supported: false }));
     if (!isCurrent() || epoch !== decoderEpoch) return false;
     if (!support.supported) {
-      if (platform === "android") fail(`This browser cannot decode ${config.codec}.`);
+      if (platform === "android") fail(`此浏览器无法解码 ${config.codec}。`);
       return false;
     }
     try {
@@ -651,7 +651,7 @@ export function createDeviceStreamClient(
       videoDecoder.configure(full);
       return true;
     } catch (cause) {
-      if (platform === "android") fail(`Video decoder: ${(cause as Error).message}`);
+      if (platform === "android") fail(`视频解码器：${(cause as Error).message}`);
       return false;
     }
   };
@@ -738,13 +738,13 @@ export function createDeviceStreamClient(
         if (Option.isSome(locked)) {
           if (!isCurrent()) return;
           controller = null;
-          void switchToWebRtc("This browser cannot play this device's WebRTC stream.", true);
+          void switchToWebRtc("此浏览器无法播放该设备的 WebRTC 画面。", true);
           return;
         }
       }
       if (target.panelId && [400, 404, 405, 410].includes(response.status)) {
         await response.body?.cancel();
-        setStatus("error", "This Device Hub does not provide fixed Duo display feeds.");
+        setStatus("error", "此 Device Hub 不提供固定的 Duo 显示画面。");
         return;
       }
       if (!response.ok || !response.body) throw new Error(`stream ${response.status}`);
@@ -753,7 +753,7 @@ export function createDeviceStreamClient(
         // An AVCC body can stay open after its helper stops producing frames.
         const timer = setTimeout(() => {
           if (!isCurrent()) return;
-          retryDetail = "Device stream stopped receiving video. Reconnecting…";
+          retryDetail = "已无法接收设备画面，正在重新连接…";
           videoController.abort();
         }, FIRST_FRAME_TIMEOUT_MS);
         videoReadTimer = timer;
@@ -798,12 +798,12 @@ export function createDeviceStreamClient(
                 if (serveSimOnly)
                   setStatus(
                     "error",
-                    `This browser cannot decode this device's ${avcCodecString(chunk.payload)} stream.`,
+                    `此浏览器无法解码此设备的 ${avcCodecString(chunk.payload)} 视频流。`,
                   );
                 else if (target.videoOnly)
                   setStatus(
                     "error",
-                    `This browser cannot decode the Duo panel's ${avcCodecString(chunk.payload)} stream.`,
+                    `此浏览器无法解码 Duo 面板的 ${avcCodecString(chunk.payload)} 视频流。`,
                   );
                 else fallBackToMjpeg();
                 return;
@@ -825,7 +825,7 @@ export function createDeviceStreamClient(
     } catch (cause) {
       if (!isCurrent()) return;
       retryDetail ??= videoController.signal.aborted
-        ? "Video decoder fell behind. Reconnecting…"
+        ? "视频解码速度不足，正在重新连接…"
         : (cause as Error).message;
     }
     if (isCurrent()) {
@@ -967,7 +967,7 @@ export function createDeviceStreamClient(
           if (!isCurrent()) return clearWatchdog();
           checksWithoutFrame++;
           if (checksWithoutFrame * WEBRTC_STALL_CHECK_MS >= WEBRTC_STALL_TIMEOUT_MS) {
-            retry("Device stream stalled. Reconnecting…");
+            retry("设备画面已卡住，正在重新连接…");
           }
         }, WEBRTC_STALL_CHECK_MS);
       }
@@ -990,8 +990,7 @@ export function createDeviceStreamClient(
       video.requestVideoFrameCallback(presentFrame);
     };
     connection.onconnectionstatechange = () => {
-      if (connection.connectionState === "failed")
-        retry("Device stream connection failed. Reconnecting…");
+      if (connection.connectionState === "failed") retry("设备画面连接失败，正在重新连接…");
     };
     try {
       await connection.setLocalDescription(await connection.createOffer());
@@ -1019,7 +1018,7 @@ export function createDeviceStreamClient(
         iceGatheringDeadlineMs < ICE_GATHERING_MAX_TIMEOUT_MS
       ) {
         iceGatheringDeadlineMs = Math.min(iceGatheringDeadlineMs * 2, ICE_GATHERING_MAX_TIMEOUT_MS);
-        return retry("Device stream found no network candidates yet. Retrying…");
+        return retry("设备画面尚未找到可用的网络候选，正在重试…");
       }
       const response = await fetch(webRtcUrl("offer"), {
         method: "POST",
@@ -1038,11 +1037,10 @@ export function createDeviceStreamClient(
       }
       if (response.status === 401 || response.status === 403) return handleUnauthorized();
       // 409: another viewer is still negotiating with this simulator.
-      if (!response.ok) return retry(`Device stream offer failed (${response.status}). Retrying…`);
+      if (!response.ok) return retry(`设备流协商失败（${response.status}）。正在重试…`);
       const answer = decodeWebRtcAnswer(await response.json());
       if (!isCurrent()) return;
-      if (Option.isNone(answer))
-        return retry("Device stream returned an invalid answer. Retrying…");
+      if (Option.isNone(answer)) return retry("设备画面返回了无效应答，正在重试…");
       await connection.setRemoteDescription(answer.value);
     } catch (cause) {
       retry((cause as Error).message);
@@ -1067,7 +1065,7 @@ export function createDeviceStreamClient(
     }
     // MJPEG may have shown frames already: say the stream is connecting again
     // rather than leave a blank canvas until the first WebRTC frame.
-    connecting("Switching to WebRTC.");
+    connecting("正在切换到 WebRTC。");
     void readWebRtc(settings);
   };
 
@@ -1138,7 +1136,7 @@ export function createDeviceStreamClient(
             iosInputUnavailable = config.value.inputUnavailable === true;
             events.onInputConnected(
               iosInputAdmitted && !iosInputUnavailable,
-              iosInputUnavailable ? "Simulator input is unavailable" : undefined,
+              iosInputUnavailable ? "模拟器输入不可用" : undefined,
             );
             const previous = screen;
             screen = config.value;
@@ -1276,11 +1274,11 @@ export function createDeviceStreamClient(
     if (stopped || generation !== session) return;
     if (settings) {
       if (typeof RTCPeerConnection === "undefined")
-        return fail("This browser cannot receive the device's WebRTC stream.");
+        return fail("此浏览器无法接收该设备的 WebRTC 画面。");
       if (!target.videoOnly) connectAndroid(true);
       void readWebRtc(settings);
     } else if (useWebCodecs) connectAndroid();
-    else fail("This browser cannot decode the Android stream (WebCodecs unavailable).");
+    else fail("此浏览器无法解码 Android 画面（WebCodecs 不可用）。");
   };
 
   const start = () => {
@@ -1294,7 +1292,7 @@ export function createDeviceStreamClient(
     if (serveSimOnly) {
       if (!target.videoOnly) void connectIosInput();
       if (useWebCodecs) void readIosVideo();
-      else fail("This browser cannot decode this device's stream (WebCodecs unavailable).");
+      else fail("此浏览器无法解码该设备的画面（WebCodecs 不可用）。");
     } else if (platform === "ios") {
       if (!target.videoOnly) void connectIosInput();
       if (useWebCodecs) void readIosVideo();

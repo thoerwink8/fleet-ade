@@ -266,7 +266,7 @@ export const make = Effect.fn("SshDeviceHost.make")(function* (
       Effect.orElseSucceed(() => ({
         platform,
         available: false,
-        reason: "Cannot reach device host. Test its SSH connection in Settings.",
+        reason: "无法连接设备主机。请在设置中测试其 SSH 连接。",
       })),
     );
 

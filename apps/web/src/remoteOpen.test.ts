@@ -126,7 +126,7 @@ describe("resolveRemoteOpenState", () => {
     { alias: "admin-user@server", username: "  " },
   ])("keeps one login username in editor links for $alias (username: '$username')", (sshTarget) => {
     const state = resolveRemoteOpenState({
-      target: new SshConnectionTarget({ environmentId, label: "server", connectionId: "ssh-1" }),
+      target: new SshConnectionTarget({ environmentId, label: "服务器", connectionId: "ssh-1" }),
       sshTarget,
       isDesktopRenderer: true,
       remoteOpenTargets: TAILSCALE_TARGETS,
@@ -149,7 +149,7 @@ describe("resolveRemoteOpenState", () => {
 
   it("uses the advertised login username in editor links over a relay", () => {
     const state = resolveRemoteOpenState({
-      target: new RelayConnectionTarget({ environmentId, label: "server" }),
+      target: new RelayConnectionTarget({ environmentId, label: "服务器" }),
       sshTarget: null,
       isDesktopRenderer: false,
       remoteOpenTargets: [

@@ -101,7 +101,7 @@ const items: ReadonlyArray<OrchestrationV2TurnItem> = [
     type: "dynamic_tool",
     toolName: "mcp__t3-code__html_render",
     input: null,
-    output: { htmlRender: { attachmentId: "thread-a-1", title: "Chart", height: 200 } },
+    output: { htmlRender: { attachmentId: "thread-a-1", title: "图表", height: 200 } },
   },
   reply("reply", 3, "All checks pass."),
 ];
@@ -237,7 +237,7 @@ describe("GuestPage", () => {
     await userEvent.click(screen.getByText("vp run check:changed"));
     await expect.element(screen.getByText("4 files checked")).toBeVisible();
     await expect
-      .element(screen.getByTitle("Chart"))
+      .element(screen.getByTitle("图表"))
       .toHaveAttribute(
         "src",
         expect.stringContaining(`${GUEST_RENDER_ROUTE}?share=${SHARE_ID}&item=visual`),
@@ -259,9 +259,9 @@ describe("GuestPage", () => {
       .mockImplementation(fakeEventSource(opening([run("run-1", 1, "completed")], items)) as never);
     await using screen = await render(<GuestPage />);
 
-    await expect.element(screen.getByLabelText("Attach files")).toBeVisible();
+    await expect.element(screen.getByLabelText("添加附件")).toBeVisible();
     const notes = new File(["hello"], "notes.txt", { type: "text/plain" });
-    await userEvent.upload(screen.getByLabelText("Files to attach"), notes);
+    await userEvent.upload(screen.getByLabelText("要附加的文件"), notes);
     await expect.element(screen.getByText("notes.txt")).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     await vi.waitFor(() =>

@@ -82,29 +82,29 @@ function savedBackendStatus(environment: EnvironmentPresentation): {
   readonly tone: "muted" | "error";
 } {
   if (!environment.entry.enabled && environment.connection.phase !== "unsupported")
-    return { text: "Off", tone: "muted" };
+    return { text: "关闭", tone: "muted" };
   const { connection } = environment;
   switch (connection.phase) {
     case "connected":
-      return { text: "Connected", tone: "muted" };
+      return { text: "已连接", tone: "muted" };
     case "connecting":
-      return { text: "Connecting", tone: "muted" };
+      return { text: "正在连接", tone: "muted" };
     case "reconnecting":
       return {
-        text: connection.error ? `Reconnecting: ${connection.error}` : "Reconnecting",
+        text: connection.error ? `正在重新连接：${connection.error}` : "正在重新连接",
         tone: "error",
       };
     case "unsupported":
-      return { text: "Client not supported", tone: "muted" };
+      return { text: "不支持此客户端", tone: "muted" };
     case "error":
       return {
-        text: connection.error ? `Connection failed: ${connection.error}` : "Connection failed",
+        text: connection.error ? `连接失败：${connection.error}` : "连接失败",
         tone: "error",
       };
     case "offline":
-      return { text: "Offline", tone: "muted" };
+      return { text: "离线", tone: "muted" };
     case "available":
-      return { text: "Not connected", tone: "muted" };
+      return { text: "未连接", tone: "muted" };
   }
 }
 
@@ -130,7 +130,7 @@ export function SavedBackendListRow({
     onCopy: ({ traceId }) => {
       toastManager.add({
         type: "success",
-        title: "Trace ID copied",
+        title: "已复制追踪 ID",
         description: traceId,
       });
     },
@@ -138,7 +138,7 @@ export function SavedBackendListRow({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not copy trace ID",
+          title: "无法复制追踪 ID",
           description: error.message,
         }),
       );
@@ -152,15 +152,15 @@ export function SavedBackendListRow({
     onCopy: ({ url }) => {
       toastManager.add({
         type: "success",
-        title: "MCP URL copied",
-        description: `Add it to an agent, e.g. claude mcp add --transport http t3 ${url}`,
+        title: "已复制 MCP URL",
+        description: `将其添加到智能体，例如 claude mcp add --transport http t3 ${url}`,
       });
     },
     onError: (error) => {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not copy MCP URL",
+          title: "无法复制 MCP URL",
           description: error.message,
         }),
       );
@@ -230,7 +230,7 @@ export function SavedBackendListRow({
       ? (environment.connection.error ?? connectionStatusText(environment.connection))
       : enabled
         ? connectionStatusText(environment.connection)
-        : "Switched off"
+        : "已停用"
   }${
     versionMismatch
       ? `\nUpdate available: ${versionMismatch.serverVersion} → ${versionMismatch.clientVersion}`
@@ -277,7 +277,7 @@ export function SavedBackendListRow({
             onClick={() => setRoutesOpen((open) => !open)}
             className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           >
-            {routeCount === 1 ? "Routes" : `${routeCount} routes`}
+            {routeCount === 1 ? "线路" : `${routeCount} 条线路`}
             <ChevronRightIcon
               aria-hidden
               className={cn(
@@ -296,7 +296,7 @@ export function SavedBackendListRow({
             onClick={() => setPermissionsOpen((open) => !open)}
             className="inline-flex shrink-0 items-center gap-0.5 rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
           >
-            Permissions
+            权限
             <ChevronRightIcon
               aria-hidden
               className={cn(
@@ -361,21 +361,21 @@ export function SavedBackendListRow({
       serverUpdateState.status !== "running" ? (
         <OutdatedServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} server`}
+          serverLabel={`${environment.label} 服务器`}
           fromVersion={lastDescriptor?.serverVersion}
           targetVersion={APP_VERSION}
-          label={serverUpdateState.status === "failed" ? "Retry update" : "Update"}
+          label={serverUpdateState.status === "failed" ? "重试更新" : "更新"}
         />
       ) : null}
       {showUpdateAction ? (
         <ServerUpdateAction
           environmentId={environmentId}
-          serverLabel={`${environment.label} server`}
+          serverLabel={`${environment.label} 服务器`}
           selfUpdate={resolveServerSelfUpdateCapability(environment.serverConfig)}
           installation={environment.serverConfig?.environment.capabilities.serverInstallation}
           desktopAppUpdate={supportsDesktopAppUpdate(environment.serverConfig)}
           targetVersion={versionMismatch.clientVersion}
-          label={serverUpdateState.status === "failed" ? "Retry update" : "Update"}
+          label={serverUpdateState.status === "failed" ? "重试更新" : "更新"}
           appearance="icon"
         />
       ) : null}
@@ -386,13 +386,13 @@ export function SavedBackendListRow({
               size="sm"
               checked={enabled}
               disabled={isRemoving || blocked}
-              aria-label={`${enabled ? "Switch off" : "Switch on"} ${environment.label}`}
+              aria-label={`${enabled ? "关闭" : "开启"} ${environment.label}`}
               onCheckedChange={(checked) => onSetEnabled(environmentId, checked)}
             />
           }
         />
         <TooltipPopup side="top">
-          {blocked ? "Client not supported" : enabled ? "Switch off" : "Switch on"}
+          {blocked ? "不支持此客户端" : enabled ? "关闭" : "开启"}
         </TooltipPopup>
       </Tooltip>
       <Menu>
@@ -403,7 +403,7 @@ export function SavedBackendListRow({
               variant="ghost-muted"
               size="icon-xs"
               disabled={isRemoving}
-              aria-label={`More actions for ${environment.label}`}
+              aria-label={`${environment.label} 的更多操作`}
             />
           }
         >
@@ -416,17 +416,17 @@ export function SavedBackendListRow({
           />
           <MenuItem onClick={() => setRoutesOpen((open) => !open)}>
             <RouteIcon />
-            {routesOpen ? "Hide routes" : "Routes"}
+            {routesOpen ? "隐藏线路" : "线路"}
           </MenuItem>
           {mcpUrl ? (
-            <MenuItem onClick={() => copyMcpUrl(mcpUrl, { url: mcpUrl })}>Copy MCP URL</MenuItem>
+            <MenuItem onClick={() => copyMcpUrl(mcpUrl, { url: mcpUrl })}>复制 MCP URL</MenuItem>
           ) : null}
           {errorTraceId ? (
-            <MenuItem onClick={() => copyTraceId(errorTraceId)}>Copy trace ID</MenuItem>
+            <MenuItem onClick={() => copyTraceId(errorTraceId)}>复制追踪 ID</MenuItem>
           ) : null}
           <MenuSeparator />
           <MenuItem variant="destructive" onClick={() => onRemove(environment)}>
-            {isRemoving ? "Removing…" : "Remove from this device…"}
+            {isRemoving ? "正在移除…" : "从此设备移除…"}
           </MenuItem>
         </MenuPopup>
       </Menu>
@@ -439,7 +439,7 @@ function CloudLinkSwitch({
   disabled,
   disabledReason,
   onCheckedChange,
-  ariaLabel = "Enable T3 Connect",
+  ariaLabel = "启用 T3 Connect",
 }: {
   readonly checked: boolean;
   readonly disabled: boolean;
@@ -490,11 +490,9 @@ function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | 
         action={
           // At the cap the alert below carries the same actions.
           !openAccountPage || showLimitAlert ? null : usage.upgrade ? (
-            <InlineButton onClick={() => openAccountPage("t3-chat")}>Get more tunnels</InlineButton>
+            <InlineButton onClick={() => openAccountPage("t3-chat")}>获取更多隧道</InlineButton>
           ) : usage.used >= usage.limit ? (
-            <InlineButton onClick={() => openAccountPage("t3-connect")}>
-              Manage tunnels
-            </InlineButton>
+            <InlineButton onClick={() => openAccountPage("t3-connect")}>管理隧道</InlineButton>
           ) : null
         }
       />
@@ -547,9 +545,7 @@ function ConfiguredCloudLinkRow({
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingPreference, setIsUpdatingPreference] = useState(false);
 
-  const disabledReason = canManageRelay
-    ? null
-    : "Your session does not have permission to manage T3 Connect access.";
+  const disabledReason = canManageRelay ? null : "你的会话无权管理 T3 Connect 访问权限。";
   const isBusy = isUpdating || isUpdatingPreference;
   const switchDisabled =
     !canManageRelay ||
@@ -563,7 +559,7 @@ function ConfiguredCloudLinkRow({
   const signedOut = isSignedIn === false;
   const signInButton = (
     <Button size="sm" variant="outline" onClick={openAuthPrompt}>
-      Sign in
+      登录
     </Button>
   );
   const refreshLinkState = useEffectEvent(cloudLinkState.refresh);
@@ -580,7 +576,7 @@ function ConfiguredCloudLinkRow({
       formatConnectReachable(reachability)
     ) : reachability?.status === "unreachable" ? (
       <span className="block text-destructive">
-        {[reachability.reason, reachability.hint, `Fix: ${reachability.fix}`]
+        {[reachability.reason, reachability.hint, `解决方法：${reachability.fix}`]
           .filter(Boolean)
           .join(" ")}{" "}
         <a
@@ -589,7 +585,7 @@ function ConfiguredCloudLinkRow({
           rel="noreferrer"
           className="underline underline-offset-2"
         >
-          More info
+          更多信息
         </a>
       </span>
     ) : null;
@@ -602,15 +598,15 @@ function ConfiguredCloudLinkRow({
       toastManager.add({
         type: "success",
         title: enabled
-          ? "T3 Connect linked"
+          ? "已关联 T3 Connect"
           : publishAgentActivity
-            ? "T3 Connect tunnel disabled"
-            : "T3 Connect unlinked",
+            ? "已停用 T3 Connect 隧道"
+            : "已取消关联 T3 Connect",
         description: enabled
-          ? "This environment is available through T3 Connect."
+          ? "可以通过 T3 Connect 访问此环境。"
           : publishAgentActivity
-            ? "The managed tunnel was removed. Agent activity publishing stays on."
-            : "This environment is no longer available through T3 Connect.",
+            ? "已移除托管隧道。仍会发布智能体活动。"
+            : "无法再通过 T3 Connect 访问此环境。",
       });
     }
     setIsUpdating(false);
@@ -623,10 +619,10 @@ function ConfiguredCloudLinkRow({
     if (ok) {
       toastManager.add({
         type: "success",
-        title: enabled ? "Agent activity enabled" : "Agent activity disabled",
+        title: enabled ? "已启用智能体活动" : "已停用智能体活动",
         description: enabled
-          ? "This environment publishes agent activity to your mobile clients."
-          : "This environment will stop publishing agent activity.",
+          ? "此环境会向你的移动客户端发布智能体活动。"
+          : "此环境将停止发布智能体活动。",
       });
     }
     setIsUpdatingPreference(false);
@@ -642,10 +638,10 @@ function ConfiguredCloudLinkRow({
     if (ok) {
       toastManager.add({
         type: "success",
-        title: enabled ? "Webhooks held while offline" : "Webhooks no longer held",
+        title: enabled ? "已开启离线保留 webhook 请求" : "已停止保留 webhook 请求",
         description: enabled
-          ? "T3 Connect keeps webhook requests for up to 24 hours while this environment is offline."
-          : "Requests to an offline environment now fail. Anything already held is still delivered.",
+          ? "此环境离线时，T3 Connect 最多保留 webhook 请求 24 小时。"
+          : "现在，发往离线环境的请求会失败。之前保留的请求仍会投递。",
       });
     }
     setIsUpdatingPreference(false);
@@ -660,18 +656,18 @@ function ConfiguredCloudLinkRow({
             connectDenial !== undefined && !managedTunnelActive
               ? connectDenial
               : signedOut
-                ? "Sign in to make this environment available to your other devices through T3 Connect."
+                ? "登录后，你的其他设备就能通过 T3 Connect 访问此环境。"
                 : linkRevoked
-                  ? "This environment was removed from T3 Connect. Turn it on to link it again."
+                  ? "此环境已从 T3 Connect 移除。开启后可重新关联。"
                   : managedTunnelActive
                     ? reachability?.status === "unreachable"
-                      ? "T3 Connect is on, but other devices cannot reach this environment."
+                      ? "T3 Connect 已开启，但其他设备无法访问此环境。"
                       : reachability?.status === "reachable"
-                        ? "This environment is available to your other devices through T3 Connect."
-                        : "T3 Connect is on. Reachability has not been checked yet."
+                        ? "你的其他设备可以通过 T3 Connect 访问此环境。"
+                        : "T3 Connect 已开启，尚未检查能否访问。"
                     : managedTunnelOutOfSync
-                      ? "T3 Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it."
-                      : "Make this environment available to your other devices through T3 Connect."
+                      ? "T3 Connect 状态不同步。此环境的关联仅用于发布智能体活动，其他设备无法连接。请开启 T3 Connect 修复。"
+                      : "让你的其他设备通过 T3 Connect 访问此环境。"
           }
           status={operationError ?? cloudLinkState.error ?? reachabilityStatus}
           managed={managedTunnelActive ? undefined : connectDenial}
@@ -695,12 +691,12 @@ function ConfiguredCloudLinkRow({
       ) : linkRevoked ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again."
+          description="此环境已从 T3 Connect 移除。请在主机上运行 `t3 connect link` 重新关联。"
         />
       ) : isElectron ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="Run `t3 connect link` on the host, then restart T3 Code there."
+          description="请在主机上运行 `t3 connect link`，然后在那里重启 T3 Code。"
         />
       ) : null}
       {signedOut && showSwitch ? null : (
@@ -708,8 +704,8 @@ function ConfiguredCloudLinkRow({
           title={searchableSetting("publish-agent-activity").title}
           description={
             signedOut
-              ? "Sign in to send activity to mobile notifications and Live Activities."
-              : "Send activity to mobile notifications and Live Activities without T3 Connect."
+              ? "登录后即可向手机通知和实时活动发送活动信息。"
+              : "无需 T3 Connect，即可将活动发送到手机通知和实时活动。"
           }
           managed={connectDenial}
           control={
@@ -717,7 +713,7 @@ function ConfiguredCloudLinkRow({
               signInButton
             ) : (
               <CloudLinkSwitch
-                ariaLabel="Publish agent activity to mobile clients"
+                ariaLabel="向移动客户端发布智能体活动"
                 checked={publishAgentActivity}
                 disabled={switchDisabled}
                 disabledReason={disabledReason}
@@ -730,11 +726,11 @@ function ConfiguredCloudLinkRow({
       {managedTunnelActive && !signedOut ? (
         <SettingsRow
           title={searchableSetting("hold-webhooks-while-offline").title}
-          description="Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: T3 Connect only forwards requests and stores nothing."
+          description="此环境离线时，最多保留 webhook 请求 24 小时，恢复后再投递。关闭时，T3 Connect 仅转发请求，不保存任何内容。"
           managed={connectDenial}
           control={
             <CloudLinkSwitch
-              ariaLabel="Hold webhook requests while this environment is offline"
+              ariaLabel="此环境离线时保留 webhook 请求"
               checked={holdWebhooksWhileOffline}
               disabled={switchDisabled}
               disabledReason={disabledReason}
@@ -761,7 +757,7 @@ export function CloudLinkRow({
     return (
       <SettingsRow
         title="T3 Connect"
-        description="To edit these settings, pair this connection with both View relay and Manage relay permissions."
+        description="要编辑这些设置，请在配对此连接时同时授予“查看中继”和“管理中继”权限。"
       />
     );
   }
@@ -775,11 +771,11 @@ function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnable
         <ChevronsLeftRightEllipsisIcon />
       </EmptyMedia>
       <EmptyHeader>
-        <EmptyTitle>No saved remote environments</EmptyTitle>
+        <EmptyTitle>没有已保存的远程环境</EmptyTitle>
         <EmptyDescription>
           {cloudEnabled
-            ? "Click “Add environment” to pair another environment, or connect one from T3 Connect."
-            : "Click “Add environment” to pair another environment."}
+            ? "点击“添加环境”配对其他环境，或从 T3 Connect 连接一个环境。"
+            : "点击“添加环境”配对其他环境。"}
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

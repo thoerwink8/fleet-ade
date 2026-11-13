@@ -123,7 +123,7 @@ it.layer(layer)("PreviewManager", (it) => {
       yield* manager.reportStatus({
         threadId,
         tabId: opened.tabId,
-        navStatus: { _tag: "Success", url: "http://localhost:5173/ready", title: "Ready" },
+        navStatus: { _tag: "Success", url: "http://localhost:5173/ready", title: "就绪" },
         canGoBack: true,
         canGoForward: false,
       });
@@ -184,7 +184,7 @@ it.layer(layer)("PreviewManager", (it) => {
           navStatus: {
             _tag: "Success" as const,
             url: "http://localhost:5173/changed",
-            title: "Changed",
+            title: "有更新",
           },
           canGoBack: true,
           canGoForward: true,

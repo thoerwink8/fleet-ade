@@ -73,7 +73,7 @@ export function resolveVersionMismatch(
   return {
     clientVersion: normalizedClientVersion,
     serverVersion: normalizedServerVersion,
-    hint: "Version mismatch. Try syncing the client and server to the same T3 Code version.",
+    hint: "版本不一致。请让客户端和服务器使用相同的 T3 Code 版本。",
   };
 }
 

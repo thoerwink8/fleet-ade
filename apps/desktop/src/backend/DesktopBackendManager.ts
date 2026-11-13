@@ -984,7 +984,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
               yield* backendOutputLog.persistFailureSnapshot({
                 details: error.message,
               });
-              yield* reportStartupFailure("The server started but did not become ready in time.");
+              yield* reportStartupFailure("服务器已启动，但未能及时就绪。");
             },
           ),
           onOutput: (streamName, chunk) =>
@@ -1043,7 +1043,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
         // Retrying cannot fix a policy refusal, so say so at once; retries still pick up a fix.
         const managedPolicy = exitCode === SERVER_EXIT_CODE_MANAGED_POLICY;
         if (managedPolicy || attempt >= STARTUP_FAILURE_RESTART_ATTEMPTS) {
-          yield* reportStartupFailure(`The server could not start (${reason}).`, managedPolicy);
+          yield* reportStartupFailure(`服务器无法启动（${reason}）。`, managedPolicy);
         }
         const restartFiber = yield* Effect.forkIn(
           Effect.sleep(delay).pipe(

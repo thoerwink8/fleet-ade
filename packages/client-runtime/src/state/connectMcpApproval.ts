@@ -28,7 +28,7 @@ export class ConnectMcpApprovalUnavailableError extends Schema.TaggedError<Conne
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Could not reach that environment through T3 Connect with this account.";
+    return "无法使用此账号通过 T3 Connect 访问该环境。";
   }
 }
 

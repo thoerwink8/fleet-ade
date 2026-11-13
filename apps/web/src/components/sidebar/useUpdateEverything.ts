@@ -155,7 +155,7 @@ export function useUpdateEverything(
               if (runOutcome.status !== "updated") {
                 providerFailures.set(
                   run.environmentId,
-                  runOutcome.status === "failed" ? runOutcome.line : "Provider update interrupted",
+                  runOutcome.status === "failed" ? runOutcome.line : "提供方更新已中断",
                 );
               }
               return runOutcome;

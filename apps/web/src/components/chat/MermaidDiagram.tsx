@@ -245,10 +245,7 @@ export function MermaidDiagram({
       autoDirection: false,
       ...(math ? { math, sanitize: sanitizeMathDiagramSvg } : { sanitize: sanitizeDiagramSvg }),
       onRender: () => setRenderError(null),
-      onError: (error) =>
-        setRenderError(
-          error instanceof Error ? error.message : "The diagram could not be rendered.",
-        ),
+      onError: (error) => setRenderError(error instanceof Error ? error.message : "无法渲染图表。"),
     });
     return () => mounted.destroy();
   };
@@ -256,7 +253,7 @@ export function MermaidDiagram({
   if (load.status === "failed") {
     return (
       <DiagramError
-        message="The diagram renderer failed to load."
+        message="图表渲染器加载失败。"
         source={source}
         onRetry={() => {
           if (core.status === "failed") coreLoad = null;
@@ -276,7 +273,7 @@ export function MermaidDiagram({
       {renderError ? <DiagramError message={renderError} source={source} /> : null}
       <button
         type="button"
-        aria-label="Expand diagram"
+        aria-label="放大图表"
         hidden={renderError !== null}
         className="block w-full cursor-zoom-in rounded-md focus-visible:outline-2 focus-visible:outline-ring"
         onClick={(event) => {
@@ -305,7 +302,7 @@ function DiagramError({
         <p className="m-0 text-xs text-destructive">Unable to render diagram: {message}</p>
         {onRetry ? (
           <Button type="button" variant="ghost" size="xs" onClick={onRetry}>
-            Retry
+            重试
           </Button>
         ) : null}
       </div>

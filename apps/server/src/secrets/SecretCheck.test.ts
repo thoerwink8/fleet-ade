@@ -155,7 +155,7 @@ const setup = Effect.fn("SecretCheckTest.setup")(function* (
     SecretResolver.layer({
       drivers: [secretDriver],
       secretProviders: Effect.succeed({
-        [secretProvider]: { kind: FAKE_KIND, label: "Personal", config: {} },
+        [secretProvider]: { kind: FAKE_KIND, label: "个人", config: {} },
       }),
     }),
   );

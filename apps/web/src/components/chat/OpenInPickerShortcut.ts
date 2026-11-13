@@ -83,7 +83,7 @@ export function useOpenFavoriteEditorShortcut({
         });
         if (url === undefined) return;
         void openRemoteEditorUrl(url).then((opened) => {
-          if (opened) announce(`Opened in ${label}`);
+          if (opened) announce(`已在 ${label} 中打开`);
         });
         return;
       }
@@ -94,7 +94,7 @@ export function useOpenFavoriteEditorShortcut({
           editor: preferredEditor,
         },
       }).then((result) => {
-        if (result._tag === "Success") announce(`Opened in ${label}`);
+        if (result._tag === "Success") announce(`已在 ${label} 中打开`);
       });
     };
     window.addEventListener("keydown", handler);

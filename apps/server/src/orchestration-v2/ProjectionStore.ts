@@ -1434,7 +1434,7 @@ function makeForkMarkerTurnItem(input: {
     parentItemId: null,
     ordinal: 0,
     status: "completed",
-    title: "Forked from conversation",
+    title: "从对话分叉",
     startedAt: null,
     completedAt: createdAt,
     updatedAt: createdAt,

@@ -242,7 +242,7 @@ it.layer(layerTest)("ProjectService", (it) => {
       const created = yield* service.create({
         commandId: CommandId.make("command:project:create"),
         projectId,
-        title: "Project",
+        title: "项目",
         workspaceRoot: "/work/project/",
         defaultModelSelection: modelSelection,
         scripts: [
@@ -357,7 +357,7 @@ it.layer(layerTest)("ProjectService", (it) => {
       yield* service.create({
         commandId: CommandId.make("command:metrics:create"),
         projectId: ProjectId.make("project:metrics"),
-        title: "Metrics",
+        title: "指标",
         workspaceRoot: "/work/metrics",
       });
 
@@ -396,7 +396,7 @@ it.layer(layerTest)("ProjectService", (it) => {
       const input = {
         commandId: CommandId.make("command:retry:create"),
         projectId,
-        title: "Retry",
+        title: "重试",
         workspaceRoot: "/work/retry",
       };
       const first = yield* service.create(input);

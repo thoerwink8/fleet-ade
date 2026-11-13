@@ -193,7 +193,7 @@ it.effect("creates one Scratch project, even for concurrent first requests", () 
       const root = yield* requireRoot;
       const scratchProjects = snapshot.projects.filter((project) => project.workspaceRoot === root);
       assert.lengthOf(scratchProjects, 1);
-      assert.equal(scratchProjects[0]?.title, "No project");
+      assert.equal(scratchProjects[0]?.title, "无项目");
       assert.deepEqual(scratchProjects[0]?.projectIcon, {
         kind: "lucide",
         name: "message-square-dashed",
@@ -289,7 +289,7 @@ it.effect("leaves threads in other projects alone", () =>
       const other = yield* projects.create({
         commandId: CommandId.make("command:other"),
         projectId: ProjectId.make("project:other"),
-        title: "Other",
+        title: "其他",
         workspaceRoot: path.join(baseDir, "other"),
         createWorkspaceRootIfMissing: true,
       });

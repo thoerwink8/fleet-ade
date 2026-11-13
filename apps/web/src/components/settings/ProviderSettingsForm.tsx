@@ -133,15 +133,15 @@ export function deriveProviderSettingsFields(
           control: formAnnotation.control ?? "text",
           label:
             isLocalAcp && key === "commandPath"
-              ? "Executable"
+              ? "可执行文件"
               : (annotatedTitle ?? titleizeFieldKey(key)),
           ...(isLocalAcp && key === "commandPath"
-            ? { description: "Executable name or path on this environment." }
+            ? { description: "此环境中的可执行文件名称或路径。" }
             : annotatedDescription !== undefined
               ? { description: annotatedDescription }
               : {}),
           ...(isLocalAcp && key === "commandPath"
-            ? { placeholder: "e.g. dsh" }
+            ? { placeholder: "例如：dsh" }
             : formAnnotation.placeholder !== undefined
               ? { placeholder: formAnnotation.placeholder }
               : {}),
@@ -236,8 +236,8 @@ function ProviderCommandArguments({
 
   return (
     <SettingsRow
-      title="Arguments"
-      description="One literal argument per row, in launch order."
+      title="参数"
+      description="每行一个原样传入的参数，按启动顺序排列。"
       managed={managedReason}
       control={
         <Button
@@ -247,7 +247,7 @@ function ProviderCommandArguments({
           onClick={() => updateArguments([...rows, makeCommandArgumentDraftRow("")])}
         >
           <PlusIcon />
-          Add argument
+          添加参数
         </Button>
       }
     >
@@ -271,7 +271,7 @@ function ProviderCommandArguments({
                       ),
                     )
                   }
-                  aria-label={`Argument ${index + 1}`}
+                  aria-label={`参数 ${index + 1}`}
                   spellCheck={false}
                 />
                 <Button
@@ -281,7 +281,7 @@ function ProviderCommandArguments({
                   onClick={() =>
                     updateArguments(rows.filter((current) => current.id !== argument.id))
                   }
-                  aria-label={`Remove argument ${index + 1}`}
+                  aria-label={`移除参数 ${index + 1}`}
                 >
                   <XIcon />
                 </Button>
@@ -395,7 +395,7 @@ function SecretSettingsControl({
           size="icon-sm"
           variant="ghost-destructive"
           onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-          aria-label={`Clear ${field.label}`}
+          aria-label={`清除 ${field.label}`}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -589,7 +589,7 @@ function ProviderSettingsFieldRow({
               size="icon-sm"
               variant="ghost-destructive"
               onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-              aria-label={`Clear ${field.label}`}
+              aria-label={`清除 ${field.label}`}
             >
               <XIcon className="size-3.5" />
             </Button>

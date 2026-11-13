@@ -39,7 +39,7 @@ function Launcher(props: { keys: string; received: string[] }) {
     <div
       ref={focusOnMount}
       tabIndex={0}
-      aria-label="Open a surface"
+      aria-label="打开面板"
       data-surface-launcher-keys={props.keys}
     />
   );

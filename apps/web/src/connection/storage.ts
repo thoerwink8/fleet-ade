@@ -96,7 +96,7 @@ const encodeStoredVcsRefs = Schema.encodeEffect(StoredVcsRefsJson);
 function catalogError(operation: string, cause: unknown) {
   return new ConnectionTransientError({
     reason: "remote-unavailable",
-    detail: `Could not ${operation} the local connection catalog: ${String(cause)}`,
+    detail: `无法${operation}本地连接目录：${String(cause)}`,
   });
 }
 
@@ -500,12 +500,7 @@ export function makeCatalogBackend(database: DatabaseHandle): CatalogBackend {
           Effect.flatMap((stored) =>
             stored
               ? Effect.void
-              : Effect.fail(
-                  catalogError(
-                    "save",
-                    "Desktop secure storage is unavailable in this system context.",
-                  ),
-                ),
+              : Effect.fail(catalogError("save", "此系统环境下无法使用桌面安全存储。")),
           ),
         ),
     };
@@ -675,7 +670,7 @@ export function makeBrowserPullRequestRoutingPermissions(
       if (connectionKey === null)
         return yield* new ConnectionBlockedError({
           reason: "configuration",
-          detail: "This environment does not have a saved connection endpoint.",
+          detail: "此环境没有已保存的连接端点。",
         });
       return yield* write(
         entry.target.environmentId,

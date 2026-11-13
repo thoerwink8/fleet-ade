@@ -73,7 +73,7 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
     id: threadId,
     environmentId,
     projectId,
-    title: "Thread",
+    title: "会话",
     modelSelection: {
       instanceId: ProviderInstanceId.make("codex"),
       model: "gpt-5.4",
@@ -160,15 +160,15 @@ describe("isThreadEnvironmentLocked", () => {
 describe("buildExpiredTerminalContextToastCopy", () => {
   it("refers to several expired contexts as them", () => {
     expect(buildExpiredTerminalContextToastCopy(2, "empty")).toEqual({
-      title: "Expired terminal contexts won't be sent",
-      description: "Remove them or re-add them to include terminal output.",
+      title: "已过期的终端上下文不会被发送",
+      description: "请移除它们；如需包含这些终端输出，请重新添加。",
     });
     expect(buildExpiredTerminalContextToastCopy(2, "omitted")).toEqual({
-      title: "Expired terminal contexts omitted from message",
-      description: "Re-add them if you want that terminal output included.",
+      title: "已过期的终端上下文已从消息中略去",
+      description: "如需包含这些终端输出，请重新添加它们。",
     });
     expect(buildExpiredTerminalContextToastCopy(1, "omitted").description).toBe(
-      "Re-add it if you want that terminal output included.",
+      "如需包含该终端输出，请重新添加它。",
     );
   });
 });
@@ -471,7 +471,7 @@ describe("resolveThreadSwitchTimeline", () => {
           message: {
             id: MessageId.make("preview-message"),
             role: "user",
-            text: "Preview",
+            text: "预览",
             runId: null,
             streaming: false,
             createdAt: "2026-09-10T12:00:00.000Z",
@@ -497,7 +497,7 @@ describe("resolveThreadSwitchTimeline", () => {
           message: {
             id: MessageId.make("preview-message"),
             role: "user",
-            text: "Preview",
+            text: "预览",
             runId: null,
             streaming: false,
             createdAt: "2026-09-10T12:00:00.000Z",
@@ -641,7 +641,7 @@ describe("resolveComposerProviderSelection", () => {
     expect(selection.selectedProviderEntry?.instanceId).toBe(signedOutEntry.instanceId);
     expect(
       getAntigravitySendBlockReason(selection.selectedProviderEntry?.snapshot, "gemini-pro"),
-    ).toBe("Sign in to Antigravity in provider settings before sending.");
+    ).toBe("发送前请先在提供方设置中登录 Antigravity。");
   });
 
   it("blocks a saved model that a ready catalog no longer lists", () => {
@@ -651,7 +651,7 @@ describe("resolveComposerProviderSelection", () => {
     }).snapshot;
 
     expect(getAntigravitySendBlockReason(provider, "saved-model-not-in-current-catalog")).toBe(
-      "That Antigravity model is no longer available. Choose another model.",
+      "该 Antigravity 模型已不可用。请选择其他模型。",
     );
     expect(getAntigravitySendBlockReason(provider, "gemini-pro")).toBeNull();
   });

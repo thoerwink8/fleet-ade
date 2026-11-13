@@ -72,14 +72,14 @@ function formatThreadError(cause: Cause.Cause<unknown>): string {
   const error = Cause.squash(cause);
   return error instanceof Error && error.message.trim().length > 0
     ? error.message
-    : "Could not synchronize the thread.";
+    : "无法同步会话。";
 }
 
 function formatHistoryError(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
-  return "Could not load earlier activity.";
+  return "无法加载更早的活动。";
 }
 
 // Steers join a running turn; every other user message opens one. The timeline shows every
@@ -732,7 +732,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
       latest: EnvironmentThreadState,
     ): ThreadHistoryController.ThreadHistoryLoadEarlierResult =>
       workAnchorId !== undefined && workCursor(latest) !== null
-        ? { _tag: "error", message: "Work history changed. Retry loading it." }
+        ? { _tag: "error", message: "工作记录已变化。请重新加载。" }
         : { _tag: "noop" };
     if (workAnchorId === undefined)
       yield* patchHistoryMeta((history) =>
@@ -767,7 +767,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
       while (true) {
         const preparedOption = yield* SubscriptionRef.get(supervisor.prepared);
         if (Option.isNone(preparedOption) || Option.isNone(httpClient))
-          return yield* failLoad("Environment is not connected.");
+          return yield* failLoad("环境未连接。");
         const views =
           workAnchorId !== undefined
             ? ["work" as const]
@@ -798,9 +798,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
                 !page.items.some(({ item }) => startsTurn(item)));
           if (keepPaging && (page.nextCursor === null || page.nextCursor === requestCursor))
             return yield* failLoad(
-              workAnchorId === undefined
-                ? "History did not advance."
-                : "Work history did not advance.",
+              workAnchorId === undefined ? "历史记录未推进。" : "工作记录未推进。",
             );
           const waiting = yield* Ref.get(awaitingCompletion);
           const result = yield* applyLock.withPermits(1)(
@@ -992,9 +990,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
   const backOffAfterDefect = Effect.suspend(() => {
     const retryDelay = subscriptionRetryDelay(THREAD_SUBSCRIPTION_RETRY_DELAY, defectRetries);
     defectRetries += 1;
-    return setStreamError("Could not synchronize the thread.").pipe(
-      Effect.andThen(Effect.sleep(retryDelay)),
-    );
+    return setStreamError("无法同步会话。").pipe(Effect.andThen(Effect.sleep(retryDelay)));
   });
   const followThread = (): Effect.Effect<
     void,
@@ -1115,7 +1111,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
             return yield* Queue.offer(resubscribes, undefined);
           }
           if (!Cause.hasDies(cause)) {
-            return yield* setStreamError("Could not synchronize the thread.");
+            return yield* setStreamError("无法同步会话。");
           }
           yield* backOffAfterDefect;
           yield* Queue.offer(resubscribes, undefined);

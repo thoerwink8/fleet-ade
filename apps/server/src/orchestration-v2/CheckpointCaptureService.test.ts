@@ -957,7 +957,7 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
             creationSource: "web",
             id: sideChatThreadId,
             projectId,
-            title: "Side chat",
+            title: "侧聊",
             providerInstanceId,
             modelSelection,
             runtimeMode: "approval-required",

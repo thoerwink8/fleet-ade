@@ -33,14 +33,14 @@ export function codexFeedbackNotice(submission: CodexFeedbackSubmission) {
     case "interrupted":
       return null;
     case "uploading":
-      return { title: "Sending feedback to OpenAI...", description: undefined };
+      return { title: "正在向 OpenAI 发送反馈…", description: undefined };
     case "sent":
       return {
-        title: "Feedback sent to OpenAI",
-        description: `Thread ID: ${submission.feedbackId}`,
+        title: "已向 OpenAI 发送反馈",
+        description: `会话 ID：${submission.feedbackId}`,
       };
     case "failed":
-      return { title: "Could not send feedback to OpenAI", description: submission.errorMessage };
+      return { title: "无法向 OpenAI 发送反馈", description: submission.errorMessage };
   }
 }
 
@@ -62,10 +62,14 @@ export function codexFeedbackMessage(
     role === "user"
       ? submission.command
       : submission.status === "sent"
-        ? `Feedback sent to OpenAI.\n\nThread ID: \`${submission.feedbackId}\``
+        ? `已向 OpenAI 发送反馈。
+
+会话 ID：\`${submission.feedbackId}\``
         : submission.status === "failed"
-          ? `Could not send feedback to OpenAI.\n\n${submission.errorMessage}`
-          : "Sending feedback to OpenAI...";
+          ? `无法向 OpenAI 发送反馈。
+
+${submission.errorMessage}`
+          : "正在向 OpenAI 发送反馈…";
 
   return {
     id: role === "user" ? submission.id : MessageId.make(`${submission.id}:feedback`),
@@ -101,7 +105,7 @@ export async function submitCodexFeedback<E>(input: {
     input.onUpdate({
       ...input.submission,
       status: "failed",
-      errorMessage: error instanceof Error ? error.message : "An error occurred.",
+      errorMessage: error instanceof Error ? error.message : "发生错误。",
     });
   }
 

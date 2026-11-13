@@ -112,7 +112,7 @@ import { cn } from "../../lib/utils";
 import { formatRelativeTime } from "../../timestampFormat";
 
 const AGENT_ONBOARDING_THREAD_ID = ThreadId.make("onboarding-agent-setup");
-const SCAN_LIMIT_MESSAGE = "Scan limit reached. Some projects or conversations may be missing.";
+const SCAN_LIMIT_MESSAGE = "已达扫描上限，部分项目或对话可能缺失。";
 
 /**
  * First-run page for one computer: its agents, the projects found in agent history, and the
@@ -128,7 +128,7 @@ export function WelcomePage({
   const { environments } = useEnvironments();
   const label =
     environments.find((environment) => environment.environmentId === environmentId)?.label ??
-    "this computer";
+    "这台电脑";
   const agentReady = useWelcomeAgents(environmentId).readyCount > 0;
   // The phone and `t3` on PATH belong to the primary computer, so only it offers them.
   const isPrimary = usePrimaryEnvironmentId() === environmentId;
@@ -162,8 +162,8 @@ export function WelcomePage({
       toastManager.add({
         id: "welcome-finishing",
         type: "info",
-        title: "Finishing setup",
-        description: "One moment.",
+        title: "正在完成设置",
+        description: "请稍候。",
       });
       return true;
     },
@@ -199,7 +199,7 @@ export function WelcomePage({
         if (importWarning) {
           toastManager.add({
             type: "warning",
-            title: "Some history was not imported",
+            title: "部分历史记录未能导入",
             description: importWarning,
             timeout: 0,
           });
@@ -215,8 +215,8 @@ export function WelcomePage({
         holdPageRef.current = false;
         const errorToast = {
           type: "error",
-          title: "Could not finish setup",
-          description: "Your settings could not be saved. Try again.",
+          title: "无法完成设置",
+          description: "无法保存你的设置，请重试。",
         } as const;
         if (completionErrorToastIdRef.current === null) {
           completionErrorToastIdRef.current = toastManager.add(errorToast);
@@ -268,10 +268,10 @@ export function WelcomePage({
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-both">
           <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 pt-12 pb-8 sm:pt-20">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Welcome to T3 Code
+              欢迎使用 T3 Code
             </h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Setting up <span className="text-foreground">{label}</span>.
+              正在设置 <span className="text-foreground">{label}</span>.
             </p>
             <div className="mt-10 border-t border-border/60">
               <AgentsSection
@@ -292,23 +292,23 @@ export function WelcomePage({
                 <span />
               ) : (
                 <Button variant="ghost-muted" disabled={isImporting} onClick={start}>
-                  Start without an agent
+                  不使用智能体直接开始
                 </Button>
               )}
               <div className="flex items-center gap-3">
                 {agentReady ? null : (
-                  <span className="text-xs text-muted-foreground">Set up one agent to start.</span>
+                  <span className="text-xs text-muted-foreground">设置一个智能体即可开始。</span>
                 )}
                 <Button disabled={!agentReady || isImporting} onClick={start}>
                   {isImporting
                     ? selected.length > 0
-                      ? "Importing…"
-                      : "Starting…"
+                      ? "正在导入…"
+                      : "正在启动…"
                     : newCount > 0
                       ? `Import ${newCount} ${newCount === 1 ? "project" : "projects"} and start`
                       : selected.length > 0
-                        ? "Import threads and start"
-                        : "Start"}
+                        ? "导入会话并开始"
+                        : "开始"}
                 </Button>
               </div>
             </div>
@@ -324,7 +324,7 @@ function TelemetryNotice({ environmentId }: { readonly environmentId: Environmen
   const telemetryOff = managedTelemetryOffMessage(useManagedPolicy(environmentId));
   return (
     <p className="mt-auto pt-12 text-2xs leading-relaxed text-muted-foreground/70">
-      {telemetryOff ?? "T3 Code collects anonymous usage data to improve the app."}
+      {telemetryOff ?? "T3 Code 会收集匿名使用数据以改进应用。"}
     </p>
   );
 }
@@ -504,7 +504,7 @@ function AgentsSection({
         const cause = squashAtomCommandFailure(result);
         toastManager.add({
           type: "error",
-          title: `Could not turn on ${agentName(provider)}`,
+          title: `无法启用 ${agentName(provider)}`,
           ...(cause instanceof Error ? { description: cause.message } : {}),
         });
       }
@@ -542,7 +542,7 @@ function AgentsSection({
           disabled={!canManageProviders || serverConfig === null}
           onClick={() => void turnOn(provider)}
         >
-          Turn on
+          启用
         </Button>
       );
     }
@@ -558,7 +558,7 @@ function AgentsSection({
           aria-expanded={open}
           onClick={() => setCodexSetupId(open ? null : provider.instanceId)}
         >
-          Set up
+          设置
         </Button>
       );
     }
@@ -576,9 +576,7 @@ function AgentsSection({
         />
       );
     }
-    return settingsAction(
-      state === "signIn" ? "Sign in" : state === "attention" ? "Details" : "Set up",
-    );
+    return settingsAction(state === "signIn" ? "登录" : state === "attention" ? "Details" : "设置");
   };
 
   const notes = [
@@ -587,7 +585,7 @@ function AgentsSection({
       (provider) =>
         needsInstallOrSignIn(provider) || codexNeedsSetup(provider, serverConfig?.settings),
     )
-      ? "This connection cannot control terminals."
+      ? "此连接无法控制终端。"
       : null,
     !canManageProviders &&
     (acpAllowed ||
@@ -595,12 +593,12 @@ function AgentsSection({
         (provider) =>
           stateOf(provider) === "disabled" || codexNeedsSetup(provider, serverConfig?.settings),
       ))
-      ? "This connection cannot manage agents."
+      ? "此连接无法管理智能体。"
       : null,
   ].filter((note) => note !== null);
 
   return (
-    <WelcomeSection title="Agents">
+    <WelcomeSection title="智能体">
       {found.map((provider) => (
         <AgentRow
           key={provider.instanceId}
@@ -610,7 +608,7 @@ function AgentsSection({
         />
       ))}
       {checking && found.length === 0 ? (
-        <p className="text-sm leading-10 text-muted-foreground">Checking {label}…</p>
+        <p className="text-sm leading-10 text-muted-foreground">正在检查… {label}…</p>
       ) : null}
       {notes.map((note) => (
         <p key={note} className="pl-8 text-xs text-muted-foreground">
@@ -628,7 +626,7 @@ function AgentsSection({
               found.length > 0 ? "text-muted-foreground" : "text-foreground",
             )}
           >
-            {found.length > 0 ? "Add more agents" : "Set up an agent"}
+            {found.length > 0 ? "添加更多智能体" : "设置智能体"}
           </span>
           {showMore ? null : <AgentLogoStack providers={available} acp={acpAllowed} />}
           <ChevronDownIcon className="ml-auto size-4 text-muted-foreground group-data-panel-open:rotate-180" />
@@ -651,7 +649,7 @@ function AgentsSection({
                 <ACPRegistryIcon className="size-4" />
               </RowIcon>
               <span className="min-w-0 flex-1 text-sm text-muted-foreground">
-                More agents in the ACP Registry
+                ACP Registry 中的更多智能体
               </span>
               <Button
                 size="xs"
@@ -659,7 +657,7 @@ function AgentsSection({
                 disabled={!canManageProviders}
                 onClick={() => setAddingProvider(true)}
               >
-                Browse
+                浏览
               </Button>
             </div>
           ) : null}
@@ -753,7 +751,7 @@ function ProjectsSection({
   if (scan === undefined) return null;
   if (scan.isPending && candidates.length === 0) {
     return (
-      <WelcomeSection title="Projects">
+      <WelcomeSection title="项目">
         <p className="text-sm leading-10 text-muted-foreground">
           Looking for projects in your {IMPORT_SOURCES_LABEL} history…
         </p>
@@ -762,12 +760,12 @@ function ProjectsSection({
   }
   const retry = (
     <Button variant="ghost" size="sm" onClick={scan.refresh}>
-      Retry
+      重试
     </Button>
   );
   if (scan.error !== null && candidates.length === 0) {
     return (
-      <WelcomeSection title="Projects">
+      <WelcomeSection title="项目">
         <div
           role="alert"
           className="flex min-h-10 items-center justify-between gap-3 text-sm text-muted-foreground"
@@ -780,7 +778,7 @@ function ProjectsSection({
   }
   if (candidates.length === 0) {
     return scan.data?.truncated ? (
-      <WelcomeSection title="Projects">
+      <WelcomeSection title="项目">
         <p className="text-xs leading-10 text-muted-foreground" role="status">
           {SCAN_LIMIT_MESSAGE}
         </p>
@@ -799,7 +797,7 @@ function ProjectsSection({
     selected.length < candidates.length &&
     !(selected.length === defaultKeys.length && defaultKeys.every((key) => selectedKeys.has(key)));
   return (
-    <WelcomeSection title="Projects">
+    <WelcomeSection title="项目">
       <div className="flex min-h-10 items-center gap-3 py-1">
         <label className="flex min-w-0 flex-1 items-center gap-3">
           <RowIcon>
@@ -816,7 +814,7 @@ function ProjectsSection({
             <span className="block text-sm font-medium text-foreground">
               {canWrite && selected.length > 0
                 ? `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"} and their threads`
-                : "Import projects and their threads"}
+                : "导入项目及其会话"}
             </span>
             <span className="block text-xs text-muted-foreground">
               From your {IMPORT_SOURCES_LABEL} history
@@ -830,7 +828,7 @@ function ProjectsSection({
             aria-expanded={reviewing}
             onClick={() => setReviewing((open) => !open)}
           >
-            {reviewing ? "Hide" : `Review all ${candidates.length}`}
+            {reviewing ? "隐藏" : `查看全部 ${candidates.length} 个`}
             <ChevronDownIcon className={cn("size-3.5", reviewing && "rotate-180")} />
           </Button>
         ) : null}
@@ -849,7 +847,7 @@ function ProjectsSection({
                 disabled={selected.length === candidates.length}
                 onClick={() => setSelectedKeys(new Set(allKeys))}
               >
-                Select all
+                全选
               </Button>
               <Button
                 variant="ghost"
@@ -857,7 +855,7 @@ function ProjectsSection({
                 disabled={selected.length === 0}
                 onClick={() => setSelectedKeys(new Set())}
               >
-                Select none
+                全不选
               </Button>
             </div>
           </div>
@@ -896,17 +894,17 @@ function ProjectsSection({
 function PhoneSection({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const [open, setOpen] = useState(false);
   return (
-    <WelcomeSection title="Phone">
+    <WelcomeSection title="手机">
       <Collapsible open={open} onOpenChange={setOpen}>
         <div className="flex min-h-10 items-center gap-3 py-1">
           <RowIcon>
             <SmartphoneIcon className="size-4" />
           </RowIcon>
           <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
-            Use T3 Code on your phone
+            在手机上使用 T3 Code
           </span>
           <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
-            {open ? "Hide" : "Set up"}
+            {open ? "隐藏" : "设置"}
             <ChevronDownIcon className={cn("size-3.5", open && "rotate-180")} />
           </CollapsibleTrigger>
         </div>
@@ -960,13 +958,13 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
     </Button>
   );
   if (isSignedIn && link === null && linkState.isPending) {
-    return <p className="text-sm text-muted-foreground">Checking T3 Connect…</p>;
+    return <p className="text-sm text-muted-foreground">正在检查 T3 Connect…</p>;
   }
   if (isSignedIn && linkState.error !== null) {
     return (
       <>
-        <p className="text-sm text-foreground">Could not check T3 Connect.</p>
-        {settingsLink("Check T3 Connect")}
+        <p className="text-sm text-foreground">无法检查 T3 Connect。</p>
+        {settingsLink("检查 T3 Connect")}
       </>
     );
   }
@@ -974,15 +972,13 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
     return (
       <p className="flex gap-1.5 text-sm text-foreground">
         <CheckIcon className="mt-0.5 size-4 shrink-0 text-success-foreground" />
-        Your phone can reach this computer. Sign in to the app with the same account.
+        你的手机可以访问这台电脑。请在应用中登录同一账号。
       </p>
     );
   }
   if (isSignedIn && shared && reachability === undefined) {
     return (
-      <p className="text-sm text-foreground">
-        T3 Connect is on for this computer. Sign in to the app with the same account.
-      </p>
+      <p className="text-sm text-foreground">这台电脑已开启 T3 Connect。请在应用中登录同一账号。</p>
     );
   }
   if (isSignedIn) {
@@ -991,20 +987,18 @@ function PhoneConnectLink({ environmentId }: { readonly environmentId: Environme
       <>
         <p className="text-sm text-foreground">
           {shared
-            ? "T3 Connect is on, but the app cannot reach this computer."
-            : "Signed in. Share this computer so the app can reach it."}
+            ? "T3 Connect 已开启，但应用无法访问这台电脑。"
+            : "已登录。请共享这台电脑，以便应用访问。"}
         </p>
-        {settingsLink(shared ? "Check T3 Connect" : "Set up T3 Connect")}
+        {settingsLink(shared ? "检查 T3 Connect" : "设置 T3 Connect")}
       </>
     );
   }
   return (
     <>
-      <p className="text-sm text-foreground">
-        Sign in to T3 Connect here, then in the app with the same account.
-      </p>
+      <p className="text-sm text-foreground">先在这里登录 T3 Connect，再在应用中登录同一账号。</p>
       <Button variant="outline" size="xs" disabled={!isLoaded} onClick={openAuthPrompt}>
-        Sign in to T3 Connect
+        登录 T3 Connect
       </Button>
     </>
   );
@@ -1051,7 +1045,7 @@ function OnboardingCodexSetup({
           const cause = squashAtomCommandFailure(result);
           toastManager.add({
             type: "error",
-            title: "Could not save Codex setup",
+            title: "无法保存 Codex 设置",
             ...(cause instanceof Error ? { description: cause.message } : {}),
           });
         }
@@ -1085,7 +1079,7 @@ function TerminalAction({
   readonly disabled: boolean;
   readonly onClick: () => void;
 }) {
-  const label = signIn ? "Sign in" : "Install";
+  const label = signIn ? "登录" : "安装";
   return (
     <Button
       size="xs"
@@ -1121,7 +1115,7 @@ function AgentRow({
     state === "install"
       ? isInstallableDriver(provider.driver)
         ? null
-        : "Not installed"
+        : "未安装"
       : compact || state === "ready" || state === "checking"
         ? null
         : state === "attention"
@@ -1153,10 +1147,10 @@ function AgentRow({
         {state === "ready" ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
             <CheckIcon className="size-3.5" />
-            Ready
+            就绪
           </span>
         ) : state === "checking" ? (
-          <span className="text-xs text-muted-foreground">Checking…</span>
+          <span className="text-xs text-muted-foreground">正在检查…</span>
         ) : (
           action
         )}
@@ -1271,18 +1265,18 @@ function AgentInstallTerminal({
       <div className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 py-1.5">
         <span className="text-2xs font-medium text-muted-foreground">
           {!canOperateTerminal ? (
-            "This connection cannot control terminals."
+            "此连接无法控制终端。"
           ) : setupState === "writeFailed" ? (
             <>
               Run <code className="rounded bg-muted px-1 font-mono">{command}</code> in this
               terminal.
             </>
           ) : setupState === "ready" ? (
-            "Review the command, then press Enter to run it."
+            "检查命令后按 Enter 运行。"
           ) : setupState === "openFailed" ? (
-            "Could not open the setup terminal."
+            "无法打开设置终端。"
           ) : (
-            "Preparing command..."
+            "正在准备命令…"
           )}
         </span>
         <div className="flex items-center gap-1">
@@ -1297,11 +1291,11 @@ function AgentInstallTerminal({
                 }
               }}
             >
-              Retry
+              重试
             </Button>
           ) : null}
           <Button size="xs" variant="ghost-muted" onClick={onClose}>
-            Close
+            关闭
           </Button>
         </div>
       </div>
@@ -1311,7 +1305,7 @@ function AgentInstallTerminal({
             threadRef={threadRef}
             threadId={AGENT_ONBOARDING_THREAD_ID}
             terminalId={terminalId}
-            terminalLabel={`Install ${driver}`}
+            terminalLabel={`安装 ${driver}`}
             cwd={cwd}
             providerInstanceId={providerInstanceId}
             advancedTypography={advancedTypography}
@@ -1326,7 +1320,7 @@ function AgentInstallTerminal({
   );
 }
 
-const IMPORT_PERMISSION_MESSAGE = "This connection cannot import projects or thread history.";
+const IMPORT_PERMISSION_MESSAGE = "此连接无法导入项目或会话历史。";
 
 // Creates the selected projects, then imports each one's agent history. Owns retry state so a
 // second Start resumes instead of recreating projects.
@@ -1570,7 +1564,7 @@ function useProjectImport({
       } else if (importedThreadCount > 0) {
         importWarningRef.current = `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}. Some thread history could not be imported.`;
       } else {
-        importWarningRef.current = "Could not import thread history.";
+        importWarningRef.current = "无法导入会话历史。";
       }
     }
     finishAfterImport();
@@ -1640,7 +1634,7 @@ function ImportCandidateList({
             />
             <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-1.5 text-left">
               <ChevronRightIcon className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-panel-open:rotate-90" />
-              <span className="truncate text-sm text-muted-foreground">Other folders</span>
+              <span className="truncate text-sm text-muted-foreground">其他文件夹</span>
               <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
                 {other.length} {other.length === 1 ? "folder" : "folders"}
               </span>
@@ -1844,14 +1838,14 @@ function CliPathSetup() {
           </>
         ) : (
           <>
-            Use <code className="font-mono">t3</code> from any terminal. Adds one line to{" "}
+            使用 <code className="font-mono">t3</code> from any terminal. Adds one line to{" "}
             {setup.file}.
           </>
         )}
       </p>
       {setup.added ? null : (
         <Button size="xs" variant="outline" disabled={busy} onClick={() => run("addToPath")}>
-          Add to PATH
+          添加到 PATH
         </Button>
       )}
     </div>

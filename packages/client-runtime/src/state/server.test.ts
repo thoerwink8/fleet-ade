@@ -219,7 +219,7 @@ describe("update restart reconnect nudges", () => {
             phase: "blocked",
             lastFailure: {
               reason: "authentication",
-              detail: "The environment credential is invalid.",
+              detail: "环境凭据无效。",
             },
           },
           { phase: "blocked", lastFailure: { reason: "configuration" } },
@@ -773,7 +773,7 @@ describe("server state projection", () => {
         ),
       ),
     ).toBe(false);
-    expect(isLegacyUpdateHandoffLoss(Cause.fail(new Error("Install failed.")))).toBe(false);
+    expect(isLegacyUpdateHandoffLoss(Cause.fail(new Error("安装失败。")))).toBe(false);
   });
 
   it.effect("resumes after the progress stream disconnects following completion", () => {
@@ -838,7 +838,7 @@ describe("server state projection", () => {
       stage: "installing" as const,
       fromVersion: "0.0.30",
       targetVersion: "0.0.31",
-      message: "Install failed.",
+      message: "安装失败。",
     };
 
     expect(serverUpdateStateForServerVersion(running, "0.0.31")).toBe(running);
@@ -890,7 +890,7 @@ describe("server state projection", () => {
       );
       expect(foreignRollback).toMatchObject({
         status: "failed",
-        reason: "The service launcher resumed without committing the requested server version.",
+        reason: "服务启动器已恢复，但未应用请求的服务器版本。",
       });
     }),
   );
@@ -1593,7 +1593,7 @@ describe("launcher update resume", () => {
     stage: "resuming",
     fromVersion: "0.0.30",
     targetVersion: "0.0.31",
-    message: "The service launcher resumed without committing the requested server version.",
+    message: "服务启动器已恢复，但未应用请求的服务器版本。",
   };
 
   it.effect("fails promptly when a server the launcher did not start comes back", () =>

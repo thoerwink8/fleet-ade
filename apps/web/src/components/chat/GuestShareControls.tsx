@@ -97,7 +97,7 @@ function GuestShareDialog({
     const error = squashAtomCommandFailure(result);
     setState({
       status: "failed",
-      message: error instanceof Error ? error.message : "Could not create a guest link.",
+      message: error instanceof Error ? error.message : "无法创建访客链接。",
     });
   };
 
@@ -110,7 +110,7 @@ function GuestShareDialog({
     >
       <DialogPopup className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Share with guest</DialogTitle>
+          <DialogTitle>与访客共享</DialogTitle>
           <DialogDescription>
             The guest sees the thread as you do, including command output and the agent&apos;s
             reasoning. Each message they send waits for you.
@@ -121,20 +121,20 @@ function GuestShareDialog({
             <div className="flex items-center gap-2">
               <Input
                 readOnly
-                aria-label="Guest link"
+                aria-label="访客链接"
                 value={state.url}
                 onFocus={(event) => event.currentTarget.select()}
               />
               <Button size="sm" variant="outline" onClick={() => copyToClipboard(state.url)}>
                 {isCopied ? <CheckIcon /> : <CopyIcon />}
-                {isCopied ? "Copied" : "Copy"}
+                {isCopied ? "已复制" : "复制"}
               </Button>
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">
               {activeShare !== null
-                ? "A new link ends the current one."
-                : "The link works once and expires in 24 hours."}
+                ? "新链接会让当前链接失效。"
+                : "链接只能使用一次，24 小时后过期。"}
             </p>
           )}
           {state.status === "failed" ? (
@@ -146,7 +146,7 @@ function GuestShareDialog({
         <DialogFooter>
           {state.status === "created" ? (
             <Button size="sm" onClick={onClose}>
-              Done
+              完成
             </Button>
           ) : (
             <>
@@ -156,14 +156,14 @@ function GuestShareDialog({
                 onClick={onClose}
                 disabled={state.status === "creating"}
               >
-                Cancel
+                取消
               </Button>
               <Button
                 size="sm"
                 onClick={() => void create()}
                 disabled={!canCreate || state.status === "creating"}
               >
-                {state.status === "creating" ? "Creating..." : "Create link"}
+                {state.status === "creating" ? "正在创建…" : "创建链接"}
               </Button>
             </>
           )}
@@ -198,7 +198,7 @@ export function GuestShareIndicator({ threadRef }: { readonly threadRef: ScopedT
           setClosing(false);
         }}
       >
-        Stop sharing
+        停止分享
       </Button>
     </div>
   );
@@ -207,10 +207,8 @@ export function GuestShareIndicator({ threadRef }: { readonly threadRef: ScopedT
 function GuestShareStatus({ share }: { readonly share: ThreadGuestShare }) {
   const nowMinute = useNowMinute();
   // The share stays on the thread after it expires, until the owner clears it.
-  if (share.expiresAt.slice(0, 16) <= nowMinute) return <span>Guest link expired</span>;
-  return (
-    <span>{share.guestName !== null ? `${share.guestName} is a guest` : "Guest link active"}</span>
-  );
+  if (share.expiresAt.slice(0, 16) <= nowMinute) return <span>访客链接已过期</span>;
+  return <span>{share.guestName !== null ? `${share.guestName} 是访客` : "访客链接有效"}</span>;
 }
 
 /**
@@ -303,18 +301,18 @@ export function GuestPendingMessages({
                   size="xs"
                   variant="ghost-muted"
                   disabled={busy}
-                  aria-label={`Dismiss message from ${guestName}`}
+                  aria-label={`忽略来自 ${guestName} 的消息`}
                   onClick={() => void resolve(message.id, "dismiss")}
                 >
-                  Dismiss
+                  忽略
                 </Button>
                 <Button
                   size="xs"
                   disabled={busy}
-                  aria-label={`Send message from ${guestName}`}
+                  aria-label={`发送来自 ${guestName} 的消息`}
                   onClick={() => void resolve(message.id, "send")}
                 >
-                  Send
+                  发送
                 </Button>
               </div>
             ) : null}

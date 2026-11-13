@@ -44,7 +44,7 @@ function connectTransport(
         kind: "error",
         message: isUnavailable(result.failure)
           ? result.failure.message
-          : "Could not reach this environment. Try again.",
+          : "无法访问此环境。请重试。",
       };
     }
     onEnvironment({
@@ -103,8 +103,8 @@ export function ApproveAgentSurface() {
   if (environmentId === null || transport === null) {
     return (
       <Message
-        title="This sign-in link is incomplete"
-        description="Close this page and start the sign-in again from your agent."
+        title="此登录链接不完整"
+        description="请关闭此页面，然后从你的智能体重新发起登录。"
       />
     );
   }
@@ -112,8 +112,8 @@ export function ApproveAgentSurface() {
   if (framed) {
     return (
       <Message
-        title="Open this page in its own window"
-        description="For your safety, agent sign-ins cannot be approved inside another site."
+        title="请在单独的窗口中打开此页面"
+        description="为了安全，不能在其他网站内批准智能体登录。"
       />
     );
   }
@@ -122,9 +122,9 @@ export function ApproveAgentSurface() {
     return (
       <StandalonePage>
         <StandalonePageHeader
-          context="Agent sign-in"
-          title="Connecting to T3 Connect"
-          description="One moment while your account loads."
+          context="智能体登录"
+          title="正在连接 T3 Connect"
+          description="正在加载你的账号，请稍候。"
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
       </StandalonePage>
@@ -133,13 +133,10 @@ export function ApproveAgentSurface() {
 
   if (!isSignedIn) {
     return (
-      <Message
-        title="Sign in to approve"
-        description="Sign in to T3 Connect with the account this environment is linked to."
-      >
+      <Message title="登录以批准" description="请使用此环境所关联的账号登录 T3 Connect。">
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>
-            Sign in
+            登录
           </Button>
         </div>
       </Message>
@@ -164,7 +161,7 @@ export function ApproveAgentSurface() {
                 <a href={`${new URL("/connect-agent", environment.url).toString()}?${search}`} />
               }
             >
-              Use a sign-in code instead
+              改用登录码
             </Button>
           ) : null}
           <Button
@@ -173,7 +170,7 @@ export function ApproveAgentSurface() {
             onClick={() => void clerk.signOut({ redirectUrl: window.location.href })}
             type="button"
           >
-            Use another account
+            使用其他账号
           </Button>
         </div>
       }
@@ -192,7 +189,7 @@ function Message({
 }) {
   return (
     <StandalonePage>
-      <StandalonePageHeader context="Agent sign-in" title={title} description={description} />
+      <StandalonePageHeader context="智能体登录" title={title} description={description} />
       {children}
     </StandalonePage>
   );

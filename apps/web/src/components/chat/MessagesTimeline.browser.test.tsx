@@ -501,19 +501,19 @@ describe("MessagesTimeline messages", () => {
   it("folds a user message only when the fold hides at least as much as it shows", async () => {
     setup();
     const lines = (count: number) =>
-      Array.from({ length: count }, (_, index) => `Line ${index}`).join("\n");
+      Array.from({ length: count }, (_, index) => `第 ${index} 行`).join("\n");
     await using screen = await renderTimeline([
       message(lines(12), {}, "medium"),
       message(lines(60), {}, "long"),
     ]);
-    await vi.waitFor(() => expect(screen.buttons("Show full message")).toHaveLength(1));
+    await vi.waitFor(() => expect(screen.buttons("显示完整消息")).toHaveLength(1));
     const [medium, long] = [
       ...screen.container.querySelectorAll<HTMLElement>("[data-user-message-body]"),
     ];
     expect(medium!.dataset.userMessageCollapsible).toBe("false");
     expect(medium!.textContent).toContain("Line 11");
     const foldedHeight = long!.offsetHeight;
-    await click(screen.button("Show full message"));
+    await click(screen.button("显示完整消息"));
     expect(long!.offsetHeight).toBeGreaterThanOrEqual(foldedHeight * 2);
   });
 
@@ -580,8 +580,8 @@ describe("MessagesTimeline messages", () => {
         >
           <MessagesTimeline {...props} timelineEntries={entries} />
         </div>
-        <div {...workspaceAreaProps("composer", 2, "Message input")}>
-          <button type="button">Send</button>
+        <div {...workspaceAreaProps("composer", 2, "消息输入框")}>
+          <button type="button">发送</button>
         </div>
       </>,
     );
@@ -620,13 +620,13 @@ describe("MessagesTimeline messages", () => {
           .slice(-2)
           .map((strip) => strip.dataset.inView),
       ).toEqual(["true", "true"]);
-      expect(screen.button("Previous turn")).not.toBeDisabled();
+      expect(screen.button("上一轮")).not.toBeDisabled();
     });
 
-    expect(screen.button("Next turn")).toBeDisabled();
+    expect(screen.button("下一轮")).toBeDisabled();
 
     viewport.scrollTop -= 30;
-    await vi.waitFor(() => expect(screen.button("Next turn")).not.toBeDisabled());
+    await vi.waitFor(() => expect(screen.button("下一轮")).not.toBeDisabled());
     // Legend keeps its initial end anchor until a scroll leaves the end, and re-pins on resize.
     viewport.scrollTop = 0;
     await vi.waitFor(() => expect(strips()[0]?.dataset.inView).toBe("true"));
@@ -636,18 +636,18 @@ describe("MessagesTimeline messages", () => {
       <MessagesTimeline {...props} timelineEntries={entries} liveFollowEnabled={false} />,
     );
     viewport.scrollTop = viewport.scrollHeight;
-    await vi.waitFor(() => expect(screen.button("Next turn")).toBeDisabled());
+    await vi.waitFor(() => expect(screen.button("下一轮")).toBeDisabled());
     screen.container.style.height = "600px";
     await vi.waitFor(() => {
       expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBeGreaterThan(
         500,
       );
-      expect(screen.button("Next turn")).not.toBeDisabled();
+      expect(screen.button("下一轮")).not.toBeDisabled();
     });
 
     // So does a footer that grows below a detached bottom.
     viewport.scrollTop = viewport.scrollHeight;
-    await vi.waitFor(() => expect(screen.button("Next turn")).toBeDisabled());
+    await vi.waitFor(() => expect(screen.button("下一轮")).toBeDisabled());
     await screen.rerender(
       <MessagesTimeline
         {...props}
@@ -660,7 +660,7 @@ describe("MessagesTimeline messages", () => {
       expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBeGreaterThan(
         300,
       );
-      expect(screen.button("Next turn")).not.toBeDisabled();
+      expect(screen.button("下一轮")).not.toBeDisabled();
     });
   });
 
@@ -684,7 +684,7 @@ describe("MessagesTimeline messages", () => {
     const viewport = base.listRef.current!.getScrollableNode()!;
     await vi.waitFor(() => {
       expect(viewport.scrollTop).toBeGreaterThan(0);
-      expect(screen.button("Next turn")).toBeDisabled();
+      expect(screen.button("下一轮")).toBeDisabled();
     });
 
     await screen.rerender(
@@ -701,7 +701,7 @@ describe("MessagesTimeline messages", () => {
       expect(
         Math.abs(row!.getBoundingClientRect().top - viewport.getBoundingClientRect().top),
       ).toBeLessThanOrEqual(2);
-      expect(screen.button("Next turn")).not.toBeDisabled();
+      expect(screen.button("下一轮")).not.toBeDisabled();
     });
   });
 
@@ -831,7 +831,7 @@ describe("MessagesTimeline messages", () => {
       for (const id of userIds.slice(1)) {
         const from = turnAtTop();
         await vi.waitFor(async () => {
-          if (turnAtTop() === from) await click(screen.button("Next turn"));
+          if (turnAtTop() === from) await click(screen.button("下一轮"));
           expect(turnAtTop(), "turn at the top after Next turn").toBe(id);
         });
       }
@@ -1375,9 +1375,9 @@ describe("MessagesTimeline automation prompts", () => {
         ],
       },
     );
-    expect(screen.buttons("Edit from here")).toHaveLength(0);
+    expect(screen.buttons("从这里编辑")).toHaveLength(0);
     await click(screen.button(/^Automation/));
-    expect(screen.buttons("Edit from here")).toHaveLength(1);
+    expect(screen.buttons("从这里编辑")).toHaveLength(1);
   });
 });
 
@@ -1411,11 +1411,11 @@ describe("MessagesTimeline agent messages", () => {
     expect(row.textContent).toContain("Review finished");
     expect(row.getAttribute("aria-expanded")).toBe("false");
     expect(screen.text()).not.toContain("drops the index");
-    expect(screen.buttons("Open thread")).toHaveLength(0);
+    expect(screen.buttons("打开会话")).toHaveLength(0);
 
     await click(row);
     expect(screen.text()).toContain("The migration drops the index before backfilling it.");
-    await click(screen.button("Open thread"));
+    await click(screen.button("打开会话"));
     expect(onOpenThread).toHaveBeenCalledWith(SENDER_THREAD_ID, ENVIRONMENT_ID);
 
     await click(screen.button(/^Agent/));
@@ -1423,7 +1423,7 @@ describe("MessagesTimeline agent messages", () => {
 
     // The linked sender shows the title it sent, and its thread cannot be opened from here.
     await click(screen.button(/^Release lead/));
-    expect(screen.buttons("Open thread")).toHaveLength(0);
+    expect(screen.buttons("打开会话")).toHaveLength(0);
   });
 
   it("leaves messages sent by T3 Code as full bubbles", async () => {
@@ -1481,7 +1481,7 @@ describe("MessagesTimeline attachments", () => {
         sizeBytes: attachment.sizeBytes,
       };
       await using screen = await renderTimeline([message("", { attachments: [attachment] })]);
-      expect(screen.buttons("Copy message")).toHaveLength(0);
+      expect(screen.buttons("复制消息")).toHaveLength(0);
       await screen.rerender(
         <MessagesTimeline
           {...baseProps()}
@@ -1493,7 +1493,7 @@ describe("MessagesTimeline attachments", () => {
           ]}
         />,
       );
-      expect(screen.buttons("Copy message")).toHaveLength(0);
+      expect(screen.buttons("复制消息")).toHaveLength(0);
       await screen.rerender(
         <MessagesTimeline
           {...baseProps()}
@@ -1516,7 +1516,7 @@ describe("MessagesTimeline attachments", () => {
         />,
       );
       using write = vi.spyOn(navigator.clipboard, "write").mockResolvedValue();
-      await click(screen.button("Copy message"));
+      await click(screen.button("复制消息"));
       await vi.waitFor(() => expect(write).toHaveBeenCalledOnce());
       const [item] = write.mock.calls[0]![0];
       const text = await (await item!.getType("text/plain")).text();
@@ -2117,7 +2117,7 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
       detail: "Open the current tab",
       appName: "Safari",
       options: [
-        { decision: "decline", label: "Deny" },
+        { decision: "decline", label: "拒绝" },
         { decision: "accept", label: "Allow once" },
         {
           decision: "acceptAlways",
@@ -2172,7 +2172,7 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await expect.element(screen.getByText("Needs permission to run the command")).toBeVisible();
   await vi.waitFor(() => {
     expect(
-      getComputedStyle(screen.getByLabelText("Command", { exact: true }).element()).userSelect,
+      getComputedStyle(screen.getByLabelText("命令", { exact: true }).element()).userSelect,
     ).toBe("text");
     expect(
       getComputedStyle(screen.getByText("Needs permission to run the command").element())
@@ -2180,14 +2180,14 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     ).toBe("text");
   });
   await expect.element(screen.getByText("Safari", { exact: true })).toBeVisible();
-  await click(screen.button("Why am I being asked this?"));
+  await click(screen.button("为什么要问我这个？"));
   await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
-  await click(screen.button("Why am I being asked this?"));
-  await click(screen.buttons("More approval options")[1]!);
+  await click(screen.button("为什么要问我这个？"));
+  await click(screen.buttons("更多审批选项")[1]!);
   await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
   await page.getByRole("menuitem", { name: "Always allow Safari" }).click();
   expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "acceptAlways");
-  await click(screen.buttons("More approval options")[0]!);
+  await click(screen.buttons("更多审批选项")[0]!);
   await expect.element(page.getByRole("menuitem", { name: "Cancel", exact: true })).toBeVisible();
   await page.getByRole("menuitem", { name: "Always allow this session" }).click();
   expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "acceptForSession");
@@ -2224,14 +2224,14 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     }),
   );
   await expect
-    .element(screen.getByLabelText("Command", { exact: true }))
-    .toHaveTextContent("Command approval");
+    .element(screen.getByLabelText("命令", { exact: true }))
+    .toHaveTextContent("命令审批");
   await screen.rerender(ui({ canOperateThread: false }));
   await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
   await vi.waitFor(() =>
-    expect(
-      screen.buttons("More approval options").every((button) => button.hasAttribute("disabled")),
-    ).toBe(true),
+    expect(screen.buttons("更多审批选项").every((button) => button.hasAttribute("disabled"))).toBe(
+      true,
+    ),
   );
   await screen.rerender(ui({ respondingRequestIds: [commandRequest] }));
   await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
@@ -2242,7 +2242,7 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     ui({ pendingApprovals: [{ ...approvals[0]!, responseCapability: "not_resumable" }] }),
   );
   await expect
-    .element(screen.getByText("Provider process is gone. Interrupt or restart the run to respond."))
+    .element(screen.getByText("提供方进程已退出。请中断或重新开始这次运行后再回应。"))
     .toBeVisible();
   await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(0));
   await screen.rerender(
@@ -2251,7 +2251,7 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await expect
     .element(screen.getByRole("group", { name: "Command approval" }))
     .not.toBeInTheDocument();
-  await vi.waitFor(() => expect(screen.text()).not.toContain("Waiting for approval"));
+  await vi.waitFor(() => expect(screen.text()).not.toContain("等待批准"));
   await screen.getByRole("button", { expanded: false }).click();
   await expect
     .element(screen.getByRole("button", { name: approvals[0]!.detail!, exact: true }))

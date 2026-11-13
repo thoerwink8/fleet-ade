@@ -16,7 +16,7 @@ describe("isJsonToolText", () => {
     ['"completed"', true],
     ['{"partial":', false],
     ['{"count":1}\n\nFinished.', false],
-    ["No output.", false],
+    ["没有输出。", false],
     ["", false],
   ] as const)("classifies %j as JSON: %s", (text, expected) => {
     expect(isJsonToolText(text)).toBe(expected);
@@ -72,11 +72,11 @@ describe("tool image output parsing", () => {
       expect(
         turnItemOutputText(
           toolItem({
-            content: [{ type: "text", text: "File contents" }],
+            content: [{ type: "text", text: "文件内容" }],
             structuredContent: { path: "read.ts", ready: true },
           }),
         ),
-      ).toBe("File contents");
+      ).toBe("文件内容");
     },
   );
   it.each(["array", "content", "structured"] as const)(

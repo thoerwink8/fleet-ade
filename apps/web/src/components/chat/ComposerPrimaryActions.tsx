@@ -74,15 +74,15 @@ const formatPendingPrimaryActionLabel = (input: {
   questionIndex: number;
 }) => {
   if (input.isResponding) {
-    return "Submitting...";
+    return "正在提交…";
   }
   if (input.compact) {
-    return input.isLastQuestion ? "Submit" : "Next";
+    return input.isLastQuestion ? "提交" : "下一题";
   }
   if (!input.isLastQuestion) {
-    return "Next question";
+    return "下一题";
   }
-  return input.questionIndex > 0 ? "Submit answers" : "Submit answer";
+  return input.questionIndex > 0 ? "提交答案" : "提交答案";
 };
 
 const STOP_PENDING_MAX_MS = 10_000;
@@ -162,7 +162,7 @@ function StopGenerationButton({
               onStopRequested();
               onInterrupt();
             }}
-            aria-label={stopPhase === "pending" ? "Stopping" : "Stop generation"}
+            aria-label={stopPhase === "pending" ? "正在停止" : "停止生成"}
           />
         }
       >
@@ -170,7 +170,7 @@ function StopGenerationButton({
           <rect x="2" y="2" width="8" height="8" rx="1.5" />
         </svg>
       </TooltipTrigger>
-      <TooltipPopup>{stopPhase === "pending" ? "Stopping…" : "Interrupt"}</TooltipPopup>
+      <TooltipPopup>{stopPhase === "pending" ? "正在停止…" : "中断"}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -299,7 +299,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               {...pointerFocusProps}
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}
-              aria-label="Previous question"
+              aria-label="上一题"
             >
               <ChevronLeftIcon className="size-3.5" />
             </Button>
@@ -311,7 +311,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               onClick={onPreviousPendingQuestion}
               disabled={pendingAction.isResponding}
             >
-              Previous
+              上一题
             </Button>
           )
         ) : null}
@@ -370,32 +370,32 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   const compactsBeforeSend = compactTokens !== null && !keepFullHistory;
 
   const submitLabel = showResume
-    ? "Resume thread"
+    ? "继续会话"
     : isEditingQueuedMessage
-      ? "Update queued message"
+      ? "更新排队消息"
       : compactsBeforeSend
-        ? "Compact and send"
+        ? "压缩后发送"
         : isQueuing
-          ? "Queue message"
+          ? "加入队列"
           : isRunning
-            ? "Steer message"
-            : "Submit message";
+            ? "引导当前执行"
+            : "发送消息";
   const submitStatus = isEnvironmentUnavailable
-    ? "Environment disconnected"
+    ? "环境已断开"
     : (sendDisabledReason ??
       (isPreparingWorktree
-        ? "Preparing worktree"
+        ? "正在准备工作树"
         : isSendBusy
           ? isEditingQueuedMessage
-            ? "Updating queued message"
-            : "Submitting message"
+            ? "正在更新排队消息"
+            : "正在发送消息"
           : null));
   const submitTooltip =
     submitStatus ??
     (compactsBeforeSend
-      ? `Summarize ${compactTokens} tokens of history, then send`
+      ? `先总结 ${compactTokens} token 的历史记录，再发送`
       : isRunning && !isEditingQueuedMessage && canSteer
-        ? `Click to ${followUpBehavior}, ${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}-click${alternateShortcutLabel ? ` or ${alternateShortcutLabel}` : ""} to ${alternateAction}`
+        ? `点击以${followUpBehavior}，${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}以${alternateAction}`
         : submitLabel);
 
   const sendButton = (
@@ -478,7 +478,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
               className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-(--control-radius) px-2 font-medium text-base text-foreground/80 tabular-nums outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-64 sm:text-sm aria-pressed:bg-accent/60 aria-pressed:text-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:text-muted-foreground"
               {...pointerFocusProps}
               aria-pressed={!keepFullHistory}
-              aria-label={`Compact ${compactTokens} tokens of history before sending`}
+              aria-label={`发送前压缩 ${compactTokens} token 的历史记录`}
               disabled={!canOperateThread}
               onClick={onToggleKeepFullHistory}
             />
@@ -486,17 +486,17 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         >
           <Minimize2Icon aria-hidden="true" />
           <span className="@max-[480px]/composer-surface:hidden">
-            {keepFullHistory ? "Keep" : "Compact"}
+            {keepFullHistory ? "保留" : "压缩"}
           </span>
           <span className="text-muted-foreground">{compactTokens}</span>
         </TooltipTrigger>
         <TooltipPopup>
           <div>
             {keepFullHistory
-              ? `Next send keeps all ${compactTokens} tokens.`
-              : `Next send compacts ${compactTokens} tokens first.`}
+              ? `下次发送时保留全部 ${compactTokens} token。`
+              : `下次发送前先压缩 ${compactTokens} token。`}
           </div>
-          <div>{keepFullHistory ? "Click to compact first" : "Click to keep full history"}</div>
+          <div>{keepFullHistory ? "点击以先压缩历史记录" : "点击以保留完整历史记录"}</div>
         </TooltipPopup>
       </Tooltip>
       {children}

@@ -83,7 +83,7 @@ export function HtmlRenderFrame(props: {
               <TooltipTrigger
                 render={
                   <Button
-                    aria-label="Open full screen"
+                    aria-label="全屏打开"
                     size="icon-xs"
                     variant="glass"
                     onClick={async () => {
@@ -95,8 +95,8 @@ export function HtmlRenderFrame(props: {
                       else
                         toastManager.add({
                           type: "error",
-                          title: "Page unavailable",
-                          description: "Reconnect to the environment and try again.",
+                          title: "页面不可用",
+                          description: "请重新连接环境后重试。",
                         });
                     }}
                   />
@@ -104,7 +104,7 @@ export function HtmlRenderFrame(props: {
               >
                 <Maximize2Icon className="size-3.5" />
               </TooltipTrigger>
-              <TooltipPopup side="left">Open full screen</TooltipPopup>
+              <TooltipPopup side="left">全屏打开</TooltipPopup>
             </Tooltip>
           </div>
           {expandedSrc !== null ? (

@@ -29,8 +29,8 @@ interface LinkSummary {
 }
 
 const PROMPT_HEADER = {
-  title: "Open this prompt",
-  description: "It opens as a draft. Nothing runs until you press Send.",
+  title: "打开此提示词",
+  description: "它会以草稿形式打开。在你点击“发送”之前不会运行任何内容。",
 };
 
 function summarize(
@@ -45,12 +45,12 @@ function summarize(
       value:
         prompt.value === null
           ? {
-              title: "Open this thread",
-              description: "It opens in T3 Code if you're connected to the machine it runs on.",
+              title: "打开此会话",
+              description: "如果你已连接到运行它的机器，它会在 T3 Code 中打开。",
               prompt: null,
               details: [],
             }
-          : { ...PROMPT_HEADER, prompt: prompt.value, details: ["Opens one of your threads."] },
+          : { ...PROMPT_HEADER, prompt: prompt.value, details: ["打开你的一个会话。"] },
     };
   }
   const link = parseNewThreadLink(url.search);
@@ -73,8 +73,8 @@ function summarize(
       ...PROMPT_HEADER,
       prompt: link.value.prompt,
       details: [
-        repository ? `Repository ${repository.owner}/${repository.name}` : "No project",
-        ...(provider ? [`Model ${model ? `${provider} ${model}` : provider}`] : []),
+        repository ? `Repository ${repository.owner}/${repository.name}` : "无项目",
+        ...(provider ? [`模型 ${model ? `${provider} ${model}` : provider}`] : []),
       ],
     },
   };
@@ -135,7 +135,7 @@ function HostedPromptLinkLanding({
   if (!summary.ok) {
     return (
       <StandalonePage>
-        <StandalonePageHeader title="Could not open the link" description={summary.error} />
+        <StandalonePageHeader title="无法打开链接" description={summary.error} />
       </StandalonePage>
     );
   }
@@ -146,7 +146,7 @@ function HostedPromptLinkLanding({
       <StandalonePageHeader title={title} description={description} />
       {prompt !== null && prompt.hiddenCharacters > 0 ? (
         <Alert className="mt-5" variant="error">
-          <AlertTitle>This prompt had hidden characters, it may be malicious</AlertTitle>
+          <AlertTitle>此提示词含有隐藏字符，可能是恶意内容</AlertTitle>
           <AlertDescription>
             T3 Code removed {prompt.hiddenCharacters} hidden character
             {prompt.hiddenCharacters === 1 ? "" : "s"}. Read the prompt before you send it.
@@ -163,17 +163,17 @@ function HostedPromptLinkLanding({
       ) : null}
       <div className="mt-6 flex flex-wrap gap-2">
         <Button render={<a href={deepLink} />} onClick={() => onChoose("app", remember)}>
-          {onPhone ? "Open in app" : "Open in desktop app"}
+          {onPhone ? "在应用中打开" : "在桌面应用中打开"}
         </Button>
         {canContinue ? (
           <Button variant="outline" onClick={() => onChoose("browser", remember)}>
-            Continue here
+            在此继续
           </Button>
         ) : null}
       </div>
       <label className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
         <Checkbox checked={remember} onCheckedChange={(checked) => setRemember(checked === true)} />
-        Remember my choice
+        记住我的选择
       </label>
     </StandalonePage>
   );

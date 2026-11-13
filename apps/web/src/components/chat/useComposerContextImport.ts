@@ -161,15 +161,15 @@ export function useComposerContextImport(input: {
     const fail = (reason: string) => {
       toastManager.add({
         type: "error",
-        title: `Couldn't bring ${record.name} into this message`,
-        description: `${reason} Remove the chip or attach the file again.`,
+        title: `无法把 ${record.name} 放入这条消息`,
+        description: `${reason}请移除这个标签，或重新添加文件。`,
       });
     };
     let file = copiedComposerAttachmentFile(sourceEnvironmentId, record.attachmentId);
     if (!file) {
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail("The environment it came from is not connected.");
+        fail("它来源的环境未连接。");
         return;
       }
       const result = await createAssetUrl({
@@ -182,16 +182,12 @@ export function useComposerContextImport(input: {
           : null;
       if (!url) {
         const cause = result._tag === "Failure" ? Cause.squash(result.cause) : null;
-        fail(
-          isUnreachable(cause)
-            ? "The environment it came from is not reachable right now."
-            : "The original attachment is no longer available.",
-        );
+        fail(isUnreachable(cause) ? "它来源的环境暂时无法访问。" : "原始附件已不可用。");
         return;
       }
       const blob = await downloadAttachmentBlob(url);
       if (!blob) {
-        fail("Downloading it from the source failed.");
+        fail("从来源下载失败。");
         return;
       }
       // Question attachments have no inline reference; annotations can own their screenshots.
@@ -229,7 +225,7 @@ export function useComposerContextImport(input: {
       (pendingThreadImportsRef.current.get(importTargetKey) ?? 0) > 0 &&
       countReservedAttachments() >= PROVIDER_SEND_TURN_MAX_ATTACHMENTS
     ) {
-      fail("The attachment limit has been reached.");
+      fail("已达到附件数量上限。");
       return;
     }
     if (record.kind === "image") {
@@ -253,8 +249,7 @@ export function useComposerContextImport(input: {
             ) ?? false,
         },
       );
-      if (!accepted.includes(localId))
-        fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+      if (!accepted.includes(localId)) fail("草稿拒绝了这个附件（重复或已达到附件上限）。");
     } else {
       const accepted = addComposerFilesToDraft([
         {
@@ -266,8 +261,7 @@ export function useComposerContextImport(input: {
           file,
         },
       ]);
-      if (!accepted.includes(localId))
-        fail("The draft rejected this attachment (duplicate or attachment limit reached).");
+      if (!accepted.includes(localId)) fail("草稿拒绝了这个附件（重复或已达到附件上限）。");
     }
   };
   const importAttachmentRecord = async (

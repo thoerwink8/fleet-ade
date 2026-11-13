@@ -44,7 +44,7 @@ it.effect("preview_open navigates the opened tab to a dev server in one tool cal
       visible: false,
       tabId,
       url: "http://localhost:3000/settings?tab=account",
-      title: "Settings",
+      title: "设置",
       loading: false,
     };
     const events = yield* broker.connect({

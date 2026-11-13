@@ -14,7 +14,7 @@ describe("ContextChip", () => {
   it("sets its label on the sentence baseline at the sentence size without growing the line", async () => {
     await using screen = await render(
       <p className="w-[60ch] text-sm leading-relaxed">
-        Open
+        打开
         <BaselineMarker id="text" /> the{" "}
         <ContextChip kind="mention" render={<button type="button" />}>
           <FileIcon />
@@ -24,7 +24,7 @@ describe("ContextChip", () => {
             Typography.tsx
           </ContextChipLabel>
         </ContextChip>{" "}
-        file
+        文件
       </p>,
     );
     const paragraph = screen.container.querySelector("p")!;

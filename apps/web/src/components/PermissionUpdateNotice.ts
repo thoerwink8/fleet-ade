@@ -42,13 +42,12 @@ function showPermissionNotice(
     toastManager.close(id);
   };
   const id = toastManager.add({
-    title: `Permissions have changed for ${label}`,
-    description:
-      "This connection still uses the old permissions, so some actions may no longer be available. Pair again using a new link with the permissions you need.",
+    title: `${label} 的权限已变更`,
+    description: "此连接仍在使用旧权限，部分操作可能已不可用。请使用包含所需权限的新链接重新配对。",
     timeout: 0,
     onClose: persistDismissal,
     actionProps: {
-      children: "Open Sharing & access",
+      children: "打开共享与访问",
       onClick: () => {
         dismiss();
         void router.navigate({ to: "/settings/access" });

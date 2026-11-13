@@ -81,7 +81,7 @@ describe("Esc in a shortcut recorder", () => {
     await using _screen = await render(
       <Dialog open onOpenChange={onOpenChange}>
         <DialogPopup>
-          <DialogTitle>Settings</DialogTitle>
+          <DialogTitle>设置</DialogTitle>
           <KeybindingsSettingsPanel />
         </DialogPopup>
       </Dialog>,
@@ -92,7 +92,7 @@ describe("Esc in a shortcut recorder", () => {
     await expect.element(field).not.toHaveValue("");
     await userEvent.tab();
     await activate(field, "focus");
-    await expect.element(field).toHaveAttribute("placeholder", "Press shortcut");
+    await expect.element(field).toHaveAttribute("placeholder", "按下快捷键");
 
     await userEvent.keyboard("{Escape}");
 
@@ -110,7 +110,7 @@ it("Esc in the keybindings search clears the query without closing Settings", as
   await using _screen = await render(
     <Dialog open onOpenChange={onOpenChange}>
       <DialogPopup>
-        <DialogTitle>Settings</DialogTitle>
+        <DialogTitle>设置</DialogTitle>
         <KeybindingsSettingsPanel />
       </DialogPopup>
     </Dialog>,

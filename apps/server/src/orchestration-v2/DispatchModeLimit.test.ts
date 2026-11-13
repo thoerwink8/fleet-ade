@@ -203,7 +203,7 @@ it.layer(layerWithCeiling)("runtime mode ceiling", (it) => {
         commandId: CommandId.make("create:ceiling-user:full"),
         threadId,
         projectId: ProjectId.make("project:dispatch-mode-limit"),
-        title: "Full",
+        title: "全宽",
         modelSelection: { instanceId, model: "gpt-5" },
         runtimeMode: "full-access",
         interactionMode: "default",

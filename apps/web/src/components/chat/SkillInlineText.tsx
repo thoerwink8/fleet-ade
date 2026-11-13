@@ -128,15 +128,15 @@ export function SkillChipPopover(props: {
       kind="skill"
       icon={<SkillChipIcon />}
       label={props.label}
-      accessibleLabel={`Skill ${props.label}`}
+      accessibleLabel={`技能 ${props.label}`}
       copyMarkdown={props.copyMarkdown}
     >
       <div className="space-y-3 p-2 text-sm">
         <p className="font-medium">{props.label}</p>
-        <p>{props.description || "No description is available for this skill."}</p>
+        <p>{props.description || "这个技能没有描述。"}</p>
         {props.onViewInstructions ? (
           <Button variant="outline" size="sm" onClick={props.onViewInstructions}>
-            View instructions
+            查看说明
           </Button>
         ) : null}
       </div>

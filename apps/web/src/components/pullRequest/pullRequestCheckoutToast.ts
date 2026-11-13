@@ -3,7 +3,7 @@ import type { ChangeRequestTerminology } from "@t3tools/client-runtime/source-co
 export function offHeadPullRequestCheckoutToast(terminology: ChangeRequestTerminology) {
   return {
     type: "warning",
-    title: "Checked out, but not confirmed on the latest commit",
-    description: `This checkout could not be confirmed at the ${terminology.singular}'s latest commit, so its code may differ. Local commits or uncommitted work keep a checkout where it is.`,
+    title: "已检出，但未确认是否为最新提交",
+    description: `无法确认此工作副本位于 ${terminology.singular} 的最新提交上，因此代码可能有差异。存在本地提交或未提交的改动时，工作副本会保持原位。`,
   } as const;
 }

@@ -30,7 +30,7 @@ it("only activates the favicon resource after removing a custom icon", async () 
   const project: ProjectFaviconProject = {
     environmentId: EnvironmentId.make("test"),
     workspaceRoot: "/project",
-    title: "Project",
+    title: "项目",
     faviconPath: "icon.png",
     projectIcon: { kind: "monogram", text: "PR", color: "blue" },
   };

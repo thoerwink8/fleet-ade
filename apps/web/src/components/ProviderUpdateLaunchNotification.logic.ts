@@ -83,7 +83,7 @@ function getProviderUpdatedTitle(
 ): string {
   const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
   const version = provider.installedVersion ?? provider.version;
-  return version ? `${providerName} updated: ${formatVersion(version)}` : `${providerName} updated`;
+  return version ? `${providerName} 已更新：${formatVersion(version)}` : `${providerName} 已更新`;
 }
 
 // Only OpenCode reports an installed CLI apart from a running external server.
@@ -99,9 +99,7 @@ export function getProviderRestartNotice(
 }
 
 function getProviderUpdatedDescription(providerCount: number): string {
-  return providerCount === 1
-    ? "New sessions will use the updated provider."
-    : "New sessions will use the updated providers.";
+  return providerCount === 1 ? "新会话将使用更新后的提供方。" : "新会话将使用更新后的提供方。";
 }
 
 function getProviderFailedUpdateTitle(
@@ -111,7 +109,7 @@ function getProviderFailedUpdateTitle(
   const attemptedVersion = provider.versionAdvisory?.latestVersion;
   return attemptedVersion
     ? `${providerName} ${formatVersion(attemptedVersion)} update failed`
-    : `${providerName} update failed`;
+    : `${providerName} 更新失败`;
 }
 
 export function isProviderUpdateCandidate(
@@ -222,7 +220,7 @@ export function getProviderUpdateRunOutcome(
     const error = squashAtomCommandFailure(run.result);
     return {
       status: "failed",
-      line: `${label}: ${error instanceof Error ? error.message : "Provider update failed."}`,
+      line: `${label}: ${error instanceof Error ? error.message : "提供方更新失败。"}`,
     };
   }
   const provider = run.result.value.providers.find(
@@ -262,7 +260,7 @@ export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdate
   if (failureLines.length === 0) {
     return {
       type: "success",
-      title: settled.length === 1 ? "Provider updated" : `${settled.length} providers updated`,
+      title: settled.length === 1 ? "提供方已更新" : `已更新 ${settled.length} 个提供方`,
       description: successMessages.join("\n") || getProviderUpdatedDescription(settled.length),
     };
   }
@@ -270,10 +268,10 @@ export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdate
     type: "error",
     title:
       failureLines.length < settled.length
-        ? `${failureLines.length} of ${settled.length} provider updates failed`
+        ? `${failureLines.length} 个提供方中有 ${settled.length} 个更新失败`
         : settled.length === 1
-          ? "Provider update failed"
-          : "Provider updates failed",
+          ? "提供方更新失败"
+          : "提供方更新失败",
     description: [...failureLines, ...successMessages].join("\n"),
   };
 }
@@ -339,12 +337,12 @@ export function getProviderUpdateSidebarPillView(
       tone: "loading",
       title:
         activeProviders.length === 1
-          ? `Updating ${activeProviderName}`
-          : `Updating ${activeProviders.length} providers`,
+          ? `正在更新 ${activeProviderName}`
+          : `正在更新 ${activeProviders.length} 个提供方`,
       description:
         activeProviders.length === 1
           ? `${formatProviderList(activeProviders)} update in progress.`
-          : `${formatProviderList(activeProviders)} updates are in progress.`,
+          : `${formatProviderList(activeProviders)} 正在更新。`,
     };
   }
 
@@ -420,7 +418,7 @@ export function getProviderUpdateSidebarPillView(
       title:
         succeededProviders.length === 1
           ? getProviderUpdatedTitle(succeededProvider)
-          : `${succeededProviders.length} providers updated`,
+          : `已更新 ${succeededProviders.length} 个提供方`,
       description:
         [...new Set(succeededProviders.map(getProviderRestartNotice).filter(Boolean))].join("\n") ||
         getProviderUpdatedDescription(succeededProviders.length),

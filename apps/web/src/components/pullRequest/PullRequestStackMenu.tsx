@@ -99,7 +99,7 @@ export function PullRequestStackMenu({
     setConfirmation(null);
     const toastId = toastManager.add({
       type: "loading",
-      title: action === "merge" ? "Merging stack..." : "Rebasing stack...",
+      title: action === "merge" ? "正在合并堆叠…" : "正在对堆叠变基…",
     });
     const result = await runAction({
       environmentId,
@@ -117,22 +117,20 @@ export function PullRequestStackMenu({
     if (result._tag === "Failure") {
       toastManager.update(toastId, {
         type: "error",
-        title: action === "merge" ? "Could not merge the stack" : "Could not rebase the stack",
+        title: action === "merge" ? "无法合并堆叠" : "无法对堆叠变基",
         description: readableFailure(
           squashAtomCommandFailure(result),
           action === "merge"
-            ? "The host refused the merge. Check that you have write access, that the checks it requires have passed, and that the branch is not conflicting."
-            : "The host refused the rebase. A rebase stops at the first commit that does not apply cleanly.",
+            ? "托管平台拒绝了合并。请确认你有写入权限、其要求的检查已通过，且分支没有冲突。"
+            : "托管平台拒绝了变基。变基在应用提交时遇到冲突就会停止。",
         ),
       });
     } else {
       toastManager.update(toastId, {
         type: "success",
-        title: action === "merge" ? "Stack merge request completed" : "Stack rebased",
+        title: action === "merge" ? "堆叠合并请求已完成" : "堆叠已变基",
         description:
-          action === "merge"
-            ? `${hostLabel} merged the stack or added it to its merge queue.`
-            : undefined,
+          action === "merge" ? `${hostLabel} 已合并该堆叠，或已将其加入合并队列。` : undefined,
       });
     }
   };
@@ -148,7 +146,7 @@ export function PullRequestStackMenu({
                   <Button
                     variant="ghost"
                     size="xs"
-                    aria-label={`Stack ${stack.number}, layer ${position} of ${stack.layers.length}`}
+                    aria-label={`堆叠 ${stack.number}，第 ${position} 层，共 ${stack.layers.length} 层`}
                   />
                 }
               >
@@ -166,7 +164,7 @@ export function PullRequestStackMenu({
         <MenuPopup align="start">
           <MenuGroup>
             <PullRequestStackHeader number={stack.number} notice={notice} stale={!!onRetry} />
-            {onRetry ? <MenuItem onClick={onRetry}>Retry stack refresh</MenuItem> : null}
+            {onRetry ? <MenuItem onClick={onRetry}>重试刷新堆叠</MenuItem> : null}
             <PullRequestStackLayers
               stack={stack}
               reference={reference}
@@ -196,12 +194,12 @@ export function PullRequestStackMenu({
                   onClick={() => setConfirmation("update-branch")}
                 >
                   <RefreshCwIcon aria-hidden />
-                  Rebase stack
+                  对堆叠变基
                 </MenuItem>
               ) : null}
               {mergeHasClosed || mergeLayers.some((layer) => layer.isDraft) ? (
                 <p className="px-2 py-1 text-xs text-muted-foreground">
-                  Every layer being merged must be open and ready for review.
+                  要合并的每一层都必须是打开的，且已准备好接受审查。
                 </p>
               ) : null}
             </>
@@ -222,7 +220,7 @@ export function PullRequestStackMenu({
                   onClick={mergeDisabled ? undefined : () => setConfirmation("merge")}
                 >
                   <PullRequestGlyph.merged aria-hidden className="size-3.5" />
-                  Merge stack
+                  合并堆叠
                 </Button>
               </span>
             }
@@ -230,7 +228,7 @@ export function PullRequestStackMenu({
           <TooltipPopup>
             {stale
               ? notice
-              : `Merge stack through #${reference.number} into ${stack.base} (${mergeLayers.length} ${mergeLayers.length === 1 ? terminology.singular : terminology.plural})`}
+              : `将堆叠经由 #${reference.number} 合并到 ${stack.base}（${mergeLayers.length} 个 ${mergeLayers.length === 1 ? terminology.singular : terminology.plural}）`}
           </TooltipPopup>
         </Tooltip>
       ) : null}
@@ -244,13 +242,13 @@ export function PullRequestStackMenu({
           <DialogHeader>
             <DialogTitle>
               {confirmation === "merge"
-                ? `Merge ${mergeLayers.length} ${mergeLayers.length === 1 ? terminology.singular : terminology.plural}?`
-                : `Rebase ${unmerged.length} ${unmerged.length === 1 ? terminology.singular : terminology.plural}?`}
+                ? `合并 ${mergeLayers.length} 个 ${mergeLayers.length === 1 ? terminology.singular : terminology.plural}？`
+                : `变基 ${unmerged.length} 个 ${unmerged.length === 1 ? terminology.singular : terminology.plural}？`}
             </DialogTitle>
             <DialogDescription>
               {confirmation === "merge"
-                ? `Merge #${reference.number} and its unmerged layers below into ${stack.base} using ${mergeMethod}. ${hostLabel} checks their rules before merging or queueing them and rebases the remaining stack after merging.`
-                : `Rebase the remote branches from bottom to top onto ${stack.base}. This rewrites branch history and may restart checks. If a layer fails, earlier updates remain.`}
+                ? `使用${reference.number}将 #${stack.base} 及其下方未合并的各层合并到 ${mergeMethod}。${hostLabel} 会在合并或排队前检查它们的规则，并在合并后对剩余堆叠执行变基。`
+                : `将远端分支自下而上变基到 ${stack.base}。这会重写分支历史，并可能重新运行检查。如果某一层失败，之前的更新会保留。`}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -267,10 +265,10 @@ export function PullRequestStackMenu({
           </DialogPanel>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmation(null)}>
-              Cancel
+              取消
             </Button>
             <Button onClick={() => void run()}>
-              {confirmation === "merge" ? "Merge stack" : "Rebase stack"}
+              {confirmation === "merge" ? "合并堆叠" : "对堆叠变基"}
             </Button>
           </DialogFooter>
         </DialogPopup>

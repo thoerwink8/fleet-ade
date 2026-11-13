@@ -152,18 +152,18 @@ function CloudSpeechLogo({ provider }: { provider: CloudSpeechProvider }) {
 }
 const formatSize = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 const SHORTCUT_MODES: Record<VoiceShortcutMode, { label: string; hint: string }> = {
-  auto: { label: "Auto", hint: "Tap to toggle, hold to talk" },
-  hold: { label: "Hold", hint: "Record while held" },
-  toggle: { label: "Toggle", hint: "Tap to start, tap to stop" },
+  auto: { label: "自动", hint: "点按切换，按住说话" },
+  hold: { label: "长按", hint: "按住期间录音" },
+  toggle: { label: "开关", hint: "点按开始，再点按停止" },
 };
 const UNLOAD_LABELS: Record<SpeechModelUnloadTimeout, string> = {
   never: "Never",
   immediately: "Immediately",
-  min_2: "After 2 minutes",
-  min_5: "After 5 minutes",
-  min_10: "After 10 minutes",
-  min_15: "After 15 minutes",
-  hour_1: "After 1 hour",
+  min_2: "2 分钟后",
+  min_5: "5 分钟后",
+  min_10: "10 分钟后",
+  min_15: "15 分钟后",
+  hour_1: "1 小时后",
 };
 const normalizeTerm = (value: string) => value.replace(/\s+/g, " ").trim().normalize("NFC");
 const spellingsOf = (words: SpeechCustomWords) =>
@@ -220,22 +220,22 @@ function ModelCard(props: ModelCardProps) {
             {model.recommended ? (
               <ModelBadge
                 icon={<StarIcon className="mr-1 size-3" />}
-                label="Recommended"
-                tooltip="A good default pick for the languages it covers."
+                label="推荐"
+                tooltip="转写其支持的语言时，推荐优先选用此模型。"
               />
             ) : null}
             {model.supportsStreaming ? (
               <ModelBadge
                 icon={<AudioLinesIcon className="mr-1 size-3" />}
-                label="Live preview"
-                tooltip="Shows words in your draft as you speak, before the recording finishes."
+                label="实时预览"
+                tooltip="说话时就会在草稿中显示文字，无需等到录音结束。"
               />
             ) : null}
             {model.supportsTranslation ? (
               <ModelBadge
                 icon={<LanguagesIcon className="mr-1 size-3" />}
-                label="Translate"
-                tooltip="Can write English text from speech in another language. Turn on Translate to English to use it."
+                label="翻译"
+                tooltip="可将其他语言的语音转为英文。开启“翻译为英文”即可使用。"
               />
             ) : null}
           </div>
@@ -255,7 +255,7 @@ function ModelCard(props: ModelCardProps) {
             tier={props.benchmarkTier}
             facts={[
               ...(model.languages.length > 1
-                ? [`${model.languages.length} languages`]
+                ? [`${model.languages.length} 种语言`]
                 : model.benchmark
                   ? []
                   : [languageLabel(model.languages[0] ?? "")]),
@@ -266,7 +266,7 @@ function ModelCard(props: ModelCardProps) {
             <div className="mt-2">
               <div
                 role="progressbar"
-                aria-label={`${model.name} download progress`}
+                aria-label={`${model.name} 下载进度`}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(progress)}
@@ -279,8 +279,8 @@ function ModelCard(props: ModelCardProps) {
               </div>
               <p className="mt-1 text-2xs text-muted-foreground">
                 {model.state === "verifying"
-                  ? "Verifying download…"
-                  : `${Math.round(progress)}% downloaded`}
+                  ? "正在校验下载内容…"
+                  : `已下载 ${Math.round(progress)}%`}
               </p>
             </div>
           ) : null}
@@ -291,7 +291,7 @@ function ModelCard(props: ModelCardProps) {
             <Button
               size="icon-sm"
               variant="outline"
-              aria-label={`Cancel ${model.name} download`}
+              aria-label={`取消下载 ${model.name}`}
               disabled={!props.canCancel}
               onClick={props.onCancel}
             >
@@ -300,16 +300,16 @@ function ModelCard(props: ModelCardProps) {
           ) : model.state === "downloadable" ? (
             <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onDownload}>
               <DownloadIcon />
-              Download
+              下载
             </Button>
           ) : model.active ? (
             <Button size="sm" variant="secondary" disabled>
               <CheckIcon />
-              Selected
+              已选择
             </Button>
           ) : (
             <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onSelect}>
-              Use model
+              使用模型
             </Button>
           )}
           {model.state === "installed" ? (
@@ -319,8 +319,8 @@ function ModelCard(props: ModelCardProps) {
               disabled={props.busy}
               aria-label={
                 model.linkedFrom
-                  ? `Stop using your ${model.name} file; the file stays on disk`
-                  : `Delete ${model.name}`
+                  ? `停止使用你的 ${model.name} 文件；文件仍保留在磁盘上`
+                  : `删除 ${model.name}`
               }
               onClick={props.onDelete}
             >
@@ -387,8 +387,8 @@ function DictionaryEditor(props: {
             rows={1}
             maxLength={5_100}
             disabled={disabled}
-            placeholder="Add words, separated by commas"
-            aria-label={`Add a word or phrase to the ${label}`}
+            placeholder="添加词语，用逗号分隔"
+            aria-label={`向 ${label} 添加词语或短语`}
             onChange={(event) => setTermDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -400,12 +400,12 @@ function DictionaryEditor(props: {
         </div>
         <Button type="button" variant="outline" disabled={!canAddTerm} onClick={addTerm}>
           <PlusIcon />
-          Add
+          添加
         </Button>
       </div>
       {words.length > 0 ? (
         <ul
-          aria-label={`${label} entries`}
+          aria-label={`${label} 条目`}
           className="mt-2.5 flex flex-col gap-1.5 @min-[32rem]/settings-row:flex-row @min-[32rem]/settings-row:flex-wrap"
         >
           {words.map(({ term, aliases }) => (
@@ -422,8 +422,8 @@ function DictionaryEditor(props: {
                   autoFocus
                   value={aliasDraft.value}
                   maxLength={50}
-                  aria-label={`Alias for ${term}`}
-                  placeholder="Misspelling"
+                  aria-label={`${term} 的别名`}
+                  placeholder="错误拼写"
                   className="ms-auto w-32"
                   onChange={(event) => setAliasDraft({ term, value: event.target.value })}
                   onBlur={() => setAliasDraft(null)}
@@ -442,10 +442,10 @@ function DictionaryEditor(props: {
                   variant="ghost-muted"
                   className="ms-auto"
                   disabled={disabled || aliases.length >= 8}
-                  aria-label={`Add an alias for ${term}`}
+                  aria-label={`为 ${term} 添加别名`}
                   onClick={() => setAliasDraft({ term, value: "" })}
                 >
-                  Alias
+                  别名
                 </Button>
               )}
               <Button
@@ -453,7 +453,7 @@ function DictionaryEditor(props: {
                 size="icon-xs"
                 variant="ghost-muted"
                 disabled={disabled}
-                aria-label={`Remove ${term}`}
+                aria-label={`移除 ${term}`}
                 onClick={() => onChange(words.filter((entry) => entry.term !== term))}
               >
                 <XIcon />
@@ -478,7 +478,7 @@ function ProjectDictionaryRow() {
       serverScoped
       settingKeys={["speechProjectCustomWords"]}
       {...searchableSetting("speech-project-dictionary")}
-      title={isProjectScope ? "Project dictionary" : "Shared dictionary"}
+      title={isProjectScope ? "项目词典" : "共享词典"}
       description={
         isProjectScope
           ? `Used by everyone who dictates in ${scope.scope.label}.`
@@ -487,7 +487,7 @@ function ProjectDictionaryRow() {
     >
       <div className="mt-3 pb-2">
         <DictionaryEditor
-          label={isProjectScope ? "project dictionary" : "shared dictionary"}
+          label={isProjectScope ? "项目词典" : "共享词典"}
           words={words}
           disabled={scope.connectedEnvironments.length === 0}
           onChange={(next) => updateScopedSettings({ speechProjectCustomWords: next })}
@@ -542,7 +542,7 @@ function CleanupModelRow() {
   const setModel = (next: ReturnType<typeof createModelSelection>) => {
     const reason = modelDisabledReason(next.instanceId, next.model);
     if (reason) {
-      toastManager.add({ type: "error", title: "Cleanup model not saved", description: reason });
+      toastManager.add({ type: "error", title: "未保存文本整理模型", description: reason });
       return;
     }
     updateSettings({ speechPostProcessingModelSelection: next });
@@ -552,17 +552,15 @@ function CleanupModelRow() {
       serverScoped
       settingKeys={["speechPostProcessingModelSelection"]}
       {...searchableSetting("speech-post-processing-model")}
-      title="Cleanup model"
-      description="Model for transcript cleanup, such as a cheaper or faster one. When disabled, use the text generation model configured for this environment."
+      title="文本整理模型"
+      description="整理转写文本所用的模型，例如更便宜或更快的模型。关闭时使用此环境配置的文本生成模型。"
       control={
         connectedEnvironments.length === 0 ? (
-          <span className="text-sm text-muted-foreground">Connect an environment first.</span>
+          <span className="text-sm text-muted-foreground">请先连接一个环境。</span>
         ) : (
           <div className="flex min-w-0 flex-wrap items-center gap-2 @min-[32rem]/settings-row:justify-end">
             {dedicated && (!hasProvider || !instanceEntry) ? (
-              <span className="text-sm text-muted-foreground">
-                No text generation providers available.
-              </span>
+              <span className="text-sm text-muted-foreground">没有可用的文本生成提供方。</span>
             ) : null}
             {dedicated && hasProvider && instanceEntry ? (
               <>
@@ -606,7 +604,7 @@ function CleanupModelRow() {
                     : null,
                 })
               }
-              aria-label="Use a separate cleanup model"
+              aria-label="使用单独的文本整理模型"
             />
           </div>
         )
@@ -655,7 +653,7 @@ function useVoiceModels(prepared: PreparedConnection | null) {
         if (current !== epoch.current || revision !== refreshRevision.current) return;
         toastManager.add({
           type: "error",
-          title: "Could not load transcription models",
+          title: "无法加载转写模型",
           description: error instanceof Error ? error.message : String(error),
         });
       }
@@ -735,34 +733,34 @@ function AdvancedSpeechSettings({
     <AdvancedSettings targetIds={[searchableSetting("speech-hardware").id]}>
       <SettingsRow
         {...searchableSetting("speech-hardware")}
-        title="Hardware"
-        description="Auto uses the environment’s GPU when it has one."
+        title="硬件"
+        description="选择“自动”时，环境有 GPU 就会使用 GPU。"
         control={
           <Select
             value={supported.acceleration}
             disabled={controlsDisabled}
             onValueChange={(value) => {
               if (value)
-                void run("Could not change transcription hardware", () =>
+                void run("无法更改转写硬件", () =>
                   runEnvironmentSpeech(
                     updateEnvironmentSpeechAcceleration(prepared, value as SpeechAcceleration),
                   ),
                 );
             }}
           >
-            <SelectTrigger size="sm" aria-label="Transcription hardware" className="max-w-72">
+            <SelectTrigger size="sm" aria-label="转写硬件" className="max-w-72">
               <SelectValue>
                 {supported.acceleration === "auto"
-                  ? "Auto"
+                  ? "自动"
                   : supported.acceleration === "cpu"
                     ? "CPU"
                     : (supported.gpuDevices.find(
                         (device) => `gpu:${device.id}` === supported.acceleration,
-                      )?.name ?? "Selected GPU")}
+                      )?.name ?? "已选择的 GPU")}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
-              <SelectItem value="auto">Auto</SelectItem>
+              <SelectItem value="auto">自动</SelectItem>
               <SelectItem value="cpu">CPU</SelectItem>
               {supported.gpuDevices.map((device) => (
                 <SelectItem key={device.id} value={`gpu:${device.id}`}>
@@ -774,15 +772,15 @@ function AdvancedSpeechSettings({
         }
       />
       <SettingsRow
-        title="Unload model"
-        description="Release the model’s memory on the environment after it sits idle."
+        title="从内存卸载模型"
+        description="模型闲置达到指定时长后，释放它在环境中占用的内存。"
         control={
           <Select
             value={supported.modelUnloadTimeout}
             disabled={controlsDisabled}
             onValueChange={(value) => {
               if (value)
-                void run("Could not change when the model unloads", () =>
+                void run("无法更改模型从内存卸载的时机", () =>
                   runEnvironmentSpeech(
                     updateEnvironmentSpeechModelUnloadTimeout(
                       prepared,
@@ -792,7 +790,7 @@ function AdvancedSpeechSettings({
                 );
             }}
           >
-            <SelectTrigger size="sm" aria-label="Unload model" className="max-w-72">
+            <SelectTrigger size="sm" aria-label="从内存卸载模型" className="max-w-72">
               <SelectValue>{UNLOAD_LABELS[supported.modelUnloadTimeout]}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -845,9 +843,7 @@ function SpeechModelBrowser(props: {
     speed: "Fastest",
   };
   const languagesLabel =
-    selectedLanguages.length === 0
-      ? "All languages"
-      : selectedLanguages.map(languageLabel).join(", ");
+    selectedLanguages.length === 0 ? "所有语言" : selectedLanguages.map(languageLabel).join(", ");
   const sortedModels = filterSpeechModels(models, {
     search,
     languages: selectedLanguages,
@@ -867,14 +863,14 @@ function SpeechModelBrowser(props: {
     return (
       <SettingsRow
         {...searchableSetting("speech-models")}
-        title="Models"
-        description={`This environment can’t transcribe audio: ${status.reason}.`}
+        title="模型"
+        description={`此环境无法转写音频：${status.reason}。`}
       />
     );
   return (
     <SettingsRow
       {...searchableSetting("speech-models")}
-      title="Models"
+      title="模型"
       description={`Grades are error rates and speed is seconds per 30 s of audio, from Handy’s benchmark ${status.benchmarkTier === "cpu" ? "CPU" : "GPU"}.`}
       className="@container/voice-models"
     >
@@ -885,8 +881,8 @@ function SpeechModelBrowser(props: {
           </InputGroupAddon>
           <InputGroupInput
             type="search"
-            aria-label="Search transcription models"
-            placeholder="Search models"
+            aria-label="搜索转写模型"
+            placeholder="搜索模型"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -904,22 +900,18 @@ function SpeechModelBrowser(props: {
           <MenuPopup align="end">
             <MenuSearchInput
               autoFocus
-              aria-label="Search languages"
-              placeholder="Search languages"
+              aria-label="搜索语言"
+              placeholder="搜索语言"
               value={languageSearch}
               onChange={(e) => setLanguageSearch(e.target.value)}
             />
-            <div
-              role="group"
-              aria-label="Browse models by language"
-              className="max-h-72 overflow-y-auto"
-            >
+            <div role="group" aria-label="按语言浏览模型" className="max-h-72 overflow-y-auto">
               {needle ? null : (
                 <MenuCheckboxItem
                   checked={selectedLanguages.length === 0}
                   onCheckedChange={() => setSelection([])}
                 >
-                  All languages
+                  所有语言
                 </MenuCheckboxItem>
               )}
               {visibleLanguages.map((code) => (
@@ -938,7 +930,7 @@ function SpeechModelBrowser(props: {
                 </MenuCheckboxItem>
               ))}
               {visibleLanguages.length === 0 && (
-                <p className="px-2 py-1.5 text-sm text-muted-foreground">No languages match.</p>
+                <p className="px-2 py-1.5 text-sm text-muted-foreground">没有匹配的语言。</p>
               )}
             </div>
           </MenuPopup>
@@ -953,7 +945,7 @@ function SpeechModelBrowser(props: {
           </MenuTrigger>
           <MenuPopup align="end">
             <MenuGroup>
-              <MenuGroupLabel>Sort by</MenuGroupLabel>
+              <MenuGroupLabel>排序方式</MenuGroupLabel>
               <MenuRadioGroup
                 value={sort}
                 onValueChange={(value) => setSort(value as SpeechModelSort)}
@@ -972,7 +964,7 @@ function SpeechModelBrowser(props: {
             </MenuGroup>
             <MenuSeparator />
             <MenuCheckboxItem checked={downloadedOnly} onCheckedChange={setDownloadedOnly}>
-              Downloaded only
+              仅已下载
             </MenuCheckboxItem>
           </MenuPopup>
         </Menu>
@@ -980,11 +972,11 @@ function SpeechModelBrowser(props: {
       <div
         className="mt-2 mb-2 max-h-96 divide-y divide-border/60 overflow-y-auto rounded-lg border border-border/60"
         role="region"
-        aria-label="Transcription models"
+        aria-label="转写模型"
         tabIndex={0}
       >
         {sortedModels.length === 0 && (
-          <p className="px-3 py-3 text-sm text-muted-foreground">No models match.</p>
+          <p className="px-3 py-3 text-sm text-muted-foreground">没有匹配的模型。</p>
         )}
         {renderedModels.map((model) => {
           const card: ModelCardProps = {
@@ -998,20 +990,20 @@ function SpeechModelBrowser(props: {
             benchmarkTier: status.benchmarkTier,
             onDownload: () =>
               void run(
-                "Could not download the model",
+                "无法下载模型",
                 () => runEnvironmentSpeech(downloadEnvironmentSpeechModel(prepared, model.id)),
                 model.id,
               ),
             onSelect: () =>
-              void run("Could not select the model", () =>
+              void run("无法选择模型", () =>
                 runEnvironmentSpeech(selectEnvironmentSpeechModel(prepared, model.id)),
               ),
             onCancel: () =>
-              void run("Could not cancel the download", () =>
+              void run("无法取消下载", () =>
                 runEnvironmentSpeech(cancelEnvironmentSpeechModelDownload(prepared, model.id)),
               ),
             onDelete: () =>
-              void run("Could not delete the model", () =>
+              void run("无法删除模型", () =>
                 runEnvironmentSpeech(removeEnvironmentSpeechModel(prepared, model.id)),
               ),
           };
@@ -1034,7 +1026,7 @@ function SpeechModelBrowser(props: {
           className="mb-2 flex flex-col items-start gap-2 @min-[28rem]/voice-models:flex-row @min-[28rem]/voice-models:items-center"
           onSubmit={(event) => {
             event.preventDefault();
-            void run("Could not use a model from that path", async () => {
+            void run("无法使用该路径下的模型", async () => {
               await runEnvironmentSpeech(linkEnvironmentSpeechModels(prepared, existingPath));
               setExistingPath("");
             });
@@ -1043,8 +1035,8 @@ function SpeechModelBrowser(props: {
           <div className="w-full min-w-0 flex-1">
             <Input
               size="compact"
-              aria-label="Path to a model file or folder already on this environment"
-              placeholder="Already downloaded elsewhere? Paste the model file or folder path"
+              aria-label="此环境上已有的模型文件或文件夹路径"
+              placeholder="已在别处下载过？粘贴模型文件或文件夹路径"
               value={existingPath}
               onChange={(e) => setExistingPath(e.target.value)}
             />
@@ -1055,7 +1047,7 @@ function SpeechModelBrowser(props: {
             variant="outline"
             disabled={controlsDisabled || !existingPath.trim()}
           >
-            Use existing
+            使用已有
           </Button>
         </form>
       ) : null}
@@ -1117,14 +1109,12 @@ function TranscriptionTest(props: {
                   }}
                 >
                   <MicIcon />
-                  Test model
+                  测试模型
                 </Button>
               ) : null
             ) : (
               <span className="text-xs text-muted-foreground">
-                {speech.status?.supported === false
-                  ? speech.status.reason
-                  : "Waiting for the environment to connect"}
+                {speech.status?.supported === false ? speech.status.reason : "正在等待环境连接"}
               </span>
             )}
           </div>
@@ -1141,7 +1131,7 @@ function TranscriptionTest(props: {
               {speech.preview || transcript !== null ? (
                 <p
                   role="status"
-                  aria-label="Test transcript"
+                  aria-label="测试转写文本"
                   className="select-text whitespace-pre-wrap break-words text-sm leading-relaxed"
                 >
                   {speech.preview ? (
@@ -1150,7 +1140,7 @@ function TranscriptionTest(props: {
                       <span className="text-muted-foreground">{speech.preview.tentative}</span>
                     </>
                   ) : (
-                    transcript || "No speech recognized. Try again."
+                    transcript || "未识别到语音，请重试。"
                   )}
                 </p>
               ) : null}
@@ -1158,7 +1148,7 @@ function TranscriptionTest(props: {
             <Button
               size="icon-sm"
               variant="ghost-muted"
-              aria-label="Close model test"
+              aria-label="关闭模型测试"
               onClick={() => {
                 speech.cancel();
                 setShowTranscript(false);
@@ -1258,8 +1248,7 @@ export function VoiceSettingsPanel() {
     (env) => env.environmentId === pendingCloud?.environmentId,
   );
   // OpenRouter users without settings access still manage their own model choice.
-  const manageLabel =
-    destination.cloudProvider === "openrouter" ? "Manage OpenRouter" : "Manage key";
+  const manageLabel = destination.cloudProvider === "openrouter" ? "管理 OpenRouter" : "管理密钥";
   const chosenEnvironment = environments.find(
     (environment) => environment.environmentId === destination.environmentId,
   );
@@ -1289,8 +1278,8 @@ export function VoiceSettingsPanel() {
       <SettingsSection id="voice-input" title="Input">
         <SettingsRow
           {...searchableSetting("voice-microphone")}
-          title="Microphone"
-          description="Voice input uses the first connected microphone in this list."
+          title="麦克风"
+          description="语音输入使用此列表中第一个已连接的麦克风。"
           control={
             <Tooltip>
               <TooltipTrigger
@@ -1299,14 +1288,14 @@ export function VoiceSettingsPanel() {
                     type="button"
                     variant="outline"
                     size="icon-sm"
-                    aria-label="Refresh microphones"
+                    aria-label="刷新麦克风"
                     onClick={() => void refreshMicrophones()}
                   >
                     <RefreshCwIcon />
                   </Button>
                 }
               />
-              <TooltipPopup>Refresh microphones</TooltipPopup>
+              <TooltipPopup>刷新麦克风</TooltipPopup>
             </Tooltip>
           }
         >
@@ -1321,7 +1310,7 @@ export function VoiceSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("dictation-shortcut-mode")}
-          title="Dictation shortcut"
+          title="听写快捷键"
           description={`${SHORTCUT_MODES[settings.voiceShortcutMode].hint}.`}
           control={
             <Select
@@ -1331,7 +1320,7 @@ export function VoiceSettingsPanel() {
                   void updateClientSettings({ voiceShortcutMode: value as VoiceShortcutMode });
               }}
             >
-              <SelectTrigger size="sm" aria-label="Dictation shortcut mode">
+              <SelectTrigger size="sm" aria-label="听写快捷键模式">
                 <SelectValue>{SHORTCUT_MODES[settings.voiceShortcutMode].label}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -1351,10 +1340,10 @@ export function VoiceSettingsPanel() {
         />
       </SettingsSection>
 
-      <SettingsSection id="voice-transcription" title="Transcription">
+      <SettingsSection id="voice-transcription" title="转写">
         <SettingsRow
           {...searchableSetting("voice-transcription-destination")}
-          title="Transcribe with"
+          title="转写方式"
           description={
             destination.environmentId && chosenUnsupported
               ? `${chosenEnvironment.label} can’t transcribe audio locally. Choose another destination.`
@@ -1386,7 +1375,7 @@ export function VoiceSettingsPanel() {
               >
                 <SelectTrigger
                   size="sm"
-                  aria-label="Transcribe with"
+                  aria-label="转写方式"
                   className="min-w-0 @min-[32rem]/settings-row:w-auto @min-[32rem]/settings-row:max-w-72"
                 >
                   <SelectValue>
@@ -1402,12 +1391,12 @@ export function VoiceSettingsPanel() {
                         {destination.cloudProvider
                           ? CLOUD_SPEECH_LABELS[destination.cloudProvider]
                           : destination.environmentId
-                            ? (chosenEnvironment?.label ?? "Chosen environment (unavailable)")
-                            : "Off"}
+                            ? (chosenEnvironment?.label ?? "已选择的环境（不可用）")
+                            : "关闭"}
                         {destination.cloudProvider && (
                           <span className="text-muted-foreground">
                             {" via "}
-                            {chosenEnvironment?.label ?? "unavailable environment"}
+                            {chosenEnvironment?.label ?? "环境不可用"}
                           </span>
                         )}
                       </span>
@@ -1418,12 +1407,12 @@ export function VoiceSettingsPanel() {
                   <SelectItem value={OFF}>
                     <span className="flex items-center gap-2">
                       <MicOffIcon aria-hidden className="size-4" />
-                      Off
+                      关闭
                     </span>
                   </SelectItem>
                   {environmentChoices.length > 0 && (
                     <SelectGroup>
-                      <SelectGroupLabel>On an environment</SelectGroupLabel>
+                      <SelectGroupLabel>在环境中</SelectGroupLabel>
                       {environmentChoices.map(({ environment, value }) => (
                         <SelectItem key={value} value={value}>
                           <span className="flex items-center gap-2">
@@ -1441,7 +1430,7 @@ export function VoiceSettingsPanel() {
                         <SelectItem
                           key={value}
                           value={value}
-                          aria-label={`${CLOUD_SPEECH_LABELS[provider]} via ${environment.label}`}
+                          aria-label={`${CLOUD_SPEECH_LABELS[provider]}（经由 ${environment.label}）`}
                         >
                           <span className="flex items-center gap-2">
                             <CloudSpeechLogo provider={provider} />
@@ -1455,9 +1444,7 @@ export function VoiceSettingsPanel() {
                   (!chosenEnvironment ||
                     (destination.cloudProvider &&
                       !cloudChoices.some((option) => option.value === destinationValue))) ? (
-                    <SelectItem value={destinationValue}>
-                      Chosen environment (unavailable)
-                    </SelectItem>
+                    <SelectItem value={destinationValue}>已选择的环境（不可用）</SelectItem>
                   ) : null}
                 </SelectPopup>
               </Select>
@@ -1505,13 +1492,13 @@ export function VoiceSettingsPanel() {
         {(model || destination.cloudProvider) && (
           <SettingsRow
             {...searchableSetting("speech-language")}
-            title="Language"
+            title="语言"
             description={
               destination.cloudProvider
                 ? "The provider detects your language automatically."
                 : model?.supportsLanguageDetection
-                  ? `${model.model} detects the language automatically.`
-                  : `${model?.model ?? "This model"} uses one fixed language.`
+                  ? `${model.model} 会自动检测语言。`
+                  : `${model?.model ?? "This model"} 使用固定语言。`
             }
             control={
               <SpeechLanguageSelect
@@ -1522,11 +1509,11 @@ export function VoiceSettingsPanel() {
         )}
         {model?.supportsTranslation ? (
           <SettingsRow
-            title="Translate to English"
-            description="Speak any language and get English text."
+            title="翻译为英文"
+            description="用任意语言说话，生成英文文本。"
             control={
               <Switch
-                aria-label="Translate to English"
+                aria-label="翻译为英文"
                 checked={settings.speechTranslateToEnglish}
                 onCheckedChange={(checked) =>
                   void updateClientSettings({ speechTranslateToEnglish: checked })
@@ -1537,7 +1524,7 @@ export function VoiceSettingsPanel() {
         ) : null}
         <SettingsRow
           {...searchableSetting("speech-silence-filtering")}
-          title="Silence filtering"
+          title="静音过滤"
           description={
             destination.cloudProvider === "openai"
               ? "OpenAI handles silence itself."
@@ -1545,7 +1532,7 @@ export function VoiceSettingsPanel() {
           }
           control={
             <Switch
-              aria-label="Silence filtering"
+              aria-label="静音过滤"
               disabled={destination.cloudProvider === "openai"}
               checked={settings.speechSilenceFiltering}
               onCheckedChange={(checked) =>
@@ -1556,11 +1543,11 @@ export function VoiceSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("remove-filler-words")}
-          title="Remove filler words"
-          description="Drop “um” and “uh” from transcripts."
+          title="移除语气词"
+          description="从转写中去掉“嗯”、“啊”这类填充词。"
           control={
             <Switch
-              aria-label="Remove filler words"
+              aria-label="移除语气词"
               checked={settings.speechRemoveFillerWords}
               onCheckedChange={(checked) =>
                 void updateClientSettings({ speechRemoveFillerWords: checked })
@@ -1583,15 +1570,15 @@ export function VoiceSettingsPanel() {
         {prepared && <AdvancedSpeechSettings prepared={prepared} catalog={catalog} />}
       </SettingsSection>
 
-      <SettingsSection id="voice-dictionary" title="Dictionary">
+      <SettingsSection id="voice-dictionary" title="词典">
         <SettingsRow
           {...searchableSetting("speech-dictionary")}
-          title="Your dictionary"
-          description="Names and terms to spell your way, saved on this device."
+          title="你的词表"
+          description="按你的写法记录的名称和术语，保存在这台设备上。"
         >
           <div className="mt-3 pb-2">
             <DictionaryEditor
-              label="dictionary"
+              label="词典"
               words={settings.speechCustomWords}
               onChange={(words) => void updateClientSettings({ speechCustomWords: words })}
             />
@@ -1602,11 +1589,11 @@ export function VoiceSettingsPanel() {
 
       <SettingsSection id={searchableSetting("speech-post-processing").id} title="Cleanup">
         <SettingsRow
-          title="Clean up transcripts"
-          description="Off by default. Sends the transcript and nearby draft text, never audio, to the cleanup model."
+          title="整理转写文本"
+          description="默认关闭。只把转写文本和附近的草稿发给整理模型，不发送音频。"
           control={
             <Switch
-              aria-label="Clean up transcripts"
+              aria-label="整理转写文本"
               checked={cleanupEnabled}
               onCheckedChange={chooseTranscriptCleanup}
             />
@@ -1637,13 +1624,13 @@ export function VoiceSettingsPanel() {
                     });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Cleanup instructions">
+                <SelectTrigger size="sm" aria-label="文本整理指令">
                   <SelectValue>
-                    {settings.speechPostProcessingPrompt.mode === "custom" ? "Custom" : "Built-in"}
+                    {settings.speechPostProcessingPrompt.mode === "custom" ? "Custom" : "内置"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="default">Built-in</SelectItem>
+                  <SelectItem value="default">内置</SelectItem>
                   <SelectItem value="custom">Custom</SelectItem>
                 </SelectPopup>
               </Select>
@@ -1652,7 +1639,7 @@ export function VoiceSettingsPanel() {
             {settings.speechPostProcessingPrompt.mode === "custom" ? (
               <div className="mt-3 pb-2">
                 <Textarea
-                  aria-label="Custom cleanup instructions"
+                  aria-label="自定义文本整理指令"
                   maxLength={10_000}
                   value={settings.speechPostProcessingPrompt.customInstructions}
                   onChange={(event) =>
@@ -1672,15 +1659,15 @@ export function VoiceSettingsPanel() {
         {cleanupEnabled ? (
           <SettingsRow
             {...searchableSetting("speech-correction-word")}
-            title="Correction cue"
-            description="The phrase you say to fix a mistake, like “scratch that”."
+            title="纠正提示词"
+            description="用来改正口误的那句话，例如“划掉刚才那句”。"
             control={
               <Input
                 key={settings.speechCorrectionWord}
                 defaultValue={settings.speechCorrectionWord}
                 maxLength={50}
-                placeholder="sorry"
-                aria-label="Correction cue"
+                placeholder="不对"
+                aria-label="纠正提示词"
                 className="@min-[32rem]/settings-row:w-40"
                 onBlur={(event) => {
                   const next = event.target.value.trim();

@@ -31,7 +31,7 @@ function RedactedLogin(props: {
       <span className="select-none blur-xs" aria-hidden>
         {redactedPlaceholder(props.account)}
       </span>
-      <span className="sr-only">{props.label ?? "Hidden account"}</span>
+      <span className="sr-only">{props.label ?? "已隐藏的账户"}</span>
     </span>
   );
 }
@@ -55,7 +55,7 @@ export function SourceControlAccountSettings({
   const { label } = definition;
   const { cliName } = credentials;
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: `save ${label} account settings`,
+    label: `保存 ${label} 账户设置`,
   });
   const [saving, setSaving] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -101,7 +101,7 @@ export function SourceControlAccountSettings({
           size="icon-xs"
           variant="ghost-muted"
           onClick={() => setRevealed((current) => !current)}
-          aria-label={revealed ? `Hide ${label} accounts` : `Reveal ${label} accounts`}
+          aria-label={revealed ? `隐藏 ${label} 账户` : `显示 ${label} 账户`}
           aria-pressed={revealed}
         >
           {revealed ? <EyeOffIcon /> : <EyeIcon />}
@@ -120,7 +120,7 @@ export function SourceControlAccountSettings({
                 <span className="text-xs font-medium text-foreground">{group.host}</span>
                 {group.selectable.length === 1 && group.selectable[0] !== undefined ? (
                   <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                    <span>Signed in as</span>
+                    <span>已登录账户</span>
                     <RedactedLogin revealed={revealed} account={group.selectable[0]} />
                   </p>
                 ) : null}
@@ -128,13 +128,13 @@ export function SourceControlAccountSettings({
               <Switch
                 checked={enabled}
                 disabled={saving}
-                aria-label={`Use ${label} on ${group.host}`}
+                aria-label={`在 ${label} 上使用 ${group.host}`}
                 onCheckedChange={(checked) => void save(group.host, { enabled: checked })}
               />
             </div>
             {group.selectable.length > 1 ? (
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">Account</span>
+                <span className="text-xs text-muted-foreground">账户</span>
                 <div className="w-64 max-w-full">
                   <Select
                     value={pinned}
@@ -146,12 +146,12 @@ export function SourceControlAccountSettings({
                       });
                     }}
                   >
-                    <SelectTrigger size="sm" aria-label={`${label} account for ${group.host}`}>
+                    <SelectTrigger size="sm" aria-label={`${label} 的 ${group.host} 账户`}>
                       <SelectValue>
                         {(value: string) =>
                           value === ACTIVE_ACCOUNT ? (
                             <span className="flex min-w-0 items-center gap-1">
-                              Active {cliName} account
+                              活跃 {cliName} account
                               {group.activeAccount ? (
                                 <>
                                   (
@@ -172,7 +172,7 @@ export function SourceControlAccountSettings({
                     <SelectPopup align="end" alignItemWithTrigger={false}>
                       <SelectItem value={ACTIVE_ACCOUNT}>
                         <span className="flex min-w-0 items-center gap-1">
-                          Active {cliName} account
+                          活跃 {cliName} account
                           {group.activeAccount ? (
                             <>
                               (<RedactedLogin revealed={revealed} account={group.activeAccount} />)
@@ -185,7 +185,7 @@ export function SourceControlAccountSettings({
                           <RedactedLogin
                             revealed={revealed}
                             account={account}
-                            label={`Account ${index + 1}`}
+                            label={`账户 ${index + 1}`}
                           />
                         </SelectItem>
                       ))}
@@ -205,7 +205,7 @@ export function SourceControlAccountSettings({
                   disabled={saving}
                   onClick={() => void save(group.host, { account: null })}
                 >
-                  Use active login
+                  使用当前登录账户
                 </Button>
               </div>
             ) : null}
@@ -215,9 +215,7 @@ export function SourceControlAccountSettings({
                 className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground/70"
               >
                 <RedactedLogin revealed={revealed} account={entry.account} />
-                <span>
-                  can't be used: {entry.error ?? `${cliName} reports this login as invalid.`}
-                </span>
+                <span>can't be used: {entry.error ?? `${cliName} 报告此登录账户无效。`}</span>
               </p>
             ))}
             {group.environmentVariable ? (

@@ -252,7 +252,7 @@ const ThreadReadTool = Tool.make("t3_thread_read", {
   failureMode: "return",
   dependencies,
 })
-  .annotate(Tool.Title, "Read a T3 thread")
+  .annotate(Tool.Title, "已读取 T3 会话")
   .annotate(Tool.Strict, true)
   .annotate(Tool.Readonly, false)
   .annotate(Tool.Destructive, false)

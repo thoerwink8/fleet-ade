@@ -111,7 +111,7 @@ function claudeSubscriptionLabel(subscriptionType: string | undefined): string |
   switch (normalized) {
     case "claudemaxsubscription":
     case "claudemax5xsubscription":
-      return "Max";
+      return "最大";
     case "claudemax20xsubscription":
       return "Ultra";
     case "claudeenterprisesubscription":
@@ -125,7 +125,7 @@ function claudeSubscriptionLabel(subscriptionType: string | undefined): string |
     case "max":
     case "maxplan":
     case "max5":
-      return "Max";
+      return "最大";
     case "max20":
       return "Ultra";
     case "enterprise":

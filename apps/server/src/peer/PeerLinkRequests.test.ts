@@ -720,7 +720,7 @@ it.live("stopping the thread closes its open card, which then takes no answer", 
           notification: {
             source: { kind: "background_task" },
             outcome: "cancelled",
-            summary: "Declined",
+            summary: "已拒绝",
           },
         },
       });

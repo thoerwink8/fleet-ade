@@ -38,7 +38,7 @@ export class DesktopLocalEnvironmentAuthBackendNotConfiguredError extends Schema
   {},
 ) {
   override get message(): string {
-    return "Local backend is not configured.";
+    return "尚未配置本地后端。";
   }
 }
 
@@ -47,7 +47,7 @@ export class DesktopLocalEnvironmentAuthSessionBootstrapError extends Schema.Tag
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Failed to create the local desktop bearer session.";
+    return "无法创建桌面端本地 bearer 会话。";
   }
 }
 

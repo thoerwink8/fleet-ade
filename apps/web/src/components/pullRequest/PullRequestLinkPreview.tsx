@@ -173,7 +173,7 @@ export function PullRequestLinkPreview({
                       <>
                         <span aria-hidden>·</span>
                         <span className="shrink-0">
-                          opened <RelativeTime timestamp={preview.createdAt} />
+                          创建于 <RelativeTime timestamp={preview.createdAt} />
                         </span>
                       </>
                     )}

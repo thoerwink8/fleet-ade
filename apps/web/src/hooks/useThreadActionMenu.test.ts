@@ -53,7 +53,7 @@ vi.mock("../state/entities", () => ({
     id: "thread",
     environmentId: "secondary",
     projectId: "project",
-    title: "Thread",
+    title: "会话",
     branch: "main",
     worktreePath: null,
     runtime: null,
@@ -188,7 +188,7 @@ describe("thread menu permissions", () => {
     createMenu({ onFind }).openMenu(position);
     await state.completed.promise;
     const items = state.show.mock.calls[1]![0];
-    expect(items[0]).toMatchObject({ id: "find", label: "Find in thread" });
+    expect(items[0]).toMatchObject({ id: "find", label: "在会话中查找" });
     expect(items[0]?.disabled).not.toBe(true);
     expect(state.effects).toEqual(["find"]);
     expect(onFind).toHaveBeenCalledExactlyOnceWith(target);

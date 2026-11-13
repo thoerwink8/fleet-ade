@@ -5,7 +5,7 @@ import { useNowAfter } from "./useDeadline";
 
 function Probe(props: { deadlineMs: number }) {
   const nowMs = useNowAfter(props.deadlineMs);
-  return <output>{nowMs >= props.deadlineMs ? "passed" : "pending"}</output>;
+  return <output>{nowMs >= props.deadlineMs ? "passed" : "等待中"}</output>;
 }
 
 describe("useNowAfter", () => {
@@ -17,7 +17,7 @@ describe("useNowAfter", () => {
       router: false,
     });
     await screen.rerender(<Probe deadlineMs={2_000} />);
-    await expect.element(screen.getByText("pending")).toBeInTheDocument();
+    await expect.element(screen.getByText("等待中")).toBeInTheDocument();
 
     await act(() => vi.advanceTimersByTime(2_000));
     await expect.element(screen.getByText("passed")).toBeInTheDocument();

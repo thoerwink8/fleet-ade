@@ -107,7 +107,7 @@ describe("ACP Registry probe", () => {
       configOptions: [
         {
           id: "effort",
-          label: "Effort",
+          label: "推理强度",
           type: "select",
           options: [{ id: "high", label: "High" }],
           currentValue: "high",
@@ -115,7 +115,7 @@ describe("ACP Registry probe", () => {
         },
         {
           id: "mode",
-          label: "Mode",
+          label: "模式",
           type: "select",
           options: [{ id: "ask", label: "Ask" }],
           currentValue: "ask",
@@ -259,7 +259,7 @@ describe("ACP Registry probe", () => {
     expect(result.configOptions).toEqual([
       {
         id: "reasoning",
-        label: "Reasoning",
+        label: "推理",
         type: "select",
         currentValue: "high",
         options: [
@@ -342,10 +342,10 @@ describe("ACP Registry probe", () => {
         { name: "$workspace-skill", description: "Run the workspace skill" },
         { name: "$WORKSPACE-SKILL", description: "duplicate" },
         { name: "$", description: "empty" },
-        { name: "review", description: "Review changes" },
+        { name: "review", description: "查看更改" },
       ]),
     ).toEqual({
-      slashCommands: [{ name: "review", description: "Review changes" }],
+      slashCommands: [{ name: "review", description: "查看更改" }],
       skills: [
         {
           name: "workspace-skill",

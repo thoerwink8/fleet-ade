@@ -189,7 +189,7 @@ it("app-stream-assistant-turn", async () => {
       payload: userItem(LIVE, live.id, "live-user", HISTORY_TURNS * 2, "Continue"),
     });
   });
-  await expect.element(page.getByText("Continue", { exact: true })).toBeVisible();
+  await expect.element(page.getByText("继续", { exact: true })).toBeVisible();
   const counted = await measure(async () => {
     let text = "";
     for (let delta = 0; delta < STREAM_DELTAS; delta++) {
@@ -304,7 +304,7 @@ const openSettings =
   (router: AppRouter, to: "/settings/general" | "/settings/appearance") => async () => {
     await act(() => router.navigate({ to }));
     // A section title from each page, since neither page has a heading that names it.
-    const name = to === "/settings/general" ? "Time format" : "Interface";
+    const name = to === "/settings/general" ? "时间格式" : "Interface";
     await expect.element(page.getByRole("heading", { name, exact: true })).toBeVisible();
     // Appearance highlights its code font preview off-thread, then attaches it in a shadow root.
     if (to === "/settings/appearance") {

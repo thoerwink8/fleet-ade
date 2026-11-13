@@ -70,7 +70,7 @@ export interface PrStatusIndicator {
 }
 
 export interface TerminalStatusIndicator {
-  label: "Terminal process running";
+  label: "终端进程正在运行";
   colorClass: string;
   pulse: boolean;
 }
@@ -214,19 +214,19 @@ function resolveThreadPullRequestBadgePresentation({
     return {
       Icon: PullRequestGlyph.stack,
       toneClassName: aggregate.toneClassName,
-      label: `Stack of ${badge.layers} ${terminology.plural}, ${aggregate.label.toLowerCase()}`,
+      label: `包含 ${badge.layers} 个 ${terminology.plural} 的堆叠，${aggregate.label.toLowerCase()}`,
       text: badge.layers,
     };
   }
   if (number === undefined || url === undefined) return null;
 
-  const tooltip = status?.tooltip ?? `${terminology.shortLabel} #${number}, status pending`;
+  const tooltip = status?.tooltip ?? `${terminology.shortLabel} #${number}，状态待更新`;
   if (badge?.kind === "pull-request" && badge.others > 0) {
     const aggregate = PULL_REQUEST_STATE_PRESENTATION[badge.state];
     return {
       Icon: aggregate.Icon,
       toneClassName: aggregate.toneClassName,
-      label: `${tooltip}, and ${badge.others} more linked; overall ${aggregate.label.toLowerCase()}`,
+      label: `${tooltip}，另有 ${badge.others} 个已关联；整体状态：${aggregate.label.toLowerCase()}`,
       text: `+${badge.others + 1}`,
     };
   }
@@ -388,7 +388,7 @@ export function ThreadPullRequestsMiniList({
           >
             {line.stack ? (
               <span className="ml-auto shrink-0 pl-1 text-3xs">
-                {line.stack.kind === "native" ? "stack" : "chain"} · {line.stack.size}
+                {line.stack.kind === "native" ? "堆叠" : "链"} · {line.stack.size}
               </span>
             ) : null}
           </ThreadPullRequestMiniListItem>
@@ -535,7 +535,7 @@ export function terminalStatusFromRunningIds(
     return null;
   }
   return {
-    label: "Terminal process running",
+    label: "终端进程正在运行",
     colorClass: "text-teal-600 dark:text-teal-300/90",
     pulse: true,
   };
@@ -565,8 +565,8 @@ export function ThreadTerminalStatusButton({
   const status = terminalStatusFromRunningIds(terminalIds);
   const label =
     terminalIds.length === 1
-      ? "1 terminal process running. Open terminal"
-      : `${terminalIds.length} terminal processes running. Open terminal`;
+      ? "1 个终端进程正在运行。打开终端"
+      : `${terminalIds.length} 个终端进程正在运行。打开终端`;
   return (
     <Tooltip>
       <TooltipTrigger
@@ -612,8 +612,8 @@ export function ThreadWorktreeIndicator({
 
   const displayPath = formatWorktreePathForDisplay(worktreePath);
   const tooltip = thread.branch
-    ? `Worktree: ${displayPath} (${thread.branch})`
-    : `Worktree: ${displayPath}`;
+    ? `工作树：${displayPath}（${thread.branch}）`
+    : `工作树：${displayPath}`;
 
   return (
     <Tooltip>
@@ -774,7 +774,7 @@ export function ThreadRowLeadingStatus({ thread }: { thread: SidebarThreadSummar
       {pendingLink ? (
         <PullRequestGlyph.pullRequest
           className="size-3 text-muted-foreground"
-          aria-label={`${changeRequestTerminologyForUrl(pendingLink.url).shortLabel} #${pendingLink.number}, status pending`}
+          aria-label={`${changeRequestTerminologyForUrl(pendingLink.url).shortLabel} #${pendingLink.number}，状态待更新`}
         />
       ) : null}
       {threadStatus ? <ThreadStatusLabel status={threadStatus} /> : null}

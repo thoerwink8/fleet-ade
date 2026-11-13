@@ -60,21 +60,21 @@ const ensureRelayClientAvailable = Effect.fn("linkEnvironment.ensureRelayClientA
     const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
     const status = yield* registry
       .run(environmentId, request(WS_METHODS.cloudGetRelayClientStatus, {}))
-      .pipe(Effect.mapError(relayClientRpcError("Could not check relay client availability.")));
+      .pipe(Effect.mapError(relayClientRpcError("无法检查中继客户端是否可用。")));
     if (status.status === "available") return;
     if (status.status === "unsupported") {
       return yield* new CloudEnvironmentLinkError({
-        message: `T3 Code cannot install the relay client automatically on ${status.platform}-${status.arch}.`,
+        message: `T3 Code 无法在 ${status.platform}-${status.arch} 上自动安装中继客户端。`,
       });
     }
 
     const confirmed = yield* Effect.tryPromise({
       try: () => requestRelayClientInstallConfirmation(status.version),
-      catch: relayClientRpcError("Could not confirm relay client installation."),
+      catch: relayClientRpcError("无法确认中继客户端的安装。"),
     });
     if (!confirmed) {
       return yield* new CloudEnvironmentLinkError({
-        message: "Relay client installation was cancelled.",
+        message: "中继客户端安装已取消。",
       });
     }
 
@@ -87,12 +87,12 @@ const ensureRelayClientAvailable = Effect.fn("linkEnvironment.ensureRelayClientA
       )
       .pipe(
         Stream.runLast,
-        Effect.mapError(relayClientRpcError("Could not install the relay client.")),
+        Effect.mapError(relayClientRpcError("无法安装中继客户端。")),
         Effect.ensuring(Effect.sync(finishRelayClientInstall)),
       );
     if (Option.isNone(installed) || installed.value.type !== "complete") {
       return yield* new CloudEnvironmentLinkError({
-        message: "The relay client install completed without a final status.",
+        message: "中继客户端安装结束时没有返回最终状态。",
       });
     }
     const installedStatus = installed.value.status;
@@ -100,8 +100,8 @@ const ensureRelayClientAvailable = Effect.fn("linkEnvironment.ensureRelayClientA
       return yield* new CloudEnvironmentLinkError({
         message:
           installedStatus.status === "unsupported"
-            ? `T3 Code cannot install the relay client automatically on ${installedStatus.platform}-${installedStatus.arch}.`
-            : "The relay client is still unavailable after installation.",
+            ? `T3 Code 无法在 ${installedStatus.platform}-${installedStatus.arch} 上自动安装中继客户端。`
+            : "安装后中继客户端仍不可用。",
       });
     }
   },
@@ -169,12 +169,12 @@ function ensureLinkedEnvironmentMatches(input: {
 }): Effect.Effect<void, CloudEnvironmentLinkError> {
   if (input.link.environmentId !== input.expectedEnvironmentId) {
     return new CloudEnvironmentLinkError({
-      message: "Relay returned credentials for a different environment.",
+      message: "中继返回的凭据属于另一个环境。",
     });
   }
   if (input.link.endpoint.providerKind !== input.expectedProviderKind) {
     return new CloudEnvironmentLinkError({
-      message: "Relay returned credentials for a different endpoint provider.",
+      message: "中继返回的凭据属于另一种端点提供方。",
     });
   }
   return Effect.void;
@@ -219,13 +219,10 @@ const preparedEndpoint = (target: CloudLinkTarget) =>
       ),
     ),
   ).pipe(
-    Effect.mapError(environmentApiError("Could not reach the environment.")),
+    Effect.mapError(environmentApiError("无法连接到该环境。")),
     Effect.flatMap(
       Option.match({
-        onNone: () =>
-          Effect.fail(
-            new CloudEnvironmentLinkError({ message: "The environment is not connected." }),
-          ),
+        onNone: () => Effect.fail(new CloudEnvironmentLinkError({ message: "环境未连接。" })),
         onSome: ({ httpBaseUrl, target }) =>
           Effect.succeed({
             httpBaseUrl,
@@ -253,7 +250,7 @@ export const readCloudLinkState: (input: {
         url: (urls) => urls.linkState(),
         request: ({ client, headers }) => client.linkState({ headers }),
       },
-      "Could not read environment cloud link state.",
+      "无法读取环境的云端关联状态。",
     );
   });
 
@@ -271,7 +268,7 @@ export const checkCloudReachability: (input: {
         url: (urls) => urls.checkReachability(),
         request: ({ client, headers }) => client.checkReachability({ headers }),
       },
-      "Could not check T3 Connect.",
+      "无法检查 T3 Connect。",
     );
   });
 
@@ -294,7 +291,7 @@ export const updateCloudPreferences: (input: {
       url: (urls) => urls.preferences(),
       request: ({ client, headers }) => client.preferences({ headers, payload }),
     },
-    "Could not update environment cloud preferences.",
+    "无法更新环境的云端偏好设置。",
   );
 });
 
@@ -316,7 +313,7 @@ export const unlinkEnvironmentFromCloud: (input: {
       url: (urls) => urls.unlink(),
       request: ({ client, headers }) => client.unlink({ headers }),
     },
-    "Could not unlink the environment from cloud.",
+    "无法解除该环境与云端的关联。",
   );
 
   const configuredRelayUrl = relayUrl();
@@ -328,11 +325,7 @@ export const unlinkEnvironmentFromCloud: (input: {
         environmentId: input.target.environmentId,
       })
       .pipe(
-        Effect.mapError(
-          decodedRelayClientError(
-            "Disconnected locally, but T3 Connect did not confirm it removed this environment",
-          ),
-        ),
+        Effect.mapError(decodedRelayClientError("已在本地断开，但 T3 Connect 未确认已移除该环境")),
       );
   }
 });
@@ -403,7 +396,7 @@ export const linkEnvironmentToCloud: (input: {
           },
         }),
     },
-    "Could not obtain environment link proof.",
+    "无法获取环境关联凭证。",
   );
   const link = yield* relayClient
     .linkEnvironment({
@@ -444,6 +437,6 @@ export const linkEnvironmentToCloud: (input: {
           },
         }),
     },
-    "Could not configure environment relay access.",
+    "无法配置环境中继访问。",
   );
 });

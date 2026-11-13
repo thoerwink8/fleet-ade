@@ -107,21 +107,18 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!message || message.role !== "user") return;
 
     if (!supportsConversationRollback) {
-      setThreadError(
-        activeThread.id,
-        "This provider does not support reverting conversation history. Start a new thread instead.",
-      );
+      setThreadError(activeThread.id, "这个提供方不支持回退对话记录。请改为新建会话。");
       return;
     }
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
       setThreadError(
         activeThread.id,
-        `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+        `请先重新连接 ${activeEnvironmentUnavailableLabel}，再回退检查点。`,
       );
       return;
     }
     if (phase === "running" || isSendBusy) {
-      setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+      setThreadError(activeThread.id, "请先中断当前这一轮，再回退检查点。");
       return;
     }
     if (restoreFiles === undefined) {
@@ -192,7 +189,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to fork this response.",
+          error instanceof Error ? error.message : "无法从这条回复分叉。",
         );
       }
       return;
@@ -201,7 +198,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!targetThreadReady) {
       setThreadError(
         activeThread.id,
-        "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
+        "分叉已创建，但会话数据没有同步到此客户端。请重新连接，然后从侧边栏打开。",
       );
       return;
     }

@@ -1649,7 +1649,7 @@ export const make = Effect.gen(function* () {
               reason: SimlockDeviceHost.describeGatewayFailure(
                 cause,
                 gatewayUrl,
-                token.source === "env" ? "this machine" : "this environment",
+                token.source === "env" ? "this machine" : "此环境",
               ),
             }),
         ),

@@ -28,7 +28,7 @@ export async function prepareLocalTrackSwitch(
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "The update track did not change.",
+      message: error instanceof Error ? error.message : "更新通道未更改。",
     };
   }
   if (!input.reinstall) return { ok: true, local: null };
@@ -44,8 +44,8 @@ export async function prepareLocalTrackSwitch(
     ok: false,
     message:
       found !== null
-        ? `This app found ${found}, which is older than ${input.version}. Try again in a few minutes.`
-        : (local.message ?? `This app found no build of ${input.version} to install.`),
+        ? `此应用找到的 ${found} 早于 ${input.version}。请几分钟后重试。`
+        : (local.message ?? `此应用未找到可安装的 ${input.version} 版本。`),
   };
 }
 
@@ -66,8 +66,8 @@ export function nothingToMove(input: {
   }
   const reason =
     input.rows.length === 0 && !input.crossesLocal
-      ? `Every connected machine is already on ${input.label}.`
-      : `No machine can switch to ${input.label} now.`;
+      ? `每台已连接的机器都已使用${input.label}。`
+      : `目前没有机器可以切换到${input.label}。`;
   return !input.hasTargets && input.savedChannel === input.channel
     ? { note: null, disabledReason: reason }
     : { note: `${reason} This only saves the track.`, disabledReason: null };

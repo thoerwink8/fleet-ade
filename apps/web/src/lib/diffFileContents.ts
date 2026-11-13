@@ -127,9 +127,7 @@ function createDiffFileContentsLoader(
       return { oldFile: null, newFile };
     }
     if (!reproducesPatch(fileDiff, contents.oldContents, contents.newContents)) {
-      throw new Error(
-        "This file changed since the diff was loaded. Refresh the diff to expand it.",
-      );
+      throw new Error("加载差异后此文件已更改。刷新差异后再展开。");
     }
     return {
       oldFile: {

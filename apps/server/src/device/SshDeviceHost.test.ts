@@ -106,7 +106,7 @@ it.effect("preserves installed status after probes and cleans failed agent activ
       }),
     );
     const host = yield* SshDeviceHost.make(
-      { kind: "ssh", id: "test", label: "Test", target: "test.example" },
+      { kind: "ssh", id: "test", label: "测试", target: "test.example" },
       () =>
         rejectConfig
           ? Effect.fail(
@@ -136,7 +136,7 @@ it.effect("preserves installed status after probes and cleans failed agent activ
     yield* SshDeviceHost.probe({
       kind: "ssh",
       id: "test",
-      label: "Test",
+      label: "测试",
       target: "test.example",
     }).pipe(
       Effect.provide(ServerConfig.layerTest(home, home)),
@@ -245,7 +245,7 @@ it.effect("releases the forward of a bootstrap interrupted before its hub answer
       {
         kind: "ssh",
         id: "test",
-        label: "Test",
+        label: "测试",
         target: "test.example",
       },
       undefined,
@@ -345,7 +345,7 @@ it.effect("lists Android devices without probing the host again once it reports 
     const host = yield* SshDeviceHost.make({
       kind: "ssh",
       id: "test",
-      label: "Test",
+      label: "测试",
       target: "test.example",
     }).pipe(
       Effect.provide(Layer.mergeAll(ServerConfig.layerTest(home, home), Net.layer)),
@@ -442,7 +442,7 @@ it.effect(
       const host = yield* SshDeviceHost.make({
         kind: "ssh",
         id: "test",
-        label: "Test",
+        label: "测试",
         target: "test.example",
       }).pipe(
         Effect.provide(Layer.mergeAll(ServerConfig.layerTest(home, home), Net.layer)),
@@ -532,7 +532,7 @@ it.effect.each([
   {
     name: "a connection failure",
     exitCode: 255,
-    stderr: "Connection refused\n",
+    stderr: "连接被拒绝",
     shellEcho: "Windows_NT\n",
     nodePlatform: "win32",
     windows: false,
@@ -579,7 +579,7 @@ it.effect.each([
       const failure = yield* SshDeviceHost.probe({
         kind: "ssh",
         id: "test",
-        label: "Test",
+        label: "测试",
         target: "test.example",
       }).pipe(
         Effect.provide(ServerConfig.layerTest(home, home)),

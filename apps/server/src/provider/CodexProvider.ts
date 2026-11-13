@@ -158,7 +158,7 @@ const REASONING_EFFORT_LABELS: Readonly<Record<string, string>> = {
   low: "Low",
   medium: "Medium",
   high: "High",
-  xhigh: "Extra High",
+  xhigh: "超高",
   max: "Max",
   ultra: "Ultra",
 };
@@ -273,7 +273,7 @@ export function mapCodexModelCapabilities(
   if (reasoningOptions.length > 0) {
     optionDescriptors.push({
       id: "reasoningEffort",
-      label: "Reasoning",
+      label: "推理",
       type: "select",
       options: reasoningOptions,
       ...(defaultReasoning ? { currentValue: defaultReasoning } : {}),
@@ -287,7 +287,7 @@ export function mapCodexModelCapabilities(
       options: [
         {
           id: DEFAULT_SERVICE_TIER_ID,
-          label: "Standard",
+          label: "标准",
           ...(defaultServiceTier === DEFAULT_SERVICE_TIER_ID ? { isDefault: true } : {}),
         },
         ...serviceTiers.map((tier) => {

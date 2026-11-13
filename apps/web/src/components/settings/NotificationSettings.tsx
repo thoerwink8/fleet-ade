@@ -23,7 +23,7 @@ export function NotificationSettings() {
       {...searchableSetting("thread-notifications")}
       description={
         permissionMessage ??
-        "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open."
+        "会话完成、失败或需要输入或批准时发送系统提醒。仅在此设备上打开 T3 Code 时生效。"
       }
       control={
         <Select
@@ -42,7 +42,7 @@ export function NotificationSettings() {
             if (hasDesktopNotifications(value)) {
               if (typeof Notification === "undefined" || !window.isSecureContext) {
                 setPermissionMessage(
-                  "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+                  "通知功能需要通过 HTTPS 访问的受支持浏览器，或使用桌面应用。仍可选择“仅声音”。",
                 );
                 return;
               }
@@ -50,14 +50,12 @@ export function NotificationSettings() {
               const permission = await settlePromise(() => Notification.requestPermission());
               setRequesting(false);
               if (permission._tag === "Failure") {
-                setPermissionMessage(
-                  "Notifications are unavailable in this browser. Sound only is still available.",
-                );
+                setPermissionMessage("此浏览器不支持通知。仍可选择“仅声音”。");
                 return;
               }
               if (permission.value !== "granted") {
                 setPermissionMessage(
-                  "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
+                  "请在浏览器或系统设置中允许通知，然后重新选择此选项。仍可选择“仅声音”。",
                 );
                 return;
               }
@@ -65,7 +63,7 @@ export function NotificationSettings() {
             updateSettings({ notificationMode: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Thread notifications">
+          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="会话通知">
             <SelectValue>{NOTIFICATION_MODE_LABELS[mode]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>

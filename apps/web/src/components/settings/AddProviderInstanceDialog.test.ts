@@ -8,14 +8,14 @@ import {
 } from "./AddProviderInstanceDialog.logic";
 
 describe("resolveWizardNavigation", () => {
-  const invalidId = { instanceIdError: "Instance ID is required." };
+  const invalidId = { instanceIdError: "请输入实例 ID。" };
 
   // regression: #2813 the wizard advanced past an invalid instance id
   it("blocks Next from Identity to Config while the instance id is invalid", () => {
     expect(resolveWizardNavigation(1, 2, 3, invalidId)).toEqual({
       kind: "blocked",
       step: 1,
-      error: "Instance ID is required.",
+      error: "请输入实例 ID。",
     });
   });
 
@@ -23,7 +23,7 @@ describe("resolveWizardNavigation", () => {
     expect(resolveWizardNavigation(0, 2, 3, invalidId)).toEqual({
       kind: "blocked",
       step: 1,
-      error: "Instance ID is required.",
+      error: "请输入实例 ID。",
     });
   });
 });
@@ -33,12 +33,12 @@ describe("ACP Registry wizard", () => {
     expect(
       resolveAcpRegistryWizardNavigation(0, 1, {
         instanceIdError: null,
-        selectionError: "Select an ACP or configure one manually.",
+        selectionError: "选择一个 ACP，或手动配置。",
       }),
     ).toEqual({
       kind: "blocked",
       step: 0,
-      error: "Select an ACP or configure one manually.",
+      error: "选择一个 ACP，或手动配置。",
     });
 
     expect(

@@ -63,7 +63,7 @@ export function useUsageLimitsPanel(input: {
       return true;
     }
     setPanel(null);
-    toastManager.add({ type: "info", title: "Usage limits are unavailable for this provider" });
+    toastManager.add({ type: "info", title: "这个提供方无法查看用量限制" });
     return false;
   });
   // Async responses may clear only their originating thread's panel.

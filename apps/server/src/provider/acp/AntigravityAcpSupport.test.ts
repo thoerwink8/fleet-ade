@@ -506,7 +506,7 @@ it.layer(NodeServices.layer)("buildAntigravityPrompt", (it) => {
             resolveAttachmentPath: fixture.resolve,
             promptCapabilities,
           }),
-        ).toEqual([{ type: "text", text: "Continue" }]);
+        ).toEqual([{ type: "text", text: "继续" }]);
       }),
   );
 

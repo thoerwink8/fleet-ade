@@ -1019,7 +1019,7 @@ it.effect("a run Stop reached cannot delegate or start a watch, even after it en
         completedAt: now,
         updatedAt: now,
         type: "run_interrupt_request",
-        message: "Stop",
+        message: "停止",
       },
     });
 
@@ -1761,7 +1761,7 @@ it.effect("an unanswered Stop is flagged until Force stop ends the run with its 
   }).pipe(Effect.provide(layerTest)),
 );
 
-it.effect.each(["Stop", "Force stop"] as const)(
+it.effect.each(["Stop", "强制停止"] as const)(
   "%s ends a running run whose provider turn already completed",
   (action) =>
     Effect.gen(function* () {

@@ -96,7 +96,7 @@ describe("TelemetryExportSettings", () => {
       environmentId: "env",
       input: { patch: { observability: { otlpMetricsUrl: "http://new/v1/metrics" } } },
     });
-    expect(container.textContent).toContain("Saved. Restart the server to apply.");
+    expect(container.textContent).toContain("已保存。重启服务器后生效。");
   });
 
   it("reports and tests the endpoint the environment set over an empty setting", async () => {

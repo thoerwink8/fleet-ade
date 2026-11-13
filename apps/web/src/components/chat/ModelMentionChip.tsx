@@ -112,7 +112,7 @@ export function ModelMentionChip(props: {
         />
       }
       label={presentation.label}
-      accessibleLabel={`Model ${presentation.label}`}
+      accessibleLabel={`模型 ${presentation.label}`}
       copyMarkdown={props.source}
     >
       <div className="space-y-1 p-2 text-sm">

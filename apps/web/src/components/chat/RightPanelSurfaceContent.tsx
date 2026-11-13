@@ -123,8 +123,8 @@ export function RightPanelSurfaceContent(props: {
       if (!pullRequest.supported) {
         return (
           <PullRequestsUnavailableState
-            title="Pull requests unavailable"
-            error="Update this environment's T3 Code server to browse pull requests."
+            title="PR 不可用"
+            error="请更新此环境的 T3 Code 服务器后再浏览 pull request。"
           />
         );
       }

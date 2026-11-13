@@ -39,8 +39,8 @@ export class PeerPairingCodeError extends Schema.TaggedError<PeerPairingCodeErro
 ) {
   override get message(): string {
     return this.reason === "not_allowed"
-      ? "Your session there cannot create pairing codes. Paste a code from there instead."
-      : "Could not get a pairing code from there. Paste a code from there instead.";
+      ? "你在那边的会话无法创建配对码。请粘贴在那边生成的配对码。"
+      : "无法获取那边的配对码。请粘贴在那边生成的配对码。";
   }
 }
 
@@ -84,7 +84,7 @@ const mintOnEnvironment = Effect.fnUntraced(function* (payload: AuthCreatePairin
   if (Option.isNone(prepared)) {
     return yield* new PeerPairingCodeError({
       reason: "unavailable",
-      cause: "The environment is not connected.",
+      cause: "环境未连接。",
     });
   }
   return yield* mintPairingCredential(prepared.value, payload);

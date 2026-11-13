@@ -221,9 +221,7 @@ it("requests current dimensions after resizing and scrolling away and back befor
       data: { id: frame.message.id, ok: false, superseded: false, message: "Frame failed" },
     }),
   );
-  await expect
-    .element(screen.getByRole("status"))
-    .toHaveTextContent("These cells could not be drawn.");
+  await expect.element(screen.getByRole("status")).toHaveTextContent("这些单元格无法绘制。");
   await act(() => root.dispatchEvent(new Event("scroll")));
   await vi.waitFor(() => expect(pending).toHaveLength(4));
   const retry = pending[3]!;

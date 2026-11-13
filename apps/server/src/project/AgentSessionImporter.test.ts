@@ -235,7 +235,7 @@ const makeImporter = Effect.fn(function* (
             getById: () =>
               Effect.succeedSome({
                 id: projectId,
-                title: "Project",
+                title: "项目",
                 workspaceRoot: "/workspace/project",
                 defaultModelSelection: null,
                 scripts: [],
@@ -469,8 +469,8 @@ it.effect("does not record a changed transcript as imported without its new mess
     continued.source.size = 200;
     continued.source.mtimeMs = 3;
     continued.thread.messages.push(
-      { role: "user", text: "Continue", createdAt: timestamp },
-      { role: "assistant", text: "Continued", createdAt: timestamp },
+      { role: "user", text: "继续", createdAt: timestamp },
+      { role: "assistant", text: "继续工作", createdAt: timestamp },
     );
     yield* (yield* makeImporter([continued])).run;
 

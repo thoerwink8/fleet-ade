@@ -42,7 +42,7 @@ describe("deriveProviderModelsForDisplay", () => {
 describe("provider environment helpers", () => {
   const cursorApiKeyField = {
     name: "CURSOR_API_KEY",
-    label: "Cursor API key",
+    label: "Cursor API 密钥",
     sensitive: true,
   };
 

@@ -60,7 +60,7 @@ describe("command palette shortcuts", () => {
     await using screen = await render(
       <>
         <MountedPalette />
-        <input aria-label="Search files" />
+        <input aria-label="搜索文件" />
       </>,
       { router: "/" },
     );

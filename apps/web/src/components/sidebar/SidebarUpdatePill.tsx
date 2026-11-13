@@ -130,7 +130,7 @@ function SidebarUpdateArchitectureWarningContent() {
   return (
     <Alert variant="warning">
       <TriangleAlertIcon />
-      <AlertTitle>Intel build on Apple Silicon</AlertTitle>
+      <AlertTitle>Apple Silicon 上的 Intel 版本</AlertTitle>
       <AlertDescription>{description}</AlertDescription>
     </Alert>
   );
@@ -155,13 +155,10 @@ export async function downloadLocalUpdate(
     const actionError = shouldToastDesktopUpdateActionResult(result)
       ? getDesktopUpdateActionError(result)
       : null;
-    if (actionError) reportError("Could not download update", actionError);
+    if (actionError) reportError("无法下载更新", actionError);
     return result.completed;
   } catch (error) {
-    reportError(
-      "Could not start update download",
-      error instanceof Error ? error.message : "An unexpected error occurred.",
-    );
+    reportError("无法开始下载更新", error instanceof Error ? error.message : "发生了意外错误。");
     return false;
   }
 }
@@ -181,13 +178,10 @@ export async function installLocalUpdate(
       ? getDesktopUpdateActionError(result)
       : null;
     if (!actionError) return true;
-    reportError("Could not install update", actionError);
+    reportError("无法安装更新", actionError);
     return false;
   } catch (error) {
-    reportError(
-      "Could not install update",
-      error instanceof Error ? error.message : "An unexpected error occurred.",
-    );
+    reportError("无法安装更新", error instanceof Error ? error.message : "发生了意外错误。");
     return false;
   }
 }
@@ -256,10 +250,10 @@ function SidebarUpdateControl() {
     : showUpdateDetails
       ? state
         ? getDesktopUpdateButtonTooltip(state)
-        : "Update available"
+        : "有可用更新"
       : showCheckIcon
-        ? "Checking for updates…"
-        : (idleTooltip?.title ?? "Check for updates");
+        ? "正在检查更新…"
+        : (idleTooltip?.title ?? "检查更新");
   const disabled = showCheckIcon
     ? true
     : runsEverything
@@ -315,8 +309,8 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not confirm update",
-            description: error instanceof Error ? error.message : "Update confirmation failed.",
+            title: "无法确认更新",
+            description: error instanceof Error ? error.message : "确认更新失败。",
           }),
         );
         return;
@@ -340,11 +334,8 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not check for updates",
-            description:
-              updatesDenial ??
-              result.state.message ??
-              "Automatic updates are not available in this build.",
+            title: "无法检查更新",
+            description: updatesDenial ?? result.state.message ?? "此版本不支持自动更新。",
           }),
         );
       })
@@ -352,8 +343,8 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not check for updates",
-            description: error instanceof Error ? error.message : "Update check failed.",
+            title: "无法检查更新",
+            description: error instanceof Error ? error.message : "检查更新失败。",
           }),
         );
       });
@@ -384,8 +375,8 @@ function SidebarUpdateControl() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not update everything",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          title: "无法全部更新",
+          description: error instanceof Error ? error.message : "发生了意外错误。",
         }),
       );
     }
@@ -562,7 +553,7 @@ function SidebarUpdateControl() {
         {showReleaseNotesPopover && state ? (
           <PopoverPopup
             align="center"
-            aria-label="Update release notes"
+            aria-label="更新说明"
             initialFocus={false}
             onKeyDownCapture={(event) => {
               if (

@@ -81,7 +81,7 @@ const provider: ServerProvider = {
     updateCommand: "npm install -g @openai/codex",
     canUpdate: true,
     checkedAt: "2026-10-21T00:00:00.000Z",
-    message: "Update available.",
+    message: "有可用更新。",
   },
 };
 
@@ -102,7 +102,7 @@ function session(
 
 function setup() {
   state.environments = [
-    { environmentId: EnvironmentId.make("read-only"), label: "Read only" },
+    { environmentId: EnvironmentId.make("read-only"), label: "只读" },
     { environmentId: EnvironmentId.make("writable"), label: "Writable" },
     { environmentId: EnvironmentId.make("unresolved"), label: "Unresolved" },
   ].map((environment) => ({ ...environment, connection: { phase: "connected" } }));
@@ -173,9 +173,7 @@ it("provider updates and checks exclude connections without a confirmed manageme
   await act(async () => {
     await check();
   });
-  expect(toast).toHaveBeenCalledWith(
-    expect.objectContaining({ title: "Could not check provider updates" }),
-  );
+  expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "无法检查提供方更新" }));
 
   await act(() => {
     appAtomRegistry.set(fixture.sessions.get(writableId)!, session(["orchestration:read"]));

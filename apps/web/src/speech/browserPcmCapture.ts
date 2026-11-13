@@ -123,11 +123,11 @@ export function createBrowserPcmCapture(
           else chunks.push(data);
         };
         node.onprocessorerror = () => {
-          stopped?.reject(new Error("Microphone processing failed."));
-          input.onError("Microphone processing failed.");
+          stopped?.reject(new Error("麦克风处理失败。"));
+          input.onError("麦克风处理失败。");
         };
         for (const track of captured.getTracks())
-          track.addEventListener("ended", () => input.onError("The microphone disconnected."), {
+          track.addEventListener("ended", () => input.onError("麦克风已断开连接。"), {
             once: true,
           });
         context.createMediaStreamSource(captured).connect(node);

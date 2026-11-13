@@ -9,27 +9,24 @@ import { VoiceInputPill } from "./VoiceInputPill";
 const VOICE_ERROR_LABELS: Record<string, string> = {
   [MICROPHONE_PERMISSION_ERROR]: "Mic blocked",
   "Microphone access is required for voice input.": "Mic blocked",
-  "This draft is no longer available.": "Draft unavailable",
+  "This draft is no longer available.": "草稿不可用",
   "Another voice recording is already active.": "Already recording",
-  "Voice transcription is not available.": "Voice input unavailable",
+  "Voice transcription is not available.": "语音输入不可用",
   "Voice transcription is still finishing. Try again shortly.": "Still transcribing",
-  "Voice transcription is not available for this language.": "Language unsupported",
+  "Voice transcription is not available for this language.": "不支持该语言",
   "Could not prepare voice transcription.": "Couldn’t start",
   "Could not start voice recording.": "Couldn’t start",
-  "Voice recording was interrupted.": "Recording interrupted",
+  "Voice recording was interrupted.": "录音被中断",
   "Could not finish voice recording.": "Couldn’t finish",
-  "Could not transcribe this recording.": "Transcription failed",
-  "Voice transcription on this environment failed.": "Transcription failed",
-  "The draft changed while voice input was running. The transcript was not added.": "Draft changed",
+  "Could not transcribe this recording.": "转写失败",
+  "Voice transcription on this environment failed.": "转写失败",
+  "The draft changed while voice input was running. The transcript was not added.": "草稿已改动",
   "No speech was detected.": "No speech heard",
   "Microphone processing failed.": "Mic failed",
   "The microphone disconnected.": "Mic disconnected",
 };
 
-const RETRYABLE_TRANSCRIPTIONS = new Set([
-  "Could not transcribe this recording.",
-  "Voice transcription on this environment failed.",
-]);
+const RETRYABLE_TRANSCRIPTIONS = new Set(["无法转写这段录音。", "此环境上的语音转写失败。"]);
 
 export function VoiceInputErrorPill(props: {
   error: string | null;
@@ -41,14 +38,14 @@ export function VoiceInputErrorPill(props: {
   onDismiss(): void;
 }) {
   const navigate = useNavigate();
-  const message = props.error ?? "Voice input failed";
+  const message = props.error ?? "语音输入失败";
   const openSettings = props.errorAction === "settings";
   const compact = props.size === "compact";
   const action = openSettings
-    ? { label: "Open voice settings", text: "Settings" }
+    ? { label: "打开语音设置", text: "设置" }
     : props.error && RETRYABLE_TRANSCRIPTIONS.has(props.error)
-      ? { label: "Retry transcription", text: "Retry" }
-      : { label: "Record again", text: "Record again" };
+      ? { label: "重试转写", text: "重试" }
+      : { label: "重新录音", text: "重新录音" };
   return (
     <VoiceInputPill tone="error" size={props.size}>
       <Tooltip>
@@ -58,7 +55,7 @@ export function VoiceInputErrorPill(props: {
               type="button"
               size={compact ? "icon-xs" : "icon-sm-pill"}
               variant="ghost"
-              aria-label="Dismiss voice input error"
+              aria-label="关闭语音输入错误提示"
               onPointerDown={(event) => event.preventDefault()}
               onClick={props.onDismiss}
               className="shrink-0"
@@ -68,7 +65,7 @@ export function VoiceInputErrorPill(props: {
           }
         />
         <TooltipPopup side="top">
-          Dismiss
+          忽略
           {props.cancelShortcutLabel ? ` (${props.cancelShortcutLabel})` : ""}
         </TooltipPopup>
       </Tooltip>
@@ -85,7 +82,7 @@ export function VoiceInputErrorPill(props: {
         >
           <CircleAlertIcon aria-hidden className="size-3.5 shrink-0" />
           <span className="truncate">
-            {(props.error && VOICE_ERROR_LABELS[props.error]) || "Voice input failed"}
+            {(props.error && VOICE_ERROR_LABELS[props.error]) || "语音输入失败"}
           </span>
         </TooltipTrigger>
         <TooltipPopup side="top">{message}</TooltipPopup>

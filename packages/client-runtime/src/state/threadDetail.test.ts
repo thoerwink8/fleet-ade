@@ -402,7 +402,7 @@ describe("derived thread state through a streamed message", () => {
     thread.apply(messageUpdated({ ...streamed, text: "Hello there", updatedAt: later }));
     expect(thread.checkpoints()).toBe(first);
 
-    const followUp = { ...streamed, id: MessageId.make("message-follow-up"), text: "Done" };
+    const followUp = { ...streamed, id: MessageId.make("message-follow-up"), text: "完成" };
     thread.apply(messageUpdated(followUp));
     expect(thread.checkpoints().map((summary) => summary.assistantMessageId)).toEqual([
       followUp.id,
@@ -443,7 +443,7 @@ it("matches full structure comparisons across streamed, batched, and reordered u
   const updates = [
     { ...message, text: "Hello", updatedAt: later },
     { ...reasoning, text: "Thinking", updatedAt: later },
-    { ...reasoning, text: "Done", status: "completed" as const, streaming: false },
+    { ...reasoning, text: "完成", status: "completed" as const, streaming: false },
     { ...message, text: "Hello there", updatedAt: later },
     { ...message, text: "Hello there", ordinal: 0 },
     { ...message, text: "More text", ordinal: 0 },

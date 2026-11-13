@@ -309,7 +309,7 @@ const runWslPreflight = Effect.fn("desktop.backendConfiguration.wslPreflight")(f
   if (!wslAvailable) {
     return {
       _tag: "Failed",
-      reason: "WSL is not available on this system",
+      reason: "此系统不支持 WSL",
       fatal: false,
     } as const;
   }
@@ -321,7 +321,7 @@ const runWslPreflight = Effect.fn("desktop.backendConfiguration.wslPreflight")(f
   if (distroProbe._tag === "Failure") {
     return {
       _tag: "Failed",
-      reason: `Unable to list WSL distributions: ${distroProbe.error.message}`,
+      reason: `无法列出 WSL 发行版：${distroProbe.error.message}`,
       fatal: false,
     } as const;
   }
@@ -336,10 +336,10 @@ const runWslPreflight = Effect.fn("desktop.backendConfiguration.wslPreflight")(f
     return {
       _tag: "Failed",
       reason: input.distro
-        ? `WSL distro is not installed: ${input.distro}`
+        ? `未安装 WSL 发行版：${input.distro}`
         : installedDistros.length === 0
-          ? "WSL has no installed distributions"
-          : "WSL has no default distribution",
+          ? "WSL 尚未安装任何发行版"
+          : "WSL 尚未设置默认发行版",
       fatal: true,
     } as const;
   }
@@ -351,7 +351,7 @@ const runWslPreflight = Effect.fn("desktop.backendConfiguration.wslPreflight")(f
   const failedNodePty = (result: FailedNodePtyResult) =>
     ({
       _tag: "Failed",
-      reason: `WSL node-pty unavailable: ${result.reason}`,
+      reason: `WSL node-pty 不可用：${result.reason}`,
       fatal: result.fatal,
       ...(result.retryLimit === undefined ? {} : { retryLimit: result.retryLimit }),
     }) as const;
@@ -386,7 +386,7 @@ const runWslPreflight = Effect.fn("desktop.backendConfiguration.wslPreflight")(f
   const failedStaged = (failure: { readonly reason: string }) =>
     ({
       _tag: "Failed",
-      reason: `WSL runtime unavailable: ${failure.reason}`,
+      reason: `WSL 运行时不可用：${failure.reason}`,
       fatal: true,
     }) as const;
 
@@ -838,7 +838,7 @@ export const make = Effect.gen(function* () {
     resolvePrimaryLabel: Effect.gen(function* () {
       const { useWsl, distro } = yield* describePrimary;
       if (!useWsl) {
-        return environment.platform === "win32" ? "Windows" : "Local environment";
+        return environment.platform === "win32" ? "Windows" : "本地环境";
       }
       return distro ? `WSL (${distro})` : "WSL";
     }).pipe(Effect.withSpan("desktop.backendConfiguration.resolvePrimaryLabel")),

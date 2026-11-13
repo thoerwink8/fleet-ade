@@ -37,7 +37,7 @@ function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void })
       onClick={() => void restoreDefaults()}
     >
       <RotateCcwIcon className="mx-1 size-3.5" />
-      <span className="max-sm:sr-only">Restore device defaults</span>
+      <span className="max-sm:sr-only">恢复设备默认设置</span>
     </Button>
   );
 }
@@ -63,8 +63,8 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         eligibleEnvironmentIds={autoSettlementAvailability.eligibleEnvironmentIds}
       >
         {autoSettlementAvailability.eligibleEnvironmentIds.length > 0
-          ? `${searchTarget.title} requires a supporting environment. Choose one to continue.`
-          : `${searchTarget.title} requires a supporting environment. Connect or update an environment to continue.`}
+          ? `${searchTarget.title}需要支持此功能的环境。请选择一个环境以继续。`
+          : `${searchTarget.title}需要支持此功能的环境。请连接或更新环境以继续。`}
       </SettingsScopeNotice>
     );
   }
@@ -81,7 +81,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
         : "all";
     return (
       <SettingsScopeNotice target={target} targetId={hash}>
-        {`${searchTarget.title} is not available for the selected target. Choose its owning scope to continue.`}
+        {`${searchTarget.title}不适用于所选目标。请选择它所属的范围以继续。`}
       </SettingsScopeNotice>
     );
   }
@@ -98,7 +98,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
     return (
       <SettingsPageContainer>
         <p className="text-sm text-muted-foreground">
-          Reconnect {scope.label} to change its settings.
+          重新连接 {scope.label} to change its settings.
         </p>
       </SettingsPageContainer>
     );
@@ -107,7 +107,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
 }
 
 function SettingsContentLayout() {
-  const contentArea = workspaceAreaProps("settings", 1, "Settings content");
+  const contentArea = workspaceAreaProps("settings", 1, "设置内容");
   const location = useLocation();
   const { search, environment } = useSettingsScope();
   const contentScopeKey =
@@ -117,7 +117,7 @@ function SettingsContentLayout() {
   const [restoreSignal, setRestoreSignal] = useState(0);
 
   return (
-    <AppRouteModal label="Settings">
+    <AppRouteModal label="设置">
       <div className="relative flex min-h-0 flex-1">
         <SettingsSidebarNav pathname={location.pathname} />
         <div {...contentArea} className="flex min-h-0 min-w-0 flex-1 flex-col">

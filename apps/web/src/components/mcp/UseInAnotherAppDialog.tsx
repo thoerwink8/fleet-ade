@@ -76,7 +76,7 @@ export function UseInAnotherAppDialogHost() {
 
 function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentId | null }) {
   const { environment, label } = useAccessEnvironment(requested);
-  const title = `Use T3 Code in another app (MCP) · ${label ?? "T3 Code"}`;
+  const title = `在其他应用中使用 T3 Code（MCP）· ${label ?? "T3 Code"}`;
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : close())}>
       <WizardPopup>
@@ -87,11 +87,7 @@ function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentI
             <WizardHeader title={title} />
             <WizardPanel>
               <GateMessage
-                title={
-                  environment === null
-                    ? "Connect to an environment first."
-                    : "T3 Connect is not available in this build."
-                }
+                title={environment === null ? "请先连接一个环境。" : "此版本不支持 T3 Connect。"}
               />
             </WizardPanel>
           </>
@@ -126,7 +122,7 @@ function Wizard({
   const steps = hostedApproval ? HOSTED_APPROVAL_STEPS : STEPS;
   const shownStep = hostedApproval && step === 2 ? 1 : step;
   const next = () => setStep(step === 0 ? (hostedApproval ? 2 : 1) : 2);
-  const appName = choice === null || choice === "other" ? "the app" : choice.name;
+  const appName = choice === null || choice === "other" ? "该应用" : choice.name;
   return (
     <>
       <WizardHeader title={title}>
@@ -148,7 +144,7 @@ function Wizard({
           <section className="space-y-3">
             <h3 className="text-sm font-medium">What can {appName} do?</h3>
             <RadioGroup
-              aria-label={`What can ${appName} do?`}
+              aria-label={`${appName} 可以做什么？`}
               value={access}
               onValueChange={(value) => setPicked(value as AuthMcpClientAccess)}
             >
@@ -158,9 +154,7 @@ function Wizard({
                   access={level}
                   selected={level === access}
                   disabledReason={levels.get(level)}
-                  description={
-                    level === "full-access" ? "Runs commands and edits files without asking" : null
-                  }
+                  description={level === "full-access" ? "无需询问即可运行命令和编辑文件" : null}
                 />
               ))}
             </RadioGroup>
@@ -180,14 +174,14 @@ function Wizard({
         >
           {step === 1 ? (
             <Button variant="outline" onClick={() => setStep(0)}>
-              Back
+              返回
             </Button>
           ) : null}
           {step === 2 ? (
-            <Button onClick={close}>Done</Button>
+            <Button onClick={close}>完成</Button>
           ) : (
             <Button disabled={step === 0 ? choice === null : access === null} onClick={next}>
-              Next
+              下一步
             </Button>
           )}
         </WizardFooter>
@@ -217,10 +211,10 @@ function useGrantableLevels(environment: EnvironmentPresentation) {
       const reason =
         remoteDenial ??
         (!canMint
-          ? `This device needs the Manage access permission on ${environment.label}.`
+          ? `此设备需要 ${environment.label} 的“管理访问权限”权限。`
           : session === null ||
               !mcpClientScopes(level).every((scope) => sessionGrantsScope(session, scope))
-            ? `This device cannot grant this on ${environment.label}.`
+            ? `此设备无法在 ${environment.label} 上授予此权限。`
             : level === "read-only"
               ? undefined
               : managedRuntimeModeDenial(policy, level));
@@ -364,7 +358,7 @@ function GateScreen({
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
   const retry = (onClick: () => void) => (
     <Button variant="outline" onClick={onClick}>
-      Check again
+      重新检查
     </Button>
   );
   const checkAgain = retry(() => void check());
@@ -373,16 +367,16 @@ function GateScreen({
       return (
         <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner size="sm" tone="muted" />
-          Checking T3 Connect…
+          正在检查 T3 Connect…
         </p>
       );
     case "sign-in":
       return (
         <GateMessage
-          title="Sign in to T3 Connect"
+          title="登录 T3 Connect"
           lines={[
-            `Apps like Poke and Claude run in the cloud. They need a public address to reach ${name}.`,
-            `T3 Connect gives ${name} that address. Each app still needs your approval.`,
+            `Poke、Claude 等应用运行在云端，需要一个公网地址才能访问 ${name}。`,
+            `T3 Connect 会为 ${name} 提供这个地址。每个应用仍需你的批准。`,
           ]}
         >
           {/* Clerk's sign-in is its own modal, so this dialog closes first. */}
@@ -392,36 +386,36 @@ function GateScreen({
               openAuthPrompt();
             }}
           >
-            Sign in to T3 Connect
+            登录 T3 Connect
           </Button>
         </GateMessage>
       );
     case "disconnected":
       return gate.relay === null ? (
-        <GateMessage title={`Connect to ${name} first.`} />
+        <GateMessage title={`请先连接 ${name}。`} />
       ) : (
         <GateMessage
           title={
             gate.relay === "offline"
-              ? `${name}'s T3 Connect is offline`
-              : `Can't check T3 Connect on ${name}`
+              ? `${name} 的 T3 Connect 已离线`
+              : `无法检查 ${name} 上的 T3 Connect`
           }
         >
           {retry(refreshList)}
         </GateMessage>
       );
     case "update":
-      return <GateMessage title={`Update T3 Code on ${name}`} />;
+      return <GateMessage title={`请更新 ${name} 上的 T3 Code`} />;
     case "no-relay-read":
       return (
         <GateMessage
-          title={`Can't check T3 Connect on ${name}`}
-          lines={[`This device needs the View relay permission on ${name}.`]}
+          title={`无法检查 ${name} 上的 T3 Connect`}
+          lines={[`此设备需要 ${name} 的“查看中继”权限。`]}
         />
       );
     case "error":
       return (
-        <GateMessage title={`Can't check T3 Connect on ${name}`} lines={[gate.message]}>
+        <GateMessage title={`无法检查 ${name} 上的 T3 Connect`} lines={[gate.message]}>
           {checkAgain}
         </GateMessage>
       );
@@ -432,9 +426,9 @@ function GateScreen({
         return (
           <GateMessage
             title={
-              reachability ? `${name}'s T3 Connect is offline` : `Can't check T3 Connect on ${name}`
+              reachability ? `${name} 的 T3 Connect 已离线` : `无法检查 ${name} 上的 T3 Connect`
             }
-            lines={reachability ? [reachability.reason, `Fix: ${reachability.fix}`] : []}
+            lines={reachability ? [reachability.reason, `解决方法：${reachability.fix}`] : []}
           >
             {checkAgain}
           </GateMessage>
@@ -442,16 +436,16 @@ function GateScreen({
       }
       return (
         <GateMessage
-          title={`Turn on T3 Connect for ${name}`}
+          title={`为 ${name} 开启 T3 Connect`}
           lines={[
-            `${name} gets a public https address, with no router setup.`,
-            "Only apps you approve can use it. You can turn it off in Settings.",
+            `${name} 会获得一个公网 https 地址，无需配置路由器。`,
+            "只有你批准的应用才能使用它。你可以在设置中关闭。",
           ]}
         >
           {turnOnHere.kind === "here" ? (
             <div className="space-y-2">
               <Button disabled={connecting} onClick={() => void turnOn()}>
-                {connecting ? "Connecting…" : "Turn on"}
+                {connecting ? "正在连接…" : "启用"}
               </Button>
               {operationError ? (
                 <p className="text-xs text-destructive-foreground">{operationError}</p>
@@ -459,9 +453,9 @@ function GateScreen({
               {tunnelLimit !== null ? (
                 <>
                   <p className="text-sm text-destructive-foreground">
-                    Your T3 Connect account is out of tunnels.
+                    你的 T3 Connect 账号已没有可用隧道。
                   </p>
-                  <ManageAccessButton environment={environment} label="Manage tunnels" />
+                  <ManageAccessButton environment={environment} label="管理隧道" />
                 </>
               ) : null}
             </div>
@@ -515,7 +509,7 @@ function AppStep({
 }) {
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-medium">Which app?</h3>
+      <h3 className="text-sm font-medium">哪个应用？</h3>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
         {MCP_APPS.filter((app) => !app.hidden).map((app) => (
           <button
@@ -542,7 +536,7 @@ function AppStep({
         onClick={() => onChoose("other")}
         className="w-full rounded-lg border border-border px-3 py-2.5 text-sm font-medium outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-pressed:border-primary aria-pressed:bg-primary/8"
       >
-        Something else…
+        其他应用…
       </button>
     </section>
   );
@@ -565,7 +559,7 @@ function ConnectStep({
   const code =
     access === null ? (
       <p className="text-sm text-muted-foreground">
-        When {app?.name ?? "the app"} opens the sign-in page, choose what it may do and approve with
+        When {app?.name ?? "该应用"} opens the sign-in page, choose what it may do and approve with
         your T3 Connect account.
       </p>
     ) : (
@@ -581,23 +575,21 @@ function ConnectStep({
     return (
       <section className="space-y-4">
         <CopyRow label="URL" value={mcpUrl} />
-        {message ? <CopyRow label="Message" value={message} /> : null}
+        {message ? <CopyRow label="消息" value={message} /> : null}
         <ol className="list-decimal space-y-1 ps-5 text-sm">
           {(app?.steps ?? OTHER_MCP_APP_STEPS).map((step) => (
             <li key={step}>{step}</li>
           ))}
         </ol>
         {app === null ? (
-          <p className="text-xs text-muted-foreground">
-            Apps that require their own client ID cannot connect.
-          </p>
+          <p className="text-xs text-muted-foreground">需要自有客户端 ID 的应用无法连接。</p>
         ) : app.docs ? (
-          <TextButton onClick={() => openLink(app.docs ?? "")}>{app.name} help</TextButton>
+          <TextButton onClick={() => openLink(app.docs ?? "")}>{app.name} 帮助</TextButton>
         ) : null}
         {code}
         {app === null ? null : (
           <TextButton onClick={() => setAnotherWay(false)}>
-            {app.handoff.kind === "commands" ? "Back to commands" : "Back to one click"}
+            {app.handoff.kind === "commands" ? "返回命令" : "返回一键设置"}
           </TextButton>
         )}
         <LinkedLine environment={environment} access={access} />
@@ -609,7 +601,7 @@ function ConnectStep({
       <PrimaryAction app={app} mcpUrl={mcpUrl} />
       <CopyRow label="URL" value={mcpUrl} />
       {code}
-      <TextButton onClick={() => setAnotherWay(true)}>Set up another way</TextButton>
+      <TextButton onClick={() => setAnotherWay(true)}>用其他方式设置</TextButton>
       <LinkedLine environment={environment} access={access} />
     </section>
   );
@@ -639,7 +631,7 @@ function openLink(url: string) {
     .catch((error: unknown) =>
       toastManager.add({
         type: "error",
-        title: "Could not open the link",
+        title: "无法打开链接",
         description: error instanceof Error ? error.message : url,
       }),
     );
@@ -678,8 +670,8 @@ function PrimaryAction({ app, mcpUrl }: { readonly app: McpApp; readonly mcpUrl:
       if (!copied) {
         toastManager.add({
           type: "error",
-          title: "Could not copy",
-          description: "Use Set up another way.",
+          title: "无法复制",
+          description: "请改用“用其他方式设置”。",
         });
         return;
       }
@@ -692,7 +684,7 @@ function PrimaryAction({ app, mcpUrl }: { readonly app: McpApp; readonly mcpUrl:
           ? {}
           : {
               actionProps: {
-                children: appLink === null ? `Open ${app.name}` : `Get ${app.name}`,
+                children: appLink === null ? `打开 ${app.name}` : `Get ${app.name}`,
                 onClick: () => openLink(link),
               },
             }),
@@ -739,7 +731,7 @@ function ApprovalCode({
         expiresAt: result.success.expiresAt.epochMilliseconds,
       });
     } else {
-      setError(`Could not get a code from ${name}. Try again.`);
+      setError(`无法从 ${name} 获取登录码。请重试。`);
     }
   };
   const left = code === null ? 0 : Math.max(0, Math.floor((code.expiresAt - now) / 1000));
@@ -751,20 +743,20 @@ function ApprovalCode({
         </span>
         {live ? null : (
           <Button size="sm" variant="outline" disabled={pending} onClick={() => void mint()}>
-            {pending ? "Getting code…" : code === null ? "Get code" : "New code"}
+            {pending ? "正在获取登录码…" : code === null ? "获取登录码" : "新登录码"}
           </Button>
         )}
       </div>
       {code !== null ? (
         live ? (
           <>
-            <CopyRow label="Code" value={code.credential} />
+            <CopyRow label="登录码" value={code.credential} />
             <p className="text-xs text-muted-foreground">
               Expires {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")} · one use
             </p>
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">The code expired.</p>
+          <p className="text-xs text-muted-foreground">登录码已过期。</p>
         )
       ) : null}
       {error ? <p className="text-xs text-destructive-foreground">{error}</p> : null}
@@ -781,7 +773,7 @@ function CopyRow({ label, value }: { readonly label: string; readonly value: str
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label={`Copy ${label}`}
+        aria-label={`复制${label}`}
         onClick={() => copyToClipboard(value, undefined)}
       >
         {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
@@ -824,7 +816,7 @@ function LinkedLine({
 /** Opens Sharing & access on this environment, where its clients and T3 Connect tunnels live. */
 function ManageAccessButton({
   environment,
-  label = "Manage access",
+  label = "管理访问权限",
 }: {
   readonly environment: EnvironmentPresentation;
   readonly label?: string;

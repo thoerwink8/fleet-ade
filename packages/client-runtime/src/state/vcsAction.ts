@@ -231,7 +231,7 @@ function failVcsActionState(
     ...EMPTY_VCS_ACTION_STATE,
     operation,
     actionId,
-    error: error instanceof Error ? error.message : "Source control action failed.",
+    error: error instanceof Error ? error.message : "版本控制操作失败。",
   };
 }
 
@@ -460,7 +460,7 @@ export function createVcsActionManager<R, E>(
           stateAtom,
           beginVcsActionState({
             operation: "run_change_request",
-            label: "Running source control action",
+            label: "正在运行版本控制操作",
             actionId: input.actionId,
           }),
         );

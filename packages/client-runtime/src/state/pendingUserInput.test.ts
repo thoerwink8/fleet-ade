@@ -186,7 +186,7 @@ it.each([
     {
       ...singleSelectQuestion,
       multiSelect: true,
-      options: [{ label: "Server" }, { label: "Web" }],
+      options: [{ label: "服务器" }, { label: "网页" }],
     },
     ["Server", "Web"],
     '["Server","Web"]',

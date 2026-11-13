@@ -59,7 +59,7 @@ const makeHarness = Effect.fnUntraced(function* () {
   const supervisor = {
     target: new BearerConnectionTarget({
       environmentId: ENVIRONMENT_ID,
-      label: "Test",
+      label: "测试",
       connectionId: "test",
     }),
     session,
@@ -69,7 +69,7 @@ const makeHarness = Effect.fnUntraced(function* () {
     ...supervisor,
     target: new BearerConnectionTarget({
       environmentId: OTHER_ENVIRONMENT_ID,
-      label: "Test",
+      label: "测试",
       connectionId: "test",
     }),
     session: yield* SubscriptionRef.make(Option.some(makeSession())),

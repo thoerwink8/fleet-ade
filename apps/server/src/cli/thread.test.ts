@@ -67,7 +67,7 @@ it.effect(
       yield* fs.makeDirectory(nestedRoot, { recursive: true });
       yield* fs.makeDirectory(cwd);
       const projects = [
-        { id: ProjectId.make("current-project"), title: "Current", workspaceRoot: cwd },
+        { id: ProjectId.make("current-project"), title: "当前", workspaceRoot: cwd },
         { id: ProjectId.make("home-project"), title: "Home", workspaceRoot: home },
         { id: ProjectId.make("intended-project"), title: "Intended", workspaceRoot },
         { id: ProjectId.make("nested-project"), title: "Nested", workspaceRoot: nestedRoot },

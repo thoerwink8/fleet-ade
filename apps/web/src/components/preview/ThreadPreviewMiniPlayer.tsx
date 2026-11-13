@@ -252,8 +252,8 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: serverTab ? "Unable to pop out preview" : "Unable to update popped-out preview",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: serverTab ? "无法弹出预览" : "无法更新弹出的预览",
+        description: error instanceof Error ? error.message : "发生错误。",
       });
     }
   };
@@ -274,7 +274,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
       threadRef={threadRef}
       miniPlayer={miniPlayer}
       sourceSize={sourceSize}
-      label="Floating browser preview"
+      label="悬浮浏览器预览"
       recording={recording}
       onOpenInPanel={openInPanel}
       pillActions={
@@ -285,9 +285,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
                 <Button
                   variant={poppedOut ? "secondary" : "ghost"}
                   size="icon-xs"
-                  aria-label={
-                    poppedOut ? "Close popped-out preview" : "Pop preview into separate window"
-                  }
+                  aria-label={poppedOut ? "关闭已弹出的预览" : "将预览弹出到独立窗口"}
                   disabled={!serverTab && !desktopOverlay?.hasWebContents}
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={toggleNativePictureInPicture}
@@ -296,9 +294,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
             >
               <PictureInPicture2 />
             </TooltipTrigger>
-            <TooltipPopup side="top">
-              {poppedOut ? "Close separate window" : "Pop into separate window"}
-            </TooltipPopup>
+            <TooltipPopup side="top">{poppedOut ? "关闭独立窗口" : "弹出到独立窗口"}</TooltipPopup>
           </Tooltip>
         ) : null
       }
@@ -355,7 +351,7 @@ function BrowserMiniPlayer({ threadRef, tabId, miniPlayer }: Props & { readonly 
               </div>
             ) : !desktopOverlay?.hasWebContents ? (
               <div className="pointer-events-none absolute inset-0 z-[49] flex items-center justify-center rounded-[inherit] bg-muted text-xs text-muted-foreground">
-                Reconnecting preview…
+                正在重新连接预览…
               </div>
             ) : null}
           </>
@@ -378,7 +374,7 @@ function DeviceMiniPlayer({
     (entry) => entry.hostId === source.hostId && entry.id === source.deviceId,
   );
   const host = deviceState.hosts.find((entry) => entry.id === source.hostId);
-  const hostLabel = host?.label ?? "Device host";
+  const hostLabel = host?.label ?? "设备主机";
   const cornerRadius = (player: PreviewMiniPlayerSize) =>
     resolveDeviceMiniPlayerCornerRadius(source.platform, player);
 
@@ -397,7 +393,7 @@ function DeviceMiniPlayer({
       threadRef={threadRef}
       miniPlayer={miniPlayer}
       sourceSize={sourceSize}
-      label="Floating device preview"
+      label="悬浮设备预览"
       onOpenInPanel={openInPanel}
       cornerRadius={cornerRadius}
     >
@@ -566,7 +562,7 @@ function MiniPlayerShell({
           >
             <div
               role={recording ? "status" : undefined}
-              aria-label={recording ? "Recording preview" : undefined}
+              aria-label={recording ? "正在录制预览" : undefined}
               aria-hidden={!recording}
               className="absolute right-0 top-0 size-2 transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 group-data-pill-open:opacity-0 pointer-coarse:right-2.5 pointer-coarse:top-2.5"
             >
@@ -591,7 +587,7 @@ function MiniPlayerShell({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Open preview in right panel"
+                      aria-label="在右侧面板中打开预览"
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={onOpenInPanel}
                     />
@@ -599,7 +595,7 @@ function MiniPlayerShell({
                 >
                   <PanelRightIcon />
                 </TooltipTrigger>
-                <TooltipPopup side="top">Open in right panel</TooltipPopup>
+                <TooltipPopup side="top">在右侧面板中打开</TooltipPopup>
               </Tooltip>
               {pillActions}
               <Tooltip>
@@ -608,7 +604,7 @@ function MiniPlayerShell({
                     <Button
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="Close floating preview"
+                      aria-label="关闭悬浮预览"
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={close}
                     />
@@ -616,7 +612,7 @@ function MiniPlayerShell({
                 >
                   <XIcon />
                 </TooltipTrigger>
-                <TooltipPopup side="top">Close floating preview</TooltipPopup>
+                <TooltipPopup side="top">关闭悬浮预览</TooltipPopup>
               </Tooltip>
             </div>
           </div>

@@ -7,12 +7,12 @@ const SYNTHETIC_CLAUDE_THINKING_MODEL = "claude-synthetic-thinking";
 
 const effort = {
   id: "effort",
-  label: "Reasoning",
+  label: "推理",
   type: "select" as const,
   options: [
     { id: "low", label: "Low" },
     { id: "high", label: "High", isDefault: true },
-    { id: "max", label: "Max" },
+    { id: "max", label: "最大" },
     { id: "ultrathink", label: "Ultrathink" },
   ],
   promptInjectedValues: ["ultrathink"],
@@ -20,11 +20,11 @@ const effort = {
 
 const contextWindow = {
   id: "contextWindow",
-  label: "Context Window",
+  label: "上下文窗口",
   type: "select" as const,
   options: [
-    { id: "standard", label: "Standard" },
-    { id: "expanded", label: "Expanded", isDefault: true },
+    { id: "standard", label: "标准" },
+    { id: "expanded", label: "展开", isDefault: true },
   ],
 };
 
@@ -45,7 +45,7 @@ export const SYNTHETIC_CLAUDE_MODEL_CATALOG: ClaudeModelCatalog = {
         capabilities: {
           optionDescriptors: [
             effort,
-            { id: "fastMode", label: "Fast Mode", type: "boolean" },
+            { id: "fastMode", label: "快速模式", type: "boolean" },
             contextWindow,
           ],
         },

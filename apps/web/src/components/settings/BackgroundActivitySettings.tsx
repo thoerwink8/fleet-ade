@@ -39,7 +39,7 @@ import { searchableSetting } from "./settingsSearch";
 const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<BackgroundActivityProfile, string> = {
   balanced: "Balanced",
   performance: "Performance",
-  "battery-saver": "Battery saver",
+  "battery-saver": "省电",
 };
 
 type BackgroundActivityProfileOption = BackgroundActivityProfile | "advanced";
@@ -50,9 +50,9 @@ const BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS: Record<BackgroundActivityProfil
 };
 
 const BACKGROUND_ACTIVITY_PROFILE_DESCRIPTIONS: Record<BackgroundActivityProfile, string> = {
-  balanced: "Pauses probes for idle clients, locked hosts, or low power mode.",
-  performance: "Allows scoped background probes while any subscribed client remains connected.",
-  "battery-saver": "Also pauses background probes when the host or client is on battery.",
+  balanced: "客户端闲置、主机锁定或处于低电量模式时暂停检测。",
+  performance: "有订阅此环境的客户端保持连接时，允许相应的后台检测。",
+  "battery-saver": "主机或客户端使用电池供电时，也会暂停后台检测。",
 };
 
 const ADVANCED_BACKGROUND_ACTIVITY_DESCRIPTION = "Uses custom intervals.";
@@ -65,10 +65,10 @@ const BACKGROUND_ACTIVITY_BOOLEAN_OVERRIDES: ReadonlyArray<{
     | "pauseWhenOnBattery";
   readonly label: string;
 }> = [
-  { key: "pauseWhenHostLocked", label: "Pause when host is locked" },
-  { key: "pauseWhenHostLowPower", label: "Pause on host low power" },
-  { key: "pauseWhenClientLowPower", label: "Pause on client low power" },
-  { key: "pauseWhenOnBattery", label: "Pause on battery" },
+  { key: "pauseWhenHostLocked", label: "主机锁定时暂停" },
+  { key: "pauseWhenHostLowPower", label: "主机开启低电量模式时暂停" },
+  { key: "pauseWhenClientLowPower", label: "客户端开启低电量模式时暂停" },
+  { key: "pauseWhenOnBattery", label: "使用电池时暂停" },
 ];
 
 function resetBackgroundActivitySettings() {
@@ -116,10 +116,8 @@ function BackgroundActivityAdvancedDialog({
     <Dialog open={open && canWriteSettings} onOpenChange={onOpenChange}>
       <DialogPopup className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Background Activity</DialogTitle>
-          <DialogDescription>
-            Tune the shared power policy and the background intervals that feed it.
-          </DialogDescription>
+          <DialogTitle>后台活动</DialogTitle>
+          <DialogDescription>调整共享电源策略和相关后台任务的运行间隔。</DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <fieldset
@@ -128,9 +126,9 @@ function BackgroundActivityAdvancedDialog({
           >
             <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Shared policy</div>
+                <div className="text-sm font-medium">共享策略</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Controls whether background work may run after a subscribed interval fires.
+                  控制后台任务达到设定间隔后是否允许运行。
                 </p>
               </div>
               <Select
@@ -147,11 +145,7 @@ function BackgroundActivityAdvancedDialog({
                   }
                 }}
               >
-                <SelectTrigger
-                  size="sm"
-                  className="w-full sm:w-40"
-                  aria-label="Shared background policy"
-                >
+                <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="共享后台策略">
                   <SelectValue>{BACKGROUND_ACTIVITY_PROFILE_LABELS[activeProfile]}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -174,12 +168,12 @@ function BackgroundActivityAdvancedDialog({
                   {searchableSetting("git-fetch-interval").title}
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Refresh remote branch status in the background.
+                  在后台刷新远程分支状态。
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="Git fetch interval"
+                  label="Git 获取间隔"
                   value={automaticGitFetchIntervalSeconds}
                   min={0}
                   step={5}
@@ -194,21 +188,20 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">秒</span>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Provider health interval</div>
+                <div className="text-sm font-medium">提供方状态检查间隔</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Refresh provider availability, versions, and auth state. Model catalog updates
-                  follow Provider update checks.
+                  刷新提供方的可用状态、版本和认证状态。模型目录是否更新取决于“提供方更新检查”设置。
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="provider health interval"
+                  label="提供方状态检查间隔"
                   value={providerHealthRefreshIntervalSeconds}
                   min={0}
                   step={PROVIDER_HEALTH_INTERVAL_STEP_SECONDS}
@@ -223,20 +216,20 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">秒</span>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Host power monitor</div>
+                <div className="text-sm font-medium">主机电源监测</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Poll host power state while clients are active.
+                  客户端活跃时定期检查主机电源状态。
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="active host power interval"
+                  label="活跃时主机电源检查间隔"
                   value={hostPowerMonitorActiveIntervalSeconds}
                   min={5}
                   step={5}
@@ -251,20 +244,20 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">秒</span>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Idle host monitor</div>
+                <div className="text-sm font-medium">闲置主机监测</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Poll host power state when no foreground client is active.
+                  没有活跃的前台客户端时，定期检查主机电源状态。
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="idle host power interval"
+                  label="闲置时主机电源检查间隔"
                   value={hostPowerMonitorIdleIntervalSeconds}
                   min={5}
                   step={30}
@@ -279,7 +272,7 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">秒</span>
               </div>
             </div>
 
@@ -316,9 +309,9 @@ function BackgroundActivityAdvancedDialog({
             disabled={!canWriteSettings}
             onClick={() => updateSettings(resetBackgroundActivitySettings())}
           >
-            Reset all
+            全部重置
           </Button>
-          <Button onClick={() => onOpenChange(false)}>Done</Button>
+          <Button onClick={() => onOpenChange(false)}>完成</Button>
         </DialogFooter>
       </DialogPopup>
     </Dialog>
@@ -356,8 +349,7 @@ export function BackgroundActivitySettingsRow() {
         <span className="inline-flex items-center gap-1.5">
           {searchableSetting("background-activity").title}
           <PolicyTooltip>
-            This shared policy gates background work such as Git refreshes and provider health
-            probes after their individual intervals elapse.
+            Git 刷新和提供方状态检测等后台任务达到各自间隔后，是否运行由此共享策略决定。
           </PolicyTooltip>
         </span>
       }
@@ -365,7 +357,7 @@ export function BackgroundActivitySettingsRow() {
       resetAction={
         canResetBackgroundActivity ? (
           <SettingResetButton
-            label="background activity"
+            label="后台活动"
             onClick={() => updateSettings(resetBackgroundActivitySettings())}
           />
         ) : null
@@ -384,11 +376,7 @@ export function BackgroundActivitySettingsRow() {
               }
             }}
           >
-            <SelectTrigger
-              size="sm"
-              className="w-full sm:w-40"
-              aria-label="Background activity profile"
-            >
+            <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="后台活动模式">
               <SelectValue>
                 {(value: BackgroundActivityProfileOption | null) =>
                   value === null ? "Mixed" : BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS[value]
@@ -419,14 +407,14 @@ export function BackgroundActivitySettingsRow() {
                   <Button
                     size="icon-sm"
                     variant="outline"
-                    aria-label="Configure advanced background activity"
+                    aria-label="配置高级后台活动"
                     onClick={() => setBackgroundActivityDialogOpen(true)}
                   >
                     <SettingsIcon className="size-4" />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Configure background activity</TooltipPopup>
+              <TooltipPopup side="top">配置后台活动</TooltipPopup>
             </Tooltip>
           ) : null}
           <BackgroundActivityAdvancedDialog

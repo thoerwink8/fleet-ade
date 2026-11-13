@@ -28,13 +28,13 @@ it("derives Hyprland setup from its own helper and registered action, not old GN
     linuxBackend: "hyprland",
     linuxDesktop: "hyprland",
     shortcutRegistered: false,
-    hyprlandHelper: { status: "not-installed", message: "Install" },
+    hyprlandHelper: { status: "not-installed", message: "安装" },
   };
   expect(captureSetupBackend(state)).toBe("hyprland");
   expect(captureSetupDesktopName(state)).toBe("Hyprland");
   expect(captureSetupAccessReady(state)).toBe(false);
   expect(captureSetupInitialStep(state)).toBe("access");
-  const installed = { ...state, hyprlandHelper: { status: "ready" as const, message: "Ready" } };
+  const installed = { ...state, hyprlandHelper: { status: "ready" as const, message: "就绪" } };
   expect(captureSetupInitialStep(installed)).toBe("shortcut");
   expect(captureSetupShortcutReady(installed, false)).toBe(false);
   expect(captureSetupShortcutReady({ ...installed, shortcutPending: true }, false)).toBe(false);
@@ -121,7 +121,7 @@ it("resumes KDE setup after the helper passes its real permission check", () => 
     ...gnome,
     linuxBackend: "kde" as const,
     gnomeExtension: undefined,
-    kdeHelper: { status: "ready" as const, message: "Ready" },
+    kdeHelper: { status: "ready" as const, message: "就绪" },
   };
   expect(captureSetupAccessReady(state)).toBe(true);
   expect(captureSetupInitialStep(state)).toBe("shortcut");
@@ -144,7 +144,7 @@ it("uses a capable portal without requiring the optional GNOME extension", () =>
   const state = {
     ...gnome,
     linuxBackend: "screenshot-portal" as const,
-    gnomeExtension: { status: "not-installed" as const, message: "Not installed" },
+    gnomeExtension: { status: "not-installed" as const, message: "未安装" },
   };
   expect(captureSetupBackend(state)).toBe("portal");
   expect(captureSetupAccessReady(state)).toBe(true);
@@ -154,7 +154,7 @@ it("uses a capable portal without requiring the optional GNOME extension", () =>
       ...state,
       gnomeExtension: { status: "error", message: "Optional extension failed" },
     }),
-  ).toBe("Ready. Continue to choose your shortcut.");
+  ).toBe("已就绪，继续选择快捷键。");
 });
 
 it("lets Niri setup finish with configuration instructions without claiming the binding was verified", () => {
@@ -238,5 +238,5 @@ it.each(["kde", "hyprland"] as const)("ignores errors from inactive helpers on %
     hyprlandHelper: { status: backend === "hyprland" ? "ready" : "error", message: "Hyprland" },
   };
   expect(captureSetupAccessReady(state)).toBe(true);
-  expect(captureSetupCheckMessage(state)).toBe("Ready. Continue to choose your shortcut.");
+  expect(captureSetupCheckMessage(state)).toBe("已就绪，继续选择快捷键。");
 });

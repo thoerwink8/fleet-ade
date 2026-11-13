@@ -22,7 +22,7 @@ describe("worktree cleanup inheritance", () => {
     const layers = settingInheritanceLayers(
       {
         environmentId,
-        label: "Laptop",
+        label: "笔记本电脑",
         projectId,
         ...resolveProjectSettings(settings, projectId),
       },
@@ -32,7 +32,7 @@ describe("worktree cleanup inheritance", () => {
     expect(layers.map((layer) => [layer.key, layer.value, layer.effective])).toEqual([
       ["project", "Off", true],
       ["environment", "Custom", false],
-      ["built-in", "Not set", false],
+      ["built-in", "未设置", false],
     ]);
   });
 });
@@ -50,7 +50,7 @@ describe("settingInheritanceLayers", () => {
     const layers = settingInheritanceLayers(
       {
         environmentId,
-        label: "Laptop",
+        label: "笔记本电脑",
         projectId: null,
         ...resolveProjectSettings(settings, projectId),
       },
@@ -68,7 +68,7 @@ describe("settingInheritanceLayers", () => {
     const fromFile = settingInheritanceLayers(
       {
         environmentId,
-        label: "Laptop",
+        label: "笔记本电脑",
         projectId,
         ...resolveProjectSettings(DEFAULT_SERVER_SETTINGS, projectId, null, file),
       },
@@ -78,14 +78,14 @@ describe("settingInheritanceLayers", () => {
     expect(fromFile.map((layer) => [layer.label, layer.value, layer.effective])).toEqual([
       ["Project", "Inherits", false],
       ["Laptop", "Inherits", false],
-      ["t3.json", "New worktree", true],
-      ["Default", "Current checkout", false],
+      ["t3.json", "新工作树", true],
+      ["Default", "当前工作副本", false],
     ]);
     const settings = { ...DEFAULT_SERVER_SETTINGS, defaultThreadEnvMode: "local" as const };
     const fromEnvironment = settingInheritanceLayers(
       {
         environmentId,
-        label: "Laptop",
+        label: "笔记本电脑",
         projectId,
         ...resolveProjectSettings(settings, projectId, null, file),
       },
@@ -94,9 +94,9 @@ describe("settingInheritanceLayers", () => {
     );
     expect(fromEnvironment.map((layer) => [layer.value, layer.effective])).toEqual([
       ["Inherits", false],
-      ["Current checkout", true],
+      ["当前工作副本", true],
       ["Inherits", false],
-      ["Current checkout", false],
+      ["当前工作副本", false],
     ]);
   });
 });

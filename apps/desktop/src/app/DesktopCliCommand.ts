@@ -150,12 +150,12 @@ export const make = Effect.gen(function* () {
   // Explicit, so an inherited T3_SET=1 can never turn a read into a PATH write.
   const readUserPath = powershell({ T3_SET: "0" }).pipe(
     Effect.map((encoded) => Buffer.from(encoded.trim(), "base64").toString("utf8")),
-    Effect.mapError(() => fail("Could not read your PATH, so it was left unchanged.")),
+    Effect.mapError(() => fail("无法读取 PATH，未做更改。")),
   );
   const writeUserPath = (value: string) =>
     powershell({ T3_SET: "1", T3_PATH: value }).pipe(
       Effect.asVoid,
-      Effect.mapError(() => fail("Could not update your PATH.")),
+      Effect.mapError(() => fail("无法更新 PATH。")),
     );
 
   const isExecutableFile = Effect.fn("DesktopCliCommand.isExecutableFile")(
@@ -286,20 +286,20 @@ export const make = Effect.gen(function* () {
     Effect.provideService(FileSystem.FileSystem, fs),
     Effect.flatMap(
       Option.match({
-        onNone: () => Effect.fail(fail(`Could not set up the t3 launcher at ${launcher}.`)),
+        onNone: () => Effect.fail(fail(`无法在 ${launcher} 设置 t3 启动器。`)),
         onSome: () => Effect.void,
       }),
     ),
   );
 
   const install: DesktopCliCommand["Service"]["install"] = Effect.gen(function* () {
-    if (!environment.isPackaged) return yield* fail("The t3 command needs an installed app.");
+    if (!environment.isPackaged) return yield* fail("t3 命令需要已安装的应用。");
     yield* ensureLauncher;
     if (windows) {
       // PATH would split the folder at the `;`, leaving two wrong entries behind.
       if (binDirectory.includes(";")) {
         return yield* fail(
-          `T3 Code cannot put ${binDirectory} on PATH because it has a ";". Run ${launcher} directly.`,
+          `${binDirectory} 含有“;”，T3 Code 无法将其加入 PATH。请直接运行 ${launcher}。`,
         );
       }
       const entries = pathEntries(yield* readUserPath, ";");
@@ -307,7 +307,7 @@ export const make = Effect.gen(function* () {
         yield* writeUserPath([...entries, binDirectory].join(";"));
         yield* fs
           .writeFileString(ownedPathMarker, `${binDirectory}\n`)
-          .pipe(Effect.mapError(() => fail("Added t3 to your PATH but could not record it.")));
+          .pipe(Effect.mapError(() => fail("已将 t3 添加到 PATH，但无法记录此更改。")));
       }
       return yield* state;
     }
@@ -321,7 +321,7 @@ export const make = Effect.gen(function* () {
     // Our own link into another T3 home runs first too; it is the one this install updates.
     if (Option.isSome(shadowedBy) && shadowedBy.value !== replaced) {
       return yield* fail(
-        `Another t3 at ${shadowedBy.value} runs first in a new terminal. Remove it, or run the launcher directly at ${launcher}.`,
+        `新终端会优先运行 ${shadowedBy.value} 处的另一个 t3。请移除它，或直接运行 ${launcher} 处的启动器。`,
       );
     }
     // An old link of ours is updated where it is, so a t3 that works now keeps working. It is
@@ -365,7 +365,7 @@ export const make = Effect.gen(function* () {
       return yield* state;
     }
     return yield* fail(
-      `Another t3 command is already in ~/.local/bin and ~/bin, or neither is writable. Run the launcher directly at ${launcher}.`,
+      `~/.local/bin 和 ~/bin 中已有另一个 t3 命令，或这两个文件夹都不可写。请直接运行 ${launcher} 处的启动器。`,
     );
   }).pipe(Effect.withSpan("desktop.cliCommand.install"));
 
@@ -384,7 +384,7 @@ export const make = Effect.gen(function* () {
     for (const directory of knownLocations(environment.homeDirectory, environment.platform)) {
       const link = path.join(directory, "t3");
       if (yield* isOurLink(link)) {
-        yield* fs.remove(link).pipe(Effect.mapError(() => fail(`Could not remove ${link}.`)));
+        yield* fs.remove(link).pipe(Effect.mapError(() => fail(`无法移除 ${link}。`)));
       }
     }
     return yield* state;
@@ -395,22 +395,20 @@ export const make = Effect.gen(function* () {
   const addToPath: DesktopCliCommand["Service"]["addToPath"] = Effect.gen(function* () {
     const installed = yield* installedAt;
     if (Option.isNone(installed) || !(yield* leadsHere(installed.value))) {
-      return yield* fail("Install the t3 command first.");
+      return yield* fail("请先安装 t3 命令。");
     }
     const setup = startupLine(installed.value);
-    if (setup === undefined) return yield* fail("T3 Code cannot add t3 to this shell's PATH.");
+    if (setup === undefined) return yield* fail("T3 Code 无法将 t3 添加到此 shell 的 PATH。");
     const shadowedBy = yield* foreignFirstOnPath;
     if (Option.isSome(shadowedBy)) {
-      return yield* fail(
-        `Another t3 at ${shadowedBy.value} runs first; T3 Code leaves it in place.`,
-      );
+      return yield* fail(`${shadowedBy.value} 处的另一个 t3 会优先运行；T3 Code 不会改动它。`);
     }
     if (!(yield* folderOnPath(installed.value)) && !(yield* hasLine(setup))) {
       yield* fs.makeDirectory(path.dirname(setup.path), { recursive: true }).pipe(
         Effect.andThen(
           fs.writeFileString(setup.path, `\n# Added by T3 Code\n${setup.line}\n`, { flag: "a" }),
         ),
-        Effect.mapError(() => fail(`Could not add t3 to ${setup.file}.`)),
+        Effect.mapError(() => fail(`无法将 t3 添加到 ${setup.file}。`)),
       );
     }
     return yield* state;

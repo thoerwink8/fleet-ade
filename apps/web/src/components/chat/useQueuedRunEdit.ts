@@ -122,7 +122,7 @@ async function submitQueuedRunEdit(input: {
     await awaitAttachmentUploads(files.map((file) => file.id));
     validateFiles();
     const uploaded = getUploadedAttachments({ environmentId, images: files });
-    if (uploaded === null) throw new Error("Retry or remove failed uploads before saving.");
+    if (uploaded === null) throw new Error("保存前请重试或移除上传失败的附件。");
     return uploaded;
   };
   try {
@@ -177,9 +177,9 @@ async function submitQueuedRunEdit(input: {
         },
       },
     });
-    return result._tag === "Failure" ? "Could not save the edited queued message." : null;
+    return result._tag === "Failure" ? "无法保存编辑后的排队消息。" : null;
   } catch (error) {
-    return error instanceof Error ? error.message : "Could not save the edited queued message.";
+    return error instanceof Error ? error.message : "无法保存编辑后的排队消息。";
   }
 }
 
@@ -303,7 +303,7 @@ export function useQueuedRunEdit(input: {
           toastManager.add(
             stackedThreadToast({
               type: recovery === "kept" ? "info" : "warning",
-              title: "Queued message is no longer queued",
+              title: "排队的消息已不在队列中",
               description:
                 recovery === "kept"
                   ? `Your unsaved edit${where} was kept in the composer.`
@@ -343,7 +343,7 @@ export function useQueuedRunEdit(input: {
     ) {
       setThreadError(
         editing.threadId,
-        `A message can have at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments.`,
+        `一条消息最多可以有 ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} 个附件。`,
       );
       return;
     }

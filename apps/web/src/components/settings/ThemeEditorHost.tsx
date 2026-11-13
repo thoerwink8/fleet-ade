@@ -38,8 +38,8 @@ export function ThemeEditorHost() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not save your theme",
-            description: "Browser storage is unavailable, so the change was not kept.",
+            title: "无法保存主题",
+            description: "浏览器存储不可用，未保留更改。",
           }),
         );
         return false;
@@ -47,8 +47,8 @@ export function ThemeEditorHost() {
       toastManager.add(
         stackedThreadToast({
           type: "success",
-          title: `${savedTheme.label} updated`,
-          description: `Its ${mergedAppearance} palette was added.`,
+          title: `已更新 ${savedTheme.label}`,
+          description: `已添加其${mergedAppearance}调色板。`,
         }),
       );
       return true;
@@ -63,8 +63,8 @@ export function ThemeEditorHost() {
       toastManager.add(
         stackedThreadToast({
           type: "success",
-          title: `${savedTheme.label} saved`,
-          description: wasActive ? "Your changes are now active." : "Your changes are saved.",
+          title: `已保存 ${savedTheme.label}`,
+          description: wasActive ? "更改已生效。" : "更改已保存。",
         }),
       );
       return true;
@@ -74,8 +74,8 @@ export function ThemeEditorHost() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not save your theme",
-          description: "Browser storage is unavailable, so the change was not kept.",
+          title: "无法保存主题",
+          description: "浏览器存储不可用，未保留更改。",
         }),
       );
       return false;
@@ -83,8 +83,8 @@ export function ThemeEditorHost() {
     toastManager.add(
       stackedThreadToast({
         type: "success",
-        title: `${savedTheme.label} created`,
-        description: "It’s now active.",
+        title: `已创建 ${savedTheme.label}`,
+        description: "现已启用。",
       }),
     );
     return true;

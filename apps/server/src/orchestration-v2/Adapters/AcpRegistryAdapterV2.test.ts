@@ -835,7 +835,7 @@ describe("AcpRegistryAdapterV2", () => {
             configOptions: [
               {
                 id: "reasoning_effort",
-                label: "Reasoning effort",
+                label: "推理强度",
                 type: "select",
                 role: "reasoning",
                 currentValue: "xhigh",
@@ -1889,7 +1889,7 @@ describe("AcpRegistryAdapterV2", () => {
               message: "Which file?",
               requestedSchema: {
                 type: "object",
-                properties: { file: { type: "string", title: "File", enum: ["a.ts", "b.ts"] } },
+                properties: { file: { type: "string", title: "文件", enum: ["a.ts", "b.ts"] } },
                 required: ["file"],
               },
             };
@@ -2295,7 +2295,7 @@ describe("AcpRegistryAdapterV2", () => {
           update("child-1", {
             sessionUpdate: "tool_call_content_chunk",
             toolCallId: "stopped-tool",
-            content: { type: "content", content: { type: "text", text: "cancelled" } },
+            content: { type: "content", content: { type: "text", text: "已取消" } },
           }),
           claudeMarker("late output"),
           update(CLAUDE_ROOT_SESSION, {

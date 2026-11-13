@@ -120,7 +120,7 @@ describe("projectedSubagentsToRuntime workflow expansion", () => {
         modelSelection: { model: "claude-opus-5-5" },
       }).modelLabel,
     ).toBe("Claude Opus 5.5");
-    expect(resolveSubagentMetadata({ model: workflow!.model }).modelLabel).toBe("Not reported");
+    expect(resolveSubagentMetadata({ model: workflow!.model }).modelLabel).toBe("未报告");
   });
 
   it.each(["completed", "cancelled", "failed"] as const)(
@@ -175,17 +175,17 @@ describe("deriveWorkflowGroups over a dynamic workflow", () => {
           name: "probe-wf",
           phases: [
             { index: 1, title: "Alpha" },
-            { index: 2, title: "Beta" },
+            { index: 2, title: "测试版" },
           ],
           agents: [
             member({ state: "completed" }),
             member({ index: 2, label: "alpha:two", state: "failed" }),
-            member({ index: 3, label: "beta:one", phaseIndex: 2, phaseTitle: "Beta" }),
+            member({ index: 3, label: "beta:one", phaseIndex: 2, phaseTitle: "测试版" }),
             member({
               index: 4,
               label: "beta:two",
               phaseIndex: 2,
-              phaseTitle: "Beta",
+              phaseTitle: "测试版",
               state: "queued",
             }),
           ],

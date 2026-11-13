@@ -38,7 +38,7 @@ import * as AgentSessionScanner from "./AgentSessionScanner.ts";
 
 const makeProjectShell = (workspaceRoot: string): OrchestrationProjectShell => ({
   id: ProjectId.make("project-1"),
-  title: "Imported",
+  title: "已导入",
   workspaceRoot,
   defaultModelSelection: null,
   scripts: [],
@@ -1274,7 +1274,7 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
             type: "assistant",
             sessionId,
             timestamp: "2026-08-23T12:01:00.000Z",
-            message: { role: "assistant", content: [{ type: "text", text: "Done" }] },
+            message: { role: "assistant", content: [{ type: "text", text: "完成" }] },
           })}\n`;
 
         yield* writeTranscript({
@@ -2806,14 +2806,14 @@ describe("parseAgentSessionTranscript", () => {
             encodeTranscriptRecord({
               type: index === 0 ? "user" : "assistant",
               sessionId: "claude-session",
-              message: { content: `Message ${index}` },
+              message: { content: `给 ${index} 发消息` },
             }),
           ),
-          encodeTranscriptRecord({ type: "user", isMeta: true, message: { content: "Setup" } }),
+          encodeTranscriptRecord({ type: "user", isMeta: true, message: { content: "设置" } }),
           encodeTranscriptRecord({
             type: "user",
             isCompactSummary: true,
-            message: { content: "Summary" },
+            message: { content: "摘要" },
           }),
           encodeTranscriptRecord({
             type: "assistant",
@@ -2835,7 +2835,7 @@ describe("parseAgentSessionTranscript", () => {
       expect(thread?.omittedMessageCount).toBe(Math.max(0, count - 200));
       expect(thread?.messages).toHaveLength(Math.min(200, count));
       expect(thread?.messages[0]?.text).toBe("Message 0");
-      expect(thread?.messages.at(-1)?.text).toBe(`Message ${count - 1}`);
+      expect(thread?.messages.at(-1)?.text).toBe(`给 ${count - 1} 发消息`);
     },
   );
 
@@ -3333,7 +3333,7 @@ describe("parseAgentSessionTranscript", () => {
     const thread = AgentSessionScanner.parseAgentSessionTranscript({
       contents: JSON.stringify({
         type: "assistant",
-        message: { role: "assistant", content: "Done" },
+        message: { role: "assistant", content: "完成" },
       }),
       source: "claudeAgent",
       providerInstanceId: ProviderInstanceId.make("claudeAgent"),

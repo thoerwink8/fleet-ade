@@ -249,12 +249,12 @@ describe("PreviewView", () => {
     async (address) => {
       setup();
       await using _screen = await render(<ToastProvider timeout={0}>{view()}</ToastProvider>);
-      const input = page.getByPlaceholder("Search or enter URL");
+      const input = page.getByPlaceholder("搜索或输入 URL");
       await input.fill(address);
       await userEvent.keyboard("{Enter}");
 
-      await expect.element(page.getByText("Could not open this address")).toBeVisible();
-      await expect.element(page.getByText("Enter an http or https URL.")).toBeVisible();
+      await expect.element(page.getByText("无法打开此地址")).toBeVisible();
+      await expect.element(page.getByText("请输入 http 或 https URL。")).toBeVisible();
       expect(mocks.navigate).not.toHaveBeenCalled();
       expect(mocks.recordVisitForThread).not.toHaveBeenCalled();
       await userEvent.click(page.getByRole("button", { name: "Dismiss notification" }));
@@ -264,7 +264,7 @@ describe("PreviewView", () => {
   it("keeps the address in the bar when Enter commits an IME composition", async () => {
     setup();
     await using _screen = await render(view());
-    const input = page.getByPlaceholder("Search or enter URL");
+    const input = page.getByPlaceholder("搜索或输入 URL");
     await input.fill("https://example.com/pinyin");
 
     const enter = new KeyboardEvent("keydown", {

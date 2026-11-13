@@ -278,7 +278,7 @@ it.effect.each(deliveries)(
                   providerThreadId: null,
                   childThreadId: null,
                   nativeTaskRef: null,
-                  prompt: "Background work",
+                  prompt: "后台任务",
                   title: "Child",
                   model: null,
                   completionWake: "always",

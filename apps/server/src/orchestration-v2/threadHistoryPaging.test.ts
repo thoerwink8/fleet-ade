@@ -105,7 +105,7 @@ function interruptItem(
     ordinal,
     status: "completed",
     title: type,
-    message: type === "run_interrupt_request" ? "Stopping" : "Stopped",
+    message: type === "run_interrupt_request" ? "正在停止" : "已停止",
     startedAt: NOW,
     completedAt: NOW,
     updatedAt: NOW,
@@ -135,7 +135,7 @@ function makeProjection(visibleTurnItems: OrchestrationV2ProjectedTurnItem[]) {
     thread: {
       id: THREAD,
       projectId: "project-1",
-      title: "Thread",
+      title: "会话",
       providerInstanceId: "codex",
       modelSelection: { instanceId: "codex", model: "gpt-5" },
       runtimeMode: "full-access",
@@ -261,7 +261,7 @@ describe("threadHistoryPaging", () => {
           creationSource: "web",
           inputIntent: "turn_start",
           messageId: MessageId.make("long-human-turn"),
-          text: "Continue",
+          text: "继续",
           attachments: [],
         },
       } as OrchestrationV2ProjectedTurnItem;

@@ -44,7 +44,7 @@ describe("getProviderSummary", () => {
         message: "Run codex login.",
       }),
     ).toEqual({
-      headline: "Not authenticated",
+      headline: "未认证",
       detail: "Run codex login.",
     });
   });
@@ -64,7 +64,7 @@ describe("Antigravity with unchecked sign-in", () => {
     for (const auth of [unchecked.auth, { status: "unknown", type: "oauth-personal" }] as const) {
       const candidate = { ...unchecked, auth };
       expect.soft(getProviderSummary(candidate)).toEqual({
-        headline: "Installed · Sign-in not checked",
+        headline: "已安装 · 未检查登录状态",
         detail: unchecked.message,
       });
       expect(getProviderStatusKey(candidate)).toBe("neutral");
@@ -77,13 +77,13 @@ describe("Antigravity with unchecked sign-in", () => {
       {
         name: "confirmed sign-out",
         change: { auth: { status: "unauthenticated" } },
-        headline: "Not authenticated",
+        headline: "未认证",
         status: "warning",
       },
       {
         name: "warning despite known authentication",
         change: { auth: { status: "authenticated" } },
-        headline: "Needs attention",
+        headline: "需要处理",
         status: "warning",
       },
       {
@@ -95,25 +95,25 @@ describe("Antigravity with unchecked sign-in", () => {
       {
         name: "missing CLI",
         change: { installed: false },
-        headline: "Not found",
+        headline: "未找到",
         status: "warning",
       },
       {
         name: "API key authentication",
         change: { auth: { status: "unknown", type: "gemini-api-key" } },
-        headline: "Needs attention",
+        headline: "需要处理",
         status: "warning",
       },
       {
         name: "Agent Platform authentication",
         change: { auth: { status: "unknown", type: "agent-platform" } },
-        headline: "Needs attention",
+        headline: "需要处理",
         status: "warning",
       },
       {
         name: "another provider",
         change: { driver: provider.driver },
-        headline: "Needs attention",
+        headline: "需要处理",
         status: "warning",
       },
       {
@@ -179,7 +179,7 @@ it("does not offer an update that cannot change a limited-support version", () =
     recommendedVersion: null,
   };
   expect(getProviderVersionAdvisoryPresentation(advisory, compatibility)).toEqual({
-    title: "Limited support",
+    title: "有限支持",
     detail: "Use >=2.0.18 for full support.",
     updateCommand: null,
     emphasis: "normal",
@@ -211,7 +211,7 @@ it("shows compatibility in the version popover even when the installed version i
     recommendedVersion: "1.9.0",
   };
   expect(getProviderVersionAdvisoryPresentation(advisory, compatibility)).toEqual({
-    title: "Known broken version",
+    title: "已知有问题的版本",
     detail: compatibility.message,
     updateCommand: null,
     emphasis: "strong",
@@ -226,7 +226,7 @@ it("shows compatibility in the version popover even when the installed version i
       message: null,
     }),
   ).toEqual({
-    title: "Limited support",
+    title: "有限支持",
     detail: "Use >=2.1.0 for full support.",
     updateCommand: null,
     emphasis: "normal",

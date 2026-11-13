@@ -150,7 +150,7 @@ export function NoticeText({
             <InfoIcon />
           </PopoverTrigger>
           <PopoverPopup
-            aria-label="Notice details"
+            aria-label="提示详情"
             tooltipStyle
             side="top"
             className="max-w-[min(30rem,calc(100vw-2rem))] whitespace-normal wrap-anywhere [--inline-button-text-align:start] [--inline-button-white-space:normal] [&_[data-slot=inline-button]]:max-w-full"
@@ -185,9 +185,7 @@ function NoticeCard({
         <ComposerBanner.Content className="whitespace-nowrap">
           <NoticeText
             detailsLabel={
-              typeof item.title === "string"
-                ? `Show full title: ${item.title}`
-                : "Show title details"
+              typeof item.title === "string" ? `显示完整标题：${item.title}` : "显示标题详情"
             }
             className="min-w-0 truncate font-medium leading-7 sm:leading-6"
           >
@@ -196,9 +194,7 @@ function NoticeCard({
           {item.description ? (
             <NoticeText
               detailsLabel={
-                typeof item.title === "string"
-                  ? `Show details: ${item.title}`
-                  : "Show notice details"
+                typeof item.title === "string" ? `显示详情：${item.title}` : "显示提示详情"
               }
               className="w-0 min-w-0 grow truncate text-muted-foreground @max-[400px]:sr-only"
             >
@@ -211,7 +207,7 @@ function NoticeCard({
             {item.actions}
             {item.onDismiss ? (
               <ComposerBanner.Dismiss
-                aria-label={item.dismissLabel ?? "Dismiss warning"}
+                aria-label={item.dismissLabel ?? "关闭警告"}
                 onClick={item.onDismiss}
               />
             ) : null}

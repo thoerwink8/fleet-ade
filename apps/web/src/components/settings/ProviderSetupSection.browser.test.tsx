@@ -180,7 +180,7 @@ function resetSetup() {
   setup.confirm.mockReset().mockResolvedValue(false);
 }
 
-describe("Antigravity setup", () => {
+describe("Antigravity 设置", () => {
   it("can start installation before the first install snapshot arrives", async () => {
     resetSetup();
     setup.auth = authState({ phase: "idle", flowId: null, authorizationUrl: null });
@@ -193,9 +193,9 @@ describe("Antigravity setup", () => {
     setup.startInstall.mockReturnValueOnce(command);
     await using screen = await renderSetup({ provider: { ...provider, installed: false } });
 
-    await screen.click("Install Antigravity");
+    await screen.click("安装 Antigravity");
     await expect
-      .element(screen.getByRole("status").filter({ hasText: "Starting installation." }))
+      .element(screen.getByRole("status").filter({ hasText: "正在启动安装。" }))
       .toBeVisible();
 
     setup.installation = {
@@ -227,19 +227,19 @@ describe("Antigravity setup", () => {
       environmentId,
       input: { instanceId, flowId: "flow-1", callbackUrl },
     });
-    expect(screen.occurrences("Signed in.")).toBe(0);
+    expect(screen.occurrences("已登录")).toBe(0);
     expect(screen.callbackInput().value).toBe("");
 
     setup.auth = authState({ phase: "verifying", authorizationUrl: null });
     await publish();
-    expect(screen.occurrences("Signed in.")).toBe(0);
+    expect(screen.occurrences("已登录")).toBe(0);
     setup.auth = authState({ phase: "succeeded", authorizationUrl: null });
     await screen.rerender(
       section({
         provider: { ...provider, status: "ready", auth: { status: "authenticated" } },
       }),
     );
-    expect(screen.occurrences("Signed in.")).toBe(1);
+    expect(screen.occurrences("已登录")).toBe(1);
   });
 
   it("does not send a callback left over from a replaced sign-in flow", async () => {
@@ -278,7 +278,7 @@ describe("Antigravity setup", () => {
       provider: { ...provider, installed: false },
       binaryPath: "/missing/antigravity",
     });
-    expect(screen.button("Sign in")?.disabled).toBe(true);
+    expect(screen.button("登录")?.disabled).toBe(true);
     expect(setup.startAuth).not.toHaveBeenCalled();
   });
 });

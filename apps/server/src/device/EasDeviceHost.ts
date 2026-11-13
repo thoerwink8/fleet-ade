@@ -472,7 +472,7 @@ export const make = Effect.fn("EasDeviceHost.make")(function* (config: EasDevice
           return Effect.fail(
             unavailable(
               pending > 0
-                ? `${limit} ${pending === 1 ? "A session" : `${pending} sessions`} that failed to start or stop ${pending === 1 ? "is" : "are"} still being cleaned up; try again shortly.`
+                ? `${limit} ${pending === 1 ? "A session" : `${pending} 个会话`} that failed to start or stop ${pending === 1 ? "is" : "are"} still being cleaned up; try again shortly.`
                 : `${limit} Close one in the Device panel first.`,
             ),
           );

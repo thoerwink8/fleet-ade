@@ -37,7 +37,7 @@ const citation: AssistantCitation = {
 describe("splitPromptIntoComposerSegments", () => {
   it("splits mention tokens followed by whitespace into mention segments", () => {
     expect(splitPromptIntoComposerSegments("Inspect @AGENTS.md please")).toEqual([
-      { type: "text", text: "Inspect " },
+      { type: "text", text: "检查" },
       { type: "mention", path: "AGENTS.md", source: "@AGENTS.md" },
       { type: "text", text: " please" },
     ]);
@@ -45,7 +45,7 @@ describe("splitPromptIntoComposerSegments", () => {
 
   it("splits quoted mention tokens containing whitespace", () => {
     expect(splitPromptIntoComposerSegments('Inspect @"My File.md" please')).toEqual([
-      { type: "text", text: "Inspect " },
+      { type: "text", text: "检查" },
       { type: "mention", path: "My File.md", source: '@"My File.md"' },
       { type: "text", text: " please" },
     ]);
@@ -53,7 +53,7 @@ describe("splitPromptIntoComposerSegments", () => {
 
   it("unescapes quoted mention token content", () => {
     expect(splitPromptIntoComposerSegments('Inspect @"docs/My \\"File\\".md" please')).toEqual([
-      { type: "text", text: "Inspect " },
+      { type: "text", text: "检查" },
       {
         type: "mention",
         path: 'docs/My "File".md',
@@ -69,7 +69,7 @@ describe("splitPromptIntoComposerSegments", () => {
         "Inspect [package.json](path/to/package.json) before continuing",
       ),
     ).toEqual([
-      { type: "text", text: "Inspect " },
+      { type: "text", text: "检查" },
       {
         type: "mention",
         path: "path/to/package.json",
@@ -165,7 +165,7 @@ describe("splitPromptIntoComposerSegments", () => {
         "Inspect [config#draft?.json](config%23draft%3F.json) before continuing",
       ),
     ).toEqual([
-      { type: "text", text: "Inspect " },
+      { type: "text", text: "检查" },
       {
         type: "mention",
         path: "config#draft?.json",
@@ -177,7 +177,7 @@ describe("splitPromptIntoComposerSegments", () => {
 
   it("splits skill tokens followed by whitespace into skill segments", () => {
     expect(splitPromptIntoComposerSegments("Use $review-follow-up please")).toEqual([
-      { type: "text", text: "Use " },
+      { type: "text", text: "使用" },
       { type: "skill", name: "review-follow-up", source: "$review-follow-up" },
       { type: "text", text: " please" },
     ]);
@@ -187,7 +187,7 @@ describe("splitPromptIntoComposerSegments", () => {
     expect(
       splitPromptIntoComposerSegments(`Inspect ${terminalReference} @AGENTS.md please`),
     ).toEqual([
-      { type: "text", text: "Inspect " },
+      { type: "text", text: "检查" },
       terminalSegment,
       { type: "text", text: " " },
       { type: "mention", path: "AGENTS.md", source: "@AGENTS.md" },

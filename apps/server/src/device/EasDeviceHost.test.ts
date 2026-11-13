@@ -26,7 +26,7 @@ const APP_ID = "d763fcb8-d37c-41ea-a773-b54a0ab4a454";
 const config = (overrides: Partial<EasDeviceHostConfig> = {}): EasDeviceHostConfig => ({
   kind: "eas",
   id: "eas",
-  label: "EAS Simulator",
+  label: "EAS 模拟器",
   appId: APP_ID,
   accessToken: "expo-token",
   maxSessionMinutes: 25,

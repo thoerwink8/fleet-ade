@@ -98,136 +98,127 @@ function locate(input: ConnectionDiagnosisInput): Located | null {
 function headline(host: string, located: Located, failure: ConnectionAttemptError | null): string {
   switch (located.cause) {
     case "offline":
-      return "This device is offline";
+      return "此设备离线";
     case "session_pending":
-      return "This device is still loading its T3 Connect sign-in";
+      return "此设备仍在加载 T3 Connect 登录状态";
     case "outdated":
-      return `${host} runs an older T3 Code`;
+      return `${host} 运行的 T3 Code 版本较旧`;
     case "clock_skew":
-      return "This device's clock is off";
+      return "此设备的时钟不准确";
     case "not_linked":
-      return `${host} is not linked to your T3 Connect account`;
+      return `${host} 未关联到你的 T3 Connect 账户`;
     case "relay_error":
-      return "T3 Connect returned an error";
+      return "T3 Connect 返回了错误";
     case "tunnel_pending":
-      return `${host}'s tunnel is still being set up`;
+      return `${host} 的隧道仍在设置中`;
     case "tunnel_not_enabled":
-      return `T3 Connect is not turned on for ${host}`;
+      return `${host} 尚未开启 T3 Connect`;
     case "released":
     case "tunnel_down":
-      return `${host}'s tunnel is offline`;
+      return `${host} 的隧道离线`;
     case "origin_unreachable":
-      return `Tunnel works, but T3 Code on ${host} did not answer`;
+      return `隧道正常，但 ${host} 上的 T3 Code 没有响应`;
     case "invalid_response":
-      return `T3 Code on ${host} sent an unexpected answer`;
+      return `${host} 上的 T3 Code 返回了异常响应`;
     case "dns":
-      return `${host}'s tunnel address did not resolve`;
+      return `无法解析 ${host} 的隧道地址`;
     case "tls":
-      return `Secure connection to ${host}'s tunnel failed`;
+      return `无法与 ${host} 的隧道建立安全连接`;
     case "refused":
-      return `${host}'s tunnel refused the connection`;
+      return `${host} 的隧道拒绝了连接`;
     case "timeout":
-      return `${host} did not answer in time`;
+      return `${host} 未及时响应`;
     case "unknown":
     case null:
       break;
   }
   switch (located.hop) {
     case "device":
-      return "This device could not prepare the connection";
+      return "此设备无法准备连接";
     case "relay":
       return failure?.reason === "authentication"
-        ? "T3 Connect did not accept this device's sign-in"
-        : "This device can't reach T3 Connect";
+        ? "T3 Connect 未接受此设备的登录"
+        : "此设备无法访问 T3 Connect";
     case "tunnel":
       // The relay already reached the host when this device fails on its own.
       return failure?.reason === "network" ||
         failure?.reason === "transport" ||
         failure?.reason === "timeout"
-        ? `This device can't reach ${host}'s tunnel`
-        : `T3 Connect could not reach ${host}'s tunnel`;
+        ? `此设备无法访问 ${host} 的隧道`
+        : `T3 Connect 无法访问 ${host} 的隧道`;
     case "server":
       return failure?.reason === "authentication" || failure?.reason === "permission"
-        ? `T3 Code on ${host} did not accept this device`
-        : `T3 Code on ${host} did not answer`;
+        ? `${host} 上的 T3 Code 未接受此设备`
+        : `${host} 上的 T3 Code 没有响应`;
   }
 }
 
 function steps(host: string, located: Located, failure: ConnectionAttemptError | null): string[] {
-  const checkHost = `On ${host}, check Settings > Sharing & access or run \`t3 connect status\`.`;
+  const checkHost = `请在 ${host} 上查看“设置 > 共享与访问”，或运行 \`t3 connect status\`。`;
   switch (located.cause) {
     case "offline":
-      return ["Connect this device to the internet. T3 Code reconnects on its own."];
+      return ["请将此设备连接到互联网。T3 Code 会自动重新连接。"];
     case "session_pending":
       return [
-        "Wait a moment. T3 Code retries on its own.",
-        "If it keeps waiting, reload or restart T3 Code on this device.",
+        "请稍等。T3 Code 会自动重试。",
+        "如果一直没有进展，请在此设备上重新加载或重启 T3 Code。",
       ];
     case "outdated":
-      return [`Update T3 Code on ${host}.`];
+      return [`请更新 ${host} 上的 T3 Code。`];
     case "clock_skew":
-      return [`Turn on automatic date and time on this device and on ${host}, then retry.`];
+      return [`请在此设备和 ${host} 上开启自动日期与时间，然后重试。`];
     case "not_linked":
       return [
-        "Check that this device is signed in to the same T3 Connect account as the host.",
-        `On ${host}, open Settings > Sharing & access and turn T3 Connect on.`,
+        "请确认此设备与主机登录了同一个 T3 Connect 账户。",
+        `请在 ${host} 上打开“设置 > 共享与访问”，并开启 T3 Connect。`,
       ];
     case "tunnel_pending":
-      return ["Wait a minute. T3 Code retries on its own.", checkHost];
+      return ["请稍等片刻。T3 Code 会自动重试。", checkHost];
     case "relay_error":
-      return [
-        "Wait a few minutes. T3 Code retries on its own.",
-        "If it keeps failing, copy the diagnostics and report it.",
-      ];
+      return ["请等几分钟。T3 Code 会自动重试。", "如果仍然失败，请复制诊断信息并反馈。"];
     case "tunnel_not_enabled":
-      return [`On ${host}, open Settings > Sharing & access and turn T3 Connect on.`];
+      return [`请在 ${host} 上打开“设置 > 共享与访问”，并开启 T3 Connect。`];
     case "released":
     case "tunnel_down":
       return [
-        `Make sure ${host} is awake and T3 Code is running on it.`,
+        `请确认 ${host} 未休眠，且 T3 Code 正在运行。`,
         checkHost,
-        `A VPN or Tailscale exit node on ${host} can block the tunnel (port 7844). Turn it off or allow the tunnel.`,
+        `${host} 上的 VPN 或 Tailscale 出口节点可能会阻止隧道连接（端口 7844）。请关闭它们或允许隧道连接。`,
       ];
     case "origin_unreachable":
     case "invalid_response":
-      return [`Open or restart T3 Code on ${host}.`, checkHost];
+      return [`请在 ${host} 上打开或重启 T3 Code。`, checkHost];
     // The relay saw these on its way to the host, so the fix is on the host.
     case "dns":
     case "tls":
     case "refused":
     case "timeout":
     case "unknown":
-      return [`Make sure ${host} is awake and online.`, checkHost];
+      return [`请确认 ${host} 未休眠且已联网。`, checkHost];
     case null:
       break;
   }
   switch (located.hop) {
     case "device":
-      return [
-        "Restart T3 Code on this device.",
-        `If it keeps failing, remove ${host} from this device and add it again.`,
-      ];
+      return ["请在此设备上重启 T3 Code。", `如果仍然失败，请从此设备移除 ${host}，然后重新添加。`];
     case "relay":
       return failure?.reason === "authentication"
-        ? ["Sign out of T3 Connect and sign in again."]
+        ? ["请退出 T3 Connect 后重新登录。"]
         : [
-            "Check this device's internet connection.",
-            "A VPN, firewall, or ad blocker on this device can block T3 Connect.",
+            "请检查此设备的互联网连接。",
+            "此设备上的 VPN、防火墙或广告拦截器可能会阻止 T3 Connect 连接。",
           ];
     case "tunnel":
       return failure?.reason === "network" ||
         failure?.reason === "transport" ||
         failure?.reason === "timeout"
         ? [
-            "A VPN, firewall, or DNS filter on this device can block the tunnel.",
-            "Try another network, or add a direct route such as a Tailscale address.",
+            "此设备上的 VPN、防火墙或 DNS 过滤器可能会阻止隧道连接。",
+            "请尝试其他网络，或添加 Tailscale 地址等直连线路。",
           ]
-        : [`Make sure ${host} is awake and online.`, checkHost];
+        : [`请确认 ${host} 未休眠且已联网。`, checkHost];
     case "server":
-      return [
-        `Make sure T3 Code is running on ${host}.`,
-        "Retry. If it keeps failing, copy the diagnostics.",
-      ];
+      return [`请确认 ${host} 上的 T3 Code 正在运行。`, "请重试。如果仍然失败，请复制诊断信息。"];
   }
 }
 
@@ -292,13 +283,13 @@ const HOP_ORDER = {
 function hopLabel(hop: ConnectionHop, host: string): string {
   switch (hop) {
     case "device":
-      return "This device";
+      return "此设备";
     case "relay":
       return "T3 Connect";
     case "tunnel":
-      return `${host} tunnel`;
+      return `${host} 的隧道`;
     case "server":
-      return `T3 Code on ${host}`;
+      return `${host} 上的 T3 Code`;
   }
 }
 
@@ -338,19 +329,19 @@ export function presentConnectionDiagnosis(
     if (value !== null && value !== undefined && value !== "") facts.push([label, String(value)]);
   };
   add("Cause", located.cause ?? failure?.reason);
-  add("HTTP status", httpStatus);
+  add("HTTP 状态", httpStatus);
   add("Attempts", input.state.attempt > 0 ? input.state.attempt : null);
   add(
-    "Next retry",
+    "下次重试",
     input.state.retryAt === null
       ? null
       : DateTime.formatIso(DateTime.makeUnsafe(input.state.retryAt)),
   );
   add("Route", relayPath ? "T3 Connect" : "Direct");
-  add("App version", input.clientVersion);
-  add("Host version", input.serverVersion);
+  add("应用版本", input.clientVersion);
+  add("主机版本", input.serverVersion);
   add("Error", failure?.detail);
-  add("Trace ID", failure?.traceId);
+  add("追踪 ID", failure?.traceId);
 
   return {
     headline: headline(host, located, failure),

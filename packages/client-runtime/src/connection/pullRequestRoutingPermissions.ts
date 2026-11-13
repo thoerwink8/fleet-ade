@@ -101,7 +101,7 @@ export class PullRequestRoutingPermissions extends Context.Reference<{
       Effect.fail(
         new ConnectionBlockedError({
           reason: "unsupported",
-          detail: "Pull request routing preferences are unavailable on this client.",
+          detail: "此客户端无法使用 pull request 路由偏好设置。",
         }),
       ),
     forget: () => Effect.void,
@@ -147,7 +147,7 @@ export const makePullRequestRoutingPermissions = Effect.fn("makePullRequestRouti
           return Effect.fail(
             new ConnectionBlockedError({
               reason: "configuration",
-              detail: "This environment does not have a saved connection endpoint.",
+              detail: "此环境没有已保存的连接端点。",
             }),
           );
         return update((current) => [

@@ -43,7 +43,7 @@ const onPendingChange = vi.fn();
 // switching between them unmounts one session holder and mounts another.
 function EditorSurface() {
   useFileSaveSession({ ...target }, onPendingChange);
-  return <div>editor</div>;
+  return <div>编辑器</div>;
 }
 function MarkdownSurface() {
   useFileSaveSession({ ...target }, onPendingChange);

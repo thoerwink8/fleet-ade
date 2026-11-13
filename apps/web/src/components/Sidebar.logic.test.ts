@@ -314,8 +314,8 @@ describe("resolveSidebarThreadStatus", () => {
 
   it("titles the window with live work and requests only", () => {
     const cases = [
-      [{ ...idle, hasPendingApprovals: true, runtime }, "Needs approval"],
-      [{ ...idle, hasPendingUserInput: true }, "Needs your input"],
+      [{ ...idle, hasPendingApprovals: true, runtime }, "待批准"],
+      [{ ...idle, hasPendingUserInput: true }, "需要你的输入"],
       [{ ...idle, runtime: { ...runtime, status: "preparing" as const } }, "Working"],
       [{ ...idle, runtime }, "Working"],
       [{ ...idle, runtime, pendingGuestMessageCount: 1 }, "Working"],
@@ -438,14 +438,14 @@ describe("resolveThreadStatusPill", () => {
     const blocked = { ...baseThread, blockedOnThreadWait: true };
     expect(resolveSidebarThreadStatus(blocked)).toBe("waiting");
     expect(resolveThreadStatusPill({ thread: blocked })).toMatchObject({
-      label: "Waiting",
+      label: "等待中",
       pulse: false,
     });
 
     const resumed = { ...blocked, blockedOnThreadWait: false };
     expect(resolveSidebarThreadStatus(resumed)).toBe("working");
     expect(resolveThreadStatusPill({ thread: resumed })).toMatchObject({
-      label: "Working",
+      label: "运行中",
       pulse: true,
     });
   });
@@ -466,7 +466,7 @@ describe("resolveThreadStatusPill", () => {
         },
       }),
     ).toMatchObject({
-      label: "Waiting",
+      label: "等待中",
       colorClass: "text-sidebar-muted-foreground",
       dotClass: "bg-sidebar-muted-foreground",
       pulse: false,
@@ -487,7 +487,7 @@ describe("resolveThreadStatusPill", () => {
           },
         },
       }),
-    ).toMatchObject({ label: "Plan Ready", pulse: false });
+    ).toMatchObject({ label: "计划已就绪", pulse: false });
   });
 
   it("does not manufacture completed state without a client visit marker", () => {
@@ -521,7 +521,7 @@ describe("resolveThreadStatusPill", () => {
           },
         },
       }),
-    ).toMatchObject({ label: "Completed", pulse: false });
+    ).toMatchObject({ label: "已完成", pulse: false });
   });
 
   it("shows failed, not completed, when the unseen run failed", () => {
@@ -540,7 +540,7 @@ describe("resolveThreadStatusPill", () => {
           },
         },
       }),
-    ).toMatchObject({ label: "Failed", pulse: false });
+    ).toMatchObject({ label: "失败", pulse: false });
   });
 
   it("shows failed, not plan ready, when a plan run proposed a plan and then failed", () => {
@@ -554,7 +554,7 @@ describe("resolveThreadStatusPill", () => {
           runtime: { ...baseThread.runtime, status: "failed", activeRunId: null },
         },
       }),
-    ).toMatchObject({ label: "Failed" });
+    ).toMatchObject({ label: "失败" });
   });
 
   it("drops the failed pill once the failure has been seen", () => {
@@ -577,7 +577,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
   return {
     id: ProjectId.make("project-1"),
     environmentId: localEnvironmentId,
-    title: "Project",
+    title: "项目",
     workspaceRoot: "/tmp/project",
     repositoryIdentity: null,
     defaultModelSelection: {
@@ -597,7 +597,7 @@ function makeThread(overrides: ThreadFixtureOverrides = {}): Thread {
     id: ThreadId.make("thread-1"),
     environmentId: localEnvironmentId,
     projectId: ProjectId.make("project-1"),
-    title: "Thread",
+    title: "会话",
     modelSelection: {
       instanceId: ProviderInstanceId.make("codex"),
       model: "gpt-5.4",
@@ -951,21 +951,21 @@ describe("unseen completion with background work", () => {
       task: { kind: "command" },
       status: "ready",
       receded: false,
-      pill: "Completed",
+      pill: "已完成",
     },
     {
       roster: "dev server watchdog",
       task: { kind: "monitor" },
       status: "ready",
       receded: false,
-      pill: "Completed",
+      pill: "已完成",
     },
     {
       roster: "awaited command",
       task: { kind: "command", awaited: true },
       status: "waiting",
       receded: true,
-      pill: "Waiting",
+      pill: "等待中",
     },
   ] as const)("presents a completed thread with a $roster roster", (expected) => {
     const thread = presentThreadShell(localEnvironmentId, {

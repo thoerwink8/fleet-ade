@@ -413,7 +413,7 @@ describe("composer rich text document model", () => {
   it.each([
     { parts: [{ text: "hello ", marks: ["bold"] }], expected: "**hello** " },
     { parts: [{ text: "  ", marks: ["bold"] }], expected: "  " },
-    { parts: [{ text: " left ", marks: ["bold", "italic"] }], expected: " ***left*** " },
+    { parts: [{ text: "剩余", marks: ["bold", "italic"] }], expected: " ***left*** " },
     {
       parts: [
         { text: "one ", marks: ["bold"] },

@@ -11,17 +11,17 @@ function SubmenuPalette() {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)}>
-        Open
+        打开
       </button>
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandDialogPopup aria-label="Command palette">
+        <CommandDialogPopup aria-label="命令面板">
           <CommandPaletteContent
             items={["Project A"]}
             inputProps={{
-              placeholder: "Search projects",
+              placeholder: "搜索项目",
               startAddon: (
-                <button type="button" aria-label="Back">
-                  Back
+                <button type="button" aria-label="返回">
+                  返回
                 </button>
               ),
             }}
@@ -42,6 +42,6 @@ describe("CommandPaletteContent", () => {
 
     await userEvent.click(page.getByRole("button", { name: "Open" }));
 
-    await expect.element(page.getByPlaceholder("Search projects")).toHaveFocus();
+    await expect.element(page.getByPlaceholder("搜索项目")).toHaveFocus();
   });
 });

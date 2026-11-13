@@ -82,8 +82,8 @@ export function resolveGitActionProgressPresentation(input: {
       currentLabel && currentLabel !== "Running source control action"
         ? currentLabel
         : isPull
-          ? "Pulling latest changes..."
-          : "Starting source control action...",
+          ? "正在拉取最新改动…"
+          : "正在启动版本控制操作…",
     output: !isPull && output ? output : null,
     startedAtMs: isPull
       ? input.phaseStartedAtMs
@@ -98,7 +98,7 @@ export function formatGitActionElapsed(startedAtMs: number | null, nowMs: number
 
   const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1_000));
   if (elapsedSeconds < 60) {
-    return `${elapsedSeconds}s`;
+    return `${elapsedSeconds} 秒`;
   }
 
   const minutes = Math.floor(elapsedSeconds / 60);
@@ -137,7 +137,7 @@ export function buildMenuItems(
 
   const commitItem: GitActionMenuItem = {
     id: "commit",
-    label: "Commit",
+    label: "提交",
     disabled: !canCommit,
     icon: "commit",
     kind: "open_dialog",
@@ -150,7 +150,7 @@ export function buildMenuItems(
 
   const pushItem: GitActionMenuItem = {
     id: "push",
-    label: "Push",
+    label: "推送",
     disabled: !canPush,
     icon: "push",
     kind: "open_dialog",
@@ -166,7 +166,7 @@ export function buildMenuItems(
     pushItem,
     {
       id: "pr",
-      label: `Create ${terminology.shortLabel}`,
+      label: `创建 ${terminology.shortLabel}`,
       disabled: !canCreatePr,
       icon: "pr",
       kind: "open_dialog",
@@ -195,15 +195,15 @@ export function resolveQuickAction(
   hasPrimaryRemote = true,
 ): GitQuickAction {
   if (isBusy) {
-    return { label: "Commit", disabled: true, kind: "show_hint", hint: "Git action in progress." };
+    return { label: "提交", disabled: true, kind: "show_hint", hint: "Git 操作进行中。" };
   }
 
   if (!gitStatus) {
     return {
-      label: "Commit",
+      label: "提交",
       disabled: true,
       kind: "show_hint",
-      hint: "Git status is unavailable.",
+      hint: "Git 状态不可用。",
     };
   }
 
@@ -218,22 +218,22 @@ export function resolveQuickAction(
 
   if (!hasBranch) {
     return {
-      label: "Commit",
+      label: "提交",
       disabled: true,
       kind: "show_hint",
-      hint: `Create and checkout a ref before pushing or opening a ${terminology.singular}.`,
+      hint: `推送或创建 ${terminology.singular} 前，请先创建并检出一个引用。`,
     };
   }
 
   if (hasChanges) {
     if (isBehind || (!gitStatus.hasUpstream && !hasPrimaryRemote)) {
-      return { label: "Commit", disabled: false, kind: "run_action", action: "commit" };
+      return { label: "提交", disabled: false, kind: "run_action", action: "commit" };
     }
     if (hasOpenPr || isDefaultRef) {
-      return { label: "Commit & push", disabled: false, kind: "run_action", action: "commit_push" };
+      return { label: "提交并推送", disabled: false, kind: "run_action", action: "commit_push" };
     }
     return {
-      label: `Commit, push & ${terminology.shortLabel}`,
+      label: `提交、推送并创建 ${terminology.shortLabel}`,
       disabled: false,
       kind: "run_action",
       action: "commit_push_pr",
@@ -243,7 +243,7 @@ export function resolveQuickAction(
   if (!gitStatus.hasUpstream) {
     if (!hasPrimaryRemote) {
       return {
-        label: "Publish repository",
+        label: "发布仓库",
         disabled: false,
         kind: "open_publish",
       };
@@ -251,29 +251,29 @@ export function resolveQuickAction(
     if (!isAhead) {
       if (hasOpenPr) {
         return {
-          label: "Commit",
+          label: "提交",
           disabled: true,
           kind: "show_hint",
-          hint: "Branch is up to date. No action needed.",
+          hint: "分支已是最新，无需操作。",
         };
       }
       return {
-        label: "Push",
+        label: "推送",
         disabled: true,
         kind: "show_hint",
-        hint: "No local commits to push.",
+        hint: "没有可推送的本地提交。",
       };
     }
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: "Push",
+        label: "推送",
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: `Push & create ${terminology.shortLabel}`,
+      label: `推送并创建 ${terminology.shortLabel}`,
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -282,16 +282,16 @@ export function resolveQuickAction(
 
   if (isDiverged) {
     return {
-      label: "Sync ref",
+      label: "同步引用",
       disabled: true,
       kind: "show_hint",
-      hint: "Branch has diverged from upstream. Rebase/merge first.",
+      hint: "分支已与上游分叉。请先变基或合并。",
     };
   }
 
   if (isBehind) {
     return {
-      label: "Pull",
+      label: "拉取",
       disabled: false,
       kind: "run_pull",
     };
@@ -300,14 +300,14 @@ export function resolveQuickAction(
   if (isAhead) {
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: "Push",
+        label: "推送",
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: `Push & create ${terminology.shortLabel}`,
+      label: `推送并创建 ${terminology.shortLabel}`,
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -316,16 +316,16 @@ export function resolveQuickAction(
 
   if (hasOpenPr && gitStatus.hasUpstream) {
     return {
-      label: "Commit",
+      label: "提交",
       disabled: true,
       kind: "show_hint",
-      hint: "Branch is up to date. No action needed.",
+      hint: "分支已是最新，无需操作。",
     };
   }
 
   if (hasDefaultBranchDelta && !isDefaultRef) {
     return {
-      label: `Create ${terminology.shortLabel}`,
+      label: `创建 ${terminology.shortLabel}`,
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -333,10 +333,10 @@ export function resolveQuickAction(
   }
 
   return {
-    label: "Commit",
+    label: "提交",
     disabled: true,
     kind: "show_hint",
-    hint: "Branch is up to date. No action needed.",
+    hint: "分支已是最新，无需操作。",
   };
 }
 
@@ -347,35 +347,35 @@ export function resolveDefaultBranchActionDialogCopy(input: {
   terminology: ChangeRequestTerminology;
 }): DefaultBranchActionDialogCopy {
   const branchLabel = input.branchName;
-  const suffix = ` on "${branchLabel}". You can continue on this ref or create a feature ref and run the same action there.`;
+  const suffix = `（引用“${branchLabel}”）。你可以继续在这个引用上操作，也可以新建一个功能引用并在那里执行同样的操作。`;
   const { terminology } = input;
 
   if (input.action === "push" || input.action === "commit_push") {
     if (input.includesCommit) {
       return {
-        title: "Commit & push to default ref?",
-        description: `This action will commit and push changes${suffix}`,
-        continueLabel: `Commit & push to ${branchLabel}`,
+        title: "提交并推送到默认引用？",
+        description: `此操作会提交并推送改动${suffix}`,
+        continueLabel: `提交并推送到 ${branchLabel}`,
       };
     }
     return {
-      title: "Push to default ref?",
-      description: `This action will push local commits${suffix}`,
-      continueLabel: `Push to ${branchLabel}`,
+      title: "推送到默认引用？",
+      description: `此操作会推送本地提交${suffix}`,
+      continueLabel: `推送到 ${branchLabel}`,
     };
   }
 
   if (input.includesCommit) {
     return {
-      title: `Commit, push & create ${terminology.shortLabel} from default ref?`,
-      description: `This action will commit, push, and create a ${terminology.singular}${suffix}`,
-      continueLabel: `Commit, push & create ${terminology.shortLabel}`,
+      title: `在默认引用上提交、推送并创建 ${terminology.shortLabel}？`,
+      description: `此操作会提交、推送并创建${terminology.singular}${suffix}`,
+      continueLabel: `提交、推送并创建 ${terminology.shortLabel}`,
     };
   }
   return {
-    title: `Push & create ${terminology.shortLabel} from default ref?`,
-    description: `This action will push local commits and create a ${terminology.singular}${suffix}`,
-    continueLabel: `Push & create ${terminology.shortLabel}`,
+    title: `在默认引用上推送并创建 ${terminology.shortLabel}？`,
+    description: `此操作会推送本地提交并创建${terminology.singular}${suffix}`,
+    continueLabel: `推送并创建 ${terminology.shortLabel}`,
   };
 }
 
@@ -385,7 +385,7 @@ export function resolveFeatureBranchUnavailableReason(input: {
   hasWorkingTreeChanges: boolean;
 }): string | null {
   if (input.hasWorkingTreeChanges) return null;
-  return `There are no changes to commit, so a feature branch can't be named. Create a branch yourself or continue on ${input.branchName}.`;
+  return `没有可提交的改动，因此无法命名功能分支。请自行创建分支，或继续在 ${input.branchName} 上操作。`;
 }
 
 export function resolveThreadBranchUpdate(

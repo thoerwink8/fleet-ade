@@ -19,9 +19,9 @@ export type SecretRequestItem = Extract<
 /** A `file` request lets the agent's commands read the value, so its card must not promise more. */
 export const secretRequestPrivacyNote = (item: Pick<SecretRequestItem, "delivery">) =>
   item.delivery === "file"
-    ? "Kept out of chat, in a private file this agent's commands can read for 24 hours"
-    : "Stored securely, never shown to the agent";
-export const SECRET_REQUEST_DEFAULT_PLACEHOLDER = "Paste the secret";
+    ? "不会出现在对话中，而是存放在一个私密文件里，此智能体的命令可在 24 小时内读取"
+    : "安全存储，绝不会展示给智能体";
+export const SECRET_REQUEST_DEFAULT_PLACEHOLDER = "粘贴凭据";
 
 // Backticks, <angle brackets> and markdown link targets (balanced parentheses allowed) keep their
 // exact text; a bare link drops trailing sentence punctuation.
@@ -88,22 +88,22 @@ export type SecretRequestDisplay =
 const SAVED_DISPLAY: SecretRequestDisplay = {
   kind: "answered",
   outcome: "saved",
-  label: "Saved securely and kept private",
+  label: "已安全保存并保密",
 };
 const DECLINED_DISPLAY: SecretRequestDisplay = {
   kind: "answered",
   outcome: "declined",
-  label: "Declined",
+  label: "已拒绝",
 };
 const ENDED_DISPLAY: SecretRequestDisplay = {
   kind: "answered",
   outcome: "ended",
-  label: "Request ended",
+  label: "请求已结束",
 };
 const PENDING_DISPLAY: SecretRequestDisplay = { kind: "pending" };
 const PENDING_ELSEWHERE_DISPLAY: SecretRequestDisplay = {
   kind: "pending-elsewhere",
-  label: "Waiting for an answer in the original thread",
+  label: "正在等待原会话中的回答",
 };
 
 /**
@@ -233,5 +233,5 @@ export function secretRequestFailureMessage(failure: unknown): string {
   ) {
     return failure.message;
   }
-  return "Could not answer the request. Try again.";
+  return "无法回复此请求。请重试。";
 }

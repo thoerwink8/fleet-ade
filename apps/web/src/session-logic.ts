@@ -303,8 +303,8 @@ export function providerErrorPresentation(
     return {
       label:
         item.failure.class === "usage_limit"
-          ? "Usage limit reached"
-          : item.title?.trim() || "Provider error",
+          ? "已达到用量上限"
+          : item.title?.trim() || "提供方错误",
       detail: item.failure.message,
     };
   }
@@ -314,12 +314,12 @@ export function providerErrorPresentation(
       : `${item.retry.attempt}/${item.retry.maxAttempts}`;
   const label =
     item.status === "running"
-      ? `Retrying provider (${progress})`
+      ? `正在重试提供方（${progress}）`
       : item.status === "completed"
-        ? `Provider recovered (${progress} retries)`
+        ? `提供方已恢复（重试 ${progress} 次）`
         : item.status === "failed"
-          ? `${item.failure.class === "usage_limit" ? "Usage limit reached" : "Provider error"} after ${progress} retries`
-          : `Provider retry stopped (${progress})`;
+          ? `${item.failure.class === "usage_limit" ? "已达到用量上限" : "提供方错误"} after ${progress} retries`
+          : `已停止重试提供方（${progress}）`;
   const retryDelay =
     item.status === "running" && item.retry.retryDelayMs !== null && item.retry.retryDelayMs > 0
       ? item.retry.retryDelayMs < 1_000
@@ -351,7 +351,7 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "thread_created":
       return {
         ...common,
-        label: "Created thread",
+        label: "已创建会话",
       };
     case "compaction":
       return {
@@ -369,10 +369,10 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "command_execution":
       return {
         ...common,
-        label: title ?? "Ran command",
+        label: title ?? "已运行命令",
         command: item.input,
         rawCommand: item.input,
-        toolTitle: title ?? "Command",
+        toolTitle: title ?? "命令",
         toolData: item,
       };
     case "file_change": {
@@ -381,33 +381,33 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
         label:
           title ??
           (item.changes !== undefined && item.changes.length > 1
-            ? `Changed ${item.changes.length} files`
-            : `Changed ${item.fileName}`),
+            ? `已更改 ${item.changes.length} 个文件`
+            : `已修改 ${item.fileName}`),
         changedFiles: item.changes?.map((change) => change.path) ?? [item.fileName],
-        toolTitle: title ?? "File change",
+        toolTitle: title ?? "文件修改",
         toolData: item,
       };
     }
     case "file_search":
       return {
         ...common,
-        label: title ?? formatSearchToolLabel(item) ?? "Searched files",
+        label: title ?? formatSearchToolLabel(item) ?? "已搜索文件",
         ...(item.pattern ? { detail: item.pattern } : {}),
-        toolTitle: title ?? "File search",
+        toolTitle: title ?? "文件搜索",
         toolData: item,
       };
     case "web_search":
       return {
         ...common,
-        label: title ?? "Searched the web",
+        label: title ?? "已搜索网页",
         ...(item.patterns?.length ? { detail: item.patterns.join(", ") } : {}),
-        toolTitle: title ?? "Web search",
+        toolTitle: title ?? "网络搜索",
         toolData: item,
       };
     case "checkpoint":
       return {
         ...common,
-        label: title ?? "Checkpoint captured",
+        label: title ?? "已创建检查点",
         changedFiles: item.files.map((file) => file.path),
         toolData: item,
       };
@@ -443,8 +443,8 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
           (classified === "read"
             ? formatReadToolLabel(readPath ?? "")
             : classified === "search"
-              ? (formatSearchToolLabel({ input: item.input }) ?? item.toolName ?? "Tool call")
-              : (item.toolName ?? "Tool call")),
+              ? (formatSearchToolLabel({ input: item.input }) ?? item.toolName ?? "工具调用")
+              : (item.toolName ?? "工具调用")),
         toolTitle: title ?? item.toolName ?? "Tool",
         toolData: { input: item.input, output: item.output },
       };
@@ -463,14 +463,14 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "approval_request":
       return {
         ...common,
-        label: title ?? "Approval requested",
+        label: title ?? "已请求批准",
         detail: item.prompt ?? item.requestKind,
         toolData: item,
       };
     case "user_input_request":
       return {
         ...common,
-        label: title ?? (item.questionAnswer ? "Answered questions" : "Input requested"),
+        label: title ?? (item.questionAnswer ? "已回答问题" : "已请求输入"),
         ...(item.questionAnswer ? { questionAnswer: item.questionAnswer } : {}),
         toolData: item,
       };

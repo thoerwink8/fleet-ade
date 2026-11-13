@@ -190,7 +190,7 @@ describe("model switch change", () => {
         slug,
         capabilities: {
           optionDescriptors: [
-            { id: "serviceTier", type: "select", options: [{ id: "fast", label: "Fast" }] },
+            { id: "serviceTier", type: "select", options: [{ id: "fast", label: "快速" }] },
             {
               id: "thought_level",
               type: "select",

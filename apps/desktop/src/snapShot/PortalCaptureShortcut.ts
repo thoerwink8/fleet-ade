@@ -63,7 +63,7 @@ export class PortalCaptureShortcut {
   state: PortalShortcutState = {
     shortcutRegistered: false,
     shortcutPending: true,
-    shortcutMessage: "Waiting for shortcut permission. Approve the desktop prompt if one appears.",
+    shortcutMessage: "正在等待快捷键权限。如果桌面弹出提示，请批准。",
   };
   readonly ready: Promise<void>;
   private closed = false;
@@ -102,7 +102,7 @@ export class PortalCaptureShortcut {
       this.state = {
         shortcutRegistered: false,
         shortcutPending: true,
-        shortcutMessage: "Connecting to Hyprland shortcuts…",
+        shortcutMessage: "正在连接 Hyprland 快捷键…",
       };
     this.resetStopped();
     bus.on("error", this.failed);
@@ -159,12 +159,9 @@ export class PortalCaptureShortcut {
   }
 
   async configure() {
-    if (this.managedByHyprland)
-      throw new Error("Change the capture binding in your Hyprland config, then save it.");
+    if (this.managedByHyprland) throw new Error("请在 Hyprland 配置中更改截图快捷键，然后保存。");
     if (!this.hasSession || this.version < 2)
-      throw new Error(
-        "Open your desktop's shortcut settings and allow T3 Code's capture shortcut.",
-      );
+      throw new Error("请打开桌面系统的快捷键设置，允许 T3 Code 的截图快捷键。");
     await this.call({
       destination: this.owner,
       path: PATH,
@@ -191,10 +188,10 @@ export class PortalCaptureShortcut {
       shortcutPending: false,
       shortcutCanRetry: !this.managedByHyprland,
       shortcutMessage: this.managedByHyprland
-        ? "Couldn't connect to Hyprland shortcuts. Make sure xdg-desktop-portal-hyprland is running, then restart T3 Code."
+        ? "无法连接 Hyprland 快捷键。请确认 xdg-desktop-portal-hyprland 正在运行，然后重启 T3 Code。"
         : error instanceof Error
           ? error.message
-          : "Could not register the capture shortcut.",
+          : "无法注册截图快捷键。",
     });
     this.close();
   };
@@ -330,8 +327,8 @@ export class PortalCaptureShortcut {
             shortcutPending: false,
             shortcutMessage:
               this.version >= 2
-                ? "Shortcut permission wasn't granted. Open shortcut permissions to allow it."
-                : "Shortcut permission wasn't granted. Allow T3 Code in your desktop's shortcut settings.",
+                ? "未获得快捷键权限。请打开快捷键权限设置并授予权限。"
+                : "未获得快捷键权限。请在桌面系统的快捷键设置中允许 T3 Code。",
           });
           return undefined;
         }
@@ -355,8 +352,8 @@ export class PortalCaptureShortcut {
         shortcutActionRegistered: Boolean(shortcut),
         shortcutPending: false,
         shortcutMessage: shortcut
-          ? "Managed by Hyprland. Add the binding to your config and save it."
-          : "Hyprland did not register the capture action. Check that xdg-desktop-portal-hyprland is running, then restart T3 Code.",
+          ? "由 Hyprland 管理。请将快捷键添加到配置并保存。"
+          : "Hyprland 未注册截图操作。请确认 xdg-desktop-portal-hyprland 正在运行，然后重启 T3 Code。",
       });
       return;
     }
@@ -366,10 +363,10 @@ export class PortalCaptureShortcut {
       shortcutPending: false,
       ...(label ? { shortcutLabel: label } : {}),
       shortcutMessage: label
-        ? `Desktop shortcut: ${label}`
+        ? `桌面快捷键：${label}`
         : this.version >= 2
-          ? "No shortcut is assigned. Open shortcut permissions to choose one."
-          : "No shortcut is assigned. Choose one in your desktop's shortcut settings.",
+          ? "尚未分配快捷键。请打开快捷键权限设置进行选择。"
+          : "尚未分配快捷键。请在桌面系统的快捷键设置中选择。",
     });
   }
 
@@ -450,7 +447,7 @@ export class PortalCaptureShortcut {
         [
           this.shortcutId,
           {
-            description: new Variant("s", "Capture a window"),
+            description: new Variant("s", "截取窗口"),
             ...(!this.managedByHyprland ? { preferred_trigger: new Variant("s", trigger) } : {}),
           },
         ],

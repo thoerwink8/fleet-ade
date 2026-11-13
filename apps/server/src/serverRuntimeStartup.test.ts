@@ -159,7 +159,7 @@ it.effect.each([
                 created: true,
                 project: {
                   id: projectId,
-                  title: "Project",
+                  title: "项目",
                   workspaceRoot: "/bootstrap-project",
                   repositoryIdentity: null,
                   faviconPath: null,

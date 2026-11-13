@@ -2,13 +2,13 @@
 export function describePullRequestDiffError(error: string, providerName: string, term: string) {
   if (/\brate limit\b|\brate[-_]limited\b|\btoo many requests\b/i.test(error)) {
     return {
-      title: `${providerName} rate limit reached`,
-      description: `${providerName} is temporarily limiting requests, so this diff couldn't be loaded. Try again after the limit resets, or view the changes on ${providerName}.`,
+      title: `${providerName} 已达到速率上限`,
+      description: `${providerName} 正在临时限制请求，因此无法加载此差异。请在速率限制重置后重试，或在 ${providerName} 上查看更改。`,
     };
   }
 
   return {
-    title: "Couldn't load the changes",
-    description: `The environment couldn't load this ${term}'s diff. Try again, or view the changes on ${providerName}.`,
+    title: "无法加载更改",
+    description: `环境无法加载此 ${term} 的差异。请重试，或在 ${providerName} 上查看更改。`,
   };
 }

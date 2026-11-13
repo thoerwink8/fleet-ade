@@ -14,7 +14,7 @@ describe("mergeWorkflowAgentMetadata", () => {
     expect(metadata).toEqual({ messageId: "a", effort: "xhigh", speed: "standard" });
     expect(
       mergeWorkflowAgentMetadata(
-        [{ type: "assistant", message: { id: "a", content: [{ type: "text", text: "Done" }] } }],
+        [{ type: "assistant", message: { id: "a", content: [{ type: "text", text: "完成" }] } }],
         metadata,
       ),
     ).toEqual(metadata);

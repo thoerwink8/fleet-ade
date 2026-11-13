@@ -19,9 +19,9 @@ function ThreadProbe(props: { threadId: string }) {
   return (
     <div ref={setRoot}>
       <div data-sidebar-row="thread:beta">
-        <input aria-label="Thread title" />
+        <input aria-label="会话标题" />
       </div>
-      <textarea aria-label="Message" ref={composerRef} />
+      <textarea aria-label="消息" ref={composerRef} />
     </div>
   );
 }

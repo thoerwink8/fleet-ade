@@ -79,11 +79,11 @@ export function secretProviderFromDraft(
   { readonly id: SecretProviderId; readonly config: SecretProviderConfig },
   SecretProviderDraftIssues
 > {
-  const label = decodeField(SecretProviderLabel, draft.name, "Enter a name.");
+  const label = decodeField(SecretProviderLabel, draft.name, "请输入名称。");
   const account = decodeField(
     OnePasswordSecretProviderConfig.fields.account,
     draft.account,
-    "Enter the 1Password account.",
+    "请输入 1Password 账户。",
   );
 
   let id: SecretProviderId | null = null;
@@ -92,9 +92,8 @@ export function secretProviderFromDraft(
     nameIssue = label.failure;
   } else {
     id = target.mode === "edit" ? target.id : secretProviderIdFromName(label.success);
-    if (id === null) nameIssue = "The name needs at least one letter or digit.";
-    else if (target.mode === "add" && existingIds.has(id))
-      nameIssue = "A secret provider with this name exists.";
+    if (id === null) nameIssue = "名称至少需要一个英文字母或数字。";
+    else if (target.mode === "add" && existingIds.has(id)) nameIssue = "已有同名凭据提供方。";
   }
 
   if (

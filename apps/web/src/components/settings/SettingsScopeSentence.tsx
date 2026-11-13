@@ -87,7 +87,7 @@ export function SettingsScopeSentence() {
       </span>
       <span className="flex min-w-0 items-center gap-1.5">
         <span className="shrink-0">
-          {scope.search.machine || scope.scope.kind === "checkout" ? "on" : "across"}
+          {scope.search.machine || scope.scope.kind === "checkout" ? "星期" : "across"}
         </span>
         <EnvironmentScopeMenu {...props} />
       </span>
@@ -114,9 +114,7 @@ function ScopeOptionLabel({ option }: { option: ScopeOption }) {
           <span className="block truncate text-xs text-muted-foreground">{option.secondary}</span>
         ) : null}
       </span>
-      {option.offline ? (
-        <span className="shrink-0 text-xs text-muted-foreground">Offline</span>
-      ) : null}
+      {option.offline ? <span className="shrink-0 text-xs text-muted-foreground">离线</span> : null}
     </>
   );
 }
@@ -187,7 +185,7 @@ function ScopeMenu({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <ComboboxEmpty>No matches found.</ComboboxEmpty>
+          <ComboboxEmpty>没有匹配结果。</ComboboxEmpty>
           <ComboboxList>
             {(option: ScopeOption) => (
               <ComboboxItem key={option.value} value={option}>
@@ -255,7 +253,7 @@ function EnvironmentScopeMenu({
     : environments;
   return (
     <ScopeMenu
-      ariaLabel="Environment scope"
+      ariaLabel="环境范围"
       icon={
         selected ? (
           <EnvironmentMachineIcon
@@ -269,20 +267,20 @@ function EnvironmentScopeMenu({
         selected
           ? settingsScopeEnvironmentLabel(selected, environments)
           : environmentValue !== ALL_ENVIRONMENTS_VALUE
-            ? "Unavailable environment"
+            ? "环境不可用"
             : singleEnvironment
-              ? "No environments"
-              : "All environments"
+              ? "没有环境"
+              : "所有环境"
       }
       value={environmentValue}
       onChange={(next) => onChange(selectEnvironmentAxis(value, next))}
-      searchLabel="Search environments"
+      searchLabel="搜索环境"
       allOption={
         singleEnvironment
           ? null
           : {
               value: ALL_ENVIRONMENTS_VALUE,
-              label: "All environments",
+              label: "所有环境",
               icon: <LayersIcon aria-hidden className="size-3.5 shrink-0" />,
             }
       }
@@ -325,7 +323,7 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
             ? settingsScopeCheckoutLabel(selected, checkouts)
             : value.checkout
               ? "Unavailable checkout"
-              : "All checkouts"
+              : "全部工作副本"
         }
         value={value.checkout ?? ALL_CHECKOUTS_VALUE}
         onChange={(next) =>
@@ -337,7 +335,7 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
           )
         }
         searchLabel="Search checkouts"
-        allOption={{ value: ALL_CHECKOUTS_VALUE, label: "All checkouts" }}
+        allOption={{ value: ALL_CHECKOUTS_VALUE, label: "全部工作副本" }}
         options={checkouts.map((member) => ({
           value: member.physicalProjectKey,
           label: fileBasename(member.workspaceRoot),
@@ -356,13 +354,13 @@ function ProjectScopeMenu({ value, groups, environments, onChange }: SettingsSco
   }));
   return (
     <ScopeMenu
-      ariaLabel="Project scope"
+      ariaLabel="项目范围"
       icon={selected ? <ProjectFavicon project={selected} className="size-3.5 shrink-0" /> : null}
-      label={selected?.displayName ?? (value.project ? "Unavailable project" : "All projects")}
+      label={selected?.displayName ?? (value.project ? "项目不可用" : "所有项目")}
       value={projectAxisValue(value)}
       onChange={(next) => onChange(selectProjectAxis(value, next))}
-      searchLabel="Search projects"
-      allOption={{ value: ALL_PROJECTS_VALUE, label: "All projects" }}
+      searchLabel="搜索项目"
+      allOption={{ value: ALL_PROJECTS_VALUE, label: "所有项目" }}
       options={projects.map(({ group, machines }) => {
         const sameName = projects.filter(
           (other) =>

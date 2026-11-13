@@ -154,9 +154,7 @@ export function PullRequestThreadDialog({
       } else {
         const error = squashAtomCommandFailure(result);
         setPrepareErrorMessage(
-          error instanceof Error
-            ? error.message
-            : `Failed to prepare ${terminology.singular} thread.`,
+          error instanceof Error ? error.message : `无法准备 ${terminology.singular} 会话。`,
         );
       }
       return;
@@ -175,9 +173,9 @@ export function PullRequestThreadDialog({
   const validationMessage = !referenceDirty
     ? null
     : reference.trim().length === 0
-      ? `Paste a ${terminology.singular} URL, checkout command, or enter 123 / #123.`
+      ? `请粘贴 ${terminology.singular} URL、检出工作副本的命令，或输入 123 / #123。`
       : parsedReference === null
-        ? `Use a ${terminology.singular} URL, checkout command, 123, or #123.`
+        ? `请使用 ${terminology.singular} URL、检出工作副本的命令、123 或 #123。`
         : null;
   const errorMessage =
     validationMessage ??
@@ -187,7 +185,7 @@ export function PullRequestThreadDialog({
       : preparePullRequestThreadAction.error instanceof Error
         ? preparePullRequestThreadAction.error.message
         : preparePullRequestThreadAction.error
-          ? `Failed to prepare ${terminology.singular} thread.`
+          ? `无法准备 ${terminology.singular} 会话。`
           : null);
 
   return (
@@ -224,7 +222,7 @@ export function PullRequestThreadDialog({
             </span>
             <Input
               ref={referenceInputRef}
-              placeholder={`${terminology.shortLabel} URL, checkout command, or #42`}
+              placeholder={`${terminology.shortLabel} URL、检出工作副本的命令或 #42`}
               value={reference}
               onChange={(event) => {
                 setReferenceDirty(true);
@@ -279,7 +277,7 @@ export function PullRequestThreadDialog({
             onClick={() => onOpenChange(false)}
             disabled={preparePullRequestThreadAction.isPending}
           >
-            Cancel
+            取消
           </Button>
           <Button
             type="button"
@@ -294,7 +292,7 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "local" ? "Preparing local..." : "Local"}
+            {preparingMode === "local" ? "正在准备本地…" : "本地"}
           </Button>
           <Button
             type="button"
@@ -309,7 +307,7 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "worktree" ? "Preparing worktree..." : "Worktree"}
+            {preparingMode === "worktree" ? "正在准备工作树…" : "工作树"}
           </Button>
         </DialogFooter>
       </DialogPopup>

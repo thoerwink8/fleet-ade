@@ -35,7 +35,6 @@ import {
 } from "lucide-react";
 import { resolveEventKeys } from "@t3tools/shared/keybindings";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { T, useGT, useMessages } from "gt-react";
 
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
@@ -130,9 +129,7 @@ function SettingsSectionIcon({ to }: { to: SettingsPath }) {
 }
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
-  const gt = useGT();
-  const m = useMessages();
-  const navArea = workspaceAreaProps("settings-nav", 0, gt("Settings sections"));
+  const navArea = workspaceAreaProps("settings-nav", 0, "设置分类");
   const navigate = useNavigate();
   const currentHash = useLocation({ select: (location) => location.hash });
   const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
@@ -142,7 +139,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const [compactSearchOpen, setCompactSearchOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems();
-  const results = searchSettings(query, searchableItems, m);
+  const results = searchSettings(query, searchableItems);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
   const maxResultIndex = Math.max(results.length - 1, 0);
@@ -288,8 +285,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 onBlur={() => {
                   if (!isSearching) setCompactSearchOpen(false);
                 }}
-                placeholder={gt("Search")}
-                aria-label={gt("Search settings")}
+                placeholder={"搜索"}
+                aria-label={"搜索设置"}
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded={isSearching && hasResults}
@@ -307,7 +304,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   size="icon-micro"
                   variant="ghost-muted"
                   className="shrink-0"
-                  aria-label={gt("Clear settings search")}
+                  aria-label={"清除设置搜索"}
                   onClick={() => {
                     clearSearch();
                     searchInputRef.current?.focus();
@@ -324,14 +321,14 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 role="status"
                 className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
               >
-                <T>No settings found</T>
+                未找到设置
               </p>
             ) : null}
             {isSearching ? (
               <SidebarMenu
                 id={hasResults ? "settings-search-results" : undefined}
                 role={hasResults ? "listbox" : undefined}
-                aria-label={hasResults ? gt("Settings search results") : undefined}
+                aria-label={hasResults ? "设置搜索结果" : undefined}
               >
                 {results.map((item, index) => (
                   <SidebarMenuItem
@@ -353,10 +350,10 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                       <SettingsSectionIcon to={item.to} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-sidebar-foreground">
-                          {m(item.title)}
+                          {item.title}
                         </span>
                         <span className="block truncate text-2xs text-sidebar-muted-foreground/75">
-                          {m(SETTINGS_SECTION_LABELS[item.to])}
+                          {SETTINGS_SECTION_LABELS[item.to]}
                         </span>
                       </span>
                     </SidebarMenuButton>
@@ -369,7 +366,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   <SidebarMenu className="md:hidden">
                     <SidebarMenuItem>
                       <SidebarMenuButton
-                        aria-label={gt("Search settings")}
+                        aria-label={"搜索设置"}
                         onClick={() => setCompactSearchOpen(true)}
                       >
                         <SearchIcon />
@@ -390,7 +387,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                           group.headingHidden ? "sr-only" : !compactSearchOpen && "max-md:sr-only",
                         )}
                       >
-                        {m(group.heading)}
+                        {group.heading}
                       </h3>
                       {/* The heading stays outside the group it names so NVDA does not read the name twice. */}
                       <div role="group" aria-labelledby={`settings-nav-group-${index}`}>
@@ -413,7 +410,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                                       !compactSearchOpen && "max-md:sr-only",
                                     )}
                                   >
-                                    {m(SETTINGS_SECTION_LABELS[to])}
+                                    {SETTINGS_SECTION_LABELS[to]}
                                   </span>
                                 </SidebarMenuButton>
                               </SidebarMenuItem>

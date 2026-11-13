@@ -107,13 +107,13 @@ const platformReason = Effect.fn("LocalDeviceHost.platformReason")(function* (
 ): Effect.fn.Return<string | null, never, FileSystem.FileSystem | Path.Path> {
   const hostPlatform = yield* HostProcess.Platform;
   if (platform === "ios") {
-    if (hostPlatform !== "darwin") return "iOS Simulators need macOS with Xcode.";
-    if (!(yield* isCommandAvailable("xcrun"))) return "Xcode command line tools were not found.";
+    if (hostPlatform !== "darwin") return "iOS 模拟器需要装有 Xcode 的 macOS。";
+    if (!(yield* isCommandAvailable("xcrun"))) return "未找到 Xcode 命令行工具。";
     return null;
   }
   const sdk = yield* androidSdk;
   if (!sdk.root)
-    return "Android SDK was not found. Install it with Android Studio or set ANDROID_HOME to your SDK directory.";
+    return "未找到 Android SDK。请通过 Android Studio 安装，或将 ANDROID_HOME 设为 SDK 目录。";
   if (!sdk.adb)
     return `Android SDK Platform-Tools are missing from ${sdk.root}. Install them in Android Studio's SDK Manager.`;
   if (!sdk.emulator)

@@ -73,16 +73,16 @@ const checkForUpdatesFromMenu = Effect.gen(function* () {
   if (updateState.status === "up-to-date") {
     yield* electronDialog.showMessageBox({
       type: "info",
-      title: "You're up to date!",
-      message: `T3 Code ${updateState.currentVersion} is currently the newest version available.`,
+      title: "已是最新版本！",
+      message: `T3 Code ${updateState.currentVersion} 已是最新版本。`,
       buttons: ["OK"],
     });
   } else if (updateState.status === "error") {
     yield* electronDialog.showMessageBox({
       type: "warning",
-      title: "Update check failed",
-      message: "Could not check for updates.",
-      detail: updateState.message ?? "An unknown error occurred. Please try again later.",
+      title: "检查更新失败",
+      message: "无法检查更新。",
+      detail: updateState.message ?? "发生未知错误，请稍后重试。",
       buttons: ["OK"],
     });
   }
@@ -98,8 +98,8 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
     });
     yield* electronDialog.showMessageBox({
       type: "info",
-      title: "Updates unavailable",
-      message: "Automatic updates are not available right now.",
+      title: "更新不可用",
+      message: "目前无法自动更新。",
       detail: disabledReason.value,
       buttons: ["OK"],
     });
@@ -163,45 +163,45 @@ export const make = Effect.gen(function* () {
       template.push({
         label: environment.displayName,
         submenu: [
-          { role: "about", label: `About ${environment.displayName}` },
+          { role: "about", label: `关于 ${environment.displayName}` },
           {
-            label: "Check for Updates...",
+            label: "检查更新…",
             click: checkForUpdatesClick,
           },
           { type: "separator" },
           {
-            label: "Settings...",
+            label: "设置…",
             accelerator: "CmdOrCtrl+,",
             click: settingsClick,
           },
           { type: "separator" },
           { role: "services" },
           { type: "separator" },
-          { role: "hide", label: `Hide ${environment.displayName}` },
+          { role: "hide", label: `隐藏 ${environment.displayName}` },
           { role: "hideOthers" },
           { role: "unhide" },
           { type: "separator" },
-          { role: "quit", label: `Quit ${environment.displayName}` },
+          { role: "quit", label: `退出 ${environment.displayName}` },
         ],
       });
     }
 
     template.push(
       {
-        label: "File",
+        label: "文件",
         submenu: [
           ...(environment.platform === "darwin"
             ? []
             : [
                 {
-                  label: "Settings...",
+                  label: "设置…",
                   accelerator: "CmdOrCtrl+,",
                   click: settingsClick,
                 },
                 { type: "separator" as const },
               ]),
           {
-            label: "Close Developer Tools",
+            label: "关闭开发者工具",
             accelerator: "CmdOrCtrl+W",
             visible: false,
             click: () => {
@@ -213,12 +213,12 @@ export const make = Effect.gen(function* () {
           },
           // Cmd/Ctrl+W belongs to the renderer's tab close; it must never close the window.
           environment.platform === "darwin"
-            ? { label: "Close Window", click: (_item, window) => window?.close() }
+            ? { label: "关闭窗口", click: (_item, window) => window?.close() }
             : { role: "quit" },
         ],
       },
       {
-        label: "Edit",
+        label: "编辑",
         submenu: [
           { role: "undo" },
           { role: "redo" },
@@ -227,7 +227,7 @@ export const make = Effect.gen(function* () {
           { role: "copy" },
           { role: "paste" },
           {
-            label: "Paste as Text",
+            label: "粘贴为纯文本",
             accelerator: "CmdOrCtrl+Shift+V",
             click: pasteAsTextClick,
           },
@@ -238,7 +238,7 @@ export const make = Effect.gen(function* () {
             ? [
                 { type: "separator" as const },
                 {
-                  label: "Speech",
+                  label: "语音",
                   submenu: [{ role: "startSpeaking" as const }, { role: "stopSpeaking" as const }],
                 },
               ]
@@ -246,25 +246,25 @@ export const make = Effect.gen(function* () {
         ],
       },
       {
-        label: "View",
+        label: "查看",
         submenu: [
           /* Native reload/DevTools/zoom roles target focused guests; these commands must target the app. */
-          { label: "Reload", accelerator: "CmdOrCtrl+R", click: mainContentsClick("reload") },
+          { label: "重新加载", accelerator: "CmdOrCtrl+R", click: mainContentsClick("reload") },
           {
-            label: "Force Reload",
+            label: "强制重新加载",
             accelerator: "Shift+CmdOrCtrl+R",
             click: mainContentsClick("forceReload"),
           },
           {
-            label: "Toggle Developer Tools",
+            label: "切换开发者工具",
             accelerator: environment.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",
             click: mainContentsClick("toggleDevTools"),
           },
           { type: "separator" },
-          { label: "Actual Size", accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
-          { label: "Zoom In", accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
+          { label: "实际大小", accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
+          { label: "放大", accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
           {
-            label: "Zoom In",
+            label: "放大",
             accelerator: "CmdOrCtrl+Plus",
             visible: false,
             click: zoomClick("in"),
@@ -272,29 +272,29 @@ export const make = Effect.gen(function* () {
           ...(environment.platform === "darwin"
             ? [
                 {
-                  label: "Zoom In",
+                  label: "放大",
                   accelerator: "CmdOrCtrl+Shift+=",
                   visible: false,
                   click: zoomClick("in"),
                 },
               ]
             : []),
-          { label: "Zoom Out", accelerator: "CmdOrCtrl+-", click: zoomClick("out") },
+          { label: "缩小", accelerator: "CmdOrCtrl+-", click: zoomClick("out") },
           // Keypad codes do not match number-row accelerators.
           {
-            label: "Actual Size",
+            label: "实际大小",
             accelerator: "CmdOrCtrl+num0",
             visible: false,
             click: zoomClick("reset"),
           },
           {
-            label: "Zoom In",
+            label: "放大",
             accelerator: "CmdOrCtrl+numadd",
             visible: false,
             click: zoomClick("in"),
           },
           {
-            label: "Zoom Out",
+            label: "缩小",
             accelerator: "CmdOrCtrl+numsub",
             visible: false,
             click: zoomClick("out"),
@@ -318,7 +318,7 @@ export const make = Effect.gen(function* () {
         role: "help",
         submenu: [
           {
-            label: "Check for Updates...",
+            label: "检查更新…",
             click: checkForUpdatesClick,
           },
         ],

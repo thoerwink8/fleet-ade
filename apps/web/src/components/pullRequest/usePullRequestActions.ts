@@ -77,51 +77,48 @@ export function usePullRequestDefaultMergeMethodResolver(
 }
 
 const actionSuccessLabels = (term: string): Record<PullRequestAction, string> => ({
-  merge: "Merge requested",
-  ready: "Marked ready for review",
-  draft: "Converted to draft",
-  close: `${capitalizeTerm(term)} closed`,
-  reopen: `${capitalizeTerm(term)} reopened`,
-  "update-branch": "Branch updated with the base branch",
-  "enable-auto-merge": "Auto-merge enabled",
-  "disable-auto-merge": "Auto-merge disabled",
-  revert: `Revert ${term} opened`,
-  "delete-branch": "Branch deleted",
-  "approve-workflows": "Workflows approved",
+  merge: "已请求合并",
+  ready: "已标记为可审查",
+  draft: "已转为草稿",
+  close: `已关闭 ${capitalizeTerm(term)}`,
+  reopen: `已重新打开 ${capitalizeTerm(term)}`,
+  "update-branch": "已用基础分支更新分支",
+  "enable-auto-merge": "已开启自动合并",
+  "disable-auto-merge": "已关闭自动合并",
+  revert: `已打开还原 ${term}`,
+  "delete-branch": "已删除分支",
+  "approve-workflows": "已批准工作流",
 });
 
 const actionFailureLabels = (term: string): Record<PullRequestAction, string> => ({
-  merge: `Could not merge this ${term}`,
-  ready: "Could not mark this ready for review",
-  draft: "Could not convert this to a draft",
-  close: `Could not close this ${term}`,
-  reopen: `Could not reopen this ${term}`,
-  "update-branch": "Could not update this branch",
-  "enable-auto-merge": "Could not enable auto-merge",
-  "disable-auto-merge": "Could not disable auto-merge",
-  revert: `Could not open a revert ${term}`,
-  "delete-branch": "Could not delete this branch",
-  "approve-workflows": "Could not approve workflows",
+  merge: `无法合并此 ${term}`,
+  ready: "无法将其标记为可审查",
+  draft: "无法将其转为草稿",
+  close: `无法关闭此 ${term}`,
+  reopen: `无法重新打开此 ${term}`,
+  "update-branch": "无法更新此分支",
+  "enable-auto-merge": "无法开启自动合并",
+  "disable-auto-merge": "无法关闭自动合并",
+  revert: `无法打开还原 ${term}`,
+  "delete-branch": "无法删除此分支",
+  "approve-workflows": "无法批准工作流",
 });
 
 const actionFailureHints = (term: string): Record<PullRequestAction, string> => ({
-  merge:
-    "The host refused the merge. Check that you have write access, that the checks it requires have passed, and that the branch is not conflicting.",
-  ready: "The host refused it. Check that you have write access to this repository.",
-  draft: "The host refused it. Check that you have write access to this repository.",
-  close: "The host refused it. Check that you have write access, or that you opened it.",
-  reopen:
-    "The host refused it. Check that you have write access, and that the branch still exists.",
+  merge: "托管平台拒绝了合并。请确认你有写入权限、其要求的检查已通过，且分支没有冲突。",
+  ready: "托管平台拒绝了该操作。请确认你对此仓库有写入权限。",
+  draft: "托管平台拒绝了该操作。请确认你对此仓库有写入权限。",
+  close: "托管平台拒绝了该操作。请确认你有写入权限，或该项由你创建。",
+  reopen: "托管平台拒绝了该操作。请确认你有写入权限，且分支仍然存在。",
   "update-branch":
-    "The host refused it. Check that you have write access, and that the base branch has not diverged in a way the host cannot merge.",
-  "enable-auto-merge":
-    "The host refused it. Check that auto-merge is enabled for this repository and that you have write access.",
-  "disable-auto-merge": "The host refused it. Check that you have write access to this repository.",
-  revert: `The host refused it. Check that you have write access and that this ${term} was merged on the host.`,
+    "托管平台拒绝了此操作。请确认你有写入权限，且基础分支没有以托管平台无法合并的方式分叉。",
+  "enable-auto-merge": "托管平台拒绝了此操作。请确认此仓库已允许自动合并，且你有写入权限。",
+  "disable-auto-merge": "托管平台拒绝了该操作。请确认你对此仓库有写入权限。",
+  revert: `托管平台拒绝了该操作。请确认你有写入权限，且此 ${term} 已在托管平台上合并。`,
   "delete-branch":
-    "The host refused it. Check that you have write access to the source repository and that the branch has not moved since this page loaded.",
+    "托管平台拒绝了该操作。请确认你对源仓库有写入权限，且分支在此页面加载后没有变动。",
   "approve-workflows":
-    "The host refused it. Check that you have Actions write access and that these workflow runs are still awaiting approval.",
+    "托管平台拒绝了该操作。请确认你有 Actions 的写入权限，且这些工作流运行仍在等待批准。",
 });
 
 export function usePullRequestActionRunner({
@@ -231,7 +228,7 @@ export function usePullRequestCloseBatch(
       type: failures.length > 0 ? "error" : "success",
       title:
         failures.length > 0
-          ? `Closed ${closed} of ${batch.length} pull requests`
+          ? `已关闭 ${closed} 个 pull request 中的 ${batch.length} 个`
           : `Closed ${closed} pull request${closed === 1 ? "" : "s"}`,
       ...(failures.length > 0 ? { description: failures.slice(0, 3).join("\n") } : {}),
     });
@@ -310,18 +307,18 @@ export function usePullRequestHandoffs({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: "无法打开会话",
+        description: "请从项目中重试，或先打开一个会话。",
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: "已在会话中提问",
       description:
         task.prompt.length > 0
-          ? "The question is in the composer. Read it over, then send."
-          : `The ${terminology.singular} is in the composer. Type your question, then send.`,
+          ? "问题已在输入框中。请检查后发送。"
+          : `${terminology.singular} 已在输入框中。输入你的问题后发送。`,
     });
   };
 
@@ -337,7 +334,7 @@ export function usePullRequestHandoffs({
     // Explicit timeouts survive toast updates and would pin the result after loading.
     const toastId = toastManager.add({
       type: "loading",
-      title: `Preparing the ${terminology.singular} checkout...`,
+      title: `正在准备 ${terminology.singular} 的工作副本…`,
       data: {
         onClose: () => {
           cancelled = true;
@@ -358,8 +355,8 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        title: "无法为工作副本打开会话",
+        description: "请从项目中重试，或先打开一个会话。",
       });
       return;
     }
@@ -376,7 +373,7 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: `Could not prepare the ${terminology.singular} checkout`,
+        title: `无法准备 ${terminology.singular} 的工作副本`,
         description: checkoutFailureDescription(
           isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
         ),
@@ -399,8 +396,8 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
-        description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
+        title: "已检出，但会话仍在原处",
+        description: `工作副本已在 \`${prepared.value.branch}\` 上准备好。请从分支选择器将会话指向它，然后再次提问。`,
       });
       return;
     }
@@ -418,11 +415,11 @@ export function usePullRequestHandoffs({
         prepared.value.isOnPullRequestHead
           ? {
               type: "success",
-              title: mode === "local" ? "Checked out here" : "Checked out",
+              title: mode === "local" ? "已在此检出" : "已检出",
               description:
                 mode === "local"
-                  ? `This repository is on the ${terminology.singular}'s branch, with a thread open on it.`
-                  : `The ${terminology.singular} is in its own worktree, with a thread open on it.`,
+                  ? `此仓库已切换到 ${terminology.singular} 的分支，并在其上打开了会话。`
+                  : `${terminology.singular} 已位于独立工作树中，并在其上打开了会话。`,
             }
           : offHeadPullRequestCheckoutToast(terminology),
       );
@@ -436,8 +433,8 @@ export function usePullRequestHandoffs({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer. Read it over, then send.",
+            title: "工作副本已就绪",
+            description: "任务已在输入框中。请检查后发送。",
           }
         : offHeadPullRequestCheckoutToast(terminology),
     );

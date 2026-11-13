@@ -553,7 +553,7 @@ export const make = Effect.gen(function* () {
     ) {
       return yield* new ConnectionBlockedError({
         reason: "configuration",
-        detail: `That address claims to be ${saved.target.label}, which is already saved. Add it as a route from that environment's settings instead.`,
+        detail: `该地址标识为已保存的 ${saved.target.label}。请在该环境的设置中将其添加为路由。`,
       });
     }
   });
@@ -1016,7 +1016,7 @@ export const make = Effect.gen(function* () {
         if (reordered.length !== routes.length || new Set(routeIds).size !== routes.length) {
           return yield* new ConnectionBlockedError({
             reason: "configuration",
-            detail: "The route order must list every saved route once.",
+            detail: "路由顺序必须包含每条已保存的路由，且不能重复。",
           });
         }
         if (reordered.every((route, index) => route === routes[index])) return;

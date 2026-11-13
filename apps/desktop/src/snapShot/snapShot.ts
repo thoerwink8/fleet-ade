@@ -39,15 +39,15 @@ export function snapShotShortcutRegistrationFailureMessage(
   platform: NodeJS.Platform,
 ): string {
   return isModifierPairShortcut(shortcut)
-    ? `${snapShotModifierPairLabel(
+    ? `此系统不支持 ${snapShotModifierPairLabel(
         snapShotShortcutModifierPair(shortcut),
         platform === "darwin",
-      )} is not available on this system.`
-    : "This shortcut is already used by the system or another app.";
+      )}。`
+    : "此快捷键已被系统或其他应用占用。";
 }
 
 const COMMON_MOD_ACTIONS: Readonly<Record<string, string>> = {
-  a: "Select All",
+  a: "全选",
   c: "Copy",
   f: "Find",
   n: "New",
@@ -55,9 +55,9 @@ const COMMON_MOD_ACTIONS: Readonly<Record<string, string>> = {
   p: "Print",
   q: "Quit",
   s: "Save",
-  t: "New Tab",
+  t: "新标签页",
   v: "Paste",
-  w: "Close Window",
+  w: "关闭窗口",
   x: "Cut",
   z: "Undo",
 };
@@ -72,19 +72,19 @@ export function snapShotShortcutSystemConflict(shortcut: SnapShotKeyChord): stri
   ].filter(Boolean).length;
   if (modifierCount !== 1) return null;
   if (shortcut.shiftKey) {
-    return "Shift combinations are used for typing and text selection. Add another modifier.";
+    return "Shift 组合键用于输入和文本选择。请添加另一个修饰键。";
   }
   const key = shortcut.key.toLowerCase();
   if (shortcut.modKey) {
     const action = COMMON_MOD_ACTIONS[key];
-    return action ? `This shortcut is ${action} in most apps.` : null;
+    return action ? `此快捷键在大多数应用中用于“${action}”。` : null;
   }
   if (shortcut.ctrlKey && ["c", "d", "z"].includes(key)) {
-    return "This shortcut controls running commands in terminals.";
+    return "此快捷键用于控制终端中运行的命令。";
   }
-  if (shortcut.altKey && key === "tab") return "The system uses Alt+Tab to switch apps.";
+  if (shortcut.altKey && key === "tab") return "系统使用 Alt+Tab 切换应用。";
   if (shortcut.metaKey && ["l", " "].includes(key)) {
-    return "The system already uses this shortcut.";
+    return "系统已使用此快捷键。";
   }
   return null;
 }

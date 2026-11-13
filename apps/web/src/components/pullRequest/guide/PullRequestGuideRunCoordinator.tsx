@@ -89,7 +89,7 @@ function watchGuideRun(
     const looking = document.visibilityState === "visible" && document.hasFocus();
     if (looking && isGuideShown(runKey)) return;
 
-    const title = failure === null ? "Review guide ready" : "Review guide failed";
+    const title = failure === null ? "审查导览已就绪" : "审查导览生成失败";
     const body =
       watch.title ??
       observedPullRequestTitle(registry, watch.environmentId, watch.reference) ??
@@ -129,7 +129,7 @@ function watchGuideRun(
             ),
         },
         actionProps: {
-          children: "Open guide",
+          children: "打开导览",
           onClick: () => {
             toastManager.close(toastId);
             open();

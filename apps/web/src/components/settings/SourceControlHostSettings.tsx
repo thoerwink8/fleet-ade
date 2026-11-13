@@ -68,7 +68,7 @@ export function SourceControlHostSettings({
               void save(Object.fromEntries(Object.keys(saved ?? {}).map((key) => [key, ""])))
             }
           >
-            Remove
+            移除
           </Button>
         </div>
       ) : null}

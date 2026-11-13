@@ -56,14 +56,14 @@ export function DeviceControlsRail(props: {
   const nextAppearance = settings?.appearance === "dark" ? "light" : "dark";
   return (
     <aside
-      aria-label="Device controls"
+      aria-label="设备控制"
       data-layout="rail"
       className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-14 flex-col items-center gap-2 overflow-y-auto [justify-content:safe_center] py-3 pr-2 [scrollbar-width:none]"
     >
       <div className="pointer-events-auto flex shrink-0 flex-col items-center gap-1 overflow-y-auto rounded-full border border-border/50 bg-background/80 p-2 shadow-sm [scrollbar-width:none]">
         <RailButton
           tooltipSide={popupSide}
-          label="Home"
+          label="主屏幕"
           disabled={inputDisabled}
           onClick={() => handle?.pressButton("home")}
         >
@@ -73,7 +73,7 @@ export function DeviceControlsRail(props: {
           <>
             <RailButton
               tooltipSide={popupSide}
-              label="Back"
+              label="返回"
               disabled={inputDisabled}
               onClick={() => handle?.pressButton("back")}
             >
@@ -81,7 +81,7 @@ export function DeviceControlsRail(props: {
             </RailButton>
             <RailButton
               tooltipSide={popupSide}
-              label="Recents"
+              label="最近任务"
               disabled={inputDisabled}
               onClick={() => handle?.pressButton("recents")}
             >
@@ -94,7 +94,7 @@ export function DeviceControlsRail(props: {
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      aria-label="Rotate device"
+                      aria-label="旋转设备"
                       disabled={controls.disabled}
                     />
                   }
@@ -105,14 +105,14 @@ export function DeviceControlsRail(props: {
                   <MenuItem
                     onClick={() => void controls.act({ type: "setOrientation", value: "portrait" })}
                   >
-                    Portrait
+                    竖屏
                   </MenuItem>
                   <MenuItem
                     onClick={() =>
                       void controls.act({ type: "setOrientation", value: "landscape_left" })
                     }
                   >
-                    Landscape
+                    横屏
                   </MenuItem>
                 </MenuPopup>
               </Menu>
@@ -121,7 +121,7 @@ export function DeviceControlsRail(props: {
         ) : props.hostKind === "simlock" ? null : (
           <RailButton
             tooltipSide={popupSide}
-            label="Rotate device"
+            label="旋转设备"
             disabled={inputDisabled || !!view.keyboard?.attached}
             onClick={() => handle?.rotate()}
           >
@@ -145,8 +145,8 @@ export function DeviceControlsRail(props: {
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    aria-label="Device text size"
-                    title="Device text size"
+                    aria-label="设备文字大小"
+                    title="设备文字大小"
                     disabled={controls.disabled || !settings?.textSize}
                   />
                 }
@@ -171,7 +171,7 @@ export function DeviceControlsRail(props: {
                       ["small", "Small"],
                       ["default", "Default"],
                       ["large", "Large"],
-                      ["extra-large", "Extra large"],
+                      ["extra-large", "特大"],
                     ] as const
                   ).map(([value, label]) => (
                     <MenuRadioItem key={value} value={value}>
@@ -186,7 +186,7 @@ export function DeviceControlsRail(props: {
             </Menu>
             <RailButton
               tooltipSide={popupSide}
-              label="Device tools"
+              label="设备工具"
               pressed={props.toolsOpen}
               onClick={props.onTools}
             >
@@ -197,7 +197,7 @@ export function DeviceControlsRail(props: {
         {props.hostKind === "simlock" ? null : (
           <RailButton
             tooltipSide={popupSide}
-            label={props.screenshotPending ? "Capturing screenshot" : "Save screenshot"}
+            label={props.screenshotPending ? "正在截屏" : "保存截图"}
             disabled={!view.streaming || props.screenshotPending}
             onClick={props.onScreenshot}
           >
@@ -210,8 +210,8 @@ export function DeviceControlsRail(props: {
               <Button
                 size="icon-sm"
                 variant="ghost"
-                aria-label="More device actions"
-                title="More device actions"
+                aria-label="更多设备操作"
+                title="更多设备操作"
               />
             }
           >
@@ -220,23 +220,23 @@ export function DeviceControlsRail(props: {
           <MenuPopup side={popupSide} align="end">
             <MenuItem onClick={props.onFloat}>
               <PictureInPicture2 />
-              Float device over chat
+              让设备悬浮在对话上方
             </MenuItem>
             <MenuItem onClick={props.onClose}>
               <X />
-              Close device panel
+              关闭设备面板
             </MenuItem>
             <MenuSeparator />
             <MenuItem variant="destructive" onClick={props.onPowerOff}>
               <Power />
-              {props.hostKind === "simlock" ? "Return device to the pool" : "Power off device"}
+              {props.hostKind === "simlock" ? "将设备归还到设备池" : "关闭设备电源"}
             </MenuItem>
           </MenuPopup>
         </Menu>
         <RailDivider />
         <RailButton
           tooltipSide={popupSide}
-          label="3D view"
+          label="3D 视图"
           pressed={view.phone}
           disabled={!view.streaming || !!view.phoneUnavailableReason}
           description={view.phoneUnavailableReason ?? undefined}
@@ -246,7 +246,7 @@ export function DeviceControlsRail(props: {
         </RailButton>
         <RailButton
           tooltipSide={popupSide}
-          label="Flat view"
+          label="平面视图"
           pressed={!view.phone}
           disabled={!view.streaming}
           onClick={view.showFlat}
@@ -256,7 +256,7 @@ export function DeviceControlsRail(props: {
         {view.keyboard ? (
           <RailButton
             tooltipSide={popupSide}
-            label={view.keyboard.attached ? "Detach Magic Keyboard" : "Attach Magic Keyboard"}
+            label={view.keyboard.attached ? "断开妙控键盘" : "连接妙控键盘"}
             pressed={view.keyboard.attached}
             onClick={view.keyboard.toggle}
           >
@@ -264,7 +264,7 @@ export function DeviceControlsRail(props: {
           </RailButton>
         ) : null}
         {view.phone ? (
-          <RailButton tooltipSide={popupSide} label="Restore 3D view" onClick={view.resetView}>
+          <RailButton tooltipSide={popupSide} label="恢复 3D 视图" onClick={view.resetView}>
             <Maximize />
           </RailButton>
         ) : null}

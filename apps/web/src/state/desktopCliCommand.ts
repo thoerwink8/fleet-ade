@@ -12,7 +12,7 @@ class DesktopCliCommandUnavailableError extends Schema.TaggedError<DesktopCliCom
   {},
 ) {
   override get message(): string {
-    return "The t3 command is unavailable.";
+    return "t3 命令不可用。";
   }
 }
 
@@ -21,7 +21,7 @@ class DesktopCliCommandLoadError extends Schema.TaggedError<DesktopCliCommandLoa
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Failed to load the t3 command state.";
+    return "无法加载 t3 命令状态。";
   }
 }
 

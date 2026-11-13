@@ -53,7 +53,7 @@ export class DesktopSshPromptRequestIdGenerationError extends Schema.TaggedError
   },
 ) {
   override get message(): string {
-    return "Secure randomness is unavailable.";
+    return "无法获取安全随机数。";
   }
 }
 
@@ -93,7 +93,7 @@ export class DesktopSshPromptTimedOutError extends Schema.TaggedError<DesktopSsh
   },
 ) {
   override get message(): string {
-    return `SSH authentication timed out for ${this.destination}.`;
+    return `${this.destination} 的 SSH 身份验证超时。`;
   }
 }
 
@@ -105,7 +105,7 @@ export class DesktopSshPromptCancelledError extends Schema.TaggedError<DesktopSs
   },
 ) {
   override get message(): string {
-    return `SSH authentication cancelled for ${this.destination}.`;
+    return `${this.destination} 的 SSH 身份验证已取消。`;
   }
 }
 
@@ -117,7 +117,7 @@ export class DesktopSshPromptWindowClosedError extends Schema.TaggedError<Deskto
   },
 ) {
   override get message(): string {
-    return "SSH authentication was cancelled because the app window closed.";
+    return "应用窗口已关闭，SSH 身份验证已取消。";
   }
 }
 
@@ -129,7 +129,7 @@ export class DesktopSshPromptServiceStoppedError extends Schema.TaggedError<Desk
   },
 ) {
   override get message(): string {
-    return "SSH password prompt service stopped.";
+    return "SSH 密码提示服务已停止。";
   }
 }
 
@@ -140,7 +140,7 @@ export class DesktopSshPromptInvalidRequestIdError extends Schema.TaggedError<De
   },
 ) {
   override get message(): string {
-    return "Invalid SSH password prompt id.";
+    return "SSH 密码提示 ID 无效。";
   }
 }
 
@@ -151,7 +151,7 @@ export class DesktopSshPromptExpiredError extends Schema.TaggedError<DesktopSshP
   },
 ) {
   override get message(): string {
-    return "SSH password prompt expired. Try connecting again.";
+    return "SSH 密码提示已过期。请重新连接。";
   }
 }
 

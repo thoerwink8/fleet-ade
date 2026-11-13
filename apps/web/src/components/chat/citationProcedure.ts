@@ -38,15 +38,14 @@ const MAX_CITATION_PAGES = 20;
 
 const COULD_NOT_LOAD = {
   _tag: "failed",
-  title: "Could not load the cited response",
-  description:
-    "Load earlier turns, then click the citation to try again. Your saved quote is unchanged.",
+  title: "无法加载引用的回复",
+  description: "请先加载更早的轮次，再点击引用重试。已保存的引用内容不变。",
 } as const;
 
 const UNAVAILABLE = {
   _tag: "failed",
-  title: "The cited response is unavailable",
-  description: "It may have been removed. The selected text is still saved in your citation.",
+  title: "引用的回复不可用",
+  description: "它可能已被删除。选中的文字仍保存在你的引用中。",
 } as const;
 
 /**
@@ -68,8 +67,8 @@ export async function loadCitedHistory(input: {
     if (thread.message === "other") {
       return {
         _tag: "failed",
-        title: "The citation does not refer to an assistant response",
-        description: "The selected text is still saved in your citation.",
+        title: "这个引用指向的不是助手回复",
+        description: "选中的文字仍保存在你的引用中。",
       };
     }
     if (!thread.hasMoreHistory) return UNAVAILABLE;
@@ -206,7 +205,7 @@ const citedHistoryAtom = Atom.family(
           );
           return result._tag === "Success"
             ? result.value
-            : { _tag: "error", message: "Could not load history." };
+            : { _tag: "error", message: "无法加载历史记录。" };
         },
       }).then((outcome) => {
         if (outcome._tag === "aborted") return;

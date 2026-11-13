@@ -87,8 +87,8 @@ const GUEST_ACCESS_MESSAGES = {
   rejected: "The owner's server rejected this request.",
   empty: "Write a message or attach a file.",
   too_many_files: "Attach up to 4 files to a message.",
-  too_large: "Attached files can total up to 10 MB per message.",
-  unsupported_file: "This file cannot be attached. Images must be PNG, JPEG, GIF, or WebP.",
+  too_large: "每条消息的附件总大小不能超过 10 MB。",
+  unsupported_file: "无法附加此文件。图片必须是 PNG、JPEG、GIF 或 WebP 格式。",
   files_busy: GUEST_FAILURE.filesBusy,
 } as const;
 

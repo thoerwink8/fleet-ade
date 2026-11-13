@@ -185,9 +185,7 @@ export function validateServerUpdateReadyEvent(
     new ServerUpdateTerminalError({
       targetVersion: result.targetVersion,
       status: outcome?.status ?? "failed",
-      reason:
-        outcome?.reason ??
-        "The service launcher resumed without committing the requested server version.",
+      reason: outcome?.reason ?? "服务启动器已恢复，但未应用请求的服务器版本。",
     }),
   );
 }
@@ -285,7 +283,7 @@ export const waitForDesktopUpdateTarget = Effect.fn("waitForDesktopUpdateTarget"
   return yield* new ServerUpdateTerminalError({
     targetVersion,
     status: "failed",
-    reason: "The desktop app resumed without installing the prepared update.",
+    reason: "桌面应用已恢复，但未安装准备好的更新。",
   });
 });
 
@@ -320,7 +318,7 @@ export function serverUpdateStateForServerVersion(
 }
 
 export function serverUpdateFailureMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Server update failed.";
+  return error instanceof Error ? error.message : "服务器更新失败。";
 }
 
 function isRpcSocketError(error: unknown): boolean {

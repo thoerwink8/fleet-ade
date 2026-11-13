@@ -25,7 +25,7 @@ function OverflowMenu() {
   return (
     <>
       <Menu onOpenChangeComplete={(open) => focusRequestedPermission(open, triggerRef.current)}>
-        <MenuTrigger ref={triggerRef}>More</MenuTrigger>
+        <MenuTrigger ref={triggerRef}>更多</MenuTrigger>
         <MenuPopup {...composerMenuProps}>
           <ComposerPermissionsSection
             runtimeMode={mode}
@@ -47,9 +47,7 @@ it("reaches Permissions with arrow keys, previews, and picks with Enter", async 
   await userEvent.keyboard("{ArrowDown}");
   const supervised = page.getByRole("menuitemradio", { name: "Supervised" });
   await expect.element(supervised).toHaveFocus();
-  await expect
-    .element(supervised)
-    .toHaveAccessibleDescription("Ask before commands and file changes.");
+  await expect.element(supervised).toHaveAccessibleDescription("执行命令和修改文件前询问。");
 
   await userEvent.keyboard("{ArrowRight}");
   await expect
@@ -114,7 +112,7 @@ function PermissionsChip() {
   return (
     <div data-slot="composer-shell">
       <button type="button" data-composer-shortcut="composer.effort composer.mode">
-        Model
+        模型
       </button>
       {mode === "full-access" ? null : (
         <ComposerFooterModeControls

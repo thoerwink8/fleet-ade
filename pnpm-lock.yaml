@@ -1183,9 +1183,6 @@ importers:
       fast-xml-parser:
         specifier: 5.7.3
         version: 5.7.3
-      gt-react:
-        specifier: 11.4.18
-        version: 11.4.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       hast-util-to-html:
         specifier: ^9.0.5
         version: 9.0.5
@@ -9783,12 +9780,6 @@ packages:
     peerDependencies:
       react: '>=19.0.0'
       react-native: '>=0.78.0'
-
-  gt-react@11.4.18:
-    resolution: {integrity: sha512-c6T+oqvXdT2DSW6kXDc3HYj4MA9fR4B1VgSXaIVG8emAWhZ9Dih4npJBjRWBJNr1D3KrG0nU/+1FPxJ1Zzkhnw==}
-    peerDependencies:
-      react: '>=18.0.0'
-      react-dom: '>=18.0.0'
 
   gt-remark@1.0.12:
     resolution: {integrity: sha512-mqW6BkvfLGHwtIIdsy3C0QW26HbZDJ7EdQz7c7pL8KZrLIBzbcu2rHVqWEoleeB5+TsqMQIFWRhsUt5UpbrDWw==}
@@ -20022,14 +20013,6 @@ snapshots:
       gt-i18n: 1.0.40
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6)
-
-  gt-react@11.4.18(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
-    dependencies:
-      '@generaltranslation/react-core': 11.4.18(react@19.3.0)
-      generaltranslation: 9.5.9
-      gt-i18n: 1.0.40
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
 
   gt-remark@1.0.12(supports-color@8.1.1):
     dependencies:

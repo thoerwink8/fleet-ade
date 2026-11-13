@@ -196,7 +196,7 @@ function provider(): ServerProvider {
       updateCommand: "pnpm add -g @openai/codex@latest",
       canUpdate: true,
       checkedAt: "2026-07-24T12:00:00.000Z",
-      message: "Update available.",
+      message: "有可用更新。",
     },
   };
 }
@@ -213,7 +213,7 @@ function panel(options?: {
       <div className="@container/providers">
         <EnvironmentProviderSettings
           environmentId={environmentId}
-          environmentLabel="Remote device"
+          environmentLabel="远程设备"
           {...(options?.readOnly === undefined ? {} : { readOnly: options.readOnly })}
           {...(options?.targetInstanceId === undefined
             ? {}
@@ -253,9 +253,7 @@ describe("EnvironmentProviderSettings routing", () => {
     await setup();
     await setProviders([provider()]);
     await using _screen = await render(panel({ targetInstanceId: customId }));
-    await expect
-      .element(page.getByText("This provider instance is no longer available on this device."))
-      .toBeVisible();
+    await expect.element(page.getByText("此提供方实例在该设备上已不可用。")).toBeVisible();
     expect(state.updateSettings).not.toHaveBeenCalled();
   });
 

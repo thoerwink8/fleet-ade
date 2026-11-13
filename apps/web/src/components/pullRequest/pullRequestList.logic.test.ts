@@ -270,9 +270,7 @@ describe("default merge-readiness ranking", () => {
     const unknown = entry({ number: 1, additions: 0, deletions: 0 });
     const measured = entry({ number: 2 });
     const empty = entry({ number: 3, additions: 0, deletions: 0 });
-    const groups = [
-      { key: "others", label: "Others", entries: [unknown, measured, empty] },
-    ] as const;
+    const groups = [{ key: "others", label: "其他", entries: [unknown, measured, empty] }] as const;
 
     const sorted = sortPullRequestGroups(groups, "ready", "", (row) => row.number !== 1);
 
@@ -297,8 +295,8 @@ describe("default merge-readiness ranking", () => {
     });
     const sorted = sortPullRequestGroups(
       [
-        { key: "authored", label: "Authored", entries: [authoredWaiting, authoredReady] },
-        { key: "others", label: "Others", entries: [otherReady] },
+        { key: "authored", label: "我创建的", entries: [authoredWaiting, authoredReady] },
+        { key: "others", label: "其他", entries: [otherReady] },
       ],
       "ready",
       "",
@@ -520,7 +518,7 @@ describe("merging the environments' own listings", () => {
   it("keeps project errors scoped to the environment that reported them", () => {
     const error = {
       projectId: "project-1" as ProjectId,
-      projectTitle: "Web",
+      projectTitle: "网页",
       message: "Not signed in",
     } as const;
     const merged = mergePullRequestLists([

@@ -80,30 +80,30 @@ const actionLink = (action: StartupRecoveryAction, label: string, primary = fals
 function describeOffer(offer: StartupRecoveryOffer): { text: string; action: string } {
   switch (offer._tag) {
     case "Checking":
-      return { text: "Checking for a newer version…", action: "" };
+      return { text: "正在检查是否有更新版本…", action: "" };
     case "Update":
       return {
-        text: `Version ${offer.version} is available. It can contain a fix.`,
-        action: actionLink("update", `Update to ${offer.version}`, true),
+        text: `版本 ${offer.version} 可用。它可能包含修复。`,
+        action: actionLink("update", `更新到 ${offer.version}`, true),
       };
     case "Downloading":
       return {
-        text: `Downloading ${offer.version}${offer.percent === null ? "" : ` (${Math.floor(offer.percent / 10) * 10}%)`}. T3 Code restarts when the download is done.`,
+        text: `正在下载 ${offer.version}${offer.percent === null ? "" : `（${Math.floor(offer.percent / 10) * 10}%）`}。下载完成后 T3 Code 会重启。`,
         action: "",
       };
     case "Reinstall":
       return {
-        text: `Version ${offer.version} started correctly on this computer. This build does not download installers.`,
+        text: `版本 ${offer.version} 已在这台电脑上正常启动。这个构建不会下载安装包。`,
         action: "",
       };
     case "Releases":
       return {
-        text: "This build has no release page.",
+        text: "这个构建没有发布页。",
         action: "",
       };
     case "ManagedPolicy":
       return {
-        text: "Your organization's managed policy stopped T3 Code from starting. Send the details below to your IT administrator.",
+        text: "组织的托管策略阻止了 T3 Code 启动。请把下面的详情发给 IT 管理员。",
         action: "",
       };
   }

@@ -66,8 +66,8 @@ export function missingTailscaleEndpointDescription(
   state: Pick<DesktopServerExposureState, "mode" | "tailscaleServeEnabled"> | null,
 ): string {
   return state && state.mode !== "network-accessible" && !state.tailscaleServeEnabled
-    ? "Turn on Network access to detect Tailscale."
-    : "Start Tailscale to set up HTTPS access through MagicDNS.";
+    ? "开启网络访问后即可检测 Tailscale。"
+    : "启动 Tailscale，通过 MagicDNS 设置 HTTPS 访问。";
 }
 
 export function resolveTailscaleServeBaseUrl(
@@ -99,11 +99,9 @@ export function isWslSettingsRowVisible(input: {
  * including retryable failures. Rechecks retain downloaded-update labels; `state` is null outside desktop.
  */
 export function resolveLocalVersionStatusLabel(state: DesktopUpdateState | null): string {
-  if (!state) return "Up to date";
+  if (!state) return "已是最新版本";
   if (state.status === "downloading") {
-    return state.availableVersion
-      ? `Downloading update ${state.availableVersion}`
-      : "Downloading update";
+    return state.availableVersion ? `正在下载更新 ${state.availableVersion}` : "正在下载更新";
   }
   const action = resolveDesktopUpdateButtonAction(state);
   if (
@@ -112,14 +110,12 @@ export function resolveLocalVersionStatusLabel(state: DesktopUpdateState | null)
     (state.status === "checking" && state.downloadedVersion !== null)
   ) {
     const version = getDesktopUpdateDownloadedVersion(state);
-    return version ? `Update ${version} downloaded` : "Update downloaded";
+    return version ? `已下载更新 ${version}` : "已下载更新";
   }
   if (action === "download") {
-    return state.availableVersion
-      ? `Update ${state.availableVersion} available`
-      : "Update available";
+    return state.availableVersion ? `有可用更新 ${state.availableVersion}` : "有可用更新";
   }
-  return "Up to date";
+  return "已是最新版本";
 }
 
 export type QrEndpointOption = {
@@ -161,7 +157,7 @@ export async function applyWslEnableSelection(input: {
   return await bridge.setWslBackendEnabled(true);
 }
 
-const accessTimestampFormatter = new Intl.DateTimeFormat(undefined, {
+const accessTimestampFormatter = new Intl.DateTimeFormat("zh-CN", {
   dateStyle: "medium",
   timeStyle: "short",
 });
@@ -181,7 +177,7 @@ export function parseManualDesktopSshTarget(input: {
 }): DesktopSshEnvironmentTarget {
   const rawHost = input.host.trim();
   if (rawHost.length === 0) {
-    throw new Error("SSH host or alias is required.");
+    throw new Error("请输入 SSH 主机或别名。");
   }
 
   let hostname = rawHost;
@@ -217,11 +213,11 @@ export function parseManualDesktopSshTarget(input: {
   }
 
   if (hostname.length === 0) {
-    throw new Error("SSH host or alias is required.");
+    throw new Error("请输入 SSH 主机或别名。");
   }
 
   if (port !== null && (!Number.isInteger(port) || port <= 0 || port > 65_535)) {
-    throw new Error("SSH port must be between 1 and 65535.");
+    throw new Error("SSH 端口必须在 1 到 65535 之间。");
   }
 
   return {
@@ -276,16 +272,16 @@ export function parseRemotePairingFields(input: {
   const host = input.host.trim();
   const pairingCode = input.pairingCode.trim();
   if (!host) {
-    throw new Error("Enter a backend host.");
+    throw new Error("请输入后端主机。");
   }
   if (!pairingCode) {
-    throw new Error("Enter a pairing code.");
+    throw new Error("请输入配对码。");
   }
   return { host, pairingCode };
 }
 
 export function formatDesktopSshConnectionError(error: unknown): string {
-  const fallback = "Failed to connect SSH host.";
+  const fallback = "无法连接 SSH 主机。";
   const rawMessage = error instanceof Error ? error.message : fallback;
   const withoutIpcPrefix = rawMessage.replace(
     /^Error invoking remote method 'desktop:ensure-ssh-environment':\s*/u,
@@ -435,17 +431,17 @@ export function isHostedAppPairingUrl(value: string): boolean {
 
 export function endpointShareHint(endpoint: AdvertisedEndpoint, url: string): string {
   if (isHostedAppPairingUrl(url)) {
-    return "Opens the hosted app, no install needed";
+    return "打开托管版应用，无需安装";
   }
   switch (endpoint.reachability) {
     case "lan":
-      return "Devices on the same network";
+      return "同一网络中的设备";
     case "private-network":
-      return "Devices on your private network";
+      return "你的专用网络中的设备";
     case "public":
-      return "Reachable from anywhere";
+      return "可从任何位置访问";
     case "loopback":
-      return "Clients on this machine";
+      return "本机上的客户端";
   }
 }
 

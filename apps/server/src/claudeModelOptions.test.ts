@@ -70,7 +70,7 @@ describe("compileClaudeModelSelection", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select" as const,
             currentValue: "ultracode",
             options: choices.map((id) => ({ id, label: id, isDefault: id === "ultracode" })),

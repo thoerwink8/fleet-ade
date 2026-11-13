@@ -123,13 +123,13 @@ export function agentControlledBrowserCloseConfirmation(
   if (activeBrowserCount === 0) return null;
   if (activeBrowserCount === 1) {
     return [
-      "Close browser while the agent is using it?",
-      "The agent is actively controlling this browser. Closing it may interrupt the current browser action.",
+      "关闭智能体正在使用的浏览器？",
+      "智能体正在操作这个浏览器，关闭它可能会中断当前操作。",
     ].join("\n");
   }
   return [
-    `Close ${activeBrowserCount} browsers while the agent is using them?`,
-    "The agent is actively controlling these browsers. Closing them may interrupt the current browser actions.",
+    `关闭智能体正在使用的 ${activeBrowserCount} 个浏览器？`,
+    "智能体正在操作这些浏览器，关闭它们可能会中断当前操作。",
   ].join("\n");
 }
 
@@ -439,7 +439,7 @@ export function buildLocalDraftThread(
   return presentThreadShell(draftThread.environmentId, {
     id: threadId,
     projectId: draftThread.projectId,
-    title: "New thread",
+    title: "新建会话",
     providerInstanceId: fallbackModelSelection.instanceId,
     modelSelection: fallbackModelSelection,
     runtimeMode: draftThread.runtimeMode,
@@ -534,23 +534,23 @@ export function getAntigravitySendBlockReason(
 ): string | null {
   if (provider?.driver !== "antigravity") return null;
   if (!provider.installed) {
-    return "Install Antigravity in provider settings before sending.";
+    return "发送前请先在提供方设置中安装 Antigravity。";
   }
   if (provider.auth.status === "unauthenticated") {
-    return "Sign in to Antigravity in provider settings before sending.";
+    return "发送前请先在提供方设置中登录 Antigravity。";
   }
   const slug = model.trim();
-  if (slug.length === 0) return "Choose an Antigravity model before sending.";
+  if (slug.length === 0) return "发送前请先选择 Antigravity 模型。";
   if (provider.auth.status === "unknown") return null;
   if (provider.models.length === 0) {
-    return "Refresh Antigravity models in provider settings before sending.";
+    return "发送前请先在提供方设置中刷新 Antigravity 模型。";
   }
   if (
     provider.status === "ready" &&
     slug !== ANTIGRAVITY_DEFAULT_MODEL &&
     !provider.models.some((entry) => entry.slug === slug || entry.aliases?.includes(slug))
   ) {
-    return "That Antigravity model is no longer available. Choose another model.";
+    return "该 Antigravity 模型已不可用。请选择其他模型。";
   }
   return null;
 }
@@ -753,17 +753,17 @@ export function buildExpiredTerminalContextToastCopy(
   variant: "omitted" | "empty",
 ): { title: string; description: string } {
   const count = Math.max(1, Math.floor(expiredTerminalContextCount));
-  const noun = count === 1 ? "Expired terminal context" : "Expired terminal contexts";
+  const noun = count === 1 ? "过期的终端上下文" : "过期的终端上下文";
   const pronoun = count === 1 ? "it" : "them";
   if (variant === "empty") {
     return {
-      title: `${noun} won't be sent`,
-      description: `Remove ${pronoun} or re-add ${pronoun} to include terminal output.`,
+      title: `${noun}不会发送`,
+      description: `请移除或重新添加${pronoun}，才能带上终端输出。`,
     };
   }
   return {
-    title: `${noun} omitted from message`,
-    description: `Re-add ${pronoun} if you want that terminal output included.`,
+    title: `消息中已省略${noun}`,
+    description: `如果仍需要那段终端输出，请重新添加${pronoun}。`,
   };
 }
 
@@ -877,8 +877,8 @@ export function getStartedThreadModelChangeBlockReason(input: {
     return null;
   }
   return {
-    title: "Start a new chat to switch providers",
-    description: "This thread does not support switching providers after it has started.",
+    title: "开始新对话以切换提供方",
+    description: "此会话开始后不支持切换提供方。",
   };
 }
 
@@ -1167,7 +1167,7 @@ export type LocalThreadErrorEntry = {
 };
 
 export function chatActionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An error occurred.";
+  return error instanceof Error ? error.message : "发生错误。";
 }
 
 export function releaseChatTimelineAnchor<T extends { readonly messageId: MessageId | null }>(

@@ -20,7 +20,7 @@ describe("secretRequestDisplay", () => {
   it("never offers the form for a request inherited from another thread", () => {
     expect(secretRequestDisplay({ secretStatus: "pending" }, "inherited")).toEqual({
       kind: "pending-elsewhere",
-      label: "Waiting for an answer in the original thread",
+      label: "正在等待原会话中的回答",
     });
     expect(secretRequestDisplay({ secretStatus: "saved" }, "inherited")).toMatchObject({
       outcome: "saved",
@@ -30,7 +30,7 @@ describe("secretRequestDisplay", () => {
 
 describe("secretRequestPrivacyNote", () => {
   it("does not promise to hide a value that the agent's commands can read", () => {
-    expect(secretRequestPrivacyNote({})).toBe("Stored securely, never shown to the agent");
+    expect(secretRequestPrivacyNote({})).toBe("安全存储，绝不会展示给智能体");
     expect(secretRequestPrivacyNote({ delivery: "file" })).not.toContain("never shown");
   });
 });
@@ -83,9 +83,9 @@ describe("secretRequestFailureMessage", () => {
       secretRequestFailureMessage(new SecretRequestError({ reason: "already_answered" })),
     ).toBe("This secret request was already answered.");
     expect(secretRequestFailureMessage(new Error('Expected string, got "whsec_1"'))).toBe(
-      "Could not answer the request. Try again.",
+      "无法回复此请求。请重试。",
     );
-    expect(secretRequestFailureMessage(undefined)).toBe("Could not answer the request. Try again.");
+    expect(secretRequestFailureMessage(undefined)).toBe("无法回复此请求。请重试。");
   });
 });
 
@@ -99,7 +99,7 @@ describe("secretRequestSources", () => {
     },
     [SecretProviderId.make("later")]: {
       kind: SecretProviderKind.make("from_a_newer_build"),
-      label: "Later",
+      label: "稍后",
       config: {},
     },
   };

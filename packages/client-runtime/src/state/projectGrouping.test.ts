@@ -197,25 +197,25 @@ describe("buildProjectGroups", () => {
       const remoteEnvironmentId = EnvironmentId.make("remote");
       const projects = [
         makeProject("scratch-local", "/local/scratch", {
-          title: "No project",
+          title: "无项目",
           isScratch: true,
           repositoryIdentity: null,
         }),
         makeProject("scratch-remote", "/remote/scratch", {
-          title: "No project",
+          title: "无项目",
           environmentId: remoteEnvironmentId,
           isScratch: true,
         }),
         makeProject("scratch-duplicate", "/remote/scratch/", {
-          title: "No project",
+          title: "无项目",
           environmentId: remoteEnvironmentId,
           isScratch: true,
           repositoryIdentity: null,
           updatedAt: "2026-07-02T00:00:00.000Z",
         }),
-        makeProject("ordinary", "/ordinary", { title: "No project" }),
+        makeProject("ordinary", "/ordinary", { title: "无项目" }),
         makeProject("reserved-collision", "/other", {
-          title: "No project",
+          title: "无项目",
           repositoryIdentity: { ...repositoryIdentity, canonicalKey: "\0no-project" },
         }),
       ];
@@ -227,7 +227,7 @@ describe("buildProjectGroups", () => {
       });
       expect(groups).toHaveLength(3);
       const scratch = groups.find((group) => group.representative.isScratch)!;
-      expect(scratch.label).toBe("No project");
+      expect(scratch.label).toBe("无项目");
       expect(scratch.representative.id).toBe(projects[2]?.id);
       expect(scratch.members).toHaveLength(2);
       expect(scratch.memberProjectRefs).toEqual(

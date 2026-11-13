@@ -146,7 +146,7 @@ const makeHarness = Effect.fn("RelayDiscoveryTest.makeHarness")(function* () {
                 () =>
                   new ConnectionBlockedError({
                     reason: "authentication",
-                    detail: "Signed out.",
+                    detail: "已退出登录。",
                   }),
               ),
             ),

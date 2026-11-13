@@ -148,7 +148,7 @@ it("never changes the global user-extensions preference", async () => {
 
 it("surfaces desktop rejection and disconnect as actionable failures", async () => {
   const { setup, bus } = fixture({ state: 2, version: 3, accepted: false });
-  await expect(setup.perform("enable-extension")).rejects.toThrow("Sign out");
+  await expect(setup.perform("enable-extension")).rejects.toThrow("退出登录");
   bus.emit("error", new Error("Session bus disconnected"));
   expect(await setup.state()).toEqual({ status: "error", message: "Session bus disconnected" });
   setup.close();

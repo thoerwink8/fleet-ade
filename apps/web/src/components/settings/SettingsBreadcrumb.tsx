@@ -1,5 +1,3 @@
-import { msg, useMessages } from "gt-react";
-
 import {
   WorkspaceBreadcrumb,
   WorkspaceBreadcrumbItem,
@@ -7,12 +5,12 @@ import {
 } from "../WorkspaceBreadcrumb";
 import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
 
-const SETTINGS_LABEL = msg("Settings");
+const SETTINGS_LABEL = "设置";
 
 const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
   ...SETTINGS_SECTION_LABELS,
-  "/settings/diagnostics": msg("Diagnostics"),
-  "/settings/open-source-licenses": msg("Open source licenses"),
+  "/settings/diagnostics": "诊断",
+  "/settings/open-source-licenses": "开源许可",
 };
 
 function settingsBreadcrumbLabel(pathname: string): string | null {
@@ -21,19 +19,18 @@ function settingsBreadcrumbLabel(pathname: string): string | null {
 }
 
 export function SettingsBreadcrumb({ pathname }: { pathname: string }) {
-  const m = useMessages();
   const sectionLabel = settingsBreadcrumbLabel(pathname);
 
   return (
-    <WorkspaceBreadcrumb ariaLabel="Settings breadcrumb">
+    <WorkspaceBreadcrumb ariaLabel="设置导航路径">
       {sectionLabel ? (
         <>
-          <WorkspaceBreadcrumbItem>{m(SETTINGS_LABEL)}</WorkspaceBreadcrumbItem>
+          <WorkspaceBreadcrumbItem>{SETTINGS_LABEL}</WorkspaceBreadcrumbItem>
           <WorkspaceBreadcrumbSeparator />
         </>
       ) : null}
       <WorkspaceBreadcrumbItem current className="truncate">
-        {m(sectionLabel ?? SETTINGS_LABEL)}
+        {sectionLabel ?? SETTINGS_LABEL}
       </WorkspaceBreadcrumbItem>
     </WorkspaceBreadcrumb>
   );

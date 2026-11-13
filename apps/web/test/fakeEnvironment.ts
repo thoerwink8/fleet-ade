@@ -253,7 +253,7 @@ export function threadWithHistory(
       ),
     );
   }
-  return { id, title: `Thread ${name}`, modelSelection, runs, items };
+  return { id, title: `会话 ${name}`, modelSelection, runs, items };
 }
 
 function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {

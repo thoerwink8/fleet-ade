@@ -48,7 +48,7 @@ describe("when: ref is clean, ahead, and has an open PR", () => {
       }),
       false,
     );
-    assert.deepInclude(quick, { kind: "run_action", action: "push", label: "Push" });
+    assert.deepInclude(quick, { kind: "run_action", action: "push", label: "推送" });
   });
 });
 
@@ -113,7 +113,7 @@ describe("when: on default ref without open PR", () => {
     assert.deepInclude(quick, {
       kind: "run_action",
       action: "commit_push",
-      label: "Commit & push",
+      label: "提交并推送",
       disabled: false,
     });
   });
@@ -123,7 +123,7 @@ describe("when: local changes are behind upstream", () => {
   it("keeps the commit action available without pushing, with or without an open PR", () => {
     const behind = status({ hasWorkingTreeChanges: true, behindCount: 2 });
     const commit = {
-      label: "Commit",
+      label: "提交",
       disabled: false,
       kind: "run_action",
       action: "commit",
@@ -180,7 +180,7 @@ describe("when: ref has no upstream configured", () => {
     );
     assert.deepEqual(quick, {
       kind: "open_publish",
-      label: "Publish repository",
+      label: "发布仓库",
       disabled: false,
     });
   });

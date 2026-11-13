@@ -22,12 +22,12 @@ export function resolveSpeechPresentation(
     case "idle":
       return { status: null, active: false };
     case "error":
-      return { status: state.error ?? "Voice input failed", active: false };
+      return { status: state.error ?? "语音输入失败", active: false };
     case "preparing":
       return {
         status: progress
           ? `Downloading model ${Math.round((progress.downloaded / Math.max(1, progress.total)) * 100)}%`
-          : "Starting…",
+          : "正在启动…",
         active: true,
       };
     case "recording":
@@ -97,7 +97,7 @@ export function ComposerSpeechButton(props: {
   onStart(): void;
 }) {
   if (props.state.phase !== "idle") return null;
-  const label = "Start voice input";
+  const label = "开始语音输入";
 
   return (
     <ShortcutTooltip label={label} shortcut={props.shortcutLabel}>
@@ -156,12 +156,12 @@ export function ComposerSpeechRecordingPill(props: {
 
   return (
     <VoiceInputPill size={props.size}>
-      <ShortcutTooltip label="Cancel voice input" shortcut={props.cancelShortcutLabel}>
+      <ShortcutTooltip label="取消语音输入" shortcut={props.cancelShortcutLabel}>
         <Button
           type="button"
           size={compact ? "icon-xs" : "icon-sm-pill"}
           variant="ghost"
-          aria-label="Cancel voice input"
+          aria-label="取消语音输入"
           onPointerDown={keepFocus}
           onClick={props.onCancel}
           className="shrink-0"
@@ -201,14 +201,14 @@ export function ComposerSpeechRecordingPill(props: {
           onClick={props.onSkipPostProcessing}
           className="shrink-0"
         >
-          Skip
+          跳过
         </Button>
       ) : recording ? (
-        <ShortcutTooltip label="Finish voice input" shortcut={props.finishShortcutLabel}>
+        <ShortcutTooltip label="完成语音输入" shortcut={props.finishShortcutLabel}>
           <Button
             type="button"
             size={compact ? "icon-xs" : "icon-sm-pill"}
-            aria-label="Finish voice input"
+            aria-label="完成语音输入"
             onPointerDown={keepFocus}
             onClick={props.onStop}
             className="shrink-0"

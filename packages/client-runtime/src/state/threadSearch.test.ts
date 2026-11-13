@@ -176,7 +176,7 @@ it("ranks recent threads by this client's own latest open", () => {
   const thread = {
     environmentId: envA,
     id: ThreadId.make("thread-local"),
-    title: "Local",
+    title: "本地",
     branch: null,
     createdAt: "2026-10-01T00:00:00.000Z",
     updatedAt: "2026-10-01T00:00:00.000Z",

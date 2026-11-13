@@ -137,13 +137,13 @@ describe("runtime diagnostics in the v2 work log", () => {
     const entry = workEntry({
       ...baseItem,
       type: "dynamic_tool",
-      title: "Read file",
+      title: "已读取文件",
       toolName: "read_file",
       input: {},
       output: { message: retainedMessage },
     });
 
-    expect(entry.label).toBe("Read file");
+    expect(entry.label).toBe("已读取文件");
     expect(entry.detail).toBeUndefined();
   });
 });

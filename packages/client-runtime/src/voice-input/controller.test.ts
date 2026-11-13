@@ -101,7 +101,7 @@ describe("environment voice input", () => {
     expect(harness.controller.currentState.phase).toBe("error");
     expect(harness.deleted).toEqual([]);
 
-    harness.setDraft(draft({ text: "updated ", selection: { start: 8, end: 8 } }));
+    harness.setDraft(draft({ text: "已更新", selection: { start: 8, end: 8 } }));
     await harness.controller.start();
     expect(transcribe.mock.calls.map(([uri]) => uri)).toEqual([
       "file:///voice.m4a",
@@ -396,7 +396,7 @@ describe("VoiceInputController", () => {
               getTranscriber: () => ({
                 prepare: async () =>
                   preparedTranscription(async () => {
-                    throw new Error("Transcription failed");
+                    throw new Error("转写失败");
                   }),
               }),
             },

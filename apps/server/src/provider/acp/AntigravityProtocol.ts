@@ -95,9 +95,9 @@ export function antigravityApprovalOptions(
     });
   }
   if (optionWithKind("reject_once")) {
-    options.push({ decision: "decline", label: "Deny" });
+    options.push({ decision: "decline", label: "拒绝" });
   }
-  options.push({ decision: "cancel", label: "Cancel" });
+  options.push({ decision: "cancel", label: "取消" });
   return options;
 }
 

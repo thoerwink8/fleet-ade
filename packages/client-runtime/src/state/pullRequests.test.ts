@@ -539,7 +539,7 @@ const makeTestRuntime = Effect.fn("makeTestRuntime")(function* (
   } satisfies EnvironmentSupervisor.EnvironmentSupervisor["Service"]);
   const localTarget = new PrimaryConnectionTarget({
     environmentId: EnvironmentId.make("local-environment"),
-    label: "Local environment",
+    label: "本地环境",
     httpBaseUrl: "http://localhost:3773",
     wsBaseUrl: "ws://localhost:3773",
   });

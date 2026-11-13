@@ -95,14 +95,14 @@ function workEntryIsActiveTurnActivity(entry: WorkLogEntry): boolean {
 }
 
 function singleToolCallLabel(entry: WorkLogEntry): string {
-  if (entry.itemType === "reasoning") return entry.detail?.trim().replace(/\s+/g, " ") || "Thought";
+  if (entry.itemType === "reasoning") return entry.detail?.trim().replace(/\s+/g, " ") || "已思考";
   const toolPresentation = resolveWorkEntryToolPresentation(entry, "completed");
   if (toolPresentation) return toolPresentation.displayName;
   const item = entry.structuredPayload;
   const title =
     item?.type === "dynamic_tool" ? dynamicToolTitle(item.toolName, item.input, item.title) : null;
   if (title) return title;
-  if (entry.itemType === "web_search") return entry.toolTitle ?? "Web search";
+  if (entry.itemType === "web_search") return entry.toolTitle ?? "网络搜索";
   return workEntryDisplayLabel(entry, undefined);
 }
 
@@ -172,7 +172,7 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
       : `${path} +${entry.changedFiles!.length - 1} more`;
   }
   if (action === "read" && !entry.viewedImagePath) {
-    return "Read file";
+    return "已读取文件";
   }
   const heading = normalizeCompactToolLabel(entry.toolTitle || entry.label);
   return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;
@@ -199,7 +199,7 @@ export function threadReadTargetTitle(
 
 export function threadReadLabelPrefix(label: string) {
   return label.endsWith(THREAD_READ_OBJECT)
-    ? `${label.slice(0, -THREAD_READ_OBJECT.length)} thread`
+    ? `${label.slice(0, -THREAD_READ_OBJECT.length)} 个会话`
     : null;
 }
 
@@ -239,8 +239,7 @@ export function liveWorkEntryLabel(
   const status = liveActivityToolStatus(entry.toolLifecycleStatus, active);
   if (entry.itemType === "reasoning") {
     return (
-      entry.detail?.trim().replace(/\s+/g, " ") ||
-      (status === "inProgress" ? "Thinking" : "Thought")
+      entry.detail?.trim().replace(/\s+/g, " ") || (status === "inProgress" ? "正在思考" : "已思考")
     );
   }
   const toolPresentation = resolveWorkEntryToolPresentation({
@@ -1199,11 +1198,11 @@ function deriveTurnFolds(input: {
     const duration = elapsedMs !== null ? formatDuration(elapsedMs) : null;
     const label = isLatestInterruptedTurn
       ? duration
-        ? `You stopped after ${duration}`
-        : "You stopped this response"
+        ? `你在 ${duration} 后停止了`
+        : "你停止了这次回复"
       : duration
-        ? `Worked for ${duration}`
-        : "Worked";
+        ? `工作了 ${duration}`
+        : "已工作";
 
     // The top row keeps the whole turn's time, steers included. Work after a
     // steer folds under its own row below that steer, keyed apart from the run
@@ -1234,7 +1233,7 @@ function deriveTurnFolds(input: {
         createdAt: steer.createdAt,
         hiddenEntryIds: segmentHiddenIds(entries),
         entryIds: new Set(entries.map((entry) => entry.id)),
-        label: segmentMs !== null ? `Continued for ${formatDuration(segmentMs)}` : "Continued",
+        label: segmentMs !== null ? `继续工作了 ${formatDuration(segmentMs)}` : "继续工作",
       });
     }
   }
@@ -1756,7 +1755,7 @@ export function deriveMessagesTimelineRows(input: {
     const reason = compactionRuns.get(runId);
     if (reason !== undefined) return IDLE_COMPACTION_TITLES[reason];
     const age = resumeCompactionAgeByEntryId.get(entryId);
-    return age ? `Context compacted after ${age} idle` : undefined;
+    return age ? `闲置 ${age} 后已压缩上下文` : undefined;
   };
   const activeCompactionEntry = timelineEntries.find(
     (entry): entry is Extract<TimelineEntry, { kind: "work" }> =>
@@ -1898,7 +1897,7 @@ export function deriveMessagesTimelineRows(input: {
         createdAt: supersededFold.createdAt,
         runId: supersededFold.runId,
         attemptId: supersededFold.attemptId,
-        label: "Superseded attempt",
+        label: "已被替代的尝试",
         expanded: input.expandedAttemptIds?.has(supersededFold.attemptId) ?? false,
       });
     }
@@ -2181,8 +2180,8 @@ export function deriveMessagesTimelineRows(input: {
           label: pending
             ? reason
               ? IDLE_COMPACTING_LABELS[reason]
-              : "Compacting context"
-            : "Context compaction",
+              : "正在压缩上下文"
+            : "上下文压缩",
           tokenCounts: null,
           active: pending,
         });

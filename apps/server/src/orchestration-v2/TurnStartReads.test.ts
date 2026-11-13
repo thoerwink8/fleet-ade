@@ -145,7 +145,7 @@ it.effect.each(["sqlite"] as const)(
         runId,
         nodeId: null,
         role: "user" as const,
-        text: "Continue",
+        text: "继续",
         attachments: [],
         streaming: false,
         createdBy: "agent" as const,
@@ -448,7 +448,7 @@ it.effect(
       const source: OrchestrationV2AppThread = {
         id: sourceId,
         projectId: ProjectId.make("project:fork-compact"),
-        title: "Source",
+        title: "源码",
         providerInstanceId: instanceId,
         modelSelection: { instanceId, model: "claude-opus-5-5" },
         runtimeMode: "full-access",
@@ -471,7 +471,7 @@ it.effect(
       const fork: OrchestrationV2AppThread = {
         ...source,
         id: forkId,
-        title: "Fork",
+        title: "分叉",
         lineage: { parentThreadId: sourceId, relationshipToParent: "fork", rootThreadId: sourceId },
         forkedFrom: { type: "run", threadId: sourceId, runId: sourceRunId },
       };

@@ -30,7 +30,7 @@ it("leaves the next attachment its own top edge when there are no notices", asyn
     <ComposerBanner.Column>
       <ComposerBannerStack items={[]} />
       <ComposerBanner.Attachment>
-        <ComposerBanner.Root data-testid="drawer">Approval</ComposerBanner.Root>
+        <ComposerBanner.Root data-testid="drawer">待批准</ComposerBanner.Root>
       </ComposerBanner.Attachment>
     </ComposerBanner.Column>,
   );
@@ -43,7 +43,7 @@ it("leaves the next attachment its own top edge when there are no notices", asyn
 function noticeRow(width: string, children: ReactNode) {
   return (
     <div data-testid="row" className="flex items-center gap-1.5" style={{ width }}>
-      <NoticeText detailsLabel="Show details" className="min-w-0 truncate">
+      <NoticeText detailsLabel="显示详情" className="min-w-0 truncate">
         {children}
       </NoticeText>
     </div>
@@ -137,7 +137,7 @@ it("opens the details of a long notice right above its button", async () => {
   await using screen = await render(noticeRow("40rem", script), { container });
   const details = screen.getByRole("button", { name: "Show details" });
   await userEvent.hover(details);
-  const popup = page.getByLabelText("Notice details");
+  const popup = page.getByLabelText("提示详情");
   await expect.element(popup).toBeVisible();
 
   // A positioner sized to the unscrolled text flips beside the button and covers it.

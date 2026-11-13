@@ -166,8 +166,8 @@ describe("Antigravity permissions and questions", () => {
         label: "Allow for this thread",
         warning: "Untrusted files could re-run this action without asking.",
       },
-      { decision: "decline", label: "Deny" },
-      { decision: "cancel", label: "Cancel" },
+      { decision: "decline", label: "拒绝" },
+      { decision: "cancel", label: "取消" },
     ]);
     expect(antigravityApprovalOptions(permissionRequest)[1]).not.toHaveProperty("warning");
   });

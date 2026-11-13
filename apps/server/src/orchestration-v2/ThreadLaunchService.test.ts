@@ -78,7 +78,7 @@ const modelSelection = {
 } as const;
 const project = {
   id: projectId,
-  title: "Project",
+  title: "项目",
   workspaceRoot: "/repo",
   repositoryIdentity: null,
   faviconPath: null,
@@ -95,7 +95,7 @@ const project = {
 const otherProject = {
   ...project,
   id: otherProjectId,
-  title: "Other",
+  title: "其他",
   workspaceRoot: "/other-repo",
 } as const;
 
@@ -319,7 +319,7 @@ function launchInput(input: {
     commandId: CommandId.make(input.command),
     threadId: ThreadId.make(input.thread),
     projectId,
-    title: "New thread",
+    title: "新建会话",
     modelSelection,
     runtimeMode: "full-access" as const,
     interactionMode: "default" as const,
@@ -995,7 +995,7 @@ it.effect.each([
         Deferred.succeed(namingAttempted, undefined).pipe(
           Effect.andThen(
             Effect.fail(
-              new TextGenerationError({ operation: "generateBranchName", detail: "Unavailable" }),
+              new TextGenerationError({ operation: "generateBranchName", detail: "不可用" }),
             ),
           ),
         ),
@@ -2705,7 +2705,7 @@ it.effect.each([0, 1])("releases an async setup before its completion with exit 
       );
       assert.deepInclude(
         settled?.stages.find((stage) => stage.id === "submodules"),
-        { status: "skipped", detail: "none" },
+        { status: "skipped", detail: "无" },
       );
       assert.equal(
         (yield* threads.getThreadProjection(launched.threadId)).runs[0]?.status,

@@ -639,13 +639,13 @@ export function buildBulkTitleRegenerationContextMenuItem(input: {
   if (input.actionableCount === 0) {
     return {
       id: "regenerate-title",
-      label: `Regenerating… (${input.supportedCount})`,
+      label: `正在重新生成…（${input.supportedCount}）`,
       disabled: true,
     };
   }
   return {
     id: "regenerate-title",
-    label: `Regenerate titles (${input.actionableCount})`,
+    label: `重新生成标题（${input.actionableCount}）`,
   };
 }
 
@@ -653,20 +653,20 @@ export function buildBulkUnpinContextMenuItem(input: {
   pinnedCount: number;
 }): ContextMenuItem<"unpin"> | null {
   if (input.pinnedCount === 0) return null;
-  return { id: "unpin", label: `Unpin (${input.pinnedCount})` };
+  return { id: "unpin", label: `取消置顶（${input.pinnedCount}）` };
 }
 
 export interface ThreadStatusPill {
   label:
-    | "Working"
-    | "Connecting"
-    | "Completed"
-    | "Failed"
-    | "Pending Approval"
-    | "Awaiting Input"
-    | "Guest Request"
-    | "Waiting"
-    | "Plan Ready";
+    | "运行中"
+    | "正在连接"
+    | "已完成"
+    | "失败"
+    | "待批准"
+    | "待输入"
+    | "访客请求"
+    | "等待中"
+    | "计划已就绪";
   colorClass: string;
   dotClass: string;
   pulse: boolean;
@@ -1215,7 +1215,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval") {
     return {
-      label: "Pending Approval",
+      label: "待批准",
       colorClass: "text-amber-600 dark:text-amber-300/90",
       dotClass: "bg-amber-500 dark:bg-amber-300/90",
       pulse: false,
@@ -1224,7 +1224,7 @@ export function resolveThreadStatusPill(input: {
 
   if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
     return {
-      label: "Awaiting Input",
+      label: "待输入",
       colorClass: "text-indigo-600 dark:text-indigo-300/90",
       dotClass: "bg-indigo-500 dark:bg-indigo-300/90",
       pulse: false,
@@ -1233,7 +1233,7 @@ export function resolveThreadStatusPill(input: {
 
   if ((thread.pendingGuestMessageCount ?? 0) > 0) {
     return {
-      label: "Guest Request",
+      label: "访客请求",
       colorClass: "text-guest-foreground",
       dotClass: "bg-guest",
       pulse: false,
@@ -1245,7 +1245,7 @@ export function resolveThreadStatusPill(input: {
     thread.runtime?.status === "waiting"
   ) {
     return {
-      label: "Working",
+      label: "运行中",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
@@ -1258,7 +1258,7 @@ export function resolveThreadStatusPill(input: {
     thread.runtime?.status === "queued"
   ) {
     return {
-      label: "Connecting",
+      label: "正在连接",
       colorClass: "text-sky-600 dark:text-sky-300/80",
       dotClass: "bg-sky-500 dark:bg-sky-300/80",
       pulse: true,
@@ -1270,7 +1270,7 @@ export function resolveThreadStatusPill(input: {
     backgroundWorkHoldsCompletion(thread.pendingBackgroundTasks ?? [])
   ) {
     return {
-      label: "Waiting",
+      label: "等待中",
       colorClass: "text-sidebar-muted-foreground",
       dotClass: "bg-sidebar-muted-foreground",
       pulse: false,
@@ -1279,7 +1279,7 @@ export function resolveThreadStatusPill(input: {
 
   if (hasUnseenFailure(thread)) {
     return {
-      label: "Failed",
+      label: "失败",
       colorClass: "text-red-600 dark:text-red-300/90",
       dotClass: "bg-red-500 dark:bg-red-300/90",
       pulse: false,
@@ -1293,7 +1293,7 @@ export function resolveThreadStatusPill(input: {
     thread.hasActionableProposedPlan;
   if (hasPlanReadyPrompt) {
     return {
-      label: "Plan Ready",
+      label: "计划已就绪",
       colorClass: "text-violet-600 dark:text-violet-300/90",
       dotClass: "bg-violet-500 dark:bg-violet-300/90",
       pulse: false,
@@ -1302,7 +1302,7 @@ export function resolveThreadStatusPill(input: {
 
   if (hasUnseenCompletion(thread)) {
     return {
-      label: "Completed",
+      label: "已完成",
       colorClass: "text-emerald-600 dark:text-emerald-300/90",
       dotClass: "bg-emerald-500 dark:bg-emerald-300/90",
       pulse: false,

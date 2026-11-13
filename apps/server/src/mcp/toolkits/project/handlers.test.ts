@@ -222,7 +222,7 @@ it.effect(
       });
 
       const belowCeiling = yield* launchWith("full-access", "approval-required", {
-        title: "Fix",
+        title: "修复",
         message: "Fix the bug",
       });
       expect(belowCeiling.result).toMatchObject({
@@ -234,7 +234,7 @@ it.effect(
       expect(belowCeiling.launched[0]?.initialMessage?.senderThreadId).toBeUndefined();
 
       const aboveCeiling = yield* launchWith("auto-accept-edits", "full-access", {
-        title: "Fix",
+        title: "修复",
         hostedAppUrl: "https://t3.example.com",
       });
       expect(aboveCeiling.launched[0]?.runtimeMode).toBe("auto-accept-edits");
@@ -243,20 +243,20 @@ it.effect(
       });
 
       const requested = yield* launchWith("full-access", "approval-required", {
-        title: "Fix",
+        title: "修复",
         runtimeMode: "auto",
       });
       expect(requested.launched[0]?.runtimeMode).toBe("auto");
 
       const escalated = yield* launchWith("auto-accept-edits", "auto-accept-edits", {
-        title: "Fix",
+        title: "修复",
         runtimeMode: "full-access",
       });
       expect(escalated.result).toMatchObject({ code: "runtime_mode_escalation_denied" });
       expect(escalated.launched).toHaveLength(0);
 
       const untargeted = yield* launchWith("full-access", "full-access", {
-        title: "Fix",
+        title: "修复",
         targeted: false,
       });
       expect(untargeted.result).toMatchObject({ code: "target_required" });
@@ -266,14 +266,14 @@ it.effect(
         model: "gpt-settings",
       };
       const fromSettings = yield* launchWith("full-access", "full-access", {
-        title: "Fix",
+        title: "修复",
         overrideModel,
       });
       expect(fromSettings.launched[0]?.modelSelection).toEqual(overrideModel);
 
       // An administrator's ceiling the orchestrator enforces is named, not reported as unavailable.
       const managed = yield* launchWith("full-access", "full-access", {
-        title: "Fix",
+        title: "修复",
         refusedByCeiling: true,
       });
       expect(managed.result).toMatchObject({
@@ -319,7 +319,7 @@ it.effect("a launch steps an inherited mode down to the provider's, and refuses 
       const result = yield* toolkit
         .handle("t3_thread_launch", {
           projectId,
-          title: "Fix",
+          title: "修复",
           modelSelection: { instanceId: pi, model: "pi-model" },
           ...(runtimeMode === undefined ? {} : { runtimeMode }),
         })
@@ -378,7 +378,7 @@ it.effect("a launch with a model its provider does not advertise creates no thre
     const launchWith = (instanceId: string, model: string) =>
       toolkit
         .handle("t3_thread_launch", {
-          title: "Fix",
+          title: "修复",
           projectId,
           modelSelection: { instanceId: ProviderInstanceId.make(instanceId), model },
         })
@@ -422,7 +422,7 @@ it.effect("a launch retried with the same clientRequestId replays the first one"
     const launch = (clientRequestId: string | undefined) =>
       toolkit
         .handle("t3_thread_launch", {
-          title: "Fix",
+          title: "修复",
           projectId,
           message: "Fix the bug",
           ...(clientRequestId === undefined ? {} : { clientRequestId }),
@@ -459,7 +459,7 @@ it.effect("a launch key of any length or content gives a short id and never a de
     );
     const launch = (clientRequestId: string) =>
       toolkit
-        .handle("t3_thread_launch", { title: "Fix", projectId, clientRequestId })
+        .handle("t3_thread_launch", { title: "修复", projectId, clientRequestId })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
 
     // Percent-encoding would grow this six times; scratch folders are named from the id.
@@ -487,7 +487,7 @@ it.effect("a retried launch replays after the project loses its default model", 
       ),
     );
     const launch = toolkit
-      .handle("t3_thread_launch", { title: "Fix", projectId, clientRequestId: "fix-1" })
+      .handle("t3_thread_launch", { title: "修复", projectId, clientRequestId: "fix-1" })
       .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
 
     yield* launch;
@@ -534,7 +534,7 @@ it.effect("a launch binds only an existing checkout that is one of the project's
     const launchInto = (worktreePath: string) =>
       toolkit
         .handle("t3_thread_launch", {
-          title: "Fix",
+          title: "修复",
           projectId,
           workspaceStrategy: { type: "existing_worktree", worktreePath },
         })
@@ -586,7 +586,7 @@ it.effect("a launch into a new worktree creates nothing when its base ref has no
     const launchFrom = (baseRef: string) =>
       toolkit
         .handle("t3_thread_launch", {
-          title: "Fix",
+          title: "修复",
           projectId,
           workspaceStrategy: { type: "worktree", baseRef, startFromOrigin: false },
         })
@@ -627,7 +627,7 @@ it.effect("a launch into a new worktree creates nothing when its branch collides
     );
     const refused = (yield* toolkit
       .handle("t3_thread_launch", {
-        title: "Fix",
+        title: "修复",
         projectId,
         workspaceStrategy: { type: "worktree", baseRef: "main", branch: "werkstatt/baseline" },
       })
@@ -660,7 +660,7 @@ it.effect("a launch into an unknown project says the project was not found", () 
     ]) {
       const result = yield* toolkit
         .handle("t3_thread_launch", {
-          title: "Fix",
+          title: "修复",
           message: "Fix the bug",
           projectId: ProjectId.make("current"),
           modelSelection,
@@ -702,7 +702,7 @@ it.effect("a retried worktree launch replays after its base ref is gone", () =>
     );
     const launch = toolkit
       .handle("t3_thread_launch", {
-        title: "Fix",
+        title: "修复",
         projectId,
         clientRequestId: "fix-worktree",
         workspaceStrategy: { type: "worktree", baseRef: "feature", startFromOrigin: false },
@@ -739,7 +739,7 @@ it.effect("a client launches with the fallback for an exhausted default", () =>
         ? {
             usageLimits: {
               checkedAt: "2026-01-01T00:00:00Z",
-              windows: [{ id: "session", kind: "session", label: "Session", usedPercent: 100 }],
+              windows: [{ id: "session", kind: "session", label: "会话", usedPercent: 100 }],
             },
           }
         : {}),

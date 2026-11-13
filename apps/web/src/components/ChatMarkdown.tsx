@@ -294,7 +294,7 @@ function CodexArtifactTemplateCard(props: {
   return (
     <div
       role="group"
-      aria-label={`${props.template.displayName} template`}
+      aria-label={`${props.template.displayName} 模板`}
       data-chat-markdown-artifact-template
       className="my-[0.65rem] flex w-full min-w-0 items-center gap-3 rounded-xl border border-border/70 bg-card/60 px-3 py-2.5 text-foreground shadow-xs"
       data-artifact-kind={props.template.artifactKind}
@@ -321,7 +321,7 @@ function CodexArtifactTemplateCard(props: {
           className="shrink-0"
           onClick={() => props.onUse?.(props.template)}
         >
-          Use template
+          使用模板
         </Button>
       ) : null}
     </div>
@@ -352,37 +352,37 @@ const GITHUB_ALERT_PRESENTATIONS: Record<
   { label: string; Icon: typeof InfoIcon; borderClassName: string; titleClassName: string }
 > = {
   insight: {
-    label: "Insight",
+    label: "见解",
     Icon: StarIcon,
     borderClassName: "border-info",
     titleClassName: "text-info",
   },
   note: {
-    label: "Note",
+    label: "注意",
     Icon: InfoIcon,
     borderClassName: "border-blue-500/70",
     titleClassName: "text-blue-600 dark:text-blue-400",
   },
   tip: {
-    label: "Tip",
+    label: "提示",
     Icon: LightbulbIcon,
     borderClassName: "border-emerald-500/70",
     titleClassName: "text-emerald-600 dark:text-emerald-400",
   },
   important: {
-    label: "Important",
+    label: "重要",
     Icon: MessageSquareWarningIcon,
     borderClassName: "border-purple-500/70",
     titleClassName: "text-purple-600 dark:text-purple-400",
   },
   warning: {
-    label: "Warning",
+    label: "警告",
     Icon: TriangleAlertIcon,
     borderClassName: "border-amber-500/70",
     titleClassName: "text-amber-600 dark:text-amber-500",
   },
   caution: {
-    label: "Caution",
+    label: "当心",
     Icon: OctagonAlertIcon,
     borderClassName: "border-red-500/70",
     titleClassName: "text-red-600 dark:text-red-400",
@@ -608,9 +608,7 @@ function useChatMarkdownState({
       (error: unknown) => {
         if (mediaRequestId.current !== requestId) return;
         let description =
-          error instanceof Error
-            ? error.message
-            : "The file could not be loaded. It may have been moved or deleted.";
+          error instanceof Error ? error.message : "无法加载文件，它可能已被移动或删除。";
         if (
           isAssetNotFoundError(error) &&
           error.resource._tag === "media-file" &&
@@ -628,13 +626,13 @@ function useChatMarkdownState({
               hostEnvironmentId: appAtomRegistry.get(hostEnvironmentIdAtom),
             }).mode !== "local-exec"
           ) {
-            description = `The file was not found on ${target.label} at ${error.checkedPath ?? error.resource.path}.`;
+            description = `在 ${target.label} 的 ${error.checkedPath ?? error.resource.path} 未找到该文件。`;
           }
         }
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Media unavailable",
+            title: "媒体不可用",
             description,
           }),
         );
@@ -661,9 +659,7 @@ function useChatMarkdownState({
     }
     if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
       return Promise.resolve(
-        AsyncResult.failure<void, Error>(
-          Cause.fail(new Error("This connection cannot reveal files on this environment.")),
-        ),
+        AsyncResult.failure<void, Error>(Cause.fail(new Error("此连接无法在这个环境中显示文件。"))),
       );
     }
     return openInEditor({
@@ -727,7 +723,7 @@ function useChatMarkdownState({
         AsyncResult.failure<void, BrowserPreviewUnavailableError>(
           Cause.fail(
             new BrowserPreviewUnavailableError({
-              message: "Preview access is unavailable for this client.",
+              message: "此客户端无法使用预览。",
             }),
           ),
         ),
@@ -741,7 +737,7 @@ function useChatMarkdownState({
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Unable to open link in browser",
+              title: "无法在浏览器中打开链接",
               description: error.message,
             }),
           );
@@ -757,7 +753,7 @@ function useChatMarkdownState({
         AsyncResult.failure<void, BrowserPreviewUnavailableError>(
           Cause.fail(
             new BrowserPreviewUnavailableError({
-              message: "Environment is not connected.",
+              message: "环境未连接。",
             }),
           ),
         ),
@@ -928,7 +924,7 @@ function useChatMarkdownState({
             ? () => openMarkdownMedia(mediaPath, fileLinkMeta.filePath)
             : undefined
         }
-        openInEditorMenuLabel={canOpenApp ? "Open app" : preferredEditorMenuLabel}
+        openInEditorMenuLabel={canOpenApp ? "打开应用" : preferredEditorMenuLabel}
         onReveal={
           canUseShellActions && revealInFileManagerLabel !== undefined
             ? async () => revealFileInFileManager((await resolveHostPath()).absolutePath)
@@ -1118,7 +1114,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
         {...props}
         type="checkbox"
         name="markdown-task"
-        aria-label="Toggle task"
+        aria-label="切换任务完成状态"
         checked={checked === true}
         onChange={(event) => {
           const listItemStart = Number(event.currentTarget.closest("li")?.dataset.listItemOffset);
@@ -1169,7 +1165,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
       return environmentId ? (
         <MarkdownThreadLink environmentId={environmentId} link={threadLink} label={label} />
       ) : (
-        <span>{label ?? "Thread"}</span>
+        <span>{label ?? "会话"}</span>
       );
     }
     const contextReference = href ? parseComposerContextHref(href) : null;
@@ -1338,9 +1334,9 @@ const CHAT_MARKDOWN_COMPONENTS = {
                       type: "error",
                       title:
                         operation === "link-pull-request-to-thread"
-                          ? "Unable to link pull request"
-                          : "Unable to unlink pull request",
-                      description: cause instanceof Error ? cause.message : "The request failed.",
+                          ? "无法关联 pull request"
+                          : "无法取消关联 pull request",
+                      description: cause instanceof Error ? cause.message : "请求失败。",
                     }),
                   );
                 }

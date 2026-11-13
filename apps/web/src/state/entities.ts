@@ -526,6 +526,6 @@ export function readResponseSubagents(
           }),
         )
         ?.title.trim() ||
-      "Agent",
+      "智能体",
   }));
 }

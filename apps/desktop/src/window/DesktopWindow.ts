@@ -669,7 +669,7 @@ export const make = Effect.gen(function* () {
             });
           }
           if (params.dictionarySuggestions.length === 0) {
-            menuTemplate.push({ label: "No suggestions", enabled: false });
+            menuTemplate.push({ label: "无建议", enabled: false });
           }
           menuTemplate.push({ type: "separator" });
         }
@@ -677,7 +677,7 @@ export const make = Effect.gen(function* () {
         if (Option.isSome(ElectronShell.parseSafeExternalUrl(params.linkURL))) {
           menuTemplate.push(
             {
-              label: "Copy Link",
+              label: "复制链接",
               click: () => {
                 void runPromise(electronShell.copyText(params.linkURL));
               },
@@ -690,7 +690,7 @@ export const make = Effect.gen(function* () {
         if (Option.isSome(mailtoAddress)) {
           menuTemplate.push(
             {
-              label: "Copy Email Address",
+              label: "复制邮箱地址",
               click: () => {
                 void runPromise(electronShell.copyText(mailtoAddress.value));
               },
@@ -701,7 +701,7 @@ export const make = Effect.gen(function* () {
 
         if (params.mediaType === "image") {
           menuTemplate.push({
-            label: "Copy Image",
+            label: "复制图片",
             click: () => {
               void runPromise(
                 Effect.tryPromise({

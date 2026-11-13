@@ -141,7 +141,7 @@ export async function clearBrowserProfileData(
   const desktopEnvironmentIds = bridge === null ? [] : environmentIds;
   const serverEnvironmentIds = server?.environmentIds ?? [];
   if (desktopEnvironmentIds.length === 0 && serverEnvironmentIds.length === 0) {
-    throw new Error("Browser profile data is not available to clear.");
+    throw new Error("无法清除浏览器配置数据。");
   }
   await Promise.all([
     ...desktopEnvironmentIds.flatMap((environmentId) => [
@@ -302,9 +302,9 @@ const viewportSelectValue = (viewport: PreviewViewportSetting): string => {
 /** Inline options lack an items map; bare SelectValue would display the stored fill token. */
 const viewportSelectLabel = (viewport: PreviewViewportSetting): string => {
   const value = viewportSelectValue(viewport);
-  if (value === FILL_VALUE) return "Fill panel";
-  if (value === RESPONSIVE_VALUE) return "Responsive";
-  return PREVIEW_VIEWPORT_PRESETS.find((preset) => preset.id === value)?.label ?? "Responsive";
+  if (value === FILL_VALUE) return "填满面板";
+  if (value === RESPONSIVE_VALUE) return "响应式";
+  return PREVIEW_VIEWPORT_PRESETS.find((preset) => preset.id === value)?.label ?? "响应式";
 };
 
 const isValidDimension = (value: number) =>
@@ -369,11 +369,11 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
   return (
     <SettingsRow
       {...searchableSetting("browser-default-viewport")}
-      description="Tab size for you and agents. Fill fits the panel; other sizes show the device toolbar."
+      description="你和智能体使用的标签页尺寸。“填满面板”会适应面板大小；其他尺寸会显示设备工具栏。"
       resetAction={
         !disabled && viewport._tag !== DEFAULT_BROWSER_VIEWPORT._tag ? (
           <SettingResetButton
-            label="default browser viewport"
+            label="默认浏览器视口"
             onClick={() => updateSettings({ browserDefaultViewport: DEFAULT_BROWSER_VIEWPORT })}
           />
         ) : null
@@ -385,18 +385,14 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
             onValueChange={selectViewport}
             disabled={disabled}
           >
-            <SelectTrigger
-              size="sm"
-              className="w-full min-w-0 sm:w-44"
-              aria-label="Default browser viewport"
-            >
+            <SelectTrigger size="sm" className="w-full min-w-0 sm:w-44" aria-label="默认浏览器视口">
               <SelectValue>{viewportSelectLabel(viewport)}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
-              <SelectItem value={FILL_VALUE}>Fill panel</SelectItem>
-              <SelectItem value={RESPONSIVE_VALUE}>Responsive</SelectItem>
+              <SelectItem value={FILL_VALUE}>填满面板</SelectItem>
+              <SelectItem value={RESPONSIVE_VALUE}>响应式</SelectItem>
               <SelectGroup>
-                <SelectGroupLabel>Standard</SelectGroupLabel>
+                <SelectGroupLabel>标准</SelectGroupLabel>
                 {PREVIEW_VIEWPORT_PRESETS.map((preset) => (
                   <SelectItem key={preset.id} value={preset.id}>
                     <span className="flex w-full items-center justify-between gap-5">
@@ -424,7 +420,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
                 onValueCommitted={(value) => commitDimension("width", value)}
               >
                 <NumberFieldGroup>
-                  <NumberFieldInput aria-label="Default viewport width" />
+                  <NumberFieldInput aria-label="默认视口宽度" />
                 </NumberFieldGroup>
               </NumberField>
               <span className="text-xs text-muted-foreground">×</span>
@@ -439,7 +435,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
                 onValueCommitted={(value) => commitDimension("height", value)}
               >
                 <NumberFieldGroup>
-                  <NumberFieldInput aria-label="Default viewport height" />
+                  <NumberFieldInput aria-label="默认视口高度" />
                 </NumberFieldGroup>
               </NumberField>
               <Tooltip>
@@ -477,11 +473,11 @@ function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
   return (
     <SettingsRow
       {...searchableSetting("browser-default-zoom")}
-      description="Page zoom applied to new browser tabs."
+      description="新浏览器标签页的页面缩放比例。"
       resetAction={
         !disabled && zoomFactor !== DEFAULT_PREVIEW_ZOOM_FACTOR ? (
           <SettingResetButton
-            label="default browser zoom"
+            label="默认浏览器缩放"
             onClick={() =>
               updateSettings({ browserDefaultZoomFactor: DEFAULT_PREVIEW_ZOOM_FACTOR })
             }
@@ -497,7 +493,7 @@ function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
             if (next !== undefined) updateSettings({ browserDefaultZoomFactor: next });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Default browser zoom">
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="默认浏览器缩放">
             <SelectValue>{zoomLabel(zoomFactor)}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -520,11 +516,11 @@ function BrowserAppearanceSetting({ disabled }: { readonly disabled: boolean }) 
   return (
     <SettingsRow
       {...searchableSetting("browser-default-appearance")}
-      description="The color scheme pages are told to prefer. System follows your OS setting."
+      description="网页优先使用的配色方案。“跟随系统”使用操作系统的设置。"
       resetAction={
         !disabled && appearance !== DEFAULT_PREVIEW_APPEARANCE ? (
           <SettingResetButton
-            label="default browser appearance"
+            label="默认浏览器外观"
             onClick={() => updateSettings({ browserDefaultAppearance: DEFAULT_PREVIEW_APPEARANCE })}
           />
         ) : null
@@ -539,11 +535,7 @@ function BrowserAppearanceSetting({ disabled }: { readonly disabled: boolean }) 
             }
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-40"
-            aria-label="Default browser appearance"
-          >
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="默认浏览器外观">
             <SelectValue>{APPEARANCE_LABELS[appearance]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -567,12 +559,12 @@ function BrowserRecordingInputSettings({ disabled }: { readonly disabled: boolea
     <>
       <SettingsRow
         {...searchableSetting("browser-recording-key-presses")}
-        description="Show pressed keys and shortcuts in new recordings. Password fields are excluded."
+        description="在新录制的视频中显示按键和快捷键，密码输入框除外。"
         control={
           <Switch
             disabled={disabled}
             checked={showKeys}
-            aria-label="Show key presses in recordings"
+            aria-label="在录屏中显示按键"
             onCheckedChange={(checked) =>
               updateSettings({ browserRecordingShowKeyPresses: Boolean(checked) })
             }
@@ -581,12 +573,12 @@ function BrowserRecordingInputSettings({ disabled }: { readonly disabled: boolea
       />
       <SettingsRow
         {...searchableSetting("browser-recording-mouse-presses")}
-        description="Highlight mouse presses and held buttons in new recordings."
+        description="在新录制的视频中高亮显示鼠标点击和长按。"
         control={
           <Switch
             disabled={disabled}
             checked={showMouse}
-            aria-label="Show mouse presses in recordings"
+            aria-label="在录屏中显示鼠标点击"
             onCheckedChange={(checked) =>
               updateSettings({ browserRecordingShowMousePresses: Boolean(checked) })
             }
@@ -604,11 +596,11 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
   return (
     <SettingsRow
       {...searchableSetting("browser-recording-frame-rate")}
-      description="Maximum recording rate. 30 fps saves CPU and storage; 60 fps is smoother."
+      description="最高录制帧率。30 fps 节省 CPU 和存储空间；60 fps 更流畅。"
       resetAction={
         !disabled && frameRate !== DEFAULT_BROWSER_RECORDING_FRAME_RATE ? (
           <SettingResetButton
-            label="browser recording frame rate"
+            label="浏览器录屏帧率"
             onClick={() =>
               updateSettings({ browserRecordingFrameRate: DEFAULT_BROWSER_RECORDING_FRAME_RATE })
             }
@@ -626,11 +618,7 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
             }
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-40"
-            aria-label="Browser recording frame rate"
-          >
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="浏览器录屏帧率">
             <SelectValue>{frameRate} fps</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -647,7 +635,7 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
 }
 
 const LINK_TARGET_LABELS: Readonly<Record<BrowserLinkTarget, string>> = {
-  system: "Your default browser",
+  system: "你的默认浏览器",
   app: "T3 Code",
 };
 
@@ -658,11 +646,11 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
   return (
     <SettingsRow
       {...searchableSetting("browser-link-target")}
-      description="Where links in the chat and terminal open. Hold ⌘ or Ctrl while clicking a link to open it in your default browser either way."
+      description="聊天和终端中的链接打开位置。按住 ⌘ 或 Ctrl 点击链接，始终使用默认浏览器打开。"
       resetAction={
         !disabled && linkTarget !== DEFAULT_BROWSER_LINK_TARGET ? (
           <SettingResetButton
-            label="link target"
+            label="链接打开位置"
             onClick={() => updateSettings({ browserLinkTarget: DEFAULT_BROWSER_LINK_TARGET })}
           />
         ) : null
@@ -677,7 +665,7 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
             }
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Open links in">
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="链接打开方式">
             <SelectValue>{LINK_TARGET_LABELS[linkTarget]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -712,11 +700,11 @@ function BrowserSearchEngineSetting() {
     <>
       <SettingsRow
         {...searchableSetting("browser-search-engine")}
-        description="What the address bar searches when you type something that isn't a URL."
+        description="地址栏输入的内容不是 URL 时，使用的搜索引擎。"
         resetAction={
           engine !== DEFAULT_BROWSER_SEARCH_ENGINE || customUrl !== "" ? (
             <SettingResetButton
-              label="search engine"
+              label="搜索引擎"
               onClick={() =>
                 updateSettings({
                   browserSearchEngine: DEFAULT_BROWSER_SEARCH_ENGINE,
@@ -736,7 +724,7 @@ function BrowserSearchEngineSetting() {
               }
             }}
           >
-            <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Search engine">
+            <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="搜索引擎">
               <SelectValue>{SEARCH_ENGINE_LABELS[engine]}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -751,19 +739,19 @@ function BrowserSearchEngineSetting() {
       />
       {engine === "custom" ? (
         <SettingsRow
-          title="Custom search URL"
-          description="Use %s where the search terms go."
+          title="自定义搜索 URL"
+          description="用 %s 代表搜索词。"
           status={
             isValidSearchUrlTemplate(customUrl)
               ? undefined
-              : "Enter an http or https URL containing %s. Searches use DuckDuckGo until then."
+              : "请输入包含 %s 的 http 或 https URL。在此之前，搜索将使用 DuckDuckGo。"
           }
           control={
             <DraftInput
               nativeInput
               size="sm"
               className="w-full sm:w-64"
-              aria-label="Custom search URL"
+              aria-label="自定义搜索 URL"
               placeholder="https://example.com/search?q=%s"
               autoCapitalize="none"
               spellCheck={false}
@@ -785,11 +773,11 @@ export function PullRequestLinksOpenInAppSetting() {
   return (
     <SettingsRow
       {...searchableSetting("pull-request-links-open-in-app")}
-      description="Clicking a pull request link opens it in T3 Code. Turn off to open pull request links like any other link, on your git host."
+      description="点击 pull request 链接时在 T3 Code 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
       resetAction={
         openInApp ? null : (
           <SettingResetButton
-            label="open pull requests in T3 Code"
+            label="在 T3 Code 中打开 PR"
             onClick={() => updateSettings({ pullRequestLinksOpenInApp: true })}
           />
         )
@@ -800,7 +788,7 @@ export function PullRequestLinksOpenInAppSetting() {
           onCheckedChange={(checked) =>
             updateSettings({ pullRequestLinksOpenInApp: Boolean(checked) })
           }
-          aria-label="Open pull requests in T3 Code"
+          aria-label="在 T3 Code 中打开 PR"
         />
       }
     />
@@ -817,7 +805,7 @@ function DeviceIntegrationSettings() {
 
   return (
     <>
-      <SettingsSection id="devices" title="Devices">
+      <SettingsSection id="devices" title="设备">
         <DeviceIntegrationControls
           key={`${environmentId}:${JSON.stringify(search)}`}
           environmentId={environmentId}
@@ -866,10 +854,10 @@ function DeviceIntegrationControls({
     const results = await Promise.allSettled(
       environments.map(async (environment) => {
         if (environment.connection.phase !== "connected" || !environment.serverConfig) {
-          throw new Error("Environment disconnected");
+          throw new Error("环境已断开");
         }
         if (!readEnvironmentScope(environment.environmentId, AuthSettingsWriteScope)) {
-          throw new Error("This connection cannot change device settings.");
+          throw new Error("此连接无法更改设备设置。");
         }
         return configure({
           environmentId: environment.environmentId,
@@ -885,8 +873,8 @@ function DeviceIntegrationControls({
     if (failed.length > 0) {
       toastManager.add({
         type: "error",
-        title: "Device settings not saved on all environments",
-        description: `Could not update ${failed.map((environment) => environment.label).join(", ")}.`,
+        title: "部分环境未保存设备设置",
+        description: `无法更新 ${failed.map((environment) => environment.label).join(", ")}。`,
       });
     }
   };
@@ -917,7 +905,7 @@ function DeviceIntegrationControls({
                   .finally(() => setPending(null));
               }}
             >
-              {pending === `update-${tool}` ? "Updating…" : "Update"}
+              {pending === `update-${tool}` ? "正在更新…" : "更新"}
             </Button>
           ) : null}
           {state.supportsToolInspection ? (
@@ -933,7 +921,7 @@ function DeviceIntegrationControls({
                 );
               }}
             >
-              {pending === "check" ? "Checking…" : "Check versions"}
+              {pending === "check" ? "正在检查…" : "检查版本"}
             </Button>
           ) : null}
         </div>
@@ -954,7 +942,7 @@ function DeviceIntegrationControls({
         settingKeys={["enableDeviceSupport"]}
         description={
           <>
-            Open simulators and emulators in the Device panel. Hub:{" "}
+            在设备面板中打开模拟器。Hub：{" "}
             <DeviceToolVersions
               action={versionActions("hub")}
               kind="hub"
@@ -976,7 +964,7 @@ function DeviceIntegrationControls({
                 busy ||
                 pending !== null
               }
-              aria-label="Device hub"
+              aria-label="设备中心"
               onCheckedChange={(checked) =>
                 void update("hub", {
                   enabled: Boolean(checked),
@@ -993,7 +981,7 @@ function DeviceIntegrationControls({
         settingKeys={["enableAgentDeviceAccess"]}
         description={
           <>
-            New agent sessions can open and drive these devices. agent-device:{" "}
+            新的智能体会话可以打开并操作这些设备。agent-device：{" "}
             <DeviceToolVersions
               action={versionActions("agent")}
               kind="agent"
@@ -1013,7 +1001,7 @@ function DeviceIntegrationControls({
                 (!projectScope && (!loaded || !anyHubEnabled || busy)) ||
                 pending !== null
               }
-              aria-label="Agent device access"
+              aria-label="智能体设备访问"
               onCheckedChange={(checked) =>
                 projectScope
                   ? updateSettings({ enableAgentDeviceAccess: Boolean(checked) })
@@ -1046,13 +1034,13 @@ function AgentBrowserAccessSetting() {
       {...searchableSetting("agent-browser-access")}
       description={
         isProjectScope
-          ? "Allow agents in this project to use the shared browser. Applies when the agent session next starts."
-          : "Allow agents to use the shared browser. Projects can override it."
+          ? "允许此项目中的智能体使用共享浏览器。下次启动智能体会话时生效。"
+          : "允许智能体使用共享浏览器。项目可以覆盖此设置。"
       }
       resetAction={
         settings.enableAgentBrowserAccess !== DEFAULT_SERVER_SETTINGS.enableAgentBrowserAccess ? (
           <SettingResetButton
-            label="default browser access"
+            label="默认浏览器访问权限"
             onClick={() =>
               updateSettings({
                 enableAgentBrowserAccess: DEFAULT_SERVER_SETTINGS.enableAgentBrowserAccess,
@@ -1064,7 +1052,7 @@ function AgentBrowserAccessSetting() {
       control={
         <ScopedSwitch
           settingKeys={["enableAgentBrowserAccess"]}
-          aria-label="Agent browser access"
+          aria-label="智能体浏览器访问"
           checked={settings.enableAgentBrowserAccess}
           onCheckedChange={(enabled) => updateSettings({ enableAgentBrowserAccess: enabled })}
         />
@@ -1080,11 +1068,11 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
   return (
     <SettingsRow
       {...searchableSetting("browser-auto-show-floating-preview")}
-      description="Show the floating preview when an agent opens a browser or device unless the agent says otherwise."
+      description="智能体打开浏览器或设备时显示浮动预览，除非智能体另有要求。"
       resetAction={
         !disabled && autoShow !== DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW ? (
           <SettingResetButton
-            label="auto-show floating preview"
+            label="自动显示浮动预览"
             onClick={() =>
               updateSettings({
                 browserAutoShowFloatingPreview: DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW,
@@ -1100,7 +1088,7 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
           onCheckedChange={(checked) =>
             updateSettings({ browserAutoShowFloatingPreview: Boolean(checked) })
           }
-          aria-label="Auto-show floating preview"
+          aria-label="自动显示浮动预览"
         />
       }
     />
@@ -1193,8 +1181,8 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
     if (!removalAvailable) {
       toastManager.add({
         type: "error",
-        title: `Could not clear ${name}'s data`,
-        description: "You're not connected to a server yet.",
+        title: `无法清除 ${name} 的数据`,
+        description: "你还没有连接到服务器。",
       });
       return;
     }
@@ -1205,17 +1193,17 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
       serverProfileData,
     )
       .then(() => {
-        toastManager.add({ type: "success", title: `Cleared ${name}'s cookies and cache` });
+        toastManager.add({ type: "success", title: `已清除 ${name} 的 Cookie 和缓存` });
       })
       .catch(() => {
-        toastManager.add({ type: "error", title: `Could not clear ${name}'s data` });
+        toastManager.add({ type: "error", title: `无法清除 ${name} 的数据` });
       });
   };
 
   const removeProfile = async (id: string) => {
     if (!settingsHydrated || importInFlightRef.current) return;
     if (!removalAvailable) {
-      setProfileRemovalError("Connect to an environment before removing this profile.");
+      setProfileRemovalError("请先连接一个环境，再移除此浏览器配置。");
       return;
     }
     setProfileRemovalError(null);
@@ -1228,7 +1216,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
         serverProfileData,
       );
     } catch {
-      setProfileRemovalError("Profile data could not be deleted. Try again.");
+      setProfileRemovalError("无法删除浏览器配置数据，请重试。");
       setProfileRemovalInFlight(false);
       return;
     }
@@ -1300,7 +1288,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
   return (
     <SettingsRow
       {...searchableSetting("browser-profiles")}
-      description="Profiles separate cookies and logins. Incognito data is cleared when the app closes."
+      description="浏览器配置分别保存 Cookie 和登录状态。应用关闭时会清除无痕浏览数据。"
       control={
         <Menu onOpenChange={(open) => open && loadSources()}>
           <MenuTrigger
@@ -1313,27 +1301,25 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
             }
           >
             <PlusIcon />
-            Add profile
+            添加浏览器配置
           </MenuTrigger>
           <MenuPopup align="end">
             <MenuItem
               disabled={!settingsHydrated || atProfileLimit}
               onClick={() => createProfile("New profile")}
             >
-              Blank profile
+              空白浏览器配置
             </MenuItem>
-            {atProfileLimit ? (
-              <MenuItem disabled>You&rsquo;ve reached the profile limit</MenuItem>
-            ) : null}
+            {atProfileLimit ? <MenuItem disabled>已达到配置数量上限</MenuItem> : null}
             <MenuSeparator />
             <MenuGroup>
-              <MenuGroupLabel>Import from</MenuGroupLabel>
+              <MenuGroupLabel>导入来源</MenuGroupLabel>
               {cookieImportDenial !== undefined ? (
                 <MenuItem disabled>{cookieImportDenial}</MenuItem>
               ) : sources === null ? (
-                <MenuItem disabled>Looking for browsers…</MenuItem>
+                <MenuItem disabled>正在查找浏览器…</MenuItem>
               ) : importableSources.length === 0 ? (
-                <MenuItem disabled>No supported browsers found</MenuItem>
+                <MenuItem disabled>未找到支持的浏览器</MenuItem>
               ) : (
                 <>
                   {importableSources.map((source) => (
@@ -1357,7 +1343,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                     </MenuItem>
                   ))}
                   {primaryEnvironment == null ? (
-                    <MenuItem disabled>Connect to an environment to import cookies</MenuItem>
+                    <MenuItem disabled>连接一个环境以导入 Cookie</MenuItem>
                   ) : null}
                 </>
               )}
@@ -1393,7 +1379,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                     nativeInput
                     size="sm"
                     className="w-full max-w-56"
-                    aria-label={`Rename ${profile.name}`}
+                    aria-label={`重命名 ${profile.name}`}
                     disabled={profileWritesDisabled || importInFlight}
                     maxLength={BROWSER_PROFILE_NAME_MAX_LENGTH}
                     value={profile.name}
@@ -1402,7 +1388,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                 )}
                 {isDefault ? (
                   <span className={cn("flex", profileWritesDisabled && "opacity-64")}>
-                    <Badge>Default</Badge>
+                    <Badge>默认</Badge>
                   </span>
                 ) : null}
               </span>
@@ -1413,7 +1399,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                       size="icon-xs"
                       variant="ghost-muted"
                       disabled={profileWritesDisabled || importInFlight}
-                      aria-label={`${profile.name} options`}
+                      aria-label={`${profile.name} 的选项`}
                     />
                   }
                 >
@@ -1428,7 +1414,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                       }
                     }}
                   >
-                    Set as default
+                    设为默认
                   </MenuItem>
                   <MenuItem
                     disabled={!settingsHydrated || !removalAvailable}
@@ -1438,7 +1424,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                       } else clearProfileData(profile.id, profile.name);
                     }}
                   >
-                    Clear cookies and cache
+                    清除 Cookie 和缓存
                   </MenuItem>
                   {builtIn ? null : (
                     <MenuItem
@@ -1448,16 +1434,14 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                         if (settingsHydrated) setProfilePendingRemoval(profile);
                       }}
                     >
-                      Remove profile and data
+                      移除浏览器配置和数据
                     </MenuItem>
                   )}
                   {!removalAvailable ? (
                     <>
                       <MenuSeparator />
                       <MenuItem disabled>
-                        {environmentsReady
-                          ? "Connect to an environment to clear profile data"
-                          : "Checking environments…"}
+                        {environmentsReady ? "连接一个环境以清除浏览器配置数据" : "正在检查环境…"}
                       </MenuItem>
                     </>
                   ) : null}
@@ -1480,8 +1464,8 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove “{profilePendingRemoval?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              Its cookies and logins are deleted. Desktop tabs already open in this profile stay
-              open until you close them; server browser tabs close now.
+              将删除此浏览器配置的 Cookie
+              和登录状态。已打开的桌面标签页会保留，直到你将其关闭；服务器上的浏览器标签页会立即关闭。
             </AlertDialogDescription>
             {profileRemovalError ? (
               <p aria-live="polite" className="text-sm text-destructive">
@@ -1490,7 +1474,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
             ) : null}
             {!removalAvailable ? (
               <p className="text-sm text-muted-foreground">
-                Connect to an environment to remove this profile and its data.
+                连接一个环境以移除此浏览器配置及其数据。
               </p>
             ) : null}
           </AlertDialogHeader>
@@ -1499,7 +1483,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
               disabled={profileRemovalInFlight}
               render={<Button variant="outline" disabled={profileRemovalInFlight} />}
             >
-              Cancel
+              取消
             </AlertDialogClose>
             <Button
               variant="destructive"
@@ -1510,7 +1494,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                 }
               }}
             >
-              {profileRemovalInFlight ? "Removing…" : "Remove profile"}
+              {profileRemovalInFlight ? "正在移除…" : "移除浏览器配置"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -1527,11 +1511,11 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
               Clear “{profilePendingClear?.name}”’s cookies and cache?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              You are signed out of its sites. Server browser tabs open in this profile close now.
+              你将退出此浏览器配置中各网站的登录。服务器上使用此配置的浏览器标签页会立即关闭。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
             <Button
               variant="destructive"
               onClick={() => {
@@ -1540,7 +1524,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                 setProfilePendingClear(null);
               }}
             >
-              Clear data
+              清除数据
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -1566,8 +1550,8 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
               .catch(() => {
                 toastManager.add({
                   type: "error",
-                  title: "Could not open System Settings",
-                  description: "Open Privacy & Security → Full Disk Access manually.",
+                  title: "无法打开系统设置",
+                  description: "请手动打开“隐私与安全性”→“完全磁盘访问权限”。",
                 });
               });
           }}
@@ -1580,14 +1564,14 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
 
 export function BrowserSettingsPanel() {
   const desktopOnly = !isElectron;
-  const desktopOnlyMessage = desktopOnly ? "Only available in the desktop app." : undefined;
+  const desktopOnlyMessage = desktopOnly ? "仅桌面应用可用。" : undefined;
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="browser-agent-access" title="Agent access">
+      <SettingsSection id="browser-agent-access" title="智能体访问权限">
         <AgentBrowserAccessSetting />
       </SettingsSection>
-      <SettingsSection id="browser" title="Browsing">
+      <SettingsSection id="browser" title="浏览">
         <SettingsUnavailableGroup message={desktopOnlyMessage}>
           <BrowserProfilesSetting disabled={desktopOnly} />
           <BrowserLinkTargetSetting disabled={desktopOnly} />
@@ -1609,7 +1593,7 @@ export function BrowserSettingsPanel() {
           </SettingsUnavailableGroup>
         </AdvancedSettings>
       </SettingsSection>
-      <SettingsSection id="browser-recordings" title="Recordings">
+      <SettingsSection id="browser-recordings" title="录制">
         <SettingsUnavailableGroup message={desktopOnlyMessage}>
           <BrowserRecordingFrameRateSetting disabled={desktopOnly} />
           <BrowserRecordingInputSettings disabled={desktopOnly} />

@@ -139,7 +139,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("PR filesystem ca
       const fs = yield* FileSystem.FileSystem;
       const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-pr-cache-" });
       const cache = yield* cacheLayer(directory);
-      const error = new PullRequestOperationError({ operation: "summary", detail: "unavailable" });
+      const error = new PullRequestOperationError({ operation: "summary", detail: "不可用" });
       yield* cache.get("summary", Effect.fail(error)).pipe(Effect.flip);
       const restarted = yield* cacheLayer(directory);
       assert.strictEqual(yield* restarted.get("summary", Effect.succeed("recovered")), "recovered");
@@ -180,7 +180,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("PR filesystem ca
               if (!fail) return backing.get(key);
               fail = false;
               return Effect.fail(
-                new KeyValueStore.KeyValueStoreError({ method: "get", message: "unavailable" }),
+                new KeyValueStore.KeyValueStoreError({ method: "get", message: "不可用" }),
               );
             }),
         }),

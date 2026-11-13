@@ -286,7 +286,7 @@ const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
         .launch({
           commandId: CommandId.make(yield* randomUUID),
           projectId: project.id,
-          title: "New thread",
+          title: "新建会话",
           modelSelection:
             resolveProjectSettings(settings, project.id, project).settings.defaultModelSelection ??
             threadModelSelection,

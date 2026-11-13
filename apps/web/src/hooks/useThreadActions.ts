@@ -69,7 +69,7 @@ export class ThreadArchiveBlockedError extends Schema.TaggedError<ThreadArchiveB
   },
 ) {
   override get message(): string {
-    return "Cannot archive while the provider is active.";
+    return "提供方仍在运行时无法归档。";
   }
 }
 
@@ -81,7 +81,7 @@ export class ThreadSettlementUnsupportedError extends Schema.TaggedError<ThreadS
   },
 ) {
   override get message(): string {
-    return "This environment's server does not support settling yet. Update the server to use Settle.";
+    return "此环境的服务器尚不支持收尾。请更新服务器后再使用“收尾”。";
   }
 }
 
@@ -93,7 +93,7 @@ export class ThreadSnoozeUnsupportedError extends Schema.TaggedError<ThreadSnooz
   },
 ) {
   override get message(): string {
-    return "This environment's server does not support snoozing yet. Update the server to use Snooze.";
+    return "此环境的服务器尚不支持暂缓。请更新服务器后再使用“暂缓”。";
   }
 }
 
@@ -105,7 +105,7 @@ export class ThreadSnoozeBlockedError extends Schema.TaggedError<ThreadSnoozeBlo
   },
 ) {
   override get message(): string {
-    return "This thread is waiting on you. Respond to the pending request before snoozing it.";
+    return "此会话正在等你处理。请先回复待处理的请求，再暂缓它。";
   }
 }
 
@@ -126,7 +126,7 @@ export class ThreadAutoSettleOptOutUnsupportedError extends Schema.TaggedError<T
   },
 ) {
   override get message(): string {
-    return "This environment's server does not support turning auto-settle off per thread yet. Update the server to use it.";
+    return "此环境的服务器尚不支持按会话关闭自动收尾。请更新服务器后再使用该功能。";
   }
 }
 
@@ -138,7 +138,7 @@ export class ThreadPinningUnsupportedError extends Schema.TaggedError<ThreadPinn
   },
 ) {
   override get message(): string {
-    return "This environment's server does not support pinning yet. Update the server to use Pin.";
+    return "此环境的服务器尚不支持置顶。请更新服务器后再使用“置顶”。";
   }
 }
 
@@ -150,7 +150,7 @@ export class ThreadPinReorderUnsupportedError extends Schema.TaggedError<ThreadP
   },
 ) {
   override get message(): string {
-    return "This environment's server does not support reordering pinned threads yet. Update the server to reorder pins.";
+    return "此环境的服务器尚不支持重新排列置顶会话。请更新服务器后再调整置顶顺序。";
   }
 }
 
@@ -162,7 +162,7 @@ export class ThreadActiveReorderUnsupportedError extends Schema.TaggedError<Thre
   },
 ) {
   override get message(): string {
-    return "Update this environment's server to reorder active threads.";
+    return "请更新此环境的服务器，以重新排列活动会话。";
   }
 }
 
@@ -177,12 +177,7 @@ async function requestThreadUnpinConfirmation(input: {
   }
 
   return settlePromise(() =>
-    confirm(
-      [
-        `Unpin thread "${input.title}"?`,
-        "This will move the thread out of your pinned section.",
-      ].join("\n"),
-    ),
+    confirm([`取消置顶会话“${input.title}”？`, "这会将会话移出置顶区域。"].join("\n")),
   );
 }
 
@@ -193,8 +188,8 @@ export async function navigateAfterThreadDeletion(navigate: () => Promise<void>)
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Thread deleted, but navigation failed",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: "会话已删除，但跳转失败",
+        description: error instanceof Error ? error.message : "发生错误。",
       }),
     );
   }
@@ -267,7 +262,7 @@ function threadOperationFailure(target: ScopedThreadRef) {
     : AsyncResult.failure(
         Cause.fail(
           new EnvironmentAuthorizationError({
-            message: "This connection cannot change threads.",
+            message: "此连接无法修改会话。",
             requiredScope: AuthOrchestrationOperateScope,
           }),
         ),
@@ -421,7 +416,7 @@ export function useThreadActions() {
       action: "Archived",
       claim: action,
       undo: () => unarchiveThread(threadRef, { navigate: shouldNavigateToDraft }),
-      failureTitle: "Failed to undo archive",
+      failureTitle: "无法撤销归档",
     });
 
     if (shouldNavigateToDraft && router.state.location.href === requestingRouteHref) {
@@ -555,10 +550,10 @@ export function useThreadActions() {
       const confirmationResult = await settlePromise(() =>
         localApi.dialogs.confirm(
           [
-            "This thread is the only one linked to this worktree:",
+            "此会话是唯一关联到该工作树的会话：",
             displayWorktreePath ?? orphanedWorktreePath,
             "",
-            "Delete the worktree too?",
+            "同时删除工作树？",
           ].join("\n"),
           { variant: "destructive" },
         ),
@@ -654,7 +649,7 @@ export function useThreadActions() {
       : AsyncResult.failure(
           Cause.fail(
             new EnvironmentAuthorizationError({
-              message: "This connection can no longer remove worktrees.",
+              message: "此连接已无法移除工作树。",
               requiredScope: AuthSourceControlWriteScope,
             }),
           ),
@@ -675,7 +670,7 @@ export function useThreadActions() {
     if (cleanupFailure) {
       const removalFailed = removeResult._tag === "Failure";
       const error = squashAtomCommandFailure(cleanupFailure);
-      const message = error instanceof Error ? error.message : "An error occurred.";
+      const message = error instanceof Error ? error.message : "发生错误。";
       console.error("Worktree cleanup failed after thread deletion", {
         threadId: threadRef.threadId,
         projectCwd: threadProject.workspaceRoot,
@@ -685,11 +680,9 @@ export function useThreadActions() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: removalFailed
-            ? "Failed to delete worktree"
-            : "Worktree deleted, but Git status refresh failed",
+          title: removalFailed ? "无法删除工作树" : "工作树已删除，但刷新 Git 状态失败",
           description: removalFailed
-            ? `Could not remove ${displayWorktreePath ?? orphanedWorktreePath}. ${message}`
+            ? `无法移除 ${displayWorktreePath ?? orphanedWorktreePath}。${message}`
             : message,
         }),
       );
@@ -761,7 +754,7 @@ export function useThreadActions() {
 
   const pinThread = async (target: ScopedThreadRef, opts: { orderKey?: string } = {}) => {
     const result = await sendPin(target, opts);
-    if (result._tag === "Success") announce("Pinned 1 thread");
+    if (result._tag === "Success") announce("已置顶 1 个会话");
     return result;
   };
 
@@ -788,7 +781,7 @@ export function useThreadActions() {
         action: "Unpinned",
         claim: action,
         undo: () => runUndoPlan(target, undoPlan),
-        failureTitle: "Failed to undo unpin",
+        failureTitle: "无法撤销取消置顶",
       });
     } else {
       action.finish();
@@ -832,7 +825,7 @@ export function useThreadActions() {
       action: "Settled",
       claim: action,
       undo: () => runUndoPlan(target, undoPlan),
-      failureTitle: "Failed to undo settle",
+      failureTitle: "无法撤销收尾",
     });
     return result;
   };
@@ -945,7 +938,7 @@ export function useThreadActions() {
       action: "Snoozed",
       claim: action,
       undo: () => runUndoPlan(target, ThreadUndo.planThreadUndo("snooze")),
-      failureTitle: "Failed to wake thread",
+      failureTitle: "唤醒会话失败",
     });
     return result;
   };
@@ -981,10 +974,7 @@ export function useThreadActions() {
       const title = resolved?.thread.title ?? knownTitle ?? "this thread";
       const confirmationResult = await settlePromise(() =>
         localApi.dialogs.confirm(
-          [
-            `Delete thread "${title}"?`,
-            "This permanently clears conversation history for this thread.",
-          ].join("\n"),
+          [`删除会话“${title}”？`, "这将永久清除此会话的对话历史。"].join("\n"),
           { variant: "destructive" },
         ),
       );

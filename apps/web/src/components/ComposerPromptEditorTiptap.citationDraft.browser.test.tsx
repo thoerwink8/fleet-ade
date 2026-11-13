@@ -92,7 +92,7 @@ it("keeps an unsaved citation comment when a question takes the composer", async
       insertedSpaces: { before: false, after: true },
     }),
   );
-  const comment = page.getByLabelText("Comment on selected text");
+  const comment = page.getByLabelText("为选中的文字添加批注");
   await expect.element(comment).toBeVisible();
   await comment.click();
   await userEvent.keyboard("check this");
@@ -104,7 +104,7 @@ it("keeps an unsaved citation comment when a question takes the composer", async
   expect(drafts()?.prompt).toBe(
     `See ${serializeAssistantCitation(withAssistantCitationComment(citation, "check this"))} `,
   );
-  await expect.element(page.getByLabelText("Edit citation comment")).toBeInTheDocument();
+  await expect.element(page.getByLabelText("编辑引用批注")).toBeInTheDocument();
 });
 
 it("clears the sent prompt when an empty citation comment sends it", async () => {
@@ -122,7 +122,7 @@ it("clears the sent prompt when an empty citation comment sends it", async () =>
       insertedSpaces: { before: false, after: true },
     }),
   );
-  const comment = page.getByLabelText("Comment on selected text");
+  const comment = page.getByLabelText("为选中的文字添加批注");
   await expect.element(comment).toHaveFocus();
   await userEvent.keyboard("{Control>}{Enter}{/Control}");
 
@@ -150,7 +150,7 @@ it.each(["blocked", "refusedLater"] as const)(
         insertedSpaces: { before: false, after: true },
       }),
     );
-    const comment = page.getByLabelText("Comment on selected text");
+    const comment = page.getByLabelText("为选中的文字添加批注");
     await expect.element(comment).toHaveFocus();
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
     await expect.element(comment).not.toBeInTheDocument();
@@ -177,10 +177,10 @@ it("cancels a new citation while dictation makes the composer read-only", async 
       insertedSpaces: { before: false, after: true },
     }),
   );
-  await expect.element(page.getByLabelText("Comment on selected text")).toBeVisible();
+  await expect.element(page.getByLabelText("为选中的文字添加批注")).toBeVisible();
 
   await page.getByRole("button", { name: "Cancel" }).click();
 
-  await expect.element(page.getByLabelText("Comment on selected text")).not.toBeInTheDocument();
+  await expect.element(page.getByLabelText("为选中的文字添加批注")).not.toBeInTheDocument();
   expect(screen.container.querySelector("output")?.dataset.prompt).toBe("See ");
 });

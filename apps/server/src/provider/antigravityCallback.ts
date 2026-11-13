@@ -70,7 +70,7 @@ export const forwardAntigravityCallback = (
       new ProviderSetupError({
         instanceId,
         operation: "complete",
-        detail: "Could not deliver the sign-in response. Start sign-in again.",
+        detail: "无法发送登录响应。请重新登录。",
       });
     let response: NodeHttp.IncomingMessage | undefined;
     const request = NodeHttp.request(

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { folderDropTarget } from "./folderDrop";
 
 const environmentId = EnvironmentId.make("saved-local");
-const base = { environmentId, label: "server" };
+const base = { environmentId, label: "服务器" };
 const savedServer = (httpBaseUrl: string, connectionId = "saved-1") => ({
   target: new BearerConnectionTarget({ ...base, connectionId }),
   httpBaseUrl,

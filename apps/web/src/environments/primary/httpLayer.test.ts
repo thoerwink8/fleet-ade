@@ -55,7 +55,7 @@ describe("primary environment HTTP layer", { concurrent: false }, () => {
         location: { origin: "t3code://app" },
         desktopBridge: {
           getLocalEnvironmentBootstrap: () => ({
-            label: "Local environment",
+            label: "本地环境",
             httpBaseUrl: "http://127.0.0.1:3773",
             wsBaseUrl: "ws://127.0.0.1:3773",
             bootstrapToken: "desktop-bootstrap-token",

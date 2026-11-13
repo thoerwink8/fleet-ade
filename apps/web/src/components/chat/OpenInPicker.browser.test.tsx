@@ -123,7 +123,7 @@ async function setup() {
     return element!;
   }
 
-  const primaryButton = () => byLabel("Open file in preferred editor");
+  const primaryButton = () => byLabel("在首选编辑器中打开文件");
   const menuItems = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
 
   async function click(element: HTMLElement) {
@@ -184,7 +184,7 @@ describe("host editor access", () => {
 
     await renderPicker();
     expect(primaryButton().disabled).toBe(true);
-    expect(byLabel("Choose editor").disabled).toBe(true);
+    expect(byLabel("选择编辑器").disabled).toBe(true);
     expect((await pressOpenFavorite()).defaultPrevented).toBe(false);
   });
 });
@@ -212,7 +212,7 @@ describe("remote editor links", () => {
 
     expect(primaryButton().disabled).toBe(true);
     expect((await pressOpenFavorite()).defaultPrevented).toBe(false);
-    await click(byLabel("Choose editor"));
+    await click(byLabel("选择编辑器"));
     await vi.waitFor(() =>
       expect(menuItems().map((item) => item.textContent)).toEqual([
         "Open from a computer to edit on Test host",

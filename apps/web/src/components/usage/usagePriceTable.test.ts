@@ -34,7 +34,7 @@ describe("price table edits", () => {
       const environment = target("a", {});
       expect(usagePriceCell([environment], model, "inputCostPerMillionTokens")).toEqual({
         value: "",
-        placeholder: "Automatic",
+        placeholder: "自动",
       });
       const result = usagePriceTableChanges(environment, [
         {
@@ -118,7 +118,7 @@ describe("price table edits", () => {
       usagePriceTableChanges(mapped, [{ ...draft({}), alias: "example" }]).errors.get(
         "model:example",
       ),
-    ).toBe("Map to a different model.");
+    ).toBe("请映射到另一个模型。");
   });
 
   it("requires clearing a mapping before a price edit can apply to every environment", () => {

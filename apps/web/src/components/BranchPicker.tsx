@@ -105,7 +105,7 @@ export function BranchPicker({
       {children}
       <ComboboxPopup {...popupProps}>
         <ComboboxSearchInput
-          placeholder="Search refs..."
+          placeholder="搜索引用…"
           value={query}
           onChange={(event) => {
             onQueryChange(event.target.value);
@@ -126,7 +126,7 @@ export function BranchPicker({
           }}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <ComboboxEmpty>No refs found.</ComboboxEmpty>
+          <ComboboxEmpty>未找到引用。</ComboboxEmpty>
           <div className="relative flex min-h-0 w-full max-h-56 flex-1 flex-col overflow-hidden">
             <ComboboxListVirtualized className="flex size-full min-h-0 min-w-0 flex-col">
               <LegendList<string>
@@ -164,22 +164,21 @@ export function BranchPicker({
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground">
                       <RefreshIcon aria-hidden="true" className="size-3 shrink-0" />
-                      <span className="truncate">Start from remote</span>
+                      <span className="truncate">从远程分支开始</span>
                     </span>
                     <Switch
                       id={startFromOriginSwitchId}
                       checked={originControl.checked}
                       size="sm"
-                      aria-label="Start worktree from remote"
+                      aria-label="从远端创建工作树"
                       onCheckedChange={(checked) => originControl.onCheckedChange(Boolean(checked))}
                     />
                   </label>
                 }
               />
               <TooltipPopup side="top" className="max-w-72 whitespace-normal">
-                Uses the latest commit of the base branch’s tracked remote branch, even if its name
-                differs. Otherwise uses the same-named branch on origin. Uses your local branch if
-                that remote branch is missing.
+                使用基准分支所跟踪的远程分支的最新提交，即使名称不同。未跟踪远程分支时，使用 origin
+                上的同名分支。远程分支不存在时，使用本地分支。
               </TooltipPopup>
             </Tooltip>
           ) : null}

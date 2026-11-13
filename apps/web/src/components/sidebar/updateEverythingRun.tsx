@@ -121,7 +121,7 @@ export function retryFailedUpdateRunServers(
           ? providerFailure
           : outcome.status === "failed"
             ? outcome.message
-            : "Could not start the update",
+            : "无法开始更新",
         { serverUpdated: outcome.status === "updated" },
       ),
     );
@@ -334,7 +334,7 @@ function followHandedOffServers(servers: ReadonlyArray<HandedOffServer>): void {
       }
     };
     const timer = setTimeout(
-      () => settle(`Not back after ${HANDOFF_TIMEOUT_MS / 60_000} minutes`),
+      () => settle(`${HANDOFF_TIMEOUT_MS / 60_000} 分钟后仍未恢复`),
       server.startedAt + HANDOFF_TIMEOUT_MS - Date.now(),
     );
     const stopReconnectNudge = Effect.runCallback(
@@ -380,8 +380,8 @@ export function startDesktopUpdateLaunchNotice(): () => void {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Update did not apply",
-          description: `T3 Code is still on ${APP_VERSION}. Install ${notAppliedVersion} again from the update button.`,
+          title: "更新未生效",
+          description: `T3 Code 仍停留在 ${APP_VERSION}。请从更新按钮重新安装 ${notAppliedVersion}。`,
         }),
       );
     },

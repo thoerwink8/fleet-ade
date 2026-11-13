@@ -17,7 +17,7 @@ function Composer({ dialog = false }: { dialog?: boolean }) {
       droppedImageNames: [],
     })),
   );
-  const [draft, setDraft] = useState("Unsent draft");
+  const [draft, setDraft] = useState("未发送的草稿");
   const [open, setOpen] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(dialog);
   const [answer, setAnswer] = useState<string | null>(null);
@@ -25,16 +25,16 @@ function Composer({ dialog = false }: { dialog?: boolean }) {
     <>
       <form ref={composerFormRef}>
         <textarea
-          aria-label="Message"
+          aria-label="消息"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
         />
         <button type="button" onClick={() => setAnswer("Continue")}>
-          Continue
+          继续
         </button>
         <p role="status">{answer ? `Selected: ${answer}` : "Choose an answer"}</p>
       </form>
-      <input aria-label="Search threads" />
+      <input aria-label="搜索会话" />
       <button onClick={() => setOpen(true)}>Open stash</button>
       {open && (
         <ComposerStashMenu
@@ -54,7 +54,7 @@ function Composer({ dialog = false }: { dialog?: boolean }) {
         />
       )}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogPopup aria-label="Command palette">
+        <DialogPopup aria-label="命令面板">
           <input aria-label="Search commands" />
         </DialogPopup>
       </Dialog>
@@ -63,7 +63,7 @@ function Composer({ dialog = false }: { dialog?: boolean }) {
 }
 
 const editor = () => page.getByRole("textbox", { name: "Message" });
-const stash = () => page.getByRole("list", { name: "Stashed prompts" });
+const stash = () => page.getByRole("列表", { name: "Stashed prompts" });
 const press = (keys: string) => userEvent.keyboard(keys);
 const focus = (element: Element) => act(async () => (element as HTMLElement).focus());
 
@@ -90,13 +90,13 @@ it("leaves dialog, unrelated input and question button shortcuts alone while the
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   expect(stash().element().textContent).toContain("first prompt");
   expect(stash().element().textContent).toContain("second prompt");
-  await expect.element(editor()).toHaveValue("Unsent draft");
+  await expect.element(editor()).toHaveValue("未发送的草稿");
 
   await focus(page.getByRole("textbox", { name: "Search threads" }).element());
   await press("{ArrowDown}{Enter}{Control>}{Backspace}{/Control}{Meta>}{Backspace}{/Meta}{Escape}");
   expect(stash().element().textContent).toContain("first prompt");
   expect(stash().element().textContent).toContain("second prompt");
-  await expect.element(editor()).toHaveValue("Unsent draft");
+  await expect.element(editor()).toHaveValue("未发送的草稿");
 
   await focus(page.getByRole("button", { name: "Continue", exact: true }).element());
   await press("{Enter}");
@@ -106,5 +106,5 @@ it("leaves dialog, unrelated input and question button shortcuts alone while the
   await press("{Control>}{Backspace}{/Control}{Meta>}{Backspace}{/Meta}");
   expect(stash().element().textContent).toContain("first prompt");
   expect(stash().element().textContent).toContain("second prompt");
-  await expect.element(editor()).toHaveValue("Unsent draft");
+  await expect.element(editor()).toHaveValue("未发送的草稿");
 });

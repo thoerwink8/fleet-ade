@@ -4,7 +4,7 @@ import { effortBarHeights, resolveEffortGlyph } from "./EffortGlyph";
 
 const descriptor = (ids: ReadonlyArray<string>, promptInjectedValues?: ReadonlyArray<string>) => ({
   id: "effort",
-  label: "Reasoning",
+  label: "推理",
   type: "select" as const,
   options: ids.map((id) => ({ id, label: id[0]!.toUpperCase() + id.slice(1) })),
   ...(promptInjectedValues ? { promptInjectedValues } : {}),
@@ -41,7 +41,7 @@ describe("resolveEffortGlyph", () => {
       count: 2,
       filled: 0,
       special: null,
-      label: "Off",
+      label: "关闭",
     });
   });
 

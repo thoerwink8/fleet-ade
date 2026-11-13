@@ -806,7 +806,7 @@ it.effect("refuses saving an enabled task above the policy ceiling", () =>
       const save = (enabled: boolean) =>
         service.upsert({
           id: ScheduledTaskId.make("task:above-ceiling"),
-          title: "Nightly",
+          title: "Nightly 版",
           prompt: "Check progress",
           enabled,
           schedule: { type: "interval", everyMs: 60_000 },

@@ -151,7 +151,7 @@ export const currentSession = Effect.fn("EnvironmentRpc.currentSession")(functio
           Effect.fail(
             new EnvironmentRpcUnavailableError({
               environmentId: supervisor.target.environmentId,
-              message: `${supervisor.target.label} is not connected.`,
+              message: `${supervisor.target.label} 未连接。`,
             }),
           ),
         onSome: Effect.succeed,
@@ -183,7 +183,7 @@ export class RpcPermissionGuard extends Context.Reference<{
         : Effect.fail(
             new EnvironmentAuthorizationError({
               ...authScopeRequiredResponse(scope),
-              message: `This connection requires ${scope}.`,
+              message: `此连接需要 ${scope} 权限。`,
             }),
           );
     },

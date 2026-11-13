@@ -10,7 +10,7 @@ export interface SnapShotSetupError {
 }
 
 export function snapShotSetupError(title: string, error: unknown): SnapShotSetupError {
-  return { title, message: error instanceof Error ? error.message : "Try again." };
+  return { title, message: error instanceof Error ? error.message : "请重试。" };
 }
 
 export interface DesktopSnapShotLoad {
@@ -40,7 +40,7 @@ export const desktopSnapShotAtom = Atom.writable(
       void refreshDesktopSnapShotState(get.registry, (error) => {
         get.setSelf({
           ...Option.getOrElse(get.self<DesktopSnapShotLoad>(), () => EMPTY_LOAD),
-          refreshError: snapShotSetupError("Couldn't check capture setup", error),
+          refreshError: snapShotSetupError("无法检查截图设置", error),
         });
       });
     window.addEventListener("focus", refresh);

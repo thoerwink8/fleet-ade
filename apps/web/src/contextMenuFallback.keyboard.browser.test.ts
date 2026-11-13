@@ -7,16 +7,16 @@ import {
 
 const items = [
   { id: "heading", label: "Thread actions", header: true },
-  { id: "disabled", label: "Unavailable", disabled: true },
-  { id: "rename", label: "Rename" },
-  { id: "pin", label: "Pinned", checked: true, separatorBefore: true },
+  { id: "disabled", label: "不可用", disabled: true },
+  { id: "rename", label: "重命名" },
+  { id: "pin", label: "已置顶", checked: true, separatorBefore: true },
   {
     id: "copy",
-    label: "Copy",
+    label: "复制",
     children: [
       { id: "copy-unavailable", label: "Unavailable copy", disabled: true },
-      { id: "path", label: "Path" },
-      { id: "branch", label: "Branch" },
+      { id: "path", label: "路径" },
+      { id: "branch", label: "分支" },
     ],
   },
 ];

@@ -28,7 +28,7 @@ export class PullRequestDiffCredentialRejectedError extends Schema.TaggedError<P
   },
 ) {
   override get message(): string {
-    return "This environment session is no longer valid (invalid_credential). Refresh the page or quit and reopen T3 Code.";
+    return "此环境会话已失效（invalid_credential）。请刷新页面，或退出并重新打开 T3 Code。";
   }
 }
 

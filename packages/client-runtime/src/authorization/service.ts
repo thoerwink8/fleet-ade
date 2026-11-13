@@ -251,7 +251,7 @@ export const make = Effect.gen(function* () {
               () =>
                 new ConnectionBlockedError({
                   reason: "configuration",
-                  detail: "Could not create the websocket authorization proof.",
+                  detail: "无法创建 WebSocket 授权证明。",
                 }),
             ),
           ),
@@ -266,7 +266,7 @@ export const make = Effect.gen(function* () {
   const sessionChanged = () =>
     new ConnectionBlockedError({
       reason: "authentication",
-      detail: "Your cloud sign-in changed. Sign in again to authorize the environment.",
+      detail: "你的云端登录已变化。请重新登录以授权环境。",
     });
 
   // A missing identity before the attempt captures one means the cloud session
@@ -275,7 +275,7 @@ export const make = Effect.gen(function* () {
   const sessionPending = () =>
     new ConnectionTransientError({
       reason: "session-pending",
-      detail: "Waiting for the T3 Connect sign-in to load.",
+      detail: "正在等待 T3 Connect 登录状态加载。",
     });
 
   const assertSession = Effect.fnUntraced(function* (
@@ -356,7 +356,7 @@ export const make = Effect.gen(function* () {
             () =>
               new ConnectionBlockedError({
                 reason: "configuration",
-                detail: "Could not create the environment authorization proof.",
+                detail: "无法创建环境授权证明。",
               }),
           ),
         );
@@ -398,7 +398,7 @@ export const make = Effect.gen(function* () {
         () =>
           new ConnectionBlockedError({
             reason: "configuration",
-            detail: "Could not load the environment authorization key.",
+            detail: "无法加载环境授权密钥。",
           }),
       ),
       Effect.withSpan("environment.authorization.dpopKey.resolve"),
@@ -473,7 +473,7 @@ export const make = Effect.gen(function* () {
               Effect.fail(
                 new ConnectionTransientError({
                   reason: "timeout",
-                  detail: "Timed out renewing the environment credential.",
+                  detail: "续期环境凭据超时。",
                 }),
               ),
           }),

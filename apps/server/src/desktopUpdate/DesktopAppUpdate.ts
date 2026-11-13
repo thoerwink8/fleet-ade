@@ -133,9 +133,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
         `The T3 Code desktop app on this machine is already up to date on ${report.state.currentVersion}.`,
       );
     }
-    return yield* failWith(
-      report.reason ?? report.state.message ?? "The desktop app update failed.",
-    );
+    return yield* failWith(report.reason ?? report.state.message ?? "桌面应用更新失败。");
   });
 
   const run: DesktopAppUpdate["Service"]["run"] = Effect.fn("desktopUpdate.desktopAppUpdate.run")(
@@ -220,9 +218,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
       return yield* failWith("The desktop app stopped reporting the install.");
     }
     return yield* failWith(
-      terminal.value.reason ??
-        terminal.value.state.message ??
-        "The desktop app failed to install the update.",
+      terminal.value.reason ?? terminal.value.state.message ?? "桌面应用安装更新失败。",
     );
   });
 

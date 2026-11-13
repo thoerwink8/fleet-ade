@@ -1,5 +1,5 @@
 export const CODE_BLOCK_LANGUAGES = [
-  { id: "", label: "Plain text" },
+  { id: "", label: "纯文本" },
   { id: "asm", label: "Assembly" },
   { id: "bash", label: "Bash" },
   { id: "c", label: "C" },
@@ -7,7 +7,7 @@ export const CODE_BLOCK_LANGUAGES = [
   { id: "csharp", label: "C#" },
   { id: "css", label: "CSS" },
   { id: "dart", label: "Dart" },
-  { id: "diff", label: "Diff" },
+  { id: "diff", label: "差异" },
   { id: "dockerfile", label: "Dockerfile" },
   { id: "elixir", label: "Elixir" },
   { id: "go", label: "Go" },

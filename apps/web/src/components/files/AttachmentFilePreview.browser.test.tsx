@@ -343,7 +343,7 @@ describe("bounded binary previews", () => {
     );
     await vi.waitFor(() =>
       expect(screen.container.querySelector('[role="alert"]')?.textContent).toContain(
-        "Unable to load image.",
+        "无法加载图片。",
       ),
     );
     await act(() =>
@@ -565,7 +565,7 @@ describe("large text preview recovery", () => {
       await vi.waitFor(() => expect(screen.container.textContent).toContain("original"));
       assetUrlState.mockReturnValue({ _tag: "Failure" });
       await screen.rerender(preview("legacy-edit", 1));
-      expect(screen.container.textContent).toContain("Unable to load file preview.");
+      expect(screen.container.textContent).toContain("无法加载文件预览。");
       refresh.mockClear();
       refresh.mockImplementation(async () => {
         state(`${changed}#retried`);
@@ -891,10 +891,7 @@ describe("large text preview recovery", () => {
       10_000,
     );
     await screen.rerender(<LargeTextViewer name="log.txt" text="" delimiter={null} />);
-    await vi.waitFor(
-      () => expect(screen.container.textContent).toContain("This file is empty."),
-      10_000,
-    );
+    await vi.waitFor(() => expect(screen.container.textContent).toContain("此文件为空。"), 10_000);
     expect(screen.container.querySelector('[role="alert"]')).toBeNull();
   });
 
@@ -935,7 +932,7 @@ describe("standalone Mermaid previews", () => {
     await vi.waitFor(
       () =>
         expect(screen.container.querySelector('[role="alert"]')?.textContent).toContain(
-          "Show Mermaid source",
+          "显示 Mermaid 源码",
         ),
       { timeout: 10_000 },
     );
@@ -1073,7 +1070,7 @@ describe("attachment HTML preview recovery", () => {
     await using screen = await openRemote();
     expect(screen.container.querySelector("iframe")?.getAttribute("src")).toBe(originalUrl);
     now = 61 * 60_000;
-    await toggleMode(screen, "Show HTML source");
+    await toggleMode(screen, "显示 HTML 源码");
     await act(async () => {
       await import("./ReadOnlySourcePreview");
     });
@@ -1082,9 +1079,9 @@ describe("attachment HTML preview recovery", () => {
       expect(screen.container.querySelector("pre")?.textContent).toBe("<p>Captured HTML</p>"),
     );
 
-    await toggleMode(screen, "Show rendered page");
+    await toggleMode(screen, "显示渲染后的页面");
     expect(screen.container.querySelector("iframe")?.getAttribute("src")).toBe(renewedUrl);
-    await toggleMode(screen, "Show HTML source");
+    await toggleMode(screen, "显示 HTML 源码");
     expect(refresh).toHaveBeenCalledTimes(2);
     expect(attachmentFetches()).toEqual([renewedUrl, renewedUrl]);
   });
@@ -1100,12 +1097,12 @@ describe("attachment HTML preview recovery", () => {
     await using screen = await openRemote();
     now = 61 * 60_000;
     refresh.mockResolvedValue(null);
-    await toggleMode(screen, "Show HTML source");
+    await toggleMode(screen, "显示 HTML 源码");
     expect(attachmentFetches()).toEqual([]);
-    expect(alert(screen)?.textContent).toContain("Reconnect to the environment and try again.");
+    expect(alert(screen)?.textContent).toContain("请重新连接环境后重试。");
 
-    await toggleMode(screen, "Show rendered page");
-    await toggleMode(screen, "Show HTML source");
+    await toggleMode(screen, "显示渲染后的页面");
+    await toggleMode(screen, "显示 HTML 源码");
     expect(refresh).toHaveBeenCalledTimes(3);
     expect(attachmentFetches()).toEqual([]);
   });
@@ -1127,10 +1124,10 @@ describe("attachment HTML preview recovery", () => {
         file={file}
       />,
     );
-    await toggleMode(screen, "Show HTML source");
+    await toggleMode(screen, "显示 HTML 源码");
     await vi.waitFor(() => expect(alert(screen)?.textContent).toContain("not UTF-8"));
 
-    await toggleMode(screen, "Show rendered page");
+    await toggleMode(screen, "显示渲染后的页面");
     expect(alert(screen)).toBeNull();
     expect(screen.container.querySelector("iframe")?.title).toBe("document.html");
   });
@@ -1180,10 +1177,7 @@ it("opens a known empty attachment even when its range response is inaccessible"
       asset={{ environmentId: EnvironmentId.make("test"), attachmentId: "empty" }}
     />,
   );
-  await vi.waitFor(
-    () => expect(screen.container.textContent).toContain("This file is empty."),
-    10_000,
-  );
+  await vi.waitFor(() => expect(screen.container.textContent).toContain("此文件为空。"), 10_000);
 });
 
 it.each(["draft", "thread"] as const)(
@@ -1214,7 +1208,7 @@ it.each(["draft", "thread"] as const)(
       ),
     );
     expect(fetch).toHaveBeenCalled();
-    expect(screen.container.textContent).not.toContain("This file is empty.");
+    expect(screen.container.textContent).not.toContain("此文件为空。");
   },
 );
 
@@ -1390,7 +1384,7 @@ it("loads a font attachment through the lazy preview", async () => {
       const frame = screen.container.querySelector("iframe");
       expect(frame?.title).toBe("Carlito.ttf");
       expect(frame?.srcdoc).toContain("@font-face");
-      expect(frame?.srcdoc).toContain("The quick brown fox");
+      expect(frame?.srcdoc).toContain("敏捷的棕色狐狸跳过那只懒狗");
     },
     { timeout: 10_000 },
   );
@@ -1414,7 +1408,7 @@ it("toggles a Mermaid attachment between diagram and source through the lazy pre
   await screen.getByRole("button", { name: "Expand diagram" }).click();
   await vi.waitFor(() => {
     const image = document.querySelector<HTMLImageElement>('[role="dialog"] img');
-    expect(image?.alt).toBe("Mermaid diagram");
+    expect(image?.alt).toBe("Mermaid 图表");
     expect(image?.naturalWidth).toBeGreaterThan(0);
   });
   await page.getByRole("button", { name: "Close image preview" }).click();
@@ -1610,7 +1604,7 @@ it("keeps a workspace PDF's page, offset and zoom when a new revision reloads it
 
     await reload(screen, preview(updated, "two", "/repo/another.pdf"));
     await expect.element(screen.getByText("1 / 3 pages", { exact: true })).toBeVisible();
-    expect(screen.container.textContent).toContain("Fit width");
+    expect(screen.container.textContent).toContain("适应宽度");
     expect(region().scrollTop).toBe(0);
   } finally {
     URL.revokeObjectURL(original);

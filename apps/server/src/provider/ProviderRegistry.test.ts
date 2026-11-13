@@ -254,7 +254,7 @@ const codexModelCapabilities = createModelCapabilities({
       { id: "high", label: "High", isDefault: true },
       { id: "low", label: "Low" },
     ]),
-    booleanDescriptor("fastMode", "Fast Mode"),
+    booleanDescriptor("fastMode", "快速模式"),
   ],
 }) satisfies NonNullable<ServerProvider["models"][number]["capabilities"]>;
 
@@ -894,7 +894,7 @@ it.layer(
         optionDescriptors: [
           {
             id: "agent",
-            label: "Agent",
+            label: "智能体",
             type: "select",
             options: [{ id: "readonly", label: "Readonly" }],
           },
@@ -1025,13 +1025,13 @@ it.layer(
                 selectDescriptor("reasoning", "Reasoning", [
                   { id: "high", label: "High", isDefault: true },
                 ]),
-                booleanDescriptor("fastMode", "Fast Mode"),
+                booleanDescriptor("fastMode", "快速模式"),
                 booleanDescriptor("thinking", "Thinking"),
               ],
             }),
           },
         ],
-        slashCommands: [{ name: "review", description: "Review changes" }],
+        slashCommands: [{ name: "review", description: "查看更改" }],
         skills: [
           {
             name: "typescript",
@@ -1247,7 +1247,7 @@ it.layer(
             capabilities: null,
           },
         ],
-        slashCommands: [{ name: "review", description: "Review changes" }],
+        slashCommands: [{ name: "review", description: "查看更改" }],
         skills: [
           {
             name: "typescript",
@@ -1768,7 +1768,7 @@ it.layer(
         status: "ready",
         enabled: true,
         installed: true,
-        auth: { status: "authenticated", type: "oauth-personal", label: "Google account" },
+        auth: { status: "authenticated", type: "oauth-personal", label: "Google 账户" },
         checkedAt: "2026-09-05T00:00:00.000Z",
         version: "agy_acp_server_1.1.1",
         models: [
@@ -1867,7 +1867,7 @@ it.layer(
                 selectDescriptor("reasoning", "Reasoning", [
                   { id: "high", label: "High", isDefault: true },
                 ]),
-                booleanDescriptor("fastMode", "Fast Mode"),
+                booleanDescriptor("fastMode", "快速模式"),
                 booleanDescriptor("thinking", "Thinking"),
               ],
             }),
@@ -2383,7 +2383,7 @@ it.layer(
           yield* registry.refreshWorkspaceSnapshot({ instanceId, cwd: "/workspace" });
           assert.deepStrictEqual((yield* workspaceOf)?.skills, []);
 
-          const discoveredCommand = { name: "review", description: "Review changes" };
+          const discoveredCommand = { name: "review", description: "查看更改" };
           yield* Ref.set(scanResult, {
             ...unhealthyProvider,
             slashCommands: [discoveredCommand],
@@ -3851,10 +3851,10 @@ it.layer(
         assert.deepStrictEqual(added[1]?.capabilities?.optionDescriptors, [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select",
             options: [
-              { id: "default", label: "Default", isDefault: true },
+              { id: "default", label: "默认", isDefault: true },
               { id: "low", label: "Low" },
               { id: "high", label: "High" },
             ],
@@ -4222,7 +4222,7 @@ it.layer(
                   optionDescriptors: [
                     {
                       id: "effort",
-                      label: "Reasoning",
+                      label: "推理",
                       type: "select",
                       options: [
                         { id: "high", label: "High", isDefault: true },

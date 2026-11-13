@@ -113,7 +113,7 @@ export function DevReplayHost() {
     replay(scenario).catch((error: unknown) =>
       toastManager.add({
         type: "error",
-        title: "Replay failed",
+        title: "回放失败",
         description: error instanceof Error ? error.message : String(error),
       }),
     );

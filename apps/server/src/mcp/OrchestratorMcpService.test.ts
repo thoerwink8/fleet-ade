@@ -1657,7 +1657,7 @@ describe("OrchestratorMcpService provider resolution", () => {
               optionDescriptors: [
                 {
                   id: "effort",
-                  label: "Reasoning",
+                  label: "推理",
                   description: "How hard the model thinks.",
                   type: "select",
                   options: [
@@ -1666,12 +1666,12 @@ describe("OrchestratorMcpService provider resolution", () => {
                   ],
                   promptInjectedValues: ["high"],
                 },
-                { id: "fastMode", label: "Fast", type: "boolean" },
+                { id: "fastMode", label: "快速", type: "boolean" },
                 {
                   id: "agent",
-                  label: "Agent",
+                  label: "智能体",
                   type: "select",
-                  options: [{ id: "build", label: "Build" }],
+                  options: [{ id: "build", label: "构建" }],
                   currentValue: "build",
                 },
               ],
@@ -3031,7 +3031,7 @@ describe("OrchestratorMcpService provider resolution", () => {
     const workspaceRoot = "/repo/scheduled-base";
     const existing: ScheduledTask = {
       id: ScheduledTaskId.make("scheduled-task:base"),
-      title: "Nightly",
+      title: "Nightly 版",
       prompt: "Check the build",
       enabled: true,
       schedule: { type: "interval", everyMs: 3_600_000 },
@@ -3534,11 +3534,11 @@ describe("OrchestratorMcpService provider resolution", () => {
                       optionDescriptors: [
                         {
                           id: "effort",
-                          label: "Reasoning",
+                          label: "推理",
                           type: "select",
                           options: [
                             { id: "high", label: "High" },
-                            { id: "xhigh", label: "Extra High" },
+                            { id: "xhigh", label: "超高" },
                           ],
                         },
                         { id: "ultracode", label: "Ultracode", type: "boolean" },
@@ -3634,7 +3634,7 @@ describe("OrchestratorMcpService provider resolution", () => {
                   optionDescriptors: [
                     {
                       id: "reasoningEffort",
-                      label: "Reasoning",
+                      label: "推理",
                       type: "select",
                       options: [{ id: "low", label: "Low" }],
                     },
@@ -3692,7 +3692,7 @@ describe("OrchestratorMcpService provider resolution", () => {
                 aliases: ["gpt"],
                 isCustom: false,
                 capabilities: {
-                  optionDescriptors: [{ id: "fastMode", label: "Fast", type: "boolean" }],
+                  optionDescriptors: [{ id: "fastMode", label: "快速", type: "boolean" }],
                 },
               },
             ],
@@ -4239,7 +4239,7 @@ describe("OrchestratorMcpService thread stop", () => {
           commandId: CommandId.make("create"),
           threadId,
           projectId: ProjectId.make("project:mcp-stop"),
-          title: "Stop",
+          title: "停止",
           modelSelection,
           runtimeMode: "full-access",
           interactionMode: "default",

@@ -241,7 +241,7 @@ const fixture = Effect.fn("fixture")(function* (
         }
       : {}),
     id: LOCAL_DEVICE_HOST_ID,
-    label: "This machine",
+    label: "本机",
     summary: Effect.sync(() => ({
       id: LOCAL_DEVICE_HOST_ID,
       kind: connection.kind,
@@ -1121,7 +1121,7 @@ it.effect.each(["shutdown", "close"] as const)(
       };
       const host: DeviceHost.DeviceHost["Service"] = {
         id: LOCAL_DEVICE_HOST_ID,
-        label: "This machine",
+        label: "本机",
         summary: Effect.succeed({
           id: LOCAL_DEVICE_HOST_ID,
           kind: "local",
@@ -1404,7 +1404,7 @@ it.effect.each([
       };
       const host: DeviceHost.DeviceHost["Service"] = {
         id: LOCAL_DEVICE_HOST_ID,
-        label: "This machine",
+        label: "本机",
         summary: Effect.succeed({
           id: LOCAL_DEVICE_HOST_ID,
           kind: "local",
@@ -1630,10 +1630,10 @@ it.effect("reconciles SSH host settings without publishing no-op changes", () =>
     const removedFiles: string[] = [];
     const localHost: DeviceHost.DeviceHost["Service"] = {
       id: LOCAL_DEVICE_HOST_ID,
-      label: "This machine",
+      label: "本机",
       summary: Effect.succeed({
         id: LOCAL_DEVICE_HOST_ID,
-        label: "Local",
+        label: "本地",
         kind: "local",
         platforms: [],
         hubInstalled: false,
@@ -1740,7 +1740,7 @@ it.effect("a failed tool update reports npm's exit code but not its output", () 
   Effect.gen(function* () {
     const host: DeviceHost.DeviceHost["Service"] = {
       id: LOCAL_DEVICE_HOST_ID,
-      label: "This machine",
+      label: "本机",
       summary: Effect.succeed({
         id: LOCAL_DEVICE_HOST_ID,
         kind: "local",
@@ -2024,7 +2024,7 @@ describe("agent session release on close", () => {
 
 describe("locating a device id across hosts", () => {
   const threadId = ThreadId.make("thread-locate");
-  const thisMachine = { id: LOCAL_DEVICE_HOST_ID, label: "This machine" };
+  const thisMachine = { id: LOCAL_DEVICE_HOST_ID, label: "本机" };
   const macMini = { id: "mac-mini", label: "Mac Mini" };
   const listingHost = (
     host: { readonly id: string; readonly label: string },

@@ -122,7 +122,7 @@ const needsRestart = (before: Routes, after: Routes) =>
 
 const CHOICES = {
   connect: { title: "T3 Connect", description: "Creates a tunnel to control your PC." },
-  lan: { title: "Local network", description: "LAN and tailnet. Pairing code required." },
+  lan: { title: "本地网络", description: "LAN and tailnet. Pairing code required." },
 } satisfies Record<Route, { readonly title: string; readonly description: string }>;
 
 const formatSetup = (setup: Setup) => {
@@ -157,7 +157,7 @@ const formatSetup = (setup: Setup) => {
           ] as const,
         ]),
     [
-      "Local network",
+      "本地网络",
       setup.host !== undefined
         ? `overridden · T3CODE_HOST=${setup.host}`
         : setup.lanFromOldDefault
@@ -241,7 +241,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
     const picked = yield* Prompt.run(
       Prompt.MultiSelect({
         message: "Allow connections through:",
-        selectAll: "Select all",
+        selectAll: "全选",
         selectNone: "Clear all",
         inverseSelection: "Invert selection",
         choices: plan.ask.map((route) => ({

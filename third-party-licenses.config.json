@@ -1,6 +1,20 @@
 {
   "customNotices": [
     {
+      "name": "t3code-cn interface wording",
+      "bundles": ["web", "desktop"],
+      "license": "MIT",
+      "generatedNotices": [
+        {
+          "licenseId": "MIT",
+          "copyrights": ["Copyright (c) 2026 T3 Tools Inc."],
+          "preamble": [
+            "Chinese interface wording is taken from the MIT-licensed t3code-cn translation of T3 Code."
+          ]
+        }
+      ]
+    },
+    {
       "name": "opencode Office viewers",
       "bundles": ["web"],
       "license": "MIT",

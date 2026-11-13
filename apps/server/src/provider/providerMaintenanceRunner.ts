@@ -590,7 +590,7 @@ export const make = Effect.fn("ProviderMaintenanceRunner.make")(function* () {
             yield* setRunningMessage("Waiting for running provider work to finish.");
             const result = yield* installationGate.update(
               sharingInstances,
-              setRunningMessage(`Running ${describeCommand(command)}`).pipe(
+              setRunningMessage(`正在运行 ${describeCommand(command)}`).pipe(
                 Effect.andThen(runMaintenanceCommand(command, setRunningMessage)),
               ),
             );

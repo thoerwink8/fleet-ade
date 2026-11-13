@@ -103,7 +103,7 @@ function LinkPullRequestDialog({
     setPending(false);
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      setSubmitError(error instanceof Error ? error.message : "Could not link the pull request.");
+      setSubmitError(error instanceof Error ? error.message : "无法关联该 pull request。");
       return;
     }
     onOpenChange(false);
@@ -112,9 +112,9 @@ function LinkPullRequestDialog({
   const validation = !dirty
     ? null
     : reference.trim().length === 0
-      ? "Paste a pull request URL or enter 123 / #123."
+      ? "粘贴 pull request URL，或输入 123 / #123。"
       : resolved === null
-        ? "Use a pull request URL, 123, or #123."
+        ? "请使用 pull request URL、123 或 #123。"
         : "error" in resolved
           ? resolved.error
           : null;
@@ -123,16 +123,15 @@ function LinkPullRequestDialog({
     <Dialog open={open} onOpenChange={(next) => (pending ? undefined : onOpenChange(next))}>
       <DialogPopup className="max-w-xl" initialFocus={inputRef}>
         <DialogHeader>
-          <DialogTitle>Link pull request</DialogTitle>
+          <DialogTitle>关联 PR</DialogTitle>
           <DialogDescription>
-            Attach a pull request to this thread by its URL, or by its number for this thread's
-            repository.
+            通过 URL 或此会话仓库中的编号，将 pull request 关联到此会话。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <Input
             ref={inputRef}
-            placeholder="Pull request URL or #42"
+            placeholder="PR URL 或 #42"
             value={reference}
             onChange={(event) => {
               setDirty(true);
@@ -161,7 +160,7 @@ function LinkPullRequestDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            Cancel
+            取消
           </Button>
           <Button
             type="button"
@@ -169,7 +168,7 @@ function LinkPullRequestDialog({
             onClick={() => void submit()}
             disabled={pending || resolved === null || "error" in resolved}
           >
-            {pending ? "Linking..." : "Link"}
+            {pending ? "正在关联…" : "关联"}
           </Button>
         </DialogFooter>
       </DialogPopup>

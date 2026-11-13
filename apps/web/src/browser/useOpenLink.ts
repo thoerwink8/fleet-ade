@@ -50,7 +50,7 @@ export function useOpenLink(threadRef: ScopedThreadRef | null | undefined): (
       console.error(result.cause);
     }
     const api = readLocalApi();
-    if (!api) throw new Error("Link opening is unavailable.");
+    if (!api) throw new Error("无法打开链接。");
     await api.shell.openExternal(url);
   };
 }

@@ -69,7 +69,7 @@ export function useMediaActions(source: MediaActionSource) {
     (fileSession.error === null && fileSession.data !== null && allowsHostMedia(fileSession.data));
   const assertCanReadMedia = () => {
     if (!canReadHostMedia(hostEnvironmentId)) {
-      throw new Error("This connection cannot read host files.");
+      throw new Error("此连接无法读取主机文件。");
     }
   };
   const createAssetUrl = useAtomQueryRunner(assetEnvironment.createUrl, {
@@ -79,17 +79,17 @@ export function useMediaActions(source: MediaActionSource) {
   const actionUrl = async () => {
     assertCanReadMedia();
     if (!source.asset) {
-      if (!source.src) throw new Error("This media is unavailable. Try reopening the preview.");
+      if (!source.src) throw new Error("此媒体不可用，请尝试重新打开预览。");
       return source.src;
     }
     const { environmentId, resource } = source.asset;
     const connection = readPreparedConnection(environmentId);
-    if (!connection) throw new Error("Reconnect to this environment and try again.");
+    if (!connection) throw new Error("请重新连接此环境后重试。");
     const result = await createAssetUrl({ environmentId, input: { resource } });
     if (result._tag === "Failure") throw squashAtomCommandFailure(result);
     assertCanReadMedia();
     const url = resolveAssetUrl(connection.httpBaseUrl, result.value.relativeUrl);
-    if (!url) throw new Error("The environment returned an invalid media URL.");
+    if (!url) throw new Error("环境返回了无效的媒体 URL。");
     return url;
   };
   const save = async () => {
@@ -98,9 +98,7 @@ export function useMediaActions(source: MediaActionSource) {
   const copyImage = async () => {
     assertCanReadMedia();
     if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
-      throw new Error(
-        "Image copying is unavailable. Use a secure browser connection or save the image.",
-      );
+      throw new Error("无法复制图片。请使用安全的浏览器连接，或改为保存图片。");
     }
     // Start the clipboard write in the user gesture; fetching/decoding may finish later.
     await navigator.clipboard.write([
@@ -130,7 +128,7 @@ export function MediaActions({
     if (!api || menuOpen.current) return;
     menuOpen.current = true;
     setTooltipOpen(false);
-    let failureTitle = "Could not open media menu";
+    let failureTitle = "无法打开媒体菜单";
     let progressToast: ReturnType<typeof toastManager.add> | undefined;
     const result = await settlePromise(async () => {
       const noun = source.kind === "image" ? "image" : "video";
@@ -141,19 +139,18 @@ export function MediaActions({
         typeof ClipboardItem !== "undefined";
       const items: ContextMenuItem<MediaActionId>[] = [];
       if (reference?.kind === "file") {
-        items.push({ id: "copy-full-path", label: "Copy full path" });
-        if (reference.relativePath)
-          items.push({ id: "copy-relative-path", label: "Copy relative path" });
+        items.push({ id: "copy-full-path", label: "复制完整路径" });
+        if (reference.relativePath) items.push({ id: "copy-relative-path", label: "复制相对路径" });
       } else if (reference?.kind === "url") {
-        items.push({ id: "copy-url", label: "Copy URL" });
+        items.push({ id: "copy-url", label: "复制 URL" });
       }
       if (source.onOpenFile)
-        items.push({ id: "open-file", label: "Open in file viewer", disabled: !canReadMedia });
-      items.push({ id: "save", label: `Save ${noun}`, disabled: unavailable });
+        items.push({ id: "open-file", label: "在文件查看器中打开", disabled: !canReadMedia });
+      items.push({ id: "save", label: `保存${noun}`, disabled: unavailable });
       if (source.kind === "image") {
         items.push({
           id: "copy-image",
-          label: "Copy image",
+          label: "复制图片",
           disabled: unavailable || !canCopyImage,
         });
       }
@@ -172,10 +169,10 @@ export function MediaActions({
       if (text !== undefined) {
         const clipboardText =
           reference?.kind === "file" ? formatFilePathForClipboard(text, reference.path) : text;
-        await writeTextToClipboard(clipboardText, reference?.kind === "file" ? "file path" : "URL");
+        await writeTextToClipboard(clipboardText, reference?.kind === "file" ? "文件路径" : "URL");
         toastManager.add({
           type: "success",
-          title: action === "copy-url" ? "URL copied" : "Path copied",
+          title: action === "copy-url" ? "已复制 URL" : "路径已复制",
         });
       } else if (action === "open-file") {
         assertCanReadMedia();
@@ -183,12 +180,12 @@ export function MediaActions({
       } else if (action === "save" || action === "copy-image") {
         progressToast = toastManager.add({
           type: "loading",
-          title: action === "save" ? `Preparing ${noun} download…` : "Copying image…",
+          title: action === "save" ? `正在准备下载${noun}…` : "正在复制图片…",
         });
         await (action === "save" ? save() : copyImage());
         toastManager.update(progressToast, {
           type: "success",
-          title: action === "save" ? "Download started" : "Image copied",
+          title: action === "save" ? "已开始下载" : "已复制图片",
         });
       }
     });
@@ -197,7 +194,7 @@ export function MediaActions({
       const toast = stackedThreadToast({
         type: "error",
         title: failureTitle,
-        description: error instanceof Error ? error.message : "The media action failed.",
+        description: error instanceof Error ? error.message : "媒体操作失败。",
       });
       if (progressToast) toastManager.update(progressToast, toast);
       else toastManager.add(toast);

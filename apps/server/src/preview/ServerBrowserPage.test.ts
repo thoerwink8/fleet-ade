@@ -232,7 +232,11 @@ describe("server browser element refs", () => {
     expect(tree).toMatch(/textbox "Username" [^\n]*: maria$/m);
     const line = tree.split("\n").find((line) => line.includes('textbox "Password"'));
     expect(line).toMatch(/: •+$/);
-    await ServerBrowserPage.type(page, { locator: locators(line)[0]!, text: "next", clear: true });
+    await ServerBrowserPage.type(page, {
+      locator: locators(line)[0]!,
+      text: "下次运行",
+      clear: true,
+    });
     expect(await page.locator("#pw").inputValue()).toBe("next");
   });
 

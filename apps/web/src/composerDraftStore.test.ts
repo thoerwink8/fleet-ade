@@ -1356,7 +1356,7 @@ function modelReconciliationHarness(
         {
           target: new PrimaryConnectionTarget({
             environmentId,
-            label: "Environment",
+            label: "环境",
             httpBaseUrl: "https://example.test",
             wsBaseUrl: "wss://example.test",
           }),

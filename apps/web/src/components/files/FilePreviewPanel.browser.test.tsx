@@ -195,7 +195,7 @@ describe("source file focus", () => {
     using _style = { [Symbol.dispose]: () => style.remove() };
     await preloadHighlighter({ themes: Object.values(DEFAULT_THEMES), langs: ["typescript"] });
     const panel = () => (
-      <div {...workspaceAreaProps("panel", 1, "Workspace panel")}>
+      <div {...workspaceAreaProps("panel", 1, "工作区面板")}>
         <div data-right-panel-surface-content>{filePreview("server.ts")}</div>
       </div>
     );
@@ -240,7 +240,7 @@ describe("source file focus", () => {
       truncated: false,
     };
     await using screen = await render(
-      <div {...workspaceAreaProps("panel", 1, "Workspace panel")} style={{ width: 900 }}>
+      <div {...workspaceAreaProps("panel", 1, "工作区面板")} style={{ width: 900 }}>
         <div data-right-panel-surface-content>{filePreview("server.ts")}</div>
       </div>,
     );

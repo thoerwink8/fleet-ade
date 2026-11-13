@@ -13,12 +13,12 @@ const isServerNpmReleaseError = Schema.is(ServerNpmReleaseError);
 
 function unsupportedLookup(config: ServerConfig | null): ServerNpmReleaseError | null {
   if (config === null) {
-    return new ServerNpmReleaseError({ reason: "Connect to this server to check releases." });
+    return new ServerNpmReleaseError({ reason: "连接此服务器以检查版本。" });
   }
   return config.environment.capabilities.npmReleaseLookup === true
     ? null
     : new ServerNpmReleaseError({
-        reason: "This server does not support registry lookups. Update it before switching tracks.",
+        reason: "此服务器不支持查询仓库。请先更新，再切换通道。",
       });
 }
 
@@ -26,7 +26,7 @@ export function npmReleaseFailureMessage(cause: Cause.Cause<unknown>): string {
   const error = Option.getOrUndefined(Cause.findErrorOption(cause));
   return isServerNpmReleaseError(error)
     ? error.message
-    : "Could not check this environment's npm registry. Check the connection and registry settings.";
+    : "无法检查此环境的 npm 仓库。请检查连接和仓库设置。";
 }
 
 export const npmReleaseAtom = Atom.family((spec: string) =>
@@ -40,9 +40,7 @@ export const npmReleaseAtom = Atom.family((spec: string) =>
         (id) => unsupportedLookup(get(serverEnvironment.configValueAtom(id))) === null,
       ) ?? candidates[0];
     if (environmentId === undefined) {
-      return Effect.fail(
-        new ServerNpmReleaseError({ reason: "Connect to a server to check releases." }),
-      );
+      return Effect.fail(new ServerNpmReleaseError({ reason: "连接一个服务器以检查版本。" }));
     }
     const unsupported = unsupportedLookup(get(serverEnvironment.configValueAtom(environmentId)));
     if (unsupported !== null) return Effect.fail(unsupported);

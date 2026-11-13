@@ -539,7 +539,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("SessionStore.lay
         subject: "desktop-bootstrap",
         scopes: ["orchestration:read", "access:write"],
         client: {
-          label: "Desktop app",
+          label: "桌面应用",
           deviceType: "desktop",
           os: "macOS",
           browser: "Electron",

@@ -30,7 +30,7 @@ const commandId = Effect.succeed(CommandId.make("server:pr-created-link:test"));
 
 const project: OrchestrationProjectShell = {
   id: PROJECT_ID,
-  title: "Project",
+  title: "项目",
   workspaceRoot: "/workspace/project",
   defaultModelSelection: null,
   scripts: [],
@@ -53,7 +53,7 @@ const project: OrchestrationProjectShell = {
 const thread: PullRequestTestThread = {
   id: THREAD_ID,
   projectId: PROJECT_ID,
-  title: "Thread",
+  title: "会话",
   modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
   runtimeMode: "full-access",
   interactionMode: "default",

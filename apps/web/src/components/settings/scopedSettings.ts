@@ -336,10 +336,10 @@ export function planScopedSettingsPatch(
       : scope.kind === "unavailable"
         ? scope.message
         : unscopableKeys.length > 0
-          ? "This setting is environment-wide and cannot be overridden by a project."
+          ? "此设置是环境级设置，无法由项目覆盖。"
           : isProjectScope
-            ? "Connect the selected checkouts, or update their environments, to save a project override."
-            : `Connect ${scope.kind === "environment" ? scope.label : "an environment"} to save this setting.`;
+            ? "请连接所选工作副本，或更新它们所在的环境，以保存项目覆盖设置。"
+            : `请连接 ${scope.kind === "environment" ? scope.label : "某个环境"} 以保存此设置。`;
   return { clientPatch, hasClientWrite, serverWrites, unavailableReason };
 }
 
@@ -361,7 +361,7 @@ export function planScopedSettingsClear(
     unavailableReason:
       serverWrites.length > 0
         ? null
-        : "Connect the selected checkouts, or update their environments, to reset this override.",
+        : "请连接所选工作副本，或更新它们所在的环境，以重置此覆盖设置。",
   };
 }
 
@@ -416,8 +416,7 @@ export function planProjectOverridesClear(
     clientPatch: {} as ClientSettingsPatch,
     hasClientWrite: false,
     serverWrites,
-    unavailableReason:
-      serverWrites.length > 0 ? null : "Connect the environments to reset these overrides.",
+    unavailableReason: serverWrites.length > 0 ? null : "请连接这些环境以重置覆盖设置。",
   };
 }
 
@@ -484,7 +483,7 @@ export async function persistScopedSettingsPatch(
       return [
         {
           ...environment,
-          message: "This environment does not support this setting. Update T3 Code on it.",
+          message: "此环境不支持该设置，请更新该环境上的 T3 Code。",
         },
       ];
     }
@@ -497,10 +496,7 @@ export async function persistScopedSettingsPatch(
     return [
       {
         ...environment,
-        message:
-          error instanceof Error
-            ? error.message
-            : "The save failed. Try reconnecting and saving again.",
+        message: error instanceof Error ? error.message : "保存失败，请重新连接后再保存。",
       },
     ];
   });

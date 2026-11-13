@@ -165,7 +165,7 @@ export function DraftHeroHeadline({
   const pickerItems: readonly PickerItem[] = useOrderWhileOpen(
     [
       ...menuEntries.map(({ group }) => ({ value: group.projectKey, label: group.displayName })),
-      { value: ADD_PROJECT_VALUE, label: "Add project" },
+      { value: ADD_PROJECT_VALUE, label: "添加项目" },
     ],
     (item) => item.value,
     pickerOpen,
@@ -311,8 +311,8 @@ export function DraftHeroHeadline({
       </Tooltip>
       <ComboboxPopup align="center" className="w-72 overflow-hidden">
         <ComboboxSearchInput
-          aria-label="Search projects"
-          placeholder="Search projects..."
+          aria-label="搜索项目"
+          placeholder="搜索项目"
           value={pickerQuery}
           onChange={(event) => setPickerQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -326,7 +326,7 @@ export function DraftHeroHeadline({
             toggleProjectGroupPin(group);
           }}
         />
-        <ComboboxEmpty>No matching projects.</ComboboxEmpty>
+        <ComboboxEmpty>没有匹配的项目。</ComboboxEmpty>
         <ComboboxList>
           {(item: PickerItem) => {
             const entry = projectEntryByKey.get(item.value);
@@ -414,17 +414,17 @@ export function DraftHeroHeadline({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
       {hasResolvedProject && !isScratchDraft ? (
-        <DraftHeroProjectHeading projectName={activeProjectTitle ?? "Choose a project"}>
+        <DraftHeroProjectHeading projectName={activeProjectTitle ?? "选择项目"}>
           {projectSelector}
         </DraftHeroProjectHeading>
       ) : (
         <h1 className="w-full text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
           {isScratchDraft ? (
-            <>What should we work on?</>
+            <>我们来做些什么？</>
           ) : canChooseProject ? (
             <>{projectSelector} to start</>
           ) : (
-            <>Add a project to start</>
+            <>添加一个项目以开始</>
           )}
         </h1>
       )}

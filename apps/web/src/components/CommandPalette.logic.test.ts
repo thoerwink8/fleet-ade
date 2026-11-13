@@ -53,7 +53,7 @@ describe("linked pull request thread navigation", () => {
       threadSearchItems: items,
     });
     expect(groups.flatMap((group) => group.items)).toEqual(items);
-    expect(items[0]?.description).toBe("Archived thread");
+    expect(items[0]?.description).toBe("已归档的会话");
     await items[0]?.run();
     expect(runThread).toHaveBeenCalledWith({ environmentId, id });
   });
@@ -142,7 +142,7 @@ function makeThread(overrides: Partial<Thread> = {}): Thread {
     id: ThreadId.make("thread-1"),
     environmentId: LOCAL_ENVIRONMENT_ID,
     projectId: PROJECT_ID,
-    title: "Thread",
+    title: "会话",
     modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
     runtimeMode: "full-access",
     interactionMode: "default",
@@ -198,7 +198,7 @@ describe("buildThreadActionItems", () => {
           updatedAt: "2026-03-19T00:00:00.000Z",
         }),
       ],
-      projectByKey: new Map([[`${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`, { title: "Project" }]]),
+      projectByKey: new Map([[`${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`, { title: "项目" }]]),
       icon: null,
       runThread: async (_thread) => undefined,
     });
@@ -233,13 +233,13 @@ describe("buildThreadActionItems", () => {
       kind: "submenu" as const,
       value: "action:new-thread-in",
       searchTerms: ["new thread"],
-      title: "New thread in...",
+      title: "在以下位置新建会话…",
       icon: null,
       addonIcon: null,
-      groups: [{ value: "projects", label: "Projects", items: projects }],
+      groups: [{ value: "projects", label: "项目", items: projects }],
     };
-    const addProject = action("action:add-project", "Add project");
-    const rootGroups = [{ value: "actions", label: "Actions", items: [newThreadIn, addProject] }];
+    const addProject = action("action:add-project", "添加项目");
+    const rootGroups = [{ value: "actions", label: "操作", items: [newThreadIn, addProject] }];
     const search = (query: string, isInSubmenu: boolean) =>
       filterCommandPaletteGroups({
         activeGroups: isInSubmenu ? newThreadIn.groups : rootGroups,
@@ -266,7 +266,7 @@ describe("buildThreadActionItems", () => {
     ]);
     expect(search("new thread", false).map(([label]) => label)).not.toContain("Suggestions");
     expect(search("t3", true)).toEqual([["Projects", ["t3code"]]]);
-    expect(search("add project", true)).toEqual([["Actions", ["Add project"]]]);
+    expect(search("add project", true)).toEqual([["Actions", ["添加项目"]]]);
   });
 
   it("lists message matches last, once, without moving the title matches above them", () => {
@@ -296,7 +296,7 @@ describe("buildThreadActionItems", () => {
     expect(before).toEqual([["Threads", ["thread:environment-local:title"]]]);
     expect(after).toEqual([
       ["Threads", ["thread:environment-local:title"]],
-      ["In messages", ["thread:environment-local:message"]],
+      ["消息内容", ["thread:environment-local:message"]],
     ]);
   });
 
@@ -324,13 +324,13 @@ describe("buildThreadActionItems", () => {
     const firstGroup = (query: string) =>
       filterCommandPaletteGroups({
         activeGroups: [
-          { value: "actions", label: "Actions", items: [action("action:copy", "Copy thread ID")] },
+          { value: "actions", label: "操作", items: [action("action:copy", "Copy thread ID")] },
         ],
         query,
         isInSubmenu: false,
         projectSearchItems: [],
         settingsSearchItems: [
-          action("setting:compact", "Compact idle threads"),
+          action("setting:compact", "压缩空闲会话"),
           action("setting:providers", "Providers", ["Providers", "compatibility"]),
         ],
         threadSearchItems,
@@ -360,7 +360,7 @@ describe("buildThreadActionItems", () => {
     const labels = (query: string) =>
       filterCommandPaletteGroups({
         activeGroups: [
-          { value: "actions", label: "Actions", items: [action("action:upload", "Upload file")] },
+          { value: "actions", label: "操作", items: [action("action:upload", "Upload file")] },
         ],
         query,
         isInSubmenu: false,
@@ -375,17 +375,17 @@ describe("buildThreadActionItems", () => {
       activeGroups: [
         {
           value: "actions",
-          label: "Actions",
+          label: "操作",
           items: [
             {
               kind: "action",
               value: "action:open-prs",
-              searchTerms: ["Open pull requests", "pr", "prs", "review"],
-              title: "Open pull requests",
+              searchTerms: ["打开 PR", "pr", "prs", "review"],
+              title: "打开 PR",
               icon: null,
               run: async () => undefined,
             },
-            action("action:project", "Project settings"),
+            action("action:project", "项目设置"),
           ],
         },
       ],
@@ -404,7 +404,7 @@ describe("buildThreadActionItems", () => {
 
   it("runs the command for its whole name over a thread with that title, and lists the open thread last", () => {
     const threads = [
-      makeThread({ id: ThreadId.make("thread-new"), title: "New thread" }),
+      makeThread({ id: ThreadId.make("thread-new"), title: "新建会话" }),
       makeThread({ id: ThreadId.make("thread-open"), title: "New thread layout" }),
       makeThread({ id: ThreadId.make("thread-other"), title: "New thread button" }),
     ];
@@ -419,7 +419,7 @@ describe("buildThreadActionItems", () => {
       activeGroups: [
         {
           value: "actions",
-          label: "Actions",
+          label: "操作",
           items: [
             {
               kind: "action",
@@ -488,13 +488,13 @@ describe("buildThreadActionItems", () => {
       activeGroups: [
         {
           value: "actions",
-          label: "Actions",
+          label: "操作",
           items: [
             {
               kind: "action",
               value: "action:new-thread",
               searchTerms: ["new thread", "chat"],
-              title: "New thread",
+              title: "新建会话",
               icon: null,
               run: async () => undefined,
             },
@@ -552,7 +552,7 @@ describe("buildThreadActionItems", () => {
       activeGroups: [
         {
           value: "actions",
-          label: "Actions",
+          label: "操作",
           items: [
             {
               kind: "action",
@@ -588,7 +588,7 @@ describe("buildThreadActionItems", () => {
         {
           kind: "action",
           value: "setting:keybindings",
-          title: "Keybindings",
+          title: "快捷键",
           searchTerms: ["Keybindings", "General", "shortcuts"],
           icon: null,
           run: async () => undefined,
@@ -673,7 +673,7 @@ describe("buildThreadActionItems", () => {
         makeThread({ id: parentId, title: "Parent" }),
         makeThread({
           id: ThreadId.make("subagent"),
-          title: "Subagent",
+          title: "子智能体",
           lineage: {
             rootThreadId: parentId,
             parentThreadId: parentId,
@@ -682,7 +682,7 @@ describe("buildThreadActionItems", () => {
         }),
         makeThread({
           id: ThreadId.make("fork"),
-          title: "Fork",
+          title: "分叉",
           lineage: {
             rootThreadId: parentId,
             parentThreadId: parentId,

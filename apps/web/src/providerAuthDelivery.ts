@@ -53,15 +53,15 @@ async function completeProviderAuth(delivery: ProviderAuthDelivery): Promise<voi
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: "ChatGPT sign-in couldn't finish",
-        description: "Return to the provider and try again.",
+        title: "ChatGPT 登录未能完成",
+        description: "请回到提供方并重试。",
       });
     }
   } catch {
     toastManager.add({
       type: "error",
-      title: "ChatGPT sign-in couldn't finish",
-      description: "Reconnect to the environment and try again.",
+      title: "ChatGPT 登录未能完成",
+      description: "请重新连接环境后重试。",
     });
   }
 }

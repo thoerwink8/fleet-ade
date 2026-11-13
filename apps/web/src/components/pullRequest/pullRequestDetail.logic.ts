@@ -52,8 +52,8 @@ import { inferReviewCommentFenceLanguage, type ReviewCommentContext } from "~/re
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
   merge: "Merge",
-  squash: "Squash and merge",
-  rebase: "Rebase and merge",
+  squash: "压缩并合并",
+  rebase: "变基并合并",
   "fast-forward": "Fast-forward merge",
 };
 
@@ -253,13 +253,13 @@ export function pullRequestHandoffLabels(inThisThread: boolean) {
   return inThisThread
     ? {
         fixFinding: "Fix",
-        fixCheck: "Fix in this thread",
-        fixFindings: "Fix findings in this thread",
+        fixCheck: "在此会话中修复",
+        fixFindings: "在此会话中修复问题",
       }
     : {
-        fixFinding: "Fix in a thread",
+        fixFinding: "在会话中修复",
         fixCheck: "Fix",
-        fixFindings: "Fix findings in a thread",
+        fixFindings: "在会话中修复问题",
       };
 }
 
@@ -331,7 +331,7 @@ export function classifyPullRequestChecks(
 }
 
 export function describePullRequestChecks(checks: ReadonlyArray<PullRequestCheck>): string {
-  if (checks.length === 0) return "No checks reported";
+  if (checks.length === 0) return "未报告任何检查";
   const failed = checks.filter(
     (check) => check.status === "failure" || check.status === "cancelled",
   ).length;
@@ -339,13 +339,17 @@ export function describePullRequestChecks(checks: ReadonlyArray<PullRequestCheck
   const actionRequired = checks.filter((check) => check.status === "action-required").length;
   const passed = checks.filter((check) => check.status === "success").length;
   const parts: string[] = [];
-  if (pending > 0) parts.push(`${pending} of ${checks.length} running`);
+  if (pending > 0) parts.push(`${pending} 项检查中有 ${checks.length} 项正在运行`);
   if (actionRequired > 0) parts.push(`${actionRequired} of ${checks.length} awaiting action`);
   if (failed > 0) {
-    parts.push(parts.length > 0 ? `${failed} failed` : `${failed} of ${checks.length} failing`);
+    parts.push(
+      parts.length > 0 ? `${failed} 项失败` : `${failed} 项检查中有 ${checks.length} 项失败`,
+    );
   }
   if (parts.length === 0) {
-    return passed === checks.length ? "All checks passed" : `${passed} of ${checks.length} passing`;
+    return passed === checks.length
+      ? "所有检查均已通过"
+      : `${passed} 项检查中有 ${checks.length} 项已通过`;
   }
   return parts.join(" · ");
 }
@@ -814,7 +818,7 @@ export function buildPullRequestTimeline(
       id: commit.oid,
       at: commit.committedDate,
       kind: "commit" as const,
-      title: `Commit ${commit.oid.slice(0, 7)}`,
+      title: `提交 ${commit.oid.slice(0, 7)}`,
       body: commit.messageHeadline || null,
       markdown: false,
       url: null,
@@ -853,7 +857,7 @@ export function buildPullRequestTimeline(
             id: "merged",
             at: detail.mergedAt,
             kind: "merged" as const,
-            title: `${capitalizeTerm(term)} merged`,
+            title: `已合并 ${capitalizeTerm(term)}`,
             body: null,
             markdown: false,
             url: null,
@@ -873,7 +877,7 @@ export function buildPullRequestTimeline(
             id: "closed",
             at: detail.closedAt,
             kind: "closed" as const,
-            title: `${capitalizeTerm(term)} closed`,
+            title: `已关闭 ${capitalizeTerm(term)}`,
             body: null,
             markdown: false,
             url: null,
@@ -924,12 +928,12 @@ function reviewThreadContext(
   return {
     id: `pull-request-finding:${thread.id}`,
     sectionId: `pull-request:${pullRequestNumber}`,
-    sectionTitle: `PR #${pullRequestNumber} review`,
+    sectionTitle: `PR #${pullRequestNumber} 审查`,
     filePath: thread.path,
     startIndex: lineIndex,
     endIndex: lineIndex,
     rangeLabel:
-      thread.line === null ? "file" : `L${thread.line}${thread.side === "left" ? " (before)" : ""}`,
+      thread.line === null ? "文件" : `L${thread.line}${thread.side === "left" ? " (before)" : ""}`,
     // Strip bot bookkeeping comments before bounding finding text.
     text: bounded(
       thread.comments
@@ -1275,12 +1279,12 @@ export function buildPullRequestCommentContext(
   return {
     id: `pr-comment:${pullRequest.url}:comment:${comment.id}`,
     sectionId: `pull-request:${pullRequestNumber}`,
-    sectionTitle: `PR #${pullRequestNumber} conversation`,
+    sectionTitle: `PR #${pullRequestNumber} 对话`,
     // The chip wears `filePath rangeLabel`: the file a remark names, or who wrote one that names none.
     filePath: comment.path ?? `@${author}`,
     startIndex: 0,
     endIndex: 0,
-    rangeLabel: "comment",
+    rangeLabel: "条评论",
     text: bounded(`${author}: ${body}`),
     diff: "",
     ...(comment.path === null
@@ -1382,7 +1386,7 @@ export function buildAskAboutGuideStopHandoff(input: {
       {
         id: `pull-request-guide-stop:${input.url}:${stop.index}`,
         sectionId: `pull-request:${input.number}`,
-        sectionTitle: `PR #${input.number} review guide`,
+        sectionTitle: `PR #${input.number} 审查导览`,
         filePath: `Guide stop ${stop.index + 1}`,
         startIndex: 0,
         endIndex: 0,
@@ -1443,10 +1447,7 @@ export function checkoutFailureDescription(failure: unknown): string {
       ? failure.detail
       : `${failure.detail} (${failure.reason})`
     : failure;
-  return readableFailure(
-    description,
-    "Check that the branch still exists and is not checked out elsewhere, then try again.",
-  );
+  return readableFailure(description, "请确认该分支仍然存在且未在其他位置检出，然后重试。");
 }
 
 export function resolveBaseFreshness(detail: {

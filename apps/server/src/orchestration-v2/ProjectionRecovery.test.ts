@@ -313,10 +313,10 @@ it.effect.each(["attached", "detached", "replaced"] as const)(
         cwd: "/workspace",
         model: modelSelection.model,
         capabilities: CodexProviderCapabilitiesV2,
-        extensionStatuses: [{ key: "watch", text: "Watching" }],
+        extensionStatuses: [{ key: "watch", text: "仅查看" }],
         createdAt: now,
         updatedAt: now,
-        lastError: "Rate limited",
+        lastError: "已限流",
       };
       yield* projections.apply({
         id: EventId.make("event:recovery:failed-status:attached"),
@@ -384,7 +384,7 @@ it.effect.each(["attached", "detached", "replaced"] as const)(
               {
                 id: state === "attached" ? providerSessionId : replacementSessionId,
                 status: state === "attached" ? "error" : "stopped",
-                lastError: state === "attached" ? "Rate limited" : null,
+                lastError: state === "attached" ? "已限流" : null,
                 extensionStatuses: [],
               },
             ],

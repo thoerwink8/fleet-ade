@@ -509,9 +509,7 @@ function decodeThemeColors(colors: ThemeColors): ThemeColors {
     THEME_COLOR_ROLES.map((role) => {
       const color = toCanonicalThemeColor(colors[role]);
       if (!color) {
-        throw new Error(
-          `The color for "${role}" must be a literal CSS color such as oklch(0.62 0.2 280).`,
-        );
+        throw new Error(`“${role}”的颜色必须是字面量 CSS 颜色，例如 oklch(0.62 0.2 280)。`);
       }
       return [role, color];
     }),
@@ -1320,14 +1318,14 @@ function storedThemeHasCollectionId(storedTheme: unknown, collectionId: string):
 
 export function installCustomTheme(theme: ThemeDefinition): ThemeDefinition {
   if (RESERVED_THEME_IDS.has(theme.id)) {
-    throw new Error(`The theme id "${theme.id}" is reserved.`);
+    throw new Error(`主题 ID “${theme.id}”为保留名称。`);
   }
   const library = getWritableCustomThemeLibrary();
   if (
     BUILT_IN_THEME_DEFINITIONS.some((existing) => existing.id === theme.id) ||
     library.storedThemes.some((storedTheme) => storedThemeHasId(storedTheme, theme.id))
   ) {
-    throw new Error(`A theme named "${theme.label}" is already installed.`);
+    throw new Error(`已安装名为“${theme.label}”的主题。`);
   }
   const canonicalTheme = canonicalizeThemeDefinition(theme);
   const themes = [...library.themes, canonicalTheme];
@@ -1337,14 +1335,14 @@ export function installCustomTheme(theme: ThemeDefinition): ThemeDefinition {
 
 export function updateCustomTheme(theme: ThemeDefinition): ThemeDefinition {
   if (RESERVED_THEME_IDS.has(theme.id)) {
-    throw new Error(`The theme id "${theme.id}" is reserved.`);
+    throw new Error(`主题 ID “${theme.id}”为保留名称。`);
   }
 
   const library = getWritableCustomThemeLibrary();
   const themes = library.themes;
   const themeIndex = themes.findIndex((existing) => existing.id === theme.id);
   if (themeIndex === -1) {
-    throw new Error(`The theme "${theme.label}" is not installed.`);
+    throw new Error(`未安装主题“${theme.label}”。`);
   }
 
   const canonicalTheme = canonicalizeThemeDefinition(theme);
@@ -1370,14 +1368,14 @@ export function replaceCustomThemeCollection(
   themes: ReadonlyArray<ThemeDefinition>,
   options?: { expectedCollection?: ReadonlyArray<ThemeDefinition> },
 ): ReadonlyArray<ThemeDefinition> {
-  if (themes.length === 0) throw new Error("A theme collection cannot be empty.");
+  if (themes.length === 0) throw new Error("主题集合不能为空。");
 
   const validated = themes.map((theme) => parseStoredTheme(theme));
   if (
     validated.some((theme) => theme === null || theme.collection?.id !== collectionId) ||
     new Set(validated.map((theme) => theme?.id)).size !== validated.length
   ) {
-    throw new Error("That theme collection is invalid.");
+    throw new Error("该主题集合无效。");
   }
   const replacement = validated as ThemeDefinition[];
   const library = readWritableCustomThemeLibrary();
@@ -1387,7 +1385,7 @@ export function replaceCustomThemeCollection(
     options?.expectedCollection &&
     JSON.stringify(currentCollection) !== JSON.stringify(options.expectedCollection)
   ) {
-    throw new Error("Your installed themes changed while this package was downloading. Try again.");
+    throw new Error("下载该主题包期间已安装的主题发生了变化，请重试。");
   }
   const occupiedIds = new Set(BUILT_IN_THEME_DEFINITIONS.map((theme) => theme.id));
   for (const storedTheme of library.storedThemes) {
@@ -1403,7 +1401,7 @@ export function replaceCustomThemeCollection(
     (theme) => RESERVED_THEME_IDS.has(theme.id) || occupiedIds.has(theme.id),
   );
   if (conflictingTheme) {
-    throw new Error(`A theme named "${conflictingTheme.label}" is already installed.`);
+    throw new Error(`已安装名为“${conflictingTheme.label}”的主题。`);
   }
 
   const nextStoredThemes: unknown[] = [];
@@ -1444,68 +1442,66 @@ export function removeCustomThemes(themeIds: ReadonlyArray<string>): void {
 }
 
 function parseThemeColorOverrides(value: unknown): ThemeColorOverrides {
-  if (!isRecord(value)) throw new Error("Theme colors must be objects.");
+  if (!isRecord(value)) throw new Error("主题颜色必须是对象。");
 
   const overrides: Partial<Record<ThemeColorRole, string>> = {};
   for (const [role, color] of Object.entries(value)) {
     if (!THEME_COLOR_ROLE_SET.has(role)) {
-      throw new Error(`"${role}" is not a supported theme color role.`);
+      throw new Error(`“${role}”不是受支持的主题颜色角色。`);
     }
     const normalized = toCanonicalThemeColor(color);
     if (!normalized) {
-      throw new Error(
-        `The color for "${role}" must be a literal CSS color such as oklch(0.62 0.2 280).`,
-      );
+      throw new Error(`“${role}”的颜色必须是字面量 CSS 颜色，例如 oklch(0.62 0.2 280)。`);
     }
     overrides[role as ThemeColorRole] = normalized;
   }
   if (Object.keys(overrides).length === 0) {
-    throw new Error("Add at least one color role to the theme file.");
+    throw new Error("主题文件至少要添加一个颜色角色。");
   }
   return overrides;
 }
 
 export function parseThemeFile(value: unknown): ThemeDefinition {
   if (!isRecord(value)) {
-    throw new Error("Theme files must contain a JSON object.");
+    throw new Error("主题文件必须包含 JSON 对象。");
   }
   if (value.version !== THEME_FILE_VERSION) {
-    throw new Error(`This theme file uses an unsupported version. Expected ${THEME_FILE_VERSION}.`);
+    throw new Error(`此主题文件使用了不受支持的版本，需要 ${THEME_FILE_VERSION}。`);
   }
 
   const name = value.name;
   const appearance = value.appearance;
   const rawColors = value.colors;
-  if (!isThemeLabel(name)) throw new Error("Theme files need a name (48 characters or fewer).");
+  if (!isThemeLabel(name)) throw new Error("主题文件需要名称（最多 48 个字符）。");
   if (!isThemeAppearance(appearance)) {
-    throw new Error('Theme files need an appearance of "light" or "dark".');
+    throw new Error("主题文件需要指定外观：“light”或“dark”。");
   }
-  if (!isRecord(rawColors)) throw new Error("Theme files need a colors object.");
+  if (!isRecord(rawColors)) throw new Error("主题文件需要 colors 对象。");
 
   const id = value.id === undefined ? themeIdFromName(name) : value.id;
   if (!isThemeId(id)) {
-    throw new Error("Theme ids may only contain lowercase letters, numbers, and hyphens.");
+    throw new Error("主题 ID 只能包含小写字母、数字和连字符。");
   }
   if (RESERVED_THEME_IDS.has(id)) {
-    throw new Error(`The theme id "${id}" is reserved.`);
+    throw new Error(`主题 ID “${id}”为保留名称。`);
   }
 
   const overrides = parseThemeColorOverrides(rawColors);
   const collection = parseThemeCollection(value.collection);
   if (value.collection !== undefined && !collection) {
-    throw new Error("Theme collections need a valid id and label.");
+    throw new Error("主题集合需要有效的 ID 和名称。");
   }
 
   const fallback = getDefaultThemeColors(appearance);
   const variants: Partial<Record<ThemeAppearance, ThemeColors>> = {};
   if (value.variants !== undefined) {
-    if (!isRecord(value.variants)) throw new Error("Theme variants must be an object.");
+    if (!isRecord(value.variants)) throw new Error("主题变体必须是对象。");
     for (const [variantAppearance, variantColors] of Object.entries(value.variants)) {
       if (!isThemeAppearance(variantAppearance)) {
-        throw new Error('Theme variants may only be named "light" or "dark".');
+        throw new Error("主题变体只能命名为“light”或“dark”。");
       }
       if (variantAppearance === appearance) {
-        throw new Error(`Theme variants must not repeat the base appearance "${appearance}".`);
+        throw new Error(`主题变体不能重复基础外观“${appearance}”。`);
       }
       const variantFallback = getDefaultThemeColors(variantAppearance);
       variants[variantAppearance] = {

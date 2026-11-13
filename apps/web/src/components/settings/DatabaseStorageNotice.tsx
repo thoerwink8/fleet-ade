@@ -68,9 +68,9 @@ export function DatabaseStorageNotice({
     }));
   if (visible.length === 0) return null;
   return (
-    <SettingsSection id="storage-database" title="Database">
+    <SettingsSection id="storage-database" title="数据库">
       <SettingsRow
-        title="Reclaim freed database space"
+        title="回收数据库空闲空间"
         description={`These databases still hold space freed by history cleanup.${
           visible.every((recommendation) => recommendation.reclaimable)
             ? ""
@@ -84,7 +84,7 @@ export function DatabaseStorageNotice({
             size="xs"
             onClick={() => setDismissed((current) => [...current, environmentId])}
           >
-            Dismiss
+            忽略
           </Button>
         );
         return reclaimable ? (
@@ -98,7 +98,7 @@ export function DatabaseStorageNotice({
         ) : (
           <SettingsRow
             key={environmentId}
-            title={`${formatGiB(status.reclaimableBytes)} on ${label}`}
+            title={`${formatGiB(status.reclaimableBytes)} 上的 ${label}`}
             description={<code className="select-text break-all">{status.compactCommand}</code>}
             control={
               <div className="flex flex-wrap items-center gap-1.5">
@@ -107,7 +107,7 @@ export function DatabaseStorageNotice({
                   size="xs"
                   onClick={() => copyToClipboard(status.compactCommand, undefined)}
                 >
-                  Copy command
+                  复制命令
                 </Button>
                 {dismiss}
               </div>
@@ -144,8 +144,8 @@ function ReclaimRow({
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: `Reclaiming ${amount} on ${label}`,
-        description: `T3 Code there restarts and is back in about ${minutes} min.`,
+        title: `正在回收 ${amount} 上的 ${label}`,
+        description: `该设备上的 T3 Code 会重启，约 ${minutes} 分钟后恢复。`,
       });
       return;
     }
@@ -154,17 +154,17 @@ function ReclaimRow({
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: `Could not reclaim space on ${label}`,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      title: `无法回收 ${label} 上的空间`,
+      description: error instanceof Error ? error.message : "发生错误。",
     });
   };
   return (
     <SettingsRow
-      title={`${amount} on ${label}`}
+      title={`${amount} 上的 ${label}`}
       description={
         status.reclaimFailure === undefined
-          ? `Restarts T3 Code there. It will be offline for about ${minutes} min.`
-          : `The last attempt failed: ${status.reclaimFailure}`
+          ? `会重启该设备上的 T3 Code，大约离线 ${minutes} 分钟。`
+          : `上次尝试失败：${status.reclaimFailure}`
       }
       control={
         <div className="flex flex-wrap items-center gap-1.5">
@@ -174,14 +174,14 @@ function ReclaimRow({
             disabled={restarting}
             onClick={() => setConfirming(true)}
           >
-            {restarting ? "Restarting…" : "Reclaim"}
+            {restarting ? "正在重启…" : "回收"}
           </Button>
           {dismiss}
           <AlertDialog open={confirming} onOpenChange={setConfirming}>
             <AlertDialogPopup>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  Reclaim {amount} on {label}?
+                  回收 {amount} 星期 {label}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   T3 Code on {label} stops, rebuilds its database, and starts again. It will be
@@ -189,8 +189,8 @@ function ReclaimRow({
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
-                <Button onClick={() => void start()}>Restart and reclaim</Button>
+                <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+                <Button onClick={() => void start()}>重启并回收</Button>
               </AlertDialogFooter>
             </AlertDialogPopup>
           </AlertDialog>

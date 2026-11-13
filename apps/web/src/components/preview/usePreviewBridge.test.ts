@@ -79,7 +79,7 @@ describe("projectDesktopState", () => {
           url: "https://example.com/",
           title: "",
           code: -105,
-          description: "failed",
+          description: "失败",
         }),
       ).favicon,
     ).toBeNull();

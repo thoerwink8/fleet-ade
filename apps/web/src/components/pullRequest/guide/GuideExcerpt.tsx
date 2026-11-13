@@ -148,7 +148,7 @@ export function GuideExcerpt({
             {excerpt.end} are not in the loaded diff.
           </span>
           <Button size="xs" variant="outline" onClick={() => onOpenFile(excerpt.path)}>
-            Open in Code
+            在“代码”标签页中打开
           </Button>
         </div>
       )}
@@ -239,7 +239,7 @@ function ExcerptDiff({
     const comment = buildDiffReviewComment({
       id: `pull-request-guide:${excerpt.path}:${draft.range.start}:${draft.range.end}`,
       sectionId: `pull-request-guide:${excerpt.path}`,
-      sectionTitle: "Review guide",
+      sectionTitle: "审查导览",
       filePath: excerpt.path,
       fileDiff: file,
       range: draft.range,
@@ -298,14 +298,12 @@ function ExcerptDiff({
                 rangeLabel={`${excerpt.path}:${getReviewPositionAnchor(draft.position).line}`}
                 text=""
                 completionScope={commenting.canComment ? commenting.completionScope : null}
-                placeholder={
-                  commenting.canComment ? "Add a comment…" : "Ask the agent about these lines…"
-                }
-                submitLabel={commenting.canComment ? "Add to review" : "Ask agent"}
+                placeholder={commenting.canComment ? "添加评论…" : "就这些代码行询问智能体…"}
+                submitLabel={commenting.canComment ? "添加到审查" : "询问智能体"}
                 {...(commenting.canComment && onAskAgent !== null
                   ? {
                       secondaryAction: {
-                        label: "Ask agent",
+                        label: "询问智能体",
                         onAction: (text: string) => askAgent(text),
                       },
                     }
@@ -332,13 +330,13 @@ function ExcerptDiff({
         renderHeaderMetadata={() => (
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="tabular-nums">
-              {excerpt.side === "old" ? "removed code, " : ""}showing {slice.shown} of {slice.total}{" "}
+              {excerpt.side === "old" ? "被删除的代码，" : ""}showing {slice.shown} of {slice.total}{" "}
               diff lines
             </span>
             <Button
               size="icon-xs"
               variant="ghost-muted"
-              aria-label={`Open ${excerpt.path} in Code`}
+              aria-label={`在“代码”标签页中打开 ${excerpt.path}`}
               onClick={() => onOpenFile(excerpt.path)}
             >
               <ArrowUpRightIcon aria-hidden />

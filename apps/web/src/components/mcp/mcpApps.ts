@@ -53,7 +53,7 @@ export const MCP_APPS: readonly McpApp[] = [
       kind: "open",
       link: (url) => `https://poke.com/integrations/new?name=T3%20Code&url=${encoded(url)}`,
     },
-    steps: ["Open poke.com/integrations/new.", "Paste the URL and add the integration."],
+    steps: ["打开 poke.com/integrations/new。", "粘贴 URL 并添加集成。"],
     docs: "https://poke.com/docs/mcp-servers",
   },
   {
@@ -66,9 +66,9 @@ export const MCP_APPS: readonly McpApp[] = [
         `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=T3%20Code&connectorUrl=${encoded(url)}`,
     },
     steps: [
-      "In Claude, open Customize, then Connectors.",
-      "Choose Add custom connector and paste the URL.",
-      "The Free plan allows one custom connector.",
+      "在 Claude 中打开 Customize，然后打开 Connectors。",
+      "选择 Add custom connector 并粘贴 URL。",
+      "免费套餐只能添加一个自定义连接器。",
     ],
     docs: "https://claude.com/docs/connectors/building/directory-vs-custom",
   },
@@ -78,9 +78,9 @@ export const MCP_APPS: readonly McpApp[] = [
     logo: chatgptLogo,
     handoff: { kind: "copy-url", link: "https://chatgpt.com/plugins" },
     steps: [
-      "Open chatgpt.com/plugins on the web, then + and Add custom MCP server.",
-      "Paste the URL. Choose OAuth.",
-      "Create it as a plugin, then install it.",
+      "在网页上打开 chatgpt.com/plugins，然后点 + 并选择 Add custom MCP server。",
+      "粘贴 URL，选择 OAuth。",
+      "将其创建为插件，然后安装。",
     ],
     docs: "https://developers.openai.com/api/docs/guides/custom-mcp-server",
   },
@@ -95,8 +95,8 @@ export const MCP_APPS: readonly McpApp[] = [
       appLink: (message) => `grokbot://app/v1/prompt?text=${encoded(message)}`,
       message: (url) => `Add the MCP server ${url} and connect it.`,
     },
-    steps: ["Send this message to any of your Grok Bots."],
-    note: "Shared with all your Grok Bots.",
+    steps: ["将这条消息发送给你的任意一个 Grok Bot。"],
+    note: "你的所有 Grok Bot 共享此连接。",
     docs: "https://docs.x.ai/grok-bot/computer-and-apps",
   },
   {
@@ -105,8 +105,8 @@ export const MCP_APPS: readonly McpApp[] = [
     logo: geminiLogo,
     handoff: { kind: "copy-url", link: "https://gemini.google.com/apps" },
     steps: [
-      "In Gemini, open Settings, then Connected apps.",
-      "Choose Custom apps, then Add, and paste the URL.",
+      "在 Gemini 中打开 Settings，然后打开 Connected apps。",
+      "选择 Custom apps，再点 Add，然后粘贴 URL。",
     ],
     docs: "https://support.google.com/gemini/answer/17209137",
     // Gemini's sign-in and its tool schema checks do not work with T3 Code yet.
@@ -121,7 +121,7 @@ export const MCP_APPS: readonly McpApp[] = [
       link: "https://muse.ai",
       message: (url) => `Create a custom connector for the MCP server ${url}.`,
     },
-    steps: ["Send this message to Muse."],
+    steps: ["将这条消息发送给 Muse。"],
     docs: "https://www.meta.com/help/artificial-intelligence/1687253048996149/",
   },
   {
@@ -133,7 +133,7 @@ export const MCP_APPS: readonly McpApp[] = [
       link: "https://app.instinct.com",
       message: (url) => `Connect the MCP server ${url}.`,
     },
-    steps: ["In Instinct, open Settings, then MCP connections, if your account has it."],
+    steps: ["在 Instinct 中打开 Settings，然后打开 MCP connections（如果你的账号有此选项）。"],
   },
   {
     id: "openclaw",
@@ -150,9 +150,9 @@ export const MCP_APPS: readonly McpApp[] = [
       ],
     },
     steps: [
-      "Open the Control UI, then + and Plugins, and choose Add MCP server.",
-      "Paste the URL, and choose Streamable HTTP and OAuth.",
-      "Select Sign in for it under Settings → MCP.",
+      "打开 Control UI，点 + 和 Plugins，然后选择 Add MCP server。",
+      "粘贴 URL，然后选择 Streamable HTTP 和 OAuth。",
+      "在 Settings → MCP 下为它选择 Sign in。",
     ],
     docs: "https://docs.openclaw.ai/tools/mcp",
   },
@@ -169,16 +169,16 @@ export const MCP_APPS: readonly McpApp[] = [
       ],
     },
     steps: [
-      "Add t3code under mcp_servers in ~/.hermes/config.yaml, with the URL and auth: oauth.",
-      "Run hermes mcp login t3code.",
+      "在 ~/.hermes/config.yaml 的 mcp_servers 下添加 t3code，填写 URL 和 auth: oauth。",
+      "运行 hermes mcp login t3code。",
     ],
-    note: "On a remote host, paste the final URL back when asked.",
+    note: "在远程主机上，按提示把最终的 URL 粘贴回去。",
     docs: "https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp",
   },
 ];
 
 /** The "Something else…" choice: the URL and general steps only. */
-export const OTHER_MCP_APP_STEPS = ["Add a remote MCP server with OAuth."] as const;
+export const OTHER_MCP_APP_STEPS = ["添加一个使用 OAuth 的远程 MCP 服务器。"] as const;
 
 /**
  * The primary button for `app`: its label, the https page it opens, and what it copies first.
@@ -189,25 +189,25 @@ export function mcpHandoffAction(app: McpApp, mcpUrl: string) {
   switch (handoff.kind) {
     case "open":
       return {
-        label: `Open in ${app.name}`,
+        label: `在 ${app.name} 中打开`,
         link: handoff.link(mcpUrl),
         appLink: null,
         copy: null,
       };
     case "copy-url":
       return {
-        label: `Copy URL and open ${app.name}`,
+        label: `复制 URL 并打开 ${app.name}`,
         link: handoff.link,
         appLink: null,
-        copy: { text: mcpUrl, title: "URL copied" },
+        copy: { text: mcpUrl, title: "已复制 URL" },
       };
     case "copy-message": {
       const message = handoff.message(mcpUrl);
       return {
-        label: `Copy message and open ${app.name}`,
+        label: `复制消息并打开 ${app.name}`,
         link: handoff.link,
         appLink: handoff.appLink?.(message) ?? null,
-        copy: { text: message, title: "Message copied" },
+        copy: { text: message, title: "已复制消息" },
       };
     }
     case "commands":

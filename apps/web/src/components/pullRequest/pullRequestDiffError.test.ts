@@ -29,8 +29,8 @@ describe("describePullRequestDiffError", () => {
       "pull request",
     );
 
-    expect(result.title).toBe("Couldn't load the changes");
-    expect(result.description).toContain("Try again");
+    expect(result.title).toBe("无法加载更改");
+    expect(result.description).toContain("重试");
     expect(result.description).not.toContain("localhost");
     expect(result.description).not.toContain("limit");
   });

@@ -81,17 +81,17 @@ function SearchOptionButton(props: {
 function EmptyContentSearchDialog() {
   return (
     <CommandPaletteContent
-      aria-label="Search project contents"
+      aria-label="搜索项目内容"
       escapeLabel="Back"
-      footerActionLabel="Open file"
-      inputProps={{ disabled: true, placeholder: "Search project contents…" }}
+      footerActionLabel="打开文件"
+      inputProps={{ disabled: true, placeholder: "搜索项目内容…" }}
       mode="none"
       panelSize="fill"
       testId="project-content-search"
       value=""
     >
       <p className="m-auto px-6 text-center text-muted-foreground text-sm">
-        Open a project to search its files.
+        打开一个项目以搜索其中的文件。
       </p>
     </CommandPaletteContent>
   );
@@ -163,15 +163,15 @@ function OpenContentSearchDialog(props: {
 
   return (
     <CommandPaletteContent
-      aria-label={`Search file contents in ${target.projectName}`}
+      aria-label={`在 ${target.projectName} 中搜索文件内容`}
       escapeLabel="Back"
-      footerActionLabel="Open file"
+      footerActionLabel="打开文件"
       inputAccessory={
         <div className="absolute inset-e-2.5 top-1/2 flex shrink-0 -translate-y-1/2 items-center gap-0.5 rounded-lg border bg-muted/30 p-0.5">
           <SearchOptionButton
             active={caseSensitive}
             disabled={!search.canReadFiles}
-            label="Match case"
+            label="区分大小写"
             onClick={() => setCaseSensitive((current) => !current)}
           >
             Aa
@@ -179,7 +179,7 @@ function OpenContentSearchDialog(props: {
           <SearchOptionButton
             active={wholeWord}
             disabled={!search.canReadFiles}
-            label="Match whole word"
+            label="全词匹配"
             onClick={() => setWholeWord((current) => !current)}
           >
             <span className="underline decoration-2 underline-offset-2">ab</span>
@@ -187,7 +187,7 @@ function OpenContentSearchDialog(props: {
           <SearchOptionButton
             active={useRegex}
             disabled={!search.canReadFiles}
-            label="Use regular expression"
+            label="使用正则表达式"
             onClick={() => setUseRegex((current) => !current)}
           >
             .*
@@ -197,7 +197,7 @@ function OpenContentSearchDialog(props: {
       inputProps={{
         className: "pe-30",
         disabled: !search.canReadFiles,
-        placeholder: `Search in ${target.projectName}`,
+        placeholder: `在 ${target.projectName} 中搜索`,
         onKeyDown: (event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (event.key === "ArrowDown" && matches.length > 0) {
@@ -229,14 +229,14 @@ function OpenContentSearchDialog(props: {
         <div className="flex h-9 shrink-0 items-center border-b px-3 text-xs text-muted-foreground">
           {search.isPending ? (
             <span className="flex items-center gap-2">
-              <Spinner size="sm" /> Searching…
+              <Spinner size="sm" /> 正在搜索…
             </span>
           ) : search.error ? (
             <span className="text-destructive">{search.error}</span>
           ) : search.invalidRegex ? (
-            <span className="text-destructive">Invalid regular expression</span>
+            <span className="text-destructive">正则表达式无效</span>
           ) : (
-            `${matches.length.toLocaleString()}${search.truncated ? "+" : ""} results in ${fileCount.toLocaleString()} files`
+            `${matches.length.toLocaleString("zh-CN")}${search.truncated ? "+" : ""} results in ${fileCount.toLocaleString("zh-CN")} files`
           )}
         </div>
       ) : null}
@@ -244,12 +244,12 @@ function OpenContentSearchDialog(props: {
       {matches.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
           {search.isCheckingAccess
-            ? "Checking file access…"
+            ? "正在检查文件访问权限…"
             : !search.canReadFiles
               ? search.error
               : search.hasQuery && !search.isPending && !search.error
-                ? "No results found."
-                : "Type to search across your project."}
+                ? "未找到结果。"
+                : "输入内容以在项目中搜索。"}
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1" scrollFade>

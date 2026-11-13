@@ -77,8 +77,8 @@ export function VoiceInputSetup(props: {
   );
   const selectedMicrophoneLabel = selectedMicrophone
     ? (microphones.find((device) => device.deviceId === selectedMicrophone)?.label ??
-      "Selected microphone (Unavailable)")
-    : "System default";
+      "所选麦克风（不可用）")
+    : "系统默认";
   const status = props.status?.supported ? props.status : null;
   const model = props.model;
   const progress =
@@ -88,13 +88,13 @@ export function VoiceInputSetup(props: {
     void navigate({ to: "/settings/voice", hash });
   };
 
-  const destination = environment?.label ?? "your transcription environment";
+  const destination = environment?.label ?? "你的转写环境";
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <WizardPopup>
         <WizardHeader
-          title={props.step === 0 ? "Set up voice input" : "Voice input is ready"}
+          title={props.step === 0 ? "设置语音输入" : "Voice input is ready"}
           description={
             props.step === 0
               ? `Download a speech model once. Your audio is transcribed on ${destination}.`
@@ -122,7 +122,7 @@ export function VoiceInputSetup(props: {
                     <div role="status" className="space-y-1.5">
                       <div
                         role="progressbar"
-                        aria-label="Speech model download progress"
+                        aria-label="语音模型下载进度"
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={progress ?? undefined}
@@ -137,15 +137,15 @@ export function VoiceInputSetup(props: {
                         {model.state === "verifying"
                           ? "Verifying…"
                           : progress === null
-                            ? "Starting download…"
-                            : `${progress}% downloaded`}
+                            ? "正在开始下载…"
+                            : `已下载 ${progress}%`}
                       </p>
                     </div>
                   ) : null}
                 </div>
               ) : !props.error ? (
                 <p role="status" className="text-muted-foreground">
-                  Loading transcription models…
+                  正在加载转写模型…
                 </p>
               ) : null}
               {props.error ? (
@@ -158,7 +158,7 @@ export function VoiceInputSetup(props: {
           ) : (
             <section className="space-y-2 text-sm">
               <label className="sr-only" htmlFor="voice-setup-microphone">
-                Microphone
+                麦克风
               </label>
               <div className="flex items-center gap-2">
                 <Select
@@ -182,17 +182,17 @@ export function VoiceInputSetup(props: {
                   <SelectTrigger
                     id="voice-setup-microphone"
                     size="sm"
-                    aria-label="Microphone"
+                    aria-label="麦克风"
                     className="min-w-0 flex-1"
                   >
                     <MicIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
                     <SelectValue>{selectedMicrophoneLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectPopup align="end" alignItemWithTrigger={false}>
-                    <SelectItem value="system-default">System default</SelectItem>
+                    <SelectItem value="system-default">系统默认</SelectItem>
                     {selectedIsUnavailable ? (
                       <SelectItem value={`device:${selectedMicrophone}`}>
-                        Selected microphone (Unavailable)
+                        所选麦克风（不可用）
                       </SelectItem>
                     ) : null}
                     {microphones.map((device) => (
@@ -207,7 +207,7 @@ export function VoiceInputSetup(props: {
                   variant="ghost"
                   size="icon-sm"
                   disabled={loadingMicrophones}
-                  aria-label="Refresh microphones"
+                  aria-label="刷新麦克风"
                   onClick={() => void refreshMicrophones()}
                 >
                   <RefreshCwIcon className="size-3.5" />
@@ -235,11 +235,11 @@ export function VoiceInputSetup(props: {
             }
           >
             {props.onRetryCatalog ? (
-              <Button onClick={props.onRetryCatalog}>Retry loading models</Button>
+              <Button onClick={props.onRetryCatalog}>重新加载模型</Button>
             ) : null}
             {props.downloading ? (
               <Button variant="outline" disabled={!canManage} onClick={props.onCancelDownload}>
-                Cancel download
+                取消下载
               </Button>
             ) : null}
             {model ? (
@@ -248,11 +248,11 @@ export function VoiceInputSetup(props: {
                 onClick={props.onDownload}
               >
                 {props.downloading
-                  ? "Downloading…"
+                  ? "正在下载…"
                   : props.error
-                    ? "Try again"
+                    ? "重试"
                     : canManage
-                      ? "Download model"
+                      ? "下载模型"
                       : "Needs an admin to download"}
               </Button>
             ) : null}
@@ -267,7 +267,7 @@ export function VoiceInputSetup(props: {
           >
             <Button onClick={props.onStartRecording}>
               <MicIcon />
-              Start dictating
+              开始听写
             </Button>
           </WizardFooter>
         )}

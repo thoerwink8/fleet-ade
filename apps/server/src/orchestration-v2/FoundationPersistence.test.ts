@@ -142,7 +142,7 @@ function makeThread(threadId: ThreadId, now: DateTime.Utc): OrchestrationV2AppTh
     creationSource: "web",
     id: threadId,
     projectId: ProjectId.make(`project:${threadId}`),
-    title: `Thread ${threadId}`,
+    title: `会话 ${threadId}`,
     providerInstanceId,
     modelSelection,
     runtimeMode: "full-access",
@@ -865,7 +865,7 @@ it.layer(layerTest)("orchestration V2 foundation persistence", (it) => {
             type: "thread.metadata-updated" as const,
             threadId: thread.id,
             occurredAt: now,
-            payload: { ...thread, title: `Updated ${index}` },
+            payload: { ...thread, title: `已更新 ${index}` },
           })),
         });
         yield* Deferred.await(readClosed);
@@ -915,7 +915,7 @@ it.layer(layerTest)("orchestration V2 foundation persistence", (it) => {
             type: "thread.metadata-updated" as const,
             threadId: thread.id,
             occurredAt: now,
-            payload: { ...thread, title: `Updated ${index}` },
+            payload: { ...thread, title: `已更新 ${index}` },
           })),
         });
         yield* Deferred.succeed(releaseRead, undefined);
@@ -2035,12 +2035,12 @@ it.layer(layerTest)("orchestration V2 foundation persistence", (it) => {
             parentItemId: null,
             ordinal: 1,
             status: "completed",
-            title: "Interrupt",
+            title: "中断",
             startedAt: now,
             completedAt: now,
             updatedAt: now,
             type,
-            message: "Stopped",
+            message: "已停止",
           },
         }) as OrchestrationV2DomainEvent;
       const completeRun = (suffix: string) =>
@@ -3224,7 +3224,7 @@ it.layer(layerTest)("orchestration V2 foundation persistence", (it) => {
           assert.isTrue(Option.isSome(stop));
           if (Option.isSome(stop)) {
             assert.equal(stop.value.status, "failed");
-            assert.include(stop.value.lastError ?? "", "Timed out");
+            assert.include(stop.value.lastError ?? "", "已超时");
           }
         }).pipe(
           Effect.provide(layerWorker),
@@ -3938,7 +3938,7 @@ it.layer(layerTest)("orchestration V2 foundation persistence", (it) => {
             runId,
             providerInstanceId,
             occurredAt: now,
-            payload: { ...items[0]!, ordinal: 99_999_999, title: "Updated" },
+            payload: { ...items[0]!, ordinal: 99_999_999, title: "已更新" },
           },
         ],
       });

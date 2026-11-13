@@ -54,7 +54,7 @@ function failureToast(title: string, error: unknown) {
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      description: error instanceof Error ? error.message : "发生错误。",
     }),
   );
 }
@@ -98,22 +98,22 @@ export function useThreadActionMenu(input: {
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
     onCopy: ({ path }) => {
-      toastManager.add({ type: "success", title: "Path copied", description: path });
+      toastManager.add({ type: "success", title: "路径已复制", description: path });
     },
-    onError: (error) => failureToast("Failed to copy path", error),
+    onError: (error) => failureToast("复制路径失败", error),
   });
   const { copyToClipboard: copyBranchToClipboard } = useCopyToClipboard<{ branch: string }>({
     target: "branch name",
     onCopy: ({ branch }) => {
-      toastManager.add({ type: "success", title: "Branch copied", description: branch });
+      toastManager.add({ type: "success", title: "分支名已复制", description: branch });
     },
-    onError: (error) => failureToast("Failed to copy branch", error),
+    onError: (error) => failureToast("复制分支名失败", error),
   });
   const { copyToClipboard: copyThreadIdToClipboard } = useCopyToClipboard<{ threadId: ThreadId }>({
     onCopy: ({ threadId }) => {
-      toastManager.add({ type: "success", title: "Thread ID copied", description: threadId });
+      toastManager.add({ type: "success", title: "会话 ID 已复制", description: threadId });
     },
-    onError: (error) => failureToast("Failed to copy thread ID", error),
+    onError: (error) => failureToast("复制会话 ID 失败", error),
   });
 
   const openMenu = (position: { x: number; y: number }) => {
@@ -161,10 +161,7 @@ export function useThreadActionMenu(input: {
         threadActionRequiresOperate(action) &&
         !readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)
       ) {
-        failureToast(
-          "Thread action unavailable",
-          new Error("This connection cannot change threads."),
-        );
+        failureToast("无法执行会话操作", new Error("此连接无法修改会话。"));
         return;
       }
       if (action.startsWith("snooze:")) {
@@ -180,7 +177,7 @@ export function useThreadActionMenu(input: {
         if (!preset) return;
         const result = await snoozeThread(threadRef, preset.snoozedUntil);
         if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-          failureToast("Failed to snooze thread", squashAtomCommandFailure(result));
+          failureToast("暂缓会话失败", squashAtomCommandFailure(result));
         }
         return;
       }
@@ -222,29 +219,29 @@ export function useThreadActionMenu(input: {
             }),
           );
           if (result._tag === "Failure") {
-            failureToast("Could not create thread", squashAtomCommandFailure(result));
+            failureToast("无法创建会话", squashAtomCommandFailure(result));
           }
           return;
         }
         case "settle":
-          await reportFailure("Failed to settle thread", () => settleThread(threadRef));
+          await reportFailure("收尾会话失败", () => settleThread(threadRef));
           return;
         case "unsettle":
-          await reportFailure("Failed to un-settle thread", () => unsettleThread(threadRef));
+          await reportFailure("取消会话收尾失败", () => unsettleThread(threadRef));
           return;
         case "unsnooze":
-          await reportFailure("Failed to wake thread", () => unsnoozeThread(threadRef));
+          await reportFailure("唤醒会话失败", () => unsnoozeThread(threadRef));
           return;
         case "pin":
-          await reportFailure("Failed to pin thread", () => pinThread(threadRef));
+          await reportFailure("置顶会话失败", () => pinThread(threadRef));
           return;
         case "unpin": {
-          await reportFailure("Failed to unpin thread", () => confirmAndUnpinThread(threadRef));
+          await reportFailure("取消置顶会话失败", () => confirmAndUnpinThread(threadRef));
           return;
         }
         case "auto-settle:enabled":
         case "auto-settle:disabled":
-          await reportFailure("Failed to update auto-settle", () =>
+          await reportFailure("更新自动收尾设置失败", () =>
             setThreadAutoSettle(threadRef, action === "auto-settle:enabled"),
           );
           return;
@@ -273,11 +270,11 @@ export function useThreadActionMenu(input: {
           if (result._tag === "Success") {
             toastManager.add({
               type: "success",
-              title: "Project created",
+              title: "项目已创建",
               description: thread.title,
             });
           } else if (!isAtomCommandInterrupted(result)) {
-            failureToast("Could not turn thread into a project", squashAtomCommandFailure(result));
+            failureToast("无法将会话转换为项目", squashAtomCommandFailure(result));
           }
           return;
         }
@@ -287,8 +284,8 @@ export function useThreadActionMenu(input: {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Path unavailable",
-                description: "This thread does not have a workspace path to copy.",
+                title: "路径不可用",
+                description: "此会话没有可复制的工作区路径。",
               }),
             );
             return;
@@ -312,7 +309,7 @@ export function useThreadActionMenu(input: {
         case "archive": {
           if (confirmThreadArchive) {
             const confirmed = await settlePromise(() =>
-              api.dialogs.confirm(`Archive thread "${thread.title}"?`),
+              api.dialogs.confirm(`归档会话“${thread.title}”？`),
             );
             if (confirmed._tag === "Failure" || !confirmed.value) return;
           }
@@ -324,7 +321,7 @@ export function useThreadActionMenu(input: {
           });
           if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
             failureToast(
-              didArchive ? "Thread archived, but navigation failed" : "Failed to archive thread",
+              didArchive ? "会话已归档，但页面跳转失败" : "归档会话失败",
               squashAtomCommandFailure(result),
             );
           }
@@ -334,10 +331,7 @@ export function useThreadActionMenu(input: {
           if (confirmThreadDelete) {
             const confirmed = await settlePromise(() =>
               api.dialogs.confirm(
-                [
-                  `Delete thread "${thread.title}"?`,
-                  "This permanently clears conversation history for this thread.",
-                ].join("\n"),
+                [`删除会话“${thread.title}”？`, "这将永久清除此会话的对话历史。"].join("\n"),
                 { variant: "destructive" },
               ),
             );
@@ -350,7 +344,7 @@ export function useThreadActionMenu(input: {
             // A missing thread means cleanup failed after deletion; deleteThread already toasted that failure.
             readThreadShell(threadRef) !== null
           ) {
-            failureToast("Failed to delete thread", squashAtomCommandFailure(deleted));
+            failureToast("删除会话失败", squashAtomCommandFailure(deleted));
           }
           return;
         }

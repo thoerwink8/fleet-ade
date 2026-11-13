@@ -42,7 +42,7 @@ import { DeviceWorkspace } from "./DeviceWorkspace";
 import { PreviewPanelShell, type PreviewPanelMode } from "../preview/PreviewPanelShell";
 
 const platformLabel = (platform: DevicePlatform) =>
-  platform === "ios" ? "iOS Simulators" : "Android Emulators";
+  platform === "ios" ? "iOS 模拟器" : "Android 模拟器";
 
 const deviceKey = (device: Pick<DeviceSummary, "hostId" | "id">) =>
   `${device.hostId}\u0000${device.id}`;
@@ -238,7 +238,7 @@ export function DevicePanel(props: {
           <DeviceHostUpdates state={state} environmentId={environmentId} />
           {bootingDevices.length > 0 ? (
             <div role="status" className="border-b px-3 py-2 text-xs text-muted-foreground">
-              Starting {bootingDevices.map((device) => device.name).join(", ")}… This can take a
+              正在启动 {bootingDevices.map((device) => device.name).join(", ")}… This can take a
               minute.
             </div>
           ) : null}
@@ -252,7 +252,7 @@ export function DevicePanel(props: {
               key={`${environmentId}\u0000${deviceKey(activeDevice)}`}
               environmentId={environmentId}
               device={activeDevice}
-              hostLabel={activeHost?.label ?? "Device host"}
+              hostLabel={activeHost?.label ?? "设备主机"}
               hostKind={activeHost?.kind}
               hostDiagnostics={
                 diagnostics.find(({ hostId }) => hostId === activeDevice.hostId)?.detail
@@ -267,7 +267,7 @@ export function DevicePanel(props: {
               name={pendingDevice?.name ?? "Devices"}
               description={
                 pendingDevice
-                  ? `${state.hosts.find((host) => host.id === pendingDevice.hostId)?.label ?? "Device host"} · ${pendingDevice.version}`
+                  ? `${state.hosts.find((host) => host.id === pendingDevice.hostId)?.label ?? "设备主机"} · ${pendingDevice.version}`
                   : ""
               }
               stage="opening"
@@ -275,17 +275,17 @@ export function DevicePanel(props: {
                 loadError ??
                 (pendingDevice
                   ? pendingDevice.booted
-                    ? "Opening device…"
-                    : "Starting device…"
+                    ? "正在打开设备…"
+                    : "正在启动设备…"
                   : state.hostStatus === "installing"
-                    ? (state.hostStatusDetail ?? "Installing device support…")
-                    : "Finding devices…")
+                    ? (state.hostStatusDetail ?? "正在安装设备支持…")
+                    : "正在查找设备…")
               }
               error={loadError !== null}
             >
               {loadError !== null ? (
                 <Button size="sm" variant="outline" onClick={refreshState}>
-                  Retry
+                  重试
                 </Button>
               ) : null}
             </DeviceLoadingView>
@@ -305,8 +305,8 @@ export function DevicePanel(props: {
                       tabIndex={state.hostStatus === "failed" ? 0 : undefined}
                     >
                       {state.hostStatus === "failed"
-                        ? (state.hostStatusDetail ?? "The device hub failed to start.")
-                        : "No simulators or emulators were found on this environment."}
+                        ? (state.hostStatusDetail ?? "设备中心启动失败。")
+                        : "此环境上未找到模拟器。"}
                     </p>
                   </>
                 ) : null}
@@ -349,7 +349,7 @@ export function DevicePanel(props: {
                                 ) : (
                                   <Play />
                                 )}
-                                {device.booted ? "Open" : "Start"}
+                                {device.booted ? "打开" : "启动"}
                               </Button>
                             </div>
                           ))}
@@ -363,8 +363,8 @@ export function DevicePanel(props: {
                 !state.devices.some((device) => device.platform === "android") &&
                 !unavailablePlatforms.some((platform) => platform.platform === "android") ? (
                   <p className="max-w-sm text-xs">
-                    No Android virtual devices found. Create one in Android Studio's Device Manager,
-                    then refresh.
+                    未找到 Android 虚拟设备。请在 Android Studio 的 Device Manager
+                    中创建一个，然后刷新。
                   </p>
                 ) : null}
                 {loaded && !hostBusy ? (
@@ -374,7 +374,7 @@ export function DevicePanel(props: {
                     size="sm"
                     onClick={() => void list({ environmentId, input: {} })}
                   >
-                    Refresh devices
+                    刷新设备
                   </Button>
                 ) : null}
               </div>
@@ -402,7 +402,7 @@ function DeviceNotice(props: { readonly onDismiss: () => void; readonly children
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label="Dismiss device error"
+        aria-label="关闭设备错误提示"
         onClick={props.onDismiss}
       >
         <X />
@@ -436,8 +436,8 @@ function DeviceDiscoveryWarning(props: {
         <CircleAlert className="mt-px size-3.5 shrink-0 text-warning-foreground" />
         <span className="min-w-0">
           {platforms.length > 0
-            ? `${platforms.join(" and ")} ${platforms.length > 1 ? "lists" : "list"} on ${props.label} may be incomplete.`
-            : `Device discovery on ${props.label} reported a warning.`}
+            ? `${platforms.join(" and ")} 上的 ${platforms.length > 1 ? "lists" : "list"} ${props.label} 可能不完整。`
+            : `发现 ${props.label} 上的设备时出现警告。`}
         </span>
       </span>
       <span className="ml-auto flex shrink-0 items-center gap-0.5">
@@ -446,21 +446,21 @@ function DeviceDiscoveryWarning(props: {
             size="micro"
             variant="ghost"
             disabled={retrying}
-            aria-label={`Retry device discovery on ${props.label}`}
+            aria-label={`在 ${props.label} 上重试设备发现`}
             onClick={() => {
               setRetrying(true);
               void props.onRetry().finally(() => setRetrying(false));
             }}
           >
-            {retrying ? "Retrying…" : "Retry"}
+            {retrying ? "正在重试…" : "重试"}
           </Button>
         ) : null}
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger
-            aria-label={`Details for ${props.label}`}
+            aria-label={`${props.label} 的详情`}
             render={<Button size="micro" variant="ghost" />}
           >
-            Details
+            详情
           </PopoverTrigger>
           <PopoverPopup side="bottom" align="end" width="lg" padding="compact">
             <p className="whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
@@ -471,7 +471,7 @@ function DeviceDiscoveryWarning(props: {
         <Button
           size="icon-micro"
           variant="ghost"
-          aria-label={`Dismiss device warning for ${props.label}`}
+          aria-label={`关闭 ${props.label} 的设备警告`}
           onClick={() => {
             setOpen(false);
             setDismissedCause(cause);

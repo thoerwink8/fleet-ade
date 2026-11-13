@@ -259,7 +259,7 @@ layer("016_CanonicalizeModelSelections", (it) => {
       `;
           assert.deepStrictEqual(JSON.parse(eventRows[0]!.payloadJson), {
             projectId: "project-1",
-            title: "Project",
+            title: "项目",
             workspaceRoot: "/tmp/project",
             defaultModelSelection: {
               provider: "claudeAgent",
@@ -299,7 +299,7 @@ layer("016_CanonicalizeModelSelections", (it) => {
           assert.deepStrictEqual(JSON.parse(eventRows[3]!.payloadJson), {
             threadId: "thread-1",
             projectId: "project-1",
-            title: "Thread",
+            title: "会话",
             modelSelection: {
               provider: "claudeAgent",
               model: "claude-opus-4-6",

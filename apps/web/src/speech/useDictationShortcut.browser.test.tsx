@@ -112,13 +112,13 @@ it("lets Escape in another dictation editor reach that editor instead of canceli
       <Probe speech={actions(true)} targetRef={commentRef} />
       <div
         role="dialog"
-        aria-label="Edit citation comment"
+        aria-label="编辑引用批注"
         onKeyDown={(event) => {
           if (event.key === "Escape") editorEscape();
         }}
       >
-        <textarea aria-label="Comment" ref={commentRef} />
-        <button type="button">Cancel</button>
+        <textarea aria-label="评论" ref={commentRef} />
+        <button type="button">取消</button>
       </div>
     </>,
   );
@@ -142,7 +142,7 @@ it("lets Escape in another editor of the recording editor's dialog reach that ed
     <>
       <Probe speech={speech} targetRef={replyRef} />
       <Probe speech={actions(true)} targetRef={otherReplyRef} />
-      <div role="dialog" aria-label="Pull request">
+      <div role="dialog" aria-label="PR">
         <textarea aria-label="Reply A" ref={replyRef} />
         <textarea aria-label="Reply B" ref={otherReplyRef} />
       </div>
@@ -163,13 +163,13 @@ it("cancels the recording on Escape outside other shown dictation editors", asyn
     <>
       <Probe speech={speech} targetRef={reviewRef} />
       <Probe speech={actions(true)} targetRef={commentRef} />
-      <input aria-label="Search" />
-      <div role="dialog" aria-label="Pull request">
+      <input aria-label="搜索" />
+      <div role="dialog" aria-label="PR">
         <textarea aria-label="Review" ref={reviewRef} />
         <div hidden>
-          <textarea aria-label="Comment" ref={commentRef} />
+          <textarea aria-label="评论" ref={commentRef} />
         </div>
-        <button type="button">Submit</button>
+        <button type="button">提交</button>
       </div>
     </>,
   );

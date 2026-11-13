@@ -168,48 +168,45 @@ import { guideRunKey, useGuideRunStore } from "./guide/guideRunStore";
 import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
 
 const actionFailureLabels = (term: string): Record<PullRequestAction, string> => ({
-  merge: `Could not merge this ${term}`,
-  ready: "Could not mark this ready for review",
-  draft: "Could not convert this to a draft",
-  close: `Could not close this ${term}`,
-  reopen: `Could not reopen this ${term}`,
-  "update-branch": "Could not update this branch",
-  "enable-auto-merge": "Could not turn on auto-merge",
-  "disable-auto-merge": "Could not turn off auto-merge",
-  revert: `Could not open a revert ${term}`,
-  "delete-branch": "Could not delete this branch",
-  "approve-workflows": "Could not approve workflows",
+  merge: `无法合并此 ${term}`,
+  ready: "无法将其标记为可审查",
+  draft: "无法将其转为草稿",
+  close: `无法关闭此 ${term}`,
+  reopen: `无法重新打开此 ${term}`,
+  "update-branch": "无法更新此分支",
+  "enable-auto-merge": "无法启用自动合并",
+  "disable-auto-merge": "无法关闭自动合并",
+  revert: `无法打开还原 ${term}`,
+  "delete-branch": "无法删除此分支",
+  "approve-workflows": "无法批准工作流",
 });
 
 const actionFailureHints = (term: string): Record<PullRequestAction, string> => ({
-  merge:
-    "The host refused the merge. Check that you have write access, that the checks it requires have passed, and that the branch is not conflicting.",
-  ready: "The host refused it. Check that you have write access to this repository.",
-  draft: "The host refused it. Check that you have write access to this repository.",
-  close: "The host refused it. Check that you have write access, or that you opened it.",
-  reopen:
-    "The host refused it. Check that you have write access, and that the branch still exists.",
+  merge: "托管平台拒绝了合并。请确认你有写入权限、其要求的检查已通过，且分支没有冲突。",
+  ready: "托管平台拒绝了该操作。请确认你对此仓库有写入权限。",
+  draft: "托管平台拒绝了该操作。请确认你对此仓库有写入权限。",
+  close: "托管平台拒绝了该操作。请确认你有写入权限，或该项由你创建。",
+  reopen: "托管平台拒绝了该操作。请确认你有写入权限，且分支仍然存在。",
   "update-branch":
-    "The host refused it. Check that you have write access to the branch (a fork branch also needs its author to allow edits from maintainers), and that it does not conflict with the base.",
+    "托管平台拒绝了该操作。请确认你有该分支的写入权限（fork 分支还需要其作者允许维护者编辑），且它与基础分支没有冲突。",
   "enable-auto-merge":
-    "The host refused it. Check that this repository allows auto-merge, that you have write access, and that there is something left for it to wait on.",
-  "disable-auto-merge":
-    "The host refused it. Check that you have write access, and that the merge has not already happened.",
-  revert: `The host refused it. Check that you have write access and that this ${term} was merged on the host.`,
+    "托管平台拒绝了该操作。请确认此仓库允许自动合并、你有写入权限，且仍有尚未满足的合并条件。",
+  "disable-auto-merge": "托管平台拒绝了该操作。请确认你有写入权限，且尚未完成合并。",
+  revert: `托管平台拒绝了该操作。请确认你有写入权限，且此 ${term} 已在托管平台上合并。`,
   "delete-branch":
-    "The host refused it. Check that you have write access to the source repository and that the branch has not moved since this page loaded.",
+    "托管平台拒绝了该操作。请确认你对源仓库有写入权限，且分支在此页面加载后没有变动。",
   "approve-workflows":
-    "The host refused it. Check that you have Actions write access and that these workflow runs are still awaiting approval.",
+    "托管平台拒绝了该操作。请确认你有 Actions 的写入权限，且这些工作流运行仍在等待批准。",
 });
 
 const UPDATE_BRANCH_REBASE_FAILURE_HINT =
-  "The host refused it. A rebase stops at the first commit that does not apply cleanly; updating with a merge commit may still work.";
+  "托管平台拒绝了该操作。变基在应用提交时遇到冲突就会停止；改用合并提交更新或许可行。";
 
 const TABS: ReadonlyArray<{ value: PullRequestDetailTab; label: string }> = [
-  { value: "summary", label: "Summary" },
-  { value: "guide", label: "Guide" },
-  { value: "timeline", label: "Timeline" },
-  { value: "code", label: "Code" },
+  { value: "summary", label: "摘要" },
+  { value: "guide", label: "导览" },
+  { value: "timeline", label: "动态" },
+  { value: "code", label: "代码" },
 ];
 
 // Defer the diff viewer's worker pool until Code is approached.
@@ -219,7 +216,7 @@ const PullRequestCodeTab = lazy(loadCodeTab);
 function reportCheckoutCommandError(error: Error) {
   toastManager.add({
     type: "error",
-    title: "Could not copy checkout command",
+    title: "无法复制检出工作副本的命令",
     description: error.message,
   });
 }
@@ -535,11 +532,11 @@ export function PullRequestDetailPanel({
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { copyToClipboard: copyReference } = useCopyToClipboard<string>({
     target: `${terminology.singular} reference`,
-    onCopy: (label) => toastManager.add({ type: "success", title: `${label} copied` }),
+    onCopy: (label) => toastManager.add({ type: "success", title: `已复制 ${label}` }),
     onError: (error, label) =>
       toastManager.add({
         type: "error",
-        title: `Failed to copy ${label}`,
+        title: `无法复制 ${label}`,
         description: error.message,
       }),
   });
@@ -551,7 +548,7 @@ export function PullRequestDetailPanel({
     if (command !== "pullRequest.copyNumber") return;
     event.preventDefault();
     event.stopPropagation();
-    if (!event.repeat) copyReference(`#${reference.number}`, `${terminology.shortLabel} number`);
+    if (!event.repeat) copyReference(`#${reference.number}`, `${terminology.shortLabel} 编号`);
   });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window keydown capture listener for the copy-number shortcut
   useEffect(() => {
@@ -617,8 +614,8 @@ export function PullRequestDetailPanel({
   const mergeBlockedReason = canMergeSinglePullRequest
     ? null
     : nativeStackQuery.error
-      ? "Couldn't check stack membership"
-      : "Checking stack membership…";
+      ? "无法检查堆叠归属"
+      : "正在检查堆叠归属…";
   const activityPending = activityQuery.isPending && activity === null;
   const activityError = activity === null ? activityQuery.error : null;
   const refreshDetail = () => {
@@ -806,10 +803,10 @@ export function PullRequestDetailPanel({
       return false;
     }
     if (action === "revert") {
-      toastManager.add({ type: "success", title: `Revert ${terminology.singular} opened` });
+      toastManager.add({ type: "success", title: `已打开还原 ${terminology.singular}` });
     }
     if (action === "delete-branch") {
-      toastManager.add({ type: "success", title: "Branch deleted" });
+      toastManager.add({ type: "success", title: "已删除分支" });
     }
     if (pullRequestActionNeedsHostRefresh(action)) {
       void refreshFromHost();
@@ -841,7 +838,7 @@ export function PullRequestDetailPanel({
     });
     if (commentResult._tag === "Failure") {
       setPendingAction(null);
-      toastManager.add({ type: "error", title: "Could not post the comment" });
+      toastManager.add({ type: "error", title: "无法发表评论" });
       return { commentPosted: false };
     }
     const actionSucceeded = await finishAction(action);
@@ -896,11 +893,11 @@ export function PullRequestDetailPanel({
       writeHandoffToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
+        title: "已添加到输入框",
         description:
           task.prompt.length > 0
-            ? "The question is in the composer. Read it over, then send."
-            : `The ${terminology.singular} is in the composer. Type your question, then send.`,
+            ? "问题已在输入框中。请检查后发送。"
+            : `${terminology.singular} 已在输入框中。输入你的问题后发送。`,
       });
       return;
     }
@@ -927,18 +924,18 @@ export function PullRequestDetailPanel({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: "无法打开会话",
+        description: "请从项目中重试，或先打开一个会话。",
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: "已在会话中提问",
       description:
         task.prompt.length > 0
-          ? "The question is in the composer. Read it over, then send."
-          : `The ${terminology.singular} is in the composer. Type your question, then send.`,
+          ? "问题已在输入框中。请检查后发送。"
+          : `${terminology.singular} 已在输入框中。输入你的问题后发送。`,
     });
   };
 
@@ -952,8 +949,8 @@ export function PullRequestDetailPanel({
       writeHandoffToComposer(attachTarget, task);
       toastManager.add({
         type: "success",
-        title: "Added to the composer",
-        description: "The task is in the composer. Read it over, then send.",
+        title: "已添加到输入框",
+        description: "任务已在输入框中。请检查后发送。",
       });
       return;
     }
@@ -973,7 +970,7 @@ export function PullRequestDetailPanel({
     setHandoff(kind);
     const toastId = toastManager.add({
       type: "loading",
-      title: `Preparing the ${terminology.singular} checkout...`,
+      title: `正在准备 ${terminology.singular} 的工作副本…`,
     });
     const projectRef = scopeProjectRef(
       actingEnvironmentId,
@@ -988,8 +985,8 @@ export function PullRequestDetailPanel({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        title: "无法为工作副本打开会话",
+        description: "请从项目中重试，或先打开一个会话。",
       });
       return;
     }
@@ -1002,7 +999,7 @@ export function PullRequestDetailPanel({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: `Could not prepare the ${terminology.singular} checkout`,
+        title: `无法准备 ${terminology.singular} 的工作副本`,
         description: checkoutFailureDescription(
           isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
         ),
@@ -1022,8 +1019,8 @@ export function PullRequestDetailPanel({
       // Sending after failed rebinding would use the previous checkout.
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
-        description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
+        title: "已检出，但会话仍在原处",
+        description: `工作副本已在 \`${prepared.value.branch}\` 上准备好。请从分支选择器将会话指向它，然后再次提问。`,
       });
       return;
     }
@@ -1041,11 +1038,11 @@ export function PullRequestDetailPanel({
         prepared.value.isOnPullRequestHead
           ? {
               type: "success",
-              title: mode === "local" ? "Checked out here" : "Checked out",
+              title: mode === "local" ? "已在此检出" : "已检出",
               description:
                 mode === "local"
-                  ? `This repository is on the ${terminology.singular}'s branch, with a thread open on it.`
-                  : `The ${terminology.singular} is in its own worktree, with a thread open on it.`,
+                  ? `此仓库已切换到 ${terminology.singular} 的分支，并在其上打开了会话。`
+                  : `${terminology.singular} 已位于独立工作树中，并在其上打开了会话。`,
             }
           : offHeadPullRequestCheckoutToast(terminology),
       );
@@ -1059,8 +1056,8 @@ export function PullRequestDetailPanel({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer. Read it over, then send.",
+            title: "工作副本已就绪",
+            description: "任务已在输入框中。请检查后发送。",
           }
         : offHeadPullRequestCheckoutToast(terminology),
     );
@@ -1177,7 +1174,7 @@ export function PullRequestDetailPanel({
     // The active editor may be answering a provider question rather than editing this draft.
     if (!hasReference) store.addReviewComment(attachTarget, reference, { insertAtCaret: false });
     store.addReviewComment(attachTarget, comment, { insertAtCaret: false });
-    toastManager.add({ type: "success", title: "Added to the composer" });
+    toastManager.add({ type: "success", title: "已添加到输入框" });
   };
 
   const startCheckout = (mode: "worktree" | "local") => {
@@ -1253,13 +1250,13 @@ export function PullRequestDetailPanel({
     lastSelectedMergeMethod,
   );
   const selectedMergeMethodLabel = PULL_REQUEST_MERGE_METHOD_LABELS[selectedMergeMethod];
-  const pendingAutoMergeLabel = `Auto-merge (${selectedMergeMethodLabel.toLowerCase()})`;
+  const pendingAutoMergeLabel = `自动合并（${selectedMergeMethodLabel.toLowerCase()}）`;
   const conflicting = isPullRequestConflicting(detail);
   const autoMergeArmed = detail?.state === "open" && detail.autoMergeEnabled === true;
   const armedMergeMethod = detail?.autoMergeMethod;
   const armedAutoMergeLabel = armedMergeMethod
-    ? `Auto-merge (${PULL_REQUEST_MERGE_METHOD_LABELS[armedMergeMethod].toLowerCase()})`
-    : "Auto-merge";
+    ? `自动合并（${PULL_REQUEST_MERGE_METHOD_LABELS[armedMergeMethod].toLowerCase()}）`
+    : "自动合并";
   const workflowApprovalsRequired =
     detail?.state === "open" ? (detail.workflowApprovalsRequired ?? 0) : 0;
   const freshness = detail === null ? null : resolveBaseFreshness(detail);
@@ -1330,8 +1327,8 @@ export function PullRequestDetailPanel({
     if (detail === null) return;
     const confirmed = await readLocalApi()?.dialogs.confirm(
       [
-        `Delete branch ${detail.headBranch}?`,
-        `This deletes ${detail.headBranch} from ${detail.headRepositoryNameWithOwner ?? detail.repository}. Local branches and worktrees are not changed.`,
+        `删除分支 ${detail.headBranch}？`,
+        `这会从 ${detail.headBranch} 删除 ${detail.headRepositoryNameWithOwner ?? detail.repository}。本地分支和工作树不受影响。`,
       ].join("\n"),
       { variant: "destructive" },
     );
@@ -1341,7 +1338,7 @@ export function PullRequestDetailPanel({
     workflowApprovalsRequired > 0 && !checksStale && can("approve-workflows");
   const checksSummary = checksStale
     ? checksState === null
-      ? "No checks reported"
+      ? "未报告任何检查"
       : pullRequestChecksStatePresentation(checksState).label
     : detail
       ? summarizePullRequestChecks(detail.checks)
@@ -1444,7 +1441,7 @@ export function PullRequestDetailPanel({
               ) : null}
               {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
                 <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
-                  Retry stack lookup
+                  重试查询堆叠
                 </Button>
               ) : null}
               {nativeStack ? (
@@ -1534,7 +1531,7 @@ export function PullRequestDetailPanel({
             <Button
               size="icon-xs"
               variant="ghost"
-              aria-label={`Collapse ${terminology.singular} panel`}
+              aria-label={`折叠 ${terminology.singular} 面板`}
               onClick={onClose}
             >
               <PanelRightIcon className="size-3.5" />
@@ -1585,7 +1582,7 @@ export function PullRequestDetailPanel({
                       iconClassName="size-3"
                     />
                     <ArrowLeftIcon
-                      aria-label="receives changes from"
+                      aria-label="接收来自以下分支的更改"
                       className="size-3 shrink-0 opacity-60"
                     />
                     <Tooltip>
@@ -1602,12 +1599,12 @@ export function PullRequestDetailPanel({
                   <span className="ml-auto inline-flex shrink-0 items-baseline justify-end gap-2 text-2xs">
                     <span
                       className="inline-flex items-baseline gap-1 tabular-nums"
-                      aria-label={`${detail.changedFiles.toLocaleString()} changed ${
+                      aria-label={`${detail.changedFiles.toLocaleString("zh-CN")} changed ${
                         detail.changedFiles === 1 ? "file" : "files"
                       }`}
                     >
                       <FileDiffIcon aria-hidden className="size-3 self-center" />
-                      {detail.changedFiles.toLocaleString()}
+                      {detail.changedFiles.toLocaleString("zh-CN")}
                     </span>
                     <PullRequestChangeBreakdownStat
                       environmentId={environmentId}
@@ -1659,7 +1656,7 @@ export function PullRequestDetailPanel({
                 }
                 updated={
                   <span>
-                    updated <RelativeTime timestamp={detail.updatedAt} />
+                    已更新 <RelativeTime timestamp={detail.updatedAt} />
                   </span>
                 }
                 checkout={
@@ -1668,8 +1665,8 @@ export function PullRequestDetailPanel({
                       key={checkoutCommand}
                       value={checkoutCommand}
                       target={`${terminology.singular} checkout command`}
-                      copyLabel="Copy checkout command"
-                      copiedLabel="Checkout command copied"
+                      copyLabel="复制检出工作副本的命令"
+                      copiedLabel="已复制检出工作副本的命令"
                       className="ml-auto font-mono"
                       tooltipSide="bottom"
                       onError={reportCheckoutCommandError}
@@ -1690,11 +1687,11 @@ export function PullRequestDetailPanel({
                     key={detail.headBranch}
                     value={detail.headBranch}
                     target="branch name"
-                    copyLabel={`Copy ${terminology.singular} branch`}
-                    copiedLabel="Branch name copied"
+                    copyLabel={`复制 ${terminology.singular} 分支`}
+                    copiedLabel="已复制分支名称"
                   />
                 }
-                files={`${detail.changedFiles.toLocaleString()} ${detail.changedFiles === 1 ? "file" : "files"}`}
+                files={`${detail.changedFiles.toLocaleString("zh-CN")} ${detail.changedFiles === 1 ? "file" : "files"}`}
                 diffStat={
                   <PullRequestChangeBreakdownStat
                     environmentId={environmentId}
@@ -1729,7 +1726,7 @@ export function PullRequestDetailPanel({
               ) : (
                 <PullRequestChecksStatusLine
                   className="text-muted-foreground"
-                  aria-label={checksSummary ? `Checks: ${checksSummary}` : "Checks"}
+                  aria-label={checksSummary ? `检查：${checksSummary}` : "检查"}
                   icon={
                     checksState !== null ? (
                       <PullRequestChecksPopover
@@ -1757,8 +1754,8 @@ export function PullRequestDetailPanel({
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Comments unavailable"
-                        : `${detail.commentCount.toLocaleString()} ${
+                        ? "评论不可用"
+                        : `${detail.commentCount.toLocaleString("zh-CN")} ${
                             detail.commentCount === 1 ? "comment" : "comments"
                           }`
                     }
@@ -1768,14 +1765,14 @@ export function PullRequestDetailPanel({
                       ? "-"
                       : activityPending
                         ? "…"
-                        : detail.commentCount.toLocaleString()}
+                        : detail.commentCount.toLocaleString("zh-CN")}
                   </span>
                   <span
                     className="inline-flex items-center gap-1"
                     aria-label={
                       activityError
-                        ? "Commits unavailable"
-                        : `${detail.commits.length.toLocaleString()} ${
+                        ? "提交不可用"
+                        : `${detail.commits.length.toLocaleString("zh-CN")} ${
                             detail.commits.length === 1 ? "commit" : "commits"
                           }`
                     }
@@ -1785,7 +1782,7 @@ export function PullRequestDetailPanel({
                       ? "-"
                       : activityPending
                         ? "…"
-                        : detail.commits.length.toLocaleString()}
+                        : detail.commits.length.toLocaleString("zh-CN")}
                   </span>
                   {approvalCount > 0 ? (
                     <span
@@ -1795,27 +1792,21 @@ export function PullRequestDetailPanel({
                       )}
                     >
                       <PullRequestReviewOutcomeIcon outcome="approved" className="size-3" />
-                      {approvalCount.toLocaleString()}
-                      <span className="sr-only">
-                        {approvalCount === 1 ? "approval" : "approvals"}
-                      </span>
+                      {approvalCount.toLocaleString("zh-CN")}
+                      <span className="sr-only">{approvalCount === 1 ? "个批准" : "个批准"}</span>
                     </span>
                   ) : null}
                 </PullRequestMetaLine>
                 <Button
                   size="xs"
                   variant="ghost-muted"
-                  aria-label={
-                    timelineOrder === "newest"
-                      ? "Show oldest activity first"
-                      : "Show newest activity first"
-                  }
+                  aria-label={timelineOrder === "newest" ? "先显示最早的动态" : "先显示最新的动态"}
                   onClick={() =>
                     setTimelineOrder((value) => (value === "newest" ? "oldest" : "newest"))
                   }
                 >
                   <ArrowDownUpIcon aria-hidden className="size-3" />
-                  {timelineOrder === "newest" ? "Newest first" : "Oldest first"}
+                  {timelineOrder === "newest" ? "最新在前" : "最早在前"}
                 </Button>
               </div>
             ) : null}
@@ -1853,8 +1844,8 @@ export function PullRequestDetailPanel({
           <PullRequestsUnavailableState
             {...(isPullRequestNotFound(detailQuery.failure)
               ? {
-                  title: `${capitalizeTerm(terminology.singular)} #${reference.number} not found`,
-                  error: `It may be an issue rather than a ${terminology.singular}, or this account can't see it.`,
+                  title: `找不到 ${capitalizeTerm(terminology.singular)} #${reference.number}`,
+                  error: `它可能是 issue 而不是 ${terminology.singular}，也可能是此账号无权查看。`,
                 }
               : { error: detailQuery.error })}
             refreshing={detailQuery.isPending}
@@ -1959,7 +1950,7 @@ export function PullRequestDetailPanel({
               <div className={cn("absolute inset-0", tab !== "code" && "invisible")}>
                 <Suspense
                   fallback={
-                    <DiffPanelLoadingState label={`Loading ${terminology.singular} diff...`} />
+                    <DiffPanelLoadingState label={`正在加载 ${terminology.singular} 差异…`} />
                   }
                 >
                   <PullRequestCodeTab

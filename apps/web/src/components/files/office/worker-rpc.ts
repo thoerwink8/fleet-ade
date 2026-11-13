@@ -102,7 +102,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
     fail(new WorkerClosedError({ message: event.message || "The Office engine stopped" })),
   );
   worker.addEventListener("messageerror", () =>
-    fail(new WorkerClosedError({ message: "The Office engine sent an unreadable reply" })),
+    fail(new WorkerClosedError({ message: "Office 引擎返回了无法读取的回复" })),
   );
 
   return {
@@ -114,7 +114,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
       if (state.failure) return Promise.reject(state.failure);
 
       if (options.signal?.aborted)
-        return Promise.reject(new WorkerClosedError({ message: "The call was aborted" }));
+        return Promise.reject(new WorkerClosedError({ message: "调用已中止" }));
 
       const id = ++state.next;
 
@@ -123,7 +123,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
           () =>
             fail(
               new WorkerClosedError({
-                message: "This document took too long to preview. Open it in another app.",
+                message: "此文档预览超时。请使用其他应用打开。",
               }),
             ),
           30_000,
@@ -131,7 +131,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
         const abort = () => {
           clearTimeout(timeout);
           pending.delete(id);
-          reject(new WorkerClosedError({ message: "The call was aborted" }));
+          reject(new WorkerClosedError({ message: "调用已中止" }));
           worker.postMessage({ cancel: id } satisfies Cancel, []);
         };
 
@@ -164,7 +164,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
     },
     /** Stops the worker, which frees its engine's memory, and fails every pending call. */
     close() {
-      fail(new WorkerClosedError({ message: "The Office engine was closed" }));
+      fail(new WorkerClosedError({ message: "Office 引擎已关闭" }));
     },
   };
 }
@@ -218,7 +218,7 @@ export function serveWorker<M extends Methods>(handlers: {
           id: request.id,
           ok: false,
           superseded: false,
-          message: `Unknown method ${request.method}`,
+          message: `未知方法 ${request.method}`,
         });
         continue;
       }
@@ -281,8 +281,7 @@ export function serveWorker<M extends Methods>(handlers: {
     if (replaced !== -1) {
       const [old] = queue.splice(replaced, 1);
 
-      if (old)
-        reply({ id: old.id, ok: false, superseded: true, message: "Replaced by a newer call" });
+      if (old) reply({ id: old.id, ok: false, superseded: true, message: "已被更新的调用取代" });
     }
 
     queue.push(event.data);

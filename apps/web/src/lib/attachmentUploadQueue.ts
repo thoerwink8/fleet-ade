@@ -155,7 +155,7 @@ function uploadBytes(input: {
         reject(new Error(`Upload rejected (${xhr.status})`));
       }
     });
-    xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+    xhr.addEventListener("error", () => reject(new Error("上传失败")));
     xhr.addEventListener("timeout", () => reject(new Error("Upload timed out")));
     xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
     xhr.send(input.file);
@@ -169,7 +169,7 @@ async function runUpload(job: UploadJob): Promise<void> {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "This connection cannot upload attachments.",
+      reason: "此连接无法上传附件。",
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -217,8 +217,8 @@ async function runUpload(job: UploadJob): Promise<void> {
         environmentId: job.environmentId,
         reason:
           verification.status === "missing"
-            ? "Uploaded file expired. Remove it and attach it again."
-            : "Uploaded file could not be verified. Retry when the server reconnects.",
+            ? "已上传的文件已过期。请移除后重新添加。"
+            : "无法验证已上传的文件。请在服务器重新连接后重试。",
         ...(job.previous ? { previous: job.previous } : {}),
       });
       return;
@@ -235,7 +235,7 @@ async function runUpload(job: UploadJob): Promise<void> {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "Unsupported image type",
+      reason: "不支持的图片类型",
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -245,7 +245,7 @@ async function runUpload(job: UploadJob): Promise<void> {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "Original file is no longer available",
+      reason: "原文件已不可用",
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -256,7 +256,7 @@ async function runUpload(job: UploadJob): Promise<void> {
     setUploadState(job.image.id, {
       status: "failed",
       environmentId: job.environmentId,
-      reason: "This connection cannot upload attachments.",
+      reason: "此连接无法上传附件。",
       ...(job.previous ? { previous: job.previous } : {}),
     });
     return;
@@ -333,14 +333,14 @@ async function runUpload(job: UploadJob): Promise<void> {
     environmentId: job.environmentId,
     reason:
       result.step === "mint"
-        ? "Upload could not start"
+        ? "上传无法开始"
         : result.step === "resolve-url"
           ? readEnvironmentScope(job.environmentId, AuthOrchestrationOperateScope)
-            ? "Not connected"
-            : "This connection cannot upload attachments."
+            ? "未连接"
+            : "此连接无法上传附件。"
           : result.error instanceof Error
             ? result.error.message
-            : "Upload failed",
+            : "上传失败",
     ...(result.attachmentId ? { attachmentId: result.attachmentId } : {}),
     ...(job.previous ? { previous: job.previous } : {}),
   });
@@ -366,7 +366,7 @@ function pumpUploads(): void {
           setUploadState(job.image.id, {
             status: "failed",
             environmentId: job.environmentId,
-            reason: "Upload failed",
+            reason: "上传失败",
             ...(job.previous ? { previous: job.previous } : {}),
           });
         }

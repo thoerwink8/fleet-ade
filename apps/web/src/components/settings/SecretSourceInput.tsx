@@ -75,7 +75,7 @@ export function SecretSourceSelect(props: {
   const { value, sources } = props;
   const known = value === null || sources.some((source) => source.id === value);
   const title =
-    value === null ? "Value" : (sources.find((source) => source.id === value)?.label ?? value);
+    value === null ? "值" : (sources.find((source) => source.id === value)?.label ?? value);
   return (
     <Select
       value={value ?? STORED_VALUE}
@@ -89,7 +89,7 @@ export function SecretSourceSelect(props: {
       <SelectTrigger
         size="sm"
         className="w-auto min-w-0 shrink-0"
-        aria-label={`${props.label} source`}
+        aria-label={`${props.label} 来源`}
         title={title}
       >
         <SelectValue>
@@ -98,7 +98,7 @@ export function SecretSourceSelect(props: {
       </SelectTrigger>
       <SelectPopup align="start" alignItemWithTrigger={false}>
         <SelectItem value={STORED_VALUE}>
-          <SourceLabel icon={TypeIcon} label="Value" />
+          <SourceLabel icon={TypeIcon} label="值" />
         </SelectItem>
         {sources.map((source) => (
           <SelectItem key={source.id} value={source.id}>
@@ -146,7 +146,7 @@ function SecretCheckButton(props: {
     const response = await checkSecretSource({ environmentId, input: { source: secret } });
     const next: SecretCheck =
       response._tag !== "Success"
-        ? { status: "failed", detail: "Could not reach the server" }
+        ? { status: "failed", detail: "无法连接服务器" }
         : response.value._tag === "Resolved"
           ? { status: "resolved" }
           : { status: "failed", detail: response.value.detail };
@@ -236,7 +236,7 @@ export function SecretSourceInput({
   const reference = secret !== undefined && secret.provider === provider ? secret.reference : "";
   const providerSource = sources.find((source) => source.id === provider);
   const definition = providerSource && builtInSecretProviderDefinitions.find(providerSource.kind);
-  const label = input["aria-label"] ?? "Secret";
+  const label = input["aria-label"] ?? "凭据";
   const source =
     sources.length === 0 && provider === null ? null : (
       <SecretSourceSelect
@@ -293,7 +293,7 @@ export function SecretSourceInput({
             autoComplete="off"
             placeholder={definition?.referencePlaceholder}
             spellCheck={false}
-            aria-label={`${label} reference`}
+            aria-label={`${label} 引用`}
             aria-invalid={rejectedReference !== null}
           />
           {environmentId !== undefined &&
@@ -310,7 +310,7 @@ export function SecretSourceInput({
         </div>
         {rejectedReference !== null ? (
           <p className="text-2xs text-destructive">
-            {definition?.invalidReferenceMessage ?? "Enter a valid secret reference."}
+            {definition?.invalidReferenceMessage ?? "请输入有效的凭据引用。"}
           </p>
         ) : null}
       </div>

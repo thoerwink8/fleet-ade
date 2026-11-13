@@ -25,8 +25,8 @@ export async function suggestAppAccessForRemote(
   const owner = target.input.repository.split("/")[0] ?? target.input.repository;
   const id = toastManager.add({
     type: "info",
-    title: `Give ${target.appSignIn.appName} access to ${owner}`,
-    description: `It isn't installed there, so GitHub requests for ${target.input.repository} use your own login and its lower rate limit.`,
+    title: `让 ${target.appSignIn.appName} 访问 ${owner}`,
+    description: `该处尚未安装此应用，因此对 ${target.input.repository} 的 GitHub 请求会使用你自己的登录身份，受较低的速率限制。`,
     actionProps: {
       children: "Install",
       onClick: () => {

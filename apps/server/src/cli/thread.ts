@@ -838,7 +838,7 @@ const threadStartCommand = Command.make("start", {
             ThreadLaunchResult,
           );
           if (flags.wait && launched.runId !== null) {
-            if (!flags.json) yield* Console.error(`Thread ${launched.threadId}`);
+            if (!flags.json) yield* Console.error(`会话 ${launched.threadId}`);
             return yield* finishRun(tools, {
               threadId: launched.threadId,
               runId: launched.runId,

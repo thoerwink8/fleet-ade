@@ -213,9 +213,9 @@ export function useOpenChangeRequestLink(
             const toastId = toastManager.add(
               stackedThreadToast({
                 type: "info",
-                title: "This commit is not in the thread's workspace",
+                title: "此提交不在该会话的工作区中",
                 actionProps: {
-                  children: "Open link",
+                  children: "打开链接",
                   onClick: () => {
                     toastManager.close(toastId);
                     window.open(targetUrl, "_blank", "noopener,noreferrer");
@@ -260,8 +260,8 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to open pull request link",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: "无法打开 pull request 链接",
+          description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
     });

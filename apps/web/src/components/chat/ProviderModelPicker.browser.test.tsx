@@ -139,7 +139,7 @@ it("keeps a docked picker open after a pick and hands focus to that model's effo
         lockedProvider={null}
         instanceEntries={entries}
         modelOptionsByInstance={options}
-        triggerAriaLabel="Choose model"
+        triggerAriaLabel="选择模型"
         onInstanceModelChange={(_, selected) => setModel(selected)}
         effortColumn={(levels[model] ?? []).map((level, index, all) => (
           <button
@@ -159,7 +159,7 @@ it("keeps a docked picker open after a pick and hands focus to that model's effo
 
   await using screen = await render(<Picker />);
   await screen.getByRole("button", { name: "Choose model" }).click();
-  const search = page.getByPlaceholder("Search models...");
+  const search = page.getByPlaceholder("搜索模型…");
   await expect.element(search).toHaveFocus();
   await userEvent.keyboard("{ArrowRight}");
   await expect.element(page.getByRole("radio", { name: "High" })).toHaveFocus();
@@ -211,7 +211,7 @@ it("opens on the active provider when every favorite belongs to a disabled provi
       lockedProvider={null}
       instanceEntries={entries}
       modelOptionsByInstance={new Map(entries.map((entry) => [entry.instanceId, entry.models]))}
-      triggerAriaLabel="Choose model"
+      triggerAriaLabel="选择模型"
       onInstanceModelChange={() => {}}
     />,
   );

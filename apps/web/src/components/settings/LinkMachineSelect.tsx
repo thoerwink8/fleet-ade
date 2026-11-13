@@ -17,10 +17,9 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 export function LinkAddressWarning({ address }: { readonly address: string }) {
   return (
     <Alert variant="warning">
-      <AlertTitle>Check this address</AlertTitle>
+      <AlertTitle>请核对此地址</AlertTitle>
       <AlertDescription>
-        This app cannot confirm it is one of your machines. The pairing code you paste is sent
-        there.
+        此应用无法确认它是你的机器之一。你粘贴的配对码会发送到那里。
         <span className="block break-all">{linkDestination(address)}</span>
       </AlertDescription>
     </Alert>
@@ -32,14 +31,14 @@ export function LinkMachineBadge({ machine }: { readonly machine: LinkableMachin
   if (machine.linked) {
     return (
       <Badge variant="success" size="sm">
-        Linked
+        已关联
       </Badge>
     );
   }
   if (machine.connected) return null;
   return (
     <Badge variant="outline" size="sm">
-      {machine.connectOnly ? "T3 Connect" : "Not connected"}
+      {machine.connectOnly ? "T3 Connect" : "未连接"}
     </Badge>
   );
 }
@@ -69,7 +68,7 @@ export function LinkMachineSelect({
   return (
     <div className="space-y-1.5">
       <span id={labelId} className="block text-xs font-medium text-foreground">
-        Machine
+        机器
       </span>
       <Select
         value={value}
@@ -81,9 +80,9 @@ export function LinkMachineSelect({
         <SelectTrigger aria-labelledby={labelId}>
           <SelectValue>
             {(selected: string | null) => {
-              if (selected === ANOTHER_ADDRESS) return "Another address…";
+              if (selected === ANOTHER_ADDRESS) return "其他地址…";
               const machine = machines.find((candidate) => candidate.environmentId === selected);
-              return machine === undefined ? "Choose a machine" : <MachineName machine={machine} />;
+              return machine === undefined ? "选择机器" : <MachineName machine={machine} />;
             }}
           </SelectValue>
         </SelectTrigger>
@@ -97,7 +96,7 @@ export function LinkMachineSelect({
             </SelectItem>
           ))}
           <SelectItem value={ANOTHER_ADDRESS} hideIndicator>
-            Another address…
+            其他地址…
           </SelectItem>
         </SelectPopup>
       </Select>

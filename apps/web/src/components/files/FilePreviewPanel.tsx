@@ -213,7 +213,7 @@ function WorkspaceImagePreview(props: {
     return (
       <MediaActions source={actionsSource}>
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs leading-relaxed text-destructive">
-          Unable to load workspace image.
+          无法加载工作区图片。
         </div>
       </MediaActions>
     );
@@ -264,7 +264,7 @@ export function WorkspaceBrowserPreview(props: {
   if (assetUrl._tag === "Failure") {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs leading-relaxed text-destructive">
-        Unable to load file preview.
+        无法加载文件预览。
       </div>
     );
   }
@@ -379,7 +379,7 @@ function WorkspaceAudioPreview(props: {
   if (assetUrl._tag === "Failure" || (url !== null && failedUrl === url)) {
     return (
       <FileSurfaceFailure
-        message="Unable to load audio."
+        message="无法加载音频。"
         onRetry={() => {
           setFailedUrl(null);
           void refreshAssetUrl().catch(() => undefined);
@@ -1073,10 +1073,10 @@ function renderedToggleLabel(
   mode: "markdown" | "mermaid" | "html" | "table",
   rendered: boolean,
 ): string {
-  if (mode === "mermaid") return rendered ? "Show Mermaid source" : "Show rendered diagram";
-  if (mode === "markdown") return rendered ? "Show markdown source" : "Show rendered markdown";
-  if (mode === "table") return rendered ? "Show source" : "Show table";
-  return rendered ? "Show HTML source" : "Show rendered page";
+  if (mode === "mermaid") return rendered ? "显示 Mermaid 源码" : "显示渲染后的图表";
+  if (mode === "markdown") return rendered ? "显示 Markdown 源码" : "显示渲染后的 Markdown";
+  if (mode === "table") return rendered ? "显示源码" : "显示表格";
+  return rendered ? "显示 HTML 源码" : "显示渲染后的页面";
 }
 
 function initialExplorerOpen(): boolean {
@@ -1375,8 +1375,8 @@ export default function FilePreviewPanel({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Unable to open file in browser",
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: "无法在浏览器中打开文件",
+          description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
     })();
@@ -1387,13 +1387,13 @@ export default function FilePreviewPanel({
       return (
         <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
           <Spinner className="size-4" />
-          Checking file access...
+          正在检查文件访问权限…
         </div>
       );
     }
     return (
       <div className="p-4 text-sm text-muted-foreground">
-        {fileAccess.error ?? "This connection cannot read host files."}
+        {fileAccess.error ?? "此连接无法读取主机文件。"}
       </div>
     );
   }
@@ -1463,7 +1463,7 @@ export default function FilePreviewPanel({
           ) : null}
           {showsRawText ? (
             <FileSurfaceAction
-              label={wordWrap ? "Disable word wrap" : "Enable word wrap"}
+              label={wordWrap ? "关闭自动换行" : "开启自动换行"}
               pressed={wordWrap}
               onPress={() => setWordWrapOverride(!wordWrap)}
             >
@@ -1471,13 +1471,13 @@ export default function FilePreviewPanel({
             </FileSurfaceAction>
           ) : null}
           {canOpenInBrowser ? (
-            <FileSurfaceAction label="Open file in preview browser" onPress={handleOpenInBrowser}>
+            <FileSurfaceAction label="在预览浏览器中打开文件" onPress={handleOpenInBrowser}>
               <Globe2 className="size-3.5" />
             </FileSurfaceAction>
           ) : null}
           {!isHostFile && previewPath !== null ? (
             <FileSurfaceAction
-              label={explorerOpen ? "Hide file explorer" : "Show file explorer"}
+              label={explorerOpen ? "隐藏文件浏览器" : "显示文件浏览器"}
               pressed={explorerOpen}
               onPress={toggleExplorer}
             >
@@ -1488,7 +1488,7 @@ export default function FilePreviewPanel({
       ) : null}
       {relativePath && !attachment && !isHostFile && !canWriteFiles && !fileAccess.isPending ? (
         <div className="shrink-0 border-b px-3 py-1.5 text-2xs text-muted-foreground">
-          Read-only connection. Unsaved edits are kept until write access returns.
+          只读连接。未保存的编辑会保留，直到恢复写入权限。
         </div>
       ) : null}
       {previewPath &&
@@ -1498,7 +1498,8 @@ export default function FilePreviewPanel({
       file.data?.truncated &&
       (draft || isMarkdown || isMermaid || isHtml) ? (
         <div className="shrink-0 border-b border-warning/20 bg-warning-surface px-3 py-1.5 text-2xs text-warning-foreground">
-          Preview limited to the first 1 MB of a {file.data.byteLength.toLocaleString()} byte file.
+          Preview limited to the first 1 MB of a {file.data.byteLength.toLocaleString("zh-CN")} byte
+          file.
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -1514,7 +1515,7 @@ export default function FilePreviewPanel({
               tabIndex={-1}
               data-workspace-focus-default
               data-file-content-focus
-              aria-label="File contents"
+              aria-label="文件内容"
               className="sr-only"
               onFocus={() => queueMicrotask(focusEditorFromContent)}
             />
@@ -1619,7 +1620,7 @@ export default function FilePreviewPanel({
                 </p>
                 {attemptedPath ? (
                   <p className="text-muted-foreground">
-                    Attempted path
+                    尝试访问的路径
                     <code className="block break-all font-mono text-foreground select-all">
                       {attemptedPath}
                     </code>
@@ -1759,8 +1760,8 @@ export function WorkspaceLargeTextPreview(props: {
   const showError = (cause: unknown) => {
     toastManager.add({
       type: "error",
-      title: "Could not read file",
-      description: cause instanceof Error ? cause.message : "Try again.",
+      title: "无法读取文件",
+      description: cause instanceof Error ? cause.message : "请重试。",
     });
   };
   // Each workspace mutation re-mints the URL, so an edited file loads its new bytes.
@@ -1783,7 +1784,7 @@ export function WorkspaceLargeTextPreview(props: {
   if (assetUrl._tag === "Failure")
     return (
       <FileSurfaceFailure
-        message="Unable to load file preview."
+        message="无法加载文件预览。"
         onRetry={() => {
           setRevision((value) => value + 1);
           void refreshAssetUrl().catch(showError);
@@ -1791,14 +1792,14 @@ export function WorkspaceLargeTextPreview(props: {
       />
     );
   if (assetUrl._tag !== "Success" || loaded === null)
-    return <div className="p-6 text-xs text-muted-foreground">Loading…</div>;
+    return <div className="p-6 text-xs text-muted-foreground">加载中</div>;
   const src = `${loaded.url}${loaded.url.includes("?") ? "&" : "?"}revision=${encodeURIComponent(loaded.revision)}`;
   return (
     <>
       <div className={FILE_SURFACE_SUBHEADER_CLASS}>
-        <span className="min-w-0 flex-1 text-xs text-muted-foreground">Full file</span>
+        <span className="min-w-0 flex-1 text-xs text-muted-foreground">完整文件</span>
         <FileSurfaceAction
-          label={isCopied ? "Copied" : "Copy contents"}
+          label={isCopied ? "已复制" : "复制内容"}
           onPress={() => {
             const copy = copyContents.current;
             if (!copy) return;
@@ -1810,15 +1811,15 @@ export function WorkspaceLargeTextPreview(props: {
           {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
         </FileSurfaceAction>
         <FileSurfaceAction
-          label={saving ? "Preparing file…" : "Save file"}
+          label={saving ? "正在准备文件…" : "保存文件"}
           disabled={saving}
           onPress={() => {
             setSaving(true);
             void (async () => {
               const url = await refreshAssetUrl();
-              if (!url) throw new Error("Reconnect to the environment and try again.");
+              if (!url) throw new Error("请重新连接环境后重试。");
               const response = await fetch(url);
-              if (!response.ok) throw new Error("The file could not be loaded. Try again.");
+              if (!response.ok) throw new Error("无法加载文件，请重试。");
               const downloadUrl = URL.createObjectURL(await response.blob());
               setTimeout(() => URL.revokeObjectURL(downloadUrl), 30_000);
               const anchor = document.createElement("a");
@@ -1833,7 +1834,7 @@ export function WorkspaceLargeTextPreview(props: {
           <DownloadIcon className="size-3.5" />
         </FileSurfaceAction>
       </div>
-      <Suspense fallback={<div className="p-6 text-xs text-muted-foreground">Loading…</div>}>
+      <Suspense fallback={<div className="p-6 text-xs text-muted-foreground">加载中</div>}>
         <LargeTextViewer
           key={`${src}:${revision}`}
           name={props.name}

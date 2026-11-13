@@ -144,7 +144,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   };
 
   if (!item) return null;
-  const mediaLabel = item.type === "video" ? "video" : "image";
+  const mediaLabel = item.type === "video" ? "视频" : "图片";
   const openOriginalLink =
     item.originalUrl && resolveExternalWebLinkHost(item.originalUrl) !== null ? (
       <OpenMediaLink originalUrl={item.originalUrl} />
@@ -153,10 +153,10 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   const showingAccessibilityDetails =
     Boolean(accessibilityDetails) && accessibilityDetailsSrc === item.src;
   const contentsLabel = showingAccessibilityDetails
-    ? "Show screenshot"
+    ? "显示截图"
     : accessibilityDetails?.format === "json"
-      ? "Show accessibility JSON"
-      : "Show extracted text";
+      ? "显示无障碍 JSON"
+      : "显示提取的文字";
 
   return (
     <Dialog
@@ -184,7 +184,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           if (event.target === event.currentTarget) close();
         }}
       >
-        <DialogTitle className="sr-only">Expanded {mediaLabel} preview</DialogTitle>
+        <DialogTitle className="sr-only">展开 {mediaLabel} preview</DialogTitle>
         <Button
           type="button"
           ref={closeButtonRef}
@@ -192,7 +192,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           variant="media-close"
           className="absolute right-0 top-0 z-20"
           onClick={close}
-          aria-label={`Close ${mediaLabel} preview`}
+          aria-label={`关闭${mediaLabel}预览`}
         >
           <XIcon />
         </Button>
@@ -202,7 +202,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             size="icon"
             variant="media-navigation"
             className="left-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="Previous media"
+            aria-label="上一个媒体"
             onClick={() => navigateImage(-1)}
           >
             <ChevronLeftIcon className="size-5" />
@@ -222,9 +222,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             ) : item.src === null || failedImageSrc === item.src ? (
               <ExpandedMediaFailure>
                 <p>
-                  {openOriginalLink
-                    ? "This image could not be loaded."
-                    : "Image unavailable. The file may have been moved or deleted."}
+                  {openOriginalLink ? "这张图片无法加载。" : "图片不可用，文件可能已被移动或删除。"}
                 </p>
                 {openOriginalLink}
               </ExpandedMediaFailure>
@@ -278,7 +276,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
             size="icon"
             variant="media-navigation"
             className="right-0 top-auto bottom-0 translate-y-0 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2"
-            aria-label="Next media"
+            aria-label="下一个媒体"
             onClick={() => navigateImage(1)}
           >
             <ChevronRightIcon className="size-5" />

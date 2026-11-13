@@ -14,6 +14,6 @@ export function editorLabelForPlatform(editorId: EditorId, platform: string): st
 
 export function openInEditorMenuLabel(editorId: EditorId | null): string {
   return editorId === null || editorId === "file-manager"
-    ? "Open in editor"
-    : `Open in ${editorLabels.get(editorId) ?? "Editor"}`;
+    ? "在编辑器中打开"
+    : `在 ${editorLabels.get(editorId) ?? "Editor"} 中打开`;
 }

@@ -174,7 +174,7 @@ function sshPreparationError(cause: unknown) {
   }
   return new ConnectionTransientError({
     reason: "remote-unavailable",
-    detail: `Could not prepare the SSH environment: ${message}`,
+    detail: `无法准备 SSH 环境：${message}`,
   });
 }
 
@@ -220,7 +220,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
   if (pairingToken === null) {
     return yield* new ConnectionBlockedError({
       reason: "authentication",
-      detail: "The SSH environment did not issue a pairing credential.",
+      detail: "SSH 环境没有签发配对凭据。",
     });
   }
   const descriptor = yield* Effect.tryPromise({
@@ -230,7 +230,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
   if (expectedEnvironmentId !== undefined && descriptor.environmentId !== expectedEnvironmentId) {
     return yield* new ConnectionBlockedError({
       reason: "configuration",
-      detail: `That host reaches ${descriptor.label}, a different machine. Add it as its own environment instead.`,
+      detail: `该主机连接的是 ${descriptor.label}，属于另一台机器。请改为将其添加为独立的环境。`,
     });
   }
   const access = yield* Effect.tryPromise({
@@ -248,7 +248,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
       }
       return new ConnectionBlockedError({
         reason: "configuration",
-        detail: `${descriptor.label} runs T3 Code ${descriptor.serverVersion}, but this desktop is ${APP_VERSION}, and that server could not accept its pairing. Restart the T3 server on ${descriptor.label} so it runs ${APP_VERSION}, then retry.`,
+        detail: `${descriptor.label} 运行的 T3 Code 是 ${descriptor.serverVersion}，而这台桌面是 ${APP_VERSION}，该服务器无法接受这次配对。请在 ${descriptor.label} 上重启 T3 服务器，使它运行 ${APP_VERSION}，然后重试。`,
       });
     },
   });
@@ -284,7 +284,7 @@ export const prepareDesktopSshEnvironment = Effect.fn("web.connectionPlatform.ss
       if (descriptor.environmentId !== input.expectedEnvironmentId) {
         return yield* new ConnectionBlockedError({
           reason: "configuration",
-          detail: `That host reaches ${descriptor.label}, a different machine. Add it as its own environment instead.`,
+          detail: `该主机连接的是 ${descriptor.label}，属于另一台机器。请改为将其添加为独立的环境。`,
         });
       }
       const session = yield* Effect.tryPromise({
@@ -338,7 +338,7 @@ const layerCapabilities = Layer.effectContext(
         if (session === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: "Sign in to T3 Connect to connect this environment.",
+            detail: "请登录 T3 Connect 以连接此环境。",
           });
         }
         const token = yield* session.readClerkToken().pipe(
@@ -353,7 +353,7 @@ const layerCapabilities = Layer.effectContext(
         if (token === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: "The T3 Connect session is unavailable.",
+            detail: "T3 Connect 会话不可用。",
           });
         }
         return token;
@@ -368,7 +368,7 @@ const layerCapabilities = Layer.effectContext(
         catch: (cause) =>
           new ConnectionTransientError({
             reason: "remote-unavailable",
-            detail: `Could not load the desktop primary credential: ${String(cause)}`,
+            detail: `无法加载桌面主凭据：${String(cause)}`,
           }),
       }).pipe(Effect.map(Option.fromNullishOr)),
     });
@@ -379,7 +379,7 @@ const layerCapabilities = Layer.effectContext(
           if (bridge === undefined) {
             return yield* new ConnectionBlockedError({
               reason: "unsupported",
-              detail: "SSH environments are only available in the desktop app.",
+              detail: "SSH 环境仅在桌面应用中可用。",
             });
           }
           return yield* provisionDesktopSshEnvironment(bridge, target, expectedEnvironmentId);
@@ -390,7 +390,7 @@ const layerCapabilities = Layer.effectContext(
         if (bridge === undefined) {
           return yield* new ConnectionBlockedError({
             reason: "unsupported",
-            detail: "SSH environments are only available in the desktop app.",
+            detail: "SSH 环境仅在桌面应用中可用。",
           });
         }
         return yield* prepareDesktopSshEnvironment(bridge, input);
@@ -406,7 +406,7 @@ const layerCapabilities = Layer.effectContext(
           catch: (cause) =>
             new ConnectionTransientError({
               reason: "remote-unavailable",
-              detail: `Could not disconnect the SSH environment: ${String(cause)}`,
+              detail: `无法断开 SSH 环境：${String(cause)}`,
             }),
         });
       }),
@@ -451,7 +451,7 @@ const loadSecondaryConnectionRegistration = Effect.fn(
   ) {
     return yield* new ConnectionTransientError({
       reason: "endpoint-unavailable",
-      detail: `Desktop-local backend ${entry.id} is not ready yet.`,
+      detail: `本机桌面后端 ${entry.id} 尚未就绪。`,
     });
   }
   const httpBaseUrl = entry.httpBaseUrl;

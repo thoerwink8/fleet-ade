@@ -14,7 +14,7 @@ function RevealList(props: {
 }) {
   const revealActiveRow = useActiveRowReveal(props.reveal, props.activeKey);
   return (
-    <ul aria-label="Threads" style={{ height: ROW_HEIGHT_PX * 4, overflowY: "auto", margin: 0 }}>
+    <ul aria-label="会话" style={{ height: ROW_HEIGHT_PX * 4, overflowY: "auto", margin: 0 }}>
       {props.rowKeys.map((key) => (
         <li
           key={key}
@@ -118,7 +118,7 @@ describe("useActiveRowReveal", () => {
     );
     const target = screen.getByText("thread-40", { exact: true });
     await expect.element(target).toBeInViewport();
-    screen.getByRole("list", { name: "Threads" }).element().scrollTop = 0;
+    screen.getByRole("列表", { name: "Threads" }).element().scrollTop = 0;
     await expect.element(target).not.toBeInViewport();
 
     // The route moves to a thread the list does not hold yet, then back.

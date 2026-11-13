@@ -39,8 +39,8 @@ export function PreviewPanel({
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="max-w-sm text-sm text-muted-foreground">
             {canOperatePreview
-              ? "Preview is only available in the T3 Code desktop app."
-              : "Pair this client again with preview access to control browser previews."}
+              ? "预览仅在 T3 Code 桌面应用中可用。"
+              : "请重新配对此客户端并授予预览权限，才能控制浏览器预览。"}
           </p>
         </div>
       </PreviewPanelShell>

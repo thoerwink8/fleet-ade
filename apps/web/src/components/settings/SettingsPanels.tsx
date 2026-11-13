@@ -1,7 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { NotificationSettings } from "./NotificationSettings";
 import { CheckIcon } from "lucide-react";
-import { msg, T, useGT, useMessages } from "gt-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
@@ -103,9 +102,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "./settingsLayout";
-import { searchableSetting, type SettingsSearchItemId } from "./settingsSearch";
-import { nativeLanguageName, SYSTEM_LANGUAGE } from "@t3tools/client-runtime/locales";
-import { SUPPORTED_LOCALES } from "../../i18n/locales";
+import { searchableSetting } from "./settingsSearch";
 import { BackgroundActivitySettingsRow } from "./BackgroundActivitySettings";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { PullRequestLinksOpenInAppSetting } from "./IntegrationsSettings";
@@ -121,26 +118,26 @@ import { awaitsTrackSwitch, channelSwitchLabel } from "../sidebar/updateEverythi
 import { isHostedByThisApp } from "../sidebar/useUpdateEverything";
 
 const RESPONSE_STREAMING_MODE_LABELS: Record<ResponseStreamingMode, string> = {
-  turn: "Wait for the full response",
-  paragraph: "Show finished paragraphs",
+  turn: "等待完整回复",
+  paragraph: "显示已完成的段落",
 };
 
 const RESPONSE_STREAMING_MODE_DESCRIPTIONS: Record<ResponseStreamingMode, string> = {
-  turn: "Text appears once the agent finishes its turn.",
-  paragraph: "Each paragraph or code block appears as soon as it is complete.",
+  turn: "智能体完成本轮后一次性显示文本。",
+  paragraph: "每个段落或代码块完成后立即显示。",
 };
 
 const SIDEBAR_PROJECT_SORT_ORDER_LABELS: Record<SidebarProjectSortOrder, string> = {
-  updated_at: msg("Last user message"),
-  created_at: msg("Created at"),
-  manual: msg("Manual"),
+  updated_at: "最后一条用户消息",
+  created_at: "创建时间",
+  manual: "手动",
 };
 const isSidebarProjectSortOrder = Schema.is(SidebarProjectSortOrder);
 
 const TIMESTAMP_FORMAT_LABELS = {
-  locale: msg("System default"),
-  "12-hour": msg("12-hour"),
-  "24-hour": msg("24-hour"),
+  locale: "系统默认",
+  "12-hour": "12 小时制",
+  "24-hour": "24 小时制",
 };
 
 const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
@@ -149,9 +146,9 @@ const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
 };
 
 const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
-  direct: msg("Direct"),
-  hold: msg("Hold"),
-  "double-click": msg("Double press"),
+  direct: "Direct",
+  hold: "长按",
+  "double-click": "按两次",
 };
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
@@ -225,8 +222,8 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not confirm update",
-            description: error instanceof Error ? error.message : "Update confirmation failed.",
+            title: "无法确认更新",
+            description: error instanceof Error ? error.message : "确认更新失败。",
           }),
         );
         return;
@@ -241,8 +238,8 @@ function AboutVersionSection() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not install update",
-              description: error instanceof Error ? error.message : "Install failed.",
+              title: "无法安装更新",
+              description: error instanceof Error ? error.message : "安装失败。",
             }),
           );
         })
@@ -259,11 +256,8 @@ function AboutVersionSection() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not check for updates",
-              description:
-                updatesDenial ??
-                result.state.message ??
-                "Automatic updates are not available in this build.",
+              title: "无法检查更新",
+              description: updatesDenial ?? result.state.message ?? "此版本不支持自动更新。",
             }),
           );
         }
@@ -272,8 +266,8 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not check for updates",
-            description: error instanceof Error ? error.message : "Update check failed.",
+            title: "无法检查更新",
+            description: error instanceof Error ? error.message : "检查更新失败。",
           }),
         );
       });
@@ -288,18 +282,16 @@ function AboutVersionSection() {
 
   const actionLabel: Record<string, string> = { download: "Download", install: "Install" };
   const statusLabel: Record<string, string> = {
-    checking: "Checking…",
-    downloading: "Downloading…",
+    checking: "正在检查…",
+    downloading: "正在下载…",
     // Off its track, "up to date" only means no switch is pending; Review moves it.
-    ...(appOffTrack ? {} : { "up-to-date": "Up to Date" }),
+    ...(appOffTrack ? {} : { "up-to-date": "已是最新版本" }),
   };
-  const buttonLabel =
-    actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "Check for Updates";
+  const buttonLabel = actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "检查更新";
   const description =
     action === "download" || action === "install"
-      ? "Update available."
-      : (getDesktopUpdateDisabledReason(updateState, updatesDenial) ??
-        "Current version of the application.");
+      ? "有可用更新。"
+      : (getDesktopUpdateDisabledReason(updateState, updatesDenial) ?? "应用的当前版本。");
 
   return (
     <>
@@ -349,11 +341,11 @@ function AboutVersionSection() {
                   disabled={updateRun !== null}
                   onClick={() => setSwitchChannel(selectedUpdateChannel)}
                 >
-                  Review
+                  查看
                 </Button>
               </>
             ) : (
-              "Switches this app and every connected machine whose database the target release supports."
+              "切换此应用，以及所有数据库受目标版本支持的已连接机器。"
             )
           }
           managed={updatesDenial}
@@ -369,21 +361,21 @@ function AboutVersionSection() {
               <SelectTrigger
                 size="sm"
                 className="w-full sm:w-40"
-                aria-label="Update track"
+                aria-label="更新通道"
                 disabled={switchChannel !== null || updateRun !== null}
               >
                 <SelectValue>{channelSwitchLabel(selectedUpdateChannel)}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Stable
+                  稳定版
                 </SelectItem>
                 <SelectItem
                   hideIndicator
                   value="nightly"
                   disabled={nightlyDeniedBy !== undefined && selectedUpdateChannel !== "nightly"}
                 >
-                  Nightly
+                  Nightly 版
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -392,7 +384,7 @@ function AboutVersionSection() {
       ) : selectedHostedAppChannel ? (
         <SettingsRow
           {...searchableSetting("update-track")}
-          description="Switches the hosted app release channel."
+          description="切换托管版应用的发布通道。"
           control={
             <Select
               value={selectedHostedAppChannel}
@@ -404,15 +396,15 @@ function AboutVersionSection() {
                 if (next) window.location.assign(next);
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Update track">
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="更新通道">
                 <SelectValue>{HOSTED_APP_CHANNEL_LABEL}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Latest
+                  最新版
                 </SelectItem>
                 <SelectItem hideIndicator value="nightly">
-                  Nightly
+                  Nightly 版
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -448,146 +440,139 @@ export function useSettingsRestore(onRestored?: () => void) {
 
   const changedSettingLabels = [
     ...(theme !== "system" ? ["Theme"] : []),
-    ...(!followSystem ? ["Follow system"] : []),
-    ...(themeHalves !== null ? ["Theme mix"] : []),
+    ...(!followSystem ? ["跟随系统"] : []),
+    ...(themeHalves !== null ? ["主题混搭"] : []),
     ...(settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast
       ? ["Contrast"]
       : []),
-    ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? ["Glass opacity"] : []),
-    ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme
-      ? ["Diff colors"]
-      : []),
-    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["Chat width"] : []),
-    ...(settings.effortDisplay !== DEFAULT_UNIFIED_SETTINGS.effortDisplay
-      ? ["Effort display"]
-      : []),
+    ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? ["毛玻璃不透明度"] : []),
+    ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? ["差异颜色"] : []),
+    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["聊天宽度"] : []),
+    ...(settings.effortDisplay !== DEFAULT_UNIFIED_SETTINGS.effortDisplay ? ["推理强度显示"] : []),
     ...(settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled
-      ? ["Render math"]
+      ? ["渲染数学公式"]
       : []),
     ...(settings.panelAnimationDurationMs !== DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs
-      ? ["Panel animations"]
+      ? ["面板动画"]
       : []),
     ...(settings.environmentIdentificationMode !==
     DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode
-      ? ["Environment identification"]
+      ? ["环境标识"]
       : []),
-    ...(settings.language !== DEFAULT_UNIFIED_SETTINGS.language ? ["Language"] : []),
-    ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
-      ? ["Time format"]
-      : []),
+    ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat ? ["时间格式"] : []),
     ...(settings.notificationMode !== DEFAULT_UNIFIED_SETTINGS.notificationMode
-      ? ["Thread notifications"]
+      ? ["会话通知"]
       : []),
     ...(settings.inAppNotificationsEnabled !== DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled
-      ? ["In-app notifications"]
+      ? ["应用内通知"]
       : []),
     ...(settings.sidebarProjectGroupingMode !== DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
-      ? ["Project Grouping"]
+      ? ["项目分组"]
       : []),
     ...(settings.sidebarProjectSortOrder !== DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder
-      ? ["Project order"]
+      ? ["项目排序"]
       : []),
     ...(settings.sidebarWorkingShelfEnabled !== DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled
-      ? ["Working section"]
+      ? ["运行中分组"]
       : []),
     ...(settings.sidebarAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays
-      ? ["Auto-settle inactive threads"]
+      ? ["自动收尾不活跃会话"]
       : []),
     ...(settings.sidebarAutoSettleKeepPullRequests !==
     DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests
-      ? ["Keep threads with a PR"]
+      ? ["保留有关联 PR 的会话"]
       : []),
     ...(settings.sidebarAutoSettleOnMerge !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge
-      ? ["Auto-settle merged threads"]
+      ? ["合并后自动收尾会话"]
       : []),
     ...(settings.autoResumeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads
-      ? ["Resume after usage limits"]
+      ? ["用量限制解除后继续"]
       : []),
     ...(settings.snoozeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads
-      ? ["Snooze until limits reset"]
+      ? ["暂缓到用量限制重置"]
       : []),
     ...(!Equal.equals(settings.snoozePresets, DEFAULT_UNIFIED_SETTINGS.snoozePresets)
-      ? ["Snooze options"]
+      ? ["暂缓选项"]
       : []),
-    ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? ["Word wrap"] : []),
+    ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? ["自动换行"] : []),
     ...(settings.persistComposerContextStrip !==
     DEFAULT_UNIFIED_SETTINGS.persistComposerContextStrip
-      ? ["Composer context"]
+      ? ["输入框上下文"]
       : []),
     ...getChangedTypographySettingLabels(settings),
     ...(settings.diffFilesCollapsed !== DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed
-      ? ["Default diff file state"]
+      ? ["差异文件默认状态"]
       : []),
     ...(settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace
-      ? ["Diff whitespace changes"]
+      ? ["差异空白字符改动"]
       : []),
-    ...(settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout ? ["Diff layout"] : []),
+    ...(settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout ? ["差异布局"] : []),
     ...(settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled
-      ? ["Open pull requests and changes panels proactively"]
+      ? ["自动打开 PR 与改动面板"]
       : []),
     ...(settings.showSkillsInSlashMenu !== DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu
-      ? ["Show skills in slash menu"]
+      ? ["在斜杠菜单中显示技能"]
       : []),
     ...(settings.composerRichTextEnabled !== DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled
-      ? ["Rich text composer"]
+      ? ["富文本输入框"]
       : []),
-    ...(settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut ? ["Send shortcut"] : []),
+    ...(settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut ? ["发送快捷键"] : []),
     ...(settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior
-      ? ["Follow-up behavior"]
+      ? ["追加消息行为"]
       : []),
     ...(settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility
-      ? ["Tool calls in chat"]
+      ? ["聊天中的工具调用"]
       : []),
     ...(settings.screenReaderAnnouncements !== DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements
-      ? ["Screen reader announcements"]
+      ? ["屏幕阅读器播报"]
       : []),
     ...(settings.screenReaderWindowTitle !== DEFAULT_UNIFIED_SETTINGS.screenReaderWindowTitle
-      ? ["Screen reader window title"]
+      ? ["屏幕阅读器窗口标题"]
       : []),
     ...(settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode
-      ? ["Response streaming"]
+      ? ["流式响应"]
       : []),
     ...(settings.enableProviderUpdateChecks !== DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks
-      ? ["Provider update checks"]
+      ? ["提供方更新检查"]
       : []),
     ...(settings.continueThreadsAfterServerUpdate !==
     DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
-      ? ["Continue threads after restarts"]
+      ? ["重启后继续会话"]
       : []),
-    ...(isBackgroundActivityDirty ? ["Background activity"] : []),
+    ...(isBackgroundActivityDirty ? ["后台活动"] : []),
     ...(settings.keepAwakeWhileAgentsWork !== DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork
-      ? ["Keep awake while agents work"]
+      ? ["智能体工作时保持唤醒"]
       : []),
     ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
-      ? ["New thread mode"]
+      ? ["新会话模式"]
       : []),
     ...(settings.newWorktreesStartFromOrigin !==
     DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin
-      ? ["New worktrees start from remote"]
+      ? ["新工作树从远程分支开始"]
       : []),
     ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
-      ? ["Add project base directory"]
+      ? ["添加项目的起始目录"]
       : []),
     ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
-      ? ["Clone into host folders"]
+      ? ["克隆到主机文件夹"]
       : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
-      ? ["Unpin confirmation"]
+      ? ["取消置顶确认"]
       : []),
     ...(settings.confirmThreadArchive !== DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive
-      ? ["Archive confirmation"]
+      ? ["归档确认"]
       : []),
     ...(settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete
-      ? ["Delete confirmation"]
+      ? ["删除确认"]
       : []),
-    ...(settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? ["Quit shortcut"] : []),
-    ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
+    ...(settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? ["退出快捷键"] : []),
+    ...(isTextGenerationModelDirty ? ["文本生成模型"] : []),
     ...(settings.threadTitleInstructions !== DEFAULT_UNIFIED_SETTINGS.threadTitleInstructions
-      ? ["Thread title instructions"]
+      ? ["会话标题生成说明"]
       : []),
     ...getChangedBrowserSettingLabels(settings),
     ...(settings.enableAgentBrowserAccess !== DEFAULT_UNIFIED_SETTINGS.enableAgentBrowserAccess
-      ? ["Agent browser access"]
+      ? ["智能体浏览器访问"]
       : []),
   ];
 
@@ -595,9 +580,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     if (changedSettingLabels.length === 0) return;
     const api = readLocalApi();
     const confirmed = await (api ?? ensureLocalApi()).dialogs.confirm(
-      ["Restore default settings?", `This will reset: ${changedSettingLabels.join(", ")}.`].join(
-        "\n",
-      ),
+      ["恢复默认设置？", `将重置：${changedSettingLabels.join(", ")}。`].join("\n"),
       { variant: "destructive" },
     );
     if (!confirmed) return;
@@ -616,8 +599,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Couldn’t restore theme settings",
-          description: "Try again.",
+          title: "无法恢复主题设置",
+          description: "请重试。",
         }),
       );
     };
@@ -761,64 +744,44 @@ function AutoSettleDaysInput({
         }
       }}
       onBlur={() => setDraft(String(value))}
-      aria-label="Days of inactivity before auto-settle"
+      aria-label="自动收尾前的闲置天数"
     />
   );
 }
 
-/** Row anchor props with the registry title in the active language. */
-function useTranslatedSearchableSetting() {
-  const m = useMessages();
-  return (id: SettingsSearchItemId) => {
-    const setting = searchableSetting(id);
-    return { ...setting, title: m(setting.title) };
-  };
-}
-
 export function GeneralSettingsPanel() {
-  const gt = useGT();
-  const m = useMessages();
-  const setting = useTranslatedSearchableSetting();
+  const setting = searchableSetting;
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
     readLastEnabledProjectGroupingMode(),
   );
-  const languageValue = SUPPORTED_LOCALES.includes(settings.language)
-    ? settings.language
-    : SYSTEM_LANGUAGE;
-
   return (
     <SettingsPageContainer>
-      <SettingsSection id="notifications" title={gt("Notifications")}>
+      <SettingsSection id="notifications" title={"通知"}>
         <NotificationSettings />
         <SettingsRow
           {...setting("in-app-notifications")}
-          description={
-            <T>
-              Show a toast when another thread finishes, fails, or needs input or approval while
-              this app has focus.
-            </T>
-          }
+          description={"当应用处于前台，其他会话完成、失败或需要输入或批准时显示提示。"}
           control={
             <Switch
               checked={settings.inAppNotificationsEnabled}
               onCheckedChange={(checked) => updateSettings({ inAppNotificationsEnabled: checked })}
-              aria-label={gt("In-app notifications")}
+              aria-label={"应用内通知"}
             />
           }
         />
       </SettingsSection>
 
-      <SettingsSection id="sidebar" title={gt("Sidebar")}>
+      <SettingsSection id="sidebar" title={"侧边栏"}>
         <SettingsRow
           {...setting("project-grouping")}
-          description={<T>Combine matching repositories across environments.</T>}
+          description={"将不同环境中的相同仓库合并显示。"}
           resetAction={
             settings.sidebarProjectGroupingMode !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
               <SettingResetButton
-                label="project grouping"
+                label="项目分组"
                 onClick={() =>
                   updateSettings({
                     sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
@@ -842,18 +805,18 @@ export function GeneralSettingsPanel() {
                   ),
                 });
               }}
-              aria-label={gt("Project grouping")}
+              aria-label={"项目分组"}
             />
           }
         />
         <SettingsRow
           {...setting("project-order")}
-          description={<T>Order of projects in the sidebar project picker and command palette.</T>}
+          description={"侧边栏项目选择器和命令面板中的项目排序。"}
           resetAction={
             settings.sidebarProjectSortOrder !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder ? (
               <SettingResetButton
-                label="project order"
+                label="项目排序"
                 onClick={() =>
                   updateSettings({
                     sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
@@ -871,15 +834,15 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label={gt("Project order")}>
+              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label={"项目排序"}>
                 <SelectValue>
-                  {m(SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder])}
+                  {SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder]}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {SidebarProjectSortOrder.literals.map((sortOrder) => (
                   <SelectItem hideIndicator key={sortOrder} value={sortOrder}>
-                    {m(SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder])}
+                    {SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder]}
                   </SelectItem>
                 ))}
               </SelectPopup>
@@ -889,16 +852,13 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           {...setting("working-shelf")}
           description={
-            <T>
-              Fold working and monitoring threads into a Working section. They return to the top of
-              the inbox when they need you. The boring sidebar in Labs has no Working section.
-            </T>
+            "将正在执行和监控的会话收起到“运行中”分组。需要你处理时，它们会回到收件箱顶部。实验功能中的简洁侧边栏不显示此分组。"
           }
           resetAction={
             settings.sidebarWorkingShelfEnabled !==
             DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled ? (
               <SettingResetButton
-                label="working section"
+                label="运行中分组"
                 onClick={() =>
                   updateSettings({
                     sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
@@ -913,20 +873,20 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ sidebarWorkingShelfEnabled: Boolean(checked) })
               }
-              aria-label={gt("Working section")}
+              aria-label={"运行中分组"}
             />
           }
         />
       </SettingsSection>
 
-      <SettingsSection id="confirmations" title={gt("Confirmations")}>
+      <SettingsSection id="confirmations" title={"确认操作"}>
         <SettingsRow
           {...setting("unpin-confirmation")}
-          description={<T>Ask before unpinning a thread from the pinned section.</T>}
+          description={"取消置顶会话前询问。"}
           resetAction={
             settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin ? (
               <SettingResetButton
-                label="unpin confirmation"
+                label="取消置顶确认"
                 onClick={() =>
                   updateSettings({
                     confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -941,19 +901,17 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadUnpin: Boolean(checked) })
               }
-              aria-label={gt("Confirm thread unpinning")}
+              aria-label={"确认取消置顶会话"}
             />
           }
         />
         <SettingsRow
           {...setting("archive-confirmation")}
-          description={
-            <T>Require a second click on the inline archive action before a thread is archived.</T>
-          }
+          description={"点击会话行内的归档按钮后，需再次点击才会归档。"}
           resetAction={
             settings.confirmThreadArchive !== DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive ? (
               <SettingResetButton
-                label="archive confirmation"
+                label="归档确认"
                 onClick={() =>
                   updateSettings({
                     confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
@@ -968,17 +926,17 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadArchive: Boolean(checked) })
               }
-              aria-label={gt("Confirm thread archiving")}
+              aria-label={"确认归档会话"}
             />
           }
         />
         <SettingsRow
           {...setting("delete-confirmation")}
-          description={<T>Ask before deleting a thread and its chat history.</T>}
+          description={"删除会话及其聊天记录前询问。"}
           resetAction={
             settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete ? (
               <SettingResetButton
-                label="delete confirmation"
+                label="删除确认"
                 onClick={() =>
                   updateSettings({
                     confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
@@ -993,18 +951,18 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadDelete: Boolean(checked) })
               }
-              aria-label={gt("Confirm thread deletion")}
+              aria-label={"确认删除会话"}
             />
           }
         />
         {isElectron ? (
           <SettingsRow
             {...setting("quit-confirmation")}
-            description={<T>Hold mode also quits on two quick presses.</T>}
+            description={"长按模式也支持快速按两次退出。"}
             resetAction={
               settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? (
                 <SettingResetButton
-                  label="quit shortcut behavior"
+                  label="退出快捷键行为"
                   onClick={() =>
                     updateSettings({ confirmQuit: DEFAULT_UNIFIED_SETTINGS.confirmQuit })
                   }
@@ -1020,19 +978,13 @@ export function GeneralSettingsPanel() {
                   }
                 }}
               >
-                <SelectTrigger
-                  size="sm"
-                  className="w-full sm:w-40"
-                  aria-label={gt("Quit shortcut behavior")}
-                >
-                  <SelectValue>
-                    {m(QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit])}
-                  </SelectValue>
+                <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={"退出快捷键行为"}>
+                  <SelectValue>{QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit]}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   {Object.entries(QUIT_CONFIRMATION_MODE_LABELS).map(([value, label]) => (
                     <SelectItem hideIndicator key={value} value={value}>
-                      {m(label)}
+                      {label}
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -1042,58 +994,14 @@ export function GeneralSettingsPanel() {
         ) : null}
       </SettingsSection>
 
-      <SettingsSection id="display" title={gt("Display")}>
-        <SettingsRow
-          {...setting("language")}
-          description={<T>System default follows your browser or OS language.</T>}
-          resetAction={
-            settings.language !== DEFAULT_UNIFIED_SETTINGS.language ? (
-              <SettingResetButton
-                label="language"
-                onClick={() =>
-                  updateSettings({
-                    language: DEFAULT_UNIFIED_SETTINGS.language,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Select
-              value={languageValue}
-              onValueChange={(value) => {
-                if (value) {
-                  updateSettings({ language: value });
-                }
-              }}
-            >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={gt("Language")}>
-                <SelectValue>
-                  {languageValue === SYSTEM_LANGUAGE
-                    ? m(TIMESTAMP_FORMAT_LABELS.locale)
-                    : nativeLanguageName(languageValue)}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value={SYSTEM_LANGUAGE}>
-                  {m(TIMESTAMP_FORMAT_LABELS.locale)}
-                </SelectItem>
-                {SUPPORTED_LOCALES.map((locale) => (
-                  <SelectItem hideIndicator key={locale} value={locale}>
-                    {nativeLanguageName(locale)}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-          }
-        />
+      <SettingsSection id="display" title={"显示"}>
         <SettingsRow
           {...setting("time-format")}
-          description={<T>System default follows your browser or OS clock preference.</T>}
+          description={"系统默认使用浏览器或操作系统的时钟偏好。"}
           resetAction={
             settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat ? (
               <SettingResetButton
-                label="time format"
+                label="时间格式"
                 onClick={() =>
                   updateSettings({
                     timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
@@ -1111,22 +1019,18 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label={gt("Timestamp format")}
-              >
-                <SelectValue>{m(TIMESTAMP_FORMAT_LABELS[settings.timestampFormat])}</SelectValue>
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label={"时间格式"}>
+                <SelectValue>{TIMESTAMP_FORMAT_LABELS[settings.timestampFormat]}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="locale">
-                  {m(TIMESTAMP_FORMAT_LABELS.locale)}
+                  {TIMESTAMP_FORMAT_LABELS.locale}
                 </SelectItem>
                 <SelectItem hideIndicator value="12-hour">
-                  {m(TIMESTAMP_FORMAT_LABELS["12-hour"])}
+                  {TIMESTAMP_FORMAT_LABELS["12-hour"]}
                 </SelectItem>
                 <SelectItem hideIndicator value="24-hour">
-                  {m(TIMESTAMP_FORMAT_LABELS["24-hour"])}
+                  {TIMESTAMP_FORMAT_LABELS["24-hour"]}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1141,23 +1045,23 @@ export function ChatSettingsPanel() {
   const modifierLabel = isMacPlatform(navigator.platform) ? "⌘" : "Ctrl";
   const sendShortcutOptions = [
     { value: "enter", label: "Enter" },
-    { value: "mod-enter-multiline", label: `${modifierLabel} + Enter for multiline prompts` },
-    { value: "mod-enter", label: `${modifierLabel} + Enter always` },
+    { value: "mod-enter-multiline", label: `多行提示词用 ${modifierLabel} + Enter 发送` },
+    { value: "mod-enter", label: `始终用 ${modifierLabel} + Enter 发送` },
   ] as const;
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="composer" title="Composer">
+      <SettingsSection id="composer" title="输入框">
         <SettingsRow
           {...searchableSetting("composer-rich-text")}
-          description="Show formatted Markdown as you type."
+          description="输入时显示 Markdown 格式效果。"
           resetAction={
             settings.composerRichTextEnabled !==
             DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled ? (
               <SettingResetButton
-                label="rich text composer"
+                label="富文本输入框"
                 onClick={() =>
                   updateSettings({
                     composerRichTextEnabled: DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled,
@@ -1172,17 +1076,17 @@ export function ChatSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ composerRichTextEnabled: Boolean(checked) })
               }
-              aria-label="Rich text composer"
+              aria-label="富文本输入框"
             />
           }
         />
         <SettingsRow
           {...searchableSetting("send-shortcut")}
-          description="Choose when Enter sends a prompt or inserts a new line"
+          description="选择 Enter 是发送提示词还是插入换行"
           resetAction={
             settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut ? (
               <SettingResetButton
-                label="send shortcut"
+                label="发送快捷键"
                 onClick={() =>
                   updateSettings({ sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut })
                 }
@@ -1200,7 +1104,7 @@ export function ChatSettingsPanel() {
               <SelectTrigger
                 size="sm"
                 className="w-auto min-w-0 max-w-full"
-                aria-label="Send shortcut"
+                aria-label="发送快捷键"
               >
                 <SelectValue>
                   {
@@ -1225,11 +1129,11 @@ export function ChatSettingsPanel() {
         <AdvancedSettings targetIds={[searchableSetting("skills-in-slash-menu").id]}>
           <SettingsRow
             {...searchableSetting("skills-in-slash-menu")}
-            description="Also include skills in the / command menu. Skills always appear when you type $."
+            description="在 / 命令菜单中也显示技能。输入 $ 时始终会显示技能。"
             resetAction={
               settings.showSkillsInSlashMenu !== DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu ? (
                 <SettingResetButton
-                  label="skills in slash menu"
+                  label="在斜杠菜单中显示技能"
                   onClick={() =>
                     updateSettings({
                       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
@@ -1244,26 +1148,26 @@ export function ChatSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ showSkillsInSlashMenu: Boolean(checked) })
                 }
-                aria-label="Show skills in slash menu"
+                aria-label="在斜杠菜单中显示技能"
               />
             }
           />
         </AdvancedSettings>
       </SettingsSection>
 
-      <SettingsSection id="follow-ups" title="Follow-ups">
+      <SettingsSection id="follow-ups" title="追加消息">
         <SettingsRow
           {...searchableSetting("follow-up-behavior")}
           description={
-            "Queue follow-ups while the agent runs or steer the current run. " +
+            "智能体运行时，可以把追加消息加入队列，或用它引导当前执行。" +
             (settings.sendShortcut === "mod-enter-multiline"
-              ? `Press ${modifierLabel} + Enter for single-line prompts or ${modifierLabel} + Shift + Enter for multiline prompts to do the opposite for one message.`
+              ? `单行提示词按 ${modifierLabel} + Enter、多行提示词按 ${modifierLabel} + Shift + Enter，可对单条消息使用相反的方式。`
               : `Press ${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""} + Enter to do the opposite for one message.`)
           }
           resetAction={
             settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior ? (
               <SettingResetButton
-                label="follow-up behavior"
+                label="追加消息行为"
                 onClick={() =>
                   updateSettings({
                     followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
@@ -1281,25 +1185,25 @@ export function ChatSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="Follow-up behavior">
+              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="追加消息行为">
                 <SelectValue>
-                  {settings.followUpBehavior === "queue" ? "Queue" : "Steer"}
+                  {settings.followUpBehavior === "queue" ? "加入队列" : "引导当前执行"}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem value="queue">Queue</SelectItem>
-                <SelectItem value="steer">Steer</SelectItem>
+                <SelectItem value="queue">加入队列</SelectItem>
+                <SelectItem value="steer">引导当前执行</SelectItem>
               </SelectPopup>
             </Select>
           }
         />
       </SettingsSection>
 
-      <SettingsSection id="activity" title="Activity">
+      <SettingsSection id="activity" title="活动">
         <ToolCallVisibilityRow />
       </SettingsSection>
 
-      <SettingsSection id="screen-reader" title="Screen reader">
+      <SettingsSection id="screen-reader" title="屏幕阅读器">
         <ScreenReaderAnnouncementsRow />
         <ScreenReaderWindowTitleRow />
       </SettingsSection>
@@ -1308,9 +1212,9 @@ export function ChatSettingsPanel() {
 }
 
 const TOOL_CALL_VISIBILITY_LABELS: Record<ToolCallVisibility, string> = {
-  showAll: "Show all",
-  hideSuccessful: "Hide successful",
-  hideAll: "Hide all",
+  showAll: "全部显示",
+  hideSuccessful: "隐藏成功的调用",
+  hideAll: "全部隐藏",
   zen: "Zen",
 };
 
@@ -1322,11 +1226,11 @@ function ToolCallVisibilityRow() {
   return (
     <SettingsRow
       {...searchableSetting("tool-call-visibility")}
-      description="Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show."
+      description="隐藏智能体执行的命令、编辑和搜索。“隐藏成功的调用”仍保留失败项；“专注模式”仅显示最终回答。审批、提问和错误始终显示。"
       resetAction={
         settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility ? (
           <SettingResetButton
-            label="tool calls in chat"
+            label="聊天中的工具调用"
             onClick={() =>
               updateSettings({ toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility })
             }
@@ -1340,7 +1244,7 @@ function ToolCallVisibilityRow() {
             if (isToolCallVisibility(value)) updateSettings({ toolCallVisibility: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Tool calls in chat">
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="聊天中的工具调用">
             <SelectValue>{TOOL_CALL_VISIBILITY_LABELS[settings.toolCallVisibility]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -1357,8 +1261,8 @@ function ToolCallVisibilityRow() {
 }
 
 const SCREEN_READER_ANNOUNCEMENTS_LABELS: Record<ScreenReaderAnnouncements, string> = {
-  status: "Status only",
-  messages: "Status and messages",
+  status: "仅状态",
+  messages: "状态和消息",
   everything: "Everything",
 };
 
@@ -1370,12 +1274,12 @@ function ScreenReaderAnnouncementsRow() {
   return (
     <SettingsRow
       {...searchableSetting("screen-reader-announcements")}
-      description="What a screen reader hears from the open thread: a turn starting, needing you, and ending. Status and messages adds what the agent writes before its last message. Everything adds each step."
+      description="屏幕阅读器会从当前会话中播报：一轮开始、需要你处理以及结束。“状态和消息”还会播报智能体在最后一条消息之前写下的内容。“全部”会播报每一步。"
       resetAction={
         settings.screenReaderAnnouncements !==
         DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements ? (
           <SettingResetButton
-            label="screen reader announcements"
+            label="屏幕阅读器播报"
             onClick={() =>
               updateSettings({
                 screenReaderAnnouncements: DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements,
@@ -1393,11 +1297,7 @@ function ScreenReaderAnnouncementsRow() {
             }
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-48"
-            aria-label="Screen reader announcements"
-          >
+          <SelectTrigger size="sm" className="w-full sm:w-48" aria-label="屏幕阅读器播报">
             <SelectValue>
               {SCREEN_READER_ANNOUNCEMENTS_LABELS[settings.screenReaderAnnouncements]}
             </SelectValue>
@@ -1421,7 +1321,7 @@ function ScreenReaderWindowTitleRow() {
   return (
     <SettingsRow
       {...searchableSetting("screen-reader-window-title")}
-      description="Start the window title with the thread's status, like Needs approval, and its name, so screen readers read them first when you switch apps. Taskbars, shared screens, and time trackers see it too."
+      description="窗口标题以会话状态（例如“需要批准”）和名称开头，这样切换应用时屏幕阅读器会先读到它们。任务栏、共享屏幕和计时工具也会看到。"
       resetAction={
         settings.screenReaderWindowTitle !== DEFAULT_UNIFIED_SETTINGS.screenReaderWindowTitle ? (
           <SettingResetButton
@@ -1438,7 +1338,7 @@ function ScreenReaderWindowTitleRow() {
         <Switch
           checked={settings.screenReaderWindowTitle}
           onCheckedChange={(checked) => updateSettings({ screenReaderWindowTitle: checked })}
-          aria-label="Screen reader window title"
+          aria-label="屏幕阅读器窗口标题"
         />
       }
     />
@@ -1451,11 +1351,11 @@ function DiffColorsSettingsRow() {
   return (
     <SettingsRow
       {...searchableSetting("diff-color-scheme")}
-      description="Choose colors for additions and deletions, including change counts."
+      description="选择新增和删除内容（包括改动计数）的颜色。"
       resetAction={
         settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? (
           <SettingResetButton
-            label="diff colors"
+            label="差异颜色"
             onClick={() =>
               updateSettings({ diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme })
             }
@@ -1471,7 +1371,7 @@ function DiffColorsSettingsRow() {
                 updateSettings({ diffColorScheme: value });
             }}
           >
-            <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Diff colors">
+            <SelectTrigger size="sm" className="w-full min-w-0" aria-label="差异颜色">
               <span
                 aria-hidden="true"
                 className={
@@ -1484,12 +1384,12 @@ function DiffColorsSettingsRow() {
                 <span className="size-2 rounded-full bg-diff-addition" />
               </span>
               <SelectValue>
-                {settings.diffColorScheme === "blue-orange" ? "Blue & orange" : "Red & green"}
+                {settings.diffColorScheme === "blue-orange" ? "蓝色与橙色" : "红色与绿色"}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
-              <SelectItem value="red-green">Red & green (default)</SelectItem>
-              <SelectItem value="blue-orange">Blue & orange</SelectItem>
+              <SelectItem value="red-green">红色与绿色（默认）</SelectItem>
+              <SelectItem value="blue-orange">蓝色与橙色</SelectItem>
             </SelectPopup>
           </Select>
         </div>
@@ -1504,14 +1404,14 @@ export function DiffsSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="diffs" title="Diffs">
+      <SettingsSection id="diffs" title="差异">
         <SettingsRow
           {...searchableSetting("diff-layout")}
-          description="Show diffs stacked or side by side. The toggle in the diff toolbar changes this too."
+          description="以上下堆叠或左右并排方式显示差异。差异工具栏中的切换按钮也会修改此设置。"
           resetAction={
             settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout ? (
               <SettingResetButton
-                label="diff layout"
+                label="差异布局"
                 onClick={() => updateSettings({ diffLayout: DEFAULT_UNIFIED_SETTINGS.diffLayout })}
               />
             ) : null
@@ -1525,7 +1425,7 @@ export function DiffsSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Diff layout">
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="差异布局">
                 <SelectValue>{DIFF_LAYOUT_LABELS[settings.diffLayout]}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -1541,11 +1441,11 @@ export function DiffsSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("hide-whitespace-changes")}
-          description="Set whether the diff panel ignores whitespace-only edits by default."
+          description="设置差异面板是否默认忽略仅涉及空白字符的改动。"
           resetAction={
             settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace ? (
               <SettingResetButton
-                label="diff whitespace changes"
+                label="差异空白字符改动"
                 onClick={() =>
                   updateSettings({
                     diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
@@ -1560,17 +1460,17 @@ export function DiffsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ diffIgnoreWhitespace: Boolean(checked) })
               }
-              aria-label="Hide whitespace changes by default"
+              aria-label="默认隐藏空白字符改动"
             />
           }
         />
         <SettingsRow
           {...searchableSetting("default-diff-file-state")}
-          description="Start with files expanded or collapsed when opening diffs or a pull request's Code tab."
+          description="打开差异或 pull request 的“代码”标签页时，文件默认展开还是折叠。"
           resetAction={
             settings.diffFilesCollapsed !== DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed ? (
               <SettingResetButton
-                label="default diff file state"
+                label="差异文件默认状态"
                 onClick={() =>
                   updateSettings({
                     diffFilesCollapsed: DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed,
@@ -1588,19 +1488,15 @@ export function DiffsSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label="Default diff file state"
-              >
-                <SelectValue>{settings.diffFilesCollapsed ? "Collapsed" : "Expanded"}</SelectValue>
+              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="差异文件默认状态">
+                <SelectValue>{settings.diffFilesCollapsed ? "折叠" : "展开"}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="expanded">
-                  Expanded
+                  展开
                 </SelectItem>
                 <SelectItem hideIndicator value="collapsed">
-                  Collapsed
+                  折叠
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1609,14 +1505,14 @@ export function DiffsSettingsPanel() {
         <DiffColorsSettingsRow />
       </SettingsSection>
 
-      <SettingsSection id="pull-requests" title="Pull requests">
+      <SettingsSection id="pull-requests" title="PR">
         <SettingsRow
           {...searchableSetting("proactive-panels")}
-          description="Open linked pull requests first. Otherwise, open Changes for edits to at least 3 files or 50 lines."
+          description="优先打开关联的 pull request；否则在改动至少 3 个文件或 50 行时打开“改动”面板。"
           resetAction={
             settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled ? (
               <SettingResetButton
-                label="proactive panels"
+                label="自动打开面板"
                 onClick={() =>
                   updateSettings({
                     proactivePanelsEnabled: DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled,
@@ -1631,7 +1527,7 @@ export function DiffsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ proactivePanelsEnabled: Boolean(checked) })
               }
-              aria-label="Open pull requests and changes panels proactively"
+              aria-label="自动打开 PR 与改动面板"
             />
           }
         />
@@ -1658,11 +1554,11 @@ function ScopedCompactIdleThreadsRow() {
       settingKeys={["idleCompaction", "compactIdleThreads"]}
       mixed={idleCompaction.mixed}
       {...searchableSetting("compact-idle-threads")}
-      description="When to compact an idle Claude thread over 200,000 tokens: after you return, just before its prompt cache expires, or never. Each Claude provider can override this."
+      description="空闲且超过 200,000 token 的 Claude 会话何时压缩：在你回来后、提示缓存即将过期前，或从不压缩。每个 Claude 提供方都可以单独覆盖此设置。"
       resetAction={
         globalIdleCompaction(settings) !== globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) ? (
           <SettingResetButton
-            label="compact idle threads"
+            label="压缩空闲会话"
             onClick={() =>
               updateSettings({ idleCompaction: globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) })
             }
@@ -1677,7 +1573,7 @@ function ScopedCompactIdleThreadsRow() {
             if (mode) updateSettings({ idleCompaction: mode.value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Compact idle threads">
+          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="压缩空闲会话">
             <SelectValue>
               {(value: string | null) =>
                 value === null
@@ -1767,17 +1663,17 @@ export function ThreadsSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="new-projects" title="New projects">
+      <SettingsSection id="new-projects" title="新项目">
         <SettingsRow
           serverScoped
           settingKeys={["addProjectBaseDirectory"]}
           {...searchableSetting("add-project-starts-in")}
-          description='Leave empty to use "~/" when the Add Project browser opens.'
+          description="留空时，“添加项目”浏览器从“~/”打开。"
           resetAction={
             settings.addProjectBaseDirectory !==
             DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
               <SettingResetButton
-                label="add project base directory"
+                label="添加项目的起始目录"
                 onClick={() =>
                   updateSettings({
                     addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
@@ -1793,9 +1689,9 @@ export function ThreadsSettingsPanel() {
               value={mixedAddProjectBaseDirectory ? "" : settings.addProjectBaseDirectory}
               onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
               normalizeDraft={resolvePastedPath}
-              placeholder={mixedAddProjectBaseDirectory ? "Mixed" : "~/"}
+              placeholder={mixedAddProjectBaseDirectory ? "各不相同" : "~/"}
               spellCheck={false}
-              aria-label="Add project base directory"
+              aria-label="添加项目的起始目录"
             />
           }
         />
@@ -1803,11 +1699,11 @@ export function ThreadsSettingsPanel() {
           serverScoped
           settingKeys={["ghqCloneLayout"]}
           {...searchableSetting("ghq-clone-layout")}
-          description="Clones go to github.com/owner/repo under the folder above, like ghq."
+          description="克隆的仓库会放到上方文件夹下的 github.com/owner/repo 中，与 ghq 相同。"
           resetAction={
             settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
               <SettingResetButton
-                label="clone into host folders"
+                label="克隆到主机文件夹"
                 onClick={() =>
                   updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
                 }
@@ -1819,7 +1715,7 @@ export function ThreadsSettingsPanel() {
               settingKeys={["ghqCloneLayout"]}
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label="Clone into host folders"
+              aria-label="克隆到主机文件夹"
             />
           }
         />
@@ -1828,16 +1724,16 @@ export function ThreadsSettingsPanel() {
       <ProjectDefaultsSettings category="general" />
 
       {!isProjectScope ? (
-        <SettingsSection id="snooze" title="Snooze">
+        <SettingsSection id="snooze" title="暂缓">
           <SnoozePresetsRow />
         </SettingsSection>
       ) : null}
 
-      <SettingsSection id="usage-limits" title="Usage limits">
+      <SettingsSection id="usage-limits" title="用量限制">
         <SettingsRow
           serverScoped
           {...searchableSetting("auto-resume-limited-threads")}
-          description="Automatically resume threads when their usage limits reset. You can cancel auto-resume in each thread."
+          description="用量限制重置后自动继续会话。你可以在每个会话中取消自动继续。"
           settingKeys={["autoResumeLimitedThreads"]}
           control={
             <ScopedSwitch
@@ -1846,14 +1742,14 @@ export function ThreadsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ autoResumeLimitedThreads: Boolean(checked) })
               }
-              aria-label="Resume after usage limits"
+              aria-label="用量限制解除后继续"
             />
           }
         />
         <SettingsRow
           serverScoped
           {...searchableSetting("snooze-limited-threads")}
-          description="Snooze threads until their usage limits reset. Enable auto-resume to continue the agent after the reset."
+          description="将会话暂缓到用量限制重置。开启自动继续后，智能体会在重置后接着工作。"
           settingKeys={["snoozeLimitedThreads"]}
           control={
             <ScopedSwitch
@@ -1862,24 +1758,24 @@ export function ThreadsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ snoozeLimitedThreads: Boolean(checked) })
               }
-              aria-label="Snooze until limits reset"
+              aria-label="暂缓到用量限制重置"
             />
           }
         />
       </SettingsSection>
 
       {hasServerTargets ? (
-        <SettingsSection id="auto-settle" title="Auto-settle">
+        <SettingsSection id="auto-settle" title="自动收尾">
           <SettingsRow
             serverScoped
             settingKeys={["sidebarAutoSettleOnMerge"]}
             {...searchableSetting("auto-settle-merged-threads")}
-            description="Settle a thread when its pull request merges. Closed pull requests still settle automatically."
+            description="Pull request 合并后收尾会话。已关闭的 pull request 仍会自动收尾。"
             resetAction={
               settings.sidebarAutoSettleOnMerge !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
                 <SettingResetButton
-                  label="auto-settle on merge"
+                  label="合并后自动收尾"
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
@@ -1895,7 +1791,7 @@ export function ThreadsSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
                 }
-                aria-label="Auto-settle merged threads"
+                aria-label="合并后自动收尾会话"
               />
             }
           />
@@ -1904,12 +1800,12 @@ export function ThreadsSettingsPanel() {
             serverScoped
             settingKeys={["sidebarAutoSettleAfterDays"]}
             {...searchableSetting("auto-settle-inactive-threads")}
-            description="Sidebar threads with no activity for this long settle automatically."
+            description="侧边栏中闲置达到此时长的会话会自动收尾。"
             resetAction={
               settings.sidebarAutoSettleAfterDays !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ? (
                 <SettingResetButton
-                  label="auto-settle"
+                  label="自动收尾"
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleAfterDays:
@@ -1928,7 +1824,7 @@ export function ThreadsSettingsPanel() {
                     sidebarAutoSettleAfterDays: checked ? AUTO_SETTLE_DEFAULT_DAYS : null,
                   })
                 }
-                aria-label="Auto-settle inactive threads"
+                aria-label="自动收尾不活跃会话"
               />
             }
           />
@@ -1937,7 +1833,7 @@ export function ThreadsSettingsPanel() {
               serverScoped
               settingKeys={["sidebarAutoSettleAfterDays"]}
               title={searchableSetting("days-before-auto-settle").title}
-              description="Any new activity un-settles a thread automatically."
+              description="会话有新活动时会自动取消收尾。"
               control={
                 <AutoSettleDaysInput
                   value={settings.sidebarAutoSettleAfterDays}
@@ -1950,8 +1846,8 @@ export function ThreadsSettingsPanel() {
             <SettingsRow
               serverScoped
               settingKeys={["sidebarAutoSettleKeepPullRequests"]}
-              title="Keep threads with a PR"
-              description="Inactivity does not settle threads with a pull request. Merge and close still do."
+              title="保留有关联 PR 的会话"
+              description="闲置不会让有 pull request 的会话收尾，但合并和关闭仍会。"
               control={
                 <ScopedSwitch
                   settingKeys={["sidebarAutoSettleKeepPullRequests"]}
@@ -1959,7 +1855,7 @@ export function ThreadsSettingsPanel() {
                   onCheckedChange={(checked) =>
                     updateSettings({ sidebarAutoSettleKeepPullRequests: checked })
                   }
-                  aria-label="Keep threads with a PR"
+                  aria-label="保留有关联 PR 的会话"
                 />
               }
             />
@@ -1967,16 +1863,16 @@ export function ThreadsSettingsPanel() {
         </SettingsSection>
       ) : null}
 
-      <SettingsSection id="text-generation" title="Text generation">
+      <SettingsSection id="text-generation" title="文本生成">
         <SettingsRow
           serverScoped
           settingKeys={["textGenerationModelSelection"]}
           {...searchableSetting("text-generation-model")}
-          description="For thread titles and other generated text. Source control has its own setting. Text generators from Providers also appear here."
+          description="用于生成会话标题和其他文本。版本控制有单独的设置。“提供方”中添加的文本生成器也会显示在这里。"
           resetAction={
             hasServerTargets && isTextGenerationModelDirty ? (
               <SettingResetButton
-                label="text generation model"
+                label="文本生成模型"
                 onClick={() =>
                   updateSettings({
                     textGenerationModelSelection:
@@ -1989,12 +1885,10 @@ export function ThreadsSettingsPanel() {
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                Connect an environment to choose its text generation model.
+                请连接一个环境以选择其文本生成模型。
               </span>
             ) : !hasTextGenerationProvider ? (
-              <span className="text-sm text-muted-foreground">
-                No text generation providers available.
-              </span>
+              <span className="text-sm text-muted-foreground">没有可用的文本生成提供方。</span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-1.5">
                 <ProviderModelPicker
@@ -2005,7 +1899,7 @@ export function ThreadsSettingsPanel() {
                   instanceEntries={textGenerationModelInstanceEntries}
                   modelOptionsByInstance={textGenerationModelOptionsByInstance}
                   triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                  {...(mixedTextGenerationModel ? { triggerLabel: "Mixed" } : {})}
+                  {...(mixedTextGenerationModel ? { triggerLabel: "各不相同" } : {})}
                   getModelDisabledReason={textGenerationModelDisabledReason}
                   {...(environmentId
                     ? {
@@ -2022,7 +1916,7 @@ export function ThreadsSettingsPanel() {
                     if (reason) {
                       toastManager.add({
                         type: "error",
-                        title: "Text generation model not saved",
+                        title: "未保存文本生成模型",
                         description: reason,
                       });
                       return;
@@ -2081,13 +1975,13 @@ export function ThreadsSettingsPanel() {
             {...searchableSetting("response-streaming")}
             description={
               mixedResponseStreamingMode
-                ? "The selected targets use different streaming modes."
+                ? "所选目标使用了不同的流式模式。"
                 : RESPONSE_STREAMING_MODE_DESCRIPTIONS[settings.responseStreamingMode]
             }
             resetAction={
               settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode ? (
                 <SettingResetButton
-                  label="response streaming"
+                  label="流式响应"
                   onClick={() =>
                     updateSettings({
                       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
@@ -2105,7 +1999,7 @@ export function ThreadsSettingsPanel() {
                   }
                 }}
               >
-                <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Response streaming">
+                <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="流式响应">
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
                       value === null ? "Mixed" : RESPONSE_STREAMING_MODE_LABELS[value]
@@ -2139,17 +2033,17 @@ export function MaintenanceSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="updates" title="Updates">
+      <SettingsSection id="updates" title="更新">
         <SettingsRow
           serverScoped
           settingKeys={["enableProviderUpdateChecks"]}
           {...searchableSetting("provider-update-checks")}
-          description="Check installed provider CLIs for newer available versions and fetch model catalog updates. When off, new models may not appear."
+          description="检查已安装的提供方 CLI 是否有新版本，并获取模型目录更新。关闭后，新模型可能不会出现。"
           resetAction={
             settings.enableProviderUpdateChecks !==
             DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (
               <SettingResetButton
-                label="provider update checks"
+                label="提供方更新检查"
                 onClick={() =>
                   updateSettings({
                     enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
@@ -2165,7 +2059,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
               }
-              aria-label="Check provider versions"
+              aria-label="检查提供方版本"
             />
           }
         />
@@ -2173,18 +2067,14 @@ export function MaintenanceSettingsPanel() {
           {...searchableSetting("continue-threads-after-server-update")}
           serverScoped
           settingKeys={["continueThreadsAfterServerUpdate"]}
-          description="Automatically resume interrupted threads after an update, crash, or machine restart on the selected environments."
-          status={
-            !hasServerTargets
-              ? "All selected connected environments must support restart continuation."
-              : undefined
-          }
+          description="在所选环境中，更新、崩溃或机器重启后自动继续被中断的会话。"
+          status={!hasServerTargets ? "所有选中的已连接环境都必须支持重启后继续。" : undefined}
           resetAction={
             hasServerTargets &&
             settings.continueThreadsAfterServerUpdate !==
               DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate ? (
               <SettingResetButton
-                label="continue threads after restarts"
+                label="重启后继续会话"
                 onClick={() =>
                   updateSettings({
                     continueThreadsAfterServerUpdate:
@@ -2202,19 +2092,19 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ continueThreadsAfterServerUpdate: Boolean(checked) })
               }
-              aria-label="Continue threads after restarts"
+              aria-label="重启后继续会话"
             />
           }
         />
       </SettingsSection>
 
-      <SettingsSection id="background" title="Background activity">
+      <SettingsSection id="background" title="后台活动">
         <BackgroundActivitySettingsRow />
         <SettingsRow
           serverScoped
           settingKeys={["keepAwakeWhileAgentsWork"]}
           {...searchableSetting("keep-awake-while-agents-work")}
-          description="Stop the computer from going to sleep while agents are working, and let it sleep once they finish. Closing a laptop lid still puts it to sleep."
+          description="智能体工作时阻止电脑睡眠，结束后允许睡眠。合上笔记本盖子仍会睡眠。"
           resetAction={
             settings.keepAwakeWhileAgentsWork !==
             DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork ? (
@@ -2235,7 +2125,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ keepAwakeWhileAgentsWork: Boolean(checked) })
               }
-              aria-label="Keep awake while agents work"
+              aria-label="智能体工作时保持唤醒"
             />
           }
         />
@@ -2243,13 +2133,13 @@ export function MaintenanceSettingsPanel() {
 
       <StorageCleanupSections />
 
-      <SettingsSection id="diagnostics-section" title="Diagnostics">
+      <SettingsSection id="diagnostics-section" title="诊断">
         <SettingsRow
           {...searchableSetting("diagnostics")}
           description={
             isEnvironmentScope
-              ? "Inspect processes, resource use, and logs on this environment."
-              : "Inspect processes, resource use, and logs on one environment at a time."
+              ? "查看此环境的进程、资源占用和日志。"
+              : "逐个查看各环境的进程、资源占用和日志。"
           }
           control={
             <Button
@@ -2259,7 +2149,7 @@ export function MaintenanceSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View diagnostics
+              查看诊断
             </Button>
           }
         />
@@ -2274,11 +2164,11 @@ export function AboutSettingsPanel() {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   return (
     <SettingsPageContainer>
-      <SettingsSection id="about" title="App">
+      <SettingsSection id="about" title="应用">
         {primaryPolicy ? (
           <SettingsRow
-            title="Organization"
-            description={`This environment is managed by ${primaryPolicy.organization}. Some settings and features follow its policy.`}
+            title="组织"
+            description={`此环境由 ${primaryPolicy.organization} 管理，部分设置和功能遵循其策略。`}
             control={
               primaryPolicy.supportUrl ? (
                 <Button
@@ -2288,7 +2178,7 @@ export function AboutSettingsPanel() {
                   size="sm"
                   variant="outline"
                 >
-                  Get help
+                  获取帮助
                 </Button>
               ) : null
             }
@@ -2301,7 +2191,7 @@ export function AboutSettingsPanel() {
             <SettingsRow
               id={searchableSetting("app-version").id}
               title={<AboutVersionTitle />}
-              description="Current version of the application."
+              description="应用的当前版本。"
             />
           </>
         )}
@@ -2309,27 +2199,27 @@ export function AboutSettingsPanel() {
         {primaryEnvironmentId === null ? null : (
           <SettingsRow
             {...searchableSetting("welcome-page")}
-            description="See your agents, import projects, and set up your phone."
+            description="查看你的智能体、导入项目并设置手机。"
             control={
               <Button size="sm" variant="outline" render={<Link to="/welcome" />}>
-                Open
+                打开
               </Button>
             }
           />
         )}
       </SettingsSection>
 
-      <SettingsSection id="legal" title="Legal">
+      <SettingsSection id="legal" title="法律信息">
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          description="T3 Code 使用的依赖项、素材和可选工具的声明。"
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}
               size="sm"
               variant="outline"
             >
-              View licenses
+              查看许可证
             </Button>
           }
         />

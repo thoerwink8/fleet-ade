@@ -25,7 +25,7 @@ function validateRelayUrl(value: string) {
         new Config.ConfigError(
           new Schema.SchemaError(
             new SchemaIssue.InvalidValue({
-              message: "Relay URL must be a secure absolute HTTPS origin.",
+              message: "中继 URL 必须是安全的绝对 HTTPS 源地址。",
             }),
           ),
         ),

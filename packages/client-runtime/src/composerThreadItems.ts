@@ -66,7 +66,7 @@ export function matchComposerThreadItems(input: {
         type: "thread",
         thread: { environmentId: shell.environmentId, threadId: shell.id },
         label: shell.title,
-        description: machine === undefined ? "Thread" : `Thread on ${machine}`,
+        description: machine === undefined ? "会话" : `${machine} 上的会话`,
       };
     });
 }
@@ -110,6 +110,6 @@ export function matchComposerEnvironmentItems(input: {
       environmentId: environment.environmentId,
       machine: environment.machine,
       label: environment.label,
-      description: "Machine",
+      description: "机器",
     }));
 }

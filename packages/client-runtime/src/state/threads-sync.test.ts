@@ -1070,7 +1070,7 @@ describe("EnvironmentThreads", () => {
         expect(requests.slice(1, 3)).toEqual(["925", "925"]);
         expect(yield* harness.loadEarlier()).toEqual({
           _tag: "error",
-          message: "History did not advance.",
+          message: "历史记录未推进。",
         });
         expect((yield* SubscriptionRef.get(harness.threadState)).history.loading).toBe(false);
       }),
@@ -1990,7 +1990,7 @@ describe("EnvironmentThreads", () => {
       const retainedRequest = {
         ...command("retained-request", 0),
         type: "run_interrupt_request" as const,
-        message: "Stop",
+        message: "停止",
       } as unknown as OrchestrationV2TurnItem;
       const visibleTurnItems = [
         {
@@ -2420,7 +2420,7 @@ describe("EnvironmentThreads", () => {
           Option.isSome(value.error),
         );
         expect(failed.status).toBe("empty");
-        expect(Option.getOrThrow(failed.error)).toBe("Could not synchronize the thread.");
+        expect(Option.getOrThrow(failed.error)).toBe("无法同步会话。");
 
         yield* TestClock.adjust("60 seconds");
         expect(yield* SubscriptionRef.get(harness.subscriptionCount)).toBe(2);

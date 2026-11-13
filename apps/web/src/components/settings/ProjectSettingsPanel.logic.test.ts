@@ -99,9 +99,9 @@ describe("project removal confirmation", () => {
   const local = {
     id: ProjectId.make("shared-id"),
     environmentId: EnvironmentId.make("local"),
-    title: "Repo",
+    title: "仓库",
     workspaceRoot: "/work/repo",
-    environmentLabel: "Local",
+    environmentLabel: "本地",
   };
   const remote = {
     ...local,
@@ -150,11 +150,9 @@ describe("project removal confirmation", () => {
     });
     expect(plan.targetKind).toBe("checkout");
     expect(plan.confirmationMessage).toContain("Environment: Remote");
+    expect(plan.confirmationMessage).toContain("此项目组中的其他条目不受影响。");
     expect(plan.confirmationMessage).toContain(
-      "Other entries in this grouped project are unaffected.",
-    );
-    expect(plan.confirmationMessage).toContain(
-      "Any archived threads are deleted from T3 Code. Provider sessions are kept.",
+      "所有已归档会话将从 T3 Code 中删除。提供方会话会保留。",
     );
   });
 
@@ -169,9 +167,7 @@ describe("project removal confirmation", () => {
     });
     expect(plan.targetKind).toBe("project");
     expect(plan.confirmationMessage).toContain("This removes 2 grouped project entries.");
-    expect(plan.confirmationMessage).toContain(
-      "This removes only the project entries, not the files on disk.",
-    );
+    expect(plan.confirmationMessage).toContain("仅移除项目条目，磁盘上的文件会保留。");
   });
 });
 

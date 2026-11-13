@@ -227,7 +227,7 @@ describe("handoff budget", () => {
   it("subtracts native usage, input, attachments, instructions and space for work", () => {
     const base = {
       tokenCap: 16_000,
-      userText: "Continue",
+      userText: "继续",
       attachments: [],
       providerThread,
       nativeContextEstimate: 0,

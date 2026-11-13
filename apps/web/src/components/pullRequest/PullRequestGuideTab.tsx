@@ -95,7 +95,7 @@ export function PullRequestGuideTab({
     canWrite ? (
       <Button size={size} variant="outline" disabled={running} onClick={() => void write()}>
         {running ? <Spinner /> : <ScrollTextIcon aria-hidden className="size-3.5" />}
-        {running ? "Reading the change..." : label}
+        {running ? "正在阅读改动…" : label}
       </Button>
     ) : null;
 
@@ -110,21 +110,17 @@ export function PullRequestGuideTab({
     return (
       <div className="scrollbar-gutter-both flex h-full flex-col items-center justify-center-safe gap-2 overflow-y-auto px-4 py-10 text-center">
         <p className="text-sm font-medium text-foreground">
-          {running
-            ? "Writing a review guide"
-            : failure === null
-              ? "No review guide yet"
-              : "Could not write a review guide"}
+          {running ? "正在编写审查导览" : failure === null ? "还没有审查导览" : "无法编写审查导览"}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
           {running
-            ? "An agent is reading the change. A large one takes a few minutes. You can leave; you will be told when it is ready."
+            ? "智能体正在阅读此改动。改动较大时需要几分钟。你可以离开，就绪后会收到通知。"
             : failure === null
               ? (query.error ??
-                "A guide is a tour of the change: stops through the code in reading order, with the calls only a maintainer can make.")
+                "导览会按阅读顺序带你查看改动中的代码，并指出需要维护者判断的问题。")
               : FAILURE_HINT}
         </p>
-        {writeButton(failure === null ? "Write guide" : "Try again", "sm")}
+        {writeButton(failure === null ? "编写导览" : "重试", "sm")}
         {failure === null || running ? null : <FailureDetails detail={failure} />}
       </div>
     );
@@ -136,12 +132,12 @@ export function PullRequestGuideTab({
         {running ? <Spinner /> : <TriangleAlertIcon />}
         <AlertDescription>
           {running ? (
-            "Rewriting this guide. You will be told when the new one is ready."
+            "正在重写此导览。新版本就绪后会通知你。"
           ) : failure === null ? (
-            "Written before the latest push."
+            "编写于最近一次推送之前。"
           ) : (
             <>
-              {`Could not rewrite this guide. ${FAILURE_HINT}`}
+              {`无法重写此导览。${FAILURE_HINT}`}
               <FailureDetails detail={failure} />
             </>
           )}
@@ -174,13 +170,13 @@ export function PullRequestGuideTab({
   );
 }
 
-const FAILURE_HINT = "Check the review guide model in Settings → Source control.";
+const FAILURE_HINT = "请在“设置 → 版本控制”中检查审查导览模型。";
 
 function FailureDetails({ detail }: { detail: string }) {
   return (
     <details className="w-full max-w-lg text-xs text-muted-foreground">
       <summary className="cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-        Technical details
+        技术详情
       </summary>
       <pre className="scrollbar-gutter-both mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">
         {detail}

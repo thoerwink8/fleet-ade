@@ -9,14 +9,14 @@ const GENERIC_ERROR_PREFIXES = [
 ];
 
 const SQLITE_RECOVERY_MESSAGES: Readonly<Record<number, string>> = {
-  5: "The T3 Code server database is busy (SQLITE_BUSY). Wait a moment, then retry. If this keeps happening, check for another T3 Code process using the same data directory on the server.",
-  6: "The T3 Code server database is locked (SQLITE_LOCKED). Wait a moment, then retry. If this keeps happening, check the server logs for the process holding the database lock.",
-  8: "The T3 Code server database is read-only (SQLITE_READONLY). On the machine running the server, check that its data directory is writable and its disk is mounted read-write, then retry.",
-  10: "The T3 Code server could not read or write its database (SQLITE_IOERR). On the machine running the server, check free disk space and disk health, then retry. If it still fails, check the server logs.",
-  11: "The T3 Code server database appears damaged (SQLITE_CORRUPT). Preserve the server data directory and check the server logs before restoring a database backup.",
-  13: "The T3 Code server could not save this change because its database or disk is full (SQLITE_FULL). Free space on the machine running the server, then retry. If space is available, check the server logs for a database size limit.",
-  14: "The T3 Code server could not open a database file (SQLITE_CANTOPEN). On the machine running the server, check free disk space and that its data and temporary directories exist and are writable, then retry. If it still fails, check the server logs.",
-  26: "The T3 Code server could not read its database file (SQLITE_NOTADB). Preserve the server data directory and check the configured database path and server logs before restoring a database backup.",
+  5: "T3 Code 服务器数据库正忙（SQLITE_BUSY）。请稍等再试。如果反复出现，请检查是否有另一个 T3 Code 进程正在使用服务器上的同一数据目录。",
+  6: "T3 Code 服务器数据库已锁定（SQLITE_LOCKED）。请稍等再试。如果反复出现，请查看服务器日志，找出占用数据库锁的进程。",
+  8: "T3 Code 服务器数据库是只读的（SQLITE_READONLY）。请在运行服务器的机器上确认数据目录可写、磁盘以读写方式挂载，然后重试。",
+  10: "T3 Code 服务器无法读写数据库（SQLITE_IOERR）。请在运行服务器的机器上检查磁盘剩余空间和磁盘健康，然后重试。若仍然失败，请查看服务器日志。",
+  11: "T3 Code 服务器数据库似乎已损坏（SQLITE_CORRUPT）。请保留服务器数据目录，并在从备份恢复前查看服务器日志。",
+  13: "T3 Code 服务器无法保存这次更改，因为数据库或磁盘已满（SQLITE_FULL）。请在运行服务器的机器上腾出空间，然后重试。如果空间足够，请查看服务器日志里的数据库大小限制。",
+  14: "T3 Code 服务器无法打开数据库文件（SQLITE_CANTOPEN）。请在运行服务器的机器上检查磁盘空间，并确认数据和临时目录存在且可写，然后重试。若仍然失败，请查看服务器日志。",
+  26: "T3 Code 服务器无法读取数据库文件（SQLITE_NOTADB）。请保留服务器数据目录，并在从备份恢复前检查配置的数据库路径和服务器日志。",
 };
 
 function databaseErrorMessage(value: unknown): string | undefined {
@@ -34,7 +34,7 @@ function databaseErrorMessage(value: unknown): string | undefined {
     cause = cause.cause;
   }
 
-  return "The T3 Code server could not complete this database request. Retry once; if it still fails, check the server logs for the database error.";
+  return "T3 Code 服务器无法完成这次数据库请求。请重试一次；若仍然失败，请查看服务器日志中的数据库错误。";
 }
 
 export function userFacingDatabaseErrorMessage(cause: unknown): string | undefined {
@@ -50,21 +50,16 @@ export function userFacingDatabaseErrorMessage(cause: unknown): string | undefin
 }
 
 const CAPABILITY_REJECTION_MESSAGES: Record<string, (provider: string) => string> = {
-  queued_messages: (p) => `${p} cannot queue messages behind an active run.`,
-  active_steering: (p) =>
-    `${p} cannot redirect an active run. Stop it first, then send the message.`,
-  interrupt_restart_steering: (p) =>
-    `${p} cannot redirect an active run. Stop it first, then send the message.`,
-  interrupt: (p) => `${p} cannot stop a run once it has started.`,
-  native_fork: (p) => `${p} cannot fork this thread natively.`,
-  fork_from_turn: (p) => `${p} cannot fork from an earlier point in this thread.`,
-  rollback: (p) =>
-    `${p} cannot rewind its conversation, so this checkpoint cannot be restored on this thread.`,
-  rollback_snapshot: (p) =>
-    `${p} did not report its rewound conversation state, so the checkpoint was not restored.`,
-  context_handoff: (p) => `${p} cannot receive the context handoff needed for this switch.`,
-  strong_terminal_status: (p) =>
-    `${p} cannot confirm when its runs finish reliably enough for this.`,
+  queued_messages: (p) => `${p} 不能在正在进行的运行后面排队消息。`,
+  active_steering: (p) => `${p} 不能改道正在进行的运行。请先停止，再发送消息。`,
+  interrupt_restart_steering: (p) => `${p} 不能改道正在进行的运行。请先停止，再发送消息。`,
+  interrupt: (p) => `${p} 不能在运行开始后停止它。`,
+  native_fork: (p) => `${p} 不能原生分叉这个会话。`,
+  fork_from_turn: (p) => `${p} 不能从这个会话更早的位置分叉。`,
+  rollback: (p) => `${p} 不能回退对话，因此无法在这个会话上恢复此检查点。`,
+  rollback_snapshot: (p) => `${p} 没有报告回退后的对话状态，因此没有恢复检查点。`,
+  context_handoff: (p) => `${p} 不能接收这次切换所需的上下文交接。`,
+  strong_terminal_status: (p) => `${p} 不能可靠确认运行何时结束，因此无法这样做。`,
 };
 
 function providerDisplayName(instanceId: string): string {

@@ -100,12 +100,12 @@ function ReferenceStateIcon({ candidate }: { candidate: PullRequestReferenceCand
       ? resolvePullRequestState({ state: candidate.state, isDraft: false })
       : candidate.state === "open"
         ? {
-            label: "Open issue",
+            label: "未关闭的 issue",
             Icon: CircleDotIcon,
             toneClassName: PULL_REQUEST_STATE_PRESENTATION.open.toneClassName,
           }
         : {
-            label: "Closed issue",
+            label: "已关闭的 issue",
             Icon: CircleCheckIcon,
             toneClassName: PULL_REQUEST_STATE_PRESENTATION.merged.toneClassName,
           };
@@ -143,16 +143,16 @@ function CompletionRow({ completion }: { completion: PullRequestCompletion }) {
 
 const EMPTY_STATE = {
   mention: {
-    label: "Mention a user",
-    pending: "Searching users...",
-    failed: "Couldn't search users on the host",
-    none: "No matching users",
+    label: "提及用户",
+    pending: "正在搜索用户…",
+    failed: "无法在托管平台上搜索用户",
+    none: "没有匹配的用户",
   },
   reference: {
-    label: "Reference an issue or change request",
+    label: "引用 issue 或 change request",
     pending: "Searching...",
-    failed: "Couldn't search the host",
-    none: "No matching issues or change requests",
+    failed: "无法搜索托管平台",
+    none: "没有匹配的 issue 或 change request",
   },
 } as const;
 

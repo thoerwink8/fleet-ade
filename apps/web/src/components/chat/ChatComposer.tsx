@@ -766,14 +766,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (questionAttachmentTarget &&
     !supportsQuestionAttachments &&
     (composerImages.length > 0 || composerFiles.length > 0)
-      ? "Update this server to send files with question answers"
+      ? "请更新此服务器，才能在回答问题时发送文件"
       : null) ??
     fileCapabilityBlockReason ??
     (supportsAttachmentUploads
       ? needsReattachFileCount > 0
         ? needsReattachFileCount === 1
-          ? "Attach the interrupted file again or remove it"
-          : "Attach the interrupted files again or remove them"
+          ? "请重新添加中断的文件，或将其移除"
+          : "请重新添加中断的文件，或将它们移除"
         : // A plain send waits for its uploads. Answers and approval redirects need them first.
           questionAttachmentTarget ||
             pendingApprovals.some((approval) => !heldRequestIds.has(approval.requestId))
@@ -923,7 +923,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   const sendDisabledReason =
     externalSendDisabledReason ??
-    (multipleModelSelections?.length === 0 ? "Select at least one model." : null) ??
+    (multipleModelSelections?.length === 0 ? "请至少选择一个模型。" : null) ??
     (activePendingProgress
       ? attachmentBlockReason
       : (attachmentBlockReason ??
@@ -1229,10 +1229,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     environmentUnavailable !== null ||
     (!composerSendState.hasSendableContent && !showResumeAction);
   const collapsedComposerPrimaryActionLabel = showResumeAction
-    ? "Resume thread"
+    ? "继续会话"
     : props.resumeCompactionTokens !== null && !props.keepFullHistory
-      ? "Open composer to compact and send"
-      : "Send message";
+      ? "打开输入框以压缩并发送"
+      : "发送消息";
   const showMobilePendingAnswerActions =
     isMobileViewport && !isComposerCollapsedMobile && pendingPrimaryAction !== null;
 
@@ -1847,7 +1847,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // The pending Submit button follows the answer's own blockers, matching submitComposer.
   const primaryActionSendDisabledReason =
     (activePendingProgress ? attachmentBlockReason : sendDisabledReason) ??
-    (speechInput.preparing ? "Preparing voice input" : null);
+    (speechInput.preparing ? "正在准备语音输入" : null);
   const primaryActionEnvironmentUnavailable =
     environmentUnavailable !== null ||
     (!activePendingProgress && (noProviderAvailable || projectSelectionRequired));
@@ -2129,8 +2129,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       event?.preventDefault();
       toastManager.add({
         type: "info",
-        title: "Still compressing a pasted image.",
-        description: "Send again once its thumbnail appears.",
+        title: "粘贴的图片仍在压缩。",
+        description: "缩略图出现后请再次发送。",
       });
       return false;
     }
@@ -2138,8 +2138,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       event?.preventDefault();
       toastManager.add({
         type: "info",
-        title: "Still bringing attached context into this message.",
-        description: "Send again once its chip resolves.",
+        title: "仍在把附加的上下文放入这条消息。",
+        description: "标签加载完成后请再次发送。",
       });
       return false;
     }
@@ -2520,7 +2520,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       variant="ghost"
                       onClick={() => handleRuntimeModeChange(runtimeModeCeilingFallback)}
                     >
-                      Switch to {runtimeModeConfig[runtimeModeCeilingFallback].label}
+                      切换到 {runtimeModeConfig[runtimeModeCeilingFallback].label}
                     </Button>
                   ),
                 }),
@@ -2660,7 +2660,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (target === "remote") {
       toastManager.add({
         type: "error",
-        title: "Folders can only be referenced on a server running on this computer",
+        title: "只有在本机运行的服务器上才能引用文件夹",
       });
       return;
     }
@@ -2669,8 +2669,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (path === null) {
         toastManager.add({
           type: "error",
-          title: `Couldn't get the path of "${folder.name}"`,
-          description: "Type the folder path with @ instead.",
+          title: `无法获取“${folder.name}”的路径`,
+          description: "请改为用 @ 输入文件夹路径。",
         });
         continue;
       }
@@ -2680,8 +2680,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!inserted) {
         toastManager.add({
           type: "error",
-          title: "Unable to add folder",
-          description: "The composer is busy; try again once it is ready.",
+          title: "无法添加文件夹",
+          description: "输入框正忙，请在就绪后重试。",
         });
         break;
       }
@@ -2754,8 +2754,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onInsertRejected: () => {
       toastManager.add({
         type: "error",
-        title: "Unable to add to chat",
-        description: "The composer is busy; try again once it is ready.",
+        title: "无法添加到对话",
+        description: "输入框正忙，请在就绪后重试。",
       });
     },
   });
@@ -2767,7 +2767,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       pendingDraftWork.begin(targetKey);
       const loadingToast = toastManager.add({
         type: "loading",
-        title: "Loading thread context…",
+        title: "正在加载会话上下文…",
         timeout: 0,
         data: { threadRef: routeThreadRef, hideCopyButton: true },
       });
@@ -2792,7 +2792,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             if (activeThreadId) {
               setThreadError(
                 activeThreadId,
-                `You can attach up to ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} files per message.`,
+                `每条消息最多可添加 ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} 个文件。`,
               );
             }
           },
@@ -2802,12 +2802,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         const error = squashAtomCommandFailure(importResult);
         toastManager.add({
           type: "error",
-          title: "Unable to read the dropped thread",
+          title: "无法读取拖入的会话",
           description:
             isEnvironmentRequestInvalidError(error) &&
             error.reason === "thread_transcript_too_large"
-              ? "This thread exceeds the attachment size limit. Try a shorter thread."
-              : "Check that its environment is connected and up to date, then try again.",
+              ? "这个会话超出了附件大小限制，请换一个较短的会话。"
+              : "请确认它所在的环境已连接且为最新版本，然后重试。",
         });
       }
       toastManager.close(loadingToast);
@@ -2851,8 +2851,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       if (!inserted) {
         toastManager.add({
           type: "error",
-          title: "Unable to add thread",
-          description: "The composer is busy; try again once it is ready.",
+          title: "无法添加会话",
+          description: "输入框正忙，请在就绪后重试。",
         });
         return;
       }
@@ -3096,8 +3096,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         if (activePendingProgress) {
           toastManager.add({
             type: "info",
-            title: "Terminal output can't be added to a question answer.",
-            description: "Answer or dismiss the question first, then add it to chat.",
+            title: "终端输出无法添加到问题回答中。",
+            description: "先回答或关闭问题，再将其添加到聊天中。",
           });
           return;
         }
@@ -3393,7 +3393,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   )}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={expandMobileComposerStable}
-                  aria-label="Expand composer"
+                  aria-label="展开输入框"
                 >
                   {prompt.trim() ? (
                     <CollapsedComposerPromptPreview
@@ -3403,9 +3403,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       theme={resolvedTheme}
                     />
                   ) : showProviderUnavailable ? (
-                    "Enable a provider in Settings"
+                    "请在设置中启用一个提供方"
                   ) : (
-                    "Ask anything..."
+                    "随便问点什么…"
                   )}
                 </button>
                 {collapsedComposerImagePreviews}
@@ -3496,10 +3496,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {composerSuggestionsVisible && composerMenuItems.length === 0
                   ? isComposerMenuLoading
                     ? composerTriggerKind === "pull-request"
-                      ? "Finding pull request..."
+                      ? "正在查找 pull request…"
                       : composerTriggerKind === "skill" || composerTriggerKind === "slash-command"
-                        ? "Searching workspace skills..."
-                        : "Searching workspace files..."
+                        ? "正在搜索工作区技能…"
+                        : "正在搜索工作区文件…"
                     : composerMenuEmptyState
                   : ""}
               </div>
@@ -3545,7 +3545,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   <ComposerPromptEditor
                     draftKey={composerDraftTargetKey}
                     // Switching threads lands focus here, so the label names the thread.
-                    ariaLabel={activeThread ? `Message ${activeThread.title}` : "Message"}
+                    ariaLabel={activeThread ? `给 ${activeThread.title} 发消息` : "消息"}
                     suggestionListId={composerSuggestionListId}
                     activeSuggestionId={
                       composerSuggestionListVisible && activeComposerMenuItem
@@ -3577,18 +3577,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     placeholder={
                       isComposerApprovalState
                         ? activePendingApproval?.supportsFeedback
-                          ? "Send feedback to decline this request"
-                          : "Send a message to decline and redirect the agent"
+                          ? "发送反馈以拒绝这个请求"
+                          : "发送消息以拒绝，并给智能体新的指示"
                         : activePendingProgress
                           ? isChoiceOnlyPendingQuestion
-                            ? "Choose an option above"
+                            ? "请在上方选择一个选项"
                             : activePendingProgress.activeQuestion?.options.length === 0
                               ? "Type your answer"
-                              : "Type your own answer, or leave this blank to use the selected option"
+                              : "输入你自己的回答，或留空以使用选中的选项"
                           : projectSelectionRequired
-                            ? "Choose a project above to start a thread"
+                            ? "请在上方选择项目以开始会话"
                             : showProviderUnavailable
-                              ? "Enable a provider in Settings to send a message"
+                              ? "请在设置中启用一个提供方后再发送消息"
                               : (offeredPromptSuggestion ?? DEFAULT_COMPOSER_PLACEHOLDER)
                     }
                     placeholderSuffix={
@@ -3637,7 +3637,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
 
             {speechInput.preview ? (
               <div
-                aria-label="Live transcription"
+                aria-label="实时转写"
                 className="mx-3 mb-3 max-h-32 overflow-y-auto rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap sm:mx-4"
               >
                 <span>{speechInput.preview.committed}</span>

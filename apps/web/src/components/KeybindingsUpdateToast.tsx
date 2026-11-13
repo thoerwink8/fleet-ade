@@ -15,8 +15,8 @@ export function startKeybindingsUpdateToasts(): () => void {
     if (decision._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: "Keybindings updated",
-        description: "Keybindings configuration reloaded successfully.",
+        title: "快捷键已更新",
+        description: "快捷键配置已成功重新加载。",
       });
       return;
     }
@@ -25,7 +25,7 @@ export function startKeybindingsUpdateToasts(): () => void {
     toastManager.add(
       stackedThreadToast({
         type: "warning",
-        title: "Invalid keybindings configuration",
+        title: "快捷键配置无效",
         description: (
           <KeybindingsConfigWarning
             message={decision.message}

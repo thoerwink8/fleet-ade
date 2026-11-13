@@ -85,7 +85,7 @@ describe("presentConnectionDiagnosis", () => {
         cause: new TypeError("Failed to fetch"),
       }),
     );
-    expect(diagnose(backoff(failure))?.headline).toBe("This device can't reach T3 Connect");
+    expect(diagnose(backoff(failure))?.headline).toBe("此设备无法访问 T3 Connect");
     expect(results(backoff(failure))).toEqual([
       "device:ok",
       "relay:failed",
@@ -103,13 +103,13 @@ describe("presentConnectionDiagnosis", () => {
       }),
     );
     const diagnosis = diagnose(backoff(failure));
-    expect(diagnosis?.headline).toBe("T3 Connect returned an error");
+    expect(diagnosis?.headline).toBe("T3 Connect 返回了错误");
     expect(diagnosis?.steps.join(" ")).not.toContain("this device");
   });
 
   it("reports this device as offline before any other hop", () => {
     const state = { ...backoff(unavailable("tunnel_down")), network: "offline" as const };
-    expect(diagnose(state)?.headline).toBe("This device is offline");
+    expect(diagnose(state)?.headline).toBe("此设备离线");
     expect(results(state)?.[0]).toBe("device:failed");
   });
 
@@ -133,7 +133,7 @@ describe("presentConnectionDiagnosis", () => {
   it("blames this device, not the host, while its own T3 Connect sign-in loads", () => {
     const failure = new ConnectionTransientError({
       reason: "session-pending",
-      detail: "Waiting for the T3 Connect sign-in to load.",
+      detail: "正在等待 T3 Connect 登录状态加载。",
     });
     const diagnosis = diagnose(backoff(failure));
     expect(diagnosis?.headline).not.toContain("did not answer");
@@ -149,7 +149,7 @@ describe("presentConnectionDiagnosis", () => {
   it("does not report hops as working when the failure names none", () => {
     const failure = new ConnectionBlockedError({
       reason: "authentication",
-      detail: "Your cloud sign-in changed. Sign in again to authorize the environment.",
+      detail: "你的云端登录已变化。请重新登录以授权环境。",
     });
     expect(results(backoff(failure))).not.toContainEqual(expect.stringMatching(/:ok$/));
   });
@@ -164,6 +164,6 @@ describe("presentConnectionDiagnosis", () => {
       via: "direct",
       relayStatus: { status: "offline", endpointFailure: "tunnel_down", endpointStatus: 530 },
     });
-    expect(diagnosis?.facts.map(([label]) => label)).not.toContain("HTTP status");
+    expect(diagnosis?.facts.map(([label]) => label)).not.toContain("HTTP 状态");
   });
 });

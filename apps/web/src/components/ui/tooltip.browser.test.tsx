@@ -18,7 +18,7 @@ it.each([
     >
       <Tooltip>
         <TooltipTrigger>Timeline action</TooltipTrigger>
-        <TooltipPopup>Description</TooltipPopup>
+        <TooltipPopup>描述</TooltipPopup>
       </Tooltip>
       <div className="h-96" />
     </TooltipScrollDismissArea>,
@@ -33,11 +33,11 @@ it.each([
   }
   await userEvent.hover(trigger);
   await expect.element(trigger).toHaveFocus();
-  await expect.element(page.getByText("Description")).toBeVisible();
+  await expect.element(page.getByText("描述")).toBeVisible();
 
   screen.getByTestId("timeline").element().scrollTop = 20;
   await vi.waitFor(() => expect(onScroll).toHaveBeenCalledOnce());
 
-  if (c.keptOpen) await expect.element(page.getByText("Description")).toBeVisible();
-  else await expect.element(page.getByText("Description")).not.toBeInTheDocument();
+  if (c.keptOpen) await expect.element(page.getByText("描述")).toBeVisible();
+  else await expect.element(page.getByText("描述")).not.toBeInTheDocument();
 });

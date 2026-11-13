@@ -10,8 +10,8 @@ import { resolveSettingsScope, validateSettingsScopeSearch } from "./settingsSco
 const laptopId = EnvironmentId.make("laptop");
 const serverId = EnvironmentId.make("server");
 const environments = [
-  { environmentId: laptopId, label: "Laptop" },
-  { environmentId: serverId, label: "Server" },
+  { environmentId: laptopId, label: "笔记本电脑" },
+  { environmentId: serverId, label: "服务器" },
 ];
 
 function member(id: string, environmentId: EnvironmentId): SidebarProjectGroupMember {

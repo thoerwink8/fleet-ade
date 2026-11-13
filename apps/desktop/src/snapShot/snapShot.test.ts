@@ -172,7 +172,7 @@ describe("accessibleWindowElementTree", () => {
                     role: "button",
                     name: "Save",
                     value: "Save",
-                    description: "Save",
+                    description: "保存",
                     bounds: { x: 20, y: 30, width: 80, height: 24 },
                     actions: ["press"],
                     children: async () => [],

@@ -53,7 +53,7 @@ export function useProjectGroupUpdate() {
     if (unavailable) {
       return failWith(
         failureTitle,
-        `Connect ${unavailable.environmentLabel ?? "the selected environment"} and try again.`,
+        `请先连接 ${unavailable.environmentLabel ?? "所选环境"} 再重试。`,
       );
     }
     for (const member of members) {
@@ -73,7 +73,7 @@ export function useProjectGroupUpdate() {
       if (result._tag === "Failure") {
         reportProjectFailure(
           members.length > 1
-            ? `${failureTitle} on ${member.environmentLabel ?? "the current environment"}`
+            ? `${failureTitle} 上的 ${member.environmentLabel ?? "the current environment"}`
             : failureTitle,
           result,
         );
@@ -115,7 +115,7 @@ export function useProjectPin() {
     void updateProjectGroup(
       group.memberProjects,
       { pinned },
-      pinned ? "Failed to pin project" : "Failed to unpin project",
+      pinned ? "无法置顶项目" : "无法取消置顶项目",
     );
   };
   return {
@@ -134,10 +134,7 @@ export function checkProjectAccess(
     (member) => !readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope),
   );
   return denied
-    ? failWith(
-        failureTitle,
-        `This connection cannot change projects in ${denied.environmentLabel ?? "this environment"}.`,
-      )
+    ? failWith(failureTitle, `此连接无法更改 ${denied.environmentLabel ?? "此环境"} 中的项目。`)
     : null;
 }
 
@@ -148,7 +145,7 @@ export function reportProjectFailure(title: string, result: AtomCommandResult<un
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      description: error instanceof Error ? error.message : "发生错误。",
     }),
   );
 }

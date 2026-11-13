@@ -676,7 +676,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
           ({
             ...current,
             phase: "extracting",
-            message: "Extracting Codex.",
+            message: "正在解压 Codex。",
           }) satisfies ProviderInstallState,
       );
       // Bare `tar` on Windows can resolve to Git's MSYS tar, which reads `C:\...` as a remote host.
@@ -705,7 +705,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
           ({
             ...current,
             phase: "verifying",
-            message: "Checking Codex.",
+            message: "正在检查 Codex。",
           }) satisfies ProviderInstallState,
       );
       const executable = yield* fromDirectory(runtime, release.version, release.target);
@@ -812,7 +812,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
           phase: release ? "downloading" : "verifying",
           downloadedBytes: 0,
           ...offer(installedVersion),
-          message: release ? "Downloading Codex." : "Checking Codex.",
+          message: release ? "正在下载 Codex。" : "正在检查 Codex。",
         };
         yield* SubscriptionRef.set(state, next);
         const work = (release ? install(release) : reverify()).pipe(
@@ -827,10 +827,10 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
                     ...value,
                     phase: cancelled ? "cancelled" : "failed",
                     message: cancelled
-                      ? "Installation cancelled. The previous runtime is unchanged."
+                      ? "已取消安装，原有运行环境保持不变。"
                       : Option.isSome(error)
                         ? error.value.detail
-                        : "Could not finish the Codex installation. Check disk space and directory access.",
+                        : "无法完成 Codex 安装。请检查磁盘空间和目录访问权限。",
                   } satisfies ProviderInstallState;
                 })
               : Effect.void,
@@ -970,7 +970,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
           ({
             ...current,
             phase: "failed",
-            message: "The managed Codex runtime is incomplete. Remove it and reinstall.",
+            message: "托管的 Codex 运行环境不完整。请移除后重新安装。",
           }) satisfies ProviderInstallState,
       ),
     ),

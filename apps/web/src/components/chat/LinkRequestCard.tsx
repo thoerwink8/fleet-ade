@@ -119,9 +119,7 @@ function PendingLinkRequest(props: {
     >
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-sm font-medium text-foreground">
-          {picksMachine(item)
-            ? "Link a machine to this environment"
-            : `Link ${target} to this environment`}
+          {picksMachine(item) ? "将一台机器关联到此环境" : `将 ${target} 关联到此环境`}
         </p>
         {item.reason.trim() ? <p className="text-sm text-muted-foreground">{item.reason}</p> : null}
       </div>
@@ -139,15 +137,15 @@ function PendingLinkRequest(props: {
             disabled={declining}
             onClick={() => void decline()}
           >
-            Decline
+            拒绝
           </Button>
           <Button type="button" size="xs" disabled={declining} onClick={() => setOpen(true)}>
-            {picksMachine(item) ? "Choose machine…" : "Review link…"}
+            {picksMachine(item) ? "选择机器…" : "查看关联…"}
           </Button>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Only a session that manages access here can answer this.
+          只有在这里管理访问权限的会话才能处理此请求。
         </p>
       )}
       <LinkRequestDialog
@@ -296,8 +294,8 @@ function LinkRequestDialog(props: {
     >
       <WizardPopup>
         <WizardHeader
-          title={pickMachine ? "Link a machine" : `Link ${targetName}`}
-          description="Agents here can then launch, message and wait on threads there. Revoke it in that machine's Sharing & access."
+          title={pickMachine ? "关联机器" : `关联 ${targetName}`}
+          description="这边的智能体就可以在那边启动会话、发消息并等待。可在那台机器的“共享和访问”里撤销。"
         >
           {steps.length > 1 && !useExisting ? (
             <WizardSteps
@@ -339,7 +337,7 @@ function LinkRequestDialog(props: {
                 ) : null}
                 {asksAddress ? (
                   <label className="block space-y-1.5">
-                    <span className="block text-xs font-medium text-foreground">Address</span>
+                    <span className="block text-xs font-medium text-foreground">地址</span>
                     <Input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
@@ -367,13 +365,11 @@ function LinkRequestDialog(props: {
                     {needsAddress ? <LinkAddressWarning address={address} /> : null}
                     {canMint ? null : (
                       <label className="block space-y-1.5">
-                        <span className="block text-xs font-medium text-foreground">
-                          Pairing code
-                        </span>
+                        <span className="block text-xs font-medium text-foreground">配对码</span>
                         <Input
                           value={pairingCode}
                           onChange={(event) => setPairingCode(event.target.value)}
-                          placeholder="Paste the code"
+                          placeholder="粘贴配对码"
                           disabled={busy}
                           autoComplete="one-time-code"
                           nativeInput
@@ -414,11 +410,11 @@ function LinkRequestDialog(props: {
                 setError(null);
               }}
             >
-              Back
+              返回
             </Button>
           ) : (
             <Button variant="outline" type="button" disabled={busy} onClick={close}>
-              Cancel
+              取消
             </Button>
           )}
           <Button
@@ -426,7 +422,7 @@ function LinkRequestDialog(props: {
             type="submit"
             disabled={busy || (finishesHere ? !ready : !machineReady)}
           >
-            {busy ? "Linking…" : useExisting ? "Use this link" : finishesHere ? "Link" : "Continue"}
+            {busy ? "正在关联…" : useExisting ? "使用此关联" : finishesHere ? "关联" : "继续"}
           </Button>
         </WizardFooter>
       </WizardPopup>
@@ -445,7 +441,7 @@ function MachinePicker(props: {
   return (
     <div className="space-y-2">
       <span id={labelId} className="block text-xs font-medium">
-        Machine
+        机器
       </span>
       <RadioGroup
         aria-labelledby={labelId}
@@ -469,7 +465,7 @@ function MachinePicker(props: {
         ))}
         <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm">
           <Radio value={ANOTHER_ADDRESS} />
-          <span className="min-w-0 flex-1 font-medium">Another address…</span>
+          <span className="min-w-0 flex-1 font-medium">其他地址…</span>
         </label>
       </RadioGroup>
     </div>

@@ -69,7 +69,7 @@ const renderPrices = (initialModel?: string) =>
 describe("UsagePriceOverrides", () => {
   it("waits for a price before flagging an unpriced model's new row", async () => {
     await using _screen = await renderPrices("glm-5.3");
-    const modelId = page.getByLabelText("New model ID");
+    const modelId = page.getByLabelText("新模型 ID");
     await expect.element(modelId).toHaveValue("glm-5.3");
 
     expect(page.getByRole("alert").elements()).toEqual([]);

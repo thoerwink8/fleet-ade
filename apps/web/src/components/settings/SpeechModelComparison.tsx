@@ -77,17 +77,17 @@ export function ModelBenchmarks({
                 {score.errorPercent}% error)
               </>
             ) : (
-              "not benchmarked"
+              "未做基准测试"
             )}
           </span>
         );
       })}
       <span>
-        Speed:{" "}
+        速度：{" "}
         {tier === "cpu" && data && data.secondsPer30s.cpu === undefined ? (
-          "update server"
+          "请更新服务器"
         ) : seconds == null ? (
-          "not benchmarked"
+          "未做基准测试"
         ) : (
           <>
             <strong className="font-medium text-foreground">{seconds} s</strong> / 30 s

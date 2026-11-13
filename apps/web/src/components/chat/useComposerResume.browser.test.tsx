@@ -67,7 +67,7 @@ function ResumeButton(props: {
   });
   return (
     <button type="button" onClick={() => void onResume()}>
-      Resume
+      继续
     </button>
   );
 }

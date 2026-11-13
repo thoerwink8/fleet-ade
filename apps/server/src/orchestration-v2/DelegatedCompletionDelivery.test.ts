@@ -3494,7 +3494,7 @@ it.layer(Layer.merge(layerTest, ProviderContinuationRequests.layer))(
                 parentItemId: null,
                 ordinal: 1,
                 status: "failed",
-                title: "Usage limit reached",
+                title: "已达到用量上限",
                 startedAt: now,
                 completedAt: now,
                 updatedAt: now,
@@ -3637,9 +3637,7 @@ it.layer(Layer.merge(layerTest, ProviderContinuationRequests.layer))(
                 completedAt: null,
                 updatedAt: now,
                 requestId,
-                questions: [
-                  { id: "color", header: "Color", question: "Which color?", options: [] },
-                ],
+                questions: [{ id: "color", header: "颜色", question: "Which color?", options: [] }],
               },
             },
           ],
@@ -4554,7 +4552,7 @@ it.layer(layerTest)("delegated tasks across a server restart", (it) => {
         const orchestrator = yield* Orchestrator.OrchestratorV2;
         const eventSink = yield* EventSink.EventSinkV2;
         const now = yield* DateTime.now;
-        const suffix = runningContinuation ? "running" : "idle";
+        const suffix = runningContinuation ? "running" : "空闲";
         const threadId = ThreadId.make(`thread:settled-only-restart-${suffix}`);
         const projectId = ProjectId.make(`project:settled-only-restart-${suffix}`);
         const runId = RunId.make(`run:settled-only-restart-${suffix}`);

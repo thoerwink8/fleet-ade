@@ -174,14 +174,14 @@ function shouldOpenDefaultBrowserProfileFromMenuClick(pointerType: string | unde
 }
 
 const SURFACE_DISABLED_REASONS = {
-  browser: "Browser previews are only available in the T3 Code desktop app.",
-  terminal: "Terminal surfaces are only available from a project thread.",
-  files: "Files are only available when a project is open.",
-  diff: "Diff is only available for server threads in Git repositories.",
-  pullRequest: "This thread's branch has no pull request yet.",
-  pullRequests: "No linked pull requests are available for this thread.",
-  device: "Devices are only available from a thread.",
-  sideChat: "Side chats start after the first message.",
+  browser: "浏览器预览仅在 T3 Code 桌面应用中可用。",
+  terminal: "终端面板仅在项目会话中可用。",
+  files: "打开项目后才能使用文件面板。",
+  diff: "差异仅在 Git 仓库的服务器会话中可用。",
+  pullRequest: "此会话的分支尚无 pull request。",
+  pullRequests: "此会话没有可用的已关联 pull request。",
+  device: "设备仅在会话中可用。",
+  sideChat: "发送第一条消息后才能开始侧聊。",
 } as const;
 
 // Closed keepMounted popups must stop blocking shortcuts once their exit transition ends.
@@ -199,14 +199,14 @@ const LAUNCHER_SHORTCUT_BLOCKING_LAYERS = [
   .join(",");
 
 const SURFACE_UNAVAILABLE_HINTS = {
-  browser: "Only available in the desktop app.",
-  terminal: "Available when a project is open.",
-  files: "Available when a project is open.",
-  diff: "Available for Git repositories.",
-  pullRequest: "No pull request on this branch yet.",
-  pullRequests: "No linked pull requests available.",
-  device: "Available from a thread.",
-  sideChat: "Available after the first message.",
+  browser: "仅桌面应用可用。",
+  terminal: "打开项目后可用。",
+  files: "打开项目后可用。",
+  diff: "仅适用于 Git 仓库。",
+  pullRequest: "此分支尚无 pull request。",
+  pullRequests: "没有可用的已关联 pull request。",
+  device: "在会话中可用。",
+  sideChat: "发送第一条消息后可用。",
 } as const;
 
 type TabContextMenuAction =
@@ -244,7 +244,7 @@ function tabMuteMenuItem(input: {
 }): { label: string; disabled: boolean } {
   const muted = input.overlay?.audioMuted ?? false;
   return {
-    label: muted ? "Unmute tab" : "Mute tab",
+    label: muted ? "取消标签静音" : "将标签静音",
     disabled: input.overlay === null || !input.canResolveRuntimeTabId,
   };
 }
@@ -340,7 +340,7 @@ function RightPanelEmptyState(props: {
 
   const actions = [
     {
-      label: "Browser",
+      label: "浏览器",
       icon: Globe2,
       shortcut: "B",
       available: props.browserAvailable,
@@ -348,7 +348,7 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddBrowser,
     },
     {
-      label: "Terminal",
+      label: "终端",
       icon: TerminalSquare,
       shortcut: "T",
       available: props.terminalAvailable,
@@ -356,7 +356,7 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddTerminal,
     },
     {
-      label: "Files",
+      label: "文件",
       icon: Files,
       shortcut: "F",
       available: props.filesAvailable,
@@ -364,7 +364,7 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddFiles,
     },
     {
-      label: "Diff",
+      label: "差异",
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
@@ -372,7 +372,7 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddDiff,
     },
     {
-      label: "Pull request",
+      label: "PR",
       icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
@@ -380,7 +380,7 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddPullRequest,
     },
     {
-      label: "Linked pull requests",
+      label: "已关联的 PR",
       icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
@@ -388,8 +388,8 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddPullRequests,
     },
     {
-      label: "Device",
-      description: "Watch an iOS Simulator or Android Emulator.",
+      label: "设备",
+      description: "查看 iOS 模拟器或 Android 模拟器。",
       icon: Smartphone,
       shortcut: "M",
       available: props.deviceAvailable,
@@ -399,8 +399,8 @@ function RightPanelEmptyState(props: {
     ...(props.onAddSideChat
       ? [
           {
-            label: "Side chat",
-            description: "Ask a side question while this thread keeps working.",
+            label: "侧聊",
+            description: "在会话继续运行的同时追问一个旁支问题。",
             icon: MessagesSquare,
             shortcut: "S",
             available: props.sideChatAvailable && !props.sideChatDisabledReason,
@@ -477,7 +477,7 @@ function RightPanelEmptyState(props: {
       data-workspace-focus-default
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      aria-label="Open a surface"
+      aria-label="打开面板"
       data-surface-launcher-keys={availableActions.map((action) => action.shortcut).join("")}
       className={cn(
         "scrollbar-gutter-both flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 outline-none",
@@ -485,7 +485,7 @@ function RightPanelEmptyState(props: {
       )}
     >
       <div className="w-full max-w-xs py-6">
-        <h3 className="mb-3 text-center font-medium text-foreground text-sm">Open a surface</h3>
+        <h3 className="mb-3 text-center font-medium text-foreground text-sm">打开面板</h3>
         <div className="flex flex-col gap-0.5">
           {actions.map((action) =>
             action.available ? (
@@ -523,7 +523,7 @@ function RightPanelEmptyState(props: {
                     <MenuTrigger
                       render={
                         <Button
-                          aria-label="Open browser in a profile"
+                          aria-label="在指定配置中打开浏览器"
                           className="absolute top-1/2 right-8 -translate-y-1/2"
                           size="icon-xs"
                           variant="ghost-muted"
@@ -576,9 +576,9 @@ function surfaceTitle(
 ): string {
   switch (surface.kind) {
     case "diff":
-      return "Diff";
+      return "差异";
     case "files":
-      return "Files";
+      return "文件";
     case "file":
       return surface.relativePath.slice(
         Math.max(surface.relativePath.lastIndexOf("/"), surface.relativePath.lastIndexOf("\\")) + 1,
@@ -591,19 +591,19 @@ function surfaceTitle(
     case "pull-request":
       return `#${surface.number}`;
     case "pull-requests":
-      return "Pull requests";
+      return "PR";
     case "device":
-      return surface.title ?? surface.target?.name ?? "Device";
+      return surface.title ?? surface.target?.name ?? "设备";
     case "side-chat":
-      return "Side chat";
+      return "侧聊";
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
-      if (!snapshot || snapshot.navStatus._tag === "Idle") return "Browser";
+      if (!snapshot || snapshot.navStatus._tag === "Idle") return "浏览器";
       if (snapshot.navStatus.title.trim().length > 0) return snapshot.navStatus.title;
       try {
-        return new URL(snapshot.navStatus.url).host || "Browser";
+        return new URL(snapshot.navStatus.url).host || "浏览器";
       } catch {
-        return "Browser";
+        return "浏览器";
       }
     }
   }
@@ -701,10 +701,10 @@ function SurfaceIcon({
 function sideChatTabState(shell: EnvironmentThreadShell | null) {
   if (shell === null) return null;
   if (shell.hasPendingApprovals || shell.pendingSubagentRequest === "approval") {
-    return "needs approval";
+    return "待批准";
   }
   if (shell.hasPendingUserInput || shell.pendingSubagentRequest === "user_input") {
-    return "needs input";
+    return "待输入";
   }
   return threadRuntimeIsActive(shell.runtime) ? "running" : null;
 }
@@ -911,7 +911,7 @@ function RightPanelTab(
   const sideChatState = sideChatTabState(sideChatShell);
   const content = (
     <>
-      <PanelTabCloseButton label={`Close ${title}`} onClick={() => onClose(surface)}>
+      <PanelTabCloseButton label={`关闭 ${title}`} onClick={() => onClose(surface)}>
         <SurfaceIcon
           surface={surface}
           previewUrl={props.previewUrl}
@@ -934,7 +934,7 @@ function RightPanelTab(
               <button
                 type="button"
                 className="cursor-pointer flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
-                aria-label={audio === "muted" ? `Unmute ${title}` : `Mute ${title}`}
+                aria-label={audio === "muted" ? `取消 ${title} 的静音` : `将 ${title} 静音`}
                 onClick={(event) => {
                   event.stopPropagation();
                   void previewBridge
@@ -950,12 +950,12 @@ function RightPanelTab(
               </button>
             }
           />
-          <TooltipPopup>{audio === "muted" ? "Unmute tab" : "Mute tab"}</TooltipPopup>
+          <TooltipPopup>{audio === "muted" ? "取消标签静音" : "将标签静音"}</TooltipPopup>
         </Tooltip>
       )}
       {props.renaming ? (
         <input
-          aria-label="Device tab name"
+          aria-label="设备标签名"
           className="w-24 min-w-0 rounded-sm bg-background px-1 outline-none ring-1 ring-inset ring-ring"
           defaultValue={title}
           ref={(element) => {
@@ -1099,7 +1099,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
   const addSurfaceActions = [
     {
-      label: "Browser",
+      label: "浏览器",
       icon: Globe2,
       shortcut: "B",
       available: props.browserAvailable,
@@ -1107,7 +1107,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddBrowser,
     },
     {
-      label: "Terminal",
+      label: "终端",
       icon: TerminalSquare,
       shortcut: "T",
       available: props.terminalAvailable,
@@ -1115,7 +1115,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddTerminal,
     },
     {
-      label: "Files",
+      label: "文件",
       icon: Files,
       shortcut: "F",
       available: props.filesAvailable,
@@ -1123,7 +1123,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddFiles,
     },
     {
-      label: "Diff",
+      label: "差异",
       icon: FileDiff,
       shortcut: "D",
       available: props.diffAvailable,
@@ -1131,7 +1131,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddDiff,
     },
     {
-      label: "Pull request",
+      label: "PR",
       icon: PullRequestGlyph.pullRequest,
       shortcut: "P",
       available: props.pullRequestAvailable,
@@ -1139,7 +1139,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddPullRequest,
     },
     {
-      label: "Linked pull requests",
+      label: "已关联的 PR",
       icon: PullRequestGlyph.link,
       shortcut: "L",
       available: props.pullRequestsAvailable,
@@ -1147,7 +1147,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddPullRequests,
     },
     {
-      label: "Device",
+      label: "设备",
       icon: Smartphone,
       shortcut: "M",
       available: props.deviceAvailable,
@@ -1157,7 +1157,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     ...(props.onAddSideChat
       ? [
           {
-            label: "Side chat",
+            label: "侧聊",
             icon: MessagesSquare,
             shortcut: "S",
             available: props.sideChatAvailable === true && !props.sideChatDisabledReason,
@@ -1189,9 +1189,9 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
     const items: ContextMenuItem<TabContextMenuAction>[] = [];
     if (surface.kind === "device" && props.onRenameDevice)
-      items.push({ id: "rename", label: "Rename" });
+      items.push({ id: "rename", label: "重命名" });
     if (surface.kind === "file" && surface.attachment === undefined) {
-      items.push({ id: "copy-path", label: "Copy path" });
+      items.push({ id: "copy-path", label: "复制路径" });
     }
     const menuPreviewTabId = previewTabIdOf(surface, props.previewSessions);
     const menuOverlay = menuPreviewTabId ? (props.desktopByTabId[menuPreviewTabId] ?? null) : null;
@@ -1206,20 +1206,20 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       });
     }
     items.push(
-      { id: "close", label: "Close" },
+      { id: "close", label: "关闭" },
       {
         id: "close-others",
-        label: "Close others",
+        label: "关闭其他标签",
         disabled: props.surfaces.length <= 1,
       },
       {
         id: "close-to-right",
-        label: "Close to the right",
+        label: "关闭右侧标签",
         disabled: surfaceIndex >= props.surfaces.length - 1,
       },
       {
         id: "close-all",
-        label: "Close all",
+        label: "关闭全部标签",
         disabled: props.surfaces.length === 0,
       },
     );
@@ -1329,8 +1329,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
       workspaceLabel={
         focusedSurface
-          ? `Workspace panel: ${surfaceTitle(focusedSurface, props.previewSessions, props.terminalLabelsById)}`
-          : "Workspace panel"
+          ? `工作区面板：${surfaceTitle(focusedSurface, props.previewSessions, props.terminalLabelsById)}`
+          : "工作区面板"
       }
       mode={props.mode}
       {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
@@ -1411,7 +1411,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   ref={addSurfaceTriggerRef}
                   render={
                     <Button
-                      aria-label="Add panel surface"
+                      aria-label="添加面板"
                       className="shrink-0"
                       size="icon-xs"
                       variant="ghost-muted"
@@ -1485,14 +1485,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           <div
             className="flex shrink-0 items-center gap-0.5 [-webkit-app-region:no-drag]"
             role="group"
-            aria-label="Scroll panel tabs"
+            aria-label="滚动面板标签"
           >
             <Tooltip>
               <TooltipTrigger
                 render={
                   <span className="inline-flex">
                     <Button
-                      aria-label="Scroll tabs left"
+                      aria-label="向左滚动标签"
                       disabled={!tabScrollState.canScrollLeft}
                       onClick={() => scrollTabs(-1)}
                       size="icon-xs"
@@ -1503,14 +1503,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   </span>
                 }
               />
-              <TooltipPopup>Scroll tabs left</TooltipPopup>
+              <TooltipPopup>向左滚动标签</TooltipPopup>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger
                 render={
                   <span className="inline-flex">
                     <Button
-                      aria-label="Scroll tabs right"
+                      aria-label="向右滚动标签"
                       disabled={!tabScrollState.canScrollRight}
                       onClick={() => scrollTabs(1)}
                       size="icon-xs"
@@ -1521,7 +1521,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   </span>
                 }
               />
-              <TooltipPopup>Scroll tabs right</TooltipPopup>
+              <TooltipPopup>向右滚动标签</TooltipPopup>
             </Tooltip>
           </div>
         ) : null}
@@ -1583,7 +1583,7 @@ function DeviceTabTooltip(props: {
       <span>{props.title}</span>
       {target ? (
         <span className="text-muted-foreground">
-          {host?.label ?? "Device host"} ·{" "}
+          {host?.label ?? "设备主机"} ·{" "}
           {device?.version ?? (target.platform === "ios" ? "iOS" : "Android")}
         </span>
       ) : null}

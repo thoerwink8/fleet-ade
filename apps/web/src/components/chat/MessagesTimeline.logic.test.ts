@@ -77,7 +77,7 @@ describe("deriveMessagesTimelineRows", () => {
             {
               ...renderBase,
               kind,
-              htmlRender: { attachmentId: "preview", title: "Preview", height: 420 },
+              htmlRender: { attachmentId: "preview", title: "预览", height: 420 },
             },
           ]
         : kind === "mcp-app"
@@ -205,7 +205,7 @@ describe("deriveMessagesTimelineRows", () => {
         id,
         runId,
         createdAt: at,
-        label: "Thinking",
+        label: "正在思考",
         tone: "thinking",
         itemType: "reasoning",
         detail: id,
@@ -477,7 +477,7 @@ describe("deriveMessagesTimelineRows", () => {
               id: "nearby-tool",
               runId: fixture.runId,
               createdAt: notice.createdAt,
-              label: "Ran command",
+              label: "已运行命令",
               tone: "tool",
               toolLifecycleStatus: "completed",
             },
@@ -554,7 +554,7 @@ describe("deriveMessagesTimelineRows", () => {
       });
       expect(runningRows.find((row) => row.kind === "context-compaction")).toMatchObject({
         active: true,
-        label: "Compacting context",
+        label: "正在压缩上下文",
       });
       expect(runningRows.some((row) => row.kind === "thinking")).toBe(false);
 
@@ -639,11 +639,11 @@ describe("deriveMessagesTimelineRows", () => {
         {
           kind: "context-compaction",
           active: true,
-          label: "Compacting before the cache expires…",
+          label: "正在缓存过期前压缩…",
         },
-        "Context automatically compacted before cache expiry",
+        "已在缓存过期前自动压缩上下文",
       ],
-      ["onReturn", { kind: "working", compacting: true }, "Context compacted before sending"],
+      ["onReturn", { kind: "working", compacting: true }, "已在发送前压缩上下文"],
       [undefined, { kind: "context-compaction", active: true }, undefined],
     ] as const) {
       const prompt = compactPrompt(reason);
@@ -967,7 +967,7 @@ describe("deriveMessagesTimelineRows", () => {
     };
 
     expect(liveRowsFor([prompt, compaction, interruptResult])).toMatchObject([
-      { kind: "context-compaction", label: "Context compaction stopped" },
+      { kind: "context-compaction", label: "上下文压缩已停止" },
     ]);
     // Stopped before the provider started: no compaction row says so, so the interrupt stays.
     expect(liveRowsFor([prompt, interruptResult]).map((row) => row.id)).toContain(
@@ -1073,7 +1073,7 @@ describe("deriveMessagesTimelineRows", () => {
           message: {
             id: "assistant-1" as never,
             role: "assistant",
-            text: "Done",
+            text: "完成",
             runId: "turn-1" as never,
             createdAt: "2026-01-01T00:00:20Z",
             updatedAt: "2026-01-01T00:00:30Z",
@@ -1139,7 +1139,7 @@ describe("deriveMessagesTimelineRows", () => {
           id: "work-1",
           createdAt: "2026-01-01T00:00:08Z",
           runId: "turn-1" as never,
-          label: "Ran command",
+          label: "已运行命令",
           tone: "tool" as const,
         },
       },
@@ -1150,7 +1150,7 @@ describe("deriveMessagesTimelineRows", () => {
         message: {
           id: "assistant-final" as never,
           role: "assistant" as const,
-          text: "Done",
+          text: "完成",
           runId: "turn-1" as never,
           createdAt: "2026-01-01T00:00:20Z",
           updatedAt: "2026-01-01T00:00:22Z",
@@ -1238,7 +1238,7 @@ describe("deriveMessagesTimelineRows", () => {
           id: `work-after-text-${index}`,
           createdAt: `2026-01-01T00:00:0${index + 7}Z`,
           runId,
-          label: "Ran command",
+          label: "已运行命令",
           tone: "tool" as const,
           itemType: "command_execution" as const,
           toolLifecycleStatus: "completed" as const,
@@ -1352,7 +1352,7 @@ describe("deriveMessagesTimelineRows", () => {
             id: "work-1",
             createdAt: "2026-01-01T00:00:12Z",
             runId: "turn-1" as never,
-            label: "Ran command",
+            label: "已运行命令",
             tone: "tool" as const,
           },
         },
@@ -1416,7 +1416,7 @@ describe("deriveMessagesTimelineRows", () => {
             id: "work-1",
             createdAt: "2026-01-01T00:00:05Z",
             runId: "turn-1" as never,
-            label: "Ran command",
+            label: "已运行命令",
             tone: "tool" as const,
           },
         },
@@ -1472,7 +1472,7 @@ describe("deriveMessagesTimelineRows", () => {
           id: "work",
           createdAt: time(8),
           runId,
-          label: "Ran command",
+          label: "已运行命令",
           tone: "tool" as const,
         },
       };
@@ -1483,7 +1483,7 @@ describe("deriveMessagesTimelineRows", () => {
         message: {
           id: MessageId.make("final"),
           role: "assistant" as const,
-          text: "Done",
+          text: "完成",
           runId,
           createdAt: time(20),
           updatedAt: time(20),
@@ -1547,7 +1547,7 @@ describe("deriveMessagesTimelineRows", () => {
       kind: "work",
       id,
       createdAt: time(second),
-      entry: { id, createdAt: time(second), runId, label: "Ran command", tone: "tool" },
+      entry: { id, createdAt: time(second), runId, label: "已运行命令", tone: "tool" },
     });
     const rows = (expandedRunIds: ReadonlySet<RunId>) =>
       deriveMessagesTimelineRows({
@@ -1615,7 +1615,7 @@ describe("deriveMessagesTimelineRows", () => {
       kind: "work",
       id: "work",
       createdAt: time(4),
-      entry: { id: "work", createdAt: time(4), runId, label: "Ran command", tone: "tool" },
+      entry: { id: "work", createdAt: time(4), runId, label: "已运行命令", tone: "tool" },
     };
     const firstSteer = message("first-steer", 10, "user", "steer");
     const deriveRows = (timelineEntries: TimelineEntry[]) =>
@@ -1668,7 +1668,7 @@ describe("deriveMessagesTimelineRows", () => {
             id: "work-1",
             createdAt: "2026-01-01T00:00:05Z",
             runId: "turn-1" as never,
-            label: "Ran command",
+            label: "已运行命令",
             tone: "tool" as const,
           },
         },
@@ -1679,7 +1679,7 @@ describe("deriveMessagesTimelineRows", () => {
           message: {
             id: "assistant-final" as never,
             role: "assistant",
-            text: "Done",
+            text: "完成",
             runId: "turn-1" as never,
             createdAt: "2026-01-01T00:00:20Z",
             updatedAt: "2026-01-01T00:00:22Z",
@@ -1788,7 +1788,7 @@ describe("deriveMessagesTimelineRows", () => {
             id: "old-work",
             createdAt: "2026-01-01T00:00:05Z",
             runId: "turn-before-restart" as never,
-            label: "Searched files",
+            label: "已搜索文件",
             command: "rg restart",
             tone: "tool" as const,
             toolLifecycleStatus: "completed" as const,
@@ -2042,7 +2042,7 @@ describe("deriveMessagesTimelineRows", () => {
         {
           ...base("launch-thinking", 3, 8),
           type: "reasoning" as const,
-          title: "Thinking",
+          title: "正在思考",
           text: "Not there.",
           streaming: false,
         },
@@ -2210,7 +2210,7 @@ describe("deriveMessagesTimelineRows", () => {
               ...base("answer", 4, 5),
               type: "assistant_message" as const,
               messageId: MessageId.make("answer"),
-              text: "Done",
+              text: "完成",
               streaming: false,
             }
           : { ...command("running", 4, 4), status: "running" as const, completedAt: null },
@@ -2742,7 +2742,7 @@ describe("deriveMessagesTimelineRows", () => {
             id: "previous-work",
             createdAt: "2026-01-01T00:00:05Z",
             runId: "turn-1" as never,
-            label: "Read files",
+            label: "读取文件",
             tone: "tool" as const,
           },
         },
@@ -2768,7 +2768,7 @@ describe("deriveMessagesTimelineRows", () => {
             id: "running-work",
             createdAt: "2026-01-01T00:01:05Z",
             runId: "turn-2" as never,
-            label: "Searched files",
+            label: "已搜索文件",
             tone: "tool" as const,
           },
         },
@@ -2818,7 +2818,7 @@ describe("deriveMessagesTimelineRows", () => {
                 : {
                     id,
                     createdAt,
-                    label: "Ran command",
+                    label: "已运行命令",
                     tone: "tool" as const,
                     toolLifecycleStatus: status,
                   },
@@ -2889,7 +2889,7 @@ describe("v2 run and attempt history", () => {
           id: "work-1",
           createdAt: "2026-01-01T00:00:08Z",
           runId: "turn-1" as never,
-          label: "Ran command",
+          label: "已运行命令",
           tone: "tool" as const,
         },
       },
@@ -2924,7 +2924,7 @@ describe("v2 run and attempt history", () => {
         message: {
           id: "assistant-final" as never,
           role: "assistant" as const,
-          text: "Done",
+          text: "完成",
           runId: "turn-1" as never,
           createdAt: "2026-01-01T00:00:20Z",
           updatedAt: "2026-01-01T00:00:22Z",
@@ -3022,7 +3022,7 @@ describe("v2 run and attempt history", () => {
         id,
         createdAt: at(second),
         runId,
-        label: "Ran command",
+        label: "已运行命令",
         tone: "tool",
         itemType: "command_execution",
         toolLifecycleStatus: status,
@@ -3259,7 +3259,7 @@ describe("v2 run and attempt history", () => {
     expect(collapsedRows.find((row) => row.kind === "attempt-fold")).toMatchObject({
       attemptId: supersededAttemptId,
       runId,
-      label: "Superseded attempt",
+      label: "已被替代的尝试",
       expanded: false,
       deferredWorkItemIds: ["old-work-anchor"],
     });
@@ -3405,7 +3405,7 @@ describe("v2 run and attempt history", () => {
               kind: "work",
               createdAt: at(1),
               attempt: supersededAttempt,
-              entry: { id: "old-work", createdAt: at(1), runId, label: "Read", tone: "tool" },
+              entry: { id: "old-work", createdAt: at(1), runId, label: "读取", tone: "tool" },
             },
             assistantEntry("status-entry", supersededAttempt, 1, "commentary"),
             assistantEntry("old-reply-entry", supersededAttempt, replyCompletedSecond, phase),
@@ -3491,7 +3491,7 @@ describe("v2 run and attempt history", () => {
         completedAt: null,
         updatedAt: {},
         type,
-        message: type === "run_interrupt_request" ? "Stopping" : "Stopped",
+        message: type === "run_interrupt_request" ? "正在停止" : "已停止",
       },
     });
     const rows = deriveMessagesTimelineRows({
@@ -3545,7 +3545,7 @@ describe("v2 run and attempt history", () => {
             id: "stopped-command",
             createdAt: "2026-01-01T00:00:01Z",
             runId,
-            label: "Ran command",
+            label: "已运行命令",
             tone: "tool",
             itemType: "command_execution",
             command: "/bin/bash -lc 'sleep 90 && echo slept'",
@@ -4178,7 +4178,7 @@ describe("linked timeline resources", () => {
           id,
           runId,
           createdAt: "2026-09-08T10:00:02Z",
-          label: "Delegated a child task",
+          label: "已委派子任务",
           tone: failed ? "error" : "tool",
           itemType: "dynamic_tool",
           toolLifecycleStatus: failed
@@ -4930,7 +4930,7 @@ describe("subagent continued by a later turn", () => {
   const reasoning = (id: string, runId: RunId, ordinal: number, second: number) => ({
     ...base(id, runId, ordinal, second),
     type: "reasoning" as const,
-    text: "Thinking",
+    text: "正在思考",
     streaming: false,
   });
   const items: OrchestrationV2TurnItem[] = [

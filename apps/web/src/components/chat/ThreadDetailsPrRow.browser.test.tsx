@@ -128,7 +128,7 @@ const threadRef: ScopedThreadRef = {
 const scratchProject = {
   id: ProjectId.make("scratch"),
   environmentId: EnvironmentId.make("environment"),
-  title: "No project",
+  title: "无项目",
   workspaceRoot: "/home/user/.t3/scratch",
   scripts: [],
 };

@@ -19,11 +19,11 @@ function reportFailure(title: string, cause: unknown) {
   toastManager.add({
     type: "error",
     title,
-    description: cause instanceof Error ? cause.message : "Try again.",
+    description: cause instanceof Error ? cause.message : "请重试。",
     data: traceId
       ? {
           secondaryActionProps: {
-            children: "Copy trace ID",
+            children: "复制追踪 ID",
             onClick: () => void navigator.clipboard?.writeText(traceId),
           },
         }
@@ -53,7 +53,7 @@ export function useT3ChatLink() {
         ?.shell.openExternal(result.value)
         .catch(() => undefined);
     } else if (!isAtomCommandInterrupted(result)) {
-      reportFailure("Could not start linking", squashAtomCommandFailure(result));
+      reportFailure("无法开始关联", squashAtomCommandFailure(result));
     }
     setPending(null);
   };
@@ -67,7 +67,7 @@ export function useT3ChatLink() {
       setLinkUrl(null);
       linkState.refresh();
     } else if (!isAtomCommandInterrupted(result)) {
-      reportFailure("Could not unlink T3 Chat", squashAtomCommandFailure(result));
+      reportFailure("无法取消关联 T3 Chat", squashAtomCommandFailure(result));
     }
     setPending(null);
   };

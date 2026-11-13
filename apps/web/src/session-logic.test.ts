@@ -232,7 +232,7 @@ describe("V2 session presentation", () => {
       {
         id: assistantMessageId,
         role: "assistant",
-        text: "Done",
+        text: "完成",
         runId,
         streaming: false,
         createdAt: "2026-06-20T00:00:02.000Z",
@@ -363,7 +363,7 @@ describe("V2 session presentation", () => {
           createdAt: "2026-06-20T00:00:02.000Z",
           runId: runId(8),
           itemType: "command_execution",
-          label: "Background work",
+          label: "后台任务",
           tone: "tool",
         },
       };
@@ -471,7 +471,7 @@ describe("V2 session presentation", () => {
     const requestItem = {
       ...base("item-interrupt-request", 1),
       type: "run_interrupt_request" as const,
-      message: "Stopping",
+      message: "正在停止",
     } satisfies OrchestrationV2TurnItem;
     const commandItem = {
       ...base("item-command", 2),
@@ -483,7 +483,7 @@ describe("V2 session presentation", () => {
     const resultItem = {
       ...base("item-interrupt-result", 3),
       type: "run_interrupt_result" as const,
-      message: "Stopped",
+      message: "已停止",
     } satisfies OrchestrationV2TurnItem;
     const todoItem = {
       ...base("item-todo", 4),
@@ -519,7 +519,7 @@ describe("V2 session presentation", () => {
       ...base("item-workspace-preparation", 7),
       type: "command_execution" as const,
       title: "Workspace ready",
-      input: "Preparing workspace",
+      input: "正在准备工作区",
       output: "Workspace preparation completed.",
       exitCode: 0,
     } satisfies OrchestrationV2TurnItem;
@@ -574,7 +574,7 @@ describe("V2 session presentation", () => {
     expect(errorEntry?.kind).toBe("work");
     if (errorEntry?.kind === "work") {
       expect(errorEntry.entry.projectedItem).toBe(visibleTurnItems[5]);
-      expect(errorEntry.entry.label).toBe("Provider error");
+      expect(errorEntry.entry.label).toBe("提供方错误");
       expect(errorEntry.entry.detail).toBe("Invalid reasoning effort.");
       expect(errorEntry.entry.tone).toBe("info");
       expect(errorEntry.entry.toolLifecycleStatus).toBe("failed");
@@ -1226,7 +1226,7 @@ describe("native provider presentation in the v2 timeline", () => {
       ...base,
       type: "assistant_message",
       messageId: MessageId.make("done"),
-      text: "Done",
+      text: "完成",
       streaming: false,
     };
     const checkpoint: OrchestrationV2TurnItem = {
@@ -1310,7 +1310,7 @@ describe("HTML renders in the timeline", () => {
     sourceItemId: item.id,
     item,
   });
-  const htmlRender = { attachmentId: "render-thread-chart.html", title: "Chart", height: 420 };
+  const htmlRender = { attachmentId: "render-thread-chart.html", title: "图表", height: 420 };
   const renderCall = (
     status: OrchestrationV2TurnItem["status"],
     output?: unknown,
@@ -1319,7 +1319,7 @@ describe("HTML renders in the timeline", () => {
     status,
     type: "dynamic_tool",
     toolName: "mcp__t3-code__html_render",
-    input: { title: "Chart", height: 420 },
+    input: { title: "图表", height: 420 },
     ...(output === undefined ? {} : { output }),
   });
   const command = (id: string, second: number): OrchestrationV2TurnItem => ({
@@ -1510,7 +1510,7 @@ describe("work-log failure policy (#7999/#7893)", () => {
     ({
       id: "entry-1",
       createdAt: "2026-08-27T00:00:00.000Z",
-      label: "Ran command",
+      label: "已运行命令",
       tone: "tool",
       ...overrides,
     }) as never;
@@ -1734,7 +1734,7 @@ describe("incremental v2 timeline entries", () => {
           id: MessageId.make("live-user"),
           runId: null,
           role: "user" as const,
-          text: "Continue",
+          text: "继续",
           streaming: false,
           createdAt: fixture.time(5),
           updatedAt: fixture.time(5),

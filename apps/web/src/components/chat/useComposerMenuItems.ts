@@ -240,7 +240,7 @@ export function useComposerMenuItems({
           type: "slash-command",
           command: "model",
           label: "/model",
-          description: "Switch response model for this thread",
+          description: "切换这个会话使用的回复模型",
         },
         ...(sideChatAvailable
           ? ([
@@ -249,14 +249,14 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "side",
                 label: "/side",
-                description: sideChatDisabledReason ?? "Ask a side question in a new side chat",
+                description: sideChatDisabledReason ?? "在新的侧聊中问一个旁支问题",
               },
               {
                 id: "slash:btw",
                 type: "slash-command",
                 command: "btw",
                 label: "/btw",
-                description: sideChatDisabledReason ?? "Same as /side",
+                description: sideChatDisabledReason ?? "与 /side 相同",
               },
             ] as const)
           : []),
@@ -267,7 +267,7 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "clear",
                 label: "/clear",
-                description: "Start a fresh session; earlier messages stay visible",
+                description: "以全新的上下文重新开始，之前的消息仍会显示",
               },
             ] as const)
           : []),
@@ -285,7 +285,7 @@ export function useComposerMenuItems({
         provider: selectedProvider,
         command,
         label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "Run provider command",
+        description: command.description ?? command.input?.hint ?? "运行提供方命令",
       }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
@@ -295,9 +295,7 @@ export function useComposerMenuItems({
         skill,
         label: `/skill:${skill.name}`,
         description:
-          skill.shortDescription ??
-          skill.description ??
-          (skill.scope ? `${skill.scope} skill` : ""),
+          skill.shortDescription ?? skill.description ?? (skill.scope ? `${skill.scope} 技能` : ""),
       }));
       // T3's `/clear` replaces the provider's, which would clear a session T3 still treats as live.
       const visibleProviderSlashCommandItems = providerSlashCommandItems.filter(
@@ -321,7 +319,7 @@ export function useComposerMenuItems({
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} skill` : "Run provider skill"),
+          (skill.scope ? `${skill.scope} 技能` : "运行提供方技能"),
       }));
     }
     if (
@@ -408,25 +406,23 @@ export function useComposerMenuItems({
         exactPullRequestLookup.isPending));
   const emptyState = (() => {
     if (composerTriggerKind === "skill") {
-      return "No skills found. Try / to browse provider commands.";
+      return "未找到技能。试试输入 / 浏览提供方命令。";
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "Pull requests are not available for this project.";
+        return "这个项目无法使用 pull request。";
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "Pull requests could not be read for this project.";
+        return "无法读取这个项目的 pull request。";
       }
       return composerTrigger?.query
-        ? `No pull request matches ${composerTrigger.query}.`
-        : "No pull requests found in this repository.";
+        ? `没有匹配 ${composerTrigger.query} 的 pull request。`
+        : "这个仓库中没有 pull request。";
     }
-    return composerTriggerKind === "path"
-      ? "No matching files or folders."
-      : "No matching command.";
+    return composerTriggerKind === "path" ? "没有匹配的文件或文件夹。" : "没有匹配的命令。";
   })();
 
   return { items, isLoading, emptyState };

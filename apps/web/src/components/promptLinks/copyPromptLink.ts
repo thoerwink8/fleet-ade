@@ -70,13 +70,13 @@ export function composerPromptLink(input: {
 export async function copyPromptLink(link: string): Promise<void> {
   try {
     if (!(await writeTextToClipboard(link))) return;
-    toastManager.add({ type: "success", title: "Prompt link copied" });
+    toastManager.add({ type: "success", title: "已复制提示词链接" });
   } catch (error) {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not copy the prompt link",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: "无法复制提示词链接",
+        description: error instanceof Error ? error.message : "发生错误。",
       }),
     );
   }

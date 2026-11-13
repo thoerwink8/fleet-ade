@@ -99,7 +99,7 @@ describe("thread workflows", () => {
             },
           ],
         },
-        { id: "message-later", text: "Later" },
+        { id: "message-later", text: "稍后" },
       ],
       providerTurns: [
         {
@@ -290,7 +290,7 @@ describe("thread workflows", () => {
         },
       ],
       messages: [
-        { id: "message-promoted", text: "Run now" },
+        { id: "message-promoted", text: "立即运行" },
         { id: "message-still-queued", text: "Wait longer" },
       ],
       providerTurns: [],
@@ -319,7 +319,7 @@ describe("thread workflows", () => {
           },
           { id: "queued", status: "queued", userMessageId: "message", ordinal: 2 },
         ],
-        messages: [{ id: "message", text: "Queued" }],
+        messages: [{ id: "message", text: "排队中" }],
         providerTurns: [
           {
             id: "provider-turn-active",

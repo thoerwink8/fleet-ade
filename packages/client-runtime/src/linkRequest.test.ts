@@ -481,7 +481,7 @@ describe("linkRequestFailureMessage", () => {
       linkRequestFailureMessage({ _tag: "PeerLinkRequestError", message: "Already answered." }),
     ).toBe("Already answered.");
     expect(linkRequestFailureMessage({ _tag: "SchemaError", message: "code=abc" })).toBe(
-      "Could not answer the request. Try again.",
+      "无法回复此请求。请重试。",
     );
   });
 });

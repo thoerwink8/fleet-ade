@@ -197,7 +197,7 @@ describe("ServerUpdatesAction", () => {
     },
     {
       environmentId: "batch-c" as EnvironmentId,
-      serverLabel: "Manual",
+      serverLabel: "手动",
       selfUpdate: null,
       targetVersion: "0.0.31",
     },
@@ -211,7 +211,7 @@ describe("ServerUpdatesAction", () => {
       .mockResolvedValueOnce(AsyncResult.failure(Cause.fail(new Error("Download failed"))))
       .mockResolvedValueOnce(success());
     await using screen = await mount();
-    await click(screen, "Update all");
+    await click(screen, "全部更新");
 
     expect(testState.updateServer).toHaveBeenCalledTimes(2);
     expect(testState.toast).toHaveBeenCalledWith({
@@ -222,7 +222,7 @@ describe("ServerUpdatesAction", () => {
     expect(testState.toast).toHaveBeenCalledWith(
       expect.objectContaining({ type: "success", title: "Office updated" }),
     );
-    expect(button(screen, "Update all")!.disabled).toBe(false);
+    expect(button(screen, "全部更新")!.disabled).toBe(false);
   });
 
   it("skips a machine whose update would cross Stable and Nightly", async () => {
@@ -230,7 +230,7 @@ describe("ServerUpdatesAction", () => {
     testState.serverVersions.set("batch-a", "0.0.30-nightly.20261001.1");
     testState.updateServer.mockResolvedValue(success());
     await using screen = await mount();
-    await click(screen, "Update all");
+    await click(screen, "全部更新");
 
     expect(testState.updateServer).toHaveBeenCalledTimes(1);
     expect(testState.toast).toHaveBeenCalledWith(

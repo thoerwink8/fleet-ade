@@ -73,12 +73,12 @@ const FEATURED_DRIVER_OPTIONS = DRIVER_OPTIONS.filter((option) => option.feature
 const MORE_DRIVER_OPTIONS = DRIVER_OPTIONS.filter((option) => option.featured === false);
 const EMPTY_CONFIG_DRAFT: Record<string, unknown> = {};
 function validateInstanceId(id: string, existing: ReadonlySet<string>): string | null {
-  if (id.length === 0) return "Instance ID is required.";
-  if (id.length > 64) return "Instance ID must be 64 characters or fewer.";
+  if (id.length === 0) return "请输入实例 ID。";
+  if (id.length > 64) return "实例 ID 不能超过 64 个字符。";
   if (!INSTANCE_ID_PATTERN.test(id)) {
-    return "Instance ID must start with a letter and use only letters, digits, '-', or '_'.";
+    return "实例 ID 必须以字母开头，只能包含字母、数字、“-”或“_”。";
   }
-  if (existing.has(id)) return `An instance named '${id}' already exists.`;
+  if (existing.has(id)) return `名为“${id}”的实例已存在。`;
   return null;
 }
 
@@ -228,7 +228,7 @@ export function AddProviderInstanceDialog({
   const instanceIdError = validateInstanceId(instanceId, existingIds);
   const showInstanceIdError = hasAttemptedSubmit && instanceIdError !== null;
   const identityStep = 1;
-  const previewLabel = label.trim() || `${driverOption.label} Workspace`;
+  const previewLabel = label.trim() || `${driverOption.label} 工作区`;
 
   const configDraft = configByDriver[driver] ?? EMPTY_CONFIG_DRAFT;
   const isLocalAcp = isAcpRegistry && isManualAcpConfiguration && configDraft.source === "local";
@@ -238,13 +238,13 @@ export function AddProviderInstanceDialog({
   const acpSelectionError = isLocalAcp
     ? localCommandPath.length > 0
       ? null
-      : "Executable is required."
+      : "请输入可执行文件。"
     : selectedAcp !== null || (isManualAcpConfiguration && manualAgentId.length > 0)
       ? null
-      : "Select an ACP or configure one manually.";
+      : "选择一个 ACP，或手动配置。";
   const wizardStepSummaries = isAcpRegistry
     ? ([
-        isLocalAcp ? "Local ACP command" : (selectedAcp?.name ?? (manualAgentId || null)),
+        isLocalAcp ? "本地 ACP 命令" : (selectedAcp?.name ?? (manualAgentId || null)),
         previewLabel,
         null,
       ] as const)
@@ -359,7 +359,7 @@ export function AddProviderInstanceDialog({
     }));
     setIdentityByDriver((existing) =>
       updateProviderIdentityDraft(existing, ACP_REGISTRY_DRIVER_KIND, {
-        label: "Local ACP",
+        label: "本地 ACP",
         instanceIdOverride: null,
       }),
     );
@@ -403,8 +403,8 @@ export function AddProviderInstanceDialog({
       setIsSaving(false);
       toastManager.add({
         type: "error",
-        title: "Could not add provider instance",
-        description: error instanceof Error ? error.message : "The settings update failed.",
+        title: "无法添加提供方实例",
+        description: error instanceof Error ? error.message : "设置更新失败。",
       });
       return;
     }
@@ -417,8 +417,8 @@ export function AddProviderInstanceDialog({
     }
     toastManager.add({
       type: "success",
-      title: "Provider instance added",
-      description: `${driverOption.label} instance '${instanceId}' was added.`,
+      title: "已添加提供方实例",
+      description: `已添加 ${driverOption.label} 实例“${instanceId}”。`,
     });
     onOpenChange(false);
   };
@@ -437,7 +437,7 @@ export function AddProviderInstanceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <WizardPopup size="wide">
         <WizardHeader
-          title="Add provider"
+          title="添加提供方"
           description={<>Add an account or configure a provider on {environmentLabel}.</>}
         >
           {isAcpRegistry ? (
@@ -474,7 +474,7 @@ export function AddProviderInstanceDialog({
             <WizardPanel className={cn(isAcpRegistry && wizardStep === identityStep && "min-h-72")}>
               <div className={cn("grid gap-2", wizardStep !== 0 && "hidden")}>
                 <div id="add-instance-driver-label" className="text-sm font-medium text-foreground">
-                  Provider
+                  提供方
                 </div>
                 <ProviderOptionGrid
                   options={featuredDriverOptions}
@@ -490,7 +490,7 @@ export function AddProviderInstanceDialog({
                 <Collapsible open={showMoreProviders} onOpenChange={setShowMoreProviders}>
                   <div className="flex pt-2">
                     <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
-                      {showMoreProviders ? "Show less" : "Show more"}
+                      {showMoreProviders ? "收起" : "显示更多"}
                       <ChevronDownIcon
                         aria-hidden
                         className={cn("transition-transform", showMoreProviders && "rotate-180")}
@@ -505,12 +505,12 @@ export function AddProviderInstanceDialog({
                         value={driver}
                         disabled={isPreparingRegistryAgent}
                         onValueChange={selectDriver}
-                        aria-label="More providers"
+                        aria-label="更多提供方"
                       />
                       {!acpRegistryAllowed ? null : (
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <div aria-hidden className="flex-1 border-t border-border/70" />
-                          <span>Or choose from ACP Registry</span>
+                          <span>或从 ACP Registry 中选择</span>
                           <div aria-hidden className="flex-1 border-t border-border/70" />
                         </div>
                       )}
@@ -519,12 +519,12 @@ export function AddProviderInstanceDialog({
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <h3 className="text-sm font-medium text-foreground">
-                                {isLocalAcp ? "Local ACP command" : "Enter manually"}
+                                {isLocalAcp ? "本地 ACP 命令" : "手动输入"}
                               </h3>
                               <p className="mt-0.5 text-xs text-muted-foreground">
                                 {isLocalAcp
-                                  ? `Run an installed ACP executable on ${environmentLabel}.`
-                                  : "Enter an official registry ID and any local executable or auth override."}
+                                  ? `在 ${environmentLabel} 上运行已安装的 ACP 可执行文件。`
+                                  : "输入官方注册表 ID，以及要覆盖使用的本地可执行文件或认证设置。"}
                               </p>
                             </div>
                             <Button
@@ -535,7 +535,7 @@ export function AddProviderInstanceDialog({
                               size="xs"
                               variant="ghost"
                             >
-                              Search registry
+                              搜索注册表
                             </Button>
                           </div>
                           <SettingsGroup variant="plain">
@@ -593,24 +593,24 @@ export function AddProviderInstanceDialog({
                   <div className="flex shrink-0 gap-2 text-2xs">
                     {selectedAcp.website ? (
                       <a
-                        aria-label={`Open documentation for ${selectedAcp.name} (${selectedAcp.id})`}
+                        aria-label={`打开 ${selectedAcp.name}（${selectedAcp.id}）的文档`}
                         className="text-muted-foreground hover:text-foreground"
                         href={selectedAcp.website}
                         rel="noreferrer"
                         target="_blank"
                       >
-                        Docs
+                        文档
                       </a>
                     ) : null}
                     {selectedAcp.repository ? (
                       <a
-                        aria-label={`Open source for ${selectedAcp.name} (${selectedAcp.id})`}
+                        aria-label={`打开 ${selectedAcp.name}（${selectedAcp.id}）的源码`}
                         className="text-muted-foreground hover:text-foreground"
                         href={selectedAcp.repository}
                         rel="noreferrer"
                         target="_blank"
                       >
-                        Source
+                        源码
                       </a>
                     ) : null}
                   </div>
@@ -622,9 +622,9 @@ export function AddProviderInstanceDialog({
                 className={cn(wizardStep !== identityStep && "hidden")}
               >
                 <SettingsRow
-                  title={<label htmlFor="add-provider-label">Label</label>}
+                  title={<label htmlFor="add-provider-label">标签</label>}
                   description={
-                    <span id="add-provider-label-description">Shown in the provider list.</span>
+                    <span id="add-provider-label-description">显示在提供方列表中。</span>
                   }
                   control={
                     <Input
@@ -632,18 +632,16 @@ export function AddProviderInstanceDialog({
                       aria-describedby="add-provider-label-description"
                       size="sm"
                       className="w-full @min-[32rem]/settings-row:w-56"
-                      placeholder="e.g. Work"
+                      placeholder="例如：工作"
                       value={label}
                       onChange={(event) => setIdentityDraft({ label: event.target.value })}
                     />
                   }
                 />
                 <SettingsRow
-                  title={<label htmlFor="add-provider-instance-id">Instance ID</label>}
+                  title={<label htmlFor="add-provider-instance-id">实例 ID</label>}
                   description={
-                    <span id="add-provider-instance-id-description">
-                      Letters, digits, '-', or '_'.
-                    </span>
+                    <span id="add-provider-instance-id-description">字母、数字、“-”或“_”。</span>
                   }
                   status={
                     showInstanceIdError ? (
@@ -676,8 +674,8 @@ export function AddProviderInstanceDialog({
                   }
                 />
                 <SettingsRow
-                  title="Accent color"
-                  description="Optional marker shown in the picker."
+                  title="强调色"
+                  description="选择器中显示的可选标记。"
                   control={
                     <ProviderAccentColorPicker
                       displayName={label || driverOption.label}
@@ -706,7 +704,7 @@ export function AddProviderInstanceDialog({
               ) : !isAcpRegistry && wizardStep === 2 ? (
                 <div className="grid gap-2">
                   <p className="text-sm text-muted-foreground">
-                    This driver has no required configuration. You can add the instance now.
+                    此驱动无需额外配置，可以直接添加实例。
                   </p>
                 </div>
               ) : null}
@@ -725,12 +723,12 @@ export function AddProviderInstanceDialog({
                   setWizardStep((step) => Math.max(0, step - 1));
                 }}
               >
-                {wizardStep === 0 ? "Cancel" : "Back"}
+                {wizardStep === 0 ? "取消" : "返回"}
               </Button>
               {wizardStep === 0 && driver === "codex" ? (
                 <>
                   <Button variant="outline" size="sm" onClick={() => navigateToStep(1)}>
-                    Configure manually
+                    手动配置
                   </Button>
                   {driverLocks?.configKeys.has("setupMode") ? null : (
                     <ChatGptConnectionButton
@@ -745,7 +743,7 @@ export function AddProviderInstanceDialog({
                   disabled={isPreparingRegistryAgent}
                   onClick={() => navigateToStep(wizardStep + 1)}
                 >
-                  Next
+                  下一步
                 </Button>
               ) : (
                 <Button
@@ -753,11 +751,7 @@ export function AddProviderInstanceDialog({
                   disabled={isSaving || !canManageProviders}
                   onClick={() => void handleSave()}
                 >
-                  {isSaving
-                    ? "Adding..."
-                    : isAcpRegistry && !isLocalAcp
-                      ? "Continue to sign-in"
-                      : "Add instance"}
+                  {isSaving ? "正在添加…" : isAcpRegistry && !isLocalAcp ? "继续登录" : "添加实例"}
                 </Button>
               )}
             </WizardFooter>

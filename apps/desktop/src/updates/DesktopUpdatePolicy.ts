@@ -76,7 +76,7 @@ const make = Effect.gen(function* () {
             mode: "off",
             feedUrl: undefined,
             allowNightly: false,
-            message: `Updates are off because T3 Code cannot use the managed policy at ${error.path}. Contact your administrator.`,
+            message: `T3 Code 无法使用 ${error.path} 处的受管理策略，已停用更新。请联系管理员。`,
           }),
         ),
     }),

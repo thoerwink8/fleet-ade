@@ -26,7 +26,7 @@ class DesktopNetworkAccessUnavailableError extends Schema.TaggedError<DesktopNet
   {},
 ) {
   override get message(): string {
-    return "Desktop network access is unavailable.";
+    return "桌面网络访问不可用。";
   }
 }
 
@@ -35,7 +35,7 @@ class DesktopServerExposureStateLoadError extends Schema.TaggedError<DesktopServ
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Failed to load desktop server exposure state.";
+    return "无法加载桌面服务器开放状态。";
   }
 }
 
@@ -44,7 +44,7 @@ class DesktopAdvertisedEndpointsLoadError extends Schema.TaggedError<DesktopAdve
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Failed to load advertised desktop endpoints.";
+    return "无法加载桌面应用公布的端点。";
   }
 }
 

@@ -193,7 +193,7 @@ function serializeInsight(insight: Element, inTableCell: boolean): string {
 function serializeDetails(details: Element): string {
   const summary =
     details.querySelector(":scope > [data-markdown-details-summary]")?.textContent?.trim() ??
-    "Details";
+    "详情";
   const contentNode = details.querySelector(":scope > * [data-markdown-details-content]");
   const content = contentNode ? serializeChildren(contentNode).trim() : "";
   const open = details.getAttribute("data-markdown-details-open") === "true" ? " open" : "";

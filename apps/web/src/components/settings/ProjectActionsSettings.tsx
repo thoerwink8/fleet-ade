@@ -102,19 +102,19 @@ export function ProjectActionsSettings() {
       setRequest({
         scriptId: null,
         initial: payload,
-        error: error instanceof Error ? error.message : "Failed to import action.",
+        error: error instanceof Error ? error.message : "无法导入操作。",
       });
     }
   };
 
   return (
-    <SettingsSection id="project-actions" title="Actions">
+    <SettingsSection id="project-actions" title="操作">
       <SettingsRow
         serverScoped
         settingKeys={["defaultProjectScripts"]}
         mixed={mixed}
-        title="Actions"
-        description="Commands that run in this project's checkout or its worktree, with optional shortcuts."
+        title="操作"
+        description="在此项目的工作副本或工作树中运行的命令，可设置快捷键。"
         onResetOverride={() => void persist(() => null)}
         control={
           <div className="flex flex-wrap items-center gap-1.5">
@@ -131,14 +131,14 @@ export function ProjectActionsSettings() {
                     />
                   }
                 >
-                  Import scripts
+                  导入脚本
                   <ChevronDownIcon className="size-3.5" />
                 </MenuTrigger>
                 <MenuPopup align="end">
                   <MenuGroup>
-                    <MenuGroupLabel>Import from t3.json</MenuGroupLabel>
+                    <MenuGroupLabel>从 t3.json 导入</MenuGroupLabel>
                     <p className="px-2 pb-2 text-pretty text-sm text-muted-foreground">
-                      Add actions declared by this checkout without editing them first.
+                      直接添加此工作副本声明的操作，无需先编辑。
                     </p>
                   </MenuGroup>
                   <MenuSeparator />
@@ -166,15 +166,15 @@ export function ProjectActionsSettings() {
               onClick={() => setRequest({ scriptId: null, initial: EMPTY_PROJECT_SCRIPT_INPUT })}
             >
               <PlusIcon className="size-3.5" />
-              Add action
+              添加操作
             </Button>
           </div>
         }
       />
       {mixed ? (
         <SettingsRow
-          title="Different actions across checkouts"
-          description="Narrow the selection above to one checkout to edit its list. Adding an action here adds it to every selected checkout."
+          title="各工作副本的操作不一致"
+          description="请把上方的选择缩小到一个工作副本，再编辑它的列表。在这里添加操作会加到每一个选中的工作副本。"
         />
       ) : (
         <ProjectActionsList
@@ -186,8 +186,8 @@ export function ProjectActionsSettings() {
       )}
       {t3File.status === "invalid" ? (
         <SettingsRow
-          title="t3.json is invalid"
-          description="A t3.json exists in this checkout but fails to parse, so every action and icon it declares is ignored. Check the JSON syntax and icon values."
+          title="t3.json 无效"
+          description="此工作副本的 t3.json 无法解析，其中声明的所有操作和图标都会忽略。请检查 JSON 语法和图标值。"
           className="text-warning"
         />
       ) : null}

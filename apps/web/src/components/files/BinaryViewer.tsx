@@ -61,15 +61,10 @@ function ArchiveFile(props: { readonly path: string; readonly bytes: Uint8Array<
   }, [props.bytes, props.path, kind]);
   if (kind === "image")
     return url ? <PreviewImage key={url} src={url} name={props.path} /> : <FileSurfaceLoading />;
-  if (!text)
-    return (
-      <FileSurfaceFailure message="Only UTF-8 text and images can be opened inside an archive." />
-    );
+  if (!text) return <FileSurfaceFailure message="压缩包内只能打开 UTF-8 文本和图片。" />;
   return (
     <>
-      {text.truncated ? (
-        <FileSurfaceNotice>Preview limited to the first 1 MB.</FileSurfaceNotice>
-      ) : null}
+      {text.truncated ? <FileSurfaceNotice>预览仅限前 1 MB。</FileSurfaceNotice> : null}
       <Suspense fallback={<FileSurfaceLoading />}>
         <SourcePreview name={props.path} text={text.text} />
       </Suspense>
@@ -101,7 +96,7 @@ export default function BinaryViewer(props: {
     setError(null);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      setError("This file took too long to preview. Close it and try again.");
+      setError("此文件预览超时。请关闭后重试。");
       setBusy(false);
       workerRef.current?.terminate();
       workerRef.current = null;
@@ -124,13 +119,8 @@ export default function BinaryViewer(props: {
       workerRef.current = null;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-    timerRef.current = setTimeout(
-      () => fail("This file took too long to preview. Close it and try again."),
-      30_000,
-    );
-    worker.addEventListener("error", () =>
-      fail("Could not load the file viewer. Close it and try again."),
-    );
+    timerRef.current = setTimeout(() => fail("此文件预览超时。请关闭后重试。"), 30_000);
+    worker.addEventListener("error", () => fail("无法加载文件查看器。请关闭后重试。"));
     worker.addEventListener("message", (event: MessageEvent<BinaryWorkerResult>) => {
       if (controller.signal.aborted) return;
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -156,9 +146,7 @@ export default function BinaryViewer(props: {
           worker.postMessage({ type: "open", name: props.name, kind: props.kind, bytes }, [bytes]);
         }
       })
-      .catch((cause: unknown) =>
-        fail(cause instanceof Error ? cause.message : "Could not read this file."),
-      );
+      .catch((cause: unknown) => fail(cause instanceof Error ? cause.message : "无法读取此文件。"));
     return () => {
       controller.abort();
       worker.terminate();
@@ -195,7 +183,7 @@ export default function BinaryViewer(props: {
       {archive ? (
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/60 px-3 text-xs">
           <FileSurfaceAction
-            label={selectedPath ? "Back to archive" : "Parent folder"}
+            label={selectedPath ? "返回压缩包" : "上级文件夹"}
             disabled={!selectedPath && !folder}
             onPress={() => {
               setError(null);
@@ -207,10 +195,10 @@ export default function BinaryViewer(props: {
             <ChevronLeftIcon className="size-3.5" />
           </FileSurfaceAction>
           <span className="min-w-0 flex-1 truncate">
-            {selectedPath ?? (folder || "Archive contents")}
+            {selectedPath ?? (folder || "压缩包内容")}
           </span>
           <span className="shrink-0 text-muted-foreground">
-            {archive.entries.length.toLocaleString()} entries
+            {archive.entries.length.toLocaleString("zh-CN")} entries
             {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
           </span>
         </div>
@@ -225,22 +213,22 @@ export default function BinaryViewer(props: {
                   if (!busy && value !== null) selectPage(0, value);
                 }}
               >
-                <SelectTrigger aria-label="Table" aria-disabled={busy} aria-busy={busy} size="xs">
+                <SelectTrigger aria-label="表格" aria-disabled={busy} aria-busy={busy} size="xs">
                   <SelectValue>
-                    {table.name} ({table.count.toLocaleString()} rows)
+                    {table.name} ({table.count.toLocaleString("zh-CN")} rows)
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
                   {database.tables.map((item) => (
                     <SelectItem key={item.name} value={item.name}>
-                      {item.name} ({item.count.toLocaleString()} rows)
+                      {item.name} ({item.count.toLocaleString("zh-CN")} rows)
                     </SelectItem>
                   ))}
                 </SelectPopup>
               </Select>
             </div>
             <FileSurfaceAction
-              label="Previous rows"
+              label="上一组行"
               disabled={busy || page === 0}
               onPress={() => selectPage(page - 1)}
             >
@@ -248,11 +236,11 @@ export default function BinaryViewer(props: {
             </FileSurfaceAction>
             <span className="shrink-0 tabular-nums" aria-live="polite">
               {table.count === 0
-                ? "0 rows"
-                : `${page * SQLITE_PAGE_SIZE + 1}–${Math.min(table.count, (page + 1) * SQLITE_PAGE_SIZE)} of ${table.count.toLocaleString()}`}
+                ? "0 行"
+                : `${page * SQLITE_PAGE_SIZE + 1}–${Math.min(table.count, (page + 1) * SQLITE_PAGE_SIZE)}，共 ${table.count.toLocaleString("zh-CN")} 行`}
             </span>
             <FileSurfaceAction
-              label="Next rows"
+              label="下一组行"
               disabled={busy || (page + 1) * SQLITE_PAGE_SIZE >= table.count}
               onPress={() => selectPage(page + 1)}
             >
@@ -263,11 +251,11 @@ export default function BinaryViewer(props: {
             className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
             role="status"
           >
-            {table.count.toLocaleString()} rows · {rows?.columns.length ?? "…"} columns
+            {table.count.toLocaleString("zh-CN")} rows · {rows?.columns.length ?? "…"} columns
             {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
           </div>
           <FileSurfaceNotice>
-            Read-only. Up to 50 columns and 1,024 characters per cell. Blob contents are omitted.
+            只读。最多 50 列，每格最多 1,024 个字符。不显示 Blob 内容。
           </FileSurfaceNotice>
         </>
       ) : null}
@@ -285,19 +273,19 @@ export default function BinaryViewer(props: {
       ) : archive ? (
         <div className="scrollbar-gutter-both min-h-0 flex-1 overflow-auto">
           <table
-            aria-label="Archive entries"
+            aria-label="压缩包条目"
             className="w-full border-separate border-spacing-0 text-xs"
           >
             <thead className="sticky top-0 bg-background text-muted-foreground">
               <tr>
                 <th scope="col" className="px-3 py-2 text-left font-normal">
-                  Name
+                  名称
                 </th>
                 <th scope="col" className="px-3 py-2 text-right font-normal">
-                  Size
+                  大小
                 </th>
                 <th scope="col" className="px-3 py-2 text-right font-normal">
-                  Modified
+                  修改时间
                 </th>
               </tr>
             </thead>
@@ -337,14 +325,14 @@ export default function BinaryViewer(props: {
                       {formatAttachmentSize(item.size)}
                     </td>
                     <td className="w-28 border-b border-border/60 px-3 py-2 text-right whitespace-nowrap text-muted-foreground">
-                      {item.modified ? new Date(item.modified).toLocaleDateString() : "-"}
+                      {item.modified ? new Date(item.modified).toLocaleDateString("zh-CN") : "-"}
                     </td>
                   </tr>
                 ))}
             </tbody>
           </table>
           {children.size === 0 ? (
-            <p className="p-6 text-xs text-muted-foreground">This folder is empty.</p>
+            <p className="p-6 text-xs text-muted-foreground">此文件夹为空。</p>
           ) : null}
         </div>
       ) : rows ? (
@@ -382,11 +370,11 @@ export default function BinaryViewer(props: {
             </tbody>
           </table>
           {rows.rows.length === 0 ? (
-            <p className="p-6 text-xs text-muted-foreground">This table is empty.</p>
+            <p className="p-6 text-xs text-muted-foreground">此表为空。</p>
           ) : null}
         </div>
       ) : (
-        <p className="p-6 text-xs text-muted-foreground">This database has no readable tables.</p>
+        <p className="p-6 text-xs text-muted-foreground">此数据库没有可读取的表。</p>
       )}
     </div>
   );

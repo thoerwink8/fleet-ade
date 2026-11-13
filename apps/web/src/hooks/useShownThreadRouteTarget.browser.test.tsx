@@ -16,7 +16,7 @@ function ShownThread() {
   const { shownTarget } = useShownThreadRouteTarget();
   const label =
     shownTarget === null
-      ? "none"
+      ? "无"
       : shownTarget.kind === "server"
         ? shownTarget.threadRef.threadId
         : shownTarget.draftId;

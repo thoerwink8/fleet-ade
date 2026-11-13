@@ -132,7 +132,7 @@ export function useComposerAttachmentIntake(input: {
     ) {
       toastManager.add({
         type: "error",
-        title: "This question cannot accept attachments.",
+        title: "这个问题不能附带附件。",
       });
       return false;
     }
@@ -179,22 +179,22 @@ export function useComposerAttachmentIntake(input: {
         replacedReattachMarkerIds.add(matchingReattachMarker.id);
       }
       if (!matchingReattachMarker && reservedCount >= PROVIDER_SEND_TURN_MAX_ATTACHMENTS) {
-        error = `You can attach up to ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} files per message.`;
+        error = `每条消息最多可添加 ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} 个文件。`;
         continue;
       }
       if (attachmentKind === "unsupported-image") {
-        error = `'${file.name}' is not a supported image type. Attach GIF, HEIC, HEIF, JPEG, PNG, or WebP images.`;
+        error = `“${file.name}”不是支持的图片格式。请添加 GIF、HEIC、HEIF、JPEG、PNG 或 WebP 图片。`;
         continue;
       }
       if (attachmentKind === "image") {
         acceptedImages.push(normalizeComposerImageFileMimeType(file));
       } else {
         if (fileStagingLimit === null) {
-          error = "This server does not support file attachments.";
+          error = "这个服务器不支持文件附件。";
           continue;
         }
         if (file.size <= 0) {
-          error = `'${file.name}' is empty or could not be read.`;
+          error = `“${file.name}”为空或无法读取。`;
           continue;
         }
         if (file.size > fileStagingLimit) {
@@ -234,10 +234,8 @@ export function useComposerAttachmentIntake(input: {
         const attached = storedFiles[0]!;
         toastManager.add({
           type: "info",
-          title: `Large paste attached as ${attached.name}`,
-          description: `${formatAttachmentSize(attached.sizeBytes)} · Use ${
-            isMacPlatform(navigator.platform) ? "⌘⇧V" : "Ctrl+Shift+V"
-          } to keep a large paste inline.`,
+          title: `大段粘贴内容已作为 ${attached.name} 附加`,
+          description: `${formatAttachmentSize(attached.sizeBytes)} · 按 ${isMacPlatform(navigator.platform) ? "⌘⇧V" : "Ctrl+Shift+V"} 可将大段内容直接粘贴到正文中。`,
           data: { hideCopyButton: true },
         });
       }
@@ -356,7 +354,8 @@ export function useComposerAttachmentIntake(input: {
       return;
     }
     const confirmation = requestConfirmDialog(
-      `Remove ${image?.name ?? "this image"} from the message?\nIt is referenced in your text; removing it also removes every reference.`,
+      `要从消息中移除 ${image?.name ?? "这张图片"} 吗？
+正文中引用了它，移除后所有引用也会一并删除。`,
       { variant: "destructive" },
     );
     if (!confirmation) {
@@ -409,8 +408,8 @@ export function useComposerAttachmentIntake(input: {
       }
       toastManager.add({
         type: "error",
-        title: "Pasted text is too large for this message",
-        description: "Remove some text or an attachment, then paste again.",
+        title: "粘贴的文字对这条消息来说太长了",
+        description: "请删除部分文字或附件后再粘贴。",
         data: { hideCopyButton: true },
       });
       return true;
@@ -431,8 +430,8 @@ export function useComposerAttachmentIntake(input: {
       if (!wouldExceedInputLimit) return false;
       toastManager.add({
         type: "error",
-        title: "Pasted text is too large to attach",
-        description: "Reduce the clipboard contents or save a smaller excerpt as a file.",
+        title: "粘贴的文字太大，无法作为附件",
+        description: "请减少剪贴板内容，或把较短的摘录另存为文件。",
         data: { hideCopyButton: true },
       });
       return true;

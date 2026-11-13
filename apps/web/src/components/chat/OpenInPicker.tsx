@@ -285,13 +285,13 @@ export const OpenInPicker = memo(function OpenInPicker({
   const backgroundThread = use(BackgroundThreadContext);
   const options = resolveOpenInOptions(navigator.platform, effectiveEditors);
   const primaryOption = options.find(({ value }) => value === preferredEditor) ?? null;
-  const primaryLabel = isPanel ? `Open in ${primaryOption?.label ?? "editor"}` : "Open";
+  const primaryLabel = isPanel ? `在 ${primaryOption?.label ?? "editor"} 中打开` : "打开";
 
   const unavailableReason =
     remote.mode === "remote-unavailable"
-      ? `No SSH route to ${environmentLabel}`
+      ? `没有通往${environmentLabel}的 SSH 路由`
       : remote.mode === "remote-links" && options.length === 0
-        ? `Open from a computer to edit on ${environmentLabel}`
+        ? `从电脑打开以在${environmentLabel}上编辑`
         : null;
 
   const editorItems = (
@@ -304,7 +304,7 @@ export const OpenInPicker = memo(function OpenInPicker({
         <>
           {options.length === 0 && (
             <MenuItem density={presentation === "menu" ? "touch" : "default"} disabled>
-              No installed editors found
+              未找到已安装的编辑器
             </MenuItem>
           )}
           {options.map(({ label, Icon, value, kind }) => (
@@ -356,7 +356,7 @@ export const OpenInPicker = memo(function OpenInPicker({
         <MenuSub>
           <MenuSubTrigger density="touch" disabled={isHostEditorDenied}>
             <SquareArrowOutUpRightIcon className="size-4" />
-            <MenuItemLabel>Open in…</MenuItemLabel>
+            <MenuItemLabel>打开方式…</MenuItemLabel>
           </MenuSubTrigger>
           <MenuSubPopup>{editorItems}</MenuSubPopup>
         </MenuSub>
@@ -364,7 +364,7 @@ export const OpenInPicker = memo(function OpenInPicker({
     );
   }
 
-  const primaryControlLabel = compact ? "Open file in preferred editor" : primaryLabel;
+  const primaryControlLabel = compact ? "在首选编辑器中打开文件" : primaryLabel;
   const primaryControl = (
     <ThreadDetailsControl
       aria-label={primaryControlLabel}
@@ -380,7 +380,7 @@ export const OpenInPicker = memo(function OpenInPicker({
         if (!preferredEditor) return;
         const label = editorLabelForPlatform(preferredEditor, navigator.platform);
         void openInEditor(preferredEditor).then((opened) => {
-          if (opened) announce(`Opened in ${label}`);
+          if (opened) announce(`已在 ${label} 中打开`);
         });
       }}
     >
@@ -410,7 +410,7 @@ export const OpenInPicker = memo(function OpenInPicker({
 
   return (
     <ActionGroup
-      aria-label="Open in editor"
+      aria-label="在编辑器中打开"
       role="group"
       {...(isPanel
         ? { className: THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS, ref: panelAnchorRef }
@@ -433,7 +433,7 @@ export const OpenInPicker = memo(function OpenInPicker({
                 disabled={isHostEditorDenied}
                 render={
                   <ThreadDetailsControl
-                    aria-label="Choose editor"
+                    aria-label="选择编辑器"
                     data-toolbar-control=""
                     size={isPanel ? "sm" : "icon-xs"}
                     variant={isPanel ? "ghost" : "outline"}
@@ -449,7 +449,7 @@ export const OpenInPicker = memo(function OpenInPicker({
               className={isPanel ? THREAD_DETAILS_PANEL_CHEVRON_CLASS : "size-4"}
             />
           </TooltipTrigger>
-          <TooltipPopup side="top">Choose editor</TooltipPopup>
+          <TooltipPopup side="top">选择编辑器</TooltipPopup>
         </Tooltip>
         <MenuPopup
           align="end"

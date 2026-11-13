@@ -212,7 +212,7 @@ describe("submitComposerDraft", () => {
 describe("isComposerSubmissionBlocked", () => {
   const sendBlocked = {
     noProviderAvailable: true,
-    sendDisabledReason: "Messages loading",
+    sendDisabledReason: "正在加载消息",
     attachmentBlockReason: null,
     environmentUnavailable: false,
   };

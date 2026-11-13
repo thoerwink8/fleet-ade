@@ -39,7 +39,7 @@ function MergeButton({ reference }: { reference: PullRequestRef }) {
   });
   return (
     <button type="button" disabled={actionPending} onClick={() => void perform("merge")}>
-      {actionPending ? "Merging..." : "Merge"}
+      {actionPending ? "正在合并…" : "合并"}
     </button>
   );
 }
@@ -96,7 +96,7 @@ function FixChecksButton() {
   });
   return (
     <button type="button" onClick={() => void startHandoff("fix", { prompt: "Fix the checks" })}>
-      Fix
+      修复
     </button>
   );
 }

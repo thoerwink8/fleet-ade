@@ -397,7 +397,7 @@ it.effect(
       const supervisor = {
         target: new BearerConnectionTarget({
           environmentId: env,
-          label: "Test",
+          label: "测试",
           connectionId: "test",
         }),
         session: yield* SubscriptionRef.make(Option.some({ client } as unknown as RpcSession)),

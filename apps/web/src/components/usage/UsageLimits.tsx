@@ -44,9 +44,9 @@ import { UsageLimitsPooled } from "./UsageLimitsPooled";
 import { PROVIDER_PRESENTATION } from "./usageProviders";
 
 const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof GaugeIcon }> = {
-  ahead: { label: "Ahead of pace: spending faster than the window elapses", icon: TrendingUpIcon },
-  on: { label: "On pace with the window", icon: GaugeIcon },
-  under: { label: "Under pace: headroom left for the rest of the window", icon: TrendingDownIcon },
+  ahead: { label: "消耗偏快：用量消耗进度超过本周期的时间进度", icon: TrendingUpIcon },
+  on: { label: "与时间进度一致", icon: GaugeIcon },
+  under: { label: "消耗偏慢：本周期剩余时间内还有充足余量", icon: TrendingDownIcon },
 };
 
 export function barColor(driver: ServerProvider["driver"]): string {
@@ -132,7 +132,7 @@ function WindowBar({
     ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)
     : null;
   const summary = `${window.label}: ${remaining}% left${
-    timeLeft === null ? "" : `, ${timeLeft}% of the window left`
+    timeLeft === null ? "" : `，本周期还剩 ${timeLeft}%`
   }${resetsIn ? `, ${resetsIn}` : ""}`;
 
   return (
@@ -172,11 +172,11 @@ function WindowBar({
             {remaining}% left{timeLeft !== null ? ` · ${timeLeft}% of the window left` : ""}
           </span>
           {timeLeft !== null ? (
-            <span className="text-muted-foreground">The line is where even spending would be.</span>
+            <span className="text-muted-foreground">竖线表示匀速消耗时的位置。</span>
           ) : null}
           {resetsAt ? (
             <span className="text-muted-foreground">
-              Resets {resetsAt}
+              重置时间 {resetsAt}
               {resetsIn ? ` · ${resetsIn}` : ""}
             </span>
           ) : null}
@@ -232,10 +232,10 @@ export function LimitWindows({
 }
 
 const OUTCOME_TEXT: Record<ProviderConsumeResetCreditOutcome, string> = {
-  reset: "Reset applied. Your windows have cleared.",
-  nothingToReset: "Nothing to reset right now.",
-  noCredit: "No reset credit left.",
-  alreadyRedeemed: "That credit was already redeemed.",
+  reset: "已使用重置额度，各时间窗口已清零。",
+  nothingToReset: "当前没有可重置的内容。",
+  noCredit: "没有可用的重置额度。",
+  alreadyRedeemed: "该重置额度已被使用。",
 };
 
 export function useResetCredit(environmentId: EnvironmentId) {
@@ -261,7 +261,7 @@ export function useResetCredit(environmentId: EnvironmentId) {
     setStatus(
       "error" in result.cause && result.cause.error instanceof Error
         ? result.cause.error.message
-        : "Could not use the reset credit.",
+        : "无法使用重置额度。",
     );
   };
 
@@ -293,13 +293,13 @@ export function ResetCreditDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Use a reset credit?</AlertDialogTitle>
+          <AlertDialogTitle>使用一次重置额度？</AlertDialogTitle>
           <AlertDialogDescription>{choice?.confirmDescription}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
           <Button disabled={disabled} onClick={onConfirm}>
-            Use credit
+            使用额度
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -333,7 +333,7 @@ export function ResetCredits({
               disabled={busy || !canManageProviders}
               onClick={() => confirm(choice)}
             >
-              {busy ? "Using…" : choice.actionLabel}
+              {busy ? "正在使用…" : choice.actionLabel}
             </Button>
           ) : null}
         </div>

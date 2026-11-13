@@ -94,11 +94,7 @@ export function SimlockDeviceHostEditor(props: {
   const [invalidTokens, setInvalidTokens] = useState<ReadonlySet<EnvironmentId>>(new Set());
   const plan = planSimlockDeviceHostSave(props.environments, next, tokens);
   const problem =
-    "problem" in plan
-      ? plan.problem
-      : invalidTokens.size > 0
-        ? "Enter a valid secret reference."
-        : null;
+    "problem" in plan ? plan.problem : invalidTokens.size > 0 ? "请输入有效的凭据引用。" : null;
   const several = props.environments.length > 1;
 
   const limit = (
@@ -139,16 +135,16 @@ export function SimlockDeviceHostEditor(props: {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{props.isNew ? "Add Simlock host" : "Edit Simlock host"}</DialogTitle>
+            <DialogTitle>{props.isNew ? "添加 Simlock 主机" : "编辑 Simlock 主机"}</DialogTitle>
             <DialogDescription>
               {several
-                ? "Each selected environment's server leases devices from your Simlock gateway with its own agent token, and releases them when they close."
-                : "The environment's server leases devices from your Simlock gateway and releases them when they close."}
+                ? "每个选中环境的服务器使用自己的智能体 token，从你的 Simlock 网关租用设备，并在关闭设备时释放。"
+                : "环境的服务器从你的 Simlock 网关租用设备，并在关闭设备时释放。"}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <label className="block space-y-1.5 text-sm">
-              <span>Name</span>
+              <span>名称</span>
               <Input
                 autoFocus
                 required
@@ -161,7 +157,7 @@ export function SimlockDeviceHostEditor(props: {
               />
             </label>
             <label className="block space-y-1.5 text-sm">
-              <span>Gateway URL</span>
+              <span>网关 URL</span>
               <Input
                 required
                 type="url"
@@ -182,7 +178,7 @@ export function SimlockDeviceHostEditor(props: {
                   environmentId={environment.environmentId}
                   hostId={props.isNew ? null : props.host.id}
                   gatewayUrl={checkUrl}
-                  label={several ? `Agent token · ${environment.label}` : "Agent token"}
+                  label={several ? `智能体 token · ${environment.label}` : "智能体 token"}
                   token={tokens.get(environment.environmentId) ?? { kind: "cleared" }}
                   saved={savedValue(environment)}
                   busy={props.busy}
@@ -208,12 +204,12 @@ export function SimlockDeviceHostEditor(props: {
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              {limit("maxLeases", "Devices at once", 1, 20)}
-              {limit("maxLeaseMinutes", "Lease minutes", 5, 240)}
+              {limit("maxLeases", "同时租用的设备数", 1, 20)}
+              {limit("maxLeaseMinutes", "租用时长（分钟）", 5, 240)}
             </div>
             <p className="text-xs text-muted-foreground">
-              A lease ends after the lease minutes even while in use.
-              {props.isNew ? null : " Saving restarts this host, which releases its devices."}
+              达到租用时长后，设备即使仍在使用也会结束租用。
+              {props.isNew ? null : "保存后会重启此主机，释放其设备。"}
             </p>
             {problem === null || !gatewayUrl ? null : (
               <p className="text-xs text-destructive" role="alert">
@@ -223,10 +219,10 @@ export function SimlockDeviceHostEditor(props: {
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onClose}>
-              Cancel
+              取消
             </Button>
             <Button type="submit" disabled={props.busy || problem !== null}>
-              {props.busy ? <Spinner size="xs" /> : null} Save host
+              {props.busy ? <Spinner size="xs" /> : null} 保存主机
             </Button>
           </DialogFooter>
         </form>
@@ -277,12 +273,12 @@ function SimlockTokenField(props: {
   const identity = AsyncResult.isSuccess(check) ? check.value : null;
   const status =
     props.gatewayUrl === null ? null : check._tag === "Initial" || check.waiting ? (
-      <span className="text-muted-foreground">Checking…</span>
+      <span className="text-muted-foreground">正在检查…</span>
     ) : identity ? (
       <span className="text-muted-foreground">
         {identity.tokenSource === "env"
-          ? `Using this machine's agent-device token (${identity.signedInAs}).`
-          : `Accepted as ${identity.signedInAs}.`}
+          ? `正在使用本机的 agent-device token（${identity.signedInAs}）。`
+          : `已验证为 ${identity.signedInAs}。`}
       </span>
     ) : AsyncResult.isFailure(check) ? (
       <span
@@ -300,7 +296,7 @@ function SimlockTokenField(props: {
         <SecretSourceInput
           key={inputKey}
           id={id}
-          aria-label="Agent token"
+          aria-label="智能体 token"
           environmentId={props.environmentId}
           className="min-w-0 flex-1"
           configured={props.token.kind === "saved" && typeof props.saved === "string"}
@@ -340,7 +336,7 @@ function SimlockTokenField(props: {
             type="button"
             size="icon-sm"
             variant="ghost-destructive"
-            aria-label="Clear agent token"
+            aria-label="清空智能体 token"
             disabled={props.busy}
             onClick={() => {
               props.onChange({ kind: "cleared" });

@@ -492,7 +492,7 @@ describe("GhosttyTerminalSurface visibility", () => {
         history: "* Working |",
         exitCode: null,
         exitSignal: null,
-        label: "Terminal",
+        label: "终端",
         updatedAt: "2026-10-20T00:00:00.000Z",
       },
     });

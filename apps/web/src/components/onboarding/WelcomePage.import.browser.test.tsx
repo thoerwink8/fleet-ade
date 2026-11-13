@@ -169,7 +169,7 @@ const readyClaude: ServerProvider = {
   slashCommands: [],
   skills: [],
 };
-const permissionMessage = "This connection cannot import projects or thread history.";
+const permissionMessage = "此连接无法导入项目或会话历史。";
 
 function session(scopes: ReadonlyArray<AuthEnvironmentScope>): AuthSessionState {
   return {
@@ -408,7 +408,7 @@ it("waits for a ready agent to start, and Start without an agent still finishes 
   await using _screen = await mountWelcome();
   expect(button("Import 2 projects and start").disabled).toBe(true);
 
-  await click("Start without an agent");
+  await click("不使用智能体直接开始");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   expect(state.createProject).toHaveBeenCalledTimes(2);
 });
@@ -476,7 +476,7 @@ it("gives projects a later scan finds the default, unless the main box was unche
     );
 
   await click("Review all 2");
-  await click("Select none");
+  await click("全不选");
   await findProject("/projects/third");
   await vi.waitFor(() => expect(button("Import 1 project and start").disabled).toBe(false));
 
@@ -516,7 +516,7 @@ it("stays busy while setup saves after an import with nothing to open", async ()
 
   await click("Import 1 project and start");
   await vi.waitFor(() => expect(state.completeOnboarding).toHaveBeenCalledOnce());
-  expect(button("Importing…").disabled).toBe(true);
+  expect(button("正在导入…").disabled).toBe(true);
   await act(async () => {
     saved.resolve();
     await saved.promise;
@@ -550,7 +550,7 @@ it("leaves projects already in T3 Code out of the default import, unless the box
   const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
   await act(async () => importProjects?.click());
   await vi.waitFor(() => expect(pageText()).toContain("Import 2 projects and their threads"));
-  expect(button("Import threads and start").disabled).toBe(false);
+  expect(button("导入会话并开始").disabled).toBe(false);
 });
 
 it("keeps the started projects checked when the page opens again after a quit", async () => {
@@ -654,7 +654,7 @@ it("opens the list of agents to add once the checks find none, even after a wron
   );
   const fold = () =>
     [...document.querySelectorAll("button")].find((element) =>
-      element.textContent?.startsWith("Set up an agent"),
+      element.textContent?.startsWith("设置智能体"),
     );
   await vi.waitFor(() => expect(fold()?.getAttribute("aria-expanded")).toBe("true"));
 
@@ -688,12 +688,12 @@ it("says the phone is set up only once this computer is shared with the signed-i
       session([AuthOrchestrationOperateScope, AuthRelayReadScope, AuthRelayWriteScope]),
     ),
   );
-  state.linkError = "Could not read T3 Connect link state.";
+  state.linkError = "无法读取 T3 Connect 关联状态。";
   await using _screen = await mountWelcome();
-  await click("Set up");
+  await click("设置");
   // A failed read says so instead of asking to share the computer again.
-  await vi.waitFor(() => expect(pageText()).toContain("Could not check T3 Connect."));
-  expect(pageText()).not.toContain("Set up T3 Connect");
+  await vi.waitFor(() => expect(pageText()).toContain("无法检查 T3 Connect。"));
+  expect(pageText()).not.toContain("设置 T3 Connect");
 
   state.linkError = null;
   await act(async () =>
@@ -706,7 +706,7 @@ it("says the phone is set up only once this computer is shared with the signed-i
     }),
   );
   // Signed in, but "Not now" on the share step left this computer unreachable.
-  await vi.waitFor(() => expect(pageText()).toContain("Set up T3 Connect"));
+  await vi.waitFor(() => expect(pageText()).toContain("设置 T3 Connect"));
 
   const share = (reachability: EnvironmentCloudLinkStateResult["reachability"]) =>
     act(async () =>
@@ -732,10 +732,10 @@ it("says the phone is set up only once this computer is shared with the signed-i
     hint: null,
     fix: "Turn T3 Connect off and on.",
   });
-  await vi.waitFor(() => expect(pageText()).toContain("Check T3 Connect"));
+  await vi.waitFor(() => expect(pageText()).toContain("检查 T3 Connect"));
   expect(pageText()).not.toContain("Your phone can reach this computer.");
 
   await share({ status: "reachable", checkedAt, readyConnections: 4, protocol: "quic" });
   await vi.waitFor(() => expect(pageText()).toContain("Your phone can reach this computer."));
-  expect(pageText()).not.toContain("Check T3 Connect");
+  expect(pageText()).not.toContain("检查 T3 Connect");
 });

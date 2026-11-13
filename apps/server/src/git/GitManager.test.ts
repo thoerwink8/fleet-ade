@@ -418,7 +418,7 @@ function createFakeSourceControlProvider(scenario: FakeProviderScenario = {}): {
   const pullRequest = (): FakeChangeRequest =>
     scenario.pullRequest ?? {
       number: 101,
-      title: "Pull request",
+      title: "PR",
       url: "https://github.com/pingdotgg/codething-mvp/pull/101",
       baseRefName: "main",
       headRefName: "feature/pull-request",
@@ -1119,7 +1119,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
       yield* runGit(repoDir, ["push", "-u", "origin", "feature/settled"]);
       const pullRequest = (number: number, state: "open" | "merged"): FakeChangeRequest => ({
         number,
-        title: "Settled",
+        title: "已收尾",
         url: `https://github.com/pingdotgg/codething-mvp/pull/${number}`,
         baseRefName: "main",
         headRefName: "feature/settled",
@@ -2036,7 +2036,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
       const { manager } = yield* makeManager({
         providerScenario: {
           prListSequence: [[squashMergedPr(branch, headSha)]],
-          failWith: "Rate limited",
+          failWith: "已限流",
           failAfterCalls: 1,
         },
       });
@@ -2957,7 +2957,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
         description: "Implement stacked git actions",
         cta: {
           kind: "run_action",
-          label: "Push",
+          label: "推送",
           action: {
             kind: "push",
           },

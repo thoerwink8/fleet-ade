@@ -55,7 +55,7 @@ export default function Presentation(props: {
       const context = canvas.getContext("bitmaprenderer");
       if (!context) {
         result.bitmap.close();
-        throw new Error("This browser cannot draw slides.");
+        throw new Error("此浏览器无法绘制幻灯片。");
       }
       canvas.width = result.bitmap.width;
       canvas.height = result.bitmap.height;
@@ -77,7 +77,7 @@ export default function Presentation(props: {
       .call("open", { bytes }, { transfer: [bytes], signal: controller.signal })
       .then((slides) => {
         if (slides.length === 0 || slides.length > 500)
-          throw new Error("Preview limited to presentations with 1 to 500 slides.");
+          throw new Error("预览仅支持 1 至 500 张幻灯片的演示文稿。");
         setOpened({ slides, paint });
         onDetails(`${slides.length} slide${slides.length === 1 ? "" : "s"}`);
       })
@@ -96,17 +96,17 @@ export default function Presentation(props: {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className={FILE_SURFACE_SUBHEADER_CLASS}>
         <FileSurfaceAction
-          label="Previous slide"
+          label="上一张幻灯片"
           disabled={page === 0}
           onPress={() => select(page - 1)}
         >
           <ChevronLeftIcon className="size-3.5" />
         </FileSurfaceAction>
         <span className="flex-1 text-center text-xs tabular-nums" aria-live="polite">
-          Slide {page + 1} of {opened.slides.length}
+          幻灯片 {page + 1} of {opened.slides.length}
         </span>
         <FileSurfaceAction
-          label="Next slide"
+          label="下一张幻灯片"
           disabled={page + 1 === opened.slides.length}
           onPress={() => select(page + 1)}
         >
@@ -116,7 +116,7 @@ export default function Presentation(props: {
       <OfficePages
         pages={opened.slides}
         paint={opened.paint}
-        label="Slide"
+        label="幻灯片"
         scrollRef={scroll}
         onPageChange={setPage}
         onError={onError}
@@ -130,7 +130,7 @@ export default function Presentation(props: {
                 role="status"
                 className="absolute inset-0 flex items-center justify-center bg-background/80 p-4 text-xs text-foreground"
               >
-                This slide could not be drawn.
+                无法绘制此幻灯片。
               </p>
             ) : null}
           </>
@@ -139,11 +139,11 @@ export default function Presentation(props: {
           const slide = opened.slides[index];
           return slide?.notes || slide?.hidden ? (
             <div className="space-y-1 text-xs text-muted-foreground">
-              {slide.hidden ? <p>Hidden slide</p> : null}
+              {slide.hidden ? <p>隐藏的幻灯片</p> : null}
               {slide.notes ? (
                 <p
                   role="note"
-                  aria-label="Speaker notes"
+                  aria-label="演讲者备注"
                   className="select-text whitespace-pre-wrap break-words"
                 >
                   {slide.notes}

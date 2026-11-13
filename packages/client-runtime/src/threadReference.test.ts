@@ -47,7 +47,7 @@ describe("resolveThreadReferenceCopyTarget", () => {
     ).toMatchObject({
       kind: "pull-request",
       value: "https://github.com/t3/pr/14",
-      successTitle: "PR link copied",
+      successTitle: "已复制 PR 链接",
     });
   });
 
@@ -83,7 +83,7 @@ describe("resolveThreadReferenceCopyTarget", () => {
     expect(target).toMatchObject({
       kind: "thread",
       description: "Fix the login flow",
-      successTitle: "Thread copied",
+      successTitle: "已复制会话",
     });
     const pasted = decodeComposerContextFragment(encodeComposerContextFragment(target!.fragment!));
     expect(pasted).toEqual({

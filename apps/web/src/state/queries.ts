@@ -239,7 +239,7 @@ export function usePaginatedBranches(target: VcsRefTarget) {
           const cause = Cause.squash(failed.cause);
           return cause instanceof Error && cause.message.trim().length > 0
             ? cause.message
-            : "Failed to load refs.";
+            : "无法加载引用。";
         })()
       : null;
   const refresh = () => {
@@ -335,7 +335,7 @@ export function useProjectPathSearch(
         ? null
         : canReadFiles
           ? result.error
-          : (fileAccess.error ?? "This connection cannot search host files."),
+          : (fileAccess.error ?? "此连接无法搜索主机文件。"),
     isPending:
       !areProjectPathSearchTargetsEqual(normalizedTarget, debouncedTarget) ||
       (hasTarget && (fileAccess.isPending || result.isPending)),
@@ -399,7 +399,7 @@ export function useProjectContentSearch(target: ProjectContentSearchTarget) {
       !hasTarget || isCheckingAccess
         ? null
         : !canReadFiles
-          ? (fileAccess.error ?? "This connection cannot search host files.")
+          ? (fileAccess.error ?? "此连接无法搜索主机文件。")
           : queryTooLong
             ? `Search is limited to ${PROJECT_SEARCH_CONTENTS_QUERY_MAX_LENGTH} characters.`
             : result.error,

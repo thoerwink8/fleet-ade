@@ -366,7 +366,7 @@ export function buildProjectGroups<TProject extends EnvironmentProject>(input: {
       key,
       label:
         input.groupScratchProjects && representative.isScratch
-          ? "No project"
+          ? "无项目"
           : members.length > 1
             ? deriveProjectGroupLabel({
                 representative,

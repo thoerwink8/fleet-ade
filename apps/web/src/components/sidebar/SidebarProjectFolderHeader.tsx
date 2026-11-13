@@ -19,10 +19,10 @@ const FOLDER_DOT_CLASS_NAME = {
 } as const;
 
 const FOLDER_DOT_LABEL = {
-  attention: ", needs you",
-  failed: ", failed",
-  unread: ", done",
-  working: ", working",
+  attention: "，需要你处理",
+  failed: "，失败",
+  unread: "，已完成",
+  working: "，运行中",
 } as const;
 
 /** The folder's sidebar tree row; its thread rows name it as their parent. */
@@ -106,14 +106,14 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
                 data-sidebar-action-for={rowId}
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label={`New thread in ${group.displayName}`}
+                aria-label={`在 ${group.displayName} 中新建会话`}
                 onClick={() => props.onNewThread(group)}
               />
             }
           >
             <SquarePenIcon aria-hidden />
           </TooltipTrigger>
-          <TooltipPopup>New thread in {group.displayName}</TooltipPopup>
+          <TooltipPopup>在 {group.displayName} 中新建会话</TooltipPopup>
         </Tooltip>
       </span>
     </li>

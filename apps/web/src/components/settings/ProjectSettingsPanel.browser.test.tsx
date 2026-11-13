@@ -308,7 +308,7 @@ const removeCheckout = (screen: Screen, root: string) =>
   screen.container.querySelector<HTMLButtonElement>(`[aria-label="Remove checkout ${root}"]`)!;
 const removeAll = (screen: Screen) =>
   [...screen.container.querySelectorAll("button")].find((button) =>
-    button.textContent?.includes("Remove all entries"),
+    button.textContent?.includes("移除所有条目"),
   )!;
 
 async function grant(id: EnvironmentId, result: SessionResult) {
@@ -358,7 +358,7 @@ describe("project settings permissions", () => {
     expect(nameInput(screen).disabled).toBe(true);
     expect(removeAll(screen).disabled).toBe(true);
     expect(screen.container.textContent).toContain(
-      "Shared settings require permission to change every checkout in this group.",
+      "修改共享设置需要对本组中的每个工作副本都有修改权限。",
     );
     expect(state.update).not.toHaveBeenCalled();
   });
@@ -387,7 +387,7 @@ describe("project settings permissions", () => {
       firstUpdate.resolve(AsyncResult.success(undefined));
       await firstUpdate.promise;
     });
-    await expectProjectAccessDeniedToast("Failed to rename project");
+    await expectProjectAccessDeniedToast("无法重命名项目");
     expect(state.update).toHaveBeenCalledOnce();
     expect(state.update.mock.calls[0]![0].environmentId).toBe(primaryId);
   });
@@ -431,7 +431,7 @@ describe("project settings permissions", () => {
       confirmed.resolve(true);
       await confirmed.promise;
     });
-    await expectProjectAccessDeniedToast("Failed to remove project");
+    await expectProjectAccessDeniedToast("无法移除项目");
     expect(state.delete).not.toHaveBeenCalled();
     expect(state.releaseUploads).not.toHaveBeenCalled();
     expect(state.clearDraft).not.toHaveBeenCalled();
@@ -447,7 +447,7 @@ describe("project settings permissions", () => {
     await act(async () => {
       nameInput(screen).dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
     });
-    await expectProjectAccessDeniedToast("Failed to rename project");
+    await expectProjectAccessDeniedToast("无法重命名项目");
     expect(state.update).not.toHaveBeenCalled();
     expect(nameInput(screen).disabled).toBe(true);
 
@@ -497,14 +497,14 @@ describe("project identity reset", () => {
     state.projects = [{ ...asScratch(state.projects[0]!), faviconPath: null, projectIcon: null }];
     await using screen = await mountPanel();
 
-    await userEvent.click(resetButton(screen, "project name")!);
+    await userEvent.click(resetButton(screen, "项目名称")!);
     await vi.waitFor(() =>
       expect(state.update).toHaveBeenCalledWith({
         environmentId: primaryId,
-        input: { projectId: state.projects[0]!.id, title: "No project" },
+        input: { projectId: state.projects[0]!.id, title: "无项目" },
       }),
     );
-    await userEvent.click(resetButton(screen, "project icon")!);
+    await userEvent.click(resetButton(screen, "项目图标")!);
     await vi.waitFor(() =>
       expect(state.update).toHaveBeenLastCalledWith({
         environmentId: primaryId,
@@ -519,8 +519,8 @@ describe("project identity reset", () => {
     state.projects = [asScratch(primary!), { ...remote!, faviconPath: "logo.png" }];
     await using screen = await mountPanel();
 
-    expect(resetButton(screen, "project name")).toBeNull();
-    await userEvent.click(resetButton(screen, "project icon")!);
+    expect(resetButton(screen, "项目名称")).toBeNull();
+    await userEvent.click(resetButton(screen, "项目图标")!);
     await vi.waitFor(() => expect(state.update).toHaveBeenCalledTimes(2));
     expect(state.update.mock.calls.map(([request]) => request)).toEqual([
       {
@@ -558,7 +558,7 @@ describe("project identity reset", () => {
     expect(appAtomRegistry.get(iconUrl).value.relativeUrl).toBe("/project-favicon-missing");
 
     iconExists = true;
-    await userEvent.click(resetButton(screen, "project icon")!);
+    await userEvent.click(resetButton(screen, "项目图标")!);
 
     await vi.waitFor(() =>
       expect(appAtomRegistry.get(iconUrl).value.relativeUrl).toBe("/restored-icon.svg"),
@@ -685,11 +685,8 @@ describe("project settings scope", () => {
   });
 
   it.each([
-    [undefined, "This project has no checkout on this environment."],
-    [
-      "removed-checkout",
-      "This checkout is no longer available in the selected project and environment.",
-    ],
+    [undefined, "此项目在此环境中没有工作副本。"],
+    ["removed-checkout", "此工作副本在所选项目和环境中已不可用。"],
   ])("recovers a stale environment link with checkout %s", async (checkout, message) => {
     setup();
     state.projects = state.projects.filter((project) => project.environmentId === primaryId);

@@ -947,7 +947,7 @@ it("readThread and sendToThread reach threads in other projects", async () => {
       .pipe(Effect.flip);
     expect(create.code).toBe("parent_not_active");
     const secret = yield* service
-      .requestSecret(makeScope(), { label: "Secret", reason: "requires a run" })
+      .requestSecret(makeScope(), { label: "凭据", reason: "requires a run" })
       .pipe(Effect.flip);
     expect(secret.code).toBe("parent_not_active");
 

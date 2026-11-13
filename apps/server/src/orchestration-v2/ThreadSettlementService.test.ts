@@ -62,7 +62,7 @@ function shell(overrides: Partial<SettlementShell> = {}): SettlementShell {
   return {
     id: ThreadId.make("thread-1"),
     projectId: ProjectId.make("project-1"),
-    title: "Thread",
+    title: "会话",
     providerInstanceId: ProviderInstanceId.make("codex"),
     modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
     runtimeMode: "full-access",
@@ -124,7 +124,7 @@ function persistedLink(
         ? null
         : {
             state,
-            title: "Pull request",
+            title: "PR",
             headBranch: "feature",
             baseBranch: "main",
             isDraft: false,
@@ -426,7 +426,7 @@ describe("resolveAutoSettlementAt", () => {
       linkedAt: DateTime.formatIso(linkedAt),
       snapshot: {
         state: "merged" as const,
-        title: "Pull request",
+        title: "PR",
         headBranch: `feature-${number}`,
         baseBranch: "main",
         isDraft: false,
@@ -540,7 +540,7 @@ function makePullRequestSummary(input: {
     projectId: input.projectId,
     repository: input.repository,
     number: input.number,
-    title: "Pull request",
+    title: "PR",
     url: `https://example.test/${input.repository}/pull/${input.number}`,
     state: input.state,
     headBranch: "feature",
@@ -552,7 +552,7 @@ function makePullRequestSummary(input: {
 function makeBranchPullRequest(state: "open" | "closed" | "merged") {
   return {
     number: 42,
-    title: "Pull request",
+    title: "PR",
     url: "https://example.test/owner/repository/pull/42",
     baseRef: "main",
     headRef: "feature",
@@ -885,7 +885,7 @@ describe("ThreadSettlementServiceV2 worker", () => {
             linkedAt: "2026-08-20T00:00:00.000Z",
             snapshot: {
               state: "merged",
-              title: "Pull request",
+              title: "PR",
               headBranch: "feature",
               baseBranch: "main",
               isDraft: false,
@@ -1480,7 +1480,7 @@ describe("ThreadSettlementServiceV2 worker", () => {
         ...persistedLink("open", DateTime.makeUnsafe("2026-08-20T00:00:00.000Z")),
         snapshot: {
           state: "merged",
-          title: "Pull request",
+          title: "PR",
           headBranch: "feature",
           baseBranch: "main",
           isDraft: false,
@@ -1559,7 +1559,7 @@ describe("ThreadSettlementServiceV2 worker", () => {
             ...persistedLink("open", recent),
             snapshot: {
               state: "merged",
-              title: "Pull request",
+              title: "PR",
               headBranch: "feature",
               baseBranch: "main",
               isDraft: false,

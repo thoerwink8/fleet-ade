@@ -42,8 +42,7 @@ const commandFailure = (result: {
 }) => {
   const error = squashAtomCommandFailure(result);
   return new McpAppHostRefusal({
-    message:
-      error instanceof Error && error.message.trim() !== "" ? error.message : "Request failed.",
+    message: error instanceof Error && error.message.trim() !== "" ? error.message : "请求失败。",
   });
 };
 
@@ -260,7 +259,7 @@ export function McpAppFrame(props: {
       flushSync(() => setDisplayMode("inline"));
       const approved = await requestConfirmDialog(message);
       if (approved === undefined) {
-        throw new McpAppHostRefusal({ message: "T3 could not ask for approval here." });
+        throw new McpAppHostRefusal({ message: "T3 无法在这里请求批准。" });
       }
       return approved;
     };
@@ -280,12 +279,12 @@ export function McpAppFrame(props: {
         const info = await readLive().toolInfo({ environmentId, input: { ...input, name } });
         if (info._tag !== "Success") throw commandFailure(info);
         if (!info.value.callable)
-          throw new McpAppHostRefusal({ message: "This app cannot call that tool." });
+          throw new McpAppHostRefusal({ message: "此应用不能调用那个工具。" });
         if (!info.value.readOnly) {
           const approved = await ask(
             `Allow ${app.server} to run ${info.value.title ?? name}?\n${JSON.stringify(args, null, 2)}`,
           );
-          if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
+          if (approved !== true) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
         }
         const result = await readLive().callTool({
           environmentId,
@@ -305,16 +304,15 @@ export function McpAppFrame(props: {
       },
       openLink: async (url) => {
         if (document.activeElement !== frameRef.current || !navigator.userActivation?.isActive) {
-          throw new McpAppHostRefusal({ message: "Links open only from a click in the app." });
+          throw new McpAppHostRefusal({ message: "只能从应用内的点击打开链接。" });
         }
         window.open(url, "_blank", "noopener,noreferrer");
       },
       sendMessage: async (text) => {
         const send = readLive().props.onSendMessage;
-        if (send === undefined)
-          throw new McpAppHostRefusal({ message: "Messages are not available here." });
+        if (send === undefined) throw new McpAppHostRefusal({ message: "这里没有消息。" });
         const approved = await ask(`Send this message from ${app.server}?\n${text}`);
-        if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
+        if (approved !== true) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
         await send(text);
       },
       updateModelContext: async (context) => {
@@ -348,8 +346,8 @@ export function McpAppFrame(props: {
       },
       downloadFile: async (files) => {
         const names = files.map((file) => file.name).join(", ");
-        const approved = await ask(`Save ${names} from ${app.server}?`);
-        if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
+        const approved = await ask(`要保存来自 ${names} 的 ${app.server} 吗？`);
+        if (approved !== true) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
         for (const file of files) {
           let bytes: Uint8Array | undefined;
           let mimeType = file.mimeType ?? "application/octet-stream";
@@ -426,7 +424,7 @@ export function McpAppFrame(props: {
             setClosed(false);
           }}
         >
-          Show app
+          显示应用
         </Button>
       </div>
     );
@@ -458,7 +456,7 @@ export function McpAppFrame(props: {
           >
             <span className="truncate">{app.server}</span>
             <Button
-              aria-label="Exit full screen"
+              aria-label="退出全屏"
               size="icon-sm"
               variant="ghost"
               onClick={() => setDisplayMode("inline")}

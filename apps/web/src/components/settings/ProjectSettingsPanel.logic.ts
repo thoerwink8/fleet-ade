@@ -6,7 +6,7 @@ import type {
 } from "../../sidebarProjectGrouping";
 import type { Project } from "../../types";
 
-export const SCRATCH_PROJECT_TITLE = "No project";
+export const SCRATCH_PROJECT_TITLE = "无项目";
 const SCRATCH_PROJECT_ICON = {
   kind: "lucide",
   name: "message-square-dashed",

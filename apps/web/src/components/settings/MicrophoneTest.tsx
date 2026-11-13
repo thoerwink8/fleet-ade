@@ -85,7 +85,7 @@ export function MicrophoneTest({
       typeof MediaRecorder === "undefined" ||
       typeof AudioWorkletNode === "undefined"
     ) {
-      setError("Microphone testing is unavailable in this browser. Use HTTPS or the desktop app.");
+      setError("此浏览器无法测试麦克风。请使用 HTTPS 或桌面应用。");
       setPhase("idle");
       return;
     }
@@ -113,7 +113,7 @@ export function MicrophoneTest({
         releaseCapture();
         setLevel(0);
         if (!blob.size) {
-          setError("No audio was recorded. Try again.");
+          setError("未录到音频，请重试。");
           setPhase("idle");
           return;
         }
@@ -125,7 +125,7 @@ export function MicrophoneTest({
         if (capture.current !== current) return;
         releaseCapture();
         setLevel(0);
-        setError("Could not record microphone audio. Try again.");
+        setError("无法录制麦克风音频，请重试。");
         setPhase("idle");
       };
       recorder.addEventListener("error", onRecordingError);
@@ -134,7 +134,7 @@ export function MicrophoneTest({
           "ended",
           () => {
             if (capture.current !== current) return;
-            setError("The microphone disconnected.");
+            setError("麦克风已断开连接。");
             if (recorder.state !== "inactive") recorder.stop();
           },
           { once: true },
@@ -180,7 +180,7 @@ export function MicrophoneTest({
             ? "No microphone found."
             : cause instanceof Error
               ? cause.message
-              : "Could not access the microphone.",
+              : "无法访问麦克风。",
       );
     }
   };
@@ -195,7 +195,7 @@ export function MicrophoneTest({
       <Button
         size="sm"
         variant="outline"
-        aria-label="Stop recording"
+        aria-label="停止录音"
         disabled={phase !== "recording"}
         onClick={() => {
           const recorder = capture.current?.recorder;
@@ -203,12 +203,12 @@ export function MicrophoneTest({
         }}
       >
         <SquareIcon />
-        Stop
+        停止
       </Button>
     ) : (
       <Button size="sm" variant="outline" onClick={() => void start()}>
         {phase === "ready" ? <RotateCcwIcon /> : <MicIcon />}
-        {phase === "ready" ? "Record again" : "Record"}
+        {phase === "ready" ? "重新录音" : "Record"}
       </Button>
     );
   const panel = error ? (
@@ -217,7 +217,7 @@ export function MicrophoneTest({
     </p>
   ) : phase === "starting" ? (
     <span role="status" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-      Opening microphone…
+      正在打开麦克风…
     </span>
   ) : phase === "recording" ? (
     <>
@@ -227,17 +227,11 @@ export function MicrophoneTest({
       </div>
       <span
         className="ms-auto shrink-0 text-xs tabular-nums text-muted-foreground"
-        aria-label="Recording time"
+        aria-label="录音时长"
       >
         {formatTime(elapsed)} / {formatTime(LOOPBACK_SECONDS)}
       </span>
-      <meter
-        aria-label="Microphone input level"
-        min={0}
-        max={1}
-        value={level}
-        className="sr-only"
-      />
+      <meter aria-label="输入音量" min={0} max={1} value={level} className="sr-only" />
     </>
   ) : phase === "ready" && recording ? (
     <MicrophonePlayback key={recording.url} src={recording.url} duration={recording.duration} />
@@ -246,8 +240,8 @@ export function MicrophoneTest({
   return (
     <SettingsRow
       {...searchableSetting("microphone-test")}
-      title="Test microphone"
-      description="Record ten seconds and play it back. The audio stays on this device."
+      title="测试麦克风"
+      description="录十秒并播放。音频只留在这台设备上。"
       control={control}
     >
       {panel ? (
@@ -261,7 +255,7 @@ export function MicrophoneTest({
           <Button
             size="icon-sm"
             variant="ghost-muted"
-            aria-label={phase === "ready" ? "Discard recording" : "Cancel microphone test"}
+            aria-label={phase === "ready" ? "Discard recording" : "取消麦克风测试"}
             onClick={cancel}
           >
             <XIcon />
@@ -310,19 +304,19 @@ function MicrophonePlayback({ src, duration }: { src: string; duration: number }
       <Button
         size="icon-sm-pill"
         variant="outline"
-        aria-label={playing ? "Pause recording" : "Play recording"}
+        aria-label={playing ? "暂停回放" : "播放录音"}
         onClick={() => void togglePlayback()}
       >
         {playing ? <PauseIcon /> : <PlayIcon />}
       </Button>
       {failed ? (
         <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">
-          Could not play this recording. Try recording again.
+          无法播放此录音，请重新录音。
         </p>
       ) : (
         <input
           type="range"
-          aria-label="Recording playback position"
+          aria-label="录音回放位置"
           min={0}
           max={duration}
           step={0.01}

@@ -31,7 +31,7 @@ const patch = [
 const change = parseReviewGuideChange("src/a.ts\0src/gone.ts\0docs/readme.md\0", patch);
 
 const stop = (overrides: Partial<PullRequestReviewGuideStop>): PullRequestReviewGuideStop => ({
-  title: "Stop",
+  title: "停止",
   summary: "",
   attention: null,
   excerpts: [],

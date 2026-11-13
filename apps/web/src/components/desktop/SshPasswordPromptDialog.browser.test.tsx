@@ -55,7 +55,7 @@ it("drops a prompt the desktop ended, whether it is on screen or still waiting",
   await expect.element(screen.getByText("julius@third-host")).toBeVisible();
 
   bridge.settle("ssh-3");
-  await expect.element(screen.getByText("SSH verification required")).not.toBeInTheDocument();
+  await expect.element(screen.getByText("需要 SSH 验证")).not.toBeInTheDocument();
 });
 
 it("shows a prompt that arrived before the dialog mounted", async () => {
@@ -67,5 +67,5 @@ it("shows a prompt that arrived before the dialog mounted", async () => {
   bridge.prompt("ssh-1", "devbox");
 
   await using screen = await render(<SshPasswordPromptDialog />);
-  await expect.element(screen.getByText("SSH verification required")).toBeVisible();
+  await expect.element(screen.getByText("需要 SSH 验证")).toBeVisible();
 });

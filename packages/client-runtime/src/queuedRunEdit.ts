@@ -69,7 +69,7 @@ export function resolveQueuedEditExit(input: {
 export function queuedRunEditBlockedReason(input: {
   readonly openQuestionCount: number;
 }): string | null {
-  return input.openQuestionCount > 0 ? "Answer the question to edit queued messages" : null;
+  return input.openQuestionCount > 0 ? "请回答问题后再编辑排队消息" : null;
 }
 
 interface ExitWatch<E> {

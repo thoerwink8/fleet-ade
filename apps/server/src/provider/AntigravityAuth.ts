@@ -41,10 +41,9 @@ const NOT_STARTED_MESSAGE =
 const NOT_RESPONDING_MESSAGE =
   "Antigravity did not respond. Its runtime may not run on this machine.";
 const NO_RESPONSE_MESSAGE =
-  "Antigravity has not reached Google after 30 seconds. Check this machine's network connection. Broken IPv6 is a common cause.";
-const UNREACHABLE_MESSAGE =
-  "Antigravity could not reach Google. Check this machine's network connection, then start sign-in again.";
-const FORWARDING_FAILED_MESSAGE = "Could not deliver the sign-in response. Start sign-in again.";
+  "Antigravity 在 30 秒后仍未连上 Google。请检查此机器的网络连接，IPv6 故障是常见原因。";
+const UNREACHABLE_MESSAGE = "Antigravity 无法连接 Google。请检查此机器的网络连接后重新登录。";
+const FORWARDING_FAILED_MESSAGE = "无法发送登录响应。请重新登录。";
 const isSetupError = Schema.is(ProviderSetupError);
 const isAcpRequestError = Schema.is(AcpErrors.AcpRequestError);
 
@@ -110,7 +109,7 @@ function visibleSnapshot(snapshot: AuthSnapshot, ownerSessionId: string): Provid
     authorizationUrl: null,
     interaction: null,
     expiresAt: null,
-    ...(busy ? { message: "Sign-in is in progress in another client." } : {}),
+    ...(busy ? { message: "正在其他客户端中登录。" } : {}),
   };
 }
 
@@ -242,8 +241,8 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
           expiresAt: null,
           message: Exit.isSuccess(result)
             ? usesBrowser
-              ? "Signed in with Google."
-              : "Connected to Antigravity."
+              ? "已登录 Google。"
+              : "已连接 Antigravity。"
             : safeAuthFailure(result.cause, usesBrowser),
         });
       }),
@@ -267,8 +266,7 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
               ...flow.state,
               phase: "waiting",
               authorizationUrl: authorization.authorizationUrl,
-              message:
-                "Open the Google sign-in link. If you are remote, paste the redirect URL here.",
+              message: "打开 Google 登录链接。远程连接时，请在此粘贴跳转后的 URL。",
             });
           }),
         ),
@@ -309,7 +307,7 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
             ...flow.state,
             phase: "verifying",
             authorizationUrl: null,
-            message: "Checking Antigravity access and models.",
+            message: "正在检查 Antigravity 访问权限和模型。",
           });
         }),
       );
@@ -407,7 +405,7 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
               phase: "starting",
               flowId,
               expiresAt: DateTime.formatIso(DateTime.makeUnsafe(expiresAtMillis)),
-              message: usesBrowser ? "Starting Google sign-in." : "Checking credentials.",
+              message: usesBrowser ? "正在启动 Google 登录。" : "正在检查凭据。",
             };
             const flow: AuthFlow = {
               id: flowId,
@@ -453,7 +451,7 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
             ...flow.state,
             phase: "verifying",
             authorizationUrl: null,
-            message: "Waiting for Google to finish sign-in.",
+            message: "正在等待 Google 完成登录。",
           });
           const forwarding = yield* (
             options.forwardCallback?.(callback) ??
@@ -501,7 +499,7 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
                   phase: "cancelled",
                   authorizationUrl: null,
                   expiresAt: null,
-                  message: "Google sign-in was cancelled by sign-out.",
+                  message: "退出登录时已取消 Google 登录。",
                 });
               }
               return currentFlow;
@@ -542,8 +540,8 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
                   ...emptyState,
                   phase: Exit.isSuccess(result) ? "idle" : "failed",
                   message: Exit.isSuccess(result)
-                    ? "Signed out of Google."
-                    : "Antigravity sign-out failed. Try again.",
+                    ? "已退出 Google 登录。"
+                    : "Antigravity 退出登录失败，请重试。",
                 },
               });
             }),
@@ -552,7 +550,7 @@ export const makeAntigravityAuth = Effect.fn("makeAntigravityAuth")(function* <
             const failure = Cause.findErrorOption(result.cause);
             return yield* Option.isSome(failure) && isSetupError(failure.value)
               ? failure.value
-              : setupError("logout", "Antigravity sign-out failed. Try again.");
+              : setupError("logout", "Antigravity 退出登录失败，请重试。");
           }
           return yield* currentState("");
         }),

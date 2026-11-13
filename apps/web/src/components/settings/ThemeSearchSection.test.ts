@@ -112,12 +112,12 @@ describe("createThemeSearch", () => {
     await flush();
 
     const install = env.themeSearch.beginInstall();
-    env.view.error = "That theme could not be added.";
+    env.view.error = "无法添加此主题。";
     env.themeSearch.searchNow();
     expect(env.requests).toHaveLength(1);
     expect(env.themeSearch.endInstall(install)).toBe(true);
     expect(env.requests).toHaveLength(1);
-    expect(env.view.error).toBe("That theme could not be added.");
+    expect(env.view.error).toBe("无法添加此主题。");
 
     const next = env.themeSearch.beginInstall();
     env.themeSearch.setQuery("dracula");

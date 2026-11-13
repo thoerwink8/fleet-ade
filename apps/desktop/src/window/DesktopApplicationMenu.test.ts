@@ -233,7 +233,7 @@ describe("DesktopApplicationMenu", () => {
           platform,
         );
         const closeTools = items.find((item) => item.accelerator === "CmdOrCtrl+W");
-        assert.equal(closeTools?.label, "Close Developer Tools", platform);
+        assert.equal(closeTools?.label, "关闭开发者工具", platform);
         assert.isFunction(closeTools?.click);
         const appContents = {
           isDestroyed: () => false,

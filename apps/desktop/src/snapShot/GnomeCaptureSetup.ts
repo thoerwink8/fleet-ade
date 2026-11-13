@@ -46,9 +46,7 @@ export async function installGnomeCaptureBundle({ bundle, dataHome }: SetupPaths
     return undefined;
   });
   if (existing && (!existing.isDirectory() || existing.isSymbolicLink()))
-    throw new Error(
-      "The extension installation is not a regular directory. Manage it in GNOME Extensions instead.",
-    );
+    throw new Error("扩展安装位置不是普通目录。请在 GNOME 扩展应用中管理。");
   if (existing) {
     const installed = decodeMetadata(
       await NodeFSP.readFile(NodePath.join(target, "metadata.json"), "utf8"),
@@ -114,12 +112,7 @@ export class GnomeCaptureSetup {
         this.disconnected,
         new Promise<never>((_, reject) => {
           timer = setTimeout(
-            () =>
-              reject(
-                new Error(
-                  "GNOME did not respond. Sign in to a GNOME Wayland session and try again.",
-                ),
-              ),
+            () => reject(new Error("GNOME 未响应。请登录 GNOME Wayland 桌面会话后重试。")),
             5_000,
           );
         }),
@@ -169,53 +162,50 @@ export class GnomeCaptureSetup {
       if (!bundled["shell-version"].includes(major))
         return {
           status: "unsupported",
-          message: `The bundled extension supports GNOME ${bundled["shell-version"].join(", ")}. This session runs GNOME ${major}.`,
+          message: `内置扩展支持 GNOME ${bundled["shell-version"].join(", ")}，当前桌面会话运行 GNOME ${major}。`,
         };
       if (!info.state && !installed)
         return {
           status: "not-installed",
-          message:
-            "Install the bundled extension to capture the active window without a picker. No download or administrator password is needed.",
+          message: "安装内置扩展，即可直接截取活动窗口，无需选择窗口、下载或输入管理员密码。",
         };
       if (installed && (!info.state || (info.version && installed.version > info.version.value)))
         return {
           status: "restart-required",
           message:
-            "Installed. Save your work, sign out of GNOME and sign back in, then return here to enable the extension. Restarting T3 Code alone is not enough.",
+            "已安装。请保存工作，退出 GNOME 后重新登录，再返回此处启用扩展。仅重启 T3 Code 无法生效。",
         };
       if ((installed?.version ?? info.version?.value ?? 0) < bundled.version)
         return {
           status: "update-required",
-          message:
-            "A newer extension is bundled with this app. Install it, then sign out and back in to load the update.",
+          message: "此应用内置了更新版本的扩展。请安装后退出并重新登录，以加载更新。",
         };
       if (!properties.UserExtensionsEnabled.value)
         return {
           status: "extensions-disabled",
           message:
-            "GNOME has disabled user extensions. Turn on Extensions in the GNOME Extensions app, then check again. T3 Code will not enable your other extensions for you.",
+            "GNOME 已停用用户扩展。请在 GNOME 扩展应用中开启扩展，然后重新检查。T3 Code 不会替你启用其他扩展。",
         };
       if (info.state?.value === 1)
         return {
           status: "enabled",
-          message: "The T3 Code extension is running. Active-window snapshots are available.",
+          message: "T3 Code 扩展正在运行，可以截取活动窗口。",
         };
       if (info.state?.value === 3 || info.state?.value === 4)
         return {
           status: "error",
           message:
             info.error?.value ||
-            "GNOME could not load the extension. Check GNOME Extensions for details, or sign out and back in.",
+            "GNOME 无法加载扩展。请在 GNOME 扩展应用中查看详情，或退出后重新登录。",
         };
       return {
         status: "disabled",
-        message:
-          "Enable the T3 Code extension to allow active-window snapshots. You can disable it here at any time.",
+        message: "启用 T3 Code 扩展以截取活动窗口。你可以随时在此停用。",
       };
     } catch (error) {
       return {
         status: "error",
-        message: error instanceof Error ? error.message : "Could not check GNOME extension setup.",
+        message: error instanceof Error ? error.message : "无法检查 GNOME 扩展设置。",
       };
     }
   }

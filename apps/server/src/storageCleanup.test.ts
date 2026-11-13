@@ -66,7 +66,7 @@ function shell(overrides: Partial<OrchestrationV2ThreadShell> = {}): Orchestrati
   return {
     id: ThreadId.make("thread-1"),
     projectId: ProjectId.make("project-1"),
-    title: "Thread",
+    title: "会话",
     providerInstanceId: ProviderInstanceId.make("codex"),
     modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
     runtimeMode: "full-access",
@@ -559,7 +559,7 @@ const cleanupFixture = (
             exitCode: null,
             exitSignal: null,
             hasRunningSubprocess: false,
-            label: "Terminal",
+            label: "终端",
             updatedAt: "2026-06-10T12:00:00.000Z",
             ...paths,
           },
@@ -996,14 +996,14 @@ describe("subagent worktree ownership", () => {
             ? "Settled for 0 days"
             : "Settled for 20 days"
           : scenario === "settle-grace"
-            ? "Settled moments ago"
+            ? "刚刚收尾"
             : scenario === "recent-settle"
               ? "Settled for 0 of 8 days"
               : scenario === "recent-child-activity"
                 ? "Settled for 2 of 8 days"
                 : scenario === "running-child" || scenario === "pending-child"
-                  ? "Thread is running or has pending work"
-                  : "Not settled",
+                  ? "会话正在运行或有待处理的工作"
+                  : "尚未收尾",
       });
     }).pipe(Effect.provide(cleanupTestLayer)),
   );
@@ -1064,7 +1064,7 @@ describe("subagent worktree ownership", () => {
         yield* Deferred.succeed(fixture.resume, undefined);
         expect((yield* Fiber.join(run)).entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "Parent settlement changed since check",
+          reason: "检查后父会话的收尾状态已更改",
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
       }),
@@ -1197,18 +1197,18 @@ describe("subagent worktree ownership", () => {
         reason: removed
           ? "Settled for 20 days"
           : scenario === "running" || scenario === "pending"
-            ? "Thread is running or has pending work"
+            ? "会话正在运行或有待处理的工作"
             : shared
               ? "Shared by 2 threads"
               : scenario === "null-branch" || scenario === "stale-branch"
-                ? "A subagent thread's branch differs from this worktree's branch"
+                ? "子智能体会话的分支与此工作树的分支不同"
                 : scenario === "recent-activity"
                   ? "Settled for 2 of 8 days"
                   : scenario === "recent-inactive"
                     ? "Inactive for 2 of 8 days"
                     : ["recent-grace", "recent-settle", "child-settled-now"].includes(scenario)
-                      ? "Settled moments ago"
-                      : "Not settled",
+                      ? "刚刚收尾"
+                      : "尚未收尾",
       });
     }).pipe(Effect.provide(cleanupTestLayer)),
   );
@@ -1309,7 +1309,7 @@ describe("subagent worktree ownership", () => {
         yield* Deferred.succeed(fixture.resume, undefined);
         expect((yield* Fiber.join(run)).entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "Thread activity or shared worktree changed since check",
+          reason: "检查后会话活动或共享工作树已更改",
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
       }),
@@ -1327,7 +1327,7 @@ describe("deleted thread worktrees", () => {
   ) =>
     shell({
       id: ThreadId.make("child"),
-      title: "Subagent",
+      title: "子智能体",
       branch: "feature",
       worktreePath: owner.worktreePath,
       status: "completed",
@@ -1358,7 +1358,7 @@ describe("deleted thread worktrees", () => {
         expect(report.entries[0]).toMatchObject({
           threadId: owner.id,
           outcome: "removed",
-          reason: "Thread was deleted",
+          reason: "会话已删除",
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(false);
       }).pipe(Effect.provide(cleanupTestLayer)),
@@ -1487,7 +1487,7 @@ describe("deleted thread worktrees", () => {
           expect((yield* fixture.service.latestReport)?.entries[0]).toMatchObject({
             threadId: owner.id,
             outcome: "kept",
-            reason: "Provider session is still open",
+            reason: "提供方会话仍未关闭",
           });
           fixture.setSessionLive(false);
         }),
@@ -1521,7 +1521,7 @@ describe("deleted thread worktrees", () => {
             exitCode: null,
             exitSignal: null,
             hasRunningSubprocess: false,
-            label: "Terminal",
+            label: "终端",
             updatedAt: DateTime.formatIso(at(0)),
           },
         ]);
@@ -1619,7 +1619,7 @@ describe("deleted thread worktrees", () => {
             expect((yield* fixture.service.latestReport)?.entries[0]).toMatchObject({
               threadId: owner.id,
               outcome: "kept",
-              reason: "Thread deletion is still pending",
+              reason: "会话删除仍在等待处理",
             });
           }),
           fixture.repo,
@@ -1717,7 +1717,7 @@ describe("deleted thread worktrees", () => {
       expect(report.entries[0]).toMatchObject({
         threadId: owner.id,
         outcome: "kept",
-        reason: "Settled moments ago",
+        reason: "刚刚收尾",
       });
       expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
     }).pipe(Effect.provide(cleanupTestLayer)),
@@ -1831,7 +1831,7 @@ describe("orphan worktree reports", () => {
             {
               kind: "worktree",
               outcome: "kept",
-              reason: "No thread uses this worktree",
+              reason: "没有会话使用此工作树",
               path: orphan,
               projectPath: null,
               threadId: null,
@@ -2017,7 +2017,7 @@ describe("orphan worktree reports", () => {
             path: folder,
             outcome: "kept",
             bytes: yield* allocatedBytes(fixture.fs, `${folder}/payload`),
-            reason: "No thread uses this folder, and it isn't a git worktree",
+            reason: "没有会话使用此文件夹，且它不是 Git 工作树",
           }),
         ]);
         expect(report.bytesFreed).toBe(0);
@@ -2051,7 +2051,7 @@ describe("orphan worktree reports", () => {
           report.entries
             .map((entry) => ({ path: entry.path, reason: entry.reason }))
             .sort((left, right) => String(left.path).localeCompare(String(right.path))),
-        ).toEqual(worktrees.map((path) => ({ path, reason: "No thread uses this worktree" })));
+        ).toEqual(worktrees.map((path) => ({ path, reason: "没有会话使用此工作树" })));
       }),
     ),
   );
@@ -2188,7 +2188,7 @@ describe("orphan worktree reports", () => {
           const report = yield* fixture.service.runNow;
           expect(report.entries[0]).toMatchObject(
             platform === "win32"
-              ? { outcome: "kept", reason: "Provider session is still open" }
+              ? { outcome: "kept", reason: "提供方会话仍未关闭" }
               : { outcome: "removed" },
           );
         }),
@@ -2262,7 +2262,7 @@ describe("storage cleanup reports and local file policies", () => {
               extensionStatuses: text === "" ? [] : [{ key: "watch", text }],
               createdAt: at(-DAY_MS),
               updatedAt: at(0),
-              lastError: status === "error" ? "Rate limited" : null,
+              lastError: status === "error" ? "已限流" : null,
             },
           });
           yield* publish(sessionUpdated("ready", "Watching"));
@@ -2376,7 +2376,7 @@ describe("storage cleanup reports and local file policies", () => {
           const report = yield* Fiber.join(cleanup);
           expect(report.entries[0]).toMatchObject({
             outcome: "kept",
-            reason: "Contains a project checkout",
+            reason: "包含项目工作副本",
           });
           expect(yield* fixture.fs.readFileString(`${fixture.worktree}/tracked.txt`)).toBe(
             "original\n",
@@ -2506,7 +2506,7 @@ describe("storage cleanup reports and local file policies", () => {
   );
   it.effect.each([
     { days: 8, reason: "Inactive for 1 of 8 days" },
-    { days: null, reason: "No rules apply" },
+    { days: null, reason: "没有适用的规则" },
   ])("keeps an ineligible age/delete-only worktree without Git ($days)", ({ days, reason }) =>
     runCleanupTest(
       Effect.gen(function* () {
@@ -2557,7 +2557,7 @@ describe("storage cleanup reports and local file policies", () => {
         const report = yield* Fiber.join(cleanup);
         expect(report.entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "Thread activity or shared worktree changed since check",
+          reason: "检查后会话活动或共享工作树已更改",
           bytes: null,
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
@@ -2635,7 +2635,7 @@ describe("storage cleanup reports and local file policies", () => {
         const report = yield* Fiber.join(cleanup);
         expect(report.entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "Thread activity or shared worktree changed since check",
+          reason: "检查后会话活动或共享工作树已更改",
           bytes: null,
         });
         expect(report.bytesFreed).toBe(0);
@@ -2663,7 +2663,7 @@ describe("storage cleanup reports and local file policies", () => {
         const kept = yield* fixture.service.runNow;
         expect(kept.entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "Provider session is still open",
+          reason: "提供方会话仍未关闭",
           bytes: null,
         });
         expect(walked.filter((directory) => directory.startsWith(root))).toEqual([]);
@@ -2686,7 +2686,7 @@ describe("storage cleanup reports and local file policies", () => {
         const report = yield* fixture.service.runNow;
         expect(report.entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "Provider session is still open",
+          reason: "提供方会话仍未关闭",
         });
         expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
       }),
@@ -2696,7 +2696,7 @@ describe("storage cleanup reports and local file policies", () => {
     runCleanupTest(
       Effect.gen(function* () {
         const { service, fs, repo, worktree, command, fullStatusCalls } = yield* cleanupFixture();
-        const changed = { outcome: "kept", reason: "Repository or branch changed" };
+        const changed = { outcome: "kept", reason: "仓库或分支已更改" };
         yield* command(worktree, ["checkout", "--detach"]);
         expect((yield* service.runNow).entries[0]).toMatchObject(changed);
         yield* command(worktree, ["switch", "--orphan", "other"]);
@@ -2713,7 +2713,7 @@ describe("storage cleanup reports and local file policies", () => {
           projectPath: repo,
           path: worktree,
           threadId: "thread-1",
-          threadTitle: "Thread",
+          threadTitle: "会话",
         });
         expect(locked?.reason).toContain("Git index is locked");
         expect(yield* fs.readFileString(`${worktree}/tracked.txt`)).toBe("original\n");
@@ -2756,7 +2756,7 @@ describe("storage cleanup reports and local file policies", () => {
             outcome,
             path: worktree,
             threadId: "thread-1",
-            threadTitle: "Thread",
+            threadTitle: "会话",
             bytes: outcome === "removed" ? bytes : null,
             files: null,
           },
@@ -2772,10 +2772,10 @@ describe("storage cleanup reports and local file policies", () => {
     ),
   );
   it.effect.each([
-    ["unchanged", "removed", "No commits beyond the project branch"],
-    ["unmerged", "kept", "Has commits beyond the project branch"],
-    ["detached", "kept", "Project branch is unavailable"],
-    ["merged-only", "kept", "No remote is configured for merged-worktree cleanup"],
+    ["unchanged", "removed", "没有超出项目分支的提交"],
+    ["unmerged", "kept", "有超出项目分支的提交"],
+    ["detached", "kept", "项目分支不可用"],
+    ["merged-only", "kept", "尚未配置远程仓库，无法清理已合并的工作树"],
   ] as const)("cleans archived local-only worktrees: %s", ([state, outcome, reason]) =>
     runCleanupTest(
       Effect.gen(function* () {
@@ -2834,7 +2834,7 @@ describe("storage cleanup reports and local file policies", () => {
         const settled = yield* service.runNow;
         expect(settled.entries[0]).toMatchObject({
           outcome: "removed",
-          reason: "No commits beyond the project branch",
+          reason: "没有超出项目分支的提交",
         });
       }),
     ),
@@ -2861,7 +2861,7 @@ describe("storage cleanup reports and local file policies", () => {
           const report = yield* service.runNow;
           expect(report.entries[0]).toMatchObject({
             outcome: "removed",
-            reason: "No commits beyond the default branch",
+            reason: "没有超出默认分支的提交",
           });
           expect(yield* fs.exists(worktree)).toBe(false);
         }),
@@ -2894,7 +2894,7 @@ describe("storage cleanup reports and local file policies", () => {
           const report = yield* service.runNow;
           expect(report.entries[0]).toMatchObject({
             outcome: "kept",
-            reason: "Has commits beyond the default branch",
+            reason: "有超出默认分支的提交",
           });
           expect(yield* fs.readFileString(`${worktree}/tracked.txt`)).toBe("unmerged work\n");
         }),
@@ -2917,7 +2917,7 @@ describe("storage cleanup reports and local file policies", () => {
         const report = yield* service.runNow;
         expect(report.entries[0]).toMatchObject({
           outcome: "kept",
-          reason: "Default branch is unavailable",
+          reason: "默认分支不可用",
         });
         expect(yield* fs.exists(worktree)).toBe(true);
       }),
@@ -3070,8 +3070,8 @@ describe("storage cleanup reports and local file policies", () => {
     ),
   );
   it.live.each([
-    ["uncommitted-changes", "untracked", "Local changes exceed the inspection limit"],
-    ["any-local-files", "ignored", "Ignored files exceed the inspection limit"],
+    ["uncommitted-changes", "untracked", "本地改动超出检查上限"],
+    ["any-local-files", "ignored", "已忽略文件超出检查上限"],
   ] as const)(
     "keeps a worktree under %s when its %s file listing exceeds the inspection limit",
     ([policy, kind, reason]) =>
@@ -3159,7 +3159,7 @@ describe("storage cleanup reports and local file policies", () => {
   );
   it.live.each([
     { linked: "home", outcome: "removed", reason: "Removed 1 rotated logs" },
-    { linked: "logs folder", outcome: "kept", reason: "No expired files" },
+    { linked: "logs folder", outcome: "kept", reason: "没有过期文件" },
   ] as const)(
     "rotated logs behind a symlinked $linked are $outcome",
     ({ linked, outcome, reason }) =>
@@ -3238,7 +3238,7 @@ describe("settled worktree rechecks", () => {
           const report = yield* Fiber.join(run);
           expect(report.entries[0]).toMatchObject({
             outcome: "kept",
-            reason: "Settings changed since check",
+            reason: "检查后设置已更改",
           });
           expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
         }),
@@ -3268,9 +3268,7 @@ describe("settled worktree rechecks", () => {
           fixture.setThreads([{ ...thread, ...change }]);
           yield* Deferred.succeed(fixture.resume, undefined);
           const report = yield* Fiber.join(run);
-          expect(report.entries[0]?.reason).toBe(
-            "Thread activity or shared worktree changed since check",
-          );
+          expect(report.entries[0]?.reason).toBe("检查后会话活动或共享工作树已更改");
           expect(yield* fixture.fs.exists(fixture.worktree)).toBe(true);
         }),
       ),

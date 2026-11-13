@@ -285,7 +285,7 @@ const launchBrowser = Effect.fnUntraced(function* (input: {
         ? Deferred.fail(
             waiter.reply,
             new HtmlRenderBrowserError({
-              reason: `${waiter.method} failed`,
+              reason: `${waiter.method} 项失败`,
               cause: message.error.message,
             }),
           )

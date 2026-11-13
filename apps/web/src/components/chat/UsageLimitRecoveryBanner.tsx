@@ -60,16 +60,19 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
     resumes && resetAt && snoozedUntil && Date.parse(snoozedUntil) > Date.parse(resetAt)
       ? snoozedUntil
       : resetAt;
+  const when = displayAt ? formatUpcomingTimestamp(displayAt, timestampFormat) : "";
   const resetDescription = displayAt
-    ? `${resumes ? "Resumes" : "Resets"} ${formatUpcomingTimestamp(displayAt, timestampFormat)}`
-    : "Reset time unavailable; retry manually";
+    ? resumes
+      ? `${when} 自动继续`
+      : `${when} 重置`
+    : "重置时间未知，请手动重试";
   if (!chatGptLimit) {
     return {
       id: `usage-limit-recovery:${runId}`,
       variant: "warning",
       group: "environment",
       icon: <GaugeIcon />,
-      title: "Usage limit reached",
+      title: "已达到用量上限",
       description: resetDescription,
       actions: recoveryActions,
     };
@@ -80,16 +83,16 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
     variant: "warning",
     group: "environment",
     icon: <OpenAI aria-hidden="true" />,
-    title: "ChatGPT usage limit reached",
+    title: "已达到 ChatGPT 用量上限",
     description: workspaceLimit
-      ? "You've reached your workspace's limit for using your ChatGPT plan in other apps."
+      ? "你已达到工作区允许在其他应用中使用 ChatGPT 套餐的上限。"
       : resetDescription,
     actions: (
       <>
         {recoveryActions}
         {workspaceLimit ? (
           <Button size="xs" variant="ghost" onClick={copyAdminRequest}>
-            Copy request for admin
+            复制给管理员的申请
           </Button>
         ) : (
           <ChatGptUsageButton size="xs" variant="ghost" />
@@ -114,8 +117,8 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
       toastManager.add({
         type: "error",
-        title: "Could not snooze thread",
-        description: "The reset time has passed. Retry the thread manually.",
+        title: "无法暂缓会话",
+        description: "重置时间已过，请手动重试这个会话。",
       });
       // The deadline timer can lag after a throttled tab or sleep; disable now.
       deadlineStore(Date.parse(resetAt)).refresh();
@@ -131,8 +134,8 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     } catch (cause) {
       toastManager.add({
         type: "error",
-        title: action === "resume" ? "Could not change auto-resume" : "Could not snooze thread",
-        description: cause instanceof Error ? cause.message : "An error occurred.",
+        title: action === "resume" ? "无法修改自动继续" : "无法暂缓会话",
+        description: cause instanceof Error ? cause.message : "发生错误。",
       });
     }
     setPending(false);
@@ -141,14 +144,14 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
       <InlineButton touchTarget="padded" disabled={pending} onClick={() => void toggle("resume")}>
-        {pending ? "Saving..." : scheduled ? "Cancel auto-resume" : "Resume at reset"}
+        {pending ? "正在保存…" : scheduled ? "取消自动继续" : "重置后自动继续"}
       </InlineButton>
       <InlineButton
         touchTarget="padded"
         disabled={pending || (!snoozed && resetPassed)}
         onClick={() => void toggle("snooze")}
       >
-        {pending ? "Saving..." : snoozed ? "Wake now" : "Snooze until reset"}
+        {pending ? "正在保存…" : snoozed ? "立即唤醒" : "暂缓到重置时"}
       </InlineButton>
     </span>
   );

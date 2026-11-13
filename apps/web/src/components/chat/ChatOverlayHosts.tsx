@@ -157,15 +157,14 @@ export function BranchRestoreConfirmHost(props: {
       <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Switch to <code className="font-medium">{props.threadBranch}</code>?
+            切换到 <code className="font-medium">{props.threadBranch}</code>?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            You have uncommitted changes. They'll carry over to the other branch, or block the
-            switch if they conflict.
+            你有未提交的改动。它们会带到另一个分支；如果有冲突，则无法切换。
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
           <Button
             variant="default"
             disabled={!props.canWriteSourceControl}
@@ -174,7 +173,7 @@ export function BranchRestoreConfirmHost(props: {
               props.onConfirm();
             }}
           >
-            Switch branch
+            切换分支
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -216,22 +215,21 @@ export function RevertConfirmHost(props: {
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Edit from here?</AlertDialogTitle>
+          <AlertDialogTitle>从这里开始编辑？</AlertDialogTitle>
           <AlertDialogDescription>
-            Rewind chat to before this message. Your prompt and attachments return to the composer.
-            “Revert files too” also undoes your own edits.
+            对话将回退到这条消息之前，你的提示词和附件会回到输入框。选择“同时还原文件”还会撤销你自己做的修改。
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
           <Button
             variant="destructive-outline"
             disabled={!canRestoreFiles}
             onClick={() => confirm(true)}
           >
-            Revert files too
+            同时还原文件
           </Button>
-          <Button onClick={() => confirm(false)}>Revert and keep changes</Button>
+          <Button onClick={() => confirm(false)}>回退并保留改动</Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

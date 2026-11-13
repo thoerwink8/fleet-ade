@@ -603,7 +603,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
             "The existing managed release has the wrong version. Remove it before reinstalling.",
           );
         }
-        yield* report("verifying", "Checking the installed runtime.");
+        yield* report("verifying", "正在检查已安装的运行环境。");
         yield* validate(existing, asset.version).pipe(
           Effect.scoped,
           Effect.timeout(VALIDATION_TIMEOUT),
@@ -702,7 +702,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
         );
       }
 
-      yield* report("extracting", "Extracting the verified runtime.");
+      yield* report("extracting", "正在解压已验证的运行环境。");
       if (cli) {
         const executablePath = path.join(pairDirectory, asset.executable.name);
         if (asset.format === "executable") {
@@ -854,7 +854,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
           );
         }
       }
-      yield* report("verifying", "Checking the downloaded runtime.");
+      yield* report("verifying", "正在检查下载的运行环境。");
       yield* validate(
         {
           executablePath,
@@ -1008,8 +1008,8 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
           canRemove: current.canRemove,
           message:
             reuse === undefined
-              ? "Downloading Google's official Antigravity runtime."
-              : "Checking the installed runtime.",
+              ? "正在下载 Google 官方的 Antigravity 运行环境。"
+              : "正在检查已安装的运行环境。",
         };
         yield* SubscriptionRef.set(state, next);
         const work = (
@@ -1043,10 +1043,10 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
                     ...value,
                     phase: cancelled ? "cancelled" : "failed",
                     message: cancelled
-                      ? "Installation cancelled. The previous runtime is unchanged."
+                      ? "已取消安装，原有运行环境保持不变。"
                       : Option.isSome(error)
                         ? error.value.detail
-                        : "Could not finish the Antigravity installation. Check disk space and directory access.",
+                        : "无法完成 Antigravity 安装。请检查磁盘空间和目录访问权限。",
                   } satisfies ProviderInstallState;
                 })
               : Effect.void,
@@ -1157,7 +1157,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
           ({
             ...current,
             phase: "failed",
-            message: "The managed Antigravity runtime is incomplete. Remove it and reinstall.",
+            message: "托管的 Antigravity 运行环境不完整。请移除后重新安装。",
           }) satisfies ProviderInstallState,
       ),
     ),

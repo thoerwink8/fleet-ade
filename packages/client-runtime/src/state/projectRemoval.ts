@@ -36,21 +36,17 @@ export function planProjectRemoval<
       : `Remove ${targetKind} "${targetLabel}"?`,
     ...(singleMember
       ? [
-          `Path: ${singleMember.workspaceRoot}`,
-          ...(singleMember.environmentLabel
-            ? [`Environment: ${singleMember.environmentLabel}`]
-            : []),
+          `路径：${singleMember.workspaceRoot}`,
+          ...(singleMember.environmentLabel ? [`环境：${singleMember.environmentLabel}`] : []),
         ]
-      : [`This removes ${members.length} grouped project entries.`]),
+      : [`将移除 ${members.length} 个已分组的项目条目。`]),
     ...(threadCount > 0
-      ? [
-          "Those threads and any archived threads are deleted from T3 Code. Provider sessions are kept.",
-        ]
-      : ["Any archived threads are deleted from T3 Code. Provider sessions are kept."]),
+      ? ["这些会话及所有已归档会话将从 T3 Code 中删除。提供方会话会保留。"]
+      : ["所有已归档会话将从 T3 Code 中删除。提供方会话会保留。"]),
     isWholeGroup && !hasOtherMembers
-      ? "This removes only the project entries, not the files on disk."
-      : "Other entries in this grouped project are unaffected.",
-    "This action cannot be undone.",
+      ? "仅移除项目条目，磁盘上的文件会保留。"
+      : "此项目组中的其他条目不受影响。",
+    "此操作无法撤销。",
   ].join("\n");
 
   return { projectThreads, isWholeGroup, targetKind, confirmationMessage };

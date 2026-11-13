@@ -293,7 +293,7 @@ export function linkRequestDisplay(
     case "pending":
       return visibility === "local"
         ? { kind: "pending" }
-        : { kind: "pending-elsewhere", label: "Waiting for an answer in the original thread" };
+        : { kind: "pending-elsewhere", label: "正在等待原会话中的回答" };
     case "linked":
       return {
         kind: "answered",
@@ -303,15 +303,15 @@ export function linkRequestDisplay(
         }`,
       };
     case "declined":
-      return { kind: "answered", outcome: "declined", label: "Declined" };
+      return { kind: "answered", outcome: "declined", label: "已拒绝" };
     case "failed":
       return {
         kind: "answered",
         outcome: "failed",
-        label: `Could not link: ${item.failure ?? "the other environment refused"}`,
+        label: `无法关联：${item.failure ?? "另一个环境已拒绝"}`,
       };
     case "cancelled":
-      return { kind: "answered", outcome: "ended", label: "Request ended" };
+      return { kind: "answered", outcome: "ended", label: "请求已结束" };
   }
 }
 
@@ -384,5 +384,5 @@ export function linkRequestFailureMessage(failure: unknown): string {
   ) {
     return failure.message;
   }
-  return "Could not answer the request. Try again.";
+  return "无法回复此请求。请重试。";
 }

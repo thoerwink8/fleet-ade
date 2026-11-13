@@ -6,7 +6,7 @@ import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 const speedNotice =
-  "Fast and Ultrafast are unavailable with this ChatGPT connection. Use an existing Codex CLI login for speed options your account supports.";
+  "这个 ChatGPT 连接不支持快速和极速模式。如需使用账户支持的速度选项，请改用现有的 Codex CLI 登录。";
 
 export function ChatGptSharingControl({ provider }: { provider: ServerProvider | null }) {
   const speedNoticeId = useId();
@@ -24,7 +24,7 @@ export function ChatGptSharingControl({ provider }: { provider: ServerProvider |
           }
         >
           <OpenAI className="size-3.5" aria-hidden="true" />
-          Using ChatGPT plan
+          正在使用 ChatGPT 套餐
         </TooltipTrigger>
         <span id={speedNoticeId} className="sr-only">
           {speedNotice}

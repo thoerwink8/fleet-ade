@@ -28,13 +28,13 @@ describe("add project shared logic", () => {
   it("asks for a repository name when GitHub input is only an owner path", () => {
     const github = SourceControlProviderKind.make("github");
     expect(githubIncompleteOwnerRepositoryMessage(github, "pingdotgg/")).toBe(
-      "Enter the full owner/repository name.",
+      "请输入完整的所有者/仓库名称。",
     );
     expect(githubIncompleteOwnerRepositoryMessage(github, "  pingdotgg//  ")).toBe(
-      "Enter the full owner/repository name.",
+      "请输入完整的所有者/仓库名称。",
     );
     expect(githubIncompleteOwnerRepositoryMessage(github, "mona-cat_octo/")).toBe(
-      "Enter the full owner/repository name.",
+      "请输入完整的所有者/仓库名称。",
     );
 
     for (const input of [
@@ -196,7 +196,7 @@ describe("add project shared logic", () => {
       {
         environmentId: other,
         id: ProjectId.make("same-path-other-env"),
-        title: "Other",
+        title: "其他",
         workspaceRoot: "/repo",
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
@@ -207,7 +207,7 @@ describe("add project shared logic", () => {
       {
         environmentId: env,
         id: ProjectId.make("project"),
-        title: "Repo",
+        title: "仓库",
         workspaceRoot: "/repo/",
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",

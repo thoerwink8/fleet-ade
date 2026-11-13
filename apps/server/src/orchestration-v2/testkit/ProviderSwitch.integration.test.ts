@@ -1277,7 +1277,7 @@ describe("orchestration v2 provider switching", () => {
       const capturedTurns = yield* Ref.make<ReadonlyArray<CapturedTurn>>([]);
       const generation = yield* Ref.make(0);
       // About 112 KB of ordinary English is about 25k tokens: a quarter of a 128k window.
-      const prose = "The quick brown fox jumps over the lazy dog. ".repeat(2_500);
+      const prose = "敏捷的棕色狐狸跳过那只懒狗。".repeat(2_500);
       const layerRegistry = ProviderAdapterRegistry.layerFromAdapters([
         makeTestAdapter({
           instanceId: CODEX_MODEL_SELECTION.instanceId,
@@ -3360,7 +3360,7 @@ describe("orchestration v2 provider switching", () => {
               threadId,
               messageId: MessageId.make(`message:scheduled-fresh-background:${name}`),
               scheduledTaskId: ScheduledTaskId.make("scheduled-fresh-background"),
-              text: `Scheduled ${name}`,
+              text: `已为 ${name} 设置定时规则`,
               attachments: [],
               modelSelection: CLAUDE_MODEL_SELECTION,
               freshContext: true,
@@ -3390,7 +3390,7 @@ describe("orchestration v2 provider switching", () => {
           yield* waitForIdle(threadId);
           const turns = yield* Ref.get(capturedTurns);
           const turnFor = (name: string) =>
-            turns.find((turn) => turn.text.endsWith(`Scheduled ${name}`));
+            turns.find((turn) => turn.text.endsWith(`已为 ${name} 设置定时规则`));
           assert.isDefined(turnFor("second"));
           assert.notEqual(turnFor("second")!.nativeThreadId, turnFor("first")!.nativeThreadId);
           // Closing the busy session would end its background work.
@@ -3699,7 +3699,7 @@ describe("orchestration v2 provider switching", () => {
             releaseFirstTurn: release,
             failedRunOrdinals: new Set([1]),
             failure: makeProviderFailure({
-              message: "Usage limit reached",
+              message: "已达到用量上限",
               class: "usage_limit",
               code: "usage_limit",
             }),

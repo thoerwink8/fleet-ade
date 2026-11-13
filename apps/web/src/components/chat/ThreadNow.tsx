@@ -45,9 +45,7 @@ function ThreadNowLine({
       {/* Title and detail read as one line that gives way before the actions, so Stop stays
           reachable; when it is cut, its details button shows all of it. */}
       <NoticeText
-        detailsLabel={
-          typeof item.title === "string" ? `Show details: ${item.title}` : "Show details"
-        }
+        detailsLabel={typeof item.title === "string" ? `显示详情：${item.title}` : "显示详情"}
         className="min-w-0 truncate"
       >
         {item.title}

@@ -24,7 +24,7 @@ class MacPermissionHelperError extends Schema.TaggedError<MacPermissionHelperErr
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Could not show the permission helper.";
+    return "无法显示权限助手。";
   }
 }
 

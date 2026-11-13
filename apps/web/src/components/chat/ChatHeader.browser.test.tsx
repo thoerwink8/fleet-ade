@@ -46,11 +46,11 @@ function header(title: string) {
 it.each(["blur", "Enter"] as const)(
   "preserves a concurrent title update when an untouched rename ends with %s",
   async (finish) => {
-    persisted.title = "New thread";
+    persisted.title = "新建会话";
     await using screen = await render(header(persisted.title));
     await screen.getByRole("button", { name: "Thread actions for New thread" }).dblClick();
     const input = screen.getByRole("textbox", { name: "Thread title" });
-    await expect.element(input).toHaveValue("New thread");
+    await expect.element(input).toHaveValue("新建会话");
 
     persisted.title = "Fix login redirect";
     await screen.rerender(header(persisted.title));
@@ -76,7 +76,7 @@ it.each(["blur", "Enter"] as const)(
 it("opens the thread menu on a desktop title click without waiting", async () => {
   openMenu.mockClear();
   using _bridge = stubGlobal("desktopBridge", {});
-  await using screen = await render(header("New thread"));
+  await using screen = await render(header("新建会话"));
   await screen.getByRole("button", { name: "Thread actions for New thread" }).click();
   expect(openMenu).toHaveBeenCalledOnce();
 });

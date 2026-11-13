@@ -140,7 +140,7 @@ const attachedTerminalSessionFamily = Atom.family((key: string) => {
   if (Option.isNone(decoded)) {
     return Atom.make<TerminalSessionState>({
       ...EMPTY_TERMINAL_SESSION_STATE,
-      error: "Invalid terminal launch input",
+      error: "无效的终端启动参数",
       status: "error",
     }).pipe(Atom.withLabel(`web-terminal-session:${key}`));
   }

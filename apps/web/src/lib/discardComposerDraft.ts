@@ -42,7 +42,7 @@ export function discardComposerDraft(target: ComposerThreadTarget): void {
   showThreadUndoNotice({
     action: "Discarded",
     claim,
-    failureTitle: "Failed to restore draft",
+    failureTitle: "无法恢复草稿",
     undo: async () => {
       const current = useComposerDraftStore.getState().draftsByThreadKey[key];
       if (current && composerDraftHasUserContent(current)) {

@@ -127,7 +127,7 @@ it.each([
     label: "Page annotation",
     annotationId: "source",
     pageUrl: "http://localhost/page",
-    pageTitle: "Page",
+    pageTitle: "页",
     comment: "Check this",
     targetSummary: "Page",
     styleChanges: [],

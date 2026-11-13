@@ -46,13 +46,13 @@ function useUpdateRunMachineViews(run: UpdateEverythingRun): ReadonlyArray<Updat
 
 function localStatusLabel(run: UpdateEverythingRun, local: UpdateRunLocalState, now: number) {
   if (run.phase === "countdown" && run.restartAt !== null) {
-    return `restarts in ${Math.max(0, Math.ceil((run.restartAt - now) / 1000))}s`;
+    return `${Math.max(0, Math.ceil((run.restartAt - now) / 1000))} 秒后重启`;
   }
-  if (run.phase === "installing") return "restarting";
+  if (run.phase === "installing") return "正在重启";
   if (local?.status === "downloading") {
     return `downloading${local.percent === null ? "" : ` ${Math.floor(local.percent)}%`}`;
   }
-  return "restarts after the servers";
+  return "在所有服务器之后重启";
 }
 
 export function SidebarUpdateCapsule({
@@ -76,8 +76,7 @@ export function SidebarUpdateCapsule({
   const failed = machines.some(({ status }) => status === "failed");
   const settled = !hasActiveMachine && run.localVersion === null;
 
-  const actionLabel =
-    view.action === "later" ? "Later" : view.action === "retry" ? "Retry" : "Dismiss";
+  const actionLabel = view.action === "later" ? "稍后" : view.action === "retry" ? "重试" : "忽略";
   const runAction = () => {
     if (view.action === "later") postponeUpdateRestart();
     else if (view.action === "retry") retryFailedUpdateRunServers(updateServer);
@@ -130,16 +129,16 @@ export function SidebarUpdateCapsule({
         <div className="flex flex-col gap-1 text-xs">
           {run.localVersion !== null ? (
             <div className="flex items-center justify-between gap-3">
-              <span>This app</span>
+              <span>此应用</span>
               <span className="text-muted-foreground tabular-nums">
                 {localStatusLabel(run, local, now)}
               </span>
             </div>
           ) : onRestart ? (
             <div className="flex items-center justify-between gap-3">
-              <span>This app</span>
+              <span>此应用</span>
               <Button size="xs" variant="outline" onClick={() => void onRestart()}>
-                Restart to update
+                重启以更新
               </Button>
             </div>
           ) : null}
@@ -168,11 +167,11 @@ export function SidebarUpdateCapsule({
             <div className="mt-1 flex justify-end gap-1">
               {view.action === "retry" ? (
                 <Button size="xs" variant="outline" onClick={runAction}>
-                  Retry
+                  重试
                 </Button>
               ) : null}
               <Button size="xs" variant="ghost" onClick={dismissSettledUpdateRunMachines}>
-                Dismiss
+                忽略
               </Button>
             </div>
           ) : null}

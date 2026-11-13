@@ -462,7 +462,7 @@ describe("VcsProcess.run", () => {
         operation: "test.authentication",
         command: "node",
         exitCode: 1,
-        detail: "Authentication failed.",
+        detail: "身份验证失败。",
         failureKind: "authentication",
         stderrLength: secretStderr.length,
         stderrTruncated: false,

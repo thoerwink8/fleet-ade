@@ -1944,14 +1944,14 @@ it.effect(
           driver: CODEX_DRIVER,
           providerSession: {
             ...replacement.providerSession,
-            extensionStatuses: [{ key: "new", text: "New session" }],
+            extensionStatuses: [{ key: "new", text: "全新上下文" }],
           },
         });
         yield* replacementClient.events.pipe(Stream.runHead);
         assert.deepEqual(
           (yield* projectionStore.getThreadProjection(threadId)).providerSessions.at(-1)
             ?.extensionStatuses,
-          [{ key: "new", text: "New session" }],
+          [{ key: "new", text: "全新上下文" }],
         );
         assert.lengthOf((yield* projectionStore.getThreadProjection(threadId)).messages, 0);
         assert.lengthOf((yield* projectionStore.getThreadProjection(threadId)).turnItems, 0);
@@ -1960,7 +1960,7 @@ it.effect(
           layerTest({
             state,
             idleTimeoutMs: 60_000,
-            extensionStatuses: [{ key: "initial", text: "Watching" }],
+            extensionStatuses: [{ key: "initial", text: "仅查看" }],
           }),
         ),
       );
@@ -2290,7 +2290,7 @@ it.effect("ProviderSessionManagerV2 fails a turn whose provider retry never resu
             type: "compaction",
             driver: CODEX_DRIVER,
             status: "running",
-            title: "Compacting context",
+            title: "正在压缩上下文",
             startedAt: now,
             completedAt: null,
             updatedAt: now,
@@ -4169,7 +4169,7 @@ it.effect.each(["manual_shutdown", "server_shutdown"] as const)(
                     ...event.payload,
                     type: "user_input_request",
                     questions: [
-                      { id: "color", header: "Color", question: "Which color?", options: [] },
+                      { id: "color", header: "颜色", question: "Which color?", options: [] },
                     ],
                   },
                 }

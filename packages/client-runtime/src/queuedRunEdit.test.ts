@@ -44,9 +44,7 @@ describe("resolveQueuedEditExit", () => {
 describe("queuedRunEditBlockedReason", () => {
   it("blocks edits only while a question holds the composer", () => {
     expect(queuedRunEditBlockedReason({ openQuestionCount: 0 })).toBeNull();
-    expect(queuedRunEditBlockedReason({ openQuestionCount: 1 })).toBe(
-      "Answer the question to edit queued messages",
-    );
+    expect(queuedRunEditBlockedReason({ openQuestionCount: 1 })).toBe("请回答问题后再编辑排队消息");
   });
 });
 

@@ -48,7 +48,7 @@ describe("ACP Registry icon cache", () => {
   it("rejects oversized image responses before caching", async () => {
     const url = "https://cdn.agentclientprotocol.com/registry/icons/oversized.svg";
     fetchIcon.mockResolvedValue(
-      new Response("too large", {
+      new Response("文件过大", {
         status: 200,
         headers: {
           "content-length": String(513 * 1_024),
@@ -57,7 +57,7 @@ describe("ACP Registry icon cache", () => {
       }),
     );
 
-    await expect(loadCachedAcpRegistryIcon(url)).rejects.toThrow("too large");
+    await expect(loadCachedAcpRegistryIcon(url)).rejects.toThrow("文件过大");
     expect(put).not.toHaveBeenCalled();
   });
 

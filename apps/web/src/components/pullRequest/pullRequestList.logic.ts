@@ -62,9 +62,9 @@ const pullRequestViewerKey = (entry: ScopedEntry): string =>
   `${entry.environmentId ?? ""} ${entry.host}`;
 
 const GROUP_LABELS: Record<PullRequestGroupKey, string> = {
-  reviewRequested: "Review requested",
-  authored: "Authored",
-  others: "Others",
+  reviewRequested: "已请求我审查",
+  authored: "我提交的",
+  others: "其他",
 };
 
 function normalize(value: string | null | undefined): string | null {

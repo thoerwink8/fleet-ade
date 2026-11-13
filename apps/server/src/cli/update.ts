@@ -323,7 +323,7 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     });
   }
   const progress = createUpdateProgress();
-  progress.status("Checking for updates...");
+  progress.status("正在检查更新…");
   const targetVersion = yield* (
     input.requestedVersion !== undefined
       ? Effect.succeed(input.requestedVersion)

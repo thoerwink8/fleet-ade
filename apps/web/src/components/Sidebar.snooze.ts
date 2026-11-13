@@ -39,8 +39,8 @@ export function pickSnoozePreset(
   if (!picked) {
     toastManager.add({
       type: "warning",
-      title: "Could not snooze thread",
-      description: "That snooze time has passed. Choose another time.",
+      title: "无法暂缓会话",
+      description: "该暂缓时间已过，请选择其他时间。",
     });
   }
   return picked;

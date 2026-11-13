@@ -29,19 +29,19 @@ vi.mock("~/env", async (importOriginal) => ({
 const ITEMS: ReadonlyArray<SettingsSearchItem> = [
   {
     id: "word-wrap",
-    title: "Word wrap",
+    title: "自动换行",
     to: "/settings/general",
     searchTerms: ["long lines in code previews"],
   },
   {
     id: "network-access",
-    title: "Network access",
+    title: "网络访问",
     to: "/settings/access",
     searchTerms: ["remote pairing backend"],
   },
   {
     id: "providers",
-    title: "Providers",
+    title: "智能体提供方",
     to: "/settings/providers",
     searchTerms: ["claude codex agents"],
   },
@@ -66,7 +66,7 @@ describe("searchSettings", () => {
     expect(searchSettings("long lines", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
     const spanish = (message: string) => (message === "Word wrap" ? "Ajuste de línea" : message);
     expect(searchSettings("ajuste", ITEMS, spanish).map((item) => item.id)).toEqual(["word-wrap"]);
-    for (const query of ["fallback", "fallback agent", "fallback model"]) {
+    for (const query of ["fallback", "fallback agent", "备用模型"]) {
       expect(searchSettings(query)[0]).toMatchObject({
         id: "fallback-model",
         to: "/settings/threads",
@@ -90,7 +90,7 @@ describe("searchSettings", () => {
   it("matches normalized title substrings", () => {
     expect(searchSettings("  WORD   WRAP  ", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
     expect(searchSettings("glass").map((item) => item.id)).toEqual(["setting-glass-opacity"]);
-    expect(searchSettings("panel animations").map((item) => item.id)).toEqual(["panel-animations"]);
+    expect(searchSettings("面板动画").map((item) => item.id)).toEqual(["panel-animations"]);
     expect(searchSettings("thè\u{1ab0}mes")[0]?.id).toBe("theme");
     const localeLowerCase = vi.spyOn(String.prototype, "toLocaleLowerCase").mockReturnValue("gıt");
     try {
@@ -216,14 +216,14 @@ describe("searchSettings", () => {
 
   it("finds rows by the titles shown on their pages", () => {
     for (const [title, id] of [
-      ["Automatic worktree cleanup", "storage-worktrees"],
-      ["Delete settled worktrees", "storage-worktrees"],
-      ["Delete old browser artifacts", "storage-artifacts"],
-      ["Delete old rotated logs", "storage-artifacts"],
-      ["Custom search URL", "browser-search-engine"],
-      ["Native sessions", "providers"],
-      ["CODEX_HOME path", "providers"],
-      ["Shadow home path", "providers"],
+      ["自动清理工作树", "storage-worktrees"],
+      ["删除已收尾的工作树", "storage-worktrees"],
+      ["删除旧浏览器产物", "storage-artifacts"],
+      ["删除旧轮转日志", "storage-artifacts"],
+      ["自定义搜索 URL", "browser-search-engine"],
+      ["原生运行实例", "providers"],
+      ["CODEX_HOME 路径", "providers"],
+      ["独立主目录路径", "providers"],
     ] as const) {
       expect(searchSettings(title)[0]?.id, title).toBe(id);
     }
@@ -237,7 +237,7 @@ describe("searchSettings", () => {
 
 describe("settings search targets", () => {
   it("requires an environment for the resolved telemetry export destination", () => {
-    const result = searchSettings("OpenTelemetry export").find(
+    const result = searchSettings("OpenTelemetry 导出").find(
       (item) => item.id === "telemetry-export",
     )!;
     const target = getSettingsSearchTargetScope(result.targetId ?? result.id)!;

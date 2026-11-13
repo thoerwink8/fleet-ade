@@ -86,10 +86,7 @@ it("delivers borrowed decoded frames, reports presentation failure, and discards
   expect(frame.close).toHaveBeenCalledTimes(2);
   present.mockReturnValueOnce(false);
   decoderOutput?.(frame);
-  expect(events.onStatus).toHaveBeenLastCalledWith(
-    "error",
-    "Could not display the device stream. Reconnect to try again.",
-  );
+  expect(events.onStatus).toHaveBeenLastCalledWith("error", "无法显示设备画面，请重新连接后重试。");
   expect(frame.close).toHaveBeenCalledTimes(3);
   decoderOutput?.(frame);
   expect(present).toHaveBeenCalledTimes(3);

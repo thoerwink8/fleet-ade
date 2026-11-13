@@ -13,7 +13,7 @@ describe("AppRouteModal", () => {
   it("commits a focused field when Esc closes it", async () => {
     const onCommit = vi.fn();
     await using _screen = await render(
-      <AppRouteModal label="Settings">
+      <AppRouteModal label="设置">
         <CommitOnBlurField onCommit={onCommit} />
       </AppRouteModal>,
       { router: "/settings/general" },

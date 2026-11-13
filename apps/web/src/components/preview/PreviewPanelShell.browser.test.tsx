@@ -12,10 +12,10 @@ function Workspace(props: { open: boolean; present?: boolean; children?: ReactNo
       <div data-workspace-area="composer">
         <input aria-label="Message New thread" />
       </div>
-      <button type="button" aria-label="Toggle right panel" data-right-panel-toggle />
+      <button type="button" aria-label="切换右侧面板" data-right-panel-toggle />
       {(props.present ?? true) ? (
         <PreviewPanelShell mode="inline" open={props.open}>
-          {props.children ?? <div role="region" aria-label="Open a surface" tabIndex={-1} />}
+          {props.children ?? <div role="region" aria-label="打开面板" tabIndex={-1} />}
         </PreviewPanelShell>
       ) : null}
     </div>
@@ -53,7 +53,7 @@ describe("PreviewPanelShell focus", () => {
     const focusOnMount = (element: HTMLElement | null) => element?.focus();
     const panel = (present: boolean) => (
       <Workspace open present={present}>
-        <div role="region" aria-label="Terminal" tabIndex={-1} ref={focusOnMount} />
+        <div role="region" aria-label="终端" tabIndex={-1} ref={focusOnMount} />
       </Workspace>
     );
     await using screen = await render(panel(false));
@@ -69,8 +69,8 @@ describe("PreviewPanelShell focus", () => {
   it("keeps the composer as the origin after focus visits a menu portalled from the panel", async () => {
     const panel = (open: boolean) => (
       <Workspace open={open}>
-        <div role="region" aria-label="Open a surface" tabIndex={-1} />
-        {createPortal(<button type="button">Add panel surface</button>, document.body)}
+        <div role="region" aria-label="打开面板" tabIndex={-1} />
+        {createPortal(<button type="button">添加面板</button>, document.body)}
       </Workspace>
     );
     await using screen = await render(panel(false));
@@ -93,12 +93,12 @@ describe("PreviewPanelShell focus", () => {
           data-workspace-area="conversation"
           style={{ height: 100, overflowY: "auto" }}
         >
-          <button type="button">Copy message</button>
+          <button type="button">复制消息</button>
           <div style={{ height: 2000 }} />
         </div>
-        <button type="button" aria-label="Toggle right panel" data-right-panel-toggle />
+        <button type="button" aria-label="切换右侧面板" data-right-panel-toggle />
         <PreviewPanelShell mode="inline" open={open}>
-          <div role="region" aria-label="Open a surface" tabIndex={-1} />
+          <div role="region" aria-label="打开面板" tabIndex={-1} />
         </PreviewPanelShell>
       </div>
     );
@@ -120,11 +120,11 @@ describe("PreviewPanelShell focus", () => {
     const layout = (open: boolean, drawerOpen: boolean) => (
       <div>
         <div data-workspace-area={drawerOpen ? "terminal" : undefined}>
-          <input aria-label="Terminal input" />
+          <input aria-label="终端输入" />
         </div>
-        <button type="button" aria-label="Toggle right panel" data-right-panel-toggle />
+        <button type="button" aria-label="切换右侧面板" data-right-panel-toggle />
         <PreviewPanelShell mode="inline" open={open}>
-          <div role="region" aria-label="Open a surface" tabIndex={-1} />
+          <div role="region" aria-label="打开面板" tabIndex={-1} />
         </PreviewPanelShell>
       </div>
     );

@@ -25,7 +25,7 @@ it.effect(
                           visibility: "list",
                           default_reasoning_level: "low",
                           supported_reasoning_levels: [
-                            { effort: "low", description: "Fast" },
+                            { effort: "low", description: "快速" },
                             { effort: "high", description: "Deep" },
                           ],
                         },
@@ -81,7 +81,7 @@ it.effect(
       assert.deepEqual(a[0]!.capabilities?.optionDescriptors, [
         {
           id: "reasoningEffort",
-          label: "Reasoning",
+          label: "推理",
           type: "select",
           options: [
             { id: "low", label: "Low", isDefault: true },

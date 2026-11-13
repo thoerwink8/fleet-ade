@@ -191,7 +191,7 @@ export const closeTailscaleServeTo = Effect.fn("managedLimits.closeTailscaleServ
     };
     return yield* refuseRemoteClients(
       policy,
-      `so the server does not start while Tailscale Serve forwards ${left.map(describe).join(", and ")}`,
+      `so the server does not start while Tailscale Serve forwards ${left.map(describe).join(" 和 ")}`,
     );
   }
   yield* Effect.logInfo("Turned off Tailscale Serve the managed policy does not allow", {

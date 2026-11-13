@@ -47,7 +47,7 @@ describe("CommandPalette open intents", () => {
           }}
           style={{ position: "fixed", bottom: 0, width: 300, height: 100 }}
         >
-          Composer
+          输入框
         </div>
       </CommandPalette>,
     );
@@ -109,9 +109,7 @@ describe("CommandPalette open intents", () => {
     await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
 
     openCommandPalette({});
-    await expect
-      .element(page.getByPlaceholder("Search commands, projects, and threads..."))
-      .toHaveFocus();
+    await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     await expect
       .element(page.getByRole("option", { name: /^New thread in\.\.\./ }))
@@ -129,7 +127,7 @@ describe("CommandPalette open intents", () => {
 
     openCommandPalette({ query: "acme" });
 
-    const input = page.getByPlaceholder("Search commands, projects, and threads...");
+    const input = page.getByPlaceholder("搜索命令、项目和会话…");
     await expect.element(input).toHaveFocus();
     await expect.element(input).toHaveValue("acme");
   });

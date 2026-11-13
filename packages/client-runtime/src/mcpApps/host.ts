@@ -151,7 +151,7 @@ const errorMessage = (error: unknown) =>
     ? error.message
     : error instanceof Error && error.message.trim() !== ""
       ? error.message
-      : "Request failed.";
+      : "请求失败。";
 
 export function makeMcpAppHost(options: McpAppHostOptions): McpAppHost {
   let initialized = false;

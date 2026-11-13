@@ -96,7 +96,7 @@ it.effect.each(["sqlite"] as const)(
         runId,
         nodeId: null,
         role: "user" as const,
-        text: "Continue",
+        text: "继续",
         attachments: [],
         streaming: false,
         createdBy: "agent" as const,

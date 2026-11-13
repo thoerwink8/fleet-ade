@@ -217,7 +217,7 @@ it("shows who sent a queued message and folds automation and agent prompts", asy
   await page.getByRole("button", { name: "Open thread" }).nth(1).click({ force: true });
   expect(onOpenThread).toHaveBeenLastCalledWith("thread:linked-lead", "environment:linked");
 
-  await expect.element(page.getByText("Sent by T3 Code")).toBeVisible();
+  await expect.element(page.getByText("由 T3 Code 发送")).toBeVisible();
   await expect.element(page.getByText("Continue where you left off.")).toBeVisible();
 });
 
@@ -230,7 +230,7 @@ it("stays inside the timeline scroller instead of growing the chat column", asyn
     queuedRuns: [
       {
         run: { id: "run:queued", userMessageId: "message:queued" },
-        text: "Later",
+        text: "稍后",
         attachments: [],
       },
     ],
@@ -246,7 +246,7 @@ it("stays inside the timeline scroller instead of growing the chat column", asyn
       </div>
     </div>,
   );
-  await expect.element(page.getByText("Later", { exact: true })).toBeInTheDocument();
+  await expect.element(page.getByText("稍后", { exact: true })).toBeInTheDocument();
   const column = screen.getByTestId("column").element();
   expect(column.scrollHeight).toBe(column.clientHeight);
 });

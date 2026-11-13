@@ -1247,7 +1247,7 @@ it.effect("ranks references by number, keeping the host's recent-first order", (
           searchRepositoryReferences: () =>
             Effect.succeed({
               items: [
-                { reference: "#129", kind: "issue", number: 129, title: "Newest", state: "open" },
+                { reference: "#129", kind: "issue", number: 129, title: "最新", state: "open" },
                 {
                   reference: "#7",
                   kind: "issue",
@@ -1284,7 +1284,7 @@ it.effect("tries another workspace on the same host for the viewer", () =>
     const service = yield* makeService({
       projects: [
         project({ id: "p1", title: "broken", workspaceRoot: "/broken", repository: "acme/one" }),
-        project({ id: "p2", title: "healthy", workspaceRoot: "/healthy", repository: "acme/two" }),
+        project({ id: "p2", title: "正常", workspaceRoot: "/healthy", repository: "acme/two" }),
       ],
       providers: [
         fakePullRequestProvider(SourceControlProviderKind.make("github"), {

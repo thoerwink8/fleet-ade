@@ -55,7 +55,7 @@ function provider(input: {
       updateCommand: "updateCommand" in input ? input.updateCommand : "npm install -g provider",
       canUpdate: input.canUpdate ?? true,
       checkedAt,
-      message: "Update available.",
+      message: "有可用更新。",
     },
   };
 
@@ -350,7 +350,7 @@ describe("getProviderUpdateRunToastView", () => {
       getProviderUpdateRunToastView([
         run("Linux", "opencode", AsyncResult.success({ providers: [restarted] })),
       ]),
-    ).toMatchObject({ description: "New sessions will use the updated provider." });
+    ).toMatchObject({ description: "新会话将使用更新后的提供方。" });
   });
 
   it("lists every failed update and ignores interrupted ones", () => {

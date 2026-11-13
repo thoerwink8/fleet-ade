@@ -57,7 +57,7 @@ export function readPromptUltrathink(prompt: string): PromptUltrathink {
 const SAVED_OPTION_LABELS: Readonly<Record<string, string>> = {
   agent: "Agent",
   effort: "Effort",
-  reasoningEffort: "Reasoning effort",
+  reasoningEffort: "推理强度",
   variant: "Reasoning",
 };
 
@@ -106,7 +106,7 @@ type TraitsPersistence =
 function DefaultBadge() {
   return (
     <Badge variant="outline" size="sm" className="min-w-0">
-      Default
+      默认
     </Badge>
   );
 }
@@ -373,8 +373,7 @@ export function useTraitsSelection({
   };
 }
 
-export const ULTRATHINK_IN_BODY_NOTE =
-  'Your prompt contains "ultrathink" in the text. Remove it to change this option.';
+export const ULTRATHINK_IN_BODY_NOTE = "你的提示词中包含“ultrathink”。删除它才能修改这个选项。";
 
 const TraitsMenuContent = memo(function TraitsMenuContentImpl(props: TraitsSelectionInput) {
   const traits = useTraitsSelection(props);
@@ -471,7 +470,7 @@ const TraitsMenuContent = memo(function TraitsMenuContentImpl(props: TraitsSelec
               {(["on", "off"] as const).map((value) => (
                 <MenuRadioItem key={value} value={value} hideIndicator closeOnClick>
                   <span className="flex w-full min-w-0 items-center justify-between gap-3">
-                    <span>{value === "on" ? "On" : "Off"}</span>
+                    <span>{value === "on" ? "开启" : "关闭"}</span>
                   </span>
                 </MenuRadioItem>
               ))}

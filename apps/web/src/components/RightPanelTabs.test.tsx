@@ -24,10 +24,10 @@ function shortcutEvent(
 
 describe("surface shortcuts", () => {
   const actions = [
-    { shortcut: "B", available: true, label: "Browser" },
-    { shortcut: "D", available: false, label: "Diff" },
-    { shortcut: "T", available: true, label: "Terminal" },
-    { shortcut: "M", available: true, label: "Device" },
+    { shortcut: "B", available: true, label: "浏览器" },
+    { shortcut: "D", available: false, label: "差异" },
+    { shortcut: "T", available: true, label: "终端" },
+    { shortcut: "M", available: true, label: "设备" },
   ] as const;
 
   it("falls back to the physical key when the layout types a non-Latin letter or mark", () => {

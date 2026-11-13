@@ -28,9 +28,9 @@ function formatRemainingSeconds(seconds: number): string {
 }
 
 function getPromptErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "SSH verification prompt failed.";
+  const message = error instanceof Error ? error.message : "SSH 验证提示失败。";
   return message.includes("expired") || message.includes("no longer pending")
-    ? "This SSH verification prompt expired. Try connecting again."
+    ? "此 SSH 验证提示已过期，请重新连接。"
     : message;
 }
 
@@ -108,9 +108,7 @@ function ActiveSshPasswordPrompt({
   const remainingSeconds = remainingMs === null ? null : Math.ceil(remainingMs / 1_000);
   const remainingLabel =
     remainingSeconds === null ? null : formatRemainingSeconds(remainingSeconds);
-  const visibleResponseError = isExpired
-    ? "This SSH verification prompt expired. Try connecting again."
-    : responseError;
+  const visibleResponseError = isExpired ? "此 SSH 验证提示已过期，请重新连接。" : responseError;
 
   const respond = async (nextPassword: string | null) => {
     if (isRespondingRef.current) {
@@ -119,7 +117,7 @@ function ActiveSshPasswordPrompt({
 
     const requestId = request.requestId;
     if (nextPassword !== null && isExpired) {
-      setResponseError("This SSH verification prompt expired. Try connecting again.");
+      setResponseError("此 SSH 验证提示已过期，请重新连接。");
       return;
     }
 
@@ -163,7 +161,7 @@ function ActiveSshPasswordPrompt({
     >
       <DialogPopup className="max-w-md" initialFocus={inputRef} showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>SSH verification required</DialogTitle>
+          <DialogTitle>需要 SSH 验证</DialogTitle>
           <DialogDescription>
             Enter the password or verification code required by <code>{target}</code>. T3 Code
             passes your response to the local SSH process and keeps it in memory to reuse for this
@@ -190,7 +188,7 @@ function ActiveSshPasswordPrompt({
                         : "shrink-0 text-xs text-muted-foreground"
                     }
                   >
-                    {isExpired ? "Expired" : remainingLabel}
+                    {isExpired ? "已过期" : remainingLabel}
                   </span>
                 ) : null}
               </div>
@@ -208,18 +206,17 @@ function ActiveSshPasswordPrompt({
               <p className="text-sm text-destructive">{visibleResponseError}</p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                SSH keys may replace a password, but your server can still require a verification
-                code.
+                SSH 密钥可以替代密码，但你的服务器仍可能要求输入验证码。
               </p>
             )}
           </form>
         </DialogPanel>
         <DialogFooter>
           <Button disabled={isResponding} type="button" variant="outline" onClick={cancelPrompt}>
-            {isExpired ? "Dismiss" : "Cancel"}
+            {isExpired ? "忽略" : "取消"}
           </Button>
           <Button disabled={isResponding || isExpired} form={formId} type="submit">
-            Continue
+            继续
           </Button>
         </DialogFooter>
       </DialogPopup>

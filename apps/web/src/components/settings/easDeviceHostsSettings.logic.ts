@@ -9,7 +9,7 @@ export const parseEasDeviceHostDraft = Schema.decodeUnknownOption(EasDeviceHostC
 export const newEasDeviceHost = (id: string): EasDeviceHostConfigType => ({
   kind: "eas",
   id,
-  label: "EAS Simulator",
+  label: "EAS 模拟器",
   accessToken: "",
   maxSessionMinutes: 30,
   idleMinutes: 10,
@@ -37,6 +37,6 @@ export function updateEasDeviceHosts(
 
 export function easSessionLimits(host: EasDeviceHostConfigType) {
   const sessions =
-    host.maxConcurrentSessions === 1 ? "1 session" : `${host.maxConcurrentSessions} sessions`;
+    host.maxConcurrentSessions === 1 ? "1 个会话" : `${host.maxConcurrentSessions} 个会话`;
   return `Up to ${sessions} at once, each stopped after ${host.maxSessionMinutes} min or ${host.idleMinutes} idle min`;
 }

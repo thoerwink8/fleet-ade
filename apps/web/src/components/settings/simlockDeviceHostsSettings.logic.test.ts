@@ -18,7 +18,7 @@ const host = {
 describe("Simlock device host settings", () => {
   it("names what keeps a draft from saving", () => {
     expect(simlockDeviceHostProblem(host)).toBeNull();
-    expect(simlockDeviceHostProblem({ ...host, label: " " })).toBe("Give the host a label.");
+    expect(simlockDeviceHostProblem({ ...host, label: " " })).toBe("请填写主机名称。");
     expect(simlockDeviceHostProblem({ ...host, gatewayUrl: "gateway:4700" })).toMatch(/origin/);
     expect(
       simlockDeviceHostProblem({ ...host, gatewayUrl: "https://gateway.example/api" }),
@@ -28,7 +28,7 @@ describe("Simlock device host settings", () => {
   });
 
   it("adds, replaces, and removes one host", () => {
-    const other = { ...host, id: "other", label: "Other" };
+    const other = { ...host, id: "other", label: "其他" };
     const added = updateSimlockDeviceHosts([other], host, false);
     expect(added.map((candidate) => candidate.id)).toEqual(["other", "simlock"]);
     const renamed = updateSimlockDeviceHosts(added, { ...host, label: "Renamed" }, false);

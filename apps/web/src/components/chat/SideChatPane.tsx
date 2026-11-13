@@ -59,11 +59,11 @@ export default function SideChatPane(props: {
   const mergeRun = projection ? resolveLatestMergeBackRun(projection) : null;
   // A pending merge-back would fail the main thread's queued message, so the server refuses it.
   const bringBackBlockedReason = !canOperate
-    ? "This connection cannot change threads."
+    ? "此连接无法修改会话。"
     : threadRuntimeIsActive(parent?.runtime)
-      ? "Available when the main thread is idle."
+      ? "主会话空闲时可用。"
       : mergeRun === null
-        ? "Available after a finished reply."
+        ? "有完整回复后可用。"
         : null;
 
   const bringBack = async () => {
@@ -77,14 +77,14 @@ export default function SideChatPane(props: {
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: "Brought back",
-        description: "The main thread gets this side chat with your next message there.",
+        title: "已带回",
+        description: "你下次在主会话发消息时，会附带这段侧聊。",
       });
     } else if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "Could not bring back the side chat",
+        title: "无法带回侧聊",
         ...(error instanceof Error ? { description: error.message } : {}),
       });
     }
@@ -97,10 +97,7 @@ export default function SideChatPane(props: {
       if (!api) return;
       const confirmed = await settlePromise(() =>
         api.dialogs.confirm(
-          [
-            `Delete side chat "${shell.title}"?`,
-            "This permanently clears its conversation history.",
-          ].join("\n"),
+          [`删除侧聊“${shell.title}”？`, "这会永久清除它的对话记录。"].join("\n"),
           { variant: "destructive" },
         ),
       );
@@ -120,7 +117,7 @@ export default function SideChatPane(props: {
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: "Could not delete the side chat",
+        title: "无法删除侧聊",
         ...(error instanceof Error ? { description: error.message } : {}),
       });
     }
@@ -130,7 +127,7 @@ export default function SideChatPane(props: {
     <div data-side-chat-pane className="flex h-full min-h-0 flex-col">
       <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border pr-1 pl-3">
         <span className="min-w-0 flex-1 truncate text-xs font-medium">
-          {shell?.title ?? "Side chat"}
+          {shell?.title ?? "侧聊"}
         </span>
         <Tooltip>
           <TooltipTrigger
@@ -141,30 +138,30 @@ export default function SideChatPane(props: {
                 aria-disabled={bringBackBlockedReason !== null || bringingBack || undefined}
                 onClick={() => void bringBack()}
               >
-                Bring back
+                带回主会话
               </Button>
             }
           />
           <TooltipPopup side="bottom">
-            {bringBackBlockedReason ?? "Adds this side chat to the main thread's next message."}
+            {bringBackBlockedReason ?? "把这段侧聊附加到主会话的下一条消息中。"}
           </TooltipPopup>
         </Tooltip>
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label="Delete side chat"
+          aria-label="删除侧聊"
           disabled={!canOperate || shell === null || deleting}
           onClick={() => void deleteSideChat()}
         >
           <Trash2Icon />
         </Button>
-        <Button variant="ghost" size="icon-xs" aria-label="Close side chat" onClick={props.onClose}>
+        <Button variant="ghost" size="icon-xs" aria-label="关闭侧聊" onClick={props.onClose}>
           <XIcon />
         </Button>
       </div>
       {shell === null ? (
         snapshotLoaded ? (
-          <p className="p-3 text-xs text-muted-foreground">This side chat was deleted.</p>
+          <p className="p-3 text-xs text-muted-foreground">这段侧聊已删除。</p>
         ) : null
       ) : (
         <BackgroundThreadContext value>

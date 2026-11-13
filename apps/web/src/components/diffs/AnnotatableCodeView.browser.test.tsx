@@ -87,7 +87,7 @@ function view(
         files={files}
         pendingFiles={pendingFiles}
         sectionId="unstaged"
-        sectionTitle="Uncommitted"
+        sectionTitle="未提交的更改"
         composerDraftTarget={target}
         options={{}}
         renderHeaderFilenameSuffix={() => null}

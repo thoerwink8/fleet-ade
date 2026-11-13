@@ -32,9 +32,9 @@ import { SecretSourceInput, useSecretSources } from "./SecretSourceInput";
 const FROM_THREAD_PROJECT = "thread-project";
 
 const CREDENTIAL_SOURCES: Record<DeviceEasAccount["credentialSource"], string> = {
-  settings: "the access token saved here",
-  env: "EXPO_TOKEN on the server",
-  "eas-login": "the server's eas login",
+  settings: "此处保存的访问 token",
+  env: "服务器上的 EXPO_TOKEN",
+  "eas-login": "服务器上的 eas login",
 };
 
 const failureMessage = (cause: Cause.Cause<unknown>) => {
@@ -97,10 +97,10 @@ export function EasDeviceHostEditor(props: {
   const problem = valid
     ? null
     : !tokenValid
-      ? "Enter a valid secret reference."
+      ? "请输入有效的凭据引用。"
       : draft.maxSessionMinutes > 0 && draft.idleMinutes >= draft.maxSessionMinutes
-        ? "Idle minutes must be smaller than session minutes."
-        : "Give the host a label and limits within the ranges shown.";
+        ? "空闲时长必须小于会话时长。"
+        : "请填写主机名称，并将限制设在显示的范围内。";
   const apps = account.status === "signed-in" ? account.account.apps : [];
 
   // A check answers for the credential it was asked about: a later check or a
@@ -174,15 +174,15 @@ export function EasDeviceHostEditor(props: {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{props.isNew ? "Add EAS host" : "Edit EAS host"}</DialogTitle>
+            <DialogTitle>{props.isNew ? "添加 EAS 主机" : "编辑 EAS 主机"}</DialogTitle>
             <DialogDescription>
-              The environment's server signs in to Expo and starts the sessions. Without a token
-              here it uses EXPO_TOKEN, then its eas login.
+              环境的服务器会登录 Expo 并启动会话。未在此填写 token 时，先使用
+              EXPO_TOKEN，再使用服务器上 eas login 保存的登录状态。
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <label className="block space-y-1.5 text-sm">
-              <span>Name</span>
+              <span>名称</span>
               <Input
                 autoFocus
                 required
@@ -196,13 +196,13 @@ export function EasDeviceHostEditor(props: {
             </label>
             <div className="space-y-1.5 text-sm">
               <label htmlFor={tokenId} className="block">
-                Expo access token
+                Expo 访问 token
               </label>
               <div className="flex items-center gap-2">
                 <SecretSourceInput
                   key={tokenInputKey}
                   id={tokenId}
-                  aria-label="Expo access token"
+                  aria-label="Expo 访问 token"
                   className="min-w-0 flex-1"
                   configured={token.kind === "saved" && typeof props.host.accessToken === "string"}
                   value={
@@ -223,7 +223,7 @@ export function EasDeviceHostEditor(props: {
                     resetAccount();
                   }}
                   disabled={props.busy}
-                  placeholder="Optional"
+                  placeholder="可选"
                   onChange={(event) => {
                     const value = event.target.value;
                     // Emptying the field is not clearing the saved token; the
@@ -243,7 +243,7 @@ export function EasDeviceHostEditor(props: {
                     type="button"
                     size="icon-sm"
                     variant="ghost-destructive"
-                    aria-label="Clear access token"
+                    aria-label="清空访问 token"
                     onClick={() => {
                       setToken({ kind: "cleared" });
                       setTokenValid(true);
@@ -259,12 +259,12 @@ export function EasDeviceHostEditor(props: {
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2.5">
               <p role="status" className="min-w-0 text-xs text-muted-foreground">
                 {account.status === "signed-in"
-                  ? `Signed in as ${account.account.signedInAs} with ${CREDENTIAL_SOURCES[account.account.credentialSource]}.`
+                  ? `已使用 ${account.account.signedInAs} 登录为 ${CREDENTIAL_SOURCES[account.account.credentialSource]}。`
                   : account.status === "failed"
                     ? account.error
                     : account.status === "checking"
-                      ? "Checking the Expo account…"
-                      : "Check the Expo account before choosing a project."}
+                      ? "正在检查 Expo 账户…"
+                      : "选择项目前请先检查 Expo 账户。"}
               </p>
               <Button
                 type="button"
@@ -273,11 +273,11 @@ export function EasDeviceHostEditor(props: {
                 disabled={props.busy || !tokenValid || account.status === "checking"}
                 onClick={() => void checkAccount()}
               >
-                {account.status === "checking" ? <Spinner size="xs" /> : null} Check account
+                {account.status === "checking" ? <Spinner size="xs" /> : null} 检查账户
               </Button>
             </div>
             <div className="space-y-1.5 text-sm">
-              <span>EAS project</span>
+              <span>EAS 项目</span>
               <Select
                 value={draft.appId ?? FROM_THREAD_PROJECT}
                 disabled={props.busy}
@@ -289,17 +289,17 @@ export function EasDeviceHostEditor(props: {
                   });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="EAS project">
+                <SelectTrigger size="sm" aria-label="EAS 项目">
                   <SelectValue>
                     {(value: string) =>
                       value === FROM_THREAD_PROJECT
-                        ? "From the thread's project"
+                        ? "来自会话的项目"
                         : (apps.find((app) => app.id === value)?.fullName ?? value)
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
-                  <SelectItem value={FROM_THREAD_PROJECT}>From the thread's project</SelectItem>
+                  <SelectItem value={FROM_THREAD_PROJECT}>来自会话的项目</SelectItem>
                   {draft.appId && !apps.some((app) => app.id === draft.appId) ? (
                     <SelectItem value={draft.appId}>{draft.appId}</SelectItem>
                   ) : null}
@@ -311,20 +311,19 @@ export function EasDeviceHostEditor(props: {
                 </SelectPopup>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Sessions bill the project's Expo account. "From the thread's project" reads
-                extra.eas.projectId from the project's app config.
+                会话费用计入项目的 Expo 账户。“来自会话的项目”会读取项目应用配置中的
+                extra.eas.projectId。
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3 text-sm">
-              {limit("maxConcurrentSessions", "Sessions at once", 20)}
-              {limit("maxSessionMinutes", "Session minutes", 115)}
-              {limit("idleMinutes", "Idle minutes", 60)}
+              {limit("maxConcurrentSessions", "同时运行的会话数", 20)}
+              {limit("maxSessionMinutes", "会话时长（分钟）", 115)}
+              {limit("idleMinutes", "空闲时长（分钟）", 60)}
             </div>
             <p className="text-xs text-muted-foreground">
-              Expo allows sessions of up to 40 minutes on free accounts and 115 on paid ones, and
-              ends one after the idle minutes without activity, so idle minutes must be smaller than
-              session minutes.
-              {props.isNew ? null : " Saving restarts this host, which stops its running sessions."}
+              Expo 免费账户的会话最长为 40 分钟，付费账户最长为 115
+              分钟。达到空闲时长后会话会结束，因此空闲时长必须小于会话时长。
+              {props.isNew ? null : "保存后会重启此主机，结束正在运行的会话。"}
             </p>
             {problem === null ? null : (
               <p className="text-xs text-destructive" role="alert">
@@ -334,10 +333,10 @@ export function EasDeviceHostEditor(props: {
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={props.busy} onClick={props.onClose}>
-              Cancel
+              取消
             </Button>
             <Button type="submit" disabled={props.busy || !valid}>
-              {props.busy ? <Spinner size="xs" /> : null} Save host
+              {props.busy ? <Spinner size="xs" /> : null} 保存主机
             </Button>
           </DialogFooter>
         </form>

@@ -146,7 +146,7 @@ export function TimelineMinimap({
             }}
           />
           <button
-            aria-label={`Jump to message: ${activeItem?.userText ?? "User message"}`}
+            aria-label={`跳转到消息：${activeItem?.userText ?? "用户消息"}`}
             className="absolute inset-y-0 left-0 w-full cursor-pointer bg-transparent before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
             onBlur={() => setActiveIndex(null)}
             onClick={(event) => {
@@ -231,7 +231,7 @@ export function TimelineMinimap({
               >
                 <span className="dropdown-glass block rounded-xl p-3 text-left text-popover-foreground shadow-xl shadow-black/25">
                   <span className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium leading-5">
-                    {activeItem.userText ?? "User message"}
+                    {activeItem.userText ?? "用户消息"}
                   </span>
                   {activeItem.assistantText ? (
                     <span
@@ -275,7 +275,7 @@ function TimelineMinimapNavigationButton({
   onClick: () => void;
 }) {
   const previous = direction === "previous";
-  const label = previous ? "Previous turn" : "Next turn";
+  const label = previous ? "上一轮" : "下一轮";
   const Icon = previous ? ChevronUpIcon : ChevronDownIcon;
 
   return (

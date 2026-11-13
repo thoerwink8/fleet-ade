@@ -25,7 +25,7 @@ function reportScratchFailure(title: string, error: unknown) {
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      description: error instanceof Error ? error.message : "发生错误。",
     }),
   );
 }
@@ -61,7 +61,7 @@ export function createScratchProjectActions(input: {
 
   const openScratchProject = async (
     environmentId: EnvironmentId,
-    failureTitle = "Could not start without a project",
+    failureTitle = "无法在没有项目的情况下开始",
   ): Promise<EnvironmentProject | null> => {
     const command = projectEnvironment.openScratch;
     const result = await runAtomCommand(
@@ -82,9 +82,7 @@ export function createScratchProjectActions(input: {
     if (project) {
       await input
         .handleNewThread(scopeProjectRef(project.environmentId, project.id))
-        .catch((error: unknown) =>
-          reportScratchFailure("Could not start without a project", error),
-        );
+        .catch((error: unknown) => reportScratchFailure("无法在没有项目的情况下开始", error));
     }
   };
 

@@ -210,9 +210,8 @@ function mountUpdateButton(
     // aria-disabled keeps keyboard focus on the button while the download runs.
     button.setAttribute("aria-disabled", String(action?.kind === "downloading"));
     if (action?.kind === "download") button.textContent = "Download update";
-    if (action?.kind === "downloading")
-      button.textContent = `Downloading update (${action.percent}%)`;
-    if (action?.kind === "install") button.textContent = "Restart to update";
+    if (action?.kind === "downloading") button.textContent = `正在下载更新（${action.percent}%）`;
+    if (action?.kind === "install") button.textContent = "重启以更新";
     const failure = !action
       ? ""
       : state.errorContext === "download"
@@ -296,10 +295,10 @@ export function showBootError(error: unknown) {
   const copyCommand = element("button", {
     className: "boot-error-icon",
     type: "button",
-    title: "Copy command",
+    title: "复制命令",
     innerHTML: COPY_ICON,
   });
-  copyCommand.setAttribute("aria-label", "Copy command");
+  copyCommand.setAttribute("aria-label", "复制命令");
   copyCommand.addEventListener("click", () =>
     copyText(
       command,

@@ -118,7 +118,7 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
           output: JSON.stringify({
             structured_output: {
               title: "Improve orchestration flow",
-              body: "Body",
+              body: "请求体",
             },
           }),
           argsMustContain: `--model ${SYNTHETIC_CLAUDE_CAPABLE_MODEL}[expanded] --effort max --settings {"disableAllHooks":true,"fastMode":true}`,

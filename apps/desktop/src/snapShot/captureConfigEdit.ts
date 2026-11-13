@@ -145,9 +145,7 @@ export function editCaptureConfig(
   requestedKeys?: string,
 ) {
   if (format === "hyprland-lua" && (/^\s*return\b/m.test(source) || /\[=*\[/.test(source)))
-    throw new Error(
-      "This Lua config needs a manual edit. Choose your bindings file or use manual setup in Advanced.",
-    );
+    throw new Error("此 Lua 配置需要手动编辑。请选择快捷键配置文件，或使用“高级”中的手动设置。");
   const niri = format === "niri";
   const existing = niri
     ? (niriBinds(source)?.children ?? [])

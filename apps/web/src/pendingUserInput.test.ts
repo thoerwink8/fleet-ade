@@ -33,7 +33,7 @@ describe("projectPendingUserInputAnswer", () => {
     const comment = reviewCommentContextRecord({
       id: "file-comment-1",
       sectionId: "branch",
-      sectionTitle: "Changes",
+      sectionTitle: "改动",
       filePath: "notes.md",
       startIndex: 2,
       endIndex: 2,

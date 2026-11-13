@@ -32,11 +32,11 @@ export const previewStreamControlLabel = (control: PreviewStreamControl | null):
     : !control.canOperate
       ? "Read-only"
       : control.controller === "you"
-        ? "You have control"
+        ? "你在操作"
         : control.controller === "agent"
-          ? "Agent has control"
+          ? "智能体在操作"
           : control.controller === "another-viewer"
-            ? "Another viewer has control"
+            ? "其他查看者在操作"
             : "Watching";
 
 const isPreviewStreamDialog = (value: unknown): value is PreviewStreamControl["dialog"] =>
@@ -465,5 +465,5 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
 
 export const previewStreamHostSetupMessage = (setup: PreviewStreamHostSetup) =>
   setup.need === "sandbox"
-    ? "This server's host blocks the sandbox its browser runs in. Run this once on the host, then try again:"
-    : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
+    ? "此服务器的主机阻止了其浏览器所需的沙箱。请在主机上运行一次以下命令，然后重试："
+    : "此服务器的主机缺少其浏览器所需的库。请在主机上运行一次以下命令，然后重试：";

@@ -183,10 +183,10 @@ export function AddEnvironmentDialog({
     handleOpenChange(false);
     toastManager.add({
       type: "success",
-      title: routeTarget ? "Route added" : "Environment connected",
+      title: routeTarget ? "已添加线路" : "环境已连接",
       description: routeTarget
-        ? `${routeTarget.label} can now be reached over SSH ${target.alias}.`
-        : `${target.alias} is ready over an SSH-managed tunnel.`,
+        ? `现在可以通过 SSH ${routeTarget.label} 访问 ${target.alias}。`
+        : `${target.alias} 的 SSH 托管隧道已就绪。`,
     });
     setIsAddingSavedBackend(false);
   };
@@ -218,12 +218,12 @@ export function AddEnvironmentDialog({
         pairingCode: savedBackendPairingCode,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to add backend.";
+      const message = error instanceof Error ? error.message : "无法添加后端。";
       onErrorChange(message);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not add backend",
+          title: "无法添加后端",
           description: message,
         }),
       );
@@ -238,12 +238,12 @@ export function AddEnvironmentDialog({
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
-        const message = error instanceof Error ? error.message : "Failed to add backend.";
+        const message = error instanceof Error ? error.message : "无法添加后端。";
         onErrorChange(message);
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not add backend",
+            title: "无法添加后端",
             description: message,
           }),
         );
@@ -257,13 +257,13 @@ export function AddEnvironmentDialog({
       routeTarget
         ? {
             type: "success",
-            title: "Route added",
-            description: `${routeTarget.label} now has another way to connect.`,
+            title: "已添加线路",
+            description: `${routeTarget.label} 现在有了另一条连接线路。`,
           }
         : {
             type: "success",
-            title: "Backend added",
-            description: "The environment is saved and will reconnect on app startup.",
+            title: "已添加后端",
+            description: "已保存环境，应用启动时会自动重新连接。",
           },
     );
     setIsAddingSavedBackend(false);
@@ -408,7 +408,7 @@ export function AddEnvironmentDialog({
           />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-foreground">Pairing code</span>
+          <span className="mb-1.5 block text-xs font-medium text-foreground">配对码</span>
           <Input
             value={savedBackendPairingCode}
             onChange={(event) => setSavedBackendPairingCode(event.target.value)}
@@ -420,7 +420,7 @@ export function AddEnvironmentDialog({
       </div>
       <div>
         <span className="mt-1 block text-2xs text-muted-foreground">
-          Paste a full pairing URL here to fill both fields automatically.
+          在这里粘贴完整的配对 URL，即可自动填写两个字段。
         </span>
       </div>
     </div>
@@ -446,15 +446,15 @@ export function AddEnvironmentDialog({
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const error = squashAtomCommandFailure(result);
-        onErrorChange(error instanceof Error ? error.message : "Could not add the route.");
+        onErrorChange(error instanceof Error ? error.message : "无法添加线路。");
       }
       return;
     }
     handleOpenChange(false);
     toastManager.add({
       type: "success",
-      title: "Route added",
-      description: `${routeTarget.label} falls back to T3 Connect when its other routes are unreachable.`,
+      title: "已添加线路",
+      description: `当其他线路无法访问时，${routeTarget.label} 会改用 T3 Connect。`,
     });
   };
   const renderRemoteModeBody = () => (
@@ -462,7 +462,7 @@ export function AddEnvironmentDialog({
       {relayRouteOffer !== null ? (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
           <p className="text-xs text-muted-foreground">
-            This machine is on your T3 Connect account. Use it as a fallback route.
+            此机器属于你的 T3 Connect 账户。可将其用作备用线路。
           </p>
           <Button
             size="xs"
@@ -470,7 +470,7 @@ export function AddEnvironmentDialog({
             disabled={isAddingSavedBackend}
             onClick={() => void addRelayRoute()}
           >
-            Add T3 Connect
+            添加 T3 Connect
           </Button>
         </div>
       ) : null}
@@ -483,7 +483,7 @@ export function AddEnvironmentDialog({
         onClick={() => void handleAddSavedBackend()}
       >
         <PlusIcon className="size-3.5" />
-        {isAddingSavedBackend ? "Adding…" : routeTarget ? "Add route" : "Add environment"}
+        {isAddingSavedBackend ? "正在添加…" : routeTarget ? "添加线路" : "添加环境"}
       </Button>
     </div>
   );
@@ -495,7 +495,7 @@ export function AddEnvironmentDialog({
             htmlFor="saved-backend-ssh-host"
             className="mb-1.5 block text-xs font-medium text-foreground"
           >
-            SSH host or alias
+            SSH 主机或别名
           </label>
           <Autocomplete
             items={filteredDiscoveredSshHosts}
@@ -521,14 +521,14 @@ export function AddEnvironmentDialog({
             <AutocompleteInput
               id="saved-backend-ssh-host"
               onKeyDown={handleSavedBackendSshHostKeyDown}
-              placeholder="Search hosts or type devbox"
+              placeholder="搜索主机或输入 devbox"
               disabled={isAddingSavedBackend}
               spellCheck={false}
             />
             {hasSshHostSuggestionContent ? (
               <AutocompletePopup>
                 {isLoadingDiscoveredSshHosts ? (
-                  <div className="px-3 py-2 text-xs text-muted-foreground">Loading hosts…</div>
+                  <div className="px-3 py-2 text-xs text-muted-foreground">正在加载主机…</div>
                 ) : filteredDiscoveredSshHosts.length > 0 ? (
                   <AutocompleteList className="max-h-72">
                     {filteredDiscoveredSshHosts.map((target, index) => {
@@ -571,7 +571,7 @@ export function AddEnvironmentDialog({
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-foreground">Username</span>
+            <span className="mb-1.5 block text-xs font-medium text-foreground">用户名</span>
             <Input
               value={savedBackendSshUsername}
               onChange={(event) => setSavedBackendSshUsername(event.target.value)}
@@ -582,7 +582,7 @@ export function AddEnvironmentDialog({
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-foreground">Port</span>
+            <span className="mb-1.5 block text-xs font-medium text-foreground">端口</span>
             <Input
               value={savedBackendSshPort}
               onChange={(event) => setSavedBackendSshPort(event.target.value)}
@@ -606,7 +606,7 @@ export function AddEnvironmentDialog({
           onClick={() => void handleAddSavedBackend()}
         >
           <PlusIcon className="size-3.5" />
-          {isAddingSavedBackend ? "Adding…" : routeTarget ? "Add route" : "Add environment"}
+          {isAddingSavedBackend ? "正在添加…" : routeTarget ? "添加线路" : "添加环境"}
         </Button>
       </div>
     </div>
@@ -619,25 +619,23 @@ export function AddEnvironmentDialog({
           render={
             <DialogTrigger
               render={
-                <Button size="xs" variant="ghost-muted" aria-label="Add environment">
+                <Button size="xs" variant="ghost-muted" aria-label="添加环境">
                   <PlusIcon className="size-3" />
-                  <span>Add environment</span>
+                  <span>添加环境</span>
                 </Button>
               }
             />
           }
         />
-        <TooltipPopup side="top">Add environment</TooltipPopup>
+        <TooltipPopup side="top">添加环境</TooltipPopup>
       </Tooltip>
       <DialogPopup className="max-h-[80dvh] sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>
-            {routeTarget ? `Add a route to ${routeTarget.label}` : "Add Environment"}
-          </DialogTitle>
+          <DialogTitle>{routeTarget ? `为 ${routeTarget.label} 添加线路` : "添加环境"}</DialogTitle>
           <DialogDescription>
             {routeTarget
-              ? "Pair this machine again over another address, such as its Tailscale name. It joins the existing routes instead of adding a second machine."
-              : "Pair another environment to this client."}
+              ? "使用其他地址（例如 Tailscale 名称）再次配对此机器。该地址将加入现有线路，不会重复添加机器。"
+              : "将其他环境与此客户端配对。"}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -645,15 +643,15 @@ export function AddEnvironmentDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               {renderConnectionModeCard({
                 mode: "remote",
-                title: "Remote link",
-                description: "Enter a backend host and pairing code.",
+                title: "远程连接",
+                description: "输入后端主机和配对码。",
                 icon: <ChevronsLeftRightEllipsisIcon aria-hidden className="size-4" />,
               })}
               {desktopBridge
                 ? renderConnectionModeCard({
                     mode: "ssh",
                     title: "SSH",
-                    description: "Use local SSH config, agent, and tunnels for the backend.",
+                    description: "使用本地 SSH 配置、认证代理和隧道连接后端。",
                     icon: <TerminalIcon aria-hidden className="size-4" />,
                   })
                 : null}

@@ -983,7 +983,7 @@ describe("what to say when an action fails", () => {
     expect(checkoutFailureDescription(diagnostic("x".repeat(900)))).toBe(`${"x".repeat(319)}…`);
     for (const failure of [undefined, diagnostic(""), diagnostic("exited with code 1")]) {
       expect(checkoutFailureDescription(failure)).toBe(
-        "Check that the branch still exists and is not checked out elsewhere, then try again.",
+        "请确认该分支仍然存在且未在其他位置检出，然后重试。",
       );
     }
   });
@@ -1915,9 +1915,9 @@ describe("readableFailure", () => {
       "Azure DevOps API failed",
       "Forgejo command failed",
     ]) {
-      expect(readableFailure(new Error(message), "Try again.")).toBe("Try again.");
+      expect(readableFailure(new Error(message), "请重试。")).toBe("请重试。");
     }
-    expect(readableFailure(new Error("Branch is protected."), "Try again.")).toBe(
+    expect(readableFailure(new Error("Branch is protected."), "请重试。")).toBe(
       "Branch is protected.",
     );
   });

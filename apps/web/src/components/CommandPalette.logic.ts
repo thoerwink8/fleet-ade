@@ -50,8 +50,8 @@ export function buildLinkedThreadActionItems(
     kind: "action",
     value: `thread:${input.environmentId}:${thread.id}`,
     threadRef: { environmentId: input.environmentId, threadId: thread.id },
-    title: thread.title || "Untitled thread",
-    description: thread.archivedAt === null ? "Linked thread" : "Archived thread",
+    title: thread.title || "未命名会话",
+    description: thread.archivedAt === null ? "已关联的会话" : "已归档的会话",
     searchTerms: [input.query, thread.title],
     icon: input.icon,
     run: () => input.runThread({ environmentId: input.environmentId, id: thread.id }),
@@ -361,7 +361,7 @@ export function buildCommandPaletteProjectMetadata(input: {
   const environmentLabels = new Set<string>();
 
   for (const project of input.projects) {
-    const label = input.locationByEnvironmentId.get(project.environmentId)?.label ?? "Remote";
+    const label = input.locationByEnvironmentId.get(project.environmentId)?.label ?? "远程";
     searchTerms.push(project.title, project.workspaceRoot, label);
     environmentLabels.add(label);
   }
@@ -458,7 +458,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
       thread.id === input.activeThread?.id &&
       thread.environmentId === input.activeThread.environmentId;
     if (isCurrent) {
-      descriptionParts.push("Current thread");
+      descriptionParts.push("当前会话");
     }
 
     const leadingContent = input.renderLeadingContent?.(thread);
@@ -600,28 +600,28 @@ export function filterCommandPaletteGroups(input: {
     if (input.allOptions && input.allOptions.nestedItems.length > 0) {
       searchableGroups.push({
         value: "nested-search",
-        label: "Suggestions",
+        label: "建议",
         items: input.allOptions.nestedItems,
       });
     }
     if (input.threadSearchItems.length > 0) {
       searchableGroups.push({
         value: "threads-search",
-        label: "Threads",
+        label: "会话",
         items: input.threadSearchItems,
       });
     }
     if (input.projectSearchItems.length > 0) {
       searchableGroups.push({
         value: "projects-search",
-        label: "Projects",
+        label: "项目",
         items: input.projectSearchItems,
       });
     }
     if (input.settingsSearchItems && input.settingsSearchItems.length > 0) {
       searchableGroups.push({
         value: "settings-search",
-        label: "Settings",
+        label: "设置",
         items: input.settingsSearchItems,
       });
     }
@@ -663,7 +663,7 @@ export function filterCommandPaletteGroups(input: {
   const messageItems = (input.threadMessageItems ?? []).filter((item) => !listed.has(item.value));
   return messageItems.length === 0
     ? groups
-    : [...groups, { value: "threads-messages", label: "In messages", items: messageItems }];
+    : [...groups, { value: "threads-messages", label: "消息内容", items: messageItems }];
 }
 
 /** Every option inside a submenu as one row, e.g. "New thread in t3code" or "Change theme: Dracula". */
@@ -734,7 +734,7 @@ export function buildBrowseGroups(input: {
     });
   }
 
-  return [{ value: "directories", label: "Directories", items }];
+  return [{ value: "directories", label: "目录", items }];
 }
 
 export function filterPinnedBrowseEntries(input: {
@@ -772,12 +772,12 @@ export function buildRootGroups(input: {
 }): CommandPaletteGroup[] {
   const groups: CommandPaletteGroup[] = [];
   if (input.actionItems.length > 0) {
-    groups.push({ value: "actions", label: "Actions", items: input.actionItems });
+    groups.push({ value: "actions", label: "操作", items: input.actionItems });
   }
   if (input.recentThreadItems.length > 0) {
     groups.push({
       value: "recent-threads",
-      label: "Recent Threads",
+      label: "最近会话",
       items: input.recentThreadItems,
     });
   }
@@ -787,13 +787,13 @@ export function buildRootGroups(input: {
 export function getCommandPaletteInputPlaceholder(mode: CommandPaletteMode): string {
   switch (mode) {
     case "root":
-      return "Search commands, projects, and threads...";
+      return "搜索命令、项目和会话…";
     case "root-browse":
-      return "Enter project path (e.g. ~/projects/my-app)";
+      return "输入项目路径（例如 ~/projects/my-app）";
     case "submenu":
-      return "Search...";
+      return "搜索…";
     case "submenu-browse":
-      return "Enter path (e.g. ~/projects/my-app)";
+      return "输入项目路径（例如 ~/projects/my-app）";
   }
 }
 
@@ -838,9 +838,9 @@ export function remoteProjectInputPlaceholder(flow: AddProjectCloneFlow | null):
   if (!flow) return null;
   if (flow.step === "confirm") return null;
   if (flow.source === "url") {
-    return "Enter Git clone URL";
+    return "输入 Git 克隆 URL";
   }
-  return `Enter ${addProjectRemoteSourceLabel(flow.source)} repository (${addProjectRemoteSourcePathHint(flow.source)})`;
+  return `输入 ${addProjectRemoteSourceLabel(flow.source)} 仓库（${addProjectRemoteSourcePathHint(flow.source)}）`;
 }
 
 export function buildPaletteRemoteSourceReadiness(
@@ -853,10 +853,7 @@ export function buildPaletteRemoteSourceReadiness(
       ? entry
       : {
           ...entry,
-          hint: entry.hint.replace(
-            "Open source control settings",
-            "Open Settings -> Source control",
-          ),
+          hint: entry.hint.replace("打开版本控制设置", "打开“设置 → 版本控制”"),
         };
   };
 }
@@ -865,7 +862,7 @@ export function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
-  return "An error occurred.";
+  return "发生错误。";
 }
 
 const OVERLAY_MODE_BY_COMMAND = {

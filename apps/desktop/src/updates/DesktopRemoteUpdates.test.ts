@@ -750,7 +750,7 @@ describe("DesktopRemoteUpdates", () => {
           (report) => report.requestId === "req-overlap",
         );
         assert.equal(overlap?.outcome, "failed");
-        assert.equal(overlap?.reason, "A prepared desktop update is already in progress.");
+        assert.equal(overlap?.reason, "已有准备好的桌面更新正在进行。");
 
         yield* Deferred.succeed(releaseInstall, undefined);
         yield* settle;

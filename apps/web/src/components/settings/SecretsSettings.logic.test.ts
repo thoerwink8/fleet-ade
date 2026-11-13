@@ -29,7 +29,7 @@ const settings = Schema.decodeSync(ServerSettings)({
     hub: { kind: "cliproxy", url: "https://hub.test", managementKey: personal("op://hub") },
   },
   easDeviceHosts: [
-    { kind: "eas", id: "eas", label: "EAS Simulator", accessToken: personal("op://expo") },
+    { kind: "eas", id: "eas", label: "EAS 模拟器", accessToken: personal("op://expo") },
   ],
   simlockDeviceHosts: [
     {

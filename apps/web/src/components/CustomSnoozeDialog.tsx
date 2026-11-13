@@ -92,24 +92,20 @@ function CustomSnoozeDialog() {
             event.preventDefault();
             const snoozedUntil = resolveCustomSnooze(input, new Date());
             if (!snoozedUntil) {
-              setError(
-                mode === "date"
-                  ? "Choose a valid date and time in the future."
-                  : "Enter a positive duration.",
-              );
+              setError(mode === "date" ? "请选择将来的有效日期和时间。" : "请输入大于零的时长。");
               return;
             }
             finish({ snoozedUntil });
           }}
         >
           <DialogHeader>
-            <DialogTitle>Custom snooze</DialogTitle>
-            <DialogDescription>Choose when snoozed threads return to your inbox.</DialogDescription>
+            <DialogTitle>自定义暂缓</DialogTitle>
+            <DialogDescription>选择暂缓的会话何时回到收件箱。</DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <div className="flex flex-col gap-4">
               <ToggleGroup
-                aria-label="Schedule type"
+                aria-label="定时方式"
                 className="w-full *:flex-1"
                 value={[mode]}
                 onValueChange={(next) => {
@@ -118,14 +114,14 @@ function CustomSnoozeDialog() {
                   setError(null);
                 }}
               >
-                <Toggle value="date">Date and time</Toggle>
+                <Toggle value="date">日期和时间</Toggle>
                 <Toggle value="duration">Duration</Toggle>
               </ToggleGroup>
               <div className="flex flex-col gap-4">
                 {mode === "date" ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-2">
-                      <Label htmlFor={`${id}-date`}>Date</Label>
+                      <Label htmlFor={`${id}-date`}>日期</Label>
                       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger
                           render={
@@ -143,7 +139,7 @@ function CustomSnoozeDialog() {
                           })}
                           <CalendarIcon className="size-4 text-muted-foreground" />
                         </PopoverTrigger>
-                        <PopoverPopup align="start" aria-label="Choose snooze date">
+                        <PopoverPopup align="start" aria-label="选择暂缓日期">
                           <Calendar
                             mode="single"
                             required
@@ -161,7 +157,7 @@ function CustomSnoozeDialog() {
                       </Popover>
                     </div>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-time`}>
-                      Time
+                      时间
                       <Input
                         nativeInput
                         id={`${id}-time`}
@@ -188,15 +184,15 @@ function CustomSnoozeDialog() {
                         setError(null);
                       }}
                     >
-                      <Label htmlFor={`${id}-amount`}>Snooze for</Label>
+                      <Label htmlFor={`${id}-amount`}>暂缓时长</Label>
                       <NumberFieldGroup>
-                        <NumberFieldDecrement aria-label="Decrease duration" />
+                        <NumberFieldDecrement aria-label="减少时长" />
                         <NumberFieldInput required />
-                        <NumberFieldIncrement aria-label="Increase duration" />
+                        <NumberFieldIncrement aria-label="增加时长" />
                       </NumberFieldGroup>
                     </NumberField>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-unit`}>
-                      Unit
+                      单位
                       <Select
                         value={unit}
                         items={{ minutes: "Minutes", hours: "Hours", days: "Days" }}
@@ -210,9 +206,9 @@ function CustomSnoozeDialog() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectPopup>
-                          <SelectItem value="minutes">Minutes</SelectItem>
-                          <SelectItem value="hours">Hours</SelectItem>
-                          <SelectItem value="days">Days</SelectItem>
+                          <SelectItem value="minutes">分钟</SelectItem>
+                          <SelectItem value="hours">小时</SelectItem>
+                          <SelectItem value="days">天</SelectItem>
                         </SelectPopup>
                       </Select>
                     </Label>
@@ -240,12 +236,12 @@ function CustomSnoozeDialog() {
               }}
             >
               <Settings2Icon />
-              Edit snooze options
+              编辑暂缓选项
             </Button>
             <Button type="button" variant="outline" onClick={() => finish(null)}>
-              Cancel
+              取消
             </Button>
-            <Button type="submit">Snooze</Button>
+            <Button type="submit">暂缓</Button>
           </DialogFooter>
         </form>
       </DialogPopup>

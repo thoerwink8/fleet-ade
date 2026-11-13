@@ -83,7 +83,7 @@ describe("thread execution presentation", () => {
     const instanceId = v2Projection.thread.modelSelection.instanceId;
     const providerThreadId = ProviderThreadId.make("native-status-thread");
     const sessionId = ProviderSessionId.make("native-status-session");
-    const statuses = [{ key: "watch", text: "Watching" }];
+    const statuses = [{ key: "watch", text: "仅查看" }];
     const projection = {
       thread: { ...v2Projection.thread, activeProviderThreadId: providerThreadId },
       providerThreads: [
@@ -164,7 +164,7 @@ describe("thread execution presentation", () => {
       ordinal: 1,
       type: "error" as const,
       status: "failed" as const,
-      title: "Usage limit reached",
+      title: "已达到用量上限",
       startedAt: now,
       completedAt: now,
       updatedAt: now,
@@ -231,7 +231,7 @@ describe("thread execution presentation", () => {
       ordinal: 1,
       type: "error" as const,
       status: "failed" as const,
-      title: "Usage limit reached",
+      title: "已达到用量上限",
       startedAt: now,
       completedAt: now,
       updatedAt: now,
@@ -460,7 +460,7 @@ describe("presentRunStop", () => {
     parentItemId: null,
     ordinal: 1,
     status: type === "run_interrupt_result" ? ("interrupted" as const) : ("completed" as const),
-    title: "Interrupt",
+    title: "中断",
     startedAt: now,
     completedAt: now,
     updatedAt: now,
@@ -669,11 +669,11 @@ describe("formatModelSelectionEffort", () => {
           optionDescriptors: [
             {
               id: "effort",
-              label: "Reasoning",
+              label: "推理",
               type: "select",
               options: [
                 { id: "high", label: "High", isDefault: true },
-                { id: "xhigh", label: "Extra High" },
+                { id: "xhigh", label: "超高" },
               ],
             },
             { id: "ultracode", label: "Ultracode", type: "boolean" },
@@ -687,7 +687,7 @@ describe("formatModelSelectionEffort", () => {
       [{ id: "effort", value: "ultracode" }],
     );
 
-    expect(formatModelSelectionEffort(selection, models)).toBe("Extra High");
+    expect(formatModelSelectionEffort(selection, models)).toBe("超高");
   });
 });
 

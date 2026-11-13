@@ -442,13 +442,13 @@ const outcomeNotice = (
         notification: {
           source: { kind: "background_task" },
           outcome: "completed",
-          summary: `Linked ${label}`,
+          summary: `已关联 ${label}`,
         },
       };
     }
     case "failed":
       return {
-        text: `Linking ${target} failed: ${outcome.failure ?? "the other environment refused"}. Call t3_environment_link again if the user still wants it.`,
+        text: `Linking ${target} failed: ${outcome.failure ?? "另一个环境已拒绝"}. Call t3_environment_link again if the user still wants it.`,
         notification: {
           source: { kind: "background_task" },
           outcome: "failed",

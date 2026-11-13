@@ -31,9 +31,9 @@ function AccountSummary({ account }: { readonly account: UsageLimitsReport["acco
         <RedactedSensitiveText
           key={label}
           value={label}
-          ariaLabel="Toggle account label visibility"
-          revealTooltip="Click to reveal account"
-          hideTooltip="Click to hide account"
+          ariaLabel="切换账户标签显示"
+          revealTooltip="点击显示账户"
+          hideTooltip="点击隐藏账户"
           className="max-w-full truncate align-bottom font-sans text-xs leading-normal"
         />
       ) : (
@@ -52,18 +52,14 @@ export function usageLimitsBannerItem(
 ): ComposerBannerStackItem {
   const [first] = report.accounts;
   const single = report.accounts.length === 1 && first ? first : null;
-  const summary = single ? (
-    <AccountSummary account={single} />
-  ) : (
-    `${report.accounts.length} accounts`
-  );
+  const summary = single ? <AccountSummary account={single} /> : `${report.accounts.length} 个账户`;
   return {
     id,
     variant: "info",
     icon: <GaugeIcon />,
-    title: "Usage limits",
+    title: "用量限制",
     description: summary,
-    dismissLabel: "Dismiss usage limits",
+    dismissLabel: "关闭用量限制",
     onDismiss,
     children: <UsageLimitsBannerBody report={report} environmentId={environmentId} />,
   };
@@ -90,14 +86,14 @@ export function modelFallbackBannerItem({
     id: "fallback-model",
     variant: "info",
     icon: <GaugeIcon />,
-    title: `Using ${fallbackModelName}`,
-    description: `${defaultProviderName} is out of usage${resetsAt ? ` · resets ${formatUpcomingTimestamp(resetsAt, timestampFormat)}` : ""}`,
+    title: `正在使用 ${fallbackModelName}`,
+    description: `${defaultProviderName} 的用量已用完${resetsAt ? ` · ${formatUpcomingTimestamp(resetsAt, timestampFormat)} 重置` : ""}`,
     actions: (
       <Button size="xs" variant="ghost" onClick={onUseDefault}>
-        Use {defaultModelName}
+        使用 {defaultModelName}
       </Button>
     ),
-    dismissLabel: "Dismiss fallback model notice",
+    dismissLabel: "关闭备用模型提示",
     onDismiss,
   };
 }
@@ -144,7 +140,7 @@ function UsageLimitsBannerBody({
                   className="self-start"
                   onClick={() => void ensureLocalApi().shell.openExternal(externalUsage.url)}
                 >
-                  Manage usage
+                  管理用量
                 </Button>
               ) : null}
               {resetCreditInput && account.limits.resetCredits ? (

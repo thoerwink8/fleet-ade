@@ -99,7 +99,7 @@ function useAction<
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthSourceControlWriteScope,
-            message: "This connection cannot change source control.",
+            message: "此连接无法更改版本控制。",
           }),
         ),
       );
@@ -177,7 +177,7 @@ export function useVcsInitAction(scope: SourceControlActionScope) {
       input: { cwd: target.cwd },
     });
   };
-  return useAction({ kind: "init", label: "Initializing repository", scope, action });
+  return useAction({ kind: "init", label: "正在初始化仓库", scope, action });
 }
 
 export function useVcsPullAction(scope: SourceControlActionScope) {
@@ -210,7 +210,7 @@ export function useVcsPullAction(scope: SourceControlActionScope) {
   };
   return useAction({
     kind: "pull",
-    label: "Pulling latest changes...",
+    label: "正在拉取最新改动…",
     scope,
     action,
     onSuccess: status.refresh,
@@ -247,7 +247,7 @@ export function useGitStackedAction(scope: SourceControlActionScope) {
 
   return useAction({
     kind: "runStackedAction",
-    label: "Running source control action",
+    label: "正在运行版本控制操作",
     scope,
     action,
     onSuccess: status.refresh,
@@ -300,7 +300,7 @@ export function useSourceControlPublishRepositoryAction(scope: SourceControlActi
   };
   return useAction({
     kind: "publishRepository",
-    label: "Publishing repository",
+    label: "正在发布仓库",
     scope,
     action,
     onSuccess: status.refresh,
@@ -337,7 +337,7 @@ export function usePreparePullRequestThreadAction(scope: SourceControlActionScop
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthOrchestrationOperateScope,
-            message: "This connection cannot change threads.",
+            message: "此连接无法修改会话。",
           }),
         ),
       );
@@ -354,7 +354,7 @@ export function usePreparePullRequestThreadAction(scope: SourceControlActionScop
   };
   return useAction({
     kind: "preparePullRequestThread",
-    label: "Preparing pull request thread",
+    label: "正在准备 PR 会话",
     scope,
     action,
   });

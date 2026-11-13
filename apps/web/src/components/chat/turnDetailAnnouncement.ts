@@ -43,7 +43,7 @@ function cutText(text: string, maxLength: number): string | null {
 
 // On screen these labels are a path or a query beside an icon.
 function withVerb(work: WorkLogEntry, label: string) {
-  if (work.itemType === "file_change") return `Editing ${label}`;
+  if (work.itemType === "file_change") return `正在编辑 ${label}`;
   if (work.itemType !== "file_search" && work.itemType !== "web_search") return label;
   if (/^search(?:ed|ing)?\s/i.test(label)) return label;
   return `${work.itemType === "web_search" ? "Searching the web for" : "Searching for"} ${label}`;
@@ -67,7 +67,7 @@ function completedBeforeSuperseded(entry: MessageEntry) {
 
 function stepLabel(work: WorkLogEntry, workspaceRoot: string | undefined): string | null {
   // Reasoning text is never read out.
-  if (work.itemType === "reasoning") return "Thinking";
+  if (work.itemType === "reasoning") return "正在思考";
   const status = work.toolLifecycleStatus;
   if (status === "failed" || status === "declined" || status === "stopped") return null;
   const label = liveWorkEntryLabel(work, workspaceRoot, true).replace(/\s+/g, " ").trim();

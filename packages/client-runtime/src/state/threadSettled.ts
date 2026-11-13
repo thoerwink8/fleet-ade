@@ -262,10 +262,10 @@ function snoozePresetLabel(setting: SnoozePresetSetting, daysAhead: number): str
   if (setting.kind === "after") return `In ${formatSnoozeDuration(setting.minutes)}`;
   if (daysAhead === 0) {
     const hour = Number(setting.time.slice(0, 2));
-    return hour < 12 ? "This morning" : hour < 17 ? "This afternoon" : "This evening";
+    return hour < 12 ? "今天上午" : hour < 17 ? "今天下午" : "今天晚上";
   }
-  if (daysAhead === 1) return "Tomorrow";
-  if (setting.day === "monday") return "Next week";
+  if (daysAhead === 1) return "明天";
+  if (setting.day === "monday") return "下周";
   return daysAhead === 7 ? `Next ${capitalize(setting.day)}` : capitalize(setting.day);
 }
 
@@ -351,12 +351,12 @@ export function pickSnoozePreset(input: {
 export function snoozeWakeLabel(snoozedUntil: string, options: { readonly now: string }): string {
   const wakeMs = Date.parse(snoozedUntil);
   const nowMs = Date.parse(options.now);
-  if (Number.isNaN(wakeMs) || Number.isNaN(nowMs)) return "now";
+  if (Number.isNaN(wakeMs) || Number.isNaN(nowMs)) return "刚刚";
   const remainingMs = wakeMs - nowMs;
-  if (remainingMs <= 0) return "now";
-  if (remainingMs < HOUR_MS) return `${Math.max(1, Math.ceil(remainingMs / 60_000))}m`;
-  if (remainingMs < DAY_MS) return `${Math.ceil(remainingMs / HOUR_MS)}h`;
-  return `${Math.ceil(remainingMs / DAY_MS)}d`;
+  if (remainingMs <= 0) return "刚刚";
+  if (remainingMs < HOUR_MS) return `${Math.max(1, Math.ceil(remainingMs / 60_000))} 分钟`;
+  if (remainingMs < DAY_MS) return `${Math.ceil(remainingMs / HOUR_MS)} 小时`;
+  return `${Math.ceil(remainingMs / DAY_MS)} 天`;
 }
 
 export type CustomSnoozeInput =

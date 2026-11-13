@@ -133,7 +133,7 @@ function Harness({
           onPrepared?.(ready);
         }}
       >
-        Send
+        发送
       </button>
     </>
   );

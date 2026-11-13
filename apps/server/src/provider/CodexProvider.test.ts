@@ -10,7 +10,7 @@ it("maps current Codex model capability fields", () => {
   const capabilities = mapCodexModelCapabilities({
     additionalSpeedTiers: [],
     defaultReasoningEffort: "super-high",
-    description: "Test model",
+    description: "测试模型",
     displayName: "GPT Test",
     hidden: false,
     id: "gpt-test",
@@ -41,7 +41,7 @@ it("maps current Codex model capability fields", () => {
   assert.deepStrictEqual(capabilities.optionDescriptors, [
     {
       id: "reasoningEffort",
-      label: "Reasoning",
+      label: "推理",
       type: "select",
       options: [{ id: "super-high", label: "super-high", isDefault: true }],
       currentValue: "super-high",
@@ -51,10 +51,10 @@ it("maps current Codex model capability fields", () => {
       label: "Service Tier",
       type: "select",
       options: [
-        { id: "default", label: "Standard" },
+        { id: "default", label: "标准" },
         {
           id: "priority",
-          label: "Fast",
+          label: "快速",
           description: "Lower latency responses.",
         },
         {
@@ -71,7 +71,7 @@ it("maps current Codex model capability fields", () => {
       label: "Cyber Access",
       type: "select",
       options: [
-        { id: "standard", label: "Standard", isDefault: true },
+        { id: "standard", label: "标准", isDefault: true },
         { id: "daybreakBlue", label: "Daybreak Blue" },
       ],
       currentValue: "standard",
@@ -84,7 +84,7 @@ it("uses standard routing when the catalog has no default service tier", () => {
     additionalSpeedTiers: ["fast"],
     defaultReasoningEffort: "medium",
     defaultServiceTier: null,
-    description: "Test model",
+    description: "测试模型",
     displayName: "GPT Test",
     hidden: false,
     id: "gpt-test",
@@ -111,15 +111,15 @@ it("uses standard routing when the catalog has no default service tier", () => {
       label: "Service Tier",
       type: "select",
       options: [
-        { id: "default", label: "Standard", isDefault: true },
+        { id: "default", label: "标准", isDefault: true },
         {
           id: "priority",
-          label: "Fast",
+          label: "快速",
           description: "1.5x speed, increased usage",
         },
         {
           id: "ultrafast",
-          label: "Ultrafast",
+          label: "极速",
           description: "Even faster, more expensive",
         },
       ],

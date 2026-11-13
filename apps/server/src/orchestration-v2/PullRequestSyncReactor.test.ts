@@ -115,7 +115,7 @@ function makeLink(
         ? null
         : {
             state: "open",
-            title: "Pull request",
+            title: "PR",
             headBranch: "feature",
             baseBranch: "main",
             isDraft: false,
@@ -156,7 +156,7 @@ function makeSummary(
     projectId: input.projectId,
     repository: input.repository,
     number: input.number,
-    title: "Pull request",
+    title: "PR",
     url: `https://github.com/${input.repository}/pull/${input.number}`,
     state: "open",
     headBranch: "feature",

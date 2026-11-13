@@ -61,7 +61,7 @@ const laptopProjectId = ProjectId.make("laptop-project");
 const member = {
   id: projectId,
   environmentId: server.environmentId,
-  title: "Project",
+  title: "项目",
   workspaceRoot: "/repo",
   physicalProjectKey: `${server.environmentId}:/repo`,
   environmentLabel: server.label,
@@ -264,7 +264,7 @@ describe("scoped settings writes", () => {
     const unsupported = [
       {
         label: server.label,
-        message: "This environment does not support this setting. Update T3 Code on it.",
+        message: "此环境不支持该设置，请更新该环境上的 T3 Code。",
       },
     ];
 
@@ -463,7 +463,7 @@ describe("scoped settings writes", () => {
       planScopedSettingsPatch(project, environments, { enableProviderUpdateChecks: false }),
     ).toMatchObject({
       serverWrites: [],
-      unavailableReason: "This setting is environment-wide and cannot be overridden by a project.",
+      unavailableReason: "此设置是环境级设置，无法由项目覆盖。",
     });
   });
 
@@ -478,8 +478,7 @@ describe("scoped settings writes", () => {
         clientPatch: {},
         hasClientWrite: false,
         serverWrites: [],
-        unavailableReason:
-          "This setting is environment-wide and cannot be overridden by a project.",
+        unavailableReason: "此设置是环境级设置，无法由项目覆盖。",
       });
       expect(
         planScopedSettingsPatch(
@@ -640,7 +639,7 @@ describe("null patches at project scope", () => {
     const environments = [
       {
         environmentId,
-        label: "Laptop",
+        label: "笔记本电脑",
         connection: { phase: "connected" as const },
         serverConfig: {
           settings: {
@@ -680,7 +679,7 @@ describe("partial object patches at project scope", () => {
       id: projectId,
       environmentId,
       physicalProjectKey: "laptop:/repo",
-      environmentLabel: "Laptop",
+      environmentLabel: "笔记本电脑",
       title: "fleet",
       workspaceRoot: "/repo",
       defaultModelSelection: null,
@@ -712,7 +711,7 @@ describe("partial object patches at project scope", () => {
       [
         {
           environmentId,
-          label: "Laptop",
+          label: "笔记本电脑",
           connection: { phase: "connected" },
           serverConfig: {
             settings,

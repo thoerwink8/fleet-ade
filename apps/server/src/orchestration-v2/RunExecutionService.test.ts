@@ -3876,7 +3876,7 @@ function makeLinkedChildTurnItemFixture(input: {
     parentItemId: null,
     ordinal: 1,
     status: "running" as const,
-    title: "Working",
+    title: "运行中",
     startedAt: now,
     completedAt: null,
     updatedAt: now,
@@ -4292,7 +4292,7 @@ it.effect.each([
       threadId: ids.threadId,
       runId: ids.runId,
       role: "assistant",
-      text: "Other",
+      text: "其他",
       streaming: false,
     });
     const scenario = yield* runBackgroundItemScenario(key, () => Stream.fromQueue(providerEvents), {

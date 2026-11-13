@@ -225,9 +225,8 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
       toastManager.add({
         type: "warning",
         id: "load-balancing-attachments",
-        title: "Keep attachments on this machine",
-        description:
-          "Remove attachments before choosing automatic routing, then attach them on the selected machine.",
+        title: "请把附件留在这台机器上",
+        description: "选择自动分配前请先移除附件，再在选中的机器上重新添加。",
       });
       return;
     }
@@ -244,12 +243,12 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
   const onAutoEnvironmentStable = useStableCallback(onAutoEnvironment);
   const autoEnvironmentLabel = automaticEnvironment
     ? draftThread?.loadBalancedEnvironmentId
-      ? "Auto balance"
+      ? "自动分配"
       : loadBalancing.pending
-        ? "Checking machines…"
+        ? "正在检查机器…"
         : loadBalancing.failed
-          ? "Auto balance unavailable"
-          : "Auto balance"
+          ? "自动分配不可用"
+          : "自动分配"
     : undefined;
 
   // A change in flight belongs to the draft and project it started on.
@@ -357,8 +356,8 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not switch machine",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "无法切换机器",
+            description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
       }
@@ -368,8 +367,7 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
       const triagePrompt = followsTriage ? await prepareTriagePrompt() : undefined;
       if (triagePrompt === null) return;
       const project =
-        knownProject ??
-        (await openScratchProject(target.environmentId, "Could not switch machine"));
+        knownProject ?? (await openScratchProject(target.environmentId, "无法切换机器"));
       if (project) retarget(project, triagePrompt);
     };
     setBusyEnvironmentChange(request);

@@ -730,7 +730,7 @@ describe("DesktopBackendManager", () => {
       assert.isTrue(Option.isNone(yield* Queue.poll(reports)));
       yield* TestClock.adjust(Duration.seconds(1));
       const failure = yield* Queue.take(reports);
-      assert.equal(failure.reason, "The server started but did not become ready in time.");
+      assert.equal(failure.reason, "服务器已启动，但未能及时就绪。");
     }).pipe(Effect.provide(TestClock.layer())),
   );
 

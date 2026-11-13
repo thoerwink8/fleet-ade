@@ -593,9 +593,7 @@ const make = Effect.gen(function* () {
         entries.push({
           kind: "worktree",
           outcome: "kept",
-          reason: linked
-            ? "No thread uses this worktree"
-            : "No thread uses this folder, and it isn't a git worktree",
+          reason: linked ? "没有会话使用此工作树" : "没有会话使用此文件夹，且它不是 Git 工作树",
           path: worktreePath,
           projectPath: null,
           threadId: null,
@@ -1580,7 +1578,7 @@ const make = Effect.gen(function* () {
           entries.push({
             kind: category.kind,
             outcome: files > 0 ? "removed" : "kept",
-            reason: files === 0 ? "No expired files" : `Removed ${files} ${category.label}`,
+            reason: files === 0 ? "没有过期文件" : `Removed ${files} ${category.label}`,
             path: null,
             projectPath: null,
             threadId: null,

@@ -738,7 +738,7 @@ export class ClaudeAppendSystemPromptMissingValueError extends Schema.TaggedErro
   { flag: Schema.Literals(["--append-system-prompt", "--append-system-prompt-file"]) },
 ) {
   override get message(): string {
-    return `The ${this.flag} launch argument has no ${this.flag === "--append-system-prompt" ? "text" : "file path"}. Add it after the flag in the Claude launch arguments, then send the message again.`;
+    return `The ${this.flag} launch argument has no ${this.flag === "--append-system-prompt" ? "text" : "文件路径"}. Add it after the flag in the Claude launch arguments, then send the message again.`;
   }
 }
 
@@ -4022,8 +4022,8 @@ function parentToolUseIdFromSdkMessage(message: SDKMessage): string | null {
 }
 
 const CLAUDE_NO_STANDING_GRANT_OPTIONS = [
-  { decision: "decline", label: "Decline" },
-  { decision: "accept", label: "Approve" },
+  { decision: "decline", label: "拒绝" },
+  { decision: "accept", label: "批准" },
 ] satisfies ReadonlyArray<ProviderApprovalOption>;
 
 export function claudeApprovalPresentation(input: {
@@ -4142,10 +4142,10 @@ export const awaitClaudeApprovalDecision = Effect.fn("awaitClaudeApprovalDecisio
 // MCP servers such as Computer Use ask on every call and expect the client to
 // remember a session grant, as Codex does. The CLI drops a reply's `_meta.persist`.
 const CLAUDE_MCP_ELICITATION_OPTIONS: ReadonlyArray<ProviderApprovalOption> = [
-  { decision: "cancel", label: "Cancel" },
-  { decision: "decline", label: "Decline" },
-  { decision: "acceptForSession", label: "Always allow this session" },
-  { decision: "accept", label: "Approve" },
+  { decision: "cancel", label: "取消" },
+  { decision: "decline", label: "拒绝" },
+  { decision: "acceptForSession", label: "本次会话始终允许" },
+  { decision: "accept", label: "批准" },
 ];
 
 type ClaudeMcpElicitationContent = NonNullable<ElicitationResult["content"]>;
@@ -4678,8 +4678,8 @@ function formatClaudeUsageLimitWait(waitMs: number): string {
   const totalMinutes = Math.ceil(waitMs / 60_000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  if (hours === 0) return `${totalMinutes}m`;
-  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+  if (hours === 0) return `${totalMinutes} 分钟`;
+  return minutes === 0 ? `${hours} 小时` : `${hours} 小时 ${minutes} 分钟`;
 }
 
 interface ActiveClaudeTurnContext {
@@ -8688,8 +8688,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 status: input.status === "completed" ? "failed" : input.status,
                 title:
                   input.status === "completed" || input.status === "failed"
-                    ? "Context compaction failed"
-                    : "Context compaction stopped",
+                    ? "上下文压缩失败"
+                    : "上下文压缩已停止",
                 ...(reason === "" ? {} : { summary: reason }),
                 completedAt: input.completedAt,
                 updatedAt: input.completedAt,
@@ -10294,10 +10294,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                       : "interrupted",
                 title:
                   message.compact_result === "success"
-                    ? "Context compacted"
+                    ? "上下文已压缩"
                     : failed
-                      ? "Context compaction failed"
-                      : "Context compaction stopped",
+                      ? "上下文压缩失败"
+                      : "上下文压缩已停止",
                 ...(failed && message.compact_error ? { summary: message.compact_error } : {}),
                 completedAt: now,
                 updatedAt: now,
@@ -10345,7 +10345,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 type: "compaction",
                 driver: CLAUDE_PROVIDER,
                 status: "running",
-                title: "Compacting context",
+                title: "正在压缩上下文",
                 startedAt: now,
                 completedAt: null,
                 updatedAt: now,
@@ -10392,7 +10392,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               turnItem: {
                 ...compaction,
                 status: "completed",
-                title: "Context compacted",
+                title: "上下文已压缩",
                 completedAt: compaction.completedAt ?? now,
                 updatedAt: now,
                 ...(message.compact_metadata.pre_tokens === undefined

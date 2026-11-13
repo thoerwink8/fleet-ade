@@ -16,13 +16,11 @@ export async function boundedZip(
     markupLimit?: number;
   } = {},
 ) {
-  if (bytes.byteLength > ARCHIVE_MAX_BYTES)
-    throw new Error("Preview limited to files under 50 MB.");
+  if (bytes.byteLength > ARCHIVE_MAX_BYTES) throw new Error("预览仅支持小于 50 MB 的文件。");
   checkZipDirectory(bytes, ARCHIVE_MAX_ENTRIES);
   const zip = await JSZip.loadAsync(bytes);
   const entries = Object.values(zip.files);
-  if (entries.length > ARCHIVE_MAX_ENTRIES)
-    throw new Error("This archive contains more than 2,048 entries.");
+  if (entries.length > ARCHIVE_MAX_ENTRIES) throw new Error("此压缩包包含超过 2,048 个条目。");
   const files = new Map<
     string,
     { bytes: Uint8Array<ArrayBuffer>; date: Date; directory: boolean }
@@ -55,11 +53,7 @@ export async function boundedZip(
             (entry.name.endsWith(".xml") && length > (limits.xmlLimit ?? 8 * 1024 * 1024))
           ) {
             stream.pause();
-            reject(
-              new Error(
-                "The expanded archive exceeds the preview size or compression ratio limit.",
-              ),
-            );
+            reject(new Error("解压后的压缩包超出预览大小或压缩比限制。"));
           } else chunks.push(chunk);
         })
         .on("error", reject)

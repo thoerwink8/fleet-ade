@@ -53,7 +53,7 @@ function shell(overrides: Partial<OrchestrationV2ThreadShell> = {}): Orchestrati
   return {
     id: THREAD_ID,
     projectId: PROJECT_ID,
-    title: "Thread",
+    title: "会话",
     providerInstanceId: ProviderInstanceId.make("codex"),
     modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "test-model" },
     runtimeMode: "full-access",
@@ -133,7 +133,7 @@ describe("startup agent activity", () => {
     const ids = AgentAwarenessRelay.resolveAgentAwarenessRelayActiveThreadIds({
       environmentId: EnvironmentId.make("relay-env"),
       startedAt,
-      projects: [{ id: PROJECT_ID, title: "Project" }],
+      projects: [{ id: PROJECT_ID, title: "项目" }],
       threads: [
         shell(),
         shell({
@@ -298,7 +298,7 @@ const makeTestRelay = Effect.fnUntraced(function* (
   );
   const project = {
     id: PROJECT_ID,
-    title: "Project",
+    title: "项目",
     workspaceRoot: "/workspace",
     defaultModelSelection: null,
     scripts: [],
@@ -490,7 +490,7 @@ describe("AgentAwarenessRelay", () => {
             completedAt: null,
             type: "link_request",
             url: "https://example.com/login",
-            label: "Sign in",
+            label: "登录",
             reason: "The agent needs you to sign in.",
             linkStatus: "pending",
           },
@@ -1052,7 +1052,7 @@ describe("AgentAwarenessRelay", () => {
           creationSource: "web",
           id: THREAD_ID,
           projectId: PROJECT_ID,
-          title: "Thread",
+          title: "会话",
           providerInstanceId: ProviderInstanceId.make("codex"),
           modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "test-model" },
           runtimeMode: "full-access",
@@ -1141,8 +1141,8 @@ it.effect("catches up after startup without polling after success", () =>
     assert.equal(publications.length, 1);
     assert.include(publications[0]?.state, {
       threadId: THREAD_ID,
-      projectTitle: "Project",
-      threadTitle: "Thread",
+      projectTitle: "项目",
+      threadTitle: "会话",
       phase: "running",
     });
 

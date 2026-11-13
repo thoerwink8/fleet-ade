@@ -39,14 +39,14 @@ function phaseElapsed(phase: SubagentWorkflowGroup["phases"][number]) {
 }
 
 function phaseStatusLabel(phase: SubagentWorkflowGroup["phases"][number]) {
-  if (phase.state === "running") return "running";
-  if (phase.members.some((member) => member.status === "failed")) return "failed";
+  if (phase.state === "running") return "运行中";
+  if (phase.members.some((member) => member.status === "failed")) return "失败";
   if (
     phase.members.some((member) => member.status === "cancelled" || member.status === "interrupted")
   ) {
-    return "stopped";
+    return "已停止";
   }
-  return phase.state === "done" ? "done" : "not started";
+  return phase.state === "done" ? "已完成" : "未开始";
 }
 
 function WorkflowMemberRow({
@@ -76,7 +76,7 @@ function WorkflowMemberRow({
           render={
             <ThreadDetailsControl
               part="row"
-              aria-label={`Open ${member.title} chat`}
+              aria-label={`打开 ${member.title} 对话`}
               disabled={!canOpen}
               onClick={() => canOpen && onOpen(threadId)}
             />
@@ -160,7 +160,7 @@ export function ThreadLineageWorkflowRow({
                     variant="ghost"
                     part="icon"
                     tone="destructive"
-                    aria-label={`Stop workflow ${label}`}
+                    aria-label={`停止工作流 ${label}`}
                     disabled={stopDisabled}
                     onClick={onStop}
                   />
@@ -172,7 +172,7 @@ export function ThreadLineageWorkflowRow({
                   <SquareIcon aria-hidden className="size-3 fill-current" />
                 )}
               </TooltipTrigger>
-              <TooltipPopup side="left">Stop entire workflow</TooltipPopup>
+              <TooltipPopup side="left">停止整个工作流</TooltipPopup>
             </Tooltip>
           </div>
         ) : null}
@@ -209,9 +209,7 @@ export function ThreadLineageWorkflowRow({
                   onClick={() => setPhaseOpen((phases) => new Map(phases).set(phase.index, !open))}
                   accessory={
                     <>
-                      {status === "failed" ? (
-                        <SectionHeaderStatus>Failed</SectionHeaderStatus>
-                      ) : null}
+                      {status === "失败" ? <SectionHeaderStatus>失败</SectionHeaderStatus> : null}
                       <span className="shrink-0 text-2xs font-normal tabular-nums">
                         {phase.settledCount}/{phase.members.length}{" "}
                         {phase.members.length === 1 ? "agent" : "agents"}
@@ -256,7 +254,7 @@ export function ThreadLineageWorkflowRow({
             />
           ))}
           {phases.length === 0 && group.unphasedMembers.length === 0 ? (
-            <li className="px-2.5 py-1.5 text-2xs text-muted-foreground/70">No agents yet</li>
+            <li className="px-2.5 py-1.5 text-2xs text-muted-foreground/70">还没有智能体</li>
           ) : null}
         </ul>
       ) : null}

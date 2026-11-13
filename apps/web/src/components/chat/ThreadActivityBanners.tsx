@@ -65,8 +65,8 @@ export function childInputNowItem(input: {
     ),
     title: childThreadInputsTitle(childThreadInputs),
     waitingLabel: childThreadInputs.every((child) => child.lineage.sideChat === true)
-      ? "Side chat waiting"
-      : "Subagent waiting",
+      ? "侧聊等待中"
+      : "子智能体等待中",
     description: childThreadInputs.map((child, index) => (
       <Fragment key={child.id}>
         {index > 0 ? " " : null}
@@ -80,7 +80,7 @@ export function childInputNowItem(input: {
     )),
     actions: (
       <InlineButton onClick={() => onOpenThread(first.id, first.environmentId)}>
-        {first.hasPendingApprovals ? "Open approval" : "Open question"}
+        {first.hasPendingApprovals ? "打开审批" : "打开问题"}
       </InlineButton>
     ),
   };
@@ -111,7 +111,7 @@ export function goalNowItem(input: {
             <InlineButton
               onClick={() => void onSendCommand("/goal resume", "Failed to resume goal.")}
             >
-              Resume
+              继续
             </InlineButton>
             <span aria-hidden>·</span>
           </>
@@ -120,7 +120,7 @@ export function goalNowItem(input: {
           tone="muted"
           onClick={() => void onSendCommand("/goal clear", "Failed to clear goal.")}
         >
-          Clear
+          清除
         </InlineButton>
       </>
     ),
@@ -144,10 +144,8 @@ export function runStopNowItem(input: {
     ) : (
       <CircleStopIcon />
     ),
-    title: unresponsive ? "Agent not responding to Stop" : "Stopping",
-    description: unresponsive
-      ? "It may be short on memory. Force stop kills its processes."
-      : undefined,
+    title: unresponsive ? "智能体对“停止”没有响应" : "正在停止",
+    description: unresponsive ? "它可能内存不足。强制停止会结束它的进程。" : undefined,
     actions: (
       <>
         <span
@@ -159,7 +157,7 @@ export function runStopNowItem(input: {
         />
         {unresponsive && input.canForceStop ? (
           <InlineButton disabled={input.forceStopping} onClick={input.onForceStop}>
-            {input.forceStopping ? "Force stopping..." : "Force stop"}
+            {input.forceStopping ? "正在强制停止…" : "强制停止"}
           </InlineButton>
         ) : null}
       </>
@@ -220,7 +218,7 @@ export function backgroundWorkNowItem(input: {
     title:
       only && typeof only.label !== "string" && only.task.label !== only.task.kind ? (
         <>
-          {presentation.waiting ? "Waiting" : "Running"} · {only.label}
+          {presentation.waiting ? "等待中" : "正在运行"} · {only.label}
         </>
       ) : (
         presentation.title
@@ -259,11 +257,11 @@ export function backgroundWorkNowItem(input: {
         />
         {onlyThreadId === undefined ? null : (
           <InlineButton tone="muted" onClick={() => onOpenThread(onlyThreadId)}>
-            Open
+            打开
           </InlineButton>
         )}
         <InlineButton disabled={input.stopDisabled} onClick={() => void input.onStop()}>
-          {input.stopping ? "Stopping..." : "Stop"}
+          {input.stopping ? "正在停止…" : "停止"}
         </InlineButton>
       </>
     ),
@@ -286,7 +284,7 @@ export function branchMismatchBannerItem(input: {
     icon: <GitBranchIcon />,
     title: (
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="shrink-0 font-normal text-muted-foreground">Branch changed from</span>
+        <span className="shrink-0 font-normal text-muted-foreground">分支已从以下分支切换：</span>
         <Tooltip>
           <TooltipTrigger
             render={
@@ -304,10 +302,10 @@ export function branchMismatchBannerItem(input: {
     ),
     actions: (
       <Button size="xs" variant="ghost" disabled={input.restoreDisabled} onClick={input.onRestore}>
-        {input.restoring ? "Restoring..." : "Restore branch"}
+        {input.restoring ? "正在恢复…" : "恢复分支"}
       </Button>
     ),
-    dismissLabel: "Dismiss branch change notice",
+    dismissLabel: "关闭分支变更提示",
     onDismiss: input.onDismiss,
   };
 }

@@ -1319,7 +1319,7 @@ it.effect(
         yield* h.seedExpired;
         yield* h.auth.access;
         const state = yield* h.auth.controller.logout(Effect.void);
-        assert.strictEqual(state.message, "Signed out.");
+        assert.strictEqual(state.message, "已退出登录。");
         assert.deepEqual(Array.from(h.revocations[0]!), [
           ["token", "refresh-1"],
           ["token_type_hint", "refresh_token"],

@@ -16,11 +16,11 @@ export function tunnelUpgradeCopy(upgrade: Exclude<ManagedTunnelUpgrade, null>):
   const { pro, premier } = T3CHAT_PLAN_TUNNEL_LIMITS;
   switch (upgrade) {
     case "link":
-      return `Link T3 Chat Pro for up to ${pro} tunnels, or Premier for up to ${premier}.`;
+      return `关联 T3 Chat Pro 最多可用 ${pro} 条隧道，Premier 最多 ${premier} 条。`;
     case "pro":
-      return `Upgrade to T3 Chat Pro for up to ${pro} tunnels, or Premier for up to ${premier}.`;
+      return `升级到 T3 Chat Pro 最多可用 ${pro} 条隧道，Premier 最多 ${premier} 条。`;
     case "premier":
-      return `Upgrade to T3 Chat Premier for up to ${premier} tunnels.`;
+      return `升级到 T3 Chat Premier 最多可用 ${premier} 条隧道。`;
   }
 }
 
@@ -48,7 +48,7 @@ export function TunnelUsageMeter({
       </div>
       <div
         role="meter"
-        aria-label="T3 Connect tunnels in use"
+        aria-label="已使用的 T3 Connect 隧道"
         aria-valuemin={0}
         aria-valuemax={limit}
         aria-valuenow={used}
@@ -87,30 +87,30 @@ export function TunnelLimitAlert({
   const action =
     upgrade === "link" && onLinkT3Chat ? (
       <Button size="sm" onClick={onLinkT3Chat}>
-        Link T3 Chat
+        关联 T3 Chat
       </Button>
     ) : upgrade === "pro" || upgrade === "premier" ? (
       <Button
         size="sm"
         render={<a href={T3CHAT_SUBSCRIPTION_URL} target="_blank" rel="noopener noreferrer" />}
       >
-        Upgrade on T3 Chat
+        在 T3 Chat 升级
       </Button>
     ) : onManageTunnels ? (
       <Button size="sm" variant="outline" onClick={onManageTunnels}>
-        Manage tunnels
+        管理隧道
       </Button>
     ) : null;
   return (
     <Alert variant="warning">
       <TriangleAlertIcon />
-      <AlertTitle>You&apos;re out of tunnels (they cost us money).</AlertTitle>
+      <AlertTitle>隧道已用完（隧道需要费用）。</AlertTitle>
       <AlertDescription>
         {upgrade === "link"
-          ? "Switch to Tailscale or get more tunnels by linking your T3 Chat sub (sorry!)"
+          ? "可以改用 Tailscale，或关联你的 T3 Chat 订阅来获取更多隧道（抱歉！）"
           : upgrade
-            ? "Switch to Tailscale or get more tunnels by upgrading your T3 Chat sub (sorry!)"
-            : "Switch to Tailscale or deregister an environment you no longer use (sorry!)"}
+            ? "可以改用 Tailscale，或升级你的 T3 Chat 订阅来获取更多隧道（抱歉！）"
+            : "可以改用 Tailscale，或注销一个不再使用的环境（抱歉！）"}
       </AlertDescription>
       {action ? <AlertAction>{action}</AlertAction> : null}
     </Alert>

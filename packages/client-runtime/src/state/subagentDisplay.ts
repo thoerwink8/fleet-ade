@@ -76,7 +76,7 @@ export function resolveSubagentMetadata(input: {
     ? (resolveModelShortName(catalogModel, input.provider?.driver) ?? catalogModel.name)
     : model
       ? formatModelSlugName(model)
-      : "Not reported";
+      : "未报告";
   const qualifier = catalogModel?.subProvider?.trim();
   const modelLabel = qualifier
     ? reportedLabel
@@ -95,16 +95,16 @@ export function resolveSubagentMetadata(input: {
     ...(input.parentThread &&
     input.childProject &&
     input.childProject.id !== input.parentThread.projectId
-      ? [{ label: "Project", value: input.childProject.title }]
+      ? [{ label: "项目", value: input.childProject.title }]
       : []),
     ...(parentWorkspace && childWorkspace && parentWorkspace !== childWorkspace
       ? [
           {
             label: input.childThread?.branch
-              ? "Branch"
+              ? "分支"
               : input.childThread?.worktreePath
-                ? "Worktree"
-                : "Workspace",
+                ? "工作树"
+                : "工作区",
             value: input.childThread?.branch ?? fileBasename(childWorkspace),
           },
         ]

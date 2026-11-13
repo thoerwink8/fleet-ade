@@ -701,7 +701,7 @@ describe("EnvironmentRegistry", () => {
       });
       const descriptor = (environmentId: EnvironmentId): ExecutionEnvironmentDescriptor => ({
         environmentId,
-        label: "Server",
+        label: "服务器",
         platform: { os: "linux", arch: "x64" },
         serverVersion: "1.0.0",
         orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,

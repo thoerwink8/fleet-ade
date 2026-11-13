@@ -65,9 +65,7 @@ export function updateDeviceHosts(
   const findDestination = (destination: SshDeviceHostConfig) => {
     const matches = hosts.filter((candidate) => sameDestination(candidate, destination));
     if (matches.length > 1) {
-      throw new Error(
-        "Multiple hosts match this SSH destination. Select the environment to edit its hosts.",
-      );
+      throw new Error("多个主机匹配这个 SSH 目标。请选择要编辑其主机的环境。");
     }
     return matches[0];
   };

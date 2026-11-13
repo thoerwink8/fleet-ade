@@ -17,7 +17,7 @@ export function PullRequestStackHeader({
         {notice ? (
           <Tooltip>
             <TooltipTrigger render={<span role="status" className="text-xs font-normal" />}>
-              {stale ? "May be stale" : "Refreshing…"}
+              {stale ? "可能已过期" : "正在刷新…"}
             </TooltipTrigger>
             <TooltipPopup>{notice}</TooltipPopup>
           </Tooltip>

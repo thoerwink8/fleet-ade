@@ -141,7 +141,7 @@ async function fetchGuestHistoryPage(
   shareId: string,
   cursor: string,
 ): Promise<OrchestrationV2ThreadHistoryPage | string> {
-  const failed = "Could not load earlier turns. Try again.";
+  const failed = "无法加载更早的对话。请重试。";
   try {
     const response = await fetch(
       `${GUEST_HISTORY_ROUTE}?${GUEST_SHARE_PARAM}=${encodeURIComponent(shareId)}&cursor=${encodeURIComponent(cursor)}`,
@@ -155,7 +155,7 @@ async function fetchGuestHistoryPage(
     }
     return Option.getOrElse(decodeHistoryPage(json), () => failed);
   } catch {
-    return "Could not reach the server.";
+    return "无法连接到服务器。";
   }
 }
 
@@ -178,18 +178,18 @@ async function postGuest(
     if (response.ok) return null;
     const json: unknown = await response.json().catch(() => null);
     return Option.match(decodeErrorBody(json), {
-      onNone: () => "Something went wrong. Try again.",
+      onNone: () => "出了点问题。请重试。",
       onSome: ({ message }) => message,
     });
   } catch {
-    return "Could not reach the server.";
+    return "无法连接到服务器。";
   }
 }
 
 const STATUS_LABEL: Record<ThreadGuestMessageStatus, string> = {
-  pending: "Waiting for approval",
+  pending: "等待批准",
   sent: "Sent",
-  dismissed: "Not sent",
+  dismissed: "未发送",
 };
 
 /** Same column as the owner's timeline, so both views wrap text at the same width. */
@@ -235,7 +235,7 @@ export function GuestPage() {
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
       {access === "checking" ? (
-        <Notice title="Connecting..." />
+        <Notice title="正在连接…" />
       ) : access === "name" && credential !== null ? (
         <NameForm
           credential={credential}
@@ -249,8 +249,8 @@ export function GuestPage() {
         <GuestSession shareId={shareId} />
       ) : (
         <Notice
-          title="This link has ended or is not valid"
-          detail="Ask the owner for a new link. Each link works in one browser."
+          title="此链接已结束或无效"
+          detail="请向所有者索取新链接。每个链接只能在一个浏览器中使用。"
         />
       )}
     </div>
@@ -317,10 +317,10 @@ function GuestSession({ shareId }: { readonly shareId: string }) {
   }, [shareId]);
 
   if (stream.ended || (rejected && stream.view !== null)) {
-    return <Notice title="This link has ended" detail="The owner stopped sharing this thread." />;
+    return <Notice title="此链接已结束" detail="所有者已停止共享此会话。" />;
   }
   if (stream.view !== null) {
-    if (stream.projection === null) return <Notice title="Connecting..." />;
+    if (stream.projection === null) return <Notice title="正在连接…" />;
     return (
       <GuestThread
         view={stream.view}
@@ -330,11 +330,11 @@ function GuestSession({ shareId }: { readonly shareId: string }) {
       />
     );
   }
-  if (!rejected) return <Notice title="Connecting..." />;
+  if (!rejected) return <Notice title="正在连接…" />;
   return (
     <Notice
-      title="This link has ended or is not valid"
-      detail="Ask the owner for a new link. Each link works in one browser."
+      title="此链接已结束或无效"
+      detail="请向所有者索取新链接。每个链接只能在一个浏览器中使用。"
     />
   );
 }
@@ -370,9 +370,9 @@ function NameForm({
   };
   return (
     <form className="m-auto flex w-full max-w-xs flex-col gap-3 p-6" onSubmit={submit}>
-      <h1 className="text-base font-medium">Join a shared thread</h1>
+      <h1 className="text-base font-medium">加入共享会话</h1>
       <label className="flex flex-col gap-1.5 text-sm" htmlFor="guest-name">
-        Your name
+        你的名字
         <Input
           id="guest-name"
           autoFocus
@@ -388,10 +388,10 @@ function NameForm({
         </p>
       ) : null}
       <Button type="submit" disabled={submitting || name.trim() === ""}>
-        Join
+        加入
       </Button>
       <p className="text-xs text-muted-foreground">
-        The owner sees your name and approves each message before the agent gets it.
+        所有者会看到你的名字，并在每条消息发给智能体前进行批准。
       </p>
     </form>
   );
@@ -601,7 +601,7 @@ function GuestModelLabel({ model }: { readonly model: GuestThreadModel }) {
   return (
     <ComposerControl
       render={<span />}
-      aria-label={`Model: ${fullLabel}`}
+      aria-label={`模型：${fullLabel}`}
       className="pointer-events-none min-w-0 shrink"
     >
       {model.driver === null ? null : (
@@ -723,7 +723,7 @@ function GuestComposer({
       }}
     >
       {files.length > 0 ? (
-        <ul className="flex flex-wrap gap-2" aria-label="Attached files">
+        <ul className="flex flex-wrap gap-2" aria-label="已附加的文件">
           {files.map((staged) => (
             <li
               key={staged.key}
@@ -745,7 +745,7 @@ function GuestComposer({
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label={`Remove ${staged.file.name}`}
+                aria-label={`移除 ${staged.file.name}`}
                 onClick={() => {
                   setError(null);
                   setFiles((current) => current.filter((candidate) => candidate !== staged));
@@ -758,8 +758,8 @@ function GuestComposer({
         </ul>
       ) : null}
       <textarea
-        aria-label="Message"
-        placeholder="Message"
+        aria-label="消息"
+        placeholder="消息"
         rows={2}
         maxLength={GUEST_MESSAGE_MAX_LENGTH}
         value={text}
@@ -774,14 +774,14 @@ function GuestComposer({
           type="file"
           multiple
           hidden
-          aria-label="Files to attach"
+          aria-label="要附加的文件"
           onChange={(event) => {
             addFiles(Array.from(event.target.files ?? []));
             // The same file can be picked again after it is removed.
             event.target.value = "";
           }}
         />
-        <ComposerControl aria-label="Attach files" onClick={() => fileInputRef.current?.click()}>
+        <ComposerControl aria-label="添加附件" onClick={() => fileInputRef.current?.click()}>
           <ComposerControlIcon icon={PaperclipIcon} />
         </ComposerControl>
         <GuestModelLabel model={model} />
@@ -791,12 +791,12 @@ function GuestComposer({
           </p>
         ) : (
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            The owner approves each message
+            每条消息都需所有者批准
           </p>
         )}
         <button
           type="submit"
-          aria-label="Send"
+          aria-label="发送"
           disabled={sending || (text.trim() === "" && files.length === 0)}
           className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-message-action text-message-action-foreground shadow-xs hover:bg-message-action-hover focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-64"
         >

@@ -132,13 +132,13 @@ function AssistantForkButton({
                 () => setBusy(false),
               );
             }}
-            aria-label="Fork from this response"
+            aria-label="从这条回复分叉"
           />
         }
       >
         <GitForkIcon className={cn("size-3", busy && "animate-pulse")} />
       </TooltipTrigger>
-      <TooltipPopup side="top">Fork from this response</TooltipPopup>
+      <TooltipPopup side="top">从这条回复分叉</TooltipPopup>
     </Tooltip>
   );
 }
@@ -252,13 +252,13 @@ function AssistantReplyButton({ message, itemId }: { message: ChatMessage; itemI
             size="xs"
             variant="ghost-muted"
             onClick={reply}
-            aria-label="Reply to this response"
+            aria-label="回复这条回复"
           />
         }
       >
         <ReplyIcon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup side="top">Reply to this response</TooltipPopup>
+      <TooltipPopup side="top">回复这条回复</TooltipPopup>
     </Tooltip>
   );
 }

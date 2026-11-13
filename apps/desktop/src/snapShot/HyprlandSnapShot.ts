@@ -55,12 +55,7 @@ function run(executable: string, args: string[], signal?: AbortSignal): Promise<
       { timeout: 20_000, maxBuffer: 128 * 1024, encoding: "utf8", ...(signal ? { signal } : {}) },
       (error, stdout, stderr) => {
         if (error)
-          reject(
-            new Error(
-              stderr.trim() ||
-                "Hyprland capture did not respond. Check capture setup and try again.",
-            ),
-          );
+          reject(new Error(stderr.trim() || "Hyprland 截图未响应。请检查截图设置后重试。"));
         else resolve(stdout);
       },
     );
@@ -91,28 +86,24 @@ export class HyprlandCaptureSetup {
       if (!installed)
         return {
           status: "not-installed",
-          message: "Install the bundled helper to capture the window you're using.",
+          message: "安装内置辅助程序，以截取当前使用的窗口。",
         };
       const bundle = await regularFile(this.paths.bundle);
-      if (!bundle)
-        throw new Error(
-          "The Hyprland capture helper is missing from this build. Update or reinstall T3 Code.",
-        );
+      if (!bundle) throw new Error("此版本缺少 Hyprland 截图辅助程序。请更新或重新安装 T3 Code。");
       if (!installed.equals(bundle))
         return {
           status: "update-required",
-          message: "Update the bundled capture helper to continue.",
+          message: "请更新内置截图辅助程序以继续。",
         };
       return {
         status: "ready",
-        message:
-          "Helper ready. Hyprland may ask for screen-sharing permission on your first capture.",
+        message: "辅助程序已就绪。首次截图时，Hyprland 可能会请求屏幕共享权限。",
         ...decodeCapabilities(await run(hyprlandCaptureExecutable(this.paths), ["check"])),
       };
     } catch (error) {
       return {
         status: "error",
-        message: error instanceof Error ? error.message : "Couldn't check Hyprland capture access.",
+        message: error instanceof Error ? error.message : "无法检查 Hyprland 截图权限。",
       };
     }
   }

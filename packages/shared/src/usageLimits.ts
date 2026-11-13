@@ -736,7 +736,7 @@ function paceOfShares(usedPercent: number, elapsed: number): LimitPace {
   return "on";
 }
 
-export function formatDuration(ms: number): string {
+function formatDuration(ms: number): string {
   const remaining = Math.max(0, ms);
   const days = Math.floor(remaining / DAY);
   const hours = Math.floor((remaining % DAY) / HOUR);

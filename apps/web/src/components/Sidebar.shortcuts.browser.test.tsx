@@ -62,7 +62,7 @@ it("leaves thread shortcuts and their hints to the preview when their rules excl
     // AppRoot brings its own router.
     router: false,
   });
-  await expect.element(page.getByText(`Thread ${second.id}`).first()).toBeVisible();
+  await expect.element(page.getByText(`会话 ${second.id}`).first()).toBeVisible();
 
   const previewChrome = document.createElement("div");
   previewChrome.dataset.previewPanelMode = "browser";

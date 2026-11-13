@@ -188,10 +188,10 @@ function ConfiguredConnectOnboardingDialog() {
     if (!ok) return;
     toastManager.add({
       type: "success",
-      title: "T3 Connect enabled",
+      title: "已启用 T3 Connect",
       description: exposeEnvironment
-        ? "This environment is available to your other devices through T3 Connect."
-        : "This environment publishes agent activity to your mobile clients.",
+        ? "你的其他设备可以通过 T3 Connect 访问此环境。"
+        : "此环境会向你的移动客户端发布智能体活动。",
     });
     setStep("devices");
   };
@@ -214,13 +214,8 @@ function ConfiguredConnectOnboardingDialog() {
     >
       <WizardPopup>
         <WizardHeader
-          title="Set up T3 Connect"
-          description={
-            <>
-              Mesh your devices together. Publish this environment and connect the rest, all in one
-              place.
-            </>
-          }
+          title="设置 T3 Connect"
+          description={<>把你的设备连成一张网：在这里发布此环境，并连接其他设备。</>}
         >
           {steps.length > 1 ? (
             <WizardSteps
@@ -285,18 +280,18 @@ function ConfiguredConnectOnboardingDialog() {
           {step === "publish" ? (
             <>
               <Button variant="ghost" disabled={isApplying} onClick={() => setStep("devices")}>
-                Not now
+                暂不
               </Button>
               <Button
                 disabled={isApplying || !canManageRelay || linkStateData === null}
                 onClick={() => void applyPublishSelection()}
               >
-                {isApplying ? "Enabling…" : "Continue"}
+                {isApplying ? "正在启用…" : "继续"}
               </Button>
             </>
           ) : (
             <Button disabled={isApplying} onClick={complete}>
-              Done
+              完成
             </Button>
           )}
         </WizardFooter>
@@ -309,7 +304,7 @@ function ConfiguredConnectOnboardingDialog() {
 
 const STEP_LABELS: Record<OnboardingStep, string> = {
   publish: "Publish",
-  devices: "Connect devices",
+  devices: "连接设备",
 };
 
 function PublishStep({
@@ -335,15 +330,15 @@ function PublishStep({
     <div className="space-y-3">
       <div className="rounded-lg border">
         <OnboardingToggleRow
-          title="Publish this environment"
-          description="Make this environment available to your other devices through T3 Connect."
+          title="发布此环境"
+          description="让你的其他设备通过 T3 Connect 访问此环境。"
           checked={exposeEnvironment}
           disabled={disabled}
           onCheckedChange={onExposeEnvironmentChange}
         />
         <OnboardingToggleRow
-          title="Publish agent activity"
-          description="Send activity from this environment to your mobile clients for push notifications and Live Activities."
+          title="发布智能体活动"
+          description="将此环境的活动发送到你的移动客户端，用于推送通知和实时活动。"
           checked={publishAgentActivity}
           disabled={disabled}
           onCheckedChange={onPublishAgentActivityChange}
@@ -416,8 +411,7 @@ function DevicesStep() {
         showSavedEnvironments
         empty={
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No other environments are published to your account yet. Publish one from another device
-            and it will show up here.
+            你的账户中还没有其他已发布的环境。在其他设备上发布后，它会显示在这里。
           </p>
         }
       />

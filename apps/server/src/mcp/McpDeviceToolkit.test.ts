@@ -60,7 +60,7 @@ const state = {
     {
       id: "local",
       kind: "local" as const,
-      label: "This machine",
+      label: "本机",
       platforms: [
         { platform: "ios" as const, available: true },
         { platform: "android" as const, available: false, reason: "No SDK" },
@@ -376,7 +376,7 @@ describe("device targeting across hosts", () => {
     platform,
     openedAt: "2026-09-08T00:00:00.000Z",
   });
-  const thisMachine = { id: "local", label: "This machine" };
+  const thisMachine = { id: "local", label: "本机" };
   const macMini = { id: macHost.id, label: macHost.label };
   // DeviceService's lookup errors; DeviceService.test.ts covers when each arises.
   const onTwoHosts = new DeviceService.DeviceHostAmbiguousError({

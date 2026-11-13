@@ -81,7 +81,7 @@ const resolvePairingTarget = Effect.fn("clientRuntime.connection.onboarding.reso
       catch: (cause) =>
         new ConnectionBlockedError({
           reason: "configuration",
-          detail: cause instanceof Error ? cause.message : "The pairing details are invalid.",
+          detail: cause instanceof Error ? cause.message : "配对信息无效。",
         }),
     });
   },
@@ -94,7 +94,7 @@ function bearerConnectionId(environmentId: EnvironmentId, httpBaseUrl: string): 
 function differentMachineError(label: string) {
   return new ConnectionBlockedError({
     reason: "configuration",
-    detail: `That address reaches ${label}, a different machine. Add it as its own environment instead.`,
+    detail: `该地址指向另一台机器 ${label}。请将其添加为独立环境。`,
   });
 }
 
@@ -213,7 +213,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   ) {
     return yield* new ConnectionBlockedError({
       reason: "configuration",
-      detail: "Only saved bearer environments can be edited.",
+      detail: "只能编辑已保存的 bearer 环境。",
     });
   }
 
@@ -221,7 +221,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   if (Option.isNone(credential) || !isBearerCredential(credential.value)) {
     return yield* new ConnectionBlockedError({
       reason: "authentication",
-      detail: "The saved bearer credential is unavailable.",
+      detail: "已保存的 bearer 凭据不可用。",
     });
   }
 
@@ -229,7 +229,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   if (label === "") {
     return yield* new ConnectionBlockedError({
       reason: "configuration",
-      detail: "Environment label cannot be empty.",
+      detail: "环境名称不能为空。",
     });
   }
   const httpBaseUrl = yield* Effect.try({
@@ -237,7 +237,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
     catch: (cause) =>
       new ConnectionBlockedError({
         reason: "configuration",
-        detail: cause instanceof Error ? cause.message : "The environment URL is invalid.",
+        detail: cause instanceof Error ? cause.message : "环境 URL 无效。",
       }),
   });
   const connectionId = entry.target.connectionId;

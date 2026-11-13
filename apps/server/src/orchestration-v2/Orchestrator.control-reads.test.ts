@@ -719,7 +719,7 @@ it.effect(
             questions: [],
           },
         });
-        const answers = { text: "Blue", list: ["Red"], codex: { answers: ["Green"] } };
+        const answers = { text: "蓝色", list: ["Red"], codex: { answers: ["Green"] } };
         const normalizedAnswers = { ...answers, codex: ["Green"] };
         if (mode === "live") {
           const pending = yield* projections.getRuntimeResponseContext(threadId, requestId);
@@ -865,7 +865,7 @@ it.effect(
         commandId: CommandId.make("dispatch-with-old-history"),
         threadId,
         messageId: MessageId.make("fresh-input"),
-        text: "Continue",
+        text: "继续",
         attachments: [],
         dispatchMode: { type: "defer_start" },
         createdBy: "user",
@@ -2549,7 +2549,7 @@ it.effect("a running provider-turn update reads only the thread's queued and run
         commandId: CommandId.make("dispatch:deferred-steer-reads"),
         threadId,
         messageId: MessageId.make("message:deferred-steer-reads"),
-        text: "Request",
+        text: "待响应",
         attachments: [],
         dispatchMode: { type: "defer_start" },
         createdBy: "user",

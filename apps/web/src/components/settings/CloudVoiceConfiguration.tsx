@@ -118,13 +118,13 @@ function ModelPicker({
       >
         <ComboboxInput
           id="voice-cloud-model"
-          aria-label="OpenRouter model"
-          placeholder="Search transcription models"
+          aria-label="OpenRouter 模型"
+          placeholder="搜索转写模型"
           autoFocus
           size="sm"
         />
         <ComboboxPopup>
-          <ComboboxEmpty>No transcription model matches.</ComboboxEmpty>
+          <ComboboxEmpty>没有匹配的转写模型。</ComboboxEmpty>
           <ComboboxList className="max-h-64">
             {(model: CloudSpeechModel) => (
               <ComboboxItem key={model.id} value={model}>
@@ -235,7 +235,7 @@ export function CloudVoiceConfiguration({
       commit?.();
       close();
     } catch {
-      setError("Couldn’t save this change. Check your connection and try again.");
+      setError("无法保存此更改，请检查连接后重试。");
     }
     setBusy(false);
   };
@@ -251,13 +251,13 @@ export function CloudVoiceConfiguration({
 
   const keyField = (
     <>
-      <Label htmlFor="voice-cloud-key">{routed && saved ? "Replace API key" : "API key"}</Label>
+      <Label htmlFor="voice-cloud-key">{routed && saved ? "替换 API 密钥" : "API 密钥"}</Label>
       <div className="flex min-w-0 items-start gap-2">
         {sources.length > 0 && (
           <SecretSourceSelect
             value={sourceId}
             sources={sources}
-            label={`${company} API key`}
+            label={`${company} API 密钥`}
             disabled={busy}
             onValueChange={(next) => {
               setSourceId(next);
@@ -272,7 +272,7 @@ export function CloudVoiceConfiguration({
               key={sourceId}
               id="voice-cloud-key"
               name="reference"
-              aria-label={`${company} API key reference`}
+              aria-label={`${company} API 密钥引用`}
               autoFocus={!routed}
               placeholder={source?.referencePlaceholder}
               value={draft}
@@ -285,9 +285,9 @@ export function CloudVoiceConfiguration({
             <SecretInput
               id="voice-cloud-key"
               name="key"
-              aria-label={`${company} API key`}
+              aria-label={`${company} API 密钥`}
               autoFocus={!routed}
-              placeholder="Enter API key"
+              placeholder="输入 API 密钥"
               value={draft}
               configured={saved === true}
               disabled={busy}
@@ -299,12 +299,12 @@ export function CloudVoiceConfiguration({
       </div>
       <p className="text-sm text-muted-foreground">
         {draft.trim() && !credential
-          ? (source?.invalidReferenceMessage ?? "Enter an API key, not a URL or secret reference.")
+          ? (source?.invalidReferenceMessage ?? "请输入 API 凭据，不要输入 URL 或凭据引用。")
           : active && !routed
-            ? "Updating the key keeps dictation enabled."
+            ? "更新密钥后听写会保持启用。"
             : routed && saved
-              ? "Leave blank to keep the saved key."
-              : `Anyone with dictation access to ${environment.label} can bill this key.`}
+              ? "留空可保留已保存的密钥。"
+              : `有权在 ${environment.label} 使用听写的人都可以使用此密钥产生费用。`}
       </p>
     </>
   );
@@ -320,18 +320,18 @@ export function CloudVoiceConfiguration({
         <DialogHeader>
           <DialogTitle>
             {remove
-              ? `Remove the ${company} key?`
+              ? `移除 ${company} 密钥？`
               : active
                 ? routed
-                  ? "Manage OpenRouter dictation"
-                  : `Manage ${company} key`
-                : `Use ${name} for dictation?`}
+                  ? "管理 OpenRouter 听写"
+                  : `管理 ${company} 密钥`
+                : `使用 ${name} 听写？`}
           </DialogTitle>
           <DialogDescription>
             {remove
-              ? `Everyone using ${name} for dictation on ${environment.label} will lose access.`
+              ? `在 ${name} 上使用 ${environment.label} 听写的所有人都将无法继续使用。`
               : active && !routed
-                ? `Anyone with dictation access to ${environment.label} can use this API key.`
+                ? `有权在 ${environment.label} 使用听写的人都可以使用此 API 密钥。`
                 : cloudSpeechDisclosure(provider, environment.label)}
           </DialogDescription>
         </DialogHeader>
@@ -341,15 +341,15 @@ export function CloudVoiceConfiguration({
               <p>Connect to {environment.label} with dictation access to continue.</p>
             ) : AsyncResult.isFailure(presence) && saved === undefined ? (
               <Button size="sm" variant="outline" onClick={refresh}>
-                Retry loading API key
+                重新加载 API 密钥
               </Button>
             ) : routed &&
               AsyncResult.isSuccess(presence) &&
               presence.value &&
               saved === undefined ? (
-              <p>Update {environment.label} to use OpenRouter dictation.</p>
+              <p>更新 {environment.label} to use OpenRouter dictation.</p>
             ) : saved === undefined ? (
-              <p role="status">Checking for an API key…</p>
+              <p role="status">正在检查 API 密钥…</p>
             ) : routed ? (
               <form
                 id={formId}
@@ -360,7 +360,7 @@ export function CloudVoiceConfiguration({
                 }}
               >
                 <div className="grid gap-2">
-                  <Label htmlFor="voice-cloud-model">Model</Label>
+                  <Label htmlFor="voice-cloud-model">模型</Label>
                   {listedModels ? (
                     <ModelPicker
                       models={listedModels}
@@ -371,11 +371,11 @@ export function CloudVoiceConfiguration({
                     />
                   ) : AsyncResult.isFailure(models) ? (
                     <Button size="sm" variant="outline" type="button" onClick={refreshModels}>
-                      Retry loading models
+                      重新加载模型
                     </Button>
                   ) : (
                     <p role="status" className="text-sm text-muted-foreground">
-                      Loading transcription models…
+                      正在加载转写模型…
                     </p>
                   )}
                 </div>
@@ -405,7 +405,7 @@ export function CloudVoiceConfiguration({
               <p>Ask an administrator on {environment.label} to add an API key.</p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                This choice applies only to this device. Choose Off to stop sharing.
+                此选择仅适用于此设备。选择“关闭”即可停止共享。
               </p>
             )}
           </DialogPanel>
@@ -425,12 +425,12 @@ export function CloudVoiceConfiguration({
                 disabled={busy}
                 onClick={() => setRemove(true)}
               >
-                Remove key…
+                移除密钥…
               </Button>
             </div>
           )}
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={close}>
-            Cancel
+            取消
           </Button>
           {connected &&
             (remove ? (
@@ -441,17 +441,17 @@ export function CloudVoiceConfiguration({
                 disabled={busy}
                 onClick={() => void saveKey(null, false)}
               >
-                Remove key
+                移除密钥
               </Button>
             ) : routed ? (
               saved !== undefined && (saved || canManage) ? (
                 <Button type="submit" form={formId} size="sm" disabled={busy || !canSubmit}>
-                  {active ? "Save" : "Save and enable"}
+                  {active ? "保存" : "保存并启用"}
                 </Button>
               ) : null
             ) : editingKey ? (
               <Button type="submit" form={formId} size="sm" disabled={busy || !credential}>
-                {active ? "Save key" : "Save and enable"}
+                {active ? "保存密钥" : "保存并启用"}
               </Button>
             ) : saved && !active ? (
               <Button
@@ -462,7 +462,7 @@ export function CloudVoiceConfiguration({
                   close();
                 }}
               >
-                Use {name}
+                使用 {name}
               </Button>
             ) : null)}
         </DialogFooter>

@@ -129,7 +129,7 @@ describe("GrokAdapterV2 capabilities", () => {
     );
     const foreground = {
       toolCallId: "foreground-1",
-      title: "Terminal",
+      title: "终端",
       status: "inProgress" as const,
       data: {
         rawInput: { command: "true" },
@@ -138,7 +138,7 @@ describe("GrokAdapterV2 capabilities", () => {
     };
     const monitor = {
       toolCallId: "monitor-1",
-      title: "Monitor",
+      title: "监测器",
       status: "inProgress" as const,
       data: {
         rawInput: { variant: "Monitor", command: "sleep 30" },
@@ -452,8 +452,8 @@ describe("Grok native questions", () => {
                       question: questionText,
                       multiSelect: true,
                       options: [
-                        { label: "Tests", description: "Cover behavior" },
-                        { label: "Docs", description: "Explain usage" },
+                        { label: "测试", description: "Cover behavior" },
+                        { label: "文档", description: "Explain usage" },
                       ],
                     },
                   ],
@@ -585,8 +585,8 @@ describe("Grok native questions", () => {
         question: questionText,
         multiSelect: true,
         options: [
-          { label: "Tests", description: "Cover behavior" },
-          { label: "Docs", description: "Explain usage" },
+          { label: "测试", description: "Cover behavior" },
+          { label: "文档", description: "Explain usage" },
         ],
       });
       const pending = yield* Deferred.await(request);

@@ -17,7 +17,7 @@ import { firstManagedDenial, usePrimaryManagedPolicy } from "~/state/managedPoli
 export function LabsSettingsPanel() {
   return (
     <SettingsPageContainer>
-      <SettingsSection id="beta" title="Beta">
+      <SettingsSection id="beta" title="测试版">
         <BoringSidebarRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
@@ -36,12 +36,12 @@ function BoringSidebarRow() {
   return (
     <SettingsRow
       {...searchableSetting("boring-sidebar")}
-      description="Group sidebar threads into project folders. Pinned threads stay on top, and Snoozed and Settled stay below the folders."
+      description="将侧边栏会话按项目文件夹分组。置顶会话保留在顶部，已暂缓和已收尾会话显示在文件夹下方。"
       control={
         <Switch
           checked={settings.boringSidebarEnabled}
           onCheckedChange={(checked) => updateSettings({ boringSidebarEnabled: Boolean(checked) })}
-          aria-label="Boring sidebar (group by project)"
+          aria-label="简洁侧边栏（按项目分组）"
         />
       }
     >
@@ -61,14 +61,14 @@ function BoringSidebarMultilineRow() {
     <SettingsRow
       {...searchableSetting("boring-sidebar-multiline")}
       className="px-0 py-2 sm:px-0"
-      description="Show folder threads on two lines: the title, then the branch, pull request, and agent."
+      description="分两行显示文件夹内的会话：第一行显示标题，第二行显示分支、pull request 和智能体。"
       control={
         <Switch
           checked={settings.boringSidebarMultilineRows}
           onCheckedChange={(checked) =>
             updateSettings({ boringSidebarMultilineRows: Boolean(checked) })
           }
-          aria-label="Two-line folder rows"
+          aria-label="双行文件夹列表"
         />
       }
     />
@@ -84,10 +84,10 @@ function GuestLinksRowWithSignIn() {
   return (
     <SettingsRow
       {...searchableSetting("guest-links")}
-      description="Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to T3 Connect to use guest links."
+      description="与访客共享会话，访客可在浏览器中实时查看，并发送需要你批准的消息。登录 T3 Connect 后即可使用访客链接。"
       control={
         <Button size="sm" variant="outline" onClick={openAuthPrompt}>
-          Sign in
+          登录
         </Button>
       }
     />
@@ -118,9 +118,9 @@ function GuestLinksRow() {
           Share a thread with a guest who watches it live in a browser and sends messages you
           approve. Needs T3 Connect: sign in and link this machine in{" "}
           <Link to="/settings/access" className="underline underline-offset-2">
-            Sharing & access
+            共享与访问
           </Link>
-          . Turning it off stops every guest link.
+          。关闭后，所有访客链接都将停止工作。
         </>
       }
       control={
@@ -128,7 +128,7 @@ function GuestLinksRow() {
           settingKeys={["guestSharingEnabled"]}
           checked={settings.guestSharingEnabled}
           onCheckedChange={(checked) => updateSettings({ guestSharingEnabled: Boolean(checked) })}
-          aria-label="Guest links"
+          aria-label="访客链接"
         />
       }
     />
@@ -148,9 +148,9 @@ function LinkedEnvironmentsRow() {
           Let agents here work on your other machines, and theirs here. Turn it on for each machine,
           then link them in{" "}
           <Link to="/settings/connections" className="underline underline-offset-2">
-            Connections
+            连接
           </Link>
-          . While off, nothing new starts over a link; running tasks finish.
+          。关闭后，不会通过关联启动新任务；正在运行的任务会继续完成。
         </>
       }
       control={
@@ -160,7 +160,7 @@ function LinkedEnvironmentsRow() {
           onCheckedChange={(checked) =>
             updateSettings({ linkedEnvironmentsEnabled: Boolean(checked) })
           }
-          aria-label="Linked environments"
+          aria-label="关联环境"
         />
       }
     />
@@ -175,7 +175,7 @@ function PromptSuggestionsRow() {
       serverScoped
       {...searchableSetting("prompt-suggestions-beta")}
       settingKeys={["promptSuggestionsEnabled"]}
-      description="Show a predicted next message in the empty composer after a Claude or Codex turn. Tab uses it. Each is an extra cached request on your plan. Needs Codex 0.165+. Claude threads update on restart."
+      description="Claude 或 Codex 完成一轮回复后，在空输入框中预测下一条消息。按 Tab 使用它。每次预测都会在你的套餐上产生一次额外的缓存请求。需要 Codex 0.165+。Claude 会话在重启后更新。"
       control={
         <ScopedSwitch
           settingKeys={["promptSuggestionsEnabled"]}
@@ -183,7 +183,7 @@ function PromptSuggestionsRow() {
           onCheckedChange={(checked) =>
             updateSettings({ promptSuggestionsEnabled: Boolean(checked) })
           }
-          aria-label="Suggest next prompt"
+          aria-label="建议下一条提示词"
         />
       }
     />
@@ -211,9 +211,9 @@ function SimlockHostsRow() {
           </a>{" "}
           pool, added in{" "}
           <Link to="/settings/devices" className="underline underline-offset-2">
-            Devices
+            设备
           </Link>
-          . An alpha that may change or break. T3 Code never installs Simlock.
+          。此功能处于早期测试阶段，可能变更或失效。T3 Code 不会安装 Simlock。
         </>
       }
       control={
@@ -223,7 +223,7 @@ function SimlockHostsRow() {
           onCheckedChange={(checked) =>
             updateSettings({ simlockDeviceHostsEnabled: Boolean(checked) })
           }
-          aria-label="Simlock device hosts"
+          aria-label="Simlock 设备主机"
         />
       }
     />
@@ -250,13 +250,13 @@ function FastWorktreeCheckoutRow() {
       serverScoped
       {...searchableSetting("worktree-fast-checkout")}
       settingKeys={["fastWorktreeCheckout"]}
-      description="On a Mac, clone new worktrees from a checkout cached in the T3 home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache."
+      description="在 Mac 上，从缓存在 T3 主目录中的工作副本克隆新的工作树，无需逐个写入每个文件。无法使用时改为 Git 的常规检出。关闭后会删除缓存。"
       control={
         <ScopedSwitch
           settingKeys={["fastWorktreeCheckout"]}
           checked={settings.fastWorktreeCheckout}
           onCheckedChange={(checked) => updateSettings({ fastWorktreeCheckout: Boolean(checked) })}
-          aria-label="Fast worktree checkout"
+          aria-label="快速创建工作树"
         />
       }
     />

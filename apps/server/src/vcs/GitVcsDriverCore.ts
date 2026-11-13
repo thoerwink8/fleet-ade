@@ -3771,7 +3771,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
           {
             id: commit.sha,
             kind: "commit" as const,
-            title: `Commit ${commit.sha.slice(0, 7)}`,
+            title: `提交 ${commit.sha.slice(0, 7)}`,
             ...(subject.trim() ? { commitSubject: subject.trim() } : {}),
             baseRef: commit.parent,
             headRef: commit.sha,
@@ -3879,7 +3879,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       {
         id: "working-tree",
         kind: "working-tree",
-        title: "Uncommitted",
+        title: "未提交的更改",
         baseRef: "HEAD",
         headRef: null,
         diff: dirtyDiff,
@@ -3893,7 +3893,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       {
         id: "branch-range",
         kind: "branch-range",
-        title: review.baseRef ? `Changes vs ${review.baseRef}` : "Changes",
+        title: review.baseRef ? `Changes vs ${review.baseRef}` : "改动",
         baseRef: review.baseRef,
         headRef: repository.currentBranch ?? "HEAD",
         diff: baseDiff,

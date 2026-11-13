@@ -166,8 +166,8 @@ it("tells the user when an option click moves their typed answer into the hidden
   expect(toast).toHaveBeenCalledWith(
     expect.objectContaining({
       type: "info",
-      title: "Your typed text was set aside",
-      description: "It will be back in the composer once the question is answered.",
+      title: "你输入的文字已暂存",
+      description: "回答完问题后，它会回到输入框。",
       data: { threadRef: draftTarget },
     }),
   );
@@ -217,7 +217,7 @@ function QuestionPositionProbe(props: ProbeProps) {
         Choose Incremental
       </button>
       <button type="button" onClick={() => state.onAdvanceActivePendingUserInput()}>
-        Submit
+        提交
       </button>
     </>
   );

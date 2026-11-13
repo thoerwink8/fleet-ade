@@ -48,7 +48,7 @@ export function throwIfVoiceTranscriptionAborted(signal: AbortSignal): void {
   if (signal.aborted) {
     throw new VoiceTranscriptionError({
       code: "cancelled",
-      message: "Voice transcription was cancelled.",
+      message: "语音转写已取消。",
     });
   }
 }

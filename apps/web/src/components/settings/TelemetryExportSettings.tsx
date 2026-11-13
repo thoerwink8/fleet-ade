@@ -18,21 +18,21 @@ const SIGNALS = [
     key: "otlpTracesUrl",
     sourceKey: "otlpTracesSource",
     variableKey: "otlpTracesVariable",
-    label: "Traces",
+    label: "追踪",
     signal: "traces",
   },
   {
     key: "otlpMetricsUrl",
     sourceKey: "otlpMetricsSource",
     variableKey: "otlpMetricsVariable",
-    label: "Metrics",
+    label: "指标",
     signal: "metrics",
   },
   {
     key: "otlpLogsUrl",
     sourceKey: "otlpLogsSource",
     variableKey: "otlpLogsVariable",
-    label: "Logs",
+    label: "日志",
     signal: "logs",
   },
 ] as const;
@@ -40,7 +40,7 @@ const SIGNALS = [
 type SignalDescriptor = (typeof SIGNALS)[number];
 type SignalKey = SignalDescriptor["key"];
 
-const OVERRIDE_LABELS = { environment: "Set by environment", bootstrap: "Set by desktop" } as const;
+const OVERRIDE_LABELS = { environment: "由环境设置", bootstrap: "由桌面端设置" } as const;
 
 function runningOverride(
   running: ServerObservability | undefined,
@@ -57,17 +57,17 @@ type EndpointCheck = { readonly url: string; readonly result: OtlpEndpointCheckR
 const isHttpUrl = (url: string) => /^https?:\/\/./i.test(url);
 
 function endpointStatus(url: string, check: EndpointCheck | undefined) {
-  if (url === "") return { label: "Off", dot: "bg-muted-foreground/40" };
-  if (check?.url !== url) return { label: "Not checked", dot: "bg-muted-foreground/40" };
+  if (url === "") return { label: "关闭", dot: "bg-muted-foreground/40" };
+  if (check?.url !== url) return { label: "尚未检查", dot: "bg-muted-foreground/40" };
   const { result } = check;
-  if (result === null) return { label: "Checking…", dot: "bg-warning" };
+  if (result === null) return { label: "正在检查…", dot: "bg-warning" };
   switch (result._tag) {
     case "Accepted":
-      return { label: `Connected · ${Math.round(result.latencyMs)} ms`, dot: "bg-success" };
+      return { label: `已连接 · ${Math.round(result.latencyMs)} ms`, dot: "bg-success" };
     case "Rejected":
-      return { label: `Rejected · HTTP ${result.status}`, dot: "bg-destructive" };
+      return { label: `已拒绝 · HTTP ${result.status}`, dot: "bg-destructive" };
     case "Unreachable":
-      return { label: result.timedOut ? "Timed out" : "Unreachable", dot: "bg-destructive" };
+      return { label: result.timedOut ? "已超时" : "无法访问", dot: "bg-destructive" };
   }
 }
 
@@ -75,10 +75,8 @@ export function TelemetryExportSettings() {
   const { environment, scope } = useSettingsScope();
   if (scope.kind !== "environment" || !environment) {
     return (
-      <SettingsSection title="OpenTelemetry export" id="telemetry-export">
-        <SettingsScopeNotice target="environment">
-          Choose one environment to configure its telemetry exports.
-        </SettingsScopeNotice>
+      <SettingsSection title="OpenTelemetry 导出" id="telemetry-export">
+        <SettingsScopeNotice target="environment">选择一个环境来配置遥测导出。</SettingsScopeNotice>
       </SettingsSection>
     );
   }
@@ -143,7 +141,7 @@ function TelemetryExportForm() {
   }, [canCheck]);
 
   return (
-    <SettingsSection title="OpenTelemetry export" id="telemetry-export">
+    <SettingsSection title="OpenTelemetry 导出" id="telemetry-export">
       <form
         className="grid gap-4 px-4 py-4 sm:px-5"
         onSubmit={async (event) => {
@@ -164,18 +162,17 @@ function TelemetryExportForm() {
           setSaving(false);
           if (result._tag === "Success") {
             setDraft({});
-            setMessage("Saved. Restart the server to apply.");
+            setMessage("已保存。重启服务器后生效。");
           }
         }}
       >
         <p className="text-xs text-muted-foreground">
-          Send traces, metrics, and logs to an OTLP HTTP receiver. Restart the server to apply.
-          Environment variables override these settings.
+          将追踪、指标和日志发送到 OTLP HTTP 接收端。重启服务器后生效。环境变量会覆盖这些设置。
         </p>
         {!canEdit && (
           <p className="text-xs text-muted-foreground">
             This connection lacks permission to change settings on{" "}
-            {environment?.label ?? "the selected environment"}.
+            {environment?.label ?? "所选环境"}.
           </p>
         )}
         {SIGNALS.map((descriptor) => {
@@ -204,7 +201,7 @@ function TelemetryExportForm() {
                   size="sm"
                   type="url"
                   pattern="[Hh][Tt][Tt][Pp][Ss]?://.*"
-                  title="Enter an HTTP or HTTPS endpoint, or leave empty to disable export."
+                  title="输入 HTTP 或 HTTPS 端点，留空则停用导出。"
                   placeholder={`http://localhost:4318/v1/${signal}`}
                   value={values[key]}
                   disabled={saving || !canEdit}
@@ -227,7 +224,7 @@ function TelemetryExportForm() {
                     disabled={!isHttpUrl(url) || checks[key]?.result === null}
                     onClick={() => void checkEndpoint(key, signal, url)}
                   >
-                    Test
+                    测试
                   </Button>
                 )}
               </div>
@@ -266,10 +263,10 @@ function TelemetryExportForm() {
                 }
               }}
             >
-              Discard
+              放弃
             </Button>
             <Button type="submit" size="xs" disabled={!changed || saving || !canEdit}>
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving…" : "保存"}
             </Button>
           </div>
         </div>

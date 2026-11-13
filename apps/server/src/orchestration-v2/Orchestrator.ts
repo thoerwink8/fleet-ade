@@ -731,7 +731,7 @@ function delegatedTasksStopEffect(command: {
   };
 }
 
-const WORKSPACE_PREPARATION_INPUT = "Preparing workspace";
+const WORKSPACE_PREPARATION_INPUT = "正在准备工作区";
 const RUNTIME_REQUEST_DELIVERY_FAILED_MESSAGE =
   "T3 Code could not confirm that your answer reached the agent. If the run stays stuck, stop it and try again.";
 
@@ -4376,7 +4376,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
-          cause: "The reset time has passed. Retry the thread manually.",
+          cause: "重置时间已过，请手动重试这个会话。",
         });
       }
       if (
@@ -10319,7 +10319,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 : command.linkStatus === "failed"
                   ? "failed"
                   : "cancelled",
-            title: command.label ?? command.url ?? "Link an environment",
+            title: command.label ?? command.url ?? "关联环境",
             startedAt: existing?.startedAt ?? now,
             completedAt: pending ? null : now,
             updatedAt: now,
@@ -11483,7 +11483,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         occurredAt: now,
         payload: {
           ...state.preparationItem,
-          title: command.phase === "worktree" ? "Preparing worktree" : "Starting setup script",
+          title: command.phase === "worktree" ? "正在准备工作树" : "Starting setup script",
           updatedAt: now,
         },
       });

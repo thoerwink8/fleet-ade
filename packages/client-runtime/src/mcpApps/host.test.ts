@@ -207,7 +207,7 @@ describe("makeMcpAppHost", () => {
     const { host, sent } = setup({
       callTool: async (input) => {
         if (input.name === "delete_everything")
-          throw new McpAppHostRefusal({ message: "Declined by the user." });
+          throw new McpAppHostRefusal({ message: "用户已拒绝。" });
         received.push(input.arguments);
         return { content: [], structuredContent: { ok: true } };
       },
@@ -239,7 +239,7 @@ describe("makeMcpAppHost", () => {
     expect(sent).toContainEqual({
       jsonrpc: "2.0",
       id: 8,
-      error: { code: -32000, message: "Declined by the user." },
+      error: { code: -32000, message: "用户已拒绝。" },
     });
   });
 
@@ -330,7 +330,7 @@ describe("makeMcpAppHost", () => {
       updateModelContext: async (update) => void contexts.push(update),
       downloadFile: async (files) => {
         downloads.push(files);
-        if (files.length > 1) throw new McpAppHostRefusal({ message: "Declined by the user." });
+        if (files.length > 1) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
       },
     });
     initialize(host);

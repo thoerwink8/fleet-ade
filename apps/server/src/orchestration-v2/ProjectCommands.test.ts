@@ -123,7 +123,7 @@ describe("planProjectCommand", () => {
           type: "project.create",
           commandId: CommandId.make("cmd-duplicate-root"),
           projectId: ProjectId.make("project-duplicate-root"),
-          title: "Duplicate",
+          title: "重复",
           workspaceRoot: "/tmp/project",
         },
         { workspaceOwner: owner },

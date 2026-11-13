@@ -29,17 +29,17 @@ const manifest = (): ModelManifestData => ({
             optionDescriptors: [
               {
                 id: "effort",
-                label: "Reasoning",
+                label: "推理",
                 type: "select",
                 options: [{ id: "extreme", label: "Extreme", isDefault: true }],
               },
               {
                 id: "contextWindow",
-                label: "Context Window",
+                label: "上下文窗口",
                 type: "select",
                 options: [
-                  { id: "large", label: "Large", isDefault: true },
-                  { id: "small", label: "Small" },
+                  { id: "large", label: "大", isDefault: true },
+                  { id: "small", label: "小" },
                 ],
               },
             ],
@@ -183,7 +183,7 @@ describe("Claude model catalog", () => {
           optionDescriptors: [
             {
               id: "effort",
-              label: "Reasoning",
+              label: "推理",
               type: "select",
               options: [
                 { id: "gentle", label: "Gentle", isDefault: true },
@@ -242,13 +242,13 @@ describe("Claude model catalog", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select" as const,
             options: [
               { id: "medium", label: "Medium" },
               { id: "high", label: "High", isDefault: true },
-              { id: "xhigh", label: "Extra High" },
-              { id: "max", label: "Max" },
+              { id: "xhigh", label: "超高" },
+              { id: "max", label: "最大" },
               { id: "ultracode", label: "Ultracode" },
               { id: "ultrathink", label: "Ultrathink" },
             ],
@@ -290,7 +290,7 @@ describe("Claude model catalog", () => {
         { id: "medium", label: "Medium" },
         { id: "high", label: "High", isDefault: true },
         { id: "xhigh", label: "Extra High (capped to High)" },
-        { id: "max", label: "Max" },
+        { id: "max", label: "最大" },
         { id: "ultracode", label: "Ultracode" },
         { id: "ultrathink", label: "Ultrathink" },
       ],
@@ -300,8 +300,8 @@ describe("Claude model catalog", () => {
     assert.deepStrictEqual(
       options("xhigh").map((model) => model?.map((option) => option.label)),
       [
-        ["Medium", "High", "Extra High", "Max (capped to Extra High)", "Ultracode", "Ultrathink"],
-        ["Medium", "High", "Extra High", "Max", "Ultracode", "Ultrathink"],
+        ["Medium", "High", "超高", "Max (capped to Extra High)", "Ultracode", "Ultrathink"],
+        ["Medium", "High", "超高", "Max", "Ultracode", "Ultrathink"],
       ],
     );
 
@@ -322,7 +322,7 @@ describe("Claude model catalog", () => {
           "Ultracode (capped to High)",
           "Ultrathink",
         ],
-        ["Medium", "High", "Extra High", "Max", "Ultracode", "Ultrathink"],
+        ["Medium", "High", "超高", "Max", "Ultracode", "Ultrathink"],
       ],
     );
 
@@ -335,13 +335,13 @@ describe("Claude model catalog", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select" as const,
             options: [
               { id: "low", label: "Low" },
               { id: "medium", label: "Medium" },
               { id: "high", label: "High", isDefault: true },
-              { id: "max", label: "Max" },
+              { id: "max", label: "最大" },
             ],
           },
         ],
@@ -368,7 +368,7 @@ describe("Claude model catalog", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select" as const,
             options: [
               { id: "high", label: "High", isDefault: true },
@@ -395,13 +395,13 @@ describe("Claude model catalog", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select" as const,
             options: [
               { id: "low", label: "Low" },
               { id: "medium", label: "Medium" },
               { id: "high", label: "High", isDefault: true },
-              { id: "max", label: "Max" },
+              { id: "max", label: "最大" },
             ],
           },
         ],

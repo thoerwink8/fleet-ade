@@ -26,7 +26,7 @@ vi.mock(import("~/state/entities"), async (importOriginal) => ({
       : {
           id: "project",
           environmentId: "environment",
-          title: state.workspaceRoot === SCRATCH_ROOT ? "No project" : "plain",
+          title: state.workspaceRoot === SCRATCH_ROOT ? "无项目" : "plain",
           workspaceRoot: state.workspaceRoot,
           scripts: [],
         }) as never,
@@ -151,7 +151,7 @@ function Panel({ fixture }: { fixture: ReturnType<typeof setup> }) {
         composerDraftTarget={threadRef}
         worktreePath={state.folder}
         isServerThread
-        activeProjectName={state.workspaceRoot === SCRATCH_ROOT ? "No project" : "plain"}
+        activeProjectName={state.workspaceRoot === SCRATCH_ROOT ? "无项目" : "plain"}
         activeProjectScripts={undefined}
         preferredScriptId={null}
         keybindings={[]}

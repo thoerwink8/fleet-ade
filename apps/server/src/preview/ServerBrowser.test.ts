@@ -228,7 +228,7 @@ function makeContext(onClose?: (context: BrowserContext) => void, initialUrl = "
       url,
       title: "test page",
       loading: false,
-      visibleText: "delete",
+      visibleText: "删除",
       interactiveElements: [],
     })),
     ariaSnapshot: vi.fn(async () => '- button "delete" [ref=e1]'),
@@ -1750,7 +1750,7 @@ it.effect("a navigation that fails while a load reads its title keeps its failur
         } else if (event.type === "navigated" && event.tabId === tabId) {
           const status = event.snapshot.navStatus;
           if (status._tag === "Success") statuses.push(`Success ${status.title}`);
-          else if (status._tag === "Loading") statuses.push(`Loading ${status.url}`);
+          else if (status._tag === "Loading") statuses.push(`正在加载 ${status.url}`);
         }
       }
       expect(statuses).toEqual([
@@ -1953,7 +1953,7 @@ it.effect("only the controlling viewer's copy and cut keys reach its clipboard",
       expect(yield* clipboard(viewer.output)).toEqual([{ _tag: "clipboard", text: "copied" }]);
       keyCopy = "cut";
       yield* viewer.input({ type: "key", action: "down", key: "x", code: "KeyX", modifiers: 2 });
-      expect(yield* clipboard(viewer.output)).toEqual([{ _tag: "clipboard", text: "cut" }]);
+      expect(yield* clipboard(viewer.output)).toEqual([{ _tag: "clipboard", text: "剪切" }]);
       pageCopy = "left over";
       keyCopy = "";
       yield* viewer.input({ type: "key", action: "down", key: "c", code: "KeyC", modifiers: 4 });

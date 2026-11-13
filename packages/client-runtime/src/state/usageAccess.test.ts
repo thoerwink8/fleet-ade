@@ -12,7 +12,7 @@ describe("resolveUsageAccess", () => {
       ).toEqual({
         canReadDiagnostics: false,
         isPending: false,
-        error: "This environment is not connected.",
+        error: "此环境未连接。",
       });
     },
   );
@@ -55,12 +55,12 @@ describe("resolveUsageAccess", () => {
     expect(denied).toEqual({
       canReadDiagnostics: false,
       isPending: false,
-      error: "This connection does not have access to diagnostics and usage.",
+      error: "此连接没有诊断和用量访问权限。",
     });
     expect(failed).toEqual({
       canReadDiagnostics: false,
       isPending: false,
-      error: "Could not check this connection's access to diagnostics and usage.",
+      error: "无法检查此连接的诊断和用量访问权限。",
     });
   });
 });

@@ -35,13 +35,13 @@ export function updateSimlockDeviceHosts(
 export function simlockDeviceHostProblem(host: SimlockDeviceHostConfigType): string | null {
   const withToken = { ...host, agentToken: "token" };
   if (Option.isSome(parseSimlockDeviceHostDraft(withToken))) return null;
-  if (!host.label.trim()) return "Give the host a label.";
+  if (!host.label.trim()) return "请填写主机名称。";
   // With in-range limits, a draft that still fails has a bad gateway URL.
   return Option.isNone(
     parseSimlockDeviceHostDraft({ ...withToken, maxLeases: 1, maxLeaseMinutes: 60 }),
   )
     ? "Enter the gateway's origin, such as https://gateway.example.ts.net:4700."
-    : "Keep the limits within the ranges shown.";
+    : "请将限制设在显示的范围内。";
 }
 
 export function simlockLeaseLimits(host: SimlockDeviceHostConfigType) {

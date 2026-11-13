@@ -110,7 +110,7 @@ const makeHarness = Effect.fn("TestThreadCommands.makeHarness")(function* (optio
   const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
     target: new BearerConnectionTarget({
       environmentId: ENVIRONMENT_ID,
-      label: "Test",
+      label: "测试",
       connectionId: "test",
     }),
     state: connection,

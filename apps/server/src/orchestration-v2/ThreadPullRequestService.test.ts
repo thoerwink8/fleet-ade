@@ -94,7 +94,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
       const thread = { ...threadShell("idle-branch-thread"), branch: "feature/idle" };
       const project: OrchestrationProjectShell = {
         id: thread.projectId,
-        title: "Project",
+        title: "项目",
         workspaceRoot: "/workspace/project",
         defaultModelSelection: null,
         scripts: [],
@@ -265,7 +265,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
       };
       const project: OrchestrationProjectShell = {
         id: thread.projectId,
-        title: "Project",
+        title: "项目",
         workspaceRoot: "/workspace/project",
         defaultModelSelection: null,
         scripts: [],
@@ -428,7 +428,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
         };
         const project: OrchestrationProjectShell = {
           id: thread.projectId,
-          title: "Project",
+          title: "项目",
           workspaceRoot: "/workspace/project",
           defaultModelSelection: null,
           scripts: [],
@@ -531,7 +531,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
       };
       const project: OrchestrationProjectShell = {
         id: parent.projectId,
-        title: "Project",
+        title: "项目",
         workspaceRoot: "/workspace/project",
         defaultModelSelection: null,
         scripts: [],
@@ -668,7 +668,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
         ].map((thread) => ({ ...thread, branch: "staging" }));
         const project: OrchestrationProjectShell = {
           id: reference.projectId,
-          title: "Project",
+          title: "项目",
           workspaceRoot: "/workspace/project",
           defaultModelSelection: null,
           scripts: [],
@@ -778,7 +778,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
         };
         const project: OrchestrationProjectShell = {
           id: thread.projectId,
-          title: "Project",
+          title: "项目",
           workspaceRoot: "/workspace/project",
           defaultModelSelection: null,
           scripts: [],
@@ -919,7 +919,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
       };
       const project: OrchestrationProjectShell = {
         id: thread.projectId,
-        title: "Project",
+        title: "项目",
         workspaceRoot: "/workspace/project",
         defaultModelSelection: null,
         scripts: [],
@@ -1058,7 +1058,7 @@ describe("ThreadPullRequestServiceV2 reads", () => {
       };
       const project: OrchestrationProjectShell = {
         id: thread.projectId,
-        title: "Project",
+        title: "项目",
         workspaceRoot: "/workspace/project",
         defaultModelSelection: null,
         scripts: [],

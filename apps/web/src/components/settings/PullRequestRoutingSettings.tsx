@@ -17,12 +17,12 @@ import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { searchableSetting } from "./settingsSearch";
 
 const options: ReadonlyArray<{ value: PullRequestRoutingPermission; label: string }> = [
-  { value: "off", label: "Off" },
-  { value: "read", label: "Read PRs" },
-  { value: "read-write", label: "Read and act" },
+  { value: "off", label: "关闭" },
+  { value: "read", label: "读取 PR" },
+  { value: "read-write", label: "读取并操作" },
 ];
 
-const summaryLabels = { "read-write": "read and act", read: "read PRs" } as const;
+const summaryLabels = { "read-write": "读取并操作", read: "读取 PR" } as const;
 
 function summarizePullRequestRouting(
   entries: ReadonlyArray<{
@@ -62,13 +62,12 @@ export function PullRequestRoutingSettings({
             label: environment.label,
             permission: pullRequestRoutingPermissionFor(environment.entry, permissions),
           })),
-        ) ?? "Off"
+        ) ?? "关闭"
       }
     >
       <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        Machines you trust here can read PR data through each other's source control access. Enable
-        both machines. Read and act may use broader permissions than the machine that owns them.
-        This applies only to this device.
+        此处信任的机器可借助彼此的版本控制访问权限读取 PR
+        数据。需要在两台机器上都启用。“读取并操作”可能使用比权限所属机器更广的权限。此设置仅适用于当前设备。
       </p>
       {environments.map((environment) => (
         <EnvironmentRow
@@ -94,7 +93,7 @@ export function PullRequestRoutingSettings({
                   if (result._tag === "Failure")
                     toastManager.add({
                       type: "error",
-                      title: "Could not save pull request routing permission",
+                      title: "无法保存 pull request 路由权限",
                     });
                 },
               );
@@ -103,7 +102,7 @@ export function PullRequestRoutingSettings({
             <SelectTrigger
               size="xs"
               className="w-32"
-              aria-label={`${environment.label} pull request routing`}
+              aria-label={`${environment.label} 的 PR 路由`}
             >
               <SelectValue />
             </SelectTrigger>

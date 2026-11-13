@@ -299,7 +299,7 @@ describe("reuseUnchangedThreadShells", () => {
     stack: null,
   };
   const linked = { ...v2ThreadShell, pullRequests: [link] };
-  const other = { ...v2ThreadShell, id: ThreadId.make("thread-other"), title: "Other" };
+  const other = { ...v2ThreadShell, id: ThreadId.make("thread-other"), title: "其他" };
 
   it("keeps the previous object for an unchanged row, even without its deferred links", () => {
     const previous = { ...v2ShellSnapshot, threads: [linked, other] };
@@ -382,7 +382,7 @@ describe("applyShellStreamEvents", () => {
       remove(13, added),
       update(14, added),
       update(15, { ...archived }),
-      { kind: "project.updated", sequence: 16, project: { ...v2Project, title: "Updated" } },
+      { kind: "project.updated", sequence: 16, project: { ...v2Project, title: "已更新" } },
       { kind: "project.updated", sequence: 17, project: { ...v2Project, workspaceRoot: "/moved" } },
       { kind: "project.removed", sequence: 18, projectId: v2Project.id },
       { kind: "project.updated", sequence: 19, project: v2Project },
@@ -423,7 +423,7 @@ describe("applyShellStreamEvents", () => {
   it("does not advance the cursor for an unknown future event", () => {
     const events = [
       { kind: "future.event", sequence: 99 } as never,
-      update(1, { ...a, title: "Changed" }),
+      update(1, { ...a, title: "有更新" }),
     ];
     expect(applyShellStreamEvents(v2ShellSnapshot, events)).toEqual(
       events.reduce(applyShellStreamEvent, v2ShellSnapshot),

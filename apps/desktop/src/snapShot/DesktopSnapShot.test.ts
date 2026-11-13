@@ -1784,10 +1784,7 @@ it.effect("flags revoked macOS permissions on read and re-registers once they re
 
       mediaAccessStatusMock.mockReturnValue("denied");
       const revoked = yield* service.state;
-      assert.equal(
-        revoked.message,
-        "Allow Screen Recording in System Settings, then restart T3 Code.",
-      );
+      assert.equal(revoked.message, "请在系统设置中允许屏幕录制，然后重启 T3 Code。");
       assert.deepEqual(revoked.macPermissions, { screenRecording: false, accessibility: true });
 
       accessibilityTrustedMock.mockReturnValue(false);
@@ -1797,10 +1794,7 @@ it.effect("flags revoked macOS permissions on read and re-registers once they re
         snapShotIncludeAccessibility: false,
       });
       const blocked = yield* service.state;
-      assert.equal(
-        blocked.message,
-        "Allow Screen Recording in System Settings, then restart T3 Code.",
-      );
+      assert.equal(blocked.message, "请在系统设置中允许屏幕录制，然后重启 T3 Code。");
       assert.isFalse(blocked.shortcutRegistered);
 
       mediaAccessStatusMock.mockReturnValue("granted");
@@ -2158,7 +2152,7 @@ it.effect.each([false, true])(
     const active = {
       platform: "macos",
       id: 42,
-      title: "Setup",
+      title: "设置",
       owner: { name: "T3 Code", processId: 123, path: "/Applications/T3 Code.app" },
       bounds: { x: 0, y: 0, width: 800, height: 600 },
     };

@@ -28,7 +28,7 @@ const SHELL_SNAPSHOT: OrchestrationV2ShellSnapshot = {
   projects: [
     {
       id: PROJECT_ID,
-      title: "Project",
+      title: "项目",
       workspaceRoot: "/repo",
       repositoryIdentity: null,
       defaultModelSelection: null,
@@ -41,7 +41,7 @@ const SHELL_SNAPSHOT: OrchestrationV2ShellSnapshot = {
     {
       id: THREAD_ID,
       projectId: PROJECT_ID,
-      title: "Thread",
+      title: "会话",
       providerInstanceId: PROVIDER_INSTANCE_ID,
       modelSelection: {
         instanceId: PROVIDER_INSTANCE_ID,
@@ -102,7 +102,7 @@ describe("cooperative shell cache encoding", () => {
       ...SHELL_SNAPSHOT,
       projects: SHELL_SNAPSHOT.projects.map((project) => ({
         ...project,
-        title: "  Project  ",
+        title: "项目",
         unexpected: "drop this field",
       })),
       threads: Array.from({ length: 64 }, (_, index) => ({

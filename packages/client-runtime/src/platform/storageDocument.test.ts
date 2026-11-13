@@ -141,7 +141,7 @@ describe("ConnectionCatalogDocument", () => {
         {
           target: new PrimaryConnectionTarget({
             environmentId: ENVIRONMENT_ID,
-            label: "Local",
+            label: "本地",
             httpBaseUrl: "http://localhost:3000",
             wsBaseUrl: "ws://localhost:3000",
           }),
@@ -397,7 +397,7 @@ describe("ConnectionCatalogDocument", () => {
   it("keeps an environment's position in the catalog when its routes change", () => {
     const other = new RelayConnectionTarget({
       environmentId: EnvironmentId.make("environment-2"),
-      label: "Other",
+      label: "其他",
     });
     const document = {
       ...EMPTY_CONNECTION_CATALOG_DOCUMENT,

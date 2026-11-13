@@ -684,7 +684,7 @@ it.effect(
           driver: ProviderDriverKind.make("codex"),
           providerInstanceId: ProviderInstanceId.make("codex"),
           status: "ready",
-          extensionStatuses: [{ key: "watch", text: "Watching" }],
+          extensionStatuses: [{ key: "watch", text: "仅查看" }],
         },
       ],
       providerThreads: [

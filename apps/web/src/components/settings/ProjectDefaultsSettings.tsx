@@ -119,7 +119,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   const setModel = (value: ModelSelection | null) => {
     const reason = value ? modelDisabledReason(value.instanceId, value.model) : null;
     if (reason) {
-      toastManager.add({ type: "error", title: "Default model not saved", description: reason });
+      toastManager.add({ type: "error", title: "未保存默认模型", description: reason });
       return;
     }
     updateSettings({ defaultModelSelection: value });
@@ -131,13 +131,13 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["defaultModelSelection"]}
       mixed={mixedModel}
       id="default-model"
-      title="Model"
+      title="模型"
       description={
         isProjectScope
-          ? "Model for new threads in this project."
+          ? "此项目新会话使用的模型。"
           : !unavailable && modelSource !== "project" && automaticModel
-            ? "Default model for new threads, selected automatically. Projects can override it."
-            : "Default model for new threads. Projects can override it."
+            ? "自动选择的新会话默认模型。项目可以覆盖此设置。"
+            : "新会话的默认模型。项目可以覆盖此设置。"
       }
       status={
         mixedModel
@@ -146,7 +146,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
       resetAction={
         settings.defaultModelSelection !== null ? (
-          <SettingResetButton label="default model" onClick={() => setModel(null)} />
+          <SettingResetButton label="默认模型" onClick={() => setModel(null)} />
         ) : null
       }
       control={
@@ -161,7 +161,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               modelOptionsByInstance={modelOptions}
               triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
               {...(mixedModel
-                ? { triggerLabel: automaticModel ? "Automatic (mixed)" : "Mixed" }
+                ? { triggerLabel: automaticModel ? "自动（各不相同）" : "各不相同" }
                 : {})}
               getModelDisabledReason={modelDisabledReason}
               onOpenProviderSetup={(instanceId) => {
@@ -191,7 +191,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
           </div>
         ) : (
           <span className="text-sm text-muted-foreground">
-            {mixedModel ? "Mixed" : "No providers available"}
+            {mixedModel ? "各不相同" : "没有可用的提供方"}
           </span>
         )
       }
@@ -203,16 +203,16 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["defaultThreadEnvMode"]}
       mixed={mixedWorkspace}
       id={searchableSetting("new-threads").id}
-      title="Workspace"
+      title="工作区"
       description={
         isProjectScope
-          ? "Where new threads in this project start."
-          : "Where new threads start. Projects and their t3.json can override it."
+          ? "此项目新会话的起始工作区。"
+          : "新会话的起始工作区。项目及其 t3.json 可以覆盖此设置。"
       }
       resetAction={
         !isProjectScope && settings.defaultThreadEnvMode !== null ? (
           <SettingResetButton
-            label="default workspace"
+            label="默认工作区"
             onClick={() => updateSettings({ defaultThreadEnvMode: null })}
           />
         ) : null
@@ -225,7 +225,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               updateSettings({ defaultThreadEnvMode: value });
           }}
         >
-          <SelectTrigger size="sm" aria-label="Default workspace">
+          <SelectTrigger size="sm" aria-label="默认工作区">
             <SelectValue>
               {(value: string | null) =>
                 value === "local" || value === "worktree"
@@ -251,11 +251,11 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["fallbackModelSelection"]}
       mixed={mixedFallback}
       {...searchableSetting("fallback-model")}
-      description="Used for new threads when the default model's provider is out of usage."
+      description="默认模型的提供方额度耗尽时，新会话使用此模型。"
       resetAction={
         mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
-            label="fallback model"
+            label="备用模型"
             onClick={() => updateSettings({ fallbackModelSelection: null })}
           />
         ) : null
@@ -271,11 +271,11 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               instanceEntries={entries}
               modelOptionsByInstance={fallbackModelOptions}
               triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-              triggerAriaLabel="Fallback model"
+              triggerAriaLabel="备用模型"
               {...(mixedFallback
-                ? { triggerLabel: "Mixed" }
+                ? { triggerLabel: "各不相同" }
                 : settings.fallbackModelSelection === null
-                  ? { triggerLabel: "None" }
+                  ? { triggerLabel: "无" }
                   : {})}
               getModelDisabledReason={modelDisabledReason}
               onInstanceModelChange={(instanceId, model) => {
@@ -283,7 +283,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                 if (reason) {
                   toastManager.add({
                     type: "error",
-                    title: "Fallback model not saved",
+                    title: "未保存备用模型",
                     description: reason,
                   });
                   return;
@@ -312,7 +312,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             ) : null}
           </div>
         ) : (
-          <span className="text-sm text-muted-foreground">No providers available</span>
+          <span className="text-sm text-muted-foreground">没有可用的提供方</span>
         )
       }
     />
@@ -321,7 +321,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   return (
     <SettingsSection
       id={category === "source-control" ? "source-control-defaults" : "project-defaults"}
-      title={category === "source-control" ? "Repositories" : "New threads"}
+      title={category === "source-control" ? "仓库" : "新会话"}
     >
       {category === "project" ? (
         <>
@@ -339,14 +339,12 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             mixed={mixedPermissions}
             {...searchableSetting("default-permissions")}
             description={
-              isProjectScope
-                ? "Permissions for new threads in this project."
-                : "Default permissions for new threads. Projects can override them."
+              isProjectScope ? "此项目新会话的权限。" : "新会话的默认权限。项目可以覆盖此设置。"
             }
             resetAction={
               settings.defaultRuntimeMode !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode ? (
                 <SettingResetButton
-                  label="default permissions"
+                  label="默认权限"
                   onClick={() =>
                     updateSettings({
                       defaultRuntimeMode: DEFAULT_SERVER_SETTINGS.defaultRuntimeMode,
@@ -362,13 +360,13 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                   if (value) updateSettings({ defaultRuntimeMode: value });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Default permissions">
+                <SelectTrigger size="sm" aria-label="默认权限">
                   {!mixedPermissions && (
                     <PermissionIcon className="size-3.5 shrink-0 text-muted-foreground" />
                   )}
                   <SelectValue>
                     {mixedPermissions
-                      ? "Mixed"
+                      ? "各不相同"
                       : runtimeModeConfig[settings.defaultRuntimeMode].label}
                   </SelectValue>
                 </SelectTrigger>
@@ -414,24 +412,24 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             settingKeys={["defaultAutoPull"]}
             mixed={mixedAutoPull}
             id="automatic-pull"
-            title="Automatically pull"
+            title="自动拉取"
             description={
               isProjectScope
-                ? "Keeps this project's default branch current when the checkout has no local changes or commits."
-                : "Keeps the default branch current when the checkout has no local changes or commits. Projects can override it."
+                ? "工作副本没有本地改动或未推送的提交时，自动更新此项目的默认分支。"
+                : "工作副本没有本地改动或未推送的提交时，自动更新默认分支。项目可以覆盖此设置。"
             }
             resetAction={
               settings.defaultAutoPull ? (
                 <SettingResetButton
-                  label="default automatic pull"
-                  tooltip="Reset automatic pull to off"
+                  label="默认自动拉取"
+                  tooltip="将自动拉取重置为关闭"
                   onClick={() => updateSettings({ defaultAutoPull: false })}
                 />
               ) : null
             }
             control={
               <Switch
-                aria-label="Default automatic pull"
+                aria-label="默认自动拉取"
                 mixed={mixedAutoPull}
                 checked={mixedAutoPull ? false : settings.defaultAutoPull}
                 onCheckedChange={(enabled) => updateSettings({ defaultAutoPull: enabled })}
@@ -443,19 +441,19 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             settingKeys={["removeAgentCreditsOnMerge"]}
             mixed={mixedAgentCredits}
             {...searchableSetting("remove-agent-credits-on-merge")}
-            description="Remove recognized agent credit lines from merge and squash messages on hosts that support it, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits."
+            description="在支持的托管平台上，从合并和压缩提交说明中移除可识别的智能体署名，保留人类共同作者。包括自动合并，不包括合并队列、堆叠合并和已有提交。"
             resetAction={
               settings.removeAgentCreditsOnMerge ? (
                 <SettingResetButton
-                  label="agent credit removal"
-                  tooltip="Keep agent credits"
+                  label="移除智能体署名"
+                  tooltip="保留智能体署名"
                   onClick={() => updateSettings({ removeAgentCreditsOnMerge: false })}
                 />
               ) : null
             }
             control={
               <Switch
-                aria-label="Remove agent credits when merging"
+                aria-label="合并时移除智能体署名"
                 mixed={mixedAgentCredits}
                 checked={mixedAgentCredits ? false : settings.removeAgentCreditsOnMerge}
                 onCheckedChange={(enabled) =>
@@ -471,14 +469,14 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             {...searchableSetting("pull-request-merge-method")}
             description={
               isProjectScope
-                ? "Pull requests in this project start with this method."
-                : "Pull requests start with this method. Last selected reuses whatever you chose most recently on this device."
+                ? "此项目的 pull request 默认使用此合并方式。"
+                : "Pull request 默认使用此合并方式。“上次选择”会沿用你在此设备上最近选择的方式。"
             }
             resetAction={
               settings.pullRequestMergeMethod !== null ? (
                 <SettingResetButton
-                  label="default merge method"
-                  tooltip="Reset to last selected"
+                  label="默认合并方式"
+                  tooltip="重置为上次选择"
                   onClick={() => updateSettings({ pullRequestMergeMethod: null })}
                 />
               ) : null
@@ -492,19 +490,19 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                     updateSettings({ pullRequestMergeMethod: value });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Default pull request merge method">
+                <SelectTrigger size="sm" aria-label="默认 PR 合并方式">
                   <SelectValue>
                     {(value: string | null) =>
                       value === "merge" || value === "squash" || value === "rebase"
                         ? PULL_REQUEST_MERGE_METHOD_LABELS[value]
                         : value === "last"
-                          ? "Last selected"
+                          ? "上次选择"
                           : "Mixed"
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="last">Last selected</SelectItem>
+                  <SelectItem value="last">上次选择</SelectItem>
                   <SelectItem value="merge">{PULL_REQUEST_MERGE_METHOD_LABELS.merge}</SelectItem>
                   <SelectItem value="squash">{PULL_REQUEST_MERGE_METHOD_LABELS.squash}</SelectItem>
                   <SelectItem value="rebase">{PULL_REQUEST_MERGE_METHOD_LABELS.rebase}</SelectItem>
@@ -537,13 +535,13 @@ export function WorktreeSubmodulesRow() {
       {...searchableSetting("worktree-submodules")}
       description={
         isProjectScope
-          ? "How new worktrees in this project populate git submodules."
-          : "How new worktrees populate git submodules. Projects and their t3.json can override it."
+          ? "此项目的新工作树如何初始化 Git 子模块。"
+          : "新工作树如何初始化 Git 子模块。项目及其 t3.json 可以覆盖此设置。"
       }
       resetAction={
         !isProjectScope && settings.worktreeSubmodules !== null ? (
           <SettingResetButton
-            label="worktree submodules"
+            label="工作树子模块"
             onClick={() => updateSettings({ worktreeSubmodules: null })}
           />
         ) : null
@@ -555,7 +553,7 @@ export function WorktreeSubmodulesRow() {
             if (isWorktreeSubmodules(value)) updateSettings({ worktreeSubmodules: value });
           }}
         >
-          <SelectTrigger size="sm" aria-label="Worktree submodules">
+          <SelectTrigger size="sm" aria-label="工作树子模块">
             <SelectValue>
               {(value: string | null) =>
                 isWorktreeSubmodules(value)

@@ -392,7 +392,7 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
           auth: {
             status: "authenticated",
             type: options.auth?.type ?? "oauth-personal",
-            label: options.auth?.label ?? "Google account",
+            label: options.auth?.label ?? "Google 账户",
           },
           checkedAt: updatedAt,
           models: buildAntigravityModelsFromSession(started.sessionSetupResult, thinkingLevels),

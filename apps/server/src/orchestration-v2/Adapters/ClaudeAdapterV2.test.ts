@@ -147,7 +147,7 @@ const CUSTOM_MODEL_CLAUDE_SETTINGS = Schema.decodeSync(ClaudeSettings)({
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select",
             options: [
               { id: "gentle", label: "Gentle", isDefault: true },
@@ -167,7 +167,7 @@ const ULTRACODE_CUSTOM_MODEL_CLAUDE_SETTINGS = Schema.decodeSync(ClaudeSettings)
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select",
             options: [
               { id: "high", label: "High", isDefault: true },
@@ -848,8 +848,8 @@ describe("ClaudeAdapterV2 approval presentation", () => {
       reason: "Dangerous rm on a path built from a variable",
       fullAccessOverride: "provider_check",
       options: [
-        { decision: "decline", label: "Decline" },
-        { decision: "accept", label: "Approve" },
+        { decision: "decline", label: "拒绝" },
+        { decision: "accept", label: "批准" },
       ],
     });
   });
@@ -1521,7 +1521,7 @@ describe("ClaudeAdapterV2 MCP elicitation acceptance", () => {
 
   it("has no answer for URL mode or a form asking for a value", () => {
     for (const request of [
-      { serverName: "deploys", message: "Sign in", mode: "url", url: "https://example.com" },
+      { serverName: "deploys", message: "登录", mode: "url", url: "https://example.com" },
       form({ reason: { type: "string" } }, ["reason"]),
       form({ grant: { type: "string", enum: ["always", "session"] } }, ["grant"]),
       form({ grant: { type: "string", enum: ["deny", "always"], default: "always" } }, ["grant"]),
@@ -6322,10 +6322,10 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           prompt: "Deploy web to production?",
           appName: "Deploy",
           options: [
-            { decision: "cancel", label: "Cancel" },
-            { decision: "decline", label: "Decline" },
-            { decision: "acceptForSession", label: "Always allow this session" },
-            { decision: "accept", label: "Approve" },
+            { decision: "cancel", label: "取消" },
+            { decision: "decline", label: "拒绝" },
+            { decision: "acceptForSession", label: "本次会话始终允许" },
+            { decision: "accept", label: "批准" },
           ],
         });
         assert.isUndefined(answer.pollUnsafe());
@@ -6980,7 +6980,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                   is_error: true,
                   content: "STOP and wait for the user.",
                 },
-                { type: "tool_result", tool_use_id: "tool-ok", is_error: false, content: "OK" },
+                { type: "tool_result", tool_use_id: "tool-ok", is_error: false, content: "确定" },
               ],
             },
             ...(kind === undefined
@@ -7345,7 +7345,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         }),
         makeResultFrame({
           uuid: "00000000-0000-4000-8000-000000000685",
-          result: "Usage limit reached.",
+          result: "已达到用量上限。",
           isError: true,
           apiErrorStatus: 429,
           terminalReason: "api_error",
@@ -9641,9 +9641,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         );
         assert.equal(
           settled.title,
-          outcome.compact_result === "failed"
-            ? "Context compaction failed"
-            : "Context compaction stopped",
+          outcome.compact_result === "failed" ? "上下文压缩失败" : "上下文压缩已停止",
         );
         assert.isNotNull(settled.completedAt);
         assert.isEmpty(harness.terminalEvents());
@@ -9804,7 +9802,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.equal(settled?.status, itemStatus);
         assert.equal(
           settled?.title,
-          itemStatus === "failed" ? "Context compaction failed" : "Context compaction stopped",
+          itemStatus === "failed" ? "上下文压缩失败" : "上下文压缩已停止",
         );
         if (outcome === "interrupt_aborted") assert.isUndefined(settled?.summary);
         assert.equal(settled?.id, running?.id);
@@ -10045,7 +10043,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           {
             id: "tool-todo-1",
             name: "TodoWrite",
-            input: { todos: [{ content: "Inspect", status: "in_progress" }] },
+            input: { todos: [{ content: "检查", status: "in_progress" }] },
           },
         ]),
       );
@@ -10055,7 +10053,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           {
             id: "tool-todo-1",
             name: "TodoWrite",
-            input: { todos: [{ content: "Inspect", status: "in_progress" }] },
+            input: { todos: [{ content: "检查", status: "in_progress" }] },
           },
         ]),
       );
@@ -10124,7 +10122,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           {
             id: "tool-todo-2",
             name: "TodoWrite",
-            input: { todos: [{ content: "Inspect", status: "completed" }] },
+            input: { todos: [{ content: "检查", status: "completed" }] },
           },
           { id: "tool-exit-plan-1", name: "ExitPlanMode", input: { plan: planMarkdown } },
         ]),
@@ -10153,7 +10151,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           {
             id: "tool-todo-3",
             name: "TodoWrite",
-            input: { todos: [{ content: "Implement", status: "pending" }] },
+            input: { todos: [{ content: "执行计划", status: "pending" }] },
           },
         ]),
       );
@@ -10184,11 +10182,9 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const proposedItems = [...items.values()].filter((item) => item.type === "proposed_plan");
       assert.lengthOf(todoItems, 3);
       assert.equal(todoItems[1]?.status, "completed");
-      assert.deepEqual(todoItems[1]?.steps, [
-        { id: "todo-0", text: "Inspect", status: "completed" },
-      ]);
+      assert.deepEqual(todoItems[1]?.steps, [{ id: "todo-0", text: "检查", status: "completed" }]);
       assert.deepEqual(todoItems[2]?.steps, [
-        { id: "todo-0", text: "Implement", status: "pending" },
+        { id: "todo-0", text: "执行计划", status: "pending" },
       ]);
       assert.equal(todoItems[1]?.runId, todoItems[2]?.runId);
       assert.lengthOf(proposedItems, 1);
@@ -10372,7 +10368,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
 
   const createTask = (id: string, subject: string): TaskToolCall => ({
     name: "TaskCreate",
-    input: { subject: `Requested ${subject}`, description: `Work on ${subject}.` },
+    input: { subject: `已请求 ${subject}`, description: `Work on ${subject}.` },
     output: { task: { id, subject } },
   });
   const updateTask = (input: TaskUpdateInput, success = true): TaskToolCall => ({
@@ -10441,7 +10437,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.lengthOf(plans, 1);
         assert.deepEqual(
           plans[0]?.steps.map(({ id, text, status }) => ({ id, text, status })),
-          [{ id: "task-1", text: "Inspect", status: "running" }],
+          [{ id: "task-1", text: "检查", status: "running" }],
         );
         assert.lengthOf(
           projection.turnItems.filter((item) => item.type === "todo_list"),
@@ -10470,8 +10466,8 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.lengthOf(firstTurnPlans, 3);
         assert.equal(new Set(firstTurnPlans.map((plan) => plan.id)).size, 1);
         assert.deepEqual(firstTurnPlans.at(-1)?.steps, [
-          { id: "task-1", text: "Inspect", status: "running" },
-          { id: "task-2", text: "Implement", status: "pending" },
+          { id: "task-1", text: "检查", status: "running" },
+          { id: "task-2", text: "执行计划", status: "pending" },
         ]);
         const firstPlan = firstTurnPlans.at(-1)!;
 
@@ -10488,7 +10484,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.notEqual(newPlan.runId, firstPlan.runId);
         assert.deepEqual(newPlan.steps, [
           { id: "task-1", text: "Inspected", status: "completed" },
-          { id: "task-2", text: "Implement", status: "pending" },
+          { id: "task-2", text: "执行计划", status: "pending" },
         ]);
       }).pipe(
         Effect.scoped,
@@ -10514,14 +10510,14 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       yield* harness.finishTurn();
       assert.lengthOf(harness.plans(), 3);
       assert.deepEqual(harness.plans().at(-1)?.steps, [
-        { id: "task-2", text: "Keep", status: "pending" },
+        { id: "task-2", text: "保留", status: "pending" },
       ]);
 
       yield* harness.startTurn();
       yield* harness.call(updateTask({ taskId: "2", status: "in_progress" }));
       yield* harness.finishTurn();
       assert.deepEqual(harness.plans().at(-1)?.steps, [
-        { id: "task-2", text: "Keep", status: "running" },
+        { id: "task-2", text: "保留", status: "running" },
       ]);
       for (const plan of harness.plans().slice(2)) {
         assert.isFalse(plan.steps.some((step) => step.id === "task-1"));
@@ -10581,8 +10577,8 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           harness.plans().map((plan) => plan.steps),
           [
             [
-              { id: "task-1", text: "Inspect", status: "completed" },
-              { id: "task-2", text: "Implement", status },
+              { id: "task-1", text: "检查", status: "completed" },
+              { id: "task-2", text: "执行计划", status },
             ],
           ],
         );
@@ -10654,14 +10650,14 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const plans = harness.plans();
       assert.lengthOf(plans, 4);
       assert.deepEqual(plans[1]?.steps, [
-        { id: "task-2", text: "Queued", status: "pending" },
-        { id: "task-3", text: "Working", status: "running" },
-        { id: "task-4", text: "Done", status: "completed" },
+        { id: "task-2", text: "排队中", status: "pending" },
+        { id: "task-3", text: "运行中", status: "running" },
+        { id: "task-4", text: "完成", status: "completed" },
       ]);
       assert.deepEqual(plans[2]?.steps, [
-        { id: "task-2", text: "Queued", status: "running" },
-        { id: "task-3", text: "Working", status: "running" },
-        { id: "task-4", text: "Done", status: "completed" },
+        { id: "task-2", text: "排队中", status: "running" },
+        { id: "task-3", text: "运行中", status: "running" },
+        { id: "task-4", text: "完成", status: "completed" },
       ]);
       assert.deepEqual(plans[3]?.steps, []);
     }).pipe(
@@ -10749,7 +10745,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       yield* harness.call(updateTask({ taskId: "1", status: "completed" }));
       yield* harness.finishTurn();
       assert.deepEqual(harness.plans().at(-1)?.steps, [
-        { id: "task-1", text: "Inspect", status: "completed" },
+        { id: "task-1", text: "检查", status: "completed" },
       ]);
     }).pipe(
       Effect.scoped,
@@ -11954,7 +11950,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
                   type: "tool_use",
                   id: toolUseId,
                   name: "Bash",
-                  input: { command: "vp run build", description: "Build" },
+                  input: { command: "vp run build", description: "构建" },
                 },
               ],
               stop_reason: null,

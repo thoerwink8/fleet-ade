@@ -104,7 +104,7 @@ describe("DesktopUpdates", () => {
 
   it.effect("keeps the disabled reason available after configuration and channel changes", () => {
     const harness = makeHarness({ env: { T3CODE_DISABLE_AUTO_UPDATE: "true" } });
-    const reason = "Automatic updates are disabled by the T3CODE_DISABLE_AUTO_UPDATE setting.";
+    const reason = "T3CODE_DISABLE_AUTO_UPDATE 设置已停用自动更新。";
 
     return Effect.scoped(
       Effect.gen(function* () {

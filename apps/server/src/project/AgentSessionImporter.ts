@@ -357,7 +357,7 @@ const make = Effect.gen(function* () {
             creationSource: "server",
             id: threadId,
             projectId: input.projectId,
-            title: thread.title.trim() === "" ? "Untitled thread" : thread.title,
+            title: thread.title.trim() === "" ? "未命名会话" : thread.title,
             providerInstanceId: thread.providerInstanceId,
             modelSelection: { instanceId: thread.providerInstanceId, model },
             runtimeMode,

@@ -8,9 +8,9 @@ export function freshSessionBannerItem(onUndo: () => void): ComposerBannerStackI
     id: "fresh-session",
     variant: "info",
     icon: <EraserIcon />,
-    title: "Your next message starts a fresh session",
-    description: "The agent won't see earlier messages in this thread.",
-    dismissLabel: "Keep the current session",
+    title: "你的下一条消息将以全新上下文开始",
+    description: "智能体将看不到这个会话里之前的消息。",
+    dismissLabel: "保留当前上下文",
     onDismiss: onUndo,
   };
 }

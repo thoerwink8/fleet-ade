@@ -34,7 +34,7 @@ function makeHarness(environmentIds: ReadonlyArray<EnvironmentId> = [environment
         {
           target: new PrimaryConnectionTarget({
             environmentId: id,
-            label: "Environment",
+            label: "环境",
             httpBaseUrl: "https://example.test",
             wsBaseUrl: "wss://example.test",
           }),
@@ -72,7 +72,7 @@ describe("v2 thread shell lists", () => {
         kind: "thread.updated",
         location: "active",
         sequence: 1,
-        thread: { ...snapshot.threads[1]!, title: "Updated" },
+        thread: { ...snapshot.threads[1]!, title: "已更新" },
       }),
     );
     expect(registry.get(threads.threadRefsAtom)).toBe(before);

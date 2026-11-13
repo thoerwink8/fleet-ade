@@ -29,13 +29,12 @@ function setup(detail: string) {
 const HEAD_MOVED = "The stack head moved. Refresh the stack before trying again.";
 
 it.each([
-  { label: "Merge stack", detail: HEAD_MOVED, description: HEAD_MOVED },
-  { label: "Rebase stack", detail: HEAD_MOVED, description: HEAD_MOVED },
+  { label: "合并堆叠", detail: HEAD_MOVED, description: HEAD_MOVED },
+  { label: "对堆叠变基", detail: HEAD_MOVED, description: HEAD_MOVED },
   {
-    label: "Rebase stack",
+    label: "对堆叠变基",
     detail: "GitHub CLI command failed.",
-    description:
-      "The host refused the rebase. A rebase stops at the first commit that does not apply cleanly.",
+    description: "托管平台拒绝了变基。变基在应用提交时遇到冲突就会停止。",
   },
 ])("$label refused with $detail shows $description", async (row) => {
   setup(row.detail);

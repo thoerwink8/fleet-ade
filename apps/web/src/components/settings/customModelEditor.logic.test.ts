@@ -28,13 +28,13 @@ describe("customModelEditor.logic", () => {
             key: "a",
             type: "select",
             id: "reasoningEffort",
-            label: "Reasoning",
+            label: "推理",
             choices: [
               { key: "a1", id: "low", label: "Low", isDefault: false },
               { key: "a2", id: "high", label: "", isDefault: true },
             ],
           },
-          { key: "b", type: "boolean", id: "fastMode", label: "Fast Mode", choices: [] },
+          { key: "b", type: "boolean", id: "fastMode", label: "快速模式", choices: [] },
         ],
       }),
     );
@@ -46,7 +46,7 @@ describe("customModelEditor.logic", () => {
         optionDescriptors: [
           {
             id: "reasoningEffort",
-            label: "Reasoning",
+            label: "推理",
             type: "select",
             options: [
               { id: "low", label: "Low" },
@@ -54,7 +54,7 @@ describe("customModelEditor.logic", () => {
             ],
             currentValue: "high",
           },
-          { id: "fastMode", label: "Fast Mode", type: "boolean" },
+          { id: "fastMode", label: "快速模式", type: "boolean" },
         ],
       },
     });
@@ -77,7 +77,7 @@ describe("customModelEditor.logic", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select",
             currentValue: "high",
             options: [
@@ -101,7 +101,7 @@ describe("customModelEditor.logic", () => {
         optionDescriptors: [
           {
             id: "effort",
-            label: "Reasoning",
+            label: "推理",
             type: "select",
             options: [
               { id: "high", label: "High", isDefault: true },
@@ -121,11 +121,11 @@ describe("customModelEditor.logic", () => {
       optionDescriptors: [
         {
           id: "contextWindow",
-          label: "Context",
+          label: "上下文",
           type: "select",
           options: [{ id: "1m", label: "1M", isDefault: true }],
         },
-        { id: "thinking", label: "Thinking", type: "boolean", currentValue: true },
+        { id: "thinking", label: "思考", type: "boolean", currentValue: true },
       ],
     };
     const claude = ProviderDriverKind.make("claudeAgent");
@@ -154,7 +154,7 @@ describe("customModelEditor.logic", () => {
       key: id,
       type: "select" as const,
       id,
-      label: "Label",
+      label: "标签",
       choices: choices.map((choice) => ({
         key: choice.id,
         label: "",

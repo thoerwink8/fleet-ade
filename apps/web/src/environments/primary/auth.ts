@@ -74,7 +74,7 @@ export class PrimaryEnvironmentPairingCredentialRejectedError extends Schema.Tag
   },
 ) {
   override get message(): string {
-    return "Invalid pairing token. Check the token and try again.";
+    return "配对 token 无效。请检查后重试。";
   }
 }
 
@@ -97,7 +97,7 @@ export class PrimaryEnvironmentPairingCredentialRequiredError extends Schema.Tag
   },
 ) {
   override get message(): string {
-    return "Enter a pairing token to continue.";
+    return "请输入配对 token 以继续。";
   }
 }
 
@@ -323,7 +323,7 @@ async function bootstrapServerAuth(urlCredential: string | null): Promise<Server
     return {
       status: "requires-auth",
       auth: currentSession.auth,
-      errorMessage: error instanceof Error ? error.message : "Authentication failed.",
+      errorMessage: error instanceof Error ? error.message : "身份验证失败。",
     };
   }
 }

@@ -502,7 +502,7 @@ describe("connection onboarding", () => {
   );
   it.effect.each([
     { label: "read-only", scopes: ["orchestration:read"] },
-    { label: "default", scopes: AuthStandardClientScopes },
+    { label: "默认", scopes: AuthStandardClientScopes },
   ] as const)("preserves the $label grant when pairing a remote environment", ({ scopes }) =>
     Effect.gen(function* () {
       const registration = yield* preparePairingRegistration({

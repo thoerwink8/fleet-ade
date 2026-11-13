@@ -7,22 +7,22 @@ function formatElapsedSeconds(totalSeconds: number): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));
   const minutes = Math.floor(seconds / 60);
   if (minutes === 0) {
-    return `${seconds}s`;
+    return `${seconds} 秒`;
   }
   const hours = Math.floor(minutes / 60);
   if (hours === 0) {
     return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
   }
-  return `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
+  return `${hours} 小时 ${String(minutes % 60).padStart(2, "0")} 分钟`;
 }
 
 function formatCompactElapsedSeconds(totalSeconds: number): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 60) return `${seconds} 秒`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  if (minutes >= 600) return `${Math.floor(minutes / 60)}h`;
-  return `${Math.floor(minutes / 6) / 10}h`;
+  if (minutes < 60) return `${minutes} 分钟`;
+  if (minutes >= 600) return `${Math.floor(minutes / 60)} 小时`;
+  return `${Math.floor(minutes / 6) / 10} 小时`;
 }
 
 export function AgentElapsed({

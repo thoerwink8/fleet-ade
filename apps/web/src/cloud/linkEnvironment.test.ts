@@ -30,14 +30,14 @@ import { readCloudLinkState, unlinkEnvironmentFromCloud } from "./linkEnvironmen
 
 const TARGET = {
   environmentId: "environment-1",
-  label: "Desktop",
+  label: "桌面端",
   httpBaseUrl: "http://127.0.0.1:3000",
   wsBaseUrl: "ws://127.0.0.1:3000",
 };
 
 const SAVED_SERVICE_TARGET = {
   environmentId: "saved-service",
-  label: "Service",
+  label: "服务",
   httpBaseUrl: "http://127.0.0.1:3773",
   wsBaseUrl: "ws://127.0.0.1:3773",
 };

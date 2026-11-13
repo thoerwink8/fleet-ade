@@ -154,7 +154,7 @@ export function DeviceDuoViewport(props: {
         />
         <canvas
           ref={mountViewer}
-          aria-label="Interactive 3D iPhone Duo. Drag the screen to interact. Drag outside it or swipe with two fingers to turn. Pinch over the device to open or close its hinge."
+          aria-label="可交互的 3D iPhone Duo。拖动屏幕进行操作，拖动屏幕外区域或用两指滑动可旋转。在设备上双指捏合可开合铰链。"
           className="size-full touch-none"
           onPointerDown={(event) => {
             if (event.button !== 0) return;

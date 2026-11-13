@@ -149,7 +149,7 @@ function ThreadDetailsPrRows({
         ) : (
           <ChevronDownIcon aria-hidden className="size-4 shrink-0" />
         )}
-        {expanded ? "Show less" : `Show ${rest.length} more`}
+        {expanded ? "收起" : `再显示 ${rest.length} 个`}
       </ThreadDetailsControl>
     </>
   );

@@ -192,7 +192,7 @@ function panel(activeSurface: RightPanelSurface) {
         {/* Stands in for ServerBrowserSurface, whose page canvas handles thumb buttons itself. */}
         <canvas data-testid="page-canvas" onMouseUp={(event) => event.preventDefault()} />
         <InputGroup>
-          <InputGroupInput aria-label="Address" />
+          <InputGroupInput aria-label="地址" />
           <InputGroupAddon data-testid="address-addon" align="inline-end" />
         </InputGroup>
       </div>

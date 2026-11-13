@@ -103,7 +103,7 @@ const makeSupervisor = Effect.fn("TestEnvironmentCommands.makeSupervisor")(funct
         input.projects.push(mutation);
         return {
           id: mutation.projectId,
-          title: mutation.type === "project.create" ? mutation.title : "Project",
+          title: mutation.type === "project.create" ? mutation.title : "项目",
           workspaceRoot:
             mutation.type === "project.create" ? mutation.workspaceRoot : "/workspace/project",
           repositoryIdentity: null,
@@ -237,16 +237,16 @@ describe("V2 environment commands", () => {
         message: {
           messageId: MessageId.make("message-existing-worktree"),
           role: "user",
-          text: "Continue here",
+          text: "在此继续",
           attachments: [],
         },
         runtimeMode: "full-access",
         interactionMode: "default",
-        titleSeed: "Continue here",
+        titleSeed: "在此继续",
         bootstrap: {
           createThread: {
             projectId: ProjectId.make("project-1"),
-            title: "Thread",
+            title: "会话",
             modelSelection: v2Projection.thread.modelSelection,
             runtimeMode: "full-access",
             interactionMode: "default",
@@ -259,7 +259,7 @@ describe("V2 environment commands", () => {
 
       expect(launches[0]).toMatchObject({
         threadId: v2ThreadId,
-        title: "Continue here",
+        title: "在此继续",
         generateTitle: true,
         workspaceStrategy: {
           type: "existing_worktree",

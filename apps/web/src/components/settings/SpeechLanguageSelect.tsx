@@ -3,7 +3,7 @@ import { effectiveSpeechLanguage } from "@t3tools/shared/speech";
 import { updateClientSettings, useClientSettings } from "../../hooks/useSettings";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 
-const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
+const languageNames = new Intl.DisplayNames(["zh-CN"], { type: "language" });
 export const languageLabel = (code: string) => languageNames.of(code) ?? code;
 
 type ModelLanguages = Pick<
@@ -20,15 +20,13 @@ export function SpeechLanguageSelect({ model }: { readonly model: ModelLanguages
         preference,
       )
     : preference;
-  const effectiveLabel = resolved === "auto" ? "Auto-detect" : languageLabel(resolved);
+  const effectiveLabel = resolved === "auto" ? "自动检测" : languageLabel(resolved);
   const unavailable =
-    preference !== "auto" && preference !== resolved
-      ? `${languageLabel(preference)} unavailable`
-      : null;
+    preference !== "auto" && preference !== resolved ? `${languageLabel(preference)} 不可用` : null;
   const label = unavailable
     ? `${effectiveLabel} (${unavailable})`
     : preference === "auto" && resolved !== "auto"
-      ? `Auto (${effectiveLabel})`
+      ? `自动（${effectiveLabel}）`
       : effectiveLabel;
   return (
     <Select
@@ -38,11 +36,11 @@ export function SpeechLanguageSelect({ model }: { readonly model: ModelLanguages
         if (value) void updateClientSettings({ speechLanguage: value });
       }}
     >
-      <SelectTrigger size="sm" aria-label="Transcription language" className="max-w-64">
+      <SelectTrigger size="sm" aria-label="转写语言" className="max-w-64">
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
       <SelectPopup align="end" alignItemWithTrigger={false}>
-        <SelectItem value="auto">Auto</SelectItem>
+        <SelectItem value="auto">自动</SelectItem>
         {unavailable ? (
           <SelectItem value={preference} disabled>
             {unavailable}

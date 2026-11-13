@@ -266,7 +266,7 @@ it.effect(
           runId: null,
           nodeId: null,
           role: "user",
-          text: "Next turn",
+          text: "下一轮",
           attachments: [],
           streaming: false,
           createdAt: now,

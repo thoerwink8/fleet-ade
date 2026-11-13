@@ -38,7 +38,7 @@ export function SourceControlTokenSettings({
     readHostCredentialSettings(settings, definition.kind),
   );
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: `save ${definition.label} token`,
+    label: `保存 ${definition.label} token`,
   });
   const defaultHost = definition.publicHost ?? "";
   const [host, setHost] = useState(defaultHost);
@@ -104,7 +104,7 @@ export function SourceControlTokenSettings({
                 />
               }
             >
-              Create a token
+              创建 token
               <ExternalLinkIcon aria-hidden className="size-3" />
             </InlineButton>
           ) : null}
@@ -139,8 +139,8 @@ export function SourceControlTokenSettings({
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
             {savedHosts.length === 0
-              ? `No token saved; the server uses ${credentials.tokenEnvVar} or the ${credentials.cliName} login.`
-              : `Saved for ${savedHosts.join(", ")}.`}
+              ? `尚未保存 token；服务器将使用 ${credentials.tokenEnvVar} 或 ${credentials.cliName} 登录账户。`
+              : `已为 ${savedHosts.join(", ")} 保存。`}
           </p>
           <div className="flex shrink-0 gap-2">
             {isSaved ? (
@@ -150,7 +150,7 @@ export function SourceControlTokenSettings({
                 disabled={saving}
                 onClick={() => void save(normalizedHost, "")}
               >
-                Remove
+                移除
               </Button>
             ) : null}
             <Button
@@ -158,7 +158,7 @@ export function SourceControlTokenSettings({
               size="xs"
               disabled={!normalizedHost || submission === "" || saving}
             >
-              Save
+              保存
             </Button>
           </div>
         </div>

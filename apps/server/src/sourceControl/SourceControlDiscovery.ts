@@ -52,7 +52,7 @@ const VCS_PROBES: ReadonlyArray<VcsProbe> = [
     executable: "git",
     versionArgs: ["--version"],
     implemented: true,
-    installHint: "Install Git from https://git-scm.com/downloads or with your package manager.",
+    installHint: "从 https://git-scm.com/downloads 或通过包管理器安装 Git。",
   },
   {
     kind: "jj",
@@ -60,7 +60,7 @@ const VCS_PROBES: ReadonlyArray<VcsProbe> = [
     executable: "jj",
     versionArgs: ["--version"],
     implemented: false,
-    installHint: "Install Jujutsu with `brew install jj` or from https://github.com/jj-vcs/jj.",
+    installHint: "通过 `brew install jj` 或从 https://github.com/jj-vcs/jj 安装 Jujutsu。",
   },
 ];
 

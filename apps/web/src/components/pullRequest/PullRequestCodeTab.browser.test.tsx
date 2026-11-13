@@ -113,7 +113,7 @@ import PullRequestCodeTab from "./PullRequestCodeTab";
 const detail: PullRequestDetailView = {
   provider: SourceControlProviderKind.make("github"),
   projectId: ProjectId.make("project"),
-  projectTitle: "Project",
+  projectTitle: "项目",
   workspaceRoot: "/workspace",
   repository: "owner/repo",
   number: 1,
@@ -197,14 +197,14 @@ it("keeps the diff after a refresh that brings back the same page", async () => 
   const container = document.createElement("div");
   container.className = "flex h-[700px] w-[900px]";
   await using screen = await render(tab(0), { container });
-  await expect.element(screen.getByText("1 file", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
 
   await screen.rerender(tab(1));
 
   await expect
     .element(screen.getByText("This pull request has no file changes."))
     .not.toBeInTheDocument();
-  await expect.element(screen.getByText("1 file", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
 });
 
 // regression: #13279 a Viewed answer that lands after a link reveals a file must not fold it
@@ -315,7 +315,7 @@ it("never requests the diff of a selected commit the pull request no longer has"
     { container },
   );
 
-  await expect.element(screen.getByText("1 file", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
   await expect
     .element(screen.getByRole("button", { name: "Diff scope: All commits" }))
     .toBeVisible();
@@ -347,7 +347,7 @@ it("answers a commit's diff link only once that commit's diff is shown", async (
     />
   );
   await using screen = await render(scoped(null), { container });
-  await expect.element(screen.getByText("1 file", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
 
   // The panel selects the link's commit after this tab has already seen the link.
   await screen.rerender(scoped(null, url));

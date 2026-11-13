@@ -314,9 +314,9 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
     Effect.gen(function* () {
       for (const auth of [
         undefined,
-        { type: "oauth-personal", label: "Google account" },
+        { type: "oauth-personal", label: "Google 账户" },
         { type: "oauth-business", label: "Gemini Enterprise" },
-        { type: "gemini-api-key", label: "Gemini API key" },
+        { type: "gemini-api-key", label: "Gemini API 密钥" },
         { type: "agent-platform", label: "Agent Platform" },
       ]) {
         const harness = yield* makeHarness(auth ? { auth } : {});
@@ -388,7 +388,7 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
 
   it.effect("clears all account metadata on sign-out and authentication failure", () =>
     Effect.gen(function* () {
-      const auth = { type: "gemini-api-key", label: "Gemini API key" };
+      const auth = { type: "gemini-api-key", label: "Gemini API 密钥" };
       const harness = yield* makeHarness({ auth });
       yield* harness.initialize;
       for (const clear of [harness.provider.onSignedOut, harness.provider.onAuthRequired]) {

@@ -13,7 +13,7 @@ function failureMessage(result: TitleRegenerationResult): string | null {
   if (result._tag === "Failure") {
     if (isAtomCommandInterrupted(result)) return null;
     const error = squashAtomCommandFailure(result);
-    return error instanceof Error ? error.message : "An error occurred.";
+    return error instanceof Error ? error.message : "发生错误。";
   }
   return result.value?.status === "failed"
     ? (result.value.message ?? "Title generation failed.")
@@ -34,7 +34,7 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
       type: "error",
       title:
         results.length === 1
-          ? "Failed to regenerate thread title"
+          ? "重新生成会话标题失败"
           : `Failed to regenerate ${failures.length} of ${results.length} thread titles`,
       description: failures[0],
     });
@@ -44,8 +44,8 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
   if (results.length === 1) {
     return stackedThreadToast({
       type: "info",
-      title: "Title kept",
-      description: "The current title already fits this thread.",
+      title: "保留了标题",
+      description: "当前标题已经适合这个会话。",
     });
   }
   return stackedThreadToast({

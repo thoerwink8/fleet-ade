@@ -12,10 +12,9 @@ import { resolveClerkSignInProps } from "../clerk/authRedirect";
 import { Button } from "../ui/button";
 
 const invalidLinkMessage = {
-  context: "Authorization request",
-  title: "This connect link is incomplete",
-  description:
-    "The link is missing its authorization request. Re-run `t3 connect` in your terminal and open the freshly printed URL.",
+  context: "授权请求",
+  title: "此连接链接不完整",
+  description: "链接缺少授权请求。请在终端中重新运行 `t3 connect`，并打开新输出的 URL。",
 } as const;
 
 export function ConnectCliAuthorizeSurface() {
@@ -69,18 +68,18 @@ export function ConnectCliAuthorizeSurface() {
   return (
     <StandalonePage>
       <StandalonePageHeader
-        context="Browser authorization"
-        title="Connecting your terminal"
+        context="浏览器授权"
+        title="正在连接你的终端"
         description={
           isSignedIn
-            ? "Redirecting to authorize T3 Connect for your CLI…"
-            : "Sign in to continue authorizing T3 Connect for your CLI."
+            ? "正在跳转，为你的 CLI 授权 T3 Connect…"
+            : "请登录，以继续为你的 CLI 授权 T3 Connect。"
         }
       />
       {isLoaded && !isSignedIn ? (
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>
-            Sign in
+            登录
           </Button>
         </div>
       ) : null}

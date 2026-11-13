@@ -15,7 +15,7 @@ const device = {
 };
 
 const hosts = [
-  { id: "local", label: "This machine" },
+  { id: "local", label: "本机" },
   { id: "0dc4f37b-5e0a-4f4c-9a51-0c6b8e8a1f2d", label: "oliverMac" },
   { id: "mini-1", label: "Mac mini" },
   { id: "mini-2", label: "Mac mini" },

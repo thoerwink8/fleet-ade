@@ -83,7 +83,7 @@ export class PullRequestLinkFailedError extends Schema.TaggedError<PullRequestLi
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Could not link the pull request.";
+    return "无法关联该 pull request。";
   }
 }
 
@@ -249,7 +249,7 @@ const LinkPullRequestTool = Tool.make("link_pull_request", {
   failure: PullRequestToolError,
   dependencies,
 })
-  .annotate(Tool.Title, "Link pull request to thread")
+  .annotate(Tool.Title, "为会话关联 PR")
   .annotate(Tool.Readonly, false)
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)

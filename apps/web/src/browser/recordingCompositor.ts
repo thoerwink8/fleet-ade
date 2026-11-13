@@ -15,7 +15,7 @@ export async function createRecordingCompositor(
 ) {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error("Recording canvas is unavailable.");
+  if (!context) throw new Error("录制画布不可用。");
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;

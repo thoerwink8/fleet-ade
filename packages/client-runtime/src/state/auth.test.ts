@@ -10,7 +10,7 @@ describe("applyAuthAccessStreamEvent", () => {
       id: "pairing-link",
       scopes: ["orchestration:read"],
       subject: "subject",
-      label: "Phone",
+      label: "手机",
       createdAt: DateTime.makeUnsafe("2036-04-07T00:00:00.000Z"),
       expiresAt: DateTime.makeUnsafe("2036-04-07T00:05:00.000Z"),
     } as const;
@@ -20,7 +20,7 @@ describe("applyAuthAccessStreamEvent", () => {
       scopes: ["orchestration:read"],
       method: "browser-session-cookie",
       client: {
-        label: "Phone",
+        label: "手机",
         deviceType: "mobile",
       },
       issuedAt: DateTime.makeUnsafe("2036-04-07T00:00:00.000Z"),
@@ -57,7 +57,7 @@ describe("applyAuthAccessStreamEvent", () => {
             id: "pairing-link",
             scopes: ["orchestration:read"],
             subject: "subject",
-            label: "Phone",
+            label: "手机",
             createdAt: DateTime.makeUnsafe("2036-04-07T00:00:00.000Z"),
             expiresAt: DateTime.makeUnsafe("2036-04-07T00:05:00.000Z"),
           },

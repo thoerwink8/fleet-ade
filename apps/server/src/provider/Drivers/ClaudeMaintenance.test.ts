@@ -168,7 +168,7 @@ it.layer(NodeServices.layer)("ClaudeMaintenance", (it) => {
       name: "unavailable feed",
       settings: undefined,
       channel: "latest",
-      body: "Unavailable",
+      body: "不可用",
       status: 503,
       expected: null,
       advisory: "unknown",

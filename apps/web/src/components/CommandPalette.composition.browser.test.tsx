@@ -80,7 +80,7 @@ vi.mock("../state/environments", async (original) => ({
     environments: [
       {
         environmentId: "local",
-        label: "Local",
+        label: "本地",
         connection: { phase: "connected" },
         entry: { target: { _tag: "PrimaryConnectionTarget" } },
         serverConfig: {
@@ -139,7 +139,7 @@ describe.each(["repository", "folder", "destination"] as const)("add-project %s"
     setup();
     await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
     await act(() => openCommandPalette({ open: "add-project" }));
-    await page.getByText(step === "folder" ? "Local folder" : "Git URL", { exact: true }).click();
+    await page.getByText(step === "folder" ? "本地文件夹" : "Git URL", { exact: true }).click();
     const input = () => page.getByRole("combobox");
     if (step === "destination") {
       await input().fill("https://example.com/team/project.git");
@@ -167,28 +167,28 @@ describe.each(["repository", "folder", "destination"] as const)("add-project %s"
 });
 
 it.each([
-  { step: "folder", source: "Local folder", keys: "", description: /^(?!.*(Ctrl|⌘)).*Add.*Enter/ },
+  { step: "folder", source: "本地文件夹", keys: "", description: /^(?!.*(Ctrl|⌘)).*Add.*Enter/ },
   {
     step: "highlighted folder",
-    source: "Local folder",
+    source: "本地文件夹",
     keys: "{ArrowDown}",
     description: /Add.*(Ctrl|⌘) Enter/,
   },
   { step: "repository", source: "Git URL", keys: "", description: /Continue.*Enter/ },
-  { step: "new project", source: "New project", keys: "", description: /Create.*Enter/ },
+  { step: "new project", source: "新建项目", keys: "", description: /Create.*Enter/ },
   {
     step: "permission-blocked folder",
-    source: "Local folder",
+    source: "本地文件夹",
     keys: "",
     deniedScope: AuthOrchestrationOperateScope,
-    description: "This connection cannot add projects.",
+    description: "此连接无法添加项目。",
   },
   {
     step: "permission-blocked destination",
     source: "Git URL",
     keys: "https://example.com/team/project.git{Enter}",
     deniedScope: AuthSourceControlWriteScope,
-    description: "This connection needs permission to write source control and add projects.",
+    description: "此连接需要写入版本控制和添加项目的权限。",
   },
 ])(
   "tells screen readers how to submit the $step step",
@@ -206,7 +206,7 @@ it("keeps the caret in place when an edit briefly makes the folder path not a pa
   setup();
   await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
   await act(() => openCommandPalette({ open: "add-project" }));
-  await page.getByText("Local folder", { exact: true }).click();
+  await page.getByText("本地文件夹", { exact: true }).click();
   const input = () => page.getByRole("combobox");
   await input().fill("/workspace/project");
   await userEvent.keyboard("{Home}{ArrowRight}{Backspace}");
@@ -219,7 +219,7 @@ it("keeps the caret in place when an edit briefly makes the folder path not a pa
 
 it.each([
   { flow: "Git URL", value: "https://github.com/pingdotgg/t3code.git", submit: "Continue (Enter)" },
-  { flow: "New project", value: "demo-tab-order", submit: /^Create \(/ },
+  { flow: "新建项目", value: "demo-tab-order", submit: /^Create \(/ },
 ])("moves focus from the $flow input to its enabled submit button on Tab", async (step) => {
   await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
   await act(() => openCommandPalette({ open: "add-project" }));
@@ -236,7 +236,7 @@ it("tells screen readers whether a new project will be published", async () => {
   setup(undefined, githubAvailable);
   await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
   await act(() => openCommandPalette({ open: "add-project" }));
-  await page.getByText("New project", { exact: true }).click();
+  await page.getByText("新建项目", { exact: true }).click();
   await page.getByRole("combobox").fill("demo-project");
   const option = page.getByRole("option", { name: /Create private repository/ });
   await expect.element(option).toHaveAttribute("aria-checked", "false");

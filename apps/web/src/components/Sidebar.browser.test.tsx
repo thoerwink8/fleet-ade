@@ -129,7 +129,7 @@ function threadShell(projectId: ProjectId, index: number): EnvironmentThreadShel
     environmentId: EnvironmentId.make("local"),
     id: ThreadId.make(`thread-${index}`),
     projectId,
-    title: `Thread ${index}`,
+    title: `会话 ${index}`,
   });
 }
 

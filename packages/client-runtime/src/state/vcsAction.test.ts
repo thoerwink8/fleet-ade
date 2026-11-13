@@ -135,7 +135,7 @@ describe("vcsActionState", () => {
   it("projects phase and hook progress without owning the async operation", () => {
     const initial = beginVcsActionState({
       operation: "run_change_request",
-      label: "Running source control action",
+      label: "正在运行版本控制操作",
       actionId,
     });
     const phase = applyVcsActionProgressEvent(

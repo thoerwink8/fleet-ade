@@ -60,7 +60,7 @@ function CommitLink({ url = commitUrl }: { url?: string }) {
   const open = useOpenChangeRequestLink(threadRef);
   return (
     <a href={url} onClick={(event) => open(event, url)}>
-      Commit
+      提交
     </a>
   );
 }

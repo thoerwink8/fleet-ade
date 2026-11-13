@@ -298,7 +298,7 @@ function changeLines(
       return [
         `- ${change.remarks.length} new ${change.remarks.length === 1 ? "comment" : "comments"}:`,
         ...listed(change.remarks, (remark) => {
-          const where = remark.path === null ? "" : ` on ${remark.path}`;
+          const where = remark.path === null ? "" : `在 ${remark.path} 上`;
           const body = snippet(remark.body);
           const said = body.length === 0 ? (remark.reviewState ?? "reviewed") : `"${body}"`;
           return `  - ${remark.author?.login ?? "someone"}${where}: ${said}${remark.url ? ` ${remark.url}` : ""}`;
@@ -374,7 +374,7 @@ export function pullRequestWatchMessage(input: {
   const { changes, exhausted } = input.report;
   const context = {
     baseBranch: input.baseBranch,
-    commit: input.headSha === null ? "" : ` on ${input.headSha.slice(0, 7)}`,
+    commit: input.headSha === null ? "" : `在 ${input.headSha.slice(0, 7)} 上`,
   };
   const text = [
     `Update on pull request #${input.number} (${input.url}), which T3 Code is watching for you:`,

@@ -15,7 +15,7 @@ const COMMITS = 2000;
 const detail: PullRequestDetailView = {
   provider: SourceControlProviderKind.make("github"),
   projectId: ProjectId.make("project"),
-  projectTitle: "Project",
+  projectTitle: "项目",
   workspaceRoot: "/workspace",
   repository: "owner/repo",
   number: 1,

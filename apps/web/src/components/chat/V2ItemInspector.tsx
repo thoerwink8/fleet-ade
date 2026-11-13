@@ -122,11 +122,7 @@ function useFetchedTurnItem(
       environmentId,
       pending: item === wireItem && detail.isPending,
       error:
-        item !== wireItem
-          ? null
-          : detail.data?.item === null
-            ? "Output is no longer available."
-            : detail.error,
+        item !== wireItem ? null : detail.data?.item === null ? "输出已不可用。" : detail.error,
       empty: fetches && item !== wireItem,
     },
   };
@@ -148,7 +144,7 @@ function ToolOutputImages(props: ToolOutputState) {
       key={resource.index}
       environmentId={props.environmentId}
       resource={resource}
-      alt="Tool output image"
+      alt="工具输出图片"
       maxHeightRem={16}
       onImageExpand={props.onImageExpand}
     />
@@ -159,11 +155,11 @@ function ToolOutput(props: ToolOutputState) {
   return props.output ? (
     <StructuredValue value={props.output} highlightJson />
   ) : props.pending ? (
-    <div className="text-muted-foreground italic">Loading output…</div>
+    <div className="text-muted-foreground italic">正在加载输出…</div>
   ) : props.error ? (
     <div className="text-destructive">Couldn&apos;t load output: {props.error}</div>
   ) : props.empty && props.images.length === 0 ? (
-    <div className="text-muted-foreground italic">No output.</div>
+    <div className="text-muted-foreground italic">没有输出。</div>
   ) : null;
 }
 
@@ -301,7 +297,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                   })
                 }
               >
-                Open diff
+                打开差异
               </Button>
             ) : null}
           </div>
@@ -367,7 +363,7 @@ export const V2ItemInspector = memo(function V2ItemInspector(props: V2ItemInspec
                   </a>
                 ) : (
                   <p className="font-medium text-foreground">
-                    {result.title ?? result.url ?? "Search result"}
+                    {result.title ?? result.url ?? "搜索结果"}
                   </p>
                 )}
                 {result.snippet ? <p className="text-muted-foreground">{result.snippet}</p> : null}

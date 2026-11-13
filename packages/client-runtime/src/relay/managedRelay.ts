@@ -63,7 +63,7 @@ export class ManagedRelayDpopKeyLoadError extends Schema.TaggedError<ManagedRela
   },
 ) {
   override get message(): string {
-    return "Could not load relay DPoP proof key.";
+    return "无法加载中继 DPoP 证明密钥。";
   }
 }
 
@@ -144,7 +144,7 @@ export class ManagedRelayUrlInvalidError extends Schema.TaggedError<ManagedRelay
   },
 ) {
   override get message(): string {
-    return "Relay URL must be a secure absolute HTTPS origin.";
+    return "中继 URL 必须是安全的绝对 HTTPS 源地址。";
   }
 }
 
@@ -174,7 +174,7 @@ export class ManagedRelayAccessTokenScopesUnexpectedError extends Schema.TaggedE
   },
 ) {
   override get message(): string {
-    return "Relay granted unexpected DPoP access token scopes.";
+    return "中继授予了意外的 DPoP 访问 token 权限范围。";
   }
 }
 
@@ -187,7 +187,7 @@ export class ManagedRelayTokenProofCreationError extends Schema.TaggedError<Mana
   },
 ) {
   override get message(): string {
-    return "Could not create relay token DPoP proof.";
+    return "无法创建中继 token 的 DPoP 证明。";
   }
 }
 
@@ -200,7 +200,7 @@ export class ManagedRelayRequestProofCreationError extends Schema.TaggedError<Ma
   },
 ) {
   override get message(): string {
-    return "Could not create relay request DPoP proof.";
+    return "无法创建中继请求的 DPoP 证明。";
   }
 }
 

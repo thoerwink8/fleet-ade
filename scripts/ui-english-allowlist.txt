@@ -1,0 +1,224 @@
+# 产品名，界面保留英文
+T3 Code
+# 产品名，界面保留英文
+T3 Connect
+# 产品名，界面保留英文
+Agent Platform
+# 产品名，界面保留英文
+ACP Registry
+# 追踪术语，界面保留英文
+Span
+# 托管平台名
+GitHub
+# 提供方名称
+Codex
+# 提供方名称
+Claude
+# 提供方名称
+Cursor
+# 操作系统名
+macOS
+# 操作系统名
+Windows
+# 操作系统名
+Linux
+# 系统文件管理器名
+Finder
+# 技术缩写
+CLI
+# 技术缩写
+MCP
+# 技术缩写
+SSH
+# 技术缩写
+API
+# 技术缩写
+URL
+# 技术缩写
+JSON
+# 技术缩写
+HTTP
+# 技术缩写
+CSS
+# 技术缩写
+HTML
+# 凭证词，术语表要求保留英文
+token
+# GitHub 议题这个词保留英文
+issue
+# 术语表要求保留英文
+change request
+# 短标签里的拉取请求缩写
+PR
+# 短标签里的合并请求缩写
+MR
+# 协议和运行时标识，不是文案
+localhost
+# 代码字体名，不是文案
+Segoe UI
+# 术语表要求完整句子保留
+pull request
+# 术语表要求完整句子保留
+merge request
+# 协议名
+HTTPS
+# 协议名
+ACP
+# 协议名
+DPoP
+# 浏览器术语
+Cookie
+# 产品名
+Tailscale
+# 产品名
+OpenTelemetry
+# 产品名
+OpenRouter
+# 产品名
+Open VSX
+# 产品名
+1Password
+# 产品名
+Antigravity
+# 产品名
+ChatGPT
+# 产品名
+Claude Code
+# 产品名
+Grok Build
+# 产品名
+Muse Code
+# 产品名
+T3 Chat
+# 产品名
+Office
+# 桌面环境名
+GNOME
+# 产品功能名
+SnapShots
+# 图标库名
+Lucide
+# 密钥管理产品名
+Expo
+# 构建服务名
+EAS
+# 键盘键名
+Enter
+# 键盘键名
+Shift
+# 键盘键名
+Escape
+# 键盘键名
+Command
+# 键盘键名
+Ctrl
+# 键盘键名
+Tab
+# 信号名
+SIGINT
+# 信号名
+SIGKILL
+# 环境变量名
+PATH
+# 环境变量名
+CODEX_HOME
+# 环境变量名
+CURSOR_API_KEY
+# 环境变量名
+T3CODE_RELAY_URL
+# 版本控制产品名
+Git
+# 文档格式名
+Markdown
+# 文档格式名
+PDF
+# 表格格式名
+CSV
+# 排版格式名
+LaTeX
+# 排版格式名
+TeX
+# 克隆路径示例
+github.com/owner/repo
+# 处理器名
+CPU
+# 处理器名
+GPU
+# 子系统名
+WSL
+# 设备名
+Android
+# 设备名
+iPhone
+# 设备名
+iPad
+# 芯片品牌
+Intel
+# 芯片品牌
+Apple Silicon
+# Git 默认远程名
+origin
+# 工具名
+ghq
+# 用来识别内部派发错误前缀，对照的是英文异常文本，不是展示文案
+Failed to dispatch orchestration V2 command
+# 用来识别内部派发错误前缀，对照的是英文异常文本，不是展示文案
+Failed to dispatch orchestration command
+# 用来识别内部派发错误前缀，对照的是英文异常文本，不是展示文案
+Provider adapter failed while dispatching orchestration command
+# 设备系统名
+iOS
+# 主机类型示例
+devbox
+# 中转站产品名
+CLIProxyAPI
+# 推理强度档位名，按原名显示
+High
+# 设备品牌
+Mac
+# 设备型号
+Mac mini
+# 设备形态名
+Duo
+# 帧率单位
+fps
+# 配置文件名
+keybindings.json
+# 回调技术名
+webhook
+# 监控产品名
+Sentry
+# 代码托管域名
+github.com
+# 云主机缩写
+VPS
+# 进程号缩写
+PID
+# 客户端产品名
+T3 Code Desktop
+# 客户端产品名
+T3 Code Web
+# SSH 地址示例
+user@host
+# 数据库错误码
+SQLITE_BUSY
+# 数据库错误码
+SQLITE_LOCKED
+# 数据库错误码
+SQLITE_READONLY
+# 数据库错误码
+SQLITE_IOERR
+# 数据库错误码
+SQLITE_CORRUPT
+# 数据库错误码
+SQLITE_FULL
+# 数据库错误码
+SQLITE_CANTOPEN
+# 数据库错误码
+SQLITE_NOTADB
+# GitHub 搜索语法示例
+label:bug
+# 要用户原样输入的命令
+claude mcp add --transport http
+# 要用户原样输入的命令
+t3 connect link

@@ -106,7 +106,7 @@ function preview(): ReviewDiffPreviewResult {
       {
         id: "branch",
         kind: "branch-range",
-        title: "Changes",
+        title: "改动",
         baseRef: "main",
         headRef: "dev",
         diff: "",
@@ -223,7 +223,7 @@ it.each([
     await userEvent.click(selector);
     await expect.element(page.getByRole("option", { name: "main", exact: true })).toBeVisible();
     await userEvent.click(page.getByRole("option", { name: recovery, exact: true }));
-    await expect.element(screen.getByText("No net changes in this selection.")).toBeVisible();
+    await expect.element(screen.getByText("此选择没有净改动。")).toBeVisible();
     await expect.element(screen.getByText(errorMessage, { exact: true })).not.toBeInTheDocument();
     const key = scopedThreadKey(context.threadRef);
     await vi.waitFor(() => {
@@ -298,7 +298,5 @@ it("says a turn diff cut off at the server's size limit is incomplete", async ()
     </RegistryContext.Provider>,
   );
   await expect.element(screen.getByText("first.txt", { exact: true }).first()).toBeVisible();
-  await expect
-    .element(screen.getByText("This preview exceeds the size limit. Changes shown are incomplete."))
-    .toBeVisible();
+  await expect.element(screen.getByText("此预览超出大小限制。显示的改动不完整。")).toBeVisible();
 });

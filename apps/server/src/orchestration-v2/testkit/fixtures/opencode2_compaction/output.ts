@@ -39,7 +39,7 @@ export function assertOpenCode2CompactionOutput(
   const [compaction] = compactions;
   assert.equal(compaction?.runId, compactRun?.id);
   assert.equal(compaction?.status, "completed");
-  assert.equal(compaction?.title, "Context compacted");
+  assert.equal(compaction?.title, "上下文已压缩");
   assert.include(compaction?.type === "compaction" ? compaction.summary : "", "PAPAYA");
   assert.include(compaction?.type === "compaction" ? compaction.summary : "", "## Objective");
   assert.isUndefined(

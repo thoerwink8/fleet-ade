@@ -644,7 +644,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
     const prepared = yield* SubscriptionRef.get(supervisor.prepared);
     if (Option.isNone(prepared)) {
       return yield* new EnvironmentHttpConnectionNotReadyError({
-        message: "The environment HTTP connection is not ready.",
+        message: "环境 HTTP 连接尚未就绪。",
       });
     }
     return yield* loader.load(prepared.value, input);
@@ -669,7 +669,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       ) {
         return yield* new PullRequestOperationError({
           operation: "runAction",
-          detail: "This pull request cannot be merged.",
+          detail: "无法合并此 pull request。",
         });
       }
       if (detail.capabilities.stackActions) {
@@ -677,7 +677,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
         if (stack !== null) {
           return yield* new PullRequestOperationError({
             operation: "runAction",
-            detail: "Open this pull request to merge its stack.",
+            detail: "请打开此 pull request 以合并其堆栈。",
           });
         }
       }
@@ -686,7 +686,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
         catch: (cause) =>
           new PullRequestOperationError({
             operation: "runAction",
-            detail: cause instanceof Error ? cause.message : "Could not choose a merge method.",
+            detail: cause instanceof Error ? cause.message : "无法选择合并方式。",
           }),
       });
       preparedInput = { ...actionInput, mergeMethod };

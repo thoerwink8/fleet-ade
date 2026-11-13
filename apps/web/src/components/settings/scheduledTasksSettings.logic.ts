@@ -35,7 +35,7 @@ import type { ResolvedSettingsScope } from "./settingsScope";
 
 export const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
-const ONCE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+const ONCE_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
   dateStyle: "medium",
   timeStyle: "short",
 });
@@ -45,13 +45,13 @@ export function scheduleLabel(
   timeZone?: string,
   runAt?: string | null,
 ): string {
-  if (schedule.type === "webhook") return "On webhook";
-  if (schedule.type === "once") return `Once, ${ONCE_FORMATTER.format(new Date(schedule.runAt))}`;
+  if (schedule.type === "webhook") return "收到 webhook 时";
+  if (schedule.type === "once") return `单次，${ONCE_FORMATTER.format(new Date(schedule.runAt))}`;
   if (schedule.type === "interval") {
     const minutes = schedule.everyMs / 60_000;
     return Number.isInteger(minutes)
-      ? `Every ${minutes} min`
-      : `Every ${Math.round(schedule.everyMs / 1000)} sec`;
+      ? `每 ${minutes} 分钟`
+      : `每 ${Math.round(schedule.everyMs / 1000)} 秒`;
   }
   const weekdays = schedule.weekdays ?? [];
   const days =
@@ -148,38 +148,36 @@ export function scheduleDraftErrors(draft: DraftState) {
   if (draft.scheduleMode === "once") {
     const runAt = new Date(draft.runAt);
     if (Number.isNaN(runAt.getTime()))
-      return [{ title: "Invalid run time", description: "Pick a date and time." }];
+      return [{ title: "运行时间无效", description: "请选择日期和时间。" }];
     // A time skipped by a daylight saving change parses to a different clock time.
     if (toDateTimeLocalValue(runAt) !== draft.runAt)
-      return [
-        { title: "Invalid run time", description: "That time does not exist in your time zone." },
-      ];
+      return [{ title: "运行时间无效", description: "你所在的时区不存在这个时间。" }];
     return [];
   }
   if (draft.scheduleMode !== "webhook") return [];
   if (parseMaxDeliveryAge(draft.maxDeliveryAgeMinutes) === undefined)
     return [
       {
-        title: "Invalid age limit",
-        description: `Enter whole minutes from 1 to ${MAX_WEBHOOK_DELIVERY_AGE_MINUTES}, or leave it blank.`,
+        title: "请求时效限制无效",
+        description: `请输入 1 到 ${MAX_WEBHOOK_DELIVERY_AGE_MINUTES} 之间的整数分钟数，或留空。`,
       },
     ];
   const errors: Array<{ title: string; description: string }> = [];
   for (const [label, value] of [
-    ["Duplicate request key", draft.replayKey],
-    ["Coalesce key", draft.coalesceKey],
+    ["重复请求键", draft.replayKey],
+    ["合并键", draft.coalesceKey],
   ] as const) {
     if (value.trim() && !isWebhookDedupeTemplate(value.trim()))
       errors.push({
-        title: "Invalid webhook settings",
+        title: "webhook 设置无效",
         description: `${label} must contain a valid request placeholder.`,
       });
   }
   const window = draft.coalesceWindowSeconds.trim();
   if (window && (!Number.isInteger(Number(window)) || Number(window) < 10 || Number(window) > 3600))
     errors.push({
-      title: "Invalid webhook settings",
-      description: "Coalesce window must be whole seconds from 10 to 3600.",
+      title: "webhook 设置无效",
+      description: "合并窗口必须是 10 到 3600 之间的整数秒。",
     });
   return errors;
 }
@@ -188,16 +186,16 @@ export function webhookDeliveryLabel(delivery: {
   readonly outcome: string;
   readonly pendingWindow?: boolean | undefined;
 }) {
-  if (delivery.outcome === "accepted") return delivery.pendingWindow ? "Opened window" : "Ran";
+  if (delivery.outcome === "accepted") return delivery.pendingWindow ? "已开始合并窗口" : "已运行";
   const labels: Record<string, string> = {
-    dispatch_failed: "Run failed",
+    dispatch_failed: "运行失败",
     duplicate: "Duplicate",
     coalesced: "Coalesced",
     filtered: "Filtered",
-    rejected_signature: "Bad signature",
-    disabled: "Task paused",
-    rate_limited: "Rate limited",
-    expired: "Too old",
+    rejected_signature: "签名无效",
+    disabled: "任务已暂停",
+    rate_limited: "已限流",
+    expired: "已过期",
   };
   return labels[delivery.outcome] ?? delivery.outcome.replaceAll("_", " ");
 }

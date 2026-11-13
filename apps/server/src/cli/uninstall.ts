@@ -289,9 +289,7 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
       yield* fs
         .remove(plan.runtimeDir, { recursive: true, force: true })
         .pipe(
-          Effect.mapError(
-            () => new CliUninstallError({ reason: `Could not remove ${plan.runtimeDir}.` }),
-          ),
+          Effect.mapError(() => new CliUninstallError({ reason: `无法移除 ${plan.runtimeDir}。` })),
         );
       yield* Console.log(`Removed ${plan.runtimeDir}.`);
     }

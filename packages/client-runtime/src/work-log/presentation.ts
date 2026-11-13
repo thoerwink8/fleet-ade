@@ -70,14 +70,11 @@ export function contextCompactionTokenCounts(
 }
 
 export function contextCompactionLabel(item: CompactionLabelItem): string {
-  if (item.status === "failed") return "Context compaction failed";
-  if (item.status === "cancelled" || item.status === "interrupted")
-    return "Context compaction stopped";
-  if (isOrchestrationV2WorkActive(item.status)) return "Compacting context";
+  if (item.status === "failed") return "上下文压缩失败";
+  if (item.status === "cancelled" || item.status === "interrupted") return "上下文压缩已停止";
+  if (isOrchestrationV2WorkActive(item.status)) return "正在压缩上下文";
   const tokens = contextCompactionTokenCounts(item);
-  return tokens
-    ? `Context compacted ${tokens.before} → ${tokens.after} tokens`
-    : "Context compacted";
+  return tokens ? `上下文已压缩：${tokens.before} → ${tokens.after} token` : "上下文已压缩";
 }
 
 export interface WorkLogPresentationEntry {
@@ -182,7 +179,7 @@ function resolveT3McpToolPresentation(
           : status === "declined"
             ? `Declined to ${action.toLowerCase()}`
             : status === "stopped"
-              ? `Stopped ${running.toLowerCase()}`
+              ? `已停止 ${running.toLowerCase()}`
               : running;
 
   const actionKind =
@@ -478,9 +475,7 @@ function toolGroupActionLabel(action: ToolGroupAction, count: number): string {
     case "unwatch-pr":
       return `Stopped watching ${count} ${count === 1 ? "pull request" : "pull requests"}`;
     case "list-prs":
-      return count === 1
-        ? "Checked linked pull requests"
-        : `Checked linked pull requests ${count} times`;
+      return count === 1 ? "已检查关联的 PR" : `已检查关联的 pull request ${count} 次`;
     case "read":
       return `Read ${count} ${count === 1 ? "file" : "files"}`;
     case "edit":
@@ -569,7 +564,7 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
   const toolEntries = entries.filter((entry) => entry.itemType !== "reasoning");
   if (entries.length > 0 && toolEntries.length === 0) {
     return {
-      summary: entries.length === 1 ? "Thought" : `Thought (×${entries.length})`,
+      summary: entries.length === 1 ? "已思考" : `已思考（×${entries.length}）`,
       hasFailure: false,
     };
   }

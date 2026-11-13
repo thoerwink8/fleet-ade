@@ -8,7 +8,7 @@ export class DeviceScreenshotError extends Schema.TaggedError<DeviceScreenshotEr
   { status: Schema.Number },
 ) {
   override get message(): string {
-    return `Screenshot capture failed (${this.status}). Try again.`;
+    return `截屏失败（${this.status}），请重试。`;
   }
 }
 
@@ -25,6 +25,6 @@ export async function captureDeviceScreenshot(target: DeviceStreamTarget, signal
   });
   if (!response.ok) throw new DeviceScreenshotError({ status: response.status });
   const image = await response.blob();
-  if (!image.size) throw new Error("The device returned an empty screenshot. Try again.");
+  if (!image.size) throw new Error("设备返回了空白截图，请重试。");
   return image;
 }

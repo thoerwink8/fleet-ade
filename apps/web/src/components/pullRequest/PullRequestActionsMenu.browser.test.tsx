@@ -137,7 +137,7 @@ it("saves maintainer edits, locks while saving, and restores the saved value whe
   await checkbox.click();
   await expect.element(checkbox).toBeChecked();
   await expect.element(checkbox).toBeDisabled();
-  await expect.element(page.getByRole("status")).toHaveTextContent("Saving…");
+  await expect.element(page.getByRole("status")).toHaveTextContent("正在保存…");
   settle({
     _tag: "Failure",
     cause: Cause.fail(new Error("Resource not accessible by integration")),
@@ -146,7 +146,7 @@ it("saves maintainer edits, locks while saving, and restores the saved value whe
   expect(mocks.notify).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({
       type: "error",
-      title: "Could not save maintainer access",
+      title: "无法保存维护者权限",
       description: "Resource not accessible by integration",
     }),
   );

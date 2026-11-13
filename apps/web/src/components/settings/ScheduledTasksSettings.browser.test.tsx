@@ -62,13 +62,13 @@ function setup() {
 }
 
 function secondaryEnvironment() {
-  return { ...environment(), environmentId: secondaryId, label: "Secondary" };
+  return { ...environment(), environmentId: secondaryId, label: "次要颜色" };
 }
 
 function environment() {
   return {
     environmentId,
-    label: "Laptop",
+    label: "笔记本电脑",
     connection: { phase: state.connected ? "connected" : "disconnected" },
     serverConfig: state.connected
       ? { environment: { platform: "linux", capabilities: { oneTimeSchedules: true } } }
@@ -80,7 +80,7 @@ vi.mock(import("./SettingsScopeContext"), async (original) => {
   const scope = () => {
     const entry = environment();
     return {
-      scope: { kind: "all", label: "All", members: [], environmentIds: [environmentId] },
+      scope: { kind: "all", label: "全部", members: [], environmentIds: [environmentId] },
       environments: state.secondary ? [entry, secondaryEnvironment()] : [entry],
       connectedEnvironments: state.connected
         ? state.secondary
@@ -138,7 +138,7 @@ vi.mock(import("../../state/environments"), async (original) => ({
 }));
 vi.mock(import("../../state/entities"), async (original) => ({
   ...(await original()),
-  useProjects: (() => [{ id: projectId, environmentId, title: "Project" }]) as never,
+  useProjects: (() => [{ id: projectId, environmentId, title: "项目" }]) as never,
 }));
 vi.mock(import("../../hooks/useSettings"), async (original) => ({
   ...(await original()),
@@ -164,7 +164,7 @@ describe("ScheduledTasksSettings", () => {
     await act(() => registry.set(permissions.get(secondaryId)!, true));
     await expect.element(create).toBeEnabled();
     await create.click();
-    await expect.element(page.getByLabelText("Runs on")).toHaveTextContent("Secondary");
+    await expect.element(page.getByLabelText("运行环境")).toHaveTextContent("Secondary");
   });
 
   it("keeps the permitted representative as the creation target", async () => {
@@ -172,7 +172,7 @@ describe("ScheduledTasksSettings", () => {
     state.secondary = true;
     await using screen = await render(<ScheduledTasksSettings />);
     await screen.getByRole("button", { name: "New task" }).click();
-    await expect.element(page.getByLabelText("Runs on")).toHaveTextContent("Laptop");
+    await expect.element(page.getByLabelText("运行环境")).toHaveTextContent("Laptop");
   });
 
   it("disables creation without a connected target", async () => {

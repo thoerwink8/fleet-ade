@@ -67,7 +67,7 @@ export function SecretProviderDialog({
       <DialogPopup className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {existing ? `Edit ${existing.config.label}` : "Add a 1Password provider"}
+            {existing ? `编辑 ${existing.config.label}` : "添加 1Password 提供方"}
           </DialogTitle>
           <DialogDescription>
             Provider variables on {environmentLabel} can read values from it by name. Values are
@@ -84,10 +84,10 @@ export function SecretProviderDialog({
             }}
           >
             <div className="grid gap-1.5">
-              <Label htmlFor="secret-provider-name">Name</Label>
+              <Label htmlFor="secret-provider-name">名称</Label>
               <Input
                 id="secret-provider-name"
-                placeholder="Personal"
+                placeholder="个人"
                 value={draft.name}
                 onChange={(event) => update({ name: event.target.value })}
                 maxLength={64}
@@ -108,7 +108,7 @@ export function SecretProviderDialog({
               ) : null}
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="secret-provider-account">Account</Label>
+              <Label htmlFor="secret-provider-account">账户</Label>
               <Input
                 id="secret-provider-account"
                 placeholder="my.1password.com"
@@ -131,22 +131,21 @@ export function SecretProviderDialog({
                 </p>
               ) : null}
               <p className="text-xs text-muted-foreground">
-                The account shorthand, sign-in address without https://, or ID that op account list
-                shows.
+                填写 op account list 显示的账户简称、登录地址（不含 https://）或 ID。
               </p>
             </div>
           </form>
         </DialogPanel>
         <DialogFooter variant="bare">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            取消
           </Button>
           <Button
             type="submit"
             form="secret-provider-form"
             disabled={submitted && Result.isFailure(result)}
           >
-            {existing ? "Save changes" : "Add provider"}
+            {existing ? "保存更改" : "添加提供方"}
           </Button>
         </DialogFooter>
       </DialogPopup>

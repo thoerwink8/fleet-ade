@@ -194,7 +194,7 @@ export function PolicyTooltip({ children }: { readonly children: string }) {
       <TooltipTrigger
         delay={200}
         render={
-          <Button size="icon-micro" variant="ghost-muted" aria-label="Background policy details">
+          <Button size="icon-micro" variant="ghost-muted" aria-label="后台策略详情">
             <InfoIcon className="size-3.5" />
           </Button>
         }
@@ -396,8 +396,8 @@ export function SettingsRow({
       scopedKeys.length > 0 ? (
       source === "project" || source === "mixed" ? (
         <SettingResetButton
-          label={typeof title === "string" ? title : "override"}
-          tooltip="Reset to inherited value"
+          label={typeof title === "string" ? title : "覆盖设置"}
+          tooltip="恢复为继承的值"
           onClick={() => (onResetOverride ? onResetOverride() : clearOverrides(scopedKeys))}
         />
       ) : null
@@ -428,24 +428,24 @@ export function SettingsRow({
     managed !== undefined && control
       ? inertControl(managed)
       : managedBy !== undefined && control
-        ? inertControl(`Managed by ${managedBy}.`)
+        ? inertControl(`由 ${managedBy} 管理。`)
         : unavailable && control
           ? inertControl(
               !canWriteSettings
-                ? `This connection lacks permission to change settings on ${
+                ? `此连接没有权限更改 ${
                     context
                       ? context.connectedEnvironments
                           .filter((target) => !writableIds.has(target.environmentId))
                           .map((target) => target.label)
-                          .join(", ") || "the selected environment"
-                      : (primaryEnvironment?.label ?? "the primary environment")
-                  }.`
+                          .join(", ") || "所选环境"
+                      : (primaryEnvironment?.label ?? "主环境")
+                  } 的设置。`
                 : context
-                  ? "Reconnect the selected environment to change this setting."
+                  ? "请重新连接所选环境以修改此设置。"
                   : PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE,
             )
           : environmentWide && control
-            ? inertControl("Environment-wide setting. Select an environment to change it.")
+            ? inertControl("这是环境级设置，请先选择一个环境再修改。")
             : control;
   const customized =
     context !== null &&
@@ -459,16 +459,16 @@ export function SettingsRow({
       }),
     );
   const inheritance: { state: SettingInheritanceState; summary: string } = mixed
-    ? { state: "mixed", summary: "Mixed across selected environments" }
+    ? { state: "mixed", summary: "所选环境之间各不相同" }
     : source === "project"
-      ? { state: "overridden", summary: "Overridden for this project" }
+      ? { state: "overridden", summary: "已为此项目覆盖" }
       : source === "t3.json"
-        ? { state: "inherited", summary: "Inherited from the repository's t3.json" }
+        ? { state: "inherited", summary: "继承自仓库的 t3.json" }
         : source === "environment" && scopedKeys.length > 0
-          ? { state: "inherited", summary: `Inherited from ${inheritedFrom}` }
+          ? { state: "inherited", summary: `继承自 ${inheritedFrom}` }
           : customized
-            ? { state: "environment", summary: "Set on the environment" }
-            : { state: "default", summary: "Built-in default" };
+            ? { state: "environment", summary: "在环境上设置" }
+            : { state: "default", summary: "内置默认值" };
   const renderedInheritance =
     context && serverScoped && settingKeys.length > 0 ? (
       <SettingInheritance
@@ -549,7 +549,7 @@ export function SettingsRow({
 
 export function SettingResetButton({
   label,
-  tooltip = "Reset to default",
+  tooltip = "恢复默认值",
   disabled = false,
   onClick,
 }: {
@@ -565,7 +565,7 @@ export function SettingResetButton({
           <Button
             size="icon-micro"
             variant="ghost-muted"
-            aria-label={`Reset ${label} to default`}
+            aria-label={`将 ${label} 恢复为默认值`}
             disabled={disabled}
             onClick={(event) => {
               event.stopPropagation();

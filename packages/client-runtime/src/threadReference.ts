@@ -37,8 +37,8 @@ export function threadChipCopyTarget(
     description: record.title,
     fragment: { version: 1, source: { environmentId: threadRef.environmentId }, records: [record] },
     clipboardTarget: "thread",
-    successTitle: "Thread copied",
-    failureTitle: "Failed to copy thread",
+    successTitle: "已复制会话",
+    failureTitle: "无法复制会话",
   };
 }
 
@@ -62,8 +62,8 @@ export function resolveThreadReferenceCopyTarget(input: {
         value: pullRequestUrl,
         description: pullRequestUrl,
         clipboardTarget: "pull request link",
-        successTitle: "PR link copied",
-        failureTitle: "Failed to copy PR link",
+        successTitle: "已复制 PR 链接",
+        failureTitle: "无法复制 PR 链接",
       }
     : threadChipCopyTarget(input.threadRef, input.title, input.hostedAppUrl);
 }

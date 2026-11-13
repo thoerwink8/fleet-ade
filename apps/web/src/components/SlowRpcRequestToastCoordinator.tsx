@@ -20,7 +20,7 @@ function SlowRequestDetails({ requests }: { requests: ReadonlyArray<SlowRpcAckRe
         >
           <div className="wrap-break-word font-medium text-foreground">{request.tag}</div>
           <div className="mt-0.5 text-3xs opacity-75">
-            Started {new Date(request.startedAt).toLocaleTimeString()}
+            Started {new Date(request.startedAt).toLocaleTimeString("zh-CN")}
           </div>
         </li>
       ))}
@@ -45,11 +45,11 @@ export function startSlowRpcRequestToasts(): () => void {
       data: {
         expandableContent: <SlowRequestDetails requests={slowRequests} />,
         expandableDescriptionTrigger: true,
-        expandableLabels: { collapse: "Hide requests", expand: "Show requests" },
+        expandableLabels: { collapse: "隐藏请求", expand: "显示请求" },
       },
       description: describeSlowRequests(slowRequests),
       timeout: 0,
-      title: "Some requests are slow",
+      title: "部分请求响应较慢",
       type: "warning" as const,
     };
 

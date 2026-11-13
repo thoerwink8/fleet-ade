@@ -201,14 +201,14 @@ function AddToChatButton({
             size="icon-xs"
             variant="ghost-muted"
             className="-mt-1 shrink-0"
-            aria-label="Add to chat"
+            aria-label="添加到对话"
             onClick={() => onAddToChat(comment)}
           />
         }
       >
         <MessageSquarePlusIcon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup>Add to chat</TooltipPopup>
+      <TooltipPopup>添加到对话</TooltipPopup>
     </Tooltip>
   );
 }
@@ -219,7 +219,7 @@ function OpenOnHostButton({ url, onOpen }: { url: string | null; onOpen: (url: s
       size="icon-xs"
       variant="ghost-muted"
       className="-mr-1 shrink-0"
-      aria-label="Open activity on host"
+      aria-label="在托管平台上打开动态"
       onClick={() => onOpen(url)}
     >
       <ExternalLinkIcon className="size-3" />
@@ -260,7 +260,7 @@ function ConversationCard({
     });
     setSaving(false);
     if (result._tag === "Failure") {
-      toastManager.add({ type: "error", title: "Could not save the comment" });
+      toastManager.add({ type: "error", title: "无法保存评论" });
       return;
     }
     setEditing(false);
@@ -299,7 +299,7 @@ function ConversationCard({
             </PullRequestMetaLine>
           </div>
           {editable !== null && !editing ? (
-            <PullRequestEditButton aria-label="Edit comment" onClick={() => setEditing(true)} />
+            <PullRequestEditButton aria-label="编辑评论" onClick={() => setEditing(true)} />
           ) : null}
           {event.body && event.comment && !reply ? (
             <AddToChatButton comment={event.comment} reactions={reactions} />
@@ -326,7 +326,7 @@ function ConversationCard({
             environmentId={reactions.environmentId}
             completionScope={reactions.completionScope}
             threadRef={reactions.threadRef}
-            label="Edit comment"
+            label="编辑评论"
             saving={saving}
             onSave={(body) => void save(body)}
             onCancel={() => setEditing(false)}
@@ -398,11 +398,11 @@ function ConversationGroup({
           >
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-semibold">
-                {events.length.toLocaleString()} {events.length === 1 ? "comment" : "comments"}
+                {events.length.toLocaleString("zh-CN")} {events.length === 1 ? "条评论" : "条评论"}
               </span>
               <span className="block truncate text-3xs text-muted-foreground">
-                {actors.length.toLocaleString()} {actors.length === 1 ? "author" : "authors"} ·{" "}
-                <RelativeTime timestamp={first.at} />
+                {actors.length.toLocaleString("zh-CN")} {actors.length === 1 ? "author" : "authors"}{" "}
+                · <RelativeTime timestamp={first.at} />
               </span>
             </span>
             <ChevronDownIcon
@@ -482,7 +482,7 @@ function ReviewThreadEvent({
           onClick={() => setExpanded((current) => !current)}
         >
           {thread.path === null ? (
-            <span className="min-w-0 truncate">Overview</span>
+            <span className="min-w-0 truncate">概览</span>
           ) : (
             <>
               <FileCode2Icon aria-hidden className="size-3 shrink-0" />
@@ -494,18 +494,18 @@ function ReviewThreadEvent({
           {thread.isResolved ? (
             <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground">
               <CircleCheckIcon aria-hidden className="size-3" />
-              Resolved
+              已解决
             </span>
           ) : null}
-          {dismissed ? <span className="shrink-0 font-medium">Review dismissed</span> : null}
-          {thread.isOutdated ? <span className="shrink-0 font-medium">Outdated</span> : null}
+          {dismissed ? <span className="shrink-0 font-medium">审查已撤销</span> : null}
+          {thread.isOutdated ? <span className="shrink-0 font-medium">已过时</span> : null}
           {expanded ? null : (
             <span className="shrink-0">
               · {event.actor?.login ?? "ghost"}
               {replyCount > 0 ? (
                 <>
                   {" "}
-                  · {replyCount.toLocaleString()} {replyCount === 1 ? "reply" : "replies"}
+                  · {replyCount.toLocaleString("zh-CN")} {replyCount === 1 ? "reply" : "replies"}
                 </>
               ) : null}
             </span>
@@ -576,7 +576,7 @@ function CommitEvent({
     <button
       type="button"
       className="group relative mb-5 block w-full cursor-pointer rounded-sm pl-12 text-left outline-none [contain-intrinsic-block-size:48px] [content-visibility:auto] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-      aria-label={`View commit ${event.id}`}
+      aria-label={`查看提交 ${event.id}`}
       onClick={() => onOpen(event.id)}
     >
       <ActorTimelineMarker
@@ -586,7 +586,7 @@ function CommitEvent({
       <div className="flex min-w-0 items-center gap-2.5 py-1.5">
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold text-foreground transition-colors group-hover:text-primary">
-            {event.body ?? "Untitled commit"}
+            {event.body ?? "未命名提交"}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
             <code className="font-mono">{event.id.slice(0, 7)}</code>
@@ -613,16 +613,16 @@ function LifecycleEvent({ event, term }: { event: PullRequestTimelineEvent; term
     event.kind === "opened"
       ? {
           icon: <PullRequestGlyph.pullRequest className="size-3.5" />,
-          label: `${title} opened`,
+          label: `已打开 ${title}`,
         }
       : event.kind === "merged"
         ? {
             icon: <PullRequestGlyph.merged className="size-3.5" />,
-            label: `${title} merged`,
+            label: `已合并 ${title}`,
           }
         : {
             icon: <PullRequestGlyph.closed className="size-3.5" />,
-            label: `${title} closed`,
+            label: `已关闭 ${title}`,
           };
 
   return (
@@ -681,7 +681,7 @@ function ReviewVerdictEvent({
                 }
               >
                 {pullRequestReviewOutcomeLabel(outcome)}
-                {stale ? <span className="sr-only">, before the latest commits</span> : null}
+                {stale ? <span className="sr-only">，在最新提交之前</span> : null}
               </TooltipTrigger>
               <TooltipPopup>{pullRequestReviewOutcomeStaleLabel(outcome)}</TooltipPopup>
             </Tooltip>
@@ -882,7 +882,7 @@ export function PullRequestTimelineTab({
       <div ref={scrollerRef} className="scrollbar-gutter-both h-full overflow-y-auto px-4 py-5">
         <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
           <PullRequestGlyph.pullRequest className="mb-2 size-5" />
-          <p className="text-xs">No activity yet.</p>
+          <p className="text-xs">还没有动态。</p>
         </div>
       </div>
     );
@@ -906,7 +906,7 @@ export function PullRequestTimelineTab({
       ListHeaderComponent={
         anchor !== null && targetIndex < 0 && revealUrl === undefined ? (
           <p role="status" className="py-4 text-xs text-muted-foreground">
-            The linked item is not in the loaded activity.
+            链接的条目不在已加载的动态中。
           </p>
         ) : (
           <div className="h-5" />

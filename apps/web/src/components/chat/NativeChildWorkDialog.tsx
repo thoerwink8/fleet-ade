@@ -36,12 +36,12 @@ export function NativeChildWorkDialog(props: {
     <Dialog open={open} onOpenChange={setOpen}>
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
         <ListTreeIcon />
-        <span className="@max-[420px]/composer-surface:sr-only">Subagent work</span>
+        <span className="@max-[420px]/composer-surface:sr-only">子智能体工作</span>
       </Button>
       <DialogPopup className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Subagent work</DialogTitle>
-          <DialogDescription>Read only. These subagents cannot take messages.</DialogDescription>
+          <DialogTitle>子智能体工作</DialogTitle>
+          <DialogDescription>只读。这些子智能体无法接收消息。</DialogDescription>
         </DialogHeader>
         {open ? <NativeChildWorkContent {...props} /> : null}
       </DialogPopup>
@@ -66,10 +66,10 @@ function NativeChildWorkContent(props: {
         {query.error !== null ? (
           <p className="text-sm text-destructive-foreground">{query.error}</p>
         ) : children === undefined ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">加载中</p>
         ) : children.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            The provider has no record of which subagents this call started.
+            提供方没有记录这次调用启动了哪些子智能体。
           </p>
         ) : (
           children.map((child) => <NativeChild key={child.conversationId} child={child} />)
@@ -77,7 +77,7 @@ function NativeChildWorkContent(props: {
       </DialogPanel>
       <DialogFooter variant="bare">
         <Button size="sm" variant="outline" disabled={query.isPending} onClick={query.refresh}>
-          Refresh
+          刷新
         </Button>
       </DialogFooter>
     </>
@@ -87,16 +87,14 @@ function NativeChildWorkContent(props: {
 function NativeChild(props: { readonly child: OrchestrationV2NativeChildWork }) {
   const { child } = props;
   return (
-    <section aria-label={child.role || "Subagent"} className="flex min-w-0 flex-col gap-2">
-      <h3 className="text-sm font-medium text-foreground">{child.role || "Subagent"}</h3>
+    <section aria-label={child.role || "子智能体"} className="flex min-w-0 flex-col gap-2">
+      <h3 className="text-sm font-medium text-foreground">{child.role || "子智能体"}</h3>
       <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
         {child.prompt}
       </p>
-      {child.truncated ? (
-        <p className="text-xs text-muted-foreground">Earlier steps are not shown.</p>
-      ) : null}
+      {child.truncated ? <p className="text-xs text-muted-foreground">更早的步骤未显示。</p> : null}
       {child.steps === null ? (
-        <p className="text-xs text-muted-foreground">No transcript yet.</p>
+        <p className="text-xs text-muted-foreground">暂无记录。</p>
       ) : (
         <ol className="m-0 flex list-none flex-col gap-2 border-s ps-3">
           {child.steps.map((step) => (

@@ -55,7 +55,7 @@ it.effect("keeps the probe subprocess alive while gateway model discovery can fi
       return {
         initializationResult: async () => ({
           account: { email: "dev@example.com", subscriptionType: "pro", tokenSource: "oauth" },
-          commands: [{ name: "review", description: "Review changes", argumentHint: "[path]" }],
+          commands: [{ name: "review", description: "查看更改", argumentHint: "[path]" }],
           models: [{ value: "gateway/claude-relay", displayName: "Relay", description: "" }],
         }),
         usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET: () =>

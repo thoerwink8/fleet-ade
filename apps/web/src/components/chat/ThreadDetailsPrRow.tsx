@@ -205,8 +205,8 @@ export function ThreadDetailsPrRow({
     writeHandoffToComposer(composerTarget, task);
     toastManager.add({
       type: "success",
-      title: "Added to the composer",
-      description: "The task is in the composer. Read it over, then send.",
+      title: "已添加到输入框",
+      description: "任务已在输入框中。请检查后发送。",
     });
   };
 
@@ -324,8 +324,8 @@ export function ThreadDetailsPrRow({
             <div className="flex min-w-0 items-center gap-2">
               <FileDiffIcon className="size-3 shrink-0 stroke-muted-foreground" />
               <div className="min-w-0 flex items-baseline gap-1 truncate text-foreground/75">
-                {detail.changedFiles.toLocaleString()}{" "}
-                {detail.changedFiles === 1 ? "file" : "files"}
+                {detail.changedFiles.toLocaleString("zh-CN")}{" "}
+                {detail.changedFiles === 1 ? "文件" : "文件"}
                 <PullRequestDiffStat additions={detail.additions} deletions={detail.deletions} />
               </div>
             </div>
@@ -348,53 +348,53 @@ export function ThreadDetailsPrRow({
   const trailingAction =
     rowAction === "resolve"
       ? {
-          label: "Resolve",
-          pendingLabel: "Preparing...",
+          label: "解决",
+          pendingLabel: "正在准备…",
           pending: handoff === "conflicts",
           destructive: true,
           suffix: newThreadSuffix,
           tooltip:
             composerTarget === undefined
-              ? "Check the branch out and resolve the conflicts in a new thread"
+              ? "在新会话中检出分支并解决冲突"
               : "Resolve the conflicts in this thread",
           onClick: startResolveConflicts,
         }
       : rowAction === "ready"
         ? {
-            label: "Ready",
-            pendingLabel: "Marking...",
+            label: "就绪",
+            pendingLabel: "正在标记…",
             pending: actionPending,
             destructive: false,
             suffix: null,
-            tooltip: `Mark this ${terminology.singular} as ready for review`,
+            tooltip: `将这个 ${terminology.singular} 标记为可审查`,
             onClick: () => void perform("ready"),
           }
         : rowAction === "fix"
           ? {
-              label: "Fix",
-              pendingLabel: "Fix",
+              label: "修复",
+              pendingLabel: "修复",
               pending: handoff === "findings",
               destructive: true,
               suffix:
                 handoff === "findings" ? (
-                  <Spinner size="xs" aria-label="Preparing fix" />
+                  <Spinner size="xs" aria-label="正在准备修复" />
                 ) : (
                   newThreadSuffix
                 ),
               tooltip:
                 composerTarget === undefined
-                  ? "Fix the failing checks in a new thread"
+                  ? "在新会话中修复未通过的检查"
                   : "Fix the failing checks in this thread",
               onClick: startFixChecks,
             }
           : rowAction === "merge"
             ? {
-                label: "Merge",
-                pendingLabel: "Merging...",
+                label: "合并",
+                pendingLabel: "正在合并…",
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
-                tooltip: `Merge this ${terminology.singular} (${selectedMergeMethod})`,
+                tooltip: `合并这个 ${terminology.singular}（${selectedMergeMethod}）`,
                 onClick: () => setConfirmingMerge(true),
               }
             : null;
@@ -412,7 +412,7 @@ export function ThreadDetailsPrRow({
               size="sm"
               part={part}
               className="group/watch"
-              aria-label={`Stop watching #${number}`}
+              aria-label={`停止关注 #${number}`}
               onClick={onStopWatching}
             />
           }
@@ -430,8 +430,7 @@ export function ThreadDetailsPrRow({
           />
         </TooltipTrigger>
         <TooltipPopup side="top">
-          Watching: the agent wakes when checks finish, someone comments, or the branch conflicts.
-          Click to stop.
+          关注中：检查完成、有人评论或分支出现冲突时，智能体会被唤醒。点击停止关注。
         </TooltipPopup>
       </Tooltip>
     ) : null;
@@ -525,14 +524,14 @@ export function ThreadDetailsPrRow({
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>
             <AlertDialogHeader>
-              <AlertDialogTitle>Merge {terminology.singular}?</AlertDialogTitle>
+              <AlertDialogTitle>合并 {terminology.singular}?</AlertDialogTitle>
               <AlertDialogDescription>
                 This merges #{number} using {selectedMergeMethod}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogClose render={<Button variant="outline" size="sm" />}>
-                Cancel
+                取消
               </AlertDialogClose>
               <Button
                 size="sm"
@@ -542,7 +541,7 @@ export function ThreadDetailsPrRow({
                   void perform("merge", selectedMergeMethod);
                 }}
               >
-                Merge
+                合并
               </Button>
             </AlertDialogFooter>
           </AlertDialogPopup>

@@ -118,7 +118,7 @@ const assertShellIndexCoversShells = Effect.fnUntraced(function* () {
   const awareness = (thread: Parameters<typeof projectThreadAwarenessV2>[0]["thread"]) =>
     projectThreadAwarenessV2({
       environmentId: EnvironmentId.make("test"),
-      project: { title: "Test" },
+      project: { title: "测试" },
       thread,
     });
   assert.deepEqual(
@@ -3020,7 +3020,7 @@ it.effect("SQL snapshot windows keep cards for requests still pending", () =>
           creationSource: "web",
           messageId: MessageId.make(`message:pending-request-window:${turn}`),
           inputIntent: "turn_start",
-          text: `Turn ${turn}`,
+          text: `第 ${turn} 轮`,
           attachments: [],
         },
       ];
@@ -3029,7 +3029,7 @@ it.effect("SQL snapshot windows keep cards for requests still pending", () =>
           id: "scope",
           header: "Scope",
           question: "Which scope?",
-          options: [{ label: "All", description: "Everything" }],
+          options: [{ label: "全部", description: "全部" }],
         };
         items.push(
           {
@@ -3753,7 +3753,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
                     creationSource: "web",
                     messageId: `message:bounded-sql-history:${ordinal}`,
                     inputIntent: "turn_start",
-                    text: `Turn ${ordinal}`,
+                    text: `第 ${ordinal} 轮`,
                     attachments: [],
                   }
                 : { type: "command_execution" }),
@@ -3776,7 +3776,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
             runId: RunId.make(`run:bounded-sql-history:${ordinal}`),
             nodeId: NodeId.make(`node:bounded-sql-history:${ordinal}`),
             role: "user",
-            text: `Turn ${ordinal}`,
+            text: `第 ${ordinal} 轮`,
             attachments: [],
             streaming: false,
             createdAt: now,
@@ -4946,7 +4946,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
               type: "user_message",
               messageId: `message:bounded-sql-history:cancelled:${ordinal}`,
               inputIntent: "queued_turn",
-              text: "cancelled",
+              text: "已取消",
               attachments: [],
             })}
           )
@@ -5013,7 +5013,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
             type: "user_message",
             messageId: "message:bounded-sql-history:cancelled:1202",
             inputIntent: "queued_turn",
-            text: "cancelled",
+            text: "已取消",
             attachments: [],
           })}
         )
@@ -5173,7 +5173,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
             ordinal: input.ordinal,
             status: "completed",
             title: input.type,
-            message: input.type === "run_interrupt_request" ? "Stopping" : "Stopped",
+            message: input.type === "run_interrupt_request" ? "正在停止" : "已停止",
             startedAt: nowIso,
             completedAt: nowIso,
             updatedAt: nowIso,
@@ -5533,7 +5533,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
                     creationSource: "web",
                     messageId: `message:paged-scrollback:${ordinal}`,
                     inputIntent: "turn_start",
-                    text: `Turn ${ordinal}`,
+                    text: `第 ${ordinal} 轮`,
                     attachments: [],
                   }
                 : { type: "command_execution", input: "echo", output: "ok", exitCode: 0 }),
@@ -5952,14 +5952,14 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
               creationSource: "web",
               messageId: `message:window-equivalence:${round}:${items.length}`,
               inputIntent,
-              text: "Turn",
+              text: "轮次",
               attachments: [],
             });
           const notification = () =>
             add("notification", {
               source: { kind: "system" },
               outcome: "completed",
-              summary: "Wake",
+              summary: "唤醒",
             });
           const wakes =
             kind === "one row"
@@ -6011,7 +6011,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
             if (reply || (replies && row % 5 === 0) || chance(0.02))
               add("assistant_message", {
                 messageId: `message:window-equivalence:${round}:${items.length}`,
-                text: "Reply",
+                text: "回复",
                 streaming: false,
               });
             // A late wake has no other input above its turn start.
@@ -6020,13 +6020,13 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
               userMessage("steer");
           }
           if (kind === "late wake") notification();
-          if (kind === "stopped") add("run_interrupt_request", { message: "Stop" });
+          if (kind === "stopped") add("run_interrupt_request", { message: "停止" });
           if (kind === "replaced attempt" || (kind === "stopped" && chance(0.5)))
-            add("run_interrupt_result", { message: "Stopped" });
+            add("run_interrupt_result", { message: "已停止" });
           if (kind === "short" && chance(0.3))
             add("error", {
               status: "failed",
-              failure: { class: "unknown", message: "Failed", code: null, retryable: false },
+              failure: { class: "unknown", message: "失败", code: null, retryable: false },
             });
         }
         yield* sql`
@@ -7516,7 +7516,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
             type: "compaction",
             driver,
             status: "failed",
-            title: "Context compaction failed",
+            title: "上下文压缩失败",
             summary: "Not enough messages to compact.",
             startedAt: now,
             completedAt: now,
@@ -8033,7 +8033,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
         parentItemId: null,
         ordinal: 2,
         status: "failed" as const,
-        title: "Usage limit reached",
+        title: "已达到用量上限",
         startedAt: now,
         completedAt: now,
         updatedAt: now,
@@ -8486,7 +8486,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
             parentItemId: null,
             ordinal: 1,
             status: "failed",
-            title: "Usage limit reached",
+            title: "已达到用量上限",
             startedAt: now,
             completedAt: now,
             updatedAt: now,
@@ -8814,7 +8814,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
           parentItemId: null,
           ordinal: 1,
           status: "failed",
-          title: "Usage limit reached",
+          title: "已达到用量上限",
           startedAt: now,
           completedAt: now,
           updatedAt: now,
@@ -9909,7 +9909,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
           ["inherited", "assistant_message", "one"],
           ["inherited", "user_message", "source two"],
           ["inherited", "assistant_message", "two"],
-          ["synthetic", "fork", "Forked from conversation"],
+          ["synthetic", "fork", "从对话分叉"],
         ],
       );
 
@@ -10215,8 +10215,8 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
               parentItemId: null,
               ordinal,
               status: "completed",
-              title: "Stopped",
-              message: "Stopped",
+              title: "已停止",
+              message: "已停止",
               startedAt: nowIso,
               completedAt: nowIso,
               updatedAt: nowIso,
@@ -11037,7 +11037,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
           occurredAt: at,
           payload: { ...thread, pullRequests },
         });
-      const project = { title: "Project" };
+      const project = { title: "项目" };
       const environmentId = EnvironmentId.make("environment:watched-pull-request");
       const phase = Effect.gen(function* () {
         const shell = yield* store.getThreadShell(threadId);
@@ -11173,7 +11173,7 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
         occurredAt: completedAt,
         payload: providerThread,
       });
-      const project = { title: "Project" };
+      const project = { title: "项目" };
       const environmentId = EnvironmentId.make("environment:held-completion");
       yield* assertShellIndexCoversShells();
       const held = yield* store.getThreadShell(threadId);

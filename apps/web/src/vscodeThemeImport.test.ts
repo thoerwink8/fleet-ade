@@ -90,7 +90,7 @@ describe("theme import text", () => {
     '{ "name": "Test", "colors": { "editor.background": "#002b36" } } /* unterminated',
     '{ "name": "Test", "colors": { "editor.background": "#002b36" } } extra',
   ])("rejects malformed input rather than using parser recovery: %s", (source) => {
-    expect(() => parseThemeImport(source)).toThrow("That theme file is not valid JSON.");
+    expect(() => parseThemeImport(source)).toThrow("主题文件不是有效的 JSON。");
   });
 
   it("preserves native T3 theme parsing and strict JSON syntax", () => {

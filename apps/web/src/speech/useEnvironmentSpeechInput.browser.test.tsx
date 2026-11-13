@@ -187,7 +187,7 @@ vi.mock("./browserVoiceInput", () => ({
             transcribe: async () => {
               mocks.transcribeCalls.push(
                 input.cloudProvider
-                  ? `${[input.cloudProvider, (input as { cloudModel?: string }).cloudModel].filter(Boolean).join(":")} via ${environmentId}`
+                  ? `${[input.cloudProvider, (input as { cloudModel?: string }).cloudModel].filter(Boolean).join(":")}（经由 ${environmentId}）`
                   : environmentId,
               );
               const next = mocks.transcripts.shift() ?? "dictated";
@@ -486,7 +486,7 @@ it.each(["cancel", "failed restart"] as const)(
     await act(() => {
       firstStart = mocks.voice.start();
     });
-    await expect.element(page.getByText("Loading transcription models…")).toBeVisible();
+    await expect.element(page.getByText("正在加载转写模型…")).toBeVisible();
     if (action === "cancel") {
       await act(() => mocks.voice.cancel());
     } else {
@@ -544,13 +544,13 @@ it.each([
     "does not advance a cancelled download when another model is ready",
     "downloadable",
     [],
-    "The model is not ready. Try downloading it again.",
+    "模型尚未就绪。请重新下载。",
   ],
   [
     "reports a failed selection apart from the download",
     "installed",
     ["german"],
-    "The model downloaded, but this environment could not select it. Try again.",
+    "模型已下载，但此环境无法选用它。请重试。",
   ],
 ] as const)("%s", async (_, landedState, selected, error) => {
   setup({ destination: "env-a" });

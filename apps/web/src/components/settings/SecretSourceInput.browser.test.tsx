@@ -8,7 +8,7 @@ import { SecretSourceInput } from "./SecretSourceInput";
 const personal = SecretProviderId.make("personal");
 const work = SecretProviderId.make("work");
 const sources = [
-  { id: personal, kind: SecretProviderKind.make("one_password"), label: "Personal" },
+  { id: personal, kind: SecretProviderKind.make("one_password"), label: "个人" },
   { id: work, kind: SecretProviderKind.make("one_password"), label: "Work" },
 ];
 
@@ -26,7 +26,7 @@ describe("SecretSourceInput", () => {
     const onValidityChange = vi.fn();
     await using screen = await render(
       <SecretSourceInput
-        aria-label="API key"
+        aria-label="API 密钥"
         value={{ provider: personal, reference: "op://Private/OpenAI/credential" }}
         sources={sources}
         onCommit={() => {}}
@@ -53,7 +53,7 @@ describe("SecretSourceInput", () => {
     const onSecretChange = vi.fn();
     await using screen = await render(
       <SecretSourceInput
-        aria-label="API key"
+        aria-label="API 密钥"
         value={{ provider: personal, reference: "op://Private/OpenAI/credential" }}
         sources={sources}
         onCommit={() => {}}
@@ -73,7 +73,7 @@ describe("SecretSourceInput", () => {
     const onValidityChange = vi.fn();
     await using screen = await render(
       <SecretSourceInput
-        aria-label="API key"
+        aria-label="API 密钥"
         value={{ provider: personal, reference: "op://Private/OpenAI/credential" }}
         sources={sources}
         onCommit={() => {}}

@@ -72,7 +72,7 @@ function setup() {
   state.projection = {
     thread: {
       id: threadId,
-      title: "Fork",
+      title: "分叉",
       activeProviderThreadId: null,
       lineage: { parentThreadId: ThreadId.make("source"), relationshipToParent: "fork" },
       forkedFrom: null,
@@ -86,8 +86,8 @@ function setup() {
 }
 
 it.each([
-  ["merge", "Could not merge back"],
-  ["disconnect", "Could not disconnect agent session"],
+  ["merge", "无法合并回去"],
+  ["disconnect", "无法断开智能体会话"],
 ])("reports a rejected %s command and clears the busy state", async (action, title) => {
   setup();
   await using screen = await render(
@@ -119,8 +119,8 @@ it.each([
 });
 
 it.each([
-  ["merge", "Could not merge back"],
-  ["disconnect", "Could not disconnect agent session"],
+  ["merge", "无法合并回去"],
+  ["disconnect", "无法断开智能体会话"],
 ])("clears the previous %s error after a successful retry", async (action, title) => {
   setup();
   await using screen = await render(

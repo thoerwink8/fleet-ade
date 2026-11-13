@@ -36,7 +36,7 @@ function readDataUrlBlob(src: string): Blob {
       : decodePercentBytes(payload);
     return new Blob([bytes], { type: mimeType || "text/plain" });
   } catch (cause) {
-    throw new Error("This inline media could not be decoded.", { cause });
+    throw new Error("无法解码此内嵌媒体。", { cause });
   }
 }
 
@@ -51,11 +51,11 @@ async function fetchMediaBlob(src: string): Promise<Blob> {
     return new Blob([new Uint8Array(native.data)], { type: native.mimeType });
   }
   const status = native?.status ?? response?.status;
-  if (status !== undefined) throw new Error(`The file could not be fetched (HTTP ${status}).`);
+  if (status !== undefined) throw new Error(`无法获取该文件（HTTP ${status}）。`);
   throw new Error(
     desktop
-      ? "The file could not be fetched. Check the connection and try again."
-      : "The file could not be fetched. The host may block browser access (CORS), or the connection may be unavailable.",
+      ? "无法获取该文件，请检查连接后重试。"
+      : "无法获取该文件。主机可能限制了浏览器访问（CORS），或连接不可用。",
   );
 }
 
@@ -63,7 +63,7 @@ async function readMediaBlob(src: string): Promise<Blob> {
   if (/^data:/i.test(src)) return readDataUrlBlob(src);
   const blob = await fetchMediaBlob(src);
   if (blob.type.split(";", 1)[0] === "text/html") {
-    throw new Error("This link returned a web page instead of media. Open the original URL.");
+    throw new Error("此链接返回的是网页而不是媒体，请打开原始 URL。");
   }
   return blob;
 }
@@ -91,29 +91,23 @@ export async function readMediaPng(src: string): Promise<Blob> {
     try {
       await image.decode();
     } catch (cause) {
-      throw new Error(
-        "The browser could not decode this image for copying. Try saving it instead.",
-        {
-          cause,
-        },
-      );
+      throw new Error("浏览器无法解码这张图片，无法复制，请改为保存。", {
+        cause,
+      });
     }
     const { naturalWidth: width, naturalHeight: height } = image;
     if (width <= 0 || height <= 0 || width * height > 64_000_000) {
-      throw new Error(
-        "This image is too large or has no usable dimensions. Try saving it instead.",
-      );
+      throw new Error("这张图片太大或没有可用的尺寸，请改为保存。");
     }
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error("Image copying is unavailable in this browser.");
+    if (!context) throw new Error("此浏览器无法复制图片。");
     context.drawImage(image, 0, 0);
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
-        (png) =>
-          png ? resolve(png) : reject(new Error("The image could not be converted to PNG.")),
+        (png) => (png ? resolve(png) : reject(new Error("无法将图片转换为 PNG。"))),
         "image/png",
       );
     });

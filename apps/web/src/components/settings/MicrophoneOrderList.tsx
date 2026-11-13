@@ -51,7 +51,7 @@ export function MicrophoneOrderList(props: {
     >
       <SortableContext items={keys} strategy={verticalListSortingStrategy}>
         <ol
-          aria-label="Microphones, preferred first"
+          aria-label="麦克风，优先使用排在前面的"
           className="divide-y divide-border/60 rounded-lg border border-border/60"
         >
           {order.map((entry, index) => {
@@ -118,10 +118,10 @@ function MicrophoneRow(props: {
       <span className="col-start-2 flex @min-[32rem]/settings-row:col-start-auto">
         {props.inUse ? (
           <span className="rounded-sm bg-success/12 px-1 text-2xs text-success-foreground">
-            In use
+            正在使用
           </span>
         ) : props.notConnected ? (
-          <span className="text-2xs text-muted-foreground">Not connected</span>
+          <span className="text-2xs text-muted-foreground">未连接</span>
         ) : null}
       </span>
       <span
@@ -138,7 +138,7 @@ function MicrophoneRow(props: {
           size="icon-xs"
           variant="ghost-muted"
           disabled={props.position === 1}
-          aria-label={`Move ${name} up`}
+          aria-label={`上移 ${name}`}
           onClick={() => props.onMove(-1)}
         >
           <ArrowUpIcon />
@@ -148,7 +148,7 @@ function MicrophoneRow(props: {
           size="icon-xs"
           variant="ghost-muted"
           disabled={props.position === props.count}
-          aria-label={`Move ${name} down`}
+          aria-label={`下移 ${name}`}
           onClick={() => props.onMove(1)}
         >
           <ArrowDownIcon />

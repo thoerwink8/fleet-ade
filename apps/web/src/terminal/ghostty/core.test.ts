@@ -81,7 +81,7 @@ describe("GhosttyTerminalCore snapshots", () => {
         history,
         exitCode: null,
         exitSignal: null,
-        label: "Terminal",
+        label: "终端",
         updatedAt: "2026-09-04T00:00:00.000Z",
       },
     });
@@ -386,7 +386,7 @@ describe("GhosttyTerminalCore snapshots", () => {
       history: "hello",
       exitCode: null,
       exitSignal: null,
-      label: "Terminal",
+      label: "终端",
       updatedAt: "2026-09-04T00:00:01.000Z",
     };
     const events = [

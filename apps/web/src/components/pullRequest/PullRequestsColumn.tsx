@@ -57,12 +57,7 @@ function ExpandableSearch({
     );
   }
   return (
-    <Button
-      size="icon-sm"
-      variant="ghost"
-      aria-label="Search pull requests"
-      onClick={() => onOpenChange(true)}
-    >
+    <Button size="icon-sm" variant="ghost" aria-label="搜索 PR" onClick={() => onOpenChange(true)}>
       <SearchIcon className="size-4" />
     </Button>
   );
@@ -109,7 +104,7 @@ export function PullRequestsColumn({
   listBody: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
-  const contentArea = workspaceAreaProps("pull-requests", 1, "Pull requests");
+  const contentArea = workspaceAreaProps("pull-requests", 1, "PR");
   const markerRef = useRef<HTMLDivElement | null>(null);
   const [condensed, setCondensed] = useState(false);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- IntersectionObserver on the scroll marker condenses the topbar
@@ -174,28 +169,28 @@ export function PullRequestsColumn({
       >
         {titlebarControls}
         {condensed ? (
-          <WorkspaceBreadcrumb ariaLabel="Pull request scope" className="overflow-hidden">
+          <WorkspaceBreadcrumb ariaLabel="PR 范围" className="overflow-hidden">
             <WorkspaceBreadcrumbItem current className={cn(searchExpanded && "sr-only")}>
-              <h1 className="truncate">Pull requests</h1>
+              <h1 className="truncate">PR</h1>
             </WorkspaceBreadcrumbItem>
             {searchExpanded ? null : <WorkspaceBreadcrumbSeparator />}
             <WorkspaceBreadcrumbItem className="shrink gap-1.5">
               <PullRequestCompactFilterMenu
-                label="Filter by state"
+                label="按状态筛选"
                 value={state}
                 options={STATE_TABS}
                 onChange={onState}
                 className="shrink-0"
               />
               <PullRequestCompactFilterMenu
-                label="Filter by involvement"
+                label="按参与方式筛选"
                 value={involvement}
                 options={INVOLVEMENT_TABS}
                 onChange={onInvolvement}
               />
               {hostMenuOptions.length > 2 ? (
                 <PullRequestCompactFilterMenu
-                  label="Filter by host"
+                  label="按托管平台筛选"
                   value={host ?? ""}
                   options={hostMenuOptions}
                   onChange={(next) => onHost(next === "" ? undefined : next)}
@@ -204,9 +199,9 @@ export function PullRequestsColumn({
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
         ) : (
-          <WorkspaceBreadcrumb ariaLabel="Pull requests breadcrumb">
+          <WorkspaceBreadcrumb ariaLabel="PR 面包屑">
             <WorkspaceBreadcrumbItem current>
-              <h1 className="truncate">Pull requests</h1>
+              <h1 className="truncate">PR</h1>
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
         )}
@@ -241,11 +236,11 @@ export function PullRequestsColumn({
               {sortMenu}
               {filtersMenu}
               <PullRequestCompactFilterMenu
-                label="Filter by provider"
+                label="按提供方筛选"
                 outlined
                 iconOnly={host !== undefined}
                 triggerIcon={<Plug2Icon aria-hidden className="size-4" />}
-                triggerLabel="All"
+                triggerLabel="全部"
                 value={host ?? ""}
                 options={hostMenuOptions}
                 onChange={(next) => onHost(next === "" ? undefined : next)}
@@ -277,7 +272,7 @@ function PullRequestRefreshControl({
     <Button
       size={compact ? "icon-sm" : "icon"}
       variant={compact ? "ghost" : "outline"}
-      aria-label="Refresh pull requests"
+      aria-label="刷新 PR"
       onClick={onRefresh}
       disabled={refreshing}
     >

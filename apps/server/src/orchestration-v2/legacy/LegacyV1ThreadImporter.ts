@@ -219,7 +219,7 @@ function importedThread(row: LegacyThreadRow, importedAt: DateTime.Utc): Orchest
     creationSource: "server",
     id: threadId,
     projectId: ProjectId.make(row.project_id),
-    title: row.title.trim() === "" ? "Untitled thread" : row.title,
+    title: row.title.trim() === "" ? "未命名会话" : row.title,
     providerInstanceId: modelSelection.instanceId,
     modelSelection,
     runtimeMode: runtimeModeFor(row.runtime_mode),

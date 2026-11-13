@@ -21,7 +21,7 @@ vi.mock("../../state/environments", async (importOriginal) => ({
     environments: [
       {
         environmentId: "voice-host",
-        label: "Laptop",
+        label: "笔记本电脑",
         connection: { phase: "available" },
         serverConfig: {
           secretReferences: true,
@@ -49,7 +49,7 @@ async function withVoicePanel(
 ) {
   const target = new PrimaryConnectionTarget({
     environmentId: id,
-    label: "Laptop",
+    label: "笔记本电脑",
     httpBaseUrl: window.location.origin,
     wsBaseUrl: "ws://localhost",
   });

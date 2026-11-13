@@ -132,9 +132,7 @@ it.each([
         expect(screen.router?.state.location.pathname).toBe("/remote/older-thread"),
       );
     } else {
-      await expect
-        .element(screen.getByText("Thread no longer available", { exact: true }))
-        .toBeVisible();
+      await expect.element(screen.getByText("会话已不存在", { exact: true })).toBeVisible();
     }
   },
 );
@@ -151,8 +149,6 @@ it("names a thread on a machine this client has no connection to, without waitin
       />
     </RegistryContext>,
   );
-  await expect
-    .element(screen.getByText("Thread on another machine", { exact: true }))
-    .toBeVisible();
+  await expect.element(screen.getByText("会话在另一台机器上", { exact: true })).toBeVisible();
   await expect.element(screen.getByRole("link")).not.toBeInTheDocument();
 });

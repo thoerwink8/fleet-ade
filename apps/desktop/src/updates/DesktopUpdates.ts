@@ -347,19 +347,19 @@ function getAutoUpdateDisabledReason(args: {
   hasUpdateFeedConfig: boolean;
 }): string | null {
   if (args.policy.mode === "off") {
-    return args.policy.message ?? "Updates are turned off on this machine.";
+    return args.policy.message ?? "本机已停用更新。";
   }
   if (!args.hasUpdateFeedConfig) {
-    return "Automatic updates are not available because no update feed is configured.";
+    return "尚未配置更新源，无法自动更新。";
   }
   if (args.isDevelopment || !args.isPackaged) {
-    return "Automatic updates are only available in packaged production builds.";
+    return "只有打包的正式版本支持自动更新。";
   }
   if (args.disabledByEnv) {
-    return "Automatic updates are disabled by the T3CODE_DISABLE_AUTO_UPDATE setting.";
+    return "T3CODE_DISABLE_AUTO_UPDATE 设置已停用自动更新。";
   }
   if (args.platform === "linux" && !args.appImage && !args.isDebPackage) {
-    return "Automatic updates on Linux require the AppImage or the .deb package.";
+    return "Linux 自动更新需要 AppImage 或 .deb 安装包。";
   }
   return null;
 }
@@ -1251,7 +1251,7 @@ export const make = Effect.gen(function* () {
       if (Option.isSome(channelBlockedReason(nextChannel))) {
         return yield* new DesktopUpdateChannelManagedError({
           channel: nextChannel,
-          policyMessage: policy.message ?? "Your administrator manages T3 Code updates.",
+          policyMessage: policy.message ?? "T3 Code 更新由管理员管理。",
         });
       }
       // A background check holds the updater only briefly, so wait it out instead of refusing.

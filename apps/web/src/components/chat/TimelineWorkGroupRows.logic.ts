@@ -9,7 +9,7 @@ function formatWorkingTimer(startIso: string, endIso: string): string | null {
 
   const elapsedSeconds = Math.max(0, Math.floor((endedAtMs - startedAtMs) / 1000));
   if (elapsedSeconds < 60) {
-    return `${elapsedSeconds}s`;
+    return `${elapsedSeconds} 秒`;
   }
 
   return formatDuration(elapsedSeconds * 1_000);

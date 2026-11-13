@@ -614,7 +614,7 @@ it.effect("shares each live event item across subscribers and dedupes bodies per
             ...owner,
             id: messageId,
             role: "assistant",
-            text: "Done",
+            text: "完成",
             attachments: [],
             streaming: false,
             createdBy: "agent",
@@ -642,7 +642,7 @@ it.effect("shares each live event item across subscribers and dedupes bodies per
             title: null,
             status: "completed",
             messageId,
-            text: "Done",
+            text: "完成",
             streaming: false,
             startedAt: at,
             completedAt: at,
@@ -2148,7 +2148,7 @@ it.effect.each([
         : null;
       const project = {
         id: ProjectId.make("project:idle"),
-        title: "Idle",
+        title: "闲置",
         workspaceRoot: "/tmp/idle",
         defaultModelSelection: null,
         scripts: [],

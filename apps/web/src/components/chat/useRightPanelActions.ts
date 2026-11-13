@@ -119,7 +119,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Unable to open browser",
+            title: "无法打开浏览器",
             description: error.message,
           }),
         );
@@ -251,8 +251,8 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Failed to copy path",
-          description: "Clipboard API unavailable.",
+          title: "复制路径失败",
+          description: "剪贴板 API 不可用。",
         }),
       );
       return;
@@ -266,7 +266,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
       () => {
         toastManager.add({
           type: "success",
-          title: "Path copied",
+          title: "路径已复制",
           description: clipboardPath,
         });
       },
@@ -274,8 +274,8 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to copy path",
-            description: error instanceof Error ? error.message : "An error occurred.",
+            title: "复制路径失败",
+            description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
       },

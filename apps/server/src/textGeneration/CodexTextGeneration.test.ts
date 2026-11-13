@@ -612,7 +612,7 @@ it.effect.each(PREFLIGHT_PRIMARY_STATES)("text generation preflight: %s", (prima
           ? {
               usageLimits: {
                 checkedAt: "1970-01-01T00:00:00Z",
-                windows: [{ id: "session", kind: "session", label: "Session", usedPercent: 100 }],
+                windows: [{ id: "session", kind: "session", label: "会话", usedPercent: 100 }],
               },
             }
           : {}),

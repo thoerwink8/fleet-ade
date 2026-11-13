@@ -53,17 +53,17 @@ export function UpdateTrackSwitchDialog({
     <AlertDialog open onOpenChange={(open) => !open && onClose()}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Switch to {label}</AlertDialogTitle>
+          <AlertDialogTitle>切换到 {label}</AlertDialogTitle>
           <AlertDialogDescription>
             {AsyncResult.isFailure(release)
               ? npmReleaseFailureMessage(release.cause)
               : AsyncResult.isSuccess(release)
-                ? `Could not find the latest ${label} release in this environment's npm registry.`
-                : "Checking releases…"}
+                ? `无法在此环境的 npm 仓库中找到最新的 ${label} 版本。`
+                : "正在检查版本…"}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
@@ -113,7 +113,7 @@ function SwitchPlan({
     setChecking(true);
     const fail = (description: string) =>
       toastManager.add(
-        stackedThreadToast({ type: "error", title: `Could not switch to ${label}`, description }),
+        stackedThreadToast({ type: "error", title: `无法切换到 ${label}`, description }),
       );
     const prepared = await prepareLocalTrackSwitch(bridge, {
       channel: release.channel,
@@ -145,8 +145,8 @@ function SwitchPlan({
                   !acceptsTrackSwitchRelease(downloadedVersion, release.channel, release.version)
                 ) {
                   reportError(
-                    "Could not install update",
-                    `This app downloaded ${downloadedVersion ?? "nothing"}, not ${release.version} or newer.`,
+                    "无法安装更新",
+                    `此应用下载了 ${downloadedVersion ?? "nothing"}，需要 ${release.version} 或更新版本。`,
                   );
                   return false;
                 }
@@ -157,7 +157,7 @@ function SwitchPlan({
     );
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      fail(error instanceof Error ? error.message : "An unexpected error occurred.");
+      fail(error instanceof Error ? error.message : "发生了意外错误。");
     }
   };
 
@@ -165,25 +165,23 @@ function SwitchPlan({
     <UpdateEverythingDialog
       open
       onOpenChange={(open) => !open && !checking && onClose()}
-      title={`Switch to ${label}?`}
+      title={`切换到 ${label}？`}
       version={release.version}
       providerCount={0}
       rows={everything.rows}
       notes={[
         ...(idle.note === null ? [] : [idle.note]),
-        ...(crossesLocal && updatesOff
-          ? ["This app's updates are off here, so reinstall it yourself to switch."]
-          : []),
+        ...(crossesLocal && updatesOff ? ["此应用已停用更新，请手动重新安装以切换通道。"] : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
-          ? ["If T3 Code does not reopen after it restarts, open it again."]
+          ? ["如果 T3 Code 重启后没有重新打开，请再次打开。"]
           : []),
       ]}
       restarts={everything.restarts}
-      confirmLabel={checking ? "Checking…" : `Switch to ${label}`}
+      confirmLabel={checking ? "正在检查…" : `切换到 ${label}`}
       busy={checking}
       disabledReason={
         switchesLocal && localBlocked !== null
-          ? `This app cannot switch: ${localBlocked}.`
+          ? `此应用无法切换：${localBlocked}。`
           : idle.disabledReason
       }
       onConfirm={() => void run()}

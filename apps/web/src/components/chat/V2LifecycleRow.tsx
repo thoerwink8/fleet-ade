@@ -78,7 +78,7 @@ export function V2LifecycleRow(props: {
   if (item.type === "run_interrupt_result") {
     return (
       <TimelineSystemDivider
-        label="Run interrupted"
+        label="运行已中断"
         detail={item.message}
         icon={CircleStopIcon}
         wrapDetail
@@ -98,9 +98,9 @@ export function V2LifecycleRow(props: {
     const relatedThreadId = item.source.type === "run" ? item.source.threadId : item.targetThreadId;
     return (
       <TimelineSystemDivider
-        label={item.source.type === "run" ? "Forked from conversation" : "Conversation fork"}
+        label={item.source.type === "run" ? "从对话分叉" : "对话分叉"}
         icon={GitForkIcon}
-        actionLabel={item.source.type === "run" ? "Open source conversation" : "Open fork"}
+        actionLabel={item.source.type === "run" ? "打开原对话" : "打开分叉"}
         onAction={() => props.onOpenThread(relatedThreadId)}
       />
     );
@@ -116,15 +116,15 @@ export function V2LifecycleRow(props: {
             <MessageSquareIcon className="size-4 text-secondary-label" aria-hidden />
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-medium">
-            {item.title ?? "Created thread"}
+            {item.title ?? "已创建会话"}
           </span>
           <Button
             size="xs"
             variant="outline"
-            aria-label={`Open ${item.title ?? "created thread"}`}
+            aria-label={`打开 ${item.title ?? "已创建会话"}`}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            Open chat
+            打开对话
           </Button>
         </div>
       );
@@ -133,13 +133,13 @@ export function V2LifecycleRow(props: {
       <WorkLogRow
         data-v2-item-type={item.type}
         icon={<T3Wordmark className="size-4 text-icon-muted" aria-hidden />}
-        label={<>Created thread{item.title ? ` · ${item.title}` : ""}</>}
+        label={<>已创建会话{item.title ? ` · ${item.title}` : ""}</>}
         trailing={
           <InlineButton
-            aria-label={`Open ${item.title ?? "created thread"}`}
+            aria-label={`打开 ${item.title ?? "已创建会话"}`}
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            Open chat
+            打开对话
           </InlineButton>
         }
       />
@@ -172,14 +172,14 @@ const STATUS_VISUALS: Record<
   OrchestrationV2TurnItem["status"],
   { dotClass: string; label: string }
 > = {
-  pending: { dotClass: "bg-info", label: "Queued" },
-  running: { dotClass: "bg-info", label: "Running" },
-  waiting: { dotClass: "bg-info", label: "Waiting" },
-  idle: { dotClass: "bg-muted-foreground/50", label: "Idle · resumable" },
-  completed: { dotClass: "bg-success", label: "Completed" },
-  failed: { dotClass: "bg-destructive", label: "Failed" },
-  cancelled: { dotClass: "bg-muted-foreground/60", label: "Stopped" },
-  interrupted: { dotClass: "bg-muted-foreground/60", label: "Stopped" },
+  pending: { dotClass: "bg-info", label: "排队中" },
+  running: { dotClass: "bg-info", label: "正在运行" },
+  waiting: { dotClass: "bg-info", label: "等待中" },
+  idle: { dotClass: "bg-muted-foreground/50", label: "空闲 · 可继续" },
+  completed: { dotClass: "bg-success", label: "已完成" },
+  failed: { dotClass: "bg-destructive", label: "失败" },
+  cancelled: { dotClass: "bg-muted-foreground/60", label: "已停止" },
+  interrupted: { dotClass: "bg-muted-foreground/60", label: "已停止" },
 };
 
 function subagentStatusVisual(status: OrchestrationV2TurnItem["status"]) {
@@ -465,7 +465,7 @@ function SubagentTimelineLink(props: {
             {props.title}
           </span>
           {remote !== undefined ? (
-            <span className="shrink-0 text-xs text-muted-foreground">on {remote.label}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">星期 {remote.label}</span>
           ) : null}
         </span>
         <span
@@ -516,7 +516,7 @@ function SubagentTimelineLink(props: {
             <button
               type="button"
               data-v2-item-type="subagent"
-              aria-label={`Open ${props.title}`}
+              aria-label={`打开 ${props.title}`}
               aria-description={statusLabel}
               onClick={open}
               className={cn(
@@ -600,7 +600,7 @@ function EnvironmentHandoffRow({
 
 /** Marks where `/clear` or an automation started a new provider session in this thread. */
 export function FreshSessionRow() {
-  return <TimelineSystemDivider label="New session" icon={EraserIcon} />;
+  return <TimelineSystemDivider label="全新上下文" icon={EraserIcon} />;
 }
 
 /** A same-harness model or effort change. Shows only what changed. */
@@ -640,7 +640,7 @@ export function HandoffRow(props: {
   const entries = settings ? applyProviderInstanceSettings(derived, settings, null) : derived;
   return (
     <TimelineSystemDivider
-      label={props.pending ? "Context handoff pending" : "Context handoff"}
+      label={props.pending ? "上下文交接待处理" : "上下文交接"}
       icon={ArrowRightLeftIcon}
       showDetailSeparator={false}
       tone={props.failed ? "danger" : "neutral"}

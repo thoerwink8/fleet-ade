@@ -172,7 +172,7 @@ export class ServerAuthPairingLinkRevocationError extends Schema.TaggedError<Ser
   },
 ) {
   override get message(): string {
-    return "Failed to revoke pairing link.";
+    return "无法撤销配对链接。";
   }
 }
 

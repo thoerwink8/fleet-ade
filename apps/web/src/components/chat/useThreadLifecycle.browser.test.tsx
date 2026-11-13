@@ -64,10 +64,10 @@ function threadInput(threadId: string, branch: string) {
 type ThreadInput = ReturnType<typeof threadInput>;
 
 it.each([
-  { remote: false, approval: false, link: "Open question" },
-  { remote: true, approval: false, link: "Open question" },
+  { remote: false, approval: false, link: "打开问题" },
+  { remote: true, approval: false, link: "打开问题" },
   { remote: true, approval: false, link: "Child" },
-  { remote: true, approval: true, link: "Open approval" },
+  { remote: true, approval: true, link: "打开审批" },
 ])("opens the child in its environment ($remote, $link)", async ({ remote, approval, link }) => {
   setup();
   const parent = threadInput("parent", "main");
@@ -145,7 +145,7 @@ function RestoreBranchHarness(props: {
         disabled={lifecycle.isRestoringThreadBranch}
         onClick={lifecycle.handleSwitchCheckoutToThreadStable}
       >
-        {lifecycle.isRestoringThreadBranch ? "Restoring..." : "Restore branch"}
+        {lifecycle.isRestoringThreadBranch ? "正在恢复…" : "恢复分支"}
       </button>
     </>
   );

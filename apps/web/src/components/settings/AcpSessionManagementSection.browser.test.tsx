@@ -168,7 +168,7 @@ it("does not import with provider management alone", async () => {
   setup();
   grants.scopes.delete("orchestration:operate");
   await using screen = await renderSection();
-  await screen.click("List sessions");
+  await screen.click("列出运行实例");
   expect(screen.button("Import").disabled).toBe(true);
   await screen.click("Import");
   expect(commands.import).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ it("does not import with provider management alone", async () => {
 it("rechecks task access after confirming deletion", async () => {
   setup();
   await using screen = await renderSection();
-  await screen.click("List sessions");
+  await screen.click("列出运行实例");
   dialogs.confirm.mockImplementationOnce(async () => {
     grants.scopes.delete("orchestration:operate");
     return true;
@@ -197,7 +197,7 @@ it.each(["Save", "Disable"])("keeps other provider edits through a %s refetch", 
   const response = { _tag: "Success" as const, value: { providers } };
   commands.listProviders.mockResolvedValue(response);
   await using screen = await renderSection();
-  await screen.click("List providers");
+  await screen.click("列出提供方");
   const input = (label: string) =>
     screen.container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
   await userEvent.fill(input("other base URL"), "https://other.example.test/v1");
@@ -371,7 +371,7 @@ it("ignores a late listing after project replacement", async () => {
     }),
   );
   await using screen = await renderSection();
-  await screen.click("List sessions");
+  await screen.click("列出运行实例");
   await screen.setProjects([replacement]);
   await act(async () =>
     finish({ _tag: "Success", value: { sessions: [session], nextCursor: "old-page" } }),
@@ -394,7 +394,7 @@ it.each(["Save", "Disable"])("does not refetch the old project after a late %s",
     })),
   );
   await using screen = await renderSection();
-  await screen.click("List providers");
+  await screen.click("列出提供方");
   await screen.click(action);
   expect(command).toHaveBeenCalledOnce();
   await screen.setProjects([replacement]);
@@ -414,7 +414,7 @@ it.each(["Delete", "Disable"])(
       }),
     );
     await using screen = await renderSection();
-    await screen.click(action === "Delete" ? "List sessions" : "List providers");
+    await screen.click(action === "Delete" ? "列出运行实例" : "列出提供方");
     await screen.click(action);
     await screen.setProjects([replacement]);
     await act(async () => finish(true));
@@ -434,12 +434,12 @@ it("keeps logout pending across project replacement and clears replacement sessi
     })),
   );
   await using screen = await renderSection();
-  await screen.click("Log out");
+  await screen.click("退出登录");
   await screen.setProjects([replacement]);
-  await screen.click("List sessions");
+  await screen.click("列出运行实例");
   await expect.element(screen.getByText(session.title)).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Logging out" })).toBeDisabled();
-  await screen.click("Logging out");
+  await screen.click("正在退出登录");
   expect(commands.logout).toHaveBeenCalledOnce();
   await act(async () => finish());
   await expect.element(screen.getByText(session.title)).not.toBeInTheDocument();

@@ -13,18 +13,18 @@ import { TimelineRowCtx } from "./timelineRowContext";
 import { WorkLogRow } from "./WorkLog";
 
 const APPROVAL_PRESENTATION = {
-  command: { icon: "terminal", label: "Command approval", detailLabel: "Command" },
-  "file-change": { icon: "square-pen", label: "File change approval", detailLabel: "File change" },
-  "file-read": { icon: "eye", label: "File read approval", detailLabel: "File to read" },
+  command: { icon: "terminal", label: "命令审批", detailLabel: "命令" },
+  "file-change": { icon: "square-pen", label: "文件修改审批", detailLabel: "文件修改" },
+  "file-read": { icon: "eye", label: "文件读取审批", detailLabel: "要读取的文件" },
   permission: {
     icon: "wrench",
-    label: "App permission approval",
-    detailLabel: "Permission request",
+    label: "应用权限审批",
+    detailLabel: "权限请求",
   },
   "mcp-elicitation": {
     icon: "hammer",
-    label: "App access approval",
-    detailLabel: "App access request",
+    label: "应用访问审批",
+    detailLabel: "应用访问请求",
   },
 } satisfies Record<
   PendingApproval["requestKind"],
@@ -76,7 +76,7 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
             <>
               <span className="inline-flex items-center gap-1 text-warning">
                 <ShieldIcon aria-hidden className="size-3 shrink-0" />
-                Waiting for approval
+                等待批准
               </span>
               {onRespondToApproval ? (
                 <>
@@ -97,7 +97,7 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
             </>
           ) : (
             <span className="text-warning">
-              Provider process is gone. Interrupt or restart the run to respond.
+              提供方进程已退出。请中断或重新开始这次运行后再回应。
             </span>
           )}
           {approval.fullAccessOverride ? (

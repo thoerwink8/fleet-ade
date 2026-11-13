@@ -16,7 +16,7 @@ it("keeps a failed send visible, including a disconnect while draining queued mo
   expect(onChange).toHaveBeenLastCalledWith({
     pending: false,
     requested: null,
-    error: "Device is disconnected.",
+    error: "设备已断开连接。",
   });
   send.mockReturnValueOnce(true);
   queue.enqueue({ control: "pose", value: "book" });
@@ -25,7 +25,7 @@ it("keeps a failed send visible, including a disconnect while draining queued mo
   expect(onChange).toHaveBeenLastCalledWith({
     pending: false,
     requested: null,
-    error: "Device is disconnected.",
+    error: "设备已断开连接。",
   });
 });
 

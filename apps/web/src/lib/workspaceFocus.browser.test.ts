@@ -304,7 +304,7 @@ describe("workspace area focus", () => {
     const content = document.createElement("div");
     content.setAttribute("data-right-panel-surface-content", "");
     const bringBack = document.createElement("button");
-    bringBack.textContent = "Bring back";
+    bringBack.textContent = "带回主会话";
     content.append(bringBack);
     panel.element.append(content);
     const timeline = conversationScroller(50);
@@ -334,7 +334,7 @@ describe("workspace area focus", () => {
     fixture.area("composer", 2);
     const header = fixture.append("<header></header>");
     const toggle = document.createElement("button");
-    toggle.setAttribute("aria-label", "Toggle right panel");
+    toggle.setAttribute("aria-label", "切换右侧面板");
     header.append(toggle);
     toggle.focus();
     const moved = toggle.cloneNode() as HTMLButtonElement;

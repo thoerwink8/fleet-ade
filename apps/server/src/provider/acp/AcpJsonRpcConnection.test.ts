@@ -907,7 +907,7 @@ describe("AcpSessionRuntime", () => {
         "completed",
       ]);
       for (const toolCall of toolCalls) {
-        expect(toolCall.title).toBe("Read file");
+        expect(toolCall.title).toBe("已读取文件");
       }
     }).pipe(
       Effect.provide(

@@ -1930,7 +1930,7 @@ describe("rejected git refs", () => {
   it.effect("leaves a rejected fetch unclassified", () =>
     Effect.gen(function* () {
       const error = yield* failWith(
-        [`From ${remoteUrl}`, " ! [rejected]        main       -> side  (non-fast-forward)"].join(
+        [`基于 ${remoteUrl}`, " ! [rejected]        main       -> side  (non-fast-forward)"].join(
           "\n",
         ),
       );

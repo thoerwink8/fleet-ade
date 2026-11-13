@@ -47,7 +47,7 @@ function makeProject(
 ): OrchestrationProjectShell {
   return {
     id: PROJECT_ID,
-    title: "Project",
+    title: "项目",
     workspaceRoot: "/workspace/project",
     defaultModelSelection: null,
     scripts: [],
@@ -61,7 +61,7 @@ function makeThread(pullRequests: ReadonlyArray<ThreadPullRequestLink>): PullReq
   return {
     id: THREAD_ID,
     projectId: PROJECT_ID,
-    title: "Thread",
+    title: "会话",
     modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
     runtimeMode: "full-access",
     interactionMode: "default",
@@ -141,7 +141,7 @@ const makeHarness = Effect.fn("makePullRequestWatchHarness")(function* (
           : Effect.succeed({
               ...input,
               provider: SourceControlProviderKind.make("github"),
-              title: "Pull request",
+              title: "PR",
               url: `https://github.com/${input.repository}/pull/${input.number}`,
               state: options.readState ?? "open",
               headBranch: "feature",

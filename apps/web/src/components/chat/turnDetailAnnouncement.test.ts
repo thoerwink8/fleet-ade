@@ -123,11 +123,11 @@ describe("turnDetail", () => {
         work("compact", {
           tone: "info",
           sourceActivityKind: "context-compaction",
-          label: "Compacting context",
+          label: "正在压缩上下文",
           toolLifecycleStatus: "inProgress",
         }),
       ],
-      activity: "Compacting context",
+      activity: "正在压缩上下文",
     },
     {
       name: "nothing once the context is compacted",
@@ -137,7 +137,7 @@ describe("turnDetail", () => {
         work("compact", {
           tone: "info",
           sourceActivityKind: "context-compaction",
-          label: "Context compacted",
+          label: "上下文已压缩",
           toolLifecycleStatus: "completed",
         }),
       ],

@@ -158,7 +158,7 @@ it.effect("checks unsaved settings, keeping the saved key behind a redaction mar
       return String(url).endsWith("/chat/completions")
         ? Response.json({
             model: JSON.parse(String(init?.body)).model,
-            choices: [{ finish_reason: "stop", message: { content: "OK" } }],
+            choices: [{ finish_reason: "stop", message: { content: "确定" } }],
           })
         : Response.json({ data: [{ id: "model-a" }] });
     });

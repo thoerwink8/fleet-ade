@@ -36,7 +36,7 @@ vi.mock(import("~/state/session"), async (original) => {
   const { EnvironmentId } = await import("@t3tools/contracts");
   const target = new PrimaryConnectionTarget({
     environmentId: EnvironmentId.make("environment-1"),
-    label: "Local",
+    label: "本地",
     httpBaseUrl: "http://localhost:1",
     wsBaseUrl: "ws://localhost:1",
   });

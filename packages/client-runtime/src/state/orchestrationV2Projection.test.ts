@@ -505,7 +505,7 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
       type: "user_message",
       messageId: MessageId.make("message-steer"),
       inputIntent: "steer",
-      text: "steer",
+      text: "引导当前执行",
       attachments: [],
       createdBy: "user",
       creationSource: "web",

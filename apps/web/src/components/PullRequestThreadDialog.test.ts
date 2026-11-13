@@ -57,7 +57,7 @@ vi.mock("~/state/sourceControlActions", async () => {
   return {
     readCachedPullRequestResolution: () => null,
     usePullRequestResolutionState: () => ({
-      data: { pullRequest: { number: 123, title: "Pull request", state: "open" } },
+      data: { pullRequest: { number: 123, title: "PR", state: "open" } },
     }),
     usePreparePullRequestThreadAction,
   };

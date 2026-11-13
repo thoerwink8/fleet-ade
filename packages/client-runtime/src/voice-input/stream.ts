@@ -58,7 +58,7 @@ export function openSpeechStream(input: {
     clearTimeout(timer);
     timer = setTimeout(() => fail(new Error("Live transcription stopped responding.")), 120_000);
   };
-  const abort = () => fail(new Error("Voice transcription was cancelled."), false);
+  const abort = () => fail(new Error("语音转写已取消。"), false);
   const pump = () => {
     if (!isReady || closed || finishSent) return;
     if (!input.canSend()) return fail(new Error("Voice consent was revoked."));

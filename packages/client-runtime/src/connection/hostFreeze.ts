@@ -16,10 +16,10 @@ export function hostFreezeNotice(
   if (stall === undefined) return null;
   const { loadAverage, cpuCount } = stall;
   return {
-    title: `${hostLabel} froze for ${Math.round(stall.durationMs / 1000)}s`,
+    title: `${hostLabel} 卡顿了 ${Math.round(stall.durationMs / 1000)} 秒`,
     description:
       loadAverage !== undefined && loadAverage > cpuCount
-        ? `Its CPU is overloaded (load ${Math.round(loadAverage)} on ${cpuCount} cores).`
-        : `T3 Code on ${hostLabel} was too busy to answer.`,
+        ? `其 CPU 负载过高（${Math.round(loadAverage)} 个核心的负载为 ${cpuCount}）。`
+        : `${hostLabel} 上的 T3 Code 太忙，未能响应。`,
   };
 }

@@ -11,7 +11,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export const MessageCopyButton = memo(function MessageCopyButton({
   text,
-  label = "Copy message",
+  label = "复制消息",
   icon: Icon = CopyIcon,
   extraFlavors,
   size = "xs",

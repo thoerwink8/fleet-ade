@@ -84,7 +84,7 @@ describe("nothingToMove", () => {
     skipped: "its server predates database checks; update it on Nightly first",
   };
   const stableSwitch = {
-    label: "Stable",
+    label: "稳定版",
     channel: "latest" as const,
     savedChannel: "latest" as const,
     switchesLocal: false,

@@ -36,7 +36,7 @@ export function hasAvailableCompactionProvider(input: {
 
 export function formatContextWindowCompactionMessage(autoCompactThreshold?: number | null): string {
   if (typeof autoCompactThreshold === "number" && autoCompactThreshold > 0) {
-    return `Compacts automatically at about ${autoCompactThreshold.toLocaleString("en-US")} tokens.`;
+    return `大约 ${autoCompactThreshold.toLocaleString("en-US")} token 时会自动压缩。`;
   }
-  return "Context compacts automatically when needed.";
+  return "上下文会在需要时自动压缩。";
 }

@@ -103,7 +103,7 @@ function expandableMarkdownImageProps(
   return {
     role: "button" as const,
     tabIndex: 0,
-    "aria-label": `Preview ${previewName}`,
+    "aria-label": `预览 ${previewName}`,
     onClick: expand,
     onKeyDown: (event: ReactKeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") expand(event);
@@ -117,11 +117,7 @@ function ChatMarkdownMediaUnavailableLabel(props: {
   readonly detail?: string | undefined;
 }) {
   const label =
-    props.kind === "audio"
-      ? "Audio unavailable"
-      : props.kind === "video"
-        ? "Video unavailable"
-        : "Image unavailable";
+    props.kind === "audio" ? "音频不可用" : props.kind === "video" ? "视频不可用" : "图片不可用";
   return (
     <span data-thread-find-ignore className="inline-flex items-center gap-1.5">
       <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
@@ -246,7 +242,7 @@ export function ChatMarkdownImage(props: {
         id={props.imageProps?.id}
         data-markdown-copy={props.copyMarkdown}
         role="status"
-        aria-label="Loading image"
+        aria-label="正在加载图片"
         className={CHAT_MARKDOWN_MEDIA_LAYOUT_CLASS_NAME}
       />
     );
@@ -264,7 +260,7 @@ export function ChatMarkdownImage(props: {
         style={props.style}
         {...(failed
           ? { role: "alert" as const }
-          : { role: "status" as const, "aria-label": "Loading image" })}
+          : { role: "status" as const, "aria-label": "正在加载图片" })}
       >
         {failed ? (
           <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">

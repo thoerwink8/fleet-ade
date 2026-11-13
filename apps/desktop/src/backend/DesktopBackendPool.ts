@@ -177,7 +177,7 @@ export const layer = Layer.effect(
             { reason },
           );
           yield* electronDialog.showErrorBox(
-            "WSL backend is still unavailable",
+            "WSL 后端仍不可用",
             `${reason}\n\nT3 Code will use the Windows backend for this launch and retry WSL the next time the app starts.`,
           );
           yield* appSettings.applyWslWindowsFallbackInMemory;
@@ -188,7 +188,7 @@ export const layer = Layer.effect(
           reason,
         });
         yield* electronDialog.showErrorBox(
-          "WSL backend couldn't start",
+          "WSL 后端无法启动",
           `${reason}\n\nFalling back to the Windows backend so T3 Code can open. Re-enable the WSL backend from Settings > Sharing & access once the WSL distro is fixed.`,
         );
         // Clear wslOnly too so enabling WSL cannot restore a failed mode.
@@ -235,7 +235,7 @@ export const layer = Layer.effect(
         DesktopHomeOwner.readLiveHomeOwner().pipe(
           Effect.flatMap((owner) =>
             electronDialog.showErrorBox(
-              "This T3 home is unavailable",
+              "此 T3 主目录不可用",
               DesktopHomeOwner.homeOwnedMessage(owner),
             ),
           ),

@@ -7,7 +7,7 @@ import { resolveServerBackedAppStageLabel } from "../branding.logic";
 import { primaryServerConfigAtom } from "../state/server";
 
 export type SidebarStageBackdropVariant = "nightly" | "dev";
-export type EnvironmentIdentificationPillLabel = "Dev" | "Nightly";
+export type EnvironmentIdentificationPillLabel = "Dev" | "Nightly 版";
 
 const STAGE_BACKDROP_VIEW_BOX = "0 0 8192 96";
 
@@ -19,7 +19,7 @@ export function resolveSidebarStageBackdropVariant(
   if (mode === "dev-artwork") return "dev";
   if (mode !== "artwork") return null;
   const normalized = stageLabel.trim().toLowerCase();
-  if (normalized === "nightly") return "nightly";
+  if (normalized === "nightly" || normalized.startsWith("nightly ")) return "nightly";
   if (normalized === "dev") return "dev";
   return null;
 }
@@ -29,7 +29,7 @@ export function resolveEnvironmentIdentificationPillLabel(
 ): EnvironmentIdentificationPillLabel | null {
   const normalized = stageLabel.trim().toLowerCase();
   if (normalized === "dev") return "Dev";
-  if (normalized === "nightly") return "Nightly";
+  if (normalized === "nightly" || normalized.startsWith("nightly ")) return "Nightly 版";
   return null;
 }
 

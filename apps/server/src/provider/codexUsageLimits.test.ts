@@ -91,7 +91,7 @@ describe("codexRateLimitsToLimits", () => {
         {
           id: "primary",
           kind: "session",
-          label: "Session",
+          label: "会话",
           usedPercent: 12,
           windowDurationMins: 300,
           resetsAt: "2026-07-14T03:33:20.000Z",
@@ -261,7 +261,7 @@ describe("mergeCodexRateLimits", () => {
         {
           id: "primary",
           kind: "session",
-          label: "Session",
+          label: "会话",
           usedPercent: 12,
           windowDurationMins: 300,
         },

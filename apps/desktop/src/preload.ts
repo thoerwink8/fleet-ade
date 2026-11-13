@@ -97,7 +97,7 @@ function unwrapEnsureSshEnvironmentResult(result: unknown) {
     const message =
       "message" in result && typeof result.message === "string"
         ? result.message
-        : "SSH authentication cancelled.";
+        : "SSH 身份验证已取消。";
     throw new Error(message);
   }
   return result as Awaited<ReturnType<DesktopBridge["ensureSshEnvironment"]>>;

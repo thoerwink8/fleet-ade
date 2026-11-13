@@ -34,11 +34,11 @@ export const WEBHOOK_FILTER_OPS: ReadonlyArray<{
   readonly op: ScheduledTaskWebhookFilterOp;
   readonly label: string;
 }> = [
-  { op: "equals", label: "equals" },
-  { op: "notEquals", label: "does not equal" },
-  { op: "in", label: "is one of" },
-  { op: "startsWith", label: "starts with" },
-  { op: "exists", label: "exists" },
+  { op: "equals", label: "等于" },
+  { op: "notEquals", label: "不等于" },
+  { op: "in", label: "属于以下值之一" },
+  { op: "startsWith", label: "开头为" },
+  { op: "exists", label: "存在" },
 ];
 
 let lastWebhookFilterDraftId = 0;
@@ -78,7 +78,7 @@ export function parseWebhookFilterDrafts(
   drafts: ReadonlyArray<WebhookFilterDraft>,
 ): { readonly filters: ReadonlyArray<ScheduledTaskWebhookFilter> } | { readonly error: string } {
   if (drafts.length > MAX_WEBHOOK_FILTERS) {
-    return { error: `Use at most ${MAX_WEBHOOK_FILTERS} filters.` };
+    return { error: `最多使用 ${MAX_WEBHOOK_FILTERS} 个筛选条件。` };
   }
   const filters: ScheduledTaskWebhookFilter[] = [];
   for (const [index, draft] of drafts.entries()) {

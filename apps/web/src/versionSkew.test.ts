@@ -16,8 +16,7 @@ import {
   resolveVersionMismatch,
 } from "./versionSkew";
 
-const MISMATCH_HINT =
-  "Version mismatch. Try syncing the client and server to the same T3 Code version.";
+const MISMATCH_HINT = "版本不一致。请让客户端和服务器使用相同的 T3 Code 版本。";
 
 describe("versionSkew", () => {
   it("updates only the proven install and safely quotes its paths", () => {
@@ -52,7 +51,7 @@ describe("versionSkew", () => {
       stage: "downloading",
       fromVersion: "0.0.33",
       targetVersion: "0.0.34",
-      message: "Download failed.",
+      message: "下载失败。",
     } as const satisfies ServerUpdateState;
     const retryFailure = { ...failure };
     const otherEnvironmentFailure = { ...failure };
@@ -61,7 +60,7 @@ describe("versionSkew", () => {
 
     expect(isServerUpdateFailureDismissed(failure)).toBe(true);
     expect(failure.status).toBe("failed");
-    expect(failure.message).toBe("Download failed.");
+    expect(failure.message).toBe("下载失败。");
     expect(isServerUpdateFailureDismissed(retryFailure)).toBe(false);
     expect(isServerUpdateFailureDismissed(otherEnvironmentFailure)).toBe(false);
   });

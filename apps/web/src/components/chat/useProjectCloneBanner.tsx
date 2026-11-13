@@ -42,7 +42,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
         stackedThreadToast({
           type: "error",
           title,
-          description: error instanceof Error ? error.message : "An error occurred.",
+          description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
     }
@@ -51,11 +51,11 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
   const activeProjectFileCopy = useProjectFileCopy(activeProjectRef);
   const projectCloneSendBlockReason =
     activeProjectClone?.phase === "running"
-      ? "Cloning repository"
+      ? "正在克隆仓库"
       : activeProjectClone !== null && activeProjectClone.phase !== "done"
-        ? "Repository not cloned"
+        ? "仓库尚未克隆"
         : activeProjectFileCopy?.phase === "copying"
-          ? "Copying files"
+          ? "正在复制文件"
           : null;
   const projectCloneBannerItem = (() => {
     if (activeProjectFileCopy?.phase === "failed" && activeProjectRef) {
@@ -78,7 +78,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
         id: `project-clone:${projectId}`,
         variant: "info",
         icon: <DownloadIcon />,
-        title: `Cloning ${name}`,
+        title: `正在克隆 ${name}`,
         description: projectCloneProgressSummary(activeProjectClone),
         actions: (
           <Button
@@ -90,7 +90,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
               )
             }
           >
-            Cancel
+            取消
           </Button>
         ),
       };
@@ -100,8 +100,8 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
       id: `project-clone:${projectId}`,
       variant: cancelled ? "warning" : "error",
       icon: <DownloadIcon />,
-      title: cancelled ? `Cancelled cloning ${name}` : `Failed to clone ${name}`,
-      description: cancelled ? "Retry to bring in the repository." : activeProjectClone.error,
+      title: cancelled ? `已取消克隆 ${name}` : `克隆 ${name} 失败`,
+      description: cancelled ? "重试即可重新获取仓库。" : activeProjectClone.error,
       actions: (
         <>
           <Button
@@ -109,7 +109,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
             variant="ghost"
             onClick={() => void removeClonedProject({ environmentId, projectId })}
           >
-            Remove project
+            移除项目
           </Button>
           <Button
             size="xs"
@@ -120,7 +120,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
               )
             }
           >
-            Retry
+            重试
           </Button>
         </>
       ),

@@ -130,9 +130,9 @@ describe("ThreadActivityAnnouncer", () => {
     expect(heard).toEqual([
       ["Working", ""],
       ["Working", "T3 Code: Checking the repo"],
-      ["Needs approval", "T3 Code: Checking the repo"],
-      ["Needs approval", "T3 Code: Checking the repo"],
-      ["Needs approval", "Running rg"],
+      ["待批准", "T3 Code: Checking the repo"],
+      ["待批准", "T3 Code: Checking the repo"],
+      ["待批准", "Running rg"],
     ]);
   });
 

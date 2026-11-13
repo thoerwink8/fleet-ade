@@ -33,7 +33,7 @@ function source(paths: string[], hash: string): ReviewDiffPreviewSource {
   return {
     id: "working-tree",
     kind: "working-tree",
-    title: "Uncommitted",
+    title: "未提交的更改",
     baseRef: "HEAD",
     headRef: null,
     diff: "",
@@ -62,7 +62,7 @@ function Probe({ source }: { source: ReviewDiffPreviewSource }) {
       {files.renderableFiles.map((file) => (
         <div key={`${file.name}:${file.type}`}>
           <span>
-            {file.name}:{file.hunks.length ? "loaded" : "pending"}
+            {file.name}:{file.hunks.length ? "loaded" : "等待中"}
           </span>
           <span>{file.type}</span>
         </div>

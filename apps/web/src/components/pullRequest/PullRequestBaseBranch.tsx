@@ -34,7 +34,7 @@ function PullRequestBaseFreshnessWarning({
   const behind =
     freshness.behindBy === null
       ? ""
-      : ` by ${freshness.behindBy.toLocaleString()} ${
+      : ` by ${freshness.behindBy.toLocaleString("zh-CN")} ${
           freshness.behindBy === 1 ? "commit" : "commits"
         }`;
   const summary = `This branch is out-of-date with ${baseBranch}${behind}.`;
@@ -60,7 +60,7 @@ function PullRequestBaseFreshnessWarning({
       </PopoverTrigger>
       <PopoverPopup align="start" side="bottom" className="max-w-80" padding="compact">
         <p className="text-xs text-foreground">{summary}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">Changes can be cleanly merged.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">可以无冲突地合并。</p>
         {freshness.methods.length > 0 ? (
           <span className="mt-2 flex flex-wrap items-center gap-1.5">
             {freshness.methods.map((method) => (
@@ -72,7 +72,7 @@ function PullRequestBaseFreshnessWarning({
                 onClick={() => onUpdate(method)}
               >
                 <PullRequestGlyph.merged aria-hidden className="size-3" />
-                {method === "rebase" ? "Update with rebase" : "Update branch"}
+                {method === "rebase" ? "通过变基更新" : "更新分支"}
               </Button>
             ))}
           </span>
@@ -101,7 +101,7 @@ export function PullRequestBaseBranch({
   const label = (
     <>
       {stacked ? (
-        <PullRequestGlyph.stack aria-label="Stacked pull request" className="size-3 shrink-0" />
+        <PullRequestGlyph.stack aria-label="堆叠的 PR" className="size-3 shrink-0" />
       ) : null}
       <code className="flex min-w-0">
         <MiddleTruncate value={baseBranch} showTitle={false} />
@@ -131,7 +131,7 @@ export function PullRequestBaseBranch({
           </span>
         }
       />
-      <TooltipPopup side="top">{stacked ? `Stacked on ${baseBranch}` : baseBranch}</TooltipPopup>
+      <TooltipPopup side="top">{stacked ? `堆叠于 ${baseBranch}` : baseBranch}</TooltipPopup>
     </Tooltip>
   );
 }

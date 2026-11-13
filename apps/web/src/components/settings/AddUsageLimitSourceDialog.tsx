@@ -76,7 +76,7 @@ export function AddUsageLimitSourceDialog({
     >
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add a CLIProxyAPI hub</DialogTitle>
+          <DialogTitle>添加 CLIProxyAPI 中转站</DialogTitle>
           <DialogDescription>
             Show the quota of every account the hub pools, next to the providers on{" "}
             {environmentLabel}. The key stays on that server.
@@ -91,7 +91,7 @@ export function AddUsageLimitSourceDialog({
             }}
           >
             <div className="grid gap-1.5">
-              <Label htmlFor="usage-source-url">Hub URL</Label>
+              <Label htmlFor="usage-source-url">中转站 URL</Label>
               <Input
                 id="usage-source-url"
                 placeholder="https://hub.example.ts.net:8318"
@@ -101,10 +101,10 @@ export function AddUsageLimitSourceDialog({
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="usage-source-key">Management key</Label>
+              <Label htmlFor="usage-source-key">管理密钥</Label>
               <SecretSourceInput
                 id="usage-source-key"
-                aria-label="Management key"
+                aria-label="管理密钥"
                 value={keyDraft}
                 sources={secretSources}
                 environmentId={environmentId}
@@ -114,10 +114,10 @@ export function AddUsageLimitSourceDialog({
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="usage-source-label">Label (optional)</Label>
+              <Label htmlFor="usage-source-label">标签（可选）</Label>
               <Input
                 id="usage-source-label"
-                placeholder="Defaults to the hub's host name"
+                placeholder="默认使用中转站的主机名"
                 value={label}
                 onChange={(event) => setLabel(event.target.value)}
               />
@@ -132,10 +132,10 @@ export function AddUsageLimitSourceDialog({
               onOpenChange(false);
             }}
           >
-            Cancel
+            取消
           </Button>
           <Button onClick={save} disabled={!canSave}>
-            Add hub
+            添加中转站
           </Button>
         </DialogFooter>
       </DialogPopup>

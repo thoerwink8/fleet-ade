@@ -101,7 +101,7 @@ export const WorkGroupSection = memo(function WorkGroupSection({
   }
 
   return (
-    <section aria-label="Activity">
+    <section aria-label="活动">
       {nonEmptyEntries.map((workEntry) => (
         <SimpleWorkEntryRow
           key={workEntry.id}
@@ -273,7 +273,7 @@ function ExpandedWorkGroupEntries({
           onItemSizeChanged={updateExpandedContentHeight}
           tabIndex={0}
           role="region"
-          aria-label="Tool calls"
+          aria-label="工具调用"
           data-tool-group-scroll
           style={{ maxHeight: `calc(min(18rem, 50dvh) + ${expandedContentHeight}px)` }}
           className={cn(
@@ -294,15 +294,15 @@ export function WorkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: 
   const compacting = row.compacting === true || isCompacting;
   const shimmer = isPreparingWorktree || compacting;
   const label = isPreparingWorktree ? (
-    "Setting up worktree…"
+    "正在设置工作树…"
   ) : compacting ? (
     <CompactingLabel createdAt={row.createdAt} />
   ) : row.createdAt ? (
     <>
-      Working for <WorkingTimer createdAt={row.createdAt} />
+      已工作 <WorkingTimer createdAt={row.createdAt} />
     </>
   ) : (
-    "Working..."
+    "运行中"
   );
   return (
     <div className="border-b border-border/60 pb-2 pt-1">
@@ -327,7 +327,7 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
   const terminalId = snapshot.setupScript?.terminalId ?? null;
   const openTerminal = ctx.onOpenWorktreeSetupTerminal;
   const onOpenTerminal = openTerminal && terminalId ? () => openTerminal(terminalId) : null;
-  const scriptName = snapshot.setupScript?.name ?? "Setup script";
+  const scriptName = snapshot.setupScript?.name ?? "设置脚本";
   return (
     <Popover>
       <PopoverTrigger
@@ -336,12 +336,12 @@ function BackgroundWorktreeSetupChip({ snapshot }: { snapshot: WorktreeSetupSnap
             variant="ghost-muted"
             size="micro"
             className="ml-auto min-w-0 shrink-0"
-            aria-label={`Background setup is still running: ${scriptName}. Show setup progress.`}
+            aria-label={`后台设置仍在运行：${scriptName}。显示设置进度。`}
           />
         }
       >
         <Spinner className="size-3 shrink-0" />
-        <span className="truncate">Background setup</span>
+        <span className="truncate">后台设置</span>
       </PopoverTrigger>
       <PopoverPopup side="bottom" align="end" width="lg" padding="compact">
         <WorktreeSetupCard
@@ -362,10 +362,10 @@ function CompactingLabel({ createdAt }: { createdAt: string | null }) {
       <Minimize2Icon aria-hidden="true" className="size-3" />
       {createdAt ? (
         <span>
-          Compacting for <WorkingTimer createdAt={createdAt} />
+          压缩中，已用时 <WorkingTimer createdAt={createdAt} />
         </span>
       ) : (
-        "Compacting…"
+        "正在压缩…"
       )}
     </span>
   );
@@ -380,7 +380,7 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
   const live = ctx.pendingApprovals.size === 0;
   const activity = (
     <LiveActivityRow
-      label={providerStartingLabel ?? liveAnswerPreview ?? "Thinking"}
+      label={providerStartingLabel ?? liveAnswerPreview ?? "正在思考"}
       iconName="brain"
       active={live}
       shimmer={live}
@@ -473,7 +473,7 @@ function LiveActivityContent({
                   : "text-icon-muted",
             )}
             role={announceFailure ? "img" : undefined}
-            aria-label={announceFailure ? "Tool call failed" : undefined}
+            aria-label={announceFailure ? "工具调用失败" : undefined}
           >
             <ToolActivityIconView
               icon={toolIcon}
@@ -571,9 +571,9 @@ export function LiveWorkEntryTimelineRow({
         label={
           thoughtIsStatus ? (
             row.active ? (
-              "Thinking"
+              "正在思考"
             ) : (
-              "Thought"
+              "已思考"
             )
           ) : row.entry.itemType === "reasoning" ? (
             <ChatMarkdown
@@ -634,7 +634,7 @@ function WorkGroupHeader(props: {
 }) {
   return (
     <WorkLogButton
-      aria-label={props.failed ? `${props.label}, tool call failed` : props.label}
+      aria-label={props.failed ? `${props.label}，工具调用失败` : props.label}
       aria-expanded={props.expanded}
       onClick={props.onToggle}
       icon={

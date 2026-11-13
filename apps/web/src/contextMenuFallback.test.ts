@@ -228,7 +228,7 @@ describe("showContextMenuFallback", () => {
       return 0;
     });
 
-    const selectionPromise = showContextMenuFallback([{ id: "rename", label: "Rename" }]);
+    const selectionPromise = showContextMenuFallback([{ id: "rename", label: "重命名" }]);
     const renameButton = findButton("Rename");
 
     renameButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
