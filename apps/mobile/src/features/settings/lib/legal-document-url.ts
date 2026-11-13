@@ -1,24 +1,22 @@
-const DEFAULT_MARKETING_SITE_URL = "https://t3.codes";
-
-function resolveMarketingSiteUrl(override: string | undefined): URL {
+function resolveMarketingSiteUrl(override: string | undefined): URL | null {
+  const raw = override?.trim();
+  if (!raw) return null;
   try {
-    const url = new URL(override?.trim() || DEFAULT_MARKETING_SITE_URL);
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      return new URL(DEFAULT_MARKETING_SITE_URL);
-    }
-
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
     url.search = "";
     url.hash = "";
     url.pathname = `${url.pathname.replace(/\/+$/, "")}/`;
     return url;
   } catch {
-    return new URL(DEFAULT_MARKETING_SITE_URL);
+    return null;
   }
 }
 
 const MARKETING_SITE_URL = resolveMarketingSiteUrl(process.env.EXPO_PUBLIC_MARKETING_SITE_URL);
 
 function marketingSiteDocumentUrl(path: string): string {
+  if (!MARKETING_SITE_URL) return "";
   return new URL(path, MARKETING_SITE_URL).toString();
 }
 

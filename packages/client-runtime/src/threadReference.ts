@@ -49,7 +49,7 @@ export function resolveThreadReferenceCopyTarget(input: {
   readonly openPanelPullRequestUrl?: string | null | undefined;
   readonly pullRequests?: ReadonlyArray<ThreadPullRequestLink> | undefined;
   readonly linkedPullRequestUrl?: string | null;
-  readonly hostedAppUrl?: string;
+  readonly hostedAppUrl?: string | undefined;
 }): ThreadReferenceCopyTarget | null {
   if (input.openPanelPullRequestUrl === null) return null;
   const pullRequestUrl =

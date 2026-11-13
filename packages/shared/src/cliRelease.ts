@@ -3,8 +3,6 @@ import * as Schema from "effect/Schema";
 
 import { compareSemverVersions } from "./semver.ts";
 
-const CLI_RELEASE_REPOSITORY = "pingdotgg/t3code";
-export const CLI_RELEASES_PAGE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases`;
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
 
@@ -42,15 +40,6 @@ export function cliArchiveFileName(version: string, platformKey: CliArchivePlatf
   return `t3-${version}-${platformKey}.${platformKey.startsWith("win32") ? "zip" : "tar.gz"}`;
 }
 
-const CLI_RELEASE_DEFAULT_BASE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases/download`;
-
-export function cliReleaseDownloadBaseUrl(
-  version: string,
-  baseUrl: string | undefined = CLI_RELEASE_DEFAULT_BASE_URL,
-): string {
-  return `${(baseUrl?.trim() || CLI_RELEASE_DEFAULT_BASE_URL).replace(/\/+$/, "")}/v${version}`;
-}
-
 /** `segments` added to `baseUrl`'s path, keeping its query, such as a signed mirror URL's token. */
 export function releaseAssetUrl(baseUrl: string, ...segments: ReadonlyArray<string>): string {
   const url = new URL(baseUrl);
@@ -62,9 +51,11 @@ export function releaseAssetUrl(baseUrl: string, ...segments: ReadonlyArray<stri
 export function cliReleaseAssetUrl(
   version: string,
   fileName: string,
-  baseUrl: string | undefined = CLI_RELEASE_DEFAULT_BASE_URL,
-): string {
-  return releaseAssetUrl(baseUrl?.trim() || CLI_RELEASE_DEFAULT_BASE_URL, `v${version}`, fileName);
+  baseUrl: string | undefined,
+): string | undefined {
+  const trimmed = baseUrl?.trim();
+  if (!trimmed) return undefined;
+  return releaseAssetUrl(trimmed, `v${version}`, fileName);
 }
 
 export function parseChecksums(text: string): ReadonlyMap<string, string> {
@@ -129,11 +120,6 @@ export function acceptsTrackSwitchRelease(
     cliReleaseChannelOf(found) === (channel === "nightly" ? "nightly" : "stable") &&
     compareSemverVersions(found, checked) >= 0
   );
-}
-
-/** Page until the channel matches; nightlies can push preview/stable releases past the first page. */
-export function cliReleaseIndexPageUrl(page: number): string {
-  return `https://api.github.com/repos/${CLI_RELEASE_REPOSITORY}/releases?per_page=100&page=${page}`;
 }
 
 /** Draft assets are not downloadable. */

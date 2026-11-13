@@ -536,18 +536,44 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
       assert.isNull(preview.publish);
       assert.isNull(previewChannel.publish);
+      assert.isNull(release.publish);
+    }).pipe(
+      Effect.provide(
+        ConfigProvider.layer(
+          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "pingdotgg/t3code" } }),
+        ),
+      ),
+    ),
+  );
+
+  it.effect("publishes desktop updates only for an explicit repository", () =>
+    Effect.gen(function* () {
+      const release = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.0.33",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
       assert.deepStrictEqual(release.publish, [
         {
           provider: "github",
-          owner: "pingdotgg",
-          repo: "t3code",
+          owner: "example",
+          repo: "updates",
           releaseType: "release",
         },
       ]);
     }).pipe(
       Effect.provide(
         ConfigProvider.layer(
-          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "pingdotgg/t3code" } }),
+          ConfigProvider.fromEnv({
+            env: {
+              T3CODE_DESKTOP_UPDATE_REPOSITORY: "example/updates",
+              GITHUB_REPOSITORY: "pingdotgg/t3code",
+            },
+          }),
         ),
       ),
     ),

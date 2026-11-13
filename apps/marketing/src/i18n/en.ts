@@ -76,7 +76,7 @@ export const en = {
   download: {
     title: "Download T3 Code for macOS, Windows, and Linux | T3 Code",
     description:
-      "Download the official T3 Code desktop app for macOS, Windows, or Linux, or get the iOS and Android apps. t3.codes is the only official download site.",
+      "Download the official T3 Code desktop app for macOS, Windows, or Linux, or get the iOS and Android apps. example.invalid is the only official download site.",
     breadcrumb: "Download",
     heading: "Download T3 Code",
     channelLabel: "Release channel",

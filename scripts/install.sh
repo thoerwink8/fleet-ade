@@ -2,23 +2,20 @@
 # Installs the T3 Code CLI from a GitHub Release archive. Needs only sh, tar,
 # sha256sum or shasum, and curl or wget; no Node, npm, or compiler.
 #
-#   curl -fsSL https://t3.codes/install.sh | sh
-#
 # Environment:
 #   T3CODE_CHANNEL           release train to follow: stable, nightly, or preview
 #                            (default: stable; preview is a maintainers' test train)
-#   T3CODE_VERSION           exact version to install (overrides T3CODE_CHANNEL)
+#   T3CODE_VERSION           exact version to install (required)
 #   T3CODE_HOME              T3 home directory (default: ~/.t3)
 #   T3CODE_INSTALL_BIN_DIR   where the `t3` symlink goes (default: ~/.local/bin)
-#   T3CODE_RELEASE_BASE_URL  mirror for releases/download (default: GitHub)
+#   T3CODE_RELEASE_BASE_URL  archive mirror (required)
 #
 # The archive is unpacked into $T3CODE_HOME/runtime/versions/<version>, the
 # same layout `t3 service install` uses, so the service reuses this download
 # instead of fetching the release again.
 set -eu
 
-repo="pingdotgg/t3code"
-base_url="${T3CODE_RELEASE_BASE_URL:-https://github.com/${repo}/releases/download}"
+base_url="${T3CODE_RELEASE_BASE_URL:-}"
 t3_home="${T3CODE_HOME:-$HOME/.t3}"
 case "$t3_home" in
   /*) ;;
@@ -171,7 +168,7 @@ case "$(uname -m)" in
   *) fail "unsupported architecture $(uname -m)" ;;
 esac
 if [ "${platform}-${arch}" = darwin-x64 ]; then
-  fail "there is no t3 CLI for Intel Macs. Install the desktop app from https://t3.codes/download, or run a server from source: https://github.com/${repo}/blob/main/docs/user/install.md#intel-macs"
+  fail "there is no t3 CLI for Intel Macs. Run a server from source."
 fi
 command -v tar >/dev/null 2>&1 || fail "tar is required"
 if command -v sha256sum >/dev/null 2>&1; then
@@ -182,31 +179,13 @@ else
   fail "sha256sum or shasum is required"
 fi
 
+if [ -z "$base_url" ]; then
+  fail "no release archive is configured (T3CODE_RELEASE_BASE_URL)"
+fi
 channel="${T3CODE_CHANNEL:-stable}"
 version="${T3CODE_VERSION:-}"
 if [ -z "$version" ]; then
-  case "$channel" in
-    stable) tag_pattern='v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)' ;;
-    nightly | preview) tag_pattern="v\([0-9][^\"]*-${channel}\.[0-9]*\.[0-9]*\)" ;;
-    *) fail "T3CODE_CHANNEL must be stable, nightly, or preview" ;;
-  esac
-  tmp_index="$(mktemp)"
-  if [ "$channel" = stable ]; then
-    # release.yml marks only plain stable releases latest. This is a github.com
-    # page, so it is not cut off by a page of newer nightlies or the API quota.
-    fetch "https://github.com/${repo}/releases/latest" "$tmp_index" application/json
-    version="$(sed -n "s/.*\"tag_name\": *\"${tag_pattern}\".*/\1/p" "$tmp_index" | head -n 1)"
-  else
-    page=1
-    while [ -z "$version" ] && [ "$page" -le 10 ]; do
-      fetch "https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}" "$tmp_index"
-      version="$(sed -n "s/.*\"tag_name\": *\"${tag_pattern}\".*/\1/p" "$tmp_index" | head -n 1)"
-      grep -q '"tag_name"' "$tmp_index" || break
-      page=$((page + 1))
-    done
-  fi
-  rm -f "$tmp_index"
-  [ -n "$version" ] || fail "could not find a ${channel} release; set T3CODE_VERSION"
+  fail "set T3CODE_VERSION; this build does not look up a public release"
 fi
 case "$version" in
   *-preview.*)

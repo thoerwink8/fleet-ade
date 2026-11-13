@@ -80,7 +80,7 @@ export const ptBR: Messages = {
   download: {
     title: "Baixe o T3 Code para macOS, Windows e Linux | T3 Code",
     description:
-      "Baixe o app oficial de desktop do T3 Code para macOS, Windows ou Linux, ou os apps para iOS e Android. t3.codes é o único site oficial de download.",
+      "Baixe o app oficial de desktop do T3 Code para macOS, Windows ou Linux, ou os apps para iOS e Android. example.invalid é o único site oficial de download.",
     breadcrumb: "Baixar",
     heading: "Baixar o T3 Code",
     channelLabel: "Canal de versões",

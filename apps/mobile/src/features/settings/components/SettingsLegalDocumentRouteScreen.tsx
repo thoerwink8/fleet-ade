@@ -27,6 +27,20 @@ export function SettingsLegalDocumentRouteScreen({
   const [externalUrl, setExternalUrl] = useState(documentUrl);
   const navigation = useNavigation();
   const safeExternalUrl = isLegalDocumentUrl(externalUrl) ? externalUrl : LEGAL_URL;
+  if (!isLegalDocumentUrl(documentUrl)) {
+    return (
+      <View className="flex-1 bg-sheet">
+        <SheetHeader
+          title={documentName}
+          accessibilityLabel="Close legal document"
+          onClose={() => navigation.goBack()}
+        />
+        <Text className="px-4 pt-6 text-sm text-muted-foreground">
+          This build does not publish a legal document.
+        </Text>
+      </View>
+    );
+  }
   const headerOptions = (
     <SheetHeader
       title={documentName}

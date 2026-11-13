@@ -1283,8 +1283,8 @@ const program = Effect.gen(function* () {
                 type: "search",
                 query: "t3 code",
                 sources: [
-                  { type: "url", url: "https://t3.codes" },
-                  { type: "url", url: "https://t3.codes" },
+                  { type: "url", url: "https://example.invalid" },
+                  { type: "url", url: "https://example.invalid" },
                   { type: "url", url: "https://github.com/pingdotgg/t3code" },
                 ],
               },
@@ -1295,13 +1295,13 @@ const program = Effect.gen(function* () {
           {
             sessionUpdate: "tool_call_update",
             toolCallId: "grok-web-fetch",
-            title: "Fetch: https://t3.codes",
+            title: "Fetch: https://example.invalid",
             kind: "fetch",
             status: "completed",
-            rawInput: { variant: "WebFetch", url: "https://t3.codes" },
+            rawInput: { variant: "WebFetch", url: "https://example.invalid" },
             rawOutput: {
               type: "WebFetch",
-              Content: { url: "https://t3.codes", content: "T3 Code page" },
+              Content: { url: "https://example.invalid", content: "T3 Code page" },
             },
             content: [{ type: "content", content: { type: "text", text: "T3 Code page" } }],
           },

@@ -208,9 +208,13 @@ const installFromArchive = Effect.fn("cloud.pinned_runtime.install_archive")(fun
   const httpClient = input.httpClient;
   input.onProgress?.({ stage: "download", received: 0, total: undefined });
   const { fileName, expected } = yield* publishedArchive(input, platformKey);
+  const archiveUrl = cliReleaseAssetUrl(input.version, fileName, input.releaseBaseUrl);
+  if (archiveUrl === undefined) {
+    return yield* new PinnedRuntimeInstallError({ step: "no release archive is configured" });
+  }
   const archive = yield* fetchReleaseAsset(
     httpClient,
-    cliReleaseAssetUrl(input.version, fileName, input.releaseBaseUrl),
+    archiveUrl,
     "downloading the t3 release archive",
     input.onProgress,
   );
@@ -265,11 +269,19 @@ const publishedArchive = Effect.fn("cloud.pinned_runtime.published_archive")(fun
   platformKey: CliArchivePlatformKey,
 ) {
   const fileName = cliArchiveFileName(input.version, platformKey);
+  const checksumUrl = cliReleaseAssetUrl(
+    input.version,
+    CLI_RELEASE_CHECKSUMS_FILE,
+    input.releaseBaseUrl,
+  );
+  if (checksumUrl === undefined) {
+    return yield* new PinnedRuntimeInstallError({ step: "no release archive is configured" });
+  }
   const checksums = parseChecksums(
     new TextDecoder().decode(
       yield* fetchReleaseAsset(
         input.httpClient,
-        cliReleaseAssetUrl(input.version, CLI_RELEASE_CHECKSUMS_FILE, input.releaseBaseUrl),
+        checksumUrl,
         "downloading the t3 release checksums",
       ),
     ),

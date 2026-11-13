@@ -17,12 +17,12 @@ const tunnel: EnvironmentCloudLinkStateResult = {
   relayIssuer: "https://relay.example.test",
   managedTunnelActive: true,
   publishAgentActivity: true,
-  tunnelHostname: "prod-a1.t3coderelay.com",
+  tunnelHostname: "prod-a1.relay.example.invalid",
 };
 
 const savedTunnel = {
-  httpBaseUrl: "https://prod-b2.t3coderelay.com",
-  wsBaseUrl: "wss://prod-b2.t3coderelay.com",
+  httpBaseUrl: "https://prod-b2.relay.example.invalid",
+  wsBaseUrl: "wss://prod-b2.relay.example.invalid",
   providerKind: "cloudflare_tunnel",
 } as const;
 
@@ -48,12 +48,12 @@ describe("resolveMcpGate", () => {
   it("opens on a fresh reachable check, at the tunnel's MCP URL", () => {
     expect(resolveMcpGate(open)).toEqual({
       kind: "open",
-      mcpUrl: "https://prod-a1.t3coderelay.com/mcp",
+      mcpUrl: "https://prod-a1.relay.example.invalid/mcp",
     });
     // A saved machine's address comes from T3 Connect, not from what it reports itself.
     expect(resolveMcpGate(saved)).toEqual({
       kind: "open",
-      mcpUrl: "https://prod-b2.t3coderelay.com/mcp",
+      mcpUrl: "https://prod-b2.relay.example.invalid/mcp",
     });
     // A disconnected saved machine follows T3 Connect's list. Offline or an unreadable list keeps
     // a retry; only a list showing nothing wrong asks to reconnect.

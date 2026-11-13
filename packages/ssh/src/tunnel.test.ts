@@ -237,10 +237,10 @@ describe("ssh tunnel scripts", () => {
         archiveVersion,
       );
     }
-    assert.include(
-      SshTunnel.buildRemoteT3RunnerScript(ARCHIVE),
-      "T3_ARCHIVE_VERSION='1.2.3-preview.20260911.4'",
-    );
+    const script = SshTunnel.buildRemoteT3RunnerScript(ARCHIVE);
+    assert.include(script, "T3_ARCHIVE_VERSION='1.2.3-preview.20260911.4'");
+    assert.include(script, "No release archive is configured for t3");
+    assert.notInclude(script, "github.com/pingdotgg/t3code/releases/download");
   });
 
   it.each([
@@ -271,13 +271,11 @@ describe("ssh tunnel scripts", () => {
           env: { HOME: NodePath.join(root, "home"), PATH: `${bin}:${process.env.PATH ?? ""}` },
         });
         assert.notEqual(result.status, 0);
+        assert.notInclude(result.stderr, "download attempt");
         if (downloads) {
-          assert.include(result.stderr, "download attempt");
-          // A bare curl error does not tell the user that t3 itself could not be downloaded.
+          assert.include(result.stderr, "No release archive is configured");
           assert.include(result.stderr, ARCHIVE.archiveVersion);
-          assert.include(result.stderr, "https://github.com/pingdotgg/t3code/releases/download");
         } else {
-          assert.notInclude(result.stderr, "download attempt");
           assert.include(result.stderr, "has no t3 release archive.");
         }
       } finally {

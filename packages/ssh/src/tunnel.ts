@@ -7,7 +7,7 @@ import type {
   DesktopSshEnvironmentTarget,
 } from "@t3tools/contracts";
 import { waitForHttpReady as waitForHttpReadyShared } from "@t3tools/shared/httpReadiness";
-import { cliReleaseDownloadBaseUrl } from "@t3tools/shared/cliRelease";
+
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import * as NetService from "@t3tools/shared/Net";
 import { extractJsonObject, fromLenientJson } from "@t3tools/shared/schemaJson";
@@ -516,6 +516,10 @@ if ! t3_runtime_ready; then
     "Linux x86_64" | "Linux amd64") T3_PLATFORM_KEY="linux-x64" ;;
     *) printf 'Remote host %s has no t3 release archive.\\n' "$(uname -s) $(uname -m)" >&2; exit 1 ;;
   esac
+  if [ -z "$T3_RELEASE_BASE_URL" ]; then
+    printf 'No release archive is configured for t3 %s.\\n' "$T3_ARCHIVE_VERSION" >&2
+    exit 1
+  fi
   T3_ARCHIVE="t3-$T3_ARCHIVE_VERSION-$T3_PLATFORM_KEY.tar.gz"
   T3_STAGING="$(mktemp -d "$HOME/.t3/runtime/versions/.staging-XXXXXX")"
   trap 'rm -rf "$T3_STAGING" "$T3_LOCK"' EXIT
@@ -524,7 +528,7 @@ if ! t3_runtime_ready; then
     elif command -v wget >/dev/null 2>&1; then wget -q --timeout=30 --tries=1 "$1" -O "$2"
     else printf 'Remote host needs curl or wget to download %s.\\n' "$T3_ARCHIVE" >&2; exit 1
     fi || {
-      printf 'Could not download t3 %s from %s. If this host cannot reach it, install t3 %s on it with https://t3.codes/install.sh (T3CODE_VERSION=%s; T3CODE_RELEASE_BASE_URL selects a mirror).\\n' "$T3_ARCHIVE_VERSION" "$1" "$T3_ARCHIVE_VERSION" "$T3_ARCHIVE_VERSION" >&2
+      printf 'Could not download t3 %s from %s. Set T3CODE_RELEASE_BASE_URL to a mirror this host can reach.\\n' "$T3_ARCHIVE_VERSION" "$1" >&2
       exit 1
     }
   }
@@ -985,10 +989,7 @@ export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string
   if (archiveVersion !== "" && !EXACT_ARCHIVE_VERSION.test(archiveVersion)) {
     throw new SshInvalidArchiveVersionError({ archiveVersion });
   }
-  const releaseBaseUrl = cliReleaseDownloadBaseUrl("", input?.releaseBaseUrl ?? undefined).replace(
-    /\/v$/u,
-    "",
-  );
+  const releaseBaseUrl = input?.releaseBaseUrl?.trim().replace(/\/+$/u, "") ?? "";
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_RUNNER_SCRIPT, {
       T3_NODE_SCRIPT_PATH: shellSingleQuote(nodeScriptPath),

@@ -18,7 +18,6 @@ import {
   parseMcpApprovalCode,
   type RuntimeMode,
 } from "@t3tools/contracts";
-import { DEFAULT_HOSTED_APP_URL } from "@t3tools/shared/connectAuth";
 import { encodeOAuthScope } from "@t3tools/shared/oauthScope";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -591,13 +590,7 @@ export const layerMcpClientAuthenticator = Layer.effect(
     const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
     const environment = yield* ServerEnvironment.ServerEnvironment;
     const environmentId = yield* environment.getEnvironmentId;
-    const hostedAppUrl = yield* hostedAppUrlConfig.pipe(
-      Effect.catch((cause) =>
-        Effect.logWarning("Outside MCP clients get app.t3.codes thread links", { cause }).pipe(
-          Effect.as(DEFAULT_HOSTED_APP_URL),
-        ),
-      ),
-    );
+    const hostedAppUrl = yield* hostedAppUrlConfig.pipe(Effect.option);
     return McpHttpServer.McpClientAuthenticator.of({
       authenticate: Effect.fn("McpHttpServer.McpClientAuthenticator.authenticate")(
         function (request) {
@@ -613,7 +606,9 @@ export const layerMcpClientAuthenticator = Layer.effect(
                     label: client.label,
                     access: client.access,
                     linked: client.peerLink,
-                    ...(client.peerLink ? {} : { hostedAppUrl }),
+                    ...(Option.isSome(hostedAppUrl) && !client.peerLink
+                      ? { hostedAppUrl: hostedAppUrl.value }
+                      : {}),
                   },
                   capabilities: new Set<McpInvocationContext.McpCapability>([
                     "orchestration",

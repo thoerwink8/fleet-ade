@@ -1181,7 +1181,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
         "not_linked",
       );
       // The address shows before any check passes.
-      expect(state.tunnelHostname).toBe("prod-abc.t3coderelay.com");
+      expect(state.tunnelHostname).toBe("prod-abc.relay.example.invalid");
     }).pipe(
       provideReleaseHarness({
         store,
@@ -1191,7 +1191,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
         connector: {
           pid: 123,
           readyConnections: 0,
-          hostname: "prod-abc.t3coderelay.com",
+          hostname: "prod-abc.relay.example.invalid",
           protocol: null,
         },
       }),

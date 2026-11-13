@@ -76,7 +76,7 @@ export const ru: Messages = {
   download: {
     title: "Скачать T3 Code для macOS, Windows и Linux | T3 Code",
     description:
-      "Скачайте официальное десктопное приложение T3 Code для macOS, Windows или Linux либо приложения для iOS и Android. Единственный официальный сайт для загрузки: t3.codes.",
+      "Скачайте официальное десктопное приложение T3 Code для macOS, Windows или Linux либо приложения для iOS и Android. Единственный официальный сайт для загрузки: example.invalid.",
     breadcrumb: "Скачать",
     heading: "Скачать T3 Code",
     channelLabel: "Канал релизов",

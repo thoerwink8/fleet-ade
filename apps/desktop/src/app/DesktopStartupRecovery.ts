@@ -18,7 +18,6 @@ import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopObservability from "./DesktopObservability.ts";
 import * as DesktopState from "./DesktopState.ts";
 
-const RELEASES_URL = "https://github.com/pingdotgg/t3code/releases";
 const LAST_STARTED_VERSION_FILE = "desktop-last-started-version";
 // Buttons are plain links to this host; will-navigate cancels them and runs the action.
 const ACTION_ORIGIN = "https://startup-recovery.invalid";
@@ -38,7 +37,7 @@ export type StartupRecoveryOffer =
 const STARTUP_RECOVERY_ACTIONS = ["update", "reinstall", "releases", "copy", "quit"] as const;
 type StartupRecoveryAction = (typeof STARTUP_RECOVERY_ACTIONS)[number];
 
-/** Prefer a newer build, then the last build that started on this machine, then the releases page. */
+/** Prefer a newer build, then the last build that started on this machine. */
 export function resolveStartupRecoveryOffer(
   update: DesktopUpdateState,
   lastStartedVersion: string | null,
@@ -94,13 +93,13 @@ function describeOffer(offer: StartupRecoveryOffer): { text: string; action: str
       };
     case "Reinstall":
       return {
-        text: `Version ${offer.version} started correctly on this computer. Download it and install it to go back.`,
-        action: actionLink("reinstall", `Download ${offer.version}`, true),
+        text: `Version ${offer.version} started correctly on this computer. This build does not download installers.`,
+        action: "",
       };
     case "Releases":
       return {
-        text: "Get a different version from the releases page.",
-        action: actionLink("releases", "Open releases", true),
+        text: "This build has no release page.",
+        action: "",
       };
     case "ManagedPolicy":
       return {
@@ -222,12 +221,7 @@ export const listen: Effect.Effect<
         return;
       }
       case "reinstall":
-        if (current._tag === "Reinstall") {
-          yield* electronShell.openExternal(`${RELEASES_URL}/tag/v${current.version}`);
-        }
-        return;
       case "releases":
-        yield* electronShell.openExternal(RELEASES_URL);
         return;
       case "copy": {
         const failure = yield* Ref.get(failureRef);

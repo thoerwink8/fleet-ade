@@ -67,6 +67,7 @@ export function SidebarUpdateReleaseNotes({
   if (state.releaseNotes.length === 0) {
     return <>{tooltip}</>;
   }
+  const historyUrl = getDesktopUpdateReleaseHistoryUrl();
   const releasedAt = state.releaseNotes.find(
     (releaseNote) => releaseNote.version === state.availableVersion,
   )?.releasedAt;
@@ -150,9 +151,9 @@ export function SidebarUpdateReleaseNotes({
             </section>
           );
         })}
-        {state.omittedReleaseCount > 0 ? (
+        {state.omittedReleaseCount > 0 && historyUrl ? (
           <div className="mt-3">
-            <ReleaseLink releaseUrl={getDesktopUpdateReleaseHistoryUrl()} shell={shell}>
+            <ReleaseLink releaseUrl={historyUrl} shell={shell}>
               {`${state.omittedReleaseCount} older ${state.omittedReleaseCount === 1 ? "release" : "releases"} on GitHub`}
             </ReleaseLink>
           </div>

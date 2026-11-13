@@ -971,7 +971,6 @@ interface StagePackageJson {
   readonly packageManager: string;
   readonly description: string;
   readonly license: string;
-  readonly homepage: string;
   readonly author: string;
   readonly main: string;
   readonly build: Record<string, unknown>;
@@ -2693,13 +2692,8 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
 ) {
   const env = yield* Config.all({
     updateRepository: Config.String("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
-    githubRepository: Config.String("GITHUB_REPOSITORY").pipe(Config.option),
   });
-  const rawRepo = (
-    Option.getOrUndefined(env.updateRepository)?.trim() ||
-    Option.getOrUndefined(env.githubRepository)?.trim() ||
-    ""
-  ).trim();
+  const rawRepo = (Option.getOrUndefined(env.updateRepository)?.trim() || "").trim();
   if (!rawRepo) return undefined;
 
   const [owner, repo, ...rest] = rawRepo.split("/");
@@ -2912,7 +2906,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       icon: "icons",
       category: "Development",
       synopsis: "Desktop GUI for coding agents",
-      maintainer: "T3 Tools <hello@t3.codes>",
+      maintainer: "T3 Tools <hello@example.invalid>",
       protocols: [
         {
           name: "T3 Code",
@@ -3909,7 +3903,6 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     description:
       "T3 Code is an open-source desktop app for coding agents. Work with your existing agent subscriptions, review code changes, and run commands in your projects. Connect from desktop, web, or mobile to continue working remotely.",
     license: "MIT",
-    homepage: "https://t3.codes",
     author: "T3 Tools",
     main: "apps/desktop/dist-electron/boot.cjs",
     build: yield* createBuildConfig(

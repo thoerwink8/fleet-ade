@@ -1264,7 +1264,7 @@ jobs:
             exit 1
           fi
 
-          router_url="${T3CODE_WEB_ROUTER_URL:-https://app.t3.codes}"
+          router_url="${T3CODE_WEB_ROUTER_URL:-https://app.example.invalid}"
           if [[ "${{ needs.preflight.outputs.release_channel }}" == "stable" ]]; then
             channel_name="latest"
           else
@@ -1344,9 +1344,9 @@ jobs:
             exit 1
           fi
 
-          router_url="${T3CODE_WEB_ROUTER_URL:-https://app.t3.codes}"
-          latest_domain="${T3CODE_WEB_LATEST_DOMAIN:-latest.app.t3.codes}"
-          nightly_domain="${T3CODE_WEB_NIGHTLY_DOMAIN:-nightly.app.t3.codes}"
+          router_url="${T3CODE_WEB_ROUTER_URL:-https://app.example.invalid}"
+          latest_domain="${T3CODE_WEB_LATEST_DOMAIN:-latest.app.example.invalid}"
+          nightly_domain="${T3CODE_WEB_NIGHTLY_DOMAIN:-nightly.app.example.invalid}"
           router_domain="${router_url#http://}"
           router_domain="${router_domain#https://}"
           router_domain="${router_domain%%/*}"
@@ -1374,7 +1374,7 @@ jobs:
           fi
 
   # Same split as the web app: build a production deployment early, then
-  # promote it to t3.codes once the release it links to exists. As above, the
+  # promote it to example.invalid once the release it links to exists. As above, the
   # project's own *.vercel.app hostname moves at build time.
   build_marketing:
     name: Build marketing site

@@ -27,11 +27,6 @@ export const config: VercelConfig = {
     },
   ],
   redirects: [
-    {
-      source: "/app",
-      destination: "https://app.t3.codes",
-      permanent: true,
-    },
     // One QR code in the desktop app serves both stores. iPadOS reports a Mac, so it gets /download.
     {
       source: "/mobile",

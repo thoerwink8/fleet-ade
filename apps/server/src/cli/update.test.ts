@@ -48,26 +48,19 @@ const unrelatedLsof = ProcessRunner.ProcessRunner.of({
 
 afterEach(() => vi.restoreAllMocks());
 
-it.effect("authenticates each release page until the requested channel is found", () =>
+it.effect("does not look up a public release catalog", () =>
   Effect.gen(function* () {
-    const pages: string[] = [];
-    const httpClient = HttpClient.make((request) => {
-      const url = new URL(request.url);
-      assert.equal(url.origin, "https://api.github.com");
-      assert.equal(url.pathname, "/repos/pingdotgg/t3code/releases");
-      assert.equal(request.headers.accept, "application/vnd.github+json");
-      assert.equal(request.headers.authorization, "Bearer gh-token");
-      const page = url.searchParams.get("page") ?? "";
-      pages.push(page);
-      const tag_name = page === "1" ? "v1.2.4-preview.20260101.1" : "v1.2.3";
-      return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json([{ tag_name }])));
+    let called = false;
+    const httpClient = HttpClient.make(() => {
+      called = true;
+      return Effect.die("should not request");
     });
-    const version = yield* resolveNewestVersion("stable").pipe(
-      Effect.provideService(HostProcess.Environment, { GH_TOKEN: "gh-token" }),
+    const result = yield* resolveNewestVersion("stable").pipe(
       Effect.provideService(HttpClient.HttpClient, httpClient),
+      Effect.exit,
     );
-    assert.equal(version, "1.2.3");
-    assert.deepStrictEqual(pages, ["1", "2"]);
+    assert.isFalse(called);
+    assert.isTrue(Exit.isFailure(result));
   }),
 );
 
