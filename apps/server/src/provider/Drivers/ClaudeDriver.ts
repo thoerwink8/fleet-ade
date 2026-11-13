@@ -33,6 +33,7 @@ import {
   probeClaudeWorkspaceSnapshot,
   type ClaudeCapabilitiesProbe,
 } from "../ClaudeProvider.ts";
+import { isClaudeReclaudeNotFound, resolveClaudeSdkExecutablePath } from "./ClaudeExecutable.ts";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
 import * as ModelCatalog from "@t3tools/provider-core/server/ModelCatalog";
 import { resolveClaudeModelCatalog } from "../ClaudeModelCatalog.ts";
@@ -121,8 +122,12 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       enabled,
       binaryPath: expandHomePath(config.binaryPath, yield* HostProcess.HomeDirectory),
     } satisfies ClaudeSettings;
+    const reclaudePath = yield* resolveClaudeSdkExecutablePath(
+      effectiveConfig.binaryPath,
+      processEnv,
+    ).pipe(Effect.catchIf(isClaudeReclaudeNotFound, () => Effect.succeed("")));
     const resolveMaintenance = yield* makeClaudeMaintenanceResolution({
-      binaryPath: effectiveConfig.binaryPath,
+      binaryPath: reclaudePath,
       env: processEnv,
     }).pipe(
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),

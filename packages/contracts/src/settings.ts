@@ -784,9 +784,10 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     ),
     binaryPath: makeBinaryPathSetting("claude").pipe(
       Schema.annotateKey({
-        title: "Binary path",
-        description: "Path to the Claude binary used by this instance.",
-        providerSettingsForm: { placeholder: "claude", clearWhenEmpty: "omit" },
+        title: "启动程序",
+        description:
+          "留空时自动使用本机的 reclaude。找不到 reclaude 时不启用 Claude，也不会改用 claude。",
+        providerSettingsForm: { placeholder: "reclaude 的完整路径", clearWhenEmpty: "omit" },
       }),
     ),
     homePath: TrimmedString.pipe(

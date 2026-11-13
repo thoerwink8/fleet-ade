@@ -40,7 +40,11 @@ import {
   spawnAndCollect,
   type ServerProviderDraft,
 } from "@t3tools/provider-core/server/snapshotProbe";
-import { resolveClaudeSdkExecutablePath } from "./Drivers/ClaudeExecutable.ts";
+import {
+  CLAUDE_RECLAUDE_MISSING_MESSAGE,
+  isClaudeReclaudeNotFound,
+  resolveClaudeSdkExecutablePath,
+} from "./Drivers/ClaudeExecutable.ts";
 import {
   claudeSignedOutMessage,
   hasClaudeManagedMcpConfig,
@@ -572,7 +576,11 @@ const runClaudeCommand = Effect.fn("runClaudeCommand")(function* (
   cwd?: string,
 ) {
   const claudeEnvironment = yield* makeClaudeEnvironment(claudeSettings, environment);
-  const spawnCommand = yield* resolveSpawnCommand(claudeSettings.binaryPath, args, {
+  const executablePath = yield* resolveClaudeSdkExecutablePath(
+    claudeSettings.binaryPath,
+    claudeEnvironment,
+  );
+  const spawnCommand = yield* resolveSpawnCommand(executablePath, args, {
     env: claudeEnvironment,
   });
   const command = ChildProcess.make(spawnCommand.command, spawnCommand.args, {
@@ -580,7 +588,7 @@ const runClaudeCommand = Effect.fn("runClaudeCommand")(function* (
     shell: spawnCommand.shell,
     ...(cwd ? { cwd } : {}),
   });
-  return yield* spawnAndCollect(claudeSettings.binaryPath, command);
+  return yield* spawnAndCollect(executablePath, command);
 });
 
 export const probeClaudeWorkspaceSnapshot = Effect.fn("probeClaudeWorkspaceSnapshot")(function* (
@@ -663,6 +671,21 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
 
   if (Result.isFailure(versionProbe)) {
     const error = versionProbe.failure;
+    if (isClaudeReclaudeNotFound(error)) {
+      return buildServerProvider({
+        presentation: CLAUDE_PRESENTATION,
+        enabled: claudeSettings.enabled,
+        checkedAt,
+        models: allModels,
+        probe: {
+          installed: false,
+          version: null,
+          status: "warning",
+          auth: { status: "unknown" },
+          message: CLAUDE_RECLAUDE_MISSING_MESSAGE,
+        },
+      });
+    }
     yield* Effect.logWarning("Claude Agent CLI health check failed.", {
       errorTag: error._tag,
     });

@@ -42,6 +42,7 @@ import {
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import { deepMerge } from "@t3tools/shared/Struct";
 import { createModelCapabilities } from "@t3tools/shared/model";
 import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
@@ -53,6 +54,10 @@ import {
 } from "./CodexProvider.ts";
 import { BUNDLED_CLAUDE_MODEL_CATALOG } from "./ClaudeModelCatalog.ts";
 import { checkClaudeProviderStatus } from "./ClaudeProvider.ts";
+import {
+  CLAUDE_RECLAUDE_MISSING_MESSAGE,
+  ClaudeExecutableFileCheck,
+} from "./Drivers/ClaudeExecutable.ts";
 import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as AntigravityInstallation from "./AntigravityInstallation.ts";
 import * as ModelManifest from "./ModelManifest.ts";
@@ -3873,7 +3878,6 @@ it.layer(
 
     it.effect("does not let a lazy mise shim install Claude during a status check (#33415)", () =>
       Effect.gen(function* () {
-        if ((yield* HostProcess.Platform) === "win32") return;
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-fake-mise-claude-" });
@@ -3904,6 +3908,10 @@ it.layer(
           { ...defaultClaudeSettings, binaryPath },
           claudeCapabilities(),
           environment,
+        ).pipe(
+          Effect.provideService(HostProcess.HomeDirectory, directory),
+          Effect.provideService(SpawnExecutableResolution, () => undefined),
+          Effect.provideService(ClaudeExecutableFileCheck, () => false),
         );
 
         assert.isFalse(
@@ -3911,6 +3919,9 @@ it.layer(
           "the Claude --version status probe let mise install Claude",
         );
         assert.isNull(status.version, "mise's own version is not Claude's");
+        assert.strictEqual(status.installed, false);
+        assert.strictEqual(status.status, "warning");
+        assert.strictEqual(status.message, CLAUDE_RECLAUDE_MISSING_MESSAGE);
       }),
     );
 

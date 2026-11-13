@@ -2,89 +2,133 @@ import { describe, expect, it } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 
-import { ClaudeExecutableFileCheck, resolveClaudeSdkExecutablePath } from "./ClaudeExecutable.ts";
+import {
+  CLAUDE_RECLAUDE_MISSING_MESSAGE,
+  ClaudeExecutableFileCheck,
+  ClaudeReclaudeNotFound,
+  resolveClaudeSdkExecutablePath,
+} from "./ClaudeExecutable.ts";
 
-const NPM_DIR = "C:\\Users\\dev\\AppData\\Roaming\\npm";
-const NPM_SHIM = `${NPM_DIR}\\claude.cmd`;
-const NPM_PACKAGE_EXE = `${NPM_DIR}\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe`;
-const NPM_PACKAGE_CLI = `${NPM_DIR}\\node_modules\\@anthropic-ai\\claude-code\\cli.js`;
+const HOME = "C:\\Users\\someone";
+const RECLAUDE_EXE = `${HOME}\\.local\\bin\\reclaude.exe`;
+const RECLAUDE_CMD = `${HOME}\\.local\\bin\\reclaude.cmd`;
+const CLAUDE_EXE =
+  "C:\\Users\\someone\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe";
 
-function withWindowsResolution(input: {
-  readonly resolvedCommand: string | undefined;
+function withResolution(input: {
+  readonly platform: NodeJS.Platform;
+  readonly home?: string;
+  readonly resolve?: (command: string) => string | undefined;
   readonly existingFiles?: ReadonlyArray<string>;
 }) {
   const existing = new Set(input.existingFiles ?? []);
   return <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.provideService(HostProcess.Platform, "win32"),
-      Effect.provideService(SpawnExecutableResolution, () => input.resolvedCommand),
+      Effect.provideService(HostProcess.Platform, input.platform),
+      Effect.provideService(HostProcess.HomeDirectory, input.home ?? HOME),
+      Effect.provideService(SpawnExecutableResolution, (command) => input.resolve?.(command)),
       Effect.provideService(ClaudeExecutableFileCheck, (filePath) => existing.has(filePath)),
     );
 }
 
 describe("resolveClaudeSdkExecutablePath", () => {
-  it.effect("follows an npm launcher shim to the packaged native binary", () =>
+  it.effect("resolves the default claude name to reclaude on PATH", () =>
     Effect.gen(function* () {
       expect(
         yield* resolveClaudeSdkExecutablePath("claude", {}).pipe(
-          withWindowsResolution({
-            resolvedCommand: NPM_SHIM,
-            existingFiles: [NPM_PACKAGE_EXE, NPM_PACKAGE_CLI],
+          withResolution({
+            platform: "win32",
+            resolve: (command) => (command === "reclaude" ? RECLAUDE_EXE : CLAUDE_EXE),
+            existingFiles: [RECLAUDE_EXE, CLAUDE_EXE],
           }),
         ),
-      ).toBe(NPM_PACKAGE_EXE);
+      ).toBe(RECLAUDE_EXE);
     }),
   );
 
-  it.effect("follows .bat and .ps1 launcher shims the same way", () =>
+  it.effect("uses the per-user install when PATH has no reclaude", () =>
     Effect.gen(function* () {
-      for (const shim of [`${NPM_DIR}\\claude.bat`, `${NPM_DIR}\\claude.ps1`]) {
+      for (const platform of ["win32", "darwin"] as const) {
+        const expected = platform === "win32" ? RECLAUDE_EXE : "/Users/someone/.local/bin/reclaude";
         expect(
           yield* resolveClaudeSdkExecutablePath("claude", {}).pipe(
-            withWindowsResolution({
-              resolvedCommand: shim,
-              existingFiles: [NPM_PACKAGE_EXE],
+            withResolution({
+              platform,
+              home: platform === "win32" ? HOME : "/Users/someone",
+              resolve: () => CLAUDE_EXE,
+              existingFiles: [expected, CLAUDE_EXE],
             }),
           ),
-        ).toBe(NPM_PACKAGE_EXE);
+        ).toBe(expected);
       }
     }),
   );
 
-  it.effect("normalizes mixed-case shim extensions before matching", () =>
+  it.effect("finds a Homebrew reclaude on Mac", () =>
     Effect.gen(function* () {
       expect(
-        yield* resolveClaudeSdkExecutablePath("claude", {}).pipe(
-          withWindowsResolution({
-            resolvedCommand: `${NPM_DIR}\\claude.CMD`,
-            existingFiles: [NPM_PACKAGE_EXE],
+        yield* resolveClaudeSdkExecutablePath("", {}).pipe(
+          withResolution({
+            platform: "darwin",
+            home: "/Users/someone",
+            resolve: () => undefined,
+            existingFiles: ["/opt/homebrew/bin/reclaude"],
           }),
         ),
-      ).toBe(NPM_PACKAGE_EXE);
+      ).toBe("/opt/homebrew/bin/reclaude");
     }),
   );
 
-  it.effect("falls back to cli.js when the package ships no native binary", () =>
+  it.effect("keeps an explicit reclaude path", () =>
     Effect.gen(function* () {
+      const explicit = "D:\\tools\\reclaude.exe";
       expect(
-        yield* resolveClaudeSdkExecutablePath("claude", {}).pipe(
-          withWindowsResolution({
-            resolvedCommand: NPM_SHIM,
-            existingFiles: [NPM_PACKAGE_CLI],
+        yield* resolveClaudeSdkExecutablePath(explicit, {}).pipe(
+          withResolution({
+            platform: "win32",
+            resolve: () => CLAUDE_EXE,
+            existingFiles: [explicit, CLAUDE_EXE],
           }),
         ),
-      ).toBe(NPM_PACKAGE_CLI);
+      ).toBe(explicit);
     }),
   );
 
-  it.effect("returns the configured path when a shim has no known package entry", () =>
+  it.effect("prefers reclaude.exe beside a reclaude shim and ignores claude.exe", () =>
     Effect.gen(function* () {
       expect(
         yield* resolveClaudeSdkExecutablePath("claude", {}).pipe(
-          withWindowsResolution({ resolvedCommand: NPM_SHIM }),
+          withResolution({
+            platform: "win32",
+            resolve: (command) => (command === "reclaude" ? RECLAUDE_CMD : CLAUDE_EXE),
+            existingFiles: [RECLAUDE_CMD, RECLAUDE_EXE, CLAUDE_EXE],
+          }),
         ),
-      ).toBe("claude");
+      ).toBe(RECLAUDE_EXE);
+    }),
+  );
+
+  it.effect("fails closed when reclaude is missing and never returns claude", () =>
+    Effect.gen(function* () {
+      const exit = yield* resolveClaudeSdkExecutablePath("claude", {}).pipe(
+        withResolution({
+          platform: "win32",
+          resolve: () => CLAUDE_EXE,
+          existingFiles: [CLAUDE_EXE],
+        }),
+        Effect.exit,
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failed = exit.cause;
+        const message = String(failed);
+        expect(message).toContain("ClaudeReclaudeNotFound");
+        expect(message).not.toContain(CLAUDE_EXE);
+        expect(message).toContain(CLAUDE_RECLAUDE_MISSING_MESSAGE);
+      }
+      expect(ClaudeReclaudeNotFound).toBeDefined();
     }),
   );
 });

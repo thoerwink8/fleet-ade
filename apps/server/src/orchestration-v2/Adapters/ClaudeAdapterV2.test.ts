@@ -1608,18 +1608,25 @@ const captureSdkExecutablePaths = Effect.fn("captureSdkExecutablePaths")(functio
 });
 
 describe("ClaudeAdapterV2 executable path", () => {
-  it.effect("follows a bare claude on Windows to the npm package executable", () =>
+  it.effect("resolves a bare claude on Windows to reclaude, not the npm package", () =>
     Effect.scoped(
       Effect.gen(function* () {
         const npmDir = "C:\\Users\\dev\\AppData\\Roaming\\npm";
         const packageExe = `${npmDir}\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe`;
+        const reclaudeExe = "C:\\Users\\someone\\.local\\bin\\reclaude.exe";
         const { executablePaths } = yield* captureSdkExecutablePaths("claude").pipe(
           Effect.provideService(HostProcess.Platform, "win32"),
-          Effect.provideService(SpawnExecutableResolution, () => `${npmDir}\\claude.cmd`),
-          Effect.provideService(ClaudeExecutableFileCheck, (filePath) => filePath === packageExe),
+          Effect.provideService(HostProcess.HomeDirectory, "C:\\Users\\someone"),
+          Effect.provideService(SpawnExecutableResolution, (command) =>
+            command === "reclaude" ? reclaudeExe : `${npmDir}\\claude.cmd`,
+          ),
+          Effect.provideService(
+            ClaudeExecutableFileCheck,
+            (filePath) => filePath === packageExe || filePath === reclaudeExe,
+          ),
         );
 
-        assert.deepEqual(executablePaths, [packageExe]);
+        assert.deepEqual(executablePaths, [reclaudeExe]);
       }),
     ).pipe(
       Effect.provide(

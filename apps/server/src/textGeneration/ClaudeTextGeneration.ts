@@ -28,6 +28,7 @@ import {
   resolveClaudeModelSlug,
   scopeClaudeModelCatalog,
 } from "../provider/ClaudeModelCatalog.ts";
+import { resolveClaudeSdkExecutablePath } from "../provider/Drivers/ClaudeExecutable.ts";
 import {
   hasClaudeManagedMcpConfig,
   makeClaudeEnvironment,
@@ -211,8 +212,21 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
               )
           : cwd;
       const managedMcpConfig = yield* hasClaudeManagedMcpConfig();
-      const spawnCommand = yield* resolveSpawnCommand(
+      const executablePath = yield* resolveClaudeSdkExecutablePath(
         claudeSettings.binaryPath || "claude",
+        claudeEnvironment,
+      ).pipe(
+        Effect.mapError(
+          (cause) =>
+            new TextGenerationError({
+              operation,
+              detail: cause.message,
+              cause,
+            }),
+        ),
+      );
+      const spawnCommand = yield* resolveSpawnCommand(
+        executablePath,
         [
           "-p",
           "--output-format",
