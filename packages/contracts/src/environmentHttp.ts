@@ -1019,6 +1019,25 @@ class EnvironmentWebhooksHttpApi extends HttpApiGroup.make("webhooks")
   .add(HttpApiEndpoint.patch("webhookPatch", WEBHOOK_PATH, webhookEndpoint))
   .add(HttpApiEndpoint.get("webhookGet", WEBHOOK_PATH, webhookEndpoint)) {}
 
+/** What one read of `FLEET_ENGINE_HEALTH_URL` found. The address itself is never returned. */
+export const FleetEngineStatus = Schema.Struct({
+  configured: Schema.Boolean,
+  reachable: Schema.Boolean,
+  httpStatus: Schema.NullOr(Schema.Number),
+  /** Parsed JSON, truncated text, or null when there is nothing to show. */
+  body: Schema.NullOr(Schema.Unknown),
+  checkedAt: Schema.String,
+  reason: Schema.NullOr(Schema.String),
+});
+export type FleetEngineStatus = typeof FleetEngineStatus.Type;
+
+class FleetEngineHttpApi extends HttpApiGroup.make("fleetEngine").add(
+  HttpApiEndpoint.get("status", "/api/fleet/engine-status", {
+    headers: OptionalBearerHeaders,
+    success: FleetEngineStatus,
+  }).middleware(EnvironmentAuthenticatedAuth),
+) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
@@ -1028,4 +1047,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentProjectsHttpApi)
   .add(EnvironmentVoiceHttpApi)
   .add(EnvironmentConnectHttpApi)
-  .add(EnvironmentWebhooksHttpApi) {}
+  .add(EnvironmentWebhooksHttpApi)
+  .add(FleetEngineHttpApi) {}
