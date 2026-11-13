@@ -38,6 +38,7 @@ import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
+import { publishNetworkSettings } from "./network/snapshot.ts";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as Semaphore from "effect/Semaphore";
 import * as Scope from "effect/Scope";
@@ -692,8 +693,10 @@ const make = Effect.gen(function* () {
   const watcherScope = yield* Scope.make("sequential");
   yield* Effect.addFinalizer(() => Scope.close(watcherScope, Exit.void));
 
-  const emitChange = (settings: ServerSettings) =>
-    PubSub.publish(changesPubSub, settings).pipe(Effect.asVoid);
+  const emitChange = (settings: ServerSettings) => {
+    publishNetworkSettings(settings);
+    return PubSub.publish(changesPubSub, settings).pipe(Effect.asVoid);
+  };
 
   const readConfigExists = fs.exists(settingsPath).pipe(
     Effect.mapError(

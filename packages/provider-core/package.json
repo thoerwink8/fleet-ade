@@ -87,6 +87,10 @@
       "types": "./src/server/nativeProtocolLogging.ts",
       "import": "./src/server/nativeProtocolLogging.ts"
     },
+    "./server/networkEnvironment": {
+      "types": "./src/server/networkEnvironment.ts",
+      "import": "./src/server/networkEnvironment.ts"
+    },
     "./server/notification": {
       "types": "./src/server/notification.ts",
       "import": "./src/server/notification.ts"

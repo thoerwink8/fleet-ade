@@ -412,6 +412,7 @@ export function applyServerSettingsPatch(
     projectAgentBrowserAccessOverrides: _legacyBrowserAccess,
     projectAutoPullOverrides: _legacyAutoPull,
     projectScriptOverrides: _legacyScripts,
+    network: networkPatch,
     ...patchForMerge
   } = patch;
   const currentBackgroundActivity = normalizeServerBackgroundActivitySettings(current);
@@ -544,6 +545,7 @@ export function applyServerSettingsPatch(
     ...(patch.providerInstances !== undefined
       ? { providerInstances: patch.providerInstances }
       : {}),
+    ...(networkPatch !== undefined ? { network: networkPatch } : {}),
     ...(patch.worktreesDirectory !== undefined &&
     patch.worktreesDirectory !== current.worktreesDirectory
       ? {

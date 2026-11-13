@@ -20,6 +20,7 @@ import {
   TrimmedNonEmptyString,
   TrimmedString,
 } from "./baseSchemas.ts";
+import { DEFAULT_NETWORK_SETTINGS, NetworkSettings } from "./network.ts";
 import { UsageLimitSourceId } from "./usageLimitSourceId.ts";
 import { UsageModelFilter } from "./usage.ts";
 import { SecretProviderId, SecretProviderSlug } from "./secretReference.ts";
@@ -1576,6 +1577,11 @@ export const ServerSettings = Schema.Struct({
 
   /** Sent by the Usage tab with each summary request to this environment; edit in settings.json. Invalid values are ignored. */
   usageModelFilter: ForwardCompatibleOptional(UsageModelFilter),
+
+  /** Outbound line for this environment and the agents it starts. */
+  network: NetworkSettings.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_NETWORK_SETTINGS)),
+  ),
 });
 export type ServerSettings = typeof ServerSettings.Type;
 
@@ -1775,6 +1781,7 @@ const ModelSelectionPatch = Schema.Struct({
 });
 
 export const ServerSettingsPatch = Schema.Struct({
+  network: Schema.optionalKey(NetworkSettings),
   setModelFavorites: Schema.optionalKey(
     Schema.Array(Schema.Struct({ ...ModelFavorite.fields, favorite: Schema.Boolean })),
   ),

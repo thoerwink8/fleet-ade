@@ -3,6 +3,7 @@ import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as NodeCrypto from "node:crypto";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
+import * as NetworkInspect from "./network/inspect.ts";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
@@ -2313,6 +2314,8 @@ export const layerWsRpc = (
             Effect.andThen(scheduledTasks.getWebhookDelivery(input)),
           ),
         [WS_METHODS.serverProbe]: (_input) => Effect.succeed({}),
+        [WS_METHODS.serverNetwork]: (input) =>
+          NetworkInspect.inspectNetwork({ probe: input.probe === true }),
         [WS_METHODS.serverGetConfig]: (_input) =>
           loadServerConfig({
             usageLimitsCommand: false,

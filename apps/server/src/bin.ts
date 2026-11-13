@@ -1,4 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off -- The service launcher starts before the CLI runtime.
+// First, so node:child_process.spawn is patched before Effect captures it.
+import "./network/installSpawnPatch.ts";
 import * as NodeModule from "node:module";
 import * as NodeSea from "node:sea";
 import * as NodeURL from "node:url";

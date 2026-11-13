@@ -18,6 +18,7 @@ import type { ResolvedSettingsScope } from "./settingsScope";
 export type SettingsPath =
   | "/settings/projects"
   | "/settings/general"
+  | "/settings/network"
   | "/settings/diagnostics"
   | "/settings/voice"
   | "/settings/appearance"
@@ -95,6 +96,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/diagnostics": "诊断",
   "/settings/projects": "项目",
   "/settings/general": "通用",
+  "/settings/network": "网络",
   "/settings/appearance": "外观",
   "/settings/chat": "聊天",
   "/settings/diffs": "差异与 PR",
@@ -128,6 +130,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
     headingHidden: true,
     paths: [
       "/settings/general",
+      "/settings/network",
       "/settings/appearance",
       "/settings/chat",
       "/settings/diffs",
@@ -437,6 +440,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "项目排序",
     to: "/settings/general",
     searchTerms: ["sort projects sidebar manual created recent"],
+  },
+  {
+    id: "network",
+    title: "网络",
+    to: "/settings/network",
+    searchTerms: ["proxy", "代理", "http_proxy", "证书", "直连"],
+    environmentOnly: true,
+    scope: "environment",
   },
   {
     id: "snooze-options",
@@ -1355,6 +1366,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/diagnostics": "environment",
   "/settings/projects": "project",
   "/settings/general": null,
+  "/settings/network": "environment",
   "/settings/voice": null,
   "/settings/appearance": null,
   "/settings/chat": null,

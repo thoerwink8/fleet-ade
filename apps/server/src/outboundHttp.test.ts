@@ -12,6 +12,7 @@ import { FetchHttpClient, HttpClient } from "effect/http";
 import * as Undici from "undici";
 import { afterAll, afterEach, beforeAll, describe, expect } from "vite-plus/test";
 
+import { NetworkRoutingDispatcher } from "./network/outbound.ts";
 import {
   builtinFetchUsesHttp2,
   ignoreMacosTypeOfServiceEinval,
@@ -73,7 +74,7 @@ const versionViaBuiltinFetch = () =>
   );
 
 describe("installHttp1FetchDispatcher", () => {
-  it("makes the global dispatcher negotiate HTTP/1.1 and keeps the env proxy agent", async () => {
+  it("makes the global dispatcher negotiate HTTP/1.1 through the network route", async () => {
     Undici.setGlobalDispatcher(new Undici.Agent());
     expect(await versionViaGlobalDispatcher()).toBe("2.0");
 
@@ -82,7 +83,7 @@ describe("installHttp1FetchDispatcher", () => {
 
     Undici.setGlobalDispatcher(new Undici.EnvHttpProxyAgent());
     installHttp1FetchDispatcher();
-    expect(Undici.getGlobalDispatcher()).toBeInstanceOf(Undici.EnvHttpProxyAgent);
+    expect(Undici.getGlobalDispatcher()).toBeInstanceOf(NetworkRoutingDispatcher);
   });
 
   // Only bundled undici 8 (Node 26+) offers fetch h2 and can prove dispatcher replacement.

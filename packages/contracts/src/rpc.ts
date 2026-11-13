@@ -38,6 +38,7 @@ import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
 import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { ServerNetworkInput, ServerNetworkResult } from "./network.ts";
 import { SecretSourceCheckResult } from "./settingsSecretValue.ts";
 import { SecretReference } from "./secretReference.ts";
 import {
@@ -506,6 +507,7 @@ export const WS_METHODS = {
   deviceAction: "device.action",
 
   serverProbe: "server.probe",
+  serverNetwork: "server.network",
   serverGetConfig: "server.getConfig",
   serverGetNpmRelease: "server.getNpmRelease",
   serverRefreshProviders: "server.refreshProviders",
@@ -645,6 +647,12 @@ const WsServerRemoveKeybindingRpc = Rpc.make(WS_METHODS.serverRemoveKeybinding, 
 const WsServerProbeRpc = Rpc.make(WS_METHODS.serverProbe, {
   payload: Schema.Struct({}),
   success: Schema.Struct({}),
+  error: EnvironmentAuthorizationError,
+});
+
+const WsServerNetworkRpc = Rpc.make(WS_METHODS.serverNetwork, {
+  payload: ServerNetworkInput,
+  success: ServerNetworkResult,
   error: EnvironmentAuthorizationError,
 });
 
@@ -2105,6 +2113,7 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
 export const WsRpcGroup = RpcGroup.make(
   WsGuestShareCreateRpc,
   WsServerProbeRpc,
+  WsServerNetworkRpc,
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,
   WsServerUpdateProviderRpc,

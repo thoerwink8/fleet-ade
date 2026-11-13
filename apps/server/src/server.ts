@@ -14,7 +14,11 @@ import * as NodeHttp from "node:http";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
-import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import * as NodePath from "@effect/platform-node/NodePath";
+import * as NodeStdio from "@effect/platform-node/NodeStdio";
+import * as NodeTerminal from "@effect/platform-node/NodeTerminal";
+import * as NetworkChildProcess from "./network/childProcess.ts";
 import { EnvironmentHttpApi, type RepositoryIdentity } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Cause from "effect/Cause";
@@ -386,7 +390,16 @@ const layerHttpServer = Layer.unwrap(
 ).pipe(Layer.provide(ManagedPolicy.layer));
 
 const layerPlatformServices = DocumentText.layer.pipe(
-  Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(
+      NetworkChildProcess.layer,
+      NodeFileSystem.layer,
+      NodePath.layer,
+      NodeStdio.layer,
+      NodeTerminal.layer,
+      NodeCrypto.layer,
+    ),
+  ),
 );
 
 const layerPersistence = Layer.empty.pipe(Layer.provideMerge(SqlitePersistence.layerConfig));

@@ -2,13 +2,17 @@ import { doctorCommand } from "./cli/doctor.ts";
 import { policyCommand } from "./cli/policy.ts";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
-import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
+import * as NodePath from "@effect/platform-node/NodePath";
+import * as NodeStdio from "@effect/platform-node/NodeStdio";
+import * as NodeTerminal from "@effect/platform-node/NodeTerminal";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { Argument, Command } from "effect/cli";
 import * as CliError from "effect/cli/CliError";
 
 import * as NetService from "@t3tools/shared/Net";
+import * as NetworkChildProcess from "./network/childProcess.ts";
 import packageJson from "../package.json" with { type: "json" };
 import { acpMcpBridgeCommand, acpMcpCallCommand } from "./cli/acpMcpBridge.ts";
 import { authCommand } from "./cli/auth.ts";
@@ -41,7 +45,15 @@ import { traceCommand } from "./cli/trace.ts";
 import { triageCommand } from "./cli/triage.ts";
 import { connectCommand, statusCommand, upCommand } from "./cli/up.ts";
 
-const layerCliRuntime = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer);
+const layerCliRuntime = Layer.mergeAll(
+  NetworkChildProcess.layer,
+  NodeFileSystem.layer,
+  NodePath.layer,
+  NodeStdio.layer,
+  NodeTerminal.layer,
+  NodeCrypto.layer,
+  NetService.layer,
+);
 
 const connectPublicConfigMissingMessage =
   "T3 Connect commands are unavailable: this build is missing T3 Connect public configuration.";
