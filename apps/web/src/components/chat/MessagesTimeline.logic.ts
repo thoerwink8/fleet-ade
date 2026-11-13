@@ -74,6 +74,7 @@ import {
   formatSearchToolLabel,
 } from "@t3tools/shared/toolActivity";
 import { isWindowsAbsolutePath } from "@t3tools/shared/path";
+import { agentOutputSilenceSince } from "./TimelineWorkGroupRows.logic";
 
 export function timelineEntryRunId(entry: TimelineEntry): RunId | null {
   if (entry.kind === "message") {
@@ -92,6 +93,45 @@ function workEntryIsActiveTurnActivity(entry: WorkLogEntry): boolean {
     (entry.toolLifecycleStatus === undefined &&
       (entry.sourceActivityKind === "task.progress" || workLogEntryIsToolLike(entry)))
   );
+}
+
+function agentOutputStamp(entry: TimelineEntry): string | null {
+  if (entry.kind === "message") {
+    if (entry.message.role !== "assistant") return null;
+    return entry.message.updatedAt || entry.createdAt;
+  }
+  if (entry.kind === "work") {
+    const updatedAt = entry.entry.structuredPayload?.updatedAt;
+    return updatedAt === undefined ? entry.createdAt : DateTime.formatIso(updatedAt);
+  }
+  if (entry.kind === "proposed-plan") return entry.proposedPlan.updatedAt;
+  if (entry.kind === "html-render" || entry.kind === "mcp-app") return entry.createdAt;
+  return null;
+}
+
+function agentOutputInFlight(entry: TimelineEntry): boolean {
+  if (entry.kind === "message") {
+    return entry.message.role === "assistant" && entry.message.streaming;
+  }
+  if (entry.kind === "proposed-plan") return entry.proposedPlan.streaming === true;
+  return entry.kind === "work" && workEntryIsActiveTurnActivity(entry.entry);
+}
+
+function silenceSinceForActiveTurn(
+  entries: ReadonlyArray<TimelineEntry>,
+  runId: RunId | null,
+  turnStartedAt: string | null,
+): string | null {
+  const agentOutputAt: string[] = [];
+  let outputInFlight = false;
+  for (const entry of entries) {
+    const entryRunId = timelineEntryRunId(entry);
+    if (runId === null ? entryRunId !== null : entryRunId !== runId) continue;
+    const stamp = agentOutputStamp(entry);
+    if (stamp !== null) agentOutputAt.push(stamp);
+    if (agentOutputInFlight(entry)) outputInFlight = true;
+  }
+  return agentOutputSilenceSince({ turnStartedAt, agentOutputAt, outputInFlight });
 }
 
 function singleToolCallLabel(entry: WorkLogEntry): string {
@@ -529,6 +569,7 @@ type MessagesTimelineRowContent =
       kind: "thinking";
       id: string;
       createdAt: string | null;
+      silenceSince: string | null;
       groupId?: string;
       expanded?: boolean;
     }
@@ -2279,6 +2320,11 @@ export function deriveMessagesTimelineRows(input: {
     !compactionOnlyRunFinished &&
     (latestToolFailed || (!hasActivityRow && !input.pendingApprovalRequestIds?.size))
   ) {
+    const silenceSince = silenceSinceForActiveTurn(
+      timelineEntries,
+      input.latestRun?.runId ?? null,
+      input.activeTurnStartedAt ?? null,
+    );
     const failedGroupAnchor = latestToolFailed ? activeWorkAnchor : undefined;
     if (failedGroupAnchor) {
       const groupId = workGroupId(failedGroupAnchor.id);
@@ -2288,6 +2334,7 @@ export function deriveMessagesTimelineRows(input: {
         kind: "thinking",
         id: LIVE_ACTIVITY_ROW_ID,
         createdAt: input.activeTurnStartedAt ?? null,
+        silenceSince,
         groupId,
         expanded,
       });
@@ -2300,6 +2347,7 @@ export function deriveMessagesTimelineRows(input: {
         kind: "thinking",
         id: LIVE_ACTIVITY_ROW_ID,
         createdAt: input.activeTurnStartedAt ?? null,
+        silenceSince,
       });
     }
   }
@@ -2550,7 +2598,15 @@ function replaceStreamingMessageRows(
     return patched;
   };
   const patchedLiveThoughtIds = new Set<string>();
+  const silenceSince = silenceSinceForActiveTurn(
+    timelineEntries,
+    latestRun?.runId ?? null,
+    input.activeTurnStartedAt ?? null,
+  );
   const rows = previous.rows.map((row): MessagesTimelineRow => {
+    if (row.kind === "thinking") {
+      return row.silenceSince === silenceSince ? row : { ...row, silenceSince };
+    }
     if (row.kind === "proposed-plan") {
       const proposedPlan = plans.get(row.id);
       return proposedPlan ? { ...row, proposedPlan } : row;
@@ -2659,7 +2715,12 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
       );
     case "thinking": {
       const bt = b as typeof a;
-      return a.createdAt === bt.createdAt && a.groupId === bt.groupId && a.expanded === bt.expanded;
+      return (
+        a.createdAt === bt.createdAt &&
+        a.groupId === bt.groupId &&
+        a.expanded === bt.expanded &&
+        a.silenceSince === bt.silenceSince
+      );
     }
     case "worktree-setup":
       return a.snapshot === (b as typeof a).snapshot;

@@ -1755,12 +1755,62 @@ describe("deriveMessagesTimelineRows", () => {
       supportsConversationRollback: false,
     };
 
-    expect(deriveMessagesTimelineRows(input).at(-1)?.kind).toBe("thinking");
+    expect(deriveMessagesTimelineRows(input).at(-1)).toMatchObject({
+      kind: "thinking",
+      silenceSince: "2026-01-01T00:00:00Z",
+    });
     const ended = deriveMessagesTimelineRows({
       ...input,
       latestRun: { ...input.latestRun, turnEnded: true },
     });
     expect(ended.some((row) => row.kind === "thinking")).toBe(false);
+
+    const streaming = deriveMessagesTimelineRows({
+      ...input,
+      timelineEntries: [
+        ...input.timelineEntries,
+        {
+          id: "assistant-entry",
+          kind: "message" as const,
+          createdAt: "2026-01-01T00:00:10Z",
+          message: {
+            id: "assistant" as never,
+            role: "assistant" as const,
+            text: "在",
+            runId: "turn-1" as never,
+            createdAt: "2026-01-01T00:00:10Z",
+            updatedAt: "2026-01-01T00:00:40Z",
+            streaming: true,
+          },
+        },
+      ],
+    });
+    expect(streaming.at(-1)).toMatchObject({ kind: "thinking", silenceSince: null });
+
+    const answered = deriveMessagesTimelineRows({
+      ...input,
+      timelineEntries: [
+        ...input.timelineEntries,
+        {
+          id: "assistant-entry",
+          kind: "message" as const,
+          createdAt: "2026-01-01T00:00:10Z",
+          message: {
+            id: "assistant" as never,
+            role: "assistant" as const,
+            text: "在",
+            runId: "turn-1" as never,
+            createdAt: "2026-01-01T00:00:10Z",
+            updatedAt: "2026-01-01T00:00:40Z",
+            streaming: false,
+          },
+        },
+      ],
+    });
+    expect(answered.at(-1)).toMatchObject({
+      kind: "thinking",
+      silenceSince: "2026-01-01T00:00:40Z",
+    });
   });
 
   it("keeps a promptless restart in one active visual response", () => {

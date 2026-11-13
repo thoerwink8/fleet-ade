@@ -54,7 +54,7 @@ import {
   toolGroupSummaryIconName,
   workEntryIconName,
 } from "./TimelineWorkEntryRow.logic";
-import { formatWorkingTimerNow } from "./TimelineWorkGroupRows.logic";
+import { formatAgentOutputSilence, formatWorkingTimerNow } from "./TimelineWorkGroupRows.logic";
 
 export const WorkGroupSection = memo(function WorkGroupSection({
   anchorKey,
@@ -371,6 +371,14 @@ function CompactingLabel({ createdAt }: { createdAt: string | null }) {
   );
 }
 
+function AgentSilenceLabel({ since, fallback }: { since: string; fallback: string }) {
+  return (
+    <span
+      ref={tickTextContent((nowMs) => formatAgentOutputSilence(since, nowMs) ?? fallback, true)}
+    />
+  );
+}
+
 export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "thinking" }> }) {
   const ctx = use(TimelineRowCtx);
   const { isCompacting, isPreparingWorktree, liveAnswerPreview, providerStartingLabel } =
@@ -378,12 +386,24 @@ export function ThinkingTimelineRow({ row }: { row: Extract<TimelineRow, { kind:
   if (isPreparingWorktree || isCompacting) return <WorkLogRow label="" />;
   // A failed group keeps this disclosure while an approval waits, but nothing is thinking then.
   const live = ctx.pendingApprovals.size === 0;
+  const fallback = providerStartingLabel ?? liveAnswerPreview ?? "正在思考";
+  const showSilence = live && liveAnswerPreview == null && row.silenceSince !== null;
   const activity = (
     <LiveActivityRow
-      label={providerStartingLabel ?? liveAnswerPreview ?? "正在思考"}
+      label={
+        showSilence && row.silenceSince !== null ? (
+          <AgentSilenceLabel
+            since={row.silenceSince}
+            fallback={providerStartingLabel ?? "正在思考"}
+          />
+        ) : (
+          fallback
+        )
+      }
       iconName="brain"
       active={live}
       shimmer={live}
+      wrapLabel={showSilence}
     />
   );
   const { groupId } = row;
@@ -407,6 +427,7 @@ function LiveActivityRow({
   failed = false,
   active = false,
   shimmer = false,
+  wrapLabel = false,
 }: {
   label: ReactNode;
   iconName?: WorkEntryIconName;
@@ -414,13 +435,17 @@ function LiveActivityRow({
   failed?: boolean;
   active?: boolean;
   shimmer?: boolean;
+  wrapLabel?: boolean;
 }) {
   const animated = active && !failed;
   const showShimmer = animated && shimmer;
   return (
     <div
       ref={animated ? observeVisibleAnimation : undefined}
-      className="relative min-h-6 w-fit max-w-full min-w-0 overflow-hidden rounded-md text-sm leading-relaxed"
+      className={cn(
+        "relative min-h-6 max-w-full min-w-0 rounded-md text-sm leading-relaxed",
+        wrapLabel ? "w-full" : "w-fit overflow-hidden",
+      )}
     >
       <LiveActivityContent
         label={label}
@@ -429,10 +454,17 @@ function LiveActivityRow({
         failed={failed}
         announceFailure={failed}
         active={animated && !shimmer}
+        wrapLabel={wrapLabel}
       />
       {showShimmer ? (
         <ActivityShimmerOverlay>
-          <LiveActivityContent label={label} iconName={iconName} toolIcon={toolIcon} highlighted />
+          <LiveActivityContent
+            label={label}
+            iconName={iconName}
+            toolIcon={toolIcon}
+            highlighted
+            wrapLabel={wrapLabel}
+          />
         </ActivityShimmerOverlay>
       ) : null}
     </div>
@@ -447,6 +479,7 @@ function LiveActivityContent({
   announceFailure = false,
   active = false,
   highlighted = false,
+  wrapLabel = false,
 }: {
   label: ReactNode;
   iconName: WorkEntryIconName | undefined;
@@ -455,12 +488,14 @@ function LiveActivityContent({
   announceFailure?: boolean;
   active?: boolean;
   highlighted?: boolean;
+  wrapLabel?: boolean;
 }) {
   const showTrailingFailureMark =
     failed && iconName !== undefined && !toolIconAcceptsTint(toolIcon);
 
   return (
     <WorkLogRow
+      wrapLabel={wrapLabel}
       icon={
         iconName ? (
           <span
@@ -487,7 +522,8 @@ function LiveActivityContent({
       label={
         <span
           className={cn(
-            "block truncate",
+            "block",
+            wrapLabel ? "whitespace-normal break-words" : "truncate",
             highlighted && "text-foreground",
             active && "live-tool-shine",
           )}
