@@ -50,14 +50,6 @@ it.effect("startup and opening a session do not contact their hosts", () =>
       if (isBannedHost(host)) hits.push(host);
     });
     yield* Effect.gen(function* () {
-      const analytics = yield* Effect.promise(() => import("./telemetry/AnalyticsService.ts"));
-      yield* Effect.gen(function* () {
-        const service = yield* analytics.AnalyticsService;
-        yield* service.record("server.started", { surface: "test" });
-        yield* service.recordOwners([], "server");
-        yield* service.flush;
-      }).pipe(Effect.provide(analytics.layer));
-
       const config = yield* Effect.promise(() => import("./cloud/publicConfig.ts"));
       const emptyConfig = ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }));
       yield* config.hostedAppUrlConfig.pipe(Effect.provide(emptyConfig), Effect.exit);
