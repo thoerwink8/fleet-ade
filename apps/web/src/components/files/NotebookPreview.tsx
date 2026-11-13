@@ -147,7 +147,7 @@ export default function NotebookPreview(props: {
                     !outputView.mounted.has(`${index}-${outputIndex}`) ? null : (
                       <DocumentPages
                         html={output.text}
-                        name={`Cell ${index + 1} HTML output`}
+                        name={`单元格 ${index + 1} 的 HTML 输出`}
                         output
                       />
                     )

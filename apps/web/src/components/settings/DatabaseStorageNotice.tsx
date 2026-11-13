@@ -71,10 +71,10 @@ export function DatabaseStorageNotice({
     <SettingsSection id="storage-database" title="数据库">
       <SettingsRow
         title="回收数据库空闲空间"
-        description={`These databases still hold space freed by history cleanup.${
+        description={`这些数据库仍占用着历史清理后空出来的空间。${
           visible.every((recommendation) => recommendation.reclaimable)
             ? ""
-            : " Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment."
+            : "请在每台机器上运行命令收回空间。这会重启后台服务。如果桌面应用托管着这个环境，请先退出桌面应用。"
         }`}
       />
       {visible.map(({ environmentId, status, label, reclaimable }) => {

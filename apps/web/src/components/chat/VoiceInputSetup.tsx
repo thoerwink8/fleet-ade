@@ -94,11 +94,11 @@ export function VoiceInputSetup(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <WizardPopup>
         <WizardHeader
-          title={props.step === 0 ? "设置语音输入" : "Voice input is ready"}
+          title={props.step === 0 ? "设置语音输入" : "语音输入已就绪"}
           description={
             props.step === 0
-              ? `Download a speech model once. Your audio is transcribed on ${destination}.`
-              : "Pick a microphone, then start talking."
+              ? `语音模型只需下载一次。音频在${destination}上转写。`
+              : "选一个麦克风，然后开始说话。"
           }
         />
         <WizardPanel>
@@ -135,7 +135,7 @@ export function VoiceInputSetup(props: {
                       </div>
                       <p className="text-xs text-muted-foreground tabular-nums">
                         {model.state === "verifying"
-                          ? "Verifying…"
+                          ? "正在校验…"
                           : progress === null
                             ? "正在开始下载…"
                             : `已下载 ${progress}%`}
@@ -228,7 +228,7 @@ export function VoiceInputSetup(props: {
           <WizardFooter
             leading={
               <Button variant="ghost" onClick={() => openSettings("speech-models")}>
-                {model ? "Other models" : "Choose a model"}
+                {model ? "其他模型" : "选择模型"}
               </Button>
             }
           >

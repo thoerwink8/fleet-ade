@@ -314,15 +314,15 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
   const selected = checkouts.find((member) => member.physicalProjectKey === value.checkout);
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      <span className="shrink-0">in</span>
+      <span className="shrink-0">的</span>
       <ScopeMenu
-        ariaLabel="Checkout scope"
+        ariaLabel="工作副本范围"
         icon={<FolderIcon aria-hidden className="size-3.5 shrink-0" />}
         label={
           selected
             ? settingsScopeCheckoutLabel(selected, checkouts)
             : value.checkout
-              ? "Unavailable checkout"
+              ? "工作副本不可用"
               : "全部工作副本"
         }
         value={value.checkout ?? ALL_CHECKOUTS_VALUE}
@@ -334,7 +334,7 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
             ),
           )
         }
-        searchLabel="Search checkouts"
+        searchLabel="搜索工作副本"
         allOption={{ value: ALL_CHECKOUTS_VALUE, label: "全部工作副本" }}
         options={checkouts.map((member) => ({
           value: member.physicalProjectKey,

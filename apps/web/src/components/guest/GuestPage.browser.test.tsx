@@ -231,7 +231,7 @@ describe("GuestPage", () => {
 
     await expect.element(screen.getByText("All checks pass.")).toBeVisible();
     // A finished turn folds its work, as it does for the owner; the command is inside.
-    await userEvent.click(screen.getByRole("button", { name: /Worked for/ }));
+    await userEvent.click(screen.getByRole("button", { name: /工作了/ }));
     await expect.element(screen.getByText("vp run check:changed")).toBeVisible();
     // Expanding the command shows its output, read through the guest route.
     await userEvent.click(screen.getByText("vp run check:changed"));
@@ -246,7 +246,7 @@ describe("GuestPage", () => {
     expect(screen.container.querySelector('[aria-label="Fork from this response"]')).toBeNull();
     expect(socket).not.toHaveBeenCalled();
     // The composer names the thread's model, as the owner's does, with nothing to pick.
-    await expect.element(screen.getByLabelText("Model: GPT-5.4")).toBeVisible();
+    await expect.element(screen.getByLabelText("模型：GPT-5.4")).toBeVisible();
   });
 
   it("sends attached files with the message, as form data", async () => {

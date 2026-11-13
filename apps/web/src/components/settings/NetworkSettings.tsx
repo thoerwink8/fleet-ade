@@ -16,6 +16,7 @@ import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { effectiveRouteSentence } from "./NetworkSettings.logic";
 import { searchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
@@ -48,14 +49,6 @@ const AGENTS = [
   ["fx", "fx"],
   ["antigravity", "Antigravity"],
 ] as const;
-
-const SOURCE_LABEL = {
-  system: "系统代理",
-  custom: "指定地址",
-  direct: "直连",
-  unavailable: "读不到系统代理",
-  rejected: "地址不可用",
-} as const;
 
 function fullNetwork(network: NetworkSettings | undefined): NetworkSettings {
   return {
@@ -190,11 +183,7 @@ export function NetworkSettingsPanel() {
           serverScoped
           settingKeys={["network"]}
           title="当前生效"
-          description={
-            route
-              ? `${route.proxyUrl ?? "直连"} · ${SOURCE_LABEL[route.source]}。${route.detail}`
-              : (routeError ?? "正在读取")
-          }
+          description={route ? effectiveRouteSentence(route) : (routeError ?? "正在读取")}
           control={
             <Button
               size="sm"

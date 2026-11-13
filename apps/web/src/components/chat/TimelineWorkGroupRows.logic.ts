@@ -16,7 +16,7 @@ function formatWorkingTimer(startIso: string, endIso: string): string | null {
 }
 
 export function formatWorkingTimerNow(startIso: string): string {
-  return formatWorkingTimer(startIso, new Date().toISOString()) ?? "0s";
+  return formatWorkingTimer(startIso, new Date().toISOString()) ?? "0 秒";
 }
 
 export const AGENT_OUTPUT_SILENCE_MS = 60_000;

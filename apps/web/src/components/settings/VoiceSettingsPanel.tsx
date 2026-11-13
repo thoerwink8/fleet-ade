@@ -481,8 +481,8 @@ function ProjectDictionaryRow() {
       title={isProjectScope ? "项目词典" : "共享词典"}
       description={
         isProjectScope
-          ? `Used by everyone who dictates in ${scope.scope.label}.`
-          : "Used by everyone who dictates on this environment."
+          ? `${scope.scope.label} 里说话的人都会用到这些词。`
+          : "在这个环境里说话的人都会用到这些词。"
       }
     >
       <div className="mt-3 pb-2">
@@ -871,7 +871,7 @@ function SpeechModelBrowser(props: {
     <SettingsRow
       {...searchableSetting("speech-models")}
       title="模型"
-      description={`Grades are error rates and speed is seconds per 30 s of audio, from Handy’s benchmark ${status.benchmarkTier === "cpu" ? "CPU" : "GPU"}.`}
+      description={`分数是错误率，速度是每 30 秒音频用掉的秒数，来自 Handy 的${status.benchmarkTier === "cpu" ? "CPU" : "GPU"}基准。`}
       className="@container/voice-models"
     >
       <div className="mt-3 flex min-w-0 gap-2">
@@ -890,7 +890,7 @@ function SpeechModelBrowser(props: {
         <Menu>
           <MenuTrigger
             render={<Button variant="outline" className="max-w-56" />}
-            aria-label={`Filter by language: ${languagesLabel}`}
+            aria-label={`按语言筛选：${languagesLabel}`}
           >
             <LanguagesIcon />
             <span className="hidden truncate @min-[34rem]/voice-models:inline">
@@ -938,7 +938,7 @@ function SpeechModelBrowser(props: {
         <Menu>
           <MenuTrigger
             render={<Button variant="outline" />}
-            aria-label={`Sort and filter models: ${sortLabels[sort]}${downloadedOnly ? ", downloaded only" : ""}`}
+            aria-label={`排序和筛选模型：${sortLabels[sort]}${downloadedOnly ? "，仅已下载" : ""}`}
           >
             <ArrowDownUpIcon />
             <span className="hidden @min-[34rem]/voice-models:inline">{sortLabels[sort]}</span>
@@ -954,7 +954,7 @@ function SpeechModelBrowser(props: {
                   <MenuRadioItem key={value} value={value} closeOnClick>
                     <span className="flex items-center justify-between gap-3">
                       {value === "accuracy"
-                        ? `Most accurate in ${languageLabel(accuracyLanguage)}`
+                        ? `${languageLabel(accuracyLanguage)}最准确`
                         : sortLabels[value]}
                       <MenuRadioItemIndicator />
                     </span>
@@ -1346,8 +1346,8 @@ export function VoiceSettingsPanel() {
           title="转写方式"
           description={
             destination.environmentId && chosenUnsupported
-              ? `${chosenEnvironment.label} can’t transcribe audio locally. Choose another destination.`
-              : "Where your speech is turned into text."
+              ? `${chosenEnvironment.label} 不能在本地转写音频。请另选一个目的地。`
+              : "你说的话在这里变成文字。"
           }
           control={
             <div className="flex w-full min-w-0 items-center gap-1.5 @min-[32rem]/settings-row:w-auto">
@@ -1495,10 +1495,10 @@ export function VoiceSettingsPanel() {
             title="语言"
             description={
               destination.cloudProvider
-                ? "The provider detects your language automatically."
+                ? "提供方会自动识别你的语言。"
                 : model?.supportsLanguageDetection
                   ? `${model.model} 会自动检测语言。`
-                  : `${model?.model ?? "This model"} 使用固定语言。`
+                  : `${model?.model ?? "这个模型"} 使用固定语言。`
             }
             control={
               <SpeechLanguageSelect
@@ -1527,8 +1527,8 @@ export function VoiceSettingsPanel() {
           title="静音过滤"
           description={
             destination.cloudProvider === "openai"
-              ? "OpenAI handles silence itself."
-              : "Skip silence and background noise before transcribing."
+              ? "OpenAI 自己处理静音。"
+              : "转写前跳过静音和背景噪声。"
           }
           control={
             <Switch
@@ -1601,11 +1601,11 @@ export function VoiceSettingsPanel() {
         />
         {cleanupEnabled ? (
           <SettingsRow
-            title="Instructions"
+            title="整理说明"
             description={
               settings.speechPostProcessingPrompt.mode === "custom"
-                ? "Your own instructions for cleanup."
-                : "Fix punctuation, numbers, lists, and spoken corrections."
+                ? "你自己写的整理要求。"
+                : "修正标点、数字、列表，以及说错后改口的地方。"
             }
             control={
               <Select

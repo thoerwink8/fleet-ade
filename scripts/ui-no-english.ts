@@ -1,11 +1,12 @@
 // @effect-diagnostics nodeBuiltinImport:off globalConsole:off
 // Fails when user-visible interface copy still contains English outside the
 // allowlist. Scope is the web UI, the desktop menu, server errors shown to
-// users, and the modules that put sign-in or provider status text on screen. Logs,
-// comments, developer CLI text, font names, and code identifiers are out of
-// scope. Each allowlist line keeps one string; the comment above it is the
-// reason. JSX text and UI string attributes are read from the syntax tree, so
-// a phrase on its own line is not skipped.
+// users, the modules that put sign-in or provider status text on screen, and
+// the functions that format a duration a person reads. Logs, comments,
+// developer CLI text, font names, and code identifiers are out of scope. Each
+// allowlist line keeps one string; the comment above it is the reason. JSX
+// text, string literals inside JSX, and UI string attributes are read from the
+// syntax tree, so a phrase on its own line is not skipped.
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
@@ -28,6 +29,7 @@ const ROOTS = [
   "packages/provider-cursor/src/server/textGeneration.ts",
   "packages/provider-acp-registry/src/server/auth.ts",
   "apps/server/src/provider/Drivers/CodexManagedProvider.ts",
+  "packages/shared/src/orchestrationTiming.ts",
 ];
 const UI_NAMES = new Set([
   "title",
@@ -84,13 +86,17 @@ function loadAllowlist(file: string): ReadonlyArray<AllowEntry> {
   return entries.toSorted((left, right) => right.phrase.length - left.phrase.length);
 }
 
-function englishLeft(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean {
+function leftoverEnglishWords(text: string, allowlist: ReadonlyArray<AllowEntry>): string[] {
   let rest = text;
   for (const entry of allowlist) {
     const pattern = new RegExp(entry.phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     rest = rest.replace(pattern, " ");
   }
-  return /[A-Za-z]{3,}/.test(rest);
+  rest = rest
+    .replace(/\b--?[A-Za-z][\w.-]*\b/g, " ")
+    .replace(/\b[A-Z][A-Z0-9_]{2,}\b/g, " ")
+    .replace(/\b[A-Za-z]+(?:[/_-][A-Za-z0-9]+)+\b/g, " ");
+  return rest.match(/\b[A-Za-z]{3,}\b/g) ?? [];
 }
 
 function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean {
@@ -110,7 +116,10 @@ function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean
   if (/^[()[\]|&,]/.test(plain) || /\bnew (?:Map|Set)\b|\bAtom\b|\bKeyboardEvent\b/.test(plain)) {
     return false;
   }
-  if (!englishLeft(plain, allowlist)) return false;
+  const words = leftoverEnglishWords(plain, allowlist);
+  if (words.length === 0) return false;
+  // A Chinese sentence that only borrows one name or token is already translated.
+  if (/[\u4e00-\u9fff]/.test(plain) && words.length < 2) return false;
   if (/^[a-z0-9_.:/\- ]+$/.test(plain)) return false;
   if (
     /^(?:oklch|rgba|rgb|hsla?)\(|var\(--|system-ui|ui-monospace|sans-serif|video\/|codecs=/.test(
@@ -120,7 +129,7 @@ function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean
     return false;
   }
   if (
-    /\b(?:flex|grid|absolute|relative|fixed|sticky|hidden|inline-|items-|justify-|px-|py-|gap-|border-|bg-|text-|sm:|lg:|max-sm:|min-w-|max-w-|overflow-|z-\d)/.test(
+    /\b(?:flex|grid|absolute|relative|fixed|sticky|hidden|inline-|items-|justify-|px-|py-|gap-|border-|bg-|text-|sm:|lg:|max-sm:|min-w-|max-w-|overflow-|z-\d)|color-mix\(|\bfill-\[|currentColor|xMinYMin slice/.test(
       plain,
     )
   ) {
@@ -153,7 +162,18 @@ function included(file: string): boolean {
 
 function isLogCall(node: ts.CallExpression): boolean {
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
-  return /^log(?:Warning|Info|Error|Debug|Trace|Fatal)?$/.test(node.expression.name.text);
+  const name = node.expression.name.text;
+  if (/^log(?:Warning|Info|Error|Debug|Trace|Fatal)?$/.test(name)) return true;
+  // console.error in a click handler is a log, not the sentence on screen.
+  return (
+    (name === "error" ||
+      name === "warn" ||
+      name === "info" ||
+      name === "debug" ||
+      name === "log") &&
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === "console"
+  );
 }
 
 function literalText(node: ts.Expression): string | undefined {
@@ -177,6 +197,23 @@ function propertyName(name: ts.PropertyName): string | undefined {
 
 function lineOf(source: ts.SourceFile, node: ts.Node): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+}
+
+function templateSpans(node: ts.TemplateLiteral): string[] {
+  if (ts.isNoSubstitutionTemplateLiteral(node)) return [node.text];
+  return [node.head.text, ...node.templateSpans.map((span) => span.literal.text)];
+}
+
+// Substituted templates such as `${minutes}m` never appear as one literal, so
+// the sentence check cannot see a single-letter unit. These files are the
+// formatters that print a duration on screen.
+function isDurationFormatter(rel: string): boolean {
+  return rel.endsWith("/orchestrationTiming.ts") || rel.endsWith("/TimelineWorkGroupRows.logic.ts");
+}
+
+function isLatinDurationUnit(text: string): boolean {
+  const plain = text.trim();
+  return /(?:^|\s)\d*(?:\.\d+)?(?:ms|h|m|s)$/.test(plain);
 }
 
 const allowlist = loadAllowlist(ALLOWLIST_PATH);
@@ -212,7 +249,14 @@ for (const file of files.filter(included)) {
     rel.endsWith("/CodexAuthCallbackPage.ts") ||
     rel.endsWith("/codexAuthCallback.ts") ||
     /\/provider\/[^/]*Auth\.ts$/.test(rel);
-  const visit = (node: ts.Node): void => {
+  const durationFile = isDurationFormatter(rel);
+  const opensJsx = (node: ts.Node) =>
+    ts.isJsxElement(node) ||
+    ts.isJsxFragment(node) ||
+    ts.isJsxSelfClosingElement(node) ||
+    ts.isJsxAttribute(node) ||
+    ts.isJsxExpression(node);
+  const visit = (node: ts.Node, inJsx: boolean): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
     // Log calls are out of scope even when they sit in a sign-in module.
     if (ts.isCallExpression(node) && isLogCall(node)) return;
@@ -240,22 +284,45 @@ for (const file of files.filter(included)) {
         if (text !== undefined) texts.push(text);
       }
     }
+    // `value={"No project"}` is a literal inside JSX, not a named UI attribute,
+    // and a ternary keeps each branch as its own literal.
+    if (
+      !serverCopy &&
+      inJsx &&
+      (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+    ) {
+      texts.push(node.text);
+    }
+    if (!serverCopy && inJsx && ts.isTemplateExpression(node)) {
+      texts.push(...templateSpans(node));
+    }
+    if (durationFile && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) {
+      texts.push(node.text);
+    }
+    if (durationFile && ts.isTemplateExpression(node)) {
+      texts.push(...templateSpans(node));
+    }
     for (const text of texts) {
-      if (!isUserCopy(text, allowlist)) continue;
+      const hit = durationFile
+        ? isLatinDurationUnit(text) || isUserCopy(text, allowlist)
+        : isUserCopy(text, allowlist);
+      if (!hit) continue;
       findings.push(`${file}:${String(lineOf(source, node))}  ${text.trim()}`);
     }
-    ts.forEachChild(node, visit);
+    const childJsx = inJsx || opensJsx(node);
+    ts.forEachChild(node, (child) => visit(child, childJsx));
   };
-  visit(source);
+  visit(source, false);
 }
 
-const report = [`COUNT ${String(findings.length)}`, ...findings].join("\n");
+const uniqueFindings = [...new Set(findings)];
+const report = [`COUNT ${String(uniqueFindings.length)}`, ...uniqueFindings].join("\n");
 const outPath = process.argv[3];
 if (outPath) NodeFS.writeFileSync(outPath, report, "utf8");
-console.log(`COUNT ${String(findings.length)}`);
-if (findings.length > 0) {
+console.log(`COUNT ${String(uniqueFindings.length)}`);
+if (uniqueFindings.length > 0) {
   if (!outPath) {
-    for (const finding of findings) console.log(finding);
+    for (const finding of uniqueFindings) console.log(finding);
   }
   process.exitCode = 1;
 }

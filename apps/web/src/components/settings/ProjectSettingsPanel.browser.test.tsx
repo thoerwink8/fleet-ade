@@ -647,20 +647,18 @@ describe("project settings scope", () => {
     const key = projectKey();
     await using screen = await mountSettings({ project: key, machine: primaryId });
 
-    await userEvent.click(page.getByRole("button", { name: "Checkout scope: All checkouts" }));
+    await userEvent.click(page.getByRole("button", { name: "工作副本范围: 全部工作副本" }));
     await userEvent.click(page.getByRole("menuitemradio", { name: /clone-b/ }));
 
-    await expect
-      .element(page.getByRole("button", { name: "Checkout scope: clone-b" }))
-      .toBeVisible();
+    await expect.element(page.getByRole("button", { name: "工作副本范围: clone-b" })).toBeVisible();
     expect(screen.router.state.location.search).toMatchObject({
       project: key,
       machine: primaryId,
       checkout: expect.stringContaining("clone-b"),
     });
 
-    await userEvent.click(page.getByRole("button", { name: "Checkout scope: clone-b" }));
-    await userEvent.click(page.getByRole("menuitemradio", { name: "All checkouts" }));
+    await userEvent.click(page.getByRole("button", { name: "工作副本范围: clone-b" }));
+    await userEvent.click(page.getByRole("menuitemradio", { name: "全部工作副本" }));
 
     await vi.waitFor(() =>
       expect(screen.router.state.location.search).toEqual({ project: key, machine: primaryId }),

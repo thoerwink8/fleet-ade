@@ -315,7 +315,7 @@ describe("MessagesTimeline work rows", () => {
       />,
       { container },
     );
-    const heading = screen.getByRole("button", { name: /^Worked for/ });
+    const heading = screen.getByRole("button", { name: /^工作了/ });
     // LegendList keeps rows click-through until its initial scroll settles on animation
     // frames, which the fake clock below would freeze.
     await expect.element(heading).toHaveStyle({ pointerEvents: "auto" });
@@ -356,7 +356,7 @@ describe("MessagesTimeline work rows", () => {
     await using screen = await render(<MessagesTimeline {...props} timelineEntries={entries} />, {
       container,
     });
-    const heading = screen.getByRole("button", { name: /^Worked for/ });
+    const heading = screen.getByRole("button", { name: /^工作了/ });
     await expect.element(heading).toHaveStyle({ pointerEvents: "auto" });
     const viewport = props.listRef.current!.getScrollableNode()!;
     const distanceFromEnd = () =>
@@ -2007,7 +2007,7 @@ it("renders automatic compaction as one live divider that finishes with its reas
   container.style.cssText = "height: 1200px; width: 900px; display: flex; flex-direction: column;";
   await using screen = await render(ui(false), { container });
   await expect
-    .element(screen.getByRole("separator", { name: "Compacting before the cache expires…" }))
+    .element(screen.getByRole("separator", { name: "正在缓存过期前压缩…" }))
     .toBeVisible();
   expect(container.textContent).not.toContain("/compact");
   expect(container.textContent).not.toContain("Thinking");
@@ -2017,7 +2017,7 @@ it("renders automatic compaction as one live divider that finishes with its reas
   await expect
     .element(
       screen.getByRole("separator", {
-        name: "Context automatically compacted before cache expiry 899K → 19K tokens",
+        name: "已在缓存过期前自动压缩上下文：899K → 19K token",
       }),
     )
     .toBeVisible();

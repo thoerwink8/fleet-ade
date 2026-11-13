@@ -123,7 +123,7 @@ function AudioChip(props: AudioPreviewProps) {
       />
       <ContextChipAction
         className="ml-0 [&_svg]:size-[1em]"
-        aria-label={`${props.failed ? "Audio unavailable. " : ""}${action} ${props.name}`}
+        aria-label={`${props.failed ? "音频不可用。" : ""}${action} ${props.name}`}
         disabled={loading}
         onClick={() => {
           if (props.failed) {

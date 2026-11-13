@@ -131,9 +131,7 @@ function UpdateEverythingDialogContent({
   return (
     <>
       <AlertDialogHeader className="shrink-0">
-        <AlertDialogTitle>
-          {title ?? `Update ${updating.length} ${updating.length === 1 ? "machine" : "machines"}?`}
-        </AlertDialogTitle>
+        <AlertDialogTitle>{title ?? `要更新 ${updating.length} 台机器吗？`}</AlertDialogTitle>
         <AlertDialogDescription>
           {version !== null ? (
             <>
@@ -141,12 +139,8 @@ function UpdateEverythingDialogContent({
             </>
           ) : null}
           {version !== null && providerCount > 0 ? " · " : null}
-          {providerCount > 0
-            ? `${providerCount} provider ${providerCount === 1 ? "update" : "updates"}`
-            : null}
-          {checking
-            ? `${version !== null || providerCount > 0 ? " · " : ""}Checking for more…`
-            : null}
+          {providerCount > 0 ? `${providerCount} 个提供方更新` : null}
+          {checking ? `${version !== null || providerCount > 0 ? " · " : ""}正在继续检查…` : null}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <ScrollArea scrollFade>

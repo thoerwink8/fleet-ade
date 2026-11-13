@@ -1076,7 +1076,7 @@ function PullRequestCodeTab({
         return result.value;
       }}
       onReply={(body) =>
-        runThreadCommand("Reply could not be posted", () =>
+        runThreadCommand("无法发表回复", () =>
           replyToThread({
             environmentId,
             input: { ...reference, threadId: thread.id, body },
@@ -1091,7 +1091,7 @@ function PullRequestCodeTab({
         })
       }
       onEditComment={(commentId, body) =>
-        runThreadCommand("The comment could not be saved", () =>
+        runThreadCommand("无法保存评论", () =>
           updateComment({
             environmentId,
             input: { ...reference, commentId, kind: "review-comment", body },
@@ -1099,7 +1099,7 @@ function PullRequestCodeTab({
         )
       }
       onToggleResolved={() =>
-        void runThreadCommand("The conversation could not be updated", () =>
+        void runThreadCommand("无法更新这条讨论", () =>
           setThreadResolution({
             environmentId,
             input: { ...reference, threadId: thread.id, resolved: !thread.isResolved },

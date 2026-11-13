@@ -413,7 +413,7 @@ function PullRequestLinkCheckout({
   const { owner, name, number } = link.pullRequest;
   return (
     <LinkPage
-      title={`Check out ${owner}/${name}#${number}?`}
+      title={`要检出 ${owner}/${name}#${number} 吗？`}
       description="这会把该 pull request 的代码放到新的工作树中，并在其上运行你项目的设置脚本。"
     >
       <Button

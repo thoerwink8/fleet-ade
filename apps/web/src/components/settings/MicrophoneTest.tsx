@@ -255,7 +255,7 @@ export function MicrophoneTest({
           <Button
             size="icon-sm"
             variant="ghost-muted"
-            aria-label={phase === "ready" ? "Discard recording" : "取消麦克风测试"}
+            aria-label={phase === "ready" ? "丢弃录音" : "取消麦克风测试"}
             onClick={cancel}
           >
             <XIcon />

@@ -30,7 +30,7 @@ export function DeviceToolVersions({
       <PopoverTrigger
         aria-label={
           kind
-            ? `${label}: ${version ? `version ${version}` : selected ? "not installed" : "version unknown"}. Show details`
+            ? `${label}：${version ? `版本 ${version}` : selected ? "未安装" : "版本未知"}。查看详情`
             : undefined
         }
         render={<InlineButton tone="muted" />}

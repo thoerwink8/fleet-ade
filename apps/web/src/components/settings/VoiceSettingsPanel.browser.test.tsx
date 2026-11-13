@@ -646,27 +646,27 @@ it("records from the first connected microphone in the saved order", async () =>
       <VoiceSettingsPanel />
     </SettingsScopeProvider>,
   );
-  const list = screen.getByRole("列表", { name: "Microphones, preferred first" });
+  const list = screen.getByRole("list", { name: "麦克风，优先使用排在前面的" });
   await expect.poll(saved).toEqual(["Blue Yeti", "系统默认", "AirPods Pro"]);
   const row = (index: number) => list.getByRole("listitem").nth(index);
-  await expect.element(row(0)).toHaveTextContent("1Blue YetiIn use");
+  await expect.element(row(0)).toHaveTextContent("1Blue Yeti正在使用");
   expect(await chooseRecordingMicrophone()).toBe("yeti");
 
   devices.mockResolvedValue([airpods]);
-  await userEvent.click(screen.getByRole("button", { name: "Refresh microphones" }));
-  await expect.element(row(0)).toHaveTextContent("1Blue YetiNot connected");
-  await expect.element(row(1)).toHaveTextContent("2System defaultIn use");
+  await userEvent.click(screen.getByRole("button", { name: "刷新麦克风" }));
+  await expect.element(row(0)).toHaveTextContent("1Blue Yeti未连接");
+  await expect.element(row(1)).toHaveTextContent("2系统默认正在使用");
   expect(await chooseRecordingMicrophone()).toBe("");
 
-  await userEvent.click(screen.getByRole("button", { name: "Move AirPods Pro up" }));
-  await userEvent.click(screen.getByRole("button", { name: "Move AirPods Pro up" }));
+  await userEvent.click(screen.getByRole("button", { name: "上移 AirPods Pro" }));
+  await userEvent.click(screen.getByRole("button", { name: "上移 AirPods Pro" }));
   expect(saved()).toEqual(["AirPods Pro", "Blue Yeti", "系统默认"]);
-  await expect.element(screen.getByRole("button", { name: "Move AirPods Pro up" })).toBeDisabled();
+  await expect.element(screen.getByRole("button", { name: "上移 AirPods Pro" })).toBeDisabled();
   expect(await chooseRecordingMicrophone()).toBe("airpods");
 
   await userEvent.click(screen.getByRole("button", { name: "Forget Blue Yeti" }));
   expect(saved()).toEqual(["AirPods Pro", "系统默认"]);
   await expect
-    .element(screen.getByRole("button", { name: "Forget System default" }))
+    .element(screen.getByRole("button", { name: "Forget 系统默认" }))
     .not.toBeInTheDocument();
 });

@@ -1942,13 +1942,13 @@ describe("MuseAdapterV2", () => {
       const timeout = { maxAttempts: 2, retryDelayMs: 1_000, reason: "no first model event" };
       const turnRetry = yield* retry("turn/retryScheduled", "record-1", 1, timeout);
       assert.strictEqual(turnRetry?.status, "running");
-      assert.strictEqual(turnRetry?.failure.message, "no first model event. Retrying in 1s.");
+      assert.strictEqual(turnRetry?.failure.message, "no first model event. Retrying in 1 秒.");
       assert.deepStrictEqual(turnRetry?.retry, { attempt: 1, maxAttempts: 1, retryDelayMs: 1_000 });
       const http = { maxAttempts: 10, errorKind: "server", httpStatus: 504, retryDelayMs: 1_000 };
       const modelRetry = yield* retry("turn/modelRetryScheduled", "record-2", 1, http);
       assert.strictEqual(
         modelRetry?.failure.message,
-        "Model request failed (HTTP 504). Retrying in 1s.",
+        "Model request failed (HTTP 504). Retrying in 1 秒.",
       );
       const nextChain = yield* retry("turn/retryScheduled", "record-3", 1, timeout);
       assert.strictEqual(new Set([turnRetry?.id, modelRetry?.id, nextChain?.id]).size, 3);

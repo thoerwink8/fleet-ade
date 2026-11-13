@@ -66,8 +66,8 @@ export function MicrophoneOrderList(props: {
                 id={key}
                 name={
                   entry.kind === "default"
-                    ? "System default"
-                    : entry.label || device?.label || "Saved microphone"
+                    ? "系统默认"
+                    : entry.label || device?.label || "已保存的麦克风"
                 }
                 position={index + 1}
                 count={order.length}

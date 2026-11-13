@@ -869,7 +869,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               ? {
                   disabledInstanceIds: lockedDisabledInstanceIds,
                   getDisabledInstanceTooltip: (entry: ProviderInstanceEntry) =>
-                    `${entry.displayName} is unavailable in this thread. Start a new thread to switch providers.`,
+                    `${entry.displayName} 在这个会话里不可用。请新开一个会话再切换提供方。`,
                 }
               : {})}
           />
@@ -1074,7 +1074,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                 selectedInstanceId === "favorites" && !isSearching
                   ? "还没有收藏"
                   : workspaceModelsScanning
-                    ? "Searching project models..."
+                    ? "正在搜索项目模型…"
                     : "未找到模型"
               }
               onRequestClose={onRequestClose}

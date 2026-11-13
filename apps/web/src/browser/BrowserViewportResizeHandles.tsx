@@ -57,7 +57,7 @@ function ResizeHandle(props: {
   return (
     <button
       type="button"
-      aria-label={`${label}. Use arrow keys to resize.`}
+      aria-label={`${label}。用方向键调整大小。`}
       className={cn(EDGE_BUTTON_CLASS, kind === "corner" && "z-30", cursorClassName)}
       style={style}
       onPointerDown={(event) => onPointerDown(direction, event)}

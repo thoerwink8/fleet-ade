@@ -20,18 +20,18 @@ export function deriveSubagentElapsedMs(
 }
 
 export function formatDuration(durationMs: number): string {
-  if (!Number.isFinite(durationMs) || durationMs < 0) return "0ms";
-  if (durationMs < 1_000) return `${Math.max(1, Math.round(durationMs))}ms`;
-  if (durationMs < 10_000) return `${Math.round(durationMs / 100) / 10}s`;
+  if (!Number.isFinite(durationMs) || durationMs < 0) return "0 毫秒";
+  if (durationMs < 1_000) return `${Math.max(1, Math.round(durationMs))} 毫秒`;
+  if (durationMs < 10_000) return `${Math.round(durationMs / 100) / 10} 秒`;
   const totalSeconds = Math.round(durationMs / 1_000);
-  // Choose the unit after rounding so 59.5 seconds never renders as "60s".
-  if (totalSeconds < 60) return `${totalSeconds}s`;
+  // Choose the unit after rounding so 59.5 seconds never renders as "60 秒".
+  if (totalSeconds < 60) return `${totalSeconds} 秒`;
   const hours = Math.floor(totalSeconds / 3_600);
   const minutes = Math.floor((totalSeconds % 3_600) / 60);
   const seconds = totalSeconds % 60;
   const parts: string[] = [];
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  if (seconds > 0 || minutes > 0) parts.push(`${seconds}s`);
+  if (hours > 0) parts.push(`${hours} 小时`);
+  if (minutes > 0) parts.push(`${minutes} 分`);
+  if (seconds > 0 || minutes > 0) parts.push(`${seconds} 秒`);
   return parts.join(" ");
 }

@@ -355,7 +355,7 @@ export function AttachmentFilePreview(props: {
       }
     />
   ) : kind === "audio" ? (
-    <AudioPreview src={url} name={props.name} onError={() => setError("Unable to load audio.")} />
+    <AudioPreview src={url} name={props.name} onError={() => setError("无法加载音频。")} />
   ) : kind === "video" ? (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-black">
       <video
@@ -364,7 +364,7 @@ export function AttachmentFilePreview(props: {
         src={url}
         aria-label={props.name}
         className="max-h-full max-w-full"
-        onError={() => setError("Unable to load video.")}
+        onError={() => setError("无法加载视频。")}
       />
     </div>
   ) : kind === "image" ? (
@@ -373,7 +373,7 @@ export function AttachmentFilePreview(props: {
       src={url}
       name={props.name}
       mimeType={props.mimeType}
-      onError={() => setError("Unable to load image.")}
+      onError={() => setError("无法加载图片。")}
     />
   ) : (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center">

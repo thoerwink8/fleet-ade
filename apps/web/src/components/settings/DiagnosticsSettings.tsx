@@ -1015,7 +1015,7 @@ function DiagnosticsSettingsBody() {
             value={
               resourceData
                 ? resourceData.sampleIntervalMs === 0
-                  ? "On demand"
+                  ? "按需"
                   : formatDuration(resourceData.sampleIntervalMs)
                 : "..."
             }

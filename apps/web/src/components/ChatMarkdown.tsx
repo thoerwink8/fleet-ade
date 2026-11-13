@@ -1701,7 +1701,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
           isStreaming={isStreaming && !isClosedCodeFence(node, text, codeBlock.code)}
           onExpand={(src) =>
             expandMedia({
-              images: [{ src, name: "Mermaid diagram", mimeType: "image/svg+xml" }],
+              images: [{ src, name: "Mermaid 图", mimeType: "image/svg+xml" }],
               index: 0,
             })
           }

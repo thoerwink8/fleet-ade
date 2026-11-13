@@ -133,7 +133,7 @@ export function DeviceControlsRail(props: {
             <RailDivider />
             <RailButton
               tooltipSide={popupSide}
-              label={`Switch device to ${nextAppearance} mode`}
+              label={nextAppearance === "dark" ? "把设备切换到深色" : "把设备切换到浅色"}
               disabled={controls.disabled || !settings?.appearance}
               onClick={() => void controls.act({ type: "setAppearance", value: nextAppearance })}
             >

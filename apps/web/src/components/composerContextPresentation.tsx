@@ -238,7 +238,7 @@ function FileContextChip(props: {
       error={props.upload?.status === "failed"}
       unresolved={needsReattach}
       suffix={suffix}
-      accessibleLabel={`${isVideo && !needsReattach ? "Preview video" : "File"} attachment, ${props.record.name}, ${size}`}
+      accessibleLabel={`${isVideo && !needsReattach ? "预览视频" : "文件"}附件，${props.record.name}，${size}`}
       onOpen={
         !needsReattach
           ? () =>
@@ -247,7 +247,7 @@ function FileContextChip(props: {
       }
       tooltip={
         needsReattach
-          ? `${props.record.name} was not saved with this draft. Attach it again to send it.`
+          ? `${props.record.name} 没有随这份草稿保存。请重新附加后再发送。`
           : attachmentTooltip(props.record, props.upload)
       }
     />

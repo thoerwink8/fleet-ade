@@ -200,7 +200,7 @@ export function CaptureShortcutConfig({
                 onClick={() => void apply()}
               >
                 {working === "writing"
-                  ? "Saving…"
+                  ? "正在保存…"
                   : changed
                     ? preview.operation === "install"
                       ? "保存快捷键"

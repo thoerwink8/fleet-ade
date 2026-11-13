@@ -166,7 +166,7 @@ export function ResponseReplyCard({
     <ResponseCard
       citation={record.citation}
       copyMarkdown={copyMarkdown}
-      label={`Go to the response this replies to: ${record.label}`}
+      label={`转到这条回复所回应的内容：${record.label}`}
       title={record.subagents?.map((subagent) => subagent.title).join(", ")}
       preview={flat(record.citation.text)}
       leading={leading}

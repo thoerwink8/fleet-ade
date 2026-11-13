@@ -459,7 +459,7 @@ export function SnapShotSetupDialog({
                 if (!shortcutChanged || (await onSaveShortcut())) await onClose(true);
               }}
             >
-              {busy ? "Saving…" : shortcutChanged ? "保存并完成" : "完成"}
+              {busy ? "正在保存…" : shortcutChanged ? "保存并完成" : "完成"}
             </Button>
           ) : null}
         </WizardFooter>

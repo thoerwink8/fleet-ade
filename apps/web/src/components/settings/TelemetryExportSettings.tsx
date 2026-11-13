@@ -265,7 +265,7 @@ function TelemetryExportForm() {
               放弃
             </Button>
             <Button type="submit" size="xs" disabled={!changed || saving || !canEdit}>
-              {saving ? "Saving…" : "保存"}
+              {saving ? "正在保存…" : "保存"}
             </Button>
           </div>
         </div>

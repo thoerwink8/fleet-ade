@@ -146,7 +146,7 @@ it.layer(NodeServices.layer)("t3 update under a managed policy", (it) => {
   it.effect("refuses to update when updates are off", () =>
     Effect.gen(function* () {
       const error = yield* runWithPolicy({ mode: "off" });
-      assert.equal(error.message, "Example Corp manages T3 Code updates.");
+      assert.equal(error.message, "Example Corp 管理 T3 Code 的更新。");
     }),
   );
 
@@ -161,10 +161,7 @@ it.layer(NodeServices.layer)("t3 update under a managed policy", (it) => {
         { channel: "stable", requestedVersion: "1.2.0-nightly.20261028.1" },
       );
       for (const error of [byChannel, byVersion]) {
-        assert.equal(
-          error.message,
-          "Example Corp manages T3 Code updates. Only stable releases can be installed.",
-        );
+        assert.equal(error.message, "Example Corp 管理 T3 Code 的更新。只能安装稳定版。");
       }
     }),
   );

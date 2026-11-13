@@ -573,7 +573,7 @@ describe("deriveMessagesTimelineRows", () => {
       });
       expect(completedRows.find((row) => row.kind === "context-compaction")).toMatchObject({
         active: false,
-        label: "Context compacted 899K → 19K tokens",
+        label: "上下文已压缩：899K → 19K token",
         tokenCounts: { before: "899K", after: "19K" },
       });
       expect(completedRows.at(-1)?.kind).toBe("thinking");
@@ -903,13 +903,13 @@ describe("deriveMessagesTimelineRows", () => {
       { kind: "working", compacting: true, createdAt: DateTime.formatIso(compactionStartedAt) },
     ]);
     expect(liveRows("completed")).toMatchObject([
-      { kind: "context-compaction", title: "Context compacted after 1h 5m idle" },
+      { kind: "context-compaction", title: "闲置 1h 5m 后已压缩上下文" },
     ]);
     const laterRows = rowsFor("running", true);
     const dividers = laterRows.filter((row) => row.kind === "context-compaction");
     expect(dividers).toHaveLength(2);
     expect(dividers[0]).toMatchObject({
-      title: "Context compacted after 1h 5m idle",
+      title: "闲置 1h 5m 后已压缩上下文",
       active: false,
     });
     expect(dividers[1]).toMatchObject({ active: true });
@@ -1173,7 +1173,7 @@ describe("deriveMessagesTimelineRows", () => {
     );
     expect(foldRow?.runId).toBe("turn-1");
     expect(foldRow?.expanded).toBe(false);
-    expect(foldRow?.label).toBe("Worked for 22s");
+    expect(foldRow?.label).toBe("工作了 22 秒");
     expect(collapsedRows.map((row) => row.id)).toEqual([
       "user-entry",
       "turn-fold:turn-1",
@@ -1402,7 +1402,7 @@ describe("deriveMessagesTimelineRows", () => {
         row.kind === "turn-fold",
     );
     expect(foldRow?.runId).toBe("turn-1");
-    expect(foldRow?.label).toBe("Worked for 12s");
+    expect(foldRow?.label).toBe("工作了 12 秒");
   });
 
   it("uses latest-turn timings and the stopped label for an interrupted latest turn", () => {
@@ -1437,7 +1437,7 @@ describe("deriveMessagesTimelineRows", () => {
       expect.objectContaining({
         kind: "turn-fold",
         runId: "turn-1",
-        label: "You stopped after 47s",
+        label: "你在 47 秒 后停止了",
         expanded: false,
       }),
     ]);
@@ -1512,7 +1512,7 @@ describe("deriveMessagesTimelineRows", () => {
             "steer",
           ]);
           expect(rows[1]?.createdAt).toBe(time(0));
-          if (!isWorking) expect(rows[1]).toMatchObject({ label: "Worked for 20s", expanded });
+          if (!isWorking) expect(rows[1]).toMatchObject({ label: "工作了 20 秒", expanded });
           expect(rows.some((row) => row.id === "final")).toBe(true);
           expect(rows.some((row) => row.id === "work")).toBe(isWorking || expanded);
         }
@@ -1574,8 +1574,8 @@ describe("deriveMessagesTimelineRows", () => {
       `turn-fold:${segmentKey}`,
       "final",
     ]);
-    expect(collapsed[1]).toMatchObject({ label: "Worked for 30s" });
-    expect(collapsed[3]).toMatchObject({ label: "Continued for 20s", createdAt: time(10) });
+    expect(collapsed[1]).toMatchObject({ label: "工作了 30 秒" });
+    expect(collapsed[3]).toMatchObject({ label: "继续工作了 20 秒", createdAt: time(10) });
 
     expect(rows(new Set([segmentKey])).map((row) => row.id)).toEqual([
       "prompt",
@@ -2158,10 +2158,10 @@ describe("deriveMessagesTimelineRows", () => {
     const settled = rows({ resume: "completed", working: false });
     expect(shape(settled)).toEqual([
       "user:launch",
-      "fold:Worked for 8s",
+      "fold:工作了 8 秒",
       "assistant:launch-answer",
       "user:resume",
-      "fold:Worked for 8s",
+      "fold:工作了 8 秒",
       "assistant:resume-answer",
     ]);
 
@@ -2174,17 +2174,17 @@ describe("deriveMessagesTimelineRows", () => {
     });
     expect(shape(expanded)).toEqual([
       "user:launch",
-      "fold:Worked for 8s",
+      "fold:工作了 8 秒",
       "work-toggle",
       "assistant:launch-answer",
       "user:resume",
-      "fold:Worked for 8s",
+      "fold:工作了 8 秒",
       "assistant:resume-answer",
     ]);
 
     expect(shape(rows({ resume: "running", working: true }))).toEqual([
       "user:launch",
-      "fold:Worked for 8s",
+      "fold:工作了 8 秒",
       "assistant:launch-answer",
       "user:resume",
       "working",
@@ -2193,7 +2193,7 @@ describe("deriveMessagesTimelineRows", () => {
 
     expect(shape(rows({ resume: "failed", working: false }))).toEqual([
       "user:launch",
-      "fold:Worked for 8s",
+      "fold:工作了 8 秒",
       "assistant:launch-answer",
       "user:resume",
       "work",
@@ -2996,7 +2996,7 @@ describe("v2 run and attempt history", () => {
     );
     expect(foldRow?.runId).toBe("turn-1");
     expect(foldRow?.expanded).toBe(false);
-    expect(foldRow?.label).toBe("Worked for 22s");
+    expect(foldRow?.label).toBe("工作了 22 秒");
     expect(collapsedRows.map((row) => row.id)).toEqual([
       "user-entry",
       "turn-fold:turn-1",

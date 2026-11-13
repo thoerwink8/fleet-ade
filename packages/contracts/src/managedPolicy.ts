@@ -143,12 +143,12 @@ export type ManagedPolicySummary = typeof ManagedPolicySummary.Type;
 
 /** The message every surface shows when the policy stops an update. */
 export function managedUpdatesMessage(organization: string): string {
-  return `${organization} manages T3 Code updates.`;
+  return `${organization} 管理 T3 Code 的更新。`;
 }
 
 /** The message when the policy allows only stable releases. */
 export function managedNightlyDeniedMessage(organization: string): string {
-  return `${managedUpdatesMessage(organization)} Only stable releases can be installed.`;
+  return `${managedUpdatesMessage(organization)}只能安装稳定版。`;
 }
 
 /** Whether `path` is locked itself, sits inside a locked setting, or contains one. */

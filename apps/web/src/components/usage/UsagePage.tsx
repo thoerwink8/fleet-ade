@@ -513,8 +513,8 @@ export function UsagePage() {
             {selectedEnvironments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {environments.length === 0
-                  ? `Connect an environment to see ${showingLimits ? "limits" : "usage"}.`
-                  : `Select an environment to see ${showingLimits ? "limits" : "usage"}.`}
+                  ? `连接一个环境后才能看到${showingLimits ? "限额" : "用量"}。`
+                  : `选择一个环境后才能看到${showingLimits ? "限额" : "用量"}。`}
               </p>
             ) : showingLimits ? (
               <UsageLimitsSection

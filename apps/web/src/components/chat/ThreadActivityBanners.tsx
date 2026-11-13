@@ -108,9 +108,7 @@ export function goalNowItem(input: {
       <>
         {presentation.canResume && !isWorking ? (
           <>
-            <InlineButton
-              onClick={() => void onSendCommand("/goal resume", "Failed to resume goal.")}
-            >
+            <InlineButton onClick={() => void onSendCommand("/goal resume", "无法继续目标。")}>
               继续
             </InlineButton>
             <span aria-hidden>·</span>
@@ -118,7 +116,7 @@ export function goalNowItem(input: {
         ) : null}
         <InlineButton
           tone="muted"
-          onClick={() => void onSendCommand("/goal clear", "Failed to clear goal.")}
+          onClick={() => void onSendCommand("/goal clear", "无法清除目标。")}
         >
           清除
         </InlineButton>

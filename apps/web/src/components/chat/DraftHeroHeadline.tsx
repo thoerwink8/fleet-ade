@@ -301,7 +301,7 @@ export function DraftHeroHeadline({
           }
         >
           <DraftProjectName
-            value={isScratchDraft ? "No project" : (activeProjectTitle ?? "Choose a project")}
+            value={isScratchDraft ? "无项目" : (activeProjectTitle ?? "选择项目")}
             singleLine
           />
         </TooltipTrigger>
@@ -370,7 +370,7 @@ export function DraftHeroHeadline({
       onClick={openAddProject}
       className="pointer-events-auto inline min-w-0 max-w-full cursor-pointer border-muted-foreground/35 border-b border-dotted text-muted-foreground/60 transition-colors hover:border-muted-foreground/60 hover:text-muted-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     >
-      <DraftProjectName value={activeProjectTitle ?? "Add a project"} singleLine />
+      <DraftProjectName value={activeProjectTitle ?? "添加项目"} singleLine />
     </button>
   );
 
@@ -393,7 +393,7 @@ export function DraftHeroHeadline({
             />
           }
         >
-          or start without a project
+          或不选项目
         </TooltipTrigger>
         {noProjectShortcut ? <TooltipPopup side="bottom">{noProjectShortcut}</TooltipPopup> : null}
       </Tooltip>
@@ -422,7 +422,7 @@ export function DraftHeroHeadline({
           {isScratchDraft ? (
             <>我们来做些什么？</>
           ) : canChooseProject ? (
-            <>{projectSelector} to start</>
+            <>从{projectSelector}开始</>
           ) : (
             <>添加一个项目以开始</>
           )}

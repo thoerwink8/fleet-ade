@@ -112,7 +112,7 @@ describe("collectServerUpdateTargets", () => {
         entry.label,
         entry.reason,
       ]),
-    ).toEqual([["off", "Example Corp manages T3 Code updates."]]);
+    ).toEqual([["off", "Example Corp 管理 T3 Code 的更新。"]]);
     expect(
       collectServerUpdateTargets(
         machines.map((entry) => ({
@@ -240,10 +240,7 @@ describe("collectChannelSwitchTargets", () => {
         `数据库包含 ${NIGHTLY} 尚不支持的更改；请继续使用 Stable，直到 Nightly 通道支持这些更改`,
       ],
       ["old-desktop", "需要更高版本的桌面应用"],
-      [
-        "no-nightly",
-        "Example Corp manages T3 Code updates. Only stable releases can be installed.",
-      ],
+      ["no-nightly", "Example Corp 管理 T3 Code 的更新。只能安装稳定版。"],
     ]);
   });
 });

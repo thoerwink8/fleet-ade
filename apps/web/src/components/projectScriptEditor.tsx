@@ -562,7 +562,7 @@ function ProjectScriptEditorForm({
           取消
         </Button>
         <Button form={formId} type="submit" disabled={isSaving || !canEditActions}>
-          {isSaving ? "Saving…" : isEditing ? "保存更改" : "保存操作"}
+          {isSaving ? "正在保存…" : isEditing ? "保存更改" : "保存操作"}
         </Button>
       </DialogFooter>
     </>

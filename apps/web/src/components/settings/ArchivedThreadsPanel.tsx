@@ -237,7 +237,7 @@ export function ArchivedThreadsPanel() {
                     <span className={hasMultipleEnvironments ? "block truncate" : undefined}>
                       {hasMultipleEnvironments ? `${thread.environmentLabel} · ` : null}
                       已归档 <RelativeTime timestamp={thread.archivedAt ?? thread.createdAt} />
-                      {" \u00b7 Created "}
+                      {" · 创建于 "}
                       <RelativeTime timestamp={thread.createdAt} />
                     </span>
                   }

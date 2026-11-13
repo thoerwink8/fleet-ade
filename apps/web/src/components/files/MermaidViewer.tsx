@@ -23,7 +23,7 @@ export default function MermaidViewer(props: { readonly text: string }) {
       <MermaidDiagram source={props.text} onExpand={setExpanded} />
       {expanded ? (
         <ExpandedImageDialog
-          preview={{ images: [{ src: expanded, name: "Mermaid diagram" }], index: 0 }}
+          preview={{ images: [{ src: expanded, name: "Mermaid 图" }], index: 0 }}
           onClose={() => setExpanded(null)}
         />
       ) : null}

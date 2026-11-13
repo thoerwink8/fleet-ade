@@ -111,7 +111,7 @@ export default function OfficeViewer(props: {
         <div className={FILE_SURFACE_SUBHEADER_CLASS}>
           <span className="text-xs text-muted-foreground" aria-live="polite">
             {details}
-            {props.kind !== "xlsx" ? " · Fit to width" : ""}
+            {props.kind !== "xlsx" ? " · 适应宽度" : ""}
           </span>
         </div>
       ) : null}

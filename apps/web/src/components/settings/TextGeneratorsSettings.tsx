@@ -713,13 +713,13 @@ function TextGeneratorModelsDialog({
     >
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{name} models</DialogTitle>
+          <DialogTitle>{name} 的模型</DialogTitle>
           <DialogDescription>
             {models === null
               ? error
                 ? "无法加载模型列表。"
                 : "正在加载模型列表。"
-              : `${models.length} ${models.length === 1 ? "model" : "models"} available. Pick one in a text generation model picker.`}
+              : `${models.length} 个模型可用。请在文本生成的模型选择器里选一个。`}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>

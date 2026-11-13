@@ -141,7 +141,7 @@ function CommentIdentity({
         </TooltipTrigger>
         <TooltipPopup>
           {formatFullTimestamp(comment.createdAt, timestampFormat)}
-          {comment.url ? " · Open comment on host" : ""}
+          {comment.url ? " · 在托管站打开评论" : ""}
         </TooltipPopup>
       </Tooltip>
     </div>

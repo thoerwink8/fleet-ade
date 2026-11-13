@@ -236,3 +236,11 @@ Login succeeded, but creating an SDK API key failed
 Login failed or timed out
 # 要用户检查的配置文件路径
 ~/.cursor/sandbox.json
+# 协议名
+https
+# 协议名
+http
+# 产品名
+MagicDNS
+# 窗口管理器名
+Niri

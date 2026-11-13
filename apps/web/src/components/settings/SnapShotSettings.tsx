@@ -434,7 +434,7 @@ export function SnapShotSettings() {
                             disabled={!canSaveShortcut || setupBusy}
                             onClick={() => void saveShortcut()}
                           >
-                            {setupBusy ? "Saving…" : "保存"}
+                            {setupBusy ? "正在保存…" : "保存"}
                           </Button>
                           <Button
                             size="xs"
@@ -472,7 +472,7 @@ export function SnapShotSettings() {
                 control={
                   <Menu>
                     <MenuTrigger
-                      aria-label={"Snapshot sound: " + soundLabel}
+                      aria-label={"快照提示音：" + soundLabel}
                       render={<SelectButton size="sm" />}
                       className="w-auto min-w-0"
                       disabled={!captureAvailable}

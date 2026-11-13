@@ -264,7 +264,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       for (const harness of [service, desktop]) {
         expect(
           (yield* harness.selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip)).reason,
-        ).toBe("Example Corp manages T3 Code updates.");
+        ).toBe("Example Corp 管理 T3 Code 的更新。");
       }
       expect([...service.order, ...desktop.order]).toEqual([]);
     }),
@@ -288,7 +288,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       expect(
         (yield* selfUpdate.update({ targetVersion: "1.2.0-nightly.20261028.1" }).pipe(Effect.flip))
           .reason,
-      ).toBe("Example Corp manages T3 Code updates. Only stable releases can be installed.");
+      ).toBe("Example Corp 管理 T3 Code 的更新。只能安装稳定版。");
       expect(order).toEqual([]);
       // The mirror lists only 1.1.0's archive.
       expect((yield* selfUpdate.update({ targetVersion: "1.2.0" }).pipe(Effect.flip)).reason).toBe(

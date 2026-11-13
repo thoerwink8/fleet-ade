@@ -323,16 +323,16 @@ function AboutVersionSection() {
           {...searchableSetting("update-track")}
           description={
             nightlyDeniedBy !== undefined ? (
-              `${managedUpdatesMessage(nightlyDeniedBy)} Nightly builds are not available${
+              `${managedUpdatesMessage(nightlyDeniedBy)}${
                 selectedUpdateChannel === "nightly"
-                  ? "; switch to Stable to keep getting updates."
-                  : "."
+                  ? "每夜构建不可用，请改到稳定版以继续接收更新。"
+                  : "每夜构建不可用。"
               }`
             ) : unswitchedMachines > 0 ? (
               <>
                 {unswitchedMachines === 1
-                  ? "1 machine still runs"
-                  : `${unswitchedMachines} machines still run`}{" "}
+                  ? "还有 1 台机器在使用"
+                  : `还有 ${unswitchedMachines} 台机器在使用`}{" "}
                 {channelSwitchLabel(selectedUpdateChannel === "nightly" ? "latest" : "nightly")}.{" "}
                 {/* The dialog moves what it can and says why it skips the rest. */}
                 <Button
@@ -1162,7 +1162,7 @@ export function ChatSettingsPanel() {
             "智能体运行时，可以把追加消息加入队列，或用它引导当前执行。" +
             (settings.sendShortcut === "mod-enter-multiline"
               ? `单行提示词按 ${modifierLabel} + Enter、多行提示词按 ${modifierLabel} + Shift + Enter，可对单条消息使用相反的方式。`
-              : `Press ${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""} + Enter to do the opposite for one message.`)
+              : `按 ${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""} + Enter 可对单条消息使用相反的方式。`)
           }
           resetAction={
             settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior ? (

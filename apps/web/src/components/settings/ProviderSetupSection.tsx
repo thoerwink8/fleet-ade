@@ -257,9 +257,7 @@ function ProviderSetupActions({
                     size="sm"
                     variant="outline"
                     disabled={actionsDisabled || authActive}
-                    onClick={() =>
-                      void runCommand("Starting installation", () => startInstall(target))
-                    }
+                    onClick={() => void runCommand("无法开始安装", () => startInstall(target))}
                   >
                     {installation?.installedVersion
                       ? installation.version &&

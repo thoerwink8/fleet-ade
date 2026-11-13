@@ -4,13 +4,13 @@ import { deriveSubagentElapsedMs, formatDuration } from "./orchestrationTiming.t
 
 describe("formatDuration", () => {
   it.each([
-    [59_000, "59s"],
-    [59_500, "1m 0s"],
-    [60_000, "1m 0s"],
-    [720_000, "12m 0s"],
-    [736_000, "12m 16s"],
-    [3_600_000, "1h"],
-    [3_660_000, "1h 1m 0s"],
+    [59_000, "59 秒"],
+    [59_500, "1 分 0 秒"],
+    [60_000, "1 分 0 秒"],
+    [720_000, "12 分 0 秒"],
+    [736_000, "12 分 16 秒"],
+    [3_600_000, "1 小时"],
+    [3_660_000, "1 小时 1 分 0 秒"],
   ])("formats %i milliseconds as %s", (durationMs, expected) => {
     expect(formatDuration(durationMs)).toBe(expected);
   });

@@ -3583,7 +3583,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                           ? isChoiceOnlyPendingQuestion
                             ? "请在上方选择一个选项"
                             : activePendingProgress.activeQuestion?.options.length === 0
-                              ? "Type your answer"
+                              ? "输入你的回答"
                               : "输入你自己的回答，或留空以使用选中的选项"
                           : projectSelectionRequired
                             ? "请在上方选择项目以开始会话"

@@ -141,7 +141,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       }
       status={
         mixedModel
-          ? `${automaticModel ? "Automatic defaults differ." : "Defaults differ."} Select one environment or choose a shared model to edit effort.`
+          ? `${automaticModel ? "各环境的自动默认值不一样。" : "各环境的默认值不一样。"}请选择一个环境，或改成各环境共用的模型，再编辑力度。`
           : (presentation.providerNote ?? effortDisabledReason)
       }
       resetAction={

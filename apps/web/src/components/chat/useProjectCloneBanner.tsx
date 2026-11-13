@@ -85,7 +85,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneActionStable("Failed to cancel clone", () =>
+              void runProjectCloneActionStable("无法取消克隆", () =>
                 cancelProjectClone({ environmentId, input: { projectId } }),
               )
             }
@@ -115,7 +115,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneActionStable("Failed to retry clone", () =>
+              void runProjectCloneActionStable("无法重试克隆", () =>
                 retryProjectClone({ environmentId, input: { projectId } }),
               )
             }

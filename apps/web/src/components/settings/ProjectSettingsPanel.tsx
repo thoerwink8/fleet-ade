@@ -522,10 +522,7 @@ function ProjectDetail({
                   label="项目名称"
                   disabled={!canEditGroup}
                   onClick={() =>
-                    void updateAllMembers(
-                      { title: SCRATCH_PROJECT_TITLE },
-                      "Failed to rename project",
-                    )
+                    void updateAllMembers({ title: SCRATCH_PROJECT_TITLE }, "无法重命名项目")
                   }
                 />
               ) : null
@@ -611,7 +608,7 @@ function ProjectDetail({
                     onCheckedChange={(checked) =>
                       void organize(
                         { pinned: Boolean(checked) },
-                        checked ? "Failed to pin project" : "Failed to unpin project",
+                        checked ? "无法置顶项目" : "无法取消置顶项目",
                       )
                     }
                     aria-label="置顶项目"
@@ -633,9 +630,7 @@ function ProjectDetail({
                     onClick={() =>
                       void organize(
                         { archived: !group.archived },
-                        group.archived
-                          ? "Failed to unarchive project"
-                          : "Failed to archive project",
+                        group.archived ? "无法取消归档项目" : "无法归档项目",
                       )
                     }
                   >

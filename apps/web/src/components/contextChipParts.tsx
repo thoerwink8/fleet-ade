@@ -83,7 +83,7 @@ export function ContextChipPopover(props: {
                 : undefined
             }
             render={<button type="button" />}
-            aria-label={`${props.accessibleLabel}. Show details`}
+            aria-label={`${props.accessibleLabel}。查看详情`}
             data-markdown-copy={props.copyMarkdown}
           />
         }
