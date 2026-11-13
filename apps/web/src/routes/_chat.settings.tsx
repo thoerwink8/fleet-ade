@@ -97,9 +97,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
   if (scope.kind === "environment" && connectedEnvironments.length === 0) {
     return (
       <SettingsPageContainer>
-        <p className="text-sm text-muted-foreground">
-          重新连接 {scope.label} to change its settings.
-        </p>
+        <p className="text-sm text-muted-foreground">重新连接 {scope.label}，才能改它的设置。</p>
       </SettingsPageContainer>
     );
   }

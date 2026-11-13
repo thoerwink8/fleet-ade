@@ -438,7 +438,7 @@ export function AddProviderInstanceDialog({
       <WizardPopup size="wide">
         <WizardHeader
           title="添加提供方"
-          description={<>Add an account or configure a provider on {environmentLabel}.</>}
+          description={<>在 {environmentLabel} 上添加账号或配置提供方。</>}
         >
           {isAcpRegistry ? (
             <AddProviderInstanceWizardSteps

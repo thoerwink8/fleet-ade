@@ -196,11 +196,11 @@ export function SimlockDeviceHostEditor(props: {
                 />
               ))}
               <p className="text-xs text-muted-foreground">
-                Leases, drives, and streams devices. Create one{several ? " per environment" : ""}{" "}
-                with <code>simlock --gateway token create --role agent</code>, or leave it blank to
-                add it later. A blank token uses the machine's{" "}
-                <code>AGENT_DEVICE_DAEMON_AUTH_TOKEN</code> when its{" "}
-                <code>AGENT_DEVICE_DAEMON_BASE_URL</code> is this gateway.
+                租用、驱动并串流设备。{several ? "每个环境创建一个" : "创建一个"}
+                ，用 <code>simlock --gateway token create --role agent</code>{" "}
+                生成，也可以先留空以后再填。令牌留空时，如果这台机器的{" "}
+                <code>AGENT_DEVICE_DAEMON_BASE_URL</code> 就是此网关，则使用{" "}
+                <code>AGENT_DEVICE_DAEMON_AUTH_TOKEN</code>。
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">

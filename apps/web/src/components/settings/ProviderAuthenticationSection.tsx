@@ -334,9 +334,8 @@ export function ProviderAuthenticationSection({
         <>
           {interaction?.type === "deviceCode" ? (
             <p className="py-2 text-sm text-muted-foreground">
-              Enter code{" "}
-              <code className="select-all font-mono text-foreground">{interaction.userCode}</code>{" "}
-              in your browser.
+              在浏览器中输入登录码{" "}
+              <code className="select-all font-mono text-foreground">{interaction.userCode}</code>。
             </p>
           ) : null}
           {interaction?.type === "terminal" ? (

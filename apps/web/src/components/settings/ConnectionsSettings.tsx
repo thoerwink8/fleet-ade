@@ -944,7 +944,7 @@ function ConnectionsSettingsContent({
               <span className="block text-destructive">{desktopWslError}</span>
             ) : desktopWslState.preflightError ? (
               <span className="block text-destructive">
-                WSL backend couldn't start: {desktopWslState.preflightError}
+                WSL 后端无法启动：{desktopWslState.preflightError}
               </span>
             ) : null
           }
@@ -1475,7 +1475,7 @@ function ConnectionsSettingsContent({
               <AlertDialogHeader>
                 <AlertDialogTitle>停用 Tailscale HTTPS？</AlertDialogTitle>
                 <AlertDialogDescription>
-                  T3 Code 将重启本地后端，并停用 Tailscale Serve。
+                  T3 Code 将重启本地后端，并停用 Tailscale 转发。
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1513,7 +1513,7 @@ function ConnectionsSettingsContent({
               <DialogHeader>
                 <DialogTitle>设置 Tailscale HTTPS？</DialogTitle>
                 <DialogDescription>
-                  T3 Code 将重启本地后端并启用 Tailscale Serve，由 Tailscale 将 HTTPS
+                  T3 Code 将重启本地后端并启用 Tailscale 转发，由 Tailscale 把 HTTPS
                   流量代理到此后端。
                 </DialogDescription>
               </DialogHeader>

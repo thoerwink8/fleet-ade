@@ -260,11 +260,12 @@ export function McpConsent({
         title={`连接 ${details.clientName}`}
         description={
           <>
-            This agent wants to use the threads in every project on{" "}
+            此智能体想使用{" "}
             <span className="font-medium text-foreground">
               {environmentLabel ?? details.environmentHost}
             </span>
-            {environmentLabel ? ` (${details.environmentHost})` : null}.
+            {environmentLabel ? ` (${details.environmentHost})` : null}
+            上每个项目里的会话。
           </>
         }
       />
@@ -310,7 +311,7 @@ export function McpConsent({
               value={pairingCode}
             />
             <p className="text-xs text-muted-foreground">
-              Get one from Use T3 Code in another app (MCP), Settings → Sharing & access, or{" "}
+              可在「在其他应用中使用 T3 Code」（MCP）、设置 → 共享与访问中获取，或在本机运行{" "}
               <code>t3 auth pairing create</code> on this machine.
             </p>
           </div>

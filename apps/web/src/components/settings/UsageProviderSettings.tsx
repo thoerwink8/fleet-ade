@@ -56,7 +56,7 @@ export function UsageProviderSettings({
                 title={label}
                 description={
                   <span className="break-all">
-                    CLI Proxy{source.enabled ? "" : " · 已停用"}
+                    CLI 代理{source.enabled ? "" : " · 已停用"}
                     {label !== source.url ? ` · ${source.url}` : ""}
                   </span>
                 }

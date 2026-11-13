@@ -317,7 +317,7 @@ export function ThreadDetailsPrRow({
               <div className="flex min-w-0 items-start gap-2 text-destructive">
                 <TriangleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
                 <div className="min-w-0 flex-1 wrap-break-word">
-                  Merge conflicts with {detail.baseBranch}
+                  与 {detail.baseBranch} 存在合并冲突
                 </div>
               </div>
             ) : null}
@@ -526,7 +526,7 @@ export function ThreadDetailsPrRow({
             <AlertDialogHeader>
               <AlertDialogTitle>合并 {terminology.singular}?</AlertDialogTitle>
               <AlertDialogDescription>
-                This merges #{number} using {selectedMergeMethod}.
+                将使用 {selectedMergeMethod} 合并 #{number}。
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

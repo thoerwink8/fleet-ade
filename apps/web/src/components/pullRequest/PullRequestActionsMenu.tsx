@@ -295,7 +295,7 @@ export function PullRequestActionsMenu({
               <span className="flex max-w-xs flex-col gap-0.5">
                 <span>允许维护者编辑</span>
                 <span id={maintainerEditsHintId} className="text-xs text-muted-foreground">
-                  维护者可以向此分支推送。如果你的 fork 配置了工作流，这也可能让其访问其中的凭据。
+                  维护者可以向此分支推送。如果你的派生仓库配置了工作流，这也可能让其访问其中的凭据。
                 </span>
                 {maintainerEditsSaving ? (
                   <span role="status" className="text-xs text-muted-foreground">

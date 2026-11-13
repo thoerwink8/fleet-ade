@@ -177,7 +177,8 @@ export function EasDeviceHostEditor(props: {
             <DialogTitle>{props.isNew ? "添加 EAS 主机" : "编辑 EAS 主机"}</DialogTitle>
             <DialogDescription>
               环境的服务器会登录 Expo 并启动会话。未在此填写 token 时，先使用
-              EXPO_TOKEN，再使用服务器上 eas login 保存的登录状态。
+              EXPO_TOKEN，再使用服务器上
+              <code>eas login</code> 保存的登录状态。
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -311,8 +312,7 @@ export function EasDeviceHostEditor(props: {
                 </SelectPopup>
               </Select>
               <p className="text-xs text-muted-foreground">
-                会话费用计入项目的 Expo 账户。“来自会话的项目”会读取项目应用配置中的
-                extra.eas.projectId。
+                会话费用计入项目的Expo账户。“来自会话的项目”会读取项目应用配置中的extra.eas.projectId。
               </p>
             </div>
             <div className="grid grid-cols-3 gap-3 text-sm">

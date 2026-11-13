@@ -70,8 +70,8 @@ export function SecretProviderDialog({
             {existing ? `编辑 ${existing.config.label}` : "添加 1Password 提供方"}
           </DialogTitle>
           <DialogDescription>
-            Provider variables on {environmentLabel} can read values from it by name. Values are
-            read with the op CLI on that server when a provider starts.
+            {environmentLabel} 上的提供方变量可以按名称读取其中的值。提供方启动时，由那台服务器上的
+            op CLI 读取。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -131,7 +131,7 @@ export function SecretProviderDialog({
                 </p>
               ) : null}
               <p className="text-xs text-muted-foreground">
-                填写 op account list 显示的账户简称、登录地址（不含 https://）或 ID。
+                填写 <code>op account list</code> 显示的账户简称、登录地址（不含 https://）或 ID。
               </p>
             </div>
           </form>

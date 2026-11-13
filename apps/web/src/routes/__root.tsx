@@ -119,8 +119,7 @@ function RootRouteNotFoundView() {
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
         <h1 className="text-lg font-medium text-foreground">页面不存在</h1>
         <p className="text-sm text-muted-foreground">
-          This link doesn't point to a page in {APP_DISPLAY_NAME}. Go home to choose a project or
-          start a thread.
+          此链接不是 {APP_DISPLAY_NAME} 里的页面。返回首页以选择项目或开始会话。
         </p>
         <Button render={<Link to="/" replace />}>返回首页</Button>
       </div>

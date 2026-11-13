@@ -197,8 +197,7 @@ function LinkRowImpl({
                       <EyeIcon role="img" aria-label="仅查看" className="size-3.5" />
                     </TooltipTrigger>
                     <TooltipPopup>
-                      Watching: the agent wakes when checks finish, someone comments, or the branch
-                      conflicts
+                      正在关注：检查结束、有人评论或分支冲突时，智能体会醒来
                     </TooltipPopup>
                   </Tooltip>
                 ) : null}

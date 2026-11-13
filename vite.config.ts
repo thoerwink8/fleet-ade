@@ -4,6 +4,26 @@ import * as NodeURL from "node:url";
 import { remoteCacheUrl } from "./infra/task-cache/src/remoteCache.ts";
 import { cachedTestTasks } from "./scripts/lib/cached-tests.ts";
 
+const STAGED_BATCH = 12;
+
+function quoteStagedPath(file: string): string {
+  return `'${file.replaceAll("'", `'\\''`)}'`;
+}
+
+function stagedInBatches(command: string) {
+  return (files: readonly string[]) => {
+    const commands: string[] = [];
+    for (let index = 0; index < files.length; index += STAGED_BATCH) {
+      const args = files
+        .slice(index, index + STAGED_BATCH)
+        .map(quoteStagedPath)
+        .join(" ");
+      commands.push(`${command} ${args}`);
+    }
+    return commands;
+  };
+}
+
 const TEST_EXCLUDE = [
   "**/.repos/**",
   "**/.t3/**",
@@ -165,7 +185,12 @@ export default defineConfig({
   },
   staged: {
     // In order, so lint reads the formatted file. CI lint failures cost a full round trip.
-    "*": ["vp fmt --no-error-on-unmatched-pattern", "vp lint --no-error-on-unmatched-pattern"],
+    // Windows CreateProcess rejects one argv of every staged path (error 206). Twelve
+    // paths stay under that limit even from a deep worktree.
+    "*": [
+      stagedInBatches("vp fmt --no-error-on-unmatched-pattern"),
+      stagedInBatches("vp lint --no-error-on-unmatched-pattern"),
+    ],
     // knip checks the whole repo, so it takes no file list. Any code or manifest change can leave
     // a file, export, or dependency unused.
     "{*.{js,jsx,ts,tsx,mjs,cjs,mts,cts},package.json,knip.jsonc}": () => "vp run knip:check",

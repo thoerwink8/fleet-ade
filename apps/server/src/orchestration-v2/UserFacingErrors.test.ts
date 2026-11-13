@@ -28,6 +28,7 @@ describe("userFacingDispatchErrorMessage", () => {
       });
 
       assert.include(message, "无法打开数据库文件（SQLITE_CANTOPEN）");
+      assert.notInclude(message, "Failed to dispatch");
       assert.include(message, "运行服务器的机器");
       assert.include(message, "磁盘空间");
       assert.include(message, "数据和临时目录存在且可写");

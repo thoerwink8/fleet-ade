@@ -112,8 +112,7 @@ function GuestShareDialog({
         <DialogHeader>
           <DialogTitle>与访客共享</DialogTitle>
           <DialogDescription>
-            The guest sees the thread as you do, including command output and the agent&apos;s
-            reasoning. Each message they send waits for you.
+            访客看到的会话与你相同，包括命令输出和智能体的推理过程。他们发送的每条消息都要等你批准。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>

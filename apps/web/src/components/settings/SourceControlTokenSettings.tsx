@@ -88,12 +88,11 @@ export function SourceControlTokenSettings({
       {/* Locked while saving: a successful save clears the draft, which would drop edits made mid-request. */}
       <fieldset disabled={saving} className="contents">
         <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-          A token saved here is used before{" "}
-          <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.tokenEnvVar}</code>{" "}
-          and the{" "}
-          <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.cliName}</code> login,
-          so {definition.label} works without the {credentials.cliLabel}. Give it{" "}
-          {credentials.tokenAccess}.{" "}
+          保存在这里的 token 会优先于{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.tokenEnvVar}</code> 和{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.cliName}</code>{" "}
+          的登录被使用，因此不装 {credentials.cliLabel} 也能使用 {definition.label}。请授予{" "}
+          {credentials.tokenAccess}。{" "}
           {normalizedHost || defaultHost ? (
             <InlineButton
               render={

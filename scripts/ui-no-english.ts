@@ -3,10 +3,12 @@
 // allowlist. Scope is the web UI, the desktop menu, and server errors shown
 // to users. Logs, comments, developer CLI text, font names, and code
 // identifiers are out of scope. Each allowlist line keeps one string; the
-// comment above it is the reason.
+// comment above it is the reason. JSX text and UI string attributes are read
+// from the syntax tree, so a phrase on its own line is not skipped.
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
+import ts from "typescript-legacy";
 
 const scriptDir = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
 const ROOT = process.argv[2] ?? process.cwd();
@@ -16,14 +18,35 @@ const ROOTS = [
   "apps/desktop/src/window",
   "apps/server/src/orchestration-v2/UserFacingErrors.ts",
 ];
-const LITERAL = /(["'`])((?:(?!\1)[^\\\n]|\\.)*)\1/g;
-const UI_ATTR =
-  /\b(?:title|label|placeholder|aria-label|aria-description|aria-placeholder|alt|description|tooltip|heading|emptyText|hint|caption|subtitle)="([^"]+)"/g;
-const UI_PROP =
-  /\b(?:title|label|placeholder|description|tooltip|heading|emptyText|hint|caption|subtitle|alt|detail|helperText|actionLabel|buttonLabel|confirmTitle|confirmLabel|dialogTitle|dialogDescription|searchPlaceholder|statusText|errorText|empty|footerActionLabel)\s*:\s*(["'`])([^"'`\n]+)\1/g;
-const JSX_TEXT = />([^<>{}\n]*[A-Za-z][^<>{}\n]*)</g;
-const SKIPPED_LINE =
-  /^\s*(?:\/\/|\*|\/\*|import\b|export\s+(?:\*|type|\{))|\bclassName=|\bclassName:|https?:\/\/|console\.\w+\(|\.(?:log|debug|trace|logInfo|logWarning|logError|logDebug)\(/;
+const UI_NAMES = new Set([
+  "title",
+  "label",
+  "placeholder",
+  "aria-label",
+  "aria-description",
+  "aria-placeholder",
+  "alt",
+  "description",
+  "tooltip",
+  "heading",
+  "emptyText",
+  "hint",
+  "caption",
+  "subtitle",
+  "detail",
+  "helperText",
+  "actionLabel",
+  "buttonLabel",
+  "confirmTitle",
+  "confirmLabel",
+  "dialogTitle",
+  "dialogDescription",
+  "searchPlaceholder",
+  "statusText",
+  "errorText",
+  "empty",
+  "footerActionLabel",
+]);
 
 interface AllowEntry {
   readonly phrase: string;
@@ -48,13 +71,6 @@ function loadAllowlist(file: string): ReadonlyArray<AllowEntry> {
     reason = undefined;
   }
   return entries.toSorted((left, right) => right.phrase.length - left.phrase.length);
-}
-
-function unescapeLiteral(text: string): string {
-  return text
-    .replace(/\\n/g, "\n")
-    .replace(/\\t/g, "\t")
-    .replace(/\\(['"`\\])/g, "$1");
 }
 
 function englishLeft(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean {
@@ -124,6 +140,29 @@ function included(file: string): boolean {
   return true;
 }
 
+function literalText(node: ts.Expression): string | undefined {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isParenthesizedExpression(node)
+  ) {
+    return literalText(node.expression);
+  }
+  return undefined;
+}
+
+function propertyName(name: ts.PropertyName): string | undefined {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return name.text;
+  }
+  return undefined;
+}
+
+function lineOf(source: ts.SourceFile, node: ts.Node): number {
+  return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+}
+
 const allowlist = loadAllowlist(ALLOWLIST_PATH);
 const files: string[] = [];
 for (const root of ROOTS) {
@@ -135,25 +174,48 @@ for (const root of ROOTS) {
 
 const findings: string[] = [];
 for (const file of files.filter(included)) {
-  const lines = NodeFS.readFileSync(file, "utf8").split(/\r?\n/);
-  lines.forEach((line, index) => {
-    if (SKIPPED_LINE.test(line)) return;
+  const sourceText = NodeFS.readFileSync(file, "utf8");
+  const source = ts.createSourceFile(
+    file,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    false,
+    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const serverErrors = file.replaceAll("\\", "/").endsWith("/UserFacingErrors.ts");
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
     const texts: string[] = [];
-    const serverErrors = file.replaceAll("\\", "/").endsWith("/UserFacingErrors.ts");
     if (serverErrors) {
-      for (const match of line.matchAll(LITERAL)) texts.push(unescapeLiteral(match[2] ?? ""));
-    } else {
-      for (const match of line.matchAll(UI_ATTR)) texts.push(match[1] ?? "");
-      for (const match of line.matchAll(UI_PROP)) texts.push(match[2] ?? "");
-      if (file.endsWith(".tsx")) {
-        for (const match of line.matchAll(JSX_TEXT)) texts.push((match[1] ?? "").trim());
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+        texts.push(node.text);
+      }
+    } else if (ts.isJsxText(node)) {
+      texts.push(node.text);
+    } else if (ts.isJsxAttribute(node)) {
+      const name = node.name.getText(source);
+      const initializer = node.initializer;
+      if (UI_NAMES.has(name) && initializer) {
+        if (ts.isStringLiteral(initializer)) texts.push(initializer.text);
+        else if (ts.isJsxExpression(initializer) && initializer.expression) {
+          const text = literalText(initializer.expression);
+          if (text !== undefined) texts.push(text);
+        }
+      }
+    } else if (ts.isPropertyAssignment(node)) {
+      const name = propertyName(node.name);
+      if (name !== undefined && UI_NAMES.has(name)) {
+        const text = literalText(node.initializer);
+        if (text !== undefined) texts.push(text);
       }
     }
     for (const text of texts) {
       if (!isUserCopy(text, allowlist)) continue;
-      findings.push(`${file}:${String(index + 1)}  ${text.trim()}`);
+      findings.push(`${file}:${String(lineOf(source, node))}  ${text.trim()}`);
     }
-  });
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
 }
 
 const report = [`COUNT ${String(findings.length)}`, ...findings].join("\n");

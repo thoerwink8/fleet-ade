@@ -150,7 +150,7 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                   </span>
                 </TooltipTrigger>
                 <TooltipPopup side="left">
-                  Open in the browser panel. {externalClickLabel} for your browser.
+                  在浏览器面板中打开。{externalClickLabel} 则用你的浏览器打开。
                 </TooltipPopup>
               </Tooltip>
               {stoppable ? (

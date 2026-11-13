@@ -1265,8 +1265,8 @@ export function ProviderInstanceCard({
       title="驱动"
       description={
         <span>
-          This instance uses <code className="text-foreground">{String(instance.driver)}</code>,
-          which is not available in this build. Its configuration is preserved.
+          此实例使用 <code className="text-foreground">{String(instance.driver)}</code>
+          ，当前构建不提供该驱动。它的配置会保留。
         </span>
       }
     />

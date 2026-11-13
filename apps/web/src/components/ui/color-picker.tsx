@@ -122,8 +122,7 @@ export function ColorSaturationValuePlane({
       {...handlers}
     >
       <span id={instructionsId} className="sr-only">
-        使用方向键调整当前值，按住 Shift 可增大步长，使用 Home 和 End 设置最小值和最大值，按 Tab
-        在饱和度与亮度之间切换。
+        使用方向键调整当前值，按住Shift可增大步长，Home和End分别设为最小值和最大值，按Tab在饱和度与亮度之间切换。
       </span>
       {(
         [

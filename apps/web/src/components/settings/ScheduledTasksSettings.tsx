@@ -780,7 +780,7 @@ function ScheduledTaskRow({
               "正在监听"
             ) : task.nextRunAt ? (
               <>
-                Next run <ScheduledRelativeLabel value={task.nextRunAt} />
+                下次运行 <ScheduledRelativeLabel value={task.nextRunAt} />
               </>
             ) : (
               "未安排"
@@ -958,7 +958,7 @@ function WebhookDeliveriesDialog({
               </DeliveryBlock>
               {selected.missingFields.length > 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  Empty placeholders: {selected.missingFields.join(", ")}
+                  空占位：{selected.missingFields.join("、")}
                 </p>
               ) : null}
               <DeliveryBlock title="请求头">
@@ -1923,7 +1923,7 @@ function ScheduledTaskEditorForm({
                   <div className="min-w-0 space-y-1">
                     <Label htmlFor="scheduled-task-signature">要求签名</Label>
                     <p className="text-sm text-muted-foreground">
-                      拒绝请求体缺少有效 HMAC-SHA256 签名的请求。
+                      拒绝请求体缺少有效HMAC-SHA256签名的请求。
                     </p>
                   </div>
                   <Switch

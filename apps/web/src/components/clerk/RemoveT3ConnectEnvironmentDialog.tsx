@@ -62,23 +62,20 @@ export function RemoveT3ConnectEnvironmentDialog({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>移除 {shown.label} from this device?</AlertDialogTitle>
+            <AlertDialogTitle>要从此设备移除 {shown.label} 吗？</AlertDialogTitle>
             <AlertDialogDescription>
               这会清除它在此设备上的配对、凭据和缓存的会话。
             </AlertDialogDescription>
             <AlertDialogDescription>
               {shown.registration === "registered" ? (
                 <>
-                  It stays on your T3 Connect account and keeps its host space. Deregister it in{" "}
-                  {accountPageLink} to free it.
+                  它仍在你的 T3 Connect 账户中，并保留主机空间。可在 {accountPageLink}{" "}
+                  中注销以释放它。
                 </>
               ) : shown.registration === "unregistered" ? (
                 "它已不在你的 T3 Connect 账户中。"
               ) : (
-                <>
-                  This doesn't change your T3 Connect account. To deregister it there, use{" "}
-                  {accountPageLink}.
-                </>
+                <>这不会更改你的 T3 Connect 账户。若要在那里注销，请使用 {accountPageLink}。</>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

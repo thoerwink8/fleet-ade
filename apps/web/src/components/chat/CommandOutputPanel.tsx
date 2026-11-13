@@ -49,7 +49,7 @@ export function CommandOutputPanel(props: {
   });
 
   if (text.length === 0) {
-    if (error) return <div className="text-destructive">Couldn&apos;t load output: {error}</div>;
+    if (error) return <div className="text-destructive">无法加载输出：{error}</div>;
     if (data === null) return <div className="text-muted-foreground italic">正在加载输出…</div>;
     return data.running ? null : <div className="text-muted-foreground italic">没有输出。</div>;
   }

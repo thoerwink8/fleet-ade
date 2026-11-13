@@ -329,7 +329,7 @@ export const OpenInPicker = memo(function OpenInPicker({
           ))}
           {remote.mode === "remote-links" && !remoteHintSeen && (
             <MenuItem density={presentation === "menu" ? "touch" : "default"} disabled>
-              Opens over SSH. Needs your key on {environmentLabel}
+              通过 SSH 打开。需要你在 {environmentLabel} 上的密钥
             </MenuItem>
           )}
         </>

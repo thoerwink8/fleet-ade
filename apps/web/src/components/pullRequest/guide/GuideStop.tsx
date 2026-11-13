@@ -249,7 +249,7 @@ export function GuideStop({
                       aria-hidden
                       className="size-3.5 h-lh shrink-0 text-muted-foreground"
                     />
-                    <span className="sr-only">Ask an agent: </span>
+                    <span className="sr-only">向智能体提问：</span>
                     <span>
                       <GuideProse text={question} plain />
                     </span>

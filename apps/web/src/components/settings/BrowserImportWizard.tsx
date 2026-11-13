@@ -264,11 +264,10 @@ function FullDiskAccessStep({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Let T3 Code read {source.name}&rsquo;s cookies</DialogTitle>
+        <DialogTitle>允许 T3 Code 读取 {source.name} 的 Cookie</DialogTitle>
         <DialogDescription>
-          To import cookies from {source.name}, T3 Code needs Full Disk Access. Turn it on in System
-          Settings, then come back to finish the import. You can revoke it again once the import is
-          done.
+          要从 {source.name} 导入 Cookie，T3 Code
+          需要完全磁盘访问权限。请在系统设置中打开，然后回来完成导入。导入结束后可以再关掉。
         </DialogDescription>
       </DialogHeader>
       <DialogPanel>
@@ -346,9 +345,7 @@ function ConfigureStep({
     <>
       <DialogHeader>
         <DialogTitle>导入来源 {source.name}</DialogTitle>
-        <DialogDescription>
-          Choose which cookies to import for {destinationEnvironmentName}.
-        </DialogDescription>
+        <DialogDescription>选择要为 {destinationEnvironmentName} 导入的 Cookie。</DialogDescription>
       </DialogHeader>
       <DialogPanel>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -567,7 +564,7 @@ function BlockedStep({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Couldn&rsquo;t import from {source.name}</DialogTitle>
+        <DialogTitle>无法从 {source.name} 导入</DialogTitle>
         <DialogDescription>{message ?? BROWSER_IMPORT_FAILURE_COPY[reason]}</DialogDescription>
       </DialogHeader>
       <DialogFooter>

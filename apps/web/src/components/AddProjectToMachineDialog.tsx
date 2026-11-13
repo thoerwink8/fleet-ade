@@ -226,8 +226,8 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           <DialogHeader>
             <DialogTitle>添加到另一台机器</DialogTitle>
             <DialogDescription>
-              克隆 {project?.repositoryIdentity?.displayName ?? project?.title} and bring the local
-              files git does not track.
+              克隆 {project?.repositoryIdentity?.displayName ?? project?.title}，并带上 Git
+              不跟踪的本地文件。
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -373,12 +373,10 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                   </div>
                 )}
                 {ignoredFiles.data?.truncated ? (
-                  <p className="text-muted-foreground text-xs">
-                    Showing the first {files.length} files.
-                  </p>
+                  <p className="text-muted-foreground text-xs">仅显示前 {files.length} 个文件。</p>
                 ) : null}
                 <p className="text-muted-foreground text-xs">
-                  克隆完成后会复制这些文件。Git 整体忽略的文件夹（如 node_modules）不会被复制。
+                  克隆完成后会复制这些文件。被 Git 整目录忽略的依赖文件夹不会被复制。
                 </p>
               </div>
             ) : null}

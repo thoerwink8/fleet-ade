@@ -83,9 +83,9 @@ export function SourceControlAccountSettings({
   if (groups.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        Sign in with{" "}
-        <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.loginCommand}</code> on
-        the server host, then rescan to choose accounts here.
+        请在服务器主机上运行{" "}
+        <code className="rounded bg-muted px-1 py-px text-2xs">{credentials.loginCommand}</code>{" "}
+        登录，然后重新扫描，即可在这里选择账户。
       </p>
     );
   }
@@ -94,8 +94,9 @@ export function SourceControlAccountSettings({
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-          Choose which <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code> login
-          each {label} host uses, or turn a host off.
+          选择每个 {label} 主机使用哪个{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code>{" "}
+          登录，或关闭某个主机。
         </p>
         <Button
           size="icon-xs"
@@ -197,7 +198,7 @@ export function SourceControlAccountSettings({
             {stalePin ? (
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-warning">
-                  The chosen login is no longer signed in, so the active {cliName} login is used.
+                  所选登录已退出，因此改用当前的 {cliName} 登录。
                 </p>
                 <Button
                   size="xs"

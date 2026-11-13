@@ -142,7 +142,7 @@ function Wizard({
           <AppStep choice={choice} onChoose={setChoice} />
         ) : step === 1 ? (
           <section className="space-y-3">
-            <h3 className="text-sm font-medium">What can {appName} do?</h3>
+            <h3 className="text-sm font-medium">{appName} 可以做什么？</h3>
             <RadioGroup
               aria-label={`${appName} 可以做什么？`}
               value={access}
@@ -464,7 +464,7 @@ function GateScreen({
           ) : (
             <div className="space-y-2 text-sm">
               <CommandBlock command="t3 connect link" />
-              <p>Restart T3 Code on {name}.</p>
+              <p>请在 {name} 上重启 T3 Code。</p>
               {checkAgain}
             </div>
           )}
@@ -559,8 +559,7 @@ function ConnectStep({
   const code =
     access === null ? (
       <p className="text-sm text-muted-foreground">
-        When {app?.name ?? "该应用"} opens the sign-in page, choose what it may do and approve with
-        your T3 Connect account.
+        当{app?.name ?? "该应用"}打开登录页时，选择它能做什么，并用你的 T3 Connect 账号批准。
       </p>
     ) : (
       <ApprovalCode
@@ -648,7 +647,7 @@ function PrimaryAction({ app, mcpUrl }: { readonly app: McpApp; readonly mcpUrl:
               .commands(mcpUrl)
               .map((command) => <CommandBlock key={command} command={command} />)
           : null}
-        <p className="text-xs text-muted-foreground">Run these where {app.name} runs.</p>
+        <p className="text-xs text-muted-foreground">在运行 {app.name} 的地方执行这些命令。</p>
         {note}
       </div>
     );
@@ -739,7 +738,7 @@ function ApprovalCode({
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm">
-          Code to approve <span className="font-medium">{accessConfig[access].label}</span>
+          用于批准<span className="font-medium">{accessConfig[access].label}</span>的登录码
         </span>
         {live ? null : (
           <Button size="sm" variant="outline" disabled={pending} onClick={() => void mint()}>
@@ -752,7 +751,7 @@ function ApprovalCode({
           <>
             <CopyRow label="登录码" value={code.credential} />
             <p className="text-xs text-muted-foreground">
-              Expires {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")} · one use
+              有效期还剩 {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}，仅可使用一次
             </p>
           </>
         ) : (

@@ -148,8 +148,7 @@ function HostedPromptLinkLanding({
         <Alert className="mt-5" variant="error">
           <AlertTitle>此提示词含有隐藏字符，可能是恶意内容</AlertTitle>
           <AlertDescription>
-            T3 Code removed {prompt.hiddenCharacters} hidden character
-            {prompt.hiddenCharacters === 1 ? "" : "s"}. Read the prompt before you send it.
+            T3 Code 已去掉 {prompt.hiddenCharacters} 个隐藏字符。发送前请先读一遍提示词。
           </AlertDescription>
         </Alert>
       ) : null}

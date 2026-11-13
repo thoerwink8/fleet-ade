@@ -436,8 +436,8 @@ function ResourceHistoryChart({
               />
               <TooltipPopup side="top" className="text-left">
                 <div className="space-y-0.5">
-                  <div>CPU avg {bucket.avgCpuPercent.toFixed(1)}%</div>
-                  <div>CPU peak {bucket.maxCpuPercent.toFixed(1)}%</div>
+                  <div>CPU 平均 {bucket.avgCpuPercent.toFixed(1)}%</div>
+                  <div>CPU 峰值 {bucket.maxCpuPercent.toFixed(1)}%</div>
                   <div>读取 {formatBytes(bucket.ioReadBytes)}</div>
                   <div>写入 {formatBytes(bucket.ioWriteBytes)}</div>
                 </div>
@@ -1006,8 +1006,8 @@ function ResourceTelemetryDiagnosticsBody({
               </p>
             </div>
             <div className="flex items-center gap-2 text-3xs text-muted-foreground/65">
-              <span className="size-1.5 rounded-full bg-success" />
-              Sampling every {snapshot ? formatSampleInterval(snapshot.sampleIntervalMs) : "..."}
+              <span className="size-1.5 rounded-full bg-success" />每{" "}
+              {snapshot ? formatSampleInterval(snapshot.sampleIntervalMs) : "…"} 采样一次
             </div>
           </div>
           <div className="grid grid-cols-2 divide-x divide-y divide-border/55 md:grid-cols-3">

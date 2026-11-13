@@ -78,7 +78,7 @@ describe("ThreadActivityAnnouncer", () => {
       await act(() => vi.advanceTimersByTime(5_000));
     }
 
-    await expect.element(status).toHaveTextContent("Working");
+    await expect.element(status).toHaveTextContent("运行中");
     await expect.element(detail).toBeEmptyDOMElement();
   });
 
@@ -128,8 +128,8 @@ describe("ThreadActivityAnnouncer", () => {
     heard.push([status.textContent, detail.textContent]);
 
     expect(heard).toEqual([
-      ["Working", ""],
-      ["Working", "T3 Code: Checking the repo"],
+      ["运行中", ""],
+      ["运行中", "T3 Code: Checking the repo"],
       ["待批准", "T3 Code: Checking the repo"],
       ["待批准", "T3 Code: Checking the repo"],
       ["待批准", "Running rg"],
@@ -152,6 +152,6 @@ describe("ThreadActivityAnnouncer", () => {
     );
 
     await expect.element(detail).toHaveTextContent("T3 Code: Checking the repo. Needs approval");
-    await expect.element(status).toHaveTextContent("Working");
+    await expect.element(status).toHaveTextContent("运行中");
   });
 });

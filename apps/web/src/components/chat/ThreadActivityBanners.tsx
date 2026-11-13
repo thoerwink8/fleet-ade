@@ -294,8 +294,8 @@ export function branchMismatchBannerItem(input: {
             }
           />
           <TooltipPopup side="top">
-            This thread last ran on {mismatch.threadBranch}. Sending will continue on{" "}
-            {mismatch.currentBranch}.
+            此会话上次在 {mismatch.threadBranch} 上运行。发送后将在 {mismatch.currentBranch}{" "}
+            上继续。
           </TooltipPopup>
         </Tooltip>
       </span>

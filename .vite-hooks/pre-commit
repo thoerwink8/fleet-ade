@@ -1,1 +1,3 @@
+# vp staged reads vite.config.ts stagedInBatches and passes fmt/lint twelve
+# paths at a time. One argv of every staged path is Windows error 206.
 vp staged

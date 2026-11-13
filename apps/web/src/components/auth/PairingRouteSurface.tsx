@@ -215,14 +215,14 @@ export function HostedPairingRouteSurface() {
 
       {request ? (
         <div className="mt-5 rounded-lg border border-border/70 bg-background/55 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
-          Host: <span className="font-mono text-foreground/80">{request.host}</span>
+          主机：<span className="font-mono text-foreground/80">{request.host}</span>
         </div>
       ) : null}
 
       {status === "error" ? (
         <Alert variant="error" className="mt-5">
           <AlertDescription>
-            请确认此浏览器能访问该后端、后端为托管客户端启用了 CORS，并且在通过 HTTPS
+            请确认此浏览器能访问该后端、后端为托管客户端启用了跨域，并且在通过 HTTPS
             打开此页面时后端也使用 HTTPS。
           </AlertDescription>
         </Alert>

@@ -379,7 +379,7 @@ export function AttachmentFilePreview(props: {
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
       <p className="text-sm font-medium">此文件无法预览</p>
       <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-        Save it to open in an app that supports {props.name.split(".").at(-1) || "此格式"} files.
+        请保存后用支持 {props.name.split(".").at(-1) || "此格式"} 文件的应用打开。
       </p>
     </div>
   );
@@ -476,9 +476,9 @@ export function AttachmentFilePreview(props: {
       </div>
       {content?.truncated ? (
         <FileSurfaceNotice>
-          Preview limited to the first 1 MB
-          {props.sizeBytes > 0 ? ` of a ${props.sizeBytes.toLocaleString("zh-CN")} byte file` : ""}.
-          Save the file to read it in full.
+          仅预览前 1 MB
+          {props.sizeBytes > 0 ? `（文件共 ${props.sizeBytes.toLocaleString("zh-CN")} 字节）` : ""}
+          。 保存文件后可阅读全文。
         </FileSurfaceNotice>
       ) : null}
       {body}

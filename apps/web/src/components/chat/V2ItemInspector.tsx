@@ -157,7 +157,7 @@ function ToolOutput(props: ToolOutputState) {
   ) : props.pending ? (
     <div className="text-muted-foreground italic">正在加载输出…</div>
   ) : props.error ? (
-    <div className="text-destructive">Couldn&apos;t load output: {props.error}</div>
+    <div className="text-destructive">无法加载输出：{props.error}</div>
   ) : props.empty && props.images.length === 0 ? (
     <div className="text-muted-foreground italic">没有输出。</div>
   ) : null;

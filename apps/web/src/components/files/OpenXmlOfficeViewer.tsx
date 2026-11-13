@@ -99,7 +99,7 @@ export default function OfficeViewer(props: {
       >
         <p className="text-sm font-medium">此文件无法预览</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-          {error} Save it or open it in another app.
+          {error} 请保存，或用其他应用打开。
         </p>
       </div>
     );

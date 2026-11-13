@@ -273,8 +273,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         <DialogHeader>
           <DialogTitle>关联环境</DialogTitle>
           <DialogDescription>
-            Agents here can then launch, message and wait on threads there. It appears under
-            Authorized clients in that environment's Sharing & access, where it can be revoked.
+            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在该环境的「共享与访问」里的已授权客户端中，可以在那里撤销。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -318,8 +317,8 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 />
                 {machine !== null ? (
                   <span className="block text-xs text-muted-foreground">
-                    This app has no address for {machine.label} that another machine can reach.
-                    Enter its https or Tailscale address.
+                    此应用没有其他机器能够访问的 {machine.label} 地址。请输入它的 https 或 Tailscale
+                    地址。
                   </span>
                 ) : null}
               </label>
@@ -331,9 +330,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 <Input
                   value={pairingCode}
                   onChange={(event) => setPairingCode(event.target.value)}
-                  placeholder={
-                    machine === null ? "From Sharing & access there, or t3 pair" : "粘贴配对码"
-                  }
+                  placeholder="粘贴配对码"
                   disabled={busy}
                   autoComplete="one-time-code"
                   nativeInput
@@ -341,10 +338,15 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 />
                 {machine !== null ? (
                   <span className="block text-xs text-muted-foreground">
-                    Create a link on {machine.label}: Settings → Sharing & access → Authorized
-                    clients → Create link, then paste its code here.
+                    在 {machine.label} 上创建链接：设置 → 共享与访问 → 已授权客户端 →
+                    创建链接，然后把配对码粘贴到这里。
                   </span>
-                ) : null}
+                ) : (
+                  <span className="block text-xs text-muted-foreground">
+                    在那边打开共享与访问并创建链接，或在终端运行 <code>t3 pair</code>
+                    ，再把配对码粘贴到这里。
+                  </span>
+                )}
               </label>
             )}
             <LinkAccessPicker value={access} onChange={setAccess} disabled={busy} />

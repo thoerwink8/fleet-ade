@@ -78,8 +78,8 @@ export function AddUsageLimitSourceDialog({
         <DialogHeader>
           <DialogTitle>添加 CLIProxyAPI 中转站</DialogTitle>
           <DialogDescription>
-            Show the quota of every account the hub pools, next to the providers on{" "}
-            {environmentLabel}. The key stays on that server.
+            在 {environmentLabel}{" "}
+            上，于各提供方旁边显示该中转站汇集的每个账号的额度。密钥留在那台服务器上。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>

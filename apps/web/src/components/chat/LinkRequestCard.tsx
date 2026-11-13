@@ -348,8 +348,8 @@ function LinkRequestDialog(props: {
                     />
                     {target.kind === "machine" ? (
                       <span className="block text-xs text-muted-foreground">
-                        This app has no address for {target.label} that another machine can reach.
-                        Enter its https or Tailscale address.
+                        此应用没有可供其他机器访问的 {target.label} 地址。请填写它的 HTTPS 或
+                        Tailscale 地址。
                       </span>
                     ) : null}
                   </label>
@@ -376,8 +376,8 @@ function LinkRequestDialog(props: {
                           spellCheck={false}
                         />
                         <span className="block text-xs text-muted-foreground">
-                          Create a link on {targetName}: Settings → Sharing & access → Authorized
-                          clients → Create link, then paste its code here.
+                          请在 {targetName} 上创建关联：设置 → 共享与访问 → 已授权客户端 →
+                          创建关联，然后把配对码粘贴到这里。
                         </span>
                       </label>
                     )}
@@ -388,8 +388,8 @@ function LinkRequestDialog(props: {
             )}
             {useExisting ? (
               <p className="text-xs text-muted-foreground">
-                This environment is already linked to {targetName}. The agent can use that link as
-                it is; change its access in Settings → Environments.
+                此环境已关联到 {targetName}。智能体可以照原样使用该关联；可在设置 →
+                环境中更改其访问权限。
               </p>
             ) : null}
             {error !== null ? (

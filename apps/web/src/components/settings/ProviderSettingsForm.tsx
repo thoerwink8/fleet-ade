@@ -483,7 +483,7 @@ function ProviderSettingsTextInput({
         spellCheck={false}
       />
       {rejected !== null ? (
-        <p className="text-2xs text-destructive">Enter a valid value. It was not saved.</p>
+        <p className="text-2xs text-destructive">请输入有效的值。尚未保存。</p>
       ) : null}
     </div>
   );

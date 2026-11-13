@@ -149,6 +149,9 @@ export default mergeConfig(
       },
     },
     test: {
+      // @effect/vitest re-exports vite-plus/test. Left external, Vite's module runner loads a
+      // second vitest whose collector runner is unset, so describe() throws and the suite never starts.
+      server: { deps: { inline: ["@effect/vitest"] } },
       // Parallel sqlite/git/worktree/orchestration tests introduce load-sensitive flakes.
       fileParallelism: false,
       sequence: { sequencer: WeightedShardSequencer },

@@ -753,7 +753,7 @@ function ProjectsSection({
     return (
       <WelcomeSection title="项目">
         <p className="text-sm leading-10 text-muted-foreground">
-          Looking for projects in your {IMPORT_SOURCES_LABEL} history…
+          正在你的 {IMPORT_SOURCES_LABEL} 历史记录里查找项目…
         </p>
       </WelcomeSection>
     );
@@ -770,7 +770,7 @@ function ProjectsSection({
           role="alert"
           className="flex min-h-10 items-center justify-between gap-3 text-sm text-muted-foreground"
         >
-          <span>Could not check projects. {scan.error}</span>
+          <span>无法检查项目。{scan.error}</span>
           {retry}
         </div>
       </WelcomeSection>
@@ -813,11 +813,11 @@ function ProjectsSection({
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium text-foreground">
               {canWrite && selected.length > 0
-                ? `Import ${selected.length} ${selected.length === 1 ? "project" : "projects"} and their threads`
+                ? `导入 ${selected.length} 个项目及其会话`
                 : "导入项目及其会话"}
             </span>
             <span className="block text-xs text-muted-foreground">
-              From your {IMPORT_SOURCES_LABEL} history
+              来自你的 {IMPORT_SOURCES_LABEL} 历史记录
             </span>
           </span>
         </label>
@@ -838,7 +838,7 @@ function ProjectsSection({
         <fieldset className="-mx-1.5 mt-1 min-w-0" disabled={isImporting}>
           <div className="flex items-center justify-between gap-3 px-2 text-xs text-muted-foreground">
             <span role="status">
-              {selected.length} of {candidates.length} selected
+              已选 {selected.length} / {candidates.length}
             </span>
             <div className="flex items-center gap-1">
               <Button
@@ -880,7 +880,7 @@ function ProjectsSection({
           role="alert"
           className="flex items-center justify-between gap-3 pl-8 text-sm text-muted-foreground"
         >
-          <span>Could not check projects again. {scan.error}</span>
+          <span>无法再次检查项目。{scan.error}</span>
           {retry}
         </div>
       ) : null}
@@ -1834,12 +1834,11 @@ function CliPathSetup() {
       <p className="min-w-0 flex-1 text-sm text-muted-foreground">
         {setup.added ? (
           <>
-            Added to {setup.file}. Open a new terminal to use <code className="font-mono">t3</code>.
+            已写入 {setup.file}。请新开一个终端再使用 <code className="font-mono">t3</code>。
           </>
         ) : (
           <>
-            使用 <code className="font-mono">t3</code> from any terminal. Adds one line to{" "}
-            {setup.file}.
+            任意终端都可使用 <code className="font-mono">t3</code>。将向 {setup.file} 添加一行。
           </>
         )}
       </p>

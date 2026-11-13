@@ -737,14 +737,35 @@ function paceOfShares(usedPercent: number, elapsed: number): LimitPace {
 }
 
 function formatDuration(ms: number): string {
-  const remaining = Math.max(0, ms);
-  const days = Math.floor(remaining / DAY);
-  const hours = Math.floor((remaining % DAY) / HOUR);
-  const minutes = Math.floor((remaining % HOUR) / MINUTE);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  const parts = durationParts(ms);
+  if (parts.days > 0) return `${parts.days}d ${parts.hours}h`;
+  if (parts.hours > 0) return `${parts.hours}h ${parts.minutes}m`;
+  return `${parts.minutes}m`;
 }
+
+function durationParts(ms: number): {
+  readonly days: number;
+  readonly hours: number;
+  readonly minutes: number;
+} {
+  const remaining = Math.max(0, ms);
+  return {
+    days: Math.floor(remaining / DAY),
+    hours: Math.floor((remaining % DAY) / HOUR),
+    minutes: Math.floor((remaining % HOUR) / MINUTE),
+  };
+}
+
+/** How long until a usage window resets. Callers choose the words. */
+export type ResetCountdown =
+  | { readonly kind: "now" }
+  | { readonly kind: "momentarily" }
+  | {
+      readonly kind: "in";
+      readonly days: number;
+      readonly hours: number;
+      readonly minutes: number;
+    };
 
 /** One redeemable reset as clients offer it; `input` already names the chosen credit. */
 export interface ResetCreditChoice {
@@ -796,12 +817,15 @@ export function resetCreditChoices(
   ];
 }
 
-export function formatResetsIn(window: ServerProviderUsageWindow, now: number): string | null {
+export function formatResetsIn(
+  window: ServerProviderUsageWindow,
+  now: number,
+): ResetCountdown | null {
   const resetsAt = resetMillis(window);
   if (resetsAt === null) return null;
-  if (resetsAt <= now) return "resets now";
-  if (resetsAt - now < MINUTE) return "Resets momentarily";
-  return `resets in ${formatDuration(resetsAt - now)}`;
+  if (resetsAt <= now) return { kind: "now" };
+  if (resetsAt - now < MINUTE) return { kind: "momentarily" };
+  return { kind: "in", ...durationParts(resetsAt - now) };
 }
 
 export const USAGE_LIMITS_COMMAND = {

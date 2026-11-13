@@ -19,6 +19,8 @@ import {
 import type { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
 import { AlertTriangleIcon, ExternalLinkIcon, TicketIcon } from "lucide-react";
+
+import { resetCountdownLabel } from "./resetCountdownLabel";
 import {
   createContext,
   Fragment,
@@ -146,7 +148,7 @@ function SegmentPopover({
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const remaining = remainingPercent(window);
   const timeLeft = paceRemainingPercent(window, now);
-  const resetsIn = formatResetsIn(window, now);
+  const resetsIn = resetCountdownLabel(formatResetsIn(window, now));
   const where =
     account.environments.length > 0
       ? account.environments.map((environment) => environment.label).join(", ")
@@ -185,7 +187,7 @@ function SegmentPopover({
         {window.resetsAt ? (
           <Row label="重置时间">
             {formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)}
-            {resetsIn ? ` · ${resetsIn.replace("resets in ", "in ")}` : ""}
+            {resetsIn ? ` · ${resetsIn}` : ""}
           </Row>
         ) : null}
         {timeLeft !== null ? <Row label="匀速进度">{timeLeft}% left by now</Row> : null}
@@ -348,7 +350,7 @@ function SegmentTriggers({
   const remaining = remainingPercent(window);
   const timeLeft = paceRemainingPercent(window, now);
   const [segmentRef, paceMark] = usePaceMark(timeLeft);
-  const resetsIn = formatResetsIn(window, now);
+  const resetsIn = resetCountdownLabel(formatResetsIn(window, now));
   const credits = account.limits.resetCredits?.availableCount ?? 0;
   return (
     <>
@@ -414,7 +416,7 @@ function SegmentTriggers({
           ) : null}
           {resetsIn || credits ? (
             <span className="ms-auto flex min-w-0 items-center gap-1.5 overflow-hidden rounded-sm bg-background/85 px-1.5 py-0.5 text-2xs whitespace-nowrap text-foreground tabular-nums">
-              {resetsIn?.replace("resets in ", "↻ ") ?? ""}
+              {resetsIn ? `↻ ${resetsIn}` : ""}
               {credits ? (
                 <>
                   {resetsIn ? (
@@ -451,7 +453,7 @@ function LegendRow({
   const popover = use(SegmentPopoverContext) ?? undefined;
   const { account, window } = payload;
   const remaining = remainingPercent(window);
-  const resetsIn = formatResetsIn(window, now);
+  const resetsIn = resetCountdownLabel(formatResetsIn(window, now));
   const credits = account.limits.resetCredits?.availableCount ?? 0;
   return (
     <PopoverTrigger
@@ -473,7 +475,7 @@ function LegendRow({
       <AccountName account={account} className="min-w-0 truncate font-medium text-foreground" />
       <span className="shrink-0 font-semibold text-foreground tabular-nums">{remaining}%</span>
       <span className="ms-auto flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground tabular-nums">
-        {resetsIn?.replace("resets in ", "↻ ") ?? ""}
+        {resetsIn ? `↻ ${resetsIn}` : ""}
         {credits ? (
           <>
             {resetsIn ? <span aria-hidden>·</span> : null}

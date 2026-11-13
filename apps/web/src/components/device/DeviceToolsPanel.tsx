@@ -151,7 +151,7 @@ export function DeviceToolsPanel(props: {
             </div>
           ) : null}
           <SubmitRow
-            placeholder="https://… 或 myapp://"
+            placeholder="https://…或自定义地址"
             action="Open"
             disabled={disabled}
             onSubmit={(url) => act({ type: "openUrl", url })}

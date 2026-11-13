@@ -155,7 +155,7 @@ function ExtendedOfficeViewer(props: {
       >
         <p className="text-sm font-medium">此文件无法预览</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-          {error} Save it or open it in another app.
+          {error} 请保存，或用其他应用打开。
         </p>
       </div>
     );
@@ -270,12 +270,12 @@ function ExtendedOfficeViewer(props: {
             仅显示单元格的值。不显示图表、图片和格式。
             {sheet.truncated
               ? props.kind === "ods"
-                ? " Limited to 500 rows and 50 columns."
-                : " Preview limited to 250,000 rows, 1,024 columns, and bounded cell text."
+                ? " 最多 500 行、50 列。"
+                : " 最多预览 250,000 行、1,024 列，单元格文本有长度限制。"
               : ""}
           </FileSurfaceNotice>
           {sheet.rowCount === 0 ? (
-            <p className="p-6 text-xs text-muted-foreground">This sheet is empty.</p>
+            <p className="p-6 text-xs text-muted-foreground">此工作表是空的。</p>
           ) : (
             <VirtualTablePreview
               key={page}

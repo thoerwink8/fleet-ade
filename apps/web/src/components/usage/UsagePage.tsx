@@ -683,8 +683,7 @@ function UsageOverview({
                     <InfoIcon className="size-3" aria-hidden />
                   </PopoverTrigger>
                   <PopoverPopup side="top" tooltipStyle>
-                    API estimate excludes {formatPercent(merged.costQuality.unpricedShare)} unpriced
-                    records.
+                    API 估算不含 {formatPercent(merged.costQuality.unpricedShare)} 的未定价记录。
                   </PopoverPopup>
                 </Popover>
               )}
@@ -1096,10 +1095,7 @@ function UsageCoverageNotice({
         </span>
       ))}
       {duplicateSources.length > 0 ? (
-        <span>
-          Counted once across environments sharing a transcript directory:{" "}
-          {duplicateSources.join(", ")}
-        </span>
+        <span>在共用一份记录目录的环境之间只计一次： {duplicateSources.join(", ")}</span>
       ) : null}
     </div>
   );

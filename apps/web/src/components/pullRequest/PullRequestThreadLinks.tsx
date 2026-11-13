@@ -125,9 +125,7 @@ function EnabledPullRequestThreadLinks({
     hidingAnywhere,
   );
   const linkedThreadsLabel =
-    linkedThreads.length > 0
-      ? `Linked from ${linkedThreads.length} ${linkedThreads.length === 1 ? "thread" : "threads"}`
-      : "已关联的会话";
+    linkedThreads.length > 0 ? `已关联 ${linkedThreads.length} 个会话` : "已关联的会话";
   return (
     <>
       {display === "count" && (linkedThreads.length > 0 || relations.error !== null) ? (
@@ -152,7 +150,7 @@ function EnabledPullRequestThreadLinks({
               </Button>
             }
           />
-          <TooltipPopup>{linkedThreadsLabel}. Search in the command palette.</TooltipPopup>
+          <TooltipPopup>{linkedThreadsLabel}。在命令面板中搜索。</TooltipPopup>
         </Tooltip>
       ) : null}
       {display === "menu-item" ? (
@@ -177,7 +175,7 @@ function EnabledPullRequestThreadLinks({
       {display === "picker" ? (
         <Dialog open onOpenChange={onPickerOpenChange}>
           <DialogPopup className="max-w-md" showCloseButton={false}>
-            <DialogTitle className="sr-only">关联 {term} to a thread</DialogTitle>
+            <DialogTitle className="sr-only">把{term}关联到会话</DialogTitle>
             <ThreadPicker
               environmentId={environmentId}
               url={url}

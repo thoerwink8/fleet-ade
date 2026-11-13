@@ -1236,7 +1236,7 @@ function PullRequestCodeTab({
                   onClick={() => setVisibleCommitCount((count) => count + COMMIT_PAGE_SIZE)}
                 >
                   <span className="text-muted-foreground">
-                    Show more ({orderedCommits.length - visibleCommitCount} left)
+                    再显示 {orderedCommits.length - visibleCommitCount} 条
                   </span>
                 </DropdownMenuItem>
               ) : null}
@@ -1250,7 +1250,7 @@ function PullRequestCodeTab({
           </span>
           {hiddenTestFileCount > 0 ? (
             <Button type="button" size="xs" variant="link" onClick={() => setHideTestFiles(false)}>
-              {hiddenTestFileCount} test {hiddenTestFileCount === 1 ? "文件" : "文件"} hidden
+              已隐藏 {hiddenTestFileCount} 个测试文件
             </Button>
           ) : null}
           {filesViewed.enabled && files.length > 0 ? (
@@ -1259,7 +1259,7 @@ function PullRequestCodeTab({
                 {filePaths.filter(isFileViewed).length} / {files.length}
               </span>
               <span className="truncate">
-                {viewedFilesStore === "environment" ? `viewed in ${APP_BASE_NAME}` : "viewed"}
+                {viewedFilesStore === "environment" ? `已在 ${APP_BASE_NAME} 中查看` : "已查看"}
               </span>
               {viewedFilesStore === "environment" ? (
                 <Tooltip>
@@ -1283,8 +1283,7 @@ function PullRequestCodeTab({
                     />
                   </TooltipTrigger>
                   <TooltipPopup side="bottom">
-                    The boxes below are whatever was last read, and empty if nothing has been read
-                    yet. {filesViewed.error}
+                    下面的勾选是上次读到的结果；如果还没读到，就是空的。{filesViewed.error}
                   </TooltipPopup>
                 </Tooltip>
               ) : null}

@@ -1321,11 +1321,11 @@ function ScreenReaderWindowTitleRow() {
   return (
     <SettingsRow
       {...searchableSetting("screen-reader-window-title")}
-      description="窗口标题以会话状态（例如“需要批准”）和名称开头，这样切换应用时屏幕阅读器会先读到它们。任务栏、共享屏幕和计时工具也会看到。"
+      description="窗口标题以会话状态（例如“待批准”）和名称开头，这样切换应用时屏幕阅读器会先读到它们。任务栏、共享屏幕和计时工具也会看到。"
       resetAction={
         settings.screenReaderWindowTitle !== DEFAULT_UNIFIED_SETTINGS.screenReaderWindowTitle ? (
           <SettingResetButton
-            label="screen reader window title"
+            label="屏幕阅读器窗口标题"
             onClick={() =>
               updateSettings({
                 screenReaderWindowTitle: DEFAULT_UNIFIED_SETTINGS.screenReaderWindowTitle,

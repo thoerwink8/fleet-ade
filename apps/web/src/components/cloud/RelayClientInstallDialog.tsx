@@ -97,8 +97,7 @@ export function RelayClientInstallDialog() {
             <div className="rounded-xl border border-border/70 bg-muted/35 p-3">
               <p className="text-sm font-medium text-foreground">托管中继客户端</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                T3 Code will download and install version{" "}
-                {view.status === "confirming" ? view.version : ""} locally.
+                T3 Code 会在本机下载并安装版本 {view.status === "confirming" ? view.version : ""}。
               </p>
             </div>
           )}

@@ -28,6 +28,7 @@ import { environmentPresentations } from "../../state/presentation";
 import { useEnvironmentScope, readEnvironmentScope } from "../../state/session";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { resetCountdownLabel } from "./resetCountdownLabel";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import {
   AlertDialog,
@@ -127,13 +128,13 @@ function WindowBar({
   const remaining = remainingPercent(window);
   const timeLeft = paceRemainingPercent(window, now);
   const [barRef, paceMark] = usePaceMark(timeLeft);
-  const resetsIn = formatResetsIn(window, now);
+  const resetsIn = resetCountdownLabel(formatResetsIn(window, now));
   const resetsAt = window.resetsAt
     ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)
     : null;
-  const summary = `${window.label}: ${remaining}% left${
+  const summary = `${window.label}：剩余 ${remaining}%${
     timeLeft === null ? "" : `，本周期还剩 ${timeLeft}%`
-  }${resetsIn ? `, ${resetsIn}` : ""}`;
+  }${resetsIn ? `，${resetsIn}` : ""}`;
 
   return (
     <Tooltip>
@@ -169,7 +170,7 @@ function WindowBar({
       <TooltipPopup side="top">
         <div className="flex flex-col gap-0.5">
           <span className="text-foreground">
-            {remaining}% left{timeLeft !== null ? ` · ${timeLeft}% of the window left` : ""}
+            剩余 {remaining}%{timeLeft !== null ? ` · 本周期还剩 ${timeLeft}%` : ""}
           </span>
           {timeLeft !== null ? (
             <span className="text-muted-foreground">竖线表示匀速消耗时的位置。</span>
@@ -210,13 +211,13 @@ export function LimitWindows({
     >
       {windows.map((window) => {
         const pace = paceOf(window, now);
-        const resetsIn = formatResetsIn(window, now);
+        const resetsIn = resetCountdownLabel(formatResetsIn(window, now));
         return (
           <Fragment key={window.id}>
             <span className="flex min-w-0 items-center gap-2 text-xs">
               <span className="truncate text-muted-foreground">{window.label}</span>
               <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
-                {remainingPercent(window)}% left
+                剩余 {remainingPercent(window)}%
               </span>
             </span>
             <WindowBar color={color} window={window} now={now} />

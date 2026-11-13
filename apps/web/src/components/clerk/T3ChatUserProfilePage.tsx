@@ -25,12 +25,12 @@ function planLabel(link: RelayT3ChatLink): ReactNode {
     case "pro":
       return (
         <>
-          Pro · up to {T3CHAT_PLAN_TUNNEL_LIMITS.pro} tunnels. {upgradeLink} to Premier for{" "}
-          {T3CHAT_PLAN_TUNNEL_LIMITS.premier}.
+          Pro · 最多 {T3CHAT_PLAN_TUNNEL_LIMITS.pro} 条隧道。{upgradeLink} 可升级到Premier，获得{" "}
+          {T3CHAT_PLAN_TUNNEL_LIMITS.premier} 条。
         </>
       );
     case "free":
-      return <>{upgradeLink} for more tunnels</>;
+      return <>{upgradeLink} 以获得更多隧道</>;
   }
 }
 

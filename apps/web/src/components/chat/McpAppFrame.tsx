@@ -483,7 +483,7 @@ export function McpAppFrame(props: {
           />
         ) : asset._tag === "Failure" ? (
           <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            Unable to load the {app.server} app
+            无法加载 {app.server} 应用
           </p>
         ) : null}
       </div>

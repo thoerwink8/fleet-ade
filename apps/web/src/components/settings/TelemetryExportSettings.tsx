@@ -167,12 +167,11 @@ function TelemetryExportForm() {
         }}
       >
         <p className="text-xs text-muted-foreground">
-          将追踪、指标和日志发送到 OTLP HTTP 接收端。重启服务器后生效。环境变量会覆盖这些设置。
+          将追踪、指标和日志发送到OTLP的HTTP接收端。重启服务器后生效。环境变量会覆盖这些设置。
         </p>
         {!canEdit && (
           <p className="text-xs text-muted-foreground">
-            This connection lacks permission to change settings on{" "}
-            {environment?.label ?? "所选环境"}.
+            此连接无权修改 {environment?.label ?? "所选环境"} 上的设置。
           </p>
         )}
         {SIGNALS.map((descriptor) => {

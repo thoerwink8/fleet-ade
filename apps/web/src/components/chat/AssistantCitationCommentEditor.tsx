@@ -108,8 +108,7 @@ export function AssistantCitationCommentEditor({
       />
       {commentTooLong ? (
         <p role="status" className="pt-1 text-xs text-destructive">
-          Comments can contain up to {ASSISTANT_CITATION_MAX_COMMENT_LENGTH.toLocaleString("zh-CN")}{" "}
-          characters.
+          评论最多 {ASSISTANT_CITATION_MAX_COMMENT_LENGTH.toLocaleString("zh-CN")} 个字符。
         </p>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center justify-end gap-2">

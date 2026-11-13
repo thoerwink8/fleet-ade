@@ -101,7 +101,7 @@ export function PullRequestListEmptyState({
         <BranchMark joined={false} />
         <EmptyHeader>
           <EmptyTitle>
-            Nothing matches “{query.length > 48 ? `${query.slice(0, 48)}…` : query}”
+            没有与“{query.length > 48 ? `${query.slice(0, 48)}…` : query}”匹配的结果
           </EmptyTitle>
           <EmptyDescription>
             已在各托管平台上搜索过。请尝试更少的关键词，或按编号、作者、分支搜索。

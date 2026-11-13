@@ -657,7 +657,7 @@ function InstanceSessionManagement(
                       size="sm"
                       type="password"
                       aria-label={`${provider.providerId} 只写请求头 JSON`}
-                      placeholder='Write-only headers JSON, e.g. {"Authorization":"Bearer …"}'
+                      placeholder='只写请求头JSON，例如 {"Authorization":"Bearer …"}'
                       value={draft.headers}
                       disabled={props.readOnly || savingProviderId !== null}
                       onValueChange={(value) => updateDraft({ headers: value })}

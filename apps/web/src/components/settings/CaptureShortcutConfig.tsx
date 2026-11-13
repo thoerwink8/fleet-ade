@@ -148,7 +148,7 @@ export function CaptureShortcutConfig({
       ) : null}
       {recorder.recording ? (
         <p role="status" className="text-xs text-muted-foreground">
-          请按下快捷键，按 Esc 取消。
+          请按下快捷键，按 Escape 取消。
         </p>
       ) : null}
       {result ? (
@@ -255,7 +255,7 @@ export function CaptureShortcutConfig({
             </p>
             {niri ? <p>T3 Code 还会读取此文件引用的其他文件。</p> : null}
             {preview && preview.resolvedPath !== preview.path ? (
-              <p className="break-all">Linked to {preview.resolvedPath}. The link will be kept.</p>
+              <p className="break-all">已链接到 {preview.resolvedPath}。该链接会保留。</p>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -287,18 +287,18 @@ export function CaptureShortcutConfig({
             ) : null}
           </div>
           <p>
-            Use your desktop's shortcut settings file.{" "}
+            使用桌面环境自己的快捷键设置文件。
             {niri
-              ? "A custom --config or NIRI_CONFIG can change its location."
-              : "On Omarchy, use your own bindings file, not its defaults."}
+              ? "自定义 --config 或 NIRI_CONFIG 会改变它的位置。"
+              : "在 Omarchy 上请用你自己的按键文件，不要改它的默认文件。"}
           </p>
-          {result?.backupPath ? <p className="break-all">Backup: {result.backupPath}</p> : null}
+          {result?.backupPath ? <p className="break-all">备份：{result.backupPath}</p> : null}
           <p className="font-medium text-foreground">手动设置</p>
           <p>
             {niri
-              ? "Paste this inside binds { … } in your Niri config, then save."
-              : "Add this binding to your Hyprland config, then save."}{" "}
-            Change the keys if needed.
+              ? "把这段粘贴到 Niri 配置的 binds { … } 里，然后保存。"
+              : "把这条绑定加到 Hyprland 配置里，然后保存。"}
+            需要的话可以改按键。
           </p>
           <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-muted/50 p-3">
             {state.shortcutBinding}
@@ -313,10 +313,7 @@ export function CaptureShortcutConfig({
           >
             {isCopied ? "已复制" : "复制快捷键"}
           </Button>
-          <p>
-            Turn capture off in T3 Code to stop it. Remove the shortcut from {desktop} to free up
-            the keys.
-          </p>
+          <p>在 T3 Code 里关闭截取即可停止。从 {desktop} 移除该快捷键即可释放这些按键。</p>
           {state.shortcutActionRegistered === false ? (
             <p role="status">{state.shortcutMessage}</p>
           ) : null}

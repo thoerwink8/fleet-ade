@@ -1103,8 +1103,7 @@ export function PullRequestSummaryTab({
           <>
             {detail.commentsTruncated ? (
               <p className="mb-2 rounded-md border border-warning/30 bg-warning-surface px-2 py-1.5 text-xs">
-                This conversation is only partially loaded. {commentCount} 条评论
-                {commentCount === 1 ? " is" : "s are"} loaded; open it on the host to read the rest.
+                这段对话只加载了一部分。已加载 {commentCount} 条评论，其余请到托管平台查看。
               </p>
             ) : null}
             {items.length === 0 ? (
@@ -1127,7 +1126,7 @@ export function PullRequestSummaryTab({
                     className="w-full"
                     onClick={() => setShown({ url: detail.url, count: COMMENT_PAGE })}
                   >
-                    Show only {COMMENT_PAGE} recent conversations
+                    只显示最近 {COMMENT_PAGE} 段对话
                   </Button>
                 ) : null}
               </div>

@@ -304,7 +304,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             <p className="text-2xs text-muted-foreground/70">创建新链接，即可从此客户端分享。</p>
           ) : shareablePairingUrl === null ? (
             <p className="text-2xs text-muted-foreground/70">
-              Copy the token and pair from another client using this backend&apos;s reachable host.
+              复制 token，并用此后端可访问的主机从另一个客户端配对。
             </p>
           ) : null}
         </div>
@@ -641,7 +641,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
     <div className="flex flex-wrap items-center justify-end gap-2">
       <Button size="xs" variant="outline" onClick={() => openUseInAnotherApp(environmentId)}>
         <PlugIcon className="size-3" />
-        Use in another app (MCP)
+        在其他应用中使用（MCP）
       </Button>
       <Button
         size="xs"

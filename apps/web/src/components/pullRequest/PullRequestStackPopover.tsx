@@ -79,7 +79,7 @@ export function PullRequestStackPopover({
           }
         />
         <TooltipPopup>
-          View stack #{membership.number}, layer {membership.position} of {membership.size}
+          查看堆叠 #{membership.number}，第 {membership.position} 层，共 {membership.size} 层
         </TooltipPopup>
       </Tooltip>
       <MenuPopup

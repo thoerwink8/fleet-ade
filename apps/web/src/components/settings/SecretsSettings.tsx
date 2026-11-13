@@ -44,7 +44,7 @@ export function SecretsSettingsPanel() {
       environment.serverConfig.secretProviderSettings !== true ? (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            Update T3 Code on {environment.label} to manage its secret providers.
+            请先更新 {environment.label} 上的 T3 Code，才能管理它的凭据提供方。
           </p>
         </SettingsSection>
       ) : connected ? (
@@ -244,15 +244,13 @@ function SecretProviderUses({
   const uses = secretProviderUses(useEnvironmentSettings(environmentId), id);
   if (uses.length === 0) {
     return (
-      <AlertDialogDescription>
-        Nothing reads from {label}. The secrets themselves are untouched.
-      </AlertDialogDescription>
+      <AlertDialogDescription>没有内容从 {label} 读取。凭据本身不会改动。</AlertDialogDescription>
     );
   }
   return (
     <>
       <AlertDialogDescription>
-        These read from {label} and will be unset. The secrets themselves are untouched.
+        这些内容从 {label} 读取，引用会被清掉。凭据本身不会改动。
       </AlertDialogDescription>
       <ul className="max-h-48 list-disc space-y-0.5 overflow-y-auto ps-5 text-sm wrap-anywhere">
         {uses.map((use) => (

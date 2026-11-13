@@ -990,7 +990,7 @@ function ManagedCodexSetup({
                       void run(() => startInstall({ environmentId, input: { instanceId } }))
                     }
                   >
-                    Update Codex
+                    更新 Codex
                   </Button>
                 ) : null}
                 <Button

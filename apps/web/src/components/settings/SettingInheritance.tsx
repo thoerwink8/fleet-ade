@@ -38,10 +38,10 @@ const WRITING_STYLE_LABELS: Record<string, string> = {
 };
 
 const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<string, string> = {
-  balanced: "Balanced",
-  performance: "Performance",
+  balanced: "均衡",
+  performance: "性能",
   "battery-saver": "省电",
-  custom: "Advanced",
+  custom: "高级",
 };
 
 function formatValue(key: keyof ServerSettings, value: unknown): string {
@@ -49,22 +49,20 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
     return key === "pullRequestMergeMethod"
       ? "上次选择"
       : key === "sidebarAutoSettleAfterDays"
-        ? "Never"
+        ? "从不"
         : key === "defaultModelSelection"
-          ? "Automatic"
+          ? "自动"
           : key === "sourceControlWriterModelSelection"
             ? "文本生成模型"
             : key === "reviewGuideModelSelection"
               ? "版本控制文案模型"
               : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
-                ? "Inherit"
+                ? "继承"
                 : "未设置";
   }
-  if (typeof value === "boolean") return value ? "On" : "Off";
+  if (typeof value === "boolean") return value ? "开" : "关";
   if (typeof value === "number") {
-    return key === "sidebarAutoSettleAfterDays"
-      ? `${value} ${value === 1 ? "day" : "days"}`
-      : String(value);
+    return key === "sidebarAutoSettleAfterDays" ? `${value} 天` : String(value);
   }
   if (typeof value === "string") {
     if (key === "defaultThreadEnvMode" && (value === "local" || value === "worktree")) {
@@ -78,22 +76,22 @@ function formatValue(key: keyof ServerSettings, value: unknown): string {
         value as keyof typeof PULL_REQUEST_MERGE_METHOD_LABELS
       ];
     }
-    return value === "" ? "Empty" : value;
+    return value === "" ? "空" : value;
   }
-  if (Array.isArray(value)) return `${value.length} ${value.length === 1 ? "item" : "items"}`;
+  if (Array.isArray(value)) return `${value.length} 项`;
   if (typeof value === "object") {
     if (key === "backgroundActivity" && "profile" in value && typeof value.profile === "string") {
       return BACKGROUND_ACTIVITY_PROFILE_LABELS[value.profile] ?? value.profile;
     }
     if ("model" in value && typeof value.model === "string") return value.model;
     if ("mode" in value && typeof value.mode === "string") {
-      if (key === "worktreeCleanup") return value.mode === "off" ? "Off" : "Custom";
+      if (key === "worktreeCleanup") return value.mode === "off" ? "关" : "自定义";
       return key === "sourceControlWritingStyle"
         ? (WRITING_STYLE_LABELS[value.mode] ?? value.mode)
         : value.mode;
     }
   }
-  return "Custom";
+  return "自定义";
 }
 
 /** Matches resolveProjectSettings order. */
@@ -111,7 +109,7 @@ export function settingInheritanceLayers(
     layers.push({
       key: "project",
       label: "项目",
-      value: source === "project" ? formatValue(key, target.settings[key]) : "Inherits",
+      value: source === "project" ? formatValue(key, target.settings[key]) : "继承",
       effective: source === "project",
       set: source === "project",
     });
@@ -119,7 +117,7 @@ export function settingInheritanceLayers(
   layers.push({
     key: "environment",
     label: target.label,
-    value: environmentSet ? formatValue(key, environmentValue) : "Inherits",
+    value: environmentSet ? formatValue(key, environmentValue) : "继承",
     effective: source === "environment" && environmentSet,
     set: environmentSet,
   });
@@ -127,7 +125,7 @@ export function settingInheritanceLayers(
     layers.push({
       key: "t3.json",
       label: "t3.json",
-      value: source === "t3.json" ? formatValue(key, target.settings[key]) : "Inherits",
+      value: source === "t3.json" ? formatValue(key, target.settings[key]) : "继承",
       effective: source === "t3.json",
       set: source === "t3.json",
     });
@@ -190,7 +188,7 @@ export function SettingInheritance({
   const hasMultipleEnvironments = new Set(targets.map((target) => target.environmentId)).size > 1;
   const overrideSummary =
     overridingProjects.length > 0
-      ? `${summary} · ${overridingProjects.length} project ${overridingProjects.length === 1 ? "override" : "overrides"}`
+      ? `${summary} · ${overridingProjects.length} 个项目覆盖`
       : summary;
   const chains = targets.flatMap((target) => {
     const environment = environments.find(
@@ -401,7 +399,7 @@ export function SettingInheritance({
                       )}
                       {onClearOverrides ? (
                         <InlineButton onClick={() => onClearOverrides(overriding)}>
-                          重置 {overriding.length === 1 ? "it" : "all"}
+                          {overriding.length === 1 ? "重置此项" : "全部重置"}
                         </InlineButton>
                       ) : null}
                     </div>

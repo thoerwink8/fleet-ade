@@ -23,7 +23,7 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
       aria-label={`来自 ${entry.title} 的审批`}
       className="rounded-lg border border-border bg-background p-3 text-xs"
     >
-      <p className="mb-2 font-medium">Approval needed from {entry.title}</p>
+      <p className="mb-2 font-medium">需要来自 {entry.title} 的批准</p>
       <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono">
         {approval.detail || approval.requestKind}
       </pre>

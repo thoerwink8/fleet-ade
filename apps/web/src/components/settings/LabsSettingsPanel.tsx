@@ -115,8 +115,8 @@ function GuestLinksRow() {
       managed={settings.guestSharingEnabled ? undefined : connectDenial}
       description={
         <>
-          Share a thread with a guest who watches it live in a browser and sends messages you
-          approve. Needs T3 Connect: sign in and link this machine in{" "}
+          把会话分享给访客。对方在浏览器里实时观看，发送的消息需要你批准。需要 T3
+          Connect：请登录，并在{" "}
           <Link to="/settings/access" className="underline underline-offset-2">
             共享与访问
           </Link>
@@ -145,8 +145,7 @@ function LinkedEnvironmentsRow() {
       settingKeys={["linkedEnvironmentsEnabled"]}
       description={
         <>
-          Let agents here work on your other machines, and theirs here. Turn it on for each machine,
-          then link them in{" "}
+          让这里的智能体在你的其他机器上工作，也让那边的智能体在这里工作。请在每台机器上打开，然后在{" "}
           <Link to="/settings/connections" className="underline underline-offset-2">
             连接
           </Link>
@@ -200,7 +199,7 @@ function SimlockHostsRow() {
       settingKeys={["simlockDeviceHostsEnabled"]}
       description={
         <>
-          Let the Device panel lease simulators and emulators from your own{" "}
+          让设备面板从你自己的{" "}
           <a
             href="https://incubator.callstack.com/simlock/"
             target="_blank"
@@ -209,11 +208,11 @@ function SimlockHostsRow() {
           >
             Simlock
           </a>{" "}
-          pool, added in{" "}
+          池租用模拟器和仿真器，在{" "}
           <Link to="/settings/devices" className="underline underline-offset-2">
             设备
           </Link>
-          。此功能处于早期测试阶段，可能变更或失效。T3 Code 不会安装 Simlock。
+          。此功能处于早期测试阶段，可能变更或失效。T3 Code 不会安装它。
         </>
       }
       control={

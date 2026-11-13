@@ -157,7 +157,7 @@ export function PullRequestStackMenu({
             }
           />
           <TooltipPopup>
-            View stack #{stack.number}, layer {position} of {stack.layers.length}
+            查看堆叠 #{stack.number}，第 {position} 层，共 {stack.layers.length} 层
             {notice ? ` · ${notice}` : null}
           </TooltipPopup>
         </Tooltip>
@@ -185,7 +185,7 @@ export function PullRequestStackMenu({
               {canMerge ? (
                 <MenuItem disabled={mergeDisabled} onClick={() => setConfirmation("merge")}>
                   <PullRequestGlyph.merged aria-hidden />
-                  Merge stack ({mergeLayers.length})
+                  合并堆叠（{mergeLayers.length}）
                 </MenuItem>
               ) : null}
               {canRebase ? (

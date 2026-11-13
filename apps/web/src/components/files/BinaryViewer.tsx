@@ -251,11 +251,11 @@ export default function BinaryViewer(props: {
             className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
             role="status"
           >
-            {table.count.toLocaleString("zh-CN")} rows · {rows?.columns.length ?? "…"} columns
+            {table.count.toLocaleString("zh-CN")} 行 · {rows?.columns.length ?? "…"} 列
             {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
           </div>
           <FileSurfaceNotice>
-            只读。最多 50 列，每格最多 1,024 个字符。不显示 Blob 内容。
+            只读。最多 50 列，每格最多 1,024 个字符。不显示二进制内容。
           </FileSurfaceNotice>
         </>
       ) : null}

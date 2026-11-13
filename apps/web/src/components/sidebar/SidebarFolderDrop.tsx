@@ -48,7 +48,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "This computer's server is not connected yet",
+          title: "这台电脑的服务器尚未连接",
           description: "等它连上后再试。",
         }),
       );
@@ -124,7 +124,7 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
           className="pointer-events-none absolute inset-1.5 z-30 flex flex-col items-center justify-center gap-2 rounded-lg px-4 text-center bg-sidebar/90 text-sm text-sidebar-foreground ring-1 ring-inset ring-primary/70"
         >
           <FolderPlusIcon className="size-5 text-sidebar-muted-foreground" />
-          {bridge === undefined ? "放入文件夹需要桌面应用" : "Drop folders to add projects"}
+          {bridge === undefined ? "放入文件夹需要桌面应用" : "放下文件夹即可添加项目"}
         </div>
       ) : null}
     </div>

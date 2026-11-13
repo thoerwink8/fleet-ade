@@ -206,8 +206,8 @@ export function TextGeneratorsSettings({
               移除 {removingConfig ? textGeneratorDisplayName(removingConfig) : ""}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This deletes the API key stored on {environmentLabel}. Anything set to use this
-              generator falls back to the text generation model.
+              这将删除保存在 {environmentLabel} 上的 API
+              密钥。设置为使用此生成器的内容会退回文本生成模型。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -448,8 +448,8 @@ function TextGeneratorWizard({
           ) : (
             <div className="grid gap-4">
               <p className="text-sm text-muted-foreground">
-                {name} is connected and lists {modelCount} {modelCount === 1 ? "model" : "models"}.
-                Switch any of these to it, or keep what they use now.
+                {name} 已连接，列出了 {modelCount}{" "}
+                个模型。可以把下面这些改成它，也可以保持现在的用法。
               </p>
               {/* One grid for all rows, so pickers and Test buttons line up in columns. */}
               <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-4">
@@ -550,7 +550,7 @@ function TextGenerationTaskPicker({
           </span>
         ) : shown ? (
           <span role="status" className="text-xs text-muted-foreground">
-            {selection.model} answered. It works.
+            {selection.model} 已响应。可以用了。
           </span>
         ) : own === null ? (
           <span className="text-xs text-muted-foreground">跟随文本生成模型</span>

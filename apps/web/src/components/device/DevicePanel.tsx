@@ -238,8 +238,7 @@ export function DevicePanel(props: {
           <DeviceHostUpdates state={state} environmentId={environmentId} />
           {bootingDevices.length > 0 ? (
             <div role="status" className="border-b px-3 py-2 text-xs text-muted-foreground">
-              正在启动 {bootingDevices.map((device) => device.name).join(", ")}… This can take a
-              minute.
+              正在启动 {bootingDevices.map((device) => device.name).join("、")}… 这可能需要一分钟。
             </div>
           ) : null}
           {operationError ? (
@@ -363,8 +362,7 @@ export function DevicePanel(props: {
                 !state.devices.some((device) => device.platform === "android") &&
                 !unavailablePlatforms.some((platform) => platform.platform === "android") ? (
                   <p className="max-w-sm text-xs">
-                    未找到 Android 虚拟设备。请在 Android Studio 的 Device Manager
-                    中创建一个，然后刷新。
+                    未找到 Android 虚拟设备。请在 Android 的设备管理器中创建一个，然后刷新。
                   </p>
                 ) : null}
                 {loaded && !hostBusy ? (

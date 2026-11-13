@@ -139,7 +139,7 @@ function ModelPicker({
       </Combobox>
       {delisted ? (
         <p className="text-sm text-destructive" role="alert">
-          OpenRouter no longer lists {current}. Dictation stays off until you choose another model.
+          OpenRouter 已不再列出 {current}。在你另选模型之前，听写保持关闭。
         </p>
       ) : selected ? (
         <p className="truncate text-xs text-muted-foreground">{selected.id}</p>
@@ -338,7 +338,7 @@ export function CloudVoiceConfiguration({
         {!remove && (
           <DialogPanel>
             {!connected ? (
-              <p>Connect to {environment.label} with dictation access to continue.</p>
+              <p>请连接到 {environment.label}，并授予听写权限后再继续。</p>
             ) : AsyncResult.isFailure(presence) && saved === undefined ? (
               <Button size="sm" variant="outline" onClick={refresh}>
                 重新加载 API 密钥
@@ -347,7 +347,7 @@ export function CloudVoiceConfiguration({
               AsyncResult.isSuccess(presence) &&
               presence.value &&
               saved === undefined ? (
-              <p>更新 {environment.label} to use OpenRouter dictation.</p>
+              <p>更新 {environment.label}，以使用 OpenRouter 听写。</p>
             ) : saved === undefined ? (
               <p role="status">正在检查 API 密钥…</p>
             ) : routed ? (
@@ -382,11 +382,10 @@ export function CloudVoiceConfiguration({
                 {editingKey ? (
                   <div className="grid gap-2">{keyField}</div>
                 ) : !saved ? (
-                  <p>Ask an administrator on {environment.label} to add an API key.</p>
+                  <p>请 {environment.label} 的管理员添加 API 密钥。</p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Uses the API key saved on {environment.label}. This choice applies only to this
-                    device.
+                    使用保存在 {environment.label} 上的 API 密钥。此选择只对这台设备生效。
                   </p>
                 )}
               </form>
@@ -402,7 +401,7 @@ export function CloudVoiceConfiguration({
                 {keyField}
               </form>
             ) : !saved ? (
-              <p>Ask an administrator on {environment.label} to add an API key.</p>
+              <p>请 {environment.label} 的管理员添加 API 密钥。</p>
             ) : (
               <p className="text-sm text-muted-foreground">
                 此选择仅适用于此设备。选择“关闭”即可停止共享。

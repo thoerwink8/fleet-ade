@@ -562,7 +562,7 @@ export function AddEnvironmentDialog({
                   </AutocompleteList>
                 ) : (
                   <AutocompleteEmpty className="break-all">
-                    No hosts match "{savedBackendSshHost.trim()}".
+                    没有与“{savedBackendSshHost.trim()}”匹配的主机。
                   </AutocompleteEmpty>
                 )}
               </AutocompletePopup>

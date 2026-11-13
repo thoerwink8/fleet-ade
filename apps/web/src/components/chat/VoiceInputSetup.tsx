@@ -114,9 +114,9 @@ export function VoiceInputSetup(props: {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {model.recommended && props.language
-                      ? `Recommended for ${languageLabel(props.language)}. `
+                      ? `推荐用于${languageLabel(props.language)}。`
                       : ""}
-                    Includes a 1.2 MB silence detector.
+                    含 1.2 MB 静音检测。
                   </p>
                   {props.downloading ? (
                     <div role="status" className="space-y-1.5">
@@ -214,9 +214,7 @@ export function VoiceInputSetup(props: {
                 </Button>
               </div>
               {selectedIsUnavailable ? (
-                <p className="text-xs text-destructive">
-                  That microphone is unplugged. Pick another one.
-                </p>
+                <p className="text-xs text-destructive">这个麦克风已拔出。请另选一个。</p>
               ) : null}
               {microphoneError ? (
                 <p role="alert" className="text-xs text-muted-foreground">
@@ -253,7 +251,7 @@ export function VoiceInputSetup(props: {
                     ? "重试"
                     : canManage
                       ? "下载模型"
-                      : "Needs an admin to download"}
+                      : "需要管理员下载"}
               </Button>
             ) : null}
           </WizardFooter>
@@ -261,7 +259,7 @@ export function VoiceInputSetup(props: {
           <WizardFooter
             leading={
               <Button variant="ghost" onClick={() => openSettings("")}>
-                Voice settings
+                语音设置
               </Button>
             }
           >

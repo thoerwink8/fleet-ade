@@ -828,9 +828,7 @@ export function ServerBrowserSurface(props: {
             role="dialog"
             aria-label="为页面选择文件"
           >
-            <p className="text-sm">
-              The page asks for {fileChooser.multiple ? "文件" : "一个文件"}.
-            </p>
+            <p className="text-sm">此页面需要{fileChooser.multiple ? "多个文件" : "一个文件"}。</p>
             <input
               ref={fileInputRef}
               type="file"
