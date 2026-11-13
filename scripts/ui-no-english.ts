@@ -1,10 +1,11 @@
 // @effect-diagnostics nodeBuiltinImport:off globalConsole:off
 // Fails when user-visible interface copy still contains English outside the
-// allowlist. Scope is the web UI, the desktop menu, and server errors shown
-// to users. Logs, comments, developer CLI text, font names, and code
-// identifiers are out of scope. Each allowlist line keeps one string; the
-// comment above it is the reason. JSX text and UI string attributes are read
-// from the syntax tree, so a phrase on its own line is not skipped.
+// allowlist. Scope is the web UI, the desktop menu, server errors shown to
+// users, and the modules that put sign-in or provider status text on screen. Logs,
+// comments, developer CLI text, font names, and code identifiers are out of
+// scope. Each allowlist line keeps one string; the comment above it is the
+// reason. JSX text and UI string attributes are read from the syntax tree, so
+// a phrase on its own line is not skipped.
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
@@ -17,6 +18,16 @@ const ROOTS = [
   "apps/web/src",
   "apps/desktop/src/window",
   "apps/server/src/orchestration-v2/UserFacingErrors.ts",
+  "apps/server/src/provider/AntigravityAuth.ts",
+  "apps/server/src/provider/CodexChatGptAuth.ts",
+  "apps/server/src/provider/CodexAuthCallbackPage.ts",
+  "packages/shared/src/codexAuthCallback.ts",
+  "packages/provider-core/src/server/providerAuthFlow.ts",
+  "packages/provider-cursor/src/server/auth.ts",
+  "packages/provider-cursor/src/server/status.ts",
+  "packages/provider-cursor/src/server/textGeneration.ts",
+  "packages/provider-acp-registry/src/server/auth.ts",
+  "apps/server/src/provider/Drivers/CodexManagedProvider.ts",
 ];
 const UI_NAMES = new Set([
   "title",
@@ -140,6 +151,11 @@ function included(file: string): boolean {
   return true;
 }
 
+function isLogCall(node: ts.CallExpression): boolean {
+  if (!ts.isPropertyAccessExpression(node.expression)) return false;
+  return /^log(?:Warning|Info|Error|Debug|Trace|Fatal)?$/.test(node.expression.name.text);
+}
+
 function literalText(node: ts.Expression): string | undefined {
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
   if (
@@ -182,11 +198,26 @@ for (const file of files.filter(included)) {
     false,
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
-  const serverErrors = file.replaceAll("\\", "/").endsWith("/UserFacingErrors.ts");
+  const rel = file.replaceAll("\\", "/");
+  // These modules publish the sentence a person reads while signing in or out.
+  // Their strings are not all object fields, so every literal is a candidate.
+  const serverCopy =
+    rel.endsWith("/UserFacingErrors.ts") ||
+    rel.endsWith("/providerAuthFlow.ts") ||
+    rel.endsWith("/provider-cursor/src/server/auth.ts") ||
+    rel.endsWith("/provider-cursor/src/server/status.ts") ||
+    rel.endsWith("/provider-cursor/src/server/textGeneration.ts") ||
+    rel.endsWith("/provider-acp-registry/src/server/auth.ts") ||
+    rel.endsWith("/CodexManagedProvider.ts") ||
+    rel.endsWith("/CodexAuthCallbackPage.ts") ||
+    rel.endsWith("/codexAuthCallback.ts") ||
+    /\/provider\/[^/]*Auth\.ts$/.test(rel);
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
+    // Log calls are out of scope even when they sit in a sign-in module.
+    if (ts.isCallExpression(node) && isLogCall(node)) return;
     const texts: string[] = [];
-    if (serverErrors) {
+    if (serverCopy) {
       if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
         texts.push(node.text);
       }

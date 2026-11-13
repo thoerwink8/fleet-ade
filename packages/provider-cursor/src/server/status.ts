@@ -52,7 +52,7 @@ export const buildInitialCursorProviderSnapshot = Effect.fn(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Cursor is disabled in T3 Code settings.",
+        message: "已在 T3 Code 设置中停用 Cursor。",
       },
     });
   }
@@ -67,7 +67,7 @@ export const buildInitialCursorProviderSnapshot = Effect.fn(
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "Checking Cursor SDK availability...",
+      message: "正在检查 Cursor SDK 是否可用…",
     },
   });
 });
@@ -191,10 +191,10 @@ function cursorSdkAuth(user: SDKUser | undefined, type: "api-key" | "browser"): 
     type,
     label:
       type === "browser"
-        ? "Cursor account"
+        ? "Cursor 账号"
         : apiKeyName
-          ? `Cursor API key (${apiKeyName})`
-          : "Cursor API key",
+          ? `Cursor API 密钥 (${apiKeyName})`
+          : "Cursor API 密钥",
     ...(email ? { email } : {}),
   };
 }
@@ -264,7 +264,7 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Cursor is disabled in T3 Code settings.",
+        message: "已在 T3 Code 设置中停用 Cursor。",
       },
     });
   }
@@ -281,7 +281,7 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
         version: null,
         status: "error",
         auth: { status: "unauthenticated" },
-        message: "Sign in with Cursor or add CURSOR_API_KEY in provider settings.",
+        message: "请使用 Cursor 登录，或在提供方设置中添加 CURSOR_API_KEY。",
       },
     });
   }
@@ -306,17 +306,17 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
       cause: catalogResult.failure.cause,
     });
     const failure = catalogResult.failure;
-    let message = "Cursor SDK catalog request failed. Check server logs for details.";
+    let message = "Cursor SDK 模型目录请求失败。请查看服务器日志。";
     if (failure.authenticationFailure) {
       message =
         authenticationType === "browser"
-          ? "Cursor sign-in expired or was rejected. Sign in again in provider settings."
-          : "Cursor SDK authentication failed. Check CURSOR_API_KEY.";
+          ? "Cursor 登录已过期或被拒绝。请在提供方设置中重新登录。"
+          : "Cursor SDK 身份验证失败。请检查 CURSOR_API_KEY。";
     } else if (failure.planRequired) {
       message =
         authenticationType === "browser"
-          ? "Cursor needs a paid plan to run in T3 Code. Upgrade this account or sign in with a different one."
-          : "Cursor needs a paid plan to run in T3 Code. Upgrade the account that owns CURSOR_API_KEY or use a key from a paid account.";
+          ? "在 T3 Code 中运行 Cursor 需要付费方案。请升级此账号，或改用其他账号登录。"
+          : "在 T3 Code 中运行 Cursor 需要付费方案。请升级 CURSOR_API_KEY 所属账号，或改用付费账号的密钥。";
     }
     return buildServerProvider({
       presentation: CURSOR_PRESENTATION,
@@ -360,8 +360,6 @@ export const checkCursorProviderStatus = Effect.fn("checkCursorProviderStatus")(
       auth: cursorSdkAuth(snapshot.user, authenticationType),
     },
     discoveredModels,
-    ...(discoveredModels.length === 0
-      ? { discoveryWarning: "Cursor SDK model discovery returned no built-in models." }
-      : {}),
+    ...(discoveredModels.length === 0 ? { discoveryWarning: "Cursor SDK 没有返回内置模型。" } : {}),
   });
 });

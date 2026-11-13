@@ -13,6 +13,8 @@ export class CodexAuthCallbackError extends Schema.TaggedError<CodexAuthCallback
 }
 
 const listeners = new Map<string, AbortController>();
+const CALLBACK_PAGE_TITLE = "返回 T3 Code";
+const CALLBACK_PAGE_BODY = "已收到登录响应。T3 Code 正在完成连接。可以关闭此标签页。";
 
 export function cancelCodexAuthCallback(authorizationUrl: string) {
   const { state } = codexAuthorizationRequest(authorizationUrl);
@@ -27,8 +29,7 @@ export async function receiveCodexAuthCallback(
   signal?: AbortSignal,
 ) {
   const request = codexAuthorizationRequest(authorizationUrl);
-  if (listeners.has(request.state))
-    throw new Error("This sign-in is already open on this computer.");
+  if (listeners.has(request.state)) throw new Error("这台电脑上已有一个登录正在进行。");
   const abort = new AbortController();
   const interrupted = () => abort.abort();
   signal?.addEventListener("abort", interrupted, { once: true });
@@ -58,36 +59,32 @@ export async function receiveCodexAuthCallback(
         response
           .writeHead(200, { "content-type": "text/html; charset=utf-8" })
           .end(
-            '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>T3 Code</title><style>body{font-family:system-ui;display:grid;place-items:center;min-height:90vh;margin:0}main{max-width:360px;padding:32px}h1{font-size:24px}p{line-height:1.6;opacity:.7}</style></head><body><main><h1>Return to T3 Code</h1><p>Your sign-in response has been received. T3 Code is finishing the connection. You can close this tab.</p></main></body></html>',
+            `<!doctype html><html lang="zh-CN"><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>T3 Code</title><style>body{font-family:system-ui;display:grid;place-items:center;min-height:90vh;margin:0}main{max-width:360px;padding:32px}h1{font-size:24px}p{line-height:1.6;opacity:.7}</style></head><body><main><h1>${CALLBACK_PAGE_TITLE}</h1><p>${CALLBACK_PAGE_BODY}</p></main></body></html>`,
           );
       }
       callback.resolve(url);
     } catch {
-      response.writeHead(400).end("This response does not belong to the active sign-in.");
+      response.writeHead(400).end("此响应不属于当前正在进行的登录。");
     }
   });
-  const cancelled = () => callback.reject(new Error("Sign-in cancelled on this computer."));
+  const cancelled = () => callback.reject(new Error("已在这台电脑上取消登录。"));
   abort.signal.addEventListener("abort", cancelled, { once: true });
-  const timer = setTimeout(
-    () => callback.reject(new Error("Sign-in expired. Try again.")),
-    300_000,
-  );
+  const timer = setTimeout(() => callback.reject(new Error("登录已过期。请再试一次。")), 300_000);
   timer.unref();
   try {
-    if (signal?.aborted) throw new Error("Sign-in cancelled on this computer.");
+    if (signal?.aborted) throw new Error("已在这台电脑上取消登录。");
     await new Promise<void>((resolve, reject) => {
       server.once("error", () =>
         reject(
           new Error(
-            "The ChatGPT callback port is in use on this computer. Close the other sign-in and try again, or paste the redirect URL in T3 Code.",
+            "这台电脑上的 ChatGPT 回调端口已被占用。请关闭另一个登录后再试，或在 T3 Code 中粘贴重定向 URL。",
           ),
         ),
       );
       server.listen(Number(new URL(request.redirectUri).port), "127.0.0.1", resolve);
     });
-    if (abort.signal.aborted) throw new Error("Sign-in cancelled on this computer.");
-    if (!(await openBrowser(request.authorizationUrl)))
-      throw new Error("Could not open your sign-in browser.");
+    if (abort.signal.aborted) throw new Error("已在这台电脑上取消登录。");
+    if (!(await openBrowser(request.authorizationUrl))) throw new Error("无法打开登录浏览器。");
     return await callback.promise;
   } finally {
     clearTimeout(timer);

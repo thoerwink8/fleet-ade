@@ -79,7 +79,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
         ...base,
         installed: false,
         models: [],
-        message: "Set up Codex to get started.",
+        message: "请先完成 Codex 的设置。",
         auth: { status: "unauthenticated" as const },
       };
     const saved = yield* runtime.auth.read.pipe(Effect.orElseSucceed(() => Option.none()));
@@ -90,7 +90,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
         version: executable.value.version,
         models: [],
         message:
-          "Signed in with ChatGPT, but token sharing is disabled. Sign in again and enable token sharing, or use another provider.",
+          "已使用 ChatGPT 登录，但 token 共享处于关闭状态。请重新登录并启用 token 共享，或改用其他提供方。",
         auth: {
           status: "unauthenticated" as const,
           label: "ChatGPT",
@@ -103,7 +103,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
         installed: true,
         version: executable.value.version,
         models: [],
-        message: "Sign in with ChatGPT to use Codex.",
+        message: "请使用 ChatGPT 登录以使用 Codex。",
         auth: { status: "unauthenticated" as const },
       };
     const usageLimits = {
@@ -111,10 +111,9 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
       windows: [],
       unavailable: {
         reason: "unsupported" as const,
-        message:
-          "ChatGPT tracks subscription usage across connected apps. Open Usage settings with the account you connected to Codex.",
+        message: "ChatGPT 会在已连接的应用之间统计订阅用量。请用连接到 Codex 的账号打开用量设置。",
       },
-      externalUsage: { label: "ChatGPT usage", url: "https://chatgpt.com/#settings/Usage" },
+      externalUsage: { label: "ChatGPT 用量", url: "https://chatgpt.com/#settings/Usage" },
     };
     const managedAuth = {
       subscriptionSharing: true,
@@ -143,7 +142,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
             return yield* new ProviderSetupError({
               instanceId,
               operation: "models",
-              detail: "The ChatGPT connection changed while checking Codex. Retry.",
+              detail: "检查 Codex 时 ChatGPT 连接已改变。请重试。",
             });
           const models = yield* chatGptModels(credentials.accessToken, draft.models).pipe(
             Effect.provideService(HttpClient.HttpClient, http),
@@ -204,7 +203,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
             ...(Option.isSome(current) && current.value.scopes.includes("chatgpt.tokens.use.direct")
               ? { usageLimits }
               : {}),
-            message: "Could not check Codex right now. Retry, or reconnect in provider settings.",
+            message: "现在无法检查 Codex。请重试，或在提供方设置中重新连接。",
           })),
         ),
       ),
@@ -228,7 +227,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
         new ProviderDriverError({
           driver: DRIVER,
           instanceId,
-          detail: "Could not prepare managed Codex.",
+          detail: "无法准备托管的 Codex。",
           cause,
         }),
     ),
@@ -253,7 +252,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
         new ProviderDriverError({
           driver: DRIVER,
           instanceId,
-          detail: "Failed to build Codex orchestration adapter.",
+          detail: "无法构建 Codex 编排适配器。",
           cause,
         }),
     ),
@@ -271,7 +270,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
         (cause) =>
           new TextGenerationError({
             operation,
-            detail: "detail" in cause ? cause.detail : "Codex text generation failed.",
+            detail: "detail" in cause ? cause.detail : "Codex 文本生成失败。",
           }),
       ),
     );

@@ -42,7 +42,7 @@ const failureMessage = (cause: Cause.Cause<ProviderSetupError>) => {
   const error = Cause.findErrorOption(cause);
   return Option.isSome(error) && isSetupError(error.value)
     ? error.value.detail
-    : "Sign-in failed. Start again.";
+    : "登录失败。请重新开始。";
 };
 
 interface Flow {
@@ -117,7 +117,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
       return yield* new ProviderSetupError({
         instanceId: options.instanceId,
         operation: "respond",
-        detail: "This sign-in is no longer active in this client.",
+        detail: "这次登录在此客户端已不再进行。",
       });
     }
     return active;
@@ -151,7 +151,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
             return yield* new ProviderSetupError({
               instanceId: options.instanceId,
               operation: "import",
-              detail: "Finish or cancel the existing sign-in first.",
+              detail: "请先完成或取消正在进行的登录。",
             });
           operation = "stopping";
         }),
@@ -187,7 +187,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                   return yield* new ProviderSetupError({
                     instanceId: options.instanceId,
                     operation: "removeMethod",
-                    detail: "Finish or cancel the existing sign-in first.",
+                    detail: "请先完成或取消正在进行的登录。",
                   });
                 yield* options.removeMethod!(methodId);
                 const methods = yield* options.methods;
@@ -208,7 +208,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
           state: {
             ...empty,
             methods: snapshot.value.state.methods ?? [],
-            message: "This provider's shared sign-in changed.",
+            message: "此提供方的共享登录已改变。",
           },
         });
       }),
@@ -224,7 +224,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                 return yield* new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "session",
-                  detail: "Provider sign-in is changing. Try again after it finishes.",
+                  detail: "提供方登录正在变更。请等它结束后再试。",
                 });
               const child = yield* Scope.make();
               sessions.add(child);
@@ -258,7 +258,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
             return yield* new ProviderSetupError({
               instanceId: options.instanceId,
               operation: "start",
-              detail: "Provider setup is already in progress.",
+              detail: "提供方设置已在进行中。",
             });
           const id = yield* random.uuidV4().pipe(
             Effect.mapError(
@@ -266,7 +266,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                 new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "start",
-                  detail: "Could not start sign-in. Try again.",
+                  detail: "无法开始登录。请再试一次。",
                 }),
             ),
           );
@@ -284,7 +284,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
             phase: "starting",
             flowId: id,
             expiresAt: DateTime.formatIso(DateTime.makeUnsafe(flow.expiresAt)),
-            message: "Starting sign-in.",
+            message: "正在开始登录。",
           };
           yield* SubscriptionRef.set(snapshot, { owner, state });
           flow.fiber = yield* Effect.gen(function* () {
@@ -295,7 +295,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
               return yield* new ProviderSetupError({
                 instanceId: options.instanceId,
                 operation: "start",
-                detail: "The provider did not advertise this sign-in method.",
+                detail: "此提供方没有提供这种登录方式。",
               });
             yield* stopSessions.pipe(Effect.ensuring(stopOwnedSessions));
             yield* options.authenticate(methodId, {
@@ -315,7 +315,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                     interaction.type === "browser" || interaction.type === "deviceCode"
                       ? interaction.url
                       : null,
-                  message: "Complete sign-in to continue.",
+                  message: "请完成登录后再继续。",
                 });
               }),
               verifying: Effect.gen(function* () {
@@ -325,7 +325,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                   phase: "verifying",
                   interaction: null,
                   authorizationUrl: null,
-                  message: "Checking provider sign-in.",
+                  message: "正在检查提供方登录。",
                 });
               }),
             });
@@ -338,7 +338,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                   new ProviderSetupError({
                     instanceId: options.instanceId,
                     operation: "start",
-                    detail: "Sign-in expired. Start again.",
+                    detail: "登录已过期。请重新开始。",
                   }),
                 ),
             }),
@@ -363,9 +363,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                       interaction: null,
                       authorizationUrl: null,
                       expiresAt: null,
-                      message: Exit.isSuccess(result)
-                        ? "Sign-in complete."
-                        : failureMessage(result.cause),
+                      message: Exit.isSuccess(result) ? "登录完成。" : failureMessage(result.cause),
                     });
                     active = undefined;
                     operation = "idle";
@@ -395,13 +393,13 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                 return yield* new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "respond",
-                  detail: "This sign-in interaction is no longer available.",
+                  detail: "这次登录交互已不可用。",
                 });
               if (flow.responseFiber)
                 return yield* new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "respond",
-                  detail: "A sign-in response is already in progress.",
+                  detail: "已有一个登录响应正在处理。",
                 });
               const ready = yield* Deferred.make<void>();
               const callback = flow.respond;
@@ -442,7 +440,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
             return yield* new ProviderSetupError({
               instanceId: options.instanceId,
               operation: "complete",
-              detail: "This sign-in does not accept a redirect URL.",
+              detail: "这次登录不接受重定向 URL。",
             });
           yield* flow.complete(input.callbackUrl);
           return snapshot.value.state;
@@ -457,7 +455,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
             interaction: null,
             authorizationUrl: null,
             expiresAt: null,
-            message: "Sign-in cancelled.",
+            message: "登录已取消。",
           });
           active = undefined;
           operation = "stopping";
@@ -476,7 +474,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
             return yield* new ProviderSetupError({
               instanceId: options.instanceId,
               operation: "logout",
-              detail: "Provider setup is already stopping.",
+              detail: "提供方设置正在停止。",
             });
           operation = "stopping";
           const flow = active;
@@ -497,8 +495,8 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
         methods: snapshot.value.state.methods ?? [],
         phase: Exit.isSuccess(result) ? "idle" : "failed",
         message: Exit.isSuccess(result)
-          ? (result.value ?? "Signed out.")
-          : "Could not sign out. Try again.",
+          ? (result.value ?? "已退出登录。")
+          : "无法退出登录。请再试一次。",
       };
       yield* lock.withPermit(
         Effect.gen(function* () {
@@ -520,9 +518,7 @@ export const make = Effect.fn("ProviderAuthFlow.make")(function* (options: {
                 authorizationUrl: null,
                 interaction: null,
                 expiresAt: null,
-                message: active
-                  ? "Sign-in is in progress in another client."
-                  : current.state.message,
+                message: active ? "正在其他客户端中登录。" : current.state.message,
               },
         ),
       ),

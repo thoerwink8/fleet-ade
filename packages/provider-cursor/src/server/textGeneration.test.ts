@@ -199,15 +199,14 @@ describe("CursorTextGeneration", () => {
     {
       status: "error",
       error: { message: "Raw Cursor usage text", code: "PRO_USER_USAGE_LIMIT" },
-      detail:
-        "Cursor usage limit reached. Try again later or choose another text-generation provider.",
+      detail: "已达到 Cursor 用量上限。请稍后再试，或改用其他文本生成提供方。",
     },
     {
       status: "error",
       error: { message: "Raw Cursor backend text", code: "internal" },
-      detail: "Cursor SDK request finished with an error.",
+      detail: "Cursor SDK 请求因错误结束。",
     },
-    { status: "cancelled", error: undefined, detail: "Cursor SDK request was cancelled." },
+    { status: "cancelled", error: undefined, detail: "Cursor SDK 请求已取消。" },
   ] as const)(
     "rejects a $status Cursor SDK run ($error.code) that includes valid title JSON",
     ({ status, error, detail }) =>
@@ -252,7 +251,7 @@ describe("CursorTextGeneration", () => {
           modelSelection: { instanceId: ProviderInstanceId.make("cursor"), model: "composer-2" },
         }),
       );
-      expect(failure.detail).toContain("custom ~/.cursor/sandbox.json");
+      expect(failure.detail).toContain("~/.cursor/sandbox.json");
       expect(cursorSdkMock.prompt).not.toHaveBeenCalled();
     }).pipe(Effect.provide(layerTest)),
   );
@@ -274,7 +273,7 @@ describe("CursorTextGeneration", () => {
         }),
       );
 
-      expect(error.detail).toBe("Sign in with Cursor or add CURSOR_API_KEY in provider settings.");
+      expect(error.detail).toBe("请使用 Cursor 登录，或在提供方设置中添加 CURSOR_API_KEY。");
       expect(cursorSdkMock.prompt).not.toHaveBeenCalled();
     }).pipe(Effect.provide(layerTest)),
   );

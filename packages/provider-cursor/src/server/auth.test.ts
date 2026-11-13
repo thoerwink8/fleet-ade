@@ -201,7 +201,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("CursorAuth", (it
   it.effect("discards a credential rejected by verification and permits a fresh login", () =>
     Effect.gen(function* () {
       const rejectionMessage =
-        "Cursor needs a paid plan to run in T3 Code. Upgrade this account or sign in with a different one.";
+        "在 T3 Code 中运行 Cursor 需要付费方案。请升级此账号，或改用其他账号登录。";
       let rejected = true;
       const harness = yield* makeHarness({
         onChanged: (signedIn) =>
@@ -240,7 +240,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("CursorAuth", (it
       });
       yield* harness.auth.controller.start(owner);
       const failed = yield* phase(harness.auth, "failed");
-      expect(failed.message).toContain("could not create an API key");
+      expect(failed.message).toContain("无法创建 API 密钥");
       expect(failed.message).not.toContain("permission_denied");
       expect(yield* harness.auth.readApiKey).toBeUndefined();
       expect(warnings).toHaveLength(1);
@@ -260,7 +260,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("CursorAuth", (it
           expect(Exit.isFailure(yield* Effect.exit(harness.auth.requireApiKey))).toBe(true);
         }),
       );
-      expect(state.message).toBe("Signed out of Cursor.");
+      expect(state.message).toBe("已退出 Cursor 登录。");
       expect(yield* harness.auth.readApiKey).toBeUndefined();
       expect(yield* other.auth.requireApiKey).toBe("other-key");
       expect(harness.changes).toEqual([false]);

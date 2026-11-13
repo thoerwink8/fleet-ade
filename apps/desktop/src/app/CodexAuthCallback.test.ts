@@ -83,7 +83,7 @@ describe("desktop Codex callback helper", () => {
         cancelCodexAuthCallback(authorizationUrl);
         return true;
       }),
-    ).rejects.toThrow("cancelled");
+    ).rejects.toThrow("已在这台电脑上取消登录。");
     expect(
       await receiveCodexAuthCallback(authorizationUrl, async () => {
         await fetch(callback(authorizationUrl));

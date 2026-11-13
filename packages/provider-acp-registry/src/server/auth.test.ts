@@ -350,10 +350,7 @@ it.effect("does not report authentication when post-login verification fails", (
     const failed = yield* h.phase("failed");
     assert.deepEqual(h.changed, []);
     assert.isTrue(h.killed());
-    assert.strictEqual(
-      failed.message,
-      "The provider could not create a session after terminal sign-in. Authentication required",
-    );
+    assert.strictEqual(failed.message, "终端登录后，提供方无法创建会话。 Authentication required");
   }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
 
@@ -375,7 +372,7 @@ it.effect("surfaces the agent error message when authenticate fails with AcpRequ
     const failed = yield* h.phase("failed");
     assert.strictEqual(
       failed.message,
-      "The ACP agent could not complete sign-in. Connect to the VPN, then sign in again.",
+      "ACP 代理无法完成登录。 Connect to the VPN, then sign in again.",
     );
     assert.deepEqual(h.changed, []);
   }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
@@ -397,17 +394,14 @@ it.effect(
       yield* h.phase("verifying");
       yield* Deferred.succeed(h.verify, undefined);
       const failed = yield* h.phase("failed");
-      assert.strictEqual(
-        failed.message,
-        "The provider could not create a session after sign-in. Authentication required",
-      );
+      assert.strictEqual(failed.message, "登录后，提供方无法创建会话。 Authentication required");
       assert.deepEqual(h.changed, []);
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
 
 it("formatFailureDetail handles all cause types and formatting edge cases cleanly", () => {
-  const baseWithPeriod = "The ACP agent could not complete sign-in.";
-  const baseWithoutPeriod = "The ACP agent could not complete sign-in";
+  const baseWithPeriod = "ACP 代理无法完成登录。";
+  const baseWithoutPeriod = "ACP 代理无法完成登录";
 
   // 1. undefined or null cause
   assert.strictEqual(formatFailureDetail(baseWithPeriod, undefined), baseWithPeriod);
@@ -443,11 +437,11 @@ it("formatFailureDetail handles all cause types and formatting edge cases cleanl
   });
   assert.strictEqual(
     formatFailureDetail(baseWithPeriod, validError),
-    "The ACP agent could not complete sign-in. Connect to the VPN, then sign in again.",
+    "ACP 代理无法完成登录。 Connect to the VPN, then sign in again.",
   );
   assert.strictEqual(
     formatFailureDetail(baseWithoutPeriod, validError),
-    "The ACP agent could not complete sign-in. Connect to the VPN, then sign in again.",
+    "ACP 代理无法完成登录。 Connect to the VPN, then sign in again.",
   );
 
   // 5. AcpRequestError with trimmed message and message without ending period
@@ -458,17 +452,17 @@ it("formatFailureDetail handles all cause types and formatting edge cases cleanl
   });
   assert.strictEqual(
     formatFailureDetail(baseWithPeriod, unpunctError),
-    "The ACP agent could not complete sign-in. Invalid credentials",
+    "ACP 代理无法完成登录。 Invalid credentials",
   );
 
   // 6. Nested Cause (e.g. Cause.fail or Cause.die wrapping AcpRequestError)
   assert.strictEqual(
     formatFailureDetail(baseWithPeriod, Cause.fail(validError)),
-    "The ACP agent could not complete sign-in. Connect to the VPN, then sign in again.",
+    "ACP 代理无法完成登录。 Connect to the VPN, then sign in again.",
   );
   assert.strictEqual(
     formatFailureDetail(baseWithPeriod, Cause.die(validError)),
-    "The ACP agent could not complete sign-in. Connect to the VPN, then sign in again.",
+    "ACP 代理无法完成登录。 Connect to the VPN, then sign in again.",
   );
 
   // 7. Extremely long error message: truncates to 500 characters with ellipsis
@@ -478,6 +472,6 @@ it("formatFailureDetail handles all cause types and formatting edge cases cleanl
     code: -32000,
     errorMessage: longText,
   });
-  const expectedLong = `The ACP agent could not complete sign-in. ${"A".repeat(500)}…`;
+  const expectedLong = `ACP 代理无法完成登录。 ${"A".repeat(500)}…`;
   assert.strictEqual(formatFailureDetail(baseWithPeriod, longError), expectedLong);
 });

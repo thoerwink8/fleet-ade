@@ -143,12 +143,12 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       Effect.flatMap((response) =>
         Effect.gen(function* () {
           if (response.status < 200 || response.status >= 300)
-            return yield* failure("discover", "Could not reach ChatGPT sign-in. Try again.");
+            return yield* failure("discover", "无法连接 ChatGPT 登录。请再试一次。");
           return yield* response.json;
         }),
       ),
       Effect.flatMap(decodeDiscoveryEffect),
-      Effect.mapError(() => failure("discover", "Could not reach ChatGPT sign-in. Try again.")),
+      Effect.mapError(() => failure("discover", "无法连接 ChatGPT 登录。请再试一次。")),
     );
     if (
       !options.discoveryUrl &&
@@ -160,7 +160,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
           ...(result.revocation_endpoint ? [result.revocation_endpoint] : []),
         ].some((url) => new URL(url).origin !== result.issuer))
     )
-      return yield* failure("discover", "ChatGPT sign-in configuration could not be verified.");
+      return yield* failure("discover", "无法验证 ChatGPT 登录配置。");
     metadata = result;
     return result;
   });
@@ -170,14 +170,14 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     return yield* http.get(jwksUri).pipe(
       Effect.filterOrFail(
         (response) => response.status === 200,
-        () => failure("verify", "Could not reach ChatGPT sign-in. Try again."),
+        () => failure("verify", "无法连接 ChatGPT 登录。请再试一次。"),
       ),
       Effect.flatMap((response) => response.json),
       Effect.flatMap(decodeKeySet),
       // Bounds the body read too, as jose's remote set did; a stalled endpoint fails the sign-in.
       Effect.timeoutOrElse({
         duration: "5 seconds",
-        orElse: () => Effect.fail(failure("verify", "Could not reach ChatGPT sign-in. Try again.")),
+        orElse: () => Effect.fail(failure("verify", "无法连接 ChatGPT 登录。请再试一次。")),
       }),
       Effect.tap((fetched) =>
         Effect.map(Clock.currentTimeMillis, (now) => {
@@ -215,7 +215,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     Effect.provideService(Signature.Signature, signature),
   );
   const readSessions = store.get.pipe(
-    Effect.mapError(() => failure("read", "Could not read the saved ChatGPT connection.")),
+    Effect.mapError(() => failure("read", "无法读取已保存的 ChatGPT 连接。")),
     Effect.flatMap((bytes) =>
       Option.isNone(bytes)
         ? Effect.succeed<typeof Sessions.Type>({ activeClientId: null, sessions: [] })
@@ -223,9 +223,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
             Effect.map((saved) =>
               "sessions" in saved ? saved : { activeClientId: saved.clientId, sessions: [saved] },
             ),
-            Effect.mapError(() =>
-              failure("read", "The saved ChatGPT connection is invalid. Sign in again."),
-            ),
+            Effect.mapError(() => failure("read", "已保存的 ChatGPT 连接无效。请重新登录。")),
           ),
     ),
   );
@@ -239,12 +237,10 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
   const writeSessions = (saved: typeof Sessions.Type) =>
     encodeSessions(saved).pipe(
       Effect.flatMap((json) => store.set(new TextEncoder().encode(json))),
-      Effect.mapError(() => failure("save", "Could not save the ChatGPT connection.")),
+      Effect.mapError(() => failure("save", "无法保存 ChatGPT 连接。")),
     );
   const readRegistrations = registrationStore.get.pipe(
-    Effect.mapError(() =>
-      failure("registration", "Could not read the ChatGPT sign-in registration. Try again."),
-    ),
+    Effect.mapError(() => failure("registration", "无法读取 ChatGPT 登录注册信息。请再试一次。")),
     Effect.flatMap((bytes) =>
       Option.isNone(bytes)
         ? Effect.succeed<typeof RegistrationProfiles.Type>({ profiles: [], lastClientId: null })
@@ -269,9 +265,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
                 })),
               };
             }),
-            Effect.mapError(() =>
-              failure("registration", "The saved ChatGPT sign-in registration is invalid."),
-            ),
+            Effect.mapError(() => failure("registration", "已保存的 ChatGPT 登录注册信息无效。")),
           ),
     ),
   );
@@ -294,9 +288,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       lastClientId: profile.clientId,
     }).pipe(
       Effect.flatMap((json) => registrationStore.set(new TextEncoder().encode(json))),
-      Effect.mapError(() =>
-        failure("registration", "Could not save the ChatGPT sign-in registration. Try again."),
-      ),
+      Effect.mapError(() => failure("registration", "无法保存 ChatGPT 登录注册信息。请再试一次。")),
     );
   });
   const save = Effect.fnUntraced(function* (record: CodexChatGptCredentials, activate = true) {
@@ -315,9 +307,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     if (sessions.length) yield* writeSessions({ activeClientId: null, sessions });
     else
       yield* store.remove.pipe(
-        Effect.mapError(() =>
-          failure("disconnect", "Could not clear the ChatGPT connection. Try again."),
-        ),
+        Effect.mapError(() => failure("disconnect", "无法清除 ChatGPT 连接。请再试一次。")),
       );
   });
   const remove = Effect.gen(function* () {
@@ -350,14 +340,12 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
             })),
           ),
         ),
-        Effect.mapError(() =>
-          failure("exchange", "ChatGPT sign-in is temporarily unavailable. Try again."),
-        ),
+        Effect.mapError(() => failure("exchange", "ChatGPT 登录暂时不可用。请再试一次。")),
       );
     if (!response.ok) {
       const error = yield* Effect.try({
         try: () => decodeOAuthError(response.raw).error,
-        catch: () => failure("exchange", "ChatGPT did not accept this sign-in. Try again."),
+        catch: () => failure("exchange", "ChatGPT 没有接受这次登录。请再试一次。"),
       });
       if (
         body.get("grant_type") === "refresh_token" &&
@@ -371,29 +359,25 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         ].includes(error)
       ) {
         yield* remove;
-        return yield* failure(
-          "refresh",
-          "Your ChatGPT connection expired or was disconnected. Sign in again.",
-        );
+        return yield* failure("refresh", "ChatGPT 连接已过期或已断开。请重新登录。");
       }
       if (error === "invalid_client")
         return yield* failure(
           "client",
-          "OpenAI rejected this app's client registration. Check the ChatGPT connection configuration.",
+          "OpenAI 拒绝了此应用的客户端注册。请检查 ChatGPT 连接配置。",
         );
       if (body.get("grant_type") === "authorization_code" && error === "invalid_grant")
-        return yield* failure("code-expired", "This sign-in code expired. Start again.");
+        return yield* failure("code-expired", "此登录码已过期。请重新开始。");
       return yield* failure(
         "exchange",
         error === "access_denied"
-          ? "ChatGPT sign-in was declined. Sign in again when you are ready."
-          : "ChatGPT could not complete sign-in. Try again.",
+          ? "ChatGPT 登录被拒绝。准备好后请重新登录。"
+          : "ChatGPT 无法完成登录。请再试一次。",
       );
     }
     return yield* Effect.try({
       try: () => decodeTokens(response.raw),
-      catch: () =>
-        failure("exchange", "ChatGPT returned an invalid token response. Sign in again."),
+      catch: () => failure("exchange", "ChatGPT 返回了无效的 token 响应。请重新登录。"),
     });
   });
   const earliest = (value: (typeof TokenResponse.Type)["earliest_refresh_at"]) => {
@@ -447,7 +431,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
                     return;
                   }
                   if (used) {
-                    response.writeHead(410).end("Sign-in is no longer active.");
+                    response.writeHead(410).end("登录已不再进行。");
                     return;
                   }
                   // Reject a stray request without ending the sign-in, so the real redirect still lands.
@@ -455,9 +439,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
                   try {
                     returned = codexCallbackUrl(url.toString(), callbackBase, state);
                   } catch {
-                    response
-                      .writeHead(400)
-                      .end("This response does not belong to the active sign-in.");
+                    response.writeHead(400).end("此响应不属于当前正在进行的登录。");
                     return;
                   }
                   used = true;
@@ -466,8 +448,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
                 server.once("error", reject);
                 server.listen(0, "127.0.0.1", () => resolve(server));
               }),
-            catch: () =>
-              failure("callback", "Could not start the local sign-in callback. Try again."),
+            catch: () => failure("callback", "无法启动本地登录回调。请再试一次。"),
           }),
           (server) =>
             Effect.promise(
@@ -480,7 +461,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         );
     const address = server?.address();
     if (!clientCallback && (!address || typeof address === "string"))
-      return yield* failure("callback", "Could not start the local sign-in callback.");
+      return yield* failure("callback", "无法启动本地登录回调。");
     // Only the port may vary between attempts; token exchange uses this exact URI.
     const port =
       address && typeof address !== "string"
@@ -531,24 +512,23 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
             used = true;
             callback.resolve({ url: returned });
           },
-          catch: () =>
-            failure("complete", "This redirect URL does not belong to the active ChatGPT sign-in."),
+          catch: () => failure("complete", "此重定向 URL 不属于当前正在进行的 ChatGPT 登录。"),
         }),
     );
     const received = yield* Effect.tryPromise({
       try: () => callback.promise,
-      catch: () => failure("callback", "ChatGPT sign-in could not be completed."),
+      catch: () => failure("callback", "无法完成 ChatGPT 登录。"),
     });
     const returned = received.url;
     yield* Effect.gen(function* () {
       if (returned.searchParams.get("state") !== state)
-        return yield* failure("callback", "ChatGPT sign-in could not be verified. Start again.");
+        return yield* failure("callback", "无法验证 ChatGPT 登录。请重新开始。");
       if (returned.searchParams.has("error"))
         return yield* failure(
           "callback",
           returned.searchParams.get("error") === "access_denied"
-            ? "ChatGPT sign-in was declined. Sign in again when you are ready."
-            : "ChatGPT sign-in could not be completed. Start again.",
+            ? "ChatGPT 登录被拒绝。准备好后请重新登录。"
+            : "无法完成 ChatGPT 登录。请重新开始。",
         );
       const code = returned.searchParams.get("code");
       const clientId = registeredClientId ?? returned.searchParams.get("client_id");
@@ -560,10 +540,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
           returned.searchParams.has("client_id") &&
           returned.searchParams.get("client_id") !== registeredClientId)
       )
-        return yield* failure(
-          "callback",
-          "ChatGPT registration is incomplete. Start sign-in again.",
-        );
+        return yield* failure("callback", "ChatGPT 注册未完成。请重新登录。");
       yield* context.verifying;
       const tokens = yield* exchange(
         new URLSearchParams({
@@ -582,7 +559,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
                 yield* withSessionLock(saveRegistration({ clientId, redirectUri }));
               return yield* failure(
                 "exchange",
-                "This sign-in code expired. Reconnect the saved ChatGPT profile to start a fresh sign-in.",
+                "此登录码已过期。请重新连接已保存的 ChatGPT 配置以开始新的登录。",
               );
             }
             return yield* error;
@@ -590,10 +567,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         ),
       );
       if (!tokens.id_token)
-        return yield* failure(
-          "verify",
-          "ChatGPT did not return a verified identity. Sign in again.",
-        );
+        return yield* failure("verify", "ChatGPT 没有返回已验证的身份。请重新登录。");
       const identity = yield* verifyIdToken(tokens.id_token, clientId).pipe(
         Effect.flatMap(({ claims }) =>
           claims.nonce === nonce
@@ -603,9 +577,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
               })
             : Effect.fail(failure("verify", "identity")),
         ),
-        Effect.mapError(() =>
-          failure("verify", "ChatGPT sign-in could not be verified. Start again."),
-        ),
+        Effect.mapError(() => failure("verify", "无法验证 ChatGPT 登录。请重新开始。")),
       );
       const expectedSubject =
         savedRegistration?.subject ??
@@ -614,7 +586,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       if (registeredClientId && expectedSubject && identity.subject !== expectedSubject)
         return yield* failure(
           "verify",
-          "This sign-in returned a different ChatGPT account. Use the different-account sign-in option instead. Your saved connection is unchanged.",
+          "这次登录返回了另一个 ChatGPT 账号。请改用其他账号登录。已保存的连接没有改变。",
         );
       const knownProfile = registrations.profiles.find((profile) => profile.clientId === clientId);
       if (
@@ -631,15 +603,9 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
           })()) ||
           (knownProfile.subject && knownProfile.subject !== identity.subject))
       )
-        return yield* failure(
-          "verify",
-          "ChatGPT returned a conflicting account registration. Start again.",
-        );
+        return yield* failure("verify", "ChatGPT 返回了互相冲突的账号注册。请重新开始。");
       if (tokens.token_type.toLowerCase() !== "bearer")
-        return yield* failure(
-          "verify",
-          "ChatGPT returned an unsupported connection. Sign in again.",
-        );
+        return yield* failure("verify", "ChatGPT 返回了不受支持的连接。请重新登录。");
       const scopes = tokens.scope.split(/\s+/).filter(Boolean);
       yield* withSessionLock(
         Effect.gen(function* () {
@@ -669,8 +635,8 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         return yield* failure(
           "sharing",
           previous && previous.clientId !== clientId
-            ? "Token sharing was not enabled for the new account. Your existing ChatGPT connection is unchanged."
-            : "Signed in with ChatGPT, but token sharing is disabled. Sign in again and enable token sharing, or use another provider.",
+            ? "新账号没有启用 token 共享。现有的 ChatGPT 连接没有改变。"
+            : "已使用 ChatGPT 登录，但 token 共享处于关闭状态。请重新登录并启用 token 共享，或改用其他提供方。",
         );
     }).pipe(
       Effect.onExit((result) =>
@@ -711,30 +677,27 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
   const access = Effect.gen(function* () {
     const saved = yield* read;
     if (Option.isNone(saved))
-      return yield* failure("access", "Sign in with ChatGPT to use managed Codex.");
+      return yield* failure("access", "请使用 ChatGPT 登录以使用托管的 Codex。");
     let record = saved.value;
     if (
       options.expectedProfileKey !== undefined &&
       (yield* profileKey(record)) !== options.expectedProfileKey
     )
-      return yield* failure("access", "The ChatGPT connection changed. Start a new session.");
+      return yield* failure("access", "ChatGPT 连接已改变。请开始新的会话。");
     if (!record.scopes.includes(REQUIRED_SCOPE))
       return yield* failure(
         "sharing",
-        "Token sharing is disabled. Sign in with ChatGPT and enable token sharing.",
+        "token 共享处于关闭状态。请使用 ChatGPT 登录并启用 token 共享。",
       );
     const now = yield* Clock.currentTimeMillis;
     if (record.expiresAt - now > 60_000) return record;
     if (record.earliestRefreshAt !== null && record.earliestRefreshAt > now) {
       if (record.expiresAt > now) return record;
-      return yield* failure(
-        "refresh",
-        "ChatGPT cannot renew this connection yet. Try again shortly.",
-      );
+      return yield* failure("refresh", "ChatGPT 暂时无法续期此连接。请稍后再试。");
     }
     if (!record.refreshToken) {
       yield* remove;
-      return yield* failure("refresh", "Your ChatGPT connection expired. Sign in again.");
+      return yield* failure("refresh", "ChatGPT 连接已过期。请重新登录。");
     }
     const tokens = yield* exchange(
       new URLSearchParams({
@@ -749,11 +712,11 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       Effect.mapError((error) =>
         error._tag === "ProviderSetupError" && error.operation === "client"
           ? error
-          : failure("refresh", "Could not renew the ChatGPT connection. Retry, or sign in again."),
+          : failure("refresh", "无法续期 ChatGPT 连接。请重试，或重新登录。"),
       ),
     );
     if (!tokens.refresh_token || tokens.token_type.toLowerCase() !== "bearer") {
-      return yield* failure("refresh", "ChatGPT returned an invalid renewal. Sign in again.");
+      return yield* failure("refresh", "ChatGPT 返回了无效的续期结果。请重新登录。");
     }
     record = {
       ...record,
@@ -765,10 +728,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     };
     yield* save(record);
     if (!record.scopes.includes(REQUIRED_SCOPE))
-      return yield* failure(
-        "sharing",
-        "ChatGPT token sharing is no longer enabled. Sign in again.",
-      );
+      return yield* failure("sharing", "ChatGPT 的 token 共享已不再启用。请重新登录。");
     return record;
   }).pipe(Effect.uninterruptible, withSessionLock, lock.withPermit);
   const logout = Effect.gen(function* () {
@@ -827,15 +787,15 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
       return [
         {
           id: "chatgpt",
-          name: "Sign in with ChatGPT",
+          name: "使用 ChatGPT 登录",
           description: current?.email ? `Reconnect ${current.email}.` : null,
           ...(current?.email ? { accountEmail: current.email } : {}),
           type: "agent" as const,
         },
         {
           id: "chatgpt-change-account",
-          name: "Use a different ChatGPT account",
-          description: "Register a connection for another ChatGPT account.",
+          name: "使用其他 ChatGPT 账号",
+          description: "为另一个 ChatGPT 账号注册连接。",
           type: "agent" as const,
         },
         ...profiles.slice(0, 30).map((profile) => ({
@@ -843,9 +803,9 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
           canRemove:
             profile.subject === undefined &&
             !sessions.some((session) => session.clientId === profile.clientId),
-          name: `${profile.email ?? "ChatGPT account"} · ${profile.connectionLabel}`,
+          name: `${profile.email ?? "ChatGPT 账号"} · ${profile.connectionLabel}`,
           ...(profile.email ? { accountEmail: profile.email } : {}),
-          description: "Reuse this account's original sign-in registration.",
+          description: "沿用此账号原来的登录注册。",
           type: "agent" as const,
         })),
       ];
@@ -866,10 +826,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
                 (session) => session.clientId === profile.clientId,
               )
             )
-              return yield* failure(
-                "removeMethod",
-                "Only incomplete ChatGPT connections can be removed.",
-              );
+              return yield* failure("removeMethod", "只能移除未完成的 ChatGPT 连接。");
             const profiles = saved.profiles.filter((entry) => entry.clientId !== profile.clientId);
             yield* encodeRegistration({
               profiles,
@@ -880,10 +837,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
             }).pipe(
               Effect.flatMap((json) => registrationStore.set(new TextEncoder().encode(json))),
               Effect.mapError(() =>
-                failure(
-                  "removeMethod",
-                  "Could not remove the saved ChatGPT connection. Try again.",
-                ),
+                failure("removeMethod", "无法移除已保存的 ChatGPT 连接。请再试一次。"),
               ),
             );
           }),
@@ -902,7 +856,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
     const registration = registrations.profiles.find((profile) => profile.clientId === clientId);
     if (!registration) {
       if (methodId.startsWith("chatgpt-profile:"))
-        return yield* failure("export", "This saved connection is no longer available.");
+        return yield* failure("export", "此已保存的连接已不可用。");
       return null;
     }
     const session = (yield* readSessions).sessions.find((session) => session.clientId === clientId);
@@ -916,10 +870,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         (profile) => profile.clientId === credentials.clientId,
       );
     if (!credentials?.idToken || !credentials.issuer || !registration)
-      return yield* failure(
-        "export",
-        "Complete ChatGPT sign-in before transferring this connection.",
-      );
+      return yield* failure("export", "转移此连接前，请先完成 ChatGPT 登录。");
     return {
       registration,
       credentials: { ...credentials, idToken: credentials.idToken, issuer: credentials.issuer },
@@ -938,14 +889,9 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         !credentials.scopes.includes(REQUIRED_SCOPE) ||
         credentials.expiresAt <= (yield* Clock.currentTimeMillis)
       )
-        return yield* failure(
-          "import",
-          "The transferred ChatGPT connection is invalid or expired.",
-        );
+        return yield* failure("import", "转移来的 ChatGPT 连接无效或已过期。");
       const identity = yield* verifyIdToken(credentials.idToken, credentials.clientId).pipe(
-        Effect.mapError(() =>
-          failure("import", "The transferred ChatGPT identity could not be verified."),
-        ),
+        Effect.mapError(() => failure("import", "无法验证转移来的 ChatGPT 身份。")),
       );
       if (
         identity.claims.sub !== credentials.subject ||
@@ -954,10 +900,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         (profile.registration.email !== undefined &&
           profile.registration.email !== credentials.email)
       )
-        return yield* failure(
-          "import",
-          "The transferred ChatGPT identity does not match its profile.",
-        );
+        return yield* failure("import", "转移来的 ChatGPT 身份与其配置不符。");
     });
     const saveImported = Effect.gen(function* () {
       const { idTokenHint: _hint, ...registration } = profile.registration;
@@ -965,10 +908,7 @@ export const makeCodexChatGptAuth = Effect.fn("makeCodexChatGptAuth")(function* 
         (saved) => saved.clientId === registration.clientId,
       );
       if (existing?.subject && existing.subject !== profile.credentials.subject)
-        return yield* failure(
-          "import",
-          "The transferred identity conflicts with the saved ChatGPT connection.",
-        );
+        return yield* failure("import", "转移来的身份与已保存的 ChatGPT 连接冲突。");
       yield* saveRegistration(registration);
       yield* save(profile.credentials, true);
     });

@@ -183,7 +183,9 @@ describe("ConnectionResolver", () => {
       const error = yield* Effect.flip(broker.prepare(catalogEntry(target)));
 
       expect(error).toMatchObject({ reason: "unsupported" });
-      expect(error.message).toContain("Update T3 Code on Compatible environment");
+      expect(error.message).toBe(
+        "此客户端需要更新的服务器。请更新 Compatible environment 上的 T3 Code 后再连接。",
+      );
     }),
   );
 

@@ -105,13 +105,13 @@ describe("buildCursorProviderSnapshot", () => {
         parsed: {
           version: null,
           status: "ready",
-          auth: { status: "authenticated", type: "api-key", label: "Cursor API key" },
+          auth: { status: "authenticated", type: "api-key", label: "Cursor API 密钥" },
         },
-        discoveryWarning: "Cursor SDK model discovery returned no built-in models.",
+        discoveryWarning: "Cursor SDK 没有返回内置模型。",
       }),
     ).toMatchObject({
       status: "warning",
-      message: "Cursor SDK model discovery returned no built-in models.",
+      message: "Cursor SDK 没有返回内置模型。",
       models: [],
       supportsConversationRollback: false,
     });
@@ -186,7 +186,7 @@ describe("checkCursorProviderStatus", () => {
         auth: {
           status: "authenticated",
           type: "api-key",
-          label: "Cursor API key (test-key)",
+          label: "Cursor API 密钥 (test-key)",
           email: "cursor@example.com",
         },
         models: [
@@ -244,7 +244,7 @@ describe("checkCursorProviderStatus", () => {
       expect(provider).toMatchObject({
         status: "error",
         auth: { status: "unauthenticated" },
-        message: "Cursor SDK authentication failed. Check CURSOR_API_KEY.",
+        message: "Cursor SDK 身份验证失败。请检查 CURSOR_API_KEY。",
       });
     }),
   );
@@ -252,13 +252,12 @@ describe("checkCursorProviderStatus", () => {
   it.effect.each([
     {
       authenticationType: "browser" as const,
-      message:
-        "Cursor needs a paid plan to run in T3 Code. Upgrade this account or sign in with a different one.",
+      message: "在 T3 Code 中运行 Cursor 需要付费方案。请升级此账号，或改用其他账号登录。",
     },
     {
       authenticationType: "api-key" as const,
       message:
-        "Cursor needs a paid plan to run in T3 Code. Upgrade the account that owns CURSOR_API_KEY or use a key from a paid account.",
+        "在 T3 Code 中运行 Cursor 需要付费方案。请升级 CURSOR_API_KEY 所属账号，或改用付费账号的密钥。",
     },
   ])(
     "explains a rejected plan for $authenticationType authentication",
@@ -302,7 +301,7 @@ describe("checkCursorProviderStatus", () => {
       }),
       expected: {
         status: "ready",
-        auth: { status: "authenticated", type: "api-key", label: "Cursor API key" },
+        auth: { status: "authenticated", type: "api-key", label: "Cursor API 密钥" },
         models: [{ slug: "claude-opus-4-8", isCustom: false }],
       },
     },
@@ -311,7 +310,7 @@ describe("checkCursorProviderStatus", () => {
       meFailure: new CursorSdkError("[unknown] Forbidden", { code: "unknown", status: 403 }),
       expected: {
         status: "ready",
-        auth: { status: "authenticated", type: "api-key", label: "Cursor API key" },
+        auth: { status: "authenticated", type: "api-key", label: "Cursor API 密钥" },
         models: [{ slug: "claude-opus-4-8", isCustom: false }],
       },
     },
@@ -325,7 +324,7 @@ describe("checkCursorProviderStatus", () => {
         status: "error",
         auth: { status: "unknown" },
         message:
-          "Cursor needs a paid plan to run in T3 Code. Upgrade the account that owns CURSOR_API_KEY or use a key from a paid account.",
+          "在 T3 Code 中运行 Cursor 需要付费方案。请升级 CURSOR_API_KEY 所属账号，或改用付费账号的密钥。",
       },
     },
     {
@@ -337,7 +336,7 @@ describe("checkCursorProviderStatus", () => {
       expected: {
         status: "error",
         auth: { status: "unknown" },
-        message: "Cursor SDK catalog request failed. Check server logs for details.",
+        message: "Cursor SDK 模型目录请求失败。请查看服务器日志。",
       },
     },
     {
@@ -349,7 +348,7 @@ describe("checkCursorProviderStatus", () => {
       expected: {
         status: "error",
         auth: { status: "unauthenticated" },
-        message: "Cursor SDK authentication failed. Check CURSOR_API_KEY.",
+        message: "Cursor SDK 身份验证失败。请检查 CURSOR_API_KEY。",
       },
     },
     {
@@ -358,7 +357,7 @@ describe("checkCursorProviderStatus", () => {
       expected: {
         status: "error",
         auth: { status: "unauthenticated" },
-        message: "Cursor SDK authentication failed. Check CURSOR_API_KEY.",
+        message: "Cursor SDK 身份验证失败。请检查 CURSOR_API_KEY。",
       },
     },
   ])("$name", ({ meFailure, expected }) =>
@@ -427,7 +426,7 @@ describe("checkCursorProviderStatus", () => {
         installed: true,
         status: "error",
         auth: { status: "unauthenticated" },
-        message: "Sign in with Cursor or add CURSOR_API_KEY in provider settings.",
+        message: "请使用 Cursor 登录，或在提供方设置中添加 CURSOR_API_KEY。",
       });
     }),
   );

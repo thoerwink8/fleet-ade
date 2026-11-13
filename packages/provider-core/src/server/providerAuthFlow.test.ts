@@ -286,7 +286,7 @@ it.effect.each([
   },
   {
     failure: Effect.die(new Error("private-token in native diagnostics")),
-    message: "Sign-in failed. Start again.",
+    message: "登录失败。请重新开始。",
   },
 ])("publishes only safe authentication failure text %#", ({ failure, message }) =>
   Effect.gen(function* () {
@@ -377,7 +377,7 @@ it.effect.each(["cancel", "logout"] as const)(
     Effect.gen(function* () {
       const harness = yield* makeBlockingResponseHarness;
       const duplicate = yield* Effect.flip(harness.controller.respond!("owner", harness.input));
-      assert.include(duplicate.detail, "already in progress");
+      assert.equal(duplicate.detail, "已有一个登录响应正在处理。");
       assert.equal(harness.responses(), 1);
       const stopping = yield* (
         action === "cancel"
@@ -388,7 +388,7 @@ it.effect.each(["cancel", "logout"] as const)(
       assert.isTrue(yield* harness.controller.isChangingCredentials!);
       assert.isUndefined(stopping.pollUnsafe());
       const premature = yield* Effect.flip(harness.controller.start("other"));
-      assert.include(premature.detail, "in progress");
+      assert.equal(premature.detail, "提供方设置已在进行中。");
       yield* Deferred.succeed(harness.cleanupReleased, undefined);
       yield* Fiber.join(stopping);
       assert.isTrue(yield* Deferred.isDone(harness.cleanupFinished));
@@ -406,7 +406,7 @@ it.effect(
       yield* Deferred.succeed(harness.authenticationFinished, undefined);
       yield* Deferred.await(harness.cleanupStarted);
       const denied = yield* Effect.flip(harness.controller.withAccess!(Effect.void));
-      assert.include(denied.detail, "changing");
+      assert.equal(denied.detail, "提供方登录正在变更。请等它结束后再试。");
       yield* Deferred.succeed(harness.cleanupReleased, undefined);
       const succeeded = yield* harness.controller.subscribe("owner").pipe(
         Stream.filter((state) => state.phase === "succeeded"),

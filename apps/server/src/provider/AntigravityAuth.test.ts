@@ -235,10 +235,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
           }),
         );
         const failed = yield* phase(harness.auth, "failed");
-        assert.equal(
-          failed.message,
-          "Antigravity authenticated, but could not initialize a session or load models.",
-        );
+        assert.equal(failed.message, "Antigravity 已通过身份验证，但无法初始化会话或加载模型。");
         assert.isNull(failed.authorizationUrl);
         assert.deepEqual(harness.catalog(), ["previous-account-model"]);
         yield* Deferred.await(harness.closed);
@@ -256,7 +253,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
         AcpErrors.AcpRequestError.internalError(`access_denied ${callbackUrl}`),
       );
       const failed = yield* phase(harness.auth, "failed");
-      assert.include(failed.message ?? "", "not approved");
+      assert.include(failed.message ?? "", "未获批准");
       assert.notInclude(failed.message ?? "", "test-code");
       assert.isNull(failed.authorizationUrl);
       assert.deepEqual(harness.catalog(), ["previous-account-model"]);
@@ -272,7 +269,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
 
       yield* TestClock.adjust("30 seconds");
       const stalled = yield* harness.auth.controller.subscribe(owner).pipe(
-        Stream.filter((state) => state.message?.includes("Broken IPv6") === true),
+        Stream.filter((state) => state.message?.includes("IPv6") === true),
         Stream.runHead,
         Effect.map(Option.getOrThrow),
       );
@@ -280,7 +277,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
 
       yield* TestClock.adjust("270 seconds");
       const failed = yield* phase(harness.auth, "failed");
-      assert.include(failed.message ?? "", "could not reach Google");
+      assert.include(
+        failed.message ?? "",
+        "Antigravity 无法连接 Google。请检查此机器的网络连接后重新登录。",
+      );
     }),
   );
 
@@ -296,7 +296,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
       });
       const hasHint = harness.auth.controller.subscribe(owner).pipe(
         Stream.runHead,
-        Effect.map((state) => Option.getOrThrow(state).message?.includes("Broken IPv6") === true),
+        Effect.map((state) => Option.getOrThrow(state).message?.includes("IPv6") === true),
       );
       yield* harness.auth.controller.start(owner);
       yield* Deferred.await(initializing);
@@ -312,7 +312,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
 
       yield* TestClock.adjust("1 second");
       const stalled = yield* harness.auth.controller.subscribe(owner).pipe(
-        Stream.filter((state) => state.message?.includes("Broken IPv6") === true),
+        Stream.filter((state) => state.message?.includes("IPv6") === true),
         Stream.runHead,
         Effect.map(Option.getOrThrow),
       );
@@ -334,18 +334,18 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
 
       yield* TestClock.adjust("90 seconds");
       const stalled = yield* harness.auth.controller.subscribe(owner).pipe(
-        Stream.filter((state) => state.message !== "Starting Google sign-in."),
+        Stream.filter((state) => state.message !== "正在启动 Google 登录。"),
         Stream.runHead,
         Effect.map(Option.getOrThrow),
       );
       assert.equal(stalled.phase, "starting");
       assert.notMatch(stalled.message ?? "", blamesNetwork);
-      assert.match(stalled.message ?? "", /not started|stuck/i);
+      assert.match(stalled.message ?? "", /仍未启动|卡在/);
 
       yield* TestClock.adjust("210 seconds");
       const failed = yield* phase(harness.auth, "failed");
       assert.notMatch(failed.message ?? "", blamesNetwork);
-      assert.match(failed.message ?? "", /not respond|may not run/i);
+      assert.match(failed.message ?? "", /没有响应|无法在这台机器上运行/);
     }),
   );
 
@@ -357,7 +357,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
 
       yield* TestClock.adjust("300 seconds");
       const failed = yield* phase(harness.auth, "failed");
-      assert.equal(failed.message, "Google sign-in expired. Start sign-in again.");
+      assert.equal(failed.message, "Google 登录已过期。请重新登录。");
     }),
   );
 
@@ -420,7 +420,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
       yield* Fiber.interrupt(request);
       yield* Deferred.succeed(deliveryGate, undefined);
       const failed = yield* phase(harness.auth, "failed");
-      assert.include(failed.message ?? "", "Could not deliver");
+      assert.equal(failed.message, "无法发送登录响应。请重新登录。");
       assert.isTrue(harness.events.includes("process-close"));
     }),
   );
@@ -565,7 +565,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
       yield* Fiber.interrupt(request);
       yield* Deferred.succeed(continueStop, undefined);
       const result = yield* harness.auth.controller.subscribe(owner).pipe(
-        Stream.filter((state) => state.message === "Signed out of Google."),
+        Stream.filter((state) => state.message === "已退出 Google 登录。"),
         Stream.runHead,
         Effect.map(Option.getOrThrow),
       );

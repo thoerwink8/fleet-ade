@@ -22,13 +22,13 @@ const isTextGenerationError = Schema.is(TextGenerationError);
 function cursorSdkResultDetail(result: RunResult): string {
   switch (result.status) {
     case "cancelled":
-      return "Cursor SDK request was cancelled.";
+      return "Cursor SDK 请求已取消。";
     case "error":
       return CursorAgentSdk.isCursorUsageLimitError(result.error)
-        ? "Cursor usage limit reached. Try again later or choose another text-generation provider."
-        : "Cursor SDK request finished with an error.";
+        ? "已达到 Cursor 用量上限。请稍后再试，或改用其他文本生成提供方。"
+        : "Cursor SDK 请求因错误结束。";
     case "finished":
-      return "Cursor SDK returned empty output.";
+      return "Cursor SDK 返回了空输出。";
   }
 }
 
@@ -62,7 +62,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
     if (!cursorSettings.enabled) {
       return yield* new TextGenerationError({
         operation,
-        detail: "Cursor is disabled in T3 Code settings.",
+        detail: "已在 T3 Code 设置中停用 Cursor。",
       });
     }
 
@@ -72,7 +72,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
     if (!apiKey) {
       return yield* new TextGenerationError({
         operation,
-        detail: "Sign in with Cursor or add CURSOR_API_KEY in provider settings.",
+        detail: "请使用 Cursor 登录，或在提供方设置中添加 CURSOR_API_KEY。",
       });
     }
 
@@ -90,14 +90,14 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
         new TextGenerationError({ operation, detail, cause });
       const { Agent } = yield* Effect.try({
         try: sdk.load,
-        catch: sdkFailure("Cursor SDK could not be loaded."),
+        catch: sdkFailure("无法加载 Cursor SDK。"),
       });
       // sandbox.json expands writable paths independently of settingSources; the public API cannot override it.
       if (yield* fs.exists(`${yield* HostProcess.HomeDirectory}/.cursor/sandbox.json`)) {
         return yield* new TextGenerationError({
           operation,
           detail:
-            "Cursor text generation cannot enforce workspace isolation with a custom ~/.cursor/sandbox.json. Use another text-generation provider.",
+            "自定义的 ~/.cursor/sandbox.json 使 Cursor 文本生成无法把写入限制在工作区内。请改用其他文本生成提供方。",
         });
       }
       const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cursor-text-" });
@@ -106,12 +106,12 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       const store = yield* Effect.acquireRelease(
         Effect.tryPromise({
           try: () => sdk.loadSqlite().SqliteLocalAgentStore.open({ workspaceRef: cwd, stateRoot }),
-          catch: sdkFailure("Cursor SDK agent store could not be opened."),
+          catch: sdkFailure("无法打开 Cursor SDK 代理存储。"),
         }),
         (store) =>
           Effect.tryPromise({
             try: () => store.dispose(),
-            catch: sdkFailure("Cursor SDK agent store could not be disposed."),
+            catch: sdkFailure("无法释放 Cursor SDK 代理存储。"),
           }).pipe(Effect.ignore({ log: true })),
       );
       const agentOptions = {
@@ -144,7 +144,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
               if (signal.aborted) agent.close();
               return agent;
             }),
-          catch: sdkFailure("Cursor SDK agent could not be created."),
+          catch: sdkFailure("无法创建 Cursor SDK 代理。"),
         });
 
       const request = Effect.gen(function* () {
@@ -156,7 +156,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
           (agent) =>
             Effect.tryPromise({
               try: () => agent[Symbol.asyncDispose](),
-              catch: sdkFailure("Cursor SDK agent could not be disposed."),
+              catch: sdkFailure("无法释放 Cursor SDK 代理。"),
             }).pipe(Effect.timeout("5 seconds"), Effect.ignore({ log: true })),
           { interruptible: true },
         );
@@ -166,19 +166,19 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
               if (signal.aborted) void run.cancel().catch(() => undefined);
               return run;
             }),
-          catch: sdkFailure("Cursor SDK request could not be sent."),
+          catch: sdkFailure("无法发送 Cursor SDK 请求。"),
         });
         yield* Effect.addFinalizer(() =>
           run.status === "running"
             ? Effect.tryPromise({
                 try: () => run.cancel(),
-                catch: sdkFailure("Cursor SDK run could not be cancelled."),
+                catch: sdkFailure("无法取消 Cursor SDK 运行。"),
               }).pipe(Effect.timeout("5 seconds"), Effect.ignore({ log: true }))
             : Effect.void,
         );
         return yield* Effect.tryPromise({
           try: () => run.wait(),
-          catch: sdkFailure("Cursor SDK run failed."),
+          catch: sdkFailure("Cursor SDK 运行失败。"),
         });
       }).pipe(Effect.scoped);
       const promptResult = yield* request.pipe(
@@ -189,7 +189,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
               Effect.fail(
                 new TextGenerationError({
                   operation,
-                  detail: "Cursor SDK request timed out.",
+                  detail: "Cursor SDK 请求超时。",
                 }),
               ),
             onSome: (value) => Effect.succeed(value),
@@ -219,7 +219,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
             ? cause
             : new TextGenerationError({
                 operation,
-                detail: "Cursor SDK text generation failed.",
+                detail: "Cursor SDK 文本生成失败。",
                 cause,
               }),
         ),

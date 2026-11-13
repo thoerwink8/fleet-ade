@@ -83,6 +83,8 @@ Antigravity
 # 产品名
 ChatGPT
 # 产品名
+Google
+# 产品名
 Claude Code
 # 产品名
 Grok Build
@@ -222,3 +224,15 @@ label:bug
 claude mcp add --transport http
 # 要用户原样输入的命令
 t3 connect link
+# 协议名
+IPv6
+# 产品名
+OpenAI
+# 技术缩写
+SDK
+# 用来识别 Cursor SDK 固定英文错误前缀，对照的是 SDK 异常文本，不是展示文案
+Login succeeded, but creating an SDK API key failed
+# 用来识别 Cursor SDK 固定英文错误前缀，对照的是 SDK 异常文本，不是展示文案
+Login failed or timed out
+# 要用户检查的配置文件路径
+~/.cursor/sandbox.json

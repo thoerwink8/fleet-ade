@@ -676,7 +676,7 @@ it.effect(
         assert.strictEqual(response.headers.get("cache-control"), "no-store");
         assert.strictEqual(response.headers.get("referrer-policy"), "no-referrer");
         assert.include(response.headers.get("content-security-policy")!, "default-src 'none'");
-        assert.include(response.body, "You're signed in".replace("'", "&#39;"));
+        assert.include(response.body, "已登录");
         assert.include(
           response.body,
           'content="1;url=http://localhost:7001/settings/providers?instanceId=codex_work"',
@@ -700,7 +700,7 @@ it.effect(
         yield* h.signIn;
         yield* h.phase("failed");
         const response = h.callbackResponses[0]!;
-        assert.include(response.body, "Sign-in couldn&#39;t finish");
+        assert.include(response.body, "登录未能完成");
         assert.notInclude(response.body, 'http-equiv="refresh"');
         assert.notInclude(response.body, "attacker.example");
         assert.isTrue(Option.isNone(yield* h.auth.read));
@@ -736,7 +736,7 @@ it.effect("rejects invalid ID token nonce without saving credentials", () =>
       const h = yield* makeHarness;
       h.setInvalidNonce();
       yield* h.signIn;
-      assert.include((yield* h.phase("failed")).message!, "could not be verified");
+      assert.include((yield* h.phase("failed")).message!, "无法验证");
       assert.isTrue(Option.isNone(yield* h.auth.read));
     }),
   ),
@@ -858,7 +858,7 @@ it.effect("rejects mismatched callback state and keeps waiting for the real redi
       const h = yield* makeHarness;
       h.mismatchCallbackState();
       yield* h.signIn;
-      assert.include(h.callbackResponses[0]!.body, "does not belong to the active sign-in");
+      assert.include(h.callbackResponses[0]!.body, "此响应不属于当前正在进行的登录。");
       assert.strictEqual(h.exchanges.length, 0);
       assert.deepEqual(h.storedRecords(), []);
       assert.isTrue(Option.isNone(yield* h.auth.read));
@@ -881,7 +881,7 @@ it.effect.each(["issuer", "audience", "signature"] as const)(
         const h = yield* makeHarness;
         h.setIdentityFailure(invalidClaim);
         yield* h.signIn;
-        assert.include((yield* h.phase("failed")).message!, "could not be verified");
+        assert.include((yield* h.phase("failed")).message!, "无法验证");
         assert.strictEqual(h.exchanges.length, 1);
         assert.deepEqual(h.storedRecords(), []);
         assert.isTrue(Option.isNone(yield* h.auth.read));
@@ -901,7 +901,7 @@ it.effect.each([
       const before = h.storedRecords();
       h.setCallbackClientId("oaiapp_untrusted_callback");
       yield* h.signIn;
-      assert.include((yield* h.phase("failed")).message!, "registration is incomplete");
+      assert.include((yield* h.phase("failed")).message!, "注册未完成");
       assert.strictEqual(h.authorizationRequests[1]?.searchParams.get("client_id"), "oaiapp_test");
       assert.strictEqual(h.exchanges.length, 1);
       assert.deepEqual(h.storedRecords(), before);
@@ -1066,7 +1066,7 @@ it.effect.each([
       const before = h.storedRecords();
       h.setIdentity("another-user", "another@example.test");
       yield* h.signIn;
-      assert.include((yield* h.phase("failed")).message!, "different ChatGPT account");
+      assert.include((yield* h.phase("failed")).message!, "另一个 ChatGPT 账号");
       assert.deepEqual(h.storedRecords(), before);
       assert.strictEqual(Option.isNone(yield* h.auth.read), disconnected);
     }),
@@ -1215,7 +1215,7 @@ it.effect(
         const restarted = yield* makeHarnessFor(instanceId, bytes);
         restarted.setIdentity("another-user", "another@example.test");
         yield* restarted.signIn;
-        assert.include((yield* restarted.phase("failed")).message!, "different ChatGPT account");
+        assert.include((yield* restarted.phase("failed")).message!, "另一个 ChatGPT 账号");
         assert.isTrue(Option.isNone(yield* restarted.auth.read));
         assert.strictEqual(
           restarted.authorizationRequests[0]!.searchParams.get("ext_agent_host_id"),
@@ -1240,10 +1240,7 @@ it.effect("declined sharing on an older profile does not replace the active acco
       h.setCallbackClientId("oaiapp_test");
       h.declineSharing();
       yield* h.reconnectProfile("oaiapp_test");
-      assert.include(
-        (yield* h.phase("failed")).message!,
-        "existing ChatGPT connection is unchanged",
-      );
+      assert.include((yield* h.phase("failed")).message!, "现有的 ChatGPT 连接没有改变");
       assert.deepEqual(
         Option.getOrThrow(yield* h.auth.read),
         before.find((record) => record.clientId === "oaiapp_other_account"),
@@ -1390,7 +1387,7 @@ it.effect.each([false, true])(
         yield* h.phase("failed");
         const { waiting } = yield* h.startRemote(methodId);
         const busy = yield* Effect.flip(h.auth.controller.removeMethod!(methodId));
-        assert.include(busy.detail, "Finish or cancel");
+        assert.include(busy.detail, "请先完成或取消正在进行的登录。");
         yield* h.auth.controller.cancel("owner", waiting.flowId!);
         const removed = yield* h.auth.controller.removeMethod!(methodId);
         assert.isFalse(removed.methods!.some((method) => method.id === methodId));

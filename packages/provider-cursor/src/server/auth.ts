@@ -27,13 +27,13 @@ const AUTH_TIMEOUT_MS = 300_000;
 const loginFailureDetail = (cause: unknown) => {
   if (isCursorSdkError(cause, "CursorSdkError")) {
     if (cause.message.startsWith("Login succeeded, but creating an SDK API key failed")) {
-      return "Cursor signed you in but could not create an API key. Your team's settings may restrict API keys: ask a team admin, or add CURSOR_API_KEY in provider settings.";
+      return "Cursor 已让你登录，但无法创建 API 密钥。团队设置可能限制了 API 密钥：请联系团队管理员，或在提供方设置中添加 CURSOR_API_KEY。";
     }
     if (cause.message.startsWith("Login failed or timed out")) {
-      return "Cursor sign-in failed or timed out. Check that this machine can reach Cursor, then start sign-in again.";
+      return "Cursor 登录失败或超时。请确认这台机器能访问 Cursor，然后重新登录。";
     }
   }
-  return "Cursor sign-in failed. Start sign-in again.";
+  return "Cursor 登录失败。请重新登录。";
 };
 
 interface AuthFlow {
@@ -95,7 +95,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
         new ProviderSetupError({
           instanceId: options.instanceId,
           operation: "credentials",
-          detail: "Could not read the Cursor sign-in. Try signing in again.",
+          detail: "无法读取 Cursor 登录信息。请重新登录。",
           cause,
         }),
     });
@@ -111,7 +111,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
       return yield* new ProviderSetupError({
         instanceId: options.instanceId,
         operation: "credentials",
-        detail: "Cursor sign-in or sign-out is in progress. Try again after it finishes.",
+        detail: "Cursor 正在登录或退出。请等它结束后再试。",
       });
     }
     const apiKey = yield* readApiKey;
@@ -119,7 +119,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
       return yield* new ProviderSetupError({
         instanceId: options.instanceId,
         operation: "credentials",
-        detail: "Sign in with Cursor or add CURSOR_API_KEY in provider settings.",
+        detail: "请使用 Cursor 登录，或在提供方设置中添加 CURSOR_API_KEY。",
       });
     }
     return apiKey;
@@ -136,7 +136,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
               return yield* new ProviderSetupError({
                 instanceId: options.instanceId,
                 operation: "session",
-                detail: "Cursor sign-in or sign-out is in progress. Try again after it finishes.",
+                detail: "Cursor 正在登录或退出。请等它结束后再试。",
               });
             const child = yield* Scope.make();
             sessions.add(child);
@@ -179,7 +179,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
           new ProviderSetupError({
             instanceId: options.instanceId,
             operation: "start",
-            detail: "Could not load the Cursor SDK. Try signing in again.",
+            detail: "无法加载 Cursor SDK。请重新登录。",
             cause,
           }),
       });
@@ -193,8 +193,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
               yield* publish(flow, {
                 phase: "waiting",
                 authorizationUrl,
-                message:
-                  "Open the Cursor sign-in page and finish signing in. This page updates automatically.",
+                message: "请打开 Cursor 登录页并完成登录。此页面会自动更新。",
               });
             }),
           ),
@@ -228,19 +227,19 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
           yield* publish(flow, {
             phase: "verifying",
             authorizationUrl: null,
-            message: "Checking Cursor sign-in.",
+            message: "正在检查 Cursor 登录。",
           });
           yield* Effect.tryPromise({
             try: async () => {
               const credentials = await pendingStore.load();
-              if (!credentials) throw new Error("Cursor login did not return credentials");
+              if (!credentials) throw new Error("Cursor 登录没有返回凭证");
               await options.store.save(credentials);
             },
             catch: (cause) =>
               new ProviderSetupError({
                 instanceId: options.instanceId,
                 operation: "start",
-                detail: "Could not save the Cursor sign-in. Try again.",
+                detail: "无法保存 Cursor 登录信息。请再试一次。",
                 cause,
               }),
           });
@@ -252,7 +251,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
                 new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "start",
-                  detail: "Could not clear the rejected Cursor sign-in. Try signing out.",
+                  detail: "无法清除被拒绝的 Cursor 登录。请尝试退出登录。",
                   cause,
                 }),
             });
@@ -264,7 +263,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
             phase: "succeeded",
             authorizationUrl: null,
             expiresAt: null,
-            message: "Signed in with Cursor.",
+            message: "已使用 Cursor 登录。",
           });
         }).pipe(Effect.uninterruptible),
       );
@@ -279,7 +278,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
               new ProviderSetupError({
                 instanceId: options.instanceId,
                 operation: "start",
-                detail: "Cursor sign-in expired. Start sign-in again.",
+                detail: "Cursor 登录已过期。请重新登录。",
               }),
             ),
         }),
@@ -296,9 +295,9 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
                 authorizationUrl: null,
                 expiresAt: null,
                 message: Exit.isSuccess(result)
-                  ? "Signed in with Cursor."
+                  ? "已使用 Cursor 登录。"
                   : Option.match(Cause.findErrorOption(result.cause), {
-                      onNone: () => "Cursor sign-in failed or expired. Start sign-in again.",
+                      onNone: () => "Cursor 登录失败或已过期。请重新登录。",
                       onSome: (error) => error.detail,
                     }),
               });
@@ -317,7 +316,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
       return yield* new ProviderSetupError({
         instanceId: options.instanceId,
         operation: name,
-        detail: "This sign-in is no longer active in this client.",
+        detail: "这次登录在此客户端已不再进行。",
       });
     }
     return active;
@@ -337,21 +336,20 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
               return yield* new ProviderSetupError({
                 instanceId: options.instanceId,
                 operation: "start",
-                detail: "Enable Cursor before signing in.",
+                detail: "请先启用 Cursor，再登录。",
               });
             if (configuredKey)
               return yield* new ProviderSetupError({
                 instanceId: options.instanceId,
                 operation: "start",
-                detail:
-                  "Remove CURSOR_API_KEY from this provider's environment before using browser sign-in.",
+                detail: "使用浏览器登录前，请先从该提供方的环境中移除 CURSOR_API_KEY。",
               });
             if (active?.owner === owner && operation === "login") return snapshot.value.state;
             if (operation !== "idle")
               return yield* new ProviderSetupError({
                 instanceId: options.instanceId,
                 operation: "start",
-                detail: "Cursor setup is already in progress.",
+                detail: "Cursor 的设置已在进行中。",
               });
             const id = yield* random.uuidV4().pipe(
               Effect.mapError(
@@ -359,7 +357,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
                   new ProviderSetupError({
                     instanceId: options.instanceId,
                     operation: "start",
-                    detail: "Could not start Cursor sign-in. Try again.",
+                    detail: "无法开始 Cursor 登录。请再试一次。",
                     cause,
                   }),
               ),
@@ -375,7 +373,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
               phase: "starting",
               flowId: id,
               expiresAt,
-              message: "Starting Cursor sign-in.",
+              message: "正在开始 Cursor 登录。",
             };
             yield* SubscriptionRef.set(snapshot, { owner, state });
             flow.fiber = yield* runLogin(flow, stopSessions).pipe(
@@ -391,7 +389,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
         new ProviderSetupError({
           instanceId: options.instanceId,
           operation: "complete",
-          detail: "Finish signing in on the Cursor website. No redirect URL is needed.",
+          detail: "请在 Cursor 网站上完成登录。不需要重定向 URL。",
         }),
       ),
     cancel: (owner, id) =>
@@ -406,7 +404,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
                 phase: "cancelled",
                 authorizationUrl: null,
                 expiresAt: null,
-                message: "Cursor sign-in was cancelled.",
+                message: "Cursor 登录已取消。",
               });
               return flow;
             }),
@@ -425,14 +423,13 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
                 return yield* new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "logout",
-                  detail:
-                    "Remove CURSOR_API_KEY from this provider's environment to disconnect it.",
+                  detail: "要断开连接，请从该提供方的环境中移除 CURSOR_API_KEY。",
                 });
               if (operation !== "idle" && operation !== "login")
                 return yield* new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "logout",
-                  detail: "Cursor setup is already stopping.",
+                  detail: "Cursor 的设置正在停止。",
                 });
               operation = "stopping";
               const flow = active;
@@ -449,7 +446,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
                 new ProviderSetupError({
                   instanceId: options.instanceId,
                   operation: "logout",
-                  detail: "Could not clear the Cursor sign-in. Try again.",
+                  detail: "无法清除 Cursor 登录信息。请再试一次。",
                   cause,
                 }),
             });
@@ -460,8 +457,8 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
             ...emptyState,
             phase: Exit.isSuccess(result) ? "idle" : "failed",
             message: Exit.isSuccess(result)
-              ? "Signed out of Cursor."
-              : "Cursor sign-out failed. Try again.",
+              ? "已退出 Cursor 登录。"
+              : "退出 Cursor 登录失败。请再试一次。",
           };
           yield* SubscriptionRef.set(snapshot, { owner: null, state });
           if (Exit.isFailure(result)) return yield* Effect.failCause(result.cause);
@@ -477,7 +474,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
             methods: [
               {
                 id: "browser",
-                name: "Sign in with Cursor",
+                name: "使用 Cursor 登录",
                 description: null,
                 type: "agent" as const,
               },
@@ -501,7 +498,7 @@ export const makeCursorAuth = Effect.fn("makeCursorAuth")(function* (options: Cu
             flowId: null,
             authorizationUrl: null,
             expiresAt: null,
-            message: active ? "Sign-in is in progress in another client." : current.state.message,
+            message: active ? "正在其他客户端中登录。" : current.state.message,
           };
         }),
       ),
