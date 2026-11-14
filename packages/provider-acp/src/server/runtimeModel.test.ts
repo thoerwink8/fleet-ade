@@ -1079,7 +1079,7 @@ describe("AcpRuntimeModel", () => {
       toolCall: {
         toolCallId: "acp-compaction:compact-1",
         kind: "think",
-        title: "Compact context",
+        title: "压缩上下文",
         status: "inProgress",
       },
     });

@@ -281,15 +281,15 @@ describe("Claude model catalog", () => {
       [
         { id: "medium", label: "Medium" },
         { id: "high", label: "High", isDefault: true },
-        { id: "xhigh", label: "Extra High (capped to High)" },
-        { id: "max", label: "Max (capped to High)" },
+        { id: "xhigh", label: "超高 (capped to High)" },
+        { id: "max", label: "最大 (capped to High)" },
         { id: "ultracode", label: "Ultracode (capped to High)" },
         { id: "ultrathink", label: "Ultrathink" },
       ],
       [
         { id: "medium", label: "Medium" },
         { id: "high", label: "High", isDefault: true },
-        { id: "xhigh", label: "Extra High (capped to High)" },
+        { id: "xhigh", label: "超高 (capped to High)" },
         { id: "max", label: "最大" },
         { id: "ultracode", label: "Ultracode" },
         { id: "ultrathink", label: "Ultrathink" },
@@ -300,8 +300,8 @@ describe("Claude model catalog", () => {
     assert.deepStrictEqual(
       options("xhigh").map((model) => model?.map((option) => option.label)),
       [
-        ["Medium", "High", "超高", "Max (capped to Extra High)", "Ultracode", "Ultrathink"],
-        ["Medium", "High", "超高", "Max", "Ultracode", "Ultrathink"],
+        ["Medium", "High", "超高", "最大 (capped to 超高)", "Ultracode", "Ultrathink"],
+        ["Medium", "High", "超高", "最大", "Ultracode", "Ultrathink"],
       ],
     );
 
@@ -317,12 +317,12 @@ describe("Claude model catalog", () => {
         [
           "Medium",
           "High",
-          "Extra High (capped to High)",
-          "Max (capped to High)",
+          "超高 (capped to High)",
+          "最大 (capped to High)",
           "Ultracode (capped to High)",
           "Ultrathink",
         ],
-        ["Medium", "High", "超高", "Max", "Ultracode", "Ultrathink"],
+        ["Medium", "High", "超高", "最大", "Ultracode", "Ultrathink"],
       ],
     );
 
@@ -355,7 +355,7 @@ describe("Claude model catalog", () => {
     const cappedEffort = capped?.capabilities?.optionDescriptors?.[0];
     assert.deepStrictEqual(
       cappedEffort?.type === "select" ? cappedEffort.options.map((option) => option.label) : [],
-      ["Low", "Medium", "High", "Max (capped to High)"],
+      ["Low", "Medium", "High", "最大 (capped to High)"],
     );
   });
 
@@ -432,12 +432,12 @@ describe("Claude model catalog", () => {
     });
 
     // Claude Code matches family aliases and [1m] spellings case-insensitively.
-    assert.strictEqual(maxLabel([perModel({ Opus: "medium" })]), "Max (capped to Medium)");
+    assert.strictEqual(maxLabel([perModel({ Opus: "medium" })]), "最大 (capped to Medium)");
     assert.strictEqual(
       maxLabel([perModel({ "claude-opus-5-5[1M]": "medium" })]),
-      "Max (capped to Medium)",
+      "最大 (capped to Medium)",
     );
-    assert.strictEqual(maxLabel([perModel({ " OPUS[1m] ": "medium" })]), "Max (capped to Medium)");
+    assert.strictEqual(maxLabel([perModel({ " OPUS[1m] ": "medium" })]), "最大 (capped to Medium)");
     // Other keys name the most specific model id they contain, so dated and provider-prefixed ids
     // match while the catalog's dotted aliases and a less specific model id do not.
     for (const key of [
@@ -446,28 +446,28 @@ describe("Claude model catalog", () => {
       "us.anthropic.claude-opus-5-5-v1:0",
       "claude-opus-5-5-latest",
     ]) {
-      assert.strictEqual(maxLabel([perModel({ [key]: "medium" })]), "Max (capped to Medium)", key);
+      assert.strictEqual(maxLabel([perModel({ [key]: "medium" })]), "最大 (capped to Medium)", key);
     }
     for (const key of ["claude-opus-5.5", "opus-5.5", "opus-5-5", "opus [1m]", "claude-opus-5"]) {
-      assert.strictEqual(maxLabel([perModel({ [key]: "medium" })]), "Max", key);
+      assert.strictEqual(maxLabel([perModel({ [key]: "medium" })]), "最大", key);
     }
     // Keys naming the same model keep the lowest cap, and a `max` key does not exempt it.
     assert.strictEqual(
       maxLabel([perModel({ opus: "max", "claude-opus-5-5": "low" })]),
-      "Max (capped to Low)",
+      "最大 (capped to Low)",
     );
     // A per-model `max` only exempts the model from its own source's top-level cap.
     assert.strictEqual(
       maxLabel([{ maxEffortLevel: "medium", ...perModel({ opus: "max" }) }]),
-      "Max",
+      "最大",
     );
     assert.strictEqual(
       maxLabel([perModel({ opus: "max" }), { maxEffortLevel: "high" }]),
-      "Max (capped to High)",
+      "最大 (capped to High)",
     );
     assert.strictEqual(
       maxLabel([{ maxEffortLevel: "medium" }, perModel({ opus: "high" })]),
-      "Max (capped to Medium)",
+      "最大 (capped to Medium)",
     );
   });
 });

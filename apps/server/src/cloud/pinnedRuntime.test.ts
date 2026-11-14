@@ -137,6 +137,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       const firstChunk = yield* Deferred.make<void>();
       const install = yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -204,6 +205,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       const gatewayTimeoutServed = yield* Deferred.make<void>();
       const install = yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -246,6 +248,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       const archiveRequested = yield* Deferred.make<void>();
       const install = yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -293,6 +296,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       let requests = 0;
       const error = yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -322,6 +326,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       const commands: string[] = [];
       const error = yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -348,6 +353,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
 
       const installed = yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -379,6 +385,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
 
       yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -411,6 +418,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
 
       yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,
@@ -476,6 +484,7 @@ it.layer(NodeServices.layer)("ensurePinnedRuntimeInstalled", (it) => {
       const requests: string[] = [];
       yield* ensurePinnedRuntimeInstalled({
         baseDir,
+        releaseBaseUrl: "https://releases.example/download",
         version,
         fs,
         path,

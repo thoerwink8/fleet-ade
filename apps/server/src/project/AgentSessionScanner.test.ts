@@ -1409,7 +1409,7 @@ it.layer(NodeServices.layer)("AgentSessionScanner", (it) => {
         expect(threads.map((thread) => thread.messages.map((message) => message.text))).toEqual([
           ["Plan the change", "Active answer"],
           ["Review this code", "Looks good"],
-          ["Fix the project", "Done"],
+          ["Fix the project", "完成"],
           ["Legacy prompt", "Legacy answer"],
         ]);
         expect(threads[0]).toMatchObject({ source: "pi", title: "Pi refactor" });
@@ -2834,7 +2834,7 @@ describe("parseAgentSessionTranscript", () => {
 
       expect(thread?.omittedMessageCount).toBe(Math.max(0, count - 200));
       expect(thread?.messages).toHaveLength(Math.min(200, count));
-      expect(thread?.messages[0]?.text).toBe("Message 0");
+      expect(thread?.messages[0]?.text).toBe("给 0 发消息");
       expect(thread?.messages.at(-1)?.text).toBe(`给 ${count - 1} 发消息`);
     },
   );

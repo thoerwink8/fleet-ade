@@ -7272,7 +7272,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       if (pause.type !== "system_notice") return;
       assert.equal(
         pause.message,
-        "Claude usage limit reached. This turn is paused until the 5-hour limit resets in 2h.",
+        "已达到 Claude 用量上限。本回合已暂停，直到 5 小时上限重置（2 小时后）。",
       );
       assert.lengthOf(harness.terminalEvents(), 0);
       yield* Queue.offerAll(harness.sdkMessages, [
@@ -10444,7 +10444,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.lengthOf(plans, 1);
         assert.deepEqual(
           plans[0]?.steps.map(({ id, text, status }) => ({ id, text, status })),
-          [{ id: "task-1", text: "检查", status: "running" }],
+          [{ id: "task-1", text: "Inspect", status: "running" }],
         );
         assert.lengthOf(
           projection.turnItems.filter((item) => item.type === "todo_list"),
@@ -10473,8 +10473,8 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.lengthOf(firstTurnPlans, 3);
         assert.equal(new Set(firstTurnPlans.map((plan) => plan.id)).size, 1);
         assert.deepEqual(firstTurnPlans.at(-1)?.steps, [
-          { id: "task-1", text: "检查", status: "running" },
-          { id: "task-2", text: "执行计划", status: "pending" },
+          { id: "task-1", text: "Inspect", status: "running" },
+          { id: "task-2", text: "Implement", status: "pending" },
         ]);
         const firstPlan = firstTurnPlans.at(-1)!;
 
@@ -10491,7 +10491,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         assert.notEqual(newPlan.runId, firstPlan.runId);
         assert.deepEqual(newPlan.steps, [
           { id: "task-1", text: "Inspected", status: "completed" },
-          { id: "task-2", text: "执行计划", status: "pending" },
+          { id: "task-2", text: "Implement", status: "pending" },
         ]);
       }).pipe(
         Effect.scoped,
@@ -10517,14 +10517,14 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       yield* harness.finishTurn();
       assert.lengthOf(harness.plans(), 3);
       assert.deepEqual(harness.plans().at(-1)?.steps, [
-        { id: "task-2", text: "保留", status: "pending" },
+        { id: "task-2", text: "Keep", status: "pending" },
       ]);
 
       yield* harness.startTurn();
       yield* harness.call(updateTask({ taskId: "2", status: "in_progress" }));
       yield* harness.finishTurn();
       assert.deepEqual(harness.plans().at(-1)?.steps, [
-        { id: "task-2", text: "保留", status: "running" },
+        { id: "task-2", text: "Keep", status: "running" },
       ]);
       for (const plan of harness.plans().slice(2)) {
         assert.isFalse(plan.steps.some((step) => step.id === "task-1"));
@@ -10584,8 +10584,8 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           harness.plans().map((plan) => plan.steps),
           [
             [
-              { id: "task-1", text: "检查", status: "completed" },
-              { id: "task-2", text: "执行计划", status },
+              { id: "task-1", text: "Inspect", status: "completed" },
+              { id: "task-2", text: "Implement", status },
             ],
           ],
         );
@@ -10657,14 +10657,14 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const plans = harness.plans();
       assert.lengthOf(plans, 4);
       assert.deepEqual(plans[1]?.steps, [
-        { id: "task-2", text: "排队中", status: "pending" },
-        { id: "task-3", text: "运行中", status: "running" },
-        { id: "task-4", text: "完成", status: "completed" },
+        { id: "task-2", text: "Queued", status: "pending" },
+        { id: "task-3", text: "Working", status: "running" },
+        { id: "task-4", text: "Done", status: "completed" },
       ]);
       assert.deepEqual(plans[2]?.steps, [
-        { id: "task-2", text: "排队中", status: "running" },
-        { id: "task-3", text: "运行中", status: "running" },
-        { id: "task-4", text: "完成", status: "completed" },
+        { id: "task-2", text: "Queued", status: "running" },
+        { id: "task-3", text: "Working", status: "running" },
+        { id: "task-4", text: "Done", status: "completed" },
       ]);
       assert.deepEqual(plans[3]?.steps, []);
     }).pipe(
@@ -10752,7 +10752,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       yield* harness.call(updateTask({ taskId: "1", status: "completed" }));
       yield* harness.finishTurn();
       assert.deepEqual(harness.plans().at(-1)?.steps, [
-        { id: "task-1", text: "检查", status: "completed" },
+        { id: "task-1", text: "Inspect", status: "completed" },
       ]);
     }).pipe(
       Effect.scoped,
@@ -14993,7 +14993,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           const pause = yield* Queue.take(harness.systemNoticeReceipts);
           assert.equal(pause.turnItem.type, "system_notice");
           if (pause.turnItem.type !== "system_notice") return;
-          assert.include(pause.turnItem.message, "This turn is paused until the 5-hour limit");
+          assert.include(pause.turnItem.message, "直到 5 小时上限重置");
         }
       }).pipe(
         Effect.provide(

@@ -53,7 +53,7 @@ function kindForDuration(mins: number): ServerProviderUsageWindow["kind"] {
 }
 
 function labelForKind(kind: ServerProviderUsageWindow["kind"]): string {
-  return kind === "session" ? "Session" : kind === "weekly" ? "Weekly" : "Monthly";
+  return kind === "session" ? "会话" : kind === "weekly" ? "Weekly" : "Monthly";
 }
 
 /** primary/secondary are positions; without windowDurationMins, paid plans use 5-hour/weekly windows and Free/Go use monthly. */

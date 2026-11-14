@@ -4319,7 +4319,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               case "read":
                 turnItem = {
                   ...base,
-                  title: path ? formatReadToolLabel(path) : (title ?? "Read file"),
+                  title: path ? formatReadToolLabel(path) : (title ?? "已读取文件"),
                   type: "dynamic_tool",
                   toolName: "Read",
                   input:
@@ -5624,7 +5624,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 const previous = context.tools.get(toolCallId) ?? {
                   toolCallId,
                   kind: "think",
-                  title: "Compact context",
+                  title: "压缩上下文",
                   status: "inProgress" as const,
                   data: { toolCallId },
                 };

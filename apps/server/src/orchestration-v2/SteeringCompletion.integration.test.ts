@@ -2338,7 +2338,7 @@ it.effect.each([false, true])(
         assert.deepEqual(steered, []);
         assert.deepEqual(
           started.map((turn) => turn.message.text),
-          ["first", "restart"],
+          ["first", "重新开始"],
         );
       }).pipe(Effect.provide(layer));
     }),
@@ -2441,7 +2441,7 @@ it.effect.each([
         assert.deepEqual(steered, []);
         assert.deepEqual(
           started.map((turn) => turn.message.text),
-          ["first", "restart"],
+          ["first", "重新开始"],
         );
       }).pipe(Effect.provide(layer));
     }),

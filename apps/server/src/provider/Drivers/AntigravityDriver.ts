@@ -38,6 +38,7 @@ import {
   antigravityAuthLabel,
   antigravityAuthUsesBrowser,
   buildAntigravityAcpSpawnInput,
+  ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE,
   isAntigravitySignInRequiredError,
   prepareAntigravityProfile,
   resolveAntigravityInstanceDirectories,
@@ -534,7 +535,7 @@ export const AntigravityDriver: ProviderDriver<
               driver: DRIVER,
               instanceId,
               detail: isAntigravitySignInRequiredError(cause)
-                ? "Sign in to Antigravity in provider settings before refreshing models."
+                ? ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE
                 : cause._tag === "ProviderSetupError" &&
                     (cause.operation === "configure" || cause.operation === "start")
                   ? cause.detail

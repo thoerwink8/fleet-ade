@@ -43,7 +43,7 @@ describe("device tool helpers", () => {
   it.effect("rejects an unknown or ambiguous host and lists the candidates", () =>
     Effect.gen(function* () {
       const unknown = yield* Effect.flip(resolveHostId(hosts, "studio"));
-      expect(unknown.reason).toContain("This machine (local)");
+      expect(unknown.reason).toContain("本机 (local)");
       expect(unknown.reason).toContain("oliverMac (0dc4f37b-5e0a-4f4c-9a51-0c6b8e8a1f2d)");
       const ambiguous = yield* Effect.flip(resolveHostId(hosts, "mac mini"));
       expect(ambiguous.reason).toContain("Mac mini (mini-1), Mac mini (mini-2)");

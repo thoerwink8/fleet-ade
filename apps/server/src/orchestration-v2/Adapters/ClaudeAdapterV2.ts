@@ -4645,12 +4645,12 @@ function buildAssistantArtifacts(input: {
 }
 
 const CLAUDE_USAGE_LIMIT_WINDOWS = {
-  five_hour: "5-hour",
-  seven_day: "7-day",
-  seven_day_opus: "7-day Opus",
-  seven_day_sonnet: "7-day Sonnet",
-  seven_day_overage_included: "7-day model",
-  overage: "overage",
+  five_hour: "5 小时",
+  seven_day: "7 天",
+  seven_day_opus: "7 天 Opus",
+  seven_day_sonnet: "7 天 Sonnet",
+  seven_day_overage_included: "7 天模型",
+  overage: "超额",
 } satisfies Record<NonNullable<SDKRateLimitInfo["rateLimitType"]>, string>;
 
 const CLAUDE_USAGE_LIMIT_MAX_WAIT_MS = 30 * 24 * 60 * 60 * 1000;
@@ -4662,7 +4662,7 @@ function describeClaudeUsageLimit(
 ): string {
   const label =
     info.rateLimitType === "seven_day_overage_included" && names.overageIncluded
-      ? `7-day ${names.overageIncluded}`
+      ? `7 天 ${names.overageIncluded}`
       : info.rateLimitType
         ? CLAUDE_USAGE_LIMIT_WINDOWS[info.rateLimitType]
         : undefined;
@@ -4673,9 +4673,9 @@ function describeClaudeUsageLimit(
     waitMs !== undefined && waitMs > 0 && waitMs <= CLAUDE_USAGE_LIMIT_MAX_WAIT_MS
       ? formatClaudeUsageLimitWait(waitMs)
       : undefined;
-  return `Claude usage limit reached. This turn is paused until the ${
-    label ? `${label} ` : ""
-  }limit resets${wait ? ` in ${wait}` : ""}.`;
+  return `已达到 Claude 用量上限。本回合已暂停，直到${label ? ` ${label}` : ""}上限重置${
+    wait ? `（${wait}后）` : ""
+  }。`;
 }
 
 function formatClaudeUsageLimitWait(waitMs: number): string {

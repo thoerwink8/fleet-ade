@@ -243,7 +243,7 @@ it.layer(layerTest)("SecretCheck", (it) => {
       const result = yield* server.secretCheck.check(wanted);
 
       assert.strictEqual(result._tag, "Failed");
-      if (result._tag === "Failed") assert.include(result.detail, "Personal");
+      if (result._tag === "Failed") assert.include(result.detail, "个人");
       assert.deepStrictEqual(server.created.slice(createdBefore), []);
       assert.deepStrictEqual(server.refreshed, []);
       assert.deepStrictEqual(

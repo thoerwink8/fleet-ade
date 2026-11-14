@@ -1957,7 +1957,7 @@ describe("AcpAdapterV2", () => {
         action: "accept",
         content: {
           question_1: "other",
-          question_1_other: `Plain text\n\nAttached image "shot.png": ${JSON.stringify(NodePath.join(directory, "droid-shot.png"))}\nAttached file "spec.txt": ${JSON.stringify(NodePath.join(directory, "droid-spec.txt"))}`,
+          question_1_other: `纯文本\n\nAttached image "shot.png": ${JSON.stringify(NodePath.join(directory, "droid-shot.png"))}\nAttached file "spec.txt": ${JSON.stringify(NodePath.join(directory, "droid-spec.txt"))}`,
           question_2: "other",
           question_2_other: "option_1\n\nAttached notes: keep this custom text",
         },
@@ -6537,7 +6537,7 @@ describe("AcpAdapterV2", () => {
       });
       assert.deepEqual(agentDescriptor, {
         id: "agent",
-        label: "智能体",
+        label: "Agent",
         type: "select",
         options: [
           { id: ACP_EMPTY_OPTION_VALUE, label: "Copilot" },
@@ -7072,7 +7072,7 @@ describe("AcpAdapterV2", () => {
           },
           {
             id: "size",
-            labels: ["Medium", "Large"],
+            labels: ["Medium", "大"],
             values: ["m", "l"],
             multiSelect: undefined,
             allowCustomAnswer: false,
@@ -7086,7 +7086,7 @@ describe("AcpAdapterV2", () => {
           },
           {
             id: "areas",
-            labels: ["API", "Interface"],
+            labels: ["API", "界面"],
             values: ["api", "ui"],
             multiSelect: true,
             allowCustomAnswer: false,

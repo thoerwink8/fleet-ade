@@ -136,7 +136,7 @@ export class VcsProcessExitError extends Schema.TaggedError<VcsProcessExitError>
   ) {
     const detail =
       failureKind === "authentication"
-        ? "Authentication failed."
+        ? "身份验证失败。"
         : failureKind === "rate-limited"
           ? "API rate limit exceeded."
           : failureKind === "not-found"

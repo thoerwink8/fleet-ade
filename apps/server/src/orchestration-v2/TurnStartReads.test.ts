@@ -281,7 +281,7 @@ it.effect.each(["sqlite"] as const)(
         context.checkpointScopes.map((scope) => scope.id),
         [scopeId],
       );
-      assert.equal(context.messages.find((m) => m.id === messageId)?.text, "Continue");
+      assert.equal(context.messages.find((m) => m.id === messageId)?.text, "继续");
       assert.isTrue(context.hasConversation);
       assert.deepEqual(context.turnItems, []);
       assert.deepEqual(yield* store.getTurnStartHistory(threadId), [item]);

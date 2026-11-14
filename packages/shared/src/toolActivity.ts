@@ -393,7 +393,7 @@ export function formatReadToolLabel(path: string, extraCount = 0): string {
   const trimmed = path.trim();
   const suffix = extraCount > 0 ? ` +${extraCount} more` : "";
   if (!trimmed) {
-    return `Read file${suffix}`;
+    return `已读取文件${suffix}`;
   }
   return `Read ${trimmed}${suffix}`;
 }
@@ -440,7 +440,7 @@ export function deriveToolActivityPresentation(
       };
     }
     return {
-      summary: "Read file",
+      summary: "已读取文件",
     };
   }
 

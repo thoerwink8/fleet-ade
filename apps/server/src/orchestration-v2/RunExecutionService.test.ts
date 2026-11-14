@@ -4260,7 +4260,7 @@ it.effect.each([
     const scenario = yield* runBackgroundItemScenario(key, () => Stream.fromQueue(providerEvents), {
       batched: true,
       onIngest: (event, write) =>
-        event.type === "message.updated" && event.message.text === "Other"
+        event.type === "message.updated" && event.message.text === "其他"
           ? Deferred.succeed(blockerStarted, undefined).pipe(
               Effect.andThen(Deferred.await(releaseBlocker)),
             )

@@ -467,7 +467,7 @@ describe("Grok native questions", () => {
             frame: {
               kind: "response",
               method: "_x.ai/ask_user_question",
-              result: { outcome: "accepted", answers: { [questionText]: ["Tests", "Docs"] } },
+              result: { outcome: "accepted", answers: { [questionText]: ["测试", "文档"] } },
             },
           },
           {
@@ -594,7 +594,7 @@ describe("Grok native questions", () => {
       assert.equal(pending.responseCapability.type, "live");
       yield* runtime.respondToRuntimeRequest({
         requestId: pending.id,
-        answers: { changes: ["Tests", "Docs"] },
+        answers: { changes: ["测试", "文档"] },
       });
       yield* Deferred.await(terminal);
     }).pipe(Effect.scoped, Effect.provide(layerTest)),

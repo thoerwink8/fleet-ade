@@ -419,7 +419,7 @@ describe("ConnectReachability DNS failures", () => {
         ["ENOTFOUND", 0, "old cached answer"],
         ["ENOTFOUND", 3, "missing from public DNS"],
         // The local resolver did not answer, so nothing it cached is to blame.
-        ["EAI_AGAIN", 0, "does not resolve from this machine"],
+        ["EAI_AGAIN", 0, "本机无法解析 T3 Connect 地址"],
       ] as const) {
         const layer = reachabilityLayer(
           (request) =>

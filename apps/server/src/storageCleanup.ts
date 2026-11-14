@@ -808,7 +808,7 @@ const make = Effect.gen(function* () {
       maxOutputBytes: 64 * 1024,
       appendTruncationMarker: true,
     });
-    if (status.stdoutTruncated) return "local changes exceed the inspection limit";
+    if (status.stdoutTruncated) return "本地改动超出检查上限";
     const records = status.stdout.split("\0").filter(Boolean);
     let count = 0;
     for (let i = 0; i < records.length; i++) {
@@ -826,7 +826,7 @@ const make = Effect.gen(function* () {
       maxOutputBytes: 64 * 1024,
       appendTruncationMarker: true,
     });
-    if (ignored.stdoutTruncated) return "ignored files exceed the inspection limit";
+    if (ignored.stdoutTruncated) return "已忽略文件超出检查上限";
     const file = ignored.stdout
       .split("\0")
       .find((entry) => entry !== "" && !/(^|\/)node_modules\/$/.test(entry));
@@ -1138,7 +1138,7 @@ const make = Effect.gen(function* () {
           ),
         );
         if (!exists) return;
-        if (deleted && !settings.worktreeOnDelete) return keep("no rules apply");
+        if (deleted && !settings.worktreeOnDelete) return keep("没有适用的规则");
         if (members.length > 1 && worktreeOwner(members) === undefined)
           return keep(`shared by ${members.length} threads`);
         if (project === undefined) return keep("project is unavailable");
@@ -1146,9 +1146,9 @@ const make = Effect.gen(function* () {
           thread.branch === null ||
           !group.every((member) => storageCleanupThreadIdle(member, now, serverSettings))
         )
-          return keep(waitForStop("thread is running or has pending work"));
+          return keep(waitForStop("会话正在运行或有待处理的工作"));
         if (group.some((member) => member.branch !== thread.branch))
-          return keep("a subagent thread's branch differs from this worktree's branch");
+          return keep("子智能体会话的分支与此工作树的分支不同");
         if (yield* hasTerminal(worktreePaths)) return keep(waitForStop("open terminal"));
         if (
           [...group, ...settlementChain.slice(1)].some(
@@ -1158,7 +1158,7 @@ const make = Effect.gen(function* () {
                 SETTLE_SCRIPT_GRACE_MS,
           )
         )
-          return keep(waitForStop("settled moments ago"));
+          return keep(waitForStop("刚刚收尾"));
         const old =
           !deleted &&
           settings.worktreeAfterDays !== null &&
@@ -1177,7 +1177,7 @@ const make = Effect.gen(function* () {
           settings.worktreeUnchanged && (settledThread !== undefined || thread.archivedAt !== null);
         let eligible = deleted || old || settled;
         let removalReason = deleted
-          ? "thread was deleted"
+          ? "会话已删除"
           : old
             ? `inactive for ${Math.floor((now - activityAt) / DAY_MS)} days`
             : `settled for ${settledDays} days`;
@@ -1186,23 +1186,22 @@ const make = Effect.gen(function* () {
             ? `inactive for ${Math.floor((now - activityAt) / DAY_MS)} of ${settings.worktreeAfterDays} days`
             : settings.worktreeSettledAfterDays !== null
               ? settledFor === null
-                ? "not settled"
+                ? "尚未收尾"
                 : `settled for ${settledDays} of ${settings.worktreeSettledAfterDays} days`
               : settings.worktreeOnMerge
                 ? "not merged"
                 : unchangedApplies
-                  ? "has commits beyond the default branch"
+                  ? "有超出默认分支的提交"
                   : settings.worktreeUnchanged
-                    ? "not settled"
-                    : "no rules apply";
+                    ? "尚未收尾"
+                    : "没有适用的规则";
         // Only Git-based rules can make a not-yet-due worktree eligible, so skip Git otherwise.
         if (!eligible && !unchangedApplies && !settings.worktreeOnMerge) return keep(notDueReason);
         const pathReason = yield* worktreePathReason(worktreePath);
         if (pathReason !== null) return keep(pathReason);
         if (yield* containsProjectRoot(worktreePaths, [project, ...snapshot.projects]))
-          return keep("contains a project checkout");
-        if (yield* branchChanged(worktreePath, thread.branch))
-          return keep("repository or branch changed");
+          return keep("包含项目工作副本");
+        if (yield* branchChanged(worktreePath, thread.branch)) return keep("仓库或分支已更改");
         const changes = yield* localChangesReason(worktreePath, settings);
         if (changes !== null) return keep(changes);
         const head = yield* git.resolveCommit({ cwd: worktreePath, revision: "HEAD" });
@@ -1224,7 +1223,7 @@ const make = Effect.gen(function* () {
               return keep(
                 settings.worktreeUnchanged
                   ? notDueReason
-                  : "no remote is configured for merged-worktree cleanup",
+                  : "尚未配置远程仓库，无法清理已合并的工作树",
               );
             const projectHead = yield* git.execute({
               operation: "StorageCleanup.resolveProjectBranch",
@@ -1232,7 +1231,7 @@ const make = Effect.gen(function* () {
               args: ["symbolic-ref", "--quiet", "HEAD"],
               allowNonZeroExit: true,
             });
-            if (projectHead.exitCode !== 0) return keep("project branch is unavailable");
+            if (projectHead.exitCode !== 0) return keep("项目分支不可用");
             defaultRef = projectHead.stdout.trim();
             branch = defaultRef.slice("refs/heads/".length);
           } else {
@@ -1260,7 +1259,7 @@ const make = Effect.gen(function* () {
               }
               defaultBranches.set(defaultBranchKey, branch);
             }
-            if (branch === null) return keep("default branch is unavailable");
+            if (branch === null) return keep("默认分支不可用");
             defaultRef = `refs/remotes/${remote}/${branch}`;
             const refreshed = refreshedDefaultRefs.get(repositoryCwd) ?? new Set<string>();
             if (!refreshed.has(defaultRef)) {
@@ -1286,10 +1285,7 @@ const make = Effect.gen(function* () {
           const integrated = ancestor.exitCode === 0;
           eligible = integrated && unchangedApplies;
           if (eligible)
-            removalReason =
-              remote === null
-                ? "no commits beyond the project branch"
-                : "no commits beyond the default branch";
+            removalReason = remote === null ? "没有超出项目分支的提交" : "没有超出默认分支的提交";
           if (!eligible && remote !== null && settings.worktreeOnMerge && thread.branch !== null) {
             const pullRequest = yield* gitManager.branchPullRequest(
               { cwd: worktreePath, branch: thread.branch },
@@ -1304,14 +1300,14 @@ const make = Effect.gen(function* () {
             if (eligible) removalReason = "pull request was merged";
           }
           if (!eligible && remote === null)
-            return keep(integrated ? notDueReason : "has commits beyond the project branch");
+            return keep(integrated ? notDueReason : "有超出项目分支的提交");
         }
         if (!eligible) return keep(notDueReason);
         // Re-read this path's threads and sessions so new activity cancels removal; full per-worktree snapshots take seconds.
         const blockedSinceCheck = Effect.fnUntraced(function* () {
           const latestProjects = yield* projectStore.listShells();
           if (yield* containsProjectRoot(worktreePaths, [project, ...latestProjects]))
-            return "contains a project checkout";
+            return "包含项目工作副本";
           const bindings = yield* projections.getThreadWorktreePaths({ includeArchived: true });
           const bindingKeys = yield* Effect.forEach(bindings, (binding) =>
             canonical(binding.worktreePath),
@@ -1331,8 +1327,8 @@ const make = Effect.gen(function* () {
             `.pipe(NodeSqliteClient.readOnly);
             // Failed effects never retry, so only running work can finish and free the path.
             if (pendingCleanup.some((row) => row.status !== "failed"))
-              return waitForStop("thread deletion is still pending");
-            if (pendingCleanup.length > 0) return "thread deletion is still pending";
+              return waitForStop("会话删除仍在等待处理");
+            if (pendingCleanup.length > 0) return "会话删除仍在等待处理";
           }
           const latestShells = yield* Effect.forEach(latest, (entry) =>
             projections.getThreadShell(entry.threadId),
@@ -1359,7 +1355,7 @@ const make = Effect.gen(function* () {
               );
             })
           )
-            return waitForStop("thread activity or shared worktree changed since check");
+            return waitForStop("检查后会话活动或共享工作树已更改");
           if (settlementChain.length > 1) {
             const ancestors = yield* Effect.forEach(settlementChain.slice(1), (ancestor) =>
               projections.getThreadShell(ancestor.id),
@@ -1379,7 +1375,7 @@ const make = Effect.gen(function* () {
               !Equal.equals(latestSettlement?.settledAt, settledThread?.settledAt) ||
               !Equal.equals(latestSettlement?.updatedAt, settledThread?.updatedAt)
             )
-              return "parent settlement changed since check";
+              return "检查后父会话的收尾状态已更改";
           }
           // Sessions can outlive their run and can be shared across app threads.
           const sessionRows = yield* sql<{ payload_json: string }>`
@@ -1395,7 +1391,7 @@ const make = Effect.gen(function* () {
               (yield* occupies(worktreePaths, session.cwd)) &&
               (yield* providerSessions.isLive(session.id))
             )
-              return waitForStop("provider session is still open");
+              return waitForStop("提供方会话仍未关闭");
           }
           return null;
         });
@@ -1413,7 +1409,7 @@ const make = Effect.gen(function* () {
             const blockedWhileMeasuring = yield* blockedSinceCheck();
             if (blockedWhileMeasuring !== null) return keep(blockedWhileMeasuring);
             if (yield* branchChanged(worktreePath, thread.branch))
-              return keep("repository or branch changed since check");
+              return keep("检查后仓库或分支已更改");
             if (
               (yield* git.resolveCommit({ cwd: worktreePath, revision: "HEAD" })).commitSha !==
               head.commitSha
@@ -1432,7 +1428,7 @@ const make = Effect.gen(function* () {
                   current[key as keyof typeof settings] !== settings[key as keyof typeof settings],
               )
             )
-              return keep("settings changed since check");
+              return keep("检查后设置已更改");
             // Clean only untracked files. Ordinary worktrees retain Git's final tracked-edit check.
             if (settings.worktreeKeepWhen === "tracked-changes")
               yield* cleanupGit(worktreePath, ["clean", "-ffdx"], "git clean");

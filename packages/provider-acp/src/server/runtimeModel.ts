@@ -1571,7 +1571,7 @@ export function parseSessionUpdateEvent(params: EffectAcpSchema.SessionNotificat
             : ("inProgress" as const);
       const toolCall = makeToolCallState({
         toolCallId: `acp-compaction:${upd.compactionId}`,
-        title: "Compact context",
+        title: "压缩上下文",
         kind: "think",
         status,
         rawOutput: (upd.error ?? summary) || undefined,
@@ -1586,7 +1586,7 @@ export function parseSessionUpdateEvent(params: EffectAcpSchema.SessionNotificat
       const text = acpContentBlockDisplayText(upd.content);
       const toolCall = makeToolCallState({
         toolCallId: `acp-compaction:${upd.compactionId}`,
-        title: "Compact context",
+        title: "压缩上下文",
         kind: "think",
         status: "inProgress",
         ...(text === undefined ? {} : { rawOutput: text }),
