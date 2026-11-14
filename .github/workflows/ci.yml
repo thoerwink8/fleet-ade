@@ -39,6 +39,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Install browser secret helper build libraries
+        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config xvfb
+
       - name: Install Chromium system libraries
         run: node apps/web/node_modules/playwright/cli.js install-deps chromium
 
