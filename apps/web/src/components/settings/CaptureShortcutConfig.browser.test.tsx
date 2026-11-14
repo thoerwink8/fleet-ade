@@ -68,7 +68,7 @@ async function renderConfig(desktop: "niri" | "hyprland" = "niri") {
   return Object.assign(screen, {
     button,
     recorder,
-    diff: () => container.querySelector('[aria-label="Shortcut changes"]'),
+    diff: () => container.querySelector('[aria-label="快捷键更改"]'),
     alert: () => container.querySelector('[role="alert"]'),
     advanced: () => container.querySelector("details")!,
     async click(label: string) {

@@ -372,7 +372,7 @@ describe("EnvironmentProviderSettings provider list", () => {
     await setup();
     await setProviders([provider()]);
     await using _screen = await render(panel());
-    const select = page.getByRole("button", { name: "Select Claude" });
+    const select = page.getByRole("button", { name: "选择 Claude" });
     await expect.element(select).toHaveAttribute("aria-pressed", "false");
     const row = page.elementLocator(select.element().closest('[data-slot="settings-row"]')!);
 
@@ -470,7 +470,7 @@ describe("EnvironmentProviderSettings health check interval", () => {
   it("commits interval drafts and allows retrying rejected edits", async () => {
     await setup();
     await using _screen = await render(panel());
-    const input = page.getByRole("textbox", { name: "提供方健康检查间隔" });
+    const input = page.getByRole("textbox", { name: "提供方健康检查间隔（秒）" });
 
     await userEvent.type(input, "{ArrowUp}{ArrowDown}");
     expect(
@@ -511,7 +511,7 @@ describe("EnvironmentProviderSettings health check interval", () => {
   it("restores the saved interval when a cleared field loses focus", async () => {
     await setup();
     await using _screen = await render(panel());
-    const input = page.getByRole("textbox", { name: "提供方健康检查间隔" });
+    const input = page.getByRole("textbox", { name: "提供方健康检查间隔（秒）" });
 
     await userEvent.type(input, "{Backspace}{Backspace}{Backspace}");
     await userEvent.tab();

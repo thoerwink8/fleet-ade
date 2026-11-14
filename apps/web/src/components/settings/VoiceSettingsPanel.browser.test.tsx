@@ -147,8 +147,8 @@ it.each([{ cpu: null, accelerated: 2.1 }, { cpu: 5, accelerated: null }, { accel
         secondsPer30s,
       },
     };
-    const cpuBenchmark = `Speed: ${secondsPer30s.cpu === undefined ? "请更新服务器" : secondsPer30s.cpu === null ? "未做基准测试" : `${secondsPer30s.cpu} s / 30 s`}`;
-    const gpuBenchmark = `Speed: ${secondsPer30s.accelerated === null ? "未做基准测试" : `${secondsPer30s.accelerated} s / 30 s`}`;
+    const cpuBenchmark = `速度： ${secondsPer30s.cpu === undefined ? "请更新服务器" : secondsPer30s.cpu === null ? "未做基准测试" : `${secondsPer30s.cpu} s / 30 s`}`;
+    const gpuBenchmark = `速度： ${secondsPer30s.accelerated === null ? "未做基准测试" : `${secondsPer30s.accelerated} s / 30 s`}`;
     const fetch = globalThis.fetch;
     using _network = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const url = new URL(input instanceof Request ? input.url : input, window.location.href);
@@ -177,11 +177,13 @@ it.each([{ cpu: null, accelerated: 2.1 }, { cpu: 5, accelerated: null }, { accel
           </SettingsScopeProvider>
         );
         await using screen = await render(panel());
-        await expect.element(screen.getByText(cpuBenchmark)).toBeVisible();
+        await expect.element(screen.getByText(cpuBenchmark, { exact: true })).toBeVisible();
         prepared = remote;
         await screen.rerender(panel());
         await remoteRequested.promise;
-        await expect.element(screen.getByText(cpuBenchmark)).not.toBeInTheDocument();
+        await expect
+          .element(screen.getByText(cpuBenchmark, { exact: true }))
+          .not.toBeInTheDocument();
         remoteStatus.resolve(
           Response.json({
             ...status,
@@ -189,11 +191,13 @@ it.each([{ cpu: null, accelerated: 2.1 }, { cpu: 5, accelerated: null }, { accel
             gpuDevices: [{ id: "gpu", name: "Remote GPU" }],
           }),
         );
-        await expect.element(screen.getByText(gpuBenchmark)).toBeVisible();
+        await expect.element(screen.getByText(gpuBenchmark, { exact: true })).toBeVisible();
         prepared = local;
         await screen.rerender(panel());
-        await expect.element(screen.getByText(cpuBenchmark)).toBeVisible();
-        await expect.element(screen.getByText(gpuBenchmark)).not.toBeInTheDocument();
+        await expect.element(screen.getByText(cpuBenchmark, { exact: true })).toBeVisible();
+        await expect
+          .element(screen.getByText(gpuBenchmark, { exact: true }))
+          .not.toBeInTheDocument();
       },
     );
   },

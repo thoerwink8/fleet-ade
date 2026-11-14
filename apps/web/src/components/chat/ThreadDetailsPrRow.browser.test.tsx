@@ -272,7 +272,7 @@ it("adds the failing checks to a given composer instead of opening a new thread"
       />,
     );
   });
-  await clickButton(screen.container, "Fix");
+  await clickButton(screen.container, "修复");
   expect(state.newThread).not.toHaveBeenCalled();
   expect(state.prepareThread).not.toHaveBeenCalled();
   expect(useComposerDraftStore.getState().getComposerDraft(threadRef)?.prompt).toContain(

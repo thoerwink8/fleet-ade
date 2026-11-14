@@ -86,6 +86,7 @@ const steps: Step[] = [
 ];
 
 let failed = false;
+const failedSteps: string[] = [];
 const startedAll = performance.now();
 for (const step of steps) {
   console.log(`\n== ${step.name} ==`);
@@ -99,11 +100,12 @@ for (const step of steps) {
   const status = result.status ?? 1;
   if (result.error || status !== 0) {
     failed = true;
+    failedSteps.push(step.name);
     console.error(`${step.name} 失败 ${seconds}s`);
-    break;
+    continue;
   }
   console.log(`${step.name} 通过 ${seconds}s`);
 }
 const total = ((performance.now() - startedAll) / 1000).toFixed(1);
-console.log(`\npnpm check ${failed ? "失败" : "通过"}，用时 ${total}s`);
+console.log(`\npnpm check ${failed ? `失败：${failedSteps.join("、")}` : "通过"}，用时 ${total}s`);
 if (failed) process.exit(1);

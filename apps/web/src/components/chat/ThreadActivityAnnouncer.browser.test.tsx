@@ -151,7 +151,7 @@ describe("ThreadActivityAnnouncer", () => {
       }),
     );
 
-    await expect.element(detail).toHaveTextContent("T3 Code: Checking the repo. Needs approval");
+    await expect.element(detail).toHaveTextContent("T3 Code: Checking the repo. 待批准");
     await expect.element(status).toHaveTextContent("运行中");
   });
 });

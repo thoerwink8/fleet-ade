@@ -223,7 +223,7 @@ it("keeps a revealed file open when its Viewed mark loads afterwards", async () 
   await expect.element(screen.getByText("three()", { exact: true })).toBeVisible();
 
   deliverViewedPaths(new Set(["a.ts"]));
-  await expect.element(screen.getByRole("checkbox", { name: "Viewed" })).toBeChecked();
+  await expect.element(screen.getByRole("checkbox", { name: "已查看" })).toBeChecked();
 
   await expect
     .element(screen.getByRole("button", { name: "折叠差异" }))
@@ -316,9 +316,7 @@ it("never requests the diff of a selected commit the pull request no longer has"
   );
 
   await expect.element(screen.getByText("1 文件", { exact: true })).toBeVisible();
-  await expect
-    .element(screen.getByRole("button", { name: "Diff scope: All commits" }))
-    .toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "差异范围：全部提交" })).toBeVisible();
   expect(mocks.diffCommits).not.toContain("gone");
 });
 
@@ -437,13 +435,11 @@ it("hides a resolved conversation behind avatars on its line until they are clic
 
   // Seen open and then resolved, it stays until the avatars are clicked.
   await screen.rerender(withThread(false));
-  await expect.element(card("Open")).toBeVisible();
+  await expect.element(card("打开")).toBeVisible();
   await screen.rerender(withThread(true));
   await expect.element(card("已解决")).toBeVisible();
 
   // Stacked view draws a context row once, so both sides' conversations share the avatars.
   await screen.rerender(withThread(true, true));
-  await expect
-    .element(screen.getByRole("button", { name: "2 resolved conversations" }))
-    .toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "2 个已解决的讨论" })).toBeVisible();
 });

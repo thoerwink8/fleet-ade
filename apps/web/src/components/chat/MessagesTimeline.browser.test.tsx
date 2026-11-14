@@ -2185,7 +2185,10 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await expect.element(page.getByRole("menuitem", { name: "取消", exact: true })).toBeVisible();
   await page.getByRole("menuitem", { name: "本次会话始终允许" }).click();
   expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "acceptForSession");
-  await click(screen.button("拒绝"));
+  await screen
+    .getByRole("group", { name: "命令审批" })
+    .getByRole("button", { name: "拒绝", exact: true })
+    .click();
   expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "decline");
   await click(screen.button("Allow once"));
   expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "accept");
@@ -2206,7 +2209,10 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await expect.element(screen.getByRole("group", { name: "命令审批" })).toBeVisible();
   await click(screen.button("批准"));
   expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "accept");
-  await click(screen.button("拒绝"));
+  await screen
+    .getByRole("group", { name: "应用权限审批" })
+    .getByRole("button", { name: "拒绝", exact: true })
+    .click();
   expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "decline");
   await screen.rerender(
     ui({

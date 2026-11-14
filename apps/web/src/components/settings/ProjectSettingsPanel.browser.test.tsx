@@ -698,7 +698,7 @@ describe("project settings scope", () => {
     await expect.element(page.getByText(message, { exact: true })).toBeVisible();
     await expect.element(page.getByRole("button", { name: /^项目范围:/ })).toBeVisible();
     await expect.element(page.getByRole("button", { name: "环境范围: remote" })).toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "打开所有环境" }));
+    await userEvent.click(page.getByRole("button", { name: "显示所有环境" }));
 
     await expect
       .element(page.getByRole("textbox", { name: "项目名称" }))

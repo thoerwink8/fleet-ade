@@ -164,7 +164,7 @@ describe("ScheduledTasksSettings", () => {
     await act(() => registry.set(permissions.get(secondaryId)!, true));
     await expect.element(create).toBeEnabled();
     await create.click();
-    await expect.element(page.getByLabelText("运行环境")).toHaveTextContent("Secondary");
+    await expect.element(page.getByLabelText("运行环境")).toHaveTextContent("次要颜色");
   });
 
   it("keeps the permitted representative as the creation target", async () => {
@@ -172,7 +172,7 @@ describe("ScheduledTasksSettings", () => {
     state.secondary = true;
     await using screen = await render(<ScheduledTasksSettings />);
     await screen.getByRole("button", { name: "新建任务" }).click();
-    await expect.element(page.getByLabelText("运行环境")).toHaveTextContent("Laptop");
+    await expect.element(page.getByLabelText("运行环境")).toHaveTextContent("笔记本电脑");
   });
 
   it("disables creation without a connected target", async () => {

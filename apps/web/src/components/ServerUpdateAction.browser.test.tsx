@@ -215,9 +215,9 @@ describe("ServerUpdatesAction", () => {
 
     expect(testState.updateServer).toHaveBeenCalledTimes(2);
     expect(testState.toast).toHaveBeenCalledWith({
-      type: "success",
+      type: "error",
       title: "Laptop 更新失败",
-      description: "已重新连接到 t3@0.0.31。",
+      description: "Download failed",
     });
     expect(testState.toast).toHaveBeenCalledWith(
       expect.objectContaining({ type: "success", title: "Office 已更新" }),

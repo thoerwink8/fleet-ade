@@ -195,7 +195,7 @@ describe("resource monitor retry", () => {
 
     await expect.element(screen.getByText(startError, { exact: true })).not.toBeInTheDocument();
     await expect.element(screen.getByText(historyError, { exact: true })).not.toBeInTheDocument();
-    await expect.element(screen.getByText("Native healthy", { exact: true })).toBeVisible();
+    await expect.element(screen.getByText("原生进程监测器", { exact: true })).toBeVisible();
     await expect
       .element(screen.getByRole("button", { name: "重试监测器" }))
       .not.toBeInTheDocument();

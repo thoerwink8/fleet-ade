@@ -59,7 +59,7 @@ it("keeps the title when dragging a search result from a collapsed folder", asyn
   await userEvent.keyboard("{Enter}");
   await expect.element(secondRow).not.toBeInTheDocument();
   await userEvent.fill(page.getByRole("combobox", { name: "搜索会话" }), "search-target");
-  const result = page.getByRole("option", { name: /Thread search-target/ });
+  const result = page.getByRole("option", { name: /会话 search-target/ });
   await expect.element(result).toBeVisible();
   const bounds = result.element().getBoundingClientRect();
   const pointer = (type: string, x: number, y: number) =>

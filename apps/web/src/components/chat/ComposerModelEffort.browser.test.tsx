@@ -110,7 +110,7 @@ it("draws an agent's reasoning as bars and keeps its mode out of the levels", as
   await expect.element(page.getByRole("menuitemradio")).not.toBeInTheDocument();
   await expect.element(speed).toHaveFocus();
 
-  await userEvent.click(screen.getByRole("switch", { name: "Auto-approve tools" }));
+  await userEvent.click(screen.getByText("Auto-approve tools", { exact: true }));
   await expect
     .element(screen.getByRole("switch", { name: "Auto-approve tools" }))
     .toHaveAttribute("aria-checked", "true");

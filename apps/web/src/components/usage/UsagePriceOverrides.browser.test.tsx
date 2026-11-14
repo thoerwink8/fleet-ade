@@ -76,10 +76,10 @@ describe("UsagePriceOverrides", () => {
     await expect.element(modelId).not.toHaveAttribute("aria-invalid");
     await expect.element(page.getByRole("button", { name: "保存更改" })).toBeDisabled();
 
-    await userEvent.type(page.getByLabelText("Input price for glm-5.3"), "2");
+    await userEvent.type(page.getByLabelText("输入 的glm-5.3价格"), "2");
     await expect
       .element(page.getByRole("alert"))
-      .toHaveTextContent("Output is required on workstation.");
+      .toHaveTextContent("输出 上的workstation为必填项。");
     await expect.element(page.getByRole("button", { name: "保存更改" })).toBeDisabled();
   });
 });

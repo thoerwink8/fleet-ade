@@ -253,7 +253,7 @@ it("OpenRouter needs an exact model, and changing it writes no credential", asyn
       await expect.element(destination).toHaveTextContent("OpenRouter via 笔记本电脑");
       expect(grantModel()).toBe("other/listen-2");
       expect(writes).toEqual([]);
-      await screen.getByRole("button", { name: "管理 OpenRouter 听写" }).click();
+      await screen.getByRole("button", { name: "管理 OpenRouter" }).click();
       const current = dialog.getByRole("combobox", { name: "OpenRouter 模型" });
       await expect.element(current).toHaveValue("Other: Listen 2");
       await current.fill("acme");
