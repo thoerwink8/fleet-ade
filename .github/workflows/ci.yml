@@ -45,5 +45,29 @@ jobs:
       - name: Install Chromium system libraries
         run: node apps/web/node_modules/playwright/cli.js install-deps chromium
 
+      # Playwright launches Chromium with --disable-dev-shm-usage, so the browser
+      # keeps shared-memory files on /tmp, not /dev/shm. Print both.
+      - name: Runner resources
+        run: |
+          free -m
+          df -h /dev/shm
+          df -h /tmp
+
       - name: Check
-        run: pnpm check
+        # Vitest collects Chromium garbage only when /tmp has under 4 GiB free.
+        # A 14 GB runner still has more than that when the browser connection drops.
+        env:
+          VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB: "1024"
+        run: |
+          ( while true; do
+              echo "---- runner $(date -u +%H:%M:%S) ----"
+              free -m
+              df -h /dev/shm /tmp
+              sleep 60
+            done ) &
+          sampler=$!
+          set +e
+          pnpm check
+          code=$?
+          kill "$sampler" || true
+          exit "$code"
