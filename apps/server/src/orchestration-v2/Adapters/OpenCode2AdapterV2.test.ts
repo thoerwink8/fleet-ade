@@ -4540,7 +4540,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
         [
           [
             ["Inspect code", "completed"],
-            ["Implement", "running"],
+            ["执行计划", "running"],
             ["Verify", "pending"],
           ],
           [["Inspect code", "completed"]],
@@ -5464,7 +5464,7 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           {
             id: rows[0]!.id,
             status: "failed",
-            title: "已达到用量上限",
+            title: "Usage limit reached",
             failure: failed,
             retry: lastRetry,
           },

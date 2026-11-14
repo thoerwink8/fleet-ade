@@ -663,7 +663,7 @@ describe("DesktopBackendManager", () => {
         yield* TestClock.adjust(Duration.minutes(1));
         const { exitCount: exitsWhenReported, failure } = yield* Queue.take(reports);
         assert.equal(exitsWhenReported, exits);
-        assert.equal(failure.reason, `The server could not start (code=${code}).`);
+        assert.equal(failure.reason, `服务器无法启动（code=${code}）。`);
         assert.equal(failure.managedPolicy, managedPolicy);
         assert.isTrue(failure.output.endsWith(message));
         assert.isTrue(failure.output.isWellFormed());

@@ -343,7 +343,7 @@ describe("thread execution presentation", () => {
     expect(deriveThreadActivityRun(starting)?.providerStartingLabel).toBe("Starting Claude");
     expect(
       deriveThreadActivityRun({ ...starting, providerSessions: [] })?.providerStartingLabel,
-    ).toBe("Starting");
+    ).toBe("正在启动");
     expect(
       deriveThreadActivityRun({
         ...starting,
@@ -727,10 +727,10 @@ describe("presentProviderGoal", () => {
         { objective: "Ship the feature", status: "active", tokensUsed, tokenBudget: 2_000_000 },
         true,
       ).usage;
-    expect(usage(999_499)).toBe("999k / 2m tokens");
-    expect(usage(999_500)).toBe("1m / 2m tokens");
-    expect(usage(999_999)).toBe("1m / 2m tokens");
-    expect(usage(1_000_000)).toBe("1m / 2m tokens");
+    expect(usage(999_499)).toBe("999k / 2 分钟 tokens");
+    expect(usage(999_500)).toBe("1 分钟 / 2 分钟 tokens");
+    expect(usage(999_999)).toBe("1 分钟 / 2 分钟 tokens");
+    expect(usage(1_000_000)).toBe("1 分钟 / 2 分钟 tokens");
     expect(
       presentProviderGoal(
         {
@@ -741,7 +741,7 @@ describe("presentProviderGoal", () => {
         },
         false,
       ).usage,
-    ).toBe("1m / 1m tokens");
+    ).toBe("1 分钟 / 1 分钟 tokens");
   });
 });
 

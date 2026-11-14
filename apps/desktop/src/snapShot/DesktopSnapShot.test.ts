@@ -2097,7 +2097,7 @@ it.effect(
         assert.isTrue((yield* service.state).shortcutActionRegistered);
         const check = yield* service.checkShortcut(settings.snapShotShortcut);
         assert.isFalse(check.available);
-        assert.include(check.message, "Hyprland config");
+        assert.include(check.message, "Hyprland 配置");
         yield* service.configure({ ...settings, snapShotPlaySound: false });
         assert.lengthOf(portalShortcutInstances, 1);
         assert.lengthOf(first.close.mock.calls, 0);
@@ -2170,7 +2170,7 @@ it.effect.each([false, true])(
           assert.equal(error.reason, "setup-failed");
           assert.equal(
             error.message,
-            'Could not capture a test snapshot. Capturing the window failed. macOS grants Screen Recording and Accessibility to each app separately. In System Settings, open Privacy & Security and check that "T3 Code (Dev)" is allowed for both.',
+            '无法截取测试截图。 正在截取窗口 失败。 macOS grants Screen Recording and Accessibility to each app separately. In System Settings, open Privacy & Security and check that "T3 Code (Dev)" is allowed for both.',
           );
         } else yield* service.setup("test-mac-capture");
         assert.equal(macCaptureMock.mock.calls.length, 1);

@@ -391,7 +391,7 @@ describe("resolveSnoozePresets", () => {
         { kind: "after", minutes: 360 },
         { kind: "after", minutes: 180 },
       ]),
-    ).toEqual(["In 3 hours 23:00", "In 6 hours Thu 2:00", "Tomorrow 21:00", "Next week Mon 18:00"]);
+    ).toEqual(["In 3 hours 23:00", "In 6 hours Thu 2:00", "明天 21:00", "下周 18:00"]);
   });
 
   it("drops a today preset once its time passes and moves a weekday on that day to next week", () => {
@@ -415,14 +415,14 @@ describe("resolveSnoozePresets", () => {
     ];
     // Sunday 14:00.
     expect(menu(localDate(2026, 8, 30, 14), theo)).toEqual([
-      "Tomorrow 18:00",
-      "Tomorrow 21:00",
+      "明天 18:00",
+      "明天 21:00",
       "Friday 17:00",
     ]);
     // Friday 10:00: today's 17:00 is a week away.
     expect(menu(localDate(2026, 9, 4, 10), theo)).toEqual([
-      "Tomorrow 21:00",
-      "Next week Mon 18:00",
+      "明天 21:00",
+      "下周 18:00",
       "Next Friday 17:00",
     ]);
   });
@@ -432,8 +432,8 @@ describe("resolveSnoozePresets", () => {
     expect(menu(localDate(2026, 8, 30, 7, 1))).toEqual([
       "In 1 hour 8:01",
       "In 3 hours 10:01",
-      "This evening 18:00",
-      "Tomorrow 9:00",
+      "今天晚上 18:00",
+      "明天 9:00",
     ]);
   });
 

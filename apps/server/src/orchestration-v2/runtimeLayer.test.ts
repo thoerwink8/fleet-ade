@@ -4984,7 +4984,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const completed = yield* wakes;
       assert.lengthOf(completed, 2);
       assert.equal(completed[1]!.notification?.summary, "#14: checks passed");
-      assert.include(completed[1]!.text, "All 1 required check passed on 6074dd4.");
+      assert.include(completed[1]!.text, "All 1 required check passed在 6074dd4 上.");
       assert.equal(completed[1]!.notification?.outcome, "completed");
 
       yield* TestClock.adjust("1 hour");

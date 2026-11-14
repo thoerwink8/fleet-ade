@@ -63,7 +63,7 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
 
     const quick = resolveQuickAction(syncedFeature, false);
     assert.deepInclude(quick, {
-      label: "Create PR",
+      label: "创建 PR",
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -162,7 +162,7 @@ describe("when: ref has no upstream configured", () => {
     assert.deepInclude(quick, {
       kind: "run_action",
       action: "create_pr",
-      label: "Push & create PR",
+      label: "推送并创建 PR",
       disabled: false,
     });
   });
@@ -197,12 +197,12 @@ describe("when: the ref is on GitLab", () => {
 
   it("names merge requests in actions and the default-ref dialog", () => {
     const ahead = status({ ...gitLab, hasUpstream: false, aheadCount: 2 });
-    assert.equal(resolveQuickAction(ahead, false).label, "Push & create MR");
+    assert.equal(resolveQuickAction(ahead, false).label, "推送并创建 MR");
     assert.equal(
       resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false).label,
-      "Commit, push & MR",
+      "提交、推送并创建 MR",
     );
-    assert.equal(buildMenuItems(ahead, false).find((item) => item.id === "pr")?.label, "Create MR");
+    assert.equal(buildMenuItems(ahead, false).find((item) => item.id === "pr")?.label, "创建 MR");
 
     const copy = resolveDefaultBranchActionDialogCopy({
       action: "create_pr",
@@ -210,8 +210,8 @@ describe("when: the ref is on GitLab", () => {
       includesCommit: false,
       terminology: sourceControlClients.get("gitlab").changeRequest,
     });
-    assert.equal(copy.title, "Push & create MR from default ref?");
-    assert.include(copy.description, "create a merge request on");
+    assert.equal(copy.title, "在默认引用上推送并创建 MR？");
+    assert.include(copy.description, "并创建merge request");
   });
 });
 

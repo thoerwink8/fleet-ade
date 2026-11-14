@@ -55,7 +55,7 @@ const results = (state: SupervisorConnectionState, via?: "relay" | "direct") =>
 describe("presentConnectionDiagnosis", () => {
   it("tells a working tunnel apart from T3 Code not answering", () => {
     expect(diagnose(backoff(unavailable("origin_unreachable")))?.headline).toBe(
-      "Tunnel works, but T3 Code on Mac mini did not answer",
+      "隧道正常，但 Mac mini 上的 T3 Code 没有响应",
     );
     expect(results(backoff(unavailable("origin_unreachable")), "direct")).toEqual([
       "device:ok",
@@ -72,7 +72,7 @@ describe("presentConnectionDiagnosis", () => {
     );
     // A learned LAN route makes the environment's usual route direct; the failure still names the relay.
     const diagnosis = diagnose(backoff(failure), "direct");
-    expect(diagnosis?.headline).toBe("This device can't reach Mac mini's tunnel");
+    expect(diagnosis?.headline).toBe("此设备无法访问 Mac mini 的隧道");
     expect(diagnosis?.hops).toHaveLength(4);
     expect(diagnosis?.steps.join(" ")).not.toContain("On Mac mini");
   });
@@ -120,7 +120,7 @@ describe("presentConnectionDiagnosis", () => {
       via: "relay",
       relayStatus: { status: "offline", endpointFailure: "tunnel_down", endpointStatus: 530 },
     });
-    expect(diagnosis?.headline).toBe("Mac mini's tunnel is offline");
+    expect(diagnosis?.headline).toBe("Mac mini 的隧道离线");
     const origin = presentConnectionDiagnosis({
       hostLabel: "Mac mini",
       state: AVAILABLE_CONNECTION_STATE,

@@ -69,13 +69,13 @@ it("notices an optional include created while the diff is open", async () => {
     NodePath.join(directory, "later.kdl"),
     "binds {\n Ctrl+Shift+2 { quit; }\n}\n",
   );
-  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("changed since");
+  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("配置在预览后发生了变化");
   expect(await NodeFSP.readFile(path, "utf8")).toBe(preview.before);
 });
 it("does not overwrite edits made after preview", async () => {
   const preview = await setup.preview(target(), install);
   await NodeFSP.appendFile(path, "// edited elsewhere\n");
-  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("changed since");
+  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("配置在预览后发生了变化");
   expect(await NodeFSP.readFile(path, "utf8")).toBe(preview.before + "// edited elsewhere\n");
   expect(await NodeFSP.readdir(directory)).toEqual(["config.kdl"]);
 });
@@ -84,7 +84,7 @@ it("rechecks after validation and cleans the staged file on concurrent edits", a
   tools.validateNiri.mockImplementation(async () => {
     await NodeFSP.appendFile(path, "// keep this\n");
   });
-  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("changed since");
+  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("配置在预览后发生了变化");
   expect(await NodeFSP.readdir(directory)).toEqual(["config.kdl"]);
   expect(await NodeFSP.readFile(path, "utf8")).toContain("keep this");
 });
@@ -106,7 +106,7 @@ it("refuses a symlink retargeted since preview", async () => {
   const preview = await setup.preview({ ...target(), path: link }, install);
   await NodeFSP.unlink(link);
   await NodeFSP.symlink(other, link);
-  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("changed since");
+  await expect(setup.apply(preview.id, "niri")).rejects.toThrow("配置在预览后发生了变化");
   expect(await NodeFSP.readFile(other, "utf8")).toBe("binds {}\n");
 });
 it("validates symlinked configs from their original directory so relative includes stay valid", async () => {
@@ -165,7 +165,7 @@ it("accepts an unchanged capture shortcut reported as a Lua callback", async () 
 
   const unchanged = await setup.preview(hypr, install);
   await NodeFSP.appendFile(hypr.path, "-- edited elsewhere\n");
-  await expect(setup.apply(unchanged.id, "hyprland")).rejects.toThrow("changed since");
+  await expect(setup.apply(unchanged.id, "hyprland")).rejects.toThrow("配置在预览后发生了变化");
   expect(await NodeFSP.readFile(hypr.path, "utf8")).toBe(before + "-- edited elsewhere\n");
 });
 it.each(["preview", "apply"] as const)(

@@ -134,7 +134,7 @@ async function prepareCodexInstance() {
   const screen = stack.use(await render(dialog()));
   await click("手动配置");
   await type("#add-provider-label", "Work");
-  await click("Next");
+  await click("下一步");
   stack.move();
   return screen;
 }
@@ -156,7 +156,7 @@ describe("AddProviderInstanceDialog environment routing", () => {
     });
     await using _screen = await render(dialog());
     await click("手动配置");
-    await click("Next");
+    await click("下一步");
     await click("添加实例");
     expect(settingsHooks.mutate).toHaveBeenCalledWith({
       operation: "create",
@@ -200,8 +200,8 @@ describe("AddProviderInstanceDialog environment routing", () => {
     await click("显示更多");
     button("Use Kilo Code");
     await act(async () => radio("fx")!.click());
-    await click("Next");
-    await click("Next");
+    await click("下一步");
+    await click("下一步");
     await click("添加实例");
     expect(settingsHooks.mutate).toHaveBeenCalledWith({
       operation: "create",
@@ -249,7 +249,7 @@ describe("AddProviderInstanceDialog environment routing", () => {
     await using _screen = await render(dialog());
     await click("显示更多");
     await click("Use local command");
-    await click("Next");
+    await click("下一步");
     expect(document.body.textContent).toContain("请输入可执行文件。");
     expect(settingsHooks.mutate).not.toHaveBeenCalled();
 
@@ -257,19 +257,19 @@ describe("AddProviderInstanceDialog environment routing", () => {
     const commandArgs = ["--profile", "acp", " literal $(value) ; ", ""];
     for (const [index, argument] of commandArgs.entries()) {
       await click("添加参数");
-      if (argument) await type(`input[aria-label="Argument ${index + 1}"]`, argument);
+      if (argument) await type(`input[aria-label="参数 ${index + 1}"]`, argument);
     }
     await click("添加变量");
-    await type('input[aria-label="Environment variable name 1"]', "DSH_PROFILE");
+    await type('input[aria-label="环境变量名称 1"]', "DSH_PROFILE");
     await act(async () =>
       document
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="Mark environment variable DSH_PROFILE as sensitive"]',
+          'button[aria-label="将环境变量 DSH_PROFILE 标为敏感信息"]',
         )!
         .click(),
     );
-    await type('input[aria-label="Environment variable value 1"]', "work");
-    await click("Next");
+    await type('input[aria-label="环境变量值 1"]', "work");
+    await click("下一步");
     await type("#add-provider-label", "Deepseek Harness");
     await click("添加实例");
 

@@ -44,7 +44,7 @@ it("keeps draft previews current through edits, promotion and removal", async ()
     initial.setProjectDraftThreadId(projectRef, draftId, { threadId });
     initial.setPrompt(draftId, "First draft preview");
   });
-  await expect.element(row).toHaveAccessibleName("First draft preview, Unsent draft");
+  await expect.element(row).toHaveAccessibleName("First draft preview, 未发送的草稿");
 
   const rendersBeforeOtherComposer = onRender.mock.calls.length;
   await act(() =>
@@ -52,7 +52,7 @@ it("keeps draft previews current through edits, promotion and removal", async ()
   );
   expect(onRender).toHaveBeenCalledTimes(rendersBeforeOtherComposer);
   await act(() => initial.setPrompt(draftId, "Updated draft preview"));
-  await expect.element(row).toHaveAccessibleName("Updated draft preview, Unsent draft");
+  await expect.element(row).toHaveAccessibleName("Updated draft preview, 未发送的草稿");
 
   const quote = "Cache the parsed config per worktree.";
   const citation = formatAssistantCitationForComposer({
@@ -67,7 +67,7 @@ it("keeps draft previews current through edits, promotion and removal", async ()
     suffix: "",
   });
   await act(() => initial.setPrompt(draftId, `${citation}Why per worktree?`));
-  await expect.element(row).toHaveAccessibleName(`${quote} Why per worktree?, Unsent draft`);
+  await expect.element(row).toHaveAccessibleName(`${quote} Why per worktree?, 未发送的草稿`);
 
   await act(() => initial.markDraftThreadPromoting(draftId));
   await expect.element(row).not.toBeInTheDocument();
@@ -78,7 +78,7 @@ it("keeps draft previews current through edits, promotion and removal", async ()
     initial.setProjectDraftThreadId(projectRef, nextDraftId, { threadId: ThreadId.make("next") });
     initial.setPrompt(nextDraftId, "Next draft preview");
   });
-  await expect.element(row).toHaveAccessibleName("Next draft preview, Unsent draft");
+  await expect.element(row).toHaveAccessibleName("Next draft preview, 未发送的草稿");
   await act(() => initial.clearDraftThread(nextDraftId));
   await expect.element(row).not.toBeInTheDocument();
 });

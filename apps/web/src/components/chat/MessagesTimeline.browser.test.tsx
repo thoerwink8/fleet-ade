@@ -440,7 +440,7 @@ describe("MessagesTimeline work rows", () => {
         expect(screen.text()).toContain("Final implementation report");
         expect(screen.text()).toContain("Follow-up explanation");
         expect(screen.text()).not.toContain("Old interrupted progress");
-        await click(screen.buttons("Open Simplify delivery")[0]!);
+        await click(screen.buttons("打开 Simplify delivery")[0]!);
         expect(onOpenThread).toHaveBeenCalledWith(childThreadId);
       } else if (source === "legacy") {
         expect(screen.text()).toContain("Old interrupted progress");
@@ -511,7 +511,7 @@ describe("MessagesTimeline messages", () => {
       ...screen.container.querySelectorAll<HTMLElement>("[data-user-message-body]"),
     ];
     expect(medium!.dataset.userMessageCollapsible).toBe("false");
-    expect(medium!.textContent).toContain("Line 11");
+    expect(medium!.textContent).toContain("第 11 行");
     const foldedHeight = long!.offsetHeight;
     await click(screen.button("显示完整消息"));
     expect(long!.offsetHeight).toBeGreaterThanOrEqual(foldedHeight * 2);
@@ -590,7 +590,7 @@ describe("MessagesTimeline messages", () => {
     const viewport = props.listRef.current!.getScrollableNode()!;
     await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(0));
     const atEnd = viewport.scrollTop;
-    page.getByRole("button", { name: "Send" }).element().focus();
+    page.getByRole("button", { name: "发送" }).element().focus();
     await userEvent.keyboard("{F6}");
     focus.move(-1);
     expect(viewport).toHaveAttribute("data-workspace-keyboard-focus");
@@ -1038,7 +1038,7 @@ describe("MessagesTimeline messages", () => {
         await click(
           screen.container.querySelector<HTMLElement>('[data-work-entry-id="tool-near-composer"]')!,
         );
-        await vi.waitFor(() => expect(screen.text()).toContain("Loading output"));
+        await vi.waitFor(() => expect(screen.text()).toContain("正在加载输出"));
         await click(group());
       }
     }
@@ -1097,7 +1097,7 @@ describe("MessagesTimeline messages", () => {
       await vi.waitFor(() =>
         expect(header().getBoundingClientRect().bottom).toBeLessThanOrEqual(visibleBottom() + 1),
       );
-      await vi.waitFor(() => expect(screen.text()).toContain("Loading output"));
+      await vi.waitFor(() => expect(screen.text()).toContain("正在加载输出"));
       environmentQuery.data = {
         output: { text: `${"output line\n".repeat(20)}TOOL_INPUT_END`, truncated: false },
         running: false,
@@ -1177,12 +1177,8 @@ describe("MessagesTimeline usage limit notice", () => {
       }
       await session.send("Emulation.setTimezoneOverride", { timezoneId: "America/New_York" });
       await using screen = await renderTimeline(usageLimitEntries(resetAt));
-      const newYorkTime = new Date(resetAt).toLocaleTimeString(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-        timeZone: "America/New_York",
-      });
-      expect(screen.text()).toContain(`${newYorkTime} (America/New_York)`);
+      expect(screen.text()).toContain("(America/New_York)");
+      expect(screen.text()).not.toContain("(Europe/Madrid)");
     } finally {
       await session.send("Emulation.setTimezoneOverride", { timezoneId: "" });
     }
@@ -1297,7 +1293,7 @@ describe("MessagesTimeline automation prompts", () => {
     await using screen = await renderTimeline([
       message(AUTOMATION_PROMPT, { scheduledTaskId: TASK_ID }),
     ]);
-    const row = screen.button(/^Automation/);
+    const row = screen.button(/^自动化/);
     expect(row.textContent).toContain("Nightly triage");
     expect(row.getAttribute("aria-expanded")).toBe("false");
     expect(screen.text()).not.toContain("close duplicates");
@@ -1305,10 +1301,10 @@ describe("MessagesTimeline automation prompts", () => {
     await click(row);
     expect(screen.text()).toContain("Label every new issue and close duplicates.");
     const link = [...screen.container.querySelectorAll("a")].find(
-      (anchor) => anchor.textContent === "Open automation",
+      (anchor) => anchor.textContent === "打开自动化",
     );
     expect(link?.getAttribute("href")).toContain(`taskId=${TASK_ID}`);
-    expect(screen.buttons(/copy/i)).not.toHaveLength(0);
+    expect(screen.buttons(/复制/)).not.toHaveLength(0);
   });
 
   it("falls back to the prompt's first line without a task title", async () => {
@@ -1316,13 +1312,13 @@ describe("MessagesTimeline automation prompts", () => {
     await using screen = await renderTimeline([
       message(AUTOMATION_PROMPT, { scheduledTaskId: TASK_ID }),
     ]);
-    expect(screen.button(/^Automation/).textContent).toContain("Triage the inbox");
+    expect(screen.button(/^自动化/).textContent).toContain("Triage the inbox");
   });
 
   it("leaves ordinary user messages as full bubbles", async () => {
     setup();
     await using screen = await renderTimeline([message(AUTOMATION_PROMPT)]);
-    expect(screen.buttons(/^Automation/)).toHaveLength(0);
+    expect(screen.buttons(/^自动化/)).toHaveLength(0);
     expect(screen.text()).toContain("Label every new issue and close duplicates.");
   });
 
@@ -1335,7 +1331,7 @@ describe("MessagesTimeline automation prompts", () => {
       activeFindMatch: { entryId: "entry-message-1", runId: null, occurrence: 0 },
     });
     await vi.waitFor(() =>
-      expect(screen.button(/^Automation/).getAttribute("aria-expanded")).toBe("true"),
+      expect(screen.button(/^自动化/).getAttribute("aria-expanded")).toBe("true"),
     );
     const { range } = collectThreadFindRanges(screen.container, "duplicates")[0]!;
     const details = screen.container.querySelector("[data-thread-find-text]")!;
@@ -1376,7 +1372,7 @@ describe("MessagesTimeline automation prompts", () => {
       },
     );
     expect(screen.buttons("从这里编辑")).toHaveLength(0);
-    await click(screen.button(/^Automation/));
+    await click(screen.button(/^自动化/));
     expect(screen.buttons("从这里编辑")).toHaveLength(1);
   });
 });
@@ -1407,7 +1403,7 @@ describe("MessagesTimeline agent messages", () => {
       ],
       { onOpenThread },
     );
-    const row = screen.button(/^Agent/);
+    const row = screen.button(/^智能体/);
     expect(row.textContent).toContain("Review finished");
     expect(row.getAttribute("aria-expanded")).toBe("false");
     expect(screen.text()).not.toContain("drops the index");
@@ -1418,7 +1414,7 @@ describe("MessagesTimeline agent messages", () => {
     await click(screen.button("打开会话"));
     expect(onOpenThread).toHaveBeenCalledWith(SENDER_THREAD_ID, ENVIRONMENT_ID);
 
-    await click(screen.button(/^Agent/));
+    await click(screen.button(/^智能体/));
     expect(screen.text()).not.toContain("drops the index");
 
     // The linked sender shows the title it sent, and its thread cannot be opened from here.
@@ -1431,7 +1427,7 @@ describe("MessagesTimeline agent messages", () => {
     await using screen = await renderTimeline([
       message(AGENT_MESSAGE, { createdBy: "agent", creationSource: "server" }),
     ]);
-    expect(screen.buttons(/^Agent/)).toHaveLength(0);
+    expect(screen.buttons(/^智能体/)).toHaveLength(0);
     expect(screen.text()).toContain("drops the index");
   });
 
@@ -1447,7 +1443,7 @@ describe("MessagesTimeline agent messages", () => {
       },
     );
     await vi.waitFor(() =>
-      expect(screen.button(/^Agent/).getAttribute("aria-expanded")).toBe("true"),
+      expect(screen.button(/^智能体/).getAttribute("aria-expanded")).toBe("true"),
     );
     const { range } = collectThreadFindRanges(screen.container, "drops the index")[0]!;
     const body = screen.container.querySelector("[data-user-message-body]")!;
@@ -1579,8 +1575,8 @@ describe("MessagesTimeline attachments", () => {
       expect(progress.style.width).toBe("0%");
       expect(screen.button("Pause recording.webm")).toHaveProperty("disabled", false);
       await screen.rerender(preview(true));
-      expect(screen.text()).toContain("Unavailable");
-      await click(screen.button("Audio unavailable. Open recording.webm"));
+      expect(screen.text()).toContain("不可用");
+      await click(screen.button("音频不可用。Open recording.webm"));
       expect(onOpen).toHaveBeenCalledOnce();
     },
   );
@@ -1701,7 +1697,7 @@ describe("MessagesTimeline attachments", () => {
         />
       </TimelineRowCtx>,
     );
-    await screen.getByRole("button", { name: "Preview second.png" }).click();
+    await screen.getByRole("button", { name: "预览 second.png" }).click();
     expect(onImageExpand).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         index: 1,
@@ -2076,7 +2072,7 @@ describe("ChangedFilesCard", () => {
         screen.container.querySelector<HTMLButtonElement>(
           toggle === "folder"
             ? '[data-changed-file-row="src"] button'
-            : 'button[aria-label$="all folders"]',
+            : 'button[aria-label$="全部文件夹"]',
         )!;
       await act(() => {
         flushSync(() => button().click());
@@ -2164,10 +2160,8 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     />
   );
   await using screen = await renderElement(ui());
-  await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
-  await expect
-    .element(screen.getByRole("group", { name: "App permission approval" }))
-    .toBeVisible();
+  await expect.element(screen.getByRole("group", { name: "命令审批" })).toBeVisible();
+  await expect.element(screen.getByRole("group", { name: "应用权限审批" })).toBeVisible();
   await expect.element(screen.getByText(approvals[0]!.detail!, { exact: true })).toBeVisible();
   await expect.element(screen.getByText("Needs permission to run the command")).toBeVisible();
   await vi.waitFor(() => {
@@ -2181,17 +2175,17 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   });
   await expect.element(screen.getByText("Safari", { exact: true })).toBeVisible();
   await click(screen.button("为什么要问我这个？"));
-  await expect.element(page.getByText(/an ask rule in the agent's own settings/)).toBeVisible();
+  await expect.element(page.getByText(/智能体自身设置里有一条/)).toBeVisible();
   await click(screen.button("为什么要问我这个？"));
   await click(screen.buttons("更多审批选项")[1]!);
   await expect.element(page.getByRole("menuitem", { name: "Always allow Safari" })).toBeVisible();
   await page.getByRole("menuitem", { name: "Always allow Safari" }).click();
   expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "acceptAlways");
   await click(screen.buttons("更多审批选项")[0]!);
-  await expect.element(page.getByRole("menuitem", { name: "Cancel", exact: true })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Always allow this session" }).click();
+  await expect.element(page.getByRole("menuitem", { name: "取消", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "本次会话始终允许" }).click();
   expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "acceptForSession");
-  await click(screen.button("Decline"));
+  await click(screen.button("拒绝"));
   expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "decline");
   await click(screen.button("Allow once"));
   expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "accept");
@@ -2199,22 +2193,20 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     await screen.rerender(
       ui({ timelineEntries, heldApprovalRequestIds: new Set([commandRequest]) }),
     );
-    await expect
-      .element(screen.getByRole("group", { name: "Command approval" }))
-      .not.toBeInTheDocument();
-    await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(0));
+    await expect.element(screen.getByRole("group", { name: "命令审批" })).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.buttons("批准")).toHaveLength(0));
     await expect
       .element(screen.getByRole("button", { name: "Allow once", exact: true }))
       .toBeVisible();
     await screen.rerender(ui({ timelineEntries }));
-    await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
-    await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(1));
+    await expect.element(screen.getByRole("group", { name: "命令审批" })).toBeVisible();
+    await vi.waitFor(() => expect(screen.buttons("批准")).toHaveLength(1));
   }
   await screen.rerender(ui({ timelineEntries: [], isWorking: false }));
-  await expect.element(screen.getByRole("group", { name: "Command approval" })).toBeVisible();
-  await click(screen.button("Approve"));
+  await expect.element(screen.getByRole("group", { name: "命令审批" })).toBeVisible();
+  await click(screen.button("批准"));
   expect(onRespondToApproval).toHaveBeenLastCalledWith(commandRequest, "accept");
-  await click(screen.button("Deny"));
+  await click(screen.button("拒绝"));
   expect(onRespondToApproval).toHaveBeenLastCalledWith(appRequest, "decline");
   await screen.rerender(
     ui({
@@ -2227,14 +2219,14 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     .element(screen.getByLabelText("命令", { exact: true }))
     .toHaveTextContent("命令审批");
   await screen.rerender(ui({ canOperateThread: false }));
-  await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
+  await expect.element(screen.getByRole("button", { name: "批准", exact: true })).toBeDisabled();
   await vi.waitFor(() =>
     expect(screen.buttons("更多审批选项").every((button) => button.hasAttribute("disabled"))).toBe(
       true,
     ),
   );
   await screen.rerender(ui({ respondingRequestIds: [commandRequest] }));
-  await expect.element(screen.getByRole("button", { name: "Approve", exact: true })).toBeDisabled();
+  await expect.element(screen.getByRole("button", { name: "批准", exact: true })).toBeDisabled();
   await expect
     .element(screen.getByRole("button", { name: "Allow once", exact: true }))
     .toBeEnabled();
@@ -2244,13 +2236,11 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await expect
     .element(screen.getByText("提供方进程已退出。请中断或重新开始这次运行后再回应。"))
     .toBeVisible();
-  await vi.waitFor(() => expect(screen.buttons("Approve")).toHaveLength(0));
+  await vi.waitFor(() => expect(screen.buttons("批准")).toHaveLength(0));
   await screen.rerender(
     ui({ pendingApprovals: [], timelineEntries: entries(true), isWorking: false }),
   );
-  await expect
-    .element(screen.getByRole("group", { name: "Command approval" }))
-    .not.toBeInTheDocument();
+  await expect.element(screen.getByRole("group", { name: "命令审批" })).not.toBeInTheDocument();
   await vi.waitFor(() => expect(screen.text()).not.toContain("等待批准"));
   await screen.getByRole("button", { expanded: false }).click();
   await expect

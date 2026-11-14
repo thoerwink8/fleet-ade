@@ -17,11 +17,11 @@ it("explains a denied clipboard write and lets the same path be copied again", a
     .mockResolvedValue(undefined);
   using _console = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-  const copy = screen.getByRole("button", { name: "Copy file path" });
+  const copy = screen.getByRole("button", { name: "复制文件路径" });
   await copy.click();
 
-  await expect.element(page.getByText("Failed to copy text to the clipboard.")).toBeVisible();
-  await page.getByRole("button", { name: "Dismiss notification" }).click();
+  await expect.element(page.getByText("无法将 text 复制到剪贴板。")).toBeVisible();
+  await page.getByRole("button", { name: "关闭通知" }).click();
   await copy.click();
 
   await expect.element(page.getByText("已复制！", { exact: true })).toBeVisible();

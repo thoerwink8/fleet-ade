@@ -518,9 +518,9 @@ it.each([true, false])(
     mocks.catalogOffline = offline;
     await using _screen = await render(<Probe showWizard />);
     await act(() => mocks.voice.start());
-    const wizard = page.getByRole("dialog", { name: "Set up voice input" });
-    const retry = wizard.getByRole("button", { name: "Retry loading models" });
-    const download = wizard.getByRole("button", { name: "Download model" });
+    const wizard = page.getByRole("dialog", { name: "设置语音输入" });
+    const retry = wizard.getByRole("button", { name: "重新加载模型" });
+    const download = wizard.getByRole("button", { name: "下载模型" });
     await expect.element(wizard.getByRole("alert")).toBeVisible();
     await expect.element(download).not.toBeInTheDocument();
     if (offline) {
@@ -643,7 +643,7 @@ it.each(["not-json", JSON.stringify("off")])(
     await act(save);
     await act(() => mocks.voice.start());
     await act(() => mocks.voice.stop());
-    expect(mocks.transcribeCalls).toEqual(["xai via env-b"]);
+    expect(mocks.transcribeCalls).toEqual(["xai（经由 env-b）"]);
     expect(mocks.statusRequests).toEqual([]);
   },
 );
@@ -667,7 +667,7 @@ it("sends audio to OpenRouter only under a device grant naming the exact model",
   await using _screen = await render(<Probe />);
   await act(() => mocks.voice.start());
   await act(() => mocks.voice.stop());
-  expect(mocks.transcribeCalls).toEqual([`openrouter:${model} via env-b`]);
+  expect(mocks.transcribeCalls).toEqual([`openrouter:${model}（经由 env-b）`]);
   expect(mocks.statusRequests).toEqual([]);
 });
 

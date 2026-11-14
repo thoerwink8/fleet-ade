@@ -73,11 +73,11 @@ describe("saved stack navigation", () => {
     expect(pullRequestStackView(query, saved)).toMatchObject({
       data: saved,
       isFresh: false,
-      notice: expect.stringContaining("Refreshing"),
+      notice: "正在刷新堆叠… 当前显示已保存的数据。",
     });
     expect(
       pullRequestStackView({ ...query, isPending: false, error: "已限流" }, saved),
-    ).toMatchObject({ data: saved, isFresh: false, notice: expect.stringContaining("stale") });
+    ).toMatchObject({ data: saved, isFresh: false, notice: "堆叠数据可能已过期，未能刷新。" });
   });
   it("prefers refreshed data and honors a successful absence", () => {
     const saved = savedPullRequestStack([link], reference);

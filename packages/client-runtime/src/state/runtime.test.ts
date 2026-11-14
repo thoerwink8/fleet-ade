@@ -1199,7 +1199,7 @@ describe("environment query lifecycle", () => {
       });
       const registry = yield* mountEnvironmentQuery(atom);
       expect(yield* readEnvironmentQuery(registry, atom)).toEqual({
-        fork: { title: "分叉", projectId: supported ? projectId : null },
+        fork: { title: supported ? "分叉" : "Fork", projectId: supported ? projectId : null },
       });
     }),
   );

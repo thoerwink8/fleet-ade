@@ -81,7 +81,7 @@ describe("mapManagedRelayError", () => {
     expect(mapped).toMatchObject({
       _tag: "ConnectionBlockedError",
       reason: "authentication",
-      detail: `Relay rejected the DPoP proof. ${DPOP_UNKNOWN_HINT}`,
+      detail: `中继拒绝了 DPoP 证明。 ${DPOP_UNKNOWN_HINT}`,
       traceId: "trace-1",
     });
   });

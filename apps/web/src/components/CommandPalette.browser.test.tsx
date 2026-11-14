@@ -87,7 +87,7 @@ describe("CommandPalette open intents", () => {
 
     openCommandPalette({ open: "new-thread-in" });
 
-    await expect.element(page.getByPlaceholder("Search...")).toHaveFocus();
+    await expect.element(page.getByPlaceholder("搜索…")).toHaveFocus();
   });
 
   it("highlights the first project when New thread in... opens from the root list", async () => {
@@ -112,11 +112,11 @@ describe("CommandPalette open intents", () => {
     await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     await expect
-      .element(page.getByRole("option", { name: /^New thread in\.\.\./ }))
+      .element(page.getByRole("option", { name: /^在以下位置新建会话/ }))
       .toHaveAttribute("data-highlighted");
     await userEvent.keyboard("{Enter}");
 
-    await expect.element(page.getByPlaceholder("Search...")).toHaveFocus();
+    await expect.element(page.getByPlaceholder("搜索…")).toHaveFocus();
     await expect.element(page.getByRole("option").first()).toHaveAttribute("data-highlighted");
     await expect.element(page.getByRole("option").nth(1)).not.toHaveAttribute("data-highlighted");
   });

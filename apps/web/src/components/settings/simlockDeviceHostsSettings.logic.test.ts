@@ -22,9 +22,11 @@ describe("Simlock device host settings", () => {
     expect(simlockDeviceHostProblem({ ...host, gatewayUrl: "gateway:4700" })).toMatch(/origin/);
     expect(
       simlockDeviceHostProblem({ ...host, gatewayUrl: "https://gateway.example/api" }),
-    ).toMatch(/origin/);
-    expect(simlockDeviceHostProblem({ ...host, maxLeases: 21 })).toMatch(/ranges/);
-    expect(simlockDeviceHostProblem({ ...host, maxLeaseMinutes: 4 })).toMatch(/ranges/);
+    ).toContain("Enter the gateway's origin, such as https://gateway.example.ts.net:4700.");
+    expect(simlockDeviceHostProblem({ ...host, maxLeases: 21 })).toBe("请将限制设在显示的范围内。");
+    expect(simlockDeviceHostProblem({ ...host, maxLeaseMinutes: 4 })).toBe(
+      "请将限制设在显示的范围内。",
+    );
   });
 
   it("adds, replaces, and removes one host", () => {
@@ -32,7 +34,7 @@ describe("Simlock device host settings", () => {
     const added = updateSimlockDeviceHosts([other], host, false);
     expect(added.map((candidate) => candidate.id)).toEqual(["other", "simlock"]);
     const renamed = updateSimlockDeviceHosts(added, { ...host, label: "Renamed" }, false);
-    expect(renamed.map((candidate) => candidate.label)).toEqual(["Other", "Renamed"]);
+    expect(renamed.map((candidate) => candidate.label)).toEqual(["其他", "Renamed"]);
     expect(updateSimlockDeviceHosts(renamed, host, true)).toEqual([other]);
   });
 

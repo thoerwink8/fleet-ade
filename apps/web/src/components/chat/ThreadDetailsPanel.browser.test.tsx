@@ -198,9 +198,9 @@ it("shows a linked pull request in a folder that is not a git repository", async
     pullRequests: [linkedPullRequest],
   });
   await using _screen = await render(<Panel fixture={fixture} />);
-  await expect.element(page.getByRole("region", { name: "Workspace" })).toBeVisible();
+  await expect.element(page.getByRole("region", { name: "工作区" })).toBeVisible();
   await expect.element(page.getByText("#27513")).toBeVisible();
-  await expect.element(page.getByRole("button", { name: "Initialize Git" })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "初始化 Git" })).toBeVisible();
 });
 
 it("offers no Initialize Git before the server config says where No project lives", async () => {
@@ -210,7 +210,7 @@ it("offers no Initialize Git before the server config says where No project live
     configLoaded: false,
   });
   await using _screen = await render(<Panel fixture={fixture} />);
-  await expect.element(page.getByRole("region", { name: "Workspace" })).toBeVisible();
+  await expect.element(page.getByRole("region", { name: "工作区" })).toBeVisible();
   await expect
     .element(page.getByRole("button", { name: "Initialize Git" }))
     .not.toBeInTheDocument();

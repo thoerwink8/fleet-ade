@@ -84,7 +84,9 @@ describe("createGitDiffFileContentsLoader", () => {
   ])("rejects contents that $name", async ({ oldLines, newLines }) => {
     const loader = loaderReturning(toContents(oldLines), toContents(newLines));
 
-    await expect(loader(partialFileDiff())).rejects.toThrow("changed since the diff was loaded");
+    await expect(loader(partialFileDiff())).rejects.toThrow(
+      "加载差异后此文件已更改。刷新差异后再展开。",
+    );
   });
 
   it("loads a whitespace-ignored patch whose context shows one side's whitespace", async () => {

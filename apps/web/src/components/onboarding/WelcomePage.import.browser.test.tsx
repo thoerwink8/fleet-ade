@@ -475,7 +475,7 @@ it("gives projects a later scan finds the default, unless the main box was unche
       ]),
     );
 
-  await click("Review all 2");
+  await click("查看全部 2 个");
   await click("全不选");
   await findProject("/projects/third");
   await vi.waitFor(() => expect(button("Import 1 project and start").disabled).toBe(false));
@@ -483,7 +483,7 @@ it("gives projects a later scan finds the default, unless the main box was unche
   const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
   await act(async () => importProjects?.click());
   await findProject("/projects/fourth");
-  await vi.waitFor(() => expect(button("Start").disabled).toBe(false));
+  await vi.waitFor(() => expect(button("开始").disabled).toBe(false));
 });
 
 it("keeps the project choice across a visit to Settings until setup finishes", async () => {
@@ -492,13 +492,13 @@ it("keeps the project choice across a visit to Settings until setup finishes", a
     await using _first = await mountWelcome();
     const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
     await act(async () => importProjects?.click());
-    await vi.waitFor(() => expect(button("Start").disabled).toBe(false));
+    await vi.waitFor(() => expect(button("开始").disabled).toBe(false));
   }
   // Coming back from Settings mounts the page again.
   {
     await using _second = await mountWelcome();
-    expect(button("Start").disabled).toBe(false);
-    await click("Start");
+    expect(button("开始").disabled).toBe(false);
+    await click("开始");
     await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
     expect(state.createProject).not.toHaveBeenCalled();
   }
@@ -541,7 +541,7 @@ it("leaves projects already in T3 Code out of the default import, unless the box
   ]);
   {
     await using _screen = await mountWelcome();
-    await vi.waitFor(() => expect(pageText()).toContain("Import 1 project and their threads"));
+    await vi.waitFor(() => expect(pageText()).toContain("导入 1 个项目及其会话"));
   }
 
   // With every project already in T3 Code, checking the box still picks them.
@@ -549,7 +549,7 @@ it("leaves projects already in T3 Code out of the default import, unless the box
   await using _screen = await mountWelcome();
   const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
   await act(async () => importProjects?.click());
-  await vi.waitFor(() => expect(pageText()).toContain("Import 2 projects and their threads"));
+  await vi.waitFor(() => expect(pageText()).toContain("导入 2 个项目及其会话"));
   expect(button("导入会话并开始").disabled).toBe(false);
 });
 
@@ -571,7 +571,7 @@ it("keeps the started projects checked when the page opens again after a quit", 
     candidate("/projects/second"),
   ]);
   await using _second = await mountWelcome();
-  await vi.waitFor(() => expect(pageText()).toContain("Import 2 projects and their threads"));
+  await vi.waitFor(() => expect(pageText()).toContain("导入 2 个项目及其会话"));
 });
 
 it("keeps the project controls when a later scan fails", async () => {
@@ -581,9 +581,9 @@ it("keeps the project controls when a later scan fails", async () => {
   await act(async () =>
     appAtomRegistry.set(candidatesAtom(), [...appAtomRegistry.get(candidatesAtom())]),
   );
-  await vi.waitFor(() => expect(pageText()).toContain("Could not check projects again."));
+  await vi.waitFor(() => expect(pageText()).toContain("无法再次检查项目。"));
   expect(button("Import 2 projects and start").disabled).toBe(false);
-  expect(button("Retry").disabled).toBe(false);
+  expect(button("重试").disabled).toBe(false);
 });
 
 it("keeps saved picks when Start comes before the project list loads", async () => {
@@ -593,7 +593,7 @@ it("keeps saved picks when Start comes before the project list loads", async () 
   state.scanPending = true;
   await using _screen = await mountWelcome();
 
-  await click("Start");
+  await click("开始");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   // An import a quit cut short is still checked on the next visit.
   expect(localStorage.getItem(welcomeImportSelectionKey(primaryId))).toBe(saved);
@@ -630,7 +630,7 @@ it("keeps an import opt-out on the page when storage cannot save it", async () =
   const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
   await act(async () => importProjects?.click());
 
-  await click("Start");
+  await click("开始");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   expect(state.createProject).not.toHaveBeenCalled();
 });
@@ -671,9 +671,9 @@ it("starts without importing when this connection cannot import projects", async
   using _now = setup();
   setGrant(primaryId, false);
   await using _screen = await mountWelcome();
-  expect(pageText()).not.toContain("Review all");
+  expect(pageText()).not.toContain("查看全部");
 
-  await click("Start");
+  await click("开始");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   expect(state.createProject).not.toHaveBeenCalled();
 });
@@ -733,9 +733,9 @@ it("says the phone is set up only once this computer is shared with the signed-i
     fix: "Turn T3 Connect off and on.",
   });
   await vi.waitFor(() => expect(pageText()).toContain("检查 T3 Connect"));
-  expect(pageText()).not.toContain("Your phone can reach this computer.");
+  expect(pageText()).not.toContain("你的手机可以访问这台电脑。");
 
   await share({ status: "reachable", checkedAt, readyConnections: 4, protocol: "quic" });
-  await vi.waitFor(() => expect(pageText()).toContain("Your phone can reach this computer."));
+  await vi.waitFor(() => expect(pageText()).toContain("你的手机可以访问这台电脑。"));
   expect(pageText()).not.toContain("检查 T3 Connect");
 });

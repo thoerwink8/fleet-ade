@@ -433,7 +433,7 @@ describe("EAS Simulator host", () => {
       yield* ready.devices.boot(catalogDevice!);
       const refused = yield* ready.devices.boot(catalogDevice!).pipe(Effect.flip);
       expect(refused.message).toBe(
-        "EAS Simulator is unavailable: EAS Simulator is limited to 1 running session. Close one in the Device panel first.",
+        "EAS 模拟器 is unavailable: EAS 模拟器 is limited to 1 running session. Close one in the Device panel first.",
       );
       expect(expo.named("T3CreateEasSimulatorSession")).toHaveLength(1);
     }).pipe(Effect.scoped, Effect.provide(layer)),

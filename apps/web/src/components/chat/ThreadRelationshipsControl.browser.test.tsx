@@ -102,17 +102,17 @@ it.each([
   );
 
   if (action === "merge") {
-    await screen.getByRole("button", { name: "Merge back to source conversation" }).click();
+    await screen.getByRole("button", { name: "合并回原对话" }).click();
   } else {
-    await screen.getByRole("button", { name: "More thread actions" }).click();
-    await page.getByRole("menuitem", { name: "Disconnect agent session" }).click();
+    await screen.getByRole("button", { name: "更多会话操作" }).click();
+    await page.getByRole("menuitem", { name: "断开智能体会话" }).click();
   }
 
   await expect.element(page.getByText(title, { exact: true })).toBeVisible();
   await expect
     .element(
       screen.getByRole("button", {
-        name: action === "merge" ? "Merge back to source conversation" : "More thread actions",
+        name: action === "merge" ? "合并回原对话" : "更多会话操作",
       }),
     )
     .toBeEnabled();
@@ -137,10 +137,10 @@ it.each([
 
   const runAction = async () => {
     if (action === "merge") {
-      await screen.getByRole("button", { name: "Merge back to source conversation" }).click();
+      await screen.getByRole("button", { name: "合并回原对话" }).click();
     } else {
-      await screen.getByRole("button", { name: "More thread actions" }).click();
-      await page.getByRole("menuitem", { name: "Disconnect agent session" }).click();
+      await screen.getByRole("button", { name: "更多会话操作" }).click();
+      await page.getByRole("menuitem", { name: "断开智能体会话" }).click();
     }
   };
 
@@ -158,7 +158,7 @@ it.each([
     );
   });
   if (action === "disconnect") {
-    await expect.element(screen.getByRole("button", { name: "More thread actions" })).toBeEnabled();
+    await expect.element(screen.getByRole("button", { name: "更多会话操作" })).toBeEnabled();
   }
 });
 
@@ -201,7 +201,7 @@ it("opens an idle child from Lineage when its shell has not been loaded", async 
       showSideChats
     />,
   );
-  await screen.getByRole("button", { name: /Previous agents/ }).click();
+  await screen.getByRole("button", { name: /之前的智能体/ }).click();
   const child = screen.getByRole("button", { name: /Idle child/ });
   await expect.element(child).toBeEnabled();
   await child.click();
@@ -318,7 +318,7 @@ it("shows a remote subagent's full title in its tooltip even when its environmen
   await expect
     .element(screen.getByRole("button", { name: new RegExp(longTitle) }))
     .not.toBeInTheDocument();
-  await screen.getByRole("button", { name: /Previous agents/ }).click();
+  await screen.getByRole("button", { name: /之前的智能体/ }).click();
   const row = screen.getByRole("button", { name: new RegExp(longTitle) });
   // A long environment label must not squeeze the title out of the row.
   expect(
@@ -329,7 +329,7 @@ it("shows a remote subagent's full title in its tooltip even when its environmen
     expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(longTitle),
   );
   expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(
-    "Runs on Remote VM with a long machine name in the office. Connect to it to open the thread there.",
+    "运行在 Remote VM with a long machine name in the office 上。连接后即可在那里打开会话。",
   );
 
   await row.click({ force: true });
@@ -366,7 +366,7 @@ it("shows a delegated-from thread's full title in its tooltip even when its envi
     expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(longTitle),
   );
   expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(
-    "Delegated from a linked environment. Connect to it to open the parent thread.",
+    "由 已关联的环境 委派。连接后即可打开父会话。",
   );
 
   await row.click({ force: true });

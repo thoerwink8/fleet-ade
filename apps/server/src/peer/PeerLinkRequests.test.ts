@@ -594,12 +594,12 @@ it.live("the agent asks without waiting, and the user links the box after its tu
         role: "user",
         createdBy: "agent",
         creationSource: "server",
-        notification: { outcome: "completed", summary: "Linked Box" },
+        notification: { outcome: "completed", summary: "已关联 Box" },
       });
       expect(messages[0]!.text).toContain(box.environmentId);
       expect(messages[0]!.text).toContain("auto");
       expect(items).toHaveLength(1);
-      expect(items[0]).toMatchObject({ type: "notification", summary: "Linked Box" });
+      expect(items[0]).toMatchObject({ type: "notification", summary: "已关联 Box" });
 
       // The code appears in nothing the thread recorded or the agent received.
       expect(yield* storedText(a)).not.toContain(pairing.credential);

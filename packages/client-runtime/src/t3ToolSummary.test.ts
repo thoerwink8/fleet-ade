@@ -26,13 +26,13 @@ describe("summarizeT3ToolCalls", () => {
         output,
       ),
     );
-    expect(summarizeT3ToolCalls("thread-send", calls).label).toBe("Sent 1 message to 1 thread");
+    expect(summarizeT3ToolCalls("thread-send", calls).label).toBe("Sent 1 message 至 1 thread");
     expect(
       summarizeT3ToolCalls("thread-send", [
         completed({ toolName: "t3_thread_send", args: { threadId: "input-thread" } }),
         completed({ threadId: "input-thread" }),
       ]).label,
-    ).toBe("Sent 2 messages to 1 thread");
+    ).toBe("Sent 2 messages 至 1 thread");
   });
 
   it("counts the pull requests batch link and unlink calls changed", () => {
@@ -65,11 +65,11 @@ describe("summarizeT3ToolCalls", () => {
       { input: { threadId: "cancelled" }, output: undefined, outcome: "unfinished" },
     ];
     expect(summarizeT3ToolCalls("thread-send", calls)).toEqual({
-      label: "Sent 1 message to 1 thread",
+      label: "Sent 1 message 至 1 thread",
       failedCount: 2,
     });
     expect(summarizeT3ToolCalls("thread-send", [calls[1]!])).toEqual({
-      label: "Tried to send 1 message to 1 thread",
+      label: "Tried to send 1 message 至 1 thread",
       failedCount: 1,
     });
   });

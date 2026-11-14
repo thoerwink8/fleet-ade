@@ -17,14 +17,14 @@ import {
 
 describe("dialog initial focus", () => {
   it.each([
-    { label: "generic", options: undefined, focused: "Cancel", confirmed: false },
+    { label: "generic", options: undefined, focused: "取消", confirmed: false },
     {
       label: "destructive opt-in",
       options: { variant: "destructive", initialFocus: "confirm" },
-      focused: "Cancel",
+      focused: "取消",
       confirmed: false,
     },
-    { label: "opt-in", options: { initialFocus: "confirm" }, focused: "Confirm", confirmed: true },
+    { label: "opt-in", options: { initialFocus: "confirm" }, focused: "确认", confirmed: true },
   ] as const)(
     "focuses $focused for a $label confirmation",
     async ({ options, focused, confirmed }) => {
@@ -56,7 +56,7 @@ describe("dialog initial focus", () => {
     await act(() => page.getByRole("button", { name: "Open retry" }).element().focus());
     await userEvent.keyboard("{Enter}");
 
-    await expect.element(page.getByRole("button", { name: "Try again" })).toHaveFocus();
+    await expect.element(page.getByRole("button", { name: "重试" })).toHaveFocus();
     expect(popup.current).toBe(page.getByRole("dialog").element());
   });
 
@@ -76,7 +76,7 @@ describe("dialog initial focus", () => {
         </Dialog>,
       );
 
-      await expect.element(page.getByRole("button", { name: "Cancel", exact: true })).toHaveFocus();
+      await expect.element(page.getByRole("button", { name: "取消", exact: true })).toHaveFocus();
     },
   );
 

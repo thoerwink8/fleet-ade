@@ -195,7 +195,7 @@ describe("deriveWorkflowGroups over a dynamic workflow", () => {
     const group = groups[0];
     expect(group?.phases.map((phase) => [phase.title, phase.state])).toEqual([
       ["Alpha", "done"],
-      ["Beta", "running"],
+      ["测试版", "running"],
     ]);
     expect(group?.phases.map((phase) => phase.settledCount)).toEqual([2, 0]);
     expect(group?.phases.flatMap((phase) => phase.members)).toHaveLength(4);

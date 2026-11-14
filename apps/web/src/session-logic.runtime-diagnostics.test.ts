@@ -78,7 +78,7 @@ describe("runtime diagnostics in the v2 work log", () => {
       }),
     );
 
-    expect(workEntryDisplayLabel(entry, undefined)).toBe("Retrying provider (2/5)");
+    expect(workEntryDisplayLabel(entry, undefined)).toBe("正在重试提供方（2/5）");
     expect(entry.detail).toBe(`${retainedMessage} Retrying in 1.5s.`);
   });
 

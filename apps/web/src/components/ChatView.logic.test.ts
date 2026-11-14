@@ -160,15 +160,15 @@ describe("isThreadEnvironmentLocked", () => {
 describe("buildExpiredTerminalContextToastCopy", () => {
   it("refers to several expired contexts as them", () => {
     expect(buildExpiredTerminalContextToastCopy(2, "empty")).toEqual({
-      title: "已过期的终端上下文不会被发送",
-      description: "请移除它们；如需包含这些终端输出，请重新添加。",
+      title: "过期的终端上下文不会发送",
+      description: "请移除或重新添加them，才能带上终端输出。",
     });
     expect(buildExpiredTerminalContextToastCopy(2, "omitted")).toEqual({
-      title: "已过期的终端上下文已从消息中略去",
-      description: "如需包含这些终端输出，请重新添加它们。",
+      title: "消息中已省略过期的终端上下文",
+      description: "如果仍需要那段终端输出，请重新添加them。",
     });
     expect(buildExpiredTerminalContextToastCopy(1, "omitted").description).toBe(
-      "如需包含该终端输出，请重新添加它。",
+      "如果仍需要那段终端输出，请重新添加it。",
     );
   });
 });

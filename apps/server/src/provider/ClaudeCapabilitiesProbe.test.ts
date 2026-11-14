@@ -75,8 +75,11 @@ it.effect("keeps the probe subprocess alive while gateway model discovery can fi
         },
       }),
     );
+    const binDir = yield* fileSystem.makeTempDirectoryScoped();
+    const reclaudePath = `${binDir}/reclaude`;
+    yield* fileSystem.writeFileString(reclaudePath, "");
     const capabilities = yield* probeClaudeCapabilities(
-      yield* decodeClaudeSettings({ binaryPath: "claude" }),
+      yield* decodeClaudeSettings({ binaryPath: reclaudePath }),
       { PATH: (yield* HostProcess.Environment).PATH, CLAUDE_CONFIG_DIR: configDir },
     );
     assert.deepEqual(

@@ -89,13 +89,13 @@ it.each(["niri", "hyprland"] as const)(
     using _env = setup();
     await using screen = await renderConfig(desktop);
     expect(screen.recorder().getAttribute("aria-label")).toBe(
-      "Record snapshot shortcut, currently Ctrl+Shift+2",
+      "录制快照快捷键，当前为 Ctrl+Shift+2",
     );
     expect(screen.advanced().textContent).toContain("manual binding");
     expect(bridge.previewSnapShotConfig).not.toHaveBeenCalled();
     await screen.click("查看更改");
     expect(screen.recorder().getAttribute("aria-label")).toBe(
-      "Record snapshot shortcut, currently Ctrl+Shift+2",
+      "录制快照快捷键，当前为 Ctrl+Shift+2",
     );
     expect(bridge.applySnapShotConfig).not.toHaveBeenCalled();
     expect(screen.diff()).not.toBeNull();
@@ -114,7 +114,7 @@ it("withdraws a stale diff and requires another read instead of retrying its wri
     new Error("Your config changed since this preview."),
   );
   await screen.click("保存快捷键");
-  expect(screen.alert()?.textContent).toContain("Review the changes and try again");
+  expect(screen.alert()?.textContent).toContain("无法保存快捷键，请检查更改后重试。");
   expect(screen.advanced().textContent).toContain("Your config changed since this preview.");
   expect(screen.button("查看更改")).toBeDefined();
   expect(screen.diff()).toBeNull();

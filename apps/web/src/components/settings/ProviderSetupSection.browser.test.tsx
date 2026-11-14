@@ -195,7 +195,7 @@ describe("Antigravity 设置", () => {
 
     await screen.click("安装 Antigravity");
     await expect
-      .element(screen.getByRole("status").filter({ hasText: "正在启动安装。" }))
+      .element(screen.getByRole("status").filter({ hasText: "无法开始安装." }))
       .toBeVisible();
 
     setup.installation = {
@@ -206,11 +206,9 @@ describe("Antigravity 设置", () => {
       totalBytes: 2_000_000,
     };
     await publish();
-    await expect
-      .element(screen.getByRole("button", { name: "Cancel installation" }))
-      .toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "取消安装" })).toBeDisabled();
     await act(async () => resolveStart());
-    await expect.element(screen.getByRole("button", { name: "Cancel installation" })).toBeEnabled();
+    await expect.element(screen.getByRole("button", { name: "取消安装" })).toBeEnabled();
     await expect
       .element(screen.getByRole("status").filter({ hasText: "Downloading 1.0 MB of 2.0 MB." }))
       .toBeVisible();
@@ -221,7 +219,7 @@ describe("Antigravity 设置", () => {
     const callbackUrl = "http://127.0.0.1:5555/?state=test-only&code=test-only";
     await using screen = await renderSetup();
     await userEvent.fill(screen.callbackInput(), callbackUrl);
-    await screen.click("Continue");
+    await screen.click("继续");
 
     expect(setup.completeAuth).toHaveBeenCalledWith({
       environmentId,

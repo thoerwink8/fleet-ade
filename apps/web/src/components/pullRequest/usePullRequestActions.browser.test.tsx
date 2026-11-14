@@ -61,28 +61,28 @@ it("keeps pending merges with their pull request when navigating between threads
   const button = screen.getByRole("button");
 
   await userEvent.click(button);
-  await expect.element(button).toHaveTextContent("Merging...");
+  await expect.element(button).toHaveTextContent("正在合并…");
   await screen.rerender(<MergeButton reference={second} />);
-  await expect.element(button).toHaveTextContent("Merge");
+  await expect.poll(() => button.element().textContent).toBe("合并");
   await expect.element(button).toBeEnabled();
   await userEvent.click(button);
   expect(state.runAction).toHaveBeenCalledTimes(2);
 
   await screen.rerender(<MergeButton reference={first} />);
-  await expect.element(button).toHaveTextContent("Merging...");
+  await expect.element(button).toHaveTextContent("正在合并…");
   await expect.element(button).toBeDisabled();
   await act(async () => {
     firstResult.resolve({ _tag: "Success", value: undefined });
     await firstResult.promise;
   });
-  await expect.element(button).toHaveTextContent("Merge");
+  await expect.poll(() => button.element().textContent).toBe("合并");
   await screen.rerender(<MergeButton reference={second} />);
-  await expect.element(button).toHaveTextContent("Merging...");
+  await expect.element(button).toHaveTextContent("正在合并…");
   await act(async () => {
     secondResult.resolve({ _tag: "Success", value: undefined });
     await secondResult.promise;
   });
-  await expect.element(button).toHaveTextContent("Merge");
+  await expect.poll(() => button.element().textContent).toBe("合并");
 });
 
 function FixChecksButton() {
@@ -122,10 +122,10 @@ it("stops a pull request handoff when its loading toast is dismissed", async () 
     </ToastProvider>,
   );
 
-  await userEvent.click(screen.getByRole("button", { name: "Fix" }));
-  const toast = screen.getByRole("dialog", { name: "Preparing the pull request checkout..." });
+  await userEvent.click(screen.getByRole("button", { name: "修复" }));
+  const toast = screen.getByRole("dialog", { name: "正在准备 pull request 的工作副本…" });
   await expect.element(toast).toBeVisible();
-  await userEvent.click(toast.getByRole("button", { name: "Dismiss notification" }));
+  await userEvent.click(toast.getByRole("button", { name: "关闭通知" }));
   await expect.element(toast).not.toBeInTheDocument();
   await act(async () => {
     prepared.resolve({

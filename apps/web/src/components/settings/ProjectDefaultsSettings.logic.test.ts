@@ -75,11 +75,11 @@ describe("resolveDefaultModelSettingsPresentation", () => {
     // Settings turn Claude off before the server snapshot reflects it.
     expect(present(claudeAndCodex, claudeOff)).toEqual({
       selection: savedClaude,
-      providerNote: "Claude is turned off.",
+      providerNote: "Claude 已关闭。",
     });
     expect(present(claudeUnavailable)).toEqual({
       selection: savedClaude,
-      providerNote: "Claude is unavailable.",
+      providerNote: "Claude 不可用。",
     });
     expect(present(withoutClaude)).toEqual({
       selection: savedClaude,

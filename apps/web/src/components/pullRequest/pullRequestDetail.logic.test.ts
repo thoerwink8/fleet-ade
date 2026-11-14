@@ -425,8 +425,8 @@ describe("pull request timeline", () => {
       })
         .filter((event) => event.kind === "opened" || event.kind === "closed")
         .map((event) => event.title);
-    expect(titles("github")).toEqual(["Pull request closed", "opened this pull request"]);
-    expect(titles("gitlab")).toEqual(["Merge request closed", "opened this merge request"]);
+    expect(titles("github")).toEqual(["已关闭 Pull request", "opened this pull request"]);
+    expect(titles("gitlab")).toEqual(["已关闭 Merge request", "opened this merge request"]);
   });
 
   it("groups conversation sections without crossing commits or PR updates", () => {
@@ -1096,7 +1096,7 @@ describe("adding a remark to the chat", () => {
       comment: remark("c1", "Why not reuse the existing parser?"),
     });
 
-    expect(context && reviewCommentContextLabel(context)).toBe("#42 @octocat comment");
+    expect(context && reviewCommentContextLabel(context)).toBe("#42 @octocat 条评论");
     expect(context?.text).toBe("octocat: Why not reuse the existing parser?");
   });
 

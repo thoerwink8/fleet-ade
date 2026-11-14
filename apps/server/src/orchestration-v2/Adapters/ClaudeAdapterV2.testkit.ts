@@ -1031,19 +1031,26 @@ function layerClaudeProviderAdapterRegistryReplay(
   return Layer.unwrap(
     writeReplayTaskOutputFiles(transcript).pipe(
       Effect.orDie,
-      Effect.map((tmpRoot) =>
-        ProviderAdapterRegistry.layerFromAdaptersEffect(
-          ClaudeAdapterV2.createClaudeAdapterV2(
-            {
-              instanceId: ClaudeAdapterV2.CLAUDE_DEFAULT_INSTANCE_ID,
-              displayName: undefined,
-              environment: [{ name: "CLAUDE_CODE_TMPDIR", value: tmpRoot, sensitive: false }],
-              enabled: true,
-              config: DEFAULT_CLAUDE_SETTINGS,
-            },
-            {},
-          ).pipe(Effect.map((adapter) => [adapter])),
-        ),
+      Effect.flatMap((tmpRoot) =>
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const fileSystem = yield* FileSystem.FileSystem;
+          // The adapter refuses a turn until reclaude resolves. Replay never spawns this file.
+          const reclaudePath = path.join(tmpRoot, "reclaude");
+          yield* fileSystem.writeFileString(reclaudePath, "");
+          return ProviderAdapterRegistry.layerFromAdaptersEffect(
+            ClaudeAdapterV2.createClaudeAdapterV2(
+              {
+                instanceId: ClaudeAdapterV2.CLAUDE_DEFAULT_INSTANCE_ID,
+                displayName: undefined,
+                environment: [{ name: "CLAUDE_CODE_TMPDIR", value: tmpRoot, sensitive: false }],
+                enabled: true,
+                config: { ...DEFAULT_CLAUDE_SETTINGS, binaryPath: reclaudePath },
+              },
+              {},
+            ).pipe(Effect.map((adapter) => [adapter])),
+          );
+        }).pipe(Effect.orDie),
       ),
       Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     ),

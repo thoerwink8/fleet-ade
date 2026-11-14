@@ -9,23 +9,11 @@ afterEach(() => {
 });
 
 describe("web runtime relay telemetry policy", () => {
-  it.each([
-    {
-      surface: "desktop opt-out",
-      desktopBridge: { getRelayTelemetryEnabled: () => false },
-      exports: false,
-    },
-    {
-      surface: "desktop enabled",
-      desktopBridge: { getRelayTelemetryEnabled: () => true },
-      exports: true,
-    },
-    {
-      surface: "ordinary browser ignores host opt-out",
-      desktopBridge: undefined,
-      exports: true,
-    },
-  ])("applies $surface before the first relay span", async ({ desktopBridge, exports }) => {
+  async function appliesSurface(input: {
+    readonly desktopBridge: { getRelayTelemetryEnabled: () => boolean } | undefined;
+    readonly exports: boolean;
+  }) {
+    const { desktopBridge, exports } = input;
     vi.resetModules();
     vi.stubEnv("T3CODE_TELEMETRY_ENABLED", "false");
     vi.stubEnv("T3CODE_OTEL_SDK_DISABLED", "true");
@@ -75,5 +63,20 @@ describe("web runtime relay telemetry policy", () => {
     } else {
       expect(fetchFn).not.toHaveBeenCalled();
     }
-  });
+  }
+
+  it("applies desktop opt-out before the first relay span", () =>
+    appliesSurface({
+      desktopBridge: { getRelayTelemetryEnabled: () => false },
+      exports: false,
+    }));
+
+  it("applies desktop enabled before the first relay span", () =>
+    appliesSurface({
+      desktopBridge: { getRelayTelemetryEnabled: () => true },
+      exports: true,
+    }));
+
+  it("applies ordinary browser ignores host opt-out before the first relay span", () =>
+    appliesSurface({ desktopBridge: undefined, exports: true }));
 });

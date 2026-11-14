@@ -43,7 +43,7 @@ function makeFakeClaudeBinary(dir: string, lifecyclePort?: number) {
     const source = yield* fs.readFileString(fixturePath);
     writeFakeCli({
       directory: binDir,
-      name: "claude",
+      name: "reclaude",
       platform,
       source:
         lifecyclePort === undefined

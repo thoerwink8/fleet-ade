@@ -126,7 +126,7 @@ describe("thread workflows", () => {
 
     expect(state.queuedRuns.map(({ run, text }) => [run.id, text])).toEqual([
       ["first", "First"],
-      ["later", "Later"],
+      ["later", "稍后"],
     ]);
     expect(state.queuedRuns.map(({ attachments }) => attachments.map(({ id }) => id))).toEqual([
       ["attachment-first"],

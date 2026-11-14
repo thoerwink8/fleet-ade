@@ -234,7 +234,7 @@ describe("v2 thread shell lists", () => {
 
     withRequest("user_input");
     expect(registry.get(parent)?.pendingSubagentRequest).toBe("user_input");
-    expect(childThreadInputsTitle(registry.get(inputs))).toBe("Side chat needs input");
+    expect(childThreadInputsTitle(registry.get(inputs))).toBe("侧聊 needs input");
     expect(registry.get(threads.navigationThreadShellsAtom).map((thread) => thread.id)).toEqual([
       root.id,
     ]);
@@ -244,7 +244,7 @@ describe("v2 thread shell lists", () => {
 
     withRequest("command");
     expect(registry.get(parent)?.pendingSubagentRequest).toBe("approval");
-    expect(childThreadInputsTitle(registry.get(inputs))).toBe("Side chat needs approval");
+    expect(childThreadInputsTitle(registry.get(inputs))).toBe("侧聊 needs approval");
 
     const helper = {
       ...sideChat,

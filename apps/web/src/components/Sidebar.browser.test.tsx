@@ -110,7 +110,7 @@ describe("sidebar header new thread", () => {
       </SidebarProvider>,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "New thread", exact: true }), {
+    await userEvent.click(screen.getByRole("button", { name: "新建会话", exact: true }), {
       modifiers: scenario.shift ? ["Shift"] : [],
     });
 
@@ -171,7 +171,7 @@ describe("sidebar render isolation", () => {
         <Sidebar routeReveal={{ observedKey: null, pendingKey: null }} />
       </SidebarProvider>,
     );
-    await expect.element(screen.getByText("Thread 4").first()).toBeInTheDocument();
+    await expect.element(screen.getByText("会话 4").first()).toBeInTheDocument();
     const rowRenders = () => vi.mocked(SortableThreadRow).mock.calls.length;
 
     using _timers = fakeTimers();
@@ -244,7 +244,7 @@ describe("sidebar thread rename", () => {
       );
       await using screen = await render(tree());
       await userEvent.dblClick(screen.getByText("Fix the login redirect").first());
-      const input = screen.getByRole("textbox", { name: "Thread title" });
+      const input = screen.getByRole("textbox", { name: "会话标题" });
       await expect.element(input).toHaveValue("Fix the login redirect");
 
       vi.mocked(useQuietThreadShells).mockReturnValue([shellTitled("Generated title")]);
@@ -328,7 +328,7 @@ describe("sidebar settled pagination", () => {
       '[data-sidebar-row="shelf:settled"]',
     )!;
     if (shelf.getAttribute("aria-expanded") === "false") await act(() => shelf.click());
-    const more = screen.getByRole("button", { name: "Show 25 more", exact: true });
+    const more = screen.getByRole("button", { name: "再显示 25 个", exact: true });
     await expect.element(more).toBeInTheDocument();
     const moreButton = more.element() as HTMLButtonElement;
     const viewport = moreButton.closest<HTMLElement>('[data-slot="scroll-area-viewport"]')!;

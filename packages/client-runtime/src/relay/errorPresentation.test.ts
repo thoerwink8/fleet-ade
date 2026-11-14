@@ -16,9 +16,7 @@ describe("relayProtectedErrorMessage", () => {
       traceId: "trace-1",
     });
 
-    expect(relayProtectedErrorMessage(error)).toBe(
-      `Relay rejected the DPoP proof. ${DPOP_UNKNOWN_HINT}`,
-    );
+    expect(relayProtectedErrorMessage(error)).toBe(`中继拒绝了 DPoP 证明。 ${DPOP_UNKNOWN_HINT}`);
   });
 
   it("keeps the clock hint for a relay that confirms a time-window failure", () => {
@@ -40,8 +38,6 @@ describe("relayProtectedErrorMessage", () => {
       traceId: "trace-1",
     });
 
-    expect(relayProtectedErrorMessage(error)).toBe(
-      `Relay rejected the DPoP proof. ${DPOP_RETRY_HINT}`,
-    );
+    expect(relayProtectedErrorMessage(error)).toBe(`中继拒绝了 DPoP 证明。 ${DPOP_RETRY_HINT}`);
   });
 });

@@ -328,14 +328,14 @@ describe("KiroProvider", () => {
         { slug: "default", descriptors: 0 },
         {
           slug: "claude-fable-5.1",
-          label: "推理",
+          label: "Reasoning",
           levels: ["low", "medium", "high", "xhigh", "max"],
           defaults: ["high"],
           currentValue: "high",
         },
         {
           slug: "claude-opus-5.5",
-          label: "推理",
+          label: "Reasoning",
           levels: ["low", "medium", "high", "xhigh", "max"],
           defaults: ["medium"],
           currentValue: "medium",
@@ -343,7 +343,7 @@ describe("KiroProvider", () => {
         // Opus 4.6 has no xhigh, and Kiro runs it at high by default.
         {
           slug: "claude-opus-4.6",
-          label: "推理",
+          label: "Reasoning",
           levels: ["low", "medium", "high", "max"],
           defaults: ["high"],
           currentValue: "high",
@@ -351,7 +351,7 @@ describe("KiroProvider", () => {
         // Kimi K3 skips medium and runs at max by default.
         {
           slug: "kimi-k3",
-          label: "推理",
+          label: "Reasoning",
           levels: ["low", "high", "max"],
           defaults: ["max"],
           currentValue: "max",
@@ -438,11 +438,11 @@ describe("KiroProvider", () => {
     const descriptor = kiroAgentDescriptor(template);
     assert.deepEqual(descriptor, {
       id: "mode",
-      label: "智能体",
+      label: "Agent",
       type: "select",
       currentValue: "vibe",
       options: [
-        { id: "vibe", label: "默认", description: "General coding assistance", isDefault: true },
+        { id: "vibe", label: "Default", description: "General coding assistance", isDefault: true },
         { id: "spec", label: "Spec", description: "Structured feature development" },
         { id: "plan", label: "Plan", description: "Plan-only mode" },
         { id: "global-probe", label: "global-probe", description: "Global probe agent" },

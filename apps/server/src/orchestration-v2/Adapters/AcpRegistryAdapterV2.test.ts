@@ -2344,7 +2344,7 @@ describe("AcpRegistryAdapterV2", () => {
         ["interrupted", "interrupted", "interrupted"],
       );
       assert.deepEqual(tools.at(-1)?.output, [
-        { type: "content", content: { type: "text", text: "stoppingcancelled" } },
+        { type: "content", content: { type: "text", text: "stopping已取消" } },
       ]);
     }).pipe(Effect.provide(layerTest)),
   );

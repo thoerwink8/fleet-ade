@@ -3328,7 +3328,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
         description: "Implement stacked git actions",
         cta: {
           kind: "run_action",
-          label: "Create PR",
+          label: "创建 PR",
           action: {
             kind: "create_pr",
           },

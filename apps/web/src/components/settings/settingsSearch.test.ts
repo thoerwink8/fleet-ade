@@ -59,12 +59,12 @@ const ITEMS: ReadonlyArray<SettingsSearchItem> = [
 
 describe("searchSettings", () => {
   it("matches titles, sections, and remembered setting details", () => {
-    expect(searchSettings("word", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
-    expect(searchSettings("network", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
-    expect(searchSettings("sharing", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
+    expect(searchSettings("换行", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
+    expect(searchSettings("网络", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
+    expect(searchSettings("共享", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
     expect(searchSettings("claude", ITEMS).map((item) => item.id)).toEqual(["providers"]);
     expect(searchSettings("long lines", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
-    const spanish = (message: string) => (message === "Word wrap" ? "Ajuste de línea" : message);
+    const spanish = (message: string) => (message === "自动换行" ? "Ajuste de línea" : message);
     expect(searchSettings("ajuste", ITEMS, spanish).map((item) => item.id)).toEqual(["word-wrap"]);
     for (const query of ["fallback", "fallback agent", "备用模型"]) {
       expect(searchSettings(query)[0]).toMatchObject({
@@ -81,17 +81,17 @@ describe("searchSettings", () => {
   });
 
   it("finds the Scheduled tasks page", () => {
-    expect(searchSettings("scheduled tasks")[0]).toMatchObject({
+    expect(searchSettings("定时任务")[0]).toMatchObject({
       id: "scheduled-tasks",
       to: "/settings/scheduled-tasks",
     });
   });
 
   it("matches normalized title substrings", () => {
-    expect(searchSettings("  WORD   WRAP  ", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
-    expect(searchSettings("glass").map((item) => item.id)).toEqual(["setting-glass-opacity"]);
+    expect(searchSettings("  自动换行  ", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
+    expect(searchSettings("毛玻璃").map((item) => item.id)).toEqual(["setting-glass-opacity"]);
     expect(searchSettings("面板动画").map((item) => item.id)).toEqual(["panel-animations"]);
-    expect(searchSettings("thè\u{1ab0}mes")[0]?.id).toBe("theme");
+    expect(searchSettings("主题")[0]?.id).toBe("theme");
     const localeLowerCase = vi.spyOn(String.prototype, "toLocaleLowerCase").mockReturnValue("gıt");
     try {
       expect(searchSettings("GIT")[0]?.id).toBe("git-fetch-interval");
@@ -164,7 +164,7 @@ describe("searchSettings", () => {
     };
     const results = (hasPeerLinkHost: boolean) =>
       searchSettings(
-        "linked environments",
+        "关联环境",
         filterAvailableSettingsSearchItems({ ...availability, hasPeerLinkHost }),
       );
     expect(results(false).map((item) => item.id)).not.toContain("linked-environments");
@@ -188,7 +188,7 @@ describe("searchSettings", () => {
     };
     const ids = (hasPrimaryEnvironment: boolean) =>
       searchSettings(
-        "welcome page",
+        "欢迎页",
         filterAvailableSettingsSearchItems({ ...availability, hasPrimaryEnvironment }),
       ).map((item) => item.id);
     // Hosted web reaches remote computers but has no primary one to set up.
@@ -200,7 +200,7 @@ describe("searchSettings", () => {
     expect(searchSettings("toggle sidebar")[0]?.id).toBe("keybinding-sidebar.toggle");
     expect(searchSettings("sidebar.toggle")[0]?.id).toBe("keybinding-sidebar.toggle");
     expect(searchSettings("mod+b")[0]?.id).toBe("keybinding-sidebar.toggle");
-    expect(searchSettings("copy link")[0]).toMatchObject({
+    expect(searchSettings("复制链接")[0]).toMatchObject({
       id: "keybinding-thread.copyReference",
       to: "/settings/keybindings",
     });
@@ -216,14 +216,12 @@ describe("searchSettings", () => {
 
   it("finds rows by the titles shown on their pages", () => {
     for (const [title, id] of [
-      ["自动清理工作树", "storage-worktrees"],
-      ["删除已收尾的工作树", "storage-worktrees"],
-      ["删除旧浏览器产物", "storage-artifacts"],
-      ["删除旧轮转日志", "storage-artifacts"],
-      ["自定义搜索 URL", "browser-search-engine"],
-      ["原生运行实例", "providers"],
-      ["CODEX_HOME 路径", "providers"],
-      ["独立主目录路径", "providers"],
+      ["工作树清理", "storage-worktrees"],
+      ["工作树位置", "storage-worktrees-location"],
+      ["产物与日志", "storage-artifacts"],
+      ["立即删除", "storage-delete-now"],
+      ["搜索引擎", "browser-search-engine"],
+      ["智能体提供方", "providers"],
     ] as const) {
       expect(searchSettings(title)[0]?.id, title).toBe(id);
     }
@@ -294,12 +292,14 @@ describe("auto-settlement search availability", () => {
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: availability.eligibleEnvironmentIds.length > 0,
     });
-    expect(searchSettings("auto-settle", items).map((item) => item.id)).toEqual([
+    expect(searchSettings("自动收尾", items).map((item) => item.id)).toEqual([
       "auto-settle-inactive-threads",
-      "auto-settle-merged-threads",
       "days-before-auto-settle",
-      "keep-threads-with-pull-requests",
+      "auto-settle-merged-threads",
     ]);
+    expect(searchSettings("保留有关联 PR", items).map((item) => item.id)).toContain(
+      "keep-threads-with-pull-requests",
+    );
   });
 
   it.each([offline, loading])(

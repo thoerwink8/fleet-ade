@@ -46,15 +46,15 @@ const label = () => document.activeElement?.textContent;
 it("starts a keyboard-opened menu on its first action and wraps through enabled actions", () => {
   using _fixture = setup();
   void showContextMenuFallback(items);
-  expect(label()).toBe("Rename");
+  expect(label()).toBe("重命名");
   press("ArrowUp");
-  expect(label()).toBe("Copy");
+  expect(label()).toBe("复制");
   press("ArrowDown");
-  expect(label()).toBe("Rename");
+  expect(label()).toBe("重命名");
   press("End");
-  expect(label()).toBe("Copy");
+  expect(label()).toBe("复制");
   press("Home");
-  expect(label()).toBe("Rename");
+  expect(label()).toBe("重命名");
 });
 
 it("opens and cancels one submenu level at a time, then returns to the thread", async () => {
@@ -63,11 +63,11 @@ it("opens and cancels one submenu level at a time, then returns to the thread", 
   press("End");
   const parent = document.activeElement;
   press("ArrowRight");
-  expect(label()).toBe("Path");
+  expect(label()).toBe("路径");
   press("ArrowLeft");
   expect(document.activeElement).toBe(parent);
   press("Enter");
-  expect(label()).toBe("Path");
+  expect(label()).toBe("路径");
   press("Escape");
   expect(document.activeElement).toBe(parent);
   expect(isContextMenuOpen()).toBe(true);

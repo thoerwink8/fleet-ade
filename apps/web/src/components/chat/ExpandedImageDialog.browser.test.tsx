@@ -53,7 +53,7 @@ describe("ExpandedImageDialog", () => {
       await userEvent.keyboard("{Tab}");
       await userEvent.keyboard("{Enter}");
     }
-    await expect.element(page.getByRole("button", { name: "Close image preview" })).toHaveFocus();
+    await expect.element(page.getByRole("button", { name: "关闭图片预览" })).toHaveFocus();
     await userEvent.keyboard("{Escape}");
     await expect.element(opener).toHaveFocus();
     expect(opener.element().matches(":focus-visible")).toBe(c.focusVisible);
@@ -87,7 +87,7 @@ describe("ExpandedImageDialog", () => {
         { router: false },
       );
 
-      const viewer = screen.getByRole("region", { name: "Pipeline, zoomable image" });
+      const viewer = screen.getByRole("region", { name: "Pipeline，可缩放图片" });
       const availableWidth = window.innerWidth * 0.92 - (window.innerWidth >= 640 ? 96 : 0);
       await vi.waitFor(() =>
         expect(viewer.element().getBoundingClientRect().width).toBeCloseTo(availableWidth, 0),
@@ -106,7 +106,7 @@ describe("ExpandedImageDialog", () => {
       { router: false },
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "No accessibility data" }));
+    await userEvent.click(screen.getByRole("button", { name: "没有无障碍数据" }));
     await expect.element(screen.getByText("无障碍数据")).toBeVisible();
 
     await userEvent.keyboard("{Escape}");
@@ -114,7 +114,7 @@ describe("ExpandedImageDialog", () => {
     expect(onClose).not.toHaveBeenCalled();
 
     // Focus returns to the popup's trigger and opens its tooltip; leave it for a plain control.
-    (screen.getByRole("button", { name: "Close image preview" }).element() as HTMLElement).focus();
+    (screen.getByRole("button", { name: "关闭图片预览" }).element() as HTMLElement).focus();
     await userEvent.keyboard("{Escape}");
     await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
@@ -131,7 +131,7 @@ describe("ExpandedImageDialog", () => {
       // The dialog renders no links and reads no route.
       { router: false },
     );
-    const viewportLocator = screen.getByRole("region", { name: "large.png, zoomable image" });
+    const viewportLocator = screen.getByRole("region", { name: "large.png，可缩放图片" });
     const viewport = viewportLocator.element() as HTMLElement;
     const image = screen.getByRole("img", { name: "large.png" }).element() as HTMLElement;
     await vi.waitFor(() => expect(image.style.width).not.toBe(""));

@@ -41,7 +41,7 @@ describe("resolveEffortGlyph", () => {
       count: 2,
       filled: 0,
       special: null,
-      label: "关闭",
+      label: "Off",
     });
   });
 

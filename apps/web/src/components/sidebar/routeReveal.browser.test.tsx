@@ -118,7 +118,7 @@ describe("useActiveRowReveal", () => {
     );
     const target = screen.getByText("thread-40", { exact: true });
     await expect.element(target).toBeInViewport();
-    screen.getByRole("列表", { name: "Threads" }).element().scrollTop = 0;
+    screen.getByRole("list", { name: "会话" }).element().scrollTop = 0;
     await expect.element(target).not.toBeInViewport();
 
     // The route moves to a thread the list does not hold yet, then back.
@@ -186,7 +186,7 @@ describe("useActiveRowReveal", () => {
       { router: false },
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Toggle Sidebar" }));
+    await userEvent.click(screen.getByRole("button", { name: "切换侧边栏" }));
 
     await expect.element(page.getByText("thread-40", { exact: true })).toBeInViewport();
   });

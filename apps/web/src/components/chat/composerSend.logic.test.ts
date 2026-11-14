@@ -43,7 +43,7 @@ describe("loadBalancingSendWarning", () => {
         threadContexts: [localThread, remoteThread],
         candidateEnvironmentIds: [local, remote],
       }).description,
-    ).toMatch(/No machine can read every attached thread/);
+    ).toContain("没有一台机器能读取全部附加的会话。请在输入框中选择机器，或移除这些会话。");
   });
 
   it("blames resources when one machine can read every attached thread", () => {
@@ -53,7 +53,7 @@ describe("loadBalancingSendWarning", () => {
         threadContexts: [localThread],
         candidateEnvironmentIds: [remote, local],
       }).description,
-    ).toMatch(/No eligible machine has available resources/);
+    ).toContain("没有符合条件且资源充足的机器。请在输入框中手动选择机器。");
   });
 });
 
@@ -110,13 +110,11 @@ describe("approvalRedirectNotice", () => {
   it("explains an approval already being answered", () => {
     expect(
       approvalRedirectNotice({ ...settled, declined: false, approvalResponding: true }),
-    ).toMatch(/already being answered/);
+    ).toContain("正在回应另一个审批，所以你的消息没有发送。");
   });
 
   it("explains an approval that arrived during the decline", () => {
-    expect(approvalRedirectNotice({ ...settled, approvalArrived: true })).toMatch(
-      /Another approval arrived/,
-    );
+    expect(approvalRedirectNotice({ ...settled, approvalArrived: true })).toMatch(/又来了一个审批/);
   });
 
   it("stays quiet when the decline failed or the user left the thread", () => {

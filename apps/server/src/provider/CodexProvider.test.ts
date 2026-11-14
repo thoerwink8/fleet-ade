@@ -54,7 +54,7 @@ it("maps current Codex model capability fields", () => {
         { id: "default", label: "标准" },
         {
           id: "priority",
-          label: "快速",
+          label: "Fast",
           description: "Lower latency responses.",
         },
         {
@@ -71,7 +71,7 @@ it("maps current Codex model capability fields", () => {
       label: "Cyber Access",
       type: "select",
       options: [
-        { id: "standard", label: "标准", isDefault: true },
+        { id: "standard", label: "Standard", isDefault: true },
         { id: "daybreakBlue", label: "Daybreak Blue" },
       ],
       currentValue: "standard",
@@ -114,12 +114,12 @@ it("uses standard routing when the catalog has no default service tier", () => {
         { id: "default", label: "标准", isDefault: true },
         {
           id: "priority",
-          label: "快速",
+          label: "Fast",
           description: "1.5x speed, increased usage",
         },
         {
           id: "ultrafast",
-          label: "极速",
+          label: "Ultrafast",
           description: "Even faster, more expensive",
         },
       ],

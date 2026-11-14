@@ -167,14 +167,19 @@ describe.each(["repository", "folder", "destination"] as const)("add-project %s"
 });
 
 it.each([
-  { step: "folder", source: "本地文件夹", keys: "", description: /^(?!.*(Ctrl|⌘)).*Add.*Enter/ },
+  {
+    step: "folder",
+    source: "本地文件夹",
+    keys: "",
+    description: /^(?!.*(Ctrl|⌘)).*创建并添加.*Enter/,
+  },
   {
     step: "highlighted folder",
     source: "本地文件夹",
     keys: "{ArrowDown}",
-    description: /Add.*(Ctrl|⌘) Enter/,
+    description: /添加.*(Ctrl|⌘) Enter/,
   },
-  { step: "repository", source: "Git URL", keys: "", description: /Continue.*Enter/ },
+  { step: "repository", source: "Git URL", keys: "", description: /继续.*Enter/ },
   { step: "new project", source: "新建项目", keys: "", description: /Create.*Enter/ },
   {
     step: "permission-blocked folder",
@@ -218,7 +223,7 @@ it("keeps the caret in place when an edit briefly makes the folder path not a pa
 });
 
 it.each([
-  { flow: "Git URL", value: "https://github.com/pingdotgg/t3code.git", submit: "Continue (Enter)" },
+  { flow: "Git URL", value: "https://github.com/pingdotgg/t3code.git", submit: "继续 (Enter)" },
   { flow: "新建项目", value: "demo-tab-order", submit: /^Create \(/ },
 ])("moves focus from the $flow input to its enabled submit button on Tab", async (step) => {
   await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
@@ -238,7 +243,7 @@ it("tells screen readers whether a new project will be published", async () => {
   await act(() => openCommandPalette({ open: "add-project" }));
   await page.getByText("新建项目", { exact: true }).click();
   await page.getByRole("combobox").fill("demo-project");
-  const option = page.getByRole("option", { name: /Create private repository/ });
+  const option = page.getByRole("option", { name: /创建私有仓库/ });
   await expect.element(option).toHaveAttribute("aria-checked", "false");
   await option.click();
   await expect.element(option).toHaveAttribute("aria-checked", "true");

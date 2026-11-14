@@ -96,7 +96,7 @@ it("sends a Codex follow-up on a cold Claude thread without compacting first", a
     router: false,
   });
   await expect.element(page.getByText(`Answer 2 for ${thread.id}.`)).toBeVisible();
-  const compactAndSend = page.getByRole("button", { name: "Compact and send" });
+  const compactAndSend = page.getByRole("button", { name: "压缩后发送" });
   await expect.element(compactAndSend).toBeVisible();
 
   await page.getByRole("button", { name: "Claude Opus 4.6", exact: true }).click();

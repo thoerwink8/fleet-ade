@@ -279,7 +279,7 @@ describe("web cloud link environment client", () => {
       expect(error).toMatchObject({
         _tag: "CloudEnvironmentLinkError",
         message:
-          "Disconnected locally, but T3 Connect did not confirm it removed this environment: Relay encountered an internal error (upstream_unavailable).",
+          "已在本地断开，但 T3 Connect 未确认已移除该环境: 中继发生了内部错误（upstream_unavailable）。",
         traceId: "trace-unlink",
       });
     }),

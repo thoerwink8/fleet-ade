@@ -44,10 +44,10 @@ const openPr = {
 
 describe("git action copy", () => {
   it("says PR for a GitHub ref", () => {
-    expect(resolveQuickAction(status({ aheadCount: 1 }), false).label).toBe("Push & create PR");
+    expect(resolveQuickAction(status({ aheadCount: 1 }), false).label).toBe("推送并创建 PR");
     expect(resolveQuickAction(status({ pr: openPr }), false).label).toBe("View PR");
     const [, , prItem] = buildMenuItems(status(), false);
-    expect(prItem?.label).toBe("Create PR");
+    expect(prItem?.label).toBe("创建 PR");
     expect(
       getGitActionDisabledReason({
         item: prItem!,
@@ -60,14 +60,14 @@ describe("git action copy", () => {
 
   it("says MR for a GitLab ref", () => {
     expect(resolveQuickAction(status({ ...gitLab, aheadCount: 1 }), false).label).toBe(
-      "Push & create MR",
+      "推送并创建 MR",
     );
     expect(
       resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false).label,
-    ).toBe("Commit, push & MR");
+    ).toBe("提交、推送并创建 MR");
     expect(resolveQuickAction(status({ ...gitLab, pr: openPr }), false).label).toBe("View MR");
     const [, , prItem] = buildMenuItems(status(gitLab), false);
-    expect(prItem?.label).toBe("Create MR");
+    expect(prItem?.label).toBe("创建 MR");
     expect(
       getGitActionDisabledReason({
         item: prItem!,
@@ -91,6 +91,6 @@ describe("git action copy", () => {
         ...input,
         terminology: sourceControlClients.get("gitlab").changeRequest,
       }).continueLabel,
-    ).toBe("Commit, push & create MR");
+    ).toBe("提交、推送并创建 MR");
   });
 });

@@ -74,7 +74,7 @@ it("keeps Try again inside a short panel when a failed guide has long diagnostic
     { container: tab },
   );
 
-  const retry = screen.getByRole("button", { name: "Try again" });
+  const retry = screen.getByRole("button", { name: "重试" });
   await expect.element(retry).toBeVisible();
   const panelBox = panel.getBoundingClientRect();
   const retryBox = retry.element().getBoundingClientRect();
@@ -174,7 +174,7 @@ it("steps with J and K beside a chat, also after a stop button or while the chat
   await userEvent.click(screen.getByText("Prose for the second stop."));
   await userEvent.keyboard("k");
   await expect.element(screen.getByText("Prose for the first stop.")).toBeVisible();
-  await userEvent.click(screen.getByRole("button", { name: "Next stop" }));
+  await userEvent.click(screen.getByRole("button", { name: "下一小节" }));
   await userEvent.keyboard("j");
   await expect.element(screen.getByText("Prose for the third stop.")).toBeVisible();
   await userEvent.keyboard("k");

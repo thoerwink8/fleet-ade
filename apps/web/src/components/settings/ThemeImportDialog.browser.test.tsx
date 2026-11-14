@@ -104,7 +104,7 @@ it.each(["更新现有主题", "保留两者"])("keeps batch failures visible af
   expect(getCustomThemes().map((theme) => theme.label)).toContain("Dawn");
   await page.getByRole("button", { name: choice }).click();
   invalidateCustomThemes();
-  const label = choice === "Update existing" ? "Dusk" : "Dusk (1)";
+  const label = choice === "更新现有主题" ? "Dusk" : "Dusk (1)";
   expect(getCustomThemes().find((theme) => theme.label === label)?.colors).toEqual(
     parseThemeFile(theme("Dusk", "#f97316")).colors,
   );
@@ -149,13 +149,13 @@ describe("ThemeImportDialog JSONC imports", () => {
     );
     const json = themeJsonc("JSONC Night", "#002b36");
     if (source === "paste") {
-      await page.getByRole("textbox", { name: "Theme JSON" }).fill(json);
+      await page.getByRole("textbox", { name: "主题 JSON" }).fill(json);
     } else {
       const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
       await userEvent.upload(input, new File([json], "night.json", { type: "application/json" }));
-      await expect.element(page.getByRole("textbox", { name: "Theme JSON" })).toHaveValue(json);
+      await expect.element(page.getByRole("textbox", { name: "主题 JSON" })).toHaveValue(json);
     }
-    await page.getByRole("button", { name: "Add theme", exact: true }).click();
+    await page.getByRole("button", { name: "添加主题", exact: true }).click();
 
     expect(getCustomThemes().map((theme) => theme.label)).toEqual(["JSONC Night"]);
     expect(themeColorToHex(getCustomThemes()[0]!.colors.canvas)).toBe("#002b36");

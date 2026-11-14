@@ -162,7 +162,7 @@ it("refreshes a stored automatic choice before sending an unsent draft", async (
     <Harness input={{ ...input, draftThread: store.getDraftSession(draftId) }} />,
   );
   await expect.element(screen.getByText(a)).toBeInTheDocument();
-  await screen.getByRole("button", { name: "Send" }).click();
+  await screen.getByRole("button", { name: "发送" }).click();
   await expect.element(screen.getByText(b)).toBeInTheDocument();
   expect(resources.refreshSelection).toHaveBeenCalledWith([a, b]);
   expect(store.getDraftSession(draftId)).toMatchObject({
@@ -192,7 +192,7 @@ it.each(["manual", "attachments", "promoted"] as const)(
           : input.draftThread,
     };
     await using screen = await render(<Harness input={guardedInput} />);
-    await screen.getByRole("button", { name: "Send" }).click();
+    await screen.getByRole("button", { name: "发送" }).click();
     expect(resources.refreshSelection).not.toHaveBeenCalled();
     expect(store.getDraftSession(draftId)?.environmentId).toBe(a);
   },
@@ -203,7 +203,7 @@ it("does not reuse a stored choice when refreshed resources have no winner", asy
   resources.refreshSelection.mockResolvedValue(null);
   const onPrepared = vi.fn();
   await using screen = await render(<Harness input={input} onPrepared={onPrepared} />);
-  await screen.getByRole("button", { name: "Send" }).click();
+  await screen.getByRole("button", { name: "发送" }).click();
   await expect.element(screen.getByText(a)).toBeInTheDocument();
   await vi.waitFor(() => expect(onPrepared).toHaveBeenCalledWith(false));
 });
@@ -217,7 +217,7 @@ it("abandons a refresh when the draft changes while resources are in flight", as
     }),
   );
   await using screen = await render(<Harness input={input} />);
-  await screen.getByRole("button", { name: "Send" }).click();
+  await screen.getByRole("button", { name: "发送" }).click();
   await act(async () => {
     store.setPrompt(draftId, "Edited while checking");
     resolve(b);

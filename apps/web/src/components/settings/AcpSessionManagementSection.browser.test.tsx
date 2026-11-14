@@ -88,6 +88,13 @@ const replacement = {
 };
 type Projects = ComponentProps<typeof AcpSessionManagementSection>["projects"];
 
+function actionLabel(action: string) {
+  if (action === "Save") return "保存";
+  if (action === "Disable") return "停用";
+  if (action === "Delete") return "删除";
+  return action;
+}
+
 async function renderSection(options: { canList?: boolean; projects?: Projects } = {}) {
   const section = (projects = options.projects ?? [project]) => (
     <AcpSessionManagementSection
@@ -169,8 +176,8 @@ it("does not import with provider management alone", async () => {
   grants.scopes.delete("orchestration:operate");
   await using screen = await renderSection();
   await screen.click("列出运行实例");
-  expect(screen.button("Import").disabled).toBe(true);
-  await screen.click("Import");
+  expect(screen.button("导入").disabled).toBe(true);
+  await screen.click("导入");
   expect(commands.import).not.toHaveBeenCalled();
 });
 
@@ -182,7 +189,7 @@ it("rechecks task access after confirming deletion", async () => {
     grants.scopes.delete("orchestration:operate");
     return true;
   });
-  await screen.click("Delete");
+  await screen.click("删除");
   expect(commands.delete).not.toHaveBeenCalled();
 });
 
@@ -200,9 +207,9 @@ it.each(["Save", "Disable"])("keeps other provider edits through a %s refetch", 
   await screen.click("列出提供方");
   const input = (label: string) =>
     screen.container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-  await userEvent.fill(input("other base URL"), "https://other.example.test/v1");
-  await userEvent.fill(input("other write-only headers JSON"), '{"X-Test":"unsaved"}');
-  await userEvent.fill(input("google write-only headers JSON"), '{"X-Test":"saved"}');
+  await userEvent.fill(input("other 基础 URL"), "https://other.example.test/v1");
+  await userEvent.fill(input("other 只写请求头 JSON"), '{"X-Test":"unsaved"}');
+  await userEvent.fill(input("google 只写请求头 JSON"), '{"X-Test":"saved"}');
 
   let resolveReload!: (value: typeof response) => void;
   const reload = new Promise<typeof response>((resolve) => {
@@ -220,23 +227,23 @@ it.each(["Save", "Disable"])("keeps other provider edits through a %s refetch", 
       value: action === "Save" ? { configured: true } : { disabled: true },
     })),
   );
-  await screen.click(action);
-  expect(screen.button("Refresh").disabled).toBe(true);
+  await screen.click(actionLabel(action));
+  expect(screen.button("刷新").disabled).toBe(true);
   await act(async () => resolveMutation());
   for (const button of screen.container.querySelectorAll<HTMLButtonElement>("button")) {
-    if (button.textContent === "Save" || button.textContent === "Disable") {
+    if (button.textContent === "保存" || button.textContent === "停用") {
       expect(button.disabled).toBe(true);
     }
   }
-  await userEvent.fill(input("other base URL"), "https://newer.example.test/v1");
+  await userEvent.fill(input("other 基础 URL"), "https://newer.example.test/v1");
   await act(async () => resolveReload(response));
 
-  expect(input("other base URL").value).toBe("https://newer.example.test/v1");
-  expect(input("other write-only headers JSON").value).toBe('{"X-Test":"unsaved"}');
-  expect(input("google write-only headers JSON").value).toBe("");
-  await screen.click("Refresh");
-  expect(input("other base URL").value).toBe("https://api.example.test/v1");
-  expect(input("other write-only headers JSON").value).toBe("");
+  expect(input("other 基础 URL").value).toBe("https://newer.example.test/v1");
+  expect(input("other 只写请求头 JSON").value).toBe('{"X-Test":"unsaved"}');
+  expect(input("google 只写请求头 JSON").value).toBe("");
+  await screen.click("刷新");
+  expect(input("other 基础 URL").value).toBe("https://api.example.test/v1");
+  expect(input("other 只写请求头 JSON").value).toBe("");
 });
 
 it.each([true, false])(
@@ -246,7 +253,7 @@ it.each([true, false])(
     await using screen = await renderSection({ canList, projects: [] });
     await screen.setProjects([project]);
     const action = screen.getByRole("button", {
-      name: canList ? "List sessions" : "List providers",
+      name: canList ? "列出运行实例" : "列出提供方",
     });
     await expect.element(action).toBeEnabled();
     if (!canList) {
@@ -261,7 +268,7 @@ it.each([true, false])(
       });
     } else {
       await expect
-        .element(screen.getByRole("textbox", { name: "google base URL" }))
+        .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
         .toHaveValue("https://api.example.test/v1");
       expect(commands.listProviders).toHaveBeenCalledWith({
         environmentId,
@@ -287,33 +294,30 @@ it.each([true, false])(
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "Project for ACP sessions" : "Project for ACP providers",
+          name: canList ? "ACP 运行实例所属项目" : "ACP 提供方所属项目",
         }),
       )
       .toHaveFocus();
-    if (canList) await screen.getByRole("button", { name: "List sessions" }).click();
-    await screen.getByRole("button", { name: "List providers" }).click();
+    if (canList) await screen.getByRole("button", { name: "列出运行实例" }).click();
+    await screen.getByRole("button", { name: "列出提供方" }).click();
     await userEvent.fill(
-      screen.getByRole("textbox", { name: "google base URL" }),
+      screen.getByRole("textbox", { name: "google 基础 URL" }),
       "https://draft.test",
     );
-    await userEvent.fill(
-      screen.getByLabelText("google write-only headers JSON"),
-      '{"Secret":"draft"}',
-    );
+    await userEvent.fill(screen.getByLabelText("google 只写请求头 JSON"), '{"Secret":"draft"}');
 
     await screen.setProjects([project, replacement, second]);
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "Project for ACP sessions" : "Project for ACP providers",
+          name: canList ? "ACP 运行实例所属项目" : "ACP 提供方所属项目",
         }),
       )
       .toHaveTextContent("Second");
     await expect
-      .element(screen.getByRole("textbox", { name: "google base URL" }))
+      .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
       .toHaveValue("https://draft.test");
-    await screen.getByRole("button", { name: "Save", exact: true }).click();
+    await screen.getByRole("button", { name: "保存", exact: true }).click();
     expect(commands.setProvider).toHaveBeenLastCalledWith({
       environmentId,
       input: {
@@ -328,36 +332,36 @@ it.each([true, false])(
 
     await screen.setProjects([project]);
     await expect.element(screen.getByText(session.title)).not.toBeInTheDocument();
-    await expect.element(screen.getByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
     await expect
-      .element(screen.getByRole("textbox", { name: "google base URL" }))
+      .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
       .not.toBeInTheDocument();
-    await screen.getByRole("button", { name: "List providers" }).click();
+    await screen.getByRole("button", { name: "列出提供方" }).click();
     expect(commands.listProviders).toHaveBeenLastCalledWith({
       environmentId,
       input: { instanceId, projectId },
     });
-    await expect.element(screen.getByLabelText("google write-only headers JSON")).toHaveValue("");
+    await expect.element(screen.getByLabelText("google 只写请求头 JSON")).toHaveValue("");
     await expect
-      .element(screen.getByRole("textbox", { name: "google base URL" }))
+      .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
       .toHaveValue("https://api.example.test/v1");
 
     await screen.setProjects([second, project]);
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "Project for ACP sessions" : "Project for ACP providers",
+          name: canList ? "ACP 运行实例所属项目" : "ACP 提供方所属项目",
         }),
       )
       .toHaveTextContent("Antigravity");
     await expect
-      .element(screen.getByRole("textbox", { name: "google base URL" }))
+      .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
       .toHaveValue("https://api.example.test/v1");
 
     await screen.setProjects([]);
-    await expect.element(screen.getByRole("button", { name: "List providers" })).toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "列出提供方" })).toBeDisabled();
     await expect
-      .element(screen.getByRole("textbox", { name: "google base URL" }))
+      .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
       .not.toBeInTheDocument();
   },
 );
@@ -377,8 +381,8 @@ it("ignores a late listing after project replacement", async () => {
     finish({ _tag: "Success", value: { sessions: [session], nextCursor: "old-page" } }),
   );
   await expect.element(screen.getByText(session.title)).not.toBeInTheDocument();
-  await expect.element(screen.getByRole("button", { name: "Load more" })).not.toBeInTheDocument();
-  await expect.element(screen.getByRole("button", { name: "List sessions" })).toBeEnabled();
+  await expect.element(screen.getByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: "列出运行实例" })).toBeEnabled();
 });
 
 it.each(["Save", "Disable"])("does not refetch the old project after a late %s", async (action) => {
@@ -395,15 +399,15 @@ it.each(["Save", "Disable"])("does not refetch the old project after a late %s",
   );
   await using screen = await renderSection();
   await screen.click("列出提供方");
-  await screen.click(action);
+  await screen.click(actionLabel(action));
   expect(command).toHaveBeenCalledOnce();
   await screen.setProjects([replacement]);
   await act(async () => finish());
   expect(commands.listProviders).toHaveBeenCalledOnce();
-  await expect.element(screen.getByRole("button", { name: "List providers" })).toBeEnabled();
+  await expect.element(screen.getByRole("button", { name: "列出提供方" })).toBeEnabled();
 });
 
-it.each(["Delete", "Disable"])(
+it.each(["Delete", "停用"])(
   "does not act on a replaced project after confirming %s",
   async (action) => {
     setup();
@@ -415,7 +419,7 @@ it.each(["Delete", "Disable"])(
     );
     await using screen = await renderSection();
     await screen.click(action === "Delete" ? "列出运行实例" : "列出提供方");
-    await screen.click(action);
+    await screen.click(actionLabel(action));
     await screen.setProjects([replacement]);
     await act(async () => finish(true));
     expect(action === "Delete" ? commands.delete : commands.disableProvider).not.toHaveBeenCalled();
@@ -438,10 +442,10 @@ it("keeps logout pending across project replacement and clears replacement sessi
   await screen.setProjects([replacement]);
   await screen.click("列出运行实例");
   await expect.element(screen.getByText(session.title)).toBeVisible();
-  await expect.element(screen.getByRole("button", { name: "Logging out" })).toBeDisabled();
+  await expect.element(screen.getByRole("button", { name: "正在退出登录" })).toBeDisabled();
   await screen.click("正在退出登录");
   expect(commands.logout).toHaveBeenCalledOnce();
   await act(async () => finish());
   await expect.element(screen.getByText(session.title)).not.toBeInTheDocument();
-  await expect.element(screen.getByRole("button", { name: "Log out", exact: true })).toBeEnabled();
+  await expect.element(screen.getByRole("button", { name: "退出登录", exact: true })).toBeEnabled();
 });

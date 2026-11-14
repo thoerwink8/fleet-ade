@@ -88,7 +88,9 @@ it.each(["cancel", "revoke"])("does not send queued frames after %s", async (act
   socket.receive({ type: "update", revision: 1, text: { committed: "late", tentative: "" } });
   expect(socket.sent).toHaveLength(2);
   expect(onText).not.toHaveBeenCalled();
-  await expect(stream.finish()).rejects.toThrow(action === "cancel" ? "cancelled" : "revoked");
+  await expect(stream.finish()).rejects.toThrow(
+    action === "cancel" ? "语音转写已取消。" : "revoked",
+  );
 });
 
 it("fails on disconnect and times out stalled inference", async () => {

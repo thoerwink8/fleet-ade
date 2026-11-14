@@ -93,12 +93,12 @@ describe("turnDetail", () => {
         prompt,
         work("thought", { itemType: "reasoning", tone: "thinking", detail: "Private idea." }),
       ],
-      activity: "Thinking",
+      activity: "正在思考",
     },
     {
       name: "a file change, with the verb its icon stands for",
       entries: [prompt, work("edit", { itemType: "file_change", changedFiles: ["search.ts"] })],
-      activity: "Editing search.ts",
+      activity: "正在编辑 search.ts",
     },
     {
       name: "the step under a request and a notice",

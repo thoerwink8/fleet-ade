@@ -76,11 +76,11 @@ it.each([
       </RegistryContext>,
     );
     await expect
-      .element(screen.getByRole("link", { name: "Thread, Thread", exact: true }))
+      .element(screen.getByRole("link", { name: "会话，会话", exact: true }))
       .toBeVisible();
     await act(() => registry.set(reply, AsyncResult.failure(Cause.fail("offline"))));
     await expect
-      .element(screen.getByRole("link", { name: "Thread, Thread", exact: true }))
+      .element(screen.getByRole("link", { name: "会话，会话", exact: true }))
       .toBeVisible();
     await act(() =>
       registry.set(
@@ -98,7 +98,7 @@ it.each([
         }),
       ),
     );
-    const link = screen.getByRole("link", { name: "Thread, Older essay" });
+    const link = screen.getByRole("link", { name: "会话，Older essay" });
     await expect.element(link).toBeVisible();
     await expect.element(screen.getByRole("img", { name: "Essays project icon" })).toBeVisible();
     await link.click();
@@ -116,7 +116,7 @@ it.each([
           }),
         ),
       );
-      const decoded = screen.getByRole("link", { name: "Thread, Decoded essay" });
+      const decoded = screen.getByRole("link", { name: "会话，Decoded essay" });
       await expect.element(decoded).toBeVisible();
       await decoded.click();
       await vi.waitFor(() =>
@@ -125,14 +125,16 @@ it.each([
     }
     await act(() => registry.set(reply, AsyncResult.success({})));
     if (legacy) {
-      const remote = screen.getByRole("link", { name: "Thread, Remote thread" });
+      const remote = screen.getByRole("link", { name: "会话，Remote thread" });
       await expect.element(remote).toBeVisible();
       await remote.click();
       await vi.waitFor(() =>
         expect(screen.router?.state.location.pathname).toBe("/remote/older-thread"),
       );
     } else {
-      await expect.element(screen.getByText("会话已不存在", { exact: true })).toBeVisible();
+      await expect
+        .element(screen.getByText("Thread no longer available", { exact: true }))
+        .toBeVisible();
     }
   },
 );
@@ -149,6 +151,8 @@ it("names a thread on a machine this client has no connection to, without waitin
       />
     </RegistryContext>,
   );
-  await expect.element(screen.getByText("会话在另一台机器上", { exact: true })).toBeVisible();
+  await expect
+    .element(screen.getByText("Thread on another machine", { exact: true }))
+    .toBeVisible();
   await expect.element(screen.getByRole("link")).not.toBeInTheDocument();
 });

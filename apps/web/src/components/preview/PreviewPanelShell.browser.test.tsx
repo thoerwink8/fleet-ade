@@ -26,7 +26,7 @@ function Workspace(props: { open: boolean; present?: boolean; children?: ReactNo
 async function openPanelFromComposer(screen: Screen) {
   await userEvent.click(screen.getByRole("textbox", { name: "Message New thread" }));
   await screen.rerender(<Workspace open />);
-  await act(() => screen.getByRole("region", { name: "Open a surface" }).element().focus());
+  await act(() => screen.getByRole("region", { name: "打开面板" }).element().focus());
 }
 
 describe("PreviewPanelShell focus", () => {
@@ -59,7 +59,7 @@ describe("PreviewPanelShell focus", () => {
     await using screen = await render(panel(false));
     await userEvent.click(screen.getByRole("textbox", { name: "Message New thread" }));
     await screen.rerender(panel(true));
-    await expect.element(screen.getByRole("region", { name: "Terminal" })).toHaveFocus();
+    await expect.element(screen.getByRole("region", { name: "终端" })).toHaveFocus();
 
     await screen.rerender(panel(false));
 
@@ -76,9 +76,9 @@ describe("PreviewPanelShell focus", () => {
     await using screen = await render(panel(false));
     await userEvent.click(screen.getByRole("textbox", { name: "Message New thread" }));
     await screen.rerender(panel(true));
-    await act(() => screen.getByRole("region", { name: "Open a surface" }).element().focus());
-    await act(() => page.getByRole("button", { name: "Add panel surface" }).element().focus());
-    await act(() => screen.getByRole("region", { name: "Open a surface" }).element().focus());
+    await act(() => screen.getByRole("region", { name: "打开面板" }).element().focus());
+    await act(() => page.getByRole("button", { name: "添加面板" }).element().focus());
+    await act(() => screen.getByRole("region", { name: "打开面板" }).element().focus());
 
     await screen.rerender(panel(false));
 
@@ -103,15 +103,15 @@ describe("PreviewPanelShell focus", () => {
       </div>
     );
     await using screen = await render(layout(false));
-    await userEvent.click(screen.getByRole("button", { name: "Copy message" }));
+    await userEvent.click(screen.getByRole("button", { name: "复制消息" }));
     await screen.rerender(layout(true));
-    await act(() => screen.getByRole("region", { name: "Open a surface" }).element().focus());
+    await act(() => screen.getByRole("region", { name: "打开面板" }).element().focus());
     const timeline = screen.getByTestId("timeline").element();
     timeline.scrollTop = 1500;
 
     await screen.rerender(layout(false));
 
-    await expect.element(screen.getByRole("button", { name: "Toggle right panel" })).toHaveFocus();
+    await expect.element(screen.getByRole("button", { name: "切换右侧面板" })).toHaveFocus();
     expect(timeline.scrollTop).toBe(1500);
   });
 
@@ -129,14 +129,14 @@ describe("PreviewPanelShell focus", () => {
       </div>
     );
     await using screen = await render(layout(false, true));
-    await userEvent.click(screen.getByRole("textbox", { name: "Terminal input" }));
+    await userEvent.click(screen.getByRole("textbox", { name: "终端输入" }));
     await screen.rerender(layout(true, true));
-    await act(() => screen.getByRole("region", { name: "Open a surface" }).element().focus());
+    await act(() => screen.getByRole("region", { name: "打开面板" }).element().focus());
     await screen.rerender(layout(true, false));
 
     await screen.rerender(layout(false, false));
 
-    await expect.element(screen.getByRole("button", { name: "Toggle right panel" })).toHaveFocus();
+    await expect.element(screen.getByRole("button", { name: "切换右侧面板" })).toHaveFocus();
   });
 
   it("does not return focus to the origin of an earlier open", async () => {
@@ -147,22 +147,22 @@ describe("PreviewPanelShell focus", () => {
     await expect.element(composer).toHaveFocus();
     await act(() => composer.element().blur());
     await screen.rerender(<Workspace open />);
-    await act(() => screen.getByRole("region", { name: "Open a surface" }).element().focus());
+    await act(() => screen.getByRole("region", { name: "打开面板" }).element().focus());
 
     await screen.rerender(<Workspace open={false} />);
 
-    await expect.element(screen.getByRole("button", { name: "Toggle right panel" })).toHaveFocus();
+    await expect.element(screen.getByRole("button", { name: "切换右侧面板" })).toHaveFocus();
   });
 
   it("returns focus to the toggle when a panel opened from it collapses", async () => {
     await using screen = await render(<Workspace open={false} />);
     await userEvent.click(screen.getByRole("textbox", { name: "Message New thread" }));
-    await userEvent.click(screen.getByRole("button", { name: "Toggle right panel" }));
+    await userEvent.click(screen.getByRole("button", { name: "切换右侧面板" }));
     await screen.rerender(<Workspace open />);
-    await act(() => screen.getByRole("region", { name: "Open a surface" }).element().focus());
+    await act(() => screen.getByRole("region", { name: "打开面板" }).element().focus());
 
     await screen.rerender(<Workspace open={false} />);
 
-    await expect.element(screen.getByRole("button", { name: "Toggle right panel" })).toHaveFocus();
+    await expect.element(screen.getByRole("button", { name: "切换右侧面板" })).toHaveFocus();
   });
 });

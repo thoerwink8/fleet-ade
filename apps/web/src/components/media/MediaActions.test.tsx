@@ -155,8 +155,8 @@ it.each(["workspace-file", "media-file"] as const)(
       ]),
       { x: 1, y: 1 },
     );
-    await expect(useMediaActions(source).save()).rejects.toThrow("cannot read host files");
-    await expect(useMediaActions(source).copyImage()).rejects.toThrow("cannot read host files");
+    await expect(useMediaActions(source).save()).rejects.toThrow("此连接无法读取主机文件。");
+    await expect(useMediaActions(source).copyImage()).rejects.toThrow("此连接无法读取主机文件。");
     expect(state.mint).not.toHaveBeenCalled();
     expect(state.download).not.toHaveBeenCalled();
     expect(state.clipboard).not.toHaveBeenCalled();

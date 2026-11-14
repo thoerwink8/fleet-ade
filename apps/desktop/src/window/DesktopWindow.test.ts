@@ -1448,7 +1448,7 @@ describe("DesktopWindow", () => {
         );
 
         const { template } = yield* Deferred.await(popup);
-        const copyEmail = template.find((item) => item.label === "Copy Email Address");
+        const copyEmail = template.find((item) => item.label === "复制邮箱地址");
         assert.isDefined(
           copyEmail,
           `no "Copy Email Address" item in ${JSON.stringify(template.map((item) => item.label ?? item.role ?? item.type))}`,

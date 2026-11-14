@@ -136,7 +136,7 @@ describe("project removal confirmation", () => {
     });
     expect(plan.projectThreads).toHaveLength(3);
     expect(plan.confirmationMessage).toBe(
-      'Remove checkout "Repo" and delete its 1 thread?\nPath: /work/repo\nEnvironment: Local\nThose threads and any archived threads are deleted from T3 Code. Provider sessions are kept.\nOther entries in this grouped project are unaffected.\nThis action cannot be undone.',
+      'Remove checkout "仓库" and delete its 1 thread?\n路径：/work/repo\n环境：本地\n这些会话及所有已归档会话将从 T3 Code 中删除。提供方会话会保留。\n此项目组中的其他条目不受影响。\n此操作无法撤销。',
     );
   });
 
@@ -149,7 +149,7 @@ describe("project removal confirmation", () => {
       threads: [],
     });
     expect(plan.targetKind).toBe("checkout");
-    expect(plan.confirmationMessage).toContain("Environment: Remote");
+    expect(plan.confirmationMessage).toContain("环境：Remote");
     expect(plan.confirmationMessage).toContain("此项目组中的其他条目不受影响。");
     expect(plan.confirmationMessage).toContain(
       "所有已归档会话将从 T3 Code 中删除。提供方会话会保留。",
@@ -166,7 +166,7 @@ describe("project removal confirmation", () => {
       threads: [],
     });
     expect(plan.targetKind).toBe("project");
-    expect(plan.confirmationMessage).toContain("This removes 2 grouped project entries.");
+    expect(plan.confirmationMessage).toContain("将移除 2 个已分组的项目条目。");
     expect(plan.confirmationMessage).toContain("仅移除项目条目，磁盘上的文件会保留。");
   });
 });

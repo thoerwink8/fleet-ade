@@ -188,8 +188,8 @@ it.each([
       multiSelect: true,
       options: [{ label: "服务器" }, { label: "网页" }],
     },
-    ["Server", "Web"],
-    '["Server","Web"]',
+    ["服务器", "网页"],
+    '["服务器","网页"]',
   ],
 ])("sends a %s answer to a question with the id __proto__", (_kind, question, selected, json) => {
   const answers = buildPendingUserInputAnswers(

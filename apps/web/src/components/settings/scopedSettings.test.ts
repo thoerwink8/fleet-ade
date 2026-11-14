@@ -118,7 +118,7 @@ describe("scoped settings targets", () => {
       planScopedSettingsPatch(scope, environments, { enableProviderUpdateChecks: false }),
     ).toMatchObject({
       serverWrites: [],
-      unavailableReason: "Connect Offline to save this setting.",
+      unavailableReason: "请连接 Offline 以保存此设置。",
     });
   });
 

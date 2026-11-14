@@ -123,8 +123,8 @@ it("lets Escape in another dictation editor reach that editor instead of canceli
     </>,
   );
   for (const control of [
-    screen.getByRole("textbox", { name: "Comment" }).element(),
-    screen.getByRole("button", { name: "Cancel" }).element(),
+    screen.getByRole("textbox", { name: "评论" }).element(),
+    screen.getByRole("button", { name: "取消" }).element(),
   ]) {
     if (!(control instanceof HTMLElement)) throw new Error("expected a comment editor control");
     control.focus();
@@ -174,8 +174,8 @@ it("cancels the recording on Escape outside other shown dictation editors", asyn
     </>,
   );
   for (const control of [
-    screen.getByRole("textbox", { name: "Search" }).element(),
-    screen.getByRole("button", { name: "Submit" }).element(),
+    screen.getByRole("textbox", { name: "搜索" }).element(),
+    screen.getByRole("button", { name: "提交" }).element(),
   ]) {
     if (!(control instanceof HTMLElement)) throw new Error("expected a focusable control");
     control.focus();

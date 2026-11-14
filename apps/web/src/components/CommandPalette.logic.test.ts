@@ -178,7 +178,7 @@ describe("buildThreadActionItems", () => {
       runThread,
     });
     expect(new Set(items.map((item) => item.value)).size).toBe(2);
-    const remoteItem = items.find((item) => item.description === "Remote project · Current thread");
+    const remoteItem = items.find((item) => item.description === "Remote project · 当前会话");
     await remoteItem?.run();
     expect(runThread).toHaveBeenCalledWith(remote);
   });
@@ -198,7 +198,7 @@ describe("buildThreadActionItems", () => {
           updatedAt: "2026-03-19T00:00:00.000Z",
         }),
       ],
-      projectByKey: new Map([[`${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`, { title: "项目" }]]),
+      projectByKey: new Map([[`${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`, { title: "Project" }]]),
       icon: null,
       runThread: async (_thread) => undefined,
     });
@@ -260,13 +260,10 @@ describe("buildThreadActionItems", () => {
         ],
       }).map((group) => [group.label, group.items.map((item) => item.title)]);
 
-    expect(search("new thread in t3code", false)[0]).toEqual([
-      "Suggestions",
-      ["New thread in t3code"],
-    ]);
-    expect(search("new thread", false).map(([label]) => label)).not.toContain("Suggestions");
-    expect(search("t3", true)).toEqual([["Projects", ["t3code"]]]);
-    expect(search("add project", true)).toEqual([["Actions", ["添加项目"]]]);
+    expect(search("t3code", false)[0]).toEqual(["建议", ["在以下位置新建会话 t3code"]]);
+    expect(search("在以下位置", false).map(([label]) => label)).not.toContain("建议");
+    expect(search("t3", true)).toEqual([["项目", ["t3code"]]]);
+    expect(search("添加项目", true)).toEqual([["操作", ["添加项目"]]]);
   });
 
   it("lists message matches last, once, without moving the title matches above them", () => {
@@ -293,9 +290,9 @@ describe("buildThreadActionItems", () => {
     const before = filter([]);
     // The server matched both; the title match stays where it was.
     const after = filter([items[0]!, items[1]!].toReversed());
-    expect(before).toEqual([["Threads", ["thread:environment-local:title"]]]);
+    expect(before).toEqual([["会话", ["thread:environment-local:title"]]]);
     expect(after).toEqual([
-      ["Threads", ["thread:environment-local:title"]],
+      ["会话", ["thread:environment-local:title"]],
       ["消息内容", ["thread:environment-local:message"]],
     ]);
   });
@@ -338,7 +335,7 @@ describe("buildThreadActionItems", () => {
       })[0]?.label;
 
     for (const query of ["comp", "compa", "compac", "compact", "compacti", "compaction"]) {
-      expect(firstGroup(query), query).toBe("Threads");
+      expect(firstGroup(query), query).toBe("会话");
     }
   });
 
@@ -368,8 +365,8 @@ describe("buildThreadActionItems", () => {
         threadSearchItems,
       }).map((group) => group.label);
 
-    expect(labels("upgrade")).toEqual(["Threads"]);
-    expect(labels("upl")).toEqual(["Actions"]);
+    expect(labels("upgrade")).toEqual(["会话"]);
+    expect(labels("upl")).toEqual(["操作"]);
     // A short query still finds a command by a keyword it equals.
     const prGroups = filterCommandPaletteGroups({
       activeGroups: [
@@ -396,10 +393,9 @@ describe("buildThreadActionItems", () => {
     });
     expect(prGroups.flatMap((group) => group.items.map((item) => item.value))).toEqual([
       "action:open-prs",
-      "action:project",
     ]);
-    expect(labels("up")).toEqual(["Actions", "Threads"]);
-    expect(labels("pnpm up")).toEqual(["Threads"]);
+    expect(labels("up")).toEqual(["操作", "会话"]);
+    expect(labels("pnpm up")).toEqual(["会话"]);
   });
 
   it("runs the command for its whole name over a thread with that title, and lists the open thread last", () => {
@@ -437,7 +433,7 @@ describe("buildThreadActionItems", () => {
       projectSearchItems: [],
       threadSearchItems,
     });
-    expect(groups.map((group) => group.label)).toEqual(["Actions", "Threads"]);
+    expect(groups.map((group) => group.label)).toEqual(["操作", "会话"]);
     expect(groups[1]?.items.at(-1)?.title).toBe("New thread layout");
   });
 
@@ -466,8 +462,8 @@ describe("buildThreadActionItems", () => {
         projectSearchItems,
         threadSearchItems,
       }).map((group) => group.label);
-    expect(labels("lakebed")).toEqual(["Projects", "Threads"]);
-    expect(labels("lake")).toEqual(["Threads", "Projects"]);
+    expect(labels("lakebed")).toEqual(["项目", "会话"]);
+    expect(labels("lake")).toEqual(["会话", "项目"]);
   });
 
   it("keeps a command first over a thread in daily use that matches as well", () => {
@@ -507,7 +503,7 @@ describe("buildThreadActionItems", () => {
       threadSearchItems,
       now,
     });
-    expect(groups.map((group) => group.label)).toEqual(["Actions", "Threads"]);
+    expect(groups.map((group) => group.label)).toEqual(["会话", "操作"]);
   });
 
   it("ranks an order-independent setting title match above a split context match", () => {
@@ -588,7 +584,7 @@ describe("buildThreadActionItems", () => {
         {
           kind: "action",
           value: "setting:keybindings",
-          title: "快捷键",
+          title: "Keybindings",
           searchTerms: ["Keybindings", "General", "shortcuts"],
           icon: null,
           run: async () => undefined,

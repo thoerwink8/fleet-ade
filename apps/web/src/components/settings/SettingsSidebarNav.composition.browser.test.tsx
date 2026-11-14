@@ -19,9 +19,9 @@ it("ignores composing keys in the search", async () => {
     </SidebarProvider>,
     { router: "/settings/general" },
   );
-  const search = page.getByRole("combobox", { name: "Search settings" });
-  await search.fill("theme");
-  await expect.element(page.getByRole("option", { name: /Theme/ })).toBeVisible();
+  const search = page.getByRole("combobox", { name: "搜索设置" });
+  await search.fill("主题");
+  await expect.element(page.getByRole("option", { name: /主题/ })).toBeVisible();
 
   for (const composition of [
     { key: "Enter", isComposing: true, keyCode: 13 },
@@ -35,7 +35,7 @@ it("ignores composing keys in the search", async () => {
     await act(() => search.element().dispatchEvent(event));
     expect(event.defaultPrevented, JSON.stringify(composition)).toBe(false);
     expect(screen.router?.state.location.pathname).toBe("/settings/general");
-    await expect.element(search).toHaveValue("theme");
+    await expect.element(search).toHaveValue("主题");
   }
 
   await userEvent.keyboard("{Enter}");
@@ -55,7 +55,7 @@ function renderNav() {
 
 it("opens search from the physical Slash and F keys on non-US layouts", async () => {
   await using _screen = await renderNav();
-  const search = page.getByRole("combobox", { name: "Search settings" });
+  const search = page.getByRole("combobox", { name: "搜索设置" });
 
   for (const { init, opens } of [
     { init: { key: "/", code: "Digit7", shiftKey: true }, opens: true }, // German Shift+7
@@ -74,7 +74,7 @@ it("opens search from the physical Slash and F keys on non-US layouts", async ()
 it("moves Tab through every settings section", async () => {
   await page.viewport(1280, 800);
   await using _screen = await renderNav();
-  await userEvent.click(page.getByRole("combobox", { name: "Search settings" }));
+  await userEvent.click(page.getByRole("combobox", { name: "搜索设置" }));
 
   const sections = SETTINGS_NAV_GROUPS.flatMap((group) => group.paths).map(
     (to) => SETTINGS_SECTION_LABELS[to],
@@ -93,7 +93,7 @@ it.each([1280, 390])("names each group by a heading outside it at %ipx wide", as
   await page.viewport(width, 800);
   await using _screen = await renderNav();
 
-  for (const name of ["Agents", "Code", "Connections"]) {
+  for (const name of ["智能体", "代码", "连接"]) {
     const heading = page.getByRole("heading", { name, level: 3 });
     await expect.element(heading).toBeInTheDocument();
     const group = page.getByRole("group", { name }).element();

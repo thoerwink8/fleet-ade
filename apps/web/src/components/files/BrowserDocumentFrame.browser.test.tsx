@@ -50,12 +50,12 @@ describe("HtmlRenderDocument", () => {
     using _url = { [Symbol.dispose]: () => URL.revokeObjectURL(src) };
     await using screen = await render(<HtmlRenderDocument src={src} title="Swatches" />);
 
-    await page.frameLocator(screen.getByTitle("Swatches")).getByAltText("绿色").click();
+    await page.frameLocator(screen.getByTitle("Swatches")).getByAltText("Green").click();
 
-    const viewer = page.getByRole("dialog", { name: "Expanded image preview" });
-    await expect.element(viewer.getByAltText("绿色")).toBeVisible();
-    await expect.element(viewer.getByRole("button", { name: "Next media" })).toBeVisible();
-    await expect.element(viewer.getByRole("button", { name: "Previous media" })).toBeVisible();
+    const viewer = page.getByRole("dialog", { name: "展开 图片 preview" });
+    await expect.element(viewer.getByAltText("Green")).toBeVisible();
+    await expect.element(viewer.getByRole("button", { name: "下一个媒体" })).toBeVisible();
+    await expect.element(viewer.getByRole("button", { name: "上一个媒体" })).toBeVisible();
   });
 });
 

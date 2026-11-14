@@ -133,7 +133,7 @@ describe("cooperative shell cache encoding", () => {
       expect(parsed).not.toHaveProperty("unexpected");
       expect(parsed.snapshot).not.toHaveProperty("unexpected");
       expect(parsed.snapshot.projects[0]).not.toHaveProperty("unexpected");
-      expect(parsed.snapshot.projects[0].title).toBe("Project");
+      expect(parsed.snapshot.projects[0].title).toBe("项目");
       expect(parsed.snapshot.threads[0]).not.toHaveProperty("unexpected");
       expect(parsed.snapshot.threads[0].branch).toBe("main");
       expect(parsed.snapshot.threads[0].modelSelection).toEqual({

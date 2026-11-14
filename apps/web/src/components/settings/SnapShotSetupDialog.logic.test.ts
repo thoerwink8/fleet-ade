@@ -96,7 +96,7 @@ it("offers manual capture on an unsupported GNOME version instead of trapping se
   expect(captureSetupBackend(state)).toBe("picker");
   expect(captureSetupAccessReady(state)).toBe(true);
   expect(captureSetupInitialStep(state)).toBe("access");
-  expect(captureSetupCheckMessage(state)).toContain("choose a window each time");
+  expect(captureSetupCheckMessage(state)).toContain("已就绪，每次都需要选择窗口。");
 });
 
 it.each(["not-installed", "error"] as const)(
@@ -130,14 +130,14 @@ it("resumes KDE setup after the helper passes its real permission check", () => 
 
 it("does not report a successful check when capture support could not be read", () => {
   expect(captureSetupCheckMessage({ ...gnome, message: "Desktop disconnected" })).toContain(
-    "Still unable to check access",
+    "仍无法检查权限，请展开“高级”查看帮助。",
   );
   expect(
     captureSetupCheckMessage({
       ...gnome,
       gnomeExtension: { status: "error", message: "Could not read extension state" },
     }),
-  ).toContain("Still unable to check access");
+  ).toContain("仍无法检查权限，请展开“高级”查看帮助。");
 });
 
 it("uses a capable portal without requiring the optional GNOME extension", () => {

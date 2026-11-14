@@ -414,6 +414,6 @@ it("appends the server zone only to fixed-time schedule labels", () => {
     "Daily at 16:31 UTC",
   );
   expect(scheduleLabel({ type: "fixed_time", timeOfDay: "09:00" })).toBe("Daily at 09:00");
-  expect(scheduleLabel({ type: "interval", everyMs: 60_000 }, "Etc/UTC")).toBe("Every 1 min");
+  expect(scheduleLabel({ type: "interval", everyMs: 60_000 }, "Etc/UTC")).toBe("每 1 分钟");
   expect(scheduleLabel({ type: "webhook", signature: null }, "Etc/UTC")).toBe("收到 webhook 时");
 });

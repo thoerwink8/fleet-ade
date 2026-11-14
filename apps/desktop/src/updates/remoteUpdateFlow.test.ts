@@ -39,7 +39,7 @@ describe("nextRemoteDesktopUpdateStep", () => {
       null,
     );
     assert.equal(step.action, "done");
-    assert.include(step.action === "done" ? step.reason : "", "1.2.4 did not apply");
+    assert.include(step.action === "done" ? step.reason : "", "1.2.4 未在此机器上生效");
     assert.deepEqual(
       nextRemoteDesktopUpdateStep(
         makeState({ status: "available", availableVersion: "1.2.5", notAppliedVersion: "1.2.4" }),

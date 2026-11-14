@@ -35,6 +35,8 @@
         "setup-worktree.ts",
         "sign-macos.ts",
         "prepare-server-compile-cache.cjs",
+        // release:smoke spawns this by path; knip does not trace execFile.
+        "resolve-nightly-release.ts",
         "smoke-desktop-app.ts",
         "verify-windows-desktop-artifact.ts",
       ],

@@ -158,7 +158,7 @@ it("keeps a docked picker open after a pick and hands focus to that model's effo
   }
 
   await using screen = await render(<Picker />);
-  await screen.getByRole("button", { name: "Choose model" }).click();
+  await screen.getByRole("button", { name: "选择模型" }).click();
   const search = page.getByPlaceholder("搜索模型…");
   await expect.element(search).toHaveFocus();
   await userEvent.keyboard("{ArrowRight}");
@@ -215,6 +215,6 @@ it("opens on the active provider when every favorite belongs to a disabled provi
       onInstanceModelChange={() => {}}
     />,
   );
-  await screen.getByRole("button", { name: "Choose model" }).click();
+  await screen.getByRole("button", { name: "选择模型" }).click();
   await expect.element(page.getByRole("option", { name: /Codex model/ })).toBeVisible();
 });

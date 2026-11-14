@@ -93,32 +93,32 @@ it("draws an agent's reasoning as bars and keeps its mode out of the levels", as
   expect(status.element().querySelector("[data-composer-effort-glyph]")).not.toBeNull();
   await expect.element(status).toHaveTextContent("");
 
-  const levels = screen.getByRole("radiogroup", { name: "Thinking" });
+  const levels = screen.getByRole("radiogroup", { name: "正在思考" });
   await expect.element(levels.getByRole("radio")).toHaveLength(3);
-  await expect.element(screen.getByRole("radio", { name: "Plan" })).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("radio", { name: "套餐" })).not.toBeInTheDocument();
 
   // Up and Down walk from the levels through the option rows without opening their menus.
   await userEvent.tab();
   await expect.element(screen.getByRole("radio", { name: "Medium" })).toHaveFocus();
   await userEvent.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}");
-  const speed = screen.getByRole("button", { name: "Speed: Standard" });
+  const speed = screen.getByRole("button", { name: "速度: 标准" });
   await expect.element(speed).toHaveFocus();
   await expect.element(page.getByRole("menuitemradio")).not.toBeInTheDocument();
   await userEvent.keyboard("{ArrowRight}");
-  await expect.element(page.getByRole("menuitemradio", { name: "Standard" })).toHaveFocus();
+  await expect.element(page.getByRole("menuitemradio", { name: "标准" })).toHaveFocus();
   await userEvent.keyboard("{ArrowLeft}");
   await expect.element(page.getByRole("menuitemradio")).not.toBeInTheDocument();
   await expect.element(speed).toHaveFocus();
 
-  await userEvent.click(screen.getByText("Auto-approve tools"));
+  await userEvent.click(screen.getByRole("switch", { name: "Auto-approve tools" }));
   await expect
     .element(screen.getByRole("switch", { name: "Auto-approve tools" }))
     .toHaveAttribute("aria-checked", "true");
 
   await userEvent.click(screen.getByRole("button", { name: "Session Mode: Bypass Permissions" }));
-  await userEvent.click(page.getByRole("menuitemradio", { name: "Plan" }));
+  await userEvent.click(page.getByRole("menuitemradio", { name: "计划" }));
   await expect
-    .element(screen.getByRole("button", { name: "Session Mode: Plan" }))
+    .element(screen.getByRole("button", { name: "Session Mode: 计划" }))
     .toBeInTheDocument();
   await expect.element(page.getByRole("menuitemradio")).not.toBeInTheDocument();
 });

@@ -3224,7 +3224,7 @@ it.layer(layerTest)("orchestration V2 foundation persistence", (it) => {
           assert.isTrue(Option.isSome(stop));
           if (Option.isSome(stop)) {
             assert.equal(stop.value.status, "failed");
-            assert.include(stop.value.lastError ?? "", "已超时");
+            assert.include(stop.value.lastError ?? "", "Timed out");
           }
         }).pipe(
           Effect.provide(layerWorker),

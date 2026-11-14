@@ -65,18 +65,18 @@ function setup() {
   return stubGlobal("desktopBridge", {});
 }
 
-const remoteCard = () => page.getByRole("button", { name: /Remote link/ });
+const remoteCard = () => page.getByRole("button", { name: /远程连接/ });
 const sshCard = () => page.getByRole("button", { name: /^SSH/ });
 
 async function openDialogOnSsh() {
-  await userEvent.click(page.getByRole("button", { name: "Add environment" }));
+  await userEvent.click(page.getByRole("button", { name: "添加环境" }));
   await userEvent.click(sshCard());
   await expect.element(sshCard()).toHaveAttribute("aria-pressed", "true");
 }
 
 async function expectDefaultModeAfterReopen() {
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  await userEvent.click(page.getByRole("button", { name: "Add environment" }));
+  await userEvent.click(page.getByRole("button", { name: "添加环境" }));
   await expect.element(remoteCard()).toHaveAttribute("aria-pressed", "true");
   await expect.element(sshCard()).toHaveAttribute("aria-pressed", "false");
   await expect.element(page.getByPlaceholder("backend.example.com")).toBeInTheDocument();
@@ -89,9 +89,7 @@ describe("AddEnvironmentDialog", () => {
 
     await openDialogOnSsh();
     await userEvent.fill(page.getByPlaceholder("搜索主机或输入 devbox"), "devbox");
-    await userEvent.click(
-      page.getByRole("dialog").getByRole("button", { name: "Add environment" }),
-    );
+    await userEvent.click(page.getByRole("dialog").getByRole("button", { name: "添加环境" }));
     expect(mocks.connectSshEnvironment).toHaveBeenCalledOnce();
 
     await expectDefaultModeAfterReopen();
@@ -125,14 +123,12 @@ describe("AddEnvironmentDialog", () => {
     });
     mocks.connectSshEnvironment.mockImplementationOnce(() => pending);
     await userEvent.fill(page.getByPlaceholder("搜索主机或输入 devbox"), "devbox");
-    await userEvent.click(
-      page.getByRole("dialog").getByRole("button", { name: "Add environment" }),
-    );
+    await userEvent.click(page.getByRole("dialog").getByRole("button", { name: "添加环境" }));
     await userEvent.keyboard("{Escape}");
     await expectDefaultModeAfterReopen();
     finishConnection(AsyncResult.failure(Cause.fail(new Error("dismissed SSH attempt"))));
     await expect
-      .element(page.getByRole("dialog").getByRole("button", { name: "Add environment" }))
+      .element(page.getByRole("dialog").getByRole("button", { name: "添加环境" }))
       .toBeEnabled();
     await expect.element(page.getByText(/dismissed SSH attempt/)).not.toBeInTheDocument();
   });

@@ -199,7 +199,7 @@ describe("project favicon image loader", () => {
     const { load, downscale } = loader(
       new Response(stream, { headers: { "content-type": "image/png" } }),
     );
-    await expect(load(url, signal())).rejects.toThrow("文件过大");
+    await expect(load(url, signal())).rejects.toThrow("Project icon is too large to decode.");
     expect(pulled).toBeLessThan(PROJECT_FAVICON_MAX_SOURCE_BYTES / chunk.byteLength + 3);
     expect(downscale).not.toHaveBeenCalled();
     let cancelled = false;
@@ -213,7 +213,9 @@ describe("project favicon image loader", () => {
         headers: { "content-type": "image/png", "content-length": String(2 ** 40) },
       }),
     );
-    await expect(declared.load(url, signal())).rejects.toThrow("文件过大");
+    await expect(declared.load(url, signal())).rejects.toThrow(
+      "Project icon is too large to decode.",
+    );
     expect(cancelled).toBe(true);
     expect(declared.downscale).not.toHaveBeenCalled();
   });

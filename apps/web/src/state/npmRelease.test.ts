@@ -147,9 +147,7 @@ it.effect("does not call an unsupported RPC or fetch public npm for an older pri
     const unmount = registry.mount(release);
     try {
       const error = yield* AtomRegistry.getResult(registry, release).pipe(Effect.flip);
-      expect(npmReleaseFailureMessage(Cause.fail(error))).toContain(
-        "Update it before switching tracks",
-      );
+      expect(npmReleaseFailureMessage(Cause.fail(error))).toContain("请先更新，再切换通道");
       expect(query).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
     } finally {

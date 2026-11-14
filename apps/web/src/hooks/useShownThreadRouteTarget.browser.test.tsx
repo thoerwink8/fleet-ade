@@ -71,10 +71,10 @@ describe("useShownThreadRouteTarget", () => {
     await expect.element(shown).toHaveTextContent("thread-b");
 
     await act(() => router.navigate({ to: "/new" }));
-    await expect.element(shown).toHaveTextContent("none");
+    await expect.element(shown).toHaveTextContent("无");
 
     await act(() => router.navigate({ to: "/settings/general" }));
-    await expect.element(shown).toHaveTextContent("none");
+    await expect.element(shown).toHaveTextContent("无");
   });
 
   it("shows the thread behind Settings when it mounts while Settings is already open", async () => {

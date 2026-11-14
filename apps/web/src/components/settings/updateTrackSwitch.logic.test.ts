@@ -59,7 +59,7 @@ describe("prepareLocalTrackSwitch", () => {
     const stale = fakeBridge("0.1.2");
     expect(await prepare(stale.bridge)).toEqual({
       ok: false,
-      message: "This app found 0.1.2, which is older than 0.1.3. Try again in a few minutes.",
+      message: "此应用找到的 0.1.2 早于 0.1.3。请几分钟后重试。",
     });
     // The saved track is intent; "Switch them" retries without re-picking it.
     expect(stale.saved).toEqual(["latest"]);
@@ -96,12 +96,12 @@ describe("nothingToMove", () => {
   it("disables a switch that would neither move a machine nor save a track", () => {
     expect(nothingToMove(stableSwitch)).toEqual({
       note: null,
-      disabledReason: "No machine can switch to Stable now.",
+      disabledReason: "目前没有机器可以切换到稳定版。",
     });
   });
 
   it("says a switch only saves the track when no machine moves", () => {
-    const onlySaves = { note: "No machine can switch to Stable now. This only saves the track." };
+    const onlySaves = { note: "目前没有机器可以切换到稳定版。 This only saves the track." };
     expect(nothingToMove({ ...stableSwitch, savedChannel: "nightly" })).toEqual({
       ...onlySaves,
       disabledReason: null,
@@ -124,7 +124,7 @@ describe("nothingToMove", () => {
       disabledReason: null,
     });
     expect(nothingToMove({ ...stableSwitch, rows: [], savedChannel: "nightly" })).toEqual({
-      note: "Every connected machine is already on Stable. This only saves the track.",
+      note: "每台已连接的机器都已使用稳定版。 This only saves the track.",
       disabledReason: null,
     });
   });

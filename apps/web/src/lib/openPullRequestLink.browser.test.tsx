@@ -103,7 +103,7 @@ it.each([
     },
     { once: true },
   );
-  await act(() => screen.getByRole("link", { name: "Commit" }).element().dispatchEvent(event));
+  await act(() => screen.getByRole("link", { name: "提交" }).element().dispatchEvent(event));
   expect(defaults).toEqual([false]);
   expect(state.preview).not.toHaveBeenCalled();
   expect(useRightPanelStore.getState().byThreadKey).toEqual({});
@@ -128,12 +128,10 @@ it.each(["system", "app"] as const)(
       </AppAtomRegistryProvider>,
     );
     using open = vi.spyOn(window, "open").mockReturnValue(null);
-    await screen.getByRole("link", { name: "Commit" }).click();
-    await expect
-      .element(page.getByRole("button", { name: "Open link", exact: true }))
-      .toBeVisible();
+    await screen.getByRole("link", { name: "提交" }).click();
+    await expect.element(page.getByRole("button", { name: "打开链接", exact: true })).toBeVisible();
     expect(open).not.toHaveBeenCalled();
-    await page.getByRole("button", { name: "Open link", exact: true }).click();
+    await page.getByRole("button", { name: "打开链接", exact: true }).click();
     expect(open).toHaveBeenCalledExactlyOnceWith(commitUrl, "_blank", "noopener,noreferrer");
     expect(state.openLink).not.toHaveBeenCalled();
   },
@@ -150,7 +148,7 @@ it("opens an available commit in the closed Diff pane without the pane resetting
       <CommitLink />
     </AppAtomRegistryProvider>,
   );
-  await screen.getByRole("link", { name: "Commit" }).click();
+  await screen.getByRole("link", { name: "提交" }).click();
   await vi.waitFor(() =>
     expect(useDiffPanelStore.getState().byThreadKey).toEqual({
       [scopedThreadKey(threadRef)]: { kind: "commit", sha, baseRef: null },

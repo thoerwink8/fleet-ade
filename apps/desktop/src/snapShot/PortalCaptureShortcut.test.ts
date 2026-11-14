@@ -152,7 +152,7 @@ it("accepts Hyprland's action-only binding without claiming the keys are reserve
   expect(capture).not.toHaveBeenCalled();
   bus.activate();
   expect(capture).toHaveBeenCalledOnce();
-  await expect(client.configure()).rejects.toThrow("Hyprland config");
+  await expect(client.configure()).rejects.toThrow("Hyprland 配置");
   bus.signal(portal, "ShortcutsChanged", root, [bus.session, []]);
   bus.activate();
   expect(capture).toHaveBeenCalledOnce();
@@ -266,7 +266,7 @@ it.each([1, 2])(
     expect(client.state.shortcutRegistered).toBe(false);
     expect(client.state.shortcutPending).toBe(false);
     expect(client.state.shortcutCanRetry).toBe(true);
-    expect(client.state.shortcutMessage).toContain("wasn't granted");
+    expect(client.state.shortcutMessage).toContain("未获得快捷键权限");
     bus.activate();
     expect(capture).not.toHaveBeenCalled();
     await client.configure();

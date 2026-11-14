@@ -109,12 +109,12 @@ describe("theme import text", () => {
   it("still validates theme structure after parsing JSONC", () => {
     expect(() =>
       parseThemeImport('{ /* not a theme */ "colors": { "editor.foreground": "#fff" } }'),
-    ).toThrow('no "editor.background"');
+    ).toThrow("该 VS Code 主题没有“editor.background”颜色，无法据此生成配色。");
     expect(() =>
       parseThemeImport(
         '{ "version": 1, "name": "Bad native", "appearance": "dark", "colors": { "unknown": "#fff" } }',
       ),
-    ).toThrow('"unknown" is not a supported theme color role.');
+    ).toThrow("“unknown”不是受支持的主题颜色角色。");
   });
 });
 

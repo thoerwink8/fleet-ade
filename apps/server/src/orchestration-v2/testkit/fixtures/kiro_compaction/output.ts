@@ -46,7 +46,7 @@ export function assertKiroCompactionOutput(
     projection.turnItems
       .filter((item) => item.type === "compaction")
       .map((item) => [item.runId, item.status, item.title]),
-    [[projection.runs[1]?.id ?? null, "completed", "上下文已压缩"]],
+    [[projection.runs[1]?.id ?? null, "completed", "Context compacted"]],
   );
   const recall = projection.turnItems
     .filter((item) => item.type === "assistant_message" && item.runId === projection.runs[2]?.id)

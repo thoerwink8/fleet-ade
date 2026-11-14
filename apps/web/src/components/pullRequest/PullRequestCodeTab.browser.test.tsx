@@ -197,14 +197,14 @@ it("keeps the diff after a refresh that brings back the same page", async () => 
   const container = document.createElement("div");
   container.className = "flex h-[700px] w-[900px]";
   await using screen = await render(tab(0), { container });
-  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 文件", { exact: true })).toBeVisible();
 
   await screen.rerender(tab(1));
 
   await expect
     .element(screen.getByText("This pull request has no file changes."))
     .not.toBeInTheDocument();
-  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 文件", { exact: true })).toBeVisible();
 });
 
 // regression: #13279 a Viewed answer that lands after a link reveals a file must not fold it
@@ -226,7 +226,7 @@ it("keeps a revealed file open when its Viewed mark loads afterwards", async () 
   await expect.element(screen.getByRole("checkbox", { name: "Viewed" })).toBeChecked();
 
   await expect
-    .element(screen.getByRole("button", { name: "Collapse diff" }))
+    .element(screen.getByRole("button", { name: "折叠差异" }))
     .toHaveAttribute("aria-expanded", "true");
   await expect.element(screen.getByText("three()", { exact: true })).toBeVisible();
 });
@@ -272,7 +272,7 @@ it("pages forward to a file asked for that is not loaded yet, then scrolls to it
   const container = pagedContainer();
   await using screen = await render(tab(0), { container });
   await expect.element(screen.getByText("early-0.ts", { exact: true }).first()).toBeVisible();
-  await screen.getByRole("button", { name: "Hide test files" }).click();
+  await screen.getByRole("button", { name: "隐藏测试文件" }).click();
 
   const url = `${detail.url}/files#diff-${bytesToHex(sha256(new TextEncoder().encode("late.test.ts")))}R4-R5`;
   const settled = vi.fn();
@@ -315,7 +315,7 @@ it("never requests the diff of a selected commit the pull request no longer has"
     { container },
   );
 
-  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 文件", { exact: true })).toBeVisible();
   await expect
     .element(screen.getByRole("button", { name: "Diff scope: All commits" }))
     .toBeVisible();
@@ -347,7 +347,7 @@ it("answers a commit's diff link only once that commit's diff is shown", async (
     />
   );
   await using screen = await render(scoped(null), { container });
-  await expect.element(screen.getByText("1 个文件", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 文件", { exact: true })).toBeVisible();
 
   // The panel selects the link's commit after this tab has already seen the link.
   await screen.rerender(scoped(null, url));
@@ -415,22 +415,22 @@ it("hides a resolved conversation behind avatars on its line until they are clic
     />
   );
   await using screen = await render(withThread(true), { container });
-  const marker = screen.getByRole("button", { name: "Resolved conversation", exact: true });
-  const card = (state: string) => screen.getByRole("button", { name: `${state} · 1 comment` });
-  const reply = () => screen.getByRole("textbox", { name: "Reply to this conversation" });
+  const marker = screen.getByRole("button", { name: "已解决的讨论", exact: true });
+  const card = (state: string) => screen.getByRole("button", { name: `${state} · 1 条评论` });
+  const reply = () => screen.getByRole("textbox", { name: "回复此对话" });
 
   await expect.element(marker).toHaveAttribute("aria-expanded", "false");
-  await expect.element(card("Resolved")).not.toBeInTheDocument();
+  await expect.element(card("已解决")).not.toBeInTheDocument();
 
   await marker.click();
   await expect.element(marker).toHaveAttribute("aria-expanded", "true");
-  await expect.element(card("Resolved")).toHaveAttribute("aria-expanded", "true");
-  await screen.getByRole("button", { name: "Reply", exact: true }).click();
+  await expect.element(card("已解决")).toHaveAttribute("aria-expanded", "true");
+  await screen.getByRole("button", { name: "回复", exact: true }).click();
   await reply().fill("Unsent");
 
   // Hidden conversations stay mounted, so the unsent reply is still there.
   await marker.click();
-  await expect.element(card("Resolved")).not.toBeInTheDocument();
+  await expect.element(card("已解决")).not.toBeInTheDocument();
   await marker.click();
   await expect.element(reply()).toHaveValue("Unsent");
   await marker.click();
@@ -439,7 +439,7 @@ it("hides a resolved conversation behind avatars on its line until they are clic
   await screen.rerender(withThread(false));
   await expect.element(card("Open")).toBeVisible();
   await screen.rerender(withThread(true));
-  await expect.element(card("Resolved")).toBeVisible();
+  await expect.element(card("已解决")).toBeVisible();
 
   // Stacked view draws a context row once, so both sides' conversations share the avatars.
   await screen.rerender(withThread(true, true));

@@ -95,7 +95,7 @@ describe("settings scope resolution", () => {
       kind: "checkout",
       checkout: second,
       environmentId: laptopId,
-      label: "t3code / Laptop · /repos/second",
+      label: "t3code / 笔记本电脑 · /repos/second",
       members: [second],
       environmentIds: [laptopId],
     });

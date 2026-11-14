@@ -211,7 +211,7 @@ it.effect("registers the device tools and returns the screenshot as image conten
       expect(foreign.content.map((entry) => entry.type)).toEqual(["text"]);
 
       const listed = yield* server
-        .callTool({ name: "device_list", arguments: { hostId: "THIS MACHINE" } })
+        .callTool({ name: "device_list", arguments: { hostId: "本机" } })
         .pipe(callWith(["device"]), Effect.provideService(McpSchema.McpServerClient, client));
       expect(listed.structuredContent).toMatchObject({
         hosts: [{ id: "local" }],
@@ -223,7 +223,7 @@ it.effect("registers the device tools and returns the screenshot as image conten
         .pipe(callWith(["device"]), Effect.provideService(McpSchema.McpServerClient, client));
       expect(unknownHost.isError).toBe(true);
       expect(unknownHost.content).toEqual([
-        { type: "text", text: "No device host oliverMac. Known hosts: This machine (local)." },
+        { type: "text", text: "No device host oliverMac. Known hosts: 本机 (local)." },
       ]);
 
       const denied = yield* server
@@ -547,7 +547,7 @@ describe("device targeting across hosts", () => {
           expect(text(result)).toContain("hostId local");
           expect(text(result)).toContain("hostId mac-mini");
           expect(text(result)).toBe(
-            "Device Pixel_10 is on more than one host: 'This machine' (hostId local), 'Mac Mini' (hostId mac-mini). Pass hostId.",
+            "Device Pixel_10 is on more than one host: '本机' (hostId local), 'Mac Mini' (hostId mac-mini). Pass hostId.",
           );
           expect(opened).toEqual([]);
         }),
@@ -564,7 +564,7 @@ describe("device targeting across hosts", () => {
           expect(result.isError).toBe(true);
           expect(text(result)).toContain("hostId mac-mini");
           expect(text(result)).toBe(
-            "Device MAC-UDID is not on 'This machine' (hostId local). It is on 'Mac Mini' (hostId mac-mini); pass that hostId.",
+            "Device MAC-UDID is not on '本机' (hostId local). It is on 'Mac Mini' (hostId mac-mini); pass that hostId.",
           );
           expect(opened).toEqual([]);
         }),
@@ -584,7 +584,7 @@ describe("device targeting across hosts", () => {
           "No device Pixel_9 on 'Mac Mini' (hostId mac-mini). Call device_list for current ids.",
         );
         expect(yield* missing({ hostId: "unknown-host" })).toBe(
-          "No device host unknown-host. Known hosts: This machine (local), Mac Mini (mac-mini).",
+          "No device host unknown-host. Known hosts: 本机 (local), Mac Mini (mac-mini).",
         );
         expect(opened).toEqual([]);
       }),
@@ -616,7 +616,7 @@ describe("device targeting across hosts", () => {
           expect(wrongHost.isError).toBe(true);
           expect(text(wrongHost)).toContain("It is on 'Mac Mini' (hostId mac-mini)");
           expect(text(wrongHost)).toBe(
-            "Device MAC-UDID is not on 'This machine' (hostId local). It is on 'Mac Mini' (hostId mac-mini); pass that hostId.",
+            "Device MAC-UDID is not on '本机' (hostId local). It is on 'Mac Mini' (hostId mac-mini); pass that hostId.",
           );
         }),
       { locateSession: () => Effect.fail(onTheMac) },
@@ -670,7 +670,7 @@ describe("device targeting across hosts", () => {
           expect(result.isError).toBe(true);
           expect(text(result)).toContain("hostId mac-mini");
           expect(text(result)).toBe(
-            "Device Pixel_10 is on more than one host: 'This machine' (hostId local), 'Mac Mini' (hostId mac-mini). Pass hostId.",
+            "Device Pixel_10 is on more than one host: '本机' (hostId local), 'Mac Mini' (hostId mac-mini). Pass hostId.",
           );
           expect(closed).toEqual([]);
         }),

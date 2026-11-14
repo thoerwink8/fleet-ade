@@ -179,7 +179,7 @@ it("cancels a new citation while dictation makes the composer read-only", async 
   );
   await expect.element(page.getByLabelText("为选中的文字添加批注")).toBeVisible();
 
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "取消" }).click();
 
   await expect.element(page.getByLabelText("为选中的文字添加批注")).not.toBeInTheDocument();
   expect(screen.container.querySelector("output")?.dataset.prompt).toBe("See ");

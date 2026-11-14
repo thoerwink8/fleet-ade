@@ -30,6 +30,6 @@ it("follows a changed word wrap default while mounted", async () => {
   expect(block()?.getAttribute("data-wrap")).toBe("false");
 
   await setWordWrap(true);
-  await expect.element(screen.getByRole("button", { name: "Disable line wrap" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "取消自动换行" })).toBeVisible();
   expect(block()?.getAttribute("data-wrap")).toBe("true");
 });

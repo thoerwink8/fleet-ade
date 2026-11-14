@@ -237,7 +237,7 @@ describe("server browser element refs", () => {
       text: "下次运行",
       clear: true,
     });
-    expect(await page.locator("#pw").inputValue()).toBe("next");
+    expect(await page.locator("#pw").inputValue()).toBe("下次运行");
   });
 
   it("masks dotted values in page text next to punctuation, with odd spaces, and at the cut", async () => {

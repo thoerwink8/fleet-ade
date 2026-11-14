@@ -165,7 +165,7 @@ describe("provider update launch notification logic", () => {
     expect(view).toMatchObject({
       key: "loading:claudeAgent:running",
       tone: "loading",
-      title: "Updating Claude",
+      title: "正在更新 Claude",
       description: "Claude update in progress.",
     });
   });
@@ -204,7 +204,7 @@ describe("provider update launch notification logic", () => {
     expect(view).toMatchObject({
       key: "succeeded:claudeAgent:2026-04-23T10:01:00.000Z:Provider updated.",
       tone: "success",
-      title: "Claude updated: v1.1.0",
+      title: "Claude 已更新：v1.1.0",
     });
   });
 
@@ -261,7 +261,7 @@ describe("provider update launch notification logic", () => {
     expect(successView).toMatchObject({
       key: "succeeded:codex:2026-04-23T10:01:00.000Z:Provider updated.",
       tone: "success",
-      title: "Codex updated: v1.2.0",
+      title: "Codex 已更新：v1.2.0",
     });
 
     const failureView = getProviderUpdateSidebarPillView(providers, {
@@ -343,7 +343,7 @@ describe("getProviderUpdateRunToastView", () => {
       getProviderUpdateSidebarPillView([updated], {
         visibleAfterIso: sessionStartedAt,
       }),
-    ).toMatchObject({ title: "OpenCode updated: v2.2.5", description: message });
+    ).toMatchObject({ title: "OpenCode 已更新：v2.2.5", description: message });
 
     const restarted = { ...updated, version: "2.2.5" };
     expect(
@@ -385,7 +385,7 @@ describe("getProviderUpdateRunToastView", () => {
 
     expect(view).toEqual({
       type: "error",
-      title: "2 of 3 provider updates failed",
+      title: "2 个提供方中有 3 个更新失败",
       description: "Mac Studio · Claude: npm exited with code 1.\nLaptop · Codex: WebSocket closed",
     });
   });

@@ -8,7 +8,7 @@ import { ProviderAccentColorPicker } from "./ProviderAccentColorPicker";
 import { ThemeColorField } from "./ThemeColorPicker";
 
 const HUE = "强调色色相";
-const PLANE = "Accent color saturation and brightness";
+const PLANE = "强调色饱和度与亮度";
 
 async function renderPicker(ui: ReactNode) {
   await using stack = new AsyncDisposableStack();
@@ -61,7 +61,7 @@ async function renderThemeField(value: string) {
   );
   await using stack = new AsyncDisposableStack();
   const screen = stack.use(await renderPicker(field(value)));
-  await open("Choose Accent color color");
+  await open("选择强调色颜色");
   stack.move();
   return Object.assign(screen, {
     onChange,
@@ -77,19 +77,19 @@ function ControlledThemeField() {
 describe("theme color field", () => {
   it("jumps hue to both endpoints without changing saturation or brightness", async () => {
     await using _screen = await render(<ControlledThemeField />);
-    await open("Choose Accent color color");
+    await open("选择强调色颜色");
 
     await press(HUE, "Home");
     expect(slider(HUE).getAttribute("aria-valuenow")).toBe("0");
-    expect(byLabel<HTMLInputElement>("Accent color picker hex value").value).toBe("#804040");
+    expect(byLabel<HTMLInputElement>("强调色选择器的十六进制值").value).toBe("#804040");
 
     await press(HUE, "End");
     expect(slider(HUE).getAttribute("aria-valuenow")).toBe("360");
-    expect(byLabel<HTMLInputElement>("Accent color picker hex value").value).toBe("#804040");
+    expect(byLabel<HTMLInputElement>("强调色选择器的十六进制值").value).toBe("#804040");
 
     await press(HUE, "ArrowRight", true);
     expect(slider(HUE).getAttribute("aria-valuenow")).toBe("10");
-    expect(byLabel<HTMLInputElement>("Accent color picker hex value").value).toBe("#804b40");
+    expect(byLabel<HTMLInputElement>("强调色选择器的十六进制值").value).toBe("#804b40");
   });
 
   it("keeps the selected hue when a grey color is echoed back from theme settings", async () => {
@@ -111,7 +111,7 @@ describe("theme color field", () => {
     await using screen = await renderThemeField("#22ccff80");
     const { onChange } = screen;
 
-    await userEvent.fill(byLabel("Accent color picker hex value"), "#ff0000");
+    await userEvent.fill(byLabel("强调色选择器的十六进制值"), "#ff0000");
     expect(onChange).toHaveBeenLastCalledWith("accent", "#ff000080");
   });
 });
@@ -160,7 +160,7 @@ describe("provider accent color picker", () => {
     );
 
     await open("Add accent color for Example provider");
-    await userEvent.click(page.getByRole("button", { name: "Add color", exact: true }));
+    await userEvent.click(page.getByRole("button", { name: "添加颜色", exact: true }));
 
     expect(onCommit).toHaveBeenCalledExactlyOnceWith("#2563eb");
     await expect
@@ -182,7 +182,7 @@ describe("provider accent color picker", () => {
     );
 
     await open("Add accent color for Example provider");
-    await act(async () => byLabel("Accent color saturation").focus());
+    await act(async () => byLabel("强调色 saturation").focus());
     await userEvent.tab();
     await userEvent.tab();
     await userEvent.tab();
@@ -208,7 +208,7 @@ describe("provider accent color picker", () => {
     await open("Change accent color for Example provider");
     await press(HUE, "ArrowRight", true);
     expect(onCommit).toHaveBeenLastCalledWith("#ff2a00");
-    await userEvent.click(page.getByRole("button", { name: "Clear color", exact: true }));
+    await userEvent.click(page.getByRole("button", { name: "清除颜色", exact: true }));
     expect(onCommit).toHaveBeenLastCalledWith("");
     await expect
       .element(screen.getByRole("button", { name: "Add accent color for Example provider" }))
@@ -252,7 +252,7 @@ describe("provider accent color picker", () => {
     expect(byLabel<HTMLInputElement>("自定义十六进制强调色").value).toBe("#ff0000");
     await screen.echo("");
     expect(byLabel<HTMLInputElement>("自定义十六进制强调色").value).toBe("#2563eb");
-    await userEvent.click(page.getByRole("button", { name: "Add color", exact: true }));
+    await userEvent.click(page.getByRole("button", { name: "添加颜色", exact: true }));
     expect(screen.onCommit).toHaveBeenLastCalledWith("#2563eb");
 
     expect(byLabel("Change accent color for Codex").style.backgroundColor).toBe("rgb(37, 99, 235)");

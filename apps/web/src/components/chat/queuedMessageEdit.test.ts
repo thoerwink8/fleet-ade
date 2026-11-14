@@ -72,7 +72,7 @@ describe("queued message file edits", () => {
         uploadFiles: async () => [],
         readImage: async () => "image",
       }),
-    ).rejects.toThrow("Retry or remove");
+    ).rejects.toThrow("保存前请重试或移除上传失败的附件。");
   });
 
   it("keeps file-only edits when another client starts the queued run", () => {

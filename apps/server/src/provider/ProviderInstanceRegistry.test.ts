@@ -160,11 +160,18 @@ const makeTildeProviderFixtures = Effect.fn(
   );
   yield* fileSystem.chmod(claudePath, 0o755);
   yield* fileSystem.makeDirectory(claudeHomePath);
+  // The channel resolves only a file named reclaude. This launcher runs the fixture.
+  const reclaudePath = path.join(fixtureDir, "reclaude");
+  yield* fileSystem.writeFileString(
+    reclaudePath,
+    '#!/bin/sh\nexec node "$(dirname "$0")/claude.mjs" "$@"\n',
+  );
+  yield* fileSystem.chmod(reclaudePath, 0o755);
 
   const asTildePath = (filePath: string) => `~/${path.relative(homePath, filePath)}`;
   return {
     codexBinaryPath: asTildePath(codexPath),
-    claudeBinaryPath: asTildePath(claudePath),
+    claudeBinaryPath: asTildePath(reclaudePath),
     claudeHomePath,
     codexScriptPath,
   };

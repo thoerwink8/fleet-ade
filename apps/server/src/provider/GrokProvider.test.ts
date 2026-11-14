@@ -134,7 +134,7 @@ describe("buildGrokModelCapabilities", () => {
     expect(capabilities.optionDescriptors).toEqual([
       {
         id: "reasoningEffort",
-        label: "推理",
+        label: "Reasoning",
         type: "select",
         currentValue: "medium",
         options: [
@@ -169,7 +169,7 @@ describe("buildGrokModelCapabilities", () => {
     expect(capabilities.optionDescriptors).toEqual([
       {
         id: "reasoningEffort",
-        label: "推理",
+        label: "Reasoning",
         type: "select",
         currentValue: "high",
         options: [

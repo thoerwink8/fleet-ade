@@ -65,7 +65,7 @@ it("distinguishes saved shortcuts from observed delivery without making users re
     }),
   ).toBe("设置 GNOME 截图");
   expect(snapShotSetupSummary({ ...state, shortcutVerified: true }, false)).toContain(
-    "Enable capture",
+    "启用截图后继续",
   );
   expect(
     snapShotSetupSummary(
@@ -113,7 +113,7 @@ it("reports pending, denied, and assigned shortcuts without inferring consent fr
     message: null,
   };
   expect(snapShotStatus(state, true)).toContain("正在等待快捷键权限");
-  expect(snapShotShortcutStatus(state)).toContain("Approve the shortcut permission prompt");
+  expect(snapShotShortcutStatus(state)).toContain("允许快捷键权限请求后继续。");
   const denied = { ...state, shortcutPending: false, shortcutMessage: "Permission wasn't granted" };
   expect(snapShotShortcutStatus(denied)).toBe("Permission wasn't granted");
   const approved = {
@@ -125,7 +125,7 @@ it("reports pending, denied, and assigned shortcuts without inferring consent fr
   expect(snapShotStatus(approved, true)).toBe("可以截图");
   expect(snapShotShortcutStatus(approved)).toBeNull();
   expect(snapShotShortcutStatus({ ...approved, shortcutPending: true })).toContain(
-    "Approve the shortcut permission prompt",
+    "允许快捷键权限请求后继续。",
   );
   expect(
     snapShotShortcutStatus({

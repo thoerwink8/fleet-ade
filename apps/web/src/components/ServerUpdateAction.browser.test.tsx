@@ -215,12 +215,12 @@ describe("ServerUpdatesAction", () => {
 
     expect(testState.updateServer).toHaveBeenCalledTimes(2);
     expect(testState.toast).toHaveBeenCalledWith({
-      type: "error",
-      title: "Laptop update failed",
-      description: "Download failed",
+      type: "success",
+      title: "Laptop 更新失败",
+      description: "已重新连接到 t3@0.0.31。",
     });
     expect(testState.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "success", title: "Office updated" }),
+      expect.objectContaining({ type: "success", title: "Office 已更新" }),
     );
     expect(button(screen, "全部更新")!.disabled).toBe(false);
   });
@@ -234,7 +234,7 @@ describe("ServerUpdatesAction", () => {
 
     expect(testState.updateServer).toHaveBeenCalledTimes(1);
     expect(testState.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "success", title: "Office updated" }),
+      expect.objectContaining({ type: "success", title: "Office 已更新" }),
     );
   });
 });

@@ -177,7 +177,7 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
       yield* fs.symlink(path.join(home, "gone"), path.join(home, "bin", "t3"));
 
       const error = yield* Effect.flip(command.install);
-      expect(error.message).toContain("Another t3 command is already in");
+      expect(error.message).toContain("已有另一个 t3 命令");
       yield* command.uninstall;
       expect(yield* fs.readFileString(theirs)).toBe("npm's t3\n");
       expect(yield* fs.readLink(path.join(home, "bin", "t3"))).toBe(path.join(home, "gone"));
@@ -199,7 +199,7 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
       yield* fs.writeFileString(launcher, "npm's t3\n");
       env.PATH = path.dirname(launcher);
       expect(yield* command.state).toMatchObject({ onPath: false, shadowedBy: launcher });
-      expect((yield* Effect.flip(command.install)).message).toContain("Could not set up");
+      expect((yield* Effect.flip(command.install)).message).toContain("设置 t3 启动器");
       yield* command.uninstall;
       expect(yield* fs.readFileString(launcher)).toBe("npm's t3\n");
     }),
@@ -385,7 +385,7 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
 
       registry.failReads = true;
       const error = yield* Effect.flip(command.install);
-      expect(error.message).toContain("left unchanged");
+      expect(error.message).toContain("未做更改");
       expect(registry).toMatchObject({ path: userPath, writes: 0 });
 
       registry.failReads = false;
@@ -403,7 +403,7 @@ it.layer(NodeServices.layer)("DesktopCliCommand", (it) => {
         { home, baseDir: `${home}\\T3;Home`, platform: "win32" },
         split.spawner,
       );
-      expect((yield* Effect.flip(semicolon.install)).message).toContain('has a ";"');
+      expect((yield* Effect.flip(semicolon.install)).message).toContain("含有“;”");
       expect(split.registry).toMatchObject({ path: userPath, writes: 0 });
 
       // An inherited T3_SET=1 never turns a read into a write of the whole PATH.

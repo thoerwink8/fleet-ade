@@ -126,7 +126,7 @@ describe("price table edits", () => {
     const priced = target("priced", { example: price });
     const edit = draft({ inputCostPerMillionTokens: "3", outputCostPerMillionTokens: "8" });
     expect(usagePriceTableErrors([mapped, priced], [edit]).get(edit.id)).toBe(
-      'mapped maps this model. Remove it from "Apply to" or clear its mapping first.',
+      "mapped 已映射这个模型。请先在“应用到”中移除它，或清除它的映射。",
     );
     expect(usagePriceTableChanges(mapped, [edit]).changes).toEqual([]);
 
@@ -163,7 +163,7 @@ describe("model mapping validation", () => {
     const cyclic = target("two", {}, { a: "b", b: "c" });
     expect(usagePriceTableChanges(acyclic, edits).errors.size).toBe(0);
     expect(usagePriceTableErrors([acyclic, cyclic], edits).get("model:c")).toBe(
-      "Model mappings cannot form a cycle on two.",
+      "two 上的模型映射不能形成循环。",
     );
   });
 

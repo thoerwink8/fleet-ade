@@ -159,7 +159,7 @@ describe("V2 session presentation", () => {
         status: "failed",
         failure: { ...retryItem.failure, class: "usage_limit" },
       }),
-    ).toMatchObject({ label: "Usage limit reached after 2/10 retries" });
+    ).toMatchObject({ label: "已达到用量上限 after 2/10 retries" });
     const recoveredLimit = {
       ...retryItem,
       status: "completed" as const,
@@ -179,11 +179,11 @@ describe("V2 session presentation", () => {
       optimisticMessages: [],
     });
     if (recoveredEntry?.kind !== "work") throw new Error("Expected recovered provider work");
-    expect(recoveredEntry.entry.label).toBe("Provider recovered (2/10 retries)");
+    expect(recoveredEntry.entry.label).toBe("提供方已恢复（重试 2/10 次）");
     expect(recoveredEntry.entry.sourceActivityKind).not.toBe("runtime.warning");
     expect(workEntryDisplayIndicatesToolFailure(recoveredEntry.entry)).toBe(false);
     expect(providerErrorPresentation(retryItem)).toEqual({
-      label: "Retrying provider (2/10)",
+      label: "正在重试提供方（2/10）",
       detail: "Claude API overloaded. Retrying in 1.5s.",
     });
     expect(
@@ -192,7 +192,7 @@ describe("V2 session presentation", () => {
         status: "completed",
         completedAt: now,
       }),
-    ).toMatchObject({ label: "Provider recovered (2/10 retries)" });
+    ).toMatchObject({ label: "提供方已恢复（重试 2/10 次）" });
     expect(
       providerErrorPresentation({
         ...retryItem,
@@ -200,7 +200,7 @@ describe("V2 session presentation", () => {
         retry: { ...retryItem.retry, attempt: 10 },
         completedAt: now,
       }),
-    ).toMatchObject({ label: "Provider error after 10/10 retries" });
+    ).toMatchObject({ label: "提供方错误 after 10/10 retries" });
   });
 
   it("assigns run rollback to the turn-start message instead of a later steer", () => {

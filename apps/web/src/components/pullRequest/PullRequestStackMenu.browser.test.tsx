@@ -64,8 +64,8 @@ it.each([
       />
     </ToastProvider>,
   );
-  if (row.label === "Rebase stack") {
-    await screen.getByRole("button", { name: "Stack 1, layer 1 of 1" }).click();
+  if (row.label === "对堆叠变基") {
+    await screen.getByRole("button", { name: "堆叠 1，第 1 层，共 1 层" }).click();
     await page.getByRole("menuitem", { name: row.label }).click();
   } else {
     await screen.getByRole("button", { name: row.label, exact: true }).click();

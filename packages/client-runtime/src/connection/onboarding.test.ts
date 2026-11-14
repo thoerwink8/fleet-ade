@@ -529,7 +529,7 @@ describe("connection onboarding", () => {
         expectedEnvironmentId: EnvironmentId.make("some-other-machine"),
       }).pipe(Effect.provide(layerPairingOnboarding(undefined, calls)), Effect.flip);
       expect(error).toMatchObject({ reason: "configuration" });
-      expect(error.message).toContain("different machine");
+      expect(error.message).toContain("另一台机器");
       expect(calls.map((call) => call.url)).toEqual([
         "https://remote.example.test/.well-known/t3/environment",
       ]);

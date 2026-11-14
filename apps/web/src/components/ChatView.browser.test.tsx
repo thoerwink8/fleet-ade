@@ -89,10 +89,10 @@ it("opens the thread actions menu for an older settled thread the shell leaves o
   });
   await expect.element(page.getByText("older-settled: question 0")).toBeVisible();
 
-  await page.getByRole("button", { name: `Thread actions for ${thread.title}` }).click();
+  await page.getByRole("button", { name: `${thread.title} 的会话操作` }).click();
   // Without a bound the poll runs to the test deadline and reports a bare timeout.
   await expect
-    .element(page.getByRole("menuitem", { name: "Rename thread" }), { timeout: 5_000 })
+    .element(page.getByRole("menuitem", { name: "重命名会话" }), { timeout: 5_000 })
     .toBeVisible();
 });
 
@@ -142,9 +142,7 @@ it("retains each thread's diff selection when returning from another thread or S
 
   await act(() => useDiffPanelStore.getState().selectTurn(aRef, a.runs[0]!.id));
   await act(() => router.navigate({ to: "/settings/general" }));
-  await expect
-    .element(page.getByRole("heading", { name: "Time format", exact: true }))
-    .toBeVisible();
+  await expect.element(page.getByRole("heading", { name: "时间格式", exact: true })).toBeVisible();
   await act(() =>
     router.navigate({
       to: "/$environmentId/$threadId",
@@ -178,7 +176,7 @@ it("a stashed prompt ending in a file chip restores with the chip", async () => 
     // AppRoot brings its own router.
     router: false,
   });
-  const chip = page.getByRole("button", { name: "Preview package.json" });
+  const chip = page.getByRole("button", { name: "预览 package.json" });
   await expect.element(chip).toBeVisible();
   // The stash shortcut is a no-op until the shell snapshot lists the project.
   await expect.element(page.getByText("render", { exact: true }).first()).toBeVisible();
@@ -247,7 +245,7 @@ it("Enter on an empty prompt resumes an interrupted thread", async () => {
     // AppRoot brings its own router.
     router: false,
   });
-  await expect.element(page.getByRole("button", { name: "Resume thread" })).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "继续会话" })).toBeVisible();
 
   await userEvent.click(page.getByTestId("composer-editor"));
   await userEvent.keyboard("{Enter}");

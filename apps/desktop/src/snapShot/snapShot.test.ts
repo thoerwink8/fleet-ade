@@ -196,6 +196,7 @@ describe("accessibleWindowElementTree", () => {
       {
         role: "button",
         name: "Save",
+        description: "保存",
         bounds: { x: 20, y: 30, width: 80, height: 24 },
         actions: ["press"],
         children: [],

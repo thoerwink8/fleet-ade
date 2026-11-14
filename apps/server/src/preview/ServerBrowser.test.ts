@@ -1754,7 +1754,7 @@ it.effect("a navigation that fails while a load reads its title keeps its failur
         }
       }
       expect(statuses).toEqual([
-        "Loading https://example.com/missing",
+        "正在加载 https://example.com/missing",
         "LoadFailed https://example.com/missing",
         "Success test page",
       ]);
@@ -1953,7 +1953,7 @@ it.effect("only the controlling viewer's copy and cut keys reach its clipboard",
       expect(yield* clipboard(viewer.output)).toEqual([{ _tag: "clipboard", text: "copied" }]);
       keyCopy = "cut";
       yield* viewer.input({ type: "key", action: "down", key: "x", code: "KeyX", modifiers: 2 });
-      expect(yield* clipboard(viewer.output)).toEqual([{ _tag: "clipboard", text: "剪切" }]);
+      expect(yield* clipboard(viewer.output)).toEqual([{ _tag: "clipboard", text: "cut" }]);
       pageCopy = "left over";
       keyCopy = "";
       yield* viewer.input({ type: "key", action: "down", key: "c", code: "KeyC", modifiers: 4 });

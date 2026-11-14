@@ -181,12 +181,12 @@ it("merges with the last selected merge method", async () => {
   const clickMerge = async (scope: ParentNode) =>
     await act(async () => {
       [...scope.querySelectorAll("button")]
-        .find((button) => button.textContent?.trim() === "Merge")!
+        .find((button) => button.textContent?.trim() === "合并")!
         .click();
     });
   await clickMerge(container);
   const dialog = document.querySelector('[role="alertdialog"]')!;
-  expect(dialog.textContent).toContain("using squash");
+  expect(dialog.textContent).toContain("将使用 squash 合并");
   await clickMerge(dialog);
   expect(state.perform).toHaveBeenCalledWith("merge", "squash");
 });
@@ -209,7 +209,7 @@ it("requires a new merge click after passing checks become pending and pass agai
   const clickMerge = async () =>
     await act(async () => {
       [...container.querySelectorAll("button")]
-        .find((button) => button.textContent?.trim() === "Merge")!
+        .find((button) => button.textContent?.trim() === "合并")!
         .click();
     });
   const dialogs = () => [...document.querySelectorAll('[role="alertdialog"]')];
@@ -328,8 +328,8 @@ it.each([
       <ThreadDetailsThreadPrRows threadRef={threadRef} project={thread as never} />,
     );
   });
-  await clickButton(screen.container, "Merge");
+  await clickButton(screen.container, "合并");
   expect(document.querySelector('[role="alertdialog"]')!.textContent).toContain(
-    `using ${expected}`,
+    `将使用 ${expected} 合并`,
   );
 });

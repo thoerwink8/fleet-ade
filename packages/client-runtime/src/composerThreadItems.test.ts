@@ -73,7 +73,7 @@ it("also offers threads on linked machines, naming the machine, but no other mac
     {
       thread: { environmentId: vps, threadId: "there" },
       label: "Deploy script",
-      description: "Thread on Hetzner VPS",
+      description: "Hetzner VPS 上的会话",
     },
   ]);
 });

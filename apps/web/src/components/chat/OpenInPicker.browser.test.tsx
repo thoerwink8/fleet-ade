@@ -215,7 +215,7 @@ describe("remote editor links", () => {
     await click(byLabel("选择编辑器"));
     await vi.waitFor(() =>
       expect(menuItems().map((item) => item.textContent)).toEqual([
-        "Open from a computer to edit on Test host",
+        "从电脑打开以在Test host上编辑",
       ]),
     );
     expect(menuItems()[0]!.getAttribute("aria-disabled")).toBe("true");
@@ -244,7 +244,7 @@ describe("open in editor announcement", () => {
     await pressOpenFavorite();
     expect(await spoken()).toBe("");
     await pressOpenFavorite();
-    expect(await spoken()).toBe("Opened in VS Code");
+    expect(await spoken()).toBe("已在 VS Code 中打开");
 
     for (const region of regions()) region.textContent = "";
     await act(async () => screen.rerender(<FavoriteEditorFallback />));
@@ -252,6 +252,6 @@ describe("open in editor announcement", () => {
     await pressOpenFavorite();
     expect(await spoken()).toBe("");
     await pressOpenFavorite();
-    expect(await spoken()).toBe("Opened in VS Code");
+    expect(await spoken()).toBe("已在 VS Code 中打开");
   });
 });

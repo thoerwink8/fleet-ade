@@ -45,7 +45,7 @@ describe("linkRequestDisplay", () => {
         "local",
         accessLabel,
       ),
-    ).toMatchObject({ outcome: "failed", label: "Could not link: Pairing code expired." });
+    ).toMatchObject({ outcome: "failed", label: "无法关联：Pairing code expired." });
     expect(
       linkRequestDisplay({ ...asked, linkStatus: "pending" }, "inherited", accessLabel),
     ).toMatchObject({ kind: "pending-elsewhere" });

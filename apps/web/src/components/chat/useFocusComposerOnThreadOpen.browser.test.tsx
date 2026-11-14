@@ -35,9 +35,9 @@ it("keeps the sidebar rename input when a double-click opens another thread", as
     router: false,
   });
   await act(() => vi.advanceTimersToNextFrame());
-  await expect.element(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
+  await expect.element(screen.getByRole("textbox", { name: "消息" })).toHaveFocus();
 
-  const renameInput = screen.getByRole("textbox", { name: "Thread title" });
+  const renameInput = screen.getByRole("textbox", { name: "会话标题" });
   renameInput.element().focus();
   await screen.rerender(<ThreadProbe threadId="beta" />);
   await act(() => vi.advanceTimersToNextFrame());

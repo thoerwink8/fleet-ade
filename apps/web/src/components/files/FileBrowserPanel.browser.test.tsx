@@ -70,7 +70,7 @@ describe("FileBrowserPanel", () => {
         button: 2,
       }),
     );
-    const action = page.getByRole("menuitem", { name: "Copy mention", exact: true });
+    const action = page.getByRole("menuitem", { name: "复制提及", exact: true });
     await expect.element(action).toBeVisible();
     await userEvent.click(action);
     await vi.waitFor(() => expect(clipboard).toHaveBeenCalledWith("[README.md](README.md)"));
@@ -137,7 +137,7 @@ describe("FileBrowserPanel", () => {
     const modifier = isMacPlatform(navigator.platform) ? "Meta" : "Control";
     await userEvent.keyboard(`{${modifier}>}f{/${modifier}}`);
 
-    const search = page.getByRole("searchbox", { name: "Search repo files" });
+    const search = page.getByRole("searchbox", { name: "搜索 repo 的文件" });
     await expect.element(search).toHaveFocus();
 
     (search.element() as HTMLElement).blur();
