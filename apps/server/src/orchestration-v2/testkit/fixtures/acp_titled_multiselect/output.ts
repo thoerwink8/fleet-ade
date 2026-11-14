@@ -37,7 +37,7 @@ export function assertAcpTitledMultiSelectOutput(
       options: [
         { label: "Strict schemas", description: "Typed wire shapes", value: "schemas" },
         { label: "UI flexibility", description: "UI flexibility", value: "ui" },
-        { label: "文档", description: "文档", value: "docs" },
+        { label: "Docs", description: "Docs", value: "docs" },
       ],
       allowCustomAnswer: false,
       multiSelect: true,

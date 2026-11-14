@@ -2816,7 +2816,7 @@ it.effect.each([
       });
       assert.equal(
         error.message,
-        `Base ref "${testCase.baseRef}" does not resolve to a commit in project "Project" (/repo).`,
+        `在项目「项目」（/repo）中，基线引用「${testCase.baseRef}」对不上任何提交。`,
       );
     }).pipe(Effect.provide(harness.layer));
   }),

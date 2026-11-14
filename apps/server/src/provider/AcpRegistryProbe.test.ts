@@ -107,7 +107,7 @@ describe("ACP Registry probe", () => {
       configOptions: [
         {
           id: "effort",
-          label: "推理强度",
+          label: "Effort",
           type: "select",
           options: [{ id: "high", label: "High" }],
           currentValue: "high",
@@ -115,7 +115,7 @@ describe("ACP Registry probe", () => {
         },
         {
           id: "mode",
-          label: "模式",
+          label: "Mode",
           type: "select",
           options: [{ id: "ask", label: "Ask" }],
           currentValue: "ask",
@@ -259,7 +259,7 @@ describe("ACP Registry probe", () => {
     expect(result.configOptions).toEqual([
       {
         id: "reasoning",
-        label: "推理",
+        label: "Reasoning",
         type: "select",
         currentValue: "high",
         options: [

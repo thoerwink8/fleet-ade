@@ -11,6 +11,10 @@
       "types": "./src/changedFileKind.ts",
       "import": "./src/changedFileKind.ts"
     },
+    "./compactionTitle": {
+      "types": "./src/compactionTitle.ts",
+      "import": "./src/compactionTitle.ts"
+    },
     "./authScopeOptions": {
       "types": "./src/authScopeOptions.ts",
       "import": "./src/authScopeOptions.ts"

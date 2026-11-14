@@ -23,7 +23,7 @@ export const IDLE_COMPACTING_LABELS = {
   onReturn: "正在压缩…",
 } satisfies Record<OrchestrationV2IdleCompaction, string>;
 
-/** Leads the finished compaction's token counts, in place of "Context compacted". */
+/** Leads the finished compaction's token counts, in place of "上下文已压缩". */
 export const IDLE_COMPACTION_TITLES = {
   beforeCacheExpires: "已在缓存过期前自动压缩上下文",
   onReturn: "已在发送前压缩上下文",

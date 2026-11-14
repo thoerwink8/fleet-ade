@@ -10,6 +10,7 @@ import type {
   ToolPart,
 } from "@opencode-ai/sdk/v2";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { compactionTitle } from "@t3tools/shared/compactionTitle";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { causeErrorTag } from "@t3tools/shared/observability";
 import {
@@ -2392,7 +2393,7 @@ export const makeOpenCodeAdapterV2 = Effect.fn("makeOpenCodeAdapterV2")(function
               type: "compaction",
               driver: OPENCODE_PROVIDER,
               status: "completed",
-              title: "Context compacted",
+              title: compactionTitle("completed"),
               startedAt: turn.startedAt,
               completedAt: now,
               updatedAt: now,

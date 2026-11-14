@@ -455,7 +455,7 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
         yield* h.refresh();
         h.controls.selected = h.signedOut;
         const error = yield* h.refresh().pipe(Effect.flip);
-        expect(error.detail).toContain("Sign in to Antigravity");
+        expect(error.detail).toContain("请先在设置里登录 Antigravity");
         const snapshot = yield* h.instance.snapshot.getSnapshot;
         expect(snapshot.auth.status).toBe("unauthenticated");
         expect(snapshot.models).toEqual([]);

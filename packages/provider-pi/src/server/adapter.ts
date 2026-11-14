@@ -1,6 +1,7 @@
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as NodeUtil from "node:util";
 import { AgentScope } from "@t3tools/shared/AgentScope";
+import { compactionTitle } from "@t3tools/shared/compactionTitle";
 import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
 import { readToolOutputImage } from "@t3tools/shared/toolOutput";
 import * as Predicate from "effect/Predicate";
@@ -334,19 +335,6 @@ interface PiProviderRetryState {
   readonly failure: OrchestrationV2ProviderFailure;
   readonly startedAt: DateTime.Utc;
   readonly itemOrdinal: number;
-}
-
-function compactionTitle(status: PiCompactionStatus): string {
-  switch (status) {
-    case "running":
-      return "Compacting context...";
-    case "completed":
-      return "Context compacted";
-    case "failed":
-      return "Context compaction failed";
-    case "cancelled":
-      return "Context compaction stopped";
-  }
 }
 
 interface ActivePiTurn {

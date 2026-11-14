@@ -1,3 +1,7 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 import * as CodexErrors from "effect-codex-app-server/errors";
 import { vi } from "vite-plus/test";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
@@ -108,7 +112,15 @@ const disabledDefaultSlots = (
     ]),
   );
 
-const defaultClaudeSettings: ClaudeSettings = Schema.decodeSync(ClaudeSettings)({});
+const claudeProbeBinaryPath = NodePath.join(
+  NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-fake-reclaude-")),
+  "reclaude",
+);
+NodeFS.writeFileSync(claudeProbeBinaryPath, "");
+const defaultClaudeSettings: ClaudeSettings = {
+  ...Schema.decodeSync(ClaudeSettings)({}),
+  binaryPath: claudeProbeBinaryPath,
+};
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 const defaultCodexSettings: CodexSettings = Schema.decodeSync(CodexSettings)({});
 
@@ -1787,8 +1799,7 @@ it.layer(
         slashCommands: [{ name: "plan" }],
         skills: [],
       } as const satisfies ServerProvider;
-      const uncheckedMessage =
-        "Antigravity is installed. Google account access is not checked yet.";
+      const uncheckedMessage = "已安装 Antigravity。尚未检查 Google 账户是否可访问。";
       const restartProbe = {
         ...signedIn,
         status: "warning",

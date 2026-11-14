@@ -335,8 +335,8 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
           auth: { status: "unknown", ...(auth ? { type: auth.type } : {}) },
           message:
             auth?.type === "gemini-api-key" || auth?.type === "agent-platform"
-              ? `Antigravity is installed. Connect with ${auth.label} to load models.`
-              : "Antigravity is installed. Google account access is not checked yet.",
+              ? `已安装 Antigravity。请先连接 ${auth.label}，才能加载模型。`
+              : "已安装 Antigravity。尚未检查 Google 账户是否可访问。",
           models: [],
         });
         expect(yield* Ref.get(harness.probeCalls)).toBe(1);
@@ -399,7 +399,7 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
           installed: true,
           status: "warning",
           auth: { status: "unauthenticated", type: auth.type, label: auth.label },
-          message: "Connect with Gemini API key to use Antigravity and load models.",
+          message: "请先连接 Gemini API 密钥，才能使用 Antigravity 并加载模型。",
           models: [],
           slashCommands: [],
           skills: [],
@@ -417,9 +417,7 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
         type: auth.type,
         label: auth.label,
       });
-      expect(refreshed.message).toBe(
-        "Connect with Gemini API key to use Antigravity and load models.",
-      );
+      expect(refreshed.message).toBe("请先连接 Gemini API 密钥，才能使用 Antigravity 并加载模型。");
       expect(refreshed.supportsTextGeneration).toBe(false);
     }),
   );
@@ -672,7 +670,7 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
             {
               id: "3p-weekly",
               kind: "weekly",
-              label: "Claude & GPT (shared) · Weekly",
+              label: "Claude & GPT (shared) · 每周",
               usedPercent: 75,
             },
           ],
@@ -736,7 +734,7 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
       yield* harness.provider.onSignedOut;
       yield* Deferred.succeed(readResult, {
         checkedAt: "2026-10-09T12:01:00.000Z",
-        windows: [{ id: "gemini-5h", kind: "session", label: "Gemini · 5-hour", usedPercent: 10 }],
+        windows: [{ id: "gemini-5h", kind: "session", label: "Gemini · 5 小时", usedPercent: 10 }],
       });
       yield* Fiber.join(refresh);
       expect((yield* harness.provider.snapshot.getSnapshot).usageLimits).toBeUndefined();
@@ -765,7 +763,7 @@ it.layer(layerTest)("Antigravity provider snapshots", (it) => {
       expect(yield* Ref.get(reads)).toBe(1);
       const limits = {
         checkedAt: "2026-10-09T12:00:00.000Z",
-        windows: [{ id: "gemini-5h", kind: "session", label: "Gemini · 5-hour", usedPercent: 10 }],
+        windows: [{ id: "gemini-5h", kind: "session", label: "Gemini · 5 小时", usedPercent: 10 }],
       } satisfies ServerProviderUsageLimits;
       yield* Deferred.succeed(readResult, limits);
       expect((yield* published)?.usageLimits).toEqual(limits);

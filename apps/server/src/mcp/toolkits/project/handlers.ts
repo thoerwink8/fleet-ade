@@ -56,17 +56,17 @@ function worktreeCheckHint(
   strategy: { readonly startFromOrigin?: boolean | undefined },
 ) {
   if (error._tag === "ThreadLaunchNotRepositoryError")
-    return `Use workspaceStrategy: {type: "root"}, or pass the projectId of a Git repository.`;
+    return "没有创建会话。请改用工作区根目录，或换成一个 Git 仓库的项目。";
   if (error._tag === "ThreadLaunchBranchConflictError") {
     const sibling = error.branch.replaceAll("/", "-");
-    return `Use a name that does not nest under or contain an existing branch${
-      sibling === error.branch ? "" : `, such as "${sibling}"`
-    }.`;
+    return `没有创建会话。请改用一个不嵌在已有分支里、也不包住已有分支的名字${
+      sibling === error.branch ? "。" : `，例如「${sibling}」。`
+    }`;
   }
-  return `Pass a branch, tag, or commit that exists there${
+  return `没有创建会话。请改用仓库里存在的分支、标签或提交${
     strategy.startFromOrigin === true
-      ? "; the project has no usable remote to fetch it from."
-      : ", or set startFromOrigin:true if it exists only on a remote."
+      ? "；这个项目没有可用的远端可以拉取。"
+      : "。如果它只在远端，请把 startFromOrigin 设为 true。"
   }`;
 }
 
@@ -199,7 +199,7 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
               (error) =>
                 new OrchestratorMcpFailure({
                   code: "invalid_request",
-                  message: `${error.message} No thread was created. ${worktreeCheckHint(error, strategy)}`,
+                  message: `${error.message}${worktreeCheckHint(error, strategy)}`,
                 }),
             ),
           );

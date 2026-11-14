@@ -455,7 +455,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
   it.effect.each([
     {
       code: -32000,
-      detail: "Sign in to Antigravity in Settings before you continue.",
+      detail: "请先在设置里登录 Antigravity，再继续。",
     },
     { code: -32603, detail: "Antigravity text generation failed." },
   ])("maps ACP error $code from the prompt request to a fixed detail", ({ code, detail }) =>

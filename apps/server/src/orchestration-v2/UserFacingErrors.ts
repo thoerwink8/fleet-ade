@@ -139,3 +139,26 @@ export function userFacingDispatchErrorMessage(cause: unknown): string | undefin
   );
   return messages.at(-1);
 }
+
+export function threadLaunchBaseRefMessage(input: {
+  readonly baseRef: string;
+  readonly projectTitle: string;
+  readonly workspaceRoot: string;
+}): string {
+  return `在项目「${input.projectTitle}」（${input.workspaceRoot}）中，基线引用「${input.baseRef}」对不上任何提交。`;
+}
+
+export function threadLaunchBranchConflictMessage(input: {
+  readonly projectTitle: string;
+  readonly branch: string;
+  readonly conflictingBranch: string;
+}): string {
+  return `无法在项目「${input.projectTitle}」里创建分支「${input.branch}」：分支「${input.conflictingBranch}」已经存在。`;
+}
+
+export function threadLaunchNotRepositoryMessage(input: {
+  readonly projectTitle: string;
+  readonly workspaceRoot: string;
+}): string {
+  return `项目「${input.projectTitle}」（${input.workspaceRoot}）不是 Git 仓库。`;
+}

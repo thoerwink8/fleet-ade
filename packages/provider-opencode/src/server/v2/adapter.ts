@@ -69,6 +69,7 @@ import { readableProviderErrorMessage } from "../providerErrorMessage.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
 import { t3OrchestrationSystemPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
+import { compactionTitle } from "@t3tools/shared/compactionTitle";
 import { SKILL_MENTION_PATTERN } from "@t3tools/shared/composerInlineTokens";
 import { compareSemverVersions } from "@t3tools/shared/semver";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
@@ -1400,14 +1401,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
           nodeId: turn.input.rootNodeId,
           type: "compaction",
           driver,
-          title:
-            status === "running"
-              ? "Compacting context"
-              : status === "completed"
-                ? "Context compacted"
-                : status === "failed"
-                  ? "Compaction failed"
-                  : "Compaction interrupted",
+          title: compactionTitle(status === "interrupted" ? "cancelled" : status),
           ...(summary === undefined || summary.length === 0 ? {} : { summary }),
         },
       });

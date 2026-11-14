@@ -30,6 +30,11 @@ const ROOTS = [
   "packages/provider-acp-registry/src/server/auth.ts",
   "apps/server/src/provider/Drivers/CodexManagedProvider.ts",
   "packages/shared/src/orchestrationTiming.ts",
+  "packages/shared/src/compactionTitle.ts",
+  "packages/provider-acp/src/server/sessionConfig.ts",
+  "apps/server/src/provider/AntigravityProvider.ts",
+  "apps/server/src/provider/antigravityAuthSupport.ts",
+  "apps/server/src/provider/antigravityUsageLimits.ts",
 ];
 const UI_NAMES = new Set([
   "title",
@@ -248,6 +253,11 @@ for (const file of files.filter(included)) {
     rel.endsWith("/CodexManagedProvider.ts") ||
     rel.endsWith("/CodexAuthCallbackPage.ts") ||
     rel.endsWith("/codexAuthCallback.ts") ||
+    rel.endsWith("/compactionTitle.ts") ||
+    rel.endsWith("/sessionConfig.ts") ||
+    rel.endsWith("/AntigravityProvider.ts") ||
+    rel.endsWith("/antigravityAuthSupport.ts") ||
+    rel.endsWith("/antigravityUsageLimits.ts") ||
     /\/provider\/[^/]*Auth\.ts$/.test(rel);
   const durationFile = isDurationFormatter(rel);
   const opensJsx = (node: ts.Node) =>
@@ -264,6 +274,12 @@ for (const file of files.filter(included)) {
     if (serverCopy) {
       if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
         texts.push(node.text);
+      } else if (
+        ts.isTemplateExpression(node) &&
+        (rel.endsWith("/AntigravityProvider.ts") || rel.endsWith("/UserFacingErrors.ts"))
+      ) {
+        // Interpolated status and launch sentences are still the words a person reads.
+        texts.push(...templateSpans(node));
       }
     } else if (ts.isJsxText(node)) {
       texts.push(node.text);

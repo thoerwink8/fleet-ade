@@ -35,6 +35,7 @@ import {
   type TurnTokenUsage,
 } from "@t3tools/contracts";
 import { AgentScope, AgentScopeThreadId } from "@t3tools/shared/AgentScope";
+import { compactionTitle } from "@t3tools/shared/compactionTitle";
 import { HTML_RENDER_TOOL_NAME } from "@t3tools/shared/htmlRender";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { type SelfInvocation, selfInvocationArgs } from "@t3tools/shared/nodeRuntime";
@@ -7890,7 +7891,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 type: "compaction",
                 driver,
                 status: "completed",
-                title: "Context compacted",
+                title: compactionTitle("completed"),
                 startedAt: context.startedAt,
                 completedAt: now,
                 updatedAt: now,

@@ -4830,7 +4830,7 @@ describe("PiAdapterV2", () => {
           runningItem.type === "turn_item.updated" &&
           runningItem.turnItem.type === "compaction" &&
           runningItem.turnItem.status === "running" &&
-          runningItem.turnItem.title === "Compacting context...",
+          runningItem.turnItem.title === "正在压缩上下文…",
       );
 
       yield* fake.emit({
@@ -4859,7 +4859,7 @@ describe("PiAdapterV2", () => {
           completedItem.turnItem.ordinal === runningItem.turnItem.ordinal &&
           completedItem.turnItem.startedAt === runningItem.turnItem.startedAt &&
           completedItem.turnItem.status === "completed" &&
-          completedItem.turnItem.title === "Context compacted" &&
+          completedItem.turnItem.title === "上下文已压缩" &&
           completedItem.turnItem.beforeTokenCount === 200_000 &&
           completedItem.turnItem.afterTokenCount === 3_400,
       );
@@ -4960,7 +4960,7 @@ describe("PiAdapterV2", () => {
           stopped.turnItem.type === "compaction" &&
           stopped.turnItem.id === running.turnItem.id &&
           stopped.turnItem.status === "cancelled" &&
-          stopped.turnItem.title === "Context compaction stopped",
+          stopped.turnItem.title === "已停止压缩上下文",
       );
     }).pipe(Effect.scoped, Effect.provide(layerTest)),
   );

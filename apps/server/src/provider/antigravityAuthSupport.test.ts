@@ -386,7 +386,7 @@ describe("Antigravity stdout compatibility", () => {
       if (Result.isSuccess(result)) return;
       expect(result.failure).toMatchObject({
         _tag: "AcpTransportError",
-        detail: "Antigravity sent a protocol line that is too large.",
+        detail: "Antigravity 发来的协议行过长。",
       });
     }),
   );
@@ -761,7 +761,7 @@ it.layer(NodeServices.layer)("Antigravity profile preparation", (it) => {
       if (Result.isFailure(result)) {
         expect(result.failure).toMatchObject({
           _tag: "AcpTransportError",
-          detail: "Antigravity browser suppression verification timed out.",
+          detail: "确认阻止 Antigravity 打开浏览器时超时。",
         });
       }
 

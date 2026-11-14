@@ -42,9 +42,8 @@ import { antigravityThinkingConfig } from "./acp/AntigravityAcpSupport.ts";
 const EMPTY_MODEL_CAPABILITIES = createModelCapabilities({ optionDescriptors: [] });
 const MAX_WORKSPACE_SNAPSHOTS = 32;
 const HEALTH_CHECK_TIMEOUT_MS = 90_000;
-const SIGN_IN_MESSAGE = "Sign in with Google to use Antigravity.";
-const AUTH_UNCHECKED_MESSAGE =
-  "Antigravity is installed. Google account access is not checked yet.";
+const SIGN_IN_MESSAGE = "使用 Antigravity 前，请先用 Google 账户登录。";
+const AUTH_UNCHECKED_MESSAGE = "已安装 Antigravity。尚未检查 Google 账户是否可访问。";
 // Set while a finished quota read republishes, so that health check does not read again.
 const PublishingUsage = Context.Reference<boolean>("t3/provider/AntigravityPublishingUsage", {
   defaultValue: () => false,
@@ -176,10 +175,10 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
   const usesCredentials =
     options.auth?.type === "gemini-api-key" || options.auth?.type === "agent-platform";
   const signInMessage = usesCredentials
-    ? `Connect with ${options.auth.label} to use Antigravity and load models.`
+    ? `请先连接 ${options.auth.label}，才能使用 Antigravity 并加载模型。`
     : SIGN_IN_MESSAGE;
   const authUncheckedMessage = usesCredentials
-    ? `Antigravity is installed. Connect with ${options.auth.label} to load models.`
+    ? `已安装 Antigravity。请先连接 ${options.auth.label}，才能加载模型。`
     : AUTH_UNCHECKED_MESSAGE;
   const checkedAt = DateTime.formatIso(yield* DateTime.now);
   const initialDraft = {
@@ -199,8 +198,8 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
         status: "warning",
         auth: { status: "unknown", ...(options.auth ? { type: options.auth.type } : {}) },
         message: settings.enabled
-          ? "Checking Antigravity availability."
-          : "Antigravity is disabled in T3 Code settings.",
+          ? "正在检查 Antigravity 是否可用。"
+          : "已在 T3 Code 设置里停用 Antigravity。",
       },
     }),
     setup: { canAuthenticate: true, canInstall: true },
@@ -288,12 +287,12 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
       initialized !== undefined
         ? undefined
         : failure?._tag === "ProviderSetupError"
-          ? failure.detail.trim() || "Antigravity could not complete its local health check."
+          ? failure.detail.trim() || "Antigravity 完成本地健康检查失败。"
           : missingInstallation
-            ? "Antigravity ACP runtime is not installed or its executable could not be found."
+            ? "未安装 Antigravity 的 ACP 运行时，或找不到它的可执行文件。"
             : failure
-              ? "Antigravity could not complete its local health check."
-              : `Antigravity did not respond to its local health check within ${timeoutMs / 1_000} seconds.`;
+              ? "Antigravity 完成本地健康检查失败。"
+              : `Antigravity 在 ${timeoutMs / 1_000} 秒内没有回应本地健康检查。`;
     const supportsTextGeneration =
       initialized !== undefined ? yield* options.supportsTextGeneration : false;
     const updatedAt = DateTime.formatIso(yield* DateTime.now);

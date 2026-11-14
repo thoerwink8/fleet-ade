@@ -183,14 +183,14 @@ describe("Antigravity subscription limits", () => {
       const byId = new Map(limits.windows.map((window) => [window.id, window]));
       expect(byId.get("3p-5h")).toEqual({
         id: "3p-5h",
-        label: "Claude & GPT (shared) · 5-hour",
+        label: "Claude & GPT (shared) · 5 小时",
         kind: "session",
         usedPercent: 0,
         windowDurationMins: 300,
       });
       expect(byId.get("3p-weekly")).toEqual({
         id: "3p-weekly",
-        label: "Claude & GPT (shared) · Weekly",
+        label: "Claude & GPT (shared) · 每周",
         kind: "weekly",
         usedPercent: 0,
         windowDurationMins: 10080,
@@ -374,7 +374,7 @@ describe("Antigravity subscription limits", () => {
       expect((yield* probe).windows).toEqual([
         {
           id: "3p-5h",
-          label: "Claude & GPT (shared) · 5-hour",
+          label: "Claude & GPT (shared) · 5 小时",
           kind: "session",
           usedPercent: 50,
           windowDurationMins: 300,
@@ -382,7 +382,7 @@ describe("Antigravity subscription limits", () => {
         },
         {
           id: "3p-weekly",
-          label: "Claude & GPT (shared) · Weekly",
+          label: "Claude & GPT (shared) · 每周",
           kind: "weekly",
           usedPercent: 0,
           windowDurationMins: 10080,
@@ -430,7 +430,7 @@ describe("Antigravity subscription limits", () => {
       expect(byId.get("gemini-weekly")?.usedPercent).toBeCloseTo(4);
       expect(byId.get("gemini-5h")?.usedPercent).toBeCloseTo(9);
       expect(byId.get("3p-weekly")).toMatchObject({
-        label: "Claude & GPT (shared) · Weekly",
+        label: "Claude & GPT (shared) · 每周",
         kind: "weekly",
         usedPercent: 100,
         windowDurationMins: 10080,
@@ -472,7 +472,7 @@ describe("Antigravity subscription limits", () => {
         "gemini-weekly",
       ]);
       const byId = new Map(limits.windows.map((window) => [window.id, window]));
-      expect(byId.get("gemini-weekly")?.label).toBe("Gemini · Weekly");
+      expect(byId.get("gemini-weekly")?.label).toBe("Gemini · 每周");
       expect(byId.get("3p-5h")?.usedPercent).toBeCloseTo(70);
       expect(byId.get("3p-weekly")?.usedPercent).toBe(50);
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
@@ -541,10 +541,10 @@ describe("Antigravity subscription limits", () => {
       });
       const limits = yield* probe;
       const byId = new Map(limits.windows.map((window) => [window.id, window]));
-      expect(byId.get("gemini-weekly")?.label).toBe("Gemini · Weekly");
-      expect(byId.get("gemini-argon-wtu-weekly")?.label).toBe("Gemini 4 Argon · Weekly");
-      expect(byId.get("gemini-carbon-wtu-weekly")?.label).toBe("Gemini 4 Carbon · Weekly");
-      expect(byId.get("gemini-carbon-5h")?.label).toBe("Gemini Carbon · 5-hour");
+      expect(byId.get("gemini-weekly")?.label).toBe("Gemini · 每周");
+      expect(byId.get("gemini-argon-wtu-weekly")?.label).toBe("Gemini 4 Argon · 每周");
+      expect(byId.get("gemini-carbon-wtu-weekly")?.label).toBe("Gemini 4 Carbon · 每周");
+      expect(byId.get("gemini-carbon-5h")?.label).toBe("Gemini Carbon · 5 小时");
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
@@ -636,7 +636,7 @@ describe("Antigravity subscription limits", () => {
         {
           id: "gemini-5h",
           kind: "session",
-          label: "Gemini · 5-hour",
+          label: "Gemini · 5 小时",
           usedPercent: 0,
           windowDurationMins: 300,
         },

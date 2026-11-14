@@ -57,7 +57,7 @@ describe("Antigravity with unchecked sign-in", () => {
     driver: ProviderDriverKind.make("antigravity"),
     status: "warning",
     auth: { status: "unknown" },
-    message: "Antigravity is installed. Google account access is not checked yet.",
+    message: "已安装 Antigravity。尚未检查 Google 账户是否可访问。",
   };
 
   it("presents an unchecked Google sign-in neutrally without claiming authentication is required", () => {

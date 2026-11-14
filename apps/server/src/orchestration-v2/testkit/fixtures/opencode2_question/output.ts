@@ -44,8 +44,8 @@ export function assertOpenCode2QuestionOutput(
       header: "Color preference",
       question: "Which color do you prefer?",
       options: [
-        { label: "红色", description: "Choose the color red", value: "Red" },
-        { label: "蓝色", description: "Choose the color blue", value: "Blue" },
+        { label: "Red", description: "Choose the color red", value: "Red" },
+        { label: "Blue", description: "Choose the color blue", value: "Blue" },
       ],
       multiSelect: false,
       allowCustomAnswer: true,

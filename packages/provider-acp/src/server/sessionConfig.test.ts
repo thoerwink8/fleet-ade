@@ -115,8 +115,8 @@ describe("acpProviderOptionDescriptors", () => {
     expect(descriptors).toEqual([
       {
         id: ACP_SESSION_MODE_OPTION_ID,
-        label: "Mode",
-        description: "Session mode advertised by the ACP agent.",
+        label: "模式",
+        description: "ACP 代理公布的会话模式。",
         type: "select",
         options: [
           { id: "safe", label: "Safe" },

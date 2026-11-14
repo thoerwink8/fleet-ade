@@ -595,7 +595,7 @@ it.effect("a launch into a new worktree creates nothing when its base ref has no
     const refused = (yield* launchFrom("t3/renamed")).at(-1)?.result;
     expect(refused).toMatchObject({ code: "invalid_request" });
     expect((refused as { message: string }).message).toContain(
-      'Base ref "t3/renamed" does not resolve to a commit in project "Client target" (/projects/client-target). No thread was created.',
+      "在项目「Client target」（/projects/client-target）中，基线引用「t3/renamed」对不上任何提交。没有创建会话。",
     );
     expect(launched).toHaveLength(0);
 
@@ -636,7 +636,7 @@ it.effect("a launch into a new worktree creates nothing when its branch collides
     expect(refused).toMatchObject({
       code: "invalid_request",
       message:
-        'Branch "werkstatt/baseline" cannot be created in project "Client target": branch "werkstatt" exists. No thread was created. Use a name that does not nest under or contain an existing branch, such as "werkstatt-baseline".',
+        "无法在项目「Client target」里创建分支「werkstatt/baseline」：分支「werkstatt」已经存在。没有创建会话。请改用一个不嵌在已有分支里、也不包住已有分支的名字，例如「werkstatt-baseline」。",
     });
     expect(launched).toHaveLength(0);
   }),

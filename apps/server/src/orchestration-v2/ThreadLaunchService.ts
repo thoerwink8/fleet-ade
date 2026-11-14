@@ -1,3 +1,8 @@
+import {
+  threadLaunchBaseRefMessage,
+  threadLaunchBranchConflictMessage,
+  threadLaunchNotRepositoryMessage,
+} from "./UserFacingErrors.ts";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -166,7 +171,7 @@ export class ThreadLaunchBaseRefError extends Schema.TaggedError<ThreadLaunchBas
   },
 ) {
   override get message(): string {
-    return `Base ref "${this.baseRef}" does not resolve to a commit in project "${this.projectTitle}" (${this.workspaceRoot}).`;
+    return threadLaunchBaseRefMessage(this);
   }
 }
 
@@ -180,7 +185,7 @@ export class ThreadLaunchBranchConflictError extends Schema.TaggedError<ThreadLa
   },
 ) {
   override get message(): string {
-    return `Branch "${this.branch}" cannot be created in project "${this.projectTitle}": branch "${this.conflictingBranch}" exists.`;
+    return threadLaunchBranchConflictMessage(this);
   }
 }
 
@@ -193,7 +198,7 @@ export class ThreadLaunchNotRepositoryError extends Schema.TaggedError<ThreadLau
   },
 ) {
   override get message(): string {
-    return `Project "${this.projectTitle}" (${this.workspaceRoot}) is not a Git repository.`;
+    return threadLaunchNotRepositoryMessage(this);
   }
 }
 

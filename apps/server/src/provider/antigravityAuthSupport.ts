@@ -26,8 +26,7 @@ import {
 export const ANTIGRAVITY_AUTH_STDOUT_PREFIX =
   "Open the following link to authenticate the ACP server: ";
 export const ANTIGRAVITY_AUTH_BROWSER_MARKER = "__T3_ANTIGRAVITY_AUTH_URL__";
-export const ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE =
-  "Sign in to Antigravity in Settings before you continue.";
+export const ANTIGRAVITY_SIGN_IN_REQUIRED_MESSAGE = "请先在设置里登录 Antigravity，再继续。";
 
 const maxAuthorizationUrlLength = 16_384;
 const maxBrowserHelperLineLength =
@@ -128,13 +127,13 @@ export function antigravityAuthConfigIssue(auth: AntigravityAuthConfig): string 
     case "oauth-business":
       return auth.gcpProject && auth.gcpLocation
         ? null
-        : "Gemini Enterprise needs a GCP project and location in the Antigravity provider settings.";
+        : "请在 Antigravity 提供方设置里填写 Gemini Enterprise 的 GCP 项目和位置。";
     case "gemini-api-key":
-      return auth.apiKey ? null : "Enter a Gemini API key in the Antigravity provider settings.";
+      return auth.apiKey ? null : "请在 Antigravity 提供方设置里填写 Gemini API 密钥。";
     case "agent-platform":
       return auth.apiKey || (auth.gcpProject && auth.gcpLocation)
         ? null
-        : "Agent Platform needs an API key, or a GCP project and location, in the Antigravity provider settings.";
+        : "请在 Antigravity 提供方设置里填写 Agent Platform 的 API 密钥，或者 GCP 项目和位置。";
   }
 }
 
@@ -237,7 +236,7 @@ class AntigravitySkillLinkError extends Schema.TaggedError<AntigravitySkillLinkE
   { link: Schema.String, cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return `Could not link Antigravity user skills at ${this.link}.`;
+    return `无法把 Antigravity 的用户技能链接到 ${this.link}。`;
   }
 }
 
@@ -344,9 +343,7 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
     helperExecutable.includes("\0") ||
     helperExecutable.includes("%s")
   ) {
-    return yield* authSupportError(
-      "The T3 runtime path cannot be used to suppress Antigravity browser launches.",
-    );
+    return yield* authSupportError("T3 运行时路径不能用来阻止 Antigravity 打开浏览器。");
   }
 
   const geminiHome = path.resolve(input.profileDirectory);
@@ -406,47 +403,34 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
       stderr.truncated ||
       stderr.text !== `${ANTIGRAVITY_AUTH_BROWSER_MARKER}"${browserPreflightUrl}"\n`
     ) {
-      return yield* authSupportError("Antigravity browser suppression could not be verified.");
+      return yield* authSupportError("无法确认已经阻止 Antigravity 打开浏览器。");
     }
   }).pipe(
     Effect.scoped,
     Effect.timeoutOrElse({
       duration: "30 seconds",
-      orElse: () =>
-        Effect.fail(authSupportError("Antigravity browser suppression verification timed out.")),
+      orElse: () => Effect.fail(authSupportError("确认阻止 Antigravity 打开浏览器时超时。")),
     }),
     Effect.mapError((error) =>
       error._tag === "AcpTransportError"
         ? error
-        : authSupportError("Antigravity browser suppression could not be verified."),
+        : authSupportError("无法确认已经阻止 Antigravity 打开浏览器。"),
     ),
   );
 
   for (const directory of [geminiHome, acpDirectory, tempDirectory]) {
     yield* fs
       .makeDirectory(directory, { recursive: true, mode: 0o700 })
-      .pipe(
-        Effect.mapError(() =>
-          authSupportError("The Antigravity profile directory could not be created."),
-        ),
-      );
+      .pipe(Effect.mapError(() => authSupportError("无法创建 Antigravity 配置目录。")));
     if (platform !== "win32") {
       yield* fs
         .chmod(directory, 0o700)
-        .pipe(
-          Effect.mapError(() =>
-            authSupportError("The Antigravity profile directory permissions could not be set."),
-          ),
-        );
+        .pipe(Effect.mapError(() => authSupportError("无法设置 Antigravity 配置目录的权限。")));
     }
   }
   yield* fs
     .writeFileString(path.join(acpDirectory, "settings.json"), antigravityProfileSettings(auth))
-    .pipe(
-      Effect.mapError(() =>
-        authSupportError("The Antigravity profile settings could not be written."),
-      ),
-    );
+    .pipe(Effect.mapError(() => authSupportError("无法写入 Antigravity 配置。")));
   yield* linkAntigravityUserSkills({ profileDirectory: geminiHome, userHome, platform });
   return profile;
 });
@@ -498,8 +482,7 @@ export const parseAntigravityAuthorizationUrl = Effect.fn("parseAntigravityAutho
   function* (
     authorizationUrl: string,
   ): Effect.fn.Return<AntigravityAuthorizationUrl, AcpErrors.AcpError> {
-    const invalidUrl = () =>
-      authSupportError("Antigravity returned an invalid Google sign-in URL.");
+    const invalidUrl = () => authSupportError("Antigravity 返回的 Google 登录地址无效。");
     if (authorizationUrl.length > maxAuthorizationUrlLength || /\s/.test(authorizationUrl)) {
       return yield* invalidUrl();
     }
@@ -575,9 +558,7 @@ export function makeAntigravityStdoutTransform(
               const end = newline === -1 ? chunk.byteLength : newline + 1;
               const part = chunk.subarray(offset, end);
               if (pendingBytes + part.byteLength > maxStdoutLineBytes) {
-                return yield* authSupportError(
-                  "Antigravity sent a protocol line that is too large.",
-                );
+                return yield* authSupportError("Antigravity 发来的协议行过长。");
               }
               pending.push(part);
               pendingBytes += part.byteLength;
