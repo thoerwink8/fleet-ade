@@ -11,6 +11,10 @@
       "types": "./src/server/driver.ts",
       "import": "./src/server/driver.ts"
     },
+    "./server/GitHubRequestPolicy": {
+      "types": "./src/server/GitHubRequestPolicy.ts",
+      "import": "./src/server/GitHubRequestPolicy.ts"
+    },
     "./server/GitHubCredentials": {
       "types": "./src/server/GitHubCredentials.ts",
       "import": "./src/server/GitHubCredentials.ts"
@@ -18,6 +22,14 @@
     "./server/GitHubRest": {
       "types": "./src/server/GitHubRest.ts",
       "import": "./src/server/GitHubRest.ts"
+    },
+    "./server/GitHubQuota": {
+      "types": "./src/server/GitHubQuota.ts",
+      "import": "./src/server/GitHubQuota.ts"
+    },
+    "./server/GitHubAppSignIn": {
+      "types": "./src/server/GitHubAppSignIn.ts",
+      "import": "./src/server/GitHubAppSignIn.ts"
     }
   },
   "scripts": {
