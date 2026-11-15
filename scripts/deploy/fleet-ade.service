@@ -22,7 +22,6 @@ Environment=OTEL_SDK_DISABLED=true
 Environment=T3CODE_OTEL_SDK_DISABLED=true
 Environment=DO_NOT_TRACK=1
 Environment=GROK_DISABLE_AUTOUPDATER=1
-Environment=FLEET_ADE_WG_HOST=192.0.2.2
 Environment=FLEET_ADE_PORT=3773
 Environment=FLEET_ADE_MAX_CONCURRENT_SESSIONS=2
 EnvironmentFile=-/etc/fleet-ade/service.env

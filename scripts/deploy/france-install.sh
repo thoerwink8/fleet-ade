@@ -4,8 +4,8 @@
 #   sudo bash scripts/deploy/france-install.sh <40-char-commit-sha> \
 #     [--repo-url https://github.com/thoerwink8/fleet-ade.git] \
 #     [--wg-iface wg-fleet] \
-#     [--wg-subnet 192.0.2.0/24] \
-#     [--wg-host 192.0.2.2] \
+#     --wg-subnet <cidr> \
+#     --wg-host <ip> \
 #     [--port 3773] \
 #     [--max-sessions 2] \
 #     [--github-app-source <github-app-manifest.json>]   # only needed while /etc/fleet-ade/github-app.json does not exist
@@ -32,8 +32,8 @@ fi
 
 REPO_URL="https://github.com/thoerwink8/fleet-ade.git"
 WG_IFACE="wg-fleet"
-WG_SUBNET="192.0.2.0/24"
-WG_HOST="192.0.2.2"
+WG_SUBNET="${FLEET_ADE_WG_SUBNET:-}"
+WG_HOST="${FLEET_ADE_WG_HOST:-}"
 ADE_PORT="3773"
 MAX_SESSIONS="2"
 ADE_USER="ade"
@@ -82,6 +82,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+if [[ -z "${WG_SUBNET}" || -z "${WG_HOST}" ]]; then
+  echo "ERROR: --wg-subnet and --wg-host are required (or set FLEET_ADE_WG_SUBNET and FLEET_ADE_WG_HOST)." >&2
+  exit 1
+fi
 
 ARCH="$(uname -m)"
 if [[ "${ARCH}" != "x86_64" ]]; then

@@ -35,7 +35,11 @@ fi
 if [[ -f /etc/fleet-ade/service.env ]]; then
   source /etc/fleet-ade/service.env
 fi
-WG_HOST="${FLEET_ADE_WG_HOST:-192.0.2.2}"
+if [[ -z "${FLEET_ADE_WG_HOST:-}" ]]; then
+  echo "ERROR: FLEET_ADE_WG_HOST is required (set it in /etc/fleet-ade/service.env)." >&2
+  exit 1
+fi
+WG_HOST="${FLEET_ADE_WG_HOST}"
 ADE_PORT="${FLEET_ADE_PORT:-3773}"
 
 PREV_SHA="$(sudo -u "${ADE_USER}" git -C "${APP_DIR}" rev-parse HEAD)"
