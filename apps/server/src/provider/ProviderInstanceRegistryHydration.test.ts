@@ -5,8 +5,10 @@ import {
   ProviderInstanceId,
   SecretProviderId,
   SecretProviderKind,
+  ServerSettingsError,
   type ServerSettings,
 } from "@t3tools/contracts";
+import { OMP_ACP_INSTANCE_ID } from "@t3tools/provider-acp-registry/builtin";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it as effectIt } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -21,6 +23,7 @@ import {
   DEV_REPLAY_INSTANCE_ID,
   deriveProviderInstanceConfigMap,
   layerSettingsWatcher,
+  seedBuiltinOmpInstance,
   seedDevReplayInstance,
 } from "./ProviderInstanceRegistryHydration.ts";
 import { ProviderInstanceRegistryMutator } from "./ProviderInstanceRegistryMutator.ts";
@@ -144,6 +147,82 @@ describe("seedDevReplayInstance", () => {
           commandArgs: [expect.stringMatching(/scripts[/\\]dev-replay-agent\.ts$/)],
         });
       }),
+    ),
+  );
+});
+describe("seedBuiltinOmpInstance", () => {
+  const seed = (providerInstances: ServerSettings["providerInstances"]) =>
+    Effect.gen(function* () {
+      yield* seedBuiltinOmpInstance();
+      return (yield* (yield* ServerSettingsService).getSettings).providerInstances[
+        OMP_ACP_INSTANCE_ID
+      ];
+    }).pipe(
+      Effect.provide(
+        ServerSettingsService.layerTest({ providerInstances }).pipe(
+          Layer.provideMerge(NodeServices.layer),
+        ),
+      ),
+    );
+
+  effectIt.effect("adds the local omp agent when the instance is absent", () =>
+    seed({}).pipe(
+      Effect.map((instance) =>
+        expect(instance).toMatchObject({
+          driver: "acpRegistry",
+          displayName: "omp",
+          enabled: true,
+          config: { source: "local", commandPath: "omp", commandArgs: ["acp"] },
+        }),
+      ),
+    ),
+  );
+
+  effectIt.effect("leaves an existing omp path and disabled state untouched", () =>
+    seed({
+      [OMP_ACP_INSTANCE_ID]: {
+        driver: ProviderDriverKind.make("acpRegistry"),
+        displayName: "My omp",
+        enabled: false,
+        config: { source: "local", commandPath: "C:/custom/omp.exe", commandArgs: ["acp"] },
+      },
+    }).pipe(
+      Effect.map((instance) => {
+        expect(instance?.displayName).toBe("My omp");
+        expect(instance?.enabled).toBe(false);
+        expect(instance?.config).toEqual({
+          source: "local",
+          commandPath: "C:/custom/omp.exe",
+          commandArgs: ["acp"],
+        });
+      }),
+    ),
+  );
+
+  effectIt.effect("propagates settings failures other than an existing omp instance", () =>
+    Effect.gen(function* () {
+      const settings = yield* ServerSettingsService;
+      for (const error of [
+        new ServerSettingsError({ settingsPath: "<memory>", operation: "write-file" }),
+        new ServerSettingsError({
+          settingsPath: "<memory>",
+          operation: "create-provider-instance",
+          providerInstanceId: "another-instance",
+        }),
+      ]) {
+        const failure = yield* seedBuiltinOmpInstance().pipe(
+          Effect.provideService(ServerSettingsService, {
+            ...settings,
+            updateProviderInstance: () => Effect.fail(error),
+          }),
+          Effect.flip,
+        );
+        expect(failure).toBe(error);
+      }
+    }).pipe(
+      Effect.provide(
+        ServerSettingsService.layerTest().pipe(Layer.provideMerge(NodeServices.layer)),
+      ),
     ),
   );
 });

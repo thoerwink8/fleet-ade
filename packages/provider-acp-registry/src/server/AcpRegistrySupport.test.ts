@@ -335,6 +335,58 @@ describe("AcpRegistrySupport", () => {
       Effect.provide(layerResolver(() => Effect.die("unexpected registry request"))),
     ),
   );
+  it.effect("uses the Windows omp installer executable when the bare command is a batch shim", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const cacheDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-acp-omp-" });
+      const localAppData = path.join(cacheDir, "Local");
+      const installerExecutable = path.join(localAppData, "omp", "omp.exe");
+      yield* fileSystem.makeDirectory(path.dirname(installerExecutable), { recursive: true });
+      yield* fileSystem.writeFileString(installerExecutable, "");
+      const environment = { LOCALAPPDATA: localAppData, PATH: cacheDir };
+      const makeResolver = (resolvedPath: string | undefined) =>
+        AcpRegistrySupport.makeAcpRegistryCatalog({
+          cacheDir,
+          toolsDir: path.join(cacheDir, "tools"),
+          registryUrl,
+        }).pipe(
+          Effect.provideService(SpawnExecutableResolution, () => resolvedPath),
+          Effect.provideService(HostProcess.Platform, "win32"),
+          Effect.provideService(HostProcess.Environment, environment),
+        );
+      const localSettings = decodeAcpRegistrySettings({
+        source: "local",
+        commandPath: "omp",
+        commandArgs: ["acp"],
+      });
+
+      const batchResolver = yield* makeResolver(path.join(cacheDir, "omp.cmd"));
+      expect(yield* batchResolver.inspect(localSettings)).toMatchObject({
+        status: "ready",
+        distribution: "local",
+      });
+      expect((yield* batchResolver.resolve(localSettings, "/workspace")).spawn).toMatchObject({
+        command: installerExecutable,
+        args: ["acp"],
+        shell: false,
+      });
+
+      const missingResolver = yield* makeResolver(undefined);
+      expect((yield* missingResolver.resolve(localSettings, "/workspace")).spawn.command).toBe(
+        installerExecutable,
+      );
+
+      const executable = path.join(cacheDir, "omp.exe");
+      const directResolver = yield* makeResolver(executable);
+      expect((yield* directResolver.resolve(localSettings, "/workspace")).spawn.command).toBe(
+        executable,
+      );
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(layerResolver(() => Effect.die("unexpected registry request"))),
+    ),
+  );
 
   it.effect("reports missing or non-executable local commands without registry fallback", () =>
     Effect.gen(function* () {

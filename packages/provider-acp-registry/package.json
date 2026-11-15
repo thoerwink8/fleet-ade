@@ -11,6 +11,10 @@
       "types": "./src/settings.ts",
       "import": "./src/settings.ts"
     },
+    "./builtin": {
+      "types": "./src/builtinOmp.ts",
+      "import": "./src/builtinOmp.ts"
+    },
     "./server": {
       "types": "./src/server.ts",
       "import": "./src/server.ts"

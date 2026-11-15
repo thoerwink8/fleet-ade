@@ -131,11 +131,23 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       data-provider-accent-color={accentColor}
     >
       {isAcpRegistry ? (
-        <AcpRegistryAgentIcon
-          className={cn("size-5 rounded-none bg-transparent", iconClassName)}
-          fallbackClassName="size-full"
-          icon={acpRegistryIconUrl}
-        />
+        acpRegistryIconUrl == null && props.displayName.trim().toLowerCase() === "omp" ? (
+          <span
+            className={cn(
+              "flex size-5 shrink-0 items-center justify-center rounded-md border bg-card text-4xs font-semibold leading-none text-foreground",
+              iconClassName,
+            )}
+            aria-hidden
+          >
+            omp
+          </span>
+        ) : (
+          <AcpRegistryAgentIcon
+            className={cn("size-5 rounded-none bg-transparent", iconClassName)}
+            fallbackClassName="size-full"
+            icon={acpRegistryIconUrl}
+          />
+        )
       ) : isCustomEndpoint ? (
         // The tile is a size container: below ~18px it keeps one letter and drops the mark.
         <span

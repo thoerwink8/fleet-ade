@@ -8,6 +8,10 @@ import {
   type ProviderInstanceConfigMap,
   ServerSettings,
 } from "@t3tools/contracts";
+import {
+  OMP_ACP_INSTANCE_ID,
+  ompAcpProviderInstance,
+} from "@t3tools/provider-acp-registry/builtin";
 import * as NodeUtil from "node:util";
 
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -167,6 +171,24 @@ export const layerSettingsWatcher = (
       );
     }),
   );
+export const seedBuiltinOmpInstance = Effect.fn("seedBuiltinOmpInstance")(function* () {
+  const serverSettings = yield* Settings.ServerSettingsService;
+  // Check absence inside the settings write lock so concurrent saves keep their entries.
+  yield* serverSettings
+    .updateProviderInstance({
+      operation: "create",
+      instanceId: OMP_ACP_INSTANCE_ID,
+      instance: ompAcpProviderInstance(),
+    })
+    .pipe(
+      Effect.catchIf(
+        (error) =>
+          error.operation === "create-provider-instance" &&
+          error.providerInstanceId === OMP_ACP_INSTANCE_ID,
+        () => Effect.void,
+      ),
+    );
+});
 
 export const layer: Layer.Layer<
   | ProviderInstanceRegistry.ProviderInstanceRegistry
@@ -178,6 +200,9 @@ export const layer: Layer.Layer<
     const serverSettings = yield* Settings.ServerSettingsService;
     yield* seedDevReplayInstance().pipe(
       Effect.catchCause((cause) => Effect.logWarning("Dev replay agent unavailable", cause)),
+    );
+    yield* seedBuiltinOmpInstance().pipe(
+      Effect.catchCause((cause) => Effect.logWarning("Built-in omp agent unavailable", cause)),
     );
     // Subscribe before the seed read so saves during registry construction are queued.
     const settingsChanges = yield* serverSettings.subscribeChanges;

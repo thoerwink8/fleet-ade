@@ -132,9 +132,11 @@ export function deriveProviderSettingsFields(
           key,
           control: formAnnotation.control ?? "text",
           label:
-            isLocalAcp && key === "commandPath"
-              ? "可执行文件"
-              : (annotatedTitle ?? titleizeFieldKey(key)),
+            isLocalAcp && key === "source"
+              ? "来源"
+              : isLocalAcp && key === "commandPath"
+                ? "可执行文件"
+                : (annotatedTitle ?? titleizeFieldKey(key)),
           ...(isLocalAcp && key === "commandPath"
             ? { description: "此环境中的可执行文件名称或路径。" }
             : annotatedDescription !== undefined
@@ -153,7 +155,16 @@ export function deriveProviderSettingsFields(
             : {}),
           accepts: fieldAcceptsString(fieldSchema),
           ...(formAnnotation.control === "select" && formAnnotation.options
-            ? { options: formAnnotation.options }
+            ? {
+                options: formAnnotation.options.map((option) =>
+                  isLocalAcp && key === "source"
+                    ? {
+                        ...option,
+                        label: option.value === "local" ? "本地命令" : "ACP 注册表",
+                      }
+                    : option,
+                ),
+              }
             : {}),
         } satisfies ProviderSettingsFieldModel,
       ];

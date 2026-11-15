@@ -12,6 +12,7 @@ import {
   type AcpRegistryDistribution as AcpRegistryDistributionKind,
 } from "@t3tools/contracts";
 import type { AcpRegistryDistributionPreference } from "../settings.ts";
+import { ompNeedsInstallerExecutable } from "../builtinOmp.ts";
 import type { AcpRegistrySettings } from "../settings.ts";
 import { cliArchiveTarCommand } from "@t3tools/shared/cliRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -1735,12 +1736,32 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
         )
       : Effect.void;
 
+  const resolveLocalExecutable = Effect.fn("resolveLocalExecutable")(function* (
+    command: string,
+    environment: NodeJS.ProcessEnv,
+  ) {
+    const resolved = resolveExecutable(command, platform, environment);
+    if (
+      !ompNeedsInstallerExecutable({ commandPath: command, resolvedPath: resolved }) ||
+      platform !== "win32"
+    ) {
+      return resolved;
+    }
+    const localAppData = environment.LOCALAPPDATA;
+    if (!localAppData) return resolved;
+    const installerExecutable = path.join(localAppData, "omp", "omp.exe");
+    const installerExists = yield* fileSystem
+      .exists(installerExecutable)
+      .pipe(Effect.orElseSucceed(() => false));
+    return installerExists ? installerExecutable : resolved;
+  });
+
   const inspect: AcpRegistryCatalog["Service"]["inspect"] = Effect.fn("AcpRegistryCatalog.inspect")(
     function* (settings, environment) {
       if (settings.source === "local") {
         const command = settings.commandPath.trim();
         if (!command) return { status: "unconfigured" } as const;
-        const executable = resolveExecutable(command, platform, environment ?? hostEnvironment);
+        const executable = yield* resolveLocalExecutable(command, environment ?? hostEnvironment);
         if (executable !== undefined) yield* validateLocalExecutable(executable);
         return executable === undefined
           ? ({
@@ -1863,7 +1884,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
           });
         }
         const env = environment ?? hostEnvironment;
-        const command = resolveExecutable(executable, platform, env);
+        const command = yield* resolveLocalExecutable(executable, env);
         if (command === undefined) {
           return yield* new AcpRegistryError({
             reason: "runner_unavailable",

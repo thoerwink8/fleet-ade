@@ -71,3 +71,9 @@ export function resolveModelShortName(
   const families = driverKind ? providerClients.get(driverKind)?.modelFamilies : undefined;
   return modelShortName(model.name, families ?? []);
 }
+export {
+  isConfiguredOmpAcp,
+  OMP_ACP_BUILTIN,
+  OMP_ACP_INSTANCE_ID,
+  ompAcpSettings,
+} from "@t3tools/provider-acp-registry/builtin";

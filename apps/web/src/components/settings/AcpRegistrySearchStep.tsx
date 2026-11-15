@@ -24,6 +24,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group"
 import { ScrollArea } from "../ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { isConfiguredAcpRegistryAgent } from "./AddProviderInstanceDialog.logic";
+import { isConfiguredOmpAcp, OMP_ACP_BUILTIN } from "@t3tools/client-runtime/provider-clients";
 import { ProviderDriverKind } from "@t3tools/contracts";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { providerClients } from "./providerDriverMeta";
@@ -125,6 +126,7 @@ interface AcpRegistrySearchStepProps {
   readonly onPrepared: (agent: AcpRegistrySearchAgent) => void;
   readonly onManualConfiguration: () => void;
   readonly onLocalConfiguration?: () => void;
+  readonly onOmpConfiguration?: () => void;
 }
 
 export function AcpRegistrySearchStep({
@@ -134,6 +136,7 @@ export function AcpRegistrySearchStep({
   onPrepared,
   onManualConfiguration,
   onLocalConfiguration,
+  onOmpConfiguration,
 }: AcpRegistrySearchStepProps) {
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const { query, search, preparingId, prepareError } = registry;
@@ -218,6 +221,37 @@ export function AcpRegistrySearchStep({
         </div>
       ) : null}
 
+      {onOmpConfiguration ? (
+        <article className="min-w-0 border-b py-2.5">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <ProviderInstanceIcon
+                driverKind={ProviderDriverKind.make("acpRegistry")}
+                displayName={OMP_ACP_BUILTIN.name}
+                iconClassName="size-6 rounded-md text-muted-foreground"
+              />
+              <div className="min-w-0 flex-1">
+                <h4 className="truncate text-sm font-medium text-foreground">
+                  {OMP_ACP_BUILTIN.name}
+                </h4>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  本机命令，添加后可修改路径。
+                </p>
+              </div>
+            </div>
+            <Button
+              aria-label={`${isConfiguredOmpAcp(providerInstances) ? "已添加" : "添加"} ${OMP_ACP_BUILTIN.name}`}
+              disabled={!canManageProviders || isConfiguredOmpAcp(providerInstances)}
+              onClick={onOmpConfiguration}
+              size="xs"
+              type="button"
+              variant="outline"
+            >
+              {isConfiguredOmpAcp(providerInstances) ? "已添加" : "添加"}
+            </Button>
+          </div>
+        </article>
+      ) : null}
       {results ? (
         results.length === 0 ? (
           <div className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-dashed px-4 text-center">

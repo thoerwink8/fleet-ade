@@ -3697,6 +3697,7 @@ it.layer(
       const drained: Array<Deferred.Deferred<void>> = [];
       let readSeed = true;
       let failCurrentRead = false;
+      let changesClosed = false;
       const settings = yield* makeMutableServerSettingsService(input.current);
       const serverSettings = {
         ...settings,
@@ -3717,6 +3718,8 @@ it.layer(
         }),
         streamChanges: Stream.empty,
         subscribeChanges: Effect.gen(function* () {
+          // Reconcile can create providers after the terminal marker was published.
+          if (changesClosed) return Stream.empty;
           const subscription = yield* PubSub.subscribe(changes);
           const done = yield* Deferred.make<void>();
           drained.push(done);
@@ -3762,11 +3765,14 @@ it.layer(
               PortScanner.layerTest,
               ProviderInstallationGate.layer,
               SqlitePersistence.layerMemory,
+              // Registry reconciliation must not probe agents installed on the test host.
+              Layer.succeed(HostProcess.Environment, {}),
             ),
           ),
         ),
       ).pipe(Effect.provide(dependencies));
       failCurrentRead = input.failCurrentRead ?? false;
+      changesClosed = true;
       yield* PubSub.publish(changes, undefined);
       yield* Deferred.succeed(consume, undefined);
       yield* Effect.forEach(drained, Deferred.await);

@@ -19,6 +19,11 @@ import {
   type ProviderInstanceEnvironmentVariable,
   isManagedDriverAllowed,
 } from "@t3tools/contracts";
+import {
+  OMP_ACP_BUILTIN,
+  OMP_ACP_INSTANCE_ID,
+  ompAcpSettings,
+} from "@t3tools/client-runtime/provider-clients";
 
 import {
   useEnvironmentSettings,
@@ -366,6 +371,23 @@ export function AddProviderInstanceDialog({
     setLocalEnvironment([]);
     setHasAttemptedSubmit(false);
   };
+  const handleOmpConfiguration = () => {
+    setDriver(ACP_REGISTRY_DRIVER_KIND);
+    setSelectedAcp(null);
+    setIsManualAcpConfiguration(true);
+    setConfigByDriver((existing) => ({
+      ...existing,
+      [ACP_REGISTRY_DRIVER_KIND]: { ...ompAcpSettings() },
+    }));
+    setIdentityByDriver((existing) =>
+      updateProviderIdentityDraft(existing, ACP_REGISTRY_DRIVER_KIND, {
+        label: OMP_ACP_BUILTIN.name,
+        instanceIdOverride: existingIds.has(OMP_ACP_INSTANCE_ID) ? null : OMP_ACP_INSTANCE_ID,
+      }),
+    );
+    setLocalEnvironment([]);
+    setHasAttemptedSubmit(false);
+  };
 
   // A policy that owns this driver's launch settings also rules out ChatGPT's own runtime.
   const driverLocks = managedInstanceLocks(managedPolicy, driver);
@@ -569,6 +591,7 @@ export function AddProviderInstanceDialog({
                             onPrepared={handleAcpPrepared}
                             onManualConfiguration={handleManualAcpConfiguration}
                             onLocalConfiguration={handleLocalAcpConfiguration}
+                            onOmpConfiguration={handleOmpConfiguration}
                           />
                           {isAcpRegistry && hasAttemptedSubmit && acpSelectionError ? (
                             <p className="mt-2 text-2xs text-destructive">{acpSelectionError}</p>
