@@ -81,6 +81,31 @@ describe("useThreadJumpHintsVisible", () => {
     await userEvent.keyboard(`{/${modifier}}`);
   });
 
+  // regression: #131 a deadline armed by an earlier subscriber fired after it left and marked the hold true
+  it("does not show when an earlier subscriber's hold deadline fires after it unsubscribed", async () => {
+    const keybindings = compileResolvedKeybindingsConfig([
+      { key: "mod+1", command: "thread.jump.1" },
+    ]);
+    const modifier = isMacPlatform(navigator.platform) ? "Meta" : "Control";
+    await using first = await render(<JumpHints keybindings={keybindings} />, {
+      // A bare hook host; nothing here links or navigates.
+      router: false,
+    });
+    using _timers = fakeTimers();
+
+    await userEvent.keyboard(`{${modifier}>}`);
+    await act(() => vi.advanceTimersByTime(THREAD_JUMP_HINT_SHOW_DELAY_MS - 1));
+    await first[Symbol.asyncDispose]();
+
+    await using second = await render(<JumpHints keybindings={keybindings} />, {
+      // A bare hook host; nothing here links or navigates.
+      router: false,
+    });
+    await act(() => vi.advanceTimersByTime(1));
+    await expect.element(second.getByRole("status")).toHaveTextContent("hidden");
+    await userEvent.keyboard(`{/${modifier}}`);
+  });
+
   it("shows once the modifier goes down when its hold deadline has already passed", async () => {
     let now = MOUNTED_AT_MS;
     using _now = vi.spyOn(Date, "now").mockImplementation(() => (now += 1000));

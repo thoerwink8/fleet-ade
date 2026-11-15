@@ -712,20 +712,24 @@ export function threadShortcutContext(routeThreadRef: ScopedThreadRef | null) {
 function createModifierHoldStore(delayMs: number): ClockStore<boolean> {
   const listeners = new Set<() => void>();
   let held = false;
+  // Counts arms, not subscriptions: a deadline whose timer outlives the last
+  // subscriber must not flip `held` for whoever subscribes next.
+  let arm = 0;
   let stopDeadline = () => {};
   let stopModifiers: (() => void) | null = null;
 
-  const setHeld = (next: boolean) => {
-    if (held === next) return;
+  const setHeld = (next: boolean, fromArm: number) => {
+    if (fromArm !== arm || held === next) return;
     held = next;
     for (const listener of listeners) listener();
   };
   const onModifiersChange = () => {
     stopDeadline();
+    const fromArm = ++arm;
     const deadline = deadlineStore(deadlineAfter(delayMs));
-    stopDeadline = deadline.subscribe(() => setHeld(true));
+    stopDeadline = deadline.subscribe(() => setHeld(true, fromArm));
     // A deadline another subscriber already passed never notifies a late joiner.
-    setHeld(deadline.getSnapshot());
+    setHeld(deadline.getSnapshot(), fromArm);
   };
 
   return {
@@ -742,6 +746,8 @@ function createModifierHoldStore(delayMs: number): ClockStore<boolean> {
         stopModifiers = null;
         stopDeadline();
         stopDeadline = () => {};
+        // Retire the in-flight deadline too: its timer keeps the store alive.
+        arm += 1;
         held = false;
       };
     },
