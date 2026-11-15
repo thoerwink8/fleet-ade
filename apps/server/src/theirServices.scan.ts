@@ -25,6 +25,7 @@ export function isBannedHost(host: string): boolean {
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
   ".git",
+  ".repos",
   "dist",
   "coverage",
   ".t3",

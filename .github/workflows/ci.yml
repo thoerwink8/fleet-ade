@@ -1,8 +1,7 @@
 name: CI
 
-# The upstream workflow was a matrix of hosted jobs (lint, desktop build, sharded
-# tests, release smoke, mobile). This repo runs one Ubuntu job: install, then
-# `pnpm check`.
+# Runs `pnpm check` as parallel jobs on self-hosted runners, then
+# gates on the final `Check` summary job.
 on:
   pull_request:
   push:
@@ -17,13 +16,77 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-24.04
+  # Schedule the two `web` shards first on the two self-hosted runners so the
+  # critical path starts at t=0, then run `packages` alongside `static` + `server`.
+  web:
+    name: Web browser (${{ matrix.shard }}/2)
+    runs-on: [self-hosted, fleet-fr]
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
+      - name: Strip orphan gitlinks before checkout
+        run: |
+          if [ ! -d .git ]; then
+            exit 0
+          fi
+          git config --global --add safe.directory "$PWD" || true
+          gitlinks=$(
+            {
+              git ls-files --stage 2>/dev/null
+              git ls-tree -r HEAD 2>/dev/null
+            } | awk '$1 == "160000" {print $4}' | sort -u
+          )
+          if [ -n "$gitlinks" ]; then
+            printf '%s\n' "$gitlinks" | xargs -r git rm --sparse --cached -f --ignore-unmatch --
+            if git rev-parse --verify -q HEAD >/dev/null; then
+              tree=$(git write-tree)
+              commit=$(
+                GIT_AUTHOR_NAME=ci \
+                GIT_AUTHOR_EMAIL=ci@localhost \
+                GIT_COMMITTER_NAME=ci \
+                GIT_COMMITTER_EMAIL=ci@localhost \
+                git commit-tree "$tree" -m "strip-gitlinks"
+              )
+              git update-ref --no-deref HEAD "$commit"
+            fi
+          fi
+
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+          sparse-checkout-cone-mode: false
+
+      - name: Configure runner cache
+        run: |
+          cache_root="$RUNNER_WORKSPACE/.cache"
+          mkdir -p "$cache_root/pnpm-store" "$cache_root/xdg-data" "$cache_root/xdg-cache" "$cache_root/ms-playwright" "$cache_root/vite-task-cache"
+          python3 - "$cache_root/vite-task-cache" <<'PY'
+          import glob, os, sqlite3, sys
+          for db in glob.glob(os.path.join(sys.argv[1], "*", "cache.db")):
+              try:
+                  with sqlite3.connect(db) as conn:
+                      if conn.execute("PRAGMA quick_check;").fetchone()[0] != "ok":
+                          os.remove(db)
+              except Exception:
+                  try:
+                      os.remove(db)
+                  except OSError:
+                      pass
+          PY
+          {
+            echo "pnpm_config_store_dir=$cache_root/pnpm-store"
+            echo "XDG_DATA_HOME=$cache_root/xdg-data"
+            echo "XDG_CACHE_HOME=$cache_root/xdg-cache"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$cache_root/ms-playwright"
+            echo "VITE_CACHE_PATH=$cache_root/vite-task-cache"
+          } >> "$GITHUB_ENV"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -34,16 +97,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: package.json
-          cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile
-
-      - name: Install browser secret helper build libraries
-        run: sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config xvfb
-
-      - name: Install Chromium system libraries
-        run: node apps/web/node_modules/playwright/cli.js install-deps chromium
 
       # Playwright launches Chromium with --disable-dev-shm-usage, so the browser
       # keeps shared-memory files on /tmp, not /dev/shm. Print both.
@@ -53,9 +109,9 @@ jobs:
           df -h /dev/shm
           df -h /tmp
 
-      - name: Check
+      - name: Check web
         # Vitest collects Chromium garbage only when /tmp has under 4 GiB free.
-        # A 14 GB runner still has more than that when the browser connection drops.
+        # Force post-file Chromium GC so long runs do not drop the browser connection.
         env:
           VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB: "1024"
         run: |
@@ -67,7 +123,277 @@ jobs:
             done ) &
           sampler=$!
           set +e
-          pnpm check
+          pnpm check chromium "web ${{ matrix.shard }}/2"
           code=$?
           kill "$sampler" || true
           exit "$code"
+
+  packages:
+    name: Packages
+    needs: [web]
+    if: ${{ !cancelled() }}
+    runs-on: [self-hosted, fleet-fr]
+    timeout-minutes: 120
+    steps:
+      - name: Strip orphan gitlinks before checkout
+        run: |
+          if [ ! -d .git ]; then
+            exit 0
+          fi
+          git config --global --add safe.directory "$PWD" || true
+          gitlinks=$(
+            {
+              git ls-files --stage 2>/dev/null
+              git ls-tree -r HEAD 2>/dev/null
+            } | awk '$1 == "160000" {print $4}' | sort -u
+          )
+          if [ -n "$gitlinks" ]; then
+            printf '%s\n' "$gitlinks" | xargs -r git rm --sparse --cached -f --ignore-unmatch --
+            if git rev-parse --verify -q HEAD >/dev/null; then
+              tree=$(git write-tree)
+              commit=$(
+                GIT_AUTHOR_NAME=ci \
+                GIT_AUTHOR_EMAIL=ci@localhost \
+                GIT_COMMITTER_NAME=ci \
+                GIT_COMMITTER_EMAIL=ci@localhost \
+                git commit-tree "$tree" -m "strip-gitlinks"
+              )
+              git update-ref --no-deref HEAD "$commit"
+            fi
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+          sparse-checkout-cone-mode: false
+
+      - name: Configure runner cache
+        run: |
+          cache_root="$RUNNER_WORKSPACE/.cache"
+          mkdir -p "$cache_root/pnpm-store" "$cache_root/xdg-data" "$cache_root/xdg-cache" "$cache_root/ms-playwright" "$cache_root/vite-task-cache"
+          python3 - "$cache_root/vite-task-cache" <<'PY'
+          import glob, os, sqlite3, sys
+          for db in glob.glob(os.path.join(sys.argv[1], "*", "cache.db")):
+              try:
+                  with sqlite3.connect(db) as conn:
+                      if conn.execute("PRAGMA quick_check;").fetchone()[0] != "ok":
+                          os.remove(db)
+              except Exception:
+                  try:
+                      os.remove(db)
+                  except OSError:
+                      pass
+          PY
+          {
+            echo "pnpm_config_store_dir=$cache_root/pnpm-store"
+            echo "XDG_DATA_HOME=$cache_root/xdg-data"
+            echo "XDG_CACHE_HOME=$cache_root/xdg-cache"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$cache_root/ms-playwright"
+            echo "VITE_CACHE_PATH=$cache_root/vite-task-cache"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check packages
+        run: pnpm check ensure-electron chromium packages
+
+  static:
+    name: Lint & Typecheck
+    needs: [web]
+    if: ${{ !cancelled() }}
+    runs-on: [self-hosted, fleet-fr]
+    timeout-minutes: 120
+    steps:
+      - name: Strip orphan gitlinks before checkout
+        run: |
+          if [ ! -d .git ]; then
+            exit 0
+          fi
+          git config --global --add safe.directory "$PWD" || true
+          gitlinks=$(
+            {
+              git ls-files --stage 2>/dev/null
+              git ls-tree -r HEAD 2>/dev/null
+            } | awk '$1 == "160000" {print $4}' | sort -u
+          )
+          if [ -n "$gitlinks" ]; then
+            printf '%s\n' "$gitlinks" | xargs -r git rm --sparse --cached -f --ignore-unmatch --
+            if git rev-parse --verify -q HEAD >/dev/null; then
+              tree=$(git write-tree)
+              commit=$(
+                GIT_AUTHOR_NAME=ci \
+                GIT_AUTHOR_EMAIL=ci@localhost \
+                GIT_COMMITTER_NAME=ci \
+                GIT_COMMITTER_EMAIL=ci@localhost \
+                git commit-tree "$tree" -m "strip-gitlinks"
+              )
+              git update-ref --no-deref HEAD "$commit"
+            fi
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+          sparse-checkout-cone-mode: false
+
+      - name: Configure runner cache
+        run: |
+          cache_root="$RUNNER_WORKSPACE/.cache"
+          mkdir -p "$cache_root/pnpm-store" "$cache_root/xdg-data" "$cache_root/xdg-cache" "$cache_root/ms-playwright" "$cache_root/vite-task-cache"
+          python3 - "$cache_root/vite-task-cache" <<'PY'
+          import glob, os, sqlite3, sys
+          for db in glob.glob(os.path.join(sys.argv[1], "*", "cache.db")):
+              try:
+                  with sqlite3.connect(db) as conn:
+                      if conn.execute("PRAGMA quick_check;").fetchone()[0] != "ok":
+                          os.remove(db)
+              except Exception:
+                  try:
+                      os.remove(db)
+                  except OSError:
+                      pass
+          PY
+          {
+            echo "pnpm_config_store_dir=$cache_root/pnpm-store"
+            echo "XDG_DATA_HOME=$cache_root/xdg-data"
+            echo "XDG_CACHE_HOME=$cache_root/xdg-cache"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$cache_root/ms-playwright"
+            echo "VITE_CACHE_PATH=$cache_root/vite-task-cache"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check static
+        run: pnpm check lint ui-no-english typecheck preview-python release-checks
+
+  server:
+    name: Server (${{ matrix.shard }}/2)
+    needs: [web, static]
+    if: ${{ !cancelled() }}
+    runs-on: [self-hosted, fleet-fr]
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - name: Strip orphan gitlinks before checkout
+        run: |
+          if [ ! -d .git ]; then
+            exit 0
+          fi
+          git config --global --add safe.directory "$PWD" || true
+          gitlinks=$(
+            {
+              git ls-files --stage 2>/dev/null
+              git ls-tree -r HEAD 2>/dev/null
+            } | awk '$1 == "160000" {print $4}' | sort -u
+          )
+          if [ -n "$gitlinks" ]; then
+            printf '%s\n' "$gitlinks" | xargs -r git rm --sparse --cached -f --ignore-unmatch --
+            if git rev-parse --verify -q HEAD >/dev/null; then
+              tree=$(git write-tree)
+              commit=$(
+                GIT_AUTHOR_NAME=ci \
+                GIT_AUTHOR_EMAIL=ci@localhost \
+                GIT_COMMITTER_NAME=ci \
+                GIT_COMMITTER_EMAIL=ci@localhost \
+                git commit-tree "$tree" -m "strip-gitlinks"
+              )
+              git update-ref --no-deref HEAD "$commit"
+            fi
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+          sparse-checkout-cone-mode: false
+
+      - name: Configure runner cache
+        run: |
+          cache_root="$RUNNER_WORKSPACE/.cache"
+          mkdir -p "$cache_root/pnpm-store" "$cache_root/xdg-data" "$cache_root/xdg-cache" "$cache_root/ms-playwright" "$cache_root/vite-task-cache"
+          python3 - "$cache_root/vite-task-cache" <<'PY'
+          import glob, os, sqlite3, sys
+          for db in glob.glob(os.path.join(sys.argv[1], "*", "cache.db")):
+              try:
+                  with sqlite3.connect(db) as conn:
+                      if conn.execute("PRAGMA quick_check;").fetchone()[0] != "ok":
+                          os.remove(db)
+              except Exception:
+                  try:
+                      os.remove(db)
+                  except OSError:
+                      pass
+          PY
+          {
+            echo "pnpm_config_store_dir=$cache_root/pnpm-store"
+            echo "XDG_DATA_HOME=$cache_root/xdg-data"
+            echo "XDG_CACHE_HOME=$cache_root/xdg-cache"
+            echo "PLAYWRIGHT_BROWSERS_PATH=$cache_root/ms-playwright"
+            echo "VITE_CACHE_PATH=$cache_root/vite-task-cache"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check server shard
+        run: pnpm check chromium "server ${{ matrix.shard }}/2"
+
+  check:
+    name: Check
+    runs-on: [self-hosted, fleet-fr]
+    if: ${{ always() }}
+    needs: [web, packages, static, server]
+    timeout-minutes: 10
+    env:
+      NEEDS_JSON: ${{ toJSON(needs) }}
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          printf '%s\n' "$NEEDS_JSON" | jq .
+          printf '%s\n' "$NEEDS_JSON" | jq -e 'all(.[]; .result == "success")' > /dev/null

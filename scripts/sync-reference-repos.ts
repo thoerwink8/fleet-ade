@@ -277,7 +277,13 @@ const runGit = Effect.fn("runGit")(function* (
   return stdout;
 });
 
-const applyReferenceRepoSync = Effect.fn("applyReferenceRepoSync")(function* (
+const parseStagedGitlinkPaths = (stageOutput: string): ReadonlyArray<string> =>
+  stageOutput.split("\0").flatMap((entry) => {
+    const match = /^160000 [0-9a-f]+ \d+\t(.+)$/.exec(entry);
+    return match?.[1] ? [match[1]] : [];
+  });
+
+export const applyReferenceRepoSync = Effect.fn("applyReferenceRepoSync")(function* (
   rootDir: string,
   plan: ReferenceRepoSyncPlan,
 ) {
@@ -299,8 +305,15 @@ const applyReferenceRepoSync = Effect.fn("applyReferenceRepoSync")(function* (
   const checkout = path.join(tempDir, "checkout");
   yield* runGit(plan, rootDir, [...plan.cloneArgs, checkout]);
   const commit = (yield* runGit(plan, checkout, ["rev-parse", "HEAD"])).trim();
+  // Upstream submodule mountpoints have no mapping in the root `.gitmodules`; remove them
+  // before moving the tree into place so `git add`/`git commit` drop any `160000` gitlinks.
+  const checkoutEntries = yield* runGit(plan, checkout, ["ls-files", "--stage", "-z"]);
+  const checkoutGitlinks = parseStagedGitlinkPaths(checkoutEntries);
 
   yield* Effect.gen(function* () {
+    for (const gitlinkPath of checkoutGitlinks) {
+      yield* fs.remove(path.join(checkout, gitlinkPath), { recursive: true, force: true });
+    }
     yield* fs.remove(path.join(checkout, ".git"), { recursive: true });
     yield* fs.remove(target, { recursive: true, force: true });
     yield* fs.rename(checkout, target);

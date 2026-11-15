@@ -16,6 +16,15 @@ it.live("loads the CLI with its cache settings only when the command needs it", 
       import { getCompileCacheDir, registerHooks } from 'node:module';
       registerHooks({ resolve(specifier, context, nextResolve) {
         if (specifier === './binMain.ts') console.error('LOADED_CLI_MAIN');
+        if (
+          specifier === './outboundHttp.ts' ||
+          specifier === 'effect' ||
+          specifier.startsWith('effect/') ||
+          specifier === '@t3tools/contracts' ||
+          specifier.startsWith('@t3tools/contracts/')
+        ) {
+          console.error('LOADED_SERVER_GRAPH=' + specifier);
+        }
         if (specifier === './binCli.ts') console.error('CACHE=' + (getCompileCacheDir() ?? 'disabled'));
         return nextResolve(specifier, context);
       } });
@@ -64,7 +73,14 @@ it.live("loads the CLI with its cache settings only when the command needs it", 
     const launcher = yield* run({ T3CODE_HOME: "" }, ["__service-launcher"]);
     expect(launcher.exitCode).toBe(1);
     expect(launcher.stderr).toContain("[service-launcher] T3CODE_HOME is required");
-    expect(launcher.stderr).not.toMatch(/LOADED_CLI_MAIN|CACHE=/);
+    expect(launcher.stderr).not.toMatch(/LOADED_CLI_MAIN|LOADED_SERVER_GRAPH=|CACHE=/);
+    const sampleRtf = `${root}/sample.rtf`;
+    yield* fs.writeFileString(sampleRtf, String.raw`{\rtf1 Fast}`);
+    const documentText = yield* run({}, ["__document-text", sampleRtf, ".rtf"]);
+    expect(documentText.exitCode).toBe(0);
+    expect(documentText.stdout).toBe("Fast");
+    expect(documentText.stderr).toContain("LOADED_CLI_MAIN");
+    expect(documentText.stderr).not.toMatch(/LOADED_SERVER_GRAPH=|CACHE=/);
     const launcherHelp = yield* run({ T3CODE_HOME: "" }, ["__service-launcher", "--help"]);
     expect(launcherHelp.exitCode).toBe(0);
     expect(launcherHelp.stderr).toContain("LOADED_CLI_MAIN");

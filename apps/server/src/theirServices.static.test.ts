@@ -25,6 +25,11 @@ it.effect("flags a file that names a banned host", () =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const root = yield* fs.makeTempDirectoryScoped({ prefix: "their-hosts-" });
+    yield* fs.makeDirectory(path.join(root, ".repos"), { recursive: true });
+    yield* fs.writeFileString(
+      path.join(root, ".repos", "vendored.ts"),
+      `export const host = "https://${dotted("ingest", dotted("t3", "codes"))}/x";\n`,
+    );
     yield* fs.writeFileString(
       path.join(root, "leak.ts"),
       `export const host = "https://${dotted("ingest", dotted("t3", "codes"))}/x";\n`,

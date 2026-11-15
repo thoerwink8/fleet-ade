@@ -59,7 +59,7 @@ const DESKTOP_LAUNCH = [
   /^apps\/desktop\/src\/electron\/(ElectronApp|ElectronProtocol|ElectronWindow)\.ts$/,
   /^apps\/web\/src\/((main|AppRoot|appInit)\.tsx|(bootstrap|router)\.ts)$/,
   /^apps\/web\/src\/.*sidebar/i,
-  /^apps\/server\/src\/(bin|binMain|server|serverRuntimeStartup)\.ts$/,
+  /^apps\/server\/src\/(bin|binMain|macosSocketGuard|server|serverRuntimeStartup)\.ts$/,
   /^apps\/server\/src\/persistence\/Migrations/,
   /^apps\/server\/src\/orchestration-v2\/((ThreadSettlementService|ProjectionStore)\.ts$|legacy\/)/,
   /^packages\/contracts\/src\/settings\.ts$/,
