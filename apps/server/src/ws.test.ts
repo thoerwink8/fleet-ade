@@ -33,6 +33,7 @@ import {
   type ServerConfigStreamEvent,
   type ServerProvider,
 } from "@t3tools/contracts";
+import * as PipelineRuns from "./pipeline/PipelineRuns.ts";
 import * as Deferred from "effect/Deferred";
 import type { ProviderInstance } from "@t3tools/provider-core/server/driver";
 import * as DateTime from "effect/DateTime";
@@ -871,6 +872,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(WorkspaceEntries.WorkspaceEntries)({}),
   Layer.mock(WorkspaceFileSystem.WorkspaceFileSystem)({}),
   Layer.mock(WorktreeSetupTracker.WorktreeSetupTracker)({}),
+  Layer.mock(PipelineRuns.PipelineRuns)({}),
 );
 
 const layerConfigSources = Layer.mergeAll(

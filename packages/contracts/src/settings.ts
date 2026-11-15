@@ -1503,6 +1503,7 @@ export const ServerSettings = Schema.Struct({
    * and tasks on another machine; tasks already running there finish.
    */
   linkedEnvironmentsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  pipelineEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Maximum active agent sessions running concurrently on this server; null leaves concurrency uncapped. */
   maxConcurrentSessions: Schema.NullOr(MaxConcurrentSessions).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
@@ -1937,6 +1938,7 @@ export const ServerSettingsPatch = Schema.Struct({
   hideTaggedThreads: Schema.optionalKey(Schema.Boolean),
   guestSharingEnabled: Schema.optionalKey(Schema.Boolean),
   linkedEnvironmentsEnabled: Schema.optionalKey(Schema.Boolean),
+  pipelineEnabled: Schema.optionalKey(Schema.Boolean),
   maxConcurrentSessions: Schema.optionalKey(Schema.NullOr(MaxConcurrentSessions)),
   promptSuggestionsEnabled: Schema.optionalKey(Schema.Boolean),
   backgroundActivity: Schema.optionalKey(

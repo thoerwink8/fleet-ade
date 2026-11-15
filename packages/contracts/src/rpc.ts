@@ -26,6 +26,7 @@ import {
   PeerLinkRequestError,
   PeerLinkSummary,
 } from "./peerLink.ts";
+import { PipelineRunList, PipelineRunReadError } from "./pipeline.ts";
 import {
   ChatGptReconnectProfileInput,
   ChatGptReconnectProfile,
@@ -526,6 +527,7 @@ export const WS_METHODS = {
   peerLinksLink: "peerLinks.link",
   peerLinksUnlink: "peerLinks.unlink",
   peerLinksAnswerRequest: "peerLinks.answerRequest",
+  pipelineListRuns: "pipeline.listRuns",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverCheckSecretSource: "server.checkSecretSource",
@@ -855,6 +857,12 @@ const WsPeerLinksListRpc = Rpc.make(WS_METHODS.peerLinksList, {
   payload: Schema.Struct({}),
   success: Schema.Struct({ links: Schema.Array(PeerLinkSummary) }),
   error: Schema.Union([PeerLinkError, EnvironmentAuthorizationError]),
+});
+
+const WsPipelineListRunsRpc = Rpc.make(WS_METHODS.pipelineListRuns, {
+  payload: Schema.Struct({}),
+  success: PipelineRunList,
+  error: Schema.Union([PipelineRunReadError, EnvironmentAuthorizationError]),
 });
 
 const WsPeerLinksLinkRpc = Rpc.make(WS_METHODS.peerLinksLink, {
@@ -2152,6 +2160,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerReclaimDatabaseSpaceRpc,
   WsServerUpdateSettingsRpc,
   WsPeerLinksListRpc,
+  WsPipelineListRunsRpc,
   WsPeerLinksLinkRpc,
   WsPeerLinksUnlinkRpc,
   WsPeerLinksAnswerRequestRpc,
