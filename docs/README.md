@@ -65,6 +65,7 @@ source alone does not explain. Most code changes do not need an internal documen
 
 - [Development and local builds](./operations/development.md)
 - [France VPS headless ADE (WireGuard)](./operations/france-headless.md)
+- [SWE-2 duty: triage and nightly retro](./operations/swe-duty.md)
 - [Scenarios: real-app proof for a fix](./operations/scenarios.md)
 - [T3 Connect setup](./operations/connect-setup.md)
 - [Release](./operations/release.md)
