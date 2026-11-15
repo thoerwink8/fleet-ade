@@ -33,6 +33,7 @@ import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
 import * as ManagedRelayDpopSigner from "../relay/managedRelay.ts";
 import { EnvironmentRpcUnavailableError, request } from "../rpc/client.ts";
 import type { EnvironmentShellState } from "./shell.ts";
+import { ThreadSnapshotLoader } from "./threadSnapshotHttp.ts";
 import { fetchEnvironmentThreadTranscript } from "./threadTranscriptHttp.ts";
 
 export function createOrchestrationEnvironmentAtoms<R, E>(
@@ -252,6 +253,43 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
       tag: ORCHESTRATION_V2_WS_METHODS.getWorktreeThreadIds,
       staleTimeMs: 0,
       idleTtlMs: 0,
+    }),
+    threadLatestMessagePreview: createEnvironmentQueryAtomFamily(runtime, {
+      label: "environment-data:orchestration:thread-latest-message-preview",
+      staleTimeMs: 5 * 60_000,
+      idleTtlMs: 5 * 60_000,
+      execute: Effect.fn("orchestration.threadLatestMessagePreview")(function* (input: {
+        readonly threadId: ThreadId;
+        readonly visibleItemCount: number;
+      }) {
+        const loader = yield* Effect.serviceOption(ThreadSnapshotLoader);
+        if (Option.isNone(loader)) return null;
+        const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
+        const prepared = yield* SubscriptionRef.get(supervisor.prepared);
+        if (Option.isNone(prepared)) return null;
+        const loaded = yield* loader.value.load(prepared.value, input.threadId);
+        if (loaded._tag !== "present") return null;
+        const { visibleTurnItems, messages } = loaded.snapshot.projection;
+        for (let index = visibleTurnItems.length - 1; index >= 0; index -= 1) {
+          const item = visibleTurnItems[index]?.item;
+          if (
+            (item?.type === "assistant_message" || item?.type === "user_message") &&
+            item.text.trim().length > 0
+          ) {
+            return item.text.slice(0, 320);
+          }
+        }
+        for (let index = messages.length - 1; index >= 0; index -= 1) {
+          const message = messages[index];
+          if (
+            (message?.role === "assistant" || message?.role === "user") &&
+            message.text.trim().length > 0
+          ) {
+            return message.text.slice(0, 320);
+          }
+        }
+        return null;
+      }),
     }),
   };
 }

@@ -325,6 +325,7 @@ interface MessagesTimelineProps {
   findQuery?: string;
   activeFindMatch?: ThreadFindMatch | null;
   findNavigationId?: number;
+  semanticWorkStream?: boolean;
 }
 
 export function MessagesTimeline(props: MessagesTimelineProps) {
@@ -417,6 +418,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   emptyPlaceholderInset,
   topFadeEnabled = false,
   historyControls,
+  semanticWorkStream: semanticWorkStreamProp,
 }: MessagesTimelineProps) {
   const listIdentityKey = displayThreadKey ?? routeThreadKey;
   // Snapshot restore positions on identity changes; ongoing scroll writes must not move them.
@@ -638,6 +640,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const toolCallVisibility =
     findActive && preferredToolCallVisibility === "zen" ? "hideAll" : preferredToolCallVisibility;
   const revealedMessageId = citationRequest?.citation.messageId ?? null;
+  const semanticWorkStream =
+    semanticWorkStreamProp ?? (toolCallVisibility ?? "showAll") === "showAll";
   // Imported turns and post-steer work fold under synthetic keys, not the entries' run ids.
   const findFoldRunIds = findActive
     ? timelineTurnFoldRunIdsByEntryId({
@@ -648,6 +652,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
         runlessWorkActive,
         toolCallVisibility,
         revealedMessageId,
+        semanticWorkStream,
       })
     : null;
   const activeFindRunId =
@@ -691,6 +696,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
         runlessWorkActive,
         toolCallVisibility,
         revealedMessageId,
+        semanticWorkStream,
       })
     ).get(citedEntry.id);
     setCitationExpandedFor(citationRequest.key);
@@ -751,6 +757,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     worktreeSetup,
     toolCallVisibility,
     revealedMessageId,
+    semanticWorkStream,
   });
   const rows = useStableRows(rawRows, listIdentityKey);
   const matchedApprovalRequestIds = new Set<string>();

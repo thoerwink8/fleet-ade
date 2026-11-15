@@ -86,7 +86,7 @@ describe("turnDetail", () => {
     entries: ReadonlyArray<TimelineEntry>;
     activity: string | null;
   }>([
-    { name: "a running command", entries: [prompt, command("git")], activity: "Running git" },
+    { name: "a running command", entries: [prompt, command("git")], activity: "正在运行 git" },
     {
       name: "reasoning, without its text",
       entries: [
@@ -103,7 +103,7 @@ describe("turnDetail", () => {
     {
       name: "the step under a request and a notice",
       entries: [prompt, command("git"), work("ask", { itemType: "approval_request" }), notice],
-      activity: "Running git",
+      activity: "正在运行 git",
     },
     {
       name: "nothing for a failed step",

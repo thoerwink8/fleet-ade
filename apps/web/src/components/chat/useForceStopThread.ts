@@ -51,7 +51,7 @@ export function useForceStopThread(environmentId: EnvironmentId) {
       toastManager.add({
         type: "info",
         title: "这一轮已停止，但智能体进程仍在运行",
-        description: `It is shared with ${others === 0 ? "other" : others} working ${others === 1 ? "thread" : "threads"}. Stop those to free it.`,
+        description: `该进程正由另外 ${others === 0 ? "其他" : `${others} 个`}运行中的会话共用，停止那些会话即可释放。`,
       });
     }
   };

@@ -211,11 +211,11 @@ function QuitStep({
 function cookieCountLabel(count: number | undefined): string | undefined {
   if (count === undefined) return undefined;
   if (count === 0) return "没有 Cookie";
-  return `${count.toLocaleString("zh-CN")} ${count === 1 ? "cookie" : "cookies"}`;
+  return `${count.toLocaleString("zh-CN")} 个 Cookie`;
 }
 
 function cookieResultCount(count: number): string {
-  return `${count.toLocaleString("zh-CN")} ${count === 1 ? "cookie" : "cookies"}`;
+  return `${count.toLocaleString("zh-CN")} 个 Cookie`;
 }
 
 type ConfigureStepProps = {
@@ -518,14 +518,14 @@ function DoneStep({
       <DialogHeader>
         <DialogTitle>
           {imported > 0
-            ? `Imported ${cookieResultCount(imported)}`
+            ? `已导入 ${cookieResultCount(imported)}`
             : skipped > 0
-              ? `Skipped ${cookieResultCount(skipped)}`
+              ? `已跳过 ${cookieResultCount(skipped)}`
               : "未找到 Cookie"}
         </DialogTitle>
         <DialogDescription>
           {imported > 0
-            ? `Added to ${targetName} for ${destinationEnvironmentName}.${skipped > 0 ? ` ${cookieResultCount(skipped)} skipped.` : ""}`
+            ? `已添加到 ${destinationEnvironmentName} 的 ${targetName}。${skipped > 0 ? `已跳过 ${cookieResultCount(skipped)}。` : ""}`
             : skipped > 0
               ? `未为 ${destinationEnvironmentName} 导入任何 Cookie。`
               : `没有可为 ${destinationEnvironmentName} 导入的 Cookie。`}

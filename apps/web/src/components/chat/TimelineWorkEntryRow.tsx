@@ -15,6 +15,7 @@ import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { Link } from "@tanstack/react-router";
 import { notificationChildThreadId } from "@t3tools/client-runtime/state/thread-execution";
 import {
+  liveThoughtLine,
   resolveViewedImageAsset,
   toolGroupAction,
   workEntryViewedImagePath,
@@ -32,9 +33,15 @@ import {
 } from "../../session-logic";
 import ChatMarkdown from "../ChatMarkdown";
 import { ChatMarkdownAssetImage } from "./ChatMarkdownMedia";
-import { ChevronRightIcon, CircleAlertIcon, XIcon, RotateCcwIcon } from "lucide-react";
+import {
+  ChevronRightIcon,
+  CircleAlertIcon,
+  ImageOffIcon,
+  XIcon,
+  RotateCcwIcon,
+} from "lucide-react";
 import { Button, InlineButton } from "../ui/button";
-import { useAssetUrls } from "../../assets/assetUrls";
+import { useAssetUrls, useAssetUrlState } from "../../assets/assetUrls";
 import { useThreadShell } from "../../state/entities";
 import {
   threadReadLabelPrefix,
@@ -65,9 +72,7 @@ import {
   workEntryRawCommand,
   buildToolCallExpandedBody,
   workEntryIconName,
-  THINKING_PREVIEW_PLUGINS,
-  THOUGHT_PREVIEW_PLUGINS,
-  THOUGHT_PREVIEW_SOURCE_MAX_LENGTH,
+  estimateReasoningTokenLabel,
 } from "./TimelineWorkEntryRow.logic";
 
 export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: EnvironmentId) {
@@ -125,21 +130,23 @@ export function ReasoningTraceContent({ entries }: { entries: ReadonlyArray<Time
     isWorking && entry.runId === latestRunId && entry.toolLifecycleStatus === "inProgress";
   return (
     <WorkLogDetails followLive={entries.some(isStreaming)}>
-      {entries.map((entry) => (
-        <ChatMarkdown
-          key={entry.id}
-          className="text-foreground"
-          text={entry.detail ?? ""}
-          cwd={ctx.markdownCwd}
-          threadRef={ctx.threadRef ?? undefined}
-          skills={ctx.skills}
-          isStreaming={isStreaming(entry)}
-          headingLevelOffset={MESSAGE_HEADING_LEVEL}
-          onUseArtifactTemplate={ctx.onUseArtifactTemplate}
-          onImageExpand={ctx.onImageExpand}
-          lineBreaks
-        />
-      ))}
+      <div className="border-l-2 border-border/70 pl-3.5 py-0.5 flex flex-col gap-2.5">
+        {entries.map((entry) => (
+          <ChatMarkdown
+            key={entry.id}
+            className="text-foreground/90"
+            text={entry.detail ?? ""}
+            cwd={ctx.markdownCwd}
+            threadRef={ctx.threadRef ?? undefined}
+            skills={ctx.skills}
+            isStreaming={isStreaming(entry)}
+            headingLevelOffset={MESSAGE_HEADING_LEVEL}
+            onUseArtifactTemplate={ctx.onUseArtifactTemplate}
+            onImageExpand={ctx.onImageExpand}
+            lineBreaks
+          />
+        ))}
+      </div>
     </WorkLogDetails>
   );
 }
@@ -174,6 +181,93 @@ export const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: WorkEn
   );
 });
 
+function ViewedImageThumbnail({
+  path,
+  environmentId,
+  threadId,
+  workspaceRoot,
+  onImageExpand,
+}: {
+  path: string;
+  environmentId: EnvironmentId;
+  threadId: ThreadId;
+  workspaceRoot: string | undefined;
+  onImageExpand: (typeof TimelineRowCtx extends import("react").Context<infer T>
+    ? T
+    : never)["onImageExpand"];
+}) {
+  const image = resolveViewedImageAsset(path, { threadId, workspaceRoot });
+  const assetState = useAssetUrlState(environmentId, image?.resource ?? null);
+  const [imgFailed, setImgFailed] = useState(false);
+  const fileName = path.split(/[\\/]/).at(-1) || path;
+  const src =
+    image !== null && assetState._tag === "Success"
+      ? `${assetState.url}${image.srcFragment}`
+      : null;
+  const unavailable = image === null || assetState._tag === "Failure" || imgFailed;
+
+  if (unavailable) {
+    return (
+      <div
+        role="img"
+        aria-label={`${fileName}（图片不可用）`}
+        className="flex h-16 w-[88px] shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/35 text-muted-foreground/65"
+      >
+        <ImageOffIcon aria-hidden className="size-4" />
+      </div>
+    );
+  }
+
+  if (src === null) {
+    return (
+      <div
+        role="status"
+        aria-label="正在加载图片"
+        className="h-16 w-[88px] shrink-0 animate-pulse rounded-lg border border-border/50 bg-muted/25"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={`预览 ${fileName}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        const gallery = event.currentTarget.closest("[data-image-gallery]");
+        const galleryImages = gallery
+          ? Array.from(gallery.querySelectorAll<HTMLImageElement>("img[data-gallery-name]"))
+          : [];
+        const clickedImage = event.currentTarget.querySelector("img");
+        const images =
+          galleryImages.length > 0
+            ? galleryImages.map((el) => ({
+                src: el.getAttribute("src") || el.src,
+                name: el.dataset.galleryName || el.alt,
+              }))
+            : [{ src, name: image?.alt || fileName }];
+        const index = clickedImage ? Math.max(0, galleryImages.indexOf(clickedImage)) : 0;
+        onImageExpand?.({
+          images,
+          index,
+        });
+      }}
+      className="group/thumb relative h-16 w-[88px] shrink-0 cursor-zoom-in overflow-hidden rounded-lg border border-border/60 bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+    >
+      <img
+        src={src}
+        alt={image?.alt || fileName}
+        data-gallery-name={image?.alt || fileName}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        onError={() => setImgFailed(true)}
+        className="size-full object-cover transition-transform duration-150 group-hover/thumb:scale-[1.03]"
+      />
+    </button>
+  );
+}
+
 export function ViewedImagesTimelineRow({
   row,
 }: {
@@ -182,25 +276,17 @@ export function ViewedImagesTimelineRow({
   const { threadRef, workspaceRoot, onImageExpand } = use(TimelineRowCtx);
   if (!threadRef) return null;
   return (
-    <div className="flex flex-wrap items-start gap-2 px-0.5" data-image-gallery>
-      {row.paths.map((path) => {
-        const image = resolveViewedImageAsset(path, {
-          threadId: threadRef.threadId,
-          workspaceRoot,
-        });
-        return image ? (
-          <ChatMarkdownAssetImage
-            key={path}
-            environmentId={threadRef.environmentId}
-            resource={image.resource}
-            alt={image.alt}
-            srcFragment={image.srcFragment}
-            workspaceRoot={workspaceRoot}
-            maxHeightRem={10}
-            onImageExpand={onImageExpand}
-          />
-        ) : null;
-      })}
+    <div className="ms-7 flex flex-wrap items-center gap-2 py-0.5" data-image-gallery>
+      {row.paths.map((path) => (
+        <ViewedImageThumbnail
+          key={path}
+          path={path}
+          environmentId={threadRef.environmentId}
+          threadId={threadRef.threadId}
+          workspaceRoot={workspaceRoot}
+          onImageExpand={onImageExpand}
+        />
+      ))}
     </div>
   );
 }
@@ -254,7 +340,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? `${formatUpcomingTimestamp(resetAt, timestampFormat, undefined, timeZone)} (${timeZone})`
       : null;
     const label = warning
-      ? `Usage limit reached.${resetTime ? ` Retry after ${resetTime}.` : ""}`
+      ? `已达到用量上限。${resetTime ? `请在 ${resetTime} 后重试。` : ""}`
       : workEntry.label;
     const retryRunId =
       failureItem.runId !== null &&
@@ -323,15 +409,16 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? undefined
       : (workEntry.toolIcon ?? workEntry.toolSource?.icon);
   const isReasoning = workEntry.itemType === "reasoning";
+  const isCommandEntry = !isReasoning && toolGroupAction(workEntry) === "command";
+  const reasoningSummaryLine = isReasoning ? liveThoughtLine(workEntry.detail ?? "") : "";
+  const reasoningTokenLabel = isReasoning ? estimateReasoningTokenLabel(workEntry.detail) : null;
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
     : "";
-  const previewText =
-    isReasoning && expanded
-      ? workEntry.toolLifecycleStatus === "inProgress"
-        ? "正在思考"
-        : "已思考"
-      : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
+  const previewText = isReasoning
+    ? reasoningSummaryLine ||
+      (workEntry.toolLifecycleStatus === "inProgress" ? "正在思考" : "已思考")
+    : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)
@@ -456,25 +543,17 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       }
       label={
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
+          <p className="flex min-w-0 w-full items-center gap-1.5 text-sm leading-relaxed">
             <span
-              className={cn(answerPreview ? "min-w-0" : "min-w-0 flex-1", "truncate", headingClass)}
+              className={cn(
+                answerPreview || reasoningTokenLabel ? "min-w-0" : "min-w-0 flex-1",
+                "truncate",
+                headingClass,
+                isCommandEntry && "chat-command-text font-mono",
+              )}
             >
-              {isReasoning && !expanded ? (
-                <ChatMarkdown
-                  inline
-                  text={(workEntry.detail ?? previewText).slice(
-                    0,
-                    THOUGHT_PREVIEW_SOURCE_MAX_LENGTH,
-                  )}
-                  cwd={ctx.markdownCwd}
-                  parseRawHtml={false}
-                  extraRemarkPlugins={
-                    workEntry.toolLifecycleStatus === "inProgress"
-                      ? THINKING_PREVIEW_PLUGINS
-                      : THOUGHT_PREVIEW_PLUGINS
-                  }
-                />
+              {isReasoning ? (
+                previewText
               ) : threadLabel ? (
                 <ThreadReadLabel
                   label={threadLabel}
@@ -485,6 +564,20 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
                 previewText
               )}
             </span>
+            {reasoningTokenLabel ? (
+              <span className="shrink-0 font-mono text-xs text-muted-foreground/75 tabular-nums">
+                {reasoningTokenLabel}
+              </span>
+            ) : null}
+            {canExpandProjectedItem ? (
+              <ChevronRightIcon
+                aria-hidden
+                className={cn(
+                  "size-3.5 shrink-0 text-icon-muted opacity-75 transition-transform duration-150",
+                  expanded && "rotate-90",
+                )}
+              />
+            ) : null}
             {answerPreview ? (
               <span
                 className={cn(
@@ -534,16 +627,6 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           !showDestructiveRowStyle &&
           !toolIconAcceptsTint(entryToolIcon) ? (
             <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
-          ) : null}
-          {canExpandProjectedItem ? (
-            <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
-              <ChevronRightIcon
-                className={cn(
-                  "size-3 shrink-0 text-icon-muted opacity-70 transition-transform duration-200",
-                  expanded && "rotate-90",
-                )}
-              />
-            </span>
           ) : null}
           <TimelineRowTimestamp createdAt={workEntry.createdAt} timestampFormat={timestampFormat} />
         </>

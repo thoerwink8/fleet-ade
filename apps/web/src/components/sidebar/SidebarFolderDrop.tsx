@@ -71,8 +71,8 @@ export function SidebarFolderDrop(props: { children: ReactNode }) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: `Could not add "${folder.name}"`,
-          description: response?.message ?? "T3 Code could not read the folder's path.",
+          title: `无法添加“${folder.name}”`,
+          description: response?.message ?? "无法读取该文件夹的路径。",
         }),
       );
     }

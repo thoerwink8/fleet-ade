@@ -328,9 +328,9 @@ const sidebarProviderEntriesAtom = Atom.make((get) => {
 const EMPTY_PROVIDER_ENTRIES: ReadonlyMap<string, SidebarProviderEntry> = new Map();
 const EMPTY_THREADS: readonly EnvironmentThreadShell[] = [];
 
-const SETTLED_TAIL_INITIAL_COUNT = 10;
+const SETTLED_TAIL_INITIAL_COUNT = 15;
 const SETTLED_TAIL_PAGE_COUNT = 25;
-const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
+const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:recent-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
 
@@ -452,7 +452,7 @@ function useSidebarThreads(input: {
   const snoozeWakeClock = useSnoozeWakeClock(threads);
   const [settledShelfExpanded, setSettledShelfExpanded] = useLocalStorage(
     SETTLED_SHELF_EXPANDED_KEY,
-    false,
+    true,
     Schema.Boolean,
   );
   const [snoozedShelfExpanded, setSnoozedShelfExpanded] = useLocalStorage(
@@ -2446,7 +2446,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 type: "error",
                 title:
                   snoozedThreadRefs.length > 0
-                    ? `Failed to snooze ${failures.length} thread${failures.length === 1 ? "" : "s"}`
+                    ? `暂缓 ${failures.length} 个会话失败`
                     : "暂缓会话失败",
                 description: firstError instanceof Error ? firstError.message : "发生错误。",
               }),
@@ -3285,7 +3285,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             workingThreads.length +
             snoozedThreads.length ===
             0 &&
-          (settledCount === 0 || scopedProjectGroups.length > 0) ? (
+          (settledCount === 0 || (scopedProjectGroups.length > 0 && !settledShelfExpanded)) ? (
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
@@ -3302,11 +3302,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               ) : scopedProjectGroups.length > 0 ? (
                 <>
                   <span>
-                    {`No ${settledCount > 0 ? "active threads" : "threads"} in ${
+                    {`${
                       scopedProjectGroups.length > 1
-                        ? "these projects"
+                        ? "所选项目"
                         : scopedProjectGroups[0]!.displayName
-                    }${settledCount > 0 ? "" : " yet"}`}
+                    }中暂无${settledCount > 0 ? "进行中的会话" : "会话"}`}
                   </span>
                   <button
                     type="button"
@@ -3364,7 +3364,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           scopeThreadRef(thread.environmentId, thread.id),
                         );
                         const isCard =
-                          section === "active" || section === "pinned" || section === "working";
+                          section === "active" ||
+                          section === "pinned" ||
+                          section === "working" ||
+                          section === "settled";
                         const rowVariant = folderRow
                           ? folderRowsMultiline
                             ? "folder-multiline"
@@ -3593,10 +3596,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionHeader
                                 key="settled-shelf-header"
                                 marker="settled-header"
-                                className={cn(
-                                  workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
-                                )}
-                                label="已收尾"
+                                label="最近"
                                 count={settledCount}
                                 dragging={from !== null}
                                 isDropTarget={dragTargetSection === "settled"}
@@ -3612,7 +3612,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="settled-placeholder"
                                 marker="settled-placeholder"
-                                label="已收尾"
+                                label="最近"
                                 showHint={
                                   from !== null &&
                                   (renderedSettledThreads.length === 0 ||
@@ -3646,7 +3646,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           {/* Plus means "add", so revealing more uses a chevron. */}
                           <ChevronDownIcon aria-hidden className="size-4 shrink-0" />
                           {olderSettledShelf.loading
-                            ? "Loading"
+                            ? "正在加载…"
                             : olderSettledShelf.failed
                               ? "无法加载更早的会话，点击重试"
                               : `再显示 ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)} 个`}

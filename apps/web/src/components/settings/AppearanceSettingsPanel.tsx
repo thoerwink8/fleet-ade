@@ -38,15 +38,15 @@ import { TypographySection } from "./TypographySettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 
 const ENVIRONMENT_IDENTIFICATION_LABELS: Record<EnvironmentIdentificationMode, string> = {
-  artwork: "Artwork",
+  artwork: "背景图",
   "nightly-artwork": "Nightly 背景图",
   "dev-artwork": "开发版背景图",
   pill: "版本标签",
-  none: "None",
+  none: "无",
 };
 
 // The default "artwork" follows the running channel, so it is labeled as that channel's art,
-// or as "None" on Latest. The other channel's art is offered as a fixed choice.
+// or as "无" on Latest. The other channel's art is offered as a fixed choice.
 function environmentIdentificationOptions(
   stageVariant: SidebarStageBackdropVariant | null,
 ): ReadonlyArray<readonly [EnvironmentIdentificationMode, string]> {
@@ -55,7 +55,7 @@ function environmentIdentificationOptions(
       ["artwork", "开发版背景图"],
       ["nightly-artwork", "Nightly 背景图"],
       ["pill", "版本标签"],
-      ["none", "None"],
+      ["none", "无"],
     ];
   }
   if (stageVariant === "nightly") {
@@ -63,25 +63,25 @@ function environmentIdentificationOptions(
       ["artwork", "Nightly 背景图"],
       ["dev-artwork", "开发版背景图"],
       ["pill", "版本标签"],
-      ["none", "None"],
+      ["none", "无"],
     ];
   }
   return [
-    ["artwork", "None"],
+    ["artwork", "无"],
     ["nightly-artwork", "Nightly 背景图"],
     ["dev-artwork", "开发版背景图"],
   ];
 }
 
 const CHAT_WIDTH_LABELS: Record<ChatWidth, string> = {
-  comfortable: "Comfortable",
-  wide: "Wide",
-  full: "Full",
+  comfortable: "舒适",
+  wide: "加宽",
+  full: "铺满",
 };
 
 const EFFORT_DISPLAY_LABELS: Record<EffortDisplay, string> = {
   label: "文字",
-  bars: "Bars",
+  bars: "刻度条",
 };
 
 export function AppearanceSettingsPanel() {

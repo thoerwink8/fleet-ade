@@ -284,8 +284,8 @@ describe("CursorAdapterV2", () => {
           }
         }
         assert.deepEqual(Object.fromEntries(finalReads), {
-          "Read secret.txt": { status: unfinished, output: undefined, done: true },
-          "Read open.txt": {
+          "读取 secret.txt": { status: unfinished, output: undefined, done: true },
+          "读取 open.txt": {
             status: "completed",
             output: { fileSize: 3, content: "ok\n", totalLines: 1 },
             done: true,
@@ -1386,7 +1386,7 @@ describe("CursorAdapterV2", () => {
       );
       assert.deepEqual(
         readItems.map((item) => ({ title: item.title, input: item.input })),
-        [{ title: "Read src/env.ts", input: { path: "src/env.ts" } }],
+        [{ title: "读取 src/env.ts", input: { path: "src/env.ts" } }],
       );
       assert.deepEqual(
         fileSearchItems.map((item) => ({

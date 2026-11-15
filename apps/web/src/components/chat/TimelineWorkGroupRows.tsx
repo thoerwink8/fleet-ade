@@ -11,7 +11,7 @@ import { memo, use, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { workEntryDisplayIndicatesToolFailure } from "../../session-logic";
 import ChatMarkdown from "../ChatMarkdown";
-import { Minimize2Icon, XIcon } from "lucide-react";
+import { ChevronRightIcon, Minimize2Icon, XIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { getVirtualizedScrollFadeClassName } from "../ui/scroll-area";
 import {
@@ -571,7 +571,7 @@ export function LiveWorkEntryTimelineRow({
       )}
       aria-label={
         failed
-          ? `${thoughtLine ? `${thoughtLine} ` : ""}${threadLabel?.text ?? label}, tool call failed`
+          ? `${thoughtLine ? `${thoughtLine} ` : ""}${threadLabel?.text ?? label}，工具调用失败`
           : undefined
       }
       aria-expanded={row.expanded}
@@ -580,12 +580,12 @@ export function LiveWorkEntryTimelineRow({
       {thoughtLine ? (
         <WorkLogRow
           icon={
-            <span className="flex size-4 items-center justify-center text-icon-muted">
+            <span className="flex size-4 items-center justify-center text-primary/75">
               <ToolActivityIconView
                 icon={undefined}
                 fallbackName="brain"
-                className="block size-4 shrink-0 stroke-2"
-                muted
+                className="block size-3.5 shrink-0 stroke-2"
+                muted={false}
               />
             </span>
           }
@@ -681,7 +681,18 @@ function WorkGroupHeader(props: {
           muted
         />
       }
-      label={<span className="block truncate">{props.label}</span>}
+      label={
+        <span className="inline-flex max-w-full min-w-0 items-center gap-1">
+          <span className="truncate">{props.label}</span>
+          <ChevronRightIcon
+            aria-hidden
+            className={cn(
+              "size-3.5 shrink-0 text-icon-muted opacity-75 transition-transform duration-150",
+              props.expanded && "rotate-90",
+            )}
+          />
+        </span>
+      }
       trailing={
         <TimelineRowTimestamp createdAt={props.createdAt} timestampFormat={props.timestampFormat} />
       }

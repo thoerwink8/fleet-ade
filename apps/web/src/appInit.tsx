@@ -9,7 +9,15 @@ import { createBrowserHistory, createHashHistory } from "@tanstack/react-router"
 import * as Schema from "effect/Schema";
 
 import { applyAppearanceContrast } from "./appearanceContrast";
-import { applyAppearanceFontVariables, TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "./appearanceFonts";
+import {
+  applyAppearanceFontVariables,
+  CHAT_READING_SIZE_REM,
+  CHAT_READING_SIZE_STORAGE_KEY,
+  ChatReadingSizeSchema,
+  DEFAULT_CHAT_READING_SIZE,
+  type ChatReadingSize,
+  TYPOGRAPHY_ADVANCED_STORAGE_KEY,
+} from "./appearanceFonts";
 import { startElectronBrowserHost } from "./browser/ElectronBrowserHost";
 import { startBrowserProfileReporting } from "./browser/BrowserProfileReporter";
 import { startPreviewTitleRecording } from "./browserHistoryStore";
@@ -69,6 +77,7 @@ function startClientAppearance(): void {
   const root = document.documentElement;
   let applied: ClientSettings | null = null;
   let appliedSeparateFonts: boolean | null = null;
+  let appliedReadingSize: ChatReadingSize | null = null;
   const apply = () => {
     const settings = getClientSettings();
     const previous = applied;
@@ -80,6 +89,15 @@ function startClientAppearance(): void {
     );
     const previousSeparateFonts = appliedSeparateFonts;
     appliedSeparateFonts = separateFonts;
+    const readingSize = readLocalStorageValue(
+      CHAT_READING_SIZE_STORAGE_KEY,
+      DEFAULT_CHAT_READING_SIZE,
+      ChatReadingSizeSchema,
+    );
+    if (appliedReadingSize !== readingSize) {
+      appliedReadingSize = readingSize;
+      root.style.setProperty("--font-size-prose", CHAT_READING_SIZE_REM[readingSize]);
+    }
     if (previous?.diffColorScheme !== settings.diffColorScheme) {
       root.dataset.diffColorScheme = settings.diffColorScheme;
     }
@@ -121,6 +139,7 @@ function startClientAppearance(): void {
   };
   subscribeClientSettings(apply);
   subscribeLocalStorageKey(TYPOGRAPHY_ADVANCED_STORAGE_KEY, apply);
+  subscribeLocalStorageKey(CHAT_READING_SIZE_STORAGE_KEY, apply);
   apply();
 }
 

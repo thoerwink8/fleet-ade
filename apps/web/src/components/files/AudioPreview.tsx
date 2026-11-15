@@ -148,7 +148,7 @@ function AudioChip(props: AudioPreviewProps) {
             type="button"
             className="block max-w-full cursor-pointer truncate rounded-sm text-left focus-visible:outline-2 focus-visible:outline-foreground"
             onClick={open}
-            aria-label={`${props.failed && !props.onOpen ? "Retry" : "Preview"} ${props.name}`}
+            aria-label={`${props.failed && !props.onOpen ? "重试" : "预览"} ${props.name}`}
           >
             {middleTruncateAttachmentName(props.name)}
           </button>

@@ -658,14 +658,12 @@ function ConnectionsSettingsContent({
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       const message =
-        error instanceof Error
-          ? error.message
-          : `Failed to switch the backend ${enabled ? "on" : "off"}.`;
+        error instanceof Error ? error.message : `无法${enabled ? "开启" : "关闭"}后端。`;
       setSavedBackendError(message);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: `Could not switch backend ${enabled ? "on" : "off"}`,
+          title: `无法${enabled ? "开启" : "关闭"}后端`,
           description: message,
         }),
       );

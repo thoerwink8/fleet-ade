@@ -158,7 +158,7 @@ function MicrophoneRow(props: {
             type="button"
             size="icon-xs"
             variant="ghost-muted"
-            aria-label={`Forget ${name}`}
+            aria-label={`移除 ${name}`}
             onClick={props.onForget}
           >
             <XIcon />

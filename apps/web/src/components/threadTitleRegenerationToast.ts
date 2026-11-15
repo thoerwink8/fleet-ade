@@ -35,7 +35,7 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
       title:
         results.length === 1
           ? "重新生成会话标题失败"
-          : `Failed to regenerate ${failures.length} of ${results.length} thread titles`,
+          : `${results.length} 个会话中有 ${failures.length} 个标题重新生成失败`,
       description: failures[0],
     });
   }
@@ -50,10 +50,9 @@ export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationR
   }
   return stackedThreadToast({
     type: "info",
-    title: kept === results.length ? "Titles kept" : `Kept ${kept} of ${results.length} titles`,
+    title:
+      kept === results.length ? "已保留全部标题" : `已保留 ${results.length} 个中的 ${kept} 个标题`,
     description:
-      kept === results.length
-        ? "The current titles already fit these threads."
-        : "Those titles already fit their threads.",
+      kept === results.length ? "当前标题已经适合这些会话。" : "这些标题已经适合对应会话。",
   });
 }

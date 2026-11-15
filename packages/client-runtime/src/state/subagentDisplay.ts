@@ -17,11 +17,19 @@ export function subagentGroupSummary(
     ({ status }) => status === "pending" || status === "running" || status === "waiting",
   );
   return {
-    label: `${active ? "Kicked off" : "Ran"} ${members.length} ${members.length === 1 ? "subagent" : "subagents"}`,
+    label: `${active ? "启动了" : "运行了"} ${members.length} 个子代理`,
     active,
     failed: members.some(({ status }) => status === "failed"),
   };
 }
+
+const SUBAGENT_SUMMARY_LABELS = {
+  working: "运行中",
+  done: "已完成",
+  failed: "失败",
+  stopped: "已停止",
+  idle: "空闲",
+} as const;
 
 export function summarizeSubagentStatuses(
   statuses: ReadonlyArray<OrchestrationV2TurnItemStatus>,
@@ -36,7 +44,7 @@ export function summarizeSubagentStatuses(
   }
   return (Object.keys(counts) as Array<keyof typeof counts>)
     .filter((key) => counts[key] > 0)
-    .map((key) => `${counts[key]} ${key}`)
+    .map((key) => `${counts[key]} ${SUBAGENT_SUMMARY_LABELS[key]}`)
     .join(" · ");
 }
 

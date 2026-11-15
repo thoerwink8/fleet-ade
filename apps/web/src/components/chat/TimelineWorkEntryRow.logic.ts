@@ -5,6 +5,7 @@ import {
   toolGroupAction,
 } from "@t3tools/client-runtime/work-log/presentation";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
+import { formatTokens } from "@t3tools/shared/usageFormat";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { type TimelineWorkEntry, type TimelineRow } from "./timelineRowContext";
 import { type WorkEntryIconName } from "./TimelineToolActivityIcon";
@@ -21,9 +22,9 @@ export function toolGroupSummaryIconName(
     case "unwatch-pr":
       return "pull-request";
     case "read":
-      return "eye";
+      return "file-text";
     case "edit":
-      return "square-pen";
+      return "file-pen";
     case "command":
       return "terminal";
     case "thread-create":
@@ -37,9 +38,9 @@ export function toolGroupSummaryIconName(
     case "code-search":
       return "search";
     case "other":
-      return "wrench";
+      return "box";
     case "dynamic-tool":
-      return "hammer";
+      return "box";
     case "reasoning":
       return "brain";
     case "agent-tool":
@@ -65,7 +66,7 @@ export function workToneIcon(tone: TimelineWorkEntry["tone"]): {
   if (tone === "thinking") {
     return {
       iconName: "brain",
-      className: "text-icon-muted",
+      className: "text-primary/80",
     };
   }
   if (tone === "info") {
@@ -113,7 +114,7 @@ export function buildToolCallExpandedBody(
             "input" in workEntry.toolData
           ? workEntry.toolData.input
           : undefined;
-    if (input !== undefined) addBlock(`Tool input\n${JSON.stringify(input, null, 2)}`);
+    if (input !== undefined) addBlock(`工具输入\n${JSON.stringify(input, null, 2)}`);
   }
   const command = workEntry.command?.trim();
   const raw = workEntryRawCommand(workEntry);
@@ -167,6 +168,9 @@ export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconNa
         return "zap";
     }
   }
+  if (workEntry.itemType === "reasoning" || workEntry.tone === "thinking") {
+    return "brain";
+  }
   if (workEntry.itemType === "user_input_request" || workEntry.itemType === "approval_request") {
     return "message-circle";
   }
@@ -184,12 +188,22 @@ export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconNa
 
   switch (workEntry.itemType) {
     case "dynamic_tool":
-      return "wrench";
+      return "box";
     case "subagent":
       return "bot";
   }
 
   return workToneIcon(workEntry.tone).iconName;
+}
+
+export function estimateReasoningTokenLabel(detail: string | undefined): string | null {
+  const trimmed = detail?.trim();
+  if (!trimmed) return null;
+  const cjkMatches = trimmed.match(/[\u3400-\u9fff\uf900-\ufaff]/g);
+  const cjkCount = cjkMatches ? cjkMatches.length : 0;
+  const nonCjkCount = Math.max(0, trimmed.length - cjkCount);
+  const estimated = Math.max(1, Math.round(cjkCount * 0.7 + nonCjkCount / 4));
+  return `~${formatTokens(estimated)}`;
 }
 
 // Look past the visible label so long destinations and inline delimiters can close.
@@ -259,5 +273,5 @@ export function remarkThoughtPreview(fallback: string) {
   };
 }
 
-export const THOUGHT_PREVIEW_PLUGINS: PluggableList = [[remarkThoughtPreview, "Thought"]];
-export const THINKING_PREVIEW_PLUGINS: PluggableList = [[remarkThoughtPreview, "Thinking"]];
+export const THOUGHT_PREVIEW_PLUGINS: PluggableList = [[remarkThoughtPreview, "已思考"]];
+export const THINKING_PREVIEW_PLUGINS: PluggableList = [[remarkThoughtPreview, "正在思考"]];

@@ -340,7 +340,7 @@ describe("thread execution presentation", () => {
     };
     const starting = { ...v2Projection, runs: [openRun], providerSessions: [session] };
 
-    expect(deriveThreadActivityRun(starting)?.providerStartingLabel).toBe("Starting Claude");
+    expect(deriveThreadActivityRun(starting)?.providerStartingLabel).toBe("正在启动 Claude");
     expect(
       deriveThreadActivityRun({ ...starting, providerSessions: [] })?.providerStartingLabel,
     ).toBe("正在启动");

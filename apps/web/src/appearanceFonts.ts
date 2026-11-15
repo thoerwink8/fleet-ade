@@ -9,15 +9,25 @@ import {
   MIN_INTERFACE_FONT_SIZE,
   MIN_PROMPT_FONT_SIZE,
 } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 
 export const DEFAULT_SANS_FONT_STACK =
-  '-apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif';
+  '-apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif';
 
 // Some engines map `ui-monospace` to a proportional font, so prefer concrete names.
 export const DEFAULT_CODE_FONT_STACK =
   '"SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
 
 export const TYPOGRAPHY_ADVANCED_STORAGE_KEY = "t3code:typography-advanced";
+export const CHAT_READING_SIZE_STORAGE_KEY = "t3code:chat-reading-size";
+export const ChatReadingSizeSchema = Schema.Literals(["standard", "comfortable", "large"]);
+export type ChatReadingSize = typeof ChatReadingSizeSchema.Type;
+export const DEFAULT_CHAT_READING_SIZE: ChatReadingSize = "comfortable";
+export const CHAT_READING_SIZE_REM: Readonly<Record<ChatReadingSize, string>> = {
+  standard: "0.875rem",
+  comfortable: "0.9375rem",
+  large: "1rem",
+};
 
 export function resolveTerminalFontPreference(input: {
   readonly advanced: boolean;

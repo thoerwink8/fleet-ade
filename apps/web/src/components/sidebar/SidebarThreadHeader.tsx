@@ -57,9 +57,9 @@ export function SidebarThreadHeader({
     : "新建会话";
 
   return (
-    <div className="flex items-center gap-1">
-      <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-within:bg-sidebar-row-hover focus-within:text-sidebar-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70">
-        <SearchIcon className="size-4 shrink-0 text-(--sidebar-icon-color)" />
+    <div className="flex items-center gap-1.5">
+      <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border border-sidebar-border/80 bg-sidebar-control-surface/90 px-2.5 py-1.5 text-sm text-sidebar-foreground shadow-xs/30 transition-colors hover:border-sidebar-border hover:bg-sidebar-control-surface focus-within:border-ring/70 focus-within:bg-sidebar-control-surface focus-within:ring-2 focus-within:ring-inset focus-within:ring-ring/25">
+        <SearchIcon className="size-3.5 shrink-0 text-(--sidebar-icon-color)" />
         <SidebarInput
           ref={searchInputRef}
           nativeInput
@@ -67,7 +67,7 @@ export function SidebarThreadHeader({
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.currentTarget.value)}
           onKeyDown={onSearchKeyDown}
-          placeholder="搜索"
+          placeholder="搜索会话"
           aria-label="搜索会话"
           role="combobox"
           aria-autocomplete="list"

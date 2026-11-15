@@ -228,8 +228,8 @@ export function usePullRequestCloseBatch(
       type: failures.length > 0 ? "error" : "success",
       title:
         failures.length > 0
-          ? `已关闭 ${closed} 个 pull request 中的 ${batch.length} 个`
-          : `Closed ${closed} pull request${closed === 1 ? "" : "s"}`,
+          ? `已关闭 ${batch.length} 个 pull request 中的 ${closed} 个`
+          : `已关闭 ${closed} 个 pull request`,
       ...(failures.length > 0 ? { description: failures.slice(0, 3).join("\n") } : {}),
     });
   };

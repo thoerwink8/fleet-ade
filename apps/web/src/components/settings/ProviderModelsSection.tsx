@@ -502,9 +502,7 @@ function ProviderModelRow({
               variant="ghost-muted"
               disabled={!canWritePreferences}
               onClick={() => onToggleFavorite(model.slug)}
-              aria-label={`${isFavorite ? "Remove" : "Add"} ${model.name} ${
-                isFavorite ? "from" : "to"
-              } favorites`}
+              aria-label={isFavorite ? `将 ${model.name} 移出收藏` : `将 ${model.name} 添加到收藏`}
             />
           }
         >

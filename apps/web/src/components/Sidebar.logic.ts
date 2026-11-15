@@ -753,12 +753,15 @@ const threadJumpModifierHold = createModifierHoldStore(THREAD_JUMP_HINT_SHOW_DEL
 
 function subscribeToThreadJumpHintInputs(listener: () => void): () => void {
   const unsubscribeHold = threadJumpModifierHold.subscribe(listener);
+  // The snapshot reads the modifiers too; a hold that stays true across a new combination never notifies.
+  const unsubscribeModifiers = shortcutModifierStore.subscribe(listener);
   const unsubscribeFocus = subscribeToTerminalFocusChanges(listener);
   const unsubscribeTerminals = useTerminalUiStateStore.subscribe(listener);
   const unsubscribeRightPanels = useRightPanelStore.subscribe(listener);
   const unsubscribeModelPicker = subscribeToModelPickerVisibility(listener);
   return () => {
     unsubscribeHold();
+    unsubscribeModifiers();
     unsubscribeFocus();
     unsubscribeTerminals();
     unsubscribeRightPanels();

@@ -467,7 +467,7 @@ export function UsageProviderChart({
           loadingProviders={loadingProviders}
           format={format}
           formatTooltipPeriod={formatTooltipPeriod}
-          ariaLabel={`${resolution === "hour" ? "Hourly" : "Daily"} ${metric === "tokens" ? "processed tokens" : "cost"} by provider`}
+          ariaLabel={`各提供商${resolution === "hour" ? "每小时" : "每日"}${metric === "tokens" ? "处理的 Token 数" : "费用"}`}
         >
           {scale.ticks.map((tick) => {
             const y = toY(tick);

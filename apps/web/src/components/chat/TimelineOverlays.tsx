@@ -1,4 +1,4 @@
-import { ChevronDownIcon, PaperclipIcon } from "lucide-react";
+import { ArrowDownIcon, PaperclipIcon } from "lucide-react";
 
 import { Button } from "../ui/button";
 
@@ -28,6 +28,7 @@ export function ScrollToEndButton(props: {
   readonly summary: string | null;
   readonly onScrollToEnd: () => void;
 }) {
+  const accessibleLabel = props.summary === null ? "滚动到底部" : `滚动到底部 · ${props.summary}`;
   return (
     <div
       className="chat-scroll-to-bottom pointer-events-none absolute z-30 flex justify-center py-1.5"
@@ -35,20 +36,14 @@ export function ScrollToEndButton(props: {
     >
       <Button
         data-scroll-to-end="true"
+        aria-label={accessibleLabel}
         onPointerDown={(event) => event.preventDefault()}
         onClick={props.onScrollToEnd}
         className="pointer-events-auto"
-        size="xs"
+        size="icon"
         variant="glass"
       >
-        <ChevronDownIcon className="size-3.5" />
-        滚动到底部
-        {props.summary === null ? null : (
-          <span className="text-muted-foreground">
-            <span aria-hidden>· </span>
-            {props.summary}
-          </span>
-        )}
+        <ArrowDownIcon className="size-4" />
       </Button>
     </div>
   );

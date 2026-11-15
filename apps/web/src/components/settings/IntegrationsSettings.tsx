@@ -445,8 +445,8 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
                       size="icon-sm"
                       variant="ghost-muted"
                       disabled={disabled}
-                      aria-label={`Rotate to ${
-                        presentedSize.height >= presentedSize.width ? "landscape" : "portrait"
+                      aria-label={`旋转为${
+                        presentedSize.height >= presentedSize.width ? "横屏" : "竖屏"
                       }`}
                       onClick={() =>
                         updateSettings({ browserDefaultViewport: rotateViewport(sized) })

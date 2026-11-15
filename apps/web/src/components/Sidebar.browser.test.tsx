@@ -340,10 +340,10 @@ describe("sidebar settled pagination", () => {
     moreButton.focus({ preventScroll: true });
     await act(() => moreButton.click());
     await expect
-      .element(screen.getByRole("button", { name: "Loading", exact: true }))
+      .element(screen.getByRole("button", { name: "正在加载…", exact: true }))
       .toBeInTheDocument();
     await expect
-      .element(screen.getByRole("button", { name: "Loading", exact: true }))
+      .element(screen.getByRole("button", { name: "正在加载…", exact: true }))
       .toHaveFocus();
     expect(viewport.scrollTop).toBe(before);
     const loadedRows = screen.container.querySelectorAll("[data-thread-item]").length;

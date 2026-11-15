@@ -658,7 +658,7 @@ export function useComposerStash(input: {
         toastManager.add({
           type: "warning",
           title: "暂存的图片未能附加",
-          description: `That prompt was restored or deleted before ${kept.length} image${kept.length === 1 ? "" : "s"} finished saving. Re-attach ${kept.length === 1 ? "it" : "them"} if you still need ${kept.length === 1 ? "it" : "them"}.`,
+          description: `在 ${kept.length} 张图片保存完成前，该提示词已被恢复或删除。如仍需要，请重新附加。`,
           data: { hideCopyButton: true },
         });
       }

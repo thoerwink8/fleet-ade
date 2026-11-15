@@ -226,7 +226,7 @@ export function PullRequestPrimaryAction({
             }
           />
           <TooltipPopup side="top">
-            {armedAutoMergeLabel}: the host will merge this on its own once its requirements are met
+            {armedAutoMergeLabel}：满足条件后将由托管平台自动合并
           </TooltipPopup>
         </Tooltip>
       ) : null}
@@ -320,7 +320,7 @@ export function PullRequestPrimaryAction({
             }
           />
           <TooltipPopup side="top">
-            {armedAutoMergeLabel}: the host will merge this on its own once its requirements are met
+            {armedAutoMergeLabel}：满足条件后将由托管平台自动合并
           </TooltipPopup>
         </Tooltip>
       ) : primaryAction === "merge" ? (

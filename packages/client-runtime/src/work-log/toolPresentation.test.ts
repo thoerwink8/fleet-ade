@@ -11,7 +11,7 @@ describe("extractToolActivityPresentation", () => {
     };
     expect(extractToolActivityPresentation(item)).toEqual({
       toolSurface: "computer",
-      toolSource: { key: "computer-use", name: "Computer Use", kind: "computer" },
+      toolSource: { key: "computer-use", name: "电脑操控", kind: "computer" },
     });
     expect(extractToolActivityPresentation({ ...item, toolSurface: "browser" })).toEqual({
       toolSurface: "browser",
@@ -36,7 +36,7 @@ describe("extractToolActivityPresentation", () => {
     };
     expect(extractToolActivityPresentation(item)).toEqual({
       toolSurface: "computer",
-      toolSource: { key: "computer-use", name: "Computer Use", kind: "computer" },
+      toolSource: { key: "computer-use", name: "电脑操控", kind: "computer" },
     });
     expect(
       extractToolActivityPresentation({

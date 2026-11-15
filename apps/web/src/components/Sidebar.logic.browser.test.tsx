@@ -81,6 +81,24 @@ describe("useThreadJumpHintsVisible", () => {
     await userEvent.keyboard(`{/${modifier}}`);
   });
 
+  it("shows once the modifier goes down when its hold deadline has already passed", async () => {
+    let now = MOUNTED_AT_MS;
+    using _now = vi.spyOn(Date, "now").mockImplementation(() => (now += 1000));
+    const keybindings = compileResolvedKeybindingsConfig([
+      { key: "mod+1", command: "thread.jump.1" },
+    ]);
+    const modifier = isMacPlatform(navigator.platform) ? "Meta" : "Control";
+    await using screen = await render(<JumpHints keybindings={keybindings} />, {
+      // A bare hook host; nothing here links or navigates.
+      router: false,
+    });
+    const output = screen.getByRole("status");
+
+    await userEvent.keyboard(`{${modifier}>}`);
+    await expect.element(output).toHaveTextContent("shown");
+    await userEvent.keyboard(`{/${modifier}}`);
+  });
+
   it("follows terminal focus and the route thread's terminal while the modifier is held", async () => {
     using stack = new DisposableStack();
     const terminal = document.createElement("div");

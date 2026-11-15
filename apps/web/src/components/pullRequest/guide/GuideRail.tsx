@@ -95,7 +95,7 @@ function StopBullet({ number, seen }: { number: number; seen: boolean }) {
         seen ? "border-success/40 text-success-foreground" : "border-border text-muted-foreground",
       )}
     >
-      {seen ? <CheckIcon aria-label={`Stop ${number}, read`} className="size-3" /> : number}
+      {seen ? <CheckIcon aria-label={`第 ${number} 处，已读`} className="size-3" /> : number}
     </span>
   );
 }

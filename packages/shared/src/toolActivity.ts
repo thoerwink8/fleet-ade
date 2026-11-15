@@ -30,7 +30,7 @@ export function isJavaScriptReplTool(toolName: string | null | undefined): boole
 
 export const COMPUTER_USE_TOOL_SOURCE = {
   key: "computer-use",
-  name: "Computer Use",
+  name: "电脑操控",
   kind: "computer",
 } as const;
 
@@ -58,11 +58,11 @@ export function dynamicToolTitle(
     return (
       asTrimmedString(asRecord(input)?.title) ??
       meaningfulTitle ??
-      (dynamicToolSurface(toolName, input) === "computer" ? "Computer use" : "Run JavaScript")
+      (dynamicToolSurface(toolName, input) === "computer" ? "电脑操控" : "运行 JavaScript")
     );
   }
   const skill = claudeSkillInvocation(toolName, input);
-  return skill === undefined ? undefined : `Skill: ${skill.name}`;
+  return skill === undefined ? undefined : `技能：${skill.name}`;
 }
 
 function recordHasKeys(
@@ -310,6 +310,18 @@ export function classifyToolActivity(input: {
   if (toolName === "read" || toolName === "readfile") {
     return "read";
   }
+  if (
+    toolName === "write" ||
+    toolName === "writefile" ||
+    toolName === "edit" ||
+    toolName === "editfile" ||
+    toolName === "multiedit" ||
+    toolName === "applypatch" ||
+    toolName === "create" ||
+    toolName === "createfile"
+  ) {
+    return "file_change";
+  }
   return "other";
 }
 
@@ -372,30 +384,30 @@ export function formatSearchToolLabel(
   const glob = firstInputString(input, SEARCH_GLOB_KEYS);
   const target = searchTargetName(firstInputString(input, SEARCH_TARGET_KEYS));
   if (query && target) {
-    return `Searched ${query} in ${target}`;
+    return `在 ${target} 中搜索 ${query}`;
   }
   if (glob && target) {
-    return `Searched files ${glob} in ${target}`;
+    return `在 ${target} 中搜索文件 ${glob}`;
   }
   if (glob) {
-    return `Searched files ${glob}`;
+    return `搜索文件 ${glob}`;
   }
   if (query) {
-    return `Searched ${query}`;
+    return `搜索 ${query}`;
   }
   if (target) {
-    return `Searched in ${target}`;
+    return `在 ${target} 中搜索`;
   }
   return undefined;
 }
 
 export function formatReadToolLabel(path: string, extraCount = 0): string {
   const trimmed = path.trim();
-  const suffix = extraCount > 0 ? ` +${extraCount} more` : "";
+  const suffix = extraCount > 0 ? ` 等另外 ${extraCount} 个` : "";
   if (!trimmed) {
     return `已读取文件${suffix}`;
   }
-  return `Read ${trimmed}${suffix}`;
+  return `读取 ${trimmed}${suffix}`;
 }
 
 export interface ToolActivityPresentationInput {
@@ -416,7 +428,7 @@ export function deriveToolActivityPresentation(
 ): ToolActivityPresentation {
   const title = asTrimmedString(input.title);
   const detail = stripTrailingExitCode(asTrimmedString(input.detail));
-  const fallbackSummary = asTrimmedString(input.fallbackSummary) ?? "Tool";
+  const fallbackSummary = asTrimmedString(input.fallbackSummary) ?? "工具";
   const data = asRecord(input.data);
   const command = extractToolCommand(data, title);
   const primaryPath = extractPrimaryPath(data);
@@ -428,7 +440,7 @@ export function deriveToolActivityPresentation(
 
   if (action === "command") {
     return {
-      summary: "Ran command",
+      summary: "已运行命令",
       ...(command ? { detail: command } : {}),
     };
   }
@@ -446,7 +458,7 @@ export function deriveToolActivityPresentation(
 
   if (action === "file_change") {
     return {
-      summary: "Changed files",
+      summary: "已修改文件",
       ...(primaryPath ? { detail: primaryPath } : {}),
     };
   }
@@ -457,7 +469,7 @@ export function deriveToolActivityPresentation(
       return { summary: searchLabel };
     }
     return {
-      summary: "Searched files",
+      summary: "已搜索文件",
     };
   }
 

@@ -11,7 +11,7 @@ function formatElapsedSeconds(totalSeconds: number): string {
   }
   const hours = Math.floor(minutes / 60);
   if (hours === 0) {
-    return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+    return `${minutes} 分 ${String(seconds % 60).padStart(2, "0")} 秒`;
   }
   return `${hours} 小时 ${String(minutes % 60).padStart(2, "0")} 分钟`;
 }

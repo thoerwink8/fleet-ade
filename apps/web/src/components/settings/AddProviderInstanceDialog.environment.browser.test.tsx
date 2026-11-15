@@ -177,7 +177,7 @@ describe("AddProviderInstanceDialog environment routing", () => {
     await click("Use Kilo Code");
     await act(async () =>
       document
-        .querySelector<HTMLButtonElement>('button[aria-label="Add accent color for Kilo Code"]')!
+        .querySelector<HTMLButtonElement>('button[aria-label="添加 Kilo Code 的强调色"]')!
         .click(),
     );
     await click("添加颜色");

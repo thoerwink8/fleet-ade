@@ -23,6 +23,12 @@ const ROOTS = [
   "apps/server/src/provider/CodexChatGptAuth.ts",
   "apps/server/src/provider/CodexAuthCallbackPage.ts",
   "packages/shared/src/codexAuthCallback.ts",
+  "packages/shared/src/t3McpToolPresentation.ts",
+  "packages/shared/src/toolActivity.ts",
+  "packages/client-runtime/src/work-log/presentation.ts",
+  "packages/client-runtime/src/t3ToolSummary.ts",
+  "packages/client-runtime/src/state/subagentDisplay.ts",
+  "packages/client-runtime/src/state/threadExecution.ts",
   "packages/provider-core/src/server/providerAuthFlow.ts",
   "packages/provider-cursor/src/server/auth.ts",
   "packages/provider-cursor/src/server/status.ts",
@@ -125,7 +131,6 @@ function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean
   if (words.length === 0) return false;
   // A Chinese sentence that only borrows one name or token is already translated.
   if (/[\u4e00-\u9fff]/.test(plain) && words.length < 2) return false;
-  if (/^[a-z0-9_.:/\- ]+$/.test(plain)) return false;
   if (
     /^(?:oklch|rgba|rgb|hsla?)\(|var\(--|system-ui|ui-monospace|sans-serif|video\/|codecs=/.test(
       plain,
@@ -140,8 +145,16 @@ function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean
   ) {
     return false;
   }
+  if (/(?:^and |, and\b)|\b\d+ other\b|\b(?:is|are|was|were|has|have) [a-z]{3,}\b/.test(plain)) {
+    return true;
+  }
+  if (/^[a-z0-9_.:/\- ]+$/.test(plain)) return false;
   if (!/[A-Z\u4e00-\u9fff]/.test(plain)) return false;
-  return / [A-Za-z]{3,}/.test(plain) || /[A-Za-z][.?!…]$/.test(plain);
+  return (
+    / [A-Za-z]{3,}/.test(plain) ||
+    /\b[A-Z][a-z]{2,} \d/.test(plain) ||
+    /[A-Za-z][.?!…]$/.test(plain)
+  );
 }
 
 function walk(dir: string, out: string[]): void {
@@ -209,11 +222,71 @@ function templateSpans(node: ts.TemplateLiteral): string[] {
   return [node.head.text, ...node.templateSpans.map((span) => span.literal.text)];
 }
 
+function expressionSampleText(node: ts.Expression): string | undefined {
+  const direct = literalText(node);
+  if (direct !== undefined) return direct;
+  if (ts.isConditionalExpression(node)) {
+    return expressionSampleText(node.whenTrue) ?? expressionSampleText(node.whenFalse);
+  }
+  if (ts.isBinaryExpression(node)) {
+    return expressionSampleText(node.left) ?? expressionSampleText(node.right);
+  }
+  if (ts.isTemplateExpression(node)) {
+    return reconstructTemplateSample(node);
+  }
+  return undefined;
+}
+
+// Reconstructs interpolated templates such as `Changed ${count} ${count === 1 ? "file" : "files"}`
+// or `Tasks ${done}/${total}` into `"Changed 1 file"` / `"Tasks 1/1"` so plural templates and
+// capitalized prefixes before numbers are checked as complete user-facing phrases.
+function reconstructTemplateSample(node: ts.TemplateExpression): string {
+  let out = node.head.text;
+  for (const span of node.templateSpans) {
+    const sample = expressionSampleText(span.expression);
+    out += (sample !== undefined && sample.trim() !== "" ? sample : "1") + span.literal.text;
+  }
+  return out;
+}
+
+function expressionCandidateTexts(node: ts.Expression): string[] {
+  const direct = literalText(node);
+  if (direct !== undefined) return [direct];
+  if (ts.isTemplateExpression(node)) {
+    return [reconstructTemplateSample(node), ...templateSpans(node)];
+  }
+  if (ts.isConditionalExpression(node)) {
+    return [
+      ...expressionCandidateTexts(node.whenTrue),
+      ...expressionCandidateTexts(node.whenFalse),
+    ];
+  }
+  if (
+    ts.isBinaryExpression(node) &&
+    (node.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+      node.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+  ) {
+    return [...expressionCandidateTexts(node.left), ...expressionCandidateTexts(node.right)];
+  }
+  if (
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isParenthesizedExpression(node)
+  ) {
+    return expressionCandidateTexts(node.expression);
+  }
+  return [];
+}
+
 // Substituted templates such as `${minutes}m` never appear as one literal, so
 // the sentence check cannot see a single-letter unit. These files are the
 // formatters that print a duration on screen.
 function isDurationFormatter(rel: string): boolean {
-  return rel.endsWith("/orchestrationTiming.ts") || rel.endsWith("/TimelineWorkGroupRows.logic.ts");
+  return (
+    rel.endsWith("/orchestrationTiming.ts") ||
+    rel.endsWith("/TimelineWorkGroupRows.logic.ts") ||
+    rel.endsWith("/AgentElapsed.tsx")
+  );
 }
 
 function isLatinDurationUnit(text: string): boolean {
@@ -253,12 +326,27 @@ for (const file of files.filter(included)) {
     rel.endsWith("/CodexManagedProvider.ts") ||
     rel.endsWith("/CodexAuthCallbackPage.ts") ||
     rel.endsWith("/codexAuthCallback.ts") ||
+    rel.endsWith("/t3McpToolPresentation.ts") ||
+    rel.endsWith("/toolActivity.ts") ||
+    rel.endsWith("/work-log/presentation.ts") ||
+    rel.endsWith("/t3ToolSummary.ts") ||
+    rel.endsWith("/subagentDisplay.ts") ||
+    rel.endsWith("/threadExecution.ts") ||
     rel.endsWith("/compactionTitle.ts") ||
     rel.endsWith("/sessionConfig.ts") ||
     rel.endsWith("/AntigravityProvider.ts") ||
     rel.endsWith("/antigravityAuthSupport.ts") ||
     rel.endsWith("/antigravityUsageLimits.ts") ||
     /\/provider\/[^/]*Auth\.ts$/.test(rel);
+  const templateCopy =
+    rel.endsWith("/AntigravityProvider.ts") ||
+    rel.endsWith("/UserFacingErrors.ts") ||
+    rel.endsWith("/t3McpToolPresentation.ts") ||
+    rel.endsWith("/toolActivity.ts") ||
+    rel.endsWith("/work-log/presentation.ts") ||
+    rel.endsWith("/t3ToolSummary.ts") ||
+    rel.endsWith("/subagentDisplay.ts") ||
+    rel.endsWith("/threadExecution.ts");
   const durationFile = isDurationFormatter(rel);
   const opensJsx = (node: ts.Node) =>
     ts.isJsxElement(node) ||
@@ -268,18 +356,24 @@ for (const file of files.filter(included)) {
     ts.isJsxExpression(node);
   const visit = (node: ts.Node, inJsx: boolean): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
-    // Log calls are out of scope even when they sit in a sign-in module.
-    if (ts.isCallExpression(node) && isLogCall(node)) return;
+    // Log calls and error-substring matchers are out of scope even when they sit in a sign-in module.
+    if (ts.isCallExpression(node)) {
+      if (isLogCall(node)) return;
+      if (
+        serverCopy &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        /^(?:includes|startsWith|endsWith|indexOf)$/.test(node.expression.name.text)
+      ) {
+        return;
+      }
+    }
     const texts: string[] = [];
     if (serverCopy) {
       if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
         texts.push(node.text);
-      } else if (
-        ts.isTemplateExpression(node) &&
-        (rel.endsWith("/AntigravityProvider.ts") || rel.endsWith("/UserFacingErrors.ts"))
-      ) {
-        // Interpolated status and launch sentences are still the words a person reads.
-        texts.push(...templateSpans(node));
+      } else if (ts.isTemplateExpression(node) && templateCopy) {
+        // Interpolated status, tool summary, and launch sentences are still the words a person reads.
+        texts.push(reconstructTemplateSample(node), ...templateSpans(node));
       }
     } else if (ts.isJsxText(node)) {
       texts.push(node.text);
@@ -289,15 +383,13 @@ for (const file of files.filter(included)) {
       if (UI_NAMES.has(name) && initializer) {
         if (ts.isStringLiteral(initializer)) texts.push(initializer.text);
         else if (ts.isJsxExpression(initializer) && initializer.expression) {
-          const text = literalText(initializer.expression);
-          if (text !== undefined) texts.push(text);
+          texts.push(...expressionCandidateTexts(initializer.expression));
         }
       }
     } else if (ts.isPropertyAssignment(node)) {
       const name = propertyName(node.name);
       if (name !== undefined && UI_NAMES.has(name)) {
-        const text = literalText(node.initializer);
-        if (text !== undefined) texts.push(text);
+        texts.push(...expressionCandidateTexts(node.initializer));
       }
     }
     // `value={"No project"}` is a literal inside JSX, not a named UI attribute,
@@ -310,7 +402,7 @@ for (const file of files.filter(included)) {
       texts.push(node.text);
     }
     if (!serverCopy && inJsx && ts.isTemplateExpression(node)) {
-      texts.push(...templateSpans(node));
+      texts.push(reconstructTemplateSample(node), ...templateSpans(node));
     }
     if (durationFile && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) {
       texts.push(node.text);
@@ -332,10 +424,11 @@ for (const file of files.filter(included)) {
 }
 
 const uniqueFindings = [...new Set(findings)];
-const report = [`COUNT ${String(uniqueFindings.length)}`, ...uniqueFindings].join("\n");
 const outPath = process.argv[3];
-if (outPath) NodeFS.writeFileSync(outPath, report, "utf8");
-console.log(`COUNT ${String(uniqueFindings.length)}`);
+if (outPath) {
+  const report = [`COUNT ${String(uniqueFindings.length)}`, ...uniqueFindings].join("\n");
+  NodeFS.writeFileSync(outPath, report, "utf8");
+}
 if (uniqueFindings.length > 0) {
   if (!outPath) {
     for (const finding of uniqueFindings) console.log(finding);

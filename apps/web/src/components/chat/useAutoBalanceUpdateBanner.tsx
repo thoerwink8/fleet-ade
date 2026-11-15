@@ -121,8 +121,7 @@ export function useAutoBalanceUpdateBanner(
         </PopoverPopup>
       </Popover>
     ),
-    description:
-      manual > 0 ? `${manual} ${manual === 1 ? "needs" : "need"} a manual update` : undefined,
+    description: manual > 0 ? `${manual} 台机器需要手动更新` : undefined,
     actions:
       running === 0 && targets.length > 0 ? (
         <ServerUpdatesAction
@@ -133,7 +132,7 @@ export function useAutoBalanceUpdateBanner(
               ? "重试"
               : targets.length === machines.length
                 ? "全部更新"
-                : `Update ${targets.length} ${targets.length === 1 ? "machine" : "machines"}`
+                : `更新 ${targets.length} 台机器`
           }
         />
       ) : undefined,

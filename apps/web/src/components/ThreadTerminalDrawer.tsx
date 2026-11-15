@@ -1349,7 +1349,7 @@ function TerminalSidebarGroup({
         {terminalGroup.terminalIds.map((terminalId) => {
           const isActive = terminalId === activeTerminalId;
           const terminalLabel = terminalLabelById.get(terminalId) ?? "终端";
-          const closeTerminalLabel = `Close ${terminalLabel}${
+          const closeTerminalLabel = `关闭 ${terminalLabel}${
             isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""
           }`;
           return (

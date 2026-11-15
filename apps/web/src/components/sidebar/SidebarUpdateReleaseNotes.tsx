@@ -98,7 +98,7 @@ export function SidebarUpdateReleaseNotes({
             releaseNote.stats ??
             (omittedItemCount === 0
               ? "在 GitHub 上查看发行说明"
-              : `${omittedItemCount} more ${omittedItemCount === 1 ? "change" : "changes"} on GitHub`);
+              : `在 GitHub 上查看其余 ${omittedItemCount} 项变更`);
 
           const generated = releaseNote.stats !== undefined || releaseNote.intro !== undefined;
           return (
@@ -152,7 +152,7 @@ export function SidebarUpdateReleaseNotes({
         {state.omittedReleaseCount > 0 && historyUrl ? (
           <div className="mt-3">
             <ReleaseLink releaseUrl={historyUrl} shell={shell}>
-              {`${state.omittedReleaseCount} older ${state.omittedReleaseCount === 1 ? "release" : "releases"} on GitHub`}
+              {`在 GitHub 上查看更早的 ${state.omittedReleaseCount} 个版本`}
             </ReleaseLink>
           </div>
         ) : null}

@@ -103,7 +103,7 @@ describe("ThreadActivityAnnouncer", () => {
     }
 
     expect(heard).toEqual([""]);
-    await expect.element(detail).toHaveTextContent("Running git");
+    await expect.element(detail).toHaveTextContent("正在运行 git");
   });
 
   it("keeps a message beside the status that follows it, then reads the newest step", async () => {
@@ -132,7 +132,7 @@ describe("ThreadActivityAnnouncer", () => {
       ["运行中", "T3 Code: Checking the repo"],
       ["待批准", "T3 Code: Checking the repo"],
       ["待批准", "T3 Code: Checking the repo"],
-      ["待批准", "Running rg"],
+      ["待批准", "正在运行 rg"],
     ]);
   });
 

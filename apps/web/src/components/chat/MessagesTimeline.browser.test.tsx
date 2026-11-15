@@ -305,6 +305,7 @@ describe("MessagesTimeline work rows", () => {
     await using screen = await render(
       <MessagesTimeline
         {...props}
+        semanticWorkStream={false}
         timelineEntries={[
           ...Array.from({ length: 12 }, (_, index) =>
             message(`Earlier context ${index}`, {}, `context-${index}`),
@@ -353,9 +354,12 @@ describe("MessagesTimeline work rows", () => {
       message("Progress details\n\n".repeat(50), { role: "assistant", runId }, "progress"),
       message("Done", { role: "assistant", runId }, "final"),
     ];
-    await using screen = await render(<MessagesTimeline {...props} timelineEntries={entries} />, {
-      container,
-    });
+    await using screen = await render(
+      <MessagesTimeline {...props} semanticWorkStream={false} timelineEntries={entries} />,
+      {
+        container,
+      },
+    );
     const heading = screen.getByRole("button", { name: /^工作了/ });
     await expect.element(heading).toHaveStyle({ pointerEvents: "auto" });
     const viewport = props.listRef.current!.getScrollableNode()!;
@@ -366,6 +370,7 @@ describe("MessagesTimeline work rows", () => {
     await screen.rerender(
       <MessagesTimeline
         {...props}
+        semanticWorkStream={false}
         timelineEntries={[
           ...entries,
           message("Streamed reply\n\n".repeat(40), { role: "assistant", runId }, "streamed"),
@@ -937,6 +942,7 @@ describe("MessagesTimeline messages", () => {
         {...props}
         routeThreadKey={routeThreadKey}
         liveFollowEnabled={false}
+        semanticWorkStream={!mode.startsWith("grouped-")}
         {...(inline
           ? {}
           : {
@@ -1163,7 +1169,7 @@ describe("MessagesTimeline usage limit notice", () => {
   it("labels the retry time with the viewer's timezone", async () => {
     await using screen = await renderTimeline(usageLimitEntries("2026-03-17T19:30:00.000Z"));
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    expect(screen.text()).toMatch(/Usage limit reached\. Retry after .+\./);
+    expect(screen.text()).toMatch(/已达到用量上限。请在 .+ 后重试。/);
     expect(screen.text()).toContain(`(${timeZone})`);
   });
 
@@ -2248,7 +2254,6 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   );
   await expect.element(screen.getByRole("group", { name: "命令审批" })).not.toBeInTheDocument();
   await vi.waitFor(() => expect(screen.text()).not.toContain("等待批准"));
-  await screen.getByRole("button", { expanded: false }).click();
   await expect
     .element(screen.getByRole("button", { name: approvals[0]!.detail!, exact: true }))
     .toBeVisible();

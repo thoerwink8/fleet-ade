@@ -303,7 +303,7 @@ export function SecretSourceInput({
             <SecretCheckButton
               environmentId={environmentId}
               secret={secret}
-              label={`Check ${label}`}
+              label={`检查 ${label}`}
               disabled={input.disabled}
             />
           ) : null}

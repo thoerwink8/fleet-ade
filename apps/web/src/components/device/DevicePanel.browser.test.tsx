@@ -144,7 +144,7 @@ const devicePanel = (threadRef: ScopedThreadRef, surface = picker) => (
     onDismissSetup={() => undefined}
   />
 );
-const startButton = () => container.querySelector<HTMLButtonElement>('[aria-label="Start Phone"]');
+const startButton = () => container.querySelector<HTMLButtonElement>('[aria-label="启动 Phone"]');
 const click = (button: HTMLButtonElement | null) =>
   act(async () => {
     button!.click();
@@ -221,7 +221,7 @@ describe("DevicePanel discovery warning", () => {
       ...deviceState,
       hostStatuses: { local: { status: "ready", detail, incompletePlatforms: ["ios"] } },
     });
-    const warning = "iOS 上的 list This Mac 可能不完整。";
+    const warning = "iOS 上的 This Mac 列表可能不完整。";
     currentState = withCause("first cause");
     await using screen = await render(devicePanel(threadA), { container });
 

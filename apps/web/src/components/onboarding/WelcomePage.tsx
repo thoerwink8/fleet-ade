@@ -206,7 +206,7 @@ export function WelcomePage({
         } else if (importedThreadCount > 0) {
           toastManager.add({
             type: "success",
-            title: `Imported ${importedThreadCount} ${importedThreadCount === 1 ? "thread" : "threads"}`,
+            title: `已导入 ${importedThreadCount} 个会话`,
           });
         }
         return true;
@@ -305,7 +305,7 @@ export function WelcomePage({
                       ? "正在导入…"
                       : "正在启动…"
                     : newCount > 0
-                      ? `Import ${newCount} ${newCount === 1 ? "project" : "projects"} and start`
+                      ? `导入 ${newCount} 个项目并开始`
                       : selected.length > 0
                         ? "导入会话并开始"
                         : "开始"}

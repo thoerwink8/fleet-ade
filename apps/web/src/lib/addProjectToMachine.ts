@@ -193,7 +193,7 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
         ? null
         : {
             phase: "failed",
-            title: `Could not copy ${failed.length} ${failed.length === 1 ? "file" : "files"} to ${input.target.label}`,
+            title: `无法复制 ${failed.length} 个文件到 ${input.target.label}`,
             failures: failed,
           },
     );

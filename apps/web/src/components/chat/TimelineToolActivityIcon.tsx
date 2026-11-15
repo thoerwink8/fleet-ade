@@ -6,10 +6,13 @@ import { use, useState } from "react";
 import { T3Wordmark } from "../T3Wordmark";
 import {
   BotIcon,
+  BoxIcon,
   BrainIcon,
   CheckIcon,
   CircleAlertIcon,
   EyeIcon,
+  FilePenIcon,
+  FileTextIcon,
   GlobeIcon,
   ListTodoIcon,
   MessageCircleIcon,
@@ -35,6 +38,7 @@ export function toolIconAcceptsTint(toolIcon: ToolActivityIcon | undefined): boo
 
 export type WorkEntryIconName =
   | "bot"
+  | "box"
   | "brain"
   | "browser"
   | "check"
@@ -44,6 +48,8 @@ export type WorkEntryIconName =
   | "code"
   | "device"
   | "eye"
+  | "file-pen"
+  | "file-text"
   | "globe"
   | "hammer"
   | "message-circle"
@@ -235,6 +241,8 @@ function WorkEntryIcon({ name, className }: { name: WorkEntryIconName; className
       return <PullRequestGlyph.pullRequest className={className} aria-hidden />;
     case "bot":
       return <BotIcon className={className} aria-hidden />;
+    case "box":
+      return <BoxIcon className={className} aria-hidden />;
     case "brain":
       return <BrainIcon className={className} aria-hidden />;
     case "browser":
@@ -254,6 +262,10 @@ function WorkEntryIcon({ name, className }: { name: WorkEntryIconName; className
       return <CircleAlertIcon className={className} aria-hidden />;
     case "eye":
       return <EyeIcon className={className} aria-hidden />;
+    case "file-pen":
+      return <FilePenIcon className={className} aria-hidden />;
+    case "file-text":
+      return <FileTextIcon className={className} aria-hidden />;
     case "globe":
       return <GlobeIcon className={className} aria-hidden />;
     case "hammer":

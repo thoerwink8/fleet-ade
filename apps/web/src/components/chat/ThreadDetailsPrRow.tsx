@@ -354,9 +354,7 @@ export function ThreadDetailsPrRow({
           destructive: true,
           suffix: newThreadSuffix,
           tooltip:
-            composerTarget === undefined
-              ? "在新会话中检出分支并解决冲突"
-              : "Resolve the conflicts in this thread",
+            composerTarget === undefined ? "在新会话中检出分支并解决冲突" : "在当前会话中解决冲突",
           onClick: startResolveConflicts,
         }
       : rowAction === "ready"
@@ -384,7 +382,7 @@ export function ThreadDetailsPrRow({
               tooltip:
                 composerTarget === undefined
                   ? "在新会话中修复未通过的检查"
-                  : "Fix the failing checks in this thread",
+                  : "在当前会话中修复未通过的检查",
               onClick: startFixChecks,
             }
           : rowAction === "merge"

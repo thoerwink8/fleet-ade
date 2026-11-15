@@ -2886,8 +2886,8 @@ describe("deriveMessagesTimelineRows", () => {
       expect(rows.find((row) => row.kind === "work-toggle")).toMatchObject({
         hiddenCount: statuses.some((status) => status === "error") ? 2 : 3,
         summary: statuses.some((status) => status === "error")
-          ? "Received 1 update and used 1 tool"
-          : "Used 2 tools and received 1 update",
+          ? "收到了 1 条更新，调用了 1 个工具"
+          : "调用了 2 个工具，收到了 1 条更新",
         hasFailure,
       });
       if (statuses.some((status) => status === "error")) {
@@ -5043,5 +5043,80 @@ describe("subagent continued by a later turn", () => {
       `turn-fold:${run2}`,
       "closing-2",
     ]);
+  });
+
+  it("unfolds settled turns into semantic rows when semanticWorkStream is enabled", () => {
+    const semanticItems: OrchestrationV2TurnItem[] = [
+      user("u1", run1, 1001, 0),
+      reasoning("r1", run1, 1002, 1),
+      {
+        ...base("read-1", run1, 1003, 2),
+        type: "dynamic_tool",
+        toolName: "Read",
+        title: "Read",
+        input: { file_path: "/repo/docs/shot-a.png" },
+        output: "ok",
+      },
+      {
+        ...base("read-2", run1, 1004, 3),
+        type: "dynamic_tool",
+        toolName: "Read",
+        title: "Read",
+        input: { file_path: "/repo/src/app.tsx" },
+        output: "ok",
+      },
+      {
+        ...base("write-1", run1, 1005, 4),
+        type: "dynamic_tool",
+        toolName: "Write",
+        title: "Write",
+        input: { file_path: "/repo/src/new.ts" },
+        output: "ok",
+      },
+      {
+        ...base("cmd-1", run1, 1006, 5),
+        type: "command_execution",
+        input: "pnpm vp test run",
+        output: "passed",
+      },
+      assistant("a1", run1, 1007, 6),
+    ];
+    const rows = deriveMessagesTimelineRows({
+      timelineEntries: deriveTimelineEntriesFromVisibleTurnItems({
+        visibleTurnItems: semanticItems.map((item) => ({
+          position: item.ordinal,
+          visibility: "local",
+          sourceThreadId: threadId,
+          sourceItemId: item.id,
+          item,
+        })),
+        optimisticMessages: [],
+      }),
+      latestRun: {
+        runId: run1,
+        status: "completed",
+        startedAt: DateTime.formatIso(at(0)),
+        completedAt: DateTime.formatIso(at(6)),
+      },
+      isWorking: false,
+      turnDiffSummaries: [],
+      supportsConversationRollback: false,
+      semanticWorkStream: true,
+    });
+
+    expect(rows.some((row) => row.kind === "turn-fold")).toBe(false);
+    expect(rows.map((row) => `${row.kind}:${row.id}`)).toEqual([
+      "message:u1",
+      "work:r1",
+      "work-toggle:work-toggle:read-1",
+      "viewed-images:work-group:read-1:viewed-images",
+      "work:write-1",
+      "work:cmd-1",
+      "message:a1",
+    ]);
+    const readGroup = rows.find((row) => row.kind === "work-toggle");
+    expect(readGroup?.kind === "work-toggle" && readGroup.summary).toBe("读了 2 个文件");
+    const viewed = rows.find((row) => row.kind === "viewed-images");
+    expect(viewed?.kind === "viewed-images" && viewed.paths).toEqual(["/repo/docs/shot-a.png"]);
   });
 });

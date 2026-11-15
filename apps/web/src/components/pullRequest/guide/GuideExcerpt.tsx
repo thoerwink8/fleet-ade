@@ -139,13 +139,13 @@ export function GuideExcerpt({
         />
       ) : loading ? (
         <p className="rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          Loading {excerpt.path}...
+          正在加载 {excerpt.path}…
         </p>
       ) : (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 truncate">
-            <span className="font-mono text-foreground">{excerpt.path}</span> lines {excerpt.start}-
-            {excerpt.end} are not in the loaded diff.
+            <span className="font-mono text-foreground">{excerpt.path}</span> 的第 {excerpt.start}–
+            {excerpt.end} 行不在已加载的变更对比中。
           </span>
           <Button size="xs" variant="outline" onClick={() => onOpenFile(excerpt.path)}>
             在“代码”标签页中打开

@@ -217,7 +217,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
         toastManager.add(
           stackedThreadToast({
             type: "success",
-            title: `Started ${startedCount} ${startedCount === 1 ? "thread" : "threads"} in background`,
+            title: `已在后台启动 ${startedCount} 个会话`,
           }),
         );
       }

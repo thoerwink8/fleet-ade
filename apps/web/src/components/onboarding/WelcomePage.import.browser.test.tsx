@@ -335,7 +335,7 @@ it("rechecks after project creation and can retry its history without recreating
     return recordProject(input);
   });
   await using _screen = await mountWelcome();
-  await click("Import 2 projects and start");
+  await click("导入 2 个项目并开始");
   expect(state.createProject).toHaveBeenCalledOnce();
   await act(async () => {
     setGrant(primaryId, false);
@@ -349,7 +349,7 @@ it("rechecks after project creation and can retry its history without recreating
 
   await act(async () => setGrant(primaryId, true));
   // The first project now exists, so only the second counts as new.
-  await click("Import 1 project and start");
+  await click("导入 1 个项目并开始");
   expect(state.createProject).toHaveBeenCalledTimes(2);
   expect(state.importThreads).toHaveBeenCalledTimes(2);
   expect(state.onDone).toHaveBeenCalledOnce();
@@ -363,7 +363,7 @@ it("completes accepted imports when permission is revoked after the final server
     AsyncResult.success(await imported.promise),
   );
   await using _screen = await mountWelcome();
-  await click("Import 1 project and start");
+  await click("导入 1 个项目并开始");
   await act(async () => {
     setGrant(primaryId, false);
     imported.resolve({ importedCount: 1, skippedCount: 0 });
@@ -385,19 +385,19 @@ it("finishes setup without landing when the imported project never reaches the c
   await using _screen = await mountWelcome();
   using toastAdd = vi.spyOn(toastManager, "add");
 
-  await click("Import 1 project and start");
+  await click("导入 1 个项目并开始");
   await vi.waitFor(() => expect(state.completeOnboarding).toHaveBeenCalledOnce());
   // A failed completion hands the step back instead of leaving it importing.
-  await vi.waitFor(() => expect(button("Import 1 project and start").disabled).toBe(false));
+  await vi.waitFor(() => expect(button("导入 1 个项目并开始").disabled).toBe(false));
   expect(state.onDone).not.toHaveBeenCalled();
 
-  await click("Import 1 project and start");
+  await click("导入 1 个项目并开始");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
   expect(state.onDone).toHaveBeenCalledWith(undefined);
   // The retry skips the project it already imported, but still counts its thread.
   await vi.waitFor(() =>
     expect(toastAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "success", title: "Imported 1 thread" }),
+      expect.objectContaining({ type: "success", title: "已导入 1 个会话" }),
     ),
   );
 });
@@ -406,7 +406,7 @@ it("waits for a ready agent to start, and Start without an agent still finishes 
   using _now = setup();
   appAtomRegistry.set(state.providers as Atom.Writable<ReadonlyArray<ServerProvider>>, []);
   await using _screen = await mountWelcome();
-  expect(button("Import 2 projects and start").disabled).toBe(true);
+  expect(button("导入 2 个项目并开始").disabled).toBe(true);
 
   await click("不使用智能体直接开始");
   await vi.waitFor(() => expect(state.onDone).toHaveBeenCalledOnce());
@@ -428,7 +428,7 @@ it("blocks leaving the page until the imported projects have landed", async () =
     },
   );
   await using screen = await mountWelcome();
-  await click("Import 2 projects and start");
+  await click("导入 2 个项目并开始");
 
   // A blocked navigation never settles, so it is not awaited.
   const leave = () =>
@@ -478,7 +478,7 @@ it("gives projects a later scan finds the default, unless the main box was unche
   await click("查看全部 2 个");
   await click("全不选");
   await findProject("/projects/third");
-  await vi.waitFor(() => expect(button("Import 1 project and start").disabled).toBe(false));
+  await vi.waitFor(() => expect(button("导入 1 个项目并开始").disabled).toBe(false));
 
   const importProjects = document.querySelector<HTMLElement>('[role="checkbox"]');
   await act(async () => importProjects?.click());
@@ -503,7 +503,7 @@ it("keeps the project choice across a visit to Settings until setup finishes", a
     expect(state.createProject).not.toHaveBeenCalled();
   }
   await using _third = await mountWelcome();
-  expect(button("Import 2 projects and start").disabled).toBe(false);
+  expect(button("导入 2 个项目并开始").disabled).toBe(false);
 });
 
 it("stays busy while setup saves after an import with nothing to open", async () => {
@@ -514,7 +514,7 @@ it("stays busy while setup saves after an import with nothing to open", async ()
   state.completeOnboarding.mockImplementationOnce(() => saved.promise);
   await using _screen = await mountWelcome();
 
-  await click("Import 1 project and start");
+  await click("导入 1 个项目并开始");
   await vi.waitFor(() => expect(state.completeOnboarding).toHaveBeenCalledOnce());
   expect(button("正在导入…").disabled).toBe(true);
   await act(async () => {
@@ -561,7 +561,7 @@ it("keeps the started projects checked when the page opens again after a quit", 
   );
   {
     await using _first = await mountWelcome();
-    await click("Import 2 projects and start");
+    await click("导入 2 个项目并开始");
     await vi.waitFor(() => expect(state.importThreads).toHaveBeenCalledOnce());
   }
   // The app quit during the first project's history; it now exists in T3 Code.
@@ -582,7 +582,7 @@ it("keeps the project controls when a later scan fails", async () => {
     appAtomRegistry.set(candidatesAtom(), [...appAtomRegistry.get(candidatesAtom())]),
   );
   await vi.waitFor(() => expect(pageText()).toContain("无法再次检查项目。"));
-  expect(button("Import 2 projects and start").disabled).toBe(false);
+  expect(button("导入 2 个项目并开始").disabled).toBe(false);
   expect(button("重试").disabled).toBe(false);
 });
 
@@ -618,7 +618,7 @@ it("offers Update for a signed-in agent whose version is broken, and keeps Start
     (element) => element.textContent?.trim() === "Update",
   );
   expect(update?.getAttribute("href")).toContain("/settings/providers");
-  expect(button("Import 2 projects and start").disabled).toBe(true);
+  expect(button("导入 2 个项目并开始").disabled).toBe(true);
 });
 
 it("keeps an import opt-out on the page when storage cannot save it", async () => {

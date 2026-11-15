@@ -126,7 +126,7 @@ function ProviderCustomColorPicker(props: {
             size="icon-sm"
             variant="ghost-muted"
             style={normalized ? { backgroundColor: normalized } : undefined}
-            aria-label={`${normalized ? "Change" : "Add"} accent color for ${props.displayName}`}
+            aria-label={`${normalized ? "更改" : "添加"} ${props.displayName} 的强调色`}
           >
             {normalized ? <span className="sr-only">更改强调色</span> : <PlusIcon aria-hidden />}
           </Button>

@@ -41,12 +41,18 @@ function cutText(text: string, maxLength: number): string | null {
   return characters.length > maxLength ? characters.slice(0, maxLength).join("") : null;
 }
 
-// On screen these labels are a path or a query beside an icon.
+// On screen these labels are a path, an edit/search summary, or a query beside an icon.
 function withVerb(work: WorkLogEntry, label: string) {
-  if (work.itemType === "file_change") return `正在编辑 ${label}`;
+  if (work.itemType === "file_change") {
+    if (/^正在(?:编辑|写入)\s/u.test(label)) return label;
+    const writeMatch = /^写入\s+(.+)$/u.exec(label);
+    if (writeMatch) return `正在写入 ${writeMatch[1]}`;
+    const editMatch = /^编辑\s+(.+)$/u.exec(label);
+    return `正在编辑 ${editMatch ? editMatch[1] : label}`;
+  }
   if (work.itemType !== "file_search" && work.itemType !== "web_search") return label;
-  if (/^search(?:ed|ing)?\s/i.test(label)) return label;
-  return `${work.itemType === "web_search" ? "Searching the web for" : "Searching for"} ${label}`;
+  if (/^(?:search(?:ed|ing)?\s|(?:正在|已)?(?:在\s+.+\s+中)?搜索)/iu.test(label)) return label;
+  return `${work.itemType === "web_search" ? "正在联网搜索" : "正在搜索"} ${label}`;
 }
 
 type MessageEntry = Extract<TimelineEntry, { kind: "message" }>;

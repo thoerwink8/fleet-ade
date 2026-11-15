@@ -1546,7 +1546,7 @@ describe("OpenCodeAdapterV2", () => {
         event.type === "turn_item.updated" ? [event.turnItem] : [],
       );
       const reads = items.filter((item) => item.type === "dynamic_tool");
-      assert.equal(reads[0]?.title, "Read src/env.ts");
+      assert.equal(reads[0]?.title, "读取 src/env.ts");
       assert.deepEqual(
         reads.map((item) => ({ toolName: item.toolName, output: item.output })),
         [
@@ -1564,7 +1564,7 @@ describe("OpenCodeAdapterV2", () => {
         ],
       );
       const grep = items.find((item) => item.type === "file_search");
-      assert.equal(grep?.title, "Searched TODO in web");
+      assert.equal(grep?.title, "在 web 中搜索 TODO");
       assert.equal(grep?.type === "file_search" ? grep.pattern : null, "TODO");
       assert.deepEqual(grep?.type === "file_search" ? grep.results : null, [
         { fileName: "apps/web", preview: "---\nfile body" },

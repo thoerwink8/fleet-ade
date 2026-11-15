@@ -171,6 +171,35 @@ function workEntryReadPaths(entry: WorkLogEntry, workspaceRoot: string | undefin
   );
 }
 
+function translateLegacyEnglishToolLabel(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "Ran command") return "已运行命令";
+  if (trimmed === "Changed files") return "已修改文件";
+  if (trimmed === "Searched files") return "已搜索文件";
+  if (trimmed === "Tool") return "工具";
+  const tasksMatch = /^Tasks (\d+\/\d+.*)$/.exec(trimmed);
+  if (tasksMatch) return `任务 ${tasksMatch[1]}`;
+  const readMatch = /^Read (.+?)(?: \+(\d+) more)?$/.exec(trimmed);
+  if (readMatch) {
+    return `读取 ${readMatch[1]}${readMatch[2] ? ` 等另外 ${readMatch[2]} 个` : ""}`;
+  }
+  const searchFilesInMatch = /^Searched files (.+) in (.+)$/.exec(trimmed);
+  if (searchFilesInMatch) {
+    return `在 ${searchFilesInMatch[2]} 中搜索文件 ${searchFilesInMatch[1]}`;
+  }
+  const searchInMatch = /^Searched (.+) in (.+)$/.exec(trimmed);
+  if (searchInMatch) {
+    return `在 ${searchInMatch[2]} 中搜索 ${searchInMatch[1]}`;
+  }
+  const searchFilesMatch = /^Searched files (.+)$/.exec(trimmed);
+  if (searchFilesMatch) return `搜索文件 ${searchFilesMatch[1]}`;
+  const searchOnlyInMatch = /^Searched in (.+)$/.exec(trimmed);
+  if (searchOnlyInMatch) return `在 ${searchOnlyInMatch[1]} 中搜索`;
+  const searchMatch = /^Searched (.+)$/.exec(trimmed);
+  if (searchMatch) return `搜索 ${searchMatch[1]}`;
+  return value;
+}
+
 export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string | undefined) {
   if (entry.itemType === "system_notice") return entry.label;
   if (entry.itemType === "reasoning" || entry.tone === "thinking") {
@@ -184,7 +213,7 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
   if (action === "code-search" || action === "search") {
     const searchLabel =
       entry.itemType === "file_search"
-        ? entry.label
+        ? translateLegacyEnglishToolLabel(entry.label)
         : formatSearchToolLabel(workEntryToolDataRecord(entry));
     if (searchLabel) return searchLabel;
   }
@@ -192,12 +221,26 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
   if (action === "read" && readPaths[0]) {
     return formatReadToolLabel(readPaths[0], readPaths.length - 1);
   }
+  if (action === "edit") {
+    const editPaths = workEntryReadPaths(entry, workspaceRoot);
+    if (editPaths[0]) {
+      const isWrite =
+        (entry.structuredPayload?.type === "dynamic_tool" &&
+          entry.structuredPayload.toolName !== null &&
+          /^(?:write|write_file|create|create_file)$/i.test(entry.structuredPayload.toolName)) ||
+        /^(?:write|create)\b/i.test(entry.toolTitle ?? "");
+      const verb = isWrite ? "写入" : "编辑";
+      return editPaths.length === 1
+        ? `${verb} ${editPaths[0]}`
+        : `${verb} ${editPaths[0]} 等另外 ${editPaths.length - 1} 个`;
+    }
+  }
   const providerRetry =
     entry.projectedItem?.item.type === "error" && entry.projectedItem.item.retry !== undefined;
   const item = entry.structuredPayload;
   const title =
     item?.type === "dynamic_tool" ? dynamicToolTitle(item.toolName, item.input, item.title) : null;
-  if (title) return title;
+  if (title) return translateLegacyEnglishToolLabel(title);
   const compactDetail = entry.detail?.trim();
   const detailIsSearchOutput =
     (action === "code-search" || action === "search") && /[\r\n]/.test(compactDetail ?? "");
@@ -209,12 +252,14 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
     const path = formatWorkspaceRelativePath(firstPath, workspaceRoot);
     return entry.changedFiles!.length === 1
       ? path
-      : `${path} +${entry.changedFiles!.length - 1} more`;
+      : `${path} 等另外 ${entry.changedFiles!.length - 1} 个`;
   }
   if (action === "read" && !entry.viewedImagePath) {
     return "已读取文件";
   }
-  const heading = normalizeCompactToolLabel(entry.toolTitle || entry.label);
+  const heading = translateLegacyEnglishToolLabel(
+    normalizeCompactToolLabel(entry.toolTitle || entry.label),
+  );
   return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;
 }
 
@@ -291,15 +336,16 @@ export function liveWorkEntryLabel(
   if (command) {
     const verb =
       status === "inProgress"
-        ? "Running"
+        ? "正在运行"
         : status === "failed"
-          ? "Failed"
+          ? "运行失败"
           : status === "declined"
-            ? "Declined"
+            ? "已拒绝"
             : status === "stopped"
-              ? "Stopped"
-              : "Ran";
-    return `${verb} ${commandProgramName(command) ?? "command"}`;
+              ? "已停止"
+              : "已运行";
+    const program = commandProgramName(command);
+    return program ? `${verb} ${program}` : `${verb}命令`;
   }
   return workEntryDisplayLabel(entry, workspaceRoot);
 }
@@ -488,13 +534,14 @@ export function resolveTimelineMinimapHitStripWidth(
   contentWidth: number,
 ): number {
   const sideGutter = resolveTimelineSideGutter(viewportWidth, contentWidth);
-  return Math.max(
-    0,
-    Math.min(
-      TIMELINE_MINIMAP_HIT_STRIP_MAX_WIDTH,
-      Math.floor(sideGutter) - TIMELINE_MINIMAP_HIT_STRIP_LEFT,
-    ),
+  const gutterBased = Math.min(
+    TIMELINE_MINIMAP_HIT_STRIP_MAX_WIDTH,
+    Math.floor(sideGutter) - TIMELINE_MINIMAP_HIT_STRIP_LEFT,
   );
+  if (viewportWidth >= 768) {
+    return Math.max(20, gutterBased);
+  }
+  return Math.max(0, gutterBased);
 }
 
 const TIMELINE_MINIMAP_NAVIGATION_REACH = 14;
@@ -1530,6 +1577,31 @@ function timelineRowEntries(
   return withoutSubagentDelegationRows(settleSupersededReasoning(shown));
 }
 
+function keepDeferredTurnFoldsOnly(
+  folds: ReadonlyMap<string, TurnFold>,
+  entryById: ReadonlyMap<string, TimelineEntry>,
+): Map<string, TurnFold> {
+  const filtered = new Map<string, TurnFold>();
+  for (const [anchorId, fold] of folds) {
+    let hasDeferred = false;
+    for (const entryId of fold.entryIds) {
+      const entry = entryById.get(entryId);
+      if (entry?.kind === "work" && entry.entry.projectedItem?.item.deferredWork) {
+        hasDeferred = true;
+        break;
+      }
+    }
+    if (hasDeferred) filtered.set(anchorId, fold);
+  }
+  return filtered;
+}
+
+function isSemanticReadWorkEntry(entry: WorkLogEntry): boolean {
+  return (
+    entry.itemType !== "reasoning" && entry.tone !== "thinking" && toolGroupAction(entry) === "read"
+  );
+}
+
 function deriveTimelineTurnFolds(
   input: Pick<
     MessagesTimelineRowsInput,
@@ -1540,6 +1612,7 @@ function deriveTimelineTurnFolds(
     | "runningRunId"
     | "toolCallVisibility"
     | "revealedMessageId"
+    | "semanticWorkStream"
   >,
 ) {
   if (input.toolCallVisibility === "zen") return new Map<string, TurnFold>();
@@ -1551,7 +1624,7 @@ function deriveTimelineTurnFolds(
     unsettledRunId,
     isWorking: input.isWorking,
   });
-  return deriveTurnFolds({
+  const folds = deriveTurnFolds({
     timelineEntries,
     terminalAssistantMessageIds: deriveTerminalAssistantMessageIds(timelineEntries),
     latestRun: input.latestRun ?? null,
@@ -1560,6 +1633,11 @@ function deriveTimelineTurnFolds(
     liveSubagentEntryIds: liveSubagentCardEntryIds(timelineEntries),
     retainedAssistantReplyEntryIds: retainedAssistantReplyEntryIds(timelineEntries),
   });
+  if (input.semanticWorkStream) {
+    const entryById = new Map(timelineEntries.map((entry) => [entry.id, entry]));
+    return keepDeferredTurnFoldsOnly(folds, entryById);
+  }
+  return folds;
 }
 
 export function deriveMessagesTimelineRows(input: {
@@ -1581,6 +1659,7 @@ export function deriveMessagesTimelineRows(input: {
   worktreeSetup?: WorktreeSetupSnapshot | null;
   toolCallVisibility?: ToolCallVisibility;
   revealedMessageId?: MessageId | null;
+  semanticWorkStream?: boolean;
 }): MessagesTimelineRow[] {
   const timelineEntries = timelineRowEntries(input);
   const embeddedResultRunIds = new Set<RunId>();
@@ -1633,7 +1712,8 @@ export function deriveMessagesTimelineRows(input: {
     isWorking: input.isWorking,
   });
   const runlessWorkActive = input.isWorking && input.runlessWorkActive === true;
-  const foldsByAnchorEntryId =
+  const timelineEntryById = new Map(timelineEntries.map((entry) => [entry.id, entry]));
+  const rawFoldsByAnchorEntryId =
     input.toolCallVisibility === "zen"
       ? new Map<string, TurnFold>()
       : deriveTurnFolds({
@@ -1645,7 +1725,9 @@ export function deriveMessagesTimelineRows(input: {
           liveSubagentEntryIds,
           retainedAssistantReplyEntryIds: retainedAssistantReplyIds,
         });
-  const timelineEntryById = new Map(timelineEntries.map((entry) => [entry.id, entry]));
+  const foldsByAnchorEntryId = input.semanticWorkStream
+    ? keepDeferredTurnFoldsOnly(rawFoldsByAnchorEntryId, timelineEntryById)
+    : rawFoldsByAnchorEntryId;
   const collapsedEntryIds = new Set<string>();
   const collapsedFoldMemberIds = new Set<string>();
   for (const fold of foldsByAnchorEntryId.values()) {
@@ -1704,7 +1786,11 @@ export function deriveMessagesTimelineRows(input: {
         collapsedEntryIds.has(entry.id) ||
         collapsedSupersededEntryIds.has(entry.id) ||
         foldsByAnchorEntryId.has(entry.id) ||
-        supersededFoldsByAnchorEntryId.has(entry.id)
+        supersededFoldsByAnchorEntryId.has(entry.id) ||
+        (input.semanticWorkStream === true &&
+          (entry.entry.itemType === "reasoning" ||
+            entry.entry.tone === "thinking" ||
+            !workEntryIsInActiveRun(entry.entry)))
       ) {
         break;
       }
@@ -2017,33 +2103,36 @@ export function deriveMessagesTimelineRows(input: {
       }
       const groupedEntries = [timelineEntry.entry];
       let cursor = index + 1;
-      while (cursor < timelineEntries.length) {
-        const nextEntry = timelineEntries[cursor];
-        if (
-          !nextEntry ||
-          nextEntry.kind !== "work" ||
-          nextEntry.entry.sourceActivityKind === "context-compaction" ||
-          (nextEntry.entry.itemType === "error" &&
-            nextEntry.entry.toolLifecycleStatus === "failed") ||
-          nextEntry.entry.tone === "error" ||
-          nextEntry.entry.sourceActivityKind === "runtime.error" ||
-          nextEntry.entry.itemType === "system_notice" ||
-          nextEntry.entry.itemType === "notification" ||
-          nextEntry.entry.itemType === "todo_list" ||
-          nextEntry.entry.questionAnswer !== undefined ||
-          isPendingApproval(nextEntry.entry) ||
-          activeWorkEntryIds.has(nextEntry.id) ||
-          collapsedEntryIds.has(nextEntry.id) ||
-          collapsedSupersededEntryIds.has(nextEntry.id) ||
-          foldsByAnchorEntryId.has(nextEntry.id) ||
-          supersededFoldsByAnchorEntryId.has(nextEntry.id) ||
-          (nextEntry.entry.runId ?? null) !== (timelineEntry.entry.runId ?? null) ||
-          nextEntry.attempt?.id !== timelineEntry.attempt?.id
-        ) {
-          break;
+      if (!input.semanticWorkStream || isSemanticReadWorkEntry(timelineEntry.entry)) {
+        while (cursor < timelineEntries.length) {
+          const nextEntry = timelineEntries[cursor];
+          if (
+            !nextEntry ||
+            nextEntry.kind !== "work" ||
+            (input.semanticWorkStream && !isSemanticReadWorkEntry(nextEntry.entry)) ||
+            nextEntry.entry.sourceActivityKind === "context-compaction" ||
+            (nextEntry.entry.itemType === "error" &&
+              nextEntry.entry.toolLifecycleStatus === "failed") ||
+            nextEntry.entry.tone === "error" ||
+            nextEntry.entry.sourceActivityKind === "runtime.error" ||
+            nextEntry.entry.itemType === "system_notice" ||
+            nextEntry.entry.itemType === "notification" ||
+            nextEntry.entry.itemType === "todo_list" ||
+            nextEntry.entry.questionAnswer !== undefined ||
+            isPendingApproval(nextEntry.entry) ||
+            activeWorkEntryIds.has(nextEntry.id) ||
+            collapsedEntryIds.has(nextEntry.id) ||
+            collapsedSupersededEntryIds.has(nextEntry.id) ||
+            foldsByAnchorEntryId.has(nextEntry.id) ||
+            supersededFoldsByAnchorEntryId.has(nextEntry.id) ||
+            (nextEntry.entry.runId ?? null) !== (timelineEntry.entry.runId ?? null) ||
+            nextEntry.attempt?.id !== timelineEntry.attempt?.id
+          ) {
+            break;
+          }
+          groupedEntries.push(nextEntry.entry);
+          cursor += 1;
         }
-        groupedEntries.push(nextEntry.entry);
-        cursor += 1;
       }
       const visibleGroupedEntries = groupedEntries.filter((entry) =>
         workEntryIsVisibleInGroup(entry, workEntryIsInActiveRun(entry)),
@@ -2072,19 +2161,28 @@ export function deriveMessagesTimelineRows(input: {
           }
         } else if (
           visibleGroupedEntries.length === 1 &&
-          workLogEntryIsToolLike(visibleGroupedEntries[0]!)
+          (input.semanticWorkStream === true || workLogEntryIsToolLike(visibleGroupedEntries[0]!))
         ) {
           const singleEntry = visibleGroupedEntries[0]!;
+          const singleAction = toolGroupAction(singleEntry);
+          const displayLabel = input.semanticWorkStream
+            ? singleEntry.itemType === "reasoning" ||
+              singleEntry.tone === "thinking" ||
+              singleAction === "edit" ||
+              singleAction === "read" ||
+              !workLogEntryIsToolLike(singleEntry)
+              ? undefined
+              : singleToolCallLabel(singleEntry)
+            : singleAction === "edit"
+              ? summarizeToolGroup(visibleGroupedEntries).summary
+              : singleToolCallLabel(singleEntry);
           nextRows.push({
             kind: "work",
             id: timelineEntry.id,
             createdAt: timelineEntry.createdAt,
             groupedEntries: visibleGroupedEntries,
             isExpandedToolGroup: false,
-            displayLabel:
-              toolGroupAction(singleEntry) === "edit"
-                ? summarizeToolGroup(visibleGroupedEntries).summary
-                : singleToolCallLabel(singleEntry),
+            ...(displayLabel !== undefined ? { displayLabel } : {}),
           });
         } else {
           const groupId = workGroupId(timelineEntry.id);
@@ -2467,6 +2565,7 @@ export function timelineTurnFoldRunIdsByEntryId(
     | "runningRunId"
     | "toolCallVisibility"
     | "revealedMessageId"
+    | "semanticWorkStream"
   >,
 ): ReadonlyMap<string, RunId> {
   const byEntryId = new Map<string, RunId>();

@@ -3825,7 +3825,7 @@ describe("AcpAdapterV2", () => {
           (item) =>
             item.threadId === tasks.get("task-a")?.childThreadId &&
             item.type === "dynamic_tool" &&
-            item.title === "Read a.txt",
+            item.title === "读取 a.txt",
         ),
       );
       assert.isFalse(
@@ -4122,12 +4122,12 @@ describe("AcpAdapterV2", () => {
       const read = items.find((item) => item.type === "dynamic_tool" && item.toolName === "Read");
       assert.deepEqual(
         read?.type === "dynamic_tool" ? { title: read.title, input: read.input } : null,
-        { title: "Read src/env.ts", input: { path: "src/env.ts" } },
+        { title: "读取 src/env.ts", input: { path: "src/env.ts" } },
       );
       const search = items.find((item) => item.type === "file_search");
       assert.deepEqual(
         search?.type === "file_search" ? { title: search.title, pattern: search.pattern } : null,
-        { title: "Searched TODO in web", pattern: "apps/web" },
+        { title: "在 web 中搜索 TODO", pattern: "apps/web" },
       );
       const webItem = (nativeId: string, status: string) => {
         const item = items.findLast(

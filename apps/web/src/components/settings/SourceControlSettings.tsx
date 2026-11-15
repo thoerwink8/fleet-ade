@@ -288,7 +288,7 @@ function DiscoveryItemRow({
                       checked={offered.checked}
                       disabled={offered.disabled}
                       onCheckedChange={offered.onChange}
-                      aria-label={`Offer ${item.label} when adding or publishing a project`}
+                      aria-label={`添加或发布项目时提供 ${item.label}`}
                     />
                   }
                 />

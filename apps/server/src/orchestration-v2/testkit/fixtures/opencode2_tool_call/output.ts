@@ -35,7 +35,7 @@ export function assertOpenCode2ToolCallOutput(
 
   const read = projection.turnItems.find((item) => item.type === "dynamic_tool");
   assert.equal(read?.status, "completed");
-  assert.equal(read?.title, "Read hello.txt");
+  assert.equal(read?.title, "读取 hello.txt");
   assert.include(read?.type === "dynamic_tool" ? read.output : "", "hello from the spike");
 
   const shell = projection.turnItems.find((item) => item.type === "command_execution");

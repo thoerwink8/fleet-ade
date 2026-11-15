@@ -392,11 +392,9 @@ export function getProviderUpdateSidebarPillView(
       tone: "warning",
       title:
         unchangedProviders.length === 1
-          ? `${unchangedProviderName} still needs an update`
-          : `${unchangedProviders.length} providers still need updates`,
-      description: `${formatProviderList(unchangedProviders)} ${
-        unchangedProviders.length === 1 ? "still appears" : "still appear"
-      } outdated. Review provider settings for details.`,
+          ? `${unchangedProviderName} 仍需更新`
+          : `${unchangedProviders.length} 个提供商仍需更新`,
+      description: `${formatProviderList(unchangedProviders)} 似乎仍为旧版本，请前往提供商设置查看详情。`,
       dismissible: true,
     });
   }

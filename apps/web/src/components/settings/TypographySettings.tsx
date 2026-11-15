@@ -17,8 +17,12 @@ import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings"
 import { isMacPlatform } from "../../lib/utils";
 import { Input } from "../ui/input";
 import {
+  CHAT_READING_SIZE_STORAGE_KEY,
+  ChatReadingSizeSchema,
+  DEFAULT_CHAT_READING_SIZE,
   DEFAULT_CODE_FONT_STACK,
   DEFAULT_SANS_FONT_STACK,
+  type ChatReadingSize,
   isFontFamilyAvailable,
   isMonospaceFamily,
   resolveDefaultFamilyLabel,
@@ -327,6 +331,57 @@ function SimpleFontRows() {
   );
 }
 
+const CHAT_READING_SIZE_OPTIONS: ReadonlyArray<readonly [ChatReadingSize, string]> = [
+  ["standard", "标准 (14 px)"],
+  ["comfortable", "舒适 (15 px)"],
+  ["large", "大字号 (16 px)"],
+];
+
+function ChatReadingSizeRow() {
+  const [readingSize, setReadingSize] = useLocalStorage(
+    CHAT_READING_SIZE_STORAGE_KEY,
+    DEFAULT_CHAT_READING_SIZE,
+    ChatReadingSizeSchema,
+  );
+  const currentLabel =
+    CHAT_READING_SIZE_OPTIONS.find(([value]) => value === readingSize)?.[1] ?? "舒适 (15 px)";
+  return (
+    <SettingsRow
+      title="正文阅读字号"
+      description="会话回复中 Markdown 正文的字号档位（行高 1.75）。"
+      resetAction={
+        readingSize !== DEFAULT_CHAT_READING_SIZE ? (
+          <SettingResetButton
+            label="正文阅读字号"
+            onClick={() => setReadingSize(DEFAULT_CHAT_READING_SIZE)}
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={readingSize}
+          onValueChange={(next) => {
+            if (next === "standard" || next === "comfortable" || next === "large") {
+              setReadingSize(next);
+            }
+          }}
+        >
+          <SelectTrigger size="sm" className="w-32 shrink-0" aria-label="正文阅读字号">
+            <SelectValue>{currentLabel}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {CHAT_READING_SIZE_OPTIONS.map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
 export function TypographySection() {
   const [advanced, setAdvanced] = useLocalStorage(
     TYPOGRAPHY_ADVANCED_STORAGE_KEY,
@@ -346,6 +401,7 @@ export function TypographySection() {
   return (
     <SettingsSection id="typography" title="字体排版">
       {showAdvanced ? <FontSettingsGroup /> : <SimpleFontRows />}
+      <ChatReadingSizeRow />
       <WordWrapRow />
       <AdvancedSettings
         targetIds={[searchableSetting("separate-fonts").id, searchableSetting("font-smoothing").id]}

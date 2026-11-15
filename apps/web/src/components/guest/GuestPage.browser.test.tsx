@@ -230,8 +230,7 @@ describe("GuestPage", () => {
     await using screen = await render(<GuestPage />, { container });
 
     await expect.element(screen.getByText("All checks pass.")).toBeVisible();
-    // A finished turn folds its work, as it does for the owner; the command is inside.
-    await userEvent.click(screen.getByRole("button", { name: /工作了/ }));
+    // Under the default semantic work stream, settled turns show standalone command rows directly, as for the owner.
     await expect.element(screen.getByText("vp run check:changed")).toBeVisible();
     // Expanding the command shows its output, read through the guest route.
     await userEvent.click(screen.getByText("vp run check:changed"));

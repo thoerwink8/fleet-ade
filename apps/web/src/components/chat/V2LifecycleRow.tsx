@@ -335,11 +335,11 @@ const NOTIFICATION_OUTCOME_STATUS: Record<
 };
 
 const NOTIFICATION_OUTCOME_LABEL: Record<OrchestrationV2Notification["outcome"], string> = {
-  completed: "Finished",
-  failed: "Failed",
-  cancelled: "Stopped",
-  updated: "Updated",
-  unknown: "Finished",
+  completed: "已完成",
+  failed: "失败",
+  cancelled: "已停止",
+  updated: "已更新",
+  unknown: "已完成",
 };
 
 export function SubagentNotificationLink(props: {

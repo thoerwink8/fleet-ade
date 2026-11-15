@@ -299,15 +299,15 @@ export function useQueuedRunEdit(input: {
           const title = appAtomRegistry.get(
             environmentThreadShells.threadShellAtom(threadRef),
           )?.title;
-          const where = title === undefined ? "" : ` in “${title}”`;
+          const where = title === undefined ? "" : `（“${title}”）`;
           toastManager.add(
             stackedThreadToast({
               type: recovery === "kept" ? "info" : "warning",
               title: "排队的消息已不在队列中",
               description:
                 recovery === "kept"
-                  ? `Your unsaved edit${where} was kept in the composer.`
-                  : `Your unsaved edit${where} was discarded.`,
+                  ? `未保存的编辑内容${where}已保留在输入框中。`
+                  : `未保存的编辑内容${where}已丢弃。`,
             }),
           );
         },

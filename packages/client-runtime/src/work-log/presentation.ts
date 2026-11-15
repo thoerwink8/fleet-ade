@@ -21,7 +21,7 @@ import { resolveMediaSource } from "@t3tools/client-runtime/media-source";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
 import { formatTokens } from "@t3tools/shared/usageFormat";
-import { classifyToolActivity } from "@t3tools/shared/toolActivity";
+import { classifyToolActivity, collectToolFilePaths } from "@t3tools/shared/toolActivity";
 import { toolOutputIndicatesFailure } from "@t3tools/shared/toolOutput";
 
 import {
@@ -162,6 +162,14 @@ function workEntryToolOutput(
     : (data?.output ?? data?.result ?? data?.rawOutput ?? data?.content);
 }
 
+function joinPresentationPhrase(left: string, right: string): string {
+  if (!left) return right;
+  if (!right) return left;
+  return /[A-Za-z0-9]$/.test(left) || /^[A-Za-z0-9#]/.test(right)
+    ? `${left} ${right}`
+    : `${left}${right}`;
+}
+
 function resolveT3McpToolPresentation(
   definition: T3McpToolDefinition | null,
   status: string | undefined,
@@ -175,11 +183,11 @@ function resolveT3McpToolPresentation(
       : status === "completed"
         ? completed
         : status === "failed"
-          ? `Failed to ${action.toLowerCase()}`
+          ? `未能${action}`
           : status === "declined"
-            ? `Declined to ${action.toLowerCase()}`
+            ? `已拒绝${action}`
             : status === "stopped"
-              ? `已停止 ${running.toLowerCase()}`
+              ? `已停止${action}`
               : running;
 
   const actionKind =
@@ -207,7 +215,7 @@ function resolveT3McpToolPresentation(
       ? `${shortLabel} #${number}`
       : detail;
   return {
-    displayName: `${verb} ${target}`,
+    displayName: joinPresentationPhrase(verb, target),
     icon: definition.icon,
     ...(actionKind === undefined ? {} : { action: actionKind }),
   };
@@ -402,20 +410,60 @@ export function workEntryViewedImagePath(entry: WorkLogPresentationEntry): strin
   ) {
     return viewedImagePath;
   }
+  if (toolGroupAction(entry) !== "read") {
+    return null;
+  }
   const detail = entry.detail?.trim();
-  return toolGroupAction(entry) === "read" &&
-    detail !== undefined &&
-    !/[\r\n]/.test(detail) &&
-    isWorkspaceImagePreviewPath(detail)
-    ? detail
-    : null;
+  if (detail !== undefined && !/[\r\n]/.test(detail) && isWorkspaceImagePreviewPath(detail)) {
+    return detail;
+  }
+  const candidatePaths = [
+    ...(entry.changedFiles ?? []),
+    ...collectToolFilePaths({ input: workEntryToolInput(entry) }),
+    ...collectToolFilePaths(asRecord(entry.toolData) ?? undefined),
+  ];
+  for (const rawPath of candidatePaths) {
+    const trimmed = rawPath.trim();
+    if (trimmed && !/[\r\n]/.test(trimmed) && isWorkspaceImagePreviewPath(trimmed)) {
+      return trimmed;
+    }
+  }
+  return null;
 }
 
 /** Distinct images the agent opened across a tool group, in viewing order. */
 export function workEntriesViewedImagePaths(
   entries: ReadonlyArray<WorkLogPresentationEntry>,
 ): string[] {
-  return [...new Set(entries.flatMap((entry) => workEntryViewedImagePath(entry) ?? []))];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const entry of entries) {
+    const direct = workEntryViewedImagePath(entry);
+    if (direct && !seen.has(direct)) {
+      seen.add(direct);
+      result.push(direct);
+    }
+    if (toolGroupAction(entry) === "read") {
+      const extraPaths = [
+        ...(entry.changedFiles ?? []),
+        ...collectToolFilePaths({ input: workEntryToolInput(entry) }),
+        ...collectToolFilePaths(asRecord(entry.toolData) ?? undefined),
+      ];
+      for (const rawPath of extraPaths) {
+        const trimmed = rawPath.trim();
+        if (
+          trimmed &&
+          !/[\r\n]/.test(trimmed) &&
+          isWorkspaceImagePreviewPath(trimmed) &&
+          !seen.has(trimmed)
+        ) {
+          seen.add(trimmed);
+          result.push(trimmed);
+        }
+      }
+    }
+  }
+  return result;
 }
 
 export interface ViewedImageAsset {
@@ -467,35 +515,35 @@ function toolGroupActionCount(
 function toolGroupActionLabel(action: ToolGroupAction, count: number): string {
   switch (action) {
     case "link-pr":
-      return `Linked ${count} ${count === 1 ? "pull request" : "pull requests"}`;
+      return `关联了 ${count} 个 PR`;
     case "unlink-pr":
-      return `Unlinked ${count} ${count === 1 ? "pull request" : "pull requests"}`;
+      return `取消关联了 ${count} 个 PR`;
     case "watch-pr":
-      return `Watching ${count} ${count === 1 ? "pull request" : "pull requests"}`;
+      return `正在关注 ${count} 个 PR`;
     case "unwatch-pr":
-      return `Stopped watching ${count} ${count === 1 ? "pull request" : "pull requests"}`;
+      return `停止关注了 ${count} 个 PR`;
     case "list-prs":
-      return count === 1 ? "已检查关联的 PR" : `已检查关联的 pull request ${count} 次`;
+      return count === 1 ? "已检查关联的 PR" : `已检查关联的 PR ${count} 次`;
     case "read":
-      return `Read ${count} ${count === 1 ? "file" : "files"}`;
+      return `读了 ${count} 个文件`;
     case "edit":
-      return `Changed ${count} ${count === 1 ? "file" : "files"}`;
+      return `修改了 ${count} 个文件`;
     case "command":
-      return `Ran ${count} ${count === 1 ? "command" : "commands"}`;
+      return `运行了 ${count} 条命令`;
     case "thread-create":
-      return `Created ${count} ${count === 1 ? "thread" : "threads"}`;
+      return `创建了 ${count} 个会话`;
     case "device":
-      return `Used device controls ${count} ${count === 1 ? "time" : "times"}`;
+      return `操作了设备 ${count} 次`;
     case "browser":
-      return `Used browser ${count} ${count === 1 ? "time" : "times"}`;
+      return `使用了浏览器 ${count} 次`;
     case "search":
-      return `Searched the web ${count} ${count === 1 ? "time" : "times"}`;
+      return `搜索了网页 ${count} 次`;
     case "code-search":
-      return `Searched code ${count} ${count === 1 ? "time" : "times"}`;
+      return `搜索了代码 ${count} 次`;
     case "other":
-      return `Used ${count} ${count === 1 ? "tool" : "tools"}`;
+      return `调用了 ${count} 个工具`;
     case "update":
-      return `Received ${count} ${count === 1 ? "update" : "updates"}`;
+      return `收到了 ${count} 条更新`;
   }
 }
 
@@ -619,12 +667,10 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
       sourceNames.length < 2
         ? sourceNames[0]!
         : sourceNames.length === 2
-          ? sourceNames.join(" and ")
-          : `${sourceNames.slice(0, -1).join(", ")}, and ${sourceNames.at(-1)}`;
+          ? sourceNames.join(" 和 ")
+          : `${sourceNames.slice(0, -1).join("、")} 和 ${sourceNames.at(-1)}`;
     const allIntegrations = sourceValues.every((source) => source.kind === "integration");
-    labels.unshift(
-      `Used ${formattedNames}${allIntegrations ? ` ${sourceNames.length === 1 ? "integration" : "integrations"}` : ""}`,
-    );
+    labels.unshift(`使用了 ${formattedNames}${allIntegrations ? " 集成" : ""}`);
   }
   const sourcedCount = entries.filter(
     (entry) =>
@@ -634,15 +680,9 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
   const remainingCount =
     entries.length - sourcedCount - selected.reduce((count, group) => count + group.count, 0);
   if (remainingCount > 0) {
-    labels.push(`Performed ${remainingCount} other ${remainingCount === 1 ? "action" : "actions"}`);
+    labels.push(`执行了另外 ${remainingCount} 项操作`);
   }
-  const sentenceLabels = labels.map((label, index) =>
-    index === 0 ? label : label.charAt(0).toLowerCase() + label.slice(1),
-  );
-  const summary =
-    sentenceLabels.length < 3
-      ? sentenceLabels.join(" and ")
-      : `${sentenceLabels.slice(0, -1).join(", ")}, and ${sentenceLabels.at(-1)}`;
+  const summary = labels.join("，");
   return { summary, hasFailure: summaries.some((group) => group.failedCount > 0) };
 }
 

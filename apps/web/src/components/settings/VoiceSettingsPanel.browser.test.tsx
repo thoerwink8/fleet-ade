@@ -666,9 +666,9 @@ it("records from the first connected microphone in the saved order", async () =>
   await expect.element(screen.getByRole("button", { name: "上移 AirPods Pro" })).toBeDisabled();
   expect(await chooseRecordingMicrophone()).toBe("airpods");
 
-  await userEvent.click(screen.getByRole("button", { name: "Forget Blue Yeti" }));
+  await userEvent.click(screen.getByRole("button", { name: "移除 Blue Yeti" }));
   expect(saved()).toEqual(["AirPods Pro", "系统默认"]);
   await expect
-    .element(screen.getByRole("button", { name: "Forget 系统默认" }))
+    .element(screen.getByRole("button", { name: "移除 系统默认" }))
     .not.toBeInTheDocument();
 });

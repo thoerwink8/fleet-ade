@@ -12,15 +12,11 @@ export type EnvironmentIdentificationPillLabel = "Dev" | "Nightly 版";
 const STAGE_BACKDROP_VIEW_BOX = "0 0 8192 96";
 
 export function resolveSidebarStageBackdropVariant(
-  stageLabel: string,
+  _stageLabel: string,
   mode: EnvironmentIdentificationMode = "artwork",
 ): SidebarStageBackdropVariant | null {
   if (mode === "nightly-artwork") return "nightly";
   if (mode === "dev-artwork") return "dev";
-  if (mode !== "artwork") return null;
-  const normalized = stageLabel.trim().toLowerCase();
-  if (normalized === "nightly" || normalized.startsWith("nightly ")) return "nightly";
-  if (normalized === "dev") return "dev";
   return null;
 }
 

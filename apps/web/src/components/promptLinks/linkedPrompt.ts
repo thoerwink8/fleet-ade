@@ -9,7 +9,7 @@ export function warnAboutHiddenCharacters(prompt: LinkedPrompt): void {
   toastManager.add({
     type: "warning",
     title: "此提示词含有隐藏字符，可能是恶意内容",
-    description: `T3 Code removed ${prompt.hiddenCharacters} hidden character${prompt.hiddenCharacters === 1 ? "" : "s"}. Read the prompt before you send it.`,
+    description: `已移除 ${prompt.hiddenCharacters} 个隐藏字符，发送前请先核对提示词内容。`,
     timeout: 0,
   });
 }

@@ -114,7 +114,7 @@ function providerStartingLabel(
     (session) => session.providerInstanceId === run.providerInstanceId,
   )?.driver;
   const name = driver === undefined ? undefined : PROVIDER_DISPLAY_NAMES[driver];
-  return name === undefined ? "正在启动" : `Starting ${name}`;
+  return name === undefined ? "正在启动" : `正在启动 ${name}`;
 }
 
 function summarizeThreadRun(
@@ -275,22 +275,22 @@ export function formatSubagentEffort(input: {
 }
 
 const SUBAGENT_STATUS_LABELS: Record<OrchestrationV2ExecutionNode["status"], string> = {
-  idle: "Idle",
-  pending: "Working",
-  running: "Working",
-  waiting: "Waiting",
-  completed: "Completed",
-  interrupted: "Interrupted",
-  failed: "Failed",
-  cancelled: "Cancelled",
-  rolled_back: "Cancelled",
+  idle: "空闲",
+  pending: "执行中",
+  running: "执行中",
+  waiting: "等待中",
+  completed: "已完成",
+  interrupted: "已中断",
+  failed: "失败",
+  cancelled: "已取消",
+  rolled_back: "已取消",
 };
 
 export function formatProviderSubagentStatus(
   status: ProviderSubagentStatus | null,
   nowMs: number,
 ): string {
-  if (status === null) return "Starting";
+  if (status === null) return "启动中";
   const label = SUBAGENT_STATUS_LABELS[status.status];
   const live = isOrchestrationV2WorkActive(status.status);
   if (!live && status.status !== "completed") return label;
@@ -302,7 +302,7 @@ export function formatProviderSubagentStatus(
       : Date.parse(status.completedAt);
   if (!Number.isFinite(start) || !Number.isFinite(end)) return label;
   const elapsed = formatDuration(Math.max(1_000, Math.floor((end - start) / 1_000) * 1_000));
-  return live ? `${label} ${elapsed}` : `${label} in ${elapsed}`;
+  return live ? `${label} ${elapsed}` : `${label}（耗时 ${elapsed}）`;
 }
 
 /** The run a manual continuation resumes; the server holds the queue until it does. */
@@ -497,12 +497,12 @@ type BackgroundWorkKind = OrchestrationV2PendingBackgroundTask["kind"];
 
 const BACKGROUND_WORK_KINDS: Record<
   BackgroundWorkKind,
-  { readonly order: number; readonly singular: string; readonly plural: string }
+  { readonly order: number; readonly singular: string; readonly measure: string }
 > = {
-  subagent: { order: 0, singular: "subagent", plural: "subagents" },
-  command: { order: 1, singular: "command", plural: "commands" },
-  monitor: { order: 2, singular: "monitor", plural: "monitors" },
-  background_task: { order: 3, singular: "background task", plural: "background tasks" },
+  subagent: { order: 0, singular: "子代理", measure: "个" },
+  command: { order: 1, singular: "后台命令", measure: "条" },
+  monitor: { order: 2, singular: "监控任务", measure: "个" },
+  background_task: { order: 3, singular: "后台任务", measure: "个" },
 };
 
 export interface RunStopPresentation {
@@ -625,22 +625,22 @@ export function presentPendingBackgroundWork(
     );
   const [only] = items;
   if (items.length === 1 && only !== undefined) {
-    const noun = BACKGROUND_WORK_KINDS[only.kind].singular;
-    const named = only.label !== noun;
+    const { singular, measure } = BACKGROUND_WORK_KINDS[only.kind];
+    const named = only.label !== singular;
     const title = named
-      ? `${waiting ? "Waiting" : "Running"} · ${only.label}`
+      ? `${waiting ? "等待中" : "运行中"} · ${only.label}`
       : waiting
-        ? `Waiting on a ${noun}`
-        : `Running a ${noun}`;
+        ? `等待 1 ${measure}${singular}`
+        : `正在运行 1 ${measure}${singular}`;
     return { title, items, waiting };
   }
   const counts = new Map<BackgroundWorkKind, number>();
   for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
   const groups = Array.from(counts, ([kind, count]) => {
-    const { singular, plural } = BACKGROUND_WORK_KINDS[kind];
-    return `${count} ${count === 1 ? singular : plural}`;
+    const { singular, measure } = BACKGROUND_WORK_KINDS[kind];
+    return `${count} ${measure}${singular}`;
   });
-  return { title: `${waiting ? "Waiting on" : "Running"} ${joinWithAnd(groups)}`, items, waiting };
+  return { title: `${waiting ? "等待" : "正在运行"} ${joinWithAnd(groups)}`, items, waiting };
 }
 
 export interface ProviderGoalPresentation {

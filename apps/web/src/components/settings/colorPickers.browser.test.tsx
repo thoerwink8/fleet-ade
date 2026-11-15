@@ -123,7 +123,7 @@ async function renderAccentPicker(value: string) {
   );
   await using stack = new AsyncDisposableStack();
   const screen = stack.use(await renderPicker(picker(value)));
-  await open("Change accent color for Codex");
+  await open("更改 Codex 的强调色");
   stack.move();
   return Object.assign(screen, {
     onCommit,
@@ -142,7 +142,7 @@ describe("provider accent color picker", () => {
       />,
     );
 
-    await open("Add accent color for Example provider");
+    await open("添加 Example provider 的强调色");
     expect(byLabel<HTMLInputElement>("自定义十六进制强调色").value).toBe("#2563eb");
     expect(onCommit).not.toHaveBeenCalled();
     await userEvent.keyboard("{Escape}");
@@ -159,15 +159,15 @@ describe("provider accent color picker", () => {
       />,
     );
 
-    await open("Add accent color for Example provider");
+    await open("添加 Example provider 的强调色");
     await userEvent.click(page.getByRole("button", { name: "添加颜色", exact: true }));
 
     expect(onCommit).toHaveBeenCalledExactlyOnceWith("#2563eb");
     await expect
-      .element(screen.getByRole("button", { name: "Change accent color for Example provider" }))
+      .element(screen.getByRole("button", { name: "更改 Example provider 的强调色" }))
       .toBeVisible();
     await vi.waitFor(() =>
-      expect(document.querySelector('[aria-label="Custom hex accent color"]')).toBeNull(),
+      expect(document.querySelector('[aria-label="自定义十六进制强调色"]')).toBeNull(),
     );
   });
 
@@ -181,7 +181,7 @@ describe("provider accent color picker", () => {
       />,
     );
 
-    await open("Add accent color for Example provider");
+    await open("添加 Example provider 的强调色");
     await act(async () => byLabel("强调色 saturation").focus());
     await userEvent.tab();
     await userEvent.tab();
@@ -191,7 +191,7 @@ describe("provider accent color picker", () => {
 
     expect(onCommit).toHaveBeenCalledExactlyOnceWith("#2563eb");
     await expect
-      .element(screen.getByRole("button", { name: "Change accent color for Example provider" }))
+      .element(screen.getByRole("button", { name: "更改 Example provider 的强调色" }))
       .toBeVisible();
   });
 
@@ -205,13 +205,13 @@ describe("provider accent color picker", () => {
       />,
     );
 
-    await open("Change accent color for Example provider");
+    await open("更改 Example provider 的强调色");
     await press(HUE, "ArrowRight", true);
     expect(onCommit).toHaveBeenLastCalledWith("#ff2a00");
     await userEvent.click(page.getByRole("button", { name: "清除颜色", exact: true }));
     expect(onCommit).toHaveBeenLastCalledWith("");
     await expect
-      .element(screen.getByRole("button", { name: "Add accent color for Example provider" }))
+      .element(screen.getByRole("button", { name: "添加 Example provider 的强调色" }))
       .toBeVisible();
   });
 
@@ -255,6 +255,6 @@ describe("provider accent color picker", () => {
     await userEvent.click(page.getByRole("button", { name: "添加颜色", exact: true }));
     expect(screen.onCommit).toHaveBeenLastCalledWith("#2563eb");
 
-    expect(byLabel("Change accent color for Codex").style.backgroundColor).toBe("rgb(37, 99, 235)");
+    expect(byLabel("更改 Codex 的强调色").style.backgroundColor).toBe("rgb(37, 99, 235)");
   });
 });

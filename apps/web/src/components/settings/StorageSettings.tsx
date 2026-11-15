@@ -420,10 +420,10 @@ function CleanupSection() {
       report,
       label: settingsScopeEnvironmentLabel(environment, connectedEnvironments),
       counts: report
-        ? `${report.counts.removed} removed, ${report.counts.kept} kept${report.counts.failed > 0 ? `, ${report.counts.failed} failed` : ""}`
+        ? `已清理 ${report.counts.removed} 项，保留 ${report.counts.kept} 项${report.counts.failed > 0 ? `，失败 ${report.counts.failed} 项` : ""}`
         : "",
       description: report
-        ? `Last run ${formatRelativeTimeLabel(report.finishedAt, nowMs)}. ${formatBytes(report.bytesFreed)} recovered.${report.counts.failed > 0 ? ` ${report.counts.failed} ${report.counts.failed === 1 ? "item" : "items"} couldn't be removed.` : ""}`
+        ? `上次运行于 ${formatRelativeTimeLabel(report.finishedAt, nowMs)}，已回收 ${formatBytes(report.bytesFreed)}。${report.counts.failed > 0 ? `有 ${report.counts.failed} 项未能清理。` : ""}`
         : query?.failed
           ? "无法加载上次运行记录。"
           : query?.loading

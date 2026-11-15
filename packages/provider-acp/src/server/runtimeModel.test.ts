@@ -221,7 +221,7 @@ describe("AcpRuntimeModel", () => {
         toolCall: {
           toolCallId: "tool-1",
           kind: "execute",
-          title: "Ran command",
+          title: "已运行命令",
           status: "pending",
           command: "bun run typecheck",
           detail: "bun run typecheck",
@@ -289,7 +289,7 @@ describe("AcpRuntimeModel", () => {
       expect(mergeToolCallState(createdEvent.toolCall, updatedEvent.toolCall)).toMatchObject({
         toolCallId: "tool-1",
         status: "completed",
-        title: "Ran command",
+        title: "已运行命令",
         detail: "bun run typecheck",
         command: "bun run typecheck",
       });
@@ -1350,7 +1350,7 @@ describe("extractMcpToolCallIdentity", () => {
       ],
     });
 
-    expect(toolCall.title).toBe("Ran command");
+    expect(toolCall.title).toBe("已运行命令");
     expect(extractMcpToolCallIdentity(toolCall)).toEqual({
       server: "t3-code",
       tool: "orchestrator_capabilities",

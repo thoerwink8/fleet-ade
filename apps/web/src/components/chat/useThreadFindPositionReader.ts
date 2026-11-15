@@ -53,6 +53,7 @@ export function useThreadFindPositionReader({
           isWorking,
           runlessWorkActive,
           toolCallVisibility,
+          semanticWorkStream: (toolCallVisibility ?? "showAll") === "showAll",
         });
       const entryById = new Map(timelineEntries.map((entry) => [entry.id, entry]));
       return readThreadFindPosition(

@@ -258,7 +258,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     if (link.kind === "pull-request") {
       setState({
         status: "failed",
-        title: `Cloning ${repository.owner}/${repository.name}`,
+        title: `正在克隆 ${repository.owner}/${repository.name}`,
         message: "克隆完成后，请再次打开此链接。",
       });
       return;

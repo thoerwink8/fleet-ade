@@ -115,7 +115,11 @@ function setup(input: {
   state.workspaceRoot = input.workspaceRoot;
   state.folder = input.folder;
   state.pullRequests = input.pullRequests ?? [];
-  useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
+  useRightPanelStore.setState({
+    threadPanelVisibilityByThreadKey: {
+      "environment:thread": { inlineOpen: true, popoverOpen: false },
+    },
+  });
   const anchor = document.createElement("div");
   document.body.append(anchor);
   return {

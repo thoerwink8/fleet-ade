@@ -414,7 +414,7 @@ export function McpAppFrame(props: {
   if (closed) {
     return (
       <div className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-muted-foreground text-xs">
-        <span>The {app.server} app was closed</span>
+        <span>{app.server} 应用已关闭</span>
         <Button
           size="xs"
           variant="ghost"
@@ -467,7 +467,7 @@ export function McpAppFrame(props: {
         ) : null}
         {navigatedAway ? (
           <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            The {app.server} app left its page and was stopped
+            {app.server} 应用已离开页面并停止
           </p>
         ) : src !== null ? (
           <iframe

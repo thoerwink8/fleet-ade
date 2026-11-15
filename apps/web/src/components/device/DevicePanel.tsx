@@ -331,14 +331,14 @@ export function DevicePanel(props: {
                                   {device.name}
                                 </span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                  {`${state.hosts.find((host) => host.id === device.hostId)?.label} · ${device.version} · ${device.booted ? "Running" : "Stopped"}`}
+                                  {`${state.hosts.find((host) => host.id === device.hostId)?.label} · ${device.version} · ${device.booted ? "运行中" : "已停止"}`}
                                 </span>
                               </div>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 disabled={pendingDeviceKey !== null}
-                                aria-label={`${device.booted ? "Open" : "Start"} ${device.name}`}
+                                aria-label={`${device.booted ? "打开" : "启动"} ${device.name}`}
                                 onClick={() => void selectDevice(deviceKey(device))}
                               >
                                 {pendingDeviceKey === deviceKey(device) ? (
@@ -434,7 +434,7 @@ function DeviceDiscoveryWarning(props: {
         <CircleAlert className="mt-px size-3.5 shrink-0 text-warning-foreground" />
         <span className="min-w-0">
           {platforms.length > 0
-            ? `${platforms.join(" and ")} 上的 ${platforms.length > 1 ? "lists" : "list"} ${props.label} 可能不完整。`
+            ? `${platforms.join("、")} 上的 ${props.label} 列表可能不完整。`
             : `发现 ${props.label} 上的设备时出现警告。`}
         </span>
       </span>

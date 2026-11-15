@@ -16,9 +16,7 @@ export function startLegacyThreadMigrationToast(): () => void {
         toastId = toastManager.add({
           type: "loading",
           title: "正在恢复你的会话…",
-          description: `Migrating ${migration.totalThreadCount.toLocaleString("zh-CN")} ${
-            migration.totalThreadCount === 1 ? "thread" : "threads"
-          } from the previous version. You can keep working while this finishes.`,
+          description: `正在从旧版本迁移 ${migration.totalThreadCount.toLocaleString("zh-CN")} 个会话，期间可照常使用。`,
           timeout: 0,
         });
         return;

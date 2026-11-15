@@ -168,17 +168,33 @@ function ExtendedOfficeViewer(props: {
   const sheet = workbook?.sheets[page];
   const documentPage = previewDocument?.pages[page];
   const navigation = workbook ? "sheet" : (previewDocument?.navigation ?? "slide");
+  const navigationLabel =
+    navigation === "sheet"
+      ? "工作表"
+      : navigation === "chapter"
+        ? "章"
+        : navigation === "slide"
+          ? "张幻灯片"
+          : "页";
+  const prevNextUnit =
+    navigation === "sheet"
+      ? "工作表"
+      : navigation === "chapter"
+        ? "章"
+        : navigation === "slide"
+          ? "张幻灯片"
+          : "页";
   const documentCount = previewDocument?.pages.length ?? 0;
   const documentDetails =
     navigation === "chapter"
       ? `第 ${page + 1} 章，共 ${documentCount} 章`
-      : `${documentCount} ${navigation}${documentCount === 1 ? "" : "s"}`;
+      : `共 ${documentCount} ${navigationLabel}`;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {count > 0 ? (
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/60 px-3 text-xs">
           <FileSurfaceAction
-            label={`Previous ${navigation}`}
+            label={`上一${prevNextUnit}`}
             disabled={page === 0}
             onPress={() => selectPage(page - 1)}
           >
@@ -226,11 +242,11 @@ function ExtendedOfficeViewer(props: {
             </div>
           ) : (
             <span className="flex-1 text-center tabular-nums" aria-live="polite">
-              {navigation === "slide" ? "幻灯片" : "页"} {page + 1} of {count}
+              第 {page + 1} / {count} {navigation === "slide" ? "张幻灯片" : "页"}
             </span>
           )}
           <FileSurfaceAction
-            label={`Next ${navigation}`}
+            label={`下一${prevNextUnit}`}
             disabled={page + 1 === count}
             onPress={() => selectPage(page + 1)}
           >

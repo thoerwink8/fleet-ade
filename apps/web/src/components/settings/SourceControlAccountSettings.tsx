@@ -216,13 +216,12 @@ export function SourceControlAccountSettings({
                 className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground/70"
               >
                 <RedactedLogin revealed={revealed} account={entry.account} />
-                <span>can't be used: {entry.error ?? `${cliName} 报告此登录账户无效。`}</span>
+                <span>无法使用：{entry.error ?? `${cliName} 报告此登录账户无效。`}</span>
               </p>
             ))}
             {group.environmentVariable ? (
               <p className="text-xs text-warning">
-                {group.environmentVariable} is set on the server, so it overrides the account chosen
-                here until it is unset.
+                服务器已设置 {group.environmentVariable}，在取消设置前会覆盖此处选择的账户。
               </p>
             ) : null}
           </div>

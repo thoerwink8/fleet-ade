@@ -34,7 +34,7 @@ const INITIAL_MEASUREMENTS: ChatCanvasMeasurements = {
   width: 0,
   height: 0,
   padding: 48,
-  maxChatWidth: 768,
+  maxChatWidth: 960,
   minChatWidth: 640,
   composerHeight: 0,
   timelineGutter: 0,

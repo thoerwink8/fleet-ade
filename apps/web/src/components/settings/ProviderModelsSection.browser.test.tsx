@@ -23,6 +23,6 @@ it("lists a favorite the provider no longer reports so it can be unstarred", asy
       onModelOrderChange={() => {}}
     />,
   );
-  await screen.getByRole("button", { name: "Remove retired-model from favorites" }).click();
+  await screen.getByRole("button", { name: "将 retired-model 移出收藏" }).click();
   expect(onToggleFavorite).toHaveBeenCalledWith("retired-model");
 });

@@ -81,7 +81,7 @@ export function PullRequestComposer({
         render={<Button size="icon" variant="glass" />}
         aria-label={
           pendingComments.length > 0
-            ? `Review ${term}, ${pendingComments.length} ${pendingComments.length === 1 ? "comment" : "comments"} pending`
+            ? `审查 ${term}，${pendingComments.length} 条评论待提交`
             : reviewStarted || !canComment
               ? `审查 ${term}`
               : `评论 ${term}`

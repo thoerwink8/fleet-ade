@@ -1414,9 +1414,7 @@ export function useComposerSend(input: ComposerSendInput) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: isAtomCommandInterrupted(failure)
-                ? "Message may not have been sent"
-                : "Message not sent",
+              title: isAtomCommandInterrupted(failure) ? "消息可能尚未发送" : "消息未发送",
               description: "新草稿已保留。复制失败的那条消息即可再次发送。",
               // The toast holds the only copy of the failed text, so it stays until dismissed.
               timeout: 0,
