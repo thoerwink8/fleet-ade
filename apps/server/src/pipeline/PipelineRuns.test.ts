@@ -415,6 +415,44 @@ describe("PipelineRuns", () => {
     ),
   );
 
+  it.effect("读用量失败不覆盖已经记下的数字", () =>
+    Effect.gen(function* () {
+      const fail = yield* Ref.make(false);
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        yield* runs.tick;
+        yield* runs.note(7, {
+          sessionStartedAt: "2026-01-01T00:00:00.000Z",
+          sessionEndedAt: "2026-01-01T01:00:00.000Z",
+        });
+        const filled = (yield* runs.list).runs[0];
+        assert.strictEqual(filled?.inputTokens, 10);
+        assert.strictEqual(filled?.usageNote, null);
+        yield* Ref.set(fail, true);
+        yield* runs.tick;
+        const kept = (yield* runs.list).runs[0];
+        assert.strictEqual(kept?.inputTokens, 10);
+        assert.strictEqual(kept?.outputTokens, 10);
+        assert.strictEqual(kept?.convertedCost, 1);
+        assert.strictEqual(kept?.modelAccount, "alpha");
+        assert.strictEqual(kept?.usageNote, null);
+      }).pipe(
+        Effect.provide(
+          pipelineLayer({
+            issues: Effect.succeed([issue(7)]),
+            usage: Ref.get(fail).pipe(
+              Effect.flatMap((failed) =>
+                failed
+                  ? Effect.fail(new PipelineUsageUnreadable())
+                  : readable([record("2026-01-01T00:30:00.000Z", "alpha", 10, 1)]),
+              ),
+            ),
+          }),
+        ),
+      );
+    }),
+  );
+
   it.effect("最近二十条汇总返工率、耗时和折算费用", () =>
     Effect.gen(function* () {
       const runs = yield* PipelineRuns;
