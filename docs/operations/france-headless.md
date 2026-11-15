@@ -6,7 +6,7 @@
 
 - **只走 WireGuard 隧道**：服务端绑定 `--host 192.0.2.2 --port 3773`，`ufw` 仅放行 `wg-fleet` 网卡来自 `192.0.2.0/24` 的 `3773/tcp`，公网网卡不监听、不放行，不挂任何公网域名或反向代理。
 - **专用系统用户与独立运行时**：以专用系统用户 `ade`（无 `sudo`）运行；Node `26.12.1` 与 `pnpm@12.14.0` 仅装在 `/home/ade/.local` 下，绝不改动系统 `/usr/bin/node`（`v22.23.2`）和现有引擎服务。
-- **独立模型与仓库凭据**：`ade` 用户使用自己独立的 `/home/ade/.grok` 与 GitHub CLI（`gh`）HTTPS 凭据，不复用其他系统用户的轮换 OIDC 凭据；法国机器上禁用 `claudeAgent` 与 `codex`，仅启用 `grok`。
+- **独立模型与仓库凭据**：`ade` 用户使用自己独立的 `/home/ade/.grok`，以及单独一份 GitHub App 凭据（`/etc/fleet-ade/github-app.json`，`root:ade 0640`）换来的安装令牌访问 `thoerwink8/fleet-ade`，不用任何个人令牌，也不复用其他系统用户的凭据或轮换 OIDC 凭据；`ade` 不在 `fleet` 组；法国机器上禁用 `claudeAgent` 与 `codex`，仅启用 `grok`。
 - **离得开上游服务**：`T3CODE_TELEMETRY_ENABLED=false`、`OTEL_SDK_DISABLED=true`、`T3CODE_OTEL_SDK_DISABLED=true`、`enableProviderUpdateChecks=false` 常驻开启，不连接任何 `t3.codes` / `t3coderelay.com` 上游域名。
 - **并发与资源闸门**：服务端通过 `--max-concurrent-sessions 2`（及 `settings.json` 中的 `maxConcurrentSessions: 2`）将跨会话并发轮次限制为 2 个；超出上限的新轮次在持久出站队列排队，空闲会话按上限及时回收。
 
@@ -40,21 +40,44 @@
 
 ## 4. 首次安装
 
-1. 为 `ade` 用户准备独立的 GitHub CLI（HTTPS 凭据助手）与 Grok 登录：
+1. 为 `ade` 用户登录 Grok（GitHub 凭据由第 4 节的脚本在安装时配好，不需要 `gh auth login`）：
 
    ```bash
-   sudo -iu ade gh auth login --git-protocol https
-   sudo -iu ade gh auth setup-git
    sudo -iu ade /home/ade/.grok/bin/grok login
    ```
 
-2. 以 `root` 执行安装脚本并传入要部署的 40 位提交号（远端 SSH 命令一律加 `timeout`）：
+2. 以 `root` 执行安装脚本并传入要部署的 40 位提交号（远端 SSH 命令一律加 `timeout`）。`/etc/fleet-ade/github-app.json` 还不存在时，加 `--github-app-source <GitHub App 的 JSON 文件>` 从它创建（见第 4 节）：
 
    ```bash
-   sudo bash scripts/deploy/france-install.sh <40位提交SHA>
+   sudo bash scripts/deploy/france-install.sh <40位提交SHA> [--github-app-source <App JSON>]
    ```
 
-   脚本会自动完成：建 `ade` 用户与目录、校验并安装 Node `26.12.1` + `pnpm@12.14.0`、在临时构建 cgroup 中编译 `t3`、合并 `settings.json`（开启 `linkedEnvironmentsEnabled: true` 与 `maxConcurrentSessions: 2`）、安装 `ade.slice` 与 `fleet-ade.service`、配置 `ufw` 仅在 `wg-fleet` 放行 `3773/tcp`、启动服务并校验监听地址。
+   脚本会自动完成：建 `ade` 用户与目录、校验并安装 Node `26.12.1` + `pnpm@12.14.0`、配好 GitHub App 凭据与 git 凭据助手（第 4 节）、在临时构建 cgroup 中编译 `t3`、合并 `settings.json`（开启 `linkedEnvironmentsEnabled: true` 与 `maxConcurrentSessions: 2`）、安装 `ade.slice` 与 `fleet-ade.service`、配置 `ufw` 仅在 `wg-fleet` 放行 `3773/tcp`、启动服务并校验监听地址。
+
+### 4.1 GitHub App 凭据（`ade` 推 PR 用）
+
+`ade` 用 GitHub App 安装令牌拉取和推送 `thoerwink8/fleet-ade`，提交和 PR 的作者是 App 机器人，不是个人账号。App 需已安装到 `thoerwink8/fleet-ade`，权限含 `contents` 与 `pull_requests` 写。
+
+`scripts/deploy/france-github-app.sh`（`france-install.sh` 与 `france-update.sh` 都会调用，可重复执行）负责：
+
+| 项                                                  | 说明                                                                                                                                           |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/etc/fleet-ade/github-app.json`（`root:ade 0640`） | 只在文件不存在时由 `--source` 创建，只拷 `id`、`client_id`、`slug`、`pem` 四个字段，不带 webhook 与 client 密钥；不打印任何值                  |
+| `/home/ade/.local/bin/git-credential-fleet-ade-app` | git 凭据助手：用 App 私钥签 JWT，换 1 小时有效的安装令牌（限定仓库 `fleet-ade`），缓存在 `~/.cache/fleet-ade/`，剩余不足 10 分钟时自动重新换发 |
+| `/home/ade/.gitconfig`                              | 助手只对 `https://github.com/thoerwink8/fleet-ade`（含 `.git` 结尾）生效（`useHttpPath`），其他远端不会拿到令牌；提交身份设为 App 机器人       |
+| `/home/ade/.local/bin/gh`                           | `gh` 包装脚本：未设置 `GH_TOKEN` 时用同一个助手取安装令牌再调 `/usr/bin/gh`，供 Grok 会话开 PR                                                 |
+
+首次配置（法国机器上已有同一个 App 的 JSON 时，由有权限的人执行）：
+
+```bash
+sudo bash scripts/deploy/france-github-app.sh --source <App JSON 路径>
+```
+
+验证（不打印令牌）：
+
+```bash
+sudo -iu ade git ls-remote https://github.com/thoerwink8/fleet-ade.git HEAD
+```
 
 ## 5. 日常更新（拉提交 → 构建 → 重启）
 

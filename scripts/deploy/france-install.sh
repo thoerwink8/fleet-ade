@@ -7,7 +7,8 @@
 #     [--wg-subnet 192.0.2.0/24] \
 #     [--wg-host 192.0.2.2] \
 #     [--port 3773] \
-#     [--max-sessions 2]
+#     [--max-sessions 2] \
+#     [--github-app-source <github-app-manifest.json>]   # only needed while /etc/fleet-ade/github-app.json does not exist
 
 set -euo pipefail
 
@@ -43,6 +44,7 @@ DATA_HOME="${ADE_ROOT}/home"
 REPOS_DIR="${ADE_ROOT}/repos"
 NODE_VERSION="26.12.1"
 PNPM_VERSION="12.14.0"
+GITHUB_APP_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -68,6 +70,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --max-sessions)
       MAX_SESSIONS="$2"
+      shift 2
+      ;;
+    --github-app-source)
+      GITHUB_APP_ARGS=(--source "$2")
       shift 2
       ;;
     *)
@@ -197,7 +203,9 @@ EOF
   chmod 0640 "${ADE_HOME}/.grok/config.toml"
 fi
 
-echo "[4/9] Ensuring GitHub SSH known_hosts and fetching commit ${COMMIT_SHA}..."
+echo "[4/9] Setting up GitHub App credentials, then fetching commit ${COMMIT_SHA}..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "${SCRIPT_DIR}/france-github-app.sh" "${GITHUB_APP_ARGS[@]}"
 sudo -u "${ADE_USER}" bash -lc "
   set -euo pipefail
   touch '${ADE_HOME}/.ssh/known_hosts'

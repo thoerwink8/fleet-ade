@@ -39,6 +39,8 @@
         "resolve-nightly-release.ts",
         "smoke-desktop-app.ts",
         "verify-windows-desktop-artifact.ts",
+        // Installed onto the headless France host by scripts/deploy/france-github-app.sh.
+        "deploy/git-credential-fleet-ade-app.mjs",
       ],
       "ignoreDependencies": ["esbuild"],
       // The `t3` npm package's files: copied into the package, never imported.

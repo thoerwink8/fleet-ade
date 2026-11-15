@@ -100,7 +100,10 @@ systemd-run --wait --pipe --collect \
   -E DO_NOT_TRACK=1 \
   /bin/bash -lc "pnpm install --frozen-lockfile && ./node_modules/.bin/vp run --filter t3 build"
 
-echo "[3/4] Refreshing wrappers & systemd unit definitions and restarting fleet-ade.service..."
+echo "[3/4] Refreshing wrappers, GitHub App credential helper & systemd unit definitions and restarting fleet-ade.service..."
+
+# Run the new commit's copy: it replays the credential helper, gh wrapper and git config.
+bash "${APP_DIR}/scripts/deploy/france-github-app.sh"
 
 cat >"${ADE_HOME}/.local/bin/t3" <<'EOF'
 #!/usr/bin/env bash
