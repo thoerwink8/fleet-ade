@@ -1,3 +1,4 @@
+import * as SessionEndInbox from "../pipeline/SessionEndInbox.ts";
 import * as WorktreeBranchSync from "./WorktreeBranchSync.ts";
 import * as GuestShareService from "../guest/GuestShareService.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
@@ -412,6 +413,19 @@ export const layerProduction = Layer.mergeAll(
   layerAgentSessionScannerProvided,
   layerAgentSessionImporterProvided,
   EffectOutbox.layerPruneWorker.pipe(Layer.provide(EffectOutbox.layer)),
+  Layer.merge(
+    SessionEndInbox.layer,
+    SessionEndInbox.layerWorker.pipe(Layer.provide(SessionEndInbox.layer)),
+  ).pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        layerEventSink,
+        ProjectionStore.layer,
+        layerProjectService,
+        GitVcsDriver.layer,
+      ),
+    ),
+  ),
 ).pipe(
   Layer.provide(ResourceCleanupService.layer.pipe(Layer.provide(layerScheduledTaskProvided))),
   Layer.provide(Scheduler.layer),
