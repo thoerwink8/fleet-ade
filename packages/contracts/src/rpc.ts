@@ -357,6 +357,7 @@ import {
   ProviderConsumeResetCreditInput,
   ProviderConsumeResetCreditResult,
 } from "./providerUsageLimits.ts";
+import { ExternalQuotas } from "./externalQuotas.ts";
 import { UsagePricing, UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
 import {
   StorageCleanupReport,
@@ -551,6 +552,7 @@ export const WS_METHODS = {
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
+  serverGetExternalQuotas: "server.getExternalQuotas",
   serverRefreshUsageRates: "server.refreshUsageRates",
 
   scheduledTasksSubscribe: "scheduledTasks.subscribe",
@@ -1026,6 +1028,12 @@ const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
   payload: UsageSummaryInput,
   success: UsageSummary,
   error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
+});
+
+const WsServerGetExternalQuotasRpc = Rpc.make(WS_METHODS.serverGetExternalQuotas, {
+  payload: Schema.Struct({}),
+  success: ExternalQuotas,
+  error: EnvironmentAuthorizationError,
 });
 
 const WsServerRefreshUsageRatesRpc = Rpc.make(WS_METHODS.serverRefreshUsageRates, {
@@ -2170,6 +2178,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerListTextGeneratorModelsRpc,
   WsServerPrepareTriageRpc,
   WsServerGetUsageSummaryRpc,
+  WsServerGetExternalQuotasRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,
   WsScheduledTasksSubscribeRpc,

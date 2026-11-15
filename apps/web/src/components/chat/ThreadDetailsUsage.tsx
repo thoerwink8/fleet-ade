@@ -109,7 +109,9 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
           muted
           value={
             maxTokens !== null
-              ? `${usedTokens} / ${formatContextWindowTokens(maxTokens)}`
+              ? threshold !== null && threshold > 0
+                ? `${usedTokens} / 阈值 ${formatContextWindowTokens(threshold)}`
+                : `${usedTokens} / ${formatContextWindowTokens(maxTokens)}`
               : usedTokens
           }
           ariaValue={used !== null ? `${used}% used` : `${usedTokens} tokens used`}

@@ -1,4 +1,5 @@
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
+import { ContextThresholdNotice } from "./chat/ContextThresholdNotice";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
@@ -3572,6 +3573,17 @@ export default function ChatView(props: ChatViewProps) {
                         : undefined
                     }
                   >
+                    <ContextThresholdNotice
+                      usedTokens={activeContextWindow?.usedTokens ?? null}
+                      maxTokens={activeContextWindow?.maxTokens ?? null}
+                      autoCompactThreshold={activeContextWindow?.autoCompactThreshold ?? null}
+                      config={
+                        activeProviderInstanceId == null
+                          ? undefined
+                          : settings.providerInstances[activeProviderInstanceId]?.config
+                      }
+                      driver={selectedProvider ?? null}
+                    />
                     <ChildThreadApprovals threadRef={activeThreadRef} />
                     <div className="relative">
                       <ComposerSurface.Shell contextRow={showComposerContextStrip}>

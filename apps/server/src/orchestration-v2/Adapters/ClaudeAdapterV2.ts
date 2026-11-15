@@ -27,6 +27,10 @@ import {
 
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/filePreview";
 import {
+  claudeAutoCompactWindowForThreshold,
+  contextThresholdPercent,
+} from "@t3tools/shared/contextThreshold";
+import {
   addClaudeLedgerUsage,
   claudeLedgerDelta,
   claudeModelLedger,
@@ -5489,7 +5493,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
       const value = windowFrom(settings);
       if (value !== undefined) return value;
     }
-    return "";
+    const maxTokens = claudeContextWindow(modelSelection);
+    if (maxTokens === null) return "";
+    return (
+      claudeAutoCompactWindowForThreshold(
+        maxTokens,
+        contextThresholdPercent(adapterOptions.settings.contextThresholdPercent),
+      ) ?? ""
+    );
   });
 
   const userInvocableSkills = (cwd: string | null) =>

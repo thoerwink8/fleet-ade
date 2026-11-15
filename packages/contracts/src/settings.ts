@@ -697,6 +697,20 @@ export function makeProviderSettingsSchema<const Fields extends Schema.Struct.Fi
   );
 }
 
+const CONTEXT_THRESHOLD_PERCENT = /^(?:|[1-9]\d?|100)$/;
+
+/** Empty means half the model window. Each provider form shows the same control. */
+export function contextThresholdPercentSetting() {
+  return TrimmedString.check(Schema.isPattern(CONTEXT_THRESHOLD_PERCENT)).pipe(
+    Schema.withDecodingDefault(Effect.succeed("")),
+    Schema.annotateKey({
+      title: "上下文阈值",
+      description: "用到模型窗口的这个百分比就压缩或提醒。留空按 50%。",
+      providerSettingsForm: { placeholder: "50", clearWhenEmpty: "omit" },
+    }),
+  );
+}
+
 export const CodexSettings = makeProviderSettingsSchema(
   {
     setupMode: Schema.optionalKey(Schema.Literals(["managed", "existing"])).pipe(
@@ -743,13 +757,14 @@ export const CodexSettings = makeProviderSettingsSchema(
         description: "Additional CLI arguments passed to codex app-server on session start.",
       }),
     ),
+    contextThresholdPercent: contextThresholdPercentSetting(),
     customModels: Schema.Array(CustomModelSetting).pipe(
       Schema.withDecodingDefault(Effect.succeed([])),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
   },
   {
-    order: ["binaryPath", "homePath", "shadowHomePath", "launchArgs"],
+    order: ["contextThresholdPercent", "binaryPath", "homePath", "shadowHomePath", "launchArgs"],
   },
 );
 export type CodexSettings = typeof CodexSettings.Type;
@@ -814,6 +829,7 @@ export const ClaudeSettings = makeProviderSettingsSchema(
         },
       }),
     ),
+    contextThresholdPercent: contextThresholdPercentSetting(),
     autoCompactWindow: TrimmedString.check(
       Schema.isPattern(CLAUDE_AUTO_COMPACT_WINDOW_PATTERN),
     ).pipe(
@@ -843,7 +859,14 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     ),
   },
   {
-    order: ["binaryPath", "homePath", "autoCompactWindow", "idleCompaction", "launchArgs"],
+    order: [
+      "contextThresholdPercent",
+      "binaryPath",
+      "homePath",
+      "autoCompactWindow",
+      "idleCompaction",
+      "launchArgs",
+    ],
   },
 );
 export type ClaudeSettings = typeof ClaudeSettings.Type;
@@ -916,12 +939,22 @@ export const AntigravitySettings = makeProviderSettingsSchema(
         providerSettingsForm: { placeholder: "Automatic", clearWhenEmpty: "persist" },
       }),
     ),
+    contextThresholdPercent: contextThresholdPercentSetting(),
     customModels: Schema.Array(CustomModelSetting).pipe(
       Schema.withDecodingDefault(Effect.succeed([])),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
   },
-  { order: ["authMethod", "apiKey", "gcpProject", "gcpLocation", "binaryPath"] },
+  {
+    order: [
+      "contextThresholdPercent",
+      "authMethod",
+      "apiKey",
+      "gcpProject",
+      "gcpLocation",
+      "binaryPath",
+    ],
+  },
 );
 export type AntigravitySettings = typeof AntigravitySettings.Type;
 

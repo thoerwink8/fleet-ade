@@ -148,6 +148,7 @@ const piDiscoverySpawner = (
 const settings = {
   enabled: true,
   binaryPath: "pi",
+  contextThresholdPercent: "",
   launchArgs: "",
   customModels: [],
 } as const;

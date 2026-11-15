@@ -1,3 +1,4 @@
+import { contextThresholdPercent, contextThresholdTokens } from "@t3tools/shared/contextThreshold";
 import { pipe } from "effect/Function";
 import * as DocumentText from "../../provider/DocumentText.ts";
 import { revertCodexThread } from "../../provider/CodexThreadRevert.ts";
@@ -1448,6 +1449,7 @@ function codexThreadRuntimeParams(input: {
   readonly mcpSession: McpProviderSession.McpProviderSessionConfig | undefined;
   readonly modelSelection?: { readonly model: string };
   readonly runtimePolicy?: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
+  readonly autoCompactTokenLimit?: number;
 }): {
   readonly cwd?: string;
   readonly model?: string;
@@ -1467,6 +1469,9 @@ function codexThreadRuntimeParams(input: {
     ...(input.modelSelection === undefined ? {} : { model: input.modelSelection.model }),
     config: {
       ...CODEX_THREAD_CONFIG,
+      ...(input.autoCompactTokenLimit === undefined
+        ? {}
+        : { model_auto_compact_token_limit: input.autoCompactTokenLimit }),
       // One app-server serves many threads, so the id goes in per-thread shell config, not its env.
       ...(input.threadId === null
         ? {}
@@ -1872,6 +1877,16 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     }),
                 ),
               );
+        let rememberedContextWindow: number | null = null;
+        const compactLimitParams = () => {
+          if (rememberedContextWindow == null) return {};
+          return {
+            autoCompactTokenLimit: contextThresholdTokens(
+              rememberedContextWindow,
+              contextThresholdPercent(adapterOptions.settings.contextThresholdPercent),
+            ),
+          };
+        };
         const client = yield* clientFactory.open({
           instanceId: adapterOptions.instanceId,
           threadId: input.threadId,
@@ -4865,6 +4880,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             if (context === undefined) {
               return;
             }
+            const reportedWindow = payload.tokenUsage.modelContextWindow;
+            if (typeof reportedWindow === "number" && reportedWindow > 0) {
+              rememberedContextWindow = reportedWindow;
+            }
             const now = yield* DateTime.now;
             yield* emitProviderEvent({
               type: "provider_turn.updated",
@@ -7673,6 +7692,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     mcpSession,
                     modelSelection: threadInput.modelSelection,
                     runtimePolicy: threadInput.runtimePolicy,
+                    ...compactLimitParams(),
                   }),
                 ),
               ),
@@ -7710,6 +7730,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   ...(threadInput.runtimePolicy === undefined
                     ? {}
                     : { runtimePolicy: threadInput.runtimePolicy }),
+                  ...compactLimitParams(),
                 }),
               });
               const response = yield* ensureInitialized.pipe(
@@ -8499,6 +8520,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     mcpSession: yield* readMcpSession(threadInput.providerThread.appThreadId),
                     modelSelection: input.modelSelection,
                     runtimePolicy: input.runtimePolicy,
+                    ...compactLimitParams(),
                   }),
                 });
               }
@@ -8553,6 +8575,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   ...(threadInput.runtimePolicy === undefined
                     ? {}
                     : { runtimePolicy: threadInput.runtimePolicy }),
+                  ...compactLimitParams(),
                 }),
               });
               const response = yield* ensureInitialized.pipe(

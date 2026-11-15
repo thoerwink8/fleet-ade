@@ -8962,7 +8962,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
   );
 
   it.effect.each([
-    { autoCompactWindow: "", model: "claude-sonnet-4-6", threshold: undefined },
+    { autoCompactWindow: "", model: "claude-sonnet-4-6", threshold: 100_000 },
     { autoCompactWindow: "150000", model: "claude-sonnet-4-6", threshold: 117_000 },
     { autoCompactWindow: "200000", model: "claude-sonnet-4-6", threshold: undefined },
     { autoCompactWindow: "650000", model: "claude-sonnet-4-6", threshold: undefined },
@@ -9011,19 +9011,19 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       autoCompactWindow: "",
       model: "claude-opus-5-5",
       userSettings: '{"autoCompactWindow":"invalid"}',
-      threshold: undefined,
+      threshold: 500_000,
     },
     {
       autoCompactWindow: "",
       model: "claude-opus-5-5",
       userSettings: '{"autoCompactWindow":500000,}',
-      threshold: undefined,
+      threshold: 500_000,
     },
     {
       autoCompactWindow: "",
       model: "claude-opus-5-5",
       userSettings: '{/* invalid */ "autoCompactWindow":500000}',
-      threshold: undefined,
+      threshold: 500_000,
     },
     {
       autoCompactWindow: "",

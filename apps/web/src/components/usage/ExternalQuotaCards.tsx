@@ -1,0 +1,128 @@
+import type { ExternalQuotaGroups, ExternalUsageReport } from "@t3tools/contracts";
+
+import { Button } from "../ui/button";
+
+function formatCount(value: number): string {
+  if (value >= 10_000) {
+    const wan = value / 10_000;
+    const text = wan >= 10 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, "");
+    return `${text}万`;
+  }
+  return String(Math.round(value));
+}
+
+function formatReset(resetsAt: string | undefined): string | null {
+  if (!resetsAt) return null;
+  const parsed = Date.parse(resetsAt);
+  if (Number.isNaN(parsed)) return resetsAt;
+  return new Date(parsed).toLocaleString("zh-CN", { hour12: false });
+}
+
+function Groups({
+  title,
+  report,
+}: {
+  readonly title: string;
+  readonly report: ExternalQuotaGroups;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium">{title}</h3>
+      {report.ok ? (
+        report.groups.map((group) => (
+          <div key={group.name} className="flex flex-col gap-1">
+            <p className="text-xs text-muted-foreground">{group.name}</p>
+            {group.windows.map((window) => {
+              const reset = formatReset(window.resetsAt);
+              return (
+                <p key={`${group.name}-${window.label}`} className="text-sm">
+                  {`${window.label} 剩余 ${window.remainingPercent}%`}
+                  {reset ? `，${reset} 重置` : ""}
+                </p>
+              );
+            })}
+          </div>
+        ))
+      ) : (
+        <p className="text-sm text-muted-foreground">{report.message}</p>
+      )}
+    </section>
+  );
+}
+
+function UsageRows({
+  title,
+  rows,
+}: {
+  readonly title: string;
+  readonly rows: ExternalUsageReport;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium">{title}</h3>
+      {rows.ok ? (
+        rows.agents.length === 0 && rows.models.length === 0 ? (
+          <p className="text-sm text-muted-foreground">今天还没有调用。</p>
+        ) : (
+          <>
+            {rows.agents.map((row) => (
+              <p key={`agent-${row.name}`} className="text-sm">
+                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} token，花费 ${row.costUsd.toFixed(2)} 美元`}
+              </p>
+            ))}
+            {rows.models.map((row) => (
+              <p key={`model-${row.name}`} className="text-sm">
+                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} token，花费 ${row.costUsd.toFixed(2)} 美元`}
+              </p>
+            ))}
+          </>
+        )
+      ) : (
+        <p className="text-sm text-muted-foreground">{rows.message}</p>
+      )}
+    </section>
+  );
+}
+
+export function ExternalQuotaCards({
+  agy,
+  magpieQuotas,
+  magpieUsage,
+  localLines,
+  pending,
+  onRefresh,
+}: {
+  readonly agy: ExternalQuotaGroups | null;
+  readonly magpieQuotas: ExternalQuotaGroups | null;
+  readonly magpieUsage: ExternalUsageReport | null;
+  readonly localLines: readonly string[];
+  readonly pending: boolean;
+  readonly onRefresh: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-medium">额度与今日用量</h2>
+        <Button size="sm" variant="outline" disabled={pending} onClick={onRefresh}>
+          {pending ? "正在读取" : "刷新"}
+        </Button>
+      </div>
+      {pending && agy === null ? <p className="text-sm text-muted-foreground">正在读取</p> : null}
+      {agy ? <Groups title="Antigravity 额度" report={agy} /> : null}
+      {magpieQuotas ? <Groups title="magpie 额度" report={magpieQuotas} /> : null}
+      {magpieUsage ? <UsageRows title="magpie 今日用量" rows={magpieUsage} /> : null}
+      <section className="flex flex-col gap-1">
+        <h3 className="text-sm font-medium">本机日志用量</h3>
+        {localLines.length === 0 ? (
+          <p className="text-sm text-muted-foreground">这段时间没有读到本机日志用量。</p>
+        ) : (
+          localLines.map((line) => (
+            <p key={line} className="text-sm">
+              {line}
+            </p>
+          ))
+        )}
+      </section>
+    </div>
+  );
+}

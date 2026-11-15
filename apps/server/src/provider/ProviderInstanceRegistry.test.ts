@@ -102,6 +102,7 @@ const makeCodexConfig = (overrides: Partial<CodexSettings>): CodexSettings => ({
   homePath: "",
   shadowHomePath: "",
   launchArgs: "",
+  contextThresholdPercent: "",
   customModels: [],
   ...overrides,
 });
@@ -112,6 +113,7 @@ const makeClaudeConfig = (overrides: Partial<ClaudeSettings>): ClaudeSettings =>
   homePath: "",
   customModels: [],
   launchArgs: "",
+  contextThresholdPercent: "",
   autoCompactWindow: "",
   idleCompaction: "default",
   ...overrides,

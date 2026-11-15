@@ -1499,6 +1499,11 @@ export function createServerEnvironmentAtoms<R, E>(
     // long enough that switching windows or re-rendering does not rescan. With
     // nothing to show yet, the server's last scan answers first, then a plain
     // read, then a read that waits for slow sources.
+    externalQuotas: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:external-quotas",
+      tag: WS_METHODS.serverGetExternalQuotas,
+      staleTimeMs: 0,
+    }),
     usageSummary: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:server:usage-summary",
       tag: WS_METHODS.serverGetUsageSummary,

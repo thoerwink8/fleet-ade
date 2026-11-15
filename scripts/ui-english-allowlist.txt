@@ -80,6 +80,8 @@ Open VSX
 1Password
 # 产品名
 Antigravity
+# 本机网关产品名
+magpie
 # Antigravity CLI 打印的协议前缀，用来认出登录链接那一行
 Open the following link to authenticate the ACP server:
 # 和 NodeRuntimeFeature 的字面量一致

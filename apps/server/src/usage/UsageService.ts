@@ -6,6 +6,7 @@ import {
   type UsageProviderKind,
   type UsageSource,
   type UsagePricing,
+  type ExternalQuotas,
   type UsageSummary,
   type UsageSummaryInput,
   UsageReadError,
@@ -39,6 +40,7 @@ import type {
   TranscriptUsageFormat,
   UsageRecord,
 } from "@t3tools/provider-core/server/usage";
+import { readAgyQuota, readMagpieQuotas, readMagpieUsage } from "./externalQuotas.ts";
 import { canonicalModelFilter, resolveModelAliases, UsageAggregator } from "./usageAggregation.ts";
 import { createOverrideRateTable, parseRateTable, type RateTable } from "./usagePricing.ts";
 import {
@@ -147,6 +149,7 @@ export class UsageService extends Context.Service<
   UsageService,
   {
     readonly readSummary: (input: UsageSummaryInput) => Effect.Effect<UsageSummary, UsageReadError>;
+    readonly readExternalQuotas: () => Effect.Effect<ExternalQuotas>;
     readonly refreshRates: Effect.Effect<UsagePricing>;
   }
 >()("t3/usage/UsageService") {}
@@ -1140,7 +1143,27 @@ export const make = Effect.gen(function* () {
     return yield* Deferred.await(deferred);
   });
 
-  return { readSummary, refreshRates, awaitPersisted } as const;
+  const AGY_CACHE_MS = 10 * 60 * 1000;
+  let agyCache: { readonly at: number; readonly value: ExternalQuotas["agy"] } | null = null;
+  const readExternalQuotas = Effect.fn("UsageService.readExternalQuotas")(function* () {
+    const now = yield* Clock.currentTimeMillis;
+    const agy =
+      agyCache !== null && now - agyCache.at < AGY_CACHE_MS
+        ? agyCache.value
+        : yield* readAgyQuota().pipe(
+            Effect.tap((value) =>
+              Effect.sync(() => {
+                if (value.ok) agyCache = { at: now, value };
+              }),
+            ),
+          );
+    const [magpieQuotas, magpieUsage] = yield* Effect.all([readMagpieQuotas(), readMagpieUsage()], {
+      concurrency: 2,
+    });
+    return { agy, magpieQuotas, magpieUsage };
+  });
+
+  return { readSummary, readExternalQuotas, refreshRates, awaitPersisted } as const;
 });
 
 export const layer = Layer.effect(UsageService, make);

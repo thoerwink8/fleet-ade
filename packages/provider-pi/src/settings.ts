@@ -1,5 +1,6 @@
 // Shared with the client settings form; keep schema code browser-safe.
 import {
+  contextThresholdPercentSetting,
   CustomModelSetting,
   makeBinaryPathSetting,
   makeProviderSettingsSchema,
@@ -21,6 +22,7 @@ export const PiSettings = makeProviderSettingsSchema(
         providerSettingsForm: { placeholder: "pi", clearWhenEmpty: "omit" },
       }),
     ),
+    contextThresholdPercent: contextThresholdPercentSetting(),
     launchArgs: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
@@ -35,7 +37,7 @@ export const PiSettings = makeProviderSettingsSchema(
     ),
   },
   {
-    order: ["binaryPath", "launchArgs"],
+    order: ["contextThresholdPercent", "binaryPath", "launchArgs"],
   },
 );
 export type PiSettings = typeof PiSettings.Type;

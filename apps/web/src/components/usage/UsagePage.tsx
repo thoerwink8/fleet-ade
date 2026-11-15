@@ -77,6 +77,7 @@ import {
   WorkspaceBreadcrumbText,
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
+import { ExternalQuotaSection } from "./ExternalQuotaSection";
 import { UsageLimitsSection } from "./UsageLimits";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart } from "./UsageProviderChart";
@@ -510,6 +511,18 @@ export function UsagePage() {
 
         <ScrollArea className="min-h-0 flex-1">
           <WorkspacePageContainer width="wide">
+            {selectedEnvironments[0] ? (
+              <div className="mb-6">
+                <ExternalQuotaSection
+                  environmentId={selectedEnvironments[0].environmentId}
+                  localProviders={merged.providers.map((provider) => ({
+                    provider: provider.provider,
+                    totalTokens: provider.totalTokens,
+                    records: provider.records,
+                  }))}
+                />
+              </div>
+            ) : null}
             {selectedEnvironments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {environments.length === 0
