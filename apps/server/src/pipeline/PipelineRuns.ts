@@ -34,13 +34,13 @@ import {
 } from "./GitHubIssues.ts";
 
 /** How often a tick runs. One place. */
-export const TICK_INTERVAL = Duration.minutes(5);
+const TICK_INTERVAL = Duration.minutes(5);
 
 /** Runs that have started a session and not ended. One place. */
-export const MAX_OPEN_SESSIONS = 1;
+const MAX_OPEN_SESSIONS = 1;
 
 /** Summary window for the read API. The page shows this many. */
-export const RECENT_RUNS = 20;
+const RECENT_RUNS = 20;
 
 /** JSON file of usage records. Unset means the export cannot be read. */
 export const USAGE_EXPORT_VARIABLE = "PIPELINE_USAGE_EXPORT";
@@ -161,11 +161,11 @@ const decodeUsageFile = Schema.decodeUnknownEffect(
 const sqlFailure = (cause: unknown) => new PipelineRunsError({ cause });
 
 /** Merged, and stuck after a person cancels, no longer block another run. */
-export const isActiveRun = (run: Pick<RunRow, "status" | "stuckReason">): boolean =>
+const isActiveRun = (run: Pick<RunRow, "status" | "stuckReason">): boolean =>
   run.status !== "merged" && !(run.status === "stuck" && run.stuckReason === TERMINAL_CANCEL);
 
 /** List items under a 怎么算做完 heading. A heading with none does not qualify. */
-export const acceptanceItemCount = (body: string): number => {
+const acceptanceItemCount = (body: string): number => {
   let inSection = false;
   let count = 0;
   for (const line of body.split(/\r?\n/)) {
@@ -182,7 +182,7 @@ export const acceptanceItemCount = (body: string): number => {
 };
 
 /** Sum records whose time falls inside the session window, inclusive. */
-export const sliceUsage = (
+const sliceUsage = (
   records: ReadonlyArray<UsageRecord>,
   start: string,
   end: string,
@@ -370,16 +370,7 @@ const make = Effect.gen(function* () {
     const read = yield* Effect.exit(usage.read());
     if (Exit.isFailure(read)) {
       for (const row of closed) {
-        if (
-          row.usageNote === PIPELINE_USAGE_UNREADABLE &&
-          row.inputTokens === null &&
-          row.outputTokens === null &&
-          row.cacheTokens === null &&
-          row.convertedCost === null &&
-          row.modelAccount === null
-        ) {
-          continue;
-        }
+        if (row.inputTokens !== null || row.usageNote !== null) continue;
         yield* writeUsage(row.id, {
           modelAccount: null,
           inputTokens: null,
@@ -397,6 +388,7 @@ const make = Effect.gen(function* () {
       if (start === null || end === null) continue;
       const sliced = sliceUsage(read.value, start, end);
       if (sliced === undefined) {
+        if (row.inputTokens !== null) continue;
         yield* writeUsage(row.id, {
           modelAccount: null,
           inputTokens: null,
