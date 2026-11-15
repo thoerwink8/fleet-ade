@@ -297,6 +297,19 @@ const layerBase: Layer.Layer<
         .pipe(
           Effect.andThen(eventStore.publishCommitted(events)),
           Effect.andThen(publishLiveEvents(events)),
+          Effect.andThen(
+            events.some(
+              ({ event }) =>
+                (event.type === "run.updated" && event.payload.status !== "running") ||
+                (event.type === "provider-turn.updated" &&
+                  (event.payload.status === "completed" ||
+                    event.payload.status === "failed" ||
+                    event.payload.status === "interrupted" ||
+                    event.payload.status === "cancelled")),
+            )
+              ? effectOutbox.notifyAvailable()
+              : Effect.void,
+          ),
         );
 
     // Serialize commit and publish; reordered publication makes clients drop earlier sequences.

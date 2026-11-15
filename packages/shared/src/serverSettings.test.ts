@@ -1093,5 +1093,14 @@ describe("resolveSpeechPostProcessingModelSelection", () => {
       applyServerSettingsPatch(pinned, { speechPostProcessingModelSelection: null })
         .speechPostProcessingModelSelection,
     ).toBeNull();
+    const capped = applyServerSettingsPatch(
+      DEFAULT_SERVER_SETTINGS,
+      decodeServerSettingsPatch({ maxConcurrentSessions: 2 }),
+    );
+    expect(capped.maxConcurrentSessions).toBe(2);
+    expect(
+      applyServerSettingsPatch(capped, decodeServerSettingsPatch({ maxConcurrentSessions: null }))
+        .maxConcurrentSessions,
+    ).toBeNull();
   });
 });

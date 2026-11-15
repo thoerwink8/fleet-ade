@@ -1,11 +1,20 @@
-import { AuthSessionId, AuthStandardClientScopes } from "@t3tools/contracts";
+import {
+  AuthAccessWriteScope,
+  AuthSessionId,
+  AuthStandardClientScopes,
+  EnvironmentHttpApi,
+} from "@t3tools/contracts";
 import * as Console from "effect/Console";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as References from "effect/References";
 import * as Schema from "effect/Schema";
 import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
+import { FetchHttpClient, type HttpClient } from "effect/http";
+import * as HttpApiClient from "effect/http-api/HttpApiClient";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 
@@ -16,6 +25,7 @@ import {
   formatSessionList,
 } from "../cliAuthFormat.ts";
 import * as ServerConfig from "../config.ts";
+import { readLiveServerRuntimeState } from "../serverRuntimeState.ts";
 import { authScopesFlag } from "./authScopes.ts";
 import {
   authLocationFlags,
@@ -24,9 +34,92 @@ import {
   resolveCliAuthConfig,
 } from "./config.ts";
 
+const CLI_LIVE_AUTH_REQUEST_TIMEOUT = Duration.seconds(5);
+
+const makeLiveAuthClient = (origin: string) =>
+  HttpApiClient.make(EnvironmentHttpApi, { baseUrl: origin });
+type LiveAuthClient = Effect.Success<ReturnType<typeof makeLiveAuthClient>>;
+
+const withLiveAuthAdminCall = <A, E>(
+  environmentAuth: EnvironmentAuth.EnvironmentAuth["Service"],
+  origin: string,
+  run: (client: LiveAuthClient, headers: { readonly authorization: string }) => Effect.Effect<A, E>,
+) =>
+  Effect.acquireUseRelease(
+    environmentAuth.issueSession({
+      scopes: [AuthAccessWriteScope],
+      label: "t3 auth cli",
+      ttl: Duration.minutes(1),
+    }),
+    (issued) =>
+      makeLiveAuthClient(origin).pipe(
+        Effect.flatMap((client) => run(client, { authorization: `Bearer ${issued.token}` })),
+        Effect.timeout(CLI_LIVE_AUTH_REQUEST_TIMEOUT),
+      ),
+    (issued) => environmentAuth.revokeSession(issued.sessionId).pipe(Effect.ignore({ log: true })),
+  );
+
+export const revokeSessionLiveOrOffline = Effect.fn("auth.revokeSessionLiveOrOffline")(function* (
+  environmentAuth: EnvironmentAuth.EnvironmentAuth["Service"],
+  config: Pick<ServerConfig.ServerConfig["Service"], "serverRuntimeStatePath">,
+  sessionId: AuthSessionId,
+) {
+  const runtimeState = yield* readLiveServerRuntimeState(config.serverRuntimeStatePath);
+  if (Option.isSome(runtimeState)) {
+    const liveResult = yield* Effect.result(
+      withLiveAuthAdminCall(environmentAuth, runtimeState.value.origin, (client, headers) =>
+        client.auth.revokeClient({
+          headers,
+          payload: { sessionId },
+        }),
+      ),
+    );
+    if (liveResult._tag === "Success") {
+      return liveResult.success.revoked;
+    }
+    yield* Effect.logDebug("Failed to revoke session through live server; falling back to DB.", {
+      origin: runtimeState.value.origin,
+      cause: liveResult.failure,
+    });
+  }
+  return yield* environmentAuth.revokeSession(sessionId);
+});
+
+const revokePairingLinkLiveOrOffline = Effect.fn("auth.revokePairingLinkLiveOrOffline")(function* (
+  environmentAuth: EnvironmentAuth.EnvironmentAuth["Service"],
+  config: Pick<ServerConfig.ServerConfig["Service"], "serverRuntimeStatePath">,
+  id: string,
+) {
+  const runtimeState = yield* readLiveServerRuntimeState(config.serverRuntimeStatePath);
+  if (Option.isSome(runtimeState)) {
+    const liveResult = yield* Effect.result(
+      withLiveAuthAdminCall(environmentAuth, runtimeState.value.origin, (client, headers) =>
+        client.auth.revokePairingLink({
+          headers,
+          payload: { id },
+        }),
+      ),
+    );
+    if (liveResult._tag === "Success") {
+      return liveResult.success.revoked;
+    }
+    yield* Effect.logDebug(
+      "Failed to revoke pairing credential through live server; falling back to DB.",
+      {
+        origin: runtimeState.value.origin,
+        cause: liveResult.failure,
+      },
+    );
+  }
+  return yield* environmentAuth.revokePairingLink(id);
+});
+
 const runWithEnvironmentAuth = Effect.fn("auth.runWithEnvironmentAuth")(function* <A, E>(
   flags: CliAuthLocationFlags,
-  run: (environmentAuth: EnvironmentAuth.EnvironmentAuth["Service"]) => Effect.Effect<A, E>,
+  run: (
+    environmentAuth: EnvironmentAuth.EnvironmentAuth["Service"],
+    config: ServerConfig.ServerConfig["Service"],
+  ) => Effect.Effect<A, E, FileSystem.FileSystem | HttpClient.HttpClient>,
   options?: {
     readonly quietLogs?: boolean;
   },
@@ -36,10 +129,10 @@ const runWithEnvironmentAuth = Effect.fn("auth.runWithEnvironmentAuth")(function
   const minimumLogLevel = options?.quietLogs ? "Error" : config.logLevel;
   return yield* Effect.gen(function* () {
     const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
-    return yield* run(environmentAuth);
+    return yield* run(environmentAuth, config);
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(EnvironmentAuth.layerRuntime).pipe(
+      Layer.mergeAll(EnvironmentAuth.layerRuntime, FetchHttpClient.layer).pipe(
         Layer.provide(ServerConfig.layer(config)),
         Layer.provide(Layer.succeed(References.MinimumLogLevel, minimumLogLevel)),
       ),
@@ -148,9 +241,9 @@ const pairingRevokeCommand = Command.make("revoke", {
 }).pipe(
   Command.withDescription("Revoke an active client pairing token."),
   Command.withHandler((flags) =>
-    runWithEnvironmentAuth(flags, (environmentAuth) =>
+    runWithEnvironmentAuth(flags, (environmentAuth, config) =>
       Effect.gen(function* () {
-        const revoked = yield* environmentAuth.revokePairingLink(flags.id);
+        const revoked = yield* revokePairingLinkLiveOrOffline(environmentAuth, config, flags.id);
         yield* Console.log(
           revoked
             ? `Revoked pairing credential ${flags.id}.\n`
@@ -230,9 +323,9 @@ const sessionRevokeCommand = Command.make("revoke", {
 }).pipe(
   Command.withDescription("Revoke an active session."),
   Command.withHandler((flags) =>
-    runWithEnvironmentAuth(flags, (environmentAuth) =>
+    runWithEnvironmentAuth(flags, (environmentAuth, config) =>
       Effect.gen(function* () {
-        const revoked = yield* environmentAuth.revokeSession(flags.sessionId);
+        const revoked = yield* revokeSessionLiveOrOffline(environmentAuth, config, flags.sessionId);
         yield* Console.log(
           revoked
             ? `Revoked session ${flags.sessionId}.\n`

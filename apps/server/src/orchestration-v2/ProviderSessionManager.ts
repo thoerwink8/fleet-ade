@@ -51,6 +51,7 @@ import { ProviderWorkspaceMissingError } from "../provider/Errors.ts";
 import * as ProviderInstallationGate from "../provider/ProviderInstallationGate.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as EventSink from "./EventSink.ts";
@@ -490,6 +491,20 @@ export const layerWithOptions = (
           Effect.orElseSucceed(() => null),
         );
       });
+      const serverConfig = yield* Effect.serviceOption(ServerConfig.ServerConfig);
+      const readMaxConcurrentSessions = Effect.gen(function* () {
+        const configuredLimit = Option.isNone(serverConfig)
+          ? undefined
+          : serverConfig.value.maxConcurrentSessions;
+        const settingsLimit = Option.isNone(serverSettings)
+          ? null
+          : yield* serverSettings.value.getSettings.pipe(
+              Effect.map((settings) => settings.maxConcurrentSessions),
+              Effect.orElseSucceed(() => null),
+            );
+        return ServerConfig.resolveMaxConcurrentSessions(configuredLimit, settingsLimit);
+      });
+      const capacityEvictionGate = yield* Semaphore.make(1);
       const layerScope = yield* Effect.scope;
       // Group signals stop providers before restart capture; drop post-signal events so recovery owns that state.
       const shutdownSignal = { received: false };
@@ -2878,6 +2893,67 @@ export const layerWithOptions = (
                 });
                 yield* touchActivity(input.providerSessionId);
                 return existing.exposedRuntime;
+              }
+
+              const maxConcurrentSessions = yield* readMaxConcurrentSessions;
+              if (
+                maxConcurrentSessions !== undefined &&
+                (yield* Ref.get(sessions)).size >= maxConcurrentSessions
+              ) {
+                yield* capacityEvictionGate.withPermits(1)(
+                  Effect.gen(function* () {
+                    for (const candidate of (yield* Ref.get(sessions)).values()) {
+                      if ((yield* Ref.get(sessions)).size < maxConcurrentSessions) return;
+                      if (
+                        candidate.runtime.providerSessionId === input.providerSessionId ||
+                        candidate.busyTurns.size > 0
+                      ) {
+                        continue;
+                      }
+                      const probedRuntime = candidate.runtime;
+                      const hasPendingWork =
+                        (probedRuntime.hasPendingBackgroundWork === undefined
+                          ? false
+                          : yield* probedRuntime.hasPendingBackgroundWork.pipe(
+                              Effect.catchCause(() => Effect.succeed(false)),
+                            )) ||
+                        Option.isSome(
+                          yield* Effect.findFirst(candidate.idleThreadUnloads.keys(), (threadId) =>
+                            delegatedChildArchive(threadId).pipe(
+                              Effect.map((child) => child === "awaiting_delivery"),
+                            ),
+                          ),
+                        );
+                      if (hasPendingWork) continue;
+                      yield* Effect.forEach(
+                        candidate.idleThreadUnloads,
+                        ([threadId, pending]) =>
+                          unloadIdleThread({
+                            providerSessionId: probedRuntime.providerSessionId,
+                            threadId,
+                            generation: pending.generation,
+                            archiveOnly: true,
+                          }),
+                        { discard: true },
+                      );
+                      yield* releaseEntry({
+                        providerSessionId: probedRuntime.providerSessionId,
+                        reason: "idle_timeout",
+                        onlyIfIdleGeneration: candidate.idleGeneration,
+                      }).pipe(
+                        Effect.catchCause((cause) =>
+                          Effect.logWarning(
+                            "orchestration-v2.driver-session.capacity-eviction-failed",
+                            {
+                              providerSessionId: probedRuntime.providerSessionId,
+                              cause,
+                            },
+                          ),
+                        ),
+                      );
+                    }
+                  }),
+                );
               }
 
               const adapter = yield* registry.get(input.modelSelection.instanceId).pipe(

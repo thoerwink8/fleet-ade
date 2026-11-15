@@ -1,0 +1,20 @@
+[Unit]
+Description=Fleet ADE headless runtime slice
+Before=slices.target
+
+[Slice]
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
+IOAccounting=yes
+# Priority sits below other-repo legacy engine (default 100) and above CI runners (gha-runner.slice = 25).
+CPUWeight=50
+IOWeight=50
+CPUQuota=300%
+MemoryHigh=3072M
+MemoryMax=3584M
+MemorySwapMax=1024M
+TasksMax=3072
+
+[Install]
+WantedBy=slices.target

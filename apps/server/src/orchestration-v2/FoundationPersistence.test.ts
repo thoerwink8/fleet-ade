@@ -3088,6 +3088,58 @@ it.layer(layerTest)("orchestration V2 foundation persistence", (it) => {
     }),
   );
 
+  it.effect(
+    "caps concurrent provider turns across threads at maxConcurrentSessions without blocking non-turn effects",
+    () =>
+      Effect.gen(function* () {
+        const outbox = yield* EffectOutbox.EffectOutboxV2;
+        const cap = { maxConcurrentSessions: 2 };
+        const turnStart = (name: string) => ({
+          id: `effect:foundation-session-cap:${name}`,
+          commandId: CommandId.make(`command:foundation-session-cap:${name}`),
+          threadId: ThreadId.make(`thread:foundation-session-cap:${name}`),
+          request: {
+            type: "provider-turn.start" as const,
+            runId: RunId.make(`run:foundation-session-cap:${name}`),
+          },
+        });
+        const cleanup = {
+          id: "effect:foundation-session-cap:cleanup",
+          commandId: CommandId.make("command:foundation-session-cap:cleanup"),
+          threadId: ThreadId.make("thread:foundation-session-cap:cleanup"),
+          request: { type: "terminal.cleanup" as const },
+        };
+        yield* outbox.enqueue([turnStart("first"), turnStart("second"), turnStart("third")]);
+
+        const first = yield* outbox.claimNext({ workerId: "session-cap-worker", ...cap });
+        assert.strictEqual(Option.getOrUndefined(first)?.id, turnStart("first").id);
+        const second = yield* outbox.claimNext({ workerId: "session-cap-worker", ...cap });
+        assert.strictEqual(Option.getOrUndefined(second)?.id, turnStart("second").id);
+
+        assert.isTrue(
+          Option.isNone(yield* outbox.claimNext({ workerId: "session-cap-worker", ...cap })),
+        );
+        assert.isTrue(
+          Option.isNone(yield* outbox.nextClaimableAt(cap)),
+          "a capped provider turn must not report a past deadline while slots are full",
+        );
+
+        yield* outbox.enqueue([cleanup]);
+        const claimedCleanup = yield* outbox.claimNext({ workerId: "session-cap-worker", ...cap });
+        assert.strictEqual(Option.getOrUndefined(claimedCleanup)?.id, cleanup.id);
+        yield* outbox.succeed({ effectId: cleanup.id, workerId: "session-cap-worker" });
+        assert.isTrue(
+          Option.isNone(yield* outbox.claimNext({ workerId: "session-cap-worker", ...cap })),
+        );
+
+        yield* outbox.succeed({ effectId: turnStart("first").id, workerId: "session-cap-worker" });
+        const third = yield* outbox.claimNext({ workerId: "session-cap-worker", ...cap });
+        assert.strictEqual(Option.getOrUndefined(third)?.id, turnStart("third").id);
+        yield* outbox.succeed({ effectId: turnStart("second").id, workerId: "session-cap-worker" });
+        yield* outbox.succeed({ effectId: turnStart("third").id, workerId: "session-cap-worker" });
+      }),
+  );
+
   it.effect("does not reclaim a running effect after its process-local lease expires", () =>
     Effect.gen(function* () {
       const outbox = yield* EffectOutbox.EffectOutboxV2;

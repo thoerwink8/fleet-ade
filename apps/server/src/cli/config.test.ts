@@ -966,4 +966,35 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
       });
     }),
   );
+
+  it.effect("resolves maxConcurrentSessions from CLI flag or T3CODE_MAX_CONCURRENT_SESSIONS", () =>
+    Effect.gen(function* () {
+      const { join } = yield* Path.Path;
+      const baseDir = join(NodeOS.tmpdir(), "t3-cli-config-max-concurrent-sessions");
+      const resolveCap = (input: {
+        readonly flag?: number;
+        readonly env?: Record<string, string>;
+      }) =>
+        resolveServerConfig(
+          {
+            ...minimalWebFlags(baseDir),
+            maxConcurrentSessions:
+              input.flag === undefined ? Option.none() : Option.some(input.flag),
+          },
+          Option.none(),
+        ).pipe(
+          Effect.map((config) => config.maxConcurrentSessions),
+          Effect.provide(
+            Layer.mergeAll(
+              ConfigProvider.layer(ConfigProvider.fromEnv({ env: input.env ?? {} })),
+              NetService.layer,
+            ),
+          ),
+        );
+
+      expect(yield* resolveCap({})).toBeUndefined();
+      expect(yield* resolveCap({ env: { T3CODE_MAX_CONCURRENT_SESSIONS: "2" } })).toBe(2);
+      expect(yield* resolveCap({ flag: 2, env: { T3CODE_MAX_CONCURRENT_SESSIONS: "4" } })).toBe(2);
+    }),
+  );
 });

@@ -27,6 +27,7 @@ import * as ProviderTurnStartService from "./ProviderTurnStartService.ts";
 import * as RuntimeRequestService from "./RuntimeRequestService.ts";
 import * as ThreadTitleRegenerationService from "./ThreadTitleRegenerationService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
+import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { continueRestartedRun } from "./RestartContinuation.ts";
 
@@ -673,10 +674,12 @@ export interface OrchestrationEffectWorkerV2Shape {
   readonly awaitWork: Effect.Effect<void>;
   readonly runOnce: (input?: {
     readonly maxRunningTitleGenerations?: number;
+    readonly maxConcurrentSessions?: number;
   }) => Effect.Effect<boolean, OrchestrationEffectWorkerError>;
   readonly runRecoveryOnce: Effect.Effect<boolean, OrchestrationEffectWorkerError>;
   readonly nextClaimableAt: (input?: {
     readonly maxRunningTitleGenerations?: number;
+    readonly maxConcurrentSessions?: number;
   }) => Effect.Effect<Option.Option<DateTime.Utc>, OrchestrationEffectWorkerError>;
   readonly drain: (maxEffects?: number) => Effect.Effect<number, OrchestrationEffectWorkerError>;
 }
@@ -689,6 +692,7 @@ export class OrchestrationEffectWorkerV2 extends Context.Service<
 export interface OrchestrationEffectWorkerOptions {
   readonly workerId?: string;
   readonly maxAttempts?: number;
+  readonly maxConcurrentSessions?: number;
 }
 
 export const layerWithOptions = (
@@ -703,8 +707,27 @@ export const layerWithOptions = (
     Effect.gen(function* () {
       const outbox = yield* EffectOutbox.EffectOutboxV2;
       const executor = yield* OrchestrationEffectExecutorV2;
+      const serverConfig = yield* Effect.serviceOption(ServerConfig.ServerConfig);
+      const serverSettings = yield* Effect.serviceOption(ServerSettings.ServerSettingsService);
       const workerId = options.workerId ?? `orchestration-v2:${process.pid}`;
       const maxAttempts = Math.max(1, options.maxAttempts ?? 5);
+      const resolveMaxConcurrentSessions = (explicit: number | undefined) =>
+        explicit !== undefined
+          ? Effect.succeed(explicit)
+          : Effect.gen(function* () {
+              const configuredLimit =
+                options.maxConcurrentSessions ??
+                (Option.isNone(serverConfig)
+                  ? undefined
+                  : serverConfig.value.maxConcurrentSessions);
+              const settingsLimit = Option.isNone(serverSettings)
+                ? null
+                : yield* serverSettings.value.getSettings.pipe(
+                    Effect.map((settings) => settings.maxConcurrentSessions),
+                    Effect.orElseSucceed(() => null),
+                  );
+              return ServerConfig.resolveMaxConcurrentSessions(configuredLimit, settingsLimit);
+            });
       const wasCancelled = (effectId: string) =>
         outbox.get(effectId).pipe(
           Effect.map(
@@ -798,7 +821,16 @@ export const layerWithOptions = (
       // The worker probes for work repeatedly, including when the outbox is empty.
       const runOnce = Effect.fnUntraced(
         function* (filter: ClaimFilter = {}) {
-          const claimExit = yield* Effect.exit(outbox.claimNext({ workerId, ...filter }));
+          const maxConcurrentSessions = yield* resolveMaxConcurrentSessions(
+            filter.maxConcurrentSessions,
+          );
+          const claimExit = yield* Effect.exit(
+            outbox.claimNext({
+              workerId,
+              ...filter,
+              ...(maxConcurrentSessions === undefined ? {} : { maxConcurrentSessions }),
+            }),
+          );
           yield* increment(orchestrationEffectClaimsTotal, {
             result: Exit.isFailure(claimExit)
               ? "error"
@@ -914,7 +946,13 @@ export const layerWithOptions = (
         // Idle workers poll this; a span per poll would bury useful traces.
         nextClaimableAt: Effect.fnUntraced(
           function* (input) {
-            return yield* outbox.nextClaimableAt(input);
+            const maxConcurrentSessions = yield* resolveMaxConcurrentSessions(
+              input?.maxConcurrentSessions,
+            );
+            return yield* outbox.nextClaimableAt({
+              ...input,
+              ...(maxConcurrentSessions === undefined ? {} : { maxConcurrentSessions }),
+            });
           },
           Effect.mapError(
             (cause) =>

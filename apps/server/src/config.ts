@@ -108,6 +108,7 @@ export class ServerConfig extends Context.Service<
     readonly logWebSocketEvents: boolean;
     readonly tailscaleServeEnabled: boolean;
     readonly tailscaleServePort: number;
+    readonly maxConcurrentSessions?: number | undefined;
   }
 >()("t3/config/ServerConfig") {
   static readonly layerTest = (
@@ -117,6 +118,17 @@ export class ServerConfig extends Context.Service<
 }
 
 export const make = (config: ServerConfig["Service"]) => ServerConfig.of(config);
+
+export const resolveMaxConcurrentSessions = (
+  configuredLimit: number | undefined,
+  settingsLimit: number | null | undefined,
+): number | undefined => {
+  const normalizedSettings = settingsLimit ?? undefined;
+  if (configuredLimit !== undefined && normalizedSettings !== undefined) {
+    return Math.min(configuredLimit, normalizedSettings);
+  }
+  return configuredLimit ?? normalizedSettings;
+};
 
 export const otlpResource = (
   config: Pick<ServerConfig["Service"], "mode" | "otelEnvironment">,

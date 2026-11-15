@@ -1,0 +1,50 @@
+[Unit]
+Description=Fleet ADE Headless Server (WireGuard-only)
+After=network-online.target wg-quick@wg-fleet.service
+Wants=network-online.target wg-quick@wg-fleet.service
+
+[Service]
+Type=simple
+User=ade
+Group=ade
+Slice=ade.slice
+WorkingDirectory=/var/lib/fleet-ade/app
+Environment=HOME=/home/ade
+Environment=PATH=/home/ade/.local/bin:/home/ade/.local/node/bin:/home/ade/.grok/bin:/usr/local/bin:/usr/bin:/bin
+Environment=XDG_DATA_HOME=/home/ade/.local/share
+Environment=XDG_CACHE_HOME=/home/ade/.cache
+Environment=COREPACK_HOME=/home/ade/.cache/corepack
+Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+Environment=T3CODE_HOME=/var/lib/fleet-ade/home
+Environment=T3CODE_MAX_CONCURRENT_SESSIONS=2
+Environment=T3CODE_TELEMETRY_ENABLED=false
+Environment=OTEL_SDK_DISABLED=true
+Environment=T3CODE_OTEL_SDK_DISABLED=true
+Environment=DO_NOT_TRACK=1
+Environment=GROK_DISABLE_AUTOUPDATER=1
+Environment=FLEET_ADE_WG_HOST=192.0.2.2
+Environment=FLEET_ADE_PORT=3773
+Environment=FLEET_ADE_MAX_CONCURRENT_SESSIONS=2
+EnvironmentFile=-/etc/fleet-ade/service.env
+ExecStart=/home/ade/.local/node/bin/node /var/lib/fleet-ade/app/apps/server/dist/bin.mjs serve --host ${FLEET_ADE_WG_HOST} --port ${FLEET_ADE_PORT} --base-dir /var/lib/fleet-ade/home --max-concurrent-sessions ${FLEET_ADE_MAX_CONCURRENT_SESSIONS}
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
+IOAccounting=yes
+CPUQuota=250%
+MemoryHigh=2560M
+MemoryMax=3072M
+MemorySwapMax=1024M
+TasksMax=2048
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=5
+LimitNOFILE=65536
+PrivateTmp=yes
+NoNewPrivileges=yes
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=90s
+
+[Install]
+WantedBy=multi-user.target
