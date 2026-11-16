@@ -62,14 +62,19 @@ const decodeVerifyRuns = Schema.decodeUnknownEffect(Schema.Array(VerifyRunRow));
 
 const ModelOutput = Schema.Struct({
   verdict: Schema.NullOr(Schema.Literals(["pass", "fail"])),
+  summary: Schema.optionalKey(Schema.String),
   problems: Schema.Array(Schema.Struct({ text: Schema.String })),
   suggestions: Schema.Array(Schema.Struct({ text: Schema.String })),
   handovers: Schema.Array(Schema.Struct({ text: Schema.String })),
 });
 
 const decodeModelOutput = Schema.decodeUnknownEffect(Schema.fromJsonString(ModelOutput));
+/**
+ * 示例里 handovers 留空。非空会被裁决优先于 pass 判成交人，
+ * 所以摘要和建议不能出现在这里。
+ */
 const OUTPUT_EXAMPLE =
-  '{"verdict":"pass","problems":[{"text":"问题"}],"suggestions":[{"text":"建议"}],"handovers":[{"text":"交人"}]}';
+  '{"verdict":"pass","summary":"验收摘要","problems":[{"text":"问题"}],"suggestions":[{"text":"建议"}],"handovers":[]}';
 
 /** One verifier session. The live opener dispatches it; tests replace this and count calls. */
 export interface ColdVerifyRequest {
@@ -298,7 +303,13 @@ const verifyBriefing = (run: {
   readonly headSha: string;
 }): string => {
   const pullRequest = run.prNumber === null ? "PR 号还没有" : `PR #${run.prNumber}`;
-  return `仓 ${run.repository}。任务 #${run.issueNumber} ${run.title}。任务号不是 PR 号。${pullRequest}。只核对 head ${run.headSha} 相对该 PR 基线分支的 diff、改了哪些文件、怎么算做完、PR 正文。别的 head 不算。最后只返回这一份 JSON，字段和值只能按这个形状：${OUTPUT_EXAMPLE}`;
+  return [
+    `仓 ${run.repository}。任务 #${run.issueNumber} ${run.title}。任务号不是 PR 号。${pullRequest}。`,
+    `只核对 head ${run.headSha} 相对该 PR 基线分支的 diff、改了哪些文件、怎么算做完、PR 正文。别的 head 不算。`,
+    "summary 放验收摘要，suggestions 放修正建议（包括修正 PR 正文）。这两处都不挡合并。",
+    "handovers 只放必须有人拿 diff 以外的证据才能判的事。摘要、建议、风格意见、正文缺什么，都不放进 handovers；没有这种事就交空数组。",
+    `最后只返回这一份 JSON，字段和值只能按这个形状：${OUTPUT_EXAMPLE}`,
+  ].join("");
 };
 
 const make = Effect.gen(function* () {
