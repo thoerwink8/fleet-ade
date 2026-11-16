@@ -62,6 +62,7 @@ interface OpenRun {
   readonly status: (typeof OPEN_STATUSES)[number];
   readonly threadId: string | null;
   readonly sessionStartedAt: string | null;
+  readonly sessionEndedAt: string | null;
   readonly renewedOnce: boolean;
 }
 
@@ -72,6 +73,7 @@ const OpenRunRow = Schema.Struct({
   status: Schema.Literals(OPEN_STATUSES),
   threadId: Schema.NullOr(Schema.String),
   sessionStartedAt: Schema.NullOr(Schema.String),
+  sessionEndedAt: Schema.NullOr(Schema.String),
   renewedOnce: Schema.Boolean,
 });
 
@@ -261,6 +263,7 @@ const make = Effect.gen(function* () {
 
     for (const run of pending) {
       if (run.status === "session") {
+        if (run.sessionEndedAt !== null) continue;
         const entry =
           run.threadId === null ? undefined : endByThread.get(ThreadId.make(run.threadId));
         if (entry !== undefined) {

@@ -253,6 +253,10 @@ describe("DispatchSession", () => {
         assert.strictEqual(listed[0]?.detail, null);
         assert.strictEqual(listed[0]?.stuckReason, null);
         assert.strictEqual(listed[0]?.prNumber, null);
+        const runs = yield* PipelineRuns;
+        yield* runs.note(5, { detail: "读不到" });
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        assert.strictEqual((yield* runs.list).runs[0]?.detail, "读不到");
       }),
     ),
   );

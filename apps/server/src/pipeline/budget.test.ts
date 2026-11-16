@@ -117,7 +117,7 @@ describe("PipelineBudget", () => {
       Effect.andThen(
         run(
           [issue(8)],
-          Effect.succeed([usageOf(7_000_000, 9_000_000)]),
+          Effect.succeed([{ ...usageOf(7_000_000, 9_000_000), convertedCost: null }]),
           Effect.succeed(0),
           Effect.gen(function* () {
             const budget = yield* PipelineBudget;
@@ -127,6 +127,8 @@ describe("PipelineBudget", () => {
             assert.strictEqual(under?.status, "session");
             assert.strictEqual(under?.stuckReason, null);
             assert.strictEqual(under?.inputTokens, 7_000_000);
+            assert.strictEqual(under?.convertedCost, null);
+            assert.strictEqual(yield* budget.review(under!), "pass");
           }),
         ),
       ),

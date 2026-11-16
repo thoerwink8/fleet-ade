@@ -1,7 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { PIPELINE_COST_LABEL, PIPELINE_USAGE_UNREADABLE } from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
@@ -21,7 +20,6 @@ import {
   PipelineRuns,
   PipelineUsage,
   PipelineUsageUnreadable,
-  USAGE_EXPORT_VARIABLE,
   layer as runsLayer,
   layerUsage,
   type UsageRecord,
@@ -306,90 +304,68 @@ describe("PipelineRuns", () => {
     ),
   );
 
-  it.effect("用量文件缺失时记读不到", () =>
-    Effect.gen(function* () {
-      const runs = yield* PipelineRuns;
-      yield* runs.tick;
-      yield* runs.note(7, {
-        sessionStartedAt: "2026-01-01T00:00:00.000Z",
-        sessionEndedAt: "2026-01-01T01:00:00.000Z",
-      });
-      const run = (yield* runs.list).runs[0];
-      assert.strictEqual(run?.usageNote, PIPELINE_USAGE_UNREADABLE);
-      assert.strictEqual(run?.inputTokens, null);
-      assert.strictEqual(run?.convertedCost, null);
-    }).pipe(
-      Effect.provide(
-        runsLayer.pipe(
-          Layer.provide(
-            Layer.succeed(
-              PipelineGitHubIssues,
-              PipelineGitHubIssues.of({
-                listEligible: () => Effect.succeed([issue(7)]),
-                read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
-              }),
-            ),
-          ),
-          Layer.provide(layerUsage),
-          Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
-          Layer.provideMerge(SqlitePersistence.layerMemory),
-        ),
-      ),
-      Effect.provideService(HostProcess.Environment, {
-        [USAGE_EXPORT_VARIABLE]: "missing-usage-export.json",
-      }),
-      Effect.provide(NodeServices.layer),
-    ),
-  );
-  it.effect("用量文件按窗口切开", () =>
+  it.effect("会话原始记录按窗口读取，费用未知不填零，缺失用量不放行", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+      const sql = yield* SqlClient.SqlClient;
       const directory = yield* fs.makeTempDirectoryScoped();
-      const file = path.join(directory, "usage.json");
+      const file = path.join(directory, "session.jsonl");
+      const message = (timestamp: string, input?: number) =>
+        JSON.stringify({
+          type: "message",
+          timestamp,
+          message: { role: "assistant", provider: "magpie", model: "group/test", usage: { input } },
+        });
       yield* fs.writeFileString(
         file,
-        JSON.stringify([
-          record("2026-01-01T00:00:00.000Z", "beta", 5, 9),
-          record("2026-01-01T00:10:00.000Z", "alpha", 10, 1.5),
-          record("2026-01-01T00:20:00.000Z", "alpha", 1, 0.5),
-        ]),
+        [
+          message("2026-01-01T00:00:00.000Z", 500),
+          message("2026-01-01T00:10:00.000Z", 10),
+          message("2026-01-01T00:20:00.000Z", 1),
+          message("2026-01-01T00:21:00.000Z", 800),
+        ].join("\n"),
       );
-      yield* Effect.gen(function* () {
-        const runs = yield* PipelineRuns;
-        yield* runs.tick;
-        yield* runs.note(7, {
-          sessionStartedAt: "2026-01-01T00:10:00.000Z",
-          sessionEndedAt: "2026-01-01T00:20:00.000Z",
-        });
-        const run = (yield* runs.list).runs[0];
-        assert.strictEqual(run?.modelAccount, "alpha");
-        assert.strictEqual(run?.inputTokens, 11);
-        assert.strictEqual(run?.convertedCost, 2);
-        assert.strictEqual(run?.usageNote, null);
-      }).pipe(
-        Effect.provide(
-          runsLayer.pipe(
-            Layer.provide(
-              Layer.succeed(
-                PipelineGitHubIssues,
-                PipelineGitHubIssues.of({
-                  listEligible: () => Effect.succeed([issue(7)]),
-                  read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
-                }),
-              ),
-            ),
-            Layer.provide(layerUsage),
-            Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
-            Layer.provideMerge(SqlitePersistence.layerMemory),
-          ),
+      yield* sql`INSERT INTO orchestration_v2_projection_provider_threads
+        (provider_thread_id, thread_id, provider, status, updated_at, payload_json)
+        VALUES ('native-7', 'thread-7', 'pi', 'idle', '2026-01-01',
+          ${JSON.stringify({ driver: "pi", nativeThreadRef: { nativeId: file } })})`;
+      const usage = yield* PipelineUsage;
+      const window = {
+        threadId: "thread-7",
+        sessionStartedAt: "2026-01-01T00:10:00.000Z",
+        sessionEndedAt: "2026-01-01T00:20:00.000Z",
+      };
+      const records = yield* usage.read(window);
+      assert.deepEqual(
+        records.map((item) => item.inputTokens),
+        [10, 1],
+      );
+      assert.isTrue(records.every((item) => item.convertedCost === null));
+      assert.isTrue(records.every((item) => item.outputTokens === null));
+      assert.isTrue(
+        Exit.isFailure(yield* Effect.exit(usage.read({ ...window, threadId: "other" }))),
+      );
+      yield* fs.writeFileString(file, message("2026-01-01T00:15:00.000Z"));
+      assert.isTrue(Exit.isFailure(yield* Effect.exit(usage.read(window))));
+      yield* fs.writeFileString(file, "");
+      assert.isTrue(Exit.isFailure(yield* Effect.exit(usage.read(window))));
+      yield* fs.writeFileString(file, message("2026-01-01T00:15:00.000Z", 0));
+      assert.strictEqual((yield* usage.read(window))[0]?.inputTokens, 0);
+      yield* fs.remove(file);
+      assert.isTrue(Exit.isFailure(yield* Effect.exit(usage.read(window))));
+    }).pipe(
+      Effect.provide(
+        layerUsage.pipe(
+          Layer.provideMerge(SqlitePersistence.layerMemory),
+          Layer.provideMerge(NodeServices.layer),
         ),
-        Effect.provideService(HostProcess.Environment, { [USAGE_EXPORT_VARIABLE]: file }),
-      );
-    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+      ),
+      Effect.scoped,
+    ),
   );
 
-  it.effect("窗口里没有用量记录时是 0 而不是读不到", () =>
+  it.effect("窗口没有记录时仍然读不到", () =>
     Effect.gen(function* () {
       const runs = yield* PipelineRuns;
       yield* runs.tick;
@@ -398,13 +374,9 @@ describe("PipelineRuns", () => {
         sessionEndedAt: "2026-01-02T01:00:00.000Z",
       });
       const run = (yield* runs.list).runs[0];
-      assert.strictEqual(run?.usageNote, null);
-      assert.strictEqual(run?.inputTokens, 0);
-      assert.strictEqual(run?.outputTokens, 0);
-      assert.strictEqual(run?.cacheTokens, 0);
-      assert.strictEqual(run?.convertedCost, 0);
-      assert.strictEqual(run?.modelAccount, null);
-      assert.strictEqual(run?.costLabel, PIPELINE_COST_LABEL);
+      assert.strictEqual(run?.usageNote, PIPELINE_USAGE_UNREADABLE);
+      assert.strictEqual(run?.inputTokens, null);
+      assert.strictEqual(run?.convertedCost, null);
     }).pipe(
       Effect.provide(
         pipelineLayer({

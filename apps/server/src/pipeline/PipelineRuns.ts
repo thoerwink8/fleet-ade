@@ -9,7 +9,6 @@ import {
   type PipelineRunStatus,
   type PipelineStuckReason,
 } from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -41,9 +40,6 @@ export const MAX_OPEN_SESSIONS = 1;
 
 /** Summary window for the read API. The page shows this many. */
 const RECENT_RUNS = 20;
-
-/** JSON file of usage records. Unset means the export cannot be read. */
-export const USAGE_EXPORT_VARIABLE = "PIPELINE_USAGE_EXPORT";
 
 const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 
@@ -84,32 +80,21 @@ const TickRow = Schema.Struct({
 });
 
 const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
-const NonNegative = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
-
-const UsageRecordSchema = Schema.Struct({
-  at: Schema.String,
-  account: Schema.String.check(Schema.isMinLength(1)),
-  inputTokens: NonNegativeInt,
-  outputTokens: NonNegativeInt,
-  cacheTokens: NonNegativeInt,
-  convertedCost: NonNegative,
-});
-
 export interface UsageRecord {
   readonly at: string;
   readonly account: string;
   readonly inputTokens: number;
-  readonly outputTokens: number;
-  readonly cacheTokens: number;
-  readonly convertedCost: number;
+  readonly outputTokens: number | null;
+  readonly cacheTokens: number | null;
+  readonly convertedCost: number | null;
 }
 
 export interface UsageSlice {
   readonly modelAccount: string | null;
   readonly inputTokens: number;
-  readonly outputTokens: number;
-  readonly cacheTokens: number;
-  readonly convertedCost: number;
+  readonly outputTokens: number | null;
+  readonly cacheTokens: number | null;
+  readonly convertedCost: number | null;
 }
 
 export class PipelineUsageUnreadable extends Schema.TaggedError<PipelineUsageUnreadable>()(
@@ -124,7 +109,9 @@ export class PipelineUsageUnreadable extends Schema.TaggedError<PipelineUsageUnr
 export class PipelineUsage extends Context.Service<
   PipelineUsage,
   {
-    readonly read: () => Effect.Effect<ReadonlyArray<UsageRecord>, PipelineUsageUnreadable>;
+    readonly read: (
+      run: Pick<PipelineRun, "threadId" | "sessionStartedAt" | "sessionEndedAt">,
+    ) => Effect.Effect<ReadonlyArray<UsageRecord>, PipelineUsageUnreadable>;
   }
 >()("t3/pipeline/PipelineRuns/PipelineUsage") {}
 
@@ -160,9 +147,6 @@ export class PipelineRuns extends Context.Service<PipelineRuns, PipelineRunsShap
 const decodeRows = Schema.decodeUnknownEffect(Schema.Array(RunRow));
 const decodeTick = Schema.decodeUnknownEffect(Schema.NullOr(TickRow));
 const decodeList = Schema.decodeUnknownEffect(PipelineRunList);
-const decodeUsageFile = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(Schema.Array(UsageRecordSchema)),
-);
 
 const sqlFailure = (cause: unknown) => new PipelineRunsError({ cause });
 
@@ -200,13 +184,20 @@ const sliceUsage = (
     const at = Date.parse(record.at);
     return Number.isFinite(at) && at >= startMs && at <= endMs;
   });
-  const accounts = [...new Set(inWindow.map((record) => record.account))].sort();
+  if (inWindow.length === 0) return undefined;
+  const accounts = [...new Set(inWindow.map((record) => record.account).filter(Boolean))].sort();
   return {
     modelAccount: accounts.length === 0 ? null : accounts.join(","),
     inputTokens: inWindow.reduce((sum, record) => sum + record.inputTokens, 0),
-    outputTokens: inWindow.reduce((sum, record) => sum + record.outputTokens, 0),
-    cacheTokens: inWindow.reduce((sum, record) => sum + record.cacheTokens, 0),
-    convertedCost: inWindow.reduce((sum, record) => sum + record.convertedCost, 0),
+    outputTokens: inWindow.every((record) => record.outputTokens !== null)
+      ? inWindow.reduce((sum, record) => sum + (record.outputTokens ?? 0), 0)
+      : null,
+    cacheTokens: inWindow.every((record) => record.cacheTokens !== null)
+      ? inWindow.reduce((sum, record) => sum + (record.cacheTokens ?? 0), 0)
+      : null,
+    convertedCost: inWindow.every((record) => record.convertedCost !== null)
+      ? inWindow.reduce((sum, record) => sum + (record.convertedCost ?? 0), 0)
+      : null,
   };
 };
 
@@ -375,28 +366,15 @@ const make = Effect.gen(function* () {
       (row) => row.sessionStartedAt !== null && row.sessionEndedAt !== null,
     );
     if (closed.length === 0) return;
-    const read = yield* Effect.exit(usage.read());
-    if (Exit.isFailure(read)) {
-      for (const row of closed) {
-        if (row.inputTokens !== null || row.usageNote !== null) continue;
-        yield* writeUsage(row.id, {
-          modelAccount: null,
-          inputTokens: null,
-          outputTokens: null,
-          cacheTokens: null,
-          convertedCost: null,
-          usageNote: PIPELINE_USAGE_UNREADABLE,
-        });
-      }
-      return;
-    }
     for (const row of closed) {
+      if (row.inputTokens !== null) continue;
       const start = row.sessionStartedAt;
       const end = row.sessionEndedAt;
       if (start === null || end === null) continue;
-      const sliced = sliceUsage(read.value, start, end);
+      const read = yield* Effect.exit(usage.read(row));
+      const sliced = Exit.isSuccess(read) ? sliceUsage(read.value, start, end) : undefined;
       if (sliced === undefined) {
-        if (row.inputTokens !== null) continue;
+        if (row.usageNote !== null) continue;
         yield* writeUsage(row.id, {
           modelAccount: null,
           inputTokens: null,
@@ -513,6 +491,21 @@ const make = Effect.gen(function* () {
         updated_at = ${at}
       WHERE id = ${target.id}
     `.pipe(Effect.mapError(sqlFailure));
+    if (
+      (patch.threadId !== undefined && patch.threadId !== target.threadId) ||
+      (patch.sessionStartedAt !== undefined &&
+        patch.sessionStartedAt !== target.sessionStartedAt) ||
+      (patch.sessionEndedAt !== undefined && patch.sessionEndedAt !== target.sessionEndedAt)
+    ) {
+      yield* writeUsage(target.id, {
+        modelAccount: null,
+        inputTokens: null,
+        outputTokens: null,
+        cacheTokens: null,
+        convertedCost: null,
+        usageNote: null,
+      });
+    }
     yield* refreshUsage();
   });
 
@@ -521,20 +514,84 @@ const make = Effect.gen(function* () {
 
 export const layer = Layer.effect(PipelineRuns, make);
 
-const readExport = Effect.gen(function* () {
-  const filesystem = yield* FileSystem.FileSystem;
-  const read = Effect.fn("PipelineUsage.read")(function* () {
-    const path = (yield* HostProcess.Environment)[USAGE_EXPORT_VARIABLE]?.trim() ?? "";
-    if (path.length === 0) return yield* new PipelineUsageUnreadable();
-    const text = yield* filesystem
-      .readFileString(path)
-      .pipe(Effect.mapError(() => new PipelineUsageUnreadable()));
-    return yield* decodeUsageFile(text).pipe(Effect.mapError(() => new PipelineUsageUnreadable()));
-  });
-  return PipelineUsage.of({ read });
+const TranscriptEntry = Schema.Struct({
+  type: Schema.String,
+  timestamp: Schema.optional(Schema.String),
+  message: Schema.optional(
+    Schema.Struct({
+      role: Schema.String,
+      usage: Schema.optional(
+        Schema.Struct({
+          input: Schema.optional(NonNegativeInt),
+          output: Schema.optional(NonNegativeInt),
+          cacheRead: Schema.optional(NonNegativeInt),
+          cacheWrite: Schema.optional(NonNegativeInt),
+        }),
+      ),
+    }),
+  ),
 });
+const decodeTranscriptEntry = Schema.decodeUnknownEffect(Schema.fromJsonString(TranscriptEntry));
+const NativeSession = Schema.Struct({
+  driver: Schema.String,
+  nativeThreadRef: Schema.NullOr(Schema.Struct({ nativeId: Schema.String })),
+});
+const decodeNativeSession = Schema.decodeUnknownEffect(Schema.fromJsonString(NativeSession));
 
-export const layerUsage = Layer.effect(PipelineUsage, readExport);
+export const layerUsage = Layer.effect(
+  PipelineUsage,
+  Effect.gen(function* () {
+    const filesystem = yield* FileSystem.FileSystem;
+    const sql = yield* SqlClient.SqlClient;
+    const read = Effect.fn("PipelineUsage.read")(
+      function* (run: Pick<PipelineRun, "threadId" | "sessionStartedAt" | "sessionEndedAt">) {
+        if (run.threadId === null) return yield* new PipelineUsageUnreadable();
+        const rows = yield* sql<{
+          readonly payload: string;
+        }>`SELECT payload_json AS payload FROM orchestration_v2_projection_provider_threads
+       WHERE thread_id = ${run.threadId} AND owner_node_id IS NULL`;
+        if (rows.length !== 1) return yield* new PipelineUsageUnreadable();
+        const session = yield* decodeNativeSession(rows[0]!.payload);
+        // Other providers need their own authoritative per-message usage reader.
+        if (session.driver !== "pi" || session.nativeThreadRef === null) {
+          return yield* new PipelineUsageUnreadable();
+        }
+        const start = Date.parse(run.sessionStartedAt ?? "");
+        const end = Date.parse(run.sessionEndedAt ?? "");
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+          return yield* new PipelineUsageUnreadable();
+        }
+        const contents = yield* filesystem.readFileString(session.nativeThreadRef.nativeId);
+        const records: UsageRecord[] = [];
+        for (const line of contents.split(/\r?\n/)) {
+          if (line.trim().length === 0) continue;
+          const entry = yield* decodeTranscriptEntry(line);
+          if (entry.type !== "message" || entry.message?.role !== "assistant") continue;
+          const at = Date.parse(entry.timestamp ?? "");
+          if (!Number.isFinite(at)) return yield* new PipelineUsageUnreadable();
+          if (at < start || at > end) continue;
+          const usage = entry.message.usage;
+          if (usage?.input === undefined) return yield* new PipelineUsageUnreadable();
+          records.push({
+            at: entry.timestamp!,
+            account: "",
+            inputTokens: usage.input,
+            outputTokens: usage.output ?? null,
+            cacheTokens:
+              usage.cacheRead === undefined || usage.cacheWrite === undefined
+                ? null
+                : usage.cacheRead + usage.cacheWrite,
+            convertedCost: null,
+          });
+        }
+        if (records.length === 0) return yield* new PipelineUsageUnreadable();
+        return records;
+      },
+      Effect.mapError(() => new PipelineUsageUnreadable()),
+    );
+    return PipelineUsage.of({ read });
+  }),
+);
 
 export const layerLive = layer.pipe(
   Layer.provide(layerUsage),
