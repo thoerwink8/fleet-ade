@@ -463,9 +463,11 @@ export const layer = Layer.effect(OpenPullRequest, make);
 export const layerLive = layer.pipe(
   Layer.provide(layerOpener),
   Layer.provide(layerReader),
-  Layer.provideMerge(issuesLayer.pipe(Layer.provide(GitHubRest.layerWithDependencies))),
+  Layer.provide(issuesLayer),
+  Layer.provide(GitHubRest.layerWithDependencies),
   Layer.provide(GitVcsDriver.layer),
 );
+
 export const layerWorker = Layer.effectDiscard(
   Effect.gen(function* () {
     const opening = yield* OpenPullRequest;
