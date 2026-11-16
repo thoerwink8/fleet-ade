@@ -16,6 +16,7 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
+import { PipelineBudget } from "./budget.ts";
 import { sessionBranch } from "./DispatchSession.ts";
 import { PIPELINE_HOST, REPOSITORY } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
@@ -254,6 +255,7 @@ export class OpenPullRequest extends Context.Service<OpenPullRequest, OpenPullRe
 
 const make = Effect.gen(function* () {
   const runs = yield* PipelineRuns;
+  const budget = yield* PipelineBudget;
   const settings = yield* ServerSettings.ServerSettingsService;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const opener = yield* PullRequestOpener;
@@ -276,6 +278,19 @@ const make = Effect.gen(function* () {
       if (run.status === "checks" && run.detail === CI_GREEN) continue;
       if (run.status === "session" && run.sessionEndedAt === null) continue;
       if (run.headSha === null) {
+        yield* writeDetail(run.issueNumber, run.detail, UNREAD);
+        continue;
+      }
+      const verdict = yield* budget.review(run);
+      if (verdict === "over") {
+        yield* runs.note(run.issueNumber, {
+          status: "stuck",
+          stuckReason: "超预算",
+          detail: null,
+        });
+        continue;
+      }
+      if (verdict === "hold") {
         yield* writeDetail(run.issueNumber, run.detail, UNREAD);
         continue;
       }
@@ -312,6 +327,23 @@ const make = Effect.gen(function* () {
           headSha,
           detail: null,
         });
+        const lined = yield* budget.review({
+          ...run,
+          prNumber: opened.value.number,
+          status: "pr-open",
+        });
+        if (lined === "over") {
+          yield* runs.note(run.issueNumber, {
+            status: "stuck",
+            stuckReason: "超预算",
+            detail: null,
+          });
+          continue;
+        }
+        if (lined === "hold") {
+          yield* writeDetail(run.issueNumber, null, UNREAD);
+          continue;
+        }
         status = "pr-open";
       }
       if (status !== "checks") {
@@ -323,14 +355,16 @@ const make = Effect.gen(function* () {
         yield* writeDetail(run.issueNumber, status === "checks" ? run.detail : null, UNREAD);
         continue;
       }
+      if (outcome.value.kind === "failure") {
+        yield* budget.settle(run.issueNumber, { reason: CHECK_RED, detail: null });
+        continue;
+      }
       const note: PipelineRunNote =
         outcome.value.kind === "success"
           ? { detail: CI_GREEN }
-          : outcome.value.kind === "failure"
-            ? { status: "stuck", stuckReason: CHECK_RED, detail: null }
-            : outcome.value.kind === "missing"
-              ? { detail: NO_CHECK }
-              : { detail: null };
+          : outcome.value.kind === "missing"
+            ? { detail: NO_CHECK }
+            : { detail: null };
       const currentDetail = status === "checks" ? run.detail : null;
       if (
         note.status === undefined &&

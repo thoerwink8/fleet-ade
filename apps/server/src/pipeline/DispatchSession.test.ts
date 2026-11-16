@@ -18,6 +18,7 @@ import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import * as DispatchSession from "./DispatchSession.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
@@ -125,6 +126,12 @@ const sessionLayer = (
     Layer.provideMerge(memory),
   );
   return DispatchSession.layer.pipe(
+    Layer.provide(budgetLayer),
+    Layer.provide(
+      Layer.succeed(PullRequestAdditions, {
+        read: () => Effect.succeed(0),
+      }),
+    ),
     Layer.provide(opener),
     Layer.provide(git),
     Layer.provide(projects),
@@ -266,29 +273,47 @@ describe("DispatchSession", () => {
     ),
   );
 
-  it.effect("失败变成卡住并带上原终态", () =>
+  it.effect("失败先续一次，第二次才卡住并带上原终态", () =>
     run(enabled, [issue(5)], () =>
       Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
         const opened = yield* openClaimed;
-        yield* recordEnd(opened.threadId!, "failed", "unavailable");
-        const listed = (yield* (yield* PipelineRuns).list).runs[0];
-        assert.strictEqual(listed?.status, "stuck");
-        assert.strictEqual(listed?.stuckReason, "会话失败");
-        assert.strictEqual(listed?.detail, "原终态 failed");
-        assert.strictEqual(listed?.sessionEndedAt, ENDED_AT);
+        const firstThread = opened.threadId;
+        yield* recordEnd(firstThread!, "failed", "unavailable");
+        const renewed = (yield* runs.list).runs;
+        assert.strictEqual(renewed.length, 1);
+        assert.strictEqual(renewed[0]?.status, "claimed");
+        assert.strictEqual(renewed[0]?.stuckReason, null);
+        assert.strictEqual(renewed[0]?.detail, "已续一次");
+        assert.strictEqual(renewed[0]?.renewedOnce, true);
+        assert.strictEqual(renewed[0]?.threadId, null);
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        const retried = (yield* runs.list).runs[0];
+        assert.strictEqual(retried?.status, "session");
+        assert.notStrictEqual(retried?.threadId, firstThread);
+        yield* recordEnd(retried?.threadId ?? "", "failed", "unavailable");
+        const listed = (yield* runs.list).runs;
+        assert.strictEqual(listed.length, 1);
+        assert.strictEqual(listed[0]?.id, renewed[0]?.id);
+        assert.strictEqual(listed[0]?.status, "stuck");
+        assert.strictEqual(listed[0]?.stuckReason, "会话失败");
+        assert.strictEqual(listed[0]?.detail, "原终态 failed");
+        assert.strictEqual(listed[0]?.renewedOnce, true);
       }),
     ),
   );
 
-  it.effect("中断变成卡住并带上原终态", () =>
+  it.effect("中断先续一次", () =>
     run(enabled, [issue(5)], () =>
       Effect.gen(function* () {
         const opened = yield* openClaimed;
         yield* recordEnd(opened.threadId!, "interrupted", "unavailable");
-        const listed = (yield* (yield* PipelineRuns).list).runs[0];
-        assert.strictEqual(listed?.status, "stuck");
-        assert.strictEqual(listed?.stuckReason, "会话失败");
-        assert.strictEqual(listed?.detail, "原终态 interrupted");
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed.length, 1);
+        assert.strictEqual(listed[0]?.status, "claimed");
+        assert.strictEqual(listed[0]?.detail, "已续一次");
+        assert.strictEqual(listed[0]?.renewedOnce, true);
+        assert.strictEqual(listed[0]?.threadId, null);
       }),
     ),
   );
@@ -318,17 +343,28 @@ describe("DispatchSession", () => {
         assert.notStrictEqual(started.sessionStartedAt, null);
         yield* TestClock.adjust(Duration.minutes(2));
         yield* (yield* DispatchSession.DispatchSession).tick;
-        const listed = (yield* (yield* PipelineRuns).list).runs[0];
-        assert.strictEqual(listed?.status, "stuck");
-        assert.strictEqual(listed?.stuckReason, "超时");
-        assert.strictEqual(listed?.detail, "超时");
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed.length, 1);
+        assert.strictEqual(listed[0]?.status, "claimed");
+        assert.strictEqual(listed[0]?.detail, "已续一次");
+        assert.strictEqual(listed[0]?.renewedOnce, true);
+        assert.strictEqual(listed[0]?.threadId, null);
         assert.strictEqual((yield* Ref.get(created)).length, 1);
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        yield* TestClock.adjust(Duration.minutes(2));
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        const again = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(again.length, 1);
+        assert.strictEqual(again[0]?.status, "stuck");
+        assert.strictEqual(again[0]?.stuckReason, "超时");
+        assert.strictEqual(again[0]?.detail, "超时");
+        assert.strictEqual(again[0]?.renewedOnce, true);
       }),
     ),
   );
 
   it.effect("记下一条运行不会改掉另一条", () =>
-    run(enabled, [issue(5)], ({ visible, created }) =>
+    run(enabled, [issue(5)], ({ visible }) =>
       Effect.gen(function* () {
         const first = yield* openClaimed;
         yield* recordEnd(first.threadId!, "failed", "unavailable");
@@ -338,12 +374,10 @@ describe("DispatchSession", () => {
         const listed = (yield* (yield* PipelineRuns).list).runs;
         const kept = listed.find((item) => item.issueNumber === 5);
         const next = listed.find((item) => item.issueNumber === 6);
-        assert.strictEqual(kept?.status, "stuck");
-        assert.strictEqual(kept?.stuckReason, "会话失败");
-        assert.strictEqual(kept?.threadId, first.threadId);
-        assert.strictEqual(next?.status, "session");
-        assert.notStrictEqual(next?.threadId, first.threadId);
-        assert.strictEqual((yield* Ref.get(created)).length, 2);
+        assert.strictEqual(listed.length, 2);
+        assert.strictEqual(kept?.renewedOnce, true);
+        assert.strictEqual(kept?.id !== next?.id, true);
+        assert.strictEqual(listed.filter((item) => item.status === "session").length, 1);
       }),
     ),
   );

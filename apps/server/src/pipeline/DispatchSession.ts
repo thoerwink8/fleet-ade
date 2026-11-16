@@ -26,6 +26,7 @@ import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { REPOSITORY, PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
+import { PipelineBudget } from "./budget.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import { SessionEndInbox, type SessionEndEntry } from "./SessionEndInbox.ts";
 
@@ -61,6 +62,7 @@ interface OpenRun {
   readonly status: (typeof OPEN_STATUSES)[number];
   readonly threadId: string | null;
   readonly sessionStartedAt: string | null;
+  readonly renewedOnce: boolean;
 }
 
 const OpenRunRow = Schema.Struct({
@@ -70,6 +72,7 @@ const OpenRunRow = Schema.Struct({
   status: Schema.Literals(OPEN_STATUSES),
   threadId: Schema.NullOr(Schema.String),
   sessionStartedAt: Schema.NullOr(Schema.String),
+  renewedOnce: Schema.Boolean,
 });
 
 export interface DispatchedSession {
@@ -124,6 +127,7 @@ interface DispatchSessionShape {
 
 const make = Effect.gen(function* () {
   const runs = yield* PipelineRuns;
+  const budget = yield* PipelineBudget;
   const issues = yield* PipelineGitHubIssues;
   const inbox = yield* SessionEndInbox;
   const settings = yield* ServerSettings.ServerSettingsService;
@@ -158,7 +162,14 @@ const make = Effect.gen(function* () {
     }
   });
 
-  const stick = (issueNumber: number, note: PipelineRunNote) => runs.note(issueNumber, note);
+  const stick = (issueNumber: number, note: PipelineRunNote) =>
+    note.status === "stuck" && note.stuckReason != null
+      ? budget.settle(issueNumber, {
+          reason: note.stuckReason,
+          ...(note.detail !== undefined ? { detail: note.detail } : {}),
+          ...(note.sessionEndedAt !== undefined ? { sessionEndedAt: note.sessionEndedAt } : {}),
+        })
+      : runs.note(issueNumber, note);
 
   const applyEnd = Effect.fn("DispatchSession.applyEnd")(function* (
     run: OpenRun,
@@ -221,7 +232,9 @@ const make = Effect.gen(function* () {
       })
       .pipe(Effect.exit);
     if (Exit.isFailure(created)) return yield* failed("worktree was not created");
-    const threadId = ThreadId.make(`pipeline:${issue.number}:${run.id}`);
+    const threadId = ThreadId.make(
+      `pipeline:${issue.number}:${run.id}${run.renewedOnce ? ":retry" : ""}`,
+    );
     const opened = yield* opener
       .open({
         threadId,
@@ -282,6 +295,7 @@ const make = Effect.gen(function* () {
         });
         continue;
       }
+      if ((yield* openRuns()).some((item) => item.status === "session")) continue;
       yield* dispatchClaimed(run, issue.value, model, nowIso);
     }
   }).pipe(Effect.withSpan("DispatchSession.tick"));

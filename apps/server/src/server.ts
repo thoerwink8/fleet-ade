@@ -157,6 +157,7 @@ import * as DispatchSession from "./pipeline/DispatchSession.ts";
 import * as OpenPullRequest from "./pipeline/OpenPullRequest.ts";
 import * as ColdVerifySession from "./pipeline/ColdVerifySession.ts";
 import * as MergeGate from "./pipeline/mergeGate.ts";
+import * as PipelineBudget from "./pipeline/budget.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 import * as CodexManagedTokenBroker from "./provider/CodexManagedTokenBroker.ts";
 import * as WebhookRoute from "./scheduledTasks/webhookRoute.ts";
@@ -665,13 +666,19 @@ const layerServerRestart = Layer.effect(
   }),
 );
 const layerPipelineRuns = PipelineRuns.layerWorker.pipe(Layer.provideMerge(PipelineRuns.layerLive));
+const layerPipelineBudget = PipelineBudget.layerWorker.pipe(
+  Layer.provideMerge(PipelineBudget.layerLive),
+  Layer.provide(layerPipelineRuns),
+);
 const layerDispatchSession = DispatchSession.layerWorker.pipe(
   Layer.provideMerge(DispatchSession.layerLive),
   Layer.provide(layerPipelineRuns),
+  Layer.provide(layerPipelineBudget),
 );
 const layerOpenPullRequest = OpenPullRequest.layerWorker.pipe(
   Layer.provideMerge(OpenPullRequest.layerLive),
   Layer.provide(layerPipelineRuns),
+  Layer.provide(layerPipelineBudget),
   Layer.provide(ProjectionStoreV2.layer),
 );
 const layerColdVerify = ColdVerifySession.layerWorker.pipe(
@@ -681,6 +688,7 @@ const layerColdVerify = ColdVerifySession.layerWorker.pipe(
 const layerMergeGate = MergeGate.layerWorker.pipe(
   Layer.provideMerge(MergeGate.layerLive),
   Layer.provide(layerPipelineRuns),
+  Layer.provide(layerPipelineBudget),
 );
 const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   AgentAwarenessRelay.layer,
@@ -725,6 +733,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ProviderInstallation.layer,
   ReplayMarkers.layer,
   layerPipelineRuns,
+  layerPipelineBudget,
   layerColdVerify,
   layerDispatchSession,
   layerOpenPullRequest,

@@ -16,14 +16,15 @@ import * as Schema from "effect/Schema";
 
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { PipelineBudget } from "./budget.ts";
 import { PIPELINE_HOST, REPOSITORY } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 
 /** Workflow name in ci.yml. Job names are not this. */
-export const CI_CHECK_NAME = "CI";
+const CI_CHECK_NAME = "CI";
 
 /** Commit status written by cold verify. */
-export const COLD_VERIFY_CONTEXT = "cold-verify";
+const COLD_VERIFY_CONTEXT = "cold-verify";
 
 const WORKFLOWS_PATH = ".github/workflows/";
 const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
@@ -249,7 +250,7 @@ const makeReader = Effect.gen(function* () {
   return MergeGateReader.of({ read });
 });
 
-export const layerReader = Layer.effect(MergeGateReader, makeReader);
+const layerReader = Layer.effect(MergeGateReader, makeReader);
 
 const makeMerger = Effect.gen(function* () {
   const rest = yield* GitHubRest.GitHubRest;
@@ -288,7 +289,7 @@ const makeMerger = Effect.gen(function* () {
   return PullRequestMerger.of({ merge });
 });
 
-export const layerMerger = Layer.effect(PullRequestMerger, makeMerger);
+const layerMerger = Layer.effect(PullRequestMerger, makeMerger);
 
 interface MergeGateShape {
   readonly tick: Effect.Effect<void, PipelineRunsError | ServerSettingsError>;
@@ -305,6 +306,7 @@ const sameNote = (run: PipelineRun, note: PipelineRunNote): boolean =>
 
 const make = Effect.gen(function* () {
   const runs = yield* PipelineRuns;
+  const budget = yield* PipelineBudget;
   const settings = yield* ServerSettings.ServerSettingsService;
   const reader = yield* MergeGateReader;
   const merger = yield* PullRequestMerger;
@@ -326,6 +328,15 @@ const make = Effect.gen(function* () {
       const headSha = run.headSha;
       const prNumber = run.prNumber;
       if (prNumber === null || headSha === null) {
+        yield* write(run, { detail: UNREAD });
+        continue;
+      }
+      const verdict = yield* budget.review(run);
+      if (verdict === "over") {
+        yield* write(run, { status: "stuck", stuckReason: "超预算", detail: null });
+        continue;
+      }
+      if (verdict === "hold") {
         yield* write(run, { detail: UNREAD });
         continue;
       }

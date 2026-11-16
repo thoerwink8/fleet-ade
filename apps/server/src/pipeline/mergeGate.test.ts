@@ -6,6 +6,7 @@ import * as Ref from "effect/Ref";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import {
@@ -146,6 +147,8 @@ const gateLayer = (input: {
       ),
   });
   return layer.pipe(
+    Layer.provide(budgetLayer),
+    Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
     Layer.provide(reader),
     Layer.provide(merger),
     Layer.provide(settings),
