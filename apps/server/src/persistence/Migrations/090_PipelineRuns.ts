@@ -35,6 +35,7 @@ export default Effect.gen(function* () {
       usage_note TEXT CHECK (usage_note IS NULL OR usage_note = '读不到'),
       commit_count INTEGER,
       ci_queue_ms INTEGER,
+      detail TEXT,
       CHECK (
         (status = 'stuck' AND stuck_reason IS NOT NULL)
         OR (status <> 'stuck' AND stuck_reason IS NULL)

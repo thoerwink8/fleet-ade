@@ -55,6 +55,7 @@ export const PipelineRun = Schema.Struct({
   usageNote: Schema.NullOr(Schema.Literal(PIPELINE_USAGE_UNREADABLE)),
   commitCount: NullableInt,
   ciQueueMs: NullableInt,
+  detail: NullableText,
   costLabel: Schema.Literal(PIPELINE_COST_LABEL),
 });
 export type PipelineRun = typeof PipelineRun.Type;

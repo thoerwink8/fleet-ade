@@ -72,6 +72,7 @@ const RunRow = Schema.Struct({
   usageNote: Schema.NullOr(Schema.Literal(PIPELINE_USAGE_UNREADABLE)),
   commitCount: Schema.NullOr(Schema.Int),
   ciQueueMs: Schema.NullOr(Schema.Int),
+  detail: Schema.NullOr(Schema.String),
 });
 type RunRow = typeof RunRow.Type;
 
@@ -136,6 +137,8 @@ export interface PipelineRunNote {
   readonly sessionEndedAt?: string | null;
   readonly commitCount?: number | null;
   readonly ciQueueMs?: number | null;
+  /** Why this run stopped moving. Not the global tick row. */
+  readonly detail?: string | null;
 }
 
 interface PipelineRunsShape {
@@ -264,7 +267,8 @@ const SELECT_RUNS = `
     converted_cost AS convertedCost,
     usage_note AS usageNote,
     commit_count AS commitCount,
-    ci_queue_ms AS ciQueueMs
+    ci_queue_ms AS ciQueueMs,
+    detail
   FROM pipeline_runs
   ORDER BY updated_at DESC, id DESC
 `;
@@ -499,6 +503,7 @@ const make = Effect.gen(function* () {
         },
         commit_count = ${patch.commitCount === undefined ? target.commitCount : patch.commitCount},
         ci_queue_ms = ${patch.ciQueueMs === undefined ? target.ciQueueMs : patch.ciQueueMs},
+        detail = ${patch.detail === undefined ? target.detail : patch.detail},
         updated_at = ${at}
       WHERE id = ${target.id}
     `.pipe(Effect.mapError(sqlFailure));
@@ -527,7 +532,7 @@ export const layerUsage = Layer.effect(PipelineUsage, readExport);
 
 export const layerLive = layer.pipe(
   Layer.provide(layerUsage),
-  Layer.provide(gitHubIssuesLayer.pipe(Layer.provide(GitHubRest.layerWithDependencies))),
+  Layer.provideMerge(gitHubIssuesLayer.pipe(Layer.provide(GitHubRest.layerWithDependencies))),
 );
 
 export const layerWorker = Layer.effectDiscard(
