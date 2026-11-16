@@ -238,6 +238,36 @@ describe("ColdVerifySession", () => {
     ),
   );
 
+  it.effect("任务号和 PR 号不同时，交代里是仓、PR 号和当前 head", () =>
+    run(
+      { author: AUTHOR, verifier: VERIFIER },
+      (handles) =>
+        Effect.gen(function* () {
+          const runs = yield* PipelineRuns;
+          yield* runs.tick;
+          yield* runs.note(28, {
+            status: "verify",
+            prNumber: 32,
+            headSha: SHA,
+            stuckReason: null,
+          });
+          yield* (yield* ColdVerifySession).tick;
+          const text = (yield* Ref.get(handles.opened))[0]?.text ?? "";
+          assert.match(text, /thoerwink8\/fleet-ade/);
+          assert.match(text, /任务 #28/);
+          assert.match(text, /任务号不是 PR 号/);
+          assert.match(text, /PR #32/);
+          assert.notMatch(text, /PR #28/);
+          assert.match(text, /基线分支/);
+          assert.match(text, new RegExp(SHA));
+          assert.match(text, /别的 head 不算/);
+          assert.notMatch(text, new RegExp(OLD_SHA));
+        }),
+      false,
+      [issue(28)],
+    ),
+  );
+
   it.effect("第一轮过只把 success 写到当前 head，建议留在运行上", () =>
     run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
       Effect.gen(function* () {

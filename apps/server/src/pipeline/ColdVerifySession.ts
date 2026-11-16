@@ -46,8 +46,10 @@ const STATUS_HOST = "github.com";
 
 const VerifyRunRow = Schema.Struct({
   id: Schema.Int,
+  repository: Schema.String,
   issueNumber: Schema.Int,
   title: Schema.String,
+  prNumber: Schema.NullOr(Schema.Int),
   threadId: Schema.NullOr(Schema.String),
   headSha: Schema.String,
   detail: Schema.NullOr(Schema.String),
@@ -254,6 +256,17 @@ interface ColdVerifySessionShape {
 const matchesRepository = (owner: string | undefined, name: string | undefined): boolean =>
   owner === REPOSITORY.owner && name === REPOSITORY.name;
 
+const verifyBriefing = (run: {
+  readonly repository: string;
+  readonly issueNumber: number;
+  readonly title: string;
+  readonly prNumber: number | null;
+  readonly headSha: string;
+}): string => {
+  const pullRequest = run.prNumber === null ? "PR 号还没有" : `PR #${run.prNumber}`;
+  return `仓 ${run.repository}。任务 #${run.issueNumber} ${run.title}。任务号不是 PR 号。${pullRequest}。只核对 head ${run.headSha} 相对该 PR 基线分支的 diff、改了哪些文件、怎么算做完、PR 正文。别的 head 不算。结论用 JSON：verdict、problems、suggestions、handovers。`;
+};
+
 const make = Effect.gen(function* () {
   const runs = yield* PipelineRuns;
   const settings = yield* ServerSettings.ServerSettingsService;
@@ -271,8 +284,10 @@ const make = Effect.gen(function* () {
           ? [
               {
                 id: run.id,
+                repository: run.repository,
                 issueNumber: run.issueNumber,
                 title: run.title,
+                prNumber: run.prNumber,
                 threadId: run.threadId,
                 headSha: run.headSha,
                 detail: run.detail,
@@ -389,7 +404,7 @@ const make = Effect.gen(function* () {
           threadId,
           projectId: project.id,
           modelSelection: current.pipelineVerifierModel,
-          text: `验 #${run.issueNumber} ${run.title}，只看 diff、改了哪些文件、怎么算做完、PR 正文。结论用 JSON：verdict、problems、suggestions、handovers。`,
+          text: verifyBriefing(run),
         })
         .pipe(Effect.exit);
       if (Exit.isFailure(opened)) {
