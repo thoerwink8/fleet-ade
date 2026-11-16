@@ -39,8 +39,11 @@ import { judgeColdVerify, type ColdVerifyModelOutput } from "./coldVerifyVerdict
 
 const STUCK_NO_MODEL = "没配模型";
 const STUCK_COLD_VERIFY = "冷验收不过";
+const STUCK_INCONCLUSIVE = "冷验收没验成";
 const STUCK_HANDOVER = "交人";
 const MAX_ROUNDS = 2;
+/** New verifier sessions allowed for one round that never produced a conclusion. */
+export const MAX_INCONCLUSIVE_RETRIES = 3;
 const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 const STATUS_HOST = "github.com";
 
@@ -65,6 +68,8 @@ const ModelOutput = Schema.Struct({
 });
 
 const decodeModelOutput = Schema.decodeUnknownEffect(Schema.fromJsonString(ModelOutput));
+const OUTPUT_EXAMPLE =
+  '{"verdict":"pass","problems":[{"text":"问题"}],"suggestions":[{"text":"建议"}],"handovers":[{"text":"交人"}]}';
 
 /** One verifier session. The live opener dispatches it; tests replace this and count calls. */
 export interface ColdVerifyRequest {
@@ -87,6 +92,7 @@ export class VerifierOpener extends Context.Service<VerifierOpener, VerifierOpen
 /** A round that ran, or a reason it never started. No network and no model live here. */
 export type ColdVerifyAttempt =
   | { readonly kind: "output"; readonly output: ColdVerifyModelOutput }
+  | { readonly kind: "inconclusive" }
   | { readonly kind: "not-started"; readonly detail: string }
   | { readonly kind: "waiting" };
 
@@ -109,24 +115,31 @@ const targetOf = (sha: string): CommitStatusTarget => ({
 });
 
 const roundCount = (detail: string | null): number => {
-  const matched = /第 (\d+) 轮/.exec(detail ?? "");
+  const matched = /已完成:(\d+):轮/.exec(detail ?? "");
   const count = matched === null ? 0 : Number(matched[1]);
   return Number.isInteger(count) && count >= 0 ? count : 0;
 };
 
 /** Verifier thread stays in the detail. `thread_id` remains the author session. */
-const DISPATCHED = /^已派第 (\d+) 轮 (\S+)$/;
+const DISPATCHED = /^已派第:(\d+):次:(\d+):(\S+)$/;
+const LEGACY_INCONCLUSIVE = /^第 (\d+) 轮仍没验成$/;
 
 const dispatchedRound = (
   detail: string | null,
-): { readonly round: number; readonly threadId: string } | undefined => {
+): { readonly round: number; readonly attempt: number; readonly threadId: string } | undefined => {
   const matched = DISPATCHED.exec(detail ?? "");
   if (matched === null) return undefined;
   const round = Number(matched[1]);
-  return Number.isInteger(round) ? { round, threadId: matched[2]! } : undefined;
+  const attempt = Number(matched[2]);
+  return Number.isInteger(round) && Number.isInteger(attempt)
+    ? { round, attempt, threadId: matched[3]! }
+    : undefined;
 };
 
-const stick = (reason: "没配模型" | "冷验收不过" | "交人", detail: string): PipelineRunNote => ({
+const stick = (
+  reason: "没配模型" | "冷验收不过" | "冷验收没验成" | "交人",
+  detail: string,
+): PipelineRunNote => ({
   status: "stuck",
   stuckReason: reason,
   detail,
@@ -145,6 +158,7 @@ export const decideColdVerify = Effect.fn("ColdVerifySession.decide")(function* 
   input: {
     readonly sha: string;
     readonly priorRounds: number;
+    readonly inconclusiveAttempts: number;
     readonly attempts: ReadonlyArray<ColdVerifyAttempt>;
     readonly suggestions: ReadonlyArray<string>;
   },
@@ -166,6 +180,19 @@ export const decideColdVerify = Effect.fn("ColdVerifySession.decide")(function* 
     }
     if (attempt.kind === "not-started") {
       return decided(stick(STUCK_COLD_VERIFY, `没跑起来：${attempt.detail}`), rounds);
+    }
+    if (attempt.kind === "inconclusive") {
+      const nextAttempt = input.inconclusiveAttempts + 1;
+      if (nextAttempt >= MAX_INCONCLUSIVE_RETRIES) {
+        return decided(
+          stick(STUCK_INCONCLUSIVE, `已完成:${rounds}:轮:没验成:已试:${MAX_INCONCLUSIVE_RETRIES}`),
+          rounds,
+        );
+      }
+      return decided(
+        { status: "verify", detail: `已完成:${rounds}:轮:没验成:已试:${nextAttempt}` },
+        rounds,
+      );
     }
     rounds += 1;
     const outcome = judgeColdVerify(attempt.output);
@@ -196,21 +223,29 @@ export const decideColdVerify = Effect.fn("ColdVerifySession.decide")(function* 
         rounds,
       );
     }
+    if (outcome.kind === "unverified") {
+      const nextAttempt = input.inconclusiveAttempts + 1;
+      if (nextAttempt >= MAX_INCONCLUSIVE_RETRIES) {
+        return decided(
+          stick(STUCK_INCONCLUSIVE, `已完成:${rounds}:轮:没验成:已试:${MAX_INCONCLUSIVE_RETRIES}`),
+          rounds,
+        );
+      }
+      return decided(
+        { status: "verify", detail: `已完成:${rounds}:轮:没验成:已试:${nextAttempt}` },
+        rounds,
+      );
+    }
     if (outcome.kind === "block") suggestions.push(...outcome.suggestions);
     if (rounds >= MAX_ROUNDS) {
       return decided(
-        stick(
-          STUCK_COLD_VERIFY,
-          outcome.kind === "block"
-            ? `第 ${rounds} 轮仍不过：${outcome.problems[0] ?? "有能挡的问题"}`
-            : `第 ${rounds} 轮仍没验成`,
-        ),
+        stick(STUCK_COLD_VERIFY, `第 ${rounds} 轮仍不过：${outcome.problems[0] ?? "有能挡的问题"}`),
         rounds,
       );
     }
   }
   return decided(
-    { status: "verify", detail: rounds === 0 ? null : `第 ${rounds} 轮不过，仍待验` },
+    { status: "verify", detail: rounds === 0 ? null : `已完成:${rounds}:轮:仍待验` },
     rounds,
   );
 });
@@ -224,20 +259,19 @@ const verifierRefused = (
   return undefined;
 };
 
-const EMPTY_OUTPUT: ColdVerifyModelOutput = {
-  verdict: null,
-  problems: [],
-  suggestions: [],
-  handovers: [],
+const inconclusiveAttempts = (detail: string | null): number => {
+  const matched = /没验成:已试:(\d+)/.exec(detail ?? "");
+  const count = matched === null ? 0 : Number(matched[1]);
+  return Number.isInteger(count) && count >= 0 ? count : 0;
 };
 
-/** The last assistant message is the round's conclusion. Unreadable text is an empty round. */
+/** The last assistant message is the round's conclusion. Unreadable text did not verify. */
 export const conclusionOf = (
   messages: ReadonlyArray<{ readonly role: string; readonly text: string }>,
-): Effect.Effect<ColdVerifyModelOutput | undefined> => {
+): Effect.Effect<ColdVerifyModelOutput | "inconclusive" | undefined> => {
   const text = [...messages].reverse().find((message) => message.role === "assistant")?.text;
   if (text === undefined) return Effect.void.pipe(Effect.as(undefined));
-  return decodeModelOutput(text).pipe(Effect.orElseSucceed(() => EMPTY_OUTPUT));
+  return decodeModelOutput(text).pipe(Effect.orElseSucceed(() => "inconclusive" as const));
 };
 
 interface ColdVerifySessionShape {
@@ -264,7 +298,7 @@ const verifyBriefing = (run: {
   readonly headSha: string;
 }): string => {
   const pullRequest = run.prNumber === null ? "PR 号还没有" : `PR #${run.prNumber}`;
-  return `仓 ${run.repository}。任务 #${run.issueNumber} ${run.title}。任务号不是 PR 号。${pullRequest}。只核对 head ${run.headSha} 相对该 PR 基线分支的 diff、改了哪些文件、怎么算做完、PR 正文。别的 head 不算。结论用 JSON：verdict、problems、suggestions、handovers。`;
+  return `仓 ${run.repository}。任务 #${run.issueNumber} ${run.title}。任务号不是 PR 号。${pullRequest}。只核对 head ${run.headSha} 相对该 PR 基线分支的 diff、改了哪些文件、怎么算做完、PR 正文。别的 head 不算。最后只返回这一份 JSON，字段和值只能按这个形状：${OUTPUT_EXAMPLE}`;
 };
 
 const make = Effect.gen(function* () {
@@ -277,6 +311,25 @@ const make = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
 
   const verifyRuns = Effect.fn("ColdVerifySession.verifyRuns")(function* () {
+    for (const run of (yield* runs.list).runs) {
+      const legacy = LEGACY_INCONCLUSIVE.exec(run.detail ?? "");
+      const round = legacy === null ? 0 : Number(legacy[1]);
+      if (
+        run.repository === REPOSITORY_NAME &&
+        run.status === "stuck" &&
+        run.stuckReason === STUCK_COLD_VERIFY &&
+        run.headSha !== null &&
+        Number.isInteger(round) &&
+        round >= 1 &&
+        round <= MAX_ROUNDS
+      ) {
+        yield* runs.note(run.issueNumber, {
+          status: "verify",
+          stuckReason: null,
+          detail: round === 1 ? null : `已完成:${round - 1}:轮:仍待验`,
+        });
+      }
+    }
     const listed = yield* runs.list;
     return yield* decodeVerifyRuns(
       listed.runs.flatMap((run) =>
@@ -338,30 +391,32 @@ const make = Effect.gen(function* () {
         continue;
       }
       const prior = roundCount(run.detail);
+      const attempted = inconclusiveAttempts(run.detail);
       const dispatched = dispatchedRound(run.detail);
       if (dispatched !== undefined) {
         const ended = endByThread.get(ThreadId.make(dispatched.threadId));
         if (ended === undefined) continue;
         const attempt: ColdVerifyAttempt =
-          ended.status === "completed"
-            ? yield* projections
+          ended.status !== "completed" || ended.headLookup !== "found"
+            ? { kind: "inconclusive" }
+            : yield* projections
                 .getThreadSnapshot(ThreadId.make(dispatched.threadId))
                 .pipe(
                   Effect.flatMap((snapshot) =>
                     conclusionOf(snapshot.projection.messages).pipe(
                       Effect.map((output) =>
-                        output === undefined
-                          ? ({ kind: "not-started", detail: "会话结束但没有结论" } as const)
+                        output === undefined || output === "inconclusive"
+                          ? ({ kind: "inconclusive" } as const)
                           : ({ kind: "output", output } as const),
                       ),
                     ),
                   ),
-                )
-            : { kind: "not-started", detail: `会话终态 ${ended.status}` };
+                );
         const decision = yield* decideColdVerify(
           {
             sha: run.headSha,
             priorRounds: dispatched.round - 1,
+            inconclusiveAttempts: dispatched.attempt - 1,
             attempts: [attempt],
             suggestions: [],
           },
@@ -376,11 +431,13 @@ const make = Effect.gen(function* () {
         continue;
       }
       if (prior >= MAX_ROUNDS) continue;
+      if (attempted >= MAX_INCONCLUSIVE_RETRIES) continue;
       if (occupied >= MAX_OPEN_SESSIONS) {
         const decision = yield* decideColdVerify(
           {
             sha: run.headSha,
             priorRounds: prior,
+            inconclusiveAttempts: attempted,
             attempts: [{ kind: "waiting" }],
             suggestions: [],
           },
@@ -398,7 +455,10 @@ const make = Effect.gen(function* () {
         continue;
       }
       const next = prior + 1;
-      const threadId = ThreadId.make(`pipeline:verify:${run.issueNumber}:${run.id}:${next}`);
+      const attempt = attempted + 1;
+      const threadId = ThreadId.make(
+        `pipeline:verify:${run.issueNumber}:${run.id}:${next}:${attempt}`,
+      );
       const opened = yield* opener
         .open({
           threadId,
@@ -416,7 +476,7 @@ const make = Effect.gen(function* () {
       }
       yield* runs.note(run.issueNumber, {
         status: "verify",
-        detail: `已派第 ${next} 轮 ${threadId}`,
+        detail: `已派第:${next}:次:${attempt}:${threadId}`,
       });
       occupied += 1;
     }
