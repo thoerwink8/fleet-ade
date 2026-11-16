@@ -18,7 +18,12 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import { PipelineBudget } from "./budget.ts";
 import { sessionBranch } from "./DispatchSession.ts";
-import { PIPELINE_HOST, REPOSITORY, PipelineGitHubIssues } from "./GitHubIssues.ts";
+import {
+  PIPELINE_HOST,
+  REPOSITORY,
+  PipelineGitHubIssues,
+  layer as issuesLayer,
+} from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 
@@ -460,7 +465,7 @@ export const layerLive = layer.pipe(
   Layer.provide(layerReader),
   Layer.provide(GitHubRest.layerWithDependencies),
   Layer.provide(GitVcsDriver.layer),
-  Layer.provide(PipelineGitHubIssues.layer),
+  Layer.provide(issuesLayer),
 );
 
 export const layerWorker = Layer.effectDiscard(
