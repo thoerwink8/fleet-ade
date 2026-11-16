@@ -1510,6 +1510,10 @@ export const ServerSettings = Schema.Struct({
   pipelineAuthorModel: Schema.NullOr(ModelSelection).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  /** Empty, or the same as the author model: a verify run sticks as 没配模型 and no verifier session opens. */
+  pipelineVerifierModel: Schema.NullOr(ModelSelection).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
   /** Minutes after a session starts with no terminal event before the run sticks as 超时. */
   pipelineSessionTimeoutMinutes: PositiveInt.pipe(Schema.withDecodingDefault(Effect.succeed(90))),
   /** Maximum active agent sessions running concurrently on this server; null leaves concurrency uncapped. */
@@ -1948,6 +1952,7 @@ export const ServerSettingsPatch = Schema.Struct({
   linkedEnvironmentsEnabled: Schema.optionalKey(Schema.Boolean),
   pipelineEnabled: Schema.optionalKey(Schema.Boolean),
   pipelineAuthorModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  pipelineVerifierModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   pipelineSessionTimeoutMinutes: Schema.optionalKey(PositiveInt),
   maxConcurrentSessions: Schema.optionalKey(Schema.NullOr(MaxConcurrentSessions)),
   promptSuggestionsEnabled: Schema.optionalKey(Schema.Boolean),
