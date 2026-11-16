@@ -1516,6 +1516,8 @@ export const ServerSettings = Schema.Struct({
   ),
   /** Minutes after a session starts with no terminal event before the run sticks as 超时. */
   pipelineSessionTimeoutMinutes: PositiveInt.pipe(Schema.withDecodingDefault(Effect.succeed(90))),
+  /** Off: a run that passes the merge gate stays mergeable and is not merged. */
+  pipelineAutoMerge: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Maximum active agent sessions running concurrently on this server; null leaves concurrency uncapped. */
   maxConcurrentSessions: Schema.NullOr(MaxConcurrentSessions).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
@@ -1954,6 +1956,7 @@ export const ServerSettingsPatch = Schema.Struct({
   pipelineAuthorModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   pipelineVerifierModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   pipelineSessionTimeoutMinutes: Schema.optionalKey(PositiveInt),
+  pipelineAutoMerge: Schema.optionalKey(Schema.Boolean),
   maxConcurrentSessions: Schema.optionalKey(Schema.NullOr(MaxConcurrentSessions)),
   promptSuggestionsEnabled: Schema.optionalKey(Schema.Boolean),
   backgroundActivity: Schema.optionalKey(
