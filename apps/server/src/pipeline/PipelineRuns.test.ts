@@ -408,6 +408,21 @@ describe("PipelineRuns", () => {
         assert.strictEqual(kept?.convertedCost, 1);
         assert.strictEqual(kept?.modelAccount, "alpha");
         assert.strictEqual(kept?.usageNote, null);
+        yield* runs.note(7, {
+          threadId: "retry-thread",
+          sessionStartedAt: null,
+          sessionEndedAt: null,
+        });
+        const reset = (yield* runs.list).runs[0];
+        assert.strictEqual(reset?.inputTokens, null);
+        assert.strictEqual(reset?.convertedCost, null);
+        yield* runs.note(7, {
+          sessionStartedAt: "2026-01-02T00:00:00.000Z",
+          sessionEndedAt: "2026-01-02T01:00:00.000Z",
+        });
+        const retry = (yield* runs.list).runs[0];
+        assert.strictEqual(retry?.inputTokens, null);
+        assert.strictEqual(retry?.usageNote, PIPELINE_USAGE_UNREADABLE);
       }).pipe(
         Effect.provide(
           pipelineLayer({
