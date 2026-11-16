@@ -20,6 +20,7 @@ import * as ServerSettings from "../serverSettings.ts";
 
 import {
   ColdVerifySession,
+  MAX_INCONCLUSIVE_RETRIES,
   VerifierOpener,
   conclusionOf,
   decideColdVerify,
@@ -273,7 +274,7 @@ describe("ColdVerifySession", () => {
       Effect.gen(function* () {
         yield* claim;
         const dispatched = yield* tick;
-        const threadId = /^已派第 \d+ 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
+        const threadId = /^已派第:\d+:次:\d+:(\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
         yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
         yield* (yield* SessionEndInbox).record({
           threadId: ThreadId.make(threadId),
@@ -298,8 +299,8 @@ describe("ColdVerifySession", () => {
         yield* claim;
         for (const round of [1, 2]) {
           const dispatched = yield* tick;
-          const threadId = /^已派第 \d+ 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
-          assert.match(dispatched?.detail ?? "", new RegExp(`已派第 ${round} 轮`));
+          const threadId = /^已派第:\d+:次:\d+:(\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
+          assert.match(dispatched?.detail ?? "", new RegExp(`已派第:${round}:次:1:`));
           yield* Ref.set(handles.messages, [
             { role: "assistant", text: JSON.stringify(blockOutput) },
           ]);
@@ -328,6 +329,7 @@ describe("ColdVerifySession", () => {
           {
             sha: SHA,
             priorRounds: 0,
+            inconclusiveAttempts: 0,
             attempts: [{ kind: "output", output: passOutput }],
             suggestions: [],
           },
@@ -364,7 +366,13 @@ describe("ColdVerifySession", () => {
   it.effect("等资源仍是待验，不写失败也不写通过", () =>
     Effect.gen(function* () {
       const decision = yield* decideColdVerify(
-        { sha: SHA, priorRounds: 0, attempts: [{ kind: "waiting" }], suggestions: [] },
+        {
+          sha: SHA,
+          priorRounds: 0,
+          inconclusiveAttempts: 0,
+          attempts: [{ kind: "waiting" }],
+          suggestions: [],
+        },
         () => Effect.die("等资源不该写状态"),
       );
       assert.strictEqual(decision.note.status, "verify");
@@ -395,7 +403,7 @@ describe("ColdVerifySession", () => {
           yield* runs.note(8, { status: "merged", stuckReason: null });
           yield* (yield* ColdVerifySession).tick;
           const dispatched = (yield* runs.list).runs.find((run) => run.issueNumber === 9);
-          assert.match(dispatched?.detail ?? "", /已派第 1 轮/);
+          assert.match(dispatched?.detail ?? "", /已派第:1:次:1:/);
           assert.strictEqual((yield* Ref.get(handles.opened)).length, 1);
         }),
       false,
@@ -426,7 +434,7 @@ describe("ColdVerifySession", () => {
         assert.strictEqual(dispatched?.threadId, "author-thread");
         assert.strictEqual(dispatched?.inputTokens, 40);
         assert.strictEqual(dispatched?.modelAccount, "author");
-        const threadId = /^已派第 1 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
+        const threadId = /^已派第:1:次:1:(\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
         assert.notStrictEqual(threadId, "");
         assert.notStrictEqual(threadId, "author-thread");
         yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
@@ -458,7 +466,7 @@ describe("ColdVerifySession", () => {
         yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
         yield* (yield* SessionEndInbox).record({
           threadId: ThreadId.make(
-            /^已派第 \d+ 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "",
+            /^已派第:\d+:次:\d+:(\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "",
           ),
           runId: RunId.make("end:write-failed"),
           status: "completed",
@@ -481,9 +489,143 @@ describe("ColdVerifySession", () => {
         { role: "user", text: "看 diff" },
         { role: "assistant", text: JSON.stringify(passOutput) },
       ]);
-      assert.strictEqual(output?.verdict, "pass");
+      assert.strictEqual(output !== "inconclusive" ? output?.verdict : undefined, "pass");
       const missing = yield* conclusionOf([{ role: "user", text: "只有问题" }]);
       assert.strictEqual(missing, undefined);
     }),
+  );
+  const recordCompleted = (threadId: string, runId: string) =>
+    Effect.gen(function* () {
+      yield* (yield* SessionEndInbox).record({
+        threadId: ThreadId.make(threadId),
+        runId: RunId.make(runId),
+        status: "completed",
+        endedAt: NOW,
+        headLookup: "found",
+        headSha: SHA,
+      });
+    });
+
+  it.effect("没验成不占轮次，同一轮内换新会话，真不过仍占两轮", () =>
+    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+      Effect.gen(function* () {
+        yield* claim;
+        assert.strictEqual(MAX_INCONCLUSIVE_RETRIES, 3);
+        const threads: string[] = [];
+        for (let attempt = 1; attempt <= MAX_INCONCLUSIVE_RETRIES; attempt += 1) {
+          const dispatched = yield* tick;
+          const threadId = /^已派第:1:次:(\d+):(\S+)$/.exec(dispatched?.detail ?? "")?.[2] ?? "";
+          assert.match(dispatched?.detail ?? "", new RegExp(`已派第:1:次:${attempt}:`));
+          threads.push(threadId);
+          yield* Ref.set(handles.messages, [
+            {
+              role: "assistant",
+              text: JSON.stringify({
+                verdict: "blocked",
+                findings: [{ scope: "diff" }],
+                suggestions: ["再看"],
+              }),
+            },
+          ]);
+          yield* recordCompleted(threadId, `end:${threadId}`);
+          const listed = yield* tick;
+          if (attempt < MAX_INCONCLUSIVE_RETRIES) {
+            assert.strictEqual(listed?.status, "verify");
+            assert.strictEqual(listed?.stuckReason, null);
+          } else {
+            assert.strictEqual(listed?.status, "stuck");
+            assert.strictEqual(listed?.stuckReason, "冷验收没验成");
+          }
+          assert.match(listed?.detail ?? "", /已完成:0:轮:没验成/);
+        }
+        assert.strictEqual(new Set(threads).size, MAX_INCONCLUSIVE_RETRIES);
+        assert.strictEqual((yield* Ref.get(handles.opened)).length, MAX_INCONCLUSIVE_RETRIES);
+        assert.deepEqual(yield* Ref.get(handles.written), []);
+      }),
+    ),
+  );
+
+  it.effect("空结论不占轮次，同一轮内记一次没验成", () =>
+    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+      Effect.gen(function* () {
+        yield* claim;
+        const dispatched = yield* tick;
+        const threadId = /^已派第:1:次:1:(\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
+        yield* Ref.set(handles.messages, [
+          {
+            role: "assistant",
+            text: JSON.stringify({
+              verdict: null,
+              problems: [],
+              suggestions: [],
+              handovers: [],
+            }),
+          },
+        ]);
+        yield* recordCompleted(threadId, `end:${threadId}`);
+        const listed = yield* tick;
+        assert.strictEqual(listed?.status, "verify");
+        assert.strictEqual(listed?.stuckReason, null);
+        assert.match(listed?.detail ?? "", /已完成:0:轮:没验成:已试:1/);
+        assert.strictEqual((yield* Ref.get(handles.opened)).length, 1);
+        const retried = yield* tick;
+        assert.match(retried?.detail ?? "", /已派第:1:次:2:/);
+        assert.strictEqual((yield* Ref.get(handles.opened)).length, 2);
+      }),
+    ),
+  );
+
+  it.effect("解码失败记没验成，不记成空结论", () =>
+    Effect.gen(function* () {
+      const malformed = yield* conclusionOf([
+        {
+          role: "assistant",
+          text: JSON.stringify({
+            verdict: "blocked",
+            findings: [{ scope: "diff" }],
+            suggestions: ["再看"],
+          }),
+        },
+      ]);
+      assert.strictEqual(malformed, "inconclusive");
+      const unreadable = yield* conclusionOf([{ role: "assistant", text: "不是 JSON" }]);
+      assert.strictEqual(unreadable, "inconclusive");
+    }),
+  );
+
+  it.effect("旧的没验成卡住运行回到待验，保留 PR、head 和作者用量", () =>
+    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+      Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const sql = yield* SqlClient.SqlClient;
+        yield* runs.tick;
+        yield* runs.note(8, {
+          status: "verify",
+          prNumber: 32,
+          headSha: SHA,
+          threadId: "author-thread",
+          stuckReason: null,
+        });
+        yield* runs.note(8, {
+          status: "stuck",
+          stuckReason: "冷验收不过",
+          detail: "第 2 轮仍没验成",
+        });
+        yield* sql`UPDATE pipeline_runs SET model_account = 'author', input_tokens = 40, output_tokens = 2, cache_tokens = 0, converted_cost = 1 WHERE issue_number = 8`;
+        const listed = yield* tick;
+        assert.strictEqual(listed?.status, "verify");
+        assert.strictEqual(listed?.stuckReason, null);
+        assert.strictEqual(listed?.prNumber, 32);
+        assert.strictEqual(listed?.headSha, SHA);
+        assert.strictEqual(listed?.threadId, "author-thread");
+        assert.strictEqual(listed?.inputTokens, 40);
+        assert.match(listed?.detail ?? "", /已派第:2:次:1:/);
+        const text = (yield* Ref.get(handles.opened))[0]?.text ?? "";
+        assert.match(text, /PR #32/);
+        assert.match(text, new RegExp(SHA));
+        assert.match(text, /verdict/);
+        assert.match(text, /"text"/);
+      }),
+    ),
   );
 });

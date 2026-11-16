@@ -35,7 +35,10 @@ describe("V2 preview upgrade", () => {
         (id, repository, issue_number, title, status, updated_at, renewed_once)
         VALUES (28, 'owner/repo', 28, 'trial', 'session', '2026-01-01', 1)`;
       const before = yield* sql`SELECT * FROM pipeline_runs`;
-      assert.deepStrictEqual(yield* runMigrations(), [[92, "PipelineSessionUsage"]]);
+      assert.deepStrictEqual(yield* runMigrations(), [
+        [92, "PipelineSessionUsage"],
+        [93, "PipelineInconclusiveReason"],
+      ]);
       assert.deepStrictEqual(yield* sql`SELECT * FROM pipeline_runs`, before);
       yield* sql`UPDATE pipeline_runs SET input_tokens = 11 WHERE id = 28`;
       assert.deepStrictEqual(
@@ -101,6 +104,7 @@ describe("V2 preview upgrade", () => {
         [90, "PipelineRuns"],
         [91, "PipelineBudget"],
         [92, "PipelineSessionUsage"],
+        [93, "PipelineInconclusiveReason"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -216,6 +220,7 @@ describe("V2 preview upgrade", () => {
         [90, "PipelineRuns"],
         [91, "PipelineBudget"],
         [92, "PipelineSessionUsage"],
+        [93, "PipelineInconclusiveReason"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

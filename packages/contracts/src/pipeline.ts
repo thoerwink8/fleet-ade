@@ -19,6 +19,7 @@ export const PIPELINE_STUCK_REASONS = [
   "超时",
   "超预算",
   "冷验收不过",
+  "冷验收没验成",
   "交人",
   "取消",
   "没配模型",
