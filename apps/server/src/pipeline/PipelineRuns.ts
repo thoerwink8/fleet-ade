@@ -73,6 +73,7 @@ const RunRow = Schema.Struct({
   commitCount: Schema.NullOr(Schema.Int),
   ciQueueMs: Schema.NullOr(Schema.Int),
   detail: Schema.NullOr(Schema.String),
+  renewedOnce: Schema.Literals([0, 1]),
 });
 type RunRow = typeof RunRow.Type;
 
@@ -139,6 +140,8 @@ export interface PipelineRunNote {
   readonly ciQueueMs?: number | null;
   /** Why this run stopped moving. Not the global tick row. */
   readonly detail?: string | null;
+  /** Set when this run uses its one automatic retry. Never cleared. */
+  readonly renewedOnce?: boolean;
 }
 
 interface PipelineRunsShape {
@@ -268,7 +271,8 @@ const SELECT_RUNS = `
     usage_note AS usageNote,
     commit_count AS commitCount,
     ci_queue_ms AS ciQueueMs,
-    detail
+    detail,
+    renewed_once AS renewedOnce
   FROM pipeline_runs
   ORDER BY updated_at DESC, id DESC
 `;
@@ -449,6 +453,7 @@ const make = Effect.gen(function* () {
   const list: PipelineRunsShape["list"] = Effect.gen(function* () {
     const runs = (yield* loadRows()).map((row): PipelineRun => ({
       ...row,
+      renewedOnce: row.renewedOnce === 1,
       costLabel: PIPELINE_COST_LABEL,
     }));
     return yield* decodeList({
@@ -504,6 +509,7 @@ const make = Effect.gen(function* () {
         commit_count = ${patch.commitCount === undefined ? target.commitCount : patch.commitCount},
         ci_queue_ms = ${patch.ciQueueMs === undefined ? target.ciQueueMs : patch.ciQueueMs},
         detail = ${patch.detail === undefined ? target.detail : patch.detail},
+        renewed_once = ${patch.renewedOnce === true ? 1 : target.renewedOnce},
         updated_at = ${at}
       WHERE id = ${target.id}
     `.pipe(Effect.mapError(sqlFailure));

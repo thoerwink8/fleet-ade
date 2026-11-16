@@ -1518,6 +1518,14 @@ export const ServerSettings = Schema.Struct({
   pipelineSessionTimeoutMinutes: PositiveInt.pipe(Schema.withDecodingDefault(Effect.succeed(90))),
   /** Off: a run that passes the merge gate stays mergeable and is not merged. */
   pipelineAutoMerge: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  /** Recorded input tokens for one run. Over this the run sticks as 超预算. */
+  pipelineTokenInputEquivalent: PositiveInt.pipe(
+    Schema.withDecodingDefault(Effect.succeed(7_000_000)),
+  ),
+  /** Added lines on the pull request. Over this the run sticks as 超预算. */
+  pipelinePullRequestAddedLines: PositiveInt.pipe(
+    Schema.withDecodingDefault(Effect.succeed(3_000)),
+  ),
   /** Maximum active agent sessions running concurrently on this server; null leaves concurrency uncapped. */
   maxConcurrentSessions: Schema.NullOr(MaxConcurrentSessions).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
@@ -1957,6 +1965,8 @@ export const ServerSettingsPatch = Schema.Struct({
   pipelineVerifierModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   pipelineSessionTimeoutMinutes: Schema.optionalKey(PositiveInt),
   pipelineAutoMerge: Schema.optionalKey(Schema.Boolean),
+  pipelineTokenInputEquivalent: Schema.optionalKey(PositiveInt),
+  pipelinePullRequestAddedLines: Schema.optionalKey(PositiveInt),
   maxConcurrentSessions: Schema.optionalKey(Schema.NullOr(MaxConcurrentSessions)),
   promptSuggestionsEnabled: Schema.optionalKey(Schema.Boolean),
   backgroundActivity: Schema.optionalKey(

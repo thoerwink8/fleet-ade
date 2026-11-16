@@ -16,6 +16,7 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
+import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import {
   CiCheckReadError,
   CiCheckReader,
@@ -29,7 +30,13 @@ import {
   type PullRequestDraft,
 } from "./OpenPullRequest.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
-import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import {
+  PipelineRuns,
+  PipelineUsage,
+  PipelineUsageUnreadable,
+  layer as runsLayer,
+  type UsageRecord,
+} from "./PipelineRuns.ts";
 
 const ENDED_AT = "1970-01-01T01:00:00.000Z";
 const SHA = "abc123";
@@ -53,6 +60,8 @@ const tickLayer = (input: {
   readonly reads: Ref.Ref<ReadonlyArray<string>>;
   readonly open?: PullRequestOpener["Service"]["open"];
   readonly read?: CiCheckReader["Service"]["read"];
+  readonly additions?: PullRequestAdditions["Service"]["read"];
+  readonly usage?: Effect.Effect<ReadonlyArray<UsageRecord>, PipelineUsageUnreadable>;
   readonly worktrees?: ReadonlyArray<{ readonly threadId: string; readonly worktreePath: string }>;
 }) => {
   const settings = ServerSettings.layerTest({ pipelineEnabled: input.enabled ?? true });
@@ -63,7 +72,7 @@ const tickLayer = (input: {
         read: () => Effect.die("unused"),
       }),
     ),
-    Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
+    Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage ?? Effect.succeed([]) })),
     Layer.provide(settings),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
@@ -91,6 +100,12 @@ const tickLayer = (input: {
       ),
   } as unknown as ProjectionStore.ProjectionStoreV2["Service"]);
   return layer.pipe(
+    Layer.provide(budgetLayer),
+    Layer.provide(
+      Layer.succeed(PullRequestAdditions, {
+        read: input.additions ?? (() => Effect.succeed(0)),
+      }),
+    ),
     Layer.provide(opener),
     Layer.provide(reader),
     Layer.provide(projections),
@@ -237,8 +252,11 @@ describe("OpenPullRequest", () => {
         assert.strictEqual(success?.status, "checks");
         assert.strictEqual(success?.detail, "CI 已绿、未验");
         assert.strictEqual(success?.stuckReason, null);
-        assert.strictEqual(red?.status, "stuck");
-        assert.strictEqual(red?.stuckReason, "检查红");
+        assert.strictEqual(red?.status, "claimed");
+        assert.strictEqual(red?.stuckReason, null);
+        assert.strictEqual(red?.detail, "已续一次");
+        assert.strictEqual(red?.renewedOnce, true);
+        assert.strictEqual(red?.threadId, null);
         assert.strictEqual(missing?.status, "checks");
         assert.strictEqual(missing?.detail, "没有检查");
         assert.strictEqual(missing?.stuckReason, null);
@@ -258,6 +276,43 @@ describe("OpenPullRequest", () => {
             opened,
             reads,
             read,
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("读不到用量不开放行，也不标超预算", () =>
+    Effect.gen(function* () {
+      const opened = yield* Ref.make<ReadonlyArray<PullRequestDraft>>([]);
+      const reads = yield* Ref.make<ReadonlyArray<string>>([]);
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const opening = yield* OpenPullRequest;
+        yield* runs.tick;
+        yield* runs.note(6, {
+          status: "session",
+          threadId: "thread-6",
+          sessionStartedAt: ENDED_AT,
+          sessionEndedAt: ENDED_AT,
+          headSha: SHA,
+        });
+        yield* opening.tick;
+        const run = (yield* runs.list).runs.find((item) => item.issueNumber === 6);
+        assert.strictEqual(run?.status, "session");
+        assert.strictEqual(run?.stuckReason, null);
+        assert.strictEqual(run?.detail, "没查成");
+        assert.strictEqual(run?.prNumber, null);
+        assert.strictEqual(run?.usageNote, "读不到");
+        assert.strictEqual((yield* Ref.get(opened)).length, 0);
+      }).pipe(
+        Effect.provide(
+          tickLayer({
+            issues: [issue(6)],
+            opened,
+            reads,
+            usage: Effect.fail(new PipelineUsageUnreadable()),
+            worktrees: [{ threadId: "thread-6", worktreePath: "/wt/6" }],
           }),
         ),
       );

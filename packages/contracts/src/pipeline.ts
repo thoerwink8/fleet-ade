@@ -56,6 +56,8 @@ export const PipelineRun = Schema.Struct({
   commitCount: NullableInt,
   ciQueueMs: NullableInt,
   detail: NullableText,
+  /** True after this run has used its one automatic retry. */
+  renewedOnce: Schema.Boolean,
   costLabel: Schema.Literal(PIPELINE_COST_LABEL),
 });
 export type PipelineRun = typeof PipelineRun.Type;

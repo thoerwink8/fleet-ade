@@ -35,6 +35,7 @@ function run(patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">): 
     commitCount: null,
     ciQueueMs: null,
     detail: patch.detail ?? null,
+    renewedOnce: patch.renewedOnce ?? false,
     costLabel: PIPELINE_COST_LABEL,
   };
 }
