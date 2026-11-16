@@ -119,4 +119,24 @@ describe("coldVerifyVerdict", () => {
       handovers: ["第 3 条要看线上用量，diff 里没有"],
     });
   });
+  it("真实试跑的验收摘要和正文建议放进建议，不交人", () => {
+    const judged = judgeColdVerify(
+      output({
+        verdict: "pass",
+        suggestions: [
+          finding(
+            "只改 README 一行标题，diff 检查通过，14 项检查成功。PR 正文只有任务标题和「流水线开的」，没有具体改动及验证结果。修正正文后交维护者查看，不合并。",
+          ),
+        ],
+      }),
+    );
+
+    expect(judged).toEqual({
+      kind: "pass",
+      suggestions: [
+        "只改 README 一行标题，diff 检查通过，14 项检查成功。PR 正文只有任务标题和「流水线开的」，没有具体改动及验证结果。修正正文后交维护者查看，不合并。",
+      ],
+      handovers: [],
+    });
+  });
 });

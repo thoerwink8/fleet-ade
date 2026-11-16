@@ -18,8 +18,14 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import { PipelineBudget } from "./budget.ts";
 import { sessionBranch } from "./DispatchSession.ts";
-import { PIPELINE_HOST, REPOSITORY } from "./GitHubIssues.ts";
+import {
+  PIPELINE_HOST,
+  REPOSITORY,
+  PipelineGitHubIssues,
+  layer as issuesLayer,
+} from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 
 const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 const BASE_BRANCH = "main";
@@ -61,8 +67,56 @@ const RUNNING: Record<string, true> = {
   action_required: true,
 };
 
-export const pullRequestBody = (issueNumber: number, title: string): string =>
-  `#${issueNumber} ${title.trim()}\n\n流水线开的\n`;
+/** 任务单里「怎么算做完」一节的条目。开 PR 时这是项目改动的来源。 */
+export const acceptanceItems = (body: string): ReadonlyArray<string> => {
+  let inSection = false;
+  const items: Array<string> = [];
+  for (const line of body.split(/\r?\n/)) {
+    const heading = /^(#{1,6})\s+(\S.*?)\s*$/.exec(line);
+    if (heading !== null) {
+      if (inSection) break;
+      inSection = heading[2] === "怎么算做完";
+      continue;
+    }
+    if (!inSection) continue;
+    const item = /^\s*(?:[-*]|\d+[.)])\s+(\S.*?)\s*$/.exec(line);
+    if (item !== null) items.push(item[1]!);
+  }
+  return items;
+};
+
+/**
+ * 正文只写项目改动和已经记下的验证结果。不写谁开的、不写运行来源。
+ * 验证结果为空就明说还没有，不编一条。
+ */
+export const pullRequestBody = (input: {
+  readonly changes: ReadonlyArray<string>;
+  readonly verification: ReadonlyArray<string>;
+}): string => {
+  const changes =
+    input.changes.length === 0
+      ? "- 任务单没有写下改动"
+      : input.changes.map((item) => `- ${item}`).join("\n");
+  const verification =
+    input.verification.length === 0
+      ? "- 还没有记下验证结果"
+      : input.verification.map((item) => `- ${item}`).join("\n");
+  return `## 改动\n\n${changes}\n\n## 验证\n\n${verification}\n`;
+};
+
+const RECORDED_CHECK = /^(?:vp|pnpm|npm|node|bun|deno|pytest|cargo|go test|make)\b/;
+
+/** 提交说明里真正跑过的检查。描述、任务号、运行来源都不算。 */
+export const recordedChecks = (subjects: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const checks: Array<string> = [];
+  for (const subject of subjects) {
+    for (const piece of subject.split(/[\n；;]+/)) {
+      const check = piece.trim().replace(/^[-*]\s+/, "");
+      if (RECORDED_CHECK.test(check) && !checks.includes(check)) checks.push(check);
+    }
+  }
+  return checks;
+};
 
 export interface OpenedPullRequest {
   readonly number: number;
@@ -82,12 +136,14 @@ export interface PullRequestDraft {
   readonly cwd: string;
   readonly branch: string;
   readonly title: string;
-  readonly body: string;
+  /** 任务单原文。改动一节只从这里的「怎么算做完」取。 */
+  readonly issueBody: string;
   readonly headSha: string;
 }
 
 /**
- * Push the session branch, then open one pull request with a fixed body.
+ * Push the session branch, then open one pull request.
+ * The body is composed from the issue and the commits on the branch.
  * An open request for the same branch is reused. Tests replace this.
  */
 export class PullRequestOpener extends Context.Service<
@@ -128,11 +184,27 @@ const failOpen = (detail: string) => new PullRequestOpenError({ detail });
 
 const makeOpener = Effect.gen(function* () {
   const git = yield* GitWorkflowService.GitWorkflowService;
+  const driver = yield* GitVcsDriver.GitVcsDriver;
   const registry = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
   const open = Effect.fn("OpenPullRequest.open")(function* (draft: PullRequestDraft) {
+    const logged = yield* driver
+      .execute({
+        operation: "OpenPullRequest.commitSubjects",
+        cwd: draft.cwd,
+        args: ["log", "--format=%s%n%b%x00", `origin/${BASE_BRANCH}..HEAD`],
+        allowNonZeroExit: true,
+      })
+      .pipe(Effect.mapError((error) => failOpen(error.message)));
+    if (logged.exitCode !== 0 || logged.stdoutTruncated) {
+      return yield* failOpen("commit subjects were not read");
+    }
+    const body = pullRequestBody({
+      changes: acceptanceItems(draft.issueBody),
+      verification: recordedChecks(logged.stdout.split("\u0000")),
+    });
     const pushedBranch = yield* git
       .runStackedAction({
         actionId: `pipeline-pr-${draft.branch}`,
@@ -172,7 +244,7 @@ const makeOpener = Effect.gen(function* () {
       .pipe(Effect.mapError((error) => failOpen(error.message)));
     const created = yield* Effect.gen(function* () {
       const bodyFile = path.join(directory, "body.md");
-      yield* fileSystem.writeFileString(bodyFile, draft.body);
+      yield* fileSystem.writeFileString(bodyFile, body);
       yield* provider.createChangeRequest({
         cwd: draft.cwd,
         baseRefName: BASE_BRANCH,
@@ -255,6 +327,7 @@ export class OpenPullRequest extends Context.Service<OpenPullRequest, OpenPullRe
 
 const make = Effect.gen(function* () {
   const runs = yield* PipelineRuns;
+  const issues = yield* PipelineGitHubIssues;
   const budget = yield* PipelineBudget;
   const settings = yield* ServerSettings.ServerSettingsService;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
@@ -302,12 +375,17 @@ const make = Effect.gen(function* () {
           yield* writeDetail(run.issueNumber, run.detail, UNREAD);
           continue;
         }
+        const issue = yield* issues.read(run.issueNumber).pipe(Effect.exit);
+        if (Exit.isFailure(issue)) {
+          yield* writeDetail(run.issueNumber, run.detail, UNREAD);
+          continue;
+        }
         const opened = yield* opener
           .open({
             cwd,
             branch: sessionBranch(run.issueNumber, run.title),
             title: run.title,
-            body: pullRequestBody(run.issueNumber, run.title),
+            issueBody: issue.value.body,
             headSha,
           })
           .pipe(Effect.exit);
@@ -385,7 +463,9 @@ export const layer = Layer.effect(OpenPullRequest, make);
 export const layerLive = layer.pipe(
   Layer.provide(layerOpener),
   Layer.provide(layerReader),
+  Layer.provide(issuesLayer),
   Layer.provide(GitHubRest.layerWithDependencies),
+  Layer.provide(GitVcsDriver.layer),
 );
 
 export const layerWorker = Layer.effectDiscard(

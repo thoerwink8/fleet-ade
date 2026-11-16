@@ -12,6 +12,7 @@ import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -22,10 +23,12 @@ import {
   CiCheckReader,
   OpenPullRequest,
   PullRequestOpener,
+  acceptanceItems,
   layer,
   layerOpener,
   layerReader,
   pullRequestBody,
+  recordedChecks,
   type CiCheckOutcome,
   type PullRequestDraft,
 } from "./OpenPullRequest.ts";
@@ -65,13 +68,15 @@ const tickLayer = (input: {
   readonly worktrees?: ReadonlyArray<{ readonly threadId: string; readonly worktreePath: string }>;
 }) => {
   const settings = ServerSettings.layerTest({ pipelineEnabled: input.enabled ?? true });
+  const issues = Layer.succeed(PipelineGitHubIssues, {
+    listEligible: () => Effect.succeed(input.issues),
+    read: (number: number) => {
+      const found = input.issues.find((item) => item.number === number);
+      return found === undefined ? Effect.die("missing issue") : Effect.succeed(found);
+    },
+  });
   const runs = runsLayer.pipe(
-    Layer.provide(
-      Layer.succeed(PipelineGitHubIssues, {
-        listEligible: () => Effect.succeed(input.issues),
-        read: () => Effect.die("unused"),
-      }),
-    ),
+    Layer.provide(issues),
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage ?? Effect.succeed([]) })),
     Layer.provide(settings),
     Layer.provideMerge(SqlitePersistence.layerMemory),
@@ -110,6 +115,7 @@ const tickLayer = (input: {
     Layer.provide(reader),
     Layer.provide(projections),
     Layer.provide(settings),
+    Layer.provide(issues),
     Layer.provideMerge(runs),
   );
 };
@@ -173,8 +179,8 @@ describe("OpenPullRequest", () => {
         assert.strictEqual(drafts.length, 1);
         assert.strictEqual(drafts[0]?.branch, BRANCH);
         assert.strictEqual(drafts[0]?.cwd, "/wt/6");
-        assert.strictEqual(drafts[0]?.body, pullRequestBody(6, "fix tests"));
-        assert.strictEqual(drafts[0]?.body.includes("Closes"), false);
+        assert.strictEqual(drafts[0]?.issueBody, issue(6).body);
+        assert.strictEqual(drafts[0]?.issueBody.includes("Closes"), false);
         yield* opening.tick;
         const second = (yield* runs.list).runs.find((item) => item.issueNumber === 6);
         assert.strictEqual(second?.prNumber, 7);
@@ -451,6 +457,7 @@ const openerLayer = (input: {
   readonly actions: Ref.Ref<ReadonlyArray<string>>;
   readonly created: Ref.Ref<ReadonlyArray<string>>;
   readonly pushed?: GitRunStackedActionResult;
+  readonly subjects?: string;
 }) =>
   layerOpener.pipe(
     Layer.provide(
@@ -463,6 +470,18 @@ const openerLayer = (input: {
             ),
           ),
       } as unknown as GitWorkflowService.GitWorkflowService["Service"]),
+    ),
+    Layer.provide(
+      Layer.succeed(GitVcsDriver.GitVcsDriver, {
+        execute: () =>
+          Effect.succeed({
+            exitCode: 0,
+            stdout: input.subjects ?? "",
+            stderr: "",
+            stdoutTruncated: false,
+            stderrTruncated: false,
+          }),
+      } as unknown as GitVcsDriver.GitVcsDriver["Service"]),
     ),
     Layer.provide(
       Layer.succeed(SourceControlProviderRegistry.SourceControlProviderRegistry, {
@@ -502,7 +521,7 @@ describe("PullRequestOpener", () => {
           cwd: "/wt/6",
           branch: BRANCH,
           title: "fix tests",
-          body: pullRequestBody(6, "fix tests"),
+          issueBody: issue(6).body,
           headSha: SHA,
         });
         assert.strictEqual(opened.number, 21);
@@ -521,7 +540,10 @@ describe("PullRequestOpener", () => {
               Effect.gen(function* () {
                 const fs = yield* FileSystem.FileSystem;
                 const body = yield* fs.readFileString(bodyFile).pipe(Effect.orDie);
-                assert.strictEqual(body, pullRequestBody(6, "fix tests"));
+                assert.strictEqual(
+                  body,
+                  pullRequestBody({ changes: acceptanceItems(issue(6).body), verification: [] }),
+                );
               }).pipe(Effect.provide(NodeFileSystem.layer)),
           }),
         ),
@@ -539,7 +561,7 @@ describe("PullRequestOpener", () => {
           cwd: "/wt/6",
           branch: BRANCH,
           title: "fix tests",
-          body: pullRequestBody(6, "fix tests"),
+          issueBody: issue(6).body,
           headSha: SHA,
         });
         assert.strictEqual(opened.number, 21);
@@ -568,7 +590,7 @@ describe("PullRequestOpener", () => {
             cwd: "/wt/6",
             branch: BRANCH,
             title: "fix tests",
-            body: pullRequestBody(6, "fix tests"),
+            issueBody: issue(6).body,
             headSha: SHA,
           })
           .pipe(Effect.flip);
@@ -585,6 +607,62 @@ describe("PullRequestOpener", () => {
               action: "push",
               push: { status: "skipped_not_requested" },
             } as GitRunStackedActionResult,
+          }),
+        ),
+      );
+    }),
+  );
+  it.effect("writes the issue changes and recorded checks, not who opened it", () =>
+    Effect.gen(function* () {
+      const actions = yield* Ref.make<ReadonlyArray<string>>([]);
+      const created = yield* Ref.make<ReadonlyArray<string>>([]);
+      const issueBody = [
+        "## 怎么算做完",
+        "- README 标题改成一行",
+        "## 别的",
+        "- 流水线开的",
+        "",
+      ].join("\n");
+      const subjects = [
+        "fix(readme): retitle\nvp test run apps/server/src/pipeline/OpenPullRequest.test.ts\u0000",
+        "流水线开的\u0000",
+      ].join("");
+      yield* Effect.gen(function* () {
+        const opener = yield* PullRequestOpener;
+        yield* opener.open({
+          cwd: "/wt/6",
+          branch: BRANCH,
+          title: "fix tests",
+          issueBody,
+          headSha: SHA,
+        });
+      }).pipe(
+        Effect.provide(
+          openerLayer({
+            actions,
+            created,
+            subjects,
+            listed: Ref.get(created).pipe(
+              Effect.map((items) => (items.length === 0 ? [] : [changeRequest(21, SHA)])),
+            ),
+            onCreate: (bodyFile) =>
+              Effect.gen(function* () {
+                const fs = yield* FileSystem.FileSystem;
+                const body = yield* fs.readFileString(bodyFile).pipe(Effect.orDie);
+                assert.strictEqual(
+                  body,
+                  pullRequestBody({
+                    changes: acceptanceItems(issueBody),
+                    verification: recordedChecks(subjects.split("\u0000")),
+                  }),
+                );
+                assert.strictEqual(body.includes("流水线开的"), false);
+                assert.strictEqual(body.includes("README 标题改成一行"), true);
+                assert.strictEqual(
+                  body.includes("vp test run apps/server/src/pipeline/OpenPullRequest.test.ts"),
+                  true,
+                );
+              }).pipe(Effect.provide(NodeFileSystem.layer)),
           }),
         ),
       );
