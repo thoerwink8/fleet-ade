@@ -158,13 +158,39 @@ import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ProjectEnrichment from "./project/ProjectEnrichmentService.ts";
 import * as ProjectService from "./project/ProjectService.ts";
 import {
-  layerWsRpc,
+  layerWsRpc as makeLayerWsRpc,
   resolveOpenDiscoveryForConfig,
   subscribeOrchestrationV2Shell,
   subscribeOrchestrationV2Thread,
   WS_RPC_SERVER_OPTIONS,
   withLateConfigDiscovery,
 } from "./ws.ts";
+import * as PipelineRuns from "./pipeline/PipelineRuns.ts";
+
+const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
+  makeLayerWsRpc(...args).pipe(
+    Layer.provide(
+      Layer.succeed(
+        PipelineRuns.PipelineRuns,
+        PipelineRuns.PipelineRuns.of({
+          tick: Effect.void,
+          list: Effect.succeed({
+            runs: [],
+            summary: {
+              recent: 0,
+              reworkRate: null,
+              averageDurationMs: null,
+              averageConvertedCost: null,
+              costLabel: "折算",
+            },
+            lastTick: null,
+            costLabel: "折算",
+          }),
+          note: () => Effect.void,
+        }),
+      ),
+    ),
+  );
 
 const snapshotConfig = (fields: Partial<ServerConfig>) =>
   ({ availableEditors: [], settings: {}, ...fields }) as unknown as ServerConfig;
