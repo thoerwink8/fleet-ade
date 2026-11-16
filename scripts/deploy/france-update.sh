@@ -25,6 +25,7 @@ ADE_USER="ade"
 ADE_HOME="/home/${ADE_USER}"
 APP_DIR="/var/lib/fleet-ade/app"
 NODE_LINK="${ADE_HOME}/.local/node"
+REPO_URL="https://github.com/thoerwink8/fleet-ade.git"
 
 if [[ ! -d "${APP_DIR}/.git" ]]; then
   echo "ERROR: ${APP_DIR} is not initialized. Run france-install.sh first." >&2
@@ -43,10 +44,23 @@ WG_HOST="${FLEET_ADE_WG_HOST}"
 ADE_PORT="${FLEET_ADE_PORT:-3773}"
 
 PREV_SHA="$(sudo -u "${ADE_USER}" git -C "${APP_DIR}" rev-parse HEAD)"
+BACKUP_DIR="$(mktemp -d /var/lib/fleet-ade/backup-XXXXXXXX)"
+echo "Backing up the current release to ${BACKUP_DIR} before changing it..."
+cp -a --reflink=auto "${APP_DIR}" "${BACKUP_DIR}/app"
+cp -a /etc/fleet-ade "${BACKUP_DIR}/config"
+cp -a /etc/systemd/system/fleet-ade.service "${BACKUP_DIR}/fleet-ade.service"
+echo "Backup complete (commit ${PREV_SHA})."
+
 echo "[1/4] Fetching commit ${COMMIT_SHA} (previous: ${PREV_SHA})..."
 sudo -u "${ADE_USER}" bash -lc "
   set -euo pipefail
-  git -C '${APP_DIR}' fetch --no-tags --depth 1 origin '${COMMIT_SHA}'
+  git -C '${APP_DIR}' remote set-url origin '${REPO_URL}'
+  git -C '${APP_DIR}' fetch --no-tags --depth 1 origin main
+  MAIN_SHA=\"\$(git -C '${APP_DIR}' rev-parse FETCH_HEAD)\"
+  if [[ \"\${MAIN_SHA}\" != '${COMMIT_SHA}' ]]; then
+    echo \"ERROR: origin/main is \${MAIN_SHA}, expected ${COMMIT_SHA}; release unchanged.\" >&2
+    exit 1
+  fi
   git -C '${APP_DIR}' checkout --force --detach FETCH_HEAD
   ACTUAL_SHA=\"\$(git -C '${APP_DIR}' rev-parse HEAD)\"
   if [[ \"\${ACTUAL_SHA}\" != '${COMMIT_SHA}' ]]; then
@@ -160,4 +174,12 @@ if [[ "$(echo "${LISTENERS}" | wc -l)" -ne 1 ]] || ! echo "${LISTENERS}" | grep 
   exit 1
 fi
 
-echo "SUCCESS: fleet-ade updated ${PREV_SHA} -> ${COMMIT_SHA} and listening strictly on ${WG_HOST}:${ADE_PORT}."
+ACTUAL_SHA="$(sudo -u "${ADE_USER}" git -C "${APP_DIR}" rev-parse HEAD)"
+if [[ "${ACTUAL_SHA}" != "${COMMIT_SHA}" ]]; then
+  echo "ERROR: deployed commit ${ACTUAL_SHA} does not match ${COMMIT_SHA}." >&2
+  exit 1
+fi
+systemctl is-active --quiet fleet-ade.service
+systemctl show fleet-ade.service -p ActiveState -p SubState
+echo "SUCCESS: fleet-ade updated ${PREV_SHA} -> ${ACTUAL_SHA} and listening strictly on ${WG_HOST}:${ADE_PORT}."
+echo "Previous release backup: ${BACKUP_DIR}"
