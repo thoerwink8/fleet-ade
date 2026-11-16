@@ -15,6 +15,7 @@ import {
   ForwardCompatibleNullable,
   ForwardCompatibleOptional,
   OmittedWhenNull,
+  PositiveInt,
   ProjectId,
   ThreadId,
   TrimmedNonEmptyString,
@@ -1505,6 +1506,12 @@ export const ServerSettings = Schema.Struct({
   linkedEnvironmentsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Off: a pipeline tick does not read issues or write runs. */
   pipelineEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  /** Empty: a claimed run stops as stuck, reason 没配模型, and no worktree is created. */
+  pipelineAuthorModel: Schema.NullOr(ModelSelection).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  /** Minutes after a session starts with no terminal event before the run sticks as 超时. */
+  pipelineSessionTimeoutMinutes: PositiveInt.pipe(Schema.withDecodingDefault(Effect.succeed(90))),
   /** Maximum active agent sessions running concurrently on this server; null leaves concurrency uncapped. */
   maxConcurrentSessions: Schema.NullOr(MaxConcurrentSessions).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
@@ -1940,6 +1947,8 @@ export const ServerSettingsPatch = Schema.Struct({
   guestSharingEnabled: Schema.optionalKey(Schema.Boolean),
   linkedEnvironmentsEnabled: Schema.optionalKey(Schema.Boolean),
   pipelineEnabled: Schema.optionalKey(Schema.Boolean),
+  pipelineAuthorModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  pipelineSessionTimeoutMinutes: Schema.optionalKey(PositiveInt),
   maxConcurrentSessions: Schema.optionalKey(Schema.NullOr(MaxConcurrentSessions)),
   promptSuggestionsEnabled: Schema.optionalKey(Schema.Boolean),
   backgroundActivity: Schema.optionalKey(
