@@ -27,6 +27,35 @@ const seedPreview = Effect.gen(function* () {
 });
 
 describe("V2 preview upgrade", () => {
+  it.effect("preserves pipeline runs while allowing unknown cost with known input", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* runMigrations({ toMigrationInclusive: 91 });
+      yield* sql`INSERT INTO pipeline_runs
+        (id, repository, issue_number, title, status, updated_at, renewed_once)
+        VALUES (28, 'owner/repo', 28, 'trial', 'session', '2026-01-01', 1)`;
+      const before = yield* sql`SELECT * FROM pipeline_runs`;
+      assert.deepStrictEqual(yield* runMigrations(), [[92, "PipelineSessionUsage"]]);
+      assert.deepStrictEqual(yield* sql`SELECT * FROM pipeline_runs`, before);
+      yield* sql`UPDATE pipeline_runs SET input_tokens = 11 WHERE id = 28`;
+      assert.deepStrictEqual(
+        yield* sql`SELECT input_tokens, converted_cost, renewed_once FROM pipeline_runs`,
+        [{ input_tokens: 11, converted_cost: null, renewed_once: 1 }],
+      );
+      assert.isTrue(
+        Exit.isFailure(
+          yield* Effect.exit(sql`INSERT INTO pipeline_runs
+        (repository, issue_number, title, status, updated_at)
+        VALUES ('owner/repo', 28, 'duplicate', 'claimed', '2026-01-01')`),
+        ),
+      );
+      assert.isTrue(
+        Exit.isFailure(
+          yield* Effect.exit(sql`UPDATE pipeline_runs SET usage_note = '读不到' WHERE id = 28`),
+        ),
+      );
+    }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+  );
   it.effect("upgrades a published preview without replaying V2 or losing import progress", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
@@ -71,6 +100,7 @@ describe("V2 preview upgrade", () => {
         [89, "SessionEndInbox"],
         [90, "PipelineRuns"],
         [91, "PipelineBudget"],
+        [92, "PipelineSessionUsage"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -185,6 +215,7 @@ describe("V2 preview upgrade", () => {
         [89, "SessionEndInbox"],
         [90, "PipelineRuns"],
         [91, "PipelineBudget"],
+        [92, "PipelineSessionUsage"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
