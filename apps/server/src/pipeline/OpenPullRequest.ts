@@ -30,7 +30,7 @@ const BASE_BRANCH = "main";
  */
 const CI_WORKFLOW = "CI";
 
-/** Cold-verify picks this up. This step does not enter `verify`. */
+/** Recorded when CI is green. Cold verify selects status `verify`, not this text. */
 const CI_GREEN = "CI 已绿、未验";
 const UNREAD = "没查成";
 const NO_CHECK = "没有检查";
@@ -275,7 +275,6 @@ const make = Effect.gen(function* () {
     for (const run of listed.runs) {
       if (run.repository !== REPOSITORY_NAME) continue;
       if (run.status !== "session" && run.status !== "pr-open" && run.status !== "checks") continue;
-      if (run.status === "checks" && run.detail === CI_GREEN) continue;
       if (run.status === "session" && run.sessionEndedAt === null) continue;
       if (run.headSha === null) {
         yield* writeDetail(run.issueNumber, run.detail, UNREAD);
@@ -361,7 +360,7 @@ const make = Effect.gen(function* () {
       }
       const note: PipelineRunNote =
         outcome.value.kind === "success"
-          ? { detail: CI_GREEN }
+          ? { status: "verify", detail: CI_GREEN }
           : outcome.value.kind === "missing"
             ? { detail: NO_CHECK }
             : { detail: null };
