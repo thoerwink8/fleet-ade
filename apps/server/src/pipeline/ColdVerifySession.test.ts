@@ -11,6 +11,7 @@ import {
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
@@ -49,7 +50,11 @@ const PROJECT: Project = {
   workspaceRoot: "/repo",
   repositoryIdentity: {
     canonicalKey: "github.com/thoerwink8/fleet-ade",
-    locator: { source: "git-remote", remoteName: "origin", remoteUrl: "https://example.invalid/fleet-ade.git" },
+    locator: {
+      source: "git-remote",
+      remoteName: "origin",
+      remoteUrl: "https://example.invalid/fleet-ade.git",
+    },
     owner: "thoerwink8",
     name: "fleet-ade",
   },
@@ -192,7 +197,9 @@ const run = <E, R>(
     const opened = yield* Ref.make<ReadonlyArray<ColdVerifyRequest>>([]);
     const written = yield* Ref.make<ReadonlyArray<Written>>([]);
     const writeState = yield* Ref.make<"success" | "failure" | "miss">("success");
-    const messages = yield* Ref.make<ReadonlyArray<{ readonly role: string; readonly text: string }>>([]);
+    const messages = yield* Ref.make<
+      ReadonlyArray<{ readonly role: string; readonly text: string }>
+    >([]);
     const handles = { opened, written, writeState, messages };
     return yield* body(handles).pipe(Effect.provide(harness(models, handles, openFails, eligible)));
   });
@@ -236,10 +243,8 @@ describe("ColdVerifySession", () => {
       Effect.gen(function* () {
         yield* claim;
         const dispatched = yield* tick;
-        const threadId = dispatched?.threadId ?? "";
-        yield* Ref.set(handles.messages, [
-          { role: "assistant", text: JSON.stringify(passOutput) },
-        ]);
+        const threadId = /^已派第 \d+ 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
+        yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
         yield* (yield* SessionEndInbox).record({
           threadId: ThreadId.make(threadId),
           runId: RunId.make(`end:${threadId}`),
@@ -263,7 +268,7 @@ describe("ColdVerifySession", () => {
         yield* claim;
         for (const round of [1, 2]) {
           const dispatched = yield* tick;
-          const threadId = dispatched?.threadId ?? "";
+          const threadId = /^已派第 \d+ 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
           assert.match(dispatched?.detail ?? "", new RegExp(`已派第 ${round} 轮`));
           yield* Ref.set(handles.messages, [
             { role: "assistant", text: JSON.stringify(blockOutput) },
@@ -368,17 +373,63 @@ describe("ColdVerifySession", () => {
     ),
   );
 
+  it.effect("派验单和记结论都不换作者线程，也不清用量", () =>
+    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+      Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const sql = yield* SqlClient.SqlClient;
+        yield* runs.tick;
+        yield* runs.note(8, {
+          status: "verify",
+          headSha: SHA,
+          threadId: "author-thread",
+          stuckReason: null,
+        });
+        yield* sql`UPDATE pipeline_runs SET
+          model_account = 'author',
+          input_tokens = 40,
+          output_tokens = 2,
+          cache_tokens = 0,
+          converted_cost = 1
+          WHERE issue_number = 8`;
+        const dispatched = yield* tick;
+        assert.strictEqual(dispatched?.threadId, "author-thread");
+        assert.strictEqual(dispatched?.inputTokens, 40);
+        assert.strictEqual(dispatched?.modelAccount, "author");
+        const threadId = /^已派第 1 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
+        assert.notStrictEqual(threadId, "");
+        assert.notStrictEqual(threadId, "author-thread");
+        yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
+        yield* (yield* SessionEndInbox).record({
+          threadId: ThreadId.make(threadId),
+          runId: RunId.make(`end:${threadId}`),
+          status: "completed",
+          endedAt: NOW,
+          headLookup: "found",
+          headSha: SHA,
+        });
+        const listed = yield* tick;
+        assert.strictEqual(listed?.status, "verify");
+        assert.strictEqual(listed?.threadId, "author-thread");
+        assert.strictEqual(listed?.inputTokens, 40);
+        assert.strictEqual(listed?.outputTokens, 2);
+        assert.strictEqual(listed?.modelAccount, "author");
+        assert.strictEqual(listed?.usageNote, null);
+      }),
+    ),
+  );
+
   it.effect("状态写失败则仍是待验", () =>
     run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         const dispatched = yield* tick;
         yield* Ref.set(handles.writeState, "failure");
-        yield* Ref.set(handles.messages, [
-          { role: "assistant", text: JSON.stringify(passOutput) },
-        ]);
+        yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
         yield* (yield* SessionEndInbox).record({
-          threadId: ThreadId.make(dispatched?.threadId ?? ""),
+          threadId: ThreadId.make(
+            /^已派第 \d+ 轮 (\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "",
+          ),
           runId: RunId.make("end:write-failed"),
           status: "completed",
           endedAt: NOW,
@@ -406,4 +457,3 @@ describe("ColdVerifySession", () => {
     }),
   );
 });
-

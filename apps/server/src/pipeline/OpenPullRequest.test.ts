@@ -249,7 +249,7 @@ describe("OpenPullRequest", () => {
         const red = listed.find((item) => item.issueNumber === 2);
         const missing = listed.find((item) => item.issueNumber === 3);
         const unread = listed.find((item) => item.issueNumber === 4);
-        assert.strictEqual(success?.status, "checks");
+        assert.strictEqual(success?.status, "verify");
         assert.strictEqual(success?.detail, "CI 已绿、未验");
         assert.strictEqual(success?.stuckReason, null);
         assert.strictEqual(red?.status, "claimed");
@@ -276,6 +276,68 @@ describe("OpenPullRequest", () => {
             opened,
             reads,
             read,
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("CI 已绿的检查进入待验，作者线程和用量还在", () =>
+    Effect.gen(function* () {
+      const opened = yield* Ref.make<ReadonlyArray<PullRequestDraft>>([]);
+      const reads = yield* Ref.make<ReadonlyArray<string>>([]);
+      const read = (entry: { readonly headSha: string }) =>
+        Ref.update(reads, (shas) => [...shas, entry.headSha]).pipe(
+          Effect.as({ kind: "success" as const }),
+        );
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const opening = yield* OpenPullRequest;
+        yield* runs.tick;
+        yield* runs.note(6, {
+          status: "checks",
+          prNumber: 32,
+          headSha: SHA,
+          threadId: "author-thread",
+          sessionStartedAt: "2026-01-01T00:10:00.000Z",
+          sessionEndedAt: "2026-01-01T00:20:00.000Z",
+          detail: "CI 已绿、未验",
+        });
+        yield* opening.tick;
+        const run = (yield* runs.list).runs.find((item) => item.issueNumber === 6);
+        assert.strictEqual(run?.status, "verify");
+        assert.strictEqual(run?.detail, "CI 已绿、未验");
+        assert.strictEqual(run?.stuckReason, null);
+        assert.strictEqual(run?.threadId, "author-thread");
+        assert.strictEqual(run?.headSha, SHA);
+        assert.strictEqual(run?.prNumber, 32);
+        assert.strictEqual(run?.modelAccount, "author");
+        assert.strictEqual(run?.inputTokens, 40);
+        assert.strictEqual(run?.outputTokens, 2);
+        assert.strictEqual(run?.usageNote, null);
+        yield* opening.tick;
+        const again = (yield* runs.list).runs.find((item) => item.issueNumber === 6);
+        assert.strictEqual(again?.status, "verify");
+        assert.strictEqual(again?.threadId, "author-thread");
+        assert.strictEqual(again?.inputTokens, 40);
+        assert.strictEqual(count(yield* Ref.get(reads), SHA), 1);
+      }).pipe(
+        Effect.provide(
+          tickLayer({
+            issues: [issue(6)],
+            opened,
+            reads,
+            read,
+            usage: Effect.succeed([
+              {
+                at: "2026-01-01T00:15:00.000Z",
+                account: "author",
+                inputTokens: 40,
+                outputTokens: 2,
+                cacheTokens: 0,
+                convertedCost: 1,
+              },
+            ]),
           }),
         ),
       );

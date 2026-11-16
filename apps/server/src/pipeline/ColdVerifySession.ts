@@ -112,6 +112,18 @@ const roundCount = (detail: string | null): number => {
   return Number.isInteger(count) && count >= 0 ? count : 0;
 };
 
+/** Verifier thread stays in the detail. `thread_id` remains the author session. */
+const DISPATCHED = /^已派第 (\d+) 轮 (\S+)$/;
+
+const dispatchedRound = (
+  detail: string | null,
+): { readonly round: number; readonly threadId: string } | undefined => {
+  const matched = DISPATCHED.exec(detail ?? "");
+  if (matched === null) return undefined;
+  const round = Number(matched[1]);
+  return Number.isInteger(round) ? { round, threadId: matched[2]! } : undefined;
+};
+
 const stick = (reason: "没配模型" | "冷验收不过" | "交人", detail: string): PipelineRunNote => ({
   status: "stuck",
   stuckReason: reason,
@@ -138,65 +150,68 @@ export const decideColdVerify = Effect.fn("ColdVerifySession.decide")(function* 
     outcome: ReturnType<typeof judgeColdVerify>,
   ) => Effect.Effect<CommitStatusWrite, CommitStatusWriteError>,
 ) {
-    let rounds = input.priorRounds;
-    const suggestions = [...input.suggestions];
-    for (const attempt of input.attempts) {
-      if (attempt.kind === "waiting") {
-        return decided(
-          {
-            status: "verify",
-            detail: rounds === 0 ? null : `第 ${rounds} 轮后等资源，仍待验`,
-          },
-          rounds,
-        );
-      }
-      if (attempt.kind === "not-started") {
-        return decided(stick(STUCK_COLD_VERIFY, `没跑起来：${attempt.detail}`), rounds);
-      }
-      rounds += 1;
-      const outcome = judgeColdVerify(attempt.output);
-      if (outcome.kind === "pass") {
-        const written = yield* write(outcome);
-        if (written.sha !== input.sha || written.state !== "success") {
-          return decided(
-            { status: "verify", detail: `第 ${rounds} 轮过了，但状态没写到当前 head` },
-            rounds,
-          );
-        }
-        const kept = [...suggestions, ...outcome.suggestions];
-        return decided(
-          {
-            status: "verify",
-            detail:
-              kept.length === 0
-                ? `第 ${rounds} 轮过了，建议留在运行上`
-                : `第 ${rounds} 轮过了，建议：${kept.join("；")}`,
-          },
-          rounds,
-          written,
-        );
-      }
-      if (outcome.kind === "handover") {
-        return decided(stick(STUCK_HANDOVER, `第 ${rounds} 轮判不了：${outcome.handovers.join("；")}`), rounds);
-      }
-      if (outcome.kind === "block") suggestions.push(...outcome.suggestions);
-      if (rounds >= MAX_ROUNDS) {
-        return decided(
-          stick(
-            STUCK_COLD_VERIFY,
-            outcome.kind === "block"
-              ? `第 ${rounds} 轮仍不过：${outcome.problems[0] ?? "有能挡的问题"}`
-              : `第 ${rounds} 轮仍没验成`,
-          ),
-          rounds,
-        );
-      }
+  let rounds = input.priorRounds;
+  const suggestions = [...input.suggestions];
+  for (const attempt of input.attempts) {
+    if (attempt.kind === "waiting") {
+      return decided(
+        {
+          status: "verify",
+          detail: rounds === 0 ? null : `第 ${rounds} 轮后等资源，仍待验`,
+        },
+        rounds,
+      );
     }
-    return decided(
-      { status: "verify", detail: rounds === 0 ? null : `第 ${rounds} 轮不过，仍待验` },
-      rounds,
-    );
-  });
+    if (attempt.kind === "not-started") {
+      return decided(stick(STUCK_COLD_VERIFY, `没跑起来：${attempt.detail}`), rounds);
+    }
+    rounds += 1;
+    const outcome = judgeColdVerify(attempt.output);
+    if (outcome.kind === "pass") {
+      const written = yield* write(outcome);
+      if (written.sha !== input.sha || written.state !== "success") {
+        return decided(
+          { status: "verify", detail: `第 ${rounds} 轮过了，但状态没写到当前 head` },
+          rounds,
+        );
+      }
+      const kept = [...suggestions, ...outcome.suggestions];
+      return decided(
+        {
+          status: "verify",
+          detail:
+            kept.length === 0
+              ? `第 ${rounds} 轮过了，建议留在运行上`
+              : `第 ${rounds} 轮过了，建议：${kept.join("；")}`,
+        },
+        rounds,
+        written,
+      );
+    }
+    if (outcome.kind === "handover") {
+      return decided(
+        stick(STUCK_HANDOVER, `第 ${rounds} 轮判不了：${outcome.handovers.join("；")}`),
+        rounds,
+      );
+    }
+    if (outcome.kind === "block") suggestions.push(...outcome.suggestions);
+    if (rounds >= MAX_ROUNDS) {
+      return decided(
+        stick(
+          STUCK_COLD_VERIFY,
+          outcome.kind === "block"
+            ? `第 ${rounds} 轮仍不过：${outcome.problems[0] ?? "有能挡的问题"}`
+            : `第 ${rounds} 轮仍没验成`,
+        ),
+        rounds,
+      );
+    }
+  }
+  return decided(
+    { status: "verify", detail: rounds === 0 ? null : `第 ${rounds} 轮不过，仍待验` },
+    rounds,
+  );
+});
 
 const verifierRefused = (
   verifier: ModelSelection | null,
@@ -296,8 +311,9 @@ const make = Effect.gen(function* () {
       (run) => run.repository === REPOSITORY_NAME && run.status === "session",
     ).length;
     const inFlight = pending.filter((run) => {
-      if (!/^已派第 (\d+) 轮$/.test(run.detail ?? "") || run.threadId === null) return false;
-      return !endByThread.has(ThreadId.make(run.threadId));
+      const dispatched = dispatchedRound(run.detail);
+      if (dispatched === undefined) return false;
+      return !endByThread.has(ThreadId.make(dispatched.threadId));
     }).length;
     let occupied = authorOpen + inFlight;
 
@@ -307,29 +323,30 @@ const make = Effect.gen(function* () {
         continue;
       }
       const prior = roundCount(run.detail);
-      const dispatched = /^已派第 (\d+) 轮$/.exec(run.detail ?? "");
-      const openRound = dispatched === null ? undefined : Number(dispatched[1]);
-      if (openRound !== undefined && run.threadId !== null) {
-        const ended = endByThread.get(ThreadId.make(run.threadId));
+      const dispatched = dispatchedRound(run.detail);
+      if (dispatched !== undefined) {
+        const ended = endByThread.get(ThreadId.make(dispatched.threadId));
         if (ended === undefined) continue;
         const attempt: ColdVerifyAttempt =
           ended.status === "completed"
-            ? yield* projections.getThreadSnapshot(ThreadId.make(run.threadId)).pipe(
-                Effect.flatMap((snapshot) =>
-                  conclusionOf(snapshot.projection.messages).pipe(
-                    Effect.map((output) =>
-                      output === undefined
-                        ? ({ kind: "not-started", detail: "会话结束但没有结论" } as const)
-                        : ({ kind: "output", output } as const),
+            ? yield* projections
+                .getThreadSnapshot(ThreadId.make(dispatched.threadId))
+                .pipe(
+                  Effect.flatMap((snapshot) =>
+                    conclusionOf(snapshot.projection.messages).pipe(
+                      Effect.map((output) =>
+                        output === undefined
+                          ? ({ kind: "not-started", detail: "会话结束但没有结论" } as const)
+                          : ({ kind: "output", output } as const),
+                      ),
                     ),
                   ),
-                ),
-              )
+                )
             : { kind: "not-started", detail: `会话终态 ${ended.status}` };
         const decision = yield* decideColdVerify(
           {
             sha: run.headSha,
-            priorRounds: openRound - 1,
+            priorRounds: dispatched.round - 1,
             attempts: [attempt],
             suggestions: [],
           },
@@ -340,7 +357,6 @@ const make = Effect.gen(function* () {
           status,
           stuckReason: decision.note.stuckReason ?? null,
           detail: decision.note.detail ?? null,
-          threadId: status === "verify" ? null : run.threadId,
         });
         continue;
       }
@@ -385,8 +401,7 @@ const make = Effect.gen(function* () {
       }
       yield* runs.note(run.issueNumber, {
         status: "verify",
-        threadId,
-        detail: `已派第 ${next} 轮`,
+        detail: `已派第 ${next} 轮 ${threadId}`,
       });
       occupied += 1;
     }
@@ -395,44 +410,43 @@ const make = Effect.gen(function* () {
   return { tick };
 });
 
-export class ColdVerifySession extends Context.Service<
-  ColdVerifySession,
-  ColdVerifySessionShape
->()("t3/pipeline/ColdVerifySession") {}
+export class ColdVerifySession extends Context.Service<ColdVerifySession, ColdVerifySessionShape>()(
+  "t3/pipeline/ColdVerifySession",
+) {}
 
 const liveOpener = Layer.effect(
   VerifierOpener,
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const open = Effect.fn("ColdVerifySession.open")(function* (request: ColdVerifyRequest) {
-        const create: OrchestrationV2Command = {
-          type: "thread.create",
-          commandId: CommandId.make(`pipeline:verify:create:${request.threadId}`),
-          threadId: request.threadId,
-          projectId: request.projectId,
-          title: request.threadId,
-          modelSelection: request.modelSelection,
-          runtimeMode: "full-access",
-          interactionMode: "default",
-          branch: null,
-          worktreePath: null,
-          createdBy: "system",
-          creationSource: "server",
-        };
-        yield* orchestrator.dispatch(create);
-        const message: OrchestrationV2Command = {
-          type: "message.dispatch",
-          commandId: CommandId.make(`pipeline:verify:message:${request.threadId}`),
-          threadId: request.threadId,
-          messageId: MessageId.make(`pipeline:verify:message:${request.threadId}`),
-          text: request.text,
-          attachments: [],
-          modelSelection: request.modelSelection,
-          dispatchMode: { type: "start_immediately" },
-          createdBy: "system",
-          creationSource: "server",
-        };
-        yield* orchestrator.dispatch(message);
+      const create: OrchestrationV2Command = {
+        type: "thread.create",
+        commandId: CommandId.make(`pipeline:verify:create:${request.threadId}`),
+        threadId: request.threadId,
+        projectId: request.projectId,
+        title: request.threadId,
+        modelSelection: request.modelSelection,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        createdBy: "system",
+        creationSource: "server",
+      };
+      yield* orchestrator.dispatch(create);
+      const message: OrchestrationV2Command = {
+        type: "message.dispatch",
+        commandId: CommandId.make(`pipeline:verify:message:${request.threadId}`),
+        threadId: request.threadId,
+        messageId: MessageId.make(`pipeline:verify:message:${request.threadId}`),
+        text: request.text,
+        attachments: [],
+        modelSelection: request.modelSelection,
+        dispatchMode: { type: "start_immediately" },
+        createdBy: "system",
+        creationSource: "server",
+      };
+      yield* orchestrator.dispatch(message);
     });
     return VerifierOpener.of({ open });
   }),
