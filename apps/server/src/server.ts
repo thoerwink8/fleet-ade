@@ -155,6 +155,7 @@ import * as ReplayMarkers from "./auth/replayMarkers.ts";
 import * as PipelineRuns from "./pipeline/PipelineRuns.ts";
 import * as DispatchSession from "./pipeline/DispatchSession.ts";
 import * as OpenPullRequest from "./pipeline/OpenPullRequest.ts";
+import * as ColdVerifySession from "./pipeline/ColdVerifySession.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 import * as CodexManagedTokenBroker from "./provider/CodexManagedTokenBroker.ts";
 import * as WebhookRoute from "./scheduledTasks/webhookRoute.ts";
@@ -672,6 +673,10 @@ const layerOpenPullRequest = OpenPullRequest.layerWorker.pipe(
   Layer.provide(layerPipelineRuns),
   Layer.provide(ProjectionStoreV2.layer),
 );
+const layerColdVerify = ColdVerifySession.layerWorker.pipe(
+  Layer.provideMerge(ColdVerifySession.layerLive),
+  Layer.provide(layerPipelineRuns),
+);
 const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   AgentAwarenessRelay.layer,
   HeldHooksWaker.layer,
@@ -715,6 +720,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ProviderInstallation.layer,
   ReplayMarkers.layer,
   layerPipelineRuns,
+  layerColdVerify,
   layerDispatchSession,
   layerOpenPullRequest,
   Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),

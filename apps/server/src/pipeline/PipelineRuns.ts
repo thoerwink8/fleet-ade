@@ -37,7 +37,7 @@ import {
 const TICK_INTERVAL = Duration.minutes(5);
 
 /** Runs that have started a session and not ended. One place. */
-const MAX_OPEN_SESSIONS = 1;
+export const MAX_OPEN_SESSIONS = 1;
 
 /** Summary window for the read API. The page shows this many. */
 const RECENT_RUNS = 20;
