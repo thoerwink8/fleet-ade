@@ -12,6 +12,7 @@ export const REPOSITORY = { owner: "thoerwink8", name: "fleet-ade" } as const;
 export const ELIGIBLE_LABEL = "交给 ADE";
 
 const HOST = "github.com";
+export const PIPELINE_HOST = HOST;
 const PAGE_SIZE = 100;
 /** GitHub serves at most this many items for one listing, so a full last page is a cut-off list. */
 const MAX_ITEMS = 1000;
