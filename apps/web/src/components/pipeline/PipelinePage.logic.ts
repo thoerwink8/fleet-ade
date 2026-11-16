@@ -18,6 +18,21 @@ export const PIPELINE_STATUS_LABEL: Record<PipelineRunStatus, string> = {
   stuck: "卡住",
 };
 
+/** Badge tone for each status. Stuck is the only solid alarm. */
+export const PIPELINE_STATUS_BADGE = {
+  claimed: "secondary",
+  session: "info",
+  "pr-open": "info",
+  checks: "warning",
+  verify: "info",
+  mergeable: "success",
+  merged: "success",
+  stuck: "destructive",
+} as const satisfies Record<
+  PipelineRunStatus,
+  "secondary" | "info" | "warning" | "success" | "destructive"
+>;
+
 /**
  * One list, three views. Stuck runs are not running. A run with a pull request
  * number is listed there even while it is still running.

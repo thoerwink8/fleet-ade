@@ -6,11 +6,13 @@ import {
   type PipelineRunStatus,
 } from "@t3tools/contracts";
 
-import { groupPipelineRuns, PIPELINE_STATUS_LABEL } from "./PipelinePage.logic";
+import {
+  groupPipelineRuns,
+  PIPELINE_STATUS_BADGE,
+  PIPELINE_STATUS_LABEL,
+} from "./PipelinePage.logic";
 
-function run(
-  patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">,
-): PipelineRun {
+function run(patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">): PipelineRun {
   return {
     id: patch.id,
     repository: "acme/demo",
@@ -78,6 +80,16 @@ describe("groupPipelineRuns", () => {
       "可合并",
       "已合并",
       "卡住",
+    ]);
+    expect(PIPELINE_RUN_STATUSES.map((status) => PIPELINE_STATUS_BADGE[status])).toEqual([
+      "secondary",
+      "info",
+      "info",
+      "warning",
+      "info",
+      "success",
+      "success",
+      "destructive",
     ]);
   });
 });
