@@ -545,6 +545,36 @@ describe("ColdVerifySession", () => {
     ),
   );
 
+  it.effect("空结论不占轮次，同一轮内记一次没验成", () =>
+    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+      Effect.gen(function* () {
+        yield* claim;
+        const dispatched = yield* tick;
+        const threadId = /^已派第:1:次:1:(\S+)$/.exec(dispatched?.detail ?? "")?.[1] ?? "";
+        yield* Ref.set(handles.messages, [
+          {
+            role: "assistant",
+            text: JSON.stringify({
+              verdict: null,
+              problems: [],
+              suggestions: [],
+              handovers: [],
+            }),
+          },
+        ]);
+        yield* recordCompleted(threadId, `end:${threadId}`);
+        const listed = yield* tick;
+        assert.strictEqual(listed?.status, "verify");
+        assert.strictEqual(listed?.stuckReason, null);
+        assert.match(listed?.detail ?? "", /已完成:0:轮:没验成:已试:1/);
+        assert.strictEqual((yield* Ref.get(handles.opened)).length, 1);
+        const retried = yield* tick;
+        assert.match(retried?.detail ?? "", /已派第:1:次:2:/);
+        assert.strictEqual((yield* Ref.get(handles.opened)).length, 2);
+      }),
+    ),
+  );
+
   it.effect("解码失败记没验成，不记成空结论", () =>
     Effect.gen(function* () {
       const malformed = yield* conclusionOf([

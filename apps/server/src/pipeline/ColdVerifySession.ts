@@ -194,8 +194,21 @@ export const decideColdVerify = Effect.fn("ColdVerifySession.decide")(function* 
         rounds,
       );
     }
-    rounds += 1;
     const outcome = judgeColdVerify(attempt.output);
+    if (outcome.kind === "unverified") {
+      const nextAttempt = input.inconclusiveAttempts + 1;
+      if (nextAttempt >= MAX_INCONCLUSIVE_RETRIES) {
+        return decided(
+          stick(STUCK_INCONCLUSIVE, `已完成:${rounds}:轮:没验成:已试:${MAX_INCONCLUSIVE_RETRIES}`),
+          rounds,
+        );
+      }
+      return decided(
+        { status: "verify", detail: `已完成:${rounds}:轮:没验成:已试:${nextAttempt}` },
+        rounds,
+      );
+    }
+    rounds += 1;
     if (outcome.kind === "pass") {
       const written = yield* write(outcome);
       if (written.sha !== input.sha || written.state !== "success") {
@@ -220,19 +233,6 @@ export const decideColdVerify = Effect.fn("ColdVerifySession.decide")(function* 
     if (outcome.kind === "handover") {
       return decided(
         stick(STUCK_HANDOVER, `第 ${rounds} 轮判不了：${outcome.handovers.join("；")}`),
-        rounds,
-      );
-    }
-    if (outcome.kind === "unverified") {
-      const nextAttempt = input.inconclusiveAttempts + 1;
-      if (nextAttempt >= MAX_INCONCLUSIVE_RETRIES) {
-        return decided(
-          stick(STUCK_INCONCLUSIVE, `已完成:${rounds}:轮:没验成:已试:${MAX_INCONCLUSIVE_RETRIES}`),
-          rounds,
-        );
-      }
-      return decided(
-        { status: "verify", detail: `已完成:${rounds}:轮:没验成:已试:${nextAttempt}` },
         rounds,
       );
     }
