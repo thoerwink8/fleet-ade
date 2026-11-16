@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Feishu from "./feishu.ts";
 import * as Ref from "effect/Ref";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -127,6 +128,14 @@ const gateLayer = (input: {
     pipelineAutoMerge: input.autoMerge,
   });
   const runs = runsLayer.pipe(
+    Layer.provide(
+      Layer.succeed(
+        Feishu.PipelineFeishu,
+        Feishu.PipelineFeishu.of({
+          send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+        }),
+      ),
+    ),
     Layer.provide(
       Layer.succeed(PipelineGitHubIssues, {
         listEligible: () => Effect.succeed([issue(9)]),

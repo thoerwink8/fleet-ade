@@ -11,6 +11,7 @@ import {
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Feishu from "./feishu.ts";
 import * as Ref from "effect/Ref";
 import * as TestClock from "effect/testing/TestClock";
 
@@ -120,6 +121,14 @@ const sessionLayer = (
     listPage: () => Effect.succeed({ projects: [PROJECT], nextCursor: null }),
   } as unknown as ProjectService.ProjectService["Service"]);
   const shared = Layer.mergeAll(runsLayer, inboxLayer).pipe(
+    Layer.provide(
+      Layer.succeed(
+        Feishu.PipelineFeishu,
+        Feishu.PipelineFeishu.of({
+          send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+        }),
+      ),
+    ),
     Layer.provide(issues),
     Layer.provide(usage),
     Layer.provide(settings),

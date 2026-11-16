@@ -6,6 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Feishu from "./feishu.ts";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -58,6 +59,14 @@ const pipelineLayer = (options: {
   readonly enabled?: boolean;
 }) =>
   runsLayer.pipe(
+    Layer.provide(
+      Layer.succeed(
+        Feishu.PipelineFeishu,
+        Feishu.PipelineFeishu.of({
+          send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+        }),
+      ),
+    ),
     Layer.provide(
       Layer.succeed(
         PipelineGitHubIssues,
@@ -323,6 +332,14 @@ describe("PipelineRuns", () => {
         runsLayer.pipe(
           Layer.provide(
             Layer.succeed(
+              Feishu.PipelineFeishu,
+              Feishu.PipelineFeishu.of({
+                send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+              }),
+            ),
+          ),
+          Layer.provide(
+            Layer.succeed(
               PipelineGitHubIssues,
               PipelineGitHubIssues.of({
                 listEligible: () => Effect.succeed([issue(7)]),
@@ -370,6 +387,14 @@ describe("PipelineRuns", () => {
       }).pipe(
         Effect.provide(
           runsLayer.pipe(
+            Layer.provide(
+              Layer.succeed(
+                Feishu.PipelineFeishu,
+                Feishu.PipelineFeishu.of({
+                  send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+                }),
+              ),
+            ),
             Layer.provide(
               Layer.succeed(
                 PipelineGitHubIssues,
@@ -495,6 +520,14 @@ describe("PipelineRuns", () => {
       const directory = yield* fs.makeTempDirectoryScoped();
       const database = path.join(directory, "state.sqlite");
       const boot = runsLayer.pipe(
+        Layer.provide(
+          Layer.succeed(
+            Feishu.PipelineFeishu,
+            Feishu.PipelineFeishu.of({
+              send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+            }),
+          ),
+        ),
         Layer.provide(
           Layer.succeed(
             PipelineGitHubIssues,

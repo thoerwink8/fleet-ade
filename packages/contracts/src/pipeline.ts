@@ -58,6 +58,8 @@ export const PipelineRun = Schema.Struct({
   detail: NullableText,
   /** True after this run has used its one automatic retry. */
   renewedOnce: Schema.Boolean,
+  /** Set when the stuck push did not go out, so the stuck list can say so. */
+  notifyNote: NullableText,
   costLabel: Schema.Literal(PIPELINE_COST_LABEL),
 });
 export type PipelineRun = typeof PipelineRun.Type;

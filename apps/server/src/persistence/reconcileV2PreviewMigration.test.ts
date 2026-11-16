@@ -71,6 +71,7 @@ describe("V2 preview upgrade", () => {
         [89, "SessionEndInbox"],
         [90, "PipelineRuns"],
         [91, "PipelineBudget"],
+        [92, "PipelineNotify"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -185,6 +186,7 @@ describe("V2 preview upgrade", () => {
         [89, "SessionEndInbox"],
         [90, "PipelineRuns"],
         [91, "PipelineBudget"],
+        [92, "PipelineNotify"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

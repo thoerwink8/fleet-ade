@@ -10,6 +10,7 @@ import {
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Feishu from "./feishu.ts";
 import * as Ref from "effect/Ref";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
@@ -49,7 +50,11 @@ const PROJECT: Project = {
   workspaceRoot: "/repo",
   repositoryIdentity: {
     canonicalKey: "github.com/thoerwink8/fleet-ade",
-    locator: { source: "git-remote", remoteName: "origin", remoteUrl: "https://example.invalid/fleet-ade.git" },
+    locator: {
+      source: "git-remote",
+      remoteName: "origin",
+      remoteUrl: "https://example.invalid/fleet-ade.git",
+    },
     owner: "thoerwink8",
     name: "fleet-ade",
   },
@@ -167,6 +172,14 @@ const harness = (
       ),
   } as unknown as ProjectionStore.ProjectionStoreV2["Service"]);
   const shared = Layer.mergeAll(runsLayer, inboxLayer).pipe(
+    Layer.provide(
+      Layer.succeed(
+        Feishu.PipelineFeishu,
+        Feishu.PipelineFeishu.of({
+          send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+        }),
+      ),
+    ),
     Layer.provide(issues),
     Layer.provide(usage),
     Layer.provide(settings),
@@ -192,7 +205,9 @@ const run = <E, R>(
     const opened = yield* Ref.make<ReadonlyArray<ColdVerifyRequest>>([]);
     const written = yield* Ref.make<ReadonlyArray<Written>>([]);
     const writeState = yield* Ref.make<"success" | "failure" | "miss">("success");
-    const messages = yield* Ref.make<ReadonlyArray<{ readonly role: string; readonly text: string }>>([]);
+    const messages = yield* Ref.make<
+      ReadonlyArray<{ readonly role: string; readonly text: string }>
+    >([]);
     const handles = { opened, written, writeState, messages };
     return yield* body(handles).pipe(Effect.provide(harness(models, handles, openFails, eligible)));
   });
@@ -237,9 +252,7 @@ describe("ColdVerifySession", () => {
         yield* claim;
         const dispatched = yield* tick;
         const threadId = dispatched?.threadId ?? "";
-        yield* Ref.set(handles.messages, [
-          { role: "assistant", text: JSON.stringify(passOutput) },
-        ]);
+        yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
         yield* (yield* SessionEndInbox).record({
           threadId: ThreadId.make(threadId),
           runId: RunId.make(`end:${threadId}`),
@@ -374,9 +387,7 @@ describe("ColdVerifySession", () => {
         yield* claim;
         const dispatched = yield* tick;
         yield* Ref.set(handles.writeState, "failure");
-        yield* Ref.set(handles.messages, [
-          { role: "assistant", text: JSON.stringify(passOutput) },
-        ]);
+        yield* Ref.set(handles.messages, [{ role: "assistant", text: JSON.stringify(passOutput) }]);
         yield* (yield* SessionEndInbox).record({
           threadId: ThreadId.make(dispatched?.threadId ?? ""),
           runId: RunId.make("end:write-failed"),
@@ -406,4 +417,3 @@ describe("ColdVerifySession", () => {
     }),
   );
 });
-

@@ -68,6 +68,11 @@ function RunSection({
                       <Badge variant="error">{run.stuckReason}</Badge>
                     </span>
                   ) : null}
+                  {run.notifyNote !== null ? (
+                    <p className="mt-1 text-xs break-words text-muted-foreground">
+                      {run.notifyNote}
+                    </p>
+                  ) : null}
                 </div>
                 <p className="mt-0.5 flex shrink-0 items-center gap-2 font-mono text-xs tabular-nums text-muted-foreground">
                   <span>#{run.issueNumber}</span>

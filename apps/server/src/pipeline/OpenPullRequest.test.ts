@@ -7,6 +7,7 @@ import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Feishu from "./feishu.ts";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -66,6 +67,14 @@ const tickLayer = (input: {
 }) => {
   const settings = ServerSettings.layerTest({ pipelineEnabled: input.enabled ?? true });
   const runs = runsLayer.pipe(
+    Layer.provide(
+      Layer.succeed(
+        Feishu.PipelineFeishu,
+        Feishu.PipelineFeishu.of({
+          send: () => Effect.succeed({ delivered: false, note: "没送出：未配置" }),
+        }),
+      ),
+    ),
     Layer.provide(
       Layer.succeed(PipelineGitHubIssues, {
         listEligible: () => Effect.succeed(input.issues),

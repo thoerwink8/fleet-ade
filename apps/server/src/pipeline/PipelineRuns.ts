@@ -26,6 +26,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as Feishu from "./feishu.ts";
 import {
   REPOSITORY,
   PipelineGitHubIssues,
@@ -74,6 +75,8 @@ const RunRow = Schema.Struct({
   ciQueueMs: Schema.NullOr(Schema.Int),
   detail: Schema.NullOr(Schema.String),
   renewedOnce: Schema.Literals([0, 1]),
+  notifiedReason: Schema.NullOr(Schema.Literals(PIPELINE_STUCK_REASONS)),
+  notifyNote: Schema.NullOr(Schema.String),
 });
 type RunRow = typeof RunRow.Type;
 
@@ -272,7 +275,9 @@ const SELECT_RUNS = `
     commit_count AS commitCount,
     ci_queue_ms AS ciQueueMs,
     detail,
-    renewed_once AS renewedOnce
+    renewed_once AS renewedOnce,
+    notified_reason AS notifiedReason,
+    notify_note AS notifyNote
   FROM pipeline_runs
   ORDER BY updated_at DESC, id DESC
 `;
@@ -282,6 +287,7 @@ const make = Effect.gen(function* () {
   const issues = yield* PipelineGitHubIssues;
   const settings = yield* ServerSettings.ServerSettingsService;
   const usage = yield* PipelineUsage;
+  const feishu = yield* Feishu.PipelineFeishu;
 
   const nowIso = Effect.fn("PipelineRuns.now")(function* () {
     return DateTime.formatIso(yield* DateTime.now);
@@ -369,6 +375,40 @@ const make = Effect.gen(function* () {
     `.pipe(Effect.mapError(sqlFailure));
   });
 
+  /** One attempt per stuck reason. A failed push stays recorded; the run is not touched otherwise. */
+  const announceStuck = Effect.fn("PipelineRuns.announceStuck")(function* (id: number) {
+    const run = (yield* loadRows()).find((row) => row.id === id);
+    if (
+      run === undefined ||
+      run.status !== "stuck" ||
+      run.stuckReason === null ||
+      run.stuckReason === TERMINAL_CANCEL ||
+      run.stuckReason === run.notifiedReason
+    ) {
+      return;
+    }
+    const claimed = yield* sql<{ readonly id: number }>`
+      UPDATE pipeline_runs SET
+        notified_reason = ${run.stuckReason},
+        notify_note = ${"没送出：推送未完成"}
+      WHERE id = ${id} AND status = 'stuck' AND stuck_reason = ${run.stuckReason}
+        AND (notified_reason IS NULL OR notified_reason != ${run.stuckReason})
+      RETURNING id
+    `.pipe(Effect.mapError(sqlFailure));
+    if (claimed.length === 0) return;
+    const outcome = yield* feishu.send({
+      repository: run.repository,
+      issueNumber: run.issueNumber,
+      reason: run.stuckReason,
+      prNumber: run.prNumber,
+    });
+    yield* sql`
+      UPDATE pipeline_runs SET
+        notify_note = ${outcome.delivered ? null : outcome.note}
+      WHERE id = ${id} AND notified_reason = ${run.stuckReason}
+    `.pipe(Effect.mapError(sqlFailure));
+  });
+
   const refreshUsage = Effect.fn("PipelineRuns.refreshUsage")(function* () {
     const rows = yield* loadRows();
     const closed = rows.filter(
@@ -436,7 +476,8 @@ const make = Effect.gen(function* () {
     for (const issue of ordered) {
       if (issue.body.includes(WORKFLOWS_PATH)) {
         if (!activeIssues.has(issue.number)) {
-          yield* insertRun({ issue, status: "stuck", stuckReason: "交人" });
+          const insertedId = yield* insertRun({ issue, status: "stuck", stuckReason: "交人" });
+          if (insertedId !== undefined) yield* announceStuck(insertedId);
           activeIssues.add(issue.number);
         }
         continue;
@@ -451,7 +492,7 @@ const make = Effect.gen(function* () {
   }).pipe(Effect.withSpan("PipelineRuns.tick"));
 
   const list: PipelineRunsShape["list"] = Effect.gen(function* () {
-    const runs = (yield* loadRows()).map((row): PipelineRun => ({
+    const runs = (yield* loadRows()).map(({ notifiedReason: _notified, ...row }): PipelineRun => ({
       ...row,
       renewedOnce: row.renewedOnce === 1,
       costLabel: PIPELINE_COST_LABEL,
@@ -513,6 +554,7 @@ const make = Effect.gen(function* () {
         updated_at = ${at}
       WHERE id = ${target.id}
     `.pipe(Effect.mapError(sqlFailure));
+    yield* announceStuck(target.id);
     yield* refreshUsage();
   });
 
@@ -538,6 +580,7 @@ export const layerUsage = Layer.effect(PipelineUsage, readExport);
 
 export const layerLive = layer.pipe(
   Layer.provide(layerUsage),
+  Layer.provide(Feishu.layerLive),
   Layer.provideMerge(gitHubIssuesLayer.pipe(Layer.provide(GitHubRest.layerWithDependencies))),
 );
 
