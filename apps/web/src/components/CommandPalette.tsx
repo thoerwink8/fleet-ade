@@ -59,6 +59,7 @@ import {
   ArrowLeftIcon,
   BugIcon,
   ActivityIcon,
+  ListTreeIcon,
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -1688,6 +1689,17 @@ function OpenCommandPaletteDialog(props: {
     icon: <ActivityIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/engine" });
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:pipeline",
+    searchTerms: ["pipeline", "runs", "stuck", "流水线"],
+    title: "流水线",
+    icon: <ListTreeIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/pipeline" });
     },
   });
 

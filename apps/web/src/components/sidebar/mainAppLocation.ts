@@ -4,13 +4,14 @@ import { GUEST_PAGE_PATH } from "../../guestPage";
 import { withoutAssistantCitationHash } from "../../lib/assistantCitationNavigation";
 import { resolveThreadRouteTarget, type ThreadRouteTarget } from "../../threadRoutes";
 
-/** Settings, Usage, and engine status open as modals over the last main-app view. */
+/** Settings, Usage, engine status, and pipeline open as modals over the last main-app view. */
 export function isAppModalPage(pathname: string) {
   return (
     pathname === "/settings" ||
     pathname.startsWith("/settings/") ||
     pathname === "/usage" ||
-    pathname === "/engine"
+    pathname === "/engine" ||
+    pathname === "/pipeline"
   );
 }
 
