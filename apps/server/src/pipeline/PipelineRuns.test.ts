@@ -22,6 +22,7 @@ import {
   PipelineUsageUnreadable,
   layer as runsLayer,
   layerUsage,
+  layerUsageAt,
   type UsageRecord,
 } from "./PipelineRuns.ts";
 
@@ -363,6 +364,69 @@ describe("PipelineRuns", () => {
       ),
       Effect.scoped,
     ),
+  );
+
+  it.effect("omp 会话按编号找到原始记录，同名多份不放行", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const sessionsRoot = yield* fs.makeTempDirectoryScoped();
+      yield* Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const sql = yield* SqlClient.SqlClient;
+        const sessionId = "01a1e7fc-7a1f-762b-b314-4d99129ae3fc";
+        const directory = path.join(sessionsRoot, "worktree-a");
+        yield* fs.makeDirectory(directory);
+        const message = (timestamp: string, input: number) =>
+          JSON.stringify({
+            type: "message",
+            timestamp,
+            message: {
+              role: "assistant",
+              usage: { input, output: 2, cacheRead: 3, cacheWrite: 4 },
+            },
+          });
+        yield* fs.writeFileString(
+          path.join(directory, `2026-01-01T00-00-00-000Z_${sessionId}.jsonl`),
+          [message(`2026-01-01T00:00:00.000Z`, 500), message(`2026-01-01T00:10:00.000Z`, 10)].join(
+            String.fromCharCode(10),
+          ),
+        );
+        yield* sql`INSERT INTO orchestration_v2_projection_provider_threads
+          (provider_thread_id, thread_id, provider, status, updated_at, payload_json)
+          VALUES ('native-omp', 'thread-omp', 'acpRegistry', 'idle', '2026-01-01',
+            ${JSON.stringify({
+              driver: "acpRegistry",
+              nativeThreadRef: { nativeId: sessionId },
+            })})`;
+        const usage = yield* PipelineUsage;
+        const window = {
+          threadId: "thread-omp",
+          sessionStartedAt: "2026-01-01T00:10:00.000Z",
+          sessionEndedAt: "2026-01-01T00:20:00.000Z",
+        };
+        const records = yield* usage.read(window);
+        assert.deepEqual(
+          records.map((item) => item.inputTokens),
+          [10],
+        );
+        assert.strictEqual(records[0]?.outputTokens, 2);
+        assert.strictEqual(records[0]?.cacheTokens, 7);
+        const other = path.join(sessionsRoot, "worktree-b");
+        yield* fs.makeDirectory(other);
+        yield* fs.writeFileString(
+          path.join(other, `other_${sessionId}.jsonl`),
+          message("2026-01-01T00:10:00.000Z", 1),
+        );
+        assert.isTrue(Exit.isFailure(yield* Effect.exit(usage.read(window))));
+      }).pipe(
+        Effect.provide(
+          layerUsageAt(sessionsRoot).pipe(
+            Layer.provideMerge(SqlitePersistence.layerMemory),
+            Layer.provideMerge(NodeServices.layer),
+          ),
+        ),
+      );
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
   );
 
   it.effect("窗口没有记录时仍然读不到", () =>

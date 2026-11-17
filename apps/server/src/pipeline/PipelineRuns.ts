@@ -22,6 +22,8 @@ import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
+import * as NodeOS from "node:os";
+import * as Path from "effect/Path";
 
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -538,60 +540,96 @@ const NativeSession = Schema.Struct({
 });
 const decodeNativeSession = Schema.decodeUnknownEffect(Schema.fromJsonString(NativeSession));
 
-export const layerUsage = Layer.effect(
-  PipelineUsage,
-  Effect.gen(function* () {
-    const filesystem = yield* FileSystem.FileSystem;
-    const sql = yield* SqlClient.SqlClient;
-    const read = Effect.fn("PipelineUsage.read")(
-      function* (run: Pick<PipelineRun, "threadId" | "sessionStartedAt" | "sessionEndedAt">) {
-        if (run.threadId === null) return yield* new PipelineUsageUnreadable();
-        const rows = yield* sql<{
-          readonly payload: string;
-        }>`SELECT payload_json AS payload FROM orchestration_v2_projection_provider_threads
+/** omp writes one pi-format jsonl per session; the ACP id is the uuid in the file name, not a path. */
+const OMP_SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const layerUsageAt = (sessionsRoot: string | undefined) =>
+  Layer.effect(
+    PipelineUsage,
+    Effect.gen(function* () {
+      const filesystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = sessionsRoot ?? path.join(NodeOS.homedir(), ".omp", "agent", "sessions");
+      const sql = yield* SqlClient.SqlClient;
+      const findOmpTranscript = Effect.fn("PipelineUsage.findOmpTranscript")(function* (
+        nativeId: string,
+      ) {
+        if (!OMP_SESSION_ID.test(nativeId)) return yield* new PipelineUsageUnreadable();
+        const suffix = `_${nativeId}.jsonl`;
+        const matches: string[] = [];
+        for (const entry of yield* filesystem.readDirectory(root)) {
+          if (entry === "." || entry === ".." || entry.includes("/") || entry.includes("\\")) {
+            continue;
+          }
+          const directory = path.join(root, entry);
+          const info = yield* filesystem.stat(directory);
+          if (info.type !== "Directory") continue;
+          for (const file of yield* filesystem.readDirectory(directory)) {
+            if (file.endsWith(suffix) && !file.includes("/") && !file.includes("\\")) {
+              matches.push(path.join(directory, file));
+            }
+          }
+        }
+        const [only] = matches;
+        if (matches.length !== 1 || only === undefined) return yield* new PipelineUsageUnreadable();
+        return only;
+      });
+      const read = Effect.fn("PipelineUsage.read")(
+        function* (run: Pick<PipelineRun, "threadId" | "sessionStartedAt" | "sessionEndedAt">) {
+          if (run.threadId === null) return yield* new PipelineUsageUnreadable();
+          const rows = yield* sql<{
+            readonly payload: string;
+          }>`SELECT payload_json AS payload FROM orchestration_v2_projection_provider_threads
        WHERE thread_id = ${run.threadId} AND owner_node_id IS NULL`;
-        if (rows.length !== 1) return yield* new PipelineUsageUnreadable();
-        const session = yield* decodeNativeSession(rows[0]!.payload);
-        // Other providers need their own authoritative per-message usage reader.
-        if (session.driver !== "pi" || session.nativeThreadRef === null) {
-          return yield* new PipelineUsageUnreadable();
-        }
-        const start = Date.parse(run.sessionStartedAt ?? "");
-        const end = Date.parse(run.sessionEndedAt ?? "");
-        if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
-          return yield* new PipelineUsageUnreadable();
-        }
-        const contents = yield* filesystem.readFileString(session.nativeThreadRef.nativeId);
-        const records: UsageRecord[] = [];
-        for (const line of contents.split(/\r?\n/)) {
-          if (line.trim().length === 0) continue;
-          const entry = yield* decodeTranscriptEntry(line);
-          if (entry.type !== "message" || entry.message?.role !== "assistant") continue;
-          const at = Date.parse(entry.timestamp ?? "");
-          if (!Number.isFinite(at)) return yield* new PipelineUsageUnreadable();
-          if (at < start || at > end) continue;
-          const usage = entry.message.usage;
-          if (usage?.input === undefined) return yield* new PipelineUsageUnreadable();
-          records.push({
-            at: entry.timestamp!,
-            account: "",
-            inputTokens: usage.input,
-            outputTokens: usage.output ?? null,
-            cacheTokens:
-              usage.cacheRead === undefined || usage.cacheWrite === undefined
-                ? null
-                : usage.cacheRead + usage.cacheWrite,
-            convertedCost: null,
-          });
-        }
-        if (records.length === 0) return yield* new PipelineUsageUnreadable();
-        return records;
-      },
-      Effect.mapError(() => new PipelineUsageUnreadable()),
-    );
-    return PipelineUsage.of({ read });
-  }),
-);
+          if (rows.length !== 1) return yield* new PipelineUsageUnreadable();
+          const session = yield* decodeNativeSession(rows[0]!.payload);
+          if (session.nativeThreadRef === null) return yield* new PipelineUsageUnreadable();
+          const nativeId = session.nativeThreadRef.nativeId;
+          // pi stores the transcript path. omp stores only the session uuid.
+          const transcript =
+            session.driver === "pi"
+              ? nativeId
+              : session.driver === "acpRegistry"
+                ? yield* findOmpTranscript(nativeId)
+                : yield* new PipelineUsageUnreadable();
+          const start = Date.parse(run.sessionStartedAt ?? "");
+          const end = Date.parse(run.sessionEndedAt ?? "");
+          if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+            return yield* new PipelineUsageUnreadable();
+          }
+          const contents = yield* filesystem.readFileString(transcript);
+          const records: UsageRecord[] = [];
+          for (const line of contents.split(/\r?\n/)) {
+            if (line.trim().length === 0) continue;
+            const entry = yield* decodeTranscriptEntry(line);
+            if (entry.type !== "message" || entry.message?.role !== "assistant") continue;
+            const at = Date.parse(entry.timestamp ?? "");
+            if (!Number.isFinite(at)) return yield* new PipelineUsageUnreadable();
+            if (at < start || at > end) continue;
+            const usage = entry.message.usage;
+            if (usage?.input === undefined) return yield* new PipelineUsageUnreadable();
+            records.push({
+              at: entry.timestamp!,
+              account: "",
+              inputTokens: usage.input,
+              outputTokens: usage.output ?? null,
+              cacheTokens:
+                usage.cacheRead === undefined || usage.cacheWrite === undefined
+                  ? null
+                  : usage.cacheRead + usage.cacheWrite,
+              convertedCost: null,
+            });
+          }
+          if (records.length === 0) return yield* new PipelineUsageUnreadable();
+          return records;
+        },
+        Effect.mapError(() => new PipelineUsageUnreadable()),
+      );
+      return PipelineUsage.of({ read });
+    }),
+  );
+
+export const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
   Layer.provide(layerUsage),
