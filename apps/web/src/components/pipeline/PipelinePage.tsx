@@ -80,6 +80,9 @@ function RunDetailRow({ run }: { run: PipelineRun }) {
       <p className="min-w-0 text-sm leading-5 font-medium break-words text-foreground">
         {run.title}
       </p>
+      {run.notifyNote ? (
+        <p className="text-xs leading-5 text-muted-foreground">{run.notifyNote}</p>
+      ) : null}
       <p className="flex flex-nowrap items-center gap-x-2 overflow-x-auto whitespace-nowrap text-xs leading-5 tabular-nums text-muted-foreground">
         <span className="whitespace-nowrap">提交 {formatCommitCount(run)}</span>
         <span aria-hidden="true">·</span>

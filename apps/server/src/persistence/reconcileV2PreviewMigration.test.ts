@@ -39,18 +39,25 @@ describe("V2 preview upgrade", () => {
         [92, "PipelineSessionUsage"],
         [93, "PipelineInconclusiveReason"],
         [94, "PipelineRunMetrics"],
+        [95, "PipelineNotify"],
       ]);
       const after = yield* sql`SELECT * FROM pipeline_runs`;
       assert.deepStrictEqual(
         after.map((row) => {
-          const { commit_note: _commitNote, ci_queue_note: _ciQueueNote, ...rest } = row;
+          const {
+            commit_note: _commitNote,
+            ci_queue_note: _ciQueueNote,
+            notified_reason: _notifiedReason,
+            notify_note: _notifyNote,
+            ...rest
+          } = row;
           return rest;
         }),
         before,
       );
       assert.deepStrictEqual(
-        yield* sql`SELECT commit_note, ci_queue_note FROM pipeline_runs WHERE id = 28`,
-        [{ commit_note: null, ci_queue_note: null }],
+        yield* sql`SELECT commit_note, ci_queue_note, notified_reason, notify_note FROM pipeline_runs WHERE id = 28`,
+        [{ commit_note: null, ci_queue_note: null, notified_reason: null, notify_note: null }],
       );
       yield* sql`UPDATE pipeline_runs SET input_tokens = 11 WHERE id = 28`;
       assert.deepStrictEqual(
@@ -118,6 +125,7 @@ describe("V2 preview upgrade", () => {
         [92, "PipelineSessionUsage"],
         [93, "PipelineInconclusiveReason"],
         [94, "PipelineRunMetrics"],
+        [95, "PipelineNotify"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -235,6 +243,7 @@ describe("V2 preview upgrade", () => {
         [92, "PipelineSessionUsage"],
         [93, "PipelineInconclusiveReason"],
         [94, "PipelineRunMetrics"],
+        [95, "PipelineNotify"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
