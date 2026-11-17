@@ -19,6 +19,7 @@ import {
   layer as runsLayer,
   type UsageRecord,
 } from "./PipelineRuns.ts";
+import { layerPortsDefault } from "./intakeGates.ts";
 
 const START = "2026-11-16T00:00:00.000Z";
 const END = "2026-11-16T01:00:00.000Z";
@@ -33,6 +34,7 @@ const issue = (number: number): PipelineIssue => ({
   title: `单 ${number}`,
   body: acceptance,
   labels: ["交给 ADE"],
+  author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
 const usageOf = (inputTokens: number, outputTokens = 0): UsageRecord => ({
@@ -59,6 +61,7 @@ const layerFor = (input: {
     ),
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage })),
     Layer.provide(settings),
+    Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return budgetLayer.pipe(

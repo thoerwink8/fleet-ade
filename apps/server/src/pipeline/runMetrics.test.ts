@@ -13,6 +13,7 @@ import {
   type PipelineIssue,
 } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import { layerPortsDefault } from "./intakeGates.ts";
 import { RunMetrics, layer, queueMillis } from "./runMetrics.ts";
 
 const SHA = "abc123";
@@ -23,6 +24,7 @@ const issue = (number: number): PipelineIssue => ({
   title: `单 ${number}`,
   body: "## 怎么算做完\n- 跑通测试\n",
   labels: ["交给 ADE"],
+  author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
 const json = (status: number, body: unknown, truncated = false): GitHubRest.GitHubRestResponse => ({
@@ -72,6 +74,7 @@ const stack = (input: {
     ),
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
+    Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return layer.pipe(

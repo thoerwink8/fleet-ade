@@ -1506,6 +1506,10 @@ export const ServerSettings = Schema.Struct({
   linkedEnvironmentsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Off: a pipeline tick does not read issues or write runs. */
   pipelineEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  /** ISO time the switch last turned on. Null while off; left alone while it stays on. */
+  pipelineEnabledAt: Schema.NullOr(Schema.String).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
   /** Empty: a claimed run stops as stuck, reason 没配模型, and no worktree is created. */
   pipelineAuthorModel: Schema.NullOr(ModelSelection).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
@@ -1961,6 +1965,7 @@ export const ServerSettingsPatch = Schema.Struct({
   guestSharingEnabled: Schema.optionalKey(Schema.Boolean),
   linkedEnvironmentsEnabled: Schema.optionalKey(Schema.Boolean),
   pipelineEnabled: Schema.optionalKey(Schema.Boolean),
+  pipelineEnabledAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   pipelineAuthorModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   pipelineVerifierModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   pipelineSessionTimeoutMinutes: Schema.optionalKey(PositiveInt),

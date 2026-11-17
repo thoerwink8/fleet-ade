@@ -40,6 +40,7 @@ import {
   layer as runsLayer,
   type UsageRecord,
 } from "./PipelineRuns.ts";
+import { layerPortsDefault } from "./intakeGates.ts";
 
 const ENDED_AT = "1970-01-01T01:00:00.000Z";
 const SHA = "abc123";
@@ -54,6 +55,7 @@ const issue = (number: number, title = "fix tests"): PipelineIssue => ({
   title,
   body: "## 怎么算做完\n- 跑通测试\n",
   labels: ["交给 ADE"],
+  author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
 const tickLayer = (input: {
@@ -79,6 +81,7 @@ const tickLayer = (input: {
     Layer.provide(issues),
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage ?? Effect.succeed([]) })),
     Layer.provide(settings),
+    Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   const opener = Layer.succeed(PullRequestOpener, {

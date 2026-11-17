@@ -22,6 +22,7 @@ import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import * as DispatchSession from "./DispatchSession.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import { layerPortsDefault } from "./intakeGates.ts";
 import { SessionEndInbox, layer as inboxLayer, type SessionEndStatus } from "./SessionEndInbox.ts";
 
 const MODEL: ModelSelection = { instanceId: ProviderInstanceId.make("test-model"), model: "test" };
@@ -57,6 +58,7 @@ const issue = (number: number, title = "fix tests"): PipelineIssue => ({
   title,
   body: `单 ${number}\n${acceptance}`,
   labels: ["交给 ADE"],
+  author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
 interface PipelinePatch {
@@ -123,6 +125,7 @@ const sessionLayer = (
     Layer.provide(issues),
     Layer.provide(usage),
     Layer.provide(settings),
+    Layer.provide(layerPortsDefault),
     Layer.provideMerge(memory),
   );
   return DispatchSession.layer.pipe(

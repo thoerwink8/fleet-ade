@@ -25,6 +25,7 @@ import {
   layerUsageAt,
   type UsageRecord,
 } from "./PipelineRuns.ts";
+import { layerPortsDefault } from "./intakeGates.ts";
 
 const acceptance = `## 怎么算做完
 - 跑通测试
@@ -35,6 +36,7 @@ const issue = (number: number, body = acceptance, title = `单 ${number}`): Pipe
   title,
   body,
   labels: ["交给 ADE"],
+  author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
 const record = (
@@ -75,6 +77,7 @@ const pipelineLayer = (options: {
       ),
     ),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: options.enabled ?? true })),
+    Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 
@@ -557,6 +560,7 @@ describe("PipelineRuns", () => {
         ),
         Layer.provide(Layer.succeed(PipelineUsage, PipelineUsage.of({ read: () => readable() }))),
         Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
+        Layer.provide(layerPortsDefault),
         Layer.provide(SqlitePersistence.layerFromPath(database)),
         Layer.provideMerge(NodeServices.layer),
       );
