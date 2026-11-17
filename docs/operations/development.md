@@ -358,3 +358,5 @@ passed as `--wsl-runtime`; see the
 Add `--signed` after configuring the platform credentials in the
 [release runbook](./release.md). macOS passkeys need a signed, provisioned app; follow the
 [Connect setup](./connect-setup.md#desktop-passkeys) for local signing and renderer HMR.
+
+- verified by pipeline trial 2026-11
