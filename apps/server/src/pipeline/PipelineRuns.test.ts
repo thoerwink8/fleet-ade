@@ -63,6 +63,7 @@ const pipelineLayer = (options: {
       Layer.succeed(
         PipelineGitHubIssues,
         PipelineGitHubIssues.of({
+          addLabel: () => Effect.die("unexpected label write"),
           listEligible: () => options.issues,
           read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
         }),
@@ -553,6 +554,7 @@ describe("PipelineRuns", () => {
           Layer.succeed(
             PipelineGitHubIssues,
             PipelineGitHubIssues.of({
+              addLabel: () => Effect.die("unexpected label write"),
               listEligible: () => Effect.succeed([issue(4)]),
               read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
             }),

@@ -195,6 +195,7 @@ const gateLayer = (input: {
   const runs = runsLayer.pipe(
     Layer.provide(
       Layer.succeed(PipelineGitHubIssues, {
+        addLabel: () => Effect.die("unexpected label write"),
         listEligible: () => Effect.succeed([issue(9)]),
         read: () => Effect.die("unused"),
       }),

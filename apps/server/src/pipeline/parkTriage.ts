@@ -1,4 +1,5 @@
 import {
+  PIPELINE_STUCK_REASONS,
   CommandId,
   MessageId,
   PipelineRunsError,
@@ -19,6 +20,8 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -27,7 +30,7 @@ import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import { REPOSITORY } from "./GitHubIssues.ts";
+import { PipelineGitHubIssues, REPOSITORY } from "./GitHubIssues.ts";
 import { PipelineRuns } from "./PipelineRuns.ts";
 import { STUCK_NO_MODEL, orderedCandidates, pickRouteCandidate } from "./routeCandidates.ts";
 
@@ -49,6 +52,7 @@ export interface CommanderRequest {
   readonly issueNumber: number;
   readonly title: string;
   readonly stuckReason: PipelineStuckReason;
+  readonly detail: string | null;
   readonly model: ModelSelection | null;
 }
 
@@ -96,7 +100,19 @@ export class ParkTriage extends Context.Service<ParkTriage, ParkTriageShape>()(
 type Marker =
   | { readonly kind: "done"; readonly since: string }
   | { readonly kind: "unstarted"; readonly tries: number; readonly since: string }
-  | { readonly kind: "no-model"; readonly since: string };
+  | { readonly kind: "label-pending"; readonly since: string }
+  | {
+      readonly kind: "no-model";
+      readonly since: string;
+      readonly original: typeof OriginalContext.Type;
+    };
+
+const OriginalContext = Schema.Struct({
+  stuckReason: Schema.Literals(PIPELINE_STUCK_REASONS),
+  detail: Schema.NullOr(Schema.String),
+});
+const decodeOriginalContext = Schema.decodeUnknownOption(Schema.fromJsonString(OriginalContext));
+const encodeOriginalContext = Schema.encodeSync(Schema.fromJsonString(OriginalContext));
 
 const isHumanCategory = (value: string): value is HumanCategory =>
   (HUMAN_CATEGORIES as ReadonlyArray<string>).includes(value);
@@ -111,7 +127,13 @@ const parseMarker = (detail: string | null): Marker | null => {
     const tries = Number(unstarted[1]);
     return Number.isInteger(tries) ? { kind: "unstarted", tries, since } : null;
   }
-  if (detail.startsWith("没配模型 ")) return { kind: "no-model", since };
+  if (detail.startsWith("贴本机做待重试 ")) return { kind: "label-pending", since };
+  if (detail.startsWith("没配模型 ")) {
+    const original = decodeOriginalContext(
+      detail.slice("没配模型 ".length, detail.lastIndexOf(" ")),
+    );
+    if (Option.isSome(original)) return { kind: "no-model", since, original: original.value };
+  }
   return null;
 };
 
@@ -142,6 +164,7 @@ const make = Effect.gen(function* () {
   const runs = yield* PipelineRuns;
   const settings = yield* ServerSettings.ServerSettingsService;
   const opener = yield* CommanderSessionOpener;
+  const issues = yield* PipelineGitHubIssues;
 
   const keepStuck = Effect.fn("ParkTriage.keepStuck")(function* (run: PipelineRun, detail: string) {
     if (run.stuckReason === null) return;
@@ -171,6 +194,22 @@ const make = Effect.gen(function* () {
     });
   });
 
+  const applyLocalLabel = Effect.fn("ParkTriage.applyLocalLabel")(function* (
+    run: PipelineRun,
+    since: string,
+  ) {
+    const written = yield* issues.addLabel(run.issueNumber, LOCAL_LABEL).pipe(Effect.exit);
+    if (Exit.isFailure(written)) {
+      yield* Effect.logWarning("pipeline.park-triage.label-failed", {
+        issueNumber: run.issueNumber,
+        cause: Cause.pretty(written.cause),
+      });
+      return false;
+    }
+    yield* keepStuck(run, `已交指挥官·贴本机做 ${since}`);
+    return true;
+  });
+
   const triage = Effect.fn("ParkTriage.triage")(function* (input: {
     readonly modelConfigured: boolean;
     readonly model?: ModelSelection | null;
@@ -190,9 +229,9 @@ const make = Effect.gen(function* () {
       active.set(run.issueNumber, run);
     }
 
-    for (const run of active.values()) {
+    for (let run of active.values()) {
       if (run.status !== "stuck" || run.stuckReason === null) continue;
-      const marker = parseMarker(run.detail);
+      let marker = parseMarker(run.detail);
       if (marker?.kind === "done") continue;
       const since = marker?.since ?? run.updatedAt;
       const age = nowMs - Date.parse(since);
@@ -200,22 +239,36 @@ const make = Effect.gen(function* () {
         lines.push(`#${run.issueNumber} 停下未满 15 分钟不产生裁决请求`);
         continue;
       }
+      if (marker?.kind === "label-pending") {
+        if (yield* applyLocalLabel(run, since)) {
+          labelActions.push({ issueNumber: run.issueNumber, label: LOCAL_LABEL });
+          lines.push(`#${run.issueNumber} 已贴本机做，不再派`);
+        } else {
+          lines.push(`#${run.issueNumber} 本机做标签没写成，保留待重试，不算已处理`);
+        }
+        continue;
+      }
+      if (marker?.kind === "no-model") {
+        if (!input.modelConfigured) {
+          lines.push(`#${run.issueNumber} 没配模型，不算已处理`);
+          continue;
+        }
+        yield* runs.note(run.issueNumber, marker.original);
+        run = { ...run, ...marker.original };
+        marker = parseMarker(run.detail);
+      }
+      if (run.stuckReason === null) continue;
       if (awaitingRenew(run)) {
         lines.push(`#${run.issueNumber} 还在续一次集合里，不产生裁决请求`);
         continue;
       }
       if (!input.modelConfigured) {
-        const detail = `没配模型 ${since}`;
-        if (
-          marker?.kind !== "unstarted" &&
-          (run.detail !== detail || run.stuckReason !== STUCK_NO_MODEL)
-        ) {
-          yield* runs.note(run.issueNumber, {
-            status: "stuck",
-            stuckReason: STUCK_NO_MODEL,
-            detail,
-          });
-        }
+        const detail = `没配模型 ${encodeOriginalContext({ stuckReason: run.stuckReason, detail: run.detail })} ${since}`;
+        yield* runs.note(run.issueNumber, {
+          status: "stuck",
+          stuckReason: STUCK_NO_MODEL,
+          detail,
+        });
         lines.push(`#${run.issueNumber} 没配模型，不算已处理`);
         continue;
       }
@@ -237,6 +290,7 @@ const make = Effect.gen(function* () {
           issueNumber: run.issueNumber,
           title: run.title,
           stuckReason: run.stuckReason,
+          detail: run.detail,
           model: input.model ?? null,
         })
         .pipe(Effect.exit);
@@ -254,9 +308,13 @@ const make = Effect.gen(function* () {
         continue;
       }
       if (allowed.kind === "label") {
-        labelActions.push({ issueNumber: run.issueNumber, label: LOCAL_LABEL });
-        yield* keepStuck(run, `已交指挥官·贴本机做 ${since}`);
-        lines.push(`#${run.issueNumber} 裁决是贴本机做，标签动作 本机做，不再派`);
+        yield* keepStuck(run, `贴本机做待重试 ${since}`);
+        if (yield* applyLocalLabel(run, since)) {
+          labelActions.push({ issueNumber: run.issueNumber, label: LOCAL_LABEL });
+          lines.push(`#${run.issueNumber} 裁决是贴本机做，已贴本机做，不再派`);
+        } else {
+          lines.push(`#${run.issueNumber} 本机做标签没写成，保留待重试，不算已处理`);
+        }
         continue;
       }
       if (allowed.kind === "handover") {
@@ -332,7 +390,7 @@ const verdictFromText = (text: string): CommanderVerdict | null => {
 
 const commanderPrompt = (input: CommanderRequest): string =>
   [
-    `单 #${input.issueNumber} ${input.title} 停下了，原因是${input.stuckReason}。`,
+    `单 #${input.issueNumber} ${input.title} 停下了，原因是${input.stuckReason}。${input.detail ?? ""}`,
     "你只交裁决，不改文件、不跑命令。",
     "动作只能是继续、交人、贴本机做。交人时类别只能是要掏新钱、删了找不回又没备份、改标准。",
     '最后只返回 JSON：{"action":"继续","category":null}',
