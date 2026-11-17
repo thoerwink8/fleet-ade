@@ -63,7 +63,7 @@ const issue = (number: number, title = "fix tests"): PipelineIssue => ({
 
 interface PipelinePatch {
   readonly pipelineEnabled: boolean;
-  readonly pipelineAuthorModel: ModelSelection | null;
+  readonly pipelineAuthorModel: ReadonlyArray<ModelSelection>;
   readonly pipelineSessionTimeoutMinutes?: number;
 }
 
@@ -160,7 +160,7 @@ const run = <E, R>(
 
 const enabled = {
   pipelineEnabled: true,
-  pipelineAuthorModel: MODEL,
+  pipelineAuthorModel: [MODEL],
 } as const;
 
 const openClaimed = Effect.gen(function* () {
@@ -194,19 +194,22 @@ const recordEnd = (
 
 describe("DispatchSession", () => {
   it.effect("开关关着不建树不开会话", () =>
-    run({ pipelineEnabled: false, pipelineAuthorModel: MODEL }, [issue(5)], ({ opened, created }) =>
-      Effect.gen(function* () {
-        yield* (yield* PipelineRuns).tick;
-        yield* (yield* DispatchSession.DispatchSession).tick;
-        assert.deepEqual(yield* Ref.get(opened), []);
-        assert.deepEqual(yield* Ref.get(created), []);
-        assert.strictEqual((yield* (yield* PipelineRuns).list).runs.length, 0);
-      }),
+    run(
+      { pipelineEnabled: false, pipelineAuthorModel: [MODEL] },
+      [issue(5)],
+      ({ opened, created }) =>
+        Effect.gen(function* () {
+          yield* (yield* PipelineRuns).tick;
+          yield* (yield* DispatchSession.DispatchSession).tick;
+          assert.deepEqual(yield* Ref.get(opened), []);
+          assert.deepEqual(yield* Ref.get(created), []);
+          assert.strictEqual((yield* (yield* PipelineRuns).list).runs.length, 0);
+        }),
     ),
   );
 
   it.effect("没配模型卡住且没有树", () =>
-    run({ pipelineEnabled: true, pipelineAuthorModel: null }, [issue(5)], ({ created }) =>
+    run({ pipelineEnabled: true, pipelineAuthorModel: [] }, [issue(5)], ({ created }) =>
       Effect.gen(function* () {
         yield* (yield* PipelineRuns).tick;
         yield* (yield* DispatchSession.DispatchSession).tick;

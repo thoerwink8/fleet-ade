@@ -34,10 +34,16 @@ import {
 } from "./GitHubCommitStatus.ts";
 import { REPOSITORY } from "./GitHubIssues.ts";
 import { MAX_OPEN_SESSIONS, PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import {
+  orderedCandidates,
+  pickRouteCandidate,
+  STUCK_CANDIDATES_EXHAUSTED,
+  STUCK_NO_MODEL,
+  type StageRoutePick,
+} from "./routeCandidates.ts";
 import { SessionEndInbox } from "./SessionEndInbox.ts";
 import { judgeColdVerify, type ColdVerifyModelOutput } from "./coldVerifyVerdict.ts";
 
-const STUCK_NO_MODEL = "没配模型";
 const STUCK_COLD_VERIFY = "冷验收不过";
 const STUCK_INCONCLUSIVE = "冷验收没验成";
 const STUCK_HANDOVER = "交人";
@@ -142,7 +148,7 @@ const dispatchedRound = (
 };
 
 const stick = (
-  reason: "没配模型" | "冷验收不过" | "冷验收没验成" | "交人",
+  reason: "没配模型" | "候选用尽" | "冷验收不过" | "冷验收没验成" | "交人",
   detail: string,
 ): PipelineRunNote => ({
   status: "stuck",
@@ -256,12 +262,16 @@ export const decideColdVerify = Effect.fn("ColdVerifySession.decide")(function* 
 });
 
 const verifierRefused = (
-  verifier: ModelSelection | null,
-  author: ModelSelection | null,
-): string | undefined => {
-  if (verifier === null) return "验单模型是空的";
-  if (author !== null && sameModel(verifier, author)) return "验单模型跟写单模型相同";
-  return undefined;
+  verifierCandidates: ReadonlyArray<ModelSelection>,
+  authorCandidates: ReadonlyArray<ModelSelection>,
+): StageRoutePick | { readonly kind: "refused"; readonly detail: string } => {
+  const picked = pickRouteCandidate(orderedCandidates(verifierCandidates));
+  if (picked.kind === "stuck") return picked;
+  const author = pickRouteCandidate(orderedCandidates(authorCandidates));
+  if (author.kind === "open-session" && sameModel(picked.model, author.model)) {
+    return { kind: "refused", detail: "验单模型跟写单模型相同" };
+  }
+  return picked;
 };
 
 const inconclusiveAttempts = (detail: string | null): number => {
@@ -397,8 +407,16 @@ const make = Effect.gen(function* () {
     let occupied = authorOpen + inFlight;
 
     for (const run of pending) {
-      if (refused !== undefined || current.pipelineVerifierModel === null) {
-        yield* runs.note(run.issueNumber, stick(STUCK_NO_MODEL, refused ?? "验单模型是空的"));
+      if (refused.kind !== "open-session") {
+        yield* runs.note(
+          run.issueNumber,
+          refused.kind === "refused"
+            ? stick(STUCK_NO_MODEL, refused.detail)
+            : stick(
+                refused.reason,
+                refused.reason === STUCK_NO_MODEL ? "验单模型是空的" : STUCK_CANDIDATES_EXHAUSTED,
+              ),
+        );
         continue;
       }
       const prior = roundCount(run.detail);
@@ -474,7 +492,7 @@ const make = Effect.gen(function* () {
         .open({
           threadId,
           projectId: project.id,
-          modelSelection: current.pipelineVerifierModel,
+          modelSelection: refused.model,
           text: verifyBriefing(run),
         })
         .pipe(Effect.exit);

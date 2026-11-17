@@ -1703,6 +1703,17 @@ function OpenCommandPaletteDialog(props: {
     },
   });
 
+  actionItems.push({
+    kind: "action",
+    value: "action:channels",
+    searchTerms: ["channels", "candidates", "routing", "渠道", "候选"],
+    title: "渠道",
+    icon: <PlugIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/channels" });
+    },
+  });
+
   for (const direction of [1, -1] as const) {
     const title = direction === 1 ? "聚焦下一个工作区区域" : "聚焦上一个工作区区域";
     actionItems.push({

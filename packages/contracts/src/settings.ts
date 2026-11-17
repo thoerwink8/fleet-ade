@@ -10,6 +10,7 @@ import * as Option from "effect/Option";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
+import * as SchemaGetter from "effect/SchemaGetter";
 import {
   EnvironmentId,
   ForwardCompatibleNullable,
@@ -1389,6 +1390,24 @@ export const CloudSpeechCredentials = Schema.Struct({
 export const MaxConcurrentSessions = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1));
 export type MaxConcurrentSessions = typeof MaxConcurrentSessions.Type;
 
+/**
+ * Ordered candidates for one pipeline stage. Stored settings decode a legacy single
+ * model (or null) into one entry so an existing install keeps its configured model.
+ */
+const ModelSelectionList = Schema.Array(ModelSelection);
+const OrderedModelCandidates = Schema.Unknown.pipe(
+  Schema.decodeTo(ModelSelectionList, {
+    decode: SchemaGetter.transform((raw: unknown): typeof ModelSelectionList.Encoded =>
+      raw === null || raw === undefined
+        ? []
+        : Array.isArray(raw)
+          ? (raw as typeof ModelSelectionList.Encoded)
+          : [raw as typeof ModelSelection.Encoded],
+    ),
+    encode: SchemaGetter.transform((models: typeof ModelSelectionList.Encoded) => models),
+  }),
+);
+
 export const ServerSettings = Schema.Struct({
   // Null means unmigrated; empty is authoritative and must not resurrect cleared preferences.
   favorites: Schema.NullOr(ModelFavorites).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
@@ -1510,13 +1529,11 @@ export const ServerSettings = Schema.Struct({
   pipelineEnabledAt: Schema.NullOr(Schema.String).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
-  /** Empty: a claimed run stops as stuck, reason 没配模型, and no worktree is created. */
-  pipelineAuthorModel: Schema.NullOr(ModelSelection).pipe(
-    Schema.withDecodingDefault(Effect.succeed(null)),
-  ),
-  /** Empty, or the same as the author model: a verify run sticks as 没配模型 and no verifier session opens. */
-  pipelineVerifierModel: Schema.NullOr(ModelSelection).pipe(
-    Schema.withDecodingDefault(Effect.succeed(null)),
+  /** Each stage keeps an ordered candidate list; the picker moves to the next when one is unreadable or exhausted. Empty sticks as 没配模型. */
+  pipelineAuthorModel: OrderedModelCandidates.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  /** Ordered verifier candidates; the first usable one that differs from the author model runs, else the verify run sticks as 没配模型. */
+  pipelineVerifierModel: OrderedModelCandidates.pipe(
+    Schema.withDecodingDefault(Effect.succeed([])),
   ),
   /** Minutes after a session starts with no terminal event before the run sticks as 超时. */
   pipelineSessionTimeoutMinutes: PositiveInt.pipe(Schema.withDecodingDefault(Effect.succeed(90))),
@@ -1966,8 +1983,8 @@ export const ServerSettingsPatch = Schema.Struct({
   linkedEnvironmentsEnabled: Schema.optionalKey(Schema.Boolean),
   pipelineEnabled: Schema.optionalKey(Schema.Boolean),
   pipelineEnabledAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  pipelineAuthorModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
-  pipelineVerifierModel: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  pipelineAuthorModel: Schema.optionalKey(OrderedModelCandidates),
+  pipelineVerifierModel: Schema.optionalKey(OrderedModelCandidates),
   pipelineSessionTimeoutMinutes: Schema.optionalKey(PositiveInt),
   pipelineAutoMerge: Schema.optionalKey(Schema.Boolean),
   pipelineTokenInputEquivalent: Schema.optionalKey(PositiveInt),
