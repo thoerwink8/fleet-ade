@@ -23,6 +23,7 @@ export const PIPELINE_STUCK_REASONS = [
   "交人",
   "取消",
   "没配模型",
+  "候选用尽",
 ] as const;
 export type PipelineStuckReason = (typeof PIPELINE_STUCK_REASONS)[number];
 

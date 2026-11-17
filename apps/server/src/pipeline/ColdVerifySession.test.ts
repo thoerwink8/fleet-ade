@@ -102,7 +102,10 @@ interface Handles {
 }
 
 const harness = (
-  models: { readonly author: ModelSelection | null; readonly verifier: ModelSelection | null },
+  models: {
+    readonly author: ReadonlyArray<ModelSelection>;
+    readonly verifier: ReadonlyArray<ModelSelection>;
+  },
   handles: Handles,
   openFails = false,
   eligible: ReadonlyArray<PipelineIssue> = [issue(8)],
@@ -192,7 +195,10 @@ const harness = (
 };
 
 const run = <E, R>(
-  models: { readonly author: ModelSelection | null; readonly verifier: ModelSelection | null },
+  models: {
+    readonly author: ReadonlyArray<ModelSelection>;
+    readonly verifier: ReadonlyArray<ModelSelection>;
+  },
   body: (handles: Handles) => Effect.Effect<void, E, R>,
   openFails = false,
   eligible: ReadonlyArray<PipelineIssue> = [issue(8)],
@@ -220,7 +226,7 @@ const tick = Effect.gen(function* () {
 
 describe("ColdVerifySession", () => {
   it.effect("模型没配就卡住且不派会话", () =>
-    run({ author: AUTHOR, verifier: null }, (handles) =>
+    run({ author: [AUTHOR], verifier: [] }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         const listed = yield* tick;
@@ -232,7 +238,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("验单模型和写单模型相同就卡住且不派会话", () =>
-    run({ author: AUTHOR, verifier: AUTHOR }, (handles) =>
+    run({ author: [AUTHOR], verifier: [AUTHOR] }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         const listed = yield* tick;
@@ -244,7 +250,7 @@ describe("ColdVerifySession", () => {
 
   it.effect("任务号和 PR 号不同时，交代里是仓、PR 号和当前 head", () =>
     run(
-      { author: AUTHOR, verifier: VERIFIER },
+      { author: [AUTHOR], verifier: [VERIFIER] },
       (handles) =>
         Effect.gen(function* () {
           const runs = yield* PipelineRuns;
@@ -273,7 +279,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("第一轮过只把 success 写到当前 head，建议留在运行上", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         const dispatched = yield* tick;
@@ -297,7 +303,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("两轮都不过就卡住，原因是冷验收不过", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         for (const round of [1, 2]) {
@@ -326,7 +332,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("旧 head 上的 success 不放行", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, () =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, () =>
       Effect.gen(function* () {
         const decision = yield* decideColdVerify(
           {
@@ -353,7 +359,7 @@ describe("ColdVerifySession", () => {
 
   it.effect("会话没跑起来是不过，不写成通过", () =>
     run(
-      { author: AUTHOR, verifier: VERIFIER },
+      { author: [AUTHOR], verifier: [VERIFIER] },
       () =>
         Effect.gen(function* () {
           yield* claim;
@@ -386,7 +392,7 @@ describe("ColdVerifySession", () => {
 
   it.effect("名额满了不派验单会话，空出名额后再派", () =>
     run(
-      { author: AUTHOR, verifier: VERIFIER },
+      { author: [AUTHOR], verifier: [VERIFIER] },
       (handles) =>
         Effect.gen(function* () {
           const runs = yield* PipelineRuns;
@@ -415,7 +421,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("派验单和记结论都不换作者线程，也不清用量", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, (handles) =>
       Effect.gen(function* () {
         const runs = yield* PipelineRuns;
         const sql = yield* SqlClient.SqlClient;
@@ -461,7 +467,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("状态写失败则仍是待验", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         const dispatched = yield* tick;
@@ -510,7 +516,7 @@ describe("ColdVerifySession", () => {
     });
 
   it.effect("没验成不占轮次，同一轮内换新会话，真不过仍占两轮", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         assert.strictEqual(MAX_INCONCLUSIVE_RETRIES, 3);
@@ -549,7 +555,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("空结论不占轮次，同一轮内记一次没验成", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, (handles) =>
       Effect.gen(function* () {
         yield* claim;
         const dispatched = yield* tick;
@@ -597,7 +603,7 @@ describe("ColdVerifySession", () => {
   );
 
   it.effect("旧的没验成卡住运行回到待验，保留 PR、head 和作者用量", () =>
-    run({ author: AUTHOR, verifier: VERIFIER }, (handles) =>
+    run({ author: [AUTHOR], verifier: [VERIFIER] }, (handles) =>
       Effect.gen(function* () {
         const runs = yield* PipelineRuns;
         const sql = yield* SqlClient.SqlClient;

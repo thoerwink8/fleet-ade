@@ -29,8 +29,8 @@ import { REPOSITORY, PipelineGitHubIssues, type PipelineIssue } from "./GitHubIs
 import { PipelineBudget } from "./budget.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import { SessionEndInbox, type SessionEndEntry } from "./SessionEndInbox.ts";
+import { orderedCandidates, pickRouteCandidate } from "./routeCandidates.ts";
 
-const STUCK_NO_MODEL = "没配模型";
 const STUCK_SESSION_FAILED = "会话失败";
 const STUCK_TIMEOUT = "超时";
 const STUCK_CANCELLED = "取消";
@@ -284,11 +284,12 @@ const make = Effect.gen(function* () {
       }
 
       if (run.threadId !== null) continue;
-      const model = current.pipelineAuthorModel;
-      if (model === null) {
-        yield* stick(run.issueNumber, { status: "stuck", stuckReason: STUCK_NO_MODEL });
+      const picked = pickRouteCandidate(orderedCandidates(current.pipelineAuthorModel));
+      if (picked.kind === "stuck") {
+        yield* stick(run.issueNumber, { status: "stuck", stuckReason: picked.reason });
         continue;
       }
+      const model = picked.model;
       const issue = yield* issues.read(run.issueNumber).pipe(Effect.option);
       if (Option.isNone(issue)) {
         yield* stick(run.issueNumber, {
