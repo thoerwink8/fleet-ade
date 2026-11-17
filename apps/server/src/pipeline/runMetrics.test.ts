@@ -15,6 +15,7 @@ import {
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import { RunMetrics, layer, queueMillis } from "./runMetrics.ts";
+import * as ClaimLease from "./claimLease.ts";
 
 const SHA = "abc123";
 const CREATED = "2026-01-01T00:00:00.000Z";
@@ -75,6 +76,7 @@ const stack = (input: {
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return layer.pipe(

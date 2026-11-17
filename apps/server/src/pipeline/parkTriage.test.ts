@@ -11,6 +11,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import * as ClaimLease from "./claimLease.ts";
 import {
   CommanderSessionOpener,
   PARK_TRIAGE_AFTER_MINUTES,
@@ -47,6 +48,7 @@ const layerFor = (
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.die("unused") })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return layer.pipe(

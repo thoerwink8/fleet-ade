@@ -10,6 +10,7 @@ import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
+import * as ClaimLease from "./claimLease.ts";
 import {
   MergeGate,
   MergeGateReadError,
@@ -202,6 +203,7 @@ const gateLayer = (input: {
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   const reader = Layer.succeed(MergeGateReader, {

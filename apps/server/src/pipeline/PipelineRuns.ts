@@ -43,6 +43,7 @@ import {
   type PrerequisiteState,
 } from "./intakeGates.ts";
 import { PipelineFeishu, layer as feishuLayer, type StuckMessage } from "./feishu.ts";
+import * as ClaimLease from "./claimLease.ts";
 
 /** How often a tick runs. One place. */
 const TICK_INTERVAL = Duration.minutes(5);
@@ -296,6 +297,7 @@ const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const ports = yield* PipelineIntakePorts;
   const usage = yield* PipelineUsage;
+  const claims = yield* ClaimLease.ClaimLeasePort;
 
   const feishu = yield* Effect.serviceOption(PipelineFeishu);
 
@@ -523,6 +525,12 @@ const make = Effect.gen(function* () {
       if (acceptanceItemCount(issue.body) < 1) continue;
       if (activeIssues.has(issue.number)) continue;
       if (openSessions >= MAX_OPEN_SESSIONS) continue;
+      const leased = yield* ClaimLease.claimForRun(claims, {
+        repo: REPOSITORY_NAME,
+        issue: issue.number,
+        title: issue.title,
+      });
+      if (leased.status !== 200) continue;
       yield* insertRun({ issue, status: "claimed", stuckReason: null });
       activeIssues.add(issue.number);
     }
@@ -649,6 +657,13 @@ const make = Effect.gen(function* () {
       });
     }
     yield* refreshUsage();
+    if (nextStatus === "merged" || (nextStatus === "stuck" && nextReason === TERMINAL_CANCEL)) {
+      yield* ClaimLease.releaseClaim(claims, { repo: REPOSITORY_NAME, issue: issueNumber }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("pipeline.claim.release-failed", { cause: Cause.pretty(cause) }),
+        ),
+      );
+    }
   });
 
   return PipelineRuns.of({ tick, list, note });
@@ -772,6 +787,7 @@ export const layerUsageAt = (sessionsRoot: string | undefined) =>
 export const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
+  Layer.provide(ClaimLease.layerLive),
   Layer.provide(feishuLayer.pipe(Layer.provide(FetchHttpClient.layer))),
   Layer.provide(layerPortsDefault),
   Layer.provide(layerUsage),
