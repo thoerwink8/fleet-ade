@@ -4,6 +4,9 @@ import {
   type PipelineRun,
   type PipelineRunStatus,
 } from "@t3tools/contracts";
+import { formatCount } from "@t3tools/shared/usageFormat";
+
+export type PipelineSection = "needsAction" | "running" | "stuck" | "recentPullRequests";
 
 export interface PipelineGroups {
   readonly running: ReadonlyArray<PipelineRun>;
@@ -81,5 +84,18 @@ export function formatInputTokens(run: Pick<PipelineRun, "inputTokens" | "usageN
   if (run.usageNote === PIPELINE_USAGE_UNREADABLE || run.inputTokens === null) {
     return PIPELINE_METRIC_UNREAD;
   }
-  return String(run.inputTokens);
+  return formatCount(run.inputTokens);
+}
+
+export function pipelineRunElementId(id: number): string {
+  return `pipeline-run-${id}`;
+}
+
+export function isPipelineRunLink(
+  section: PipelineSection,
+  run: Pick<PipelineRun, "status">,
+): boolean {
+  if (section === "stuck") return true;
+  if (section === "recentPullRequests") return run.status !== "merged";
+  return false;
 }

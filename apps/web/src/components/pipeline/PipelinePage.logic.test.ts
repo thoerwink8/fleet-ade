@@ -12,8 +12,10 @@ import {
   formatInputTokens,
   formatQueueDuration,
   groupPipelineRuns,
+  isPipelineRunLink,
   PIPELINE_STATUS_BADGE,
   PIPELINE_STATUS_LABEL,
+  pipelineRunElementId,
 } from "./PipelinePage.logic";
 
 function run(patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">): PipelineRun {
@@ -113,7 +115,18 @@ describe("pipeline metric labels", () => {
     expect(formatCiQueue({ ...unread, ciQueueMs: 0 })).toBe("0 秒");
     expect(formatQueueDuration(90_000)).toBe("1 分 30 秒");
     expect(formatQueueDuration(1_500)).toBe("1.5 秒");
-    expect(formatInputTokens({ ...unread, inputTokens: 1200 })).toBe("1200");
+    expect(formatInputTokens({ ...unread, inputTokens: 1200 })).toBe("1,200");
+    expect(formatInputTokens({ ...unread, inputTokens: 48210 })).toBe("48,210");
     expect(formatCommitCount({ ...unread, commitCount: 4, commitNote: "没查成" })).toBe("没查成");
+  });
+
+  it("shows full details once per run and links duplicates in lower sections", () => {
+    expect(pipelineRunElementId(7)).toBe("pipeline-run-7");
+    expect(isPipelineRunLink("needsAction", { status: "stuck" })).toBe(false);
+    expect(isPipelineRunLink("stuck", { status: "stuck" })).toBe(true);
+    expect(isPipelineRunLink("running", { status: "checks" })).toBe(false);
+    expect(isPipelineRunLink("recentPullRequests", { status: "checks" })).toBe(true);
+    expect(isPipelineRunLink("recentPullRequests", { status: "stuck" })).toBe(true);
+    expect(isPipelineRunLink("recentPullRequests", { status: "merged" })).toBe(false);
   });
 });
