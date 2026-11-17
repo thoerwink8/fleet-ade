@@ -1,0 +1,327 @@
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import * as SqlClient from "effect/sql/SqlClient";
+
+import * as Notes from "./notes.ts";
+
+/** Same gap the old node report and session posts used, on two separate slots. */
+const GAP_MS = 20_000;
+
+export interface NodeReadGate {
+  /** Cockpit login, injected by the caller. A node token is not a login. */
+  readonly login: boolean;
+  /** Milliseconds. Tests inject this; the server mount uses `Date.now`. */
+  readonly nowMillis: () => number;
+}
+
+const serverGate: NodeReadGate = { login: false, nowMillis: Date.now };
+
+class NodeReadRejected extends Schema.TaggedError<NodeReadRejected>()("NodeReadRejected", {
+  status: Schema.Literals([400, 401, 404, 429, 503]),
+  code: Schema.String,
+  message: Schema.String,
+  retryAfter: Schema.Number,
+}) {}
+
+const reject = (
+  status: 400 | 401 | 404 | 429 | 503,
+  code: string,
+  message: string,
+  retryAfter = 0,
+) => new NodeReadRejected({ status, code, message, retryAfter });
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+
+const payloadOf = (raw: string) =>
+  Effect.fromOption(decodeJson(raw)).pipe(
+    Effect.mapError(() => reject(503, "node_snapshot_unreadable", "快照认不出，不当成没推过")),
+  );
+
+/** Overwrite rows for snapshots and sessions. Claims are only read; this file never inserts one. */
+export const migrate = Effect.gen(function* () {
+  yield* Notes.migrate;
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS node_reports (
+      node_id TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      received_at TEXT NOT NULL
+    )
+  `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS node_sessions (
+      node_id TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      received_at TEXT NOT NULL
+    )
+  `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS node_claims (
+      repo TEXT NOT NULL,
+      issue INTEGER NOT NULL,
+      claimed_by TEXT NOT NULL,
+      lease_until TEXT NOT NULL,
+      executor TEXT,
+      state TEXT,
+      fencing TEXT
+    )
+  `;
+});
+
+const authed = (sql: SqlClient.SqlClient, request: HttpServerRequest.HttpServerRequest) =>
+  Notes.authenticateNode(sql, request).pipe(
+    Effect.mapError((error) => reject(error.status, error.code, error.message)),
+  );
+
+const saveNode = Effect.fn("NodeReads.save")(function* (
+  sql: SqlClient.SqlClient,
+  kind: "report" | "sessions",
+  nodeId: string,
+  payload: string,
+  receivedAt: string,
+) {
+  const unwritable = reject(
+    503,
+    kind === "report" ? "node_report_unwritable" : "node_sessions_unwritable",
+    kind === "report" ? "快照没写上（库写失败）" : "本机会话没写上（库写失败）",
+  );
+  const written = yield* (
+    kind === "report"
+      ? sql<{ readonly node_id: string }>`
+        INSERT INTO node_reports (node_id, payload, received_at)
+        VALUES (${nodeId}, ${payload}, ${receivedAt})
+        ON CONFLICT(node_id) DO UPDATE SET
+          payload = excluded.payload,
+          received_at = excluded.received_at
+        RETURNING node_id
+      `
+      : sql<{ readonly node_id: string }>`
+        INSERT INTO node_sessions (node_id, payload, received_at)
+        VALUES (${nodeId}, ${payload}, ${receivedAt})
+        ON CONFLICT(node_id) DO UPDATE SET
+          payload = excluded.payload,
+          received_at = excluded.received_at
+        RETURNING node_id
+      `
+  ).pipe(Effect.mapError(() => unwritable));
+  if (written[0] === undefined) return yield* unwritable;
+  return receivedAt;
+});
+
+const routes = (sql: SqlClient.SqlClient, gate: NodeReadGate) => {
+  const reportGap = new Map<string, number>();
+  const sessionGap = new Map<string, number>();
+
+  const respond = (
+    effect: Effect.Effect<
+      unknown,
+      NodeReadRejected,
+      HttpServerRequest.HttpServerRequest | HttpRouter.RouteContext
+    >,
+  ) =>
+    effect.pipe(
+      Effect.match({
+        onFailure: (error) =>
+          HttpServerResponse.jsonUnsafe(
+            { error: { code: error.code, message: error.message } },
+            {
+              status: error.status,
+              headers: {
+                "cache-control": "no-store",
+                ...(error.status === 429 ? { "retry-after": String(error.retryAfter) } : {}),
+              },
+            },
+          ),
+        onSuccess: (body) =>
+          HttpServerResponse.jsonUnsafe(body, {
+            status: 200,
+            headers: { "cache-control": "no-store" },
+          }),
+      }),
+    );
+
+  const requireLogin = Effect.gen(function* () {
+    if (!gate.login) {
+      return yield* reject(401, "login_required", "要登录，不认节点证");
+    }
+  });
+
+  const postKind = (kind: "report" | "sessions") =>
+    respond(
+      Effect.gen(function* () {
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        const nodeId = yield* authed(sql, request);
+        const slot = kind === "report" ? reportGap : sessionGap;
+        const now = gate.nowMillis();
+        const before = slot.get(nodeId);
+        if (before !== undefined && now - before < GAP_MS) {
+          const retryAfter = Math.ceil((GAP_MS - (now - before)) / 1000);
+          const which = kind === "report" ? "" : "本机会话";
+          return yield* reject(
+            429,
+            "too_frequent",
+            `同一个环境 20 秒内只收一次${which}，${retryAfter} 秒后再推`,
+            retryAfter,
+          );
+        }
+        slot.set(nodeId, now);
+        const undo = () => {
+          if (before === undefined) slot.delete(nodeId);
+          else slot.set(nodeId, before);
+        };
+        const body = yield* request.json.pipe(
+          Effect.mapError(() => {
+            undo();
+            return reject(400, "invalid_body", "请求体不是 JSON");
+          }),
+        );
+        if (typeof body !== "object" || body === null || Array.isArray(body)) {
+          undo();
+          return yield* reject(400, "invalid_body", "请求体不是对象");
+        }
+        const receivedAt = DateTime.formatIso(DateTime.makeUnsafe(now));
+        yield* saveNode(sql, kind, nodeId, encodeJson(body), receivedAt).pipe(
+          Effect.tapError(() => Effect.sync(undo)),
+        );
+        return { ok: true as const, receivedAt };
+      }),
+    );
+
+  const listRows = (table: "node_reports" | "node_sessions", unread: NodeReadRejected) => {
+    const listed =
+      table === "node_reports"
+        ? sql<{ readonly node_id: string; readonly payload: string }>`
+            SELECT node_id, payload FROM node_reports
+          `.pipe(Effect.mapError(() => unread))
+        : sql<{ readonly node_id: string; readonly payload: string }>`
+            SELECT node_id, payload FROM node_sessions
+          `.pipe(Effect.mapError(() => unread));
+    return listed;
+  };
+
+  const listKeyed = (table: "node_reports" | "node_sessions", code: string, message: string) =>
+    respond(
+      Effect.gen(function* () {
+        yield* requireLogin;
+        const unread = reject(503, code, message);
+        const rows = yield* listRows(table, unread);
+        const keys = yield* sql<{ readonly node_id: string }>`
+          SELECT node_id FROM node_keys WHERE revoked_at IS NULL
+        `.pipe(Effect.mapError(() => unread));
+        const byId = new Map<string, unknown | null>();
+        for (const key of keys) byId.set(key.node_id, null);
+        for (const row of rows) {
+          byId.set(row.node_id, yield* payloadOf(row.payload));
+        }
+        const nodes = [...byId.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([id, payload]) => ({ id, payload }));
+        return { nodes };
+      }),
+    );
+
+  const detail = respond(
+    Effect.gen(function* () {
+      yield* requireLogin;
+      const params = yield* HttpRouter.params;
+      const nodeId = params.nodeId;
+      if (nodeId === undefined || !/^[a-z][a-z0-9-]{0,39}$/.test(nodeId)) {
+        return yield* reject(404, "node_not_found", "没有这个环境");
+      }
+      const unread = reject(
+        503,
+        "node_snapshot_unreadable",
+        "读不到节点快照（库读失败），不把库故障当成没有这个节点",
+      );
+      const rows = yield* sql<{ readonly payload: string }>`
+        SELECT payload FROM node_reports WHERE node_id = ${nodeId} LIMIT 1
+      `.pipe(Effect.mapError(() => unread));
+      const row = rows[0];
+      if (row !== undefined) return { id: nodeId, payload: yield* payloadOf(row.payload) };
+      const keys = yield* sql<{ readonly node_id: string }>`
+        SELECT node_id FROM node_keys
+        WHERE node_id = ${nodeId} AND revoked_at IS NULL
+        LIMIT 1
+      `.pipe(Effect.mapError(() => unread));
+      if (keys[0] !== undefined) {
+        return yield* reject(
+          404,
+          "node_never_reported",
+          `环境 ${nodeId} 配了通行证，但一次快照都没推来过`,
+        );
+      }
+      return yield* reject(404, "node_not_found", "没有这个环境");
+    }),
+  );
+
+  const claims = respond(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      yield* authed(sql, request);
+      const rows = yield* sql<{
+        readonly repo: string;
+        readonly issue: number;
+        readonly claimedBy: string;
+        readonly leaseUntil: string;
+      }>`
+        SELECT repo, issue, claimed_by AS claimedBy, lease_until AS leaseUntil
+        FROM node_claims
+      `.pipe(
+        Effect.mapError(() =>
+          reject(
+            503,
+            "local_claims_unreadable",
+            "读不到本机租约（库读失败），不拿空列表冒充「没人领着」",
+          ),
+        ),
+      );
+      const now = gate.nowMillis();
+      const active = rows.flatMap((row) => {
+        const until = Date.parse(row.leaseUntil);
+        if (Number.isNaN(until) || until <= now) return [];
+        return [
+          {
+            repo: row.repo,
+            issue: row.issue,
+            claimedBy: row.claimedBy,
+            leaseUntil: row.leaseUntil,
+          },
+        ];
+      });
+      active.sort((a, b) => a.repo.localeCompare(b.repo) || a.issue - b.issue);
+      return { claims: active };
+    }),
+  );
+
+  return Layer.mergeAll(
+    HttpRouter.add("POST", "/api/nodes/report", postKind("report")),
+    HttpRouter.add("POST", "/api/nodes/sessions", postKind("sessions")),
+    HttpRouter.add("GET", "/api/nodes/claims", claims),
+    HttpRouter.add(
+      "GET",
+      "/api/nodes",
+      listKeyed(
+        "node_reports",
+        "nodes_unreadable",
+        "读不到节点列表（库读失败），不拿空列表冒充没有环境",
+      ),
+    ),
+    HttpRouter.add(
+      "GET",
+      "/api/nodes/sessions",
+      listKeyed(
+        "node_sessions",
+        "local_sessions_unreadable",
+        "读不到本机会话（库读失败），不拿空列表冒充没有会话",
+      ),
+    ),
+    HttpRouter.add("GET", "/api/nodes/:nodeId", detail),
+  );
+};
+
+export const layerFor = (sql: SqlClient.SqlClient, gate: NodeReadGate = serverGate) =>
+  routes(sql, gate);

@@ -14,6 +14,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as ServerConfig from "../config.ts";
+import * as NodeReads from "./nodeReads.ts";
 
 const HEADER = "x-fleet-node-token";
 const NOTE_KINDS = [
@@ -254,7 +255,7 @@ export const migrate = Effect.gen(function* () {
   `);
 });
 
-const authenticate = Effect.fn("LedgerNotes.authenticate")(function* (
+export const authenticateNode = Effect.fn("LedgerNotes.authenticate")(function* (
   sql: SqlClient.SqlClient,
   request: HttpServerRequest.HttpServerRequest,
 ) {
@@ -432,7 +433,7 @@ const routes = (sql: SqlClient.SqlClient) => {
   const postNote = respond(
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const nodeId = yield* authenticate(sql, request);
+      const nodeId = yield* authenticateNode(sql, request);
       const body = yield* request.json.pipe(
         Effect.mapError(() => reject(400, "invalid_body", "请求体不是 JSON")),
       );
@@ -445,7 +446,7 @@ const routes = (sql: SqlClient.SqlClient) => {
   const getEvents = respond(
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      yield* authenticate(sql, request);
+      yield* authenticateNode(sql, request);
       const query = parseEventsQuery(request.url);
       if (isLedgerRejected(query)) return yield* query;
       return yield* listEvents(sql, query);
@@ -459,14 +460,15 @@ const routes = (sql: SqlClient.SqlClient) => {
 
 export const layerFor = routes;
 
-/** Opens this environment's ledger file, creates the append-only tables, and mounts the routes. */
+/** Opens this environment's ledger file and mounts note routes plus node snapshot reads. */
 export const routeLayer = Layer.unwrap(
   Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>
     Layer.unwrap(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient;
         yield* migrate;
-        return routes(sql);
+        yield* NodeReads.migrate;
+        return Layer.mergeAll(routes(sql), NodeReads.layerFor(sql));
       }),
     ).pipe(
       Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),
