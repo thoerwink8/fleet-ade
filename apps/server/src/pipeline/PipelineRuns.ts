@@ -618,6 +618,16 @@ const make = Effect.gen(function* () {
     }
     const now = yield* DateTime.now;
     const existing = yield* loadRows();
+    for (const run of existing) {
+      if (run.status !== "claimed" || isDefaultRepo(run.repository)) continue;
+      const repo = repos.find((candidate) => candidate.slug === run.repository);
+      if (repo === undefined) continue;
+      const labeled = yield* Effect.exit(issues.addLabel(run.issueNumber, LOCAL_LABEL, repo));
+      if (Exit.isFailure(labeled)) {
+        yield* noteTick("failed", failureTag(labeled.cause));
+        return;
+      }
+    }
     const activeIssues = new Set(
       existing.filter(isActiveRun).map((run) => `${run.repository}#${run.issueNumber}`),
     );
@@ -700,11 +710,8 @@ const make = Effect.gen(function* () {
       if (!isDefaultRepo(repository)) {
         const labeled = yield* Effect.exit(issues.addLabel(issue.number, LOCAL_LABEL, repo));
         if (Exit.isFailure(labeled)) {
-          yield* Effect.logWarning("pipeline.claim.local-label-failed", {
-            repository,
-            issue: issue.number,
-            cause: Cause.pretty(labeled.cause),
-          });
+          yield* noteTick("failed", failureTag(labeled.cause));
+          return;
         }
       }
       activeIssues.add(key);

@@ -16,10 +16,10 @@ import * as Schema from "effect/Schema";
 
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import { PIPELINE_HOST, REPOSITORY } from "./GitHubIssues.ts";
+import { PIPELINE_HOST } from "./GitHubIssues.ts";
 import { PipelineRuns } from "./PipelineRuns.ts";
+import { DEFAULT_REPO, parseRepo } from "./repoAllowlist.ts";
 
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 const UNREAD = "没查成";
 const RENEWED = "已续一次";
 const OVER_BUDGET: PipelineStuckReason = "超预算";
@@ -49,6 +49,7 @@ export class PullRequestAdditions extends Context.Service<
   {
     readonly read: (input: {
       readonly number: number;
+      readonly repository: string;
     }) => Effect.Effect<number, PullRequestAdditionsUnreadable>;
   }
 >()("t3/pipeline/budget/PullRequestAdditions") {}
@@ -84,10 +85,13 @@ const recordedInput = (run: PipelineRun): "pending" | "unread" | number => {
 
 const makeReader = Effect.gen(function* () {
   const rest = yield* GitHubRest.GitHubRest;
-  const slug = `${encodeURIComponent(REPOSITORY.owner)}/${encodeURIComponent(REPOSITORY.name)}`;
   const read = Effect.fn("PipelineBudget.readAdditions")(function* (input: {
     readonly number: number;
+    readonly repository: string;
   }) {
+    const parsed = parseRepo(input.repository);
+    if (parsed === undefined) return yield* new PullRequestAdditionsUnreadable();
+    const slug = `${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.name)}`;
     const response = yield* rest
       .rest({
         host: PIPELINE_HOST,
@@ -128,7 +132,9 @@ const make = Effect.gen(function* () {
     if (input === "unread") return "hold" as const;
     if (typeof input === "number" && input > current.tokens) return "over" as const;
     if (run.prNumber === null) return "pass" as const;
-    const read = yield* additions.read({ number: run.prNumber }).pipe(Effect.exit);
+    const read = yield* additions
+      .read({ number: run.prNumber, repository: run.repository })
+      .pipe(Effect.exit);
     if (Exit.isFailure(read)) return "hold" as const;
     return read.value > current.lines ? ("over" as const) : ("pass" as const);
   });
@@ -137,7 +143,7 @@ const make = Effect.gen(function* () {
     issueNumber: number,
     repository?: string,
   ) {
-    const repositoryName = repository ?? REPOSITORY_NAME;
+    const repositoryName = repository ?? DEFAULT_REPO;
     return (yield* runs.list).runs.find(
       (run) => run.repository === repositoryName && run.issueNumber === issueNumber,
     );
@@ -148,7 +154,7 @@ const make = Effect.gen(function* () {
     proposed: StuckProposal,
     repository?: string,
   ) {
-    const repositoryName = repository ?? REPOSITORY_NAME;
+    const repositoryName = repository ?? DEFAULT_REPO;
     let current = yield* load(issueNumber, repositoryName);
     if (current === undefined) {
       return yield* new PipelineRunsError({ cause: `no run for issue ${issueNumber}` });
@@ -159,8 +165,8 @@ const make = Effect.gen(function* () {
       current.sessionStartedAt !== null &&
       current.sessionEndedAt !== proposed.sessionEndedAt;
     if (closeWindow) {
-      yield* runs.note(issueNumber, { sessionEndedAt: proposed.sessionEndedAt }, repository);
-      current = (yield* load(issueNumber, repository)) ?? current;
+      yield* runs.note(issueNumber, { sessionEndedAt: proposed.sessionEndedAt }, repositoryName);
+      current = (yield* load(issueNumber, repositoryName)) ?? current;
     }
     if ((yield* review(current)) === "over") {
       yield* runs.note(
@@ -171,7 +177,7 @@ const make = Effect.gen(function* () {
           detail: null,
           ...(proposed.sessionEndedAt != null ? { sessionEndedAt: proposed.sessionEndedAt } : {}),
         },
-        repository,
+        repositoryName,
       );
       return;
     }
@@ -187,7 +193,7 @@ const make = Effect.gen(function* () {
           detail: RENEWED,
           renewedOnce: true,
         },
-        repository,
+        repositoryName,
       );
       return;
     }
@@ -201,34 +207,42 @@ const make = Effect.gen(function* () {
           ? { sessionEndedAt: proposed.sessionEndedAt }
           : {}),
       },
-      repository,
+      repositoryName,
     );
   });
 
   const tick = Effect.gen(function* () {
     if (!(yield* limits()).enabled) return;
     for (const run of (yield* runs.list).runs) {
-      if (run.repository !== REPOSITORY_NAME || run.status === "merged") continue;
+      if (run.status === "merged") continue;
       if (run.status === "stuck" && run.stuckReason !== null && RENEWABLE.has(run.stuckReason)) {
-        yield* settle(run.issueNumber, {
-          reason: run.stuckReason,
-          detail: run.detail,
-          sessionEndedAt: run.sessionEndedAt,
-        });
+        yield* settle(
+          run.issueNumber,
+          {
+            reason: run.stuckReason,
+            detail: run.detail,
+            sessionEndedAt: run.sessionEndedAt,
+          },
+          run.repository,
+        );
         continue;
       }
       if (run.status === "stuck") continue;
       const verdict = yield* review(run);
       if (verdict === "over") {
-        yield* runs.note(run.issueNumber, {
-          status: "stuck",
-          stuckReason: OVER_BUDGET,
-          detail: null,
-        });
+        yield* runs.note(
+          run.issueNumber,
+          {
+            status: "stuck",
+            stuckReason: OVER_BUDGET,
+            detail: null,
+          },
+          run.repository,
+        );
         continue;
       }
       if (verdict === "hold" && run.detail !== UNREAD) {
-        yield* runs.note(run.issueNumber, { detail: UNREAD });
+        yield* runs.note(run.issueNumber, { detail: UNREAD }, run.repository);
       }
     }
   }).pipe(Effect.withSpan("PipelineBudget.tick"));
@@ -238,10 +252,7 @@ const make = Effect.gen(function* () {
 
 export const layer = Layer.effect(PipelineBudget, make);
 
-export const layerLive = layer.pipe(
-  Layer.provide(layerAdditions),
-  Layer.provide(GitHubRest.layerWithDependencies),
-);
+export const layerLive = layer.pipe(Layer.provide(layerAdditions));
 
 export const layerWorker = Layer.effectDiscard(
   Effect.gen(function* () {

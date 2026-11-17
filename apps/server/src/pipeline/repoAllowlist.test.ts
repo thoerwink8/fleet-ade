@@ -7,7 +7,9 @@ import {
   type Project,
   type VcsCreateWorktreeInput,
 } from "@t3tools/contracts";
+import * as GitHubRequestPolicy from "@t3tools/source-control-github/server/GitHubRequestPolicy";
 import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
+import * as Exit from "effect/Exit";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -77,14 +79,32 @@ const projectFor = (owner: string, name: string): Project => ({
   deletedAt: null,
 });
 
-function github(catalog: Readonly<Record<string, ReadonlyArray<GitHubIssue>>>) {
+function github(
+  catalog: Readonly<Record<string, ReadonlyArray<GitHubIssue>>>,
+  failLabelAttempt?: number,
+) {
   const calls: Array<GitHubCall> = [];
+  const labeled = new Set<string>();
+  let labelAttempts = 0;
   const rest = Layer.succeed(
     GitHubRest.GitHubRest,
     GitHubRest.GitHubRest.of({
       rest: (input) => {
         const method = input.method ?? "GET";
         calls.push({ method, path: input.path, body: input.body });
+        if (method === "POST" && input.path.endsWith("/labels")) {
+          labelAttempts += 1;
+          if (labelAttempts === failLabelAttempt) {
+            return Effect.fail(
+              new GitHubRequestPolicy.GitHubApiResponseError({
+                host: "github.com",
+                operation: "pipelineIssues.addLabel",
+                status: 503,
+              }),
+            );
+          }
+          labeled.add(input.path.replace(/\/labels$/, ""));
+        }
         const single = /^repos\/([^/]+\/[^/]+)\/issues\/(\d+)$/.exec(input.path);
         if (single) {
           const found = (catalog[single[1] ?? ""] ?? []).find(
@@ -93,7 +113,16 @@ function github(catalog: Readonly<Record<string, ReadonlyArray<GitHubIssue>>>) {
           return Effect.succeed({
             status: found === undefined ? 404 : 200,
             headers: {},
-            body: JSON.stringify(found ?? { message: "missing" }),
+            body: JSON.stringify(
+              found === undefined
+                ? { message: "missing" }
+                : {
+                    ...found,
+                    labels: labeled.has(input.path)
+                      ? [...found.labels, { name: LOCAL_LABEL }]
+                      : found.labels,
+                  },
+            ),
             truncated: false,
             invalidUtf8: false,
           });
@@ -188,6 +217,120 @@ describe("repo allowlist", () => {
     );
   });
 
+  it.effect("本机标签 503 必须记录失败 tick，持久认领重启后可重试", () => {
+    const remote = github({ "acme/widgets": [githubIssue(7, "fix tests")] }, 1);
+    const services = pipelineLayer({
+      issues: remote.layer,
+      repos: ["acme/widgets"],
+      pipelineRepos: ["acme/widgets"],
+    });
+    return Effect.gen(function* () {
+      const runs = yield* PipelineRuns;
+      const failed = yield* Effect.exit(runs.tick);
+      assert.equal(Exit.isFailure(failed), false);
+      const sql = yield* SqlClient.SqlClient;
+      const tick = yield* sql<{ readonly outcome: string }>`SELECT outcome FROM pipeline_tick`;
+      assert.equal(tick[0]?.outcome, "failed");
+      assert.equal((yield* runs.list).runs[0]?.status, "claimed");
+      yield* Effect.gen(function* () {
+        yield* (yield* PipelineRuns).tick;
+      }).pipe(
+        Effect.provide(
+          Layer.fresh(runsLayer).pipe(
+            Layer.provide(remote.layer),
+            Layer.provide(usageLayer),
+            Layer.provide(
+              ServerSettings.layerTest({ pipelineEnabled: true, pipelineRepos: ["acme/widgets"] }),
+            ),
+            Layer.provide(layerPortsDefault),
+            Layer.provide(ClaimLease.layerPort({ repos: ["acme/widgets"] })),
+            Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
+          ),
+        ),
+      );
+      assert.equal(remote.calls.filter((call) => call.method === "POST").length, 2);
+      assert.equal((yield* runs.list).runs.length, 1);
+      assert.equal((yield* runs.list).runs[0]?.status, "claimed");
+    }).pipe(Effect.provide(services));
+  });
+  it.effect("派发本机标签 503 不建树不开会话，重建服务后只成功一次", () => {
+    const remote = github({ "acme/widgets": [githubIssue(7, "fix tests")] }, 2);
+    const created = { branches: [] as Array<string>, opened: 0 };
+    const projects = Layer.succeed(ProjectService.ProjectService, {
+      listPage: () =>
+        Effect.succeed({ projects: [projectFor("acme", "widgets")], nextCursor: null }),
+    } as unknown as ProjectService.ProjectService["Service"]);
+    const git = Layer.succeed(GitWorkflowService.GitWorkflowService, {
+      fetchWorktreeBaseCommit: () =>
+        Effect.succeed({ commitSha: "base", remoteRefName: "origin/main" }),
+      createWorktree: (input: VcsCreateWorktreeInput) => {
+        const branch = input.newRefName ?? input.refName;
+        created.branches.push(branch);
+        return Effect.succeed({ worktree: { path: `/worktrees/${branch}`, refName: branch } });
+      },
+    } as unknown as GitWorkflowService.GitWorkflowService["Service"]);
+    const opener = Layer.succeed(DispatchSession.SessionOpener, {
+      open: () =>
+        Effect.sync(() => {
+          created.opened += 1;
+        }),
+    });
+    const settings = ServerSettings.layerTest({
+      pipelineEnabled: true,
+      pipelineAuthorModel: [MODEL],
+      pipelineRepos: ["acme/widgets"],
+    });
+    const session = DispatchSession.layer.pipe(
+      Layer.provide(budgetLayer),
+      Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
+      Layer.provide(opener),
+      Layer.provide(git),
+      Layer.provide(projects),
+      Layer.provide(inboxLayer),
+      Layer.provide(remote.layer),
+      Layer.provide(settings),
+      Layer.provideMerge(
+        pipelineLayer({
+          issues: remote.layer,
+          repos: ["acme/widgets"],
+          pipelineRepos: ["acme/widgets"],
+          model: true,
+        }),
+      ),
+    );
+    return Effect.gen(function* () {
+      const runs = yield* PipelineRuns;
+      yield* runs.tick;
+      const first = yield* Effect.exit((yield* DispatchSession.DispatchSession).tick);
+      assert.equal(Exit.isFailure(first), true);
+      assert.deepStrictEqual(created.branches, []);
+      assert.equal(created.opened, 0);
+      assert.equal((yield* runs.list).runs[0]?.status, "claimed");
+      const sql = yield* SqlClient.SqlClient;
+      yield* Effect.gen(function* () {
+        yield* (yield* DispatchSession.DispatchSession).tick;
+      }).pipe(
+        Effect.provide(
+          Layer.fresh(DispatchSession.layer).pipe(
+            Layer.provide(budgetLayer),
+            Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
+            Layer.provide(opener),
+            Layer.provide(git),
+            Layer.provide(projects),
+            Layer.provide(inboxLayer),
+            Layer.provide(remote.layer),
+            Layer.provide(settings),
+            Layer.provide(Layer.succeed(PipelineRuns, runs)),
+            Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
+          ),
+        ),
+      );
+      assert.equal(created.opened, 1);
+      assert.equal(created.branches.length, 1);
+      assert.equal((yield* runs.list).runs.filter((run) => run.status === "session").length, 1);
+    }).pipe(Effect.provide(session));
+  });
+
   it.effect("多出来的仓才拉「交给 ADE」，认领后只给它贴「本机做」，租约不串仓", () => {
     const remote = github({
       "thoerwink8/fleet-ade": [githubIssue(7, "fix tests")],
@@ -198,10 +341,10 @@ describe("repo allowlist", () => {
       const runs = yield* PipelineRuns;
       yield* runs.tick;
       const lists = listPaths(remote.calls);
-      assert.deepStrictEqual(lists.map((path) => path.split("?")[0]).sort(), [
-        "repos/acme/widgets/issues",
-        "repos/thoerwink8/fleet-ade/issues",
-      ]);
+      assert.deepStrictEqual(
+        lists.map((path) => path.split("?")[0]),
+        ["repos/thoerwink8/fleet-ade/issues", "repos/acme/widgets/issues"],
+      );
       for (const path of lists) {
         assert.ok(path.includes("state=open"));
         assert.ok(path.includes(`labels=${encodeURIComponent(ELIGIBLE_LABEL)}`));
@@ -254,7 +397,7 @@ describe("repo allowlist", () => {
       "thoerwink8/fleet-ade": [githubIssue(7, "fix tests")],
       "acme/widgets": [githubIssue(7, "fix tests")],
     });
-    const created = { branches: [] as Array<string> };
+    const created = { branches: [] as Array<string>, opened: 0 };
     const projects = Layer.succeed(ProjectService.ProjectService, {
       listPage: () =>
         Effect.succeed({
@@ -272,7 +415,13 @@ describe("repo allowlist", () => {
       },
     } as unknown as GitWorkflowService.GitWorkflowService["Service"]);
     const opener = Layer.succeed(DispatchSession.SessionOpener, {
-      open: () => Effect.void,
+      open: (session) =>
+        Effect.sync(() => {
+          if (session.branch.startsWith("local/")) {
+            assert.equal(remote.calls.filter((call) => call.method === "POST").length, 2);
+          }
+          created.opened += 1;
+        }),
     });
     const session = DispatchSession.layer.pipe(
       Layer.provide(budgetLayer),
@@ -309,6 +458,8 @@ describe("repo allowlist", () => {
       yield* runs.note(7, { status: "stuck", stuckReason: "取消" }, opened.repository);
       created.branches = [];
       yield* dispatch.tick;
+      yield* dispatch.tick;
+      assert.equal(created.opened, 2);
       assert.deepStrictEqual([first, created.branches[0]].sort(), [
         "local/7-fix-tests",
         "pipeline/7-fix-tests",

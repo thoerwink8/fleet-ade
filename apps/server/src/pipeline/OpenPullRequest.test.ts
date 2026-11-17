@@ -61,6 +61,7 @@ const issue = (number: number, title = "fix tests"): PipelineIssue => ({
 
 const tickLayer = (input: {
   readonly enabled?: boolean;
+  readonly repos?: ReadonlyArray<string>;
   readonly issues: ReadonlyArray<PipelineIssue>;
   readonly opened: Ref.Ref<ReadonlyArray<PullRequestDraft>>;
   readonly reads: Ref.Ref<ReadonlyArray<string>>;
@@ -70,12 +71,19 @@ const tickLayer = (input: {
   readonly usage?: Effect.Effect<ReadonlyArray<UsageRecord>, PipelineUsageUnreadable>;
   readonly worktrees?: ReadonlyArray<{ readonly threadId: string; readonly worktreePath: string }>;
 }) => {
-  const settings = ServerSettings.layerTest({ pipelineEnabled: input.enabled ?? true });
+  const settings = ServerSettings.layerTest({
+    pipelineEnabled: input.enabled ?? true,
+    ...(input.repos === undefined ? {} : { pipelineRepos: input.repos }),
+  });
   const issues = Layer.succeed(PipelineGitHubIssues, {
-    addLabel: () => Effect.die("unexpected label write"),
+    addLabel: () => Effect.void,
     listEligible: () => Effect.succeed(input.issues),
-    read: (number: number) => {
+    read: (number: number, repo?: { readonly owner: string; readonly name: string }) => {
       const found = input.issues.find((item) => item.number === number);
+      if (input.repos !== undefined) {
+        assert.strictEqual(repo?.owner, "acme");
+        assert.strictEqual(repo?.name, "widgets");
+      }
       return found === undefined ? Effect.die("missing issue") : Effect.succeed(found);
     },
   });
@@ -84,7 +92,7 @@ const tickLayer = (input: {
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage ?? Effect.succeed([]) })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort({ repos: input.repos ?? ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   const opener = Layer.succeed(PullRequestOpener, {
@@ -130,6 +138,55 @@ const count = (shas: ReadonlyArray<string>, sha: string) =>
   shas.filter((item) => item === sha).length;
 
 describe("OpenPullRequest", () => {
+  it.effect("跨仓同号开自己的 local PR 并读取自己的 CI", () =>
+    Effect.gen(function* () {
+      const opened = yield* Ref.make<ReadonlyArray<PullRequestDraft>>([]);
+      const reads = yield* Ref.make<ReadonlyArray<string>>([]);
+      const targets: Array<unknown> = [];
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        yield* runs.tick;
+        yield* runs.note(
+          6,
+          {
+            status: "session",
+            threadId: "thread:acme",
+            sessionEndedAt: ENDED_AT,
+            headSha: SHA,
+          },
+          "acme/widgets",
+        );
+        yield* (yield* OpenPullRequest).tick;
+        const listed = (yield* runs.list).runs;
+        assert.strictEqual(
+          listed.find((row) => row.repository === "acme/widgets")?.status,
+          "verify",
+        );
+        assert.strictEqual(
+          listed.find((row) => row.repository === "thoerwink8/fleet-ade")?.status,
+          "claimed",
+        );
+        const drafts = yield* Ref.get(opened);
+        assert.strictEqual(drafts[0]?.branch, "local/6-fix-tests");
+        assert.strictEqual(drafts[0]?.cwd, "/wt/acme");
+        assert.deepStrictEqual(targets, [{ headSha: SHA, repository: "acme/widgets" }]);
+      }).pipe(
+        Effect.provide(
+          tickLayer({
+            repos: ["thoerwink8/fleet-ade", "acme/widgets"],
+            issues: [issue(6)],
+            opened,
+            reads,
+            worktrees: [{ threadId: "thread:acme", worktreePath: "/wt/acme" }],
+            read: (input) => {
+              targets.push(input);
+              return Effect.succeed({ kind: "success" });
+            },
+          }),
+        ),
+      );
+    }),
+  );
   it.effect("does not open a pull request when the head is unknown", () =>
     Effect.gen(function* () {
       const opened = yield* Ref.make<ReadonlyArray<PullRequestDraft>>([]);
@@ -695,15 +752,26 @@ describe("CiCheckReader", () => {
   it.effect("treats only the workflow named CI as the check", () =>
     Effect.gen(function* () {
       const reader = yield* CiCheckReader;
-      assert.deepStrictEqual(yield* reader.read({ headSha: SHA }), { kind: "success" });
-      assert.deepStrictEqual(yield* reader.read({ headSha: "pending" }), { kind: "pending" });
-      assert.deepStrictEqual(yield* reader.read({ headSha: "missing" }), { kind: "missing" });
-      assert.deepStrictEqual(yield* reader.read({ headSha: "red" }), { kind: "failure" });
+      assert.deepStrictEqual(yield* reader.read({ headSha: SHA, repository: "acme/widgets" }), {
+        kind: "success",
+      });
+      assert.deepStrictEqual(
+        yield* reader.read({ headSha: "pending", repository: "acme/widgets" }),
+        { kind: "pending" },
+      );
+      assert.deepStrictEqual(
+        yield* reader.read({ headSha: "missing", repository: "acme/widgets" }),
+        { kind: "missing" },
+      );
+      assert.deepStrictEqual(yield* reader.read({ headSha: "red", repository: "acme/widgets" }), {
+        kind: "failure",
+      });
     }).pipe(
       Effect.provide(
         layerReader.pipe(
           Layer.provide(
             restLayer((path) => {
+              assert.ok(path.startsWith("repos/acme/widgets/actions/runs?"));
               if (path.includes("head_sha=" + SHA)) {
                 return {
                   status: 200,
@@ -740,8 +808,12 @@ describe("CiCheckReader", () => {
   it.effect("does not treat a cut-off page or a failed read as a missing check", () =>
     Effect.gen(function* () {
       const reader = yield* CiCheckReader;
-      const cutOff = yield* reader.read({ headSha: "cutoff" }).pipe(Effect.exit);
-      const failed = yield* reader.read({ headSha: "down" }).pipe(Effect.exit);
+      const cutOff = yield* reader
+        .read({ headSha: "cutoff", repository: "thoerwink8/fleet-ade" })
+        .pipe(Effect.exit);
+      const failed = yield* reader
+        .read({ headSha: "down", repository: "thoerwink8/fleet-ade" })
+        .pipe(Effect.exit);
       assert.strictEqual(cutOff._tag, "Failure");
       assert.strictEqual(failed._tag, "Failure");
     }).pipe(

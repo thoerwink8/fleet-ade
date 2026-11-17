@@ -26,7 +26,7 @@ import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
-import { DEFAULT_REPO, parseRepo, worktreeBranch } from "./repoAllowlist.ts";
+import { DEFAULT_REPO, LOCAL_LABEL, parseRepo, worktreeBranch } from "./repoAllowlist.ts";
 import { PipelineBudget } from "./budget.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import { SessionEndInbox, type SessionEndEntry } from "./SessionEndInbox.ts";
@@ -234,6 +234,11 @@ const make = Effect.gen(function* () {
       );
     const repo = parseRepo(run.repository);
     if (repo === undefined) return yield* failed("repository is not owner/name");
+    if (repo.slug !== DEFAULT_REPO) {
+      yield* issues
+        .addLabel(run.issueNumber, LOCAL_LABEL, repo)
+        .pipe(Effect.mapError((cause) => new PipelineRunsError({ cause })));
+    }
     const project = yield* projectForRepository(repo.owner, repo.name);
     if (project === undefined) return yield* failed("no project for this repository");
     const branch = sessionBranch(issue.number, issue.title, run.repository);
@@ -279,9 +284,7 @@ const make = Effect.gen(function* () {
     const now = yield* DateTime.now;
     const nowIso = DateTime.formatIso(now);
     const timeout = Duration.toMillis(Duration.minutes(current.pipelineSessionTimeoutMinutes));
-    const pending = (yield* openRuns()).filter((run) =>
-      current.pipelineRepos.includes(run.repository),
-    );
+    const pending = yield* openRuns();
     const ends = yield* inbox.list;
     const endByThread = new Map(ends.map((entry) => [entry.threadId, entry]));
 
@@ -311,6 +314,7 @@ const make = Effect.gen(function* () {
         continue;
       }
 
+      if (!current.pipelineRepos.includes(run.repository)) continue;
       if (run.threadId !== null) continue;
       const picked = pickRouteCandidate(orderedCandidates(current.pipelineAuthorModel));
       if (picked.kind === "stuck") {
