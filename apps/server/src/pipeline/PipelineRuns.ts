@@ -19,6 +19,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import { FetchHttpClient } from "effect/http";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
@@ -41,6 +42,7 @@ import {
   prerequisiteIssueNumbers,
   type PrerequisiteState,
 } from "./intakeGates.ts";
+import { PipelineFeishu, layer as feishuLayer, type StuckMessage } from "./feishu.ts";
 
 /** How often a tick runs. One place. */
 const TICK_INTERVAL = Duration.minutes(5);
@@ -64,6 +66,8 @@ const RunRow = Schema.Struct({
   title: Schema.String,
   status: Schema.Literals(PIPELINE_RUN_STATUSES),
   stuckReason: Schema.NullOr(Schema.Literals(PIPELINE_STUCK_REASONS)),
+  notifiedReason: Schema.NullOr(Schema.String),
+  notifyNote: Schema.NullOr(Schema.String),
   threadId: Schema.NullOr(Schema.String),
   prNumber: Schema.NullOr(Schema.Int),
   headSha: Schema.NullOr(Schema.String),
@@ -262,6 +266,8 @@ const SELECT_RUNS = `
     title,
     status,
     stuck_reason AS stuckReason,
+    notified_reason AS notifiedReason,
+    notify_note AS notifyNote,
     thread_id AS threadId,
     pr_number AS prNumber,
     head_sha AS headSha,
@@ -291,6 +297,22 @@ const make = Effect.gen(function* () {
   const ports = yield* PipelineIntakePorts;
   const usage = yield* PipelineUsage;
 
+  const feishu = yield* Effect.serviceOption(PipelineFeishu);
+
+  // A failed attempt still counts: the same reason is not sent again.
+  const announce = Effect.fn("PipelineRuns.announce")(function* (
+    id: number,
+    message: StuckMessage,
+  ) {
+    if (Option.isNone(feishu)) return;
+    const outcome = yield* feishu.value.send(message);
+    yield* sql`
+      UPDATE pipeline_runs SET
+        notified_reason = ${message.reason},
+        notify_note = ${outcome.delivered ? null : outcome.note}
+      WHERE id = ${id}
+    `.pipe(Effect.mapError(sqlFailure));
+  });
   const nowIso = Effect.fn("PipelineRuns.now")(function* () {
     return DateTime.formatIso(yield* DateTime.now);
   });
@@ -349,7 +371,16 @@ const make = Effect.gen(function* () {
       ),
       Effect.mapError(sqlFailure),
     );
-    return inserted[0]?.id;
+    const id = inserted[0]?.id;
+    if (id !== undefined && input.status === "stuck" && input.stuckReason !== null) {
+      yield* announce(id, {
+        repository: REPOSITORY_NAME,
+        issueNumber: input.issue.number,
+        reason: input.stuckReason,
+        prNumber: null,
+      });
+    }
+    return id;
   });
 
   const writeUsage = Effect.fn("PipelineRuns.writeUsage")(function* (
@@ -499,11 +530,14 @@ const make = Effect.gen(function* () {
   }).pipe(Effect.withSpan("PipelineRuns.tick"));
 
   const list: PipelineRunsShape["list"] = Effect.gen(function* () {
-    const runs = (yield* loadRows()).map((row): PipelineRun => ({
-      ...row,
-      renewedOnce: row.renewedOnce === 1,
-      costLabel: PIPELINE_COST_LABEL,
-    }));
+    const runs = (yield* loadRows()).map((row): PipelineRun => {
+      const { notifiedReason: _notifiedReason, ...rest } = row;
+      return {
+        ...rest,
+        renewedOnce: row.renewedOnce === 1,
+        costLabel: PIPELINE_COST_LABEL,
+      };
+    });
     return yield* decodeList({
       runs,
       summary: summarize(runs),
@@ -591,6 +625,14 @@ const make = Effect.gen(function* () {
         updated_at = ${at}
       WHERE id = ${target.id}
     `.pipe(Effect.mapError(sqlFailure));
+    if (nextStatus === "stuck" && nextReason !== null && nextReason !== target.notifiedReason) {
+      yield* announce(target.id, {
+        repository: target.repository,
+        issueNumber: target.issueNumber,
+        reason: nextReason,
+        prNumber: patch.prNumber === undefined ? target.prNumber : patch.prNumber,
+      });
+    }
     if (
       (patch.threadId !== undefined && patch.threadId !== target.threadId) ||
       (patch.sessionStartedAt !== undefined &&
@@ -730,6 +772,7 @@ export const layerUsageAt = (sessionsRoot: string | undefined) =>
 export const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
+  Layer.provide(feishuLayer.pipe(Layer.provide(FetchHttpClient.layer))),
   Layer.provide(layerPortsDefault),
   Layer.provide(layerUsage),
   Layer.provideMerge(gitHubIssuesLayer.pipe(Layer.provide(GitHubRest.layerWithDependencies))),

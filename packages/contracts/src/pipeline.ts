@@ -45,6 +45,7 @@ export const PipelineRun = Schema.Struct({
   title: Schema.String,
   status: Schema.Literals(PIPELINE_RUN_STATUSES),
   stuckReason: Schema.NullOr(Schema.Literals(PIPELINE_STUCK_REASONS)),
+  notifyNote: Schema.NullOr(Schema.String),
   threadId: NullableText,
   prNumber: NullableInt,
   headSha: NullableText,

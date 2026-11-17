@@ -26,6 +26,7 @@ function run(patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">): 
     title: patch.title ?? `单 ${patch.id}`,
     status: patch.status,
     stuckReason: patch.stuckReason ?? null,
+    notifyNote: patch.notifyNote ?? null,
     threadId: patch.threadId ?? null,
     prNumber: patch.prNumber ?? null,
     headSha: patch.headSha ?? null,
@@ -55,13 +56,13 @@ describe("groupPipelineRuns", () => {
     const groups = groupPipelineRuns([
       run({ id: 1, status: "session" }),
       run({ id: 2, status: "checks", prNumber: 20 }),
-      run({ id: 3, status: "stuck", stuckReason: "检查红", prNumber: 30 }),
+      run({ id: 3, status: "stuck", stuckReason: "检查红", prNumber: 30, notifyNote: "没送出" }),
       run({ id: 4, status: "merged", prNumber: 40 }),
     ]);
 
     expect(ids(groups.running)).toEqual([1, 2]);
     expect(ids(groups.stuck)).toEqual([3]);
-    expect(groups.stuck[0]?.stuckReason).toBe("检查红");
+    expect(groups.stuck[0]?.notifyNote).toBe("没送出");
     expect(ids(groups.recentPullRequests)).toEqual([2, 3, 4]);
   });
 
@@ -72,12 +73,12 @@ describe("groupPipelineRuns", () => {
     ).map((status, index) => run({ id: index + 1, status }));
     const groups = groupPipelineRuns([
       ...active,
-      run({ id: 100, status: "stuck", stuckReason: "交人" }),
+      run({ id: 100, status: "stuck", stuckReason: "交人", notifyNote: "" }),
     ]);
 
     expect(ids(groups.running)).toEqual(active.map((item) => item.id));
     expect(ids(groups.stuck)).toEqual([100]);
-    expect(groups.recentPullRequests).toEqual([]);
+    expect(groups.stuck[0]?.notifyNote).toBe("");
   });
 
   it("names every status in Chinese without translating the stuck reason", () => {
