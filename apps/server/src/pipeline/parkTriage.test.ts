@@ -1,5 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
-import type { PipelineStuckReason } from "@t3tools/contracts";
+import {
+  ProviderInstanceId,
+  type ModelSelection,
+  type PipelineStuckReason,
+} from "@t3tools/contracts";
+import * as GitHubRequestPolicy from "@t3tools/source-control-github/server/GitHubRequestPolicy";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -17,6 +22,9 @@ import {
   ParkTriage,
   RENEW_ONCE_REASONS,
   layer,
+  scanParkedRuns,
+  layerWorker,
+  type CommanderRequest,
   type CommanderSessionResult,
 } from "./parkTriage.ts";
 
@@ -32,27 +40,49 @@ const issue = (number: number): PipelineIssue => ({
   author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
+const FIRST: ModelSelection = {
+  instanceId: ProviderInstanceId.make("claude-code"),
+  model: "claude-sonnet",
+};
+const SECOND: ModelSelection = {
+  instanceId: ProviderInstanceId.make("grok"),
+  model: "grok-code",
+};
+
 const layerFor = (
   issues: ReadonlyArray<PipelineIssue>,
   open: CommanderSessionOpener["Service"]["open"],
+  models?: {
+    readonly author?: ReadonlyArray<ModelSelection>;
+    readonly verifier?: ReadonlyArray<ModelSelection>;
+  },
+  addLabel: PipelineGitHubIssues["Service"]["addLabel"] = () => Effect.void,
 ) => {
-  const settings = ServerSettings.layerTest({ pipelineEnabled: true });
+  const settings = ServerSettings.layerTest({
+    pipelineEnabled: true,
+    ...(models?.author === undefined ? {} : { pipelineAuthorModel: [...models.author] }),
+    ...(models?.verifier === undefined ? {} : { pipelineVerifierModel: [...models.verifier] }),
+  });
+  const github = Layer.succeed(PipelineGitHubIssues, {
+    listEligible: () => Effect.succeed(issues),
+    read: () => Effect.die("unused"),
+    addLabel,
+  });
   const runs = runsLayer.pipe(
-    Layer.provide(
-      Layer.succeed(PipelineGitHubIssues, {
-        listEligible: () => Effect.succeed(issues),
-        read: () => Effect.die("unused"),
-      }),
-    ),
+    Layer.provide(github),
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.die("unused") })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
-  return layer.pipe(
-    Layer.provide(Layer.succeed(CommanderSessionOpener, { open })),
-    Layer.provide(settings),
-    Layer.provideMerge(runs),
+  return Layer.mergeAll(
+    layer.pipe(
+      Layer.provide(Layer.succeed(CommanderSessionOpener, { open })),
+      Layer.provide(github),
+      Layer.provide(settings),
+      Layer.provideMerge(runs),
+    ),
+    settings,
   );
 };
 
@@ -111,6 +141,11 @@ describe("parkTriage", () => {
           assert.strictEqual((yield* Ref.get(opened)).length, 0);
 
           yield* TestClock.adjust(Duration.millis(1));
+          yield* triage.triage({ modelConfigured: false });
+          assert.strictEqual(
+            (yield* runs.list).runs.find((run) => run.issueNumber === 2)?.stuckReason,
+            "会话失败",
+          );
           const due = yield* triage.triage({ modelConfigured: true });
           yield* Effect.logInfo(due.lines.join("\n"));
           assert.deepStrictEqual([...(yield* Ref.get(opened))].sort(), [1, 3]);
@@ -261,9 +296,9 @@ describe("parkTriage", () => {
 
   it.effect("没配指挥官模型时结果写没配模型，且不算已处理", () =>
     Effect.gen(function* () {
-      const opened = yield* Ref.make(0);
-      const open: CommanderSessionOpener["Service"]["open"] = () =>
-        Ref.update(opened, (count) => count + 1).pipe(
+      const opened = yield* Ref.make<ReadonlyArray<CommanderRequest>>([]);
+      const open: CommanderSessionOpener["Service"]["open"] = (input) =>
+        Ref.update(opened, (items) => [...items, input]).pipe(
           Effect.as({
             started: true,
             verdict: { action: "继续", category: null },
@@ -273,22 +308,28 @@ describe("parkTriage", () => {
         const runs = yield* PipelineRuns;
         const triage = yield* ParkTriage;
         yield* stick([{ number: 4, reason: "超预算" }]);
+        yield* runs.note(4, { detail: "预算已花完，需要裁决" });
         yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
         const missing = yield* triage.triage({ modelConfigured: false });
         yield* Effect.logInfo(missing.lines.join("\n"));
         see(missing.lines, "没配模型");
         see(missing.lines, "不算已处理");
         assert.strictEqual(missing.requests, 0);
-        assert.strictEqual(yield* Ref.get(opened), 0);
+        assert.strictEqual((yield* Ref.get(opened)).length, 0);
         const held = (yield* runs.list).runs[0];
         assert.strictEqual(held?.status, "stuck");
-        assert.strictEqual(held?.stuckReason, "超预算");
+        assert.strictEqual(held?.stuckReason, "没配模型");
         assert.ok(held?.detail?.includes("没配模型"));
+        yield* triage.triage({ modelConfigured: false });
+        assert.deepStrictEqual((yield* runs.list).runs[0], held);
 
         const later = yield* triage.triage({ modelConfigured: true });
         yield* Effect.logInfo(later.lines.join("\n"));
         assert.strictEqual(later.requests, 1);
-        assert.strictEqual(yield* Ref.get(opened), 1);
+        const requests = yield* Ref.get(opened);
+        assert.strictEqual(requests.length, 1);
+        assert.strictEqual(requests[0]?.stuckReason, "超预算");
+        assert.strictEqual(requests[0]?.detail, "预算已花完，需要裁决");
       }).pipe(Effect.provide(layerFor([issue(4)], open)));
     }),
   );
@@ -312,6 +353,8 @@ describe("parkTriage", () => {
           see(first.lines, "不算已处理");
           assert.strictEqual(first.requests, 1);
           assert.strictEqual((yield* runs.list).runs[0]?.stuckReason, "超预算");
+          yield* triage.triage({ modelConfigured: false });
+          assert.strictEqual((yield* runs.list).runs[0]?.stuckReason, "没配模型");
 
           const second = yield* triage.triage({ modelConfigured: true });
           yield* Effect.logInfo(second.lines.join("\n"));
@@ -336,5 +379,156 @@ describe("parkTriage", () => {
           assert.strictEqual(yield* Ref.get(opened), 2);
         }).pipe(Effect.provide(layerFor([issue(9)], open)));
       }),
+  );
+});
+
+const openedModels = () => Ref.make<ReadonlyArray<ModelSelection | null>>([]);
+
+const recordOpen =
+  (
+    opened: Ref.Ref<ReadonlyArray<ModelSelection | null>>,
+    verdict: CommanderSessionResult,
+  ): CommanderSessionOpener["Service"]["open"] =>
+  (input) =>
+    Ref.update(opened, (models) => [...models, input.model]).pipe(Effect.as(verdict));
+
+describe("park triage timer", () => {
+  it.effect("定时扫满 15 分钟的运行，裁决为继续，模型是候选串里第一个能用的", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "继续", category: null },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 7, reason: "超预算" }]);
+        const early = yield* scanParkedRuns();
+        assert.strictEqual(early.requests, 0);
+        assert.deepStrictEqual(yield* Ref.get(opened), []);
+
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const report = yield* scanParkedRuns();
+        see(report.lines, "运行回到可派");
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed.length, 1);
+        assert.strictEqual(listed[0]?.status, "claimed");
+        assert.strictEqual(listed[0]?.stuckReason, null);
+        assert.deepStrictEqual(yield* Ref.get(opened), [FIRST]);
+      }).pipe(
+        Effect.provide(layerFor([issue(7)], open, { author: [FIRST, SECOND], verifier: [SECOND] })),
+      );
+    }),
+  );
+
+  it.effect("裁决为交人时运行保持 stuck，原因交人，模型取验单串里第一个能用的", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "交人", category: "要掏新钱" },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 21, reason: "超预算" }]);
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const report = yield* scanParkedRuns();
+        see(report.lines, "原因交人");
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed[0]?.status, "stuck");
+        assert.strictEqual(listed[0]?.stuckReason, "交人");
+        assert.deepStrictEqual(yield* Ref.get(opened), [SECOND]);
+      }).pipe(Effect.provide(layerFor([issue(21)], open, { author: [], verifier: [SECOND] })));
+    }),
+  );
+
+  it.effect("生产扫描贴标签成功后才完成，失败后仅重试标签且不重开裁决会话", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const writes = yield* Ref.make(0);
+      const writeLabel: PipelineGitHubIssues["Service"]["addLabel"] = (number, label) =>
+        Effect.gen(function* () {
+          assert.strictEqual(number, 8);
+          assert.strictEqual(label, "本机做");
+          const attempt = yield* Ref.updateAndGet(writes, (count) => count + 1);
+          if (attempt === 1) {
+            return yield* new GitHubRequestPolicy.GitHubApiRequestError({
+              host: "github.com",
+              operation: "setLabels",
+              cause: new Error("offline"),
+            });
+          }
+        });
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "贴本机做", category: null },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 8, reason: "超预算" }]);
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const failed = yield* scanParkedRuns();
+        assert.deepStrictEqual(failed.labelActions, []);
+        assert.ok(!(yield* (yield* PipelineRuns).list).runs[0]?.detail?.startsWith("已交指挥官"));
+        assert.ok(!failed.lines.some((line) => line.includes("不再派")));
+        const report = yield* (yield* ParkTriage).triage({ modelConfigured: false });
+        see(report.lines, "不再派");
+        assert.deepStrictEqual(report.labelActions, [{ issueNumber: 8, label: "本机做" }]);
+        yield* scanParkedRuns();
+        assert.strictEqual(yield* Ref.get(writes), 2);
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed[0]?.status, "stuck");
+        assert.ok(listed[0]?.detail?.startsWith("已交指挥官·贴本机做"));
+        assert.notStrictEqual(listed[0]?.status, "claimed");
+        assert.deepStrictEqual(yield* Ref.get(opened), [FIRST]);
+      }).pipe(Effect.provide(layerFor([issue(8)], open, { author: [FIRST] }, writeLabel)));
+    }),
+  );
+
+  it.effect("服务器 worker 真正调用标签服务，写成功后不重复写", () =>
+    Effect.gen(function* () {
+      const writes = yield* Ref.make(0);
+      const open: CommanderSessionOpener["Service"]["open"] = () =>
+        Effect.succeed({ started: true, verdict: { action: "贴本机做", category: null } });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 8, reason: "超预算" }]);
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        yield* Layer.build(layerWorker);
+        yield* TestClock.adjust(Duration.minutes(5));
+        const run = (yield* (yield* PipelineRuns).list).runs[0];
+        assert.ok(run?.detail?.startsWith("已交指挥官·贴本机做"));
+        assert.strictEqual(yield* Ref.get(writes), 1);
+        yield* TestClock.adjust(Duration.minutes(5));
+        assert.strictEqual(yield* Ref.get(writes), 1);
+      }).pipe(
+        Effect.provide(
+          layerFor([issue(8)], open, { author: [FIRST] }, () =>
+            Ref.update(writes, (count) => count + 1),
+          ),
+        ),
+        Effect.scoped,
+      );
+    }),
+  );
+
+  it.effect("没配模型时保持 stuck、原因没配模型，不报错也不重复开会话", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "继续", category: null },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 4, reason: "超预算" }]);
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const missing = yield* scanParkedRuns();
+        see(missing.lines, "没配模型");
+        assert.strictEqual(missing.requests, 0);
+        const held = (yield* (yield* PipelineRuns).list).runs[0];
+        assert.strictEqual(held?.status, "stuck");
+        assert.strictEqual(held?.stuckReason, "没配模型");
+        const again = yield* scanParkedRuns();
+        assert.strictEqual(again.requests, 0);
+        assert.deepStrictEqual(yield* Ref.get(opened), []);
+        assert.strictEqual((yield* (yield* PipelineRuns).list).runs[0]?.stuckReason, "没配模型");
+      }).pipe(Effect.provide(layerFor([issue(4)], open, { author: [], verifier: [] })));
+    }),
   );
 });

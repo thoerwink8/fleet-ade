@@ -55,6 +55,7 @@ const pipelineLayer = <E, R>(brief: Layer.Layer<DailyBrief, E, R>) =>
       Layer.succeed(
         PipelineGitHubIssues,
         PipelineGitHubIssues.of({
+          addLabel: () => Effect.die("unexpected label write"),
           listEligible: () => Effect.succeed([]),
           read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
         }),

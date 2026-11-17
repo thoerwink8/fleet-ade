@@ -44,6 +44,7 @@ const harness = (options: { readonly webhook: string | undefined; readonly statu
       Layer.succeed(
         PipelineGitHubIssues,
         PipelineGitHubIssues.of({
+          addLabel: () => Effect.die("unexpected label write"),
           listEligible: () =>
             Effect.succeed([
               {

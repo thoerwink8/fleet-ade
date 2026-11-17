@@ -114,6 +114,7 @@ const harness = (
   const issues = Layer.succeed(
     PipelineGitHubIssues,
     PipelineGitHubIssues.of({
+      addLabel: () => Effect.die("unexpected label write"),
       listEligible: () => Effect.succeed(eligible),
       read: (number) => Effect.succeed(eligible.find((item) => item.number === number) ?? issue(8)),
     }),

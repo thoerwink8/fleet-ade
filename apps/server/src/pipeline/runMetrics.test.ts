@@ -68,6 +68,7 @@ const stack = (input: {
   const runs = runsLayer.pipe(
     Layer.provide(
       Layer.succeed(PipelineGitHubIssues, {
+        addLabel: () => Effect.die("unexpected label write"),
         listEligible: () => Effect.succeed([issue(7)]),
         read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
       }),

@@ -108,6 +108,7 @@ export class PipelineGitHubIssues extends Context.Service<
     readonly listEligible: () => Effect.Effect<ReadonlyArray<PipelineIssue>, PipelineIssuesError>;
     /** One issue's title and body, read on its own. */
     readonly read: (number: number) => Effect.Effect<PipelineIssue, PipelineIssuesError>;
+    readonly addLabel: (number: number, label: string) => Effect.Effect<void, PipelineIssuesError>;
   }
 >()("t3/pipeline/GitHubIssues/PipelineGitHubIssues") {}
 
@@ -159,7 +160,20 @@ const make = Effect.gen(function* () {
     return toIssue(issue);
   });
 
-  return PipelineGitHubIssues.of({ listEligible, read });
+  const addLabel = Effect.fn("PipelineGitHubIssues.addLabel")(function* (
+    number: number,
+    label: string,
+  ) {
+    yield* rest.rest({
+      host: HOST,
+      operation: "pipelineIssues.addLabel",
+      method: "POST",
+      path: `repos/${REPOSITORY.owner}/${REPOSITORY.name}/issues/${number}/labels`,
+      body: { labels: [label] },
+    });
+  });
+
+  return PipelineGitHubIssues.of({ listEligible, read, addLabel });
 });
 
 export const layer = Layer.effect(PipelineGitHubIssues, make);
