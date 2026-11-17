@@ -16,6 +16,7 @@ import {
   MergeRequestError,
   PullRequestMerger,
   decideMerge,
+  workflowChecks,
   layer,
   type MergeGateDecision,
   type MergeGateFacts,
@@ -39,7 +40,7 @@ interface MergeCall {
 
 const passing = (autoMerge: boolean): MergeGateFacts => ({
   headSha: HEAD,
-  ci: { state: "success", sha: HEAD },
+  checks: [{ name: "CI", state: "success", sha: HEAD }],
   coldVerify: { state: "success", sha: HEAD },
   paths: ["apps/server/src/pipeline/mergeGate.ts"],
   autoMerge,
@@ -54,17 +55,17 @@ const cases: ReadonlyArray<{
 }> = [
   {
     name: "CI 不是成功，不合",
-    facts: { ...passing(true), ci: { state: "failure", sha: HEAD } },
+    facts: { ...passing(true), checks: [{ name: "CI", state: "failure", sha: HEAD }] },
     decision: hold,
   },
   {
     name: "没有 CI 检查，不合",
-    facts: { ...passing(true), ci: { state: "missing", sha: null } },
+    facts: { ...passing(true), checks: [{ name: "CI", state: "missing", sha: null }] },
     decision: hold,
   },
   {
     name: "CI 成功但是另一个头，不合",
-    facts: { ...passing(true), ci: { state: "success", sha: OLD_HEAD } },
+    facts: { ...passing(true), checks: [{ name: "CI", state: "success", sha: OLD_HEAD }] },
     decision: hold,
   },
   {
@@ -83,9 +84,51 @@ const cases: ReadonlyArray<{
     decision: hold,
   },
   {
-    name: "diff 含 .github/workflows/，交人，不合",
+    name: "只改 .github/workflows/ci.yml 仍是交人",
     facts: { ...passing(true), paths: [".github/workflows/ci.yml"] },
     decision: { kind: "stuck", reason: "交人" },
+  },
+  {
+    name: "当前头上有一项检查不叫 CI、状态不是 success，结果不可合",
+    facts: {
+      ...passing(true),
+      checks: [
+        { name: "CI", state: "success", sha: HEAD },
+        { name: "lint", state: "failure", sha: HEAD },
+      ],
+    },
+    decision: hold,
+  },
+  {
+    name: "该项与名为 CI 的检查都是 success，且 cold-verify 为 success，结果可合",
+    facts: {
+      ...passing(false),
+      checks: [
+        { name: "CI", state: "success", sha: HEAD },
+        { name: "lint", state: "success", sha: HEAD },
+      ],
+    },
+    decision: { kind: "mergeable" },
+  },
+  {
+    name: "diff 含 AGENTS.md 时结果是交人，不是可合",
+    facts: { ...passing(true), paths: ["AGENTS.md"] },
+    decision: { kind: "stuck", reason: "交人" },
+  },
+  {
+    name: "diff 含 docs/internals/overview.md 时结果是交人，不是可合",
+    facts: { ...passing(true), paths: ["docs/internals/overview.md"] },
+    decision: { kind: "stuck", reason: "交人" },
+  },
+  {
+    name: "改名前的名字落进清单，交人，不是可合",
+    facts: { ...passing(true), paths: ["src/renamed.ts", "AGENTS.md"] },
+    decision: { kind: "stuck", reason: "交人" },
+  },
+  {
+    name: "只改 apps/web/src/components/ChatView.tsx 不因此交人",
+    facts: { ...passing(false), paths: ["apps/web/src/components/ChatView.tsx"] },
+    decision: { kind: "mergeable" },
   },
   {
     name: "都过且自动合关着，停在可合，不调合并",
@@ -109,9 +152,30 @@ describe("decideMerge", () => {
 
   it.effect("pending 不算通过", () =>
     Effect.sync(() => {
-      const pending: MergeGateFacts["ci"] = { state: "pending", sha: HEAD };
-      assert.strictEqual(decideMerge({ ...passing(true), ci: pending }).kind, "hold");
-      assert.strictEqual(decideMerge({ ...passing(true), coldVerify: pending }).kind, "hold");
+      const pending: MergeGateFacts["checks"][number] = {
+        name: "CI",
+        state: "pending",
+        sha: HEAD,
+      };
+      assert.strictEqual(decideMerge({ ...passing(true), checks: [pending] }).kind, "hold");
+      assert.strictEqual(
+        decideMerge({ ...passing(true), coldVerify: { state: "pending", sha: HEAD } }).kind,
+        "hold",
+      );
+    }),
+  );
+
+  it.effect("清单读不到时结果是没查成，不是可合", () =>
+    Effect.sync(() => {
+      const decision = decideMerge(
+        { ...passing(true), paths: ["apps/web/src/components/ChatView.tsx"] },
+        () => {
+          throw new Error("ENOENT");
+        },
+      );
+      assert.deepStrictEqual(decision, { kind: "unread", detail: "没查成" });
+      assert.notStrictEqual(decision.kind, "merge");
+      assert.notStrictEqual(decision.kind, "mergeable");
     }),
   );
 });
@@ -157,7 +221,10 @@ const gateLayer = (input: {
 };
 
 const seen = (headSha: string, facts: MergeGateFacts): MergeGateObservation => ({
-  ci: headSha === facts.headSha ? facts.ci.state : "missing",
+  checks:
+    headSha === facts.headSha
+      ? facts.checks.map((check) => ({ name: check.name, state: check.state }))
+      : [{ name: "CI", state: "missing" }],
   coldVerify: headSha === facts.headSha ? facts.coldVerify.state : "missing",
   paths: facts.paths,
   merged: false,
@@ -244,7 +311,7 @@ describe("MergeGate", () => {
             autoMerge: true,
             observe: () =>
               Effect.succeed({
-                ci: "success",
+                checks: [{ name: "CI", state: "success" }],
                 coldVerify: "success",
                 paths: ["apps/server/src/pipeline/mergeGate.ts"],
                 merged: true,
@@ -326,6 +393,45 @@ describe("MergeGate", () => {
           }),
         ),
       );
+    }),
+  );
+});
+
+describe("workflowChecks", () => {
+  it.effect("当前头上不叫 CI 的工作流不是 success，也算一项检查", () =>
+    Effect.sync(() => {
+      const checks = workflowChecks(
+        {
+          workflow_runs: [
+            {
+              id: 1,
+              name: "CI",
+              head_sha: HEAD,
+              status: "completed",
+              conclusion: "success",
+            },
+            {
+              id: 2,
+              name: "lint",
+              head_sha: HEAD,
+              status: "completed",
+              conclusion: "failure",
+            },
+            {
+              id: 3,
+              name: "lint",
+              head_sha: OLD_HEAD,
+              status: "completed",
+              conclusion: "success",
+            },
+          ],
+        },
+        HEAD,
+      );
+      assert.deepStrictEqual(checks, [
+        { name: "CI", state: "success" },
+        { name: "lint", state: "failure" },
+      ]);
     }),
   );
 });
