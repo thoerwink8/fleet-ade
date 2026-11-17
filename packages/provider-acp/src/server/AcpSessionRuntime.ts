@@ -144,6 +144,7 @@ export interface AcpSessionRuntimeOptions {
   ) => Effect.Effect<void, never>;
   readonly acpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly extraStdioMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly requestLogger?: (event: AcpSessionRequestLogEvent) => Effect.Effect<void, never>;
   readonly protocolLogging?: {
     readonly logIncoming?: boolean;
@@ -2157,14 +2158,17 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
   ): ReadonlyArray<EffectAcpSchema.McpServer> => {
     const mcpCapabilities = initializeResult.agentCapabilities?.mcpCapabilities;
     const acpServers = activationOptions?.acpMcpServers ?? options.acpMcpServers ?? [];
-    if (mcpCapabilities?.acp === true && acpServers.length > 0) {
-      return acpServers;
-    }
     const httpServers = activationOptions?.httpMcpServers ?? options.httpMcpServers ?? [];
-    if (mcpCapabilities?.http === true && httpServers.length > 0) {
-      return httpServers;
-    }
-    return activationOptions?.mcpServers ?? options.mcpServers ?? [];
+    const stdioServers = activationOptions?.mcpServers ?? options.mcpServers ?? [];
+    const selected =
+      mcpCapabilities?.acp === true && acpServers.length > 0
+        ? acpServers
+        : mcpCapabilities?.http === true && httpServers.length > 0
+          ? httpServers
+          : stdioServers;
+    const extraStdioMcpServers = options.extraStdioMcpServers ?? [];
+    // HTTP and ACP replace the t3-code stdio bridge. Extra stdio stays on create, load, and resume.
+    return extraStdioMcpServers.length === 0 ? selected : [...selected, ...extraStdioMcpServers];
   };
 
   const sessionSetupFields = (initializeResult: EffectAcpSchema.InitializeResponse) => {
