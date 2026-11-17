@@ -1,5 +1,9 @@
 import { assert, describe, it } from "@effect/vitest";
-import type { PipelineStuckReason } from "@t3tools/contracts";
+import {
+  ProviderInstanceId,
+  type ModelSelection,
+  type PipelineStuckReason,
+} from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -17,6 +21,7 @@ import {
   ParkTriage,
   RENEW_ONCE_REASONS,
   layer,
+  scanParkedRuns,
   type CommanderSessionResult,
 } from "./parkTriage.ts";
 
@@ -32,11 +37,28 @@ const issue = (number: number): PipelineIssue => ({
   author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
+const FIRST: ModelSelection = {
+  instanceId: ProviderInstanceId.make("claude-code"),
+  model: "claude-sonnet",
+};
+const SECOND: ModelSelection = {
+  instanceId: ProviderInstanceId.make("grok"),
+  model: "grok-code",
+};
+
 const layerFor = (
   issues: ReadonlyArray<PipelineIssue>,
   open: CommanderSessionOpener["Service"]["open"],
+  models?: {
+    readonly author?: ReadonlyArray<ModelSelection>;
+    readonly verifier?: ReadonlyArray<ModelSelection>;
+  },
 ) => {
-  const settings = ServerSettings.layerTest({ pipelineEnabled: true });
+  const settings = ServerSettings.layerTest({
+    pipelineEnabled: true,
+    ...(models?.author === undefined ? {} : { pipelineAuthorModel: [...models.author] }),
+    ...(models?.verifier === undefined ? {} : { pipelineVerifierModel: [...models.verifier] }),
+  });
   const runs = runsLayer.pipe(
     Layer.provide(
       Layer.succeed(PipelineGitHubIssues, {
@@ -49,10 +71,13 @@ const layerFor = (
     Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
-  return layer.pipe(
-    Layer.provide(Layer.succeed(CommanderSessionOpener, { open })),
-    Layer.provide(settings),
-    Layer.provideMerge(runs),
+  return Layer.mergeAll(
+    layer.pipe(
+      Layer.provide(Layer.succeed(CommanderSessionOpener, { open })),
+      Layer.provide(settings),
+      Layer.provideMerge(runs),
+    ),
+    settings,
   );
 };
 
@@ -282,7 +307,7 @@ describe("parkTriage", () => {
         assert.strictEqual(yield* Ref.get(opened), 0);
         const held = (yield* runs.list).runs[0];
         assert.strictEqual(held?.status, "stuck");
-        assert.strictEqual(held?.stuckReason, "超预算");
+        assert.strictEqual(held?.stuckReason, "没配模型");
         assert.ok(held?.detail?.includes("没配模型"));
 
         const later = yield* triage.triage({ modelConfigured: true });
@@ -336,5 +361,109 @@ describe("parkTriage", () => {
           assert.strictEqual(yield* Ref.get(opened), 2);
         }).pipe(Effect.provide(layerFor([issue(9)], open)));
       }),
+  );
+});
+
+const openedModels = () => Ref.make<ReadonlyArray<ModelSelection | null>>([]);
+
+const recordOpen =
+  (
+    opened: Ref.Ref<ReadonlyArray<ModelSelection | null>>,
+    verdict: CommanderSessionResult,
+  ): CommanderSessionOpener["Service"]["open"] =>
+  (input) =>
+    Ref.update(opened, (models) => [...models, input.model]).pipe(Effect.as(verdict));
+
+describe("park triage timer", () => {
+  it.effect("定时扫满 15 分钟的运行，裁决为继续，模型是候选串里第一个能用的", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "继续", category: null },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 7, reason: "超预算" }]);
+        const early = yield* scanParkedRuns();
+        assert.strictEqual(early.requests, 0);
+        assert.deepStrictEqual(yield* Ref.get(opened), []);
+
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const report = yield* scanParkedRuns();
+        see(report.lines, "运行回到可派");
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed.length, 1);
+        assert.strictEqual(listed[0]?.status, "claimed");
+        assert.strictEqual(listed[0]?.stuckReason, null);
+        assert.deepStrictEqual(yield* Ref.get(opened), [FIRST]);
+      }).pipe(
+        Effect.provide(layerFor([issue(7)], open, { author: [FIRST, SECOND], verifier: [SECOND] })),
+      );
+    }),
+  );
+
+  it.effect("裁决为交人时运行保持 stuck，原因交人，模型取验单串里第一个能用的", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "交人", category: "要掏新钱" },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 21, reason: "超预算" }]);
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const report = yield* scanParkedRuns();
+        see(report.lines, "原因交人");
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed[0]?.status, "stuck");
+        assert.strictEqual(listed[0]?.stuckReason, "交人");
+        assert.deepStrictEqual(yield* Ref.get(opened), [SECOND]);
+      }).pipe(Effect.provide(layerFor([issue(21)], open, { author: [], verifier: [SECOND] })));
+    }),
+  );
+
+  it.effect("裁决为贴本机做时有标签动作，且不再派", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "贴本机做", category: null },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 8, reason: "超预算" }]);
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const report = yield* scanParkedRuns();
+        see(report.lines, "不再派");
+        assert.deepStrictEqual(report.labelActions, [{ issueNumber: 8, label: "本机做" }]);
+        const listed = (yield* (yield* PipelineRuns).list).runs;
+        assert.strictEqual(listed[0]?.status, "stuck");
+        assert.notStrictEqual(listed[0]?.status, "claimed");
+        assert.deepStrictEqual(yield* Ref.get(opened), [FIRST]);
+      }).pipe(Effect.provide(layerFor([issue(8)], open, { author: [FIRST] })));
+    }),
+  );
+
+  it.effect("没配模型时保持 stuck、原因没配模型，不报错也不重复开会话", () =>
+    Effect.gen(function* () {
+      const opened = yield* openedModels();
+      const open = recordOpen(opened, {
+        started: true,
+        verdict: { action: "继续", category: null },
+      });
+      yield* Effect.gen(function* () {
+        yield* stick([{ number: 4, reason: "超预算" }]);
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const missing = yield* scanParkedRuns();
+        see(missing.lines, "没配模型");
+        assert.strictEqual(missing.requests, 0);
+        const held = (yield* (yield* PipelineRuns).list).runs[0];
+        assert.strictEqual(held?.status, "stuck");
+        assert.strictEqual(held?.stuckReason, "没配模型");
+        const again = yield* scanParkedRuns();
+        assert.strictEqual(again.requests, 0);
+        assert.deepStrictEqual(yield* Ref.get(opened), []);
+        assert.strictEqual((yield* (yield* PipelineRuns).list).runs[0]?.stuckReason, "没配模型");
+      }).pipe(Effect.provide(layerFor([issue(4)], open, { author: [], verifier: [] })));
+    }),
   );
 });
