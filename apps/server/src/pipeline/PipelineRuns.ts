@@ -305,7 +305,7 @@ const make = Effect.gen(function* () {
     const slot = beijingBriefSlot(yield* DateTime.now);
     if (!slot.due || briefedDay === slot.day || Option.isNone(brief)) return;
     const outcome = yield* Effect.exit(brief.value.run);
-    if (Exit.isSuccess(outcome)) briefedDay = slot.day;
+    if (Exit.isSuccess(outcome) && outcome.value.sent) briefedDay = slot.day;
   });
 
   // A failed attempt still counts: the same reason is not sent again.
