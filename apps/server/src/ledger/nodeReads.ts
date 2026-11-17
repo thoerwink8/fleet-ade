@@ -1,3 +1,5 @@
+import { AuthOrchestrationReadScope } from "@t3tools/contracts";
+
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -5,29 +7,28 @@ import * as Schema from "effect/Schema";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as Notes from "./notes.ts";
 
 /** Same gap the old node report and session posts used, on two separate slots. */
 const GAP_MS = 20_000;
 
 export interface NodeReadGate {
-  /** Cockpit login, injected by the caller. A node token is not a login. */
+  /** Test double. The server mount uses `layerLive` and the environment session instead. */
   readonly login: boolean;
-  /** Milliseconds. Tests inject this; the server mount uses `Date.now`. */
+  /** Milliseconds. Tests inject this; `layerLive` uses `Date.now`. */
   readonly nowMillis: () => number;
 }
 
-const serverGate: NodeReadGate = { login: false, nowMillis: Date.now };
-
 class NodeReadRejected extends Schema.TaggedError<NodeReadRejected>()("NodeReadRejected", {
-  status: Schema.Literals([400, 401, 404, 429, 503]),
+  status: Schema.Literals([400, 401, 403, 404, 429, 503]),
   code: Schema.String,
   message: Schema.String,
   retryAfter: Schema.Number,
 }) {}
 
 const reject = (
-  status: 400 | 401 | 404 | 429 | 503,
+  status: 400 | 401 | 403 | 404 | 429 | 503,
   code: string,
   message: string,
   retryAfter = 0,
@@ -112,7 +113,11 @@ const saveNode = Effect.fn("NodeReads.save")(function* (
   return receivedAt;
 });
 
-const routes = (sql: SqlClient.SqlClient, gate: NodeReadGate) => {
+const routes = (
+  sql: SqlClient.SqlClient,
+  nowMillis: () => number,
+  requireLogin: Effect.Effect<void, NodeReadRejected, HttpServerRequest.HttpServerRequest>,
+) => {
   const reportGap = new Map<string, number>();
   const sessionGap = new Map<string, number>();
 
@@ -144,19 +149,13 @@ const routes = (sql: SqlClient.SqlClient, gate: NodeReadGate) => {
       }),
     );
 
-  const requireLogin = Effect.gen(function* () {
-    if (!gate.login) {
-      return yield* reject(401, "login_required", "要登录，不认节点证");
-    }
-  });
-
   const postKind = (kind: "report" | "sessions") =>
     respond(
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
         const nodeId = yield* authed(sql, request);
         const slot = kind === "report" ? reportGap : sessionGap;
-        const now = gate.nowMillis();
+        const now = nowMillis();
         const before = slot.get(nodeId);
         if (before !== undefined && now - before < GAP_MS) {
           const retryAfter = Math.ceil((GAP_MS - (now - before)) / 1000);
@@ -279,7 +278,7 @@ const routes = (sql: SqlClient.SqlClient, gate: NodeReadGate) => {
           ),
         ),
       );
-      const now = gate.nowMillis();
+      const now = nowMillis();
       const active = rows.flatMap((row) => {
         const until = Date.parse(row.leaseUntil);
         if (Number.isNaN(until) || until <= now) return [];
@@ -323,5 +322,33 @@ const routes = (sql: SqlClient.SqlClient, gate: NodeReadGate) => {
   );
 };
 
-export const layerFor = (sql: SqlClient.SqlClient, gate: NodeReadGate = serverGate) =>
-  routes(sql, gate);
+const forcedLogin = (login: boolean): Effect.Effect<void, NodeReadRejected> =>
+  login ? Effect.void : Effect.fail(reject(401, "login_required", "要登录，不认节点证"));
+
+const requireSession = Effect.fn("NodeReads.requireSession")(function* (
+  auth: EnvironmentAuth.EnvironmentAuth["Service"],
+) {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const principal = yield* auth
+    .authenticateHttpRequest(request)
+    .pipe(
+      Effect.mapError((error) =>
+        EnvironmentAuth.isServerAuthCredentialError(error)
+          ? reject(401, "login_required", "要登录，不认节点证")
+          : reject(503, "login_unreadable", "登录态读不了，不当成没登录"),
+      ),
+    );
+  if (!principal.scopes.includes(AuthOrchestrationReadScope)) {
+    return yield* reject(403, "insufficient_scope", "要有 orchestration:read 才能读节点");
+  }
+});
+
+export const layerFor = (sql: SqlClient.SqlClient, gate: NodeReadGate) =>
+  routes(sql, gate.nowMillis, forcedLogin(gate.login));
+
+export const layerLive = (sql: SqlClient.SqlClient) =>
+  Layer.unwrap(
+    Effect.map(EnvironmentAuth.EnvironmentAuth, (auth) =>
+      routes(sql, Date.now, requireSession(auth)),
+    ),
+  );
