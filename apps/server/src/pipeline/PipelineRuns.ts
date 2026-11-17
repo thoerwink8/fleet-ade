@@ -43,6 +43,7 @@ import {
   type PrerequisiteState,
 } from "./intakeGates.ts";
 import { PipelineFeishu, layer as feishuLayer, type StuckMessage } from "./feishu.ts";
+import { DailyBrief, beijingBriefSlot, layerLive as dailyBriefLive } from "./dailyBrief.ts";
 
 /** How often a tick runs. One place. */
 const TICK_INTERVAL = Duration.minutes(5);
@@ -298,6 +299,14 @@ const make = Effect.gen(function* () {
   const usage = yield* PipelineUsage;
 
   const feishu = yield* Effect.serviceOption(PipelineFeishu);
+  const brief = yield* Effect.serviceOption(DailyBrief);
+  let briefedDay: string | null = null;
+  const maybeBrief = Effect.gen(function* () {
+    const slot = beijingBriefSlot(yield* DateTime.now);
+    if (!slot.due || briefedDay === slot.day || Option.isNone(brief)) return;
+    const outcome = yield* Effect.exit(brief.value.run);
+    if (Exit.isSuccess(outcome)) briefedDay = slot.day;
+  });
 
   // A failed attempt still counts: the same reason is not sent again.
   const announce = Effect.fn("PipelineRuns.announce")(function* (
@@ -448,6 +457,7 @@ const make = Effect.gen(function* () {
   });
 
   const tick: PipelineRunsShape["tick"] = Effect.gen(function* () {
+    yield* Effect.exit(maybeBrief);
     const current = yield* settings.getSettings.pipe(Effect.mapError(sqlFailure));
     if (!current.pipelineEnabled) {
       if (current.pipelineEnabledAt !== null) {
@@ -772,6 +782,7 @@ export const layerUsageAt = (sessionsRoot: string | undefined) =>
 export const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
+  Layer.provide(dailyBriefLive),
   Layer.provide(feishuLayer.pipe(Layer.provide(FetchHttpClient.layer))),
   Layer.provide(layerPortsDefault),
   Layer.provide(layerUsage),
