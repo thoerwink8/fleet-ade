@@ -23,6 +23,8 @@ export interface BriefStuckRun {
 export interface DailyBriefResult {
   readonly key: string | null;
   readonly sent: boolean;
+  /** Why this attempt was not delivered. Null when not due, already delivered, or just delivered. */
+  readonly reason: string | null;
 }
 
 /** Beijing calendar day, and whether today's 08:30 slot is due. */
@@ -46,9 +48,13 @@ export class DailyBriefSource extends Context.Service<
   { readonly stuck: Effect.Effect<ReadonlyArray<BriefStuckRun>, DailyBriefUnread> }
 >()("t3/pipeline/dailyBrief/DailyBriefSource") {}
 
+export type BriefSendOutcome =
+  | { readonly delivered: true }
+  | { readonly delivered: false; readonly reason: string };
+
 export class DailyBriefSend extends Context.Service<
   DailyBriefSend,
-  { readonly send: (text: string) => Effect.Effect<void> }
+  { readonly send: (text: string) => Effect.Effect<BriefSendOutcome> }
 >()("t3/pipeline/dailyBrief/DailyBriefSend") {}
 
 export class DailyBrief extends Context.Service<
@@ -109,7 +115,10 @@ const layerSend = Layer.effect(
   Effect.gen(function* () {
     const feishu = yield* PipelineFeishu;
     const send = Effect.fn("DailyBriefSend.send")(function* (text: string) {
-      yield* feishu.sendText(text);
+      const outcome = yield* feishu.sendText(text);
+      return outcome.delivered
+        ? { delivered: true as const }
+        : { delivered: false as const, reason: outcome.note };
     });
     return DailyBriefSend.of({ send });
   }),
@@ -121,27 +130,29 @@ const make = Effect.gen(function* () {
   const deliver = yield* DailyBriefSend;
   const read = Effect.fn("DailyBrief.run")(function* () {
     const slot = beijingBriefSlot(yield* DateTime.now);
-    if (!slot.due) return { key: null, sent: false };
+    if (!slot.due) return { key: null, sent: false, reason: null };
     const existing = yield* sql<{ readonly day: string }>`
       SELECT day FROM pipeline_daily_brief WHERE day = ${slot.day}
     `;
-    if (existing.length > 0) return { key: slot.day, sent: false };
+    if (existing.length > 0) return { key: slot.day, sent: false, reason: null };
     const stuck = yield* Effect.exit(source.stuck);
-    yield* deliver.send(formatBrief(slot.day, stuck));
+    const delivery = yield* deliver.send(formatBrief(slot.day, stuck));
+    if (!delivery.delivered) return { key: null, sent: false, reason: delivery.reason };
     yield* sql`
       INSERT INTO pipeline_daily_brief (day) VALUES (${slot.day})
       ON CONFLICT (day) DO NOTHING
     `;
-    return { key: slot.day, sent: true };
+    return { key: slot.day, sent: true, reason: null };
   });
   return DailyBrief.of({ run: read() });
 });
 
 export const layer = Layer.effect(DailyBrief, make);
 
-export const layerLive = layer.pipe(
+/** Feishu-backed brief. The HTTP client stays open so tests can fail a delivery. */
+export const layerFeishu = layer.pipe(
   Layer.provide(layerSource),
-  Layer.provide(
-    layerSend.pipe(Layer.provide(feishuLayer.pipe(Layer.provide(FetchHttpClient.layer)))),
-  ),
+  Layer.provide(layerSend.pipe(Layer.provide(feishuLayer))),
 );
+
+export const layerLive = layerFeishu.pipe(Layer.provide(FetchHttpClient.layer));
