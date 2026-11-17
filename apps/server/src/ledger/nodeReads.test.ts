@@ -4,6 +4,7 @@ import * as NodeCrypto from "node:crypto";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
+import { AuthOrchestrationReadScope, AuthSessionId } from "@t3tools/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -12,6 +13,7 @@ import * as HttpPlatform from "effect/http/HttpPlatform";
 import { HttpRouter } from "effect/http";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as NodeReads from "./nodeReads.ts";
 
 const TOKEN = "ledger-test-token";
@@ -53,7 +55,11 @@ const send = (
   handler: (request: Request) => Promise<Response>,
   method: "GET" | "POST",
   path: string,
-  options?: { readonly body?: unknown; readonly credential?: string | null },
+  options?: {
+    readonly body?: unknown;
+    readonly credential?: string | null;
+    readonly session?: string;
+  },
 ) =>
   Effect.promise(() =>
     handler(
@@ -62,6 +68,7 @@ const send = (
         headers: {
           ...(options?.body === undefined ? {} : { "content-type": "application/json" }),
           ...(options?.credential ? { "X-Fleet-Node-Token": options.credential } : {}),
+          ...(options?.session ? { authorization: `Bearer ${options.session}` } : {}),
         },
         ...(options?.body === undefined ? {} : { body: JSON.stringify(options.body) }),
       }),
@@ -263,3 +270,94 @@ it.effect("三个登录读口不接受节点证，没有登录上下文时是 40
     }),
   );
 });
+
+const SESSION = "ledger-test-session";
+
+const sessionAuth = Layer.mock(EnvironmentAuth.EnvironmentAuth, {
+  authenticateHttpRequest: (request) =>
+    request.headers.authorization === `Bearer ${SESSION}`
+      ? Effect.succeed({
+          sessionId: AuthSessionId.make("ledger-test"),
+          subject: "ledger-test",
+          method: "bearer-access-token",
+          scopes: [AuthOrchestrationReadScope],
+        })
+      : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
+});
+
+const withLive = <A, E, R>(
+  use: (
+    handler: (request: Request) => Promise<Response>,
+    sql: SqlClient.SqlClient,
+  ) => Effect.Effect<A, E, R>,
+) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* NodeReads.migrate;
+    yield* sql`INSERT INTO node_keys (node_id, token_hash) VALUES ('test-node', ${TOKEN_HASH})`;
+    const web = yield* Effect.sync(() =>
+      HttpRouter.toWebHandler(
+        NodeReads.layerLive(sql).pipe(
+          Layer.provide(sessionAuth),
+          Layer.provideMerge(
+            HttpPlatform.layer.pipe(
+              Layer.provideMerge(NodeServices.layer),
+              Layer.provideMerge(Etag.layerWeak),
+            ),
+          ),
+          Layer.provideMerge(NodeServices.layer),
+        ),
+        { disableLogger: true },
+      ),
+    );
+    return yield* Effect.acquireUseRelease(
+      Effect.succeed(web),
+      (value) => use(value.handler, sql),
+      (value) => Effect.promise(() => value.dispose()),
+    );
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" })));
+
+it.effect("已登录的请求能读到节点列表、会话列表和单节点", () =>
+  withLive((handler) =>
+    Effect.gen(function* () {
+      expect(
+        (yield* send(handler, "POST", "/api/nodes/report", {
+          body: { marker: "snap" },
+          credential: TOKEN,
+        })).status,
+      ).toBe(200);
+      expect(
+        (yield* send(handler, "POST", "/api/nodes/sessions", {
+          body: { marker: "sess" },
+          credential: TOKEN,
+        })).status,
+      ).toBe(200);
+      const session = { session: SESSION };
+      expect(yield* json(yield* send(handler, "GET", "/api/nodes", session))).toEqual({
+        nodes: [{ id: "test-node", payload: { marker: "snap" } }],
+      });
+      expect(yield* json(yield* send(handler, "GET", "/api/nodes/sessions", session))).toEqual({
+        nodes: [{ id: "test-node", payload: { marker: "sess" } }],
+      });
+      expect(yield* json(yield* send(handler, "GET", "/api/nodes/test-node", session))).toEqual({
+        id: "test-node",
+        payload: { marker: "snap" },
+      });
+    }),
+  ),
+);
+
+it.effect("没登录读三个口是 401，只带节点证也是 401", () =>
+  withLive((handler) =>
+    Effect.gen(function* () {
+      for (const path of ["/api/nodes", "/api/nodes/sessions", "/api/nodes/test-node"] as const) {
+        const bare = yield* send(handler, "GET", path);
+        expect(bare.status).toBe(401);
+        expect((yield* json<{ error: { code: string } }>(bare)).error.code).toBe("login_required");
+        const node = yield* send(handler, "GET", path, { credential: TOKEN });
+        expect(node.status).toBe(401);
+        expect((yield* json<{ error: { code: string } }>(node)).error.code).toBe("login_required");
+      }
+    }),
+  ),
+);
