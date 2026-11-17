@@ -2,6 +2,7 @@ import {
   PIPELINE_COST_LABEL,
   PIPELINE_RUN_STATUSES,
   PIPELINE_STUCK_REASONS,
+  PIPELINE_METRIC_UNREAD,
   PIPELINE_USAGE_UNREADABLE,
   PipelineRunList,
   PipelineRunsError,
@@ -69,7 +70,9 @@ const RunRow = Schema.Struct({
   convertedCost: Schema.NullOr(Schema.Number),
   usageNote: Schema.NullOr(Schema.Literal(PIPELINE_USAGE_UNREADABLE)),
   commitCount: Schema.NullOr(Schema.Int),
+  commitNote: Schema.NullOr(Schema.Literal(PIPELINE_METRIC_UNREAD)),
   ciQueueMs: Schema.NullOr(Schema.Int),
+  ciQueueNote: Schema.NullOr(Schema.Literal(PIPELINE_METRIC_UNREAD)),
   detail: Schema.NullOr(Schema.String),
   renewedOnce: Schema.Literals([0, 1]),
 });
@@ -126,7 +129,9 @@ export interface PipelineRunNote {
   readonly sessionStartedAt?: string | null;
   readonly sessionEndedAt?: string | null;
   readonly commitCount?: number | null;
+  readonly commitNote?: typeof PIPELINE_METRIC_UNREAD | null;
   readonly ciQueueMs?: number | null;
+  readonly ciQueueNote?: typeof PIPELINE_METRIC_UNREAD | null;
   /** Why this run stopped moving. Not the global tick row. */
   readonly detail?: string | null;
   /** Set when this run uses its one automatic retry. Never cleared. */
@@ -263,7 +268,9 @@ const SELECT_RUNS = `
     converted_cost AS convertedCost,
     usage_note AS usageNote,
     commit_count AS commitCount,
+    commit_note AS commitNote,
     ci_queue_ms AS ciQueueMs,
+    ci_queue_note AS ciQueueNote,
     detail,
     renewed_once AS renewedOnce
   FROM pipeline_runs
@@ -473,6 +480,34 @@ const make = Effect.gen(function* () {
       }
     }
     const at = yield* nowIso();
+    const commitCount =
+      typeof patch.commitCount === "number"
+        ? patch.commitCount
+        : patch.commitNote === PIPELINE_METRIC_UNREAD
+          ? null
+          : patch.commitCount === undefined
+            ? target.commitCount
+            : patch.commitCount;
+    const commitNote =
+      typeof patch.commitCount === "number"
+        ? null
+        : patch.commitNote === undefined
+          ? target.commitNote
+          : patch.commitNote;
+    const ciQueueMs =
+      typeof patch.ciQueueMs === "number"
+        ? patch.ciQueueMs
+        : patch.ciQueueNote === PIPELINE_METRIC_UNREAD
+          ? null
+          : patch.ciQueueMs === undefined
+            ? target.ciQueueMs
+            : patch.ciQueueMs;
+    const ciQueueNote =
+      typeof patch.ciQueueMs === "number"
+        ? null
+        : patch.ciQueueNote === undefined
+          ? target.ciQueueNote
+          : patch.ciQueueNote;
     yield* sql`
       UPDATE pipeline_runs SET
         status = ${nextStatus},
@@ -486,8 +521,10 @@ const make = Effect.gen(function* () {
         session_ended_at = ${
           patch.sessionEndedAt === undefined ? target.sessionEndedAt : patch.sessionEndedAt
         },
-        commit_count = ${patch.commitCount === undefined ? target.commitCount : patch.commitCount},
-        ci_queue_ms = ${patch.ciQueueMs === undefined ? target.ciQueueMs : patch.ciQueueMs},
+        commit_count = ${commitCount},
+        commit_note = ${commitNote},
+        ci_queue_ms = ${ciQueueMs},
+        ci_queue_note = ${ciQueueNote},
         detail = ${patch.detail === undefined ? target.detail : patch.detail},
         renewed_once = ${patch.renewedOnce === true ? 1 : target.renewedOnce},
         updated_at = ${at}

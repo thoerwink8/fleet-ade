@@ -1,4 +1,12 @@
-import type { PipelineRun, PipelineRunStatus } from "@t3tools/contracts";
+import {
+  PIPELINE_METRIC_UNREAD,
+  PIPELINE_USAGE_UNREADABLE,
+  type PipelineRun,
+  type PipelineRunStatus,
+} from "@t3tools/contracts";
+import { formatCount } from "@t3tools/shared/usageFormat";
+
+export type PipelineSection = "needsAction" | "running" | "stuck" | "recentPullRequests";
 
 export interface PipelineGroups {
   readonly running: ReadonlyArray<PipelineRun>;
@@ -43,4 +51,51 @@ export function groupPipelineRuns(runs: ReadonlyArray<PipelineRun>): PipelineGro
     stuck: runs.filter((run) => run.status === "stuck"),
     recentPullRequests: runs.filter((run) => run.prNumber !== null),
   };
+}
+
+/** Whole seconds under a minute, otherwise minutes. Zero stays zero. */
+export function formatQueueDuration(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return PIPELINE_METRIC_UNREAD;
+  if (ms < 60_000) {
+    const tenths = Math.round(ms / 100) / 10;
+    const text = Number.isInteger(tenths) ? String(tenths) : tenths.toFixed(1);
+    return `${text} 秒`;
+  }
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds === 0 ? `${minutes} 分` : `${minutes} 分 ${seconds} 秒`;
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return restMinutes === 0 ? `${hours} 小时` : `${hours} 小时 ${restMinutes} 分`;
+}
+
+export function formatCommitCount(run: Pick<PipelineRun, "commitCount" | "commitNote">): string {
+  if (run.commitNote !== null || run.commitCount === null) return PIPELINE_METRIC_UNREAD;
+  return String(run.commitCount);
+}
+
+export function formatCiQueue(run: Pick<PipelineRun, "ciQueueMs" | "ciQueueNote">): string {
+  if (run.ciQueueNote !== null || run.ciQueueMs === null) return PIPELINE_METRIC_UNREAD;
+  return formatQueueDuration(run.ciQueueMs);
+}
+
+export function formatInputTokens(run: Pick<PipelineRun, "inputTokens" | "usageNote">): string {
+  if (run.usageNote === PIPELINE_USAGE_UNREADABLE || run.inputTokens === null) {
+    return PIPELINE_METRIC_UNREAD;
+  }
+  return formatCount(run.inputTokens);
+}
+
+export function pipelineRunElementId(id: number): string {
+  return `pipeline-run-${id}`;
+}
+
+export function isPipelineRunLink(
+  section: PipelineSection,
+  run: Pick<PipelineRun, "status">,
+): boolean {
+  if (section === "stuck") return true;
+  if (section === "recentPullRequests") return run.status !== "merged";
+  return false;
 }

@@ -101,6 +101,7 @@ import Migration0090 from "./Migrations/090_PipelineRuns.ts";
 import Migration0091 from "./Migrations/091_PipelineBudget.ts";
 import Migration0092 from "./Migrations/092_PipelineSessionUsage.ts";
 import Migration0093 from "./Migrations/093_PipelineInconclusiveReason.ts";
+import Migration0094 from "./Migrations/094_PipelineRunMetrics.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -197,6 +198,7 @@ const migrationEntries = [
   [91, "PipelineBudget", Migration0091],
   [92, "PipelineSessionUsage", Migration0092],
   [93, "PipelineInconclusiveReason", Migration0093],
+  [94, "PipelineRunMetrics", Migration0094],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
