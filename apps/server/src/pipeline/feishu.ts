@@ -21,7 +21,10 @@ export type FeishuOutcome =
 
 export class PipelineFeishu extends Context.Service<
   PipelineFeishu,
-  { readonly send: (message: StuckMessage) => Effect.Effect<FeishuOutcome> }
+  {
+    readonly send: (message: StuckMessage) => Effect.Effect<FeishuOutcome>;
+    readonly sendText: (text: string) => Effect.Effect<FeishuOutcome>;
+  }
 >()("t3/pipeline/feishu/PipelineFeishu") {}
 
 const formatText = (message: StuckMessage): string =>
@@ -34,21 +37,21 @@ const formatText = (message: StuckMessage): string =>
 const make = Effect.gen(function* () {
   const http = yield* HttpClient.HttpClient;
   const environment = yield* HostProcess.Environment;
-  const send = Effect.fn("PipelineFeishu.send")(function* (message: StuckMessage) {
+  const deliver = (text: string) => {
     const webhook = environment[FEISHU_WEBHOOK_VARIABLE]?.trim() ?? "";
     if (webhook.length === 0) {
-      return {
+      return Effect.succeed({
         delivered: false,
         note: `没送出：没配 \`${FEISHU_WEBHOOK_VARIABLE}\``,
-      } as const;
+      } as const);
     }
     const request = HttpClientRequest.post(webhook).pipe(
       HttpClientRequest.bodyJsonUnsafe({
         msg_type: "text",
-        content: { text: formatText(message) },
+        content: { text },
       }),
     );
-    return yield* http.execute(request).pipe(
+    return http.execute(request).pipe(
       Effect.timeout("15 seconds"),
       Effect.map((response): FeishuOutcome =>
         response.status >= 200 && response.status < 300
@@ -57,8 +60,14 @@ const make = Effect.gen(function* () {
       ),
       Effect.orElseSucceed((): FeishuOutcome => ({ delivered: false, note: "没送出：请求失败" })),
     );
+  };
+  const send = Effect.fn("PipelineFeishu.send")(function* (message: StuckMessage) {
+    return yield* deliver(formatText(message));
   });
-  return PipelineFeishu.of({ send });
+  const sendText = Effect.fn("PipelineFeishu.sendText")(function* (text: string) {
+    return yield* deliver(text);
+  });
+  return PipelineFeishu.of({ send, sendText });
 });
 
 export const layer = Layer.effect(PipelineFeishu, make);
