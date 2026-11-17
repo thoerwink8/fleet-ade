@@ -25,7 +25,8 @@ import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import { REPOSITORY, PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
+import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
+import { DEFAULT_REPO, parseRepo, worktreeBranch } from "./repoAllowlist.ts";
 import { PipelineBudget } from "./budget.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import { SessionEndInbox, type SessionEndEntry } from "./SessionEndInbox.ts";
@@ -34,29 +35,19 @@ import { orderedCandidates, pickRouteCandidate } from "./routeCandidates.ts";
 const STUCK_SESSION_FAILED = "会话失败";
 const STUCK_TIMEOUT = "超时";
 const STUCK_CANCELLED = "取消";
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 
-const branchFragment = (title: string): string => {
-  const fragment = title
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 32)
-    .replace(/-+$/g, "");
-  return fragment.length > 0 ? fragment : "issue";
-};
-
-export const sessionBranch = (issueNumber: number, title: string): string =>
-  `pipeline/${issueNumber}-${branchFragment(title)}`;
+export const sessionBranch = (
+  issueNumber: number,
+  title: string,
+  repository: string = DEFAULT_REPO,
+): string => worktreeBranch(repository, issueNumber, title);
 
 /** A run the session step can still move. Later states belong to later issues. */
 const OPEN_STATUSES = ["claimed", "session"] as const;
 
 interface OpenRun {
   readonly id: number;
+  readonly repository: string;
   readonly issueNumber: number;
   readonly title: string;
   readonly status: (typeof OPEN_STATUSES)[number];
@@ -68,6 +59,7 @@ interface OpenRun {
 
 const OpenRunRow = Schema.Struct({
   id: Schema.Int,
+  repository: Schema.String,
   issueNumber: Schema.Int,
   title: Schema.String,
   status: Schema.Literals(OPEN_STATUSES),
@@ -102,8 +94,12 @@ export class SessionOpener extends Context.Service<SessionOpener, SessionOpenerS
 
 const decodeOpenRuns = Schema.decodeUnknownEffect(Schema.Array(OpenRunRow));
 
-const matchesRepository = (owner: string | undefined, name: string | undefined): boolean =>
-  owner === REPOSITORY.owner && name === REPOSITORY.name;
+const matchesRepository = (
+  owner: string | undefined,
+  name: string | undefined,
+  expectedOwner: string,
+  expectedName: string,
+): boolean => owner === expectedOwner && name === expectedName;
 
 const minutesSince = (startedAt: string, now: DateTime.DateTime): number | undefined => {
   const started = Date.parse(startedAt);
@@ -140,15 +136,14 @@ const make = Effect.gen(function* () {
   const openRuns = Effect.fn("DispatchSession.openRuns")(function* () {
     const listed = yield* runs.list;
     return yield* decodeOpenRuns(
-      listed.runs.filter(
-        (run) =>
-          run.repository === REPOSITORY_NAME &&
-          (run.status === "claimed" || run.status === "session"),
-      ),
+      listed.runs.filter((run) => run.status === "claimed" || run.status === "session"),
     );
   });
 
-  const projectForRepository = Effect.fn("DispatchSession.projectForRepository")(function* () {
+  const projectForRepository = Effect.fn("DispatchSession.projectForRepository")(function* (
+    owner: string,
+    name: string,
+  ) {
     let cursor = 0;
     for (;;) {
       const page = yield* projects.listPage({ cursor, limit: 50 });
@@ -156,7 +151,12 @@ const make = Effect.gen(function* () {
         (project) =>
           project.repositoryIdentity !== null &&
           project.repositoryIdentity !== undefined &&
-          matchesRepository(project.repositoryIdentity.owner, project.repositoryIdentity.name),
+          matchesRepository(
+            project.repositoryIdentity.owner,
+            project.repositoryIdentity.name,
+            owner,
+            name,
+          ),
       );
       if (match !== undefined) return match;
       if (page.nextCursor === null) return undefined;
@@ -164,14 +164,18 @@ const make = Effect.gen(function* () {
     }
   });
 
-  const stick = (issueNumber: number, note: PipelineRunNote) =>
+  const stick = (issueNumber: number, note: PipelineRunNote, repository: string) =>
     note.status === "stuck" && note.stuckReason != null
-      ? budget.settle(issueNumber, {
-          reason: note.stuckReason,
-          ...(note.detail !== undefined ? { detail: note.detail } : {}),
-          ...(note.sessionEndedAt !== undefined ? { sessionEndedAt: note.sessionEndedAt } : {}),
-        })
-      : runs.note(issueNumber, note);
+      ? budget.settle(
+          issueNumber,
+          {
+            reason: note.stuckReason,
+            ...(note.detail !== undefined ? { detail: note.detail } : {}),
+            ...(note.sessionEndedAt !== undefined ? { sessionEndedAt: note.sessionEndedAt } : {}),
+          },
+          repository,
+        )
+      : runs.note(issueNumber, note, repository);
 
   const applyEnd = Effect.fn("DispatchSession.applyEnd")(function* (
     run: OpenRun,
@@ -179,13 +183,17 @@ const make = Effect.gen(function* () {
   ) {
     if (entry.status === "completed") {
       const headKnown = entry.headLookup === "found" && entry.headSha !== undefined;
-      yield* stick(run.issueNumber, {
-        status: "session",
-        sessionEndedAt: entry.endedAt,
-        ...(headKnown
-          ? { headSha: entry.headSha, detail: null }
-          : { detail: "会话结束但查不到 head" }),
-      });
+      yield* stick(
+        run.issueNumber,
+        {
+          status: "session",
+          sessionEndedAt: entry.endedAt,
+          ...(headKnown
+            ? { headSha: entry.headSha, detail: null }
+            : { detail: "会话结束但查不到 head" }),
+        },
+        run.repository,
+      );
       return;
     }
     const terminal =
@@ -194,11 +202,15 @@ const make = Effect.gen(function* () {
         : entry.status === "interrupted"
           ? "interrupted"
           : "failed";
-    yield* stick(run.issueNumber, {
-      ...failNote(entry.status),
-      sessionEndedAt: entry.endedAt,
-      detail: `原终态 ${terminal}`,
-    });
+    yield* stick(
+      run.issueNumber,
+      {
+        ...failNote(entry.status),
+        sessionEndedAt: entry.endedAt,
+        detail: `原终态 ${terminal}`,
+      },
+      run.repository,
+    );
   });
 
   const dispatchClaimed = Effect.fn("DispatchSession.dispatchClaimed")(function* (
@@ -208,7 +220,11 @@ const make = Effect.gen(function* () {
     now: string,
   ) {
     const failed = (detail: string) =>
-      stick(run.issueNumber, { status: "stuck", stuckReason: STUCK_SESSION_FAILED, detail }).pipe(
+      stick(
+        run.issueNumber,
+        { status: "stuck", stuckReason: STUCK_SESSION_FAILED, detail },
+        run.repository,
+      ).pipe(
         Effect.tap(() =>
           Effect.logWarning("pipeline.dispatch.session-failed", {
             issueNumber: run.issueNumber,
@@ -216,9 +232,11 @@ const make = Effect.gen(function* () {
           }),
         ),
       );
-    const project = yield* projectForRepository();
+    const repo = parseRepo(run.repository);
+    if (repo === undefined) return yield* failed("repository is not owner/name");
+    const project = yield* projectForRepository(repo.owner, repo.name);
     if (project === undefined) return yield* failed("no project for this repository");
-    const branch = sessionBranch(issue.number, issue.title);
+    const branch = sessionBranch(issue.number, issue.title, run.repository);
     const cwd = project.workspaceRoot;
     const base = yield* git
       .fetchWorktreeBaseCommit({ cwd, refName: "main" })
@@ -248,7 +266,11 @@ const make = Effect.gen(function* () {
       })
       .pipe(Effect.exit);
     if (Exit.isFailure(opened)) return yield* failed("session was not opened");
-    yield* stick(run.issueNumber, { status: "session", threadId, sessionStartedAt: now });
+    yield* stick(
+      run.issueNumber,
+      { status: "session", threadId, sessionStartedAt: now },
+      run.repository,
+    );
   });
 
   const tick = Effect.gen(function* () {
@@ -257,7 +279,9 @@ const make = Effect.gen(function* () {
     const now = yield* DateTime.now;
     const nowIso = DateTime.formatIso(now);
     const timeout = Duration.toMillis(Duration.minutes(current.pipelineSessionTimeoutMinutes));
-    const pending = yield* openRuns();
+    const pending = (yield* openRuns()).filter((run) =>
+      current.pipelineRepos.includes(run.repository),
+    );
     const ends = yield* inbox.list;
     const endByThread = new Map(ends.map((entry) => [entry.threadId, entry]));
 
@@ -273,12 +297,16 @@ const make = Effect.gen(function* () {
         const elapsed =
           run.sessionStartedAt === null ? undefined : minutesSince(run.sessionStartedAt, now);
         if (elapsed !== undefined && elapsed * 60_000 > timeout) {
-          yield* stick(run.issueNumber, {
-            status: "stuck",
-            stuckReason: STUCK_TIMEOUT,
-            sessionEndedAt: nowIso,
-            detail: "超时",
-          });
+          yield* stick(
+            run.issueNumber,
+            {
+              status: "stuck",
+              stuckReason: STUCK_TIMEOUT,
+              sessionEndedAt: nowIso,
+              detail: "超时",
+            },
+            run.repository,
+          );
         }
         continue;
       }
@@ -286,17 +314,34 @@ const make = Effect.gen(function* () {
       if (run.threadId !== null) continue;
       const picked = pickRouteCandidate(orderedCandidates(current.pipelineAuthorModel));
       if (picked.kind === "stuck") {
-        yield* stick(run.issueNumber, { status: "stuck", stuckReason: picked.reason });
+        yield* stick(
+          run.issueNumber,
+          { status: "stuck", stuckReason: picked.reason },
+          run.repository,
+        );
         continue;
       }
       const model = picked.model;
-      const issue = yield* issues.read(run.issueNumber).pipe(Effect.option);
+      const repo = parseRepo(run.repository);
+      if (repo === undefined) {
+        yield* stick(
+          run.issueNumber,
+          { status: "stuck", stuckReason: STUCK_SESSION_FAILED, detail: "仓名不是 owner/name" },
+          run.repository,
+        );
+        continue;
+      }
+      const issue = yield* issues.read(run.issueNumber, repo).pipe(Effect.option);
       if (Option.isNone(issue)) {
-        yield* stick(run.issueNumber, {
-          status: "stuck",
-          stuckReason: STUCK_SESSION_FAILED,
-          detail: "读不到这张单",
-        });
+        yield* stick(
+          run.issueNumber,
+          {
+            status: "stuck",
+            stuckReason: STUCK_SESSION_FAILED,
+            detail: "读不到这张单",
+          },
+          run.repository,
+        );
         continue;
       }
       if ((yield* openRuns()).some((item) => item.status === "session")) continue;

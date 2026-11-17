@@ -67,6 +67,7 @@ interface PipelineBudgetShape {
   readonly settle: (
     issueNumber: number,
     proposed: StuckProposal,
+    repository?: string,
   ) => Effect.Effect<void, PipelineRunsError | ServerSettingsError>;
 }
 
@@ -132,17 +133,23 @@ const make = Effect.gen(function* () {
     return read.value > current.lines ? ("over" as const) : ("pass" as const);
   });
 
-  const load = Effect.fn("PipelineBudget.load")(function* (issueNumber: number) {
+  const load = Effect.fn("PipelineBudget.load")(function* (
+    issueNumber: number,
+    repository?: string,
+  ) {
+    const repositoryName = repository ?? REPOSITORY_NAME;
     return (yield* runs.list).runs.find(
-      (run) => run.repository === REPOSITORY_NAME && run.issueNumber === issueNumber,
+      (run) => run.repository === repositoryName && run.issueNumber === issueNumber,
     );
   });
 
   const settle = Effect.fn("PipelineBudget.settle")(function* (
     issueNumber: number,
     proposed: StuckProposal,
+    repository?: string,
   ) {
-    let current = yield* load(issueNumber);
+    const repositoryName = repository ?? REPOSITORY_NAME;
+    let current = yield* load(issueNumber, repositoryName);
     if (current === undefined) {
       return yield* new PipelineRunsError({ cause: `no run for issue ${issueNumber}` });
     }
@@ -152,36 +159,50 @@ const make = Effect.gen(function* () {
       current.sessionStartedAt !== null &&
       current.sessionEndedAt !== proposed.sessionEndedAt;
     if (closeWindow) {
-      yield* runs.note(issueNumber, { sessionEndedAt: proposed.sessionEndedAt });
-      current = (yield* load(issueNumber)) ?? current;
+      yield* runs.note(issueNumber, { sessionEndedAt: proposed.sessionEndedAt }, repository);
+      current = (yield* load(issueNumber, repository)) ?? current;
     }
     if ((yield* review(current)) === "over") {
-      yield* runs.note(issueNumber, {
-        status: "stuck",
-        stuckReason: OVER_BUDGET,
-        detail: null,
-        ...(proposed.sessionEndedAt != null ? { sessionEndedAt: proposed.sessionEndedAt } : {}),
-      });
+      yield* runs.note(
+        issueNumber,
+        {
+          status: "stuck",
+          stuckReason: OVER_BUDGET,
+          detail: null,
+          ...(proposed.sessionEndedAt != null ? { sessionEndedAt: proposed.sessionEndedAt } : {}),
+        },
+        repository,
+      );
       return;
     }
     if (!current.renewedOnce && RENEWABLE.has(proposed.reason)) {
-      yield* runs.note(issueNumber, {
-        status: "claimed",
-        stuckReason: null,
-        threadId: null,
-        sessionStartedAt: null,
-        sessionEndedAt: null,
-        detail: RENEWED,
-        renewedOnce: true,
-      });
+      yield* runs.note(
+        issueNumber,
+        {
+          status: "claimed",
+          stuckReason: null,
+          threadId: null,
+          sessionStartedAt: null,
+          sessionEndedAt: null,
+          detail: RENEWED,
+          renewedOnce: true,
+        },
+        repository,
+      );
       return;
     }
-    yield* runs.note(issueNumber, {
-      status: "stuck",
-      stuckReason: proposed.reason,
-      ...(proposed.detail !== undefined ? { detail: proposed.detail } : {}),
-      ...(proposed.sessionEndedAt !== undefined ? { sessionEndedAt: proposed.sessionEndedAt } : {}),
-    });
+    yield* runs.note(
+      issueNumber,
+      {
+        status: "stuck",
+        stuckReason: proposed.reason,
+        ...(proposed.detail !== undefined ? { detail: proposed.detail } : {}),
+        ...(proposed.sessionEndedAt !== undefined
+          ? { sessionEndedAt: proposed.sessionEndedAt }
+          : {}),
+      },
+      repository,
+    );
   });
 
   const tick = Effect.gen(function* () {
