@@ -32,6 +32,8 @@ export type ClaimInput =
       readonly title: string;
       readonly claimedBy: string;
       readonly leaseUntil: string;
+      /** Internal fence stored in fencing. Absent on HTTP claims. */
+      readonly token?: string | undefined;
     }
   | {
       readonly action: "renew";
@@ -47,8 +49,8 @@ export type ClaimInput =
       readonly outcome: "done" | "failed" | "released";
       readonly reason?: string | undefined;
       readonly claimedBy: string;
-      /** Release fence: deletes only while this expiry still stands. Absent = holder match only. */
-      readonly leaseUntil?: string | undefined;
+      /** Absent on HTTP finish, which deletes by holder. Present means fencing must match. */
+      readonly token?: string | undefined;
     };
 
 export type ClaimOutcome =
@@ -117,18 +119,15 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
       if (registered.length === 0) return { status: 404, code: "unknown_repo" } as const;
       const held = yield* heldBy(sql, input.repo, input.issue);
       if (input.action === "finish") {
-        const owned = held.find(
-          (row) =>
-            row.claimedBy === input.claimedBy &&
-            (input.leaseUntil === undefined || row.leaseUntil === input.leaseUntil),
-        );
-        if (owned === undefined) return { status: 409, code: "not_claimed" } as const;
-        yield* sql`
+        const token = input.token;
+        const removed = yield* sql<{ readonly issue: number }>`
           DELETE FROM node_claims
           WHERE lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
             AND claimed_by = ${input.claimedBy}
-            ${input.leaseUntil === undefined ? sql`` : sql`AND lease_until = ${input.leaseUntil}`}
+            ${token !== undefined ? sql`AND fencing = ${token}` : sql``}
+          RETURNING issue
         `;
+        if (removed.length === 0) return { status: 409, code: "not_claimed" } as const;
         return { status: 200, code: "ok", leaseUntil: null } as const;
       }
       if (input.action === "renew") {
@@ -165,7 +164,7 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
           ${input.leaseUntil},
           'local',
           'running',
-          NULL
+          ${input.token ?? null}
         )
       `;
       return { status: 200, code: "ok", leaseUntil: input.leaseUntil } as const;
