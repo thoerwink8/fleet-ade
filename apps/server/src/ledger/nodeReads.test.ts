@@ -271,6 +271,52 @@ it.effect("三个登录读口不接受节点证，没有登录上下文时是 40
   );
 });
 
+it.effect("POST /api/nodes/claims 是唯一写口：404、409、503，leaseUntil 由服务端写下", () => {
+  const clock = fixedClock(0);
+  return withWeb({ login: false, nowMillis: clock.nowMillis }, (handler, sql) =>
+    Effect.gen(function* () {
+      const body = { action: "claim", repo: "example/one", issue: 7, title: "单 7" };
+      const missing = yield* send(handler, "POST", "/api/nodes/claims", {
+        credential: TOKEN,
+        body,
+      });
+      expect(missing.status).toBe(404);
+      expect((yield* json<{ error: { code: string } }>(missing)).error.code).toBe("unknown_repo");
+      yield* sql`INSERT INTO repos (owner, name) VALUES ('example', 'one')`;
+      const first = yield* send(handler, "POST", "/api/nodes/claims", {
+        credential: TOKEN,
+        body,
+      });
+      expect(first.status).toBe(200);
+      expect(yield* json(first)).toEqual({
+        ok: true,
+        state: "running",
+        executor: "local",
+        leaseUntil: "1970-01-01T02:00:00.000Z",
+      });
+      const again = yield* send(handler, "POST", "/api/nodes/claims", {
+        credential: TOKEN,
+        body,
+      });
+      expect(again.status).toBe(409);
+      expect((yield* json<{ error: { code: string } }>(again)).error.code).toBe("engine_has_it");
+      expect(yield* sql`SELECT claimed_by, lease_until FROM node_claims`).toEqual([
+        { claimed_by: "test-node", lease_until: "1970-01-01T02:00:00.000Z" },
+      ]);
+      yield* sql`DROP TABLE repos`;
+      const unread = yield* send(handler, "POST", "/api/nodes/claims", {
+        credential: TOKEN,
+        body,
+      });
+      expect(unread.status).toBe(503);
+      expect((yield* json<{ error: { code: string } }>(unread)).error.code).toBe(
+        "local_claims_unreadable",
+      );
+      expect(yield* sql`SELECT claimed_by FROM node_claims`).toEqual([{ claimed_by: "test-node" }]);
+    }),
+  );
+});
+
 const SESSION = "ledger-test-session";
 const LIMITED_SESSION = "ledger-limited-session";
 

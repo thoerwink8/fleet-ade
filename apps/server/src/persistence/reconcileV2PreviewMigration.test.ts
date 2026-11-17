@@ -42,6 +42,7 @@ describe("V2 preview upgrade", () => {
         [95, "PipelineNotify"],
         [96, "PipelineCandidatesExhausted"],
         [97, "PipelineDailyBrief"],
+        [98, "PipelineRunClaimToken"],
       ]);
       const after = yield* sql`SELECT * FROM pipeline_runs`;
       assert.deepStrictEqual(
@@ -51,6 +52,7 @@ describe("V2 preview upgrade", () => {
             ci_queue_note: _ciQueueNote,
             notified_reason: _notifiedReason,
             notify_note: _notifyNote,
+            claim_token: _claimToken,
             ...rest
           } = row;
           return rest;
@@ -58,8 +60,16 @@ describe("V2 preview upgrade", () => {
         before,
       );
       assert.deepStrictEqual(
-        yield* sql`SELECT commit_note, ci_queue_note, notified_reason, notify_note FROM pipeline_runs WHERE id = 28`,
-        [{ commit_note: null, ci_queue_note: null, notified_reason: null, notify_note: null }],
+        yield* sql`SELECT commit_note, ci_queue_note, notified_reason, notify_note, claim_token FROM pipeline_runs WHERE id = 28`,
+        [
+          {
+            commit_note: null,
+            ci_queue_note: null,
+            notified_reason: null,
+            notify_note: null,
+            claim_token: null,
+          },
+        ],
       );
       yield* sql`UPDATE pipeline_runs SET input_tokens = 11 WHERE id = 28`;
       assert.deepStrictEqual(
@@ -130,6 +140,7 @@ describe("V2 preview upgrade", () => {
         [95, "PipelineNotify"],
         [96, "PipelineCandidatesExhausted"],
         [97, "PipelineDailyBrief"],
+        [98, "PipelineRunClaimToken"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -250,6 +261,7 @@ describe("V2 preview upgrade", () => {
         [95, "PipelineNotify"],
         [96, "PipelineCandidatesExhausted"],
         [97, "PipelineDailyBrief"],
+        [98, "PipelineRunClaimToken"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

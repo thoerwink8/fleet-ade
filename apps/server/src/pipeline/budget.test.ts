@@ -19,6 +19,7 @@ import {
   layer as runsLayer,
   type UsageRecord,
 } from "./PipelineRuns.ts";
+import * as ClaimLease from "./claimLease.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 
 const START = "2026-11-16T00:00:00.000Z";
@@ -63,6 +64,7 @@ const layerFor = (input: {
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return budgetLayer.pipe(

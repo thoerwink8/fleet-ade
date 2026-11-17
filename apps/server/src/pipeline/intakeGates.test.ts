@@ -19,6 +19,7 @@ import {
   type PrerequisiteState,
 } from "./intakeGates.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import * as ClaimLease from "./claimLease.ts";
 
 const OPENED_AT = "2020-01-01T00:00:00.000Z";
 const OLD = "2019-06-01T00:00:00.000Z";
@@ -116,6 +117,7 @@ const gateLayer = (
     Layer.provide(
       ServerSettings.layerTest({ pipelineEnabled: true, pipelineEnabledAt: OPENED_AT }),
     ),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 

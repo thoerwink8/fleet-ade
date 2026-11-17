@@ -40,6 +40,7 @@ import {
   layer as runsLayer,
   type UsageRecord,
 } from "./PipelineRuns.ts";
+import * as ClaimLease from "./claimLease.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 
 const ENDED_AT = "1970-01-01T01:00:00.000Z";
@@ -83,6 +84,7 @@ const tickLayer = (input: {
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage ?? Effect.succeed([]) })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   const opener = Layer.succeed(PullRequestOpener, {

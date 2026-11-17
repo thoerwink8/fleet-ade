@@ -21,6 +21,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import * as DispatchSession from "./DispatchSession.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
+import * as ClaimLease from "./claimLease.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import { SessionEndInbox, layer as inboxLayer, type SessionEndStatus } from "./SessionEndInbox.ts";
@@ -127,6 +128,7 @@ const sessionLayer = (
     Layer.provide(usage),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(memory),
   );
   return DispatchSession.layer.pipe(

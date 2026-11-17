@@ -10,6 +10,7 @@ import { PipelineGitHubIssues, PipelineIssuesIncompleteError } from "./GitHubIss
 import { FEISHU_WEBHOOK_VARIABLE, layer as feishuLayer } from "./feishu.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import * as ClaimLease from "./claimLease.ts";
 
 const FAKE_WEBHOOK = "https://feishu.invalid/hook/test";
 
@@ -64,6 +65,7 @@ const harness = (options: { readonly webhook: string | undefined; readonly statu
     ),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 };

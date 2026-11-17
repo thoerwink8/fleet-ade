@@ -43,6 +43,7 @@ import {
   type PrerequisiteState,
 } from "./intakeGates.ts";
 import { PipelineFeishu, layer as feishuLayer, type StuckMessage } from "./feishu.ts";
+import * as ClaimLease from "./claimLease.ts";
 import { DailyBrief, beijingBriefSlot, layerLive as dailyBriefLive } from "./dailyBrief.ts";
 
 /** How often a tick runs. One place. */
@@ -297,6 +298,7 @@ const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const ports = yield* PipelineIntakePorts;
   const usage = yield* PipelineUsage;
+  const claims = yield* ClaimLease.ClaimLeasePort;
 
   const feishu = yield* Effect.serviceOption(PipelineFeishu);
   const brief = yield* Effect.serviceOption(DailyBrief);
@@ -358,11 +360,12 @@ const make = Effect.gen(function* () {
     readonly issue: PipelineIssue;
     readonly status: "claimed" | "stuck";
     readonly stuckReason: PipelineStuckReason | null;
+    readonly claimToken?: string | null;
   }) {
     const at = yield* nowIso();
     const inserted = yield* sql<{ readonly id: number }>`
       INSERT INTO pipeline_runs (
-        repository, issue_number, title, status, stuck_reason, updated_at
+        repository, issue_number, title, status, stuck_reason, updated_at, claim_token
       )
       VALUES (
         ${REPOSITORY_NAME},
@@ -370,7 +373,8 @@ const make = Effect.gen(function* () {
         ${input.issue.title},
         ${input.status},
         ${input.stuckReason},
-        ${at}
+        ${at},
+        ${input.claimToken ?? null}
       )
       RETURNING id
     `.pipe(
@@ -456,7 +460,84 @@ const make = Effect.gen(function* () {
     }
   });
 
+  const settleRelease = Effect.fn("PipelineRuns.settleRelease")(function* (row: {
+    readonly id: number;
+    readonly issueNumber: number;
+    readonly token: string;
+  }) {
+    const outcome = yield* Effect.exit(
+      ClaimLease.releaseClaim(claims, {
+        repo: REPOSITORY_NAME,
+        issue: row.issueNumber,
+        token: row.token,
+      }),
+    );
+    if (Exit.isFailure(outcome)) {
+      yield* Effect.logWarning("pipeline.claim.release-failed", {
+        issue: row.issueNumber,
+        cause: Cause.pretty(outcome.cause),
+      });
+      return;
+    }
+    const result = outcome.value;
+    if (result.status === 503 || (result.status !== 200 && result.code !== "not_claimed")) {
+      yield* Effect.logWarning("pipeline.claim.release-failed", {
+        issue: row.issueNumber,
+        status: result.status,
+        code: result.code,
+      });
+      return;
+    }
+    if (result.code === "not_claimed") {
+      yield* Effect.logWarning("pipeline.claim.release-lost", {
+        issue: row.issueNumber,
+        code: result.code,
+      });
+    }
+    yield* sql`
+      UPDATE pipeline_runs SET claim_token = NULL
+      WHERE id = ${row.id} AND claim_token = ${row.token}
+    `.pipe(
+      Effect.mapError(sqlFailure),
+      Effect.catchCause((cause) =>
+        Effect.logWarning("pipeline.claim.release-failed", {
+          issue: row.issueNumber,
+          cause: Cause.pretty(cause),
+        }),
+      ),
+    );
+  });
+
+  const releasePending = Effect.fn("PipelineRuns.releasePending")(function* () {
+    const pending = yield* sql<{
+      readonly id: number;
+      readonly issueNumber: number;
+      readonly claimToken: string;
+    }>`
+      SELECT id, issue_number AS issueNumber, claim_token AS claimToken
+      FROM pipeline_runs
+      WHERE claim_token IS NOT NULL
+        AND (
+          status = 'merged'
+          OR (status = 'stuck' AND stuck_reason = '取消')
+        )
+    `.pipe(Effect.mapError(sqlFailure));
+    for (const row of pending) {
+      if (row.claimToken.length === 0) continue;
+      yield* settleRelease({
+        id: row.id,
+        issueNumber: row.issueNumber,
+        token: row.claimToken,
+      });
+    }
+  });
+
   const tick: PipelineRunsShape["tick"] = Effect.gen(function* () {
+    yield* releasePending().pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("pipeline.claim.release-failed", { cause: Cause.pretty(cause) }),
+      ),
+    );
     yield* Effect.exit(maybeBrief);
     const current = yield* settings.getSettings.pipe(Effect.mapError(sqlFailure));
     if (!current.pipelineEnabled) {
@@ -533,7 +614,48 @@ const make = Effect.gen(function* () {
       if (acceptanceItemCount(issue.body) < 1) continue;
       if (activeIssues.has(issue.number)) continue;
       if (openSessions >= MAX_OPEN_SESSIONS) continue;
-      yield* insertRun({ issue, status: "claimed", stuckReason: null });
+      const leased = yield* ClaimLease.claimForRun(claims, {
+        repo: REPOSITORY_NAME,
+        issue: issue.number,
+        title: issue.title,
+      });
+      if (leased.status !== 200) continue;
+      // Ledger claim commits before this insert; they are not one transaction.
+      // Release this token if the row is not stored. If that release also fails,
+      // restart cannot retry: the token was never persisted, so it expires at the
+      // original two-hour leaseUntil. Do not delete by holder or by a null fence.
+      const stored = yield* Effect.exit(
+        insertRun({
+          issue,
+          status: "claimed",
+          stuckReason: null,
+          claimToken: leased.token,
+        }),
+      );
+      if (Exit.isFailure(stored) || stored.value === undefined) {
+        const released = yield* Effect.exit(
+          ClaimLease.releaseClaim(claims, {
+            repo: REPOSITORY_NAME,
+            issue: issue.number,
+            token: leased.token,
+          }),
+        );
+        if (Exit.isFailure(released)) {
+          yield* Effect.logError("pipeline.claim.release-orphaned", {
+            issue: issue.number,
+            token: leased.token,
+            cause: Cause.pretty(released.cause),
+          });
+        } else if (released.value.status !== 200 && released.value.code !== "not_claimed") {
+          yield* Effect.logError("pipeline.claim.release-orphaned", {
+            issue: issue.number,
+            token: leased.token,
+            cause: released.value.code,
+          });
+        }
+        if (Exit.isFailure(stored)) return yield* Effect.failCause(stored.cause);
+        continue;
+      }
       activeIssues.add(issue.number);
     }
     yield* noteTick("ok", null);
@@ -659,6 +781,15 @@ const make = Effect.gen(function* () {
       });
     }
     yield* refreshUsage();
+    if (nextStatus === "merged" || (nextStatus === "stuck" && nextReason === TERMINAL_CANCEL)) {
+      const tokenRow = yield* sql<{ readonly claimToken: string | null }>`
+        SELECT claim_token AS claimToken FROM pipeline_runs WHERE id = ${target.id}
+      `.pipe(Effect.mapError(sqlFailure));
+      const token = tokenRow[0]?.claimToken;
+      if (token !== null && token !== undefined && token.length > 0) {
+        yield* settleRelease({ id: target.id, issueNumber, token });
+      }
+    }
   });
 
   return PipelineRuns.of({ tick, list, note });
@@ -782,6 +913,7 @@ export const layerUsageAt = (sessionsRoot: string | undefined) =>
 export const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
+  Layer.provide(ClaimLease.layerLive),
   Layer.provide(dailyBriefLive),
   Layer.provide(feishuLayer.pipe(Layer.provide(FetchHttpClient.layer))),
   Layer.provide(layerPortsDefault),

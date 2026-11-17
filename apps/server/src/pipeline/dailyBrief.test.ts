@@ -19,6 +19,7 @@ import {
 } from "./dailyBrief.ts";
 import { FEISHU_WEBHOOK_VARIABLE } from "./feishu.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
+import * as ClaimLease from "./claimLease.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 
 const DAY = "2026-11-17";
@@ -66,6 +67,7 @@ const pipelineLayer = <E, R>(brief: Layer.Layer<DailyBrief, E, R>) =>
     ),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
     Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 
