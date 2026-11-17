@@ -1392,6 +1392,163 @@ describe("AcpRegistryAdapterV2", () => {
     }).pipe(Effect.provide(layerTest)),
   );
 
+  it.effect("appends omp stdio MCP servers on create and resume without dropping HTTP", () =>
+    Effect.gen(function* () {
+      const selfInvocation = yield* resolveSelfInvocation();
+      const mockAgentPath = yield* (yield* Path.Path).fromFileUrl(
+        new URL("../../../scripts/acp-mock-agent.ts", import.meta.url),
+      );
+      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+      const endpoint = "http://127.0.0.1:43123/mcp";
+      const extra = {
+        name: "notes",
+        command: "C:/tools/notes-mcp",
+        args: ["serve"],
+        env: [{ name: "NOTES_ADDR", value: "127.0.0.1:9" }],
+      };
+      let sessionOrdinal = 0;
+      const sessionMcpServers = Effect.fn("sessionMcpServers")(function* (
+        config: Record<string, unknown>,
+        agentEnvironment: Record<string, string> = {},
+      ) {
+        const requests: Array<AcpSessionRuntime.AcpSessionRequestLogEvent> = [];
+        sessionOrdinal += 1;
+        const instanceId = ProviderInstanceId.make(`acp-omp-stdio-${sessionOrdinal}`);
+        const threadId = ThreadId.make(`thread-acp-omp-stdio-${sessionOrdinal}`);
+        const mcpSession = {
+          environmentId: EnvironmentId.make(`environment-acp-omp-stdio-${sessionOrdinal}`),
+          threadId,
+          providerSessionId: `mcp-session-acp-omp-stdio-${sessionOrdinal}`,
+          providerInstanceId: instanceId,
+          endpoint,
+          browserToolsAvailable: false,
+        };
+        yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer opened-token" });
+        const adapter = yield* makeAcpRegistryAdapterV2({
+          selfInvocation,
+          instanceId,
+          settings: yield* decodeAcpRegistryAdapterSettings(config),
+          environment: {},
+          nativeLogging: () => ({
+            requestLogger: (event) =>
+              Effect.sync(() => {
+                if (event.status === "started") requests.push(event);
+              }),
+          }),
+        }).pipe(
+          Effect.provide(
+            Layer.mock(AcpRegistrySupport.AcpRegistryCatalog)({
+              resolve: () =>
+                Effect.succeed({
+                  distribution: "local" as const,
+                  spawn: {
+                    command: process.execPath,
+                    args: [mockAgentPath],
+                    env: { T3_ACP_SESSION_LIFECYCLE: "1", ...agentEnvironment },
+                  },
+                }),
+            }),
+          ),
+        );
+        const modelSelection = { instanceId, model: "default" } as const;
+        const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          cwd: process.cwd(),
+        });
+        const runtime = yield* adapter.openSession({
+          threadId,
+          providerSessionId: ProviderSessionId.make(
+            `provider-session-acp-omp-stdio-${sessionOrdinal}`,
+          ),
+          modelSelection,
+          runtimePolicy,
+        });
+        const providerThread = yield* runtime.ensureThread({
+          threadId,
+          modelSelection,
+          runtimePolicy,
+        });
+        yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer rotated-token" });
+        yield* runtime.resumeThread({
+          providerThread: {
+            ...providerThread,
+            nativeThreadRef: {
+              driver: ACP_REGISTRY_PROVIDER,
+              nativeId: "mock-session-2",
+              strength: "strong",
+            },
+          },
+        });
+        const sent = (method: string) => {
+          const payload = requests.find((event) => event.method === method)?.payload;
+          return typeof payload === "object" && payload !== null
+            ? Reflect.get(payload, "mcpServers")
+            : undefined;
+        };
+        return { new: sent("session/new"), load: sent("session/load") };
+      });
+      const http = (authorization: string) => [
+        {
+          type: "http",
+          name: "t3-code",
+          url: endpoint,
+          headers: [
+            { name: "Authorization", value: authorization },
+            { name: "t3-tool-exposure", value: "deferred" },
+          ],
+        },
+      ];
+      const stdio = (authorization: string) => [
+        {
+          name: "t3-code",
+          command: selfInvocation.command,
+          args: [...selfInvocationArgs(selfInvocation, ["acp-mcp-bridge"])],
+          env: [
+            { name: "ELECTRON_RUN_AS_NODE", value: "1" },
+            { name: "T3_ACP_MCP_ENDPOINT", value: endpoint },
+            { name: "T3_ACP_MCP_AUTHORIZATION", value: authorization },
+          ],
+        },
+      ];
+      const acp = [{ type: "acp", name: "t3-code", serverId: "t3-code" }];
+      const omp = { source: "local", commandPath: "omp", commandArgs: ["acp"] };
+
+      assert.deepEqual(yield* sessionMcpServers(omp), {
+        new: stdio("Bearer opened-token"),
+        load: stdio("Bearer rotated-token"),
+      });
+      assert.deepEqual(yield* sessionMcpServers({ ...omp, stdioMcpServers: [extra] }), {
+        new: [...stdio("Bearer opened-token"), extra],
+        load: [...stdio("Bearer rotated-token"), extra],
+      });
+      assert.deepEqual(
+        yield* sessionMcpServers({ ...omp, stdioMcpServers: [extra] }, { T3_ACP_MCP_HTTP: "1" }),
+        {
+          new: [...stdio("Bearer opened-token"), extra],
+          load: [...stdio("Bearer rotated-token"), extra],
+        },
+      );
+      assert.deepEqual(
+        yield* sessionMcpServers(
+          { ...omp, stdioMcpServers: [extra] },
+          { T3_ACP_MCP_HTTP: "1", T3_ACP_MCP_ACP: "1" },
+        ),
+        {
+          new: [...acp, extra],
+          load: [...acp, extra],
+        },
+      );
+      assert.deepEqual(
+        yield* sessionMcpServers(
+          { agentId: "github-copilot-cli", stdioMcpServers: [extra] },
+          { T3_ACP_MCP_HTTP: "1" },
+        ),
+        { new: http("Bearer opened-token"), load: http("Bearer rotated-token") },
+      );
+    }).pipe(Effect.provide(layerTest)),
+  );
+
   it.effect("the agent process env names the thread it serves", () =>
     Effect.gen(function* () {
       const selfInvocation = yield* resolveSelfInvocation();

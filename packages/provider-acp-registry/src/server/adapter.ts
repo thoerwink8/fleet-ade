@@ -231,6 +231,16 @@ export const makeAcpRegistryAdapterV2 = Effect.fn("makeAcpRegistryAdapterV2")(fu
         }
       : AcpProviderCapabilitiesV2,
     customModels: readCustomModelEntries(options.settings.customModels).map((entry) => entry.slug),
+    ...(isOmp && options.settings.stdioMcpServers.length > 0
+      ? {
+          extraStdioMcpServers: options.settings.stdioMcpServers.map((server) => ({
+            name: server.name,
+            command: server.command,
+            args: [...server.args],
+            env: server.env.map((entry) => ({ name: entry.name, value: entry.value })),
+          })),
+        }
+      : {}),
     compactViaAdvertisedCommand: true,
     promptFailure: (cause) => acpRegistryPromptFailure(registryAgentId, cause),
     ...(registryAgentId === "factory-droid"

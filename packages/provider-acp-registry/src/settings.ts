@@ -62,6 +62,27 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed([])),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
+    stdioMcpServers: Schema.Array(
+      Schema.Struct({
+        name: TrimmedString,
+        command: TrimmedString,
+        args: Schema.Array(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+        env: Schema.Array(
+          Schema.Struct({
+            name: TrimmedString,
+            value: Schema.String,
+          }),
+        ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+      }),
+    ).pipe(
+      Schema.withDecodingDefault(Effect.succeed([])),
+      Schema.annotateKey({
+        title: "Stdio MCP servers",
+        description:
+          "Extra stdio MCP servers appended for a local omp instance. Other ACP agents ignore this.",
+        providerSettingsForm: { hidden: true },
+      }),
+    ),
   },
   {
     order: ["source", "agentId", "commandPath", "authMethodId"],

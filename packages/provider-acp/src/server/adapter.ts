@@ -205,6 +205,7 @@ export interface AcpAdapterV2RuntimeInput {
   readonly mcpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly extraStdioMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly resumeSessionId?: string;
   readonly interruptPromptOnCancel?: boolean;
@@ -377,6 +378,8 @@ export interface AcpAdapterV2Flavor {
   readonly mcpOverHttp?: boolean;
   /** The agent has no tool search of its own, so T3 lists optional tools on demand. */
   readonly deferMcpTools?: boolean;
+  /** Extra stdio MCP servers. Appended after HTTP or ACP replaces the t3-code bridge. */
+  readonly extraStdioMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => EffectAcpSchema.SessionNotification;
@@ -893,6 +896,7 @@ interface AcpMcpContext {
   readonly servers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly extraStdioMcpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly endpoint?: string;
   readonly authorization?: string;
@@ -903,9 +907,10 @@ function acpMcpContext(
   self: SelfInvocation,
   mcpOverHttp: boolean | undefined,
   deferMcpTools: boolean | undefined,
+  extraStdioMcpServers: ReadonlyArray<EffectAcpSchema.McpServer> = [],
 ): AcpMcpContext {
   if (session === undefined) {
-    return { servers: [], acpServers: [], httpServers: [] };
+    return { servers: [], acpServers: [], httpServers: [], extraStdioMcpServers };
   }
   // codex-acp 1.2.0 and pi-acp drop injected HTTP servers, so HTTP is opt-in per flavor.
   return {
@@ -938,6 +943,7 @@ function acpMcpContext(
             },
           ]
         : [],
+    extraStdioMcpServers,
     endpoint: session.endpoint,
     authorization: session.authorizationHeader,
     processEnvironment: {
@@ -1790,12 +1796,26 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const { flavor, selfInvocation: self } = options;
   const readMcpContext = (threadId: ThreadId | null) =>
     threadId === null
-      ? Effect.succeed(acpMcpContext(undefined, self, flavor.mcpOverHttp, flavor.deferMcpTools))
+      ? Effect.succeed(
+          acpMcpContext(
+            undefined,
+            self,
+            flavor.mcpOverHttp,
+            flavor.deferMcpTools,
+            flavor.extraStdioMcpServers ?? [],
+          ),
+        )
       : mcpSessions
           .read(threadId)
           .pipe(
             Effect.map((session) =>
-              acpMcpContext(session, self, flavor.mcpOverHttp, flavor.deferMcpTools),
+              acpMcpContext(
+                session,
+                self,
+                flavor.mcpOverHttp,
+                flavor.deferMcpTools,
+                flavor.extraStdioMcpServers ?? [],
+              ),
             ),
           );
   const driver = flavor.driver;
@@ -2499,6 +2519,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             mcpServers: mcpContext.servers,
             acpMcpServers: mcpContext.acpServers,
             httpMcpServers: mcpContext.httpServers,
+            extraStdioMcpServers: mcpContext.extraStdioMcpServers,
             ...(mcpContext.processEnvironment === undefined
               ? {}
               : { processEnvironment: mcpContext.processEnvironment }),
