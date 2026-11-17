@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-/** The one repository this pipeline reads. Not a setting, and not a loop over repositories. */
+/** Used when a call does not name a repository. Ticks pass each allowlisted repository instead. */
 export const REPOSITORY = { owner: "thoerwink8", name: "fleet-ade" } as const;
 
 /** An open issue carrying this label is eligible. A pull request never is. */
@@ -45,6 +45,8 @@ export interface PipelineIssue {
   readonly body: string;
   readonly labels: ReadonlyArray<string>;
   readonly author?: PipelineIssueAuthor | null;
+  /** `owner/name` the issue was listed from. */
+  readonly repository?: string;
   readonly createdAt?: string | null;
   readonly state?: "open" | "closed";
 }
@@ -101,14 +103,28 @@ const toIssue = (issue: DecodedIssue): PipelineIssue => ({
 
 const decodeIssuePage = Schema.decodeUnknownEffect(Schema.fromJsonString(IssuePage));
 
+export interface PipelineRepoName {
+  readonly owner: string;
+  readonly name: string;
+}
+
 export class PipelineGitHubIssues extends Context.Service<
   PipelineGitHubIssues,
   {
-    /** Every open issue of this repository that carries `ELIGIBLE_LABEL`. */
-    readonly listEligible: () => Effect.Effect<ReadonlyArray<PipelineIssue>, PipelineIssuesError>;
+    /** Open issues of one repository that carry `ELIGIBLE_LABEL`. */
+    readonly listEligible: (
+      repo?: PipelineRepoName,
+    ) => Effect.Effect<ReadonlyArray<PipelineIssue>, PipelineIssuesError>;
     /** One issue's title and body, read on its own. */
-    readonly read: (number: number) => Effect.Effect<PipelineIssue, PipelineIssuesError>;
-    readonly addLabel: (number: number, label: string) => Effect.Effect<void, PipelineIssuesError>;
+    readonly read: (
+      number: number,
+      repo?: PipelineRepoName,
+    ) => Effect.Effect<PipelineIssue, PipelineIssuesError>;
+    readonly addLabel: (
+      number: number,
+      label: string,
+      repo?: PipelineRepoName,
+    ) => Effect.Effect<void, PipelineIssuesError>;
   }
 >()("t3/pipeline/GitHubIssues/PipelineGitHubIssues") {}
 
@@ -128,8 +144,12 @@ const make = Effect.gen(function* () {
     return response.body;
   });
 
-  const listEligible = Effect.fn("PipelineGitHubIssues.listEligible")(function* () {
-    const root = `repos/${REPOSITORY.owner}/${REPOSITORY.name}/issues`;
+  const listEligible = Effect.fn("PipelineGitHubIssues.listEligible")(function* (
+    repo?: PipelineRepoName,
+  ) {
+    const owner = repo?.owner ?? REPOSITORY.owner;
+    const name = repo?.name ?? REPOSITORY.name;
+    const root = `repos/${owner}/${name}/issues`;
     const issues: Array<PipelineIssue> = [];
     for (let page = 1; ; page++) {
       const body = yield* get(
@@ -147,8 +167,13 @@ const make = Effect.gen(function* () {
     }
   });
 
-  const read = Effect.fn("PipelineGitHubIssues.read")(function* (number: number) {
-    const body = yield* get(`repos/${REPOSITORY.owner}/${REPOSITORY.name}/issues/${number}`);
+  const read = Effect.fn("PipelineGitHubIssues.read")(function* (
+    number: number,
+    repo?: PipelineRepoName,
+  ) {
+    const owner = repo?.owner ?? REPOSITORY.owner;
+    const name = repo?.name ?? REPOSITORY.name;
+    const body = yield* get(`repos/${owner}/${name}/issues/${number}`);
     const decoded = yield* decodeIssuePage(`[${body}]`);
     const issue = decoded[0];
     if (issue === undefined || issue.pull_request !== undefined) {
@@ -163,12 +188,15 @@ const make = Effect.gen(function* () {
   const addLabel = Effect.fn("PipelineGitHubIssues.addLabel")(function* (
     number: number,
     label: string,
+    repo?: PipelineRepoName,
   ) {
+    const owner = repo?.owner ?? REPOSITORY.owner;
+    const name = repo?.name ?? REPOSITORY.name;
     yield* rest.rest({
       host: HOST,
       operation: "pipelineIssues.addLabel",
       method: "POST",
-      path: `repos/${REPOSITORY.owner}/${REPOSITORY.name}/issues/${number}/labels`,
+      path: `repos/${owner}/${name}/issues/${number}/labels`,
       body: { labels: [label] },
     });
   });

@@ -18,16 +18,11 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import { PipelineBudget } from "./budget.ts";
 import { sessionBranch } from "./DispatchSession.ts";
-import {
-  PIPELINE_HOST,
-  REPOSITORY,
-  PipelineGitHubIssues,
-  layer as issuesLayer,
-} from "./GitHubIssues.ts";
+import { PIPELINE_HOST, PipelineGitHubIssues, layer as issuesLayer } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { parseRepo } from "./repoAllowlist.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 const BASE_BRANCH = "main";
 
 /**
@@ -176,6 +171,7 @@ export class CiCheckReader extends Context.Service<
   {
     readonly read: (input: {
       readonly headSha: string;
+      readonly repository: string;
     }) => Effect.Effect<CiCheckOutcome, CiCheckReadError>;
   }
 >()("t3/pipeline/OpenPullRequest/CiCheckReader") {}
@@ -278,8 +274,13 @@ export const layerOpener = Layer.effect(PullRequestOpener, makeOpener);
 const makeReader = Effect.gen(function* () {
   const rest = yield* GitHubRest.GitHubRest;
 
-  const read = Effect.fn("OpenPullRequest.readCi")(function* (input: { readonly headSha: string }) {
-    const slug = `${encodeURIComponent(REPOSITORY.owner)}/${encodeURIComponent(REPOSITORY.name)}`;
+  const read = Effect.fn("OpenPullRequest.readCi")(function* (input: {
+    readonly headSha: string;
+    readonly repository: string;
+  }) {
+    const repo = parseRepo(input.repository);
+    if (repo === undefined) return yield* new CiCheckReadError();
+    const slug = `${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
     const response = yield* rest
       .rest({
         host: PIPELINE_HOST,
@@ -334,8 +335,12 @@ const make = Effect.gen(function* () {
   const opener = yield* PullRequestOpener;
   const reader = yield* CiCheckReader;
 
-  const writeDetail = (issueNumber: number, current: string | null, next: string | null) =>
-    current === next ? Effect.void : runs.note(issueNumber, { detail: next });
+  const writeDetail = (
+    issueNumber: number,
+    current: string | null,
+    next: string | null,
+    repository: string,
+  ) => (current === next ? Effect.void : runs.note(issueNumber, { detail: next }, repository));
 
   const tick = Effect.gen(function* () {
     if (!(yield* settings.getSettings).pipelineEnabled) return;
@@ -346,24 +351,32 @@ const make = Effect.gen(function* () {
     const cwdByThread = new Map(paths.map((entry) => [String(entry.threadId), entry.worktreePath]));
 
     for (const run of listed.runs) {
-      if (run.repository !== REPOSITORY_NAME) continue;
       if (run.status !== "session" && run.status !== "pr-open" && run.status !== "checks") continue;
       if (run.status === "session" && run.sessionEndedAt === null) continue;
+      const repo = parseRepo(run.repository);
+      if (repo === undefined) {
+        yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
+        continue;
+      }
       if (run.headSha === null) {
-        yield* writeDetail(run.issueNumber, run.detail, UNREAD);
+        yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
         continue;
       }
       const verdict = yield* budget.review(run);
       if (verdict === "over") {
-        yield* runs.note(run.issueNumber, {
-          status: "stuck",
-          stuckReason: "超预算",
-          detail: null,
-        });
+        yield* runs.note(
+          run.issueNumber,
+          {
+            status: "stuck",
+            stuckReason: "超预算",
+            detail: null,
+          },
+          run.repository,
+        );
         continue;
       }
       if (verdict === "hold") {
-        yield* writeDetail(run.issueNumber, run.detail, UNREAD);
+        yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
         continue;
       }
 
@@ -372,25 +385,25 @@ const make = Effect.gen(function* () {
       if (run.prNumber === null) {
         const cwd = run.threadId === null ? undefined : cwdByThread.get(run.threadId);
         if (cwd === undefined) {
-          yield* writeDetail(run.issueNumber, run.detail, UNREAD);
+          yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
           continue;
         }
-        const issue = yield* issues.read(run.issueNumber).pipe(Effect.exit);
+        const issue = yield* issues.read(run.issueNumber, repo).pipe(Effect.exit);
         if (Exit.isFailure(issue)) {
-          yield* writeDetail(run.issueNumber, run.detail, UNREAD);
+          yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
           continue;
         }
         const opened = yield* opener
           .open({
             cwd,
-            branch: sessionBranch(run.issueNumber, run.title),
+            branch: sessionBranch(run.issueNumber, run.title, run.repository),
             title: run.title,
             issueBody: issue.value.body,
             headSha,
           })
           .pipe(Effect.exit);
         if (Exit.isFailure(opened)) {
-          yield* writeDetail(run.issueNumber, run.detail, UNREAD);
+          yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
           yield* Effect.logWarning("pipeline.open-pr.unread", {
             issueNumber: run.issueNumber,
             detail: Cause.pretty(opened.cause),
@@ -398,42 +411,55 @@ const make = Effect.gen(function* () {
           continue;
         }
         headSha = opened.value.headSha ?? headSha;
-        yield* runs.note(run.issueNumber, {
-          status: "pr-open",
-          prNumber: opened.value.number,
-          headSha,
-          detail: null,
-        });
+        yield* runs.note(
+          run.issueNumber,
+          {
+            status: "pr-open",
+            prNumber: opened.value.number,
+            headSha,
+            detail: null,
+          },
+          run.repository,
+        );
         const lined = yield* budget.review({
           ...run,
           prNumber: opened.value.number,
           status: "pr-open",
         });
         if (lined === "over") {
-          yield* runs.note(run.issueNumber, {
-            status: "stuck",
-            stuckReason: "超预算",
-            detail: null,
-          });
+          yield* runs.note(
+            run.issueNumber,
+            {
+              status: "stuck",
+              stuckReason: "超预算",
+              detail: null,
+            },
+            run.repository,
+          );
           continue;
         }
         if (lined === "hold") {
-          yield* writeDetail(run.issueNumber, null, UNREAD);
+          yield* writeDetail(run.issueNumber, null, UNREAD, run.repository);
           continue;
         }
         status = "pr-open";
       }
       if (status !== "checks") {
-        yield* runs.note(run.issueNumber, { status: "checks" });
+        yield* runs.note(run.issueNumber, { status: "checks" }, run.repository);
       }
 
-      const outcome = yield* reader.read({ headSha }).pipe(Effect.exit);
+      const outcome = yield* reader.read({ headSha, repository: run.repository }).pipe(Effect.exit);
       if (Exit.isFailure(outcome)) {
-        yield* writeDetail(run.issueNumber, status === "checks" ? run.detail : null, UNREAD);
+        yield* writeDetail(
+          run.issueNumber,
+          status === "checks" ? run.detail : null,
+          UNREAD,
+          run.repository,
+        );
         continue;
       }
       if (outcome.value.kind === "failure") {
-        yield* budget.settle(run.issueNumber, { reason: CHECK_RED, detail: null });
+        yield* budget.settle(run.issueNumber, { reason: CHECK_RED, detail: null }, run.repository);
         continue;
       }
       const note: PipelineRunNote =
@@ -451,7 +477,7 @@ const make = Effect.gen(function* () {
       ) {
         continue;
       }
-      yield* runs.note(run.issueNumber, note);
+      yield* runs.note(run.issueNumber, note, run.repository);
     }
   }).pipe(Effect.withSpan("OpenPullRequest.tick"));
 

@@ -156,6 +156,7 @@ import * as PipelineRuns from "./pipeline/PipelineRuns.ts";
 import * as DispatchSession from "./pipeline/DispatchSession.ts";
 import * as OpenPullRequest from "./pipeline/OpenPullRequest.ts";
 import * as ColdVerifySession from "./pipeline/ColdVerifySession.ts";
+import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as MergeGate from "./pipeline/mergeGate.ts";
 import * as PipelineBudget from "./pipeline/budget.ts";
 import * as RunMetrics from "./pipeline/runMetrics.ts";
@@ -671,6 +672,7 @@ const layerServerRestart = Layer.effect(
 const layerPipelineRuns = PipelineRuns.layerWorker.pipe(Layer.provideMerge(PipelineRuns.layerLive));
 const layerPipelineBudget = PipelineBudget.layerWorker.pipe(
   Layer.provideMerge(PipelineBudget.layerLive),
+  Layer.provide(GitHubRest.layerWithDependencies),
   Layer.provide(layerPipelineRuns),
 );
 const layerDispatchSession = DispatchSession.layerWorker.pipe(
@@ -690,6 +692,7 @@ const layerColdVerify = ColdVerifySession.layerWorker.pipe(
 );
 const layerMergeGate = MergeGate.layerWorker.pipe(
   Layer.provideMerge(MergeGate.layerLive),
+  Layer.provide(GitHubRest.layerWithDependencies),
   Layer.provide(layerPipelineRuns),
   Layer.provide(layerPipelineBudget),
 );

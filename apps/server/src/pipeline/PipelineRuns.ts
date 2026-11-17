@@ -35,6 +35,7 @@ import {
   layer as gitHubIssuesLayer,
   type PipelineIssue,
 } from "./GitHubIssues.ts";
+import { isDefaultRepo, LOCAL_LABEL, parseRepo } from "./repoAllowlist.ts";
 import {
   PipelineIntakePorts,
   decideIntake,
@@ -157,6 +158,7 @@ interface PipelineRunsShape {
   readonly note: (
     issueNumber: number,
     patch: PipelineRunNote,
+    repository?: string,
   ) => Effect.Effect<void, PipelineRunsError>;
 }
 
@@ -358,6 +360,7 @@ const make = Effect.gen(function* () {
 
   const insertRun = Effect.fn("PipelineRuns.insertRun")(function* (input: {
     readonly issue: PipelineIssue;
+    readonly repository: string;
     readonly status: "claimed" | "stuck";
     readonly stuckReason: PipelineStuckReason | null;
     readonly claimToken?: string | null;
@@ -368,7 +371,7 @@ const make = Effect.gen(function* () {
         repository, issue_number, title, status, stuck_reason, updated_at, claim_token
       )
       VALUES (
-        ${REPOSITORY_NAME},
+        ${input.repository},
         ${input.issue.number},
         ${input.issue.title},
         ${input.status},
@@ -387,7 +390,7 @@ const make = Effect.gen(function* () {
     const id = inserted[0]?.id;
     if (id !== undefined && input.status === "stuck" && input.stuckReason !== null) {
       yield* announce(id, {
-        repository: REPOSITORY_NAME,
+        repository: input.repository,
         issueNumber: input.issue.number,
         reason: input.stuckReason,
         prNumber: null,
@@ -462,12 +465,13 @@ const make = Effect.gen(function* () {
 
   const settleRelease = Effect.fn("PipelineRuns.settleRelease")(function* (row: {
     readonly id: number;
+    readonly repository: string;
     readonly issueNumber: number;
     readonly token: string;
   }) {
     const outcome = yield* Effect.exit(
       ClaimLease.releaseClaim(claims, {
-        repo: REPOSITORY_NAME,
+        repo: row.repository,
         issue: row.issueNumber,
         token: row.token,
       }),
@@ -511,10 +515,11 @@ const make = Effect.gen(function* () {
   const releasePending = Effect.fn("PipelineRuns.releasePending")(function* () {
     const pending = yield* sql<{
       readonly id: number;
+      readonly repository: string;
       readonly issueNumber: number;
       readonly claimToken: string;
     }>`
-      SELECT id, issue_number AS issueNumber, claim_token AS claimToken
+      SELECT id, repository, issue_number AS issueNumber, claim_token AS claimToken
       FROM pipeline_runs
       WHERE claim_token IS NOT NULL
         AND (
@@ -526,6 +531,7 @@ const make = Effect.gen(function* () {
       if (row.claimToken.length === 0) continue;
       yield* settleRelease({
         id: row.id,
+        repository: row.repository,
         issueNumber: row.issueNumber,
         token: row.claimToken,
       });
@@ -553,40 +559,84 @@ const make = Effect.gen(function* () {
       openedAt = Exit.isSuccess(wrote) ? stamped : null;
     }
     yield* refreshUsage();
-    const listed = yield* Effect.exit(issues.listEligible());
-    if (Exit.isFailure(listed)) {
-      yield* noteTick("failed", failureTag(listed.cause));
+    const repos = current.pipelineRepos.flatMap((slug) => {
+      const parsed = parseRepo(slug);
+      return parsed === undefined ? [] : [parsed];
+    });
+    if (repos.length === 0) {
+      yield* noteTick("ok", null);
       return;
+    }
+    const collected: Array<PipelineIssue> = [];
+    for (const repo of repos) {
+      const listed = yield* Effect.exit(issues.listEligible(repo));
+      if (Exit.isFailure(listed)) {
+        yield* noteTick("failed", failureTag(listed.cause));
+        return;
+      }
+      for (const issue of listed.value) {
+        collected.push({ ...issue, repository: repo.slug });
+      }
     }
     const whitelist = yield* Effect.exit(ports.readWhitelist);
     if (Exit.isFailure(whitelist)) {
       yield* noteTick("failed", "白名单读不到");
       return;
     }
-    const ordered = [...listed.value].sort((left, right) => left.number - right.number);
-    const states = new Map<number, PrerequisiteState>();
-    const needed = new Set<number>();
+    const repoOrder = new Map(repos.map((repo, index) => [repo.slug, index]));
+    const ordered = [...collected].sort((left, right) => {
+      const byRepo =
+        (repoOrder.get(left.repository ?? "") ?? 0) - (repoOrder.get(right.repository ?? "") ?? 0);
+      return byRepo === 0 ? left.number - right.number : byRepo;
+    });
+    const states = new Map<string, PrerequisiteState>();
+    const needed = new Map<
+      string,
+      { readonly repo: (typeof repos)[number]; readonly number: number }
+    >();
     for (const issue of ordered) {
-      for (const number of prerequisiteIssueNumbers(issue.body)) needed.add(number);
+      const repo = parseRepo(issue.repository ?? "");
+      if (repo === undefined) continue;
+      for (const number of prerequisiteIssueNumbers(issue.body)) {
+        needed.set(`${repo.slug}#${number}`, { repo, number });
+      }
     }
-    for (const number of needed) {
-      if (ordered.some((issue) => issue.number === number)) {
-        states.set(number, "open");
+    for (const [key, item] of needed) {
+      if (
+        ordered.some((issue) => issue.repository === item.repo.slug && issue.number === item.number)
+      ) {
+        states.set(key, "open");
         continue;
       }
-      const read = yield* Effect.exit(issues.read(number));
+      const read = yield* Effect.exit(issues.read(item.number, item.repo));
       if (Exit.isFailure(read)) {
-        states.set(number, "unread");
+        states.set(key, "unread");
         continue;
       }
       const state = read.value.state;
-      states.set(number, state === "open" || state === "closed" ? state : "unread");
+      states.set(key, state === "open" || state === "closed" ? state : "unread");
     }
     const now = yield* DateTime.now;
     const existing = yield* loadRows();
-    const activeIssues = new Set(existing.filter(isActiveRun).map((run) => run.issueNumber));
+    for (const run of existing) {
+      if (run.status !== "claimed" || isDefaultRepo(run.repository)) continue;
+      const repo = repos.find((candidate) => candidate.slug === run.repository);
+      if (repo === undefined) continue;
+      const labeled = yield* Effect.exit(issues.addLabel(run.issueNumber, LOCAL_LABEL, repo));
+      if (Exit.isFailure(labeled)) {
+        yield* noteTick("failed", failureTag(labeled.cause));
+        return;
+      }
+    }
+    const activeIssues = new Set(
+      existing.filter(isActiveRun).map((run) => `${run.repository}#${run.issueNumber}`),
+    );
     const openSessions = existing.filter((run) => run.status === "session").length;
     for (const issue of ordered) {
+      const repository = issue.repository ?? REPOSITORY_NAME;
+      const repo = parseRepo(repository);
+      if (repo === undefined) continue;
+      const key = `${repository}#${issue.number}`;
       const decision = decideIntake(
         {
           number: issue.number,
@@ -600,22 +650,22 @@ const make = Effect.gen(function* () {
           whitelist: whitelist.value,
           openedAt,
           now,
-          prerequisiteState: (number) => states.get(number) ?? "unread",
+          prerequisiteState: (number) => states.get(`${repository}#${number}`) ?? "unread",
         },
       );
       if (!decision.pull) continue;
       if (issue.body.includes(WORKFLOWS_PATH)) {
-        if (!activeIssues.has(issue.number)) {
-          yield* insertRun({ issue, status: "stuck", stuckReason: "交人" });
-          activeIssues.add(issue.number);
+        if (!activeIssues.has(key)) {
+          yield* insertRun({ issue, repository, status: "stuck", stuckReason: "交人" });
+          activeIssues.add(key);
         }
         continue;
       }
       if (acceptanceItemCount(issue.body) < 1) continue;
-      if (activeIssues.has(issue.number)) continue;
+      if (activeIssues.has(key)) continue;
       if (openSessions >= MAX_OPEN_SESSIONS) continue;
       const leased = yield* ClaimLease.claimForRun(claims, {
-        repo: REPOSITORY_NAME,
+        repo: repository,
         issue: issue.number,
         title: issue.title,
       });
@@ -627,6 +677,7 @@ const make = Effect.gen(function* () {
       const stored = yield* Effect.exit(
         insertRun({
           issue,
+          repository,
           status: "claimed",
           stuckReason: null,
           claimToken: leased.token,
@@ -635,7 +686,7 @@ const make = Effect.gen(function* () {
       if (Exit.isFailure(stored) || stored.value === undefined) {
         const released = yield* Effect.exit(
           ClaimLease.releaseClaim(claims, {
-            repo: REPOSITORY_NAME,
+            repo: repository,
             issue: issue.number,
             token: leased.token,
           }),
@@ -656,7 +707,14 @@ const make = Effect.gen(function* () {
         if (Exit.isFailure(stored)) return yield* Effect.failCause(stored.cause);
         continue;
       }
-      activeIssues.add(issue.number);
+      if (!isDefaultRepo(repository)) {
+        const labeled = yield* Effect.exit(issues.addLabel(issue.number, LOCAL_LABEL, repo));
+        if (Exit.isFailure(labeled)) {
+          yield* noteTick("failed", failureTag(labeled.cause));
+          return;
+        }
+      }
+      activeIssues.add(key);
     }
     yield* noteTick("ok", null);
   }).pipe(Effect.withSpan("PipelineRuns.tick"));
@@ -681,9 +739,11 @@ const make = Effect.gen(function* () {
   const note: PipelineRunsShape["note"] = Effect.fn("PipelineRuns.note")(function* (
     issueNumber: number,
     patch: PipelineRunNote,
+    repository?: string,
   ) {
+    const repositoryName = repository ?? REPOSITORY_NAME;
     const rows = (yield* loadRows()).filter(
-      (row) => row.repository === REPOSITORY_NAME && row.issueNumber === issueNumber,
+      (row) => row.repository === repositoryName && row.issueNumber === issueNumber,
     );
     const target = rows.find(isActiveRun) ?? rows[0];
     if (target === undefined) {
@@ -787,7 +847,7 @@ const make = Effect.gen(function* () {
       `.pipe(Effect.mapError(sqlFailure));
       const token = tokenRow[0]?.claimToken;
       if (token !== null && token !== undefined && token.length > 0) {
-        yield* settleRelease({ id: target.id, issueNumber, token });
+        yield* settleRelease({ id: target.id, repository: target.repository, issueNumber, token });
       }
     }
   });

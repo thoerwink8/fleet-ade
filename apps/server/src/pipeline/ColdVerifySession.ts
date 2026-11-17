@@ -32,7 +32,7 @@ import {
   type CommitStatusWrite,
   layer as commitStatusLayer,
 } from "./GitHubCommitStatus.ts";
-import { REPOSITORY } from "./GitHubIssues.ts";
+import { parseRepo } from "./repoAllowlist.ts";
 import { MAX_OPEN_SESSIONS, PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import {
   orderedCandidates,
@@ -50,7 +50,6 @@ const STUCK_HANDOVER = "交人";
 const MAX_ROUNDS = 2;
 /** New verifier sessions allowed for one round that never produced a conclusion. */
 export const MAX_INCONCLUSIVE_RETRIES = 3;
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 const STATUS_HOST = "github.com";
 
 const VerifyRunRow = Schema.Struct({
@@ -118,10 +117,13 @@ const sameModel = (left: ModelSelection, right: ModelSelection): boolean =>
   left.model === right.model &&
   Equal.equals(left.options ?? {}, right.options ?? {});
 
-const targetOf = (sha: string): CommitStatusTarget => ({
+const targetOf = (
+  sha: string,
+  repository: { readonly owner: string; readonly name: string },
+): CommitStatusTarget => ({
   host: STATUS_HOST,
-  owner: REPOSITORY.owner,
-  repo: REPOSITORY.name,
+  owner: repository.owner,
+  repo: repository.name,
   sha,
 });
 
@@ -302,9 +304,6 @@ interface ColdVerifySessionShape {
   >;
 }
 
-const matchesRepository = (owner: string | undefined, name: string | undefined): boolean =>
-  owner === REPOSITORY.owner && name === REPOSITORY.name;
-
 const verifyBriefing = (run: {
   readonly repository: string;
   readonly issueNumber: number;
@@ -336,7 +335,6 @@ const make = Effect.gen(function* () {
       const legacy = LEGACY_INCONCLUSIVE.exec(run.detail ?? "");
       const round = legacy === null ? 0 : Number(legacy[1]);
       if (
-        run.repository === REPOSITORY_NAME &&
         run.status === "stuck" &&
         run.stuckReason === STUCK_COLD_VERIFY &&
         run.headSha !== null &&
@@ -344,17 +342,21 @@ const make = Effect.gen(function* () {
         round >= 1 &&
         round <= MAX_ROUNDS
       ) {
-        yield* runs.note(run.issueNumber, {
-          status: "verify",
-          stuckReason: null,
-          detail: round === 1 ? null : `已完成:${round - 1}:轮:仍待验`,
-        });
+        yield* runs.note(
+          run.issueNumber,
+          {
+            status: "verify",
+            stuckReason: null,
+            detail: round === 1 ? null : `已完成:${round - 1}:轮:仍待验`,
+          },
+          run.repository,
+        );
       }
     }
     const listed = yield* runs.list;
     return yield* decodeVerifyRuns(
       listed.runs.flatMap((run) =>
-        run.repository === REPOSITORY_NAME && run.status === "verify" && run.headSha !== null
+        run.status === "verify" && run.headSha !== null
           ? [
               {
                 id: run.id,
@@ -372,21 +374,24 @@ const make = Effect.gen(function* () {
     );
   });
 
-  const projectForRepository = Effect.fn("ColdVerifySession.projectForRepository")(function* () {
-    let cursor = 0;
-    for (;;) {
-      const page = yield* projects.listPage({ cursor, limit: 50 });
-      const match = page.projects.find(
-        (project) =>
-          project.repositoryIdentity !== null &&
-          project.repositoryIdentity !== undefined &&
-          matchesRepository(project.repositoryIdentity.owner, project.repositoryIdentity.name),
-      );
-      if (match !== undefined) return match;
-      if (page.nextCursor === null) return undefined;
-      cursor = page.nextCursor;
-    }
-  });
+  const projectForRepository = Effect.fn("ColdVerifySession.projectForRepository")(
+    function* (repository: { readonly owner: string; readonly name: string }) {
+      let cursor = 0;
+      for (;;) {
+        const page = yield* projects.listPage({ cursor, limit: 50 });
+        const match = page.projects.find(
+          (project) =>
+            project.repositoryIdentity !== null &&
+            project.repositoryIdentity !== undefined &&
+            project.repositoryIdentity.owner === repository.owner &&
+            project.repositoryIdentity.name === repository.name,
+        );
+        if (match !== undefined) return match;
+        if (page.nextCursor === null) return undefined;
+        cursor = page.nextCursor;
+      }
+    },
+  );
 
   const tick = Effect.gen(function* () {
     const current = yield* settings.getSettings;
@@ -396,9 +401,7 @@ const make = Effect.gen(function* () {
     const ends = yield* inbox.list;
     const endByThread = new Map(ends.map((entry) => [entry.threadId, entry]));
     const listed = yield* runs.list;
-    const authorOpen = listed.runs.filter(
-      (run) => run.repository === REPOSITORY_NAME && run.status === "session",
-    ).length;
+    const authorOpen = listed.runs.filter((run) => run.status === "session").length;
     const inFlight = pending.filter((run) => {
       const dispatched = dispatchedRound(run.detail);
       if (dispatched === undefined) return false;
@@ -407,6 +410,15 @@ const make = Effect.gen(function* () {
     let occupied = authorOpen + inFlight;
 
     for (const run of pending) {
+      const repo = parseRepo(run.repository);
+      if (repo === undefined) {
+        yield* runs.note(
+          run.issueNumber,
+          stick(STUCK_COLD_VERIFY, "仓名不是 owner/name"),
+          run.repository,
+        );
+        continue;
+      }
       if (refused.kind !== "open-session") {
         yield* runs.note(
           run.issueNumber,
@@ -416,6 +428,7 @@ const make = Effect.gen(function* () {
                 refused.reason,
                 refused.reason === STUCK_NO_MODEL ? "验单模型是空的" : STUCK_CANDIDATES_EXHAUSTED,
               ),
+          run.repository,
         );
         continue;
       }
@@ -449,14 +462,18 @@ const make = Effect.gen(function* () {
             attempts: [attempt],
             suggestions: [],
           },
-          (outcome) => statuses.writeColdVerify(targetOf(run.headSha), outcome),
+          (outcome) => statuses.writeColdVerify(targetOf(run.headSha, repo), outcome),
         );
         const status = decision.note.status ?? "verify";
-        yield* runs.note(run.issueNumber, {
-          status,
-          stuckReason: decision.note.stuckReason ?? null,
-          detail: decision.note.detail ?? null,
-        });
+        yield* runs.note(
+          run.issueNumber,
+          {
+            status,
+            stuckReason: decision.note.stuckReason ?? null,
+            detail: decision.note.detail ?? null,
+          },
+          run.repository,
+        );
         continue;
       }
       if (prior >= MAX_ROUNDS) continue;
@@ -472,14 +489,15 @@ const make = Effect.gen(function* () {
           },
           () => Effect.die("等资源不写状态"),
         );
-        yield* runs.note(run.issueNumber, decision.note);
+        yield* runs.note(run.issueNumber, decision.note, run.repository);
         continue;
       }
-      const project = yield* projectForRepository();
+      const project = yield* projectForRepository(repo);
       if (project === undefined) {
         yield* runs.note(
           run.issueNumber,
           stick(STUCK_COLD_VERIFY, "没跑起来：no project for this repository"),
+          run.repository,
         );
         continue;
       }
@@ -500,13 +518,18 @@ const make = Effect.gen(function* () {
         yield* runs.note(
           run.issueNumber,
           stick(STUCK_COLD_VERIFY, "没跑起来：session was not opened"),
+          run.repository,
         );
         continue;
       }
-      yield* runs.note(run.issueNumber, {
-        status: "verify",
-        detail: `已派第:${next}:次:${attempt}:${threadId}`,
-      });
+      yield* runs.note(
+        run.issueNumber,
+        {
+          status: "verify",
+          detail: `已派第:${next}:次:${attempt}:${threadId}`,
+        },
+        run.repository,
+      );
       occupied += 1;
     }
   }).pipe(Effect.withSpan("ColdVerifySession.tick"));

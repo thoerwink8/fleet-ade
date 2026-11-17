@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as TestClock from "effect/testing/TestClock";
+import * as SqlClient from "effect/sql/SqlClient";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -381,6 +382,57 @@ describe("parkTriage", () => {
           assert.strictEqual(yield* Ref.get(opened), 2);
         }).pipe(Effect.provide(layerFor([issue(9)], open)));
       }),
+  );
+
+  it.effect("同一单号的两个仓库都裁决，标签和续派不写串", () =>
+    Effect.gen(function* () {
+      const opened = yield* Ref.make<ReadonlyArray<string | undefined>>([]);
+      const labels = yield* Ref.make<
+        ReadonlyArray<{ readonly number: number; readonly repo: string | undefined }>
+      >([]);
+      const open: CommanderSessionOpener["Service"]["open"] = (input) =>
+        Ref.update(opened, (items) => [...items, input.repository]).pipe(
+          Effect.as({
+            started: true,
+            verdict: { action: "贴本机做", category: null },
+          } satisfies CommanderSessionResult),
+        );
+      const addLabel: PipelineGitHubIssues["Service"]["addLabel"] = (number, _label, repo) =>
+        Ref.update(labels, (items) => [
+          ...items,
+          { number, repo: repo === undefined ? undefined : `${repo.owner}/${repo.name}` },
+        ]);
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const runs = yield* PipelineRuns;
+        yield* stick([{ number: 7, reason: "超预算" }]);
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, stuck_reason, updated_at
+          ) VALUES (
+            'acme/widgets', 7, '单 7', 'stuck', '超预算', '1970-01-01T00:00:00.000Z'
+          )
+        `;
+        yield* TestClock.adjust(Duration.minutes(PARK_TRIAGE_AFTER_MINUTES));
+        const report = yield* (yield* ParkTriage).triage({ modelConfigured: true });
+        assert.strictEqual(report.requests, 2);
+        assert.deepStrictEqual([...(yield* Ref.get(opened))].sort(), [
+          "acme/widgets",
+          "thoerwink8/fleet-ade",
+        ]);
+        assert.deepStrictEqual(
+          (yield* Ref.get(labels)).map((item) => `${item.repo}#${item.number}`).sort(),
+          ["acme/widgets#7", "thoerwink8/fleet-ade#7"],
+        );
+        const listed = yield* runs.list;
+        for (const repository of ["thoerwink8/fleet-ade", "acme/widgets"]) {
+          const run = listed.runs.find((item) => item.repository === repository);
+          assert.strictEqual(run?.status, "stuck");
+          assert.strictEqual(run?.stuckReason, "超预算");
+          assert.ok(run?.detail?.includes("本机做"), run?.detail ?? "");
+        }
+      }).pipe(Effect.provide(layerFor([issue(7)], open, undefined, addLabel)));
+    }),
   );
 });
 

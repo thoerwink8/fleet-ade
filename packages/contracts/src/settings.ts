@@ -1407,6 +1407,55 @@ const OrderedModelCandidates = Schema.Unknown.pipe(
     encode: SchemaGetter.transform((models: typeof ModelSelectionList.Encoded) => models),
   }),
 );
+export const DEFAULT_PIPELINE_REPOS = ["thoerwink8/fleet-ade"] as const;
+
+const PIPELINE_REPO_PART = /^[A-Za-z0-9_.-]+$/;
+
+/** One `owner/name`. Rejects extra slashes and `.` / `..` parts. */
+export function parsePipelineRepo(
+  value: string,
+): { readonly owner: string; readonly name: string; readonly slug: string } | undefined {
+  const trimmed = value.trim();
+  const slash = trimmed.indexOf("/");
+  if (slash <= 0 || slash !== trimmed.lastIndexOf("/")) return undefined;
+  const owner = trimmed.slice(0, slash);
+  const name = trimmed.slice(slash + 1);
+  if (
+    owner === "." ||
+    owner === ".." ||
+    name === "." ||
+    name === ".." ||
+    !PIPELINE_REPO_PART.test(owner) ||
+    !PIPELINE_REPO_PART.test(name)
+  ) {
+    return undefined;
+  }
+  return { owner, name, slug: `${owner}/${name}` };
+}
+
+/** Keeps order, drops invalid entries and later duplicates. An empty list stays empty. */
+function decodePipelineRepos(values: ReadonlyArray<unknown>): Array<string> {
+  const seen = new Set<string>();
+  const repos: Array<string> = [];
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const parsed = parsePipelineRepo(value);
+    if (parsed === undefined || seen.has(parsed.slug)) continue;
+    seen.add(parsed.slug);
+    repos.push(parsed.slug);
+  }
+  return repos;
+}
+
+const PipelineRepos = Schema.Array(Schema.Unknown).pipe(
+  Schema.decodeTo(
+    Schema.Array(Schema.String),
+    SchemaTransformation.transform<ReadonlyArray<string>, ReadonlyArray<unknown>>({
+      decode: decodePipelineRepos,
+      encode: (values) => values,
+    }),
+  ),
+);
 
 export const ServerSettings = Schema.Struct({
   // Null means unmigrated; empty is authoritative and must not resurrect cleared preferences.
@@ -1546,6 +1595,13 @@ export const ServerSettings = Schema.Struct({
   /** Added lines on the pull request. Over this the run sticks as 超预算. */
   pipelinePullRequestAddedLines: PositiveInt.pipe(
     Schema.withDecodingDefault(Effect.succeed(3_000)),
+  ),
+  /**
+   * Ordered repositories a pipeline tick lists. Empty lists nothing.
+   * A missing key is only the default repository, never every repository.
+   */
+  pipelineRepos: PipelineRepos.pipe(
+    Schema.withDecodingDefault(Effect.succeed([...DEFAULT_PIPELINE_REPOS])),
   ),
   /** Maximum active agent sessions running concurrently on this server; null leaves concurrency uncapped. */
   maxConcurrentSessions: Schema.NullOr(MaxConcurrentSessions).pipe(
@@ -1989,6 +2045,7 @@ export const ServerSettingsPatch = Schema.Struct({
   pipelineAutoMerge: Schema.optionalKey(Schema.Boolean),
   pipelineTokenInputEquivalent: Schema.optionalKey(PositiveInt),
   pipelinePullRequestAddedLines: Schema.optionalKey(PositiveInt),
+  pipelineRepos: Schema.optionalKey(PipelineRepos),
   maxConcurrentSessions: Schema.optionalKey(Schema.NullOr(MaxConcurrentSessions)),
   promptSuggestionsEnabled: Schema.optionalKey(Schema.Boolean),
   backgroundActivity: Schema.optionalKey(

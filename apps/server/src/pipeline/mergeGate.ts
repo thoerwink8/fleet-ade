@@ -17,8 +17,9 @@ import * as Schema from "effect/Schema";
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { PipelineBudget } from "./budget.ts";
-import { PIPELINE_HOST, REPOSITORY } from "./GitHubIssues.ts";
+import { PIPELINE_HOST } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { parseRepo } from "./repoAllowlist.ts";
 import standardPathsFile from "./standard-paths.json" with { type: "json" };
 
 /** Workflow name in ci.yml. Job names are not this. */
@@ -28,7 +29,6 @@ const CI_CHECK_NAME = "CI";
 const COLD_VERIFY_CONTEXT = "cold-verify";
 
 const WORKFLOWS_PATH = ".github/workflows/";
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 const UNREAD = "没查成";
 const HANDOVER: PipelineStuckReason = "交人";
 
@@ -148,6 +148,7 @@ export class MergeGateReader extends Context.Service<
     readonly read: (input: {
       readonly number: number;
       readonly headSha: string;
+      readonly repository: string;
     }) => Effect.Effect<MergeGateObservation, MergeGateReadError>;
   }
 >()("t3/pipeline/mergeGate/MergeGateReader") {}
@@ -159,6 +160,7 @@ export class PullRequestMerger extends Context.Service<
     readonly merge: (input: {
       readonly number: number;
       readonly headSha: string;
+      readonly repository: string;
     }) => Effect.Effect<void, MergeRequestError>;
   }
 >()("t3/pipeline/mergeGate/PullRequestMerger") {}
@@ -203,7 +205,11 @@ const decodeCombined = Schema.decodeUnknownEffect(Schema.fromJsonString(Combined
 const decodeFiles = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Array(DiffFile)));
 const decodePull = Schema.decodeUnknownEffect(Schema.fromJsonString(PullRequest));
 
-const slug = `${encodeURIComponent(REPOSITORY.owner)}/${encodeURIComponent(REPOSITORY.name)}`;
+const githubSlug = (repository: string): string | undefined => {
+  const parsed = parseRepo(repository);
+  if (parsed === undefined) return undefined;
+  return `${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.name)}`;
+};
 
 export const workflowChecks = (
   page: typeof WorkflowRunsPage.Type,
@@ -251,7 +257,10 @@ const makeReader = Effect.gen(function* () {
   const read = Effect.fn("mergeGate.read")(function* (input: {
     readonly number: number;
     readonly headSha: string;
+    readonly repository: string;
   }) {
+    const slug = githubSlug(input.repository);
+    if (slug === undefined) return yield* new MergeGateReadError();
     const [runs, statuses, files, pull] = yield* Effect.all(
       [
         get(
@@ -310,7 +319,10 @@ const makeMerger = Effect.gen(function* () {
   const merge = Effect.fn("mergeGate.merge")(function* (input: {
     readonly number: number;
     readonly headSha: string;
+    readonly repository: string;
   }) {
+    const slug = githubSlug(input.repository);
+    if (slug === undefined) return yield* new MergeRequestError();
     const current = yield* rest
       .rest({
         host: PIPELINE_HOST,
@@ -364,7 +376,7 @@ const make = Effect.gen(function* () {
   const merger = yield* PullRequestMerger;
 
   const write = (run: PipelineRun, note: PipelineRunNote) =>
-    sameNote(run, note) ? Effect.void : runs.note(run.issueNumber, note);
+    sameNote(run, note) ? Effect.void : runs.note(run.issueNumber, note, run.repository);
 
   const tick = Effect.gen(function* () {
     const current = yield* settings.getSettings;
@@ -373,7 +385,6 @@ const make = Effect.gen(function* () {
     const attempted = new Set<string>();
 
     for (const run of listed.runs) {
-      if (run.repository !== REPOSITORY_NAME) continue;
       if (run.status !== "checks" && run.status !== "verify" && run.status !== "mergeable") {
         continue;
       }
@@ -393,7 +404,9 @@ const make = Effect.gen(function* () {
         continue;
       }
 
-      const observed = yield* reader.read({ number: prNumber, headSha }).pipe(Effect.exit);
+      const observed = yield* reader
+        .read({ number: prNumber, headSha, repository: run.repository })
+        .pipe(Effect.exit);
       if (Exit.isFailure(observed)) {
         yield* write(run, { detail: UNREAD });
         yield* Effect.logWarning("pipeline.merge-gate.unread", {
@@ -436,16 +449,22 @@ const make = Effect.gen(function* () {
       }
       if (decision.kind !== "merge") continue;
 
-      const key = `${prNumber}:${headSha}`;
+      const key = `${run.repository}:${prNumber}:${headSha}`;
       if (attempted.has(key)) continue;
       attempted.add(key);
-      const merged = yield* merger.merge({ number: prNumber, headSha }).pipe(Effect.exit);
+      const merged = yield* merger
+        .merge({ number: prNumber, headSha, repository: run.repository })
+        .pipe(Effect.exit);
       if (Exit.isFailure(merged)) {
-        yield* runs.note(run.issueNumber, {
-          status: "mergeable",
-          stuckReason: null,
-          detail: UNREAD,
-        });
+        yield* runs.note(
+          run.issueNumber,
+          {
+            status: "mergeable",
+            stuckReason: null,
+            detail: UNREAD,
+          },
+          run.repository,
+        );
         continue;
       }
       yield* write(run, { status: "merged", stuckReason: null, detail: null });
@@ -457,11 +476,7 @@ const make = Effect.gen(function* () {
 
 export const layer = Layer.effect(MergeGate, make);
 
-export const layerLive = layer.pipe(
-  Layer.provide(layerReader),
-  Layer.provide(layerMerger),
-  Layer.provide(GitHubRest.layerWithDependencies),
-);
+export const layerLive = layer.pipe(Layer.provide(layerReader), Layer.provide(layerMerger));
 
 export const layerWorker = Layer.effectDiscard(
   Effect.gen(function* () {

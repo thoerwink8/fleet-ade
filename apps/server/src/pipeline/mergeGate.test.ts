@@ -1,12 +1,14 @@
 import { assert, describe, it } from "@effect/vitest";
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
+import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as SqlClient from "effect/sql/SqlClient";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
+import { PullRequestAdditions, layer as budgetLayer, layerLive as budgetLive } from "./budget.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
@@ -20,6 +22,7 @@ import {
   decideMerge,
   workflowChecks,
   layer,
+  layerLive,
   type MergeGateDecision,
   type MergeGateFacts,
   type MergeGateObservation,
@@ -39,6 +42,7 @@ const issue = (number: number): PipelineIssue => ({
 interface MergeCall {
   readonly number: number;
   readonly headSha: string;
+  readonly repository: string;
 }
 
 const passing = (autoMerge: boolean): MergeGateFacts => ({
@@ -249,7 +253,9 @@ describe("MergeGate", () => {
         const run = (yield* runs.list).runs.find((item) => item.issueNumber === 9);
         const merged = yield* Ref.get(calls);
         assert.strictEqual(run?.status, "merged");
-        assert.deepStrictEqual(merged, [{ number: 18, headSha: HEAD }]);
+        assert.deepStrictEqual(merged, [
+          { number: 18, headSha: HEAD, repository: "thoerwink8/fleet-ade" },
+        ]);
         assert.notStrictEqual(merged[0]?.headSha, OLD_HEAD);
         yield* gate.tick;
         assert.strictEqual((yield* Ref.get(calls)).length, 1);
@@ -279,7 +285,9 @@ describe("MergeGate", () => {
         assert.strictEqual(first?.status, "mergeable");
         assert.notStrictEqual(first?.status, "merged");
         assert.strictEqual(first?.detail, "没查成");
-        assert.deepStrictEqual(yield* Ref.get(calls), [{ number: 18, headSha: HEAD }]);
+        assert.deepStrictEqual(yield* Ref.get(calls), [
+          { number: 18, headSha: HEAD, repository: "thoerwink8/fleet-ade" },
+        ]);
         yield* gate.tick;
         const second = (yield* runs.list).runs.find((item) => item.issueNumber === 9);
         const retried = yield* Ref.get(calls);
@@ -399,6 +407,114 @@ describe("MergeGate", () => {
           }),
         ),
       );
+    }),
+  );
+
+  it.effect("同一单号同一 PR 号按仓库走不同的检查、文件和合并路径", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<ReadonlyArray<string>>([]);
+      const rest = Layer.succeed(GitHubRest.GitHubRest, {
+        rest: (request: { readonly method?: string; readonly path: string }) => {
+          const method = request.method ?? "GET";
+          const line = `${method} ${request.path}`;
+          const additions = request.path.includes("thoerwink8/fleet-ade") ? 3001 : 0;
+          const body = request.path.includes("/actions/runs")
+            ? {
+                total_count: 1,
+                workflow_runs: [
+                  {
+                    id: 1,
+                    name: "CI",
+                    head_sha: HEAD,
+                    status: "completed",
+                    conclusion: "success",
+                  },
+                ],
+              }
+            : request.path.includes("/status")
+              ? { sha: HEAD, statuses: [{ context: "cold-verify", state: "success" }] }
+              : request.path.includes("/files")
+                ? [{ filename: "apps/server/src/pipeline/mergeGate.ts" }]
+                : request.path.includes("/pulls/")
+                  ? { additions, merged: false, head: { sha: HEAD } }
+                  : {};
+          return Ref.update(calls, (items) => [...items, line]).pipe(
+            Effect.as({
+              status: 200,
+              headers: {},
+              body: JSON.stringify(body),
+              truncated: false,
+              invalidUtf8: false,
+            }),
+          );
+        },
+        credential: () => Effect.die("unused"),
+        appCredential: () => Effect.die("unused"),
+      } as GitHubRest.GitHubRest["Service"]);
+      const settings = ServerSettings.layerTest({
+        pipelineEnabled: true,
+        pipelineAutoMerge: true,
+      });
+      const runs = runsLayer.pipe(
+        Layer.provide(
+          Layer.succeed(PipelineGitHubIssues, {
+            addLabel: () => Effect.die("unexpected label write"),
+            listEligible: () => Effect.succeed([issue(9)]),
+            read: () => Effect.die("unused"),
+          }),
+        ),
+        Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
+        Layer.provide(settings),
+        Layer.provide(layerPortsDefault),
+        Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+        Layer.provideMerge(SqlitePersistence.layerMemory),
+      );
+      const live = layerLive.pipe(
+        Layer.provide(budgetLive),
+        Layer.provide(rest),
+        Layer.provide(settings),
+        Layer.provideMerge(runs),
+      );
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const stored = yield* PipelineRuns;
+        const gate = yield* MergeGate;
+        yield* stored.tick;
+        yield* stored.note(9, { status: "verify", prNumber: 18, headSha: HEAD });
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, pr_number, head_sha, updated_at
+          ) VALUES (
+            'acme/widgets', 9, '单 9', 'verify', 18, ${HEAD}, '2026-11-16T00:00:00.000Z'
+          )
+        `;
+        yield* gate.tick;
+        const listed = yield* stored.list;
+        const homeRun = listed.runs.find((item) => item.repository === "thoerwink8/fleet-ade");
+        assert.strictEqual(homeRun?.status, "stuck");
+        assert.strictEqual(homeRun?.stuckReason, "超预算");
+        assert.strictEqual(
+          listed.runs.find((item) => item.repository === "acme/widgets")?.status,
+          "merged",
+        );
+        const seen = yield* Ref.get(calls);
+        const home = "repos/thoerwink8/fleet-ade";
+        const away = "repos/acme/widgets";
+        for (const path of [
+          `GET ${home}/pulls/18`,
+          `GET ${away}/pulls/18`,
+          `GET ${away}/actions/runs?head_sha=${HEAD}&per_page=100`,
+          `GET ${away}/commits/${HEAD}/status`,
+          `GET ${away}/pulls/18/files?per_page=100`,
+          `PUT ${away}/pulls/18/merge`,
+        ]) {
+          assert.ok(seen.includes(path), seen.join("\n"));
+        }
+        assert.ok(!seen.some((line) => line.startsWith("PUT ") && line.includes(home)));
+        assert.ok(!seen.some((line) => line.includes(`${home}/actions/`)));
+        assert.ok(!seen.some((line) => line.includes(`${home}/commits/`)));
+        assert.ok(!seen.some((line) => line.includes(`${home}/pulls/18/files`)));
+      }).pipe(Effect.provide(live));
     }),
   );
 });

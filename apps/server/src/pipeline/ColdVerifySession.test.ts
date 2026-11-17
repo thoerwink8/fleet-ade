@@ -93,6 +93,7 @@ const blockOutput: ColdVerifyModelOutput = {
 interface Written {
   readonly sha: string;
   readonly state: string;
+  readonly repository?: string;
 }
 
 interface Handles {
@@ -106,6 +107,7 @@ const harness = (
   models: {
     readonly author: ReadonlyArray<ModelSelection>;
     readonly verifier: ReadonlyArray<ModelSelection>;
+    readonly repos?: ReadonlyArray<string>;
   },
   handles: Handles,
   openFails = false,
@@ -115,7 +117,7 @@ const harness = (
   const issues = Layer.succeed(
     PipelineGitHubIssues,
     PipelineGitHubIssues.of({
-      addLabel: () => Effect.die("unexpected label write"),
+      addLabel: () => Effect.void,
       listEligible: () => Effect.succeed(eligible),
       read: (number) => Effect.succeed(eligible.find((item) => item.number === number) ?? issue(8)),
     }),
@@ -125,6 +127,7 @@ const harness = (
     pipelineEnabled: true,
     pipelineAuthorModel: models.author,
     pipelineVerifierModel: models.verifier,
+    ...(models.repos === undefined ? {} : { pipelineRepos: models.repos }),
   });
   const opener = Layer.succeed(
     VerifierOpener,
@@ -161,13 +164,27 @@ const harness = (
             state,
             description: state,
           };
-          yield* Ref.update(handles.written, (current) => [...current, { sha, state }]);
+          yield* Ref.update(handles.written, (current) => [
+            ...current,
+            { sha, state, repository: `${target.owner}/${target.repo}` },
+          ]);
           return written;
         }),
     }),
   );
   const projects = Layer.succeed(ProjectService.ProjectService, {
-    listPage: () => Effect.succeed({ projects: [PROJECT], nextCursor: null }),
+    listPage: () =>
+      Effect.succeed({
+        projects: [
+          PROJECT,
+          {
+            ...PROJECT,
+            id: ProjectId.make("project:acme/widgets"),
+            repositoryIdentity: { ...PROJECT.repositoryIdentity!, owner: "acme", name: "widgets" },
+          },
+        ],
+        nextCursor: null,
+      }),
   } as unknown as ProjectService.ProjectService["Service"]);
   const projections = Layer.succeed(ProjectionStore.ProjectionStoreV2, {
     getThreadSnapshot: () =>
@@ -184,7 +201,7 @@ const harness = (
     Layer.provide(usage),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort({ repos: models.repos ?? ["thoerwink8/fleet-ade"] })),
     Layer.provideMerge(memory),
   );
   return coldLayer.pipe(
@@ -201,6 +218,7 @@ const run = <E, R>(
   models: {
     readonly author: ReadonlyArray<ModelSelection>;
     readonly verifier: ReadonlyArray<ModelSelection>;
+    readonly repos?: ReadonlyArray<string>;
   },
   body: (handles: Handles) => Effect.Effect<void, E, R>,
   openFails = false,
@@ -228,6 +246,45 @@ const tick = Effect.gen(function* () {
 });
 
 describe("ColdVerifySession", () => {
+  it.effect("跨仓同号冷验选自己的项目并只写自己的状态", () =>
+    run(
+      { author: [AUTHOR], verifier: [VERIFIER], repos: ["thoerwink8/fleet-ade", "acme/widgets"] },
+      (handles) =>
+        Effect.gen(function* () {
+          const runs = yield* PipelineRuns;
+          yield* runs.tick;
+          yield* runs.note(8, { status: "verify", headSha: SHA }, "acme/widgets");
+          const cold = yield* ColdVerifySession;
+          yield* cold.tick;
+          const opened = yield* Ref.get(handles.opened);
+          assert.strictEqual(opened[0]?.projectId, "project:acme/widgets");
+          yield* Ref.set(handles.messages, [
+            { role: "assistant", text: JSON.stringify(passOutput) },
+          ]);
+          yield* (yield* SessionEndInbox).record({
+            threadId: opened[0]!.threadId,
+            runId: RunId.make("verify:acme"),
+            status: "completed",
+            endedAt: NOW,
+            headLookup: "found",
+            headSha: SHA,
+          });
+          yield* cold.tick;
+          assert.deepStrictEqual(yield* Ref.get(handles.written), [
+            { sha: SHA, state: "success", repository: "acme/widgets" },
+          ]);
+          const listed = (yield* runs.list).runs;
+          assert.strictEqual(
+            listed.find((row) => row.repository === "acme/widgets")?.status,
+            "verify",
+          );
+          assert.strictEqual(
+            listed.find((row) => row.repository === "thoerwink8/fleet-ade")?.status,
+            "claimed",
+          );
+        }),
+    ),
+  );
   it.effect("模型没配就卡住且不派会话", () =>
     run({ author: [AUTHOR], verifier: [] }, (handles) =>
       Effect.gen(function* () {
@@ -300,7 +357,9 @@ describe("ColdVerifySession", () => {
         assert.strictEqual(listed?.status, "verify");
         assert.strictEqual(listed?.stuckReason, null);
         assert.match(listed?.detail ?? "", /建议：命名可以再短一点/);
-        assert.deepEqual(yield* Ref.get(handles.written), [{ sha: SHA, state: "success" }]);
+        assert.deepEqual(yield* Ref.get(handles.written), [
+          { sha: SHA, state: "success", repository: "thoerwink8/fleet-ade" },
+        ]);
       }),
     ),
   );

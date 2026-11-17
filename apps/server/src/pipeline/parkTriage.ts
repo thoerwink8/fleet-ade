@@ -30,11 +30,10 @@ import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import { PipelineGitHubIssues, REPOSITORY } from "./GitHubIssues.ts";
+import { PipelineGitHubIssues } from "./GitHubIssues.ts";
 import { PipelineRuns } from "./PipelineRuns.ts";
+import { parseRepo } from "./repoAllowlist.ts";
 import { STUCK_NO_MODEL, orderedCandidates, pickRouteCandidate } from "./routeCandidates.ts";
-
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 
 /** #10 的续一次集合。成员不在这里改。 */
 export const RENEW_ONCE_REASONS = ["会话失败", "检查红", "超时"] as const;
@@ -49,6 +48,7 @@ type HumanCategory = (typeof HUMAN_CATEGORIES)[number];
 const LOCAL_LABEL = "本机做";
 
 export interface CommanderRequest {
+  readonly repository: string;
   readonly issueNumber: number;
   readonly title: string;
   readonly stuckReason: PipelineStuckReason;
@@ -168,37 +168,51 @@ const make = Effect.gen(function* () {
 
   const keepStuck = Effect.fn("ParkTriage.keepStuck")(function* (run: PipelineRun, detail: string) {
     if (run.stuckReason === null) return;
-    yield* runs.note(run.issueNumber, {
-      status: "stuck",
-      stuckReason: run.stuckReason,
-      detail,
-    });
+    yield* runs.note(
+      run.issueNumber,
+      {
+        status: "stuck",
+        stuckReason: run.stuckReason,
+        detail,
+      },
+      run.repository,
+    );
   });
 
   const handOver = Effect.fn("ParkTriage.handOver")(function* (run: PipelineRun, since: string) {
-    yield* runs.note(run.issueNumber, {
-      status: "stuck",
-      stuckReason: "交人",
-      detail: `已交指挥官 ${since}`,
-    });
+    yield* runs.note(
+      run.issueNumber,
+      {
+        status: "stuck",
+        stuckReason: "交人",
+        detail: `已交指挥官 ${since}`,
+      },
+      run.repository,
+    );
   });
 
   const resume = Effect.fn("ParkTriage.resume")(function* (run: PipelineRun) {
-    yield* runs.note(run.issueNumber, {
-      status: "claimed",
-      stuckReason: null,
-      threadId: null,
-      sessionStartedAt: null,
-      sessionEndedAt: null,
-      detail: null,
-    });
+    yield* runs.note(
+      run.issueNumber,
+      {
+        status: "claimed",
+        stuckReason: null,
+        threadId: null,
+        sessionStartedAt: null,
+        sessionEndedAt: null,
+        detail: null,
+      },
+      run.repository,
+    );
   });
 
   const applyLocalLabel = Effect.fn("ParkTriage.applyLocalLabel")(function* (
     run: PipelineRun,
     since: string,
   ) {
-    const written = yield* issues.addLabel(run.issueNumber, LOCAL_LABEL).pipe(Effect.exit);
+    const repo = parseRepo(run.repository);
+    if (repo === undefined) return false;
+    const written = yield* issues.addLabel(run.issueNumber, LOCAL_LABEL, repo).pipe(Effect.exit);
     if (Exit.isFailure(written)) {
       yield* Effect.logWarning("pipeline.park-triage.label-failed", {
         issueNumber: run.issueNumber,
@@ -221,12 +235,12 @@ const make = Effect.gen(function* () {
       return { lines, requests, labelActions };
     }
     const nowMs = Date.parse(DateTime.formatIso(yield* DateTime.now));
-    const active = new Map<number, PipelineRun>();
+    const active = new Map<string, PipelineRun>();
     for (const run of (yield* runs.list).runs) {
-      if (run.repository !== REPOSITORY_NAME || closedOut(run) || active.has(run.issueNumber)) {
+      if (closedOut(run) || active.has(`${run.repository}#${run.issueNumber}`)) {
         continue;
       }
-      active.set(run.issueNumber, run);
+      active.set(`${run.repository}#${run.issueNumber}`, run);
     }
 
     for (let run of active.values()) {
@@ -253,7 +267,7 @@ const make = Effect.gen(function* () {
           lines.push(`#${run.issueNumber} 没配模型，不算已处理`);
           continue;
         }
-        yield* runs.note(run.issueNumber, marker.original);
+        yield* runs.note(run.issueNumber, marker.original, run.repository);
         run = { ...run, ...marker.original };
         marker = parseMarker(run.detail);
       }
@@ -264,11 +278,15 @@ const make = Effect.gen(function* () {
       }
       if (!input.modelConfigured) {
         const detail = `没配模型 ${encodeOriginalContext({ stuckReason: run.stuckReason, detail: run.detail })} ${since}`;
-        yield* runs.note(run.issueNumber, {
-          status: "stuck",
-          stuckReason: STUCK_NO_MODEL,
-          detail,
-        });
+        yield* runs.note(
+          run.issueNumber,
+          {
+            status: "stuck",
+            stuckReason: STUCK_NO_MODEL,
+            detail,
+          },
+          run.repository,
+        );
         lines.push(`#${run.issueNumber} 没配模型，不算已处理`);
         continue;
       }
@@ -287,6 +305,7 @@ const make = Effect.gen(function* () {
       );
       const opened = yield* opener
         .open({
+          repository: run.repository,
           issueNumber: run.issueNumber,
           title: run.title,
           stuckReason: run.stuckReason,
@@ -412,7 +431,9 @@ const liveOpener = Layer.effect(
     const projects = yield* ProjectService.ProjectService;
     const random = yield* SecureRandom.SecureRandom;
 
-    const projectIdForRepository = Effect.fn("ParkTriage.project")(function* () {
+    const projectIdForRepository = Effect.fn("ParkTriage.project")(function* (repository: string) {
+      const parsed = parseRepo(repository);
+      if (parsed === undefined) return undefined;
       let cursor = 0;
       for (;;) {
         const page = yield* projects.listPage({ cursor, limit: 50 });
@@ -420,8 +441,8 @@ const liveOpener = Layer.effect(
           (project) =>
             project.repositoryIdentity !== null &&
             project.repositoryIdentity !== undefined &&
-            project.repositoryIdentity.owner === REPOSITORY.owner &&
-            project.repositoryIdentity.name === REPOSITORY.name,
+            project.repositoryIdentity.owner === parsed.owner &&
+            project.repositoryIdentity.name === parsed.name,
         );
         if (match !== undefined) return match.id;
         if (page.nextCursor === null) return undefined;
@@ -445,10 +466,10 @@ const liveOpener = Layer.effect(
 
     const openSession = Effect.fn("ParkTriage.open")(function* (input: CommanderRequest) {
       if (input.model === null) return NOT_STARTED;
-      const projectId = yield* projectIdForRepository();
+      const projectId = yield* projectIdForRepository(input.repository);
       if (projectId === undefined) return NOT_STARTED;
       const threadId = ThreadId.make(
-        `pipeline:commander:${input.issueNumber}:${yield* random.uuidV4()}`,
+        `pipeline:commander:${encodeURIComponent(input.repository)}:${input.issueNumber}:${yield* random.uuidV4()}`,
       );
       const watched = yield* orchestrator.streamDomainEvents.pipe(
         Stream.filter(

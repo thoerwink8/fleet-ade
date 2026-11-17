@@ -10,11 +10,11 @@ import * as Schema from "effect/Schema";
 
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import { PIPELINE_HOST, REPOSITORY } from "./GitHubIssues.ts";
+import { PIPELINE_HOST } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { parseRepo } from "./repoAllowlist.ts";
 
 const TICK_INTERVAL = Duration.minutes(5);
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
 const CI_WORKFLOW = "CI";
 
 /** A number was read, the read failed, or the workflow has not reached a job start yet. */
@@ -91,7 +91,11 @@ const make = Effect.gen(function* () {
   const rest = yield* GitHubRest.GitHubRest;
   const runs = yield* PipelineRuns;
   const settings = yield* ServerSettings.ServerSettingsService;
-  const slug = `${encodeURIComponent(REPOSITORY.owner)}/${encodeURIComponent(REPOSITORY.name)}`;
+  const slugFor = (repository: string): string | undefined => {
+    const parsed = parseRepo(repository);
+    if (parsed === undefined) return undefined;
+    return `${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.name)}`;
+  };
 
   const fetchJson = (operation: string, path: string) =>
     rest
@@ -104,7 +108,12 @@ const make = Effect.gen(function* () {
         ),
       );
 
-  const readCommits = Effect.fn("RunMetrics.readCommits")(function* (prNumber: number) {
+  const readCommits = Effect.fn("RunMetrics.readCommits")(function* (
+    repository: string,
+    prNumber: number,
+  ) {
+    const slug = slugFor(repository);
+    if (slug === undefined) return PIPELINE_METRIC_UNREAD;
     const body = yield* fetchJson("pipelineCommitCount", `repos/${slug}/pulls/${prNumber}`).pipe(
       Effect.orElseSucceed(() => undefined),
     );
@@ -114,9 +123,12 @@ const make = Effect.gen(function* () {
   });
 
   const readQueue = Effect.fn("RunMetrics.readQueue")(function* (
+    repository: string,
     headSha: string,
     waitingForCheck: boolean,
   ) {
+    const slug = slugFor(repository);
+    if (slug === undefined) return PIPELINE_METRIC_UNREAD;
     const body = yield* fetchJson(
       "pipelineCiQueueRuns",
       `repos/${slug}/actions/runs?head_sha=${encodeURIComponent(headSha)}&per_page=100`,
@@ -160,12 +172,13 @@ const make = Effect.gen(function* () {
     if (!enabled) return;
     const listed = yield* runs.list.pipe(Effect.orElseSucceed(() => undefined));
     if (listed === undefined) return;
-    const targets = new Map<number, PipelineRun>();
+    const targets = new Map<string, PipelineRun>();
     for (const run of listed.runs) {
-      if (run.repository !== REPOSITORY_NAME || run.prNumber === null) continue;
-      const known = targets.get(run.issueNumber);
+      if (run.prNumber === null) continue;
+      const key = `${run.repository}#${run.issueNumber}`;
+      const known = targets.get(key);
       if (known === undefined || (isFillTarget(run) && !isFillTarget(known))) {
-        targets.set(run.issueNumber, run);
+        targets.set(key, run);
       }
     }
     for (const run of targets.values()) {
@@ -174,11 +187,17 @@ const make = Effect.gen(function* () {
       if (commitSettled && queueSettled) continue;
       const prNumber = run.prNumber;
       if (prNumber === null) continue;
-      const commit = commitSettled ? ("pending" as const) : yield* readCommits(prNumber);
+      const commit = commitSettled
+        ? ("pending" as const)
+        : yield* readCommits(run.repository, prNumber);
       const queue =
         queueSettled || run.headSha === null
           ? ("pending" as const)
-          : yield* readQueue(run.headSha, run.status === "pr-open" || run.status === "checks");
+          : yield* readQueue(
+              run.repository,
+              run.headSha,
+              run.status === "pr-open" || run.status === "checks",
+            );
       const patch: PipelineRunNote = {
         ...(typeof commit === "number" ? { commitCount: commit } : {}),
         ...(commit === PIPELINE_METRIC_UNREAD ? { commitNote: PIPELINE_METRIC_UNREAD } : {}),
@@ -193,7 +212,7 @@ const make = Effect.gen(function* () {
       ) {
         continue;
       }
-      yield* runs.note(run.issueNumber, patch).pipe(
+      yield* runs.note(run.issueNumber, patch, run.repository).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning("pipeline.run-metrics.note-failed", {
             issueNumber: run.issueNumber,

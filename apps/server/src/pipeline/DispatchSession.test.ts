@@ -142,7 +142,7 @@ const sessionLayer = (
     Layer.provide(git),
     Layer.provide(projects),
     Layer.provide(issues),
-    Layer.provide(settings),
+    Layer.provideMerge(settings),
     Layer.provideMerge(shared),
   );
 };
@@ -196,6 +196,22 @@ const recordEnd = (
   });
 
 describe("DispatchSession", () => {
+  it.effect("移出允许列表后仍接收已运行会话的结束事件，不派发新认领", () =>
+    run(enabled, [issue(7), issue(8)], ({ opened }) =>
+      Effect.gen(function* () {
+        const active = yield* openClaimed;
+        yield* (yield* ServerSettings.ServerSettingsService).updateSettings({ pipelineRepos: [] });
+        if (active.threadId === null) return yield* Effect.die("expected a thread");
+        yield* recordEnd(active.threadId, "completed", "found", "completed-head");
+        const persisted = (yield* (yield* PipelineRuns).list).runs;
+        assert.equal(persisted.find((item) => item.id === active.id)?.sessionEndedAt, ENDED_AT);
+        assert.equal(persisted.find((item) => item.id === active.id)?.headSha, "completed-head");
+        assert.equal(persisted.find((item) => item.id !== active.id)?.status, "claimed");
+        assert.equal((yield* Ref.get(opened)).length, 1);
+      }),
+    ),
+  );
+
   it.effect("开关关着不建树不开会话", () =>
     run(
       { pipelineEnabled: false, pipelineAuthorModel: [MODEL] },

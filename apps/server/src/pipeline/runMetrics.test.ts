@@ -4,6 +4,7 @@ import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as SqlClient from "effect/sql/SqlClient";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -312,6 +313,43 @@ describe("RunMetrics", () => {
         assert.strictEqual(run?.commitNote, null);
         assert.strictEqual((yield* Ref.get(calls)).length, 0);
       }).pipe(Effect.provide(stack({ calls, route: () => json(500, ""), enabled: false })));
+    }),
+  );
+
+  it.effect("same issue in two repositories is read and noted separately", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<ReadonlyArray<string>>([]);
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const runs = yield* PipelineRuns;
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, pr_number, head_sha, updated_at
+          ) VALUES
+            ('thoerwink8/fleet-ade', 7, '单 7', 'checks', 70, ${SHA}, '2026-11-16T00:00:00.000Z'),
+            ('acme/widgets', 7, '单 7', 'checks', 71, ${SHA}, '2026-11-16T00:00:00.000Z')
+        `;
+        yield* (yield* RunMetrics).tick;
+        const listed = yield* runs.list;
+        assert.strictEqual(
+          listed.runs.find((item) => item.repository === "thoerwink8/fleet-ade")?.commitCount,
+          2,
+        );
+        assert.strictEqual(
+          listed.runs.find((item) => item.repository === "acme/widgets")?.commitCount,
+          5,
+        );
+        const paths = yield* Ref.get(calls);
+        assert.ok(paths.some((path) => path.includes("repos/thoerwink8/fleet-ade/pulls/70")));
+        assert.ok(paths.some((path) => path.includes("repos/acme/widgets/pulls/71")));
+      }).pipe(
+        Effect.provide(
+          stack({
+            calls,
+            route: (path) => pull(path.includes("acme/widgets") ? 5 : 2),
+          }),
+        ),
+      );
     }),
   );
 });
