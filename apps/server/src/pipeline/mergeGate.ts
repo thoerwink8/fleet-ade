@@ -19,6 +19,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { PipelineBudget } from "./budget.ts";
 import { PIPELINE_HOST, REPOSITORY } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import standardPathsFile from "./standard-paths.json" with { type: "json" };
 
 /** Workflow name in ci.yml. Job names are not this. */
 const CI_CHECK_NAME = "CI";
@@ -40,9 +41,15 @@ export interface HeadCheck {
   readonly sha: string | null;
 }
 
+export interface RequiredCheck {
+  readonly name: string;
+  readonly state: CheckState;
+  readonly sha: string | null;
+}
+
 export interface MergeGateFacts {
   readonly headSha: string;
-  readonly ci: HeadCheck;
+  readonly checks: ReadonlyArray<RequiredCheck>;
   readonly coldVerify: HeadCheck;
   readonly paths: ReadonlyArray<string>;
   readonly autoMerge: boolean;
@@ -51,20 +58,52 @@ export interface MergeGateFacts {
 export type MergeGateDecision =
   | { readonly kind: "hold" }
   | { readonly kind: "stuck"; readonly reason: PipelineStuckReason }
+  | { readonly kind: "unread"; readonly detail: typeof UNREAD }
   | { readonly kind: "mergeable" }
   | { readonly kind: "merge" };
 
+const isPathList = (value: unknown): value is ReadonlyArray<string> =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every((item) => typeof item === "string" && item.length > 0);
+
+const readStandardPaths = (): ReadonlyArray<string> => {
+  const value: unknown = standardPathsFile;
+  if (!isPathList(value)) throw new Error("改标准的路径清单认不出");
+  return value;
+};
+
 /**
- * Pure. Pass only when CI and cold-verify are success on this head and the
- * diff does not touch `.github/workflows/`. The switch only chooses merge.
+ * Every check on this head must be success, including one named CI, and
+ * cold-verify must be success on this head. Listed paths and
+ * `.github/workflows/` are handover. A list that cannot be read is 没查成.
  */
-export const decideMerge = (facts: MergeGateFacts): MergeGateDecision => {
+export const decideMerge = (
+  facts: MergeGateFacts,
+  readPaths: () => ReadonlyArray<string> = readStandardPaths,
+): MergeGateDecision => {
   if (facts.paths.some((path) => path.startsWith(WORKFLOWS_PATH))) {
     return { kind: "stuck", reason: HANDOVER };
   }
+  let rules: ReadonlyArray<string>;
+  try {
+    rules = readPaths();
+  } catch {
+    return { kind: "unread", detail: UNREAD };
+  }
+  if (rules.length === 0) return { kind: "unread", detail: UNREAD };
   if (
-    facts.ci.state !== "success" ||
-    facts.ci.sha !== facts.headSha ||
+    facts.paths.some((path) =>
+      rules.some((rule) => (rule.endsWith("/") ? path.startsWith(rule) : path === rule)),
+    )
+  ) {
+    return { kind: "stuck", reason: HANDOVER };
+  }
+  const onThisHead = (check: RequiredCheck): boolean =>
+    check.state === "success" && check.sha === facts.headSha;
+  if (
+    !facts.checks.some((check) => check.name === CI_CHECK_NAME && onThisHead(check)) ||
+    !facts.checks.every(onThisHead) ||
     facts.coldVerify.state !== "success" ||
     facts.coldVerify.sha !== facts.headSha
   ) {
@@ -74,7 +113,10 @@ export const decideMerge = (facts: MergeGateFacts): MergeGateDecision => {
 };
 
 export interface MergeGateObservation {
-  readonly ci: CheckState;
+  readonly checks: ReadonlyArray<{
+    readonly name: string;
+    readonly state: CheckState;
+  }>;
   readonly coldVerify: CheckState;
   readonly paths: ReadonlyArray<string>;
   /** True when this head is already merged. A failed read is an error, not this. */
@@ -146,6 +188,7 @@ const CombinedStatus = Schema.Struct({
 
 const DiffFile = Schema.Struct({
   filename: Schema.String,
+  previous_filename: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
 const PullRequest = Schema.Struct({
@@ -162,20 +205,27 @@ const decodePull = Schema.decodeUnknownEffect(Schema.fromJsonString(PullRequest)
 
 const slug = `${encodeURIComponent(REPOSITORY.owner)}/${encodeURIComponent(REPOSITORY.name)}`;
 
-const ciState = (page: typeof WorkflowRunsPage.Type, headSha: string): CheckState | undefined => {
-  const named = page.workflow_runs.filter(
-    (run) => run.name === CI_CHECK_NAME && run.head_sha === headSha,
-  );
-  if (named.length === 0) {
-    const cutOff =
-      page.workflow_runs.length === 100 &&
-      (page.total_count === undefined || page.total_count > page.workflow_runs.length);
-    return cutOff ? undefined : "missing";
+export const workflowChecks = (
+  page: typeof WorkflowRunsPage.Type,
+  headSha: string,
+): ReadonlyArray<{ readonly name: string; readonly state: CheckState }> | undefined => {
+  const cutOff =
+    page.workflow_runs.length === 100 &&
+    (page.total_count === undefined || page.total_count > page.workflow_runs.length);
+  if (cutOff) return undefined;
+  const latest = new Map<string, { readonly id: number; readonly state: CheckState }>();
+  for (const run of page.workflow_runs) {
+    if (run.head_sha !== headSha) continue;
+    const name = run.name;
+    if (name === undefined || name === null || name.length === 0) return undefined;
+    const status = run.status ?? "";
+    if (status.length === 0) return undefined;
+    const state: CheckState =
+      status !== "completed" ? "pending" : run.conclusion === "success" ? "success" : "failure";
+    const previous = latest.get(name);
+    if (previous === undefined || run.id > previous.id) latest.set(name, { id: run.id, state });
   }
-  const latest = named.reduce((best, run) => (run.id > best.id ? run : best));
-  const status = latest.status ?? "";
-  if (status !== "completed") return status.length === 0 ? undefined : "pending";
-  return latest.conclusion === "success" ? "success" : "failure";
+  return [...latest.entries()].map(([name, item]) => ({ name, state: item.state }));
 };
 
 const coldState = (page: typeof CombinedStatus.Type, headSha: string): CheckState | undefined => {
@@ -236,13 +286,15 @@ const makeReader = Effect.gen(function* () {
     );
     if (decodedPull.head.sha !== input.headSha) return yield* new MergeGateReadError();
     if (decodedFiles.length === 100) return yield* new MergeGateReadError();
-    const ci = ciState(decodedRuns, input.headSha);
+    const checks = workflowChecks(decodedRuns, input.headSha);
     const coldVerify = coldState(decodedStatus, input.headSha);
-    if (ci === undefined || coldVerify === undefined) return yield* new MergeGateReadError();
+    if (checks === undefined || coldVerify === undefined) return yield* new MergeGateReadError();
     return {
-      ci,
+      checks,
       coldVerify,
-      paths: decodedFiles.map((file) => file.filename),
+      paths: decodedFiles.flatMap((file) =>
+        file.previous_filename ? [file.filename, file.previous_filename] : [file.filename],
+      ),
       merged: decodedPull.merged === true,
     };
   });
@@ -357,10 +409,11 @@ const make = Effect.gen(function* () {
 
       const decision = decideMerge({
         headSha,
-        ci: {
-          state: observed.value.ci,
-          sha: observed.value.ci === "missing" ? null : headSha,
-        },
+        checks: observed.value.checks.map((check) => ({
+          name: check.name,
+          state: check.state,
+          sha: check.state === "missing" ? null : headSha,
+        })),
         coldVerify: {
           state: observed.value.coldVerify,
           sha: observed.value.coldVerify === "missing" ? null : headSha,
@@ -369,6 +422,10 @@ const make = Effect.gen(function* () {
         autoMerge: current.pipelineAutoMerge,
       });
       if (decision.kind === "hold") continue;
+      if (decision.kind === "unread") {
+        yield* write(run, { detail: decision.detail });
+        continue;
+      }
       if (decision.kind === "stuck") {
         yield* write(run, { status: "stuck", stuckReason: decision.reason, detail: null });
         continue;
@@ -377,6 +434,7 @@ const make = Effect.gen(function* () {
         yield* write(run, { status: "mergeable", stuckReason: null, detail: null });
         continue;
       }
+      if (decision.kind !== "merge") continue;
 
       const key = `${prNumber}:${headSha}`;
       if (attempted.has(key)) continue;
