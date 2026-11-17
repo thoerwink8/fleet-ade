@@ -1,9 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as TestClock from "effect/testing/TestClock";
-
+import { HttpClient, HttpClientResponse } from "effect/http";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { PipelineGitHubIssues, PipelineIssuesIncompleteError } from "./GitHubIssues.ts";
@@ -13,8 +14,10 @@ import {
   DailyBriefSource,
   DailyBriefUnread,
   layer,
+  layerFeishu,
   type BriefStuckRun,
 } from "./dailyBrief.ts";
+import { FEISHU_WEBHOOK_VARIABLE } from "./feishu.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import * as ClaimLease from "./claimLease.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
@@ -37,6 +40,7 @@ const briefLayer = (stuck: Effect.Effect<ReadonlyArray<BriefStuckRun>, DailyBrie
           send: (text) =>
             Effect.sync(() => {
               sent.push(text);
+              return { delivered: true as const };
             }),
         }),
       ),
@@ -45,13 +49,14 @@ const briefLayer = (stuck: Effect.Effect<ReadonlyArray<BriefStuckRun>, DailyBrie
   );
 };
 
-const pipelineLayer = (brief: Layer.Layer<DailyBrief>) =>
+const pipelineLayer = <E, R>(brief: Layer.Layer<DailyBrief, E, R>) =>
   runsLayer.pipe(
     Layer.provide(brief),
     Layer.provide(
       Layer.succeed(
         PipelineGitHubIssues,
         PipelineGitHubIssues.of({
+          addLabel: () => Effect.die("unexpected label write"),
           listEligible: () => Effect.succeed([]),
           read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
         }),
@@ -145,7 +150,9 @@ describe("daily brief", () => {
       const spy = Layer.succeed(
         DailyBrief,
         DailyBrief.of({
-          run: Ref.update(calls, (n) => n + 1).pipe(Effect.as({ key: null, sent: false })),
+          run: Ref.update(calls, (n) => n + 1).pipe(
+            Effect.as({ key: DAY, sent: true, reason: null }),
+          ),
         }),
       );
       yield* Effect.gen(function* () {
@@ -160,6 +167,142 @@ describe("daily brief", () => {
         // @effect-diagnostics-next-line globalConsoleInEffect:off -- acceptance output; the test logger swallows Effect.log.
         console.log(`跨过 08:30：调用 ${count}`);
         assert.strictEqual(count, 1);
+      }).pipe(Effect.provide(pipelineLayer(spy)));
+    }),
+  );
+});
+
+const FAKE_WEBHOOK = "https://feishu.invalid/hook/brief";
+const deliveryRequests: Array<{ readonly url: string; readonly body: string }> = [];
+
+const deliveryLayer = (options: {
+  readonly webhook: string | undefined;
+  readonly status: number;
+}) => {
+  deliveryRequests.length = 0;
+  const http = Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      Effect.sync(() => {
+        deliveryRequests.push({
+          url: request.url,
+          body:
+            request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : "",
+        });
+        return HttpClientResponse.fromWeb(request, new Response(null, { status: options.status }));
+      }),
+    ),
+  );
+  const env = Layer.succeed(
+    HostProcess.Environment,
+    options.webhook === undefined ? {} : { [FEISHU_WEBHOOK_VARIABLE]: options.webhook },
+  );
+  return layerFeishu.pipe(
+    Layer.provide(http),
+    Layer.provide(env),
+    Layer.provide(SqlitePersistence.layerMemory),
+  );
+};
+
+describe("daily brief delivery", () => {
+  it.effect("没配 webhook 不占键，再跑还报没配", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(at(8, 30));
+      const brief = yield* DailyBrief;
+      const first = yield* brief.run;
+      const second = yield* brief.run;
+      // @effect-diagnostics-next-line globalConsoleInEffect:off -- acceptance output; the test logger swallows Effect.log.
+      console.log(
+        `没配 webhook：第一次 sent ${first.sent} key ${first.key} reason ${first.reason}；第二次 sent ${second.sent} key ${second.key} reason ${second.reason}；请求 ${deliveryRequests.length}`,
+      );
+      assert.strictEqual(deliveryRequests.length, 0);
+      assert.strictEqual(first.sent, false);
+      assert.strictEqual(first.key, null);
+      assert.strictEqual(first.reason, `没送出：没配 \`${FEISHU_WEBHOOK_VARIABLE}\``);
+      assert.strictEqual(second.sent, false);
+      assert.strictEqual(second.key, null);
+      assert.strictEqual(second.reason, first.reason);
+    }).pipe(Effect.provide(deliveryLayer({ webhook: undefined, status: 200 }))),
+  );
+
+  it.effect("HTTP 500 不占键，再跑还请求一次", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(at(8, 30));
+      const brief = yield* DailyBrief;
+      const first = yield* brief.run;
+      const second = yield* brief.run;
+      // @effect-diagnostics-next-line globalConsoleInEffect:off -- acceptance output; the test logger swallows Effect.log.
+      console.log(
+        `HTTP 500：第一次 sent ${first.sent} key ${first.key} reason ${first.reason}；第二次 sent ${second.sent} key ${second.key}；请求 ${deliveryRequests.length}`,
+      );
+      assert.strictEqual(first.sent, false);
+      assert.strictEqual(first.key, null);
+      assert.strictEqual(first.reason, "没送出：HTTP 500");
+      assert.strictEqual(second.sent, false);
+      assert.strictEqual(second.key, null);
+      assert.strictEqual(second.reason, first.reason);
+      assert.strictEqual(deliveryRequests.length, 2);
+    }).pipe(Effect.provide(deliveryLayer({ webhook: FAKE_WEBHOOK, status: 500 }))),
+  );
+
+  it.effect("送出后占键，同一天不再发第二条", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(at(8, 30));
+      const brief = yield* DailyBrief;
+      const first = yield* brief.run;
+      const second = yield* brief.run;
+      // @effect-diagnostics-next-line globalConsoleInEffect:off -- acceptance output; the test logger swallows Effect.log.
+      console.log(
+        `送出：第一次 sent ${first.sent} key ${first.key}；第二次 sent ${second.sent} key ${second.key}；请求 ${deliveryRequests.length}`,
+      );
+      assert.strictEqual(first.sent, true);
+      assert.strictEqual(first.key, DAY);
+      assert.strictEqual(first.reason, null);
+      assert.strictEqual(second.sent, false);
+      assert.strictEqual(second.key, DAY);
+      assert.strictEqual(second.reason, null);
+      assert.strictEqual(deliveryRequests.length, 1);
+    }).pipe(Effect.provide(deliveryLayer({ webhook: FAKE_WEBHOOK, status: 200 }))),
+  );
+
+  it.effect("HTTP 500 时后面的 tick 再请求一次", () =>
+    Effect.gen(function* () {
+      const runs = yield* PipelineRuns;
+      yield* TestClock.setTime(at(8, 30));
+      yield* runs.tick;
+      yield* TestClock.setTime(at(9, 0));
+      yield* runs.tick;
+      // @effect-diagnostics-next-line globalConsoleInEffect:off -- acceptance output; the test logger swallows Effect.log.
+      console.log(`HTTP 500 后再 tick：请求 ${deliveryRequests.length}`);
+      assert.strictEqual(deliveryRequests.length, 2);
+    }).pipe(Effect.provide(pipelineLayer(deliveryLayer({ webhook: FAKE_WEBHOOK, status: 500 })))),
+  );
+});
+
+describe("daily brief tick retry", () => {
+  it.effect("没送出时后面的 tick 再试", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make(0);
+      const spy = Layer.succeed(
+        DailyBrief,
+        DailyBrief.of({
+          run: Ref.update(calls, (n) => n + 1).pipe(
+            Effect.as({ key: null, sent: false, reason: "没送出：HTTP 500" }),
+          ),
+        }),
+      );
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        yield* TestClock.setTime(at(8, 29));
+        yield* runs.tick;
+        yield* TestClock.setTime(at(8, 30));
+        yield* runs.tick;
+        yield* TestClock.setTime(at(9, 0));
+        yield* runs.tick;
+        const count = yield* Ref.get(calls);
+        // @effect-diagnostics-next-line globalConsoleInEffect:off -- acceptance output; the test logger swallows Effect.log.
+        console.log(`没送出后再 tick：调用 ${count}`);
+        assert.strictEqual(count, 2);
       }).pipe(Effect.provide(pipelineLayer(spy)));
     }),
   );

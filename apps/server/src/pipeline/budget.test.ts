@@ -56,6 +56,7 @@ const layerFor = (input: {
   const runs = runsLayer.pipe(
     Layer.provide(
       Layer.succeed(PipelineGitHubIssues, {
+        addLabel: () => Effect.die("unexpected label write"),
         listEligible: () => Effect.succeed(input.issues),
         read: () => Effect.die("unused"),
       }),

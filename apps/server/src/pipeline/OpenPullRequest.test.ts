@@ -72,6 +72,7 @@ const tickLayer = (input: {
 }) => {
   const settings = ServerSettings.layerTest({ pipelineEnabled: input.enabled ?? true });
   const issues = Layer.succeed(PipelineGitHubIssues, {
+    addLabel: () => Effect.die("unexpected label write"),
     listEligible: () => Effect.succeed(input.issues),
     read: (number: number) => {
       const found = input.issues.find((item) => item.number === number);

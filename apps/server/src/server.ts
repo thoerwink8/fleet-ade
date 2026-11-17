@@ -159,6 +159,7 @@ import * as ColdVerifySession from "./pipeline/ColdVerifySession.ts";
 import * as MergeGate from "./pipeline/mergeGate.ts";
 import * as PipelineBudget from "./pipeline/budget.ts";
 import * as RunMetrics from "./pipeline/runMetrics.ts";
+import * as ParkTriage from "./pipeline/parkTriage.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 import * as CodexManagedTokenBroker from "./provider/CodexManagedTokenBroker.ts";
 import * as WebhookRoute from "./scheduledTasks/webhookRoute.ts";
@@ -696,6 +697,10 @@ const layerRunMetrics = RunMetrics.layerWorker.pipe(
   Layer.provideMerge(RunMetrics.layerLive),
   Layer.provide(layerPipelineRuns),
 );
+const layerParkTriage = ParkTriage.layerWorker.pipe(
+  Layer.provideMerge(ParkTriage.layerLive),
+  Layer.provide(layerPipelineRuns),
+);
 const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   AgentAwarenessRelay.layer,
   HeldHooksWaker.layer,
@@ -745,6 +750,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   layerOpenPullRequest,
   layerMergeGate,
   layerRunMetrics,
+  layerParkTriage,
   Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),
 ).pipe(
   Layer.provideMerge(layerOrchestrationApplication),

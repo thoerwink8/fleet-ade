@@ -468,7 +468,7 @@ export const routeLayer = Layer.unwrap(
         const sql = yield* SqlClient.SqlClient;
         yield* migrate;
         yield* NodeReads.migrate;
-        return Layer.mergeAll(routes(sql), NodeReads.layerFor(sql));
+        return Layer.mergeAll(routes(sql), NodeReads.layerLive(sql));
       }),
     ).pipe(
       Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),

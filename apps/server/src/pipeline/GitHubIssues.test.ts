@@ -219,6 +219,8 @@ describe("PipelineGitHubIssues", () => {
       assert.strictEqual(failureTag(listed), "GitHubNotSignedInError");
       const read = yield* Effect.result(issues.read(7));
       assert.strictEqual(failureTag(read), "GitHubNotSignedInError");
+      const labeled = yield* Effect.result(issues.addLabel(7, "本机做"));
+      assert.strictEqual(failureTag(labeled), "GitHubNotSignedInError");
     }).pipe(Effect.provide(harness({ signedIn: false }).layer)),
   );
 
@@ -229,6 +231,7 @@ describe("PipelineGitHubIssues", () => {
         const issues = yield* PipelineGitHubIssues.pipe(Effect.provide(failing.layer));
         const listed = yield* Effect.result(issues.listEligible());
         const read = yield* Effect.result(issues.read(7));
+        const labeled = yield* Effect.result(issues.addLabel(7, "本机做"));
         const expected =
           status === 401
             ? "GitHubApiAuthenticationError"
@@ -237,6 +240,7 @@ describe("PipelineGitHubIssues", () => {
               : "GitHubApiResponseError";
         assert.strictEqual(failureTag(listed), expected);
         assert.strictEqual(failureTag(read), expected);
+        assert.strictEqual(failureTag(labeled), expected);
         if (listed._tag === "Failure" && listed.failure._tag === "GitHubApiResponseError") {
           assert.strictEqual(
             (listed.failure as GitHubRequestPolicy.GitHubApiResponseError).status,

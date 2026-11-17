@@ -84,6 +84,7 @@ const sessionLayer = (
   const issues = Layer.succeed(
     PipelineGitHubIssues,
     PipelineGitHubIssues.of({
+      addLabel: () => Effect.die("unexpected label write"),
       listEligible: () => Ref.get(visible),
       read: (number) =>
         Ref.get(visible).pipe(
