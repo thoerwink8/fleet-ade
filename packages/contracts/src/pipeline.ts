@@ -32,6 +32,9 @@ export const PIPELINE_COST_LABEL = "折算";
 /** Stored when a usage export cannot be read. Never a stand-in for zero. */
 export const PIPELINE_USAGE_UNREADABLE = "读不到";
 
+/** Stored when a commit count or a CI queue could not be read. Never a stand-in for zero. */
+export const PIPELINE_METRIC_UNREAD = "没查成";
+
 const NullableText = Schema.NullOr(Schema.String);
 const NullableInt = Schema.NullOr(Schema.Int);
 
@@ -55,7 +58,9 @@ export const PipelineRun = Schema.Struct({
   convertedCost: Schema.NullOr(Schema.Number),
   usageNote: Schema.NullOr(Schema.Literal(PIPELINE_USAGE_UNREADABLE)),
   commitCount: NullableInt,
+  commitNote: Schema.NullOr(Schema.Literal(PIPELINE_METRIC_UNREAD)),
   ciQueueMs: NullableInt,
+  ciQueueNote: Schema.NullOr(Schema.Literal(PIPELINE_METRIC_UNREAD)),
   detail: NullableText,
   /** True after this run has used its one automatic retry. */
   renewedOnce: Schema.Boolean,

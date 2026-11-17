@@ -12,6 +12,9 @@ import { Button } from "../ui/button";
 import { RefreshIcon } from "../ui/refresh-icon";
 import { ScrollArea } from "../ui/scroll-area";
 import {
+  formatCiQueue,
+  formatCommitCount,
+  formatInputTokens,
   groupPipelineRuns,
   PIPELINE_STATUS_BADGE,
   PIPELINE_STATUS_LABEL,
@@ -62,6 +65,10 @@ function RunSection({
                 <div className="min-w-0 flex-1">
                   <p className="text-sm leading-5 font-medium break-words text-foreground">
                     {run.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 break-words text-muted-foreground">
+                    提交 {formatCommitCount(run)} · 排队 {formatCiQueue(run)} · 输入用量{" "}
+                    {formatInputTokens(run)}
                   </p>
                   {run.stuckReason !== null ? (
                     <span className="mt-1.5 flex">

@@ -7,6 +7,10 @@ import {
 } from "@t3tools/contracts";
 
 import {
+  formatCiQueue,
+  formatCommitCount,
+  formatInputTokens,
+  formatQueueDuration,
   groupPipelineRuns,
   PIPELINE_STATUS_BADGE,
   PIPELINE_STATUS_LABEL,
@@ -33,7 +37,9 @@ function run(patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">): 
     convertedCost: null,
     usageNote: null,
     commitCount: null,
+    commitNote: null,
     ciQueueMs: null,
+    ciQueueNote: null,
     detail: patch.detail ?? null,
     renewedOnce: patch.renewedOnce ?? false,
     costLabel: PIPELINE_COST_LABEL,
@@ -93,5 +99,21 @@ describe("groupPipelineRuns", () => {
       "success",
       "destructive",
     ]);
+  });
+});
+
+describe("pipeline metric labels", () => {
+  it("shows a real zero and 没查成 when the number was not read", () => {
+    const unread = run({ id: 1, status: "checks" });
+    expect(formatCommitCount(unread)).toBe("没查成");
+    expect(formatCiQueue(unread)).toBe("没查成");
+    expect(formatInputTokens(unread)).toBe("没查成");
+    expect(formatInputTokens({ ...unread, usageNote: "读不到" })).toBe("没查成");
+    expect(formatCommitCount({ ...unread, commitCount: 0 })).toBe("0");
+    expect(formatCiQueue({ ...unread, ciQueueMs: 0 })).toBe("0 秒");
+    expect(formatQueueDuration(90_000)).toBe("1 分 30 秒");
+    expect(formatQueueDuration(1_500)).toBe("1.5 秒");
+    expect(formatInputTokens({ ...unread, inputTokens: 1200 })).toBe("1200");
+    expect(formatCommitCount({ ...unread, commitCount: 4, commitNote: "没查成" })).toBe("没查成");
   });
 });
