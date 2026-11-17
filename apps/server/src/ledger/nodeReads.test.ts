@@ -272,6 +272,7 @@ it.effect("三个登录读口不接受节点证，没有登录上下文时是 40
 });
 
 const SESSION = "ledger-test-session";
+const LIMITED_SESSION = "ledger-limited-session";
 
 const sessionAuth = Layer.mock(EnvironmentAuth.EnvironmentAuth, {
   authenticateHttpRequest: (request) =>
@@ -282,7 +283,14 @@ const sessionAuth = Layer.mock(EnvironmentAuth.EnvironmentAuth, {
           method: "bearer-access-token",
           scopes: [AuthOrchestrationReadScope],
         })
-      : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
+      : request.headers.authorization === `Bearer ${LIMITED_SESSION}`
+        ? Effect.succeed({
+            sessionId: AuthSessionId.make("ledger-limited"),
+            subject: "ledger-limited",
+            method: "bearer-access-token",
+            scopes: [],
+          })
+        : Effect.fail(new EnvironmentAuth.ServerAuthMissingCredentialError({})),
 });
 
 const withLive = <A, E, R>(
@@ -357,6 +365,20 @@ it.effect("没登录读三个口是 401，只带节点证也是 401", () =>
         const node = yield* send(handler, "GET", path, { credential: TOKEN });
         expect(node.status).toBe(401);
         expect((yield* json<{ error: { code: string } }>(node)).error.code).toBe("login_required");
+      }
+    }),
+  ),
+);
+
+it.effect("有效但没有 orchestration:read 的凭证读三个口是 403", () =>
+  withLive((handler) =>
+    Effect.gen(function* () {
+      for (const path of ["/api/nodes", "/api/nodes/sessions", "/api/nodes/test-node"] as const) {
+        const response = yield* send(handler, "GET", path, { session: LIMITED_SESSION });
+        expect(response.status).toBe(403);
+        expect((yield* json<{ error: { code: string } }>(response)).error.code).toBe(
+          "insufficient_scope",
+        );
       }
     }),
   ),

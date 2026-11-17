@@ -1,3 +1,5 @@
+import { AuthOrchestrationReadScope } from "@t3tools/contracts";
+
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -19,14 +21,14 @@ export interface NodeReadGate {
 }
 
 class NodeReadRejected extends Schema.TaggedError<NodeReadRejected>()("NodeReadRejected", {
-  status: Schema.Literals([400, 401, 404, 429, 503]),
+  status: Schema.Literals([400, 401, 403, 404, 429, 503]),
   code: Schema.String,
   message: Schema.String,
   retryAfter: Schema.Number,
 }) {}
 
 const reject = (
-  status: 400 | 401 | 404 | 429 | 503,
+  status: 400 | 401 | 403 | 404 | 429 | 503,
   code: string,
   message: string,
   retryAfter = 0,
@@ -327,7 +329,7 @@ const requireSession = Effect.fn("NodeReads.requireSession")(function* (
   auth: EnvironmentAuth.EnvironmentAuth["Service"],
 ) {
   const request = yield* HttpServerRequest.HttpServerRequest;
-  yield* auth
+  const principal = yield* auth
     .authenticateHttpRequest(request)
     .pipe(
       Effect.mapError((error) =>
@@ -336,6 +338,9 @@ const requireSession = Effect.fn("NodeReads.requireSession")(function* (
           : reject(503, "login_unreadable", "登录态读不了，不当成没登录"),
       ),
     );
+  if (!principal.scopes.includes(AuthOrchestrationReadScope)) {
+    return yield* reject(403, "insufficient_scope", "要有 orchestration:read 才能读节点");
+  }
 });
 
 export const layerFor = (sql: SqlClient.SqlClient, gate: NodeReadGate) =>
