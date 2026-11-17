@@ -29,11 +29,18 @@ import * as Path from "effect/Path";
 import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import {
-  REPOSITORY,
   PipelineGitHubIssues,
+  REPOSITORY,
   layer as gitHubIssuesLayer,
   type PipelineIssue,
 } from "./GitHubIssues.ts";
+import {
+  PipelineIntakePorts,
+  decideIntake,
+  layerPortsDefault,
+  prerequisiteIssueNumbers,
+  type PrerequisiteState,
+} from "./intakeGates.ts";
 
 /** How often a tick runs. One place. */
 const TICK_INTERVAL = Duration.minutes(5);
@@ -281,6 +288,7 @@ const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const issues = yield* PipelineGitHubIssues;
   const settings = yield* ServerSettings.ServerSettingsService;
+  const ports = yield* PipelineIntakePorts;
   const usage = yield* PipelineUsage;
 
   const nowIso = Effect.fn("PipelineRuns.now")(function* () {
@@ -409,18 +417,71 @@ const make = Effect.gen(function* () {
   });
 
   const tick: PipelineRunsShape["tick"] = Effect.gen(function* () {
-    if (!(yield* settings.getSettings.pipe(Effect.mapError(sqlFailure))).pipelineEnabled) return;
+    const current = yield* settings.getSettings.pipe(Effect.mapError(sqlFailure));
+    if (!current.pipelineEnabled) {
+      if (current.pipelineEnabledAt !== null) {
+        yield* Effect.exit(settings.updateSettings({ pipelineEnabledAt: null }));
+      }
+      return;
+    }
+    let openedAt = current.pipelineEnabledAt;
+    if (openedAt === null) {
+      const stamped = DateTime.formatIso(yield* DateTime.now);
+      const wrote = yield* Effect.exit(settings.updateSettings({ pipelineEnabledAt: stamped }));
+      openedAt = Exit.isSuccess(wrote) ? stamped : null;
+    }
     yield* refreshUsage();
     const listed = yield* Effect.exit(issues.listEligible());
     if (Exit.isFailure(listed)) {
       yield* noteTick("failed", failureTag(listed.cause));
       return;
     }
+    const whitelist = yield* Effect.exit(ports.readWhitelist);
+    if (Exit.isFailure(whitelist)) {
+      yield* noteTick("failed", "白名单读不到");
+      return;
+    }
+    const ordered = [...listed.value].sort((left, right) => left.number - right.number);
+    const states = new Map<number, PrerequisiteState>();
+    const needed = new Set<number>();
+    for (const issue of ordered) {
+      for (const number of prerequisiteIssueNumbers(issue.body)) needed.add(number);
+    }
+    for (const number of needed) {
+      if (ordered.some((issue) => issue.number === number)) {
+        states.set(number, "open");
+        continue;
+      }
+      const read = yield* Effect.exit(issues.read(number));
+      if (Exit.isFailure(read)) {
+        states.set(number, "unread");
+        continue;
+      }
+      const state = read.value.state;
+      states.set(number, state === "open" || state === "closed" ? state : "unread");
+    }
+    const now = yield* DateTime.now;
     const existing = yield* loadRows();
     const activeIssues = new Set(existing.filter(isActiveRun).map((run) => run.issueNumber));
     const openSessions = existing.filter((run) => run.status === "session").length;
-    const ordered = [...listed.value].sort((left, right) => left.number - right.number);
     for (const issue of ordered) {
+      const decision = decideIntake(
+        {
+          number: issue.number,
+          title: issue.title,
+          body: issue.body,
+          labels: issue.labels,
+          author: issue.author ?? null,
+          createdAt: issue.createdAt ?? null,
+        },
+        {
+          whitelist: whitelist.value,
+          openedAt,
+          now,
+          prerequisiteState: (number) => states.get(number) ?? "unread",
+        },
+      );
+      if (!decision.pull) continue;
       if (issue.body.includes(WORKFLOWS_PATH)) {
         if (!activeIssues.has(issue.number)) {
           yield* insertRun({ issue, status: "stuck", stuckReason: "交人" });
@@ -669,6 +730,7 @@ export const layerUsageAt = (sessionsRoot: string | undefined) =>
 export const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
+  Layer.provide(layerPortsDefault),
   Layer.provide(layerUsage),
   Layer.provideMerge(gitHubIssuesLayer.pipe(Layer.provide(GitHubRest.layerWithDependencies))),
 );

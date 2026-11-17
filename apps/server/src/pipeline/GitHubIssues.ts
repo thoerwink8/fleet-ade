@@ -33,11 +33,20 @@ export type PipelineIssuesError =
   | PipelineIssuesIncompleteError
   | Schema.SchemaError;
 
+export interface PipelineIssueAuthor {
+  readonly login: string;
+  readonly id: number;
+  readonly type: string;
+}
+
 export interface PipelineIssue {
   readonly number: number;
   readonly title: string;
   readonly body: string;
   readonly labels: ReadonlyArray<string>;
+  readonly author?: PipelineIssueAuthor | null;
+  readonly createdAt?: string | null;
+  readonly state?: "open" | "closed";
 }
 
 const IssuePage = Schema.Array(
@@ -47,6 +56,17 @@ const IssuePage = Schema.Array(
     // GitHub sends null when an issue has no body.
     body: Schema.NullOr(Schema.String),
     pull_request: Schema.optional(Schema.Unknown),
+    state: Schema.optional(Schema.Literals(["open", "closed"])),
+    created_at: Schema.optional(Schema.NullOr(Schema.String)),
+    user: Schema.optional(
+      Schema.NullOr(
+        Schema.Struct({
+          login: Schema.String,
+          id: Schema.Int,
+          type: Schema.optional(Schema.String),
+        }),
+      ),
+    ),
     labels: Schema.Array(
       Schema.Union([Schema.String, Schema.Struct({ name: Schema.optional(Schema.String) })]),
     ),
@@ -66,6 +86,17 @@ const toIssue = (issue: DecodedIssue): PipelineIssue => ({
   title: issue.title,
   body: issue.body ?? "",
   labels: labelNames(issue.labels),
+  ...(issue.user == null
+    ? {}
+    : {
+        author: {
+          login: issue.user.login,
+          id: issue.user.id,
+          type: issue.user.type ?? "",
+        },
+      }),
+  ...(issue.created_at == null ? {} : { createdAt: issue.created_at }),
+  ...(issue.state === undefined ? {} : { state: issue.state }),
 });
 
 const decodeIssuePage = Schema.decodeUnknownEffect(Schema.fromJsonString(IssuePage));

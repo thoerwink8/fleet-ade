@@ -30,6 +30,7 @@ import {
 import { GitHubCommitStatus, type CommitStatusWrite } from "./GitHubCommitStatus.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import { layerPortsDefault } from "./intakeGates.ts";
 import { SessionEndInbox, layer as inboxLayer } from "./SessionEndInbox.ts";
 import type { ColdVerifyModelOutput } from "./coldVerifyVerdict.ts";
 
@@ -71,6 +72,7 @@ const issue = (number: number): PipelineIssue => ({
   title: `单 ${number}`,
   body: "## 怎么算做完\n- 跑通测试\n",
   labels: ["交给 ADE"],
+  author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
 const passOutput: ColdVerifyModelOutput = {
@@ -176,6 +178,7 @@ const harness = (
     Layer.provide(issues),
     Layer.provide(usage),
     Layer.provide(settings),
+    Layer.provide(layerPortsDefault),
     Layer.provideMerge(memory),
   );
   return coldLayer.pipe(

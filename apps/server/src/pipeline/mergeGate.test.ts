@@ -9,6 +9,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import { layerPortsDefault } from "./intakeGates.ts";
 import {
   MergeGate,
   MergeGateReadError,
@@ -31,6 +32,7 @@ const issue = (number: number): PipelineIssue => ({
   title: `单 ${number}`,
   body: "## 怎么算做完\n- 跑通测试\n",
   labels: ["交给 ADE"],
+  author: { login: "thoerwink8", id: 1, type: "User" },
 });
 
 interface MergeCall {
@@ -199,6 +201,7 @@ const gateLayer = (input: {
     ),
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
     Layer.provide(settings),
+    Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   const reader = Layer.succeed(MergeGateReader, {
