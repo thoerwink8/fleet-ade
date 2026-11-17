@@ -104,7 +104,7 @@ import Migration0093 from "./Migrations/093_PipelineInconclusiveReason.ts";
 import Migration0094 from "./Migrations/094_PipelineRunMetrics.ts";
 import Migration0095 from "./Migrations/095_PipelineNotify.ts";
 import Migration0096 from "./Migrations/096_PipelineCandidatesExhausted.ts";
-import Migration0097 from "./Migrations/096_PipelineDailyBrief.ts";
+import Migration0097 from "./Migrations/097_PipelineDailyBrief.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
