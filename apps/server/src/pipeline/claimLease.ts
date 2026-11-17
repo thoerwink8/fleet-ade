@@ -8,23 +8,18 @@ import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as ServerConfig from "../config.ts";
+import * as NodeClaims from "../ledger/nodeClaims.ts";
 import * as NodeReads from "../ledger/nodeReads.ts";
 
-/** Same duration as POST /api/nodes/claims. */
-const LOCAL_LEASE_MS = 2 * 60 * 60_000;
+/** The pipeline's holder id. A node token's id is a different holder. */
+const PIPELINE_CLAIMED_BY = "pipeline";
 
-export interface ClaimWrite {
-  readonly action: "claim" | "release";
-  readonly repo: string;
-  readonly issue: number;
-  readonly title: string;
-  readonly leaseUntil: string;
-}
+export type ClaimWrite = NodeClaims.ClaimRequest & { readonly leaseUntil: string };
 
 export type ClaimResult =
   | { readonly status: 200; readonly code: "ok"; readonly leaseUntil: string }
   | { readonly status: 404; readonly code: "unknown_repo" }
-  | { readonly status: 409; readonly code: "engine_has_it" }
+  | { readonly status: 409; readonly code: "engine_has_it" | "not_claimed" }
   | { readonly status: 503; readonly code: "local_claims_not_wired" | "local_claims_unreadable" };
 
 export interface ClaimAttempt {
@@ -45,41 +40,48 @@ export const claimForRun = Effect.fn("claimLease.claimForRun")(function* (
   port: ClaimLease,
   input: { readonly repo: string; readonly issue: number; readonly title: string },
 ) {
-  const leaseUntil = DateTime.formatIso(
-    DateTime.add(yield* DateTime.now, { milliseconds: LOCAL_LEASE_MS }),
-  );
+  const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
   return yield* port.apply({
     action: "claim",
     repo: input.repo,
     issue: input.issue,
     title: input.title,
-    leaseUntil,
+    leaseUntil: NodeClaims.leaseUntilFrom(nowMs),
   });
 });
 
-const CLAIMED_BY = "local";
-
-const leaseHeld = (leaseUntil: string, nowMs: number) => {
-  const until = Date.parse(leaseUntil);
-  return Number.isNaN(until) || until > nowMs;
-};
-
-/** A finished run must be claimable again; the old lease otherwise blocks it. */
+/** A finished run must be claimable again. Finish matches the holder and expiry this run wrote. */
 export const releaseClaim = Effect.fn("claimLease.releaseClaim")(function* (
   port: ClaimLease,
-  input: { readonly repo: string; readonly issue: number },
+  input: { readonly repo: string; readonly issue: number; readonly leaseUntil: string },
 ) {
   yield* port.apply({
-    action: "release",
+    action: "finish",
     repo: input.repo,
     issue: input.issue,
-    title: "",
-    leaseUntil: "1970-01-01T00:00:00.000Z",
+    outcome: "released",
+    leaseUntil: input.leaseUntil,
   });
 });
 
 const unavailable: ClaimResult = { status: 503, code: "local_claims_unreadable" };
 
+const writer = (sql: SqlClient.SqlClient) =>
+  Effect.fn("claimLease.apply")(function* (write: ClaimWrite) {
+    const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
+    return yield* NodeClaims.apply(sql, { ...write, claimedBy: PIPELINE_CLAIMED_BY }, nowMs).pipe(
+      Effect.map((outcome) =>
+        outcome.status === 200
+          ? ({ status: 200, code: "ok", leaseUntil: write.leaseUntil } as const)
+          : outcome.code === "unknown_repo"
+            ? ({ status: 404, code: "unknown_repo" } as const)
+            : ({ status: 409, code: "engine_has_it" } as const),
+      ),
+      Effect.catchCause(() => Effect.succeed(unavailable)),
+    );
+  });
+
+/** Test double. `repos` replaces the ledger's repos table; `wired: false` is the unmounted port. */
 export const layerPort = (options?: {
   readonly repos?: ReadonlyArray<string>;
   readonly wired?: boolean;
@@ -87,61 +89,38 @@ export const layerPort = (options?: {
   Layer.effect(
     ClaimLeasePort,
     Effect.gen(function* () {
-      const repos =
-        options?.repos === undefined
-          ? undefined
-          : new Set(options.repos.map((repo) => repo.toLowerCase()));
-      const wired = options?.wired ?? true;
-      const seen = yield* Ref.make<ReadonlyArray<ClaimAttempt>>([]);
       const sql = yield* SqlClient.SqlClient;
-      if (wired) yield* NodeReads.migrate;
-      const apply = Effect.fn("claimLease.apply")(function* (write: ClaimWrite) {
-        const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
-        const attempt = sql.withTransaction(
-          Effect.gen(function* () {
-            const [owner, name] = write.repo.split("/");
-            const registered =
-              repos === undefined
-                ? (yield* sql`SELECT owner FROM repos
-                WHERE lower(owner) = lower(${owner}) AND lower(name) = lower(${name}) LIMIT 1`)
-                    .length > 0
-                : repos.has(write.repo.toLowerCase());
-            if (!registered) return { status: 404, code: "unknown_repo" } as const;
-            if (write.action === "release") {
-              yield* sql`DELETE FROM node_claims
-                WHERE lower(repo) = lower(${write.repo}) AND issue = ${write.issue}`;
-              return { status: 200, code: "ok", leaseUntil: write.leaseUntil } as const;
-            }
-            const held = yield* sql<{ readonly leaseUntil: string }>`
-            SELECT lease_until AS leaseUntil FROM node_claims
-            WHERE lower(repo) = lower(${write.repo}) AND issue = ${write.issue}
-          `;
-            if (held.some((row) => leaseHeld(row.leaseUntil, nowMs))) {
-              return { status: 409, code: "engine_has_it" } as const;
-            }
-            yield* sql`DELETE FROM node_claims
-            WHERE lower(repo) = lower(${write.repo}) AND issue = ${write.issue}`;
-            yield* sql`INSERT INTO node_claims
-            (repo, issue, claimed_by, lease_until, executor, state, fencing)
-            VALUES (${write.repo}, ${write.issue}, ${CLAIMED_BY}, ${write.leaseUntil}, 'local', 'running', NULL)`;
-            return { status: 200, code: "ok", leaseUntil: write.leaseUntil } as const;
-          }),
-        );
-        const result: ClaimResult = wired
-          ? yield* attempt.pipe(Effect.catchCause(() => Effect.succeed(unavailable)))
-          : { status: 503, code: "local_claims_not_wired" };
-        yield* Ref.update(seen, (rows) => [...rows, { write, result }]);
+      yield* NodeReads.migrate;
+      for (const repo of options?.repos ?? []) {
+        const [owner, name] = repo.split("/");
+        if (owner === undefined || name === undefined) continue;
+        yield* sql`INSERT OR IGNORE INTO repos (owner, name) VALUES (${owner}, ${name})`;
+      }
+      const seen = yield* Ref.make<ReadonlyArray<ClaimAttempt>>([]);
+      const record = Effect.fn("claimLease.apply")(function* (write: ClaimWrite) {
+        const result =
+          options?.wired === false
+            ? ({ status: 503, code: "local_claims_not_wired" } as const)
+            : yield* writer(sql)(write);
+        yield* Ref.set(seen, [{ write, result }]);
         return result;
       });
-      return ClaimLeasePort.of({ apply, attempts: Ref.get(seen) });
+      return ClaimLeasePort.of({ apply: record, attempts: Ref.get(seen) });
     }),
   );
-
+/** Production: the pipeline and POST /api/nodes/claims open the same ledger file and the same writer. */
 export const layerLive = Layer.unwrap(
   Effect.gen(function* () {
     const { stateDir } = yield* ServerConfig.ServerConfig;
     const path = yield* Path.Path;
-    return layerPort().pipe(
+    return Layer.effect(
+      ClaimLeasePort,
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* NodeReads.migrate;
+        return ClaimLeasePort.of({ apply: writer(sql), attempts: Effect.succeed([]) });
+      }),
+    ).pipe(
       Layer.provide(NodeSqliteClient.layer({ filename: path.join(stateDir, "ledger.sqlite") })),
     );
   }),

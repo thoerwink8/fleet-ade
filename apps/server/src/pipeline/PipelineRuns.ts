@@ -44,6 +44,7 @@ import {
 } from "./intakeGates.ts";
 import { PipelineFeishu, layer as feishuLayer, type StuckMessage } from "./feishu.ts";
 import * as ClaimLease from "./claimLease.ts";
+import { DailyBrief, beijingBriefSlot, layerLive as dailyBriefLive } from "./dailyBrief.ts";
 
 /** How often a tick runs. One place. */
 const TICK_INTERVAL = Duration.minutes(5);
@@ -298,8 +299,17 @@ const make = Effect.gen(function* () {
   const ports = yield* PipelineIntakePorts;
   const usage = yield* PipelineUsage;
   const claims = yield* ClaimLease.ClaimLeasePort;
+  const heldLeases = new Map<number, string>();
 
   const feishu = yield* Effect.serviceOption(PipelineFeishu);
+  const brief = yield* Effect.serviceOption(DailyBrief);
+  let briefedDay: string | null = null;
+  const maybeBrief = Effect.gen(function* () {
+    const slot = beijingBriefSlot(yield* DateTime.now);
+    if (!slot.due || briefedDay === slot.day || Option.isNone(brief)) return;
+    const outcome = yield* Effect.exit(brief.value.run);
+    if (Exit.isSuccess(outcome)) briefedDay = slot.day;
+  });
 
   // A failed attempt still counts: the same reason is not sent again.
   const announce = Effect.fn("PipelineRuns.announce")(function* (
@@ -450,6 +460,7 @@ const make = Effect.gen(function* () {
   });
 
   const tick: PipelineRunsShape["tick"] = Effect.gen(function* () {
+    yield* Effect.exit(maybeBrief);
     const current = yield* settings.getSettings.pipe(Effect.mapError(sqlFailure));
     if (!current.pipelineEnabled) {
       if (current.pipelineEnabledAt !== null) {
@@ -531,6 +542,7 @@ const make = Effect.gen(function* () {
         title: issue.title,
       });
       if (leased.status !== 200) continue;
+      heldLeases.set(issue.number, leased.leaseUntil);
       yield* insertRun({ issue, status: "claimed", stuckReason: null });
       activeIssues.add(issue.number);
     }
@@ -657,8 +669,17 @@ const make = Effect.gen(function* () {
       });
     }
     yield* refreshUsage();
-    if (nextStatus === "merged" || (nextStatus === "stuck" && nextReason === TERMINAL_CANCEL)) {
-      yield* ClaimLease.releaseClaim(claims, { repo: REPOSITORY_NAME, issue: issueNumber }).pipe(
+    const held = heldLeases.get(issueNumber);
+    if (
+      held !== undefined &&
+      (nextStatus === "merged" || (nextStatus === "stuck" && nextReason === TERMINAL_CANCEL))
+    ) {
+      heldLeases.delete(issueNumber);
+      yield* ClaimLease.releaseClaim(claims, {
+        repo: REPOSITORY_NAME,
+        issue: issueNumber,
+        leaseUntil: held,
+      }).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning("pipeline.claim.release-failed", { cause: Cause.pretty(cause) }),
         ),
@@ -788,6 +809,7 @@ export const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
   Layer.provide(ClaimLease.layerLive),
+  Layer.provide(dailyBriefLive),
   Layer.provide(feishuLayer.pipe(Layer.provide(FetchHttpClient.layer))),
   Layer.provide(layerPortsDefault),
   Layer.provide(layerUsage),

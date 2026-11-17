@@ -1,6 +1,8 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { assert, it } from "@effect/vitest";
+import * as Duration from "effect/Duration";
+import * as TestClock from "effect/testing/TestClock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -36,6 +38,7 @@ const issue = (number: number, title = `单 ${number}`): PipelineIssue => ({
   body: acceptance,
   labels: ["交给 ADE"],
   author: { login: "thoerwink8", id: 1, type: "User" },
+  createdAt: "1970-01-01T00:00:00.000Z",
 });
 
 const pipelineLayer = <E, R>(claims: Layer.Layer<ClaimLeasePort, E, R>) =>
@@ -91,8 +94,8 @@ it.effect("第一次认领成功才有一条运行；同一仓同一单第二次
     assert.strictEqual(again.code, "engine_has_it");
     assert.strictEqual(yield* runCount, 1);
     const attempts = yield* port.attempts;
-    assert.strictEqual(attempts[0]?.result.status, 200);
-    assert.strictEqual(attempts[1]?.result.status, 409);
+    assert.strictEqual(attempts.length, 1);
+    assert.strictEqual(attempts[0]?.result.status, 409);
     assert.strictEqual((yield* sql`SELECT issue FROM node_claims`).length, 1);
   }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: ["thoerwink8/fleet-ade"] })))),
 );
@@ -192,4 +195,36 @@ it.effect("账本已有租约阻止建运行，成功认领对独立账本连接
       }).pipe(Effect.provide(pipelineLayer(layerLive)));
     }).pipe(Effect.provide(ServerConfig.layerTest(directory, directory)));
   }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);
+
+it.effect("两小时后另一执行方重新认领，旧运行结束不删新租约", () =>
+  Effect.gen(function* () {
+    const runs = yield* PipelineRuns;
+    const port = yield* ClaimLeasePort;
+    const sql = yield* SqlClient.SqlClient;
+    yield* runs.tick;
+    assert.strictEqual(yield* runCount, 1);
+    yield* TestClock.adjust(Duration.millis(2 * 60 * 60_000 + 1));
+    yield* sql`
+      UPDATE node_claims SET claimed_by = 'other-node', lease_until = '9999-01-01T00:00:00.000Z'
+      WHERE issue = 7
+    `;
+    yield* runs.note(7, { status: "merged" });
+    const held = yield* sql<{ readonly claimed_by: string; readonly lease_until: string }>`
+      SELECT claimed_by, lease_until FROM node_claims WHERE issue = 7
+    `;
+    assert.deepEqual(held, [{ claimed_by: "other-node", lease_until: "9999-01-01T00:00:00.000Z" }]);
+    const released = (yield* port.attempts).at(-1);
+    assert.strictEqual(released?.write.action, "finish");
+    if (released?.write.action === "finish") {
+      assert.strictEqual(released.write.outcome, "released");
+    }
+    assert.strictEqual(released?.write.leaseUntil, "1970-01-01T02:00:00.000Z");
+  }).pipe(
+    Effect.provide(
+      pipelineLayer(layerPort({ repos: ["thoerwink8/fleet-ade"] })).pipe(
+        Layer.provideMerge(TestClock.layer()),
+      ),
+    ),
+  ),
 );

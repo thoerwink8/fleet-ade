@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import * as NodeClaims from "./nodeClaims.ts";
 import * as Notes from "./notes.ts";
 
 /** Same gap the old node report and session posts used, on two separate slots. */
@@ -20,14 +21,14 @@ export interface NodeReadGate {
 const serverGate: NodeReadGate = { login: false, nowMillis: Date.now };
 
 class NodeReadRejected extends Schema.TaggedError<NodeReadRejected>()("NodeReadRejected", {
-  status: Schema.Literals([400, 401, 404, 429, 503]),
+  status: Schema.Literals([400, 401, 404, 409, 429, 503]),
   code: Schema.String,
   message: Schema.String,
   retryAfter: Schema.Number,
 }) {}
 
 const reject = (
-  status: 400 | 401 | 404 | 429 | 503,
+  status: 400 | 401 | 404 | 409 | 429 | 503,
   code: string,
   message: string,
   retryAfter = 0,
@@ -297,10 +298,78 @@ const routes = (sql: SqlClient.SqlClient, gate: NodeReadGate) => {
     }),
   );
 
+  const postClaims = respond(
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const nodeId = yield* authed(sql, request);
+      const body = yield* request.json.pipe(
+        Effect.mapError(() => reject(400, "invalid_body", "请求体不是 JSON")),
+      );
+      const parsed = NodeClaims.parseClaimRequest(body);
+      if (parsed === undefined) return yield* reject(400, "invalid_body", "请求体不符合领单格式");
+      const nowMs = gate.nowMillis();
+      const outcome = yield* NodeClaims.apply(
+        sql,
+        parsed.action === "claim"
+          ? {
+              action: "claim",
+              repo: parsed.repo,
+              issue: parsed.issue,
+              title: parsed.title,
+              claimedBy: nodeId,
+              leaseUntil: NodeClaims.leaseUntilFrom(nowMs),
+            }
+          : parsed.action === "renew"
+            ? {
+                action: "renew",
+                repo: parsed.repo,
+                issue: parsed.issue,
+                claimedBy: nodeId,
+                leaseUntil: NodeClaims.leaseUntilFrom(nowMs),
+              }
+            : {
+                action: "finish",
+                repo: parsed.repo,
+                issue: parsed.issue,
+                outcome: parsed.outcome,
+                reason: parsed.reason,
+                claimedBy: nodeId,
+              },
+        nowMs,
+      ).pipe(
+        Effect.mapError(() =>
+          reject(
+            503,
+            "local_claims_unreadable",
+            "读不到本机租约（库读失败），不拿空列表冒充「没人领着」",
+          ),
+        ),
+      );
+      if (outcome.status !== 200) {
+        return yield* reject(
+          outcome.status,
+          outcome.code,
+          outcome.code === "unknown_repo"
+            ? `${parsed.repo} 不是登记的仓，登记不了`
+            : outcome.code === "not_claimed"
+              ? `${parsed.repo}#${parsed.issue} 现在不是这台领着的`
+              : `另一执行方手上有这张单`,
+        );
+      }
+      return {
+        ok: true as const,
+        state: "running",
+        executor: "local" as const,
+        leaseUntil: outcome.leaseUntil,
+      };
+    }),
+  );
+
   return Layer.mergeAll(
     HttpRouter.add("POST", "/api/nodes/report", postKind("report")),
     HttpRouter.add("POST", "/api/nodes/sessions", postKind("sessions")),
     HttpRouter.add("GET", "/api/nodes/claims", claims),
+    HttpRouter.add("POST", "/api/nodes/claims", postClaims),
     HttpRouter.add(
       "GET",
       "/api/nodes",
