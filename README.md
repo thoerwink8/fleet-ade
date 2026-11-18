@@ -19,7 +19,7 @@
 
 ## 本仓运行方式
 
-- `pnpm dev`：起开发服务（沿用 `scripts/dev-runner.ts`），进程和端口记在 `_tmp/run/dev.json`；已经在跑会直接提示。
+- `pnpm dev`：启动开发服务（沿用 `scripts/dev-runner.ts`），进程和端口记在 `_tmp/run/dev.json`；已经在跑会直接提示。
 - `pnpm start`：构建后在后台起网页版，默认只听 `127.0.0.1:3773`，打出地址后返回；进程记在 `_tmp/run/start.json`。
 - `pnpm stop`：只停上面记下的进程树；没在跑就说明并返回 0。
 - `pnpm check`：lint、界面英文检查、typecheck 和全套单测，给 Linux 和 CI 用。Windows 本机开发用 `pnpm check:changed`。
