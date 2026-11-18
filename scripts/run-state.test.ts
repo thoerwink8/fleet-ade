@@ -64,9 +64,7 @@ describe("run state", () => {
   });
 
   it("keeps start state off the home directory", () => {
-    expect(isLinkedWorktreeGitFile("gitdir: D:/example/repo/.git/worktrees/14-cmds\n")).toBe(
-      true,
-    );
+    expect(isLinkedWorktreeGitFile("gitdir: D:/example/repo/.git/worktrees/14-cmds\n")).toBe(true);
     expect(isLinkedWorktreeGitFile("")).toBe(false);
     expect(
       resolveStartBaseDir({
