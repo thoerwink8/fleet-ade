@@ -2,6 +2,7 @@ import type { LegendListRef } from "@legendapp/list/react";
 import { useEffect, useEffectEvent, useRef, type RefObject } from "react";
 import type { ThreadFindMatch } from "./threadFind";
 import { useThreadFindHighlights } from "./threadFindHighlights";
+import { toastManager } from "../ui/toast";
 
 const FIND_MATCH_VIEW_MARGIN = 96;
 
@@ -270,6 +271,31 @@ export function useThreadFindNavigation({
 
     historyControls.onLoadEarlier(match.entryId);
   }, [entries, historyControls, listReady, match, matchKey, rowIndex]);
+  const notifiedMissingRef = useRef<string | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports once when a targeted match (search result, citation) is absent after history is exhausted
+  useEffect(() => {
+    if (matchKey === null) {
+      notifiedMissingRef.current = null;
+      return;
+    }
+    if (
+      !match ||
+      !listReady ||
+      (historyControls !== undefined &&
+        (historyControls.hasMoreHistory ||
+          historyControls.loading ||
+          historyControls.error !== null)) ||
+      entries.some((entry) => entry.id === match.entryId) ||
+      notifiedMissingRef.current === matchKey
+    )
+      return;
+    notifiedMissingRef.current = matchKey;
+    toastManager.add({
+      type: "warning",
+      title: "找不到这条消息",
+      description: "它可能已被删除。",
+    });
+  }, [entries, historyControls, listReady, match, matchKey]);
   const reveal = useEffectEvent((range: Range | null, inputs: RevealInputs) =>
     revealThreadFindMatch(range, inputs, { state: stateRef.current, listRef, readInputs }),
   );
