@@ -1772,6 +1772,7 @@ export const layerWsRpc = (
           threadLinkMetadata: true,
           shellOlderSettled: true,
           threadResumeCompletionMarker: true,
+          threadBatchCommands: true,
           threadSnapshotPagination: true,
           threadFind: true,
           threadFindProgressive: true,
@@ -1850,15 +1851,17 @@ export const layerWsRpc = (
             "orchestration_v2.command_id": command.commandId,
             "orchestration_v2.command_type": command.type,
             "orchestration_v2.thread_id":
-              command.type === "thread.fork" || command.type === "thread.merge_back"
-                ? command.targetThreadId
-                : command.type === "delegated_task.request" ||
-                    command.type === "delegated_task.wake-policy" ||
-                    command.type === "delegated_task.completion-delivery.acknowledge" ||
-                    command.type === "delegated_task.completion-delivery.dispose" ||
-                    command.type === "thread.created.record"
-                  ? command.parentThreadId
-                  : command.threadId,
+              command.type === "thread.batch"
+                ? command.threadIds[0]!
+                : command.type === "thread.fork" || command.type === "thread.merge_back"
+                  ? command.targetThreadId
+                  : command.type === "delegated_task.request" ||
+                      command.type === "delegated_task.wake-policy" ||
+                      command.type === "delegated_task.completion-delivery.acknowledge" ||
+                      command.type === "delegated_task.completion-delivery.dispose" ||
+                      command.type === "thread.created.record"
+                    ? command.parentThreadId
+                    : command.threadId,
             ...(command.type === "thread.fork" || command.type === "thread.merge_back"
               ? { "orchestration_v2.source_thread_id": command.sourceThreadId }
               : {}),
@@ -1878,7 +1881,10 @@ export const layerWsRpc = (
                   ).pipe(Effect.provide(intakeContext)),
                 )
                 .pipe(
-                  Effect.map((result) => ({ sequence: result.sequence })),
+                  Effect.map((result) => ({
+                    sequence: result.sequence,
+                    ...(result.batch === undefined ? {} : { batch: result.batch }),
+                  })),
                   Effect.mapError((cause) => {
                     const detail = userFacingDispatchErrorMessage(cause);
                     return new OrchestrationV2DispatchCommandError({

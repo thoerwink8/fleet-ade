@@ -113,10 +113,7 @@ import {
   type SidebarProjectSnapshot,
 } from "../sidebarProjectGrouping";
 import { resolveProjectExpanded, useUiStateStore } from "../uiStateStore";
-import {
-  getThreadKeysToDeselectAfterDelete,
-  useThreadSelectionStore,
-} from "../threadSelectionStore";
+import { useThreadSelectionStore } from "../threadSelectionStore";
 import {
   canTurnThreadIntoProject,
   useAcknowledgeThreadWoke,
@@ -180,7 +177,8 @@ import {
   sidebarFolderExpansionKeys,
   buildBulkTitleRegenerationContextMenuItem,
   buildBulkUnpinContextMenuItem,
-  deleteSelectedThreadEntries,
+  applyThreadBatch,
+  batchDeleteConfirmText,
   filterSidebarProjectScopeItems,
   firstValidTimestampMs,
   isSidebarNestedLinkClick,
@@ -933,12 +931,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     reorderActiveThread,
     markThreadUnread,
     archiveThread,
+    markThreadsUnread,
+    deleteThreads,
     deleteThread,
   } = useThreadActions();
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
   const regenerateThreadTitle = useOrchestrationCommand(threadEnvironment.regenerateTitle, {
+    reportFailure: false,
+  });
+  const batchThreads = useOrchestrationCommand(threadEnvironment.batch, {
     reportFailure: false,
   });
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
@@ -1823,6 +1826,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     settledThreadKeysRef.current = settledThreadKeys;
     snoozedThreadKeysRef.current = snoozedThreadKeys;
     sectionByThreadKeyRef.current = sectionByThreadKey;
+    useThreadSelectionStore.getState().setVisibleThreadKeys(orderedThreadKeys);
   });
   const startActionSweep = useStableCallback(
     (threadRef: ScopedThreadRef, action: SidebarSweepAction, event: PointerEvent) => {
@@ -2385,6 +2389,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   },
                 ]
               : []),
+            {
+              id: "archive",
+              label: `归档（${count}）`,
+              disabled: !canOperateThreads(selectedThreads),
+            },
+            {
+              id: "unarchive",
+              label: `取消归档（${count}）`,
+              disabled: !canOperateThreads(selectedThreads),
+            },
+            { id: "select-all", label: "全选当前列表" },
             { id: "mark-unread", label: `标为未读（${count}）` },
             {
               id: "delete",
@@ -2486,24 +2501,71 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         clearSelection();
         return;
       }
+      if (clicked.value === "select-all") {
+        useThreadSelectionStore.getState().replaceSelection(orderedThreadKeysRef.current);
+        return;
+      }
+      const batchTargets = threadKeys.flatMap((threadKey) => {
+        const thread = threadByKeyRef.current.get(threadKey);
+        return thread
+          ? [
+              {
+                environmentId: thread.environmentId,
+                id: thread.id,
+                title: thread.title,
+                key: threadKey,
+              },
+            ]
+          : [];
+      });
       if (clicked.value === "mark-unread") {
-        for (const threadKey of threadKeys) {
-          const thread = threadByKeyRef.current.get(threadKey);
-          if (thread) markThreadUnread(scopeThreadRef(thread.environmentId, thread.id));
+        const failures = await markThreadsUnread(batchTargets);
+        if (failures.length > 0) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "有会话未能标为未读",
+              description: failures.join("\n"),
+            }),
+          );
         }
         clearSelection();
+        return;
+      }
+      const finishBatch = async (operation: "archive" | "unarchive") => {
+        const { prunedKeys, failures } = await applyThreadBatch({
+          threads: batchTargets,
+          dispatch: (group) =>
+            batchThreads({
+              environmentId: group.environmentId,
+              input: { operation, threadIds: group.threadIds },
+            }),
+        });
+        if (failures.length > 0) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "有会话未处理",
+              description: failures.join("\n"),
+            }),
+          );
+        }
+        removeFromSelection([...prunedKeys]);
+      };
+      if (clicked.value === "archive" || clicked.value === "unarchive") {
+        if (clicked.value === "archive" && confirmThreadArchive) {
+          const confirmed = await settlePromise(() =>
+            api.dialogs.confirm(`归档 ${count} 个会话？`),
+          );
+          if (confirmed._tag === "Failure" || !confirmed.value) return;
+        }
+        await finishBatch(clicked.value);
         return;
       }
       if (clicked.value !== "delete") return;
       if (confirmThreadDelete) {
         const confirmed = await settlePromise(() =>
-          api.dialogs.confirm(
-            [
-              `Delete ${count} thread${count === 1 ? "" : "s"}?`,
-              "这将永久清除这些会话的对话历史。",
-            ].join("\n"),
-            { variant: "destructive" },
-          ),
+          api.dialogs.confirm(batchDeleteConfirmText(count), { variant: "destructive" }),
         );
         if (confirmed._tag === "Failure" || !confirmed.value) return;
       }
@@ -2516,35 +2578,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         )
       )
         return;
-      const { deletedThreadKeys, firstFailure } = await deleteSelectedThreadEntries({
-        entries: threadKeys.map((threadKey) => ({ threadKey })),
-        delete: async ({ threadKey }, deletedThreadKeys) => {
-          const thread = threadByKeyRef.current.get(threadKey);
-          if (!thread) return null;
-          return deleteThread(scopeThreadRef(thread.environmentId, thread.id), {
-            deletedThreadKeys,
-          });
-        },
-      });
-      if (firstFailure !== null) {
-        const firstError = squashAtomCommandFailure(firstFailure);
+      const { deletedKeys, failures } = await deleteThreads(batchTargets);
+      if (failures.length > 0) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "删除会话失败",
-            description: firstError instanceof Error ? firstError.message : "发生错误。",
+            title: "有会话未能删除",
+            description: failures.join("\n"),
           }),
         );
       }
-      removeFromSelection(
-        getThreadKeysToDeselectAfterDelete(selectedThreadKeys, deletedThreadKeys, (threadKey) => {
-          const threadRef = parseScopedThreadKey(threadKey);
-          return threadRef !== null && readThreadShell(threadRef) !== null;
-        }),
-      );
+      removeFromSelection([...deletedKeys]);
     },
   );
-
   const handleDraftContextMenu = useStableCallback(
     (draftId: DraftId, position: { x: number; y: number }) => {
       void (async () => {
@@ -2886,6 +2932,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || isCommandPaletteOpen() || isModelPickerOpen()) {
+        return;
+      }
+      const target = event.target;
+      const isEditing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      const selectAllShortcut =
+        !event.altKey &&
+        (event.ctrlKey || event.metaKey) &&
+        event.key.toLowerCase() === "a" &&
+        (event.shiftKey || !isEditing);
+      if (useThreadSelectionStore.getState().hasSelection() && selectAllShortcut) {
+        event.preventDefault();
+        event.stopPropagation();
+        useThreadSelectionStore.getState().replaceSelection(orderedThreadKeys);
         return;
       }
       const command = resolveShortcutCommand(event, keybindings, {

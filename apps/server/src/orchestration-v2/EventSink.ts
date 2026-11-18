@@ -1,5 +1,6 @@
 import {
   CommandId,
+  type OrchestrationV2BatchThreadResult,
   type OrchestrationV2Run,
   OrchestrationV2DomainEvent,
   type OrchestrationV2ProviderThread,
@@ -193,6 +194,8 @@ export interface EventSinkV2Shape {
     };
     /** Like writeWithEffects' updateDelegatedCompletionOnly, for this run's run.updated only. */
     readonly updateDelegatedCompletionOnlyRunId?: RunId;
+    /** The batch command's per-item outcome, recorded on the receipt for replays. */
+    readonly batch?: OrchestrationV2BatchThreadResult;
   }) => Effect.Effect<
     {
       readonly receipt: CommandReceiptStore.CommandReceiptV2;
@@ -791,6 +794,7 @@ const layerBase: Layer.Layer<
             resultSequence: sequence,
             status: "accepted",
             error: null,
+            ...(input.batch === undefined ? {} : { batch: input.batch }),
           };
           yield* commandReceipts.upsert(receipt);
           const cancelledEffectIds =

@@ -71,6 +71,34 @@ describe("threadSelectionStore", () => {
     });
   });
 
+  describe("setVisibleThreadKeys", () => {
+    it("drops the anchor once it leaves the visible list", () => {
+      const store = useThreadSelectionStore.getState();
+      store.setAnchor(THREAD_B);
+      store.setVisibleThreadKeys([THREAD_C, THREAD_D]);
+      expect(useThreadSelectionStore.getState().anchorThreadKey).toBeNull();
+    });
+
+    it("keeps the anchor while it stays visible", () => {
+      const store = useThreadSelectionStore.getState();
+      store.setAnchor(THREAD_B);
+      store.setVisibleThreadKeys([THREAD_A, THREAD_B, THREAD_C]);
+      expect(useThreadSelectionStore.getState().anchorThreadKey).toBe(THREAD_B);
+    });
+  });
+
+  describe("replaceSelection", () => {
+    it("keeps only the threads in the current filtered list", () => {
+      const store = useThreadSelectionStore.getState();
+      store.toggleThread(THREAD_A);
+      store.replaceSelection([THREAD_C, THREAD_D]);
+      expect([...useThreadSelectionStore.getState().selectedThreadKeys]).toEqual([
+        THREAD_C,
+        THREAD_D,
+      ]);
+      expect(useThreadSelectionStore.getState().anchorThreadKey).toBe(THREAD_C);
+    });
+  });
   describe("rangeSelectTo", () => {
     it("keeps anchor stable across multiple range selects", () => {
       const store = useThreadSelectionStore.getState();

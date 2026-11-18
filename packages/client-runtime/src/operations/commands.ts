@@ -101,6 +101,11 @@ export interface DeleteThreadInput extends ThreadCommandInput {
 }
 export type ArchiveThreadInput = ThreadCommandInput;
 export type UnarchiveThreadInput = ThreadCommandInput;
+export interface BatchThreadInput extends CommandMetadata {
+  readonly operation: "archive" | "unarchive" | "delete" | "mark-unread";
+  readonly threadIds: ReadonlyArray<ThreadId>;
+  readonly onlyIfUnused?: boolean;
+}
 export type SettleThreadInput = ThreadCommandInput;
 
 export interface UnsettleThreadInput extends ThreadCommandInput {
@@ -552,6 +557,95 @@ export const archiveThread = Effect.fn("EnvironmentCommands.archiveThread")(func
   input: ArchiveThreadInput,
 ) {
   return yield* simpleThreadCommand("thread.archive", input);
+});
+const BATCH_THREADS_CHUNK_SIZE = 100;
+
+export const batchThreads = Effect.fn("EnvironmentCommands.batchThreads")(function* (
+  input: BatchThreadInput,
+) {
+  const config = yield* getInitialServerConfig();
+  const items: Array<{
+    readonly threadId: ThreadId;
+    readonly status:
+      | "applied"
+      | "already_target"
+      | "not_found"
+      | "deleted"
+      | "running"
+      | "rejected";
+  }> = [];
+  let sequence = 0;
+  const merge = (
+    batch:
+      | {
+          readonly items: ReadonlyArray<{
+            readonly threadId: ThreadId;
+            readonly status: (typeof items)[number]["status"];
+          }>;
+        }
+      | undefined,
+  ) => {
+    if (batch !== undefined) items.push(...batch.items);
+  };
+  if (config.threadBatchCommands === true) {
+    for (const chunk of Array.from(
+      { length: Math.ceil(input.threadIds.length / BATCH_THREADS_CHUNK_SIZE) },
+      (_, index) =>
+        input.threadIds.slice(
+          index * BATCH_THREADS_CHUNK_SIZE,
+          (index + 1) * BATCH_THREADS_CHUNK_SIZE,
+        ),
+    )) {
+      const result = yield* dispatch({
+        type: "thread.batch",
+        commandId: yield* allocateCommandId(input),
+        operation: input.operation,
+        threadIds: chunk,
+        ...(input.onlyIfUnused === undefined ? {} : { onlyIfUnused: input.onlyIfUnused }),
+      });
+      sequence = result.sequence;
+      merge(result.batch);
+    }
+  } else {
+    // Older servers have no thread.batch; fall back to one command per thread and
+    // report per-item outcomes the same shape a batch would.
+    const perThread =
+      input.operation === "delete"
+        ? "thread.delete"
+        : input.operation === "mark-unread"
+          ? "thread.mark-unread"
+          : input.operation === "archive"
+            ? "thread.archive"
+            : "thread.unarchive";
+    for (const threadId of input.threadIds) {
+      const result = yield* dispatch({
+        type: perThread,
+        commandId: yield* allocateCommandId(input),
+        threadId,
+        ...(perThread === "thread.delete" && input.onlyIfUnused === true
+          ? { onlyIfUnused: true }
+          : {}),
+      }).pipe(
+        Effect.map((dispatched) => ({ ok: true as const, sequence: dispatched.sequence })),
+        Effect.catchTags({
+          OrchestrationV2DispatchCommandError: () =>
+            Effect.succeed({ ok: false as const, sequence: 0 }),
+        }),
+      );
+      sequence = result.sequence;
+      items.push({ threadId, status: result.ok ? "applied" : "rejected" });
+    }
+  }
+  return {
+    sequence,
+    batch: {
+      operation: input.operation,
+      items,
+      appliedCount: items.filter((item) => item.status === "applied").length,
+      rejectedCount: items.filter((item) => item.status === "running" || item.status === "rejected")
+        .length,
+    },
+  };
 });
 
 export const unarchiveThread = Effect.fn("EnvironmentCommands.unarchiveThread")(function* (

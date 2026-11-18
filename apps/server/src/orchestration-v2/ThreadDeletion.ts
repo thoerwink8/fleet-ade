@@ -23,6 +23,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
   readonly attachmentIds: ReadonlyArray<string>;
   readonly now: DateTime.Utc;
   readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
+  readonly effectScope?: string;
 }): Effect.fn.Return<ThreadDeletionPlan, IdAllocator.IdAllocatorV2Error> {
   const { command, projection, now, idAllocator } = input;
   const events: Array<OrchestrationV2DomainEvent> = [];
@@ -182,6 +183,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     }
   }
 
+  const effectScope = input.effectScope ?? command.commandId;
   for (const session of projection.providerSessions) {
     // An errored session can still own a reusable live runtime.
     if (session.status === "stopped") continue;
@@ -198,7 +200,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
       },
     });
     effects.push({
-      id: `effect:${command.commandId}:provider-session.detach:${session.id}`,
+      id: `effect:${effectScope}:provider-session.detach:${session.id}`,
       commandId: command.commandId,
       threadId: command.threadId,
       request: {
@@ -210,19 +212,19 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     });
   }
   effects.push({
-    id: `effect:${command.commandId}:scheduled-tasks.cleanup`,
+    id: `effect:${effectScope}:scheduled-tasks.cleanup`,
     commandId: command.commandId,
     threadId: command.threadId,
     request: { type: "scheduled-tasks.cleanup" },
   });
   effects.push({
-    id: `effect:${command.commandId}:terminal.cleanup`,
+    id: `effect:${effectScope}:terminal.cleanup`,
     commandId: command.commandId,
     threadId: command.threadId,
     request: { type: "terminal.cleanup" },
   });
   effects.push({
-    id: `effect:${command.commandId}:preview.cleanup`,
+    id: `effect:${effectScope}:preview.cleanup`,
     commandId: command.commandId,
     threadId: command.threadId,
     request: { type: "preview.cleanup" },
@@ -230,7 +232,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
   const attachmentIds = Array.from(new Set(input.attachmentIds));
   if (attachmentIds.length > 0) {
     effects.push({
-      id: `effect:${command.commandId}:attachment.cleanup`,
+      id: `effect:${effectScope}:attachment.cleanup`,
       commandId: command.commandId,
       threadId: command.threadId,
       request: { type: "attachment.cleanup", attachmentIds },

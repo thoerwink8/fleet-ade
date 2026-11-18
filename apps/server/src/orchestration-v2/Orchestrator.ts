@@ -38,6 +38,7 @@ import {
   type OrchestrationV2ServerCommand,
   type ThreadPullRequestLink,
   type ThreadPullRequestWatch,
+  type OrchestrationV2BatchThreadResult,
   type OrchestrationV2AppThread,
   type OrchestrationV2ContextHandoff,
   type OrchestrationV2ContextSourcePoint,
@@ -195,7 +196,7 @@ import {
   isForkableSourceRunStatus,
   ThreadForkServiceV2,
 } from "./ThreadForkService.ts";
-import { planThreadDeletion } from "./ThreadDeletion.ts";
+import { planThreadDeletion, type ThreadDeletionPlan } from "./ThreadDeletion.ts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ServerSettings from "../serverSettings.ts";
 
@@ -377,6 +378,7 @@ export type OrchestratorV2Error = typeof OrchestratorV2Error.Type;
 export interface OrchestratorV2DispatchResult {
   readonly sequence: number;
   readonly storedEvents: ReadonlyArray<OrchestrationV2StoredEvent>;
+  readonly batch?: OrchestrationV2BatchThreadResult;
   /** The command id was already accepted; analytics skip it. */
   readonly replayed?: true;
 }
@@ -615,6 +617,9 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.unarchive":
     case "thread.delete":
     case "thread.guest-share.open":
+      return command.threadId;
+    case "thread.batch":
+      return command.threadIds[0]!;
     case "thread.guest-share.redeem":
     case "thread.guest-share.close":
     case "thread.guest-message.submit":
@@ -3861,7 +3866,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       : Ref.update(effects, (existing) => [
           ...existing,
           {
-            id: `effect:${command.commandId}:guest-attachment.cleanup`,
+            id: `effect:${command.commandId}:${command.threadId}:guest-attachment.cleanup`,
             commandId: command.commandId,
             threadId: command.threadId,
             request: { type: "attachment.cleanup", attachmentIds: [...attachmentIds] },
@@ -5271,7 +5276,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       yield* Ref.update(effects, (existing) => [
         ...existing,
         {
-          id: `effect:${command.commandId}:terminal.cleanup`,
+          id: `effect:${command.commandId}:${command.threadId}:terminal.cleanup`,
           commandId: command.commandId,
           threadId: command.threadId,
           request: { type: "terminal.cleanup" },
@@ -14487,6 +14492,180 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     return parentRunId;
   });
 
+  const planDeletionsFor = Effect.fn("Orchestrator.planBatchDeletions")(function* (
+    command: Extract<
+      OrchestrationV2ServerCommand,
+      { readonly type: "thread.delete" | "thread.batch" }
+    >,
+    threadIds: ReadonlyArray<ThreadId>,
+    now: DateTime.Utc,
+  ) {
+    const plans: Array<ThreadDeletionPlan> = [];
+    for (const threadId of threadIds) {
+      const projection = yield* projectionStore
+        .getThreadRecords(threadId, [
+          "runs",
+          "attempts",
+          "nodes",
+          "runtimeRequests",
+          "subagents",
+          "providerSessions",
+        ])
+        .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
+      plans.push(
+        yield* mapDispatchError(command)(
+          planThreadDeletion({
+            command: {
+              type: "thread.delete",
+              commandId: command.commandId,
+              threadId,
+              ...(command.onlyIfUnused === true ? { onlyIfUnused: true } : {}),
+            },
+            effectScope: `${command.commandId}:${threadId}`,
+            projection,
+            attachmentIds: yield* projectionStore
+              .getThreadAttachmentIds(threadId)
+              .pipe(mapDispatchError(command)),
+            now,
+            idAllocator,
+          }),
+        ),
+      );
+    }
+    return plans;
+  });
+
+  const dispatchThreadBatch = Effect.fn("orchestrationV2.dispatch.threadBatch")(function* (
+    command: Extract<OrchestrationV2ServerCommand, { readonly type: "thread.batch" }>,
+    events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+    effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+    sideChatsByParent: ReadonlyMap<ThreadId, ReadonlyArray<ThreadId>>,
+  ) {
+    const now = yield* DateTime.now;
+    const seen = new Set<ThreadId>();
+    const items: Array<{
+      threadId: ThreadId;
+      status: "applied" | "already_target" | "not_found" | "deleted" | "running" | "rejected";
+    }> = [];
+    for (const threadId of command.threadIds) {
+      if (seen.has(threadId)) continue;
+      seen.add(threadId);
+      const thread = yield* projectionStore.getThread(threadId).pipe(
+        Effect.catchTags({
+          ProjectionStoreThreadNotFoundError: () => Effect.succeed(null),
+        }),
+        Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })),
+      );
+      if (thread === null) {
+        items.push({ threadId, status: "not_found" });
+        continue;
+      }
+      if (thread.deletedAt !== null) {
+        items.push({ threadId, status: "deleted" });
+        continue;
+      }
+      if (command.operation === "mark-unread") {
+        const shell = yield* projectionStore
+          .getThreadShell(threadId)
+          .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
+        if (shell?.latestRunCompletedAt === null || shell === null) {
+          items.push({ threadId, status: "already_target" });
+          continue;
+        }
+      }
+      if (command.operation === "delete") {
+        const records = yield* projectionStore
+          .getThreadRecords(threadId, ["runs", "messages"])
+          .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
+        if (records.runs.some((run) => isActiveRun(run) || run.status === "queued")) {
+          items.push({ threadId, status: "running" });
+          continue;
+        }
+        if (
+          command.onlyIfUnused === true &&
+          (records.runs.length > 0 || records.messages.length > 0)
+        ) {
+          items.push({ threadId, status: "rejected" });
+          continue;
+        }
+        // Same plan as a single delete: session detach, credential revoke, cleanups,
+        // cohort disposal, and the side chats locked with this thread.
+        const plans = yield* planDeletionsFor(
+          command,
+          [threadId, ...(sideChatsByParent.get(threadId) ?? [])],
+          now,
+        );
+        yield* Ref.update(events, (existing) => [
+          ...existing,
+          ...plans.flatMap((plan) => plan.events),
+        ]);
+        yield* Ref.update(effects, (existing) => [
+          ...existing,
+          ...plans.flatMap((plan) => plan.effects),
+        ]);
+        items.push({ threadId, status: "applied" });
+        continue;
+      }
+      if (command.operation === "archive" && thread.archivedAt !== null) {
+        items.push({ threadId, status: "already_target" });
+        continue;
+      }
+      if (command.operation === "unarchive" && thread.archivedAt === null) {
+        items.push({ threadId, status: "already_target" });
+        continue;
+      }
+      if (command.operation === "archive") {
+        const records = yield* projectionStore
+          .getThreadRecords(threadId, ["runs", "subagents"])
+          .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
+        if (records.runs.some((run) => isActiveRun(run) || run.status === "queued")) {
+          items.push({ threadId, status: "running" });
+          continue;
+        }
+        if (
+          records.subagents.some(
+            (task) =>
+              task.origin === "app_owned" &&
+              task.childThreadId !== null &&
+              isOrchestrationV2WorkActive(task.status),
+          )
+        ) {
+          items.push({ threadId, status: "rejected" });
+          continue;
+        }
+      }
+      const mutation =
+        command.operation === "mark-unread"
+          ? ({ type: "thread.mark-unread" } as const)
+          : ({
+              type: command.operation === "archive" ? "thread.archive" : "thread.unarchive",
+            } as const);
+      const applied = yield* dispatchThreadMutation(
+        {
+          ...mutation,
+          commandId: command.commandId,
+          threadId,
+        },
+        events,
+        effects,
+      ).pipe(
+        Effect.as(true),
+        // A thread may lose the race against its own state change after the batch planned it.
+        Effect.catchTags({ OrchestratorDispatchError: () => Effect.succeed(false) }),
+      );
+      items.push({ threadId, status: applied ? "applied" : "rejected" });
+    }
+    const appliedCount = items.filter((item) => item.status === "applied").length;
+    const rejectedCount = items.filter(
+      (item) => item.status === "running" || item.status === "rejected",
+    ).length;
+    return {
+      operation: command.operation,
+      items,
+      appliedCount,
+      rejectedCount,
+    } satisfies OrchestrationV2BatchThreadResult;
+  });
   const dispatchUnsupported = (command: OrchestrationV2ServerCommand) =>
     Effect.fail(
       new OrchestratorDispatchError({
@@ -14498,10 +14677,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const dispatchOnce = Effect.fn("orchestrationV2.dispatch.once")(function* (
     command: OrchestrationV2ServerCommand,
     sideChatIds: ReadonlyArray<ThreadId>,
+    batchSideChats?: ReadonlyMap<ThreadId, ReadonlyArray<ThreadId>>,
   ): Effect.fn.Return<
     {
       readonly events: ReadonlyArray<OrchestrationV2DomainEvent>;
       readonly effects: ReadonlyArray<PendingOrchestrationEffectV2>;
+      readonly batch?: OrchestrationV2BatchThreadResult;
       readonly cancelUnsettledEffects?: {
         readonly effectTypes: ReadonlyArray<OrchestrationEffectRequestV2["type"]>;
         readonly reason: string;
@@ -14525,6 +14706,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         }
       | undefined;
     let updateDelegatedCompletionOnlyRunId: RunId | undefined;
+    let batch: OrchestrationV2BatchThreadResult | undefined;
     switch (command.type) {
       case "thread.create":
         yield* dispatchThreadCreate(command, events);
@@ -14563,6 +14745,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         );
         break;
       }
+      case "thread.batch":
+        batch = yield* dispatchThreadBatch(command, events, effects, batchSideChats ?? new Map());
+        break;
       case "thread.delete": {
         const now = yield* DateTime.now;
         const planDeletion = Effect.fn("Orchestrator.planDeletion")(function* (
@@ -14911,6 +15096,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     return {
       events: yield* Ref.get(events),
       effects: yield* Ref.get(effects),
+      ...(batch === undefined ? {} : { batch }),
       ...(cancelUnsettledEffects === undefined ? {} : { cancelUnsettledEffects }),
       ...(updateDelegatedCompletionOnlyRunId === undefined
         ? {}
@@ -14963,6 +15149,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       sequence: receipt.resultSequence,
       storedEvents,
       replayed: true,
+      ...(receipt.batch === undefined ? {} : { batch: receipt.batch }),
     } satisfies OrchestratorV2DispatchResult;
   });
 
@@ -14971,6 +15158,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     command: OrchestrationV2ServerCommand,
     sideChatIds: ReadonlyArray<ThreadId> = [],
     cancelledTask?: OrchestrationV2Subagent,
+    batchSideChats?: ReadonlyMap<ThreadId, ReadonlyArray<ThreadId>>,
   ): Effect.fn.Return<OrchestratorV2DispatchResult, OrchestratorV2Error> {
     yield* Effect.annotateCurrentSpan({
       "orchestration_v2.command_id": command.commandId,
@@ -15004,7 +15192,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       if (shell !== null) yield* refuseAboveDispatchModeLimit(command, threadId, shell);
     }
 
-    const plan = yield* dispatchOnce(command, sideChatIds).pipe(
+    const plan = yield* dispatchOnce(command, sideChatIds, batchSideChats).pipe(
       Effect.tap((planned) => refuseAboveRuntimeModeCeiling(command, planned.events)),
       Effect.filterOrFail(
         (planned) =>
@@ -15021,7 +15209,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           // Marking or unmarking again leaves the thread as it is.
           command.type === "thread.commander.mark" ||
           command.type === "thread.commander.unmark" ||
-          (command.type === "thread.delete" && command.onlyIfUnused === true),
+          (command.type === "thread.delete" && command.onlyIfUnused === true) ||
+          command.type === "thread.batch",
         (_planned) =>
           new OrchestratorDispatchError({
             commandId: command.commandId,
@@ -15099,6 +15288,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           resultSequence: sequence,
           status: "accepted",
           error: null,
+          ...(plan.batch === undefined ? {} : { batch: plan.batch }),
         });
         return { resultSequence: sequence, inserted };
       }).pipe(
@@ -15127,6 +15317,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return {
         sequence: resultSequence,
         storedEvents: [],
+        ...(plan.batch === undefined ? {} : { batch: plan.batch }),
       } satisfies OrchestratorV2DispatchResult;
     }
     const acceptedAt = plan.events.at(-1)?.occurredAt ?? (yield* DateTime.now);
@@ -15149,6 +15340,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                   payload: cancelledTask,
                 }).pipe(mapDispatchError(command)),
               ],
+        ...(plan.batch === undefined ? {} : { batch: plan.batch }),
         effects: plan.effects,
         ...(plan.cancelUnsettledEffects === undefined
           ? {}
@@ -15221,6 +15413,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     return {
       sequence: committed.receipt.resultSequence,
       storedEvents: committed.storedEvents,
+      ...(plan.batch === undefined ? {} : { batch: plan.batch }),
       ...(committed.committed ? {} : { replayed: true as const }),
     } satisfies OrchestratorV2DispatchResult;
   }, withCommandMetrics);
@@ -15254,7 +15447,38 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ? dispatch
         : threadDispatch.withLock(command.sourceThreadId, dispatch);
     }
-    if (command.type === "thread.delete")
+    if (command.type === "thread.batch") {
+      const lockIds = [...new Set(command.threadIds)].toSorted();
+      // A delete plans each thread's side chats with it; their locks come after their
+      // parent's, same order a single delete takes them.
+      if (command.operation !== "delete") {
+        return yield* lockIds.reduce(
+          (locked, threadId) => threadDispatch.withLock(threadId, locked),
+          dispatchWithReceiptEffect(command, []),
+        );
+      }
+      return yield* lockIds.reduce(
+        (locked, threadId) => threadDispatch.withLock(threadId, locked),
+        Effect.forEach(
+          lockIds,
+          (threadId) =>
+            liveSideChatIds(threadId).pipe(Effect.map((ids) => [threadId, ids] as const)),
+          { concurrency: 1 },
+        ).pipe(
+          Effect.flatMap((entries) => {
+            const sideChatsByParent = new Map(entries.filter(([, ids]) => ids.length > 0));
+            const sideChatIds = [
+              ...new Set(entries.flatMap(([, ids]) => ids.filter((id) => !lockIds.includes(id)))),
+            ].toSorted();
+            return sideChatIds.reduce(
+              (locked, sideChatId) => threadDispatch.withLock(sideChatId, locked),
+              dispatchWithReceiptEffect(command, [], undefined, sideChatsByParent),
+            );
+          }),
+        ),
+      );
+    }
+    if (command.type === "thread.delete") {
       return yield* threadDispatch.withLock(
         command.threadId,
         liveSideChatIds(command.threadId).pipe(
@@ -15266,6 +15490,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           ),
         ),
       );
+    }
     // Taken before the lineage read, so a message whose read yields keeps its
     // place ahead of later messages to the same thread.
     if (command.type === "message.dispatch")

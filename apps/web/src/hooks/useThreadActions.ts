@@ -4,9 +4,16 @@ import {
   scopeThreadRef,
   scopedThreadKey,
 } from "@t3tools/client-runtime/environment";
-import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import {
+  isAtomCommandInterrupted,
+  settlePromise,
+  squashAtomCommandFailure,
+} from "@t3tools/client-runtime/state/runtime";
 import { canSnooze, threadWokeAt } from "@t3tools/client-runtime/state/thread-settled";
-import { threadRuntimeCanArchive } from "@t3tools/client-runtime/state/models";
+import {
+  threadRuntimeCanArchive,
+  type EnvironmentThreadShell,
+} from "@t3tools/client-runtime/state/models";
 import {
   AuthOrchestrationOperateScope,
   AuthSourceControlWriteScope,
@@ -277,6 +284,9 @@ export function useThreadActions() {
     reportFailure: false,
   });
   const deleteThreadMutation = useOrchestrationCommand(threadEnvironment.delete, {
+    reportFailure: false,
+  });
+  const batchThreadsMutation = useOrchestrationCommand(threadEnvironment.batch, {
     reportFailure: false,
   });
   const settleThreadMutation = useOrchestrationCommand(threadEnvironment.settle, {
@@ -691,6 +701,286 @@ export function useThreadActions() {
     return deleteResult;
   };
 
+  /** Batch delete across environments; mirrors deleteThread's local cleanup for every applied thread. */
+  const deleteThreads = async (
+    targets: ReadonlyArray<{ readonly environmentId: EnvironmentId; readonly id: ThreadId }>,
+  ): Promise<{
+    readonly deletedKeys: ReadonlySet<string>;
+    readonly failures: readonly string[];
+  }> => {
+    const failures: string[] = [];
+    const deletedIds = new Set<ThreadId>();
+    const shellsByEnvironment = new Map<EnvironmentId, ReadonlyArray<EnvironmentThreadShell>>();
+    const groups = new Map<EnvironmentId, ThreadId[]>();
+    for (const target of targets) {
+      const group = groups.get(target.environmentId);
+      if (group) group.push(target.id);
+      else groups.set(target.environmentId, [target.id]);
+    }
+    for (const [environmentId, threadIds] of groups) {
+      const permissionFailure = threadOperationFailure(
+        scopeThreadRef(environmentId, threadIds[0]!),
+      );
+      if (permissionFailure) {
+        const error = squashAtomCommandFailure(permissionFailure);
+        failures.push(error instanceof Error ? error.message : "发生错误。");
+        continue;
+      }
+      shellsByEnvironment.set(
+        environmentId,
+        readEnvironmentThreadRefs(environmentId).flatMap((ref) => {
+          const shell = readThreadShell(ref);
+          return shell === null ? [] : [shell];
+        }),
+      );
+      const result = await batchThreadsMutation({
+        environmentId,
+        input: { operation: "delete", threadIds },
+      });
+      if (result._tag === "Failure") {
+        if (isAtomCommandInterrupted(result)) break;
+        const error = squashAtomCommandFailure(result);
+        failures.push(error instanceof Error ? error.message : "请求失败");
+        continue;
+      }
+      for (const item of result.value.batch?.items ?? []) {
+        if (item.status === "applied" || item.status === "deleted" || item.status === "not_found") {
+          deletedIds.add(item.threadId);
+          continue;
+        }
+        const title =
+          shellsByEnvironment.get(environmentId)?.find((shell) => shell.id === item.threadId)
+            ?.title ?? item.threadId;
+        if (item.status === "running") failures.push(`${title} 正在跑，未删除`);
+        else if (item.status === "rejected") failures.push(`${title} 未处理`);
+      }
+    }
+
+    if (deletedIds.size === 0) return { deletedKeys: deletedIds, failures };
+
+    const deletedKeys = new Set<string>();
+    const worktreeRemovals: Array<{
+      environmentId: EnvironmentId;
+      project: { readonly workspaceRoot: string };
+      path: string;
+      displayPath: string | null;
+    }> = [];
+    const currentRoute = getCurrentRouteThreadRef();
+    let fallbackEnvironmentId: EnvironmentId | null = null;
+    let fallbackThreadId: ThreadId | null = null;
+    for (const [environmentId, threads] of shellsByEnvironment) {
+      const environmentConfig = appAtomRegistry
+        .get(environmentServerConfigsAtom)
+        .get(environmentId);
+      const environmentSettings = environmentConfig?.settings;
+      const localApi = readLocalApi();
+      const surviving = threads.filter((entry) => !deletedIds.has(entry.id));
+      const sessionResult = localApi == null ? null : await loadSessionState(environmentId);
+      const canDeleteWorktree =
+        sessionResult !== null &&
+        sessionResult._tag === "Success" &&
+        sessionGrantsScope(sessionResult.value, AuthSourceControlWriteScope);
+      const pendingConfirm: Array<{
+        project: { readonly workspaceRoot: string };
+        path: string;
+        displayPath: string | null;
+      }> = [];
+      for (const thread of threads) {
+        if (!deletedIds.has(thread.id)) continue;
+        const threadId = thread.id;
+        const threadRef = scopeThreadRef(environmentId, threadId);
+        expireThreadUndos(threadRef, [...LIST_PLACEMENT_UNDO_KINDS, "archive"]);
+        releaseComposerDraftUploads(threadRef);
+        clearComposerDraftForThread(threadRef);
+        clearProjectDraftThreadById(scopeProjectRef(environmentId, thread.projectId), threadRef);
+        clearTerminalUiState(threadRef);
+        clearDeletedThreadPanelState(threadRef);
+        deletedKeys.add(scopedThreadKey(threadRef));
+        for (const entry of threads) {
+          if (entry.lineage.sideChat !== true || entry.lineage.parentThreadId !== threadId) {
+            continue;
+          }
+          const sideChatRef = scopeThreadRef(environmentId, entry.id);
+          releaseComposerDraftUploads(sideChatRef);
+          clearComposerDraftForThread(sideChatRef);
+        }
+        if (currentRoute?.threadId === threadId && currentRoute.environmentId === environmentId) {
+          fallbackEnvironmentId = environmentId;
+          fallbackThreadId = getFallbackThreadIdAfterDelete({
+            threads,
+            deletedThreadId: threadId,
+            deletedThreadIds: deletedIds,
+            sortOrder: sidebarThreadSortOrder,
+            now: new Date().toISOString(),
+          });
+        }
+        const orphanedWorktreePath = getOrphanedWorktreePathForThread(surviving, threadId);
+        if (orphanedWorktreePath === null) continue;
+        const threadProject = readProject({
+          environmentId,
+          projectId: thread.projectId,
+        });
+        if (
+          threadProject === null ||
+          isScratchProject(threadProject, environmentConfig?.scratchWorkspaceRoot)
+        )
+          continue;
+        let orphan: string | null = orphanedWorktreePath;
+        if (environmentConfig?.shellThreadFamilies === true) {
+          const occupants = await loadWorktreeThreadIds({
+            environmentId,
+            input: { worktreePath: orphanedWorktreePath },
+          });
+          if (
+            occupants._tag !== "Success" ||
+            occupants.value.threadIds.some(
+              (occupant) => occupant !== threadId && !deletedIds.has(occupant),
+            )
+          ) {
+            orphan = null;
+          }
+        }
+        if (orphan === null) continue;
+        const removal = {
+          project: threadProject,
+          path: orphan,
+          displayPath: formatWorktreePathForDisplay(orphan),
+        };
+        if (
+          environmentSettings !== undefined &&
+          resolveWorktreeCleanup(environmentSettings, thread.projectId).worktreeOnDelete
+        ) {
+          worktreeRemovals.push({ environmentId, ...removal });
+        } else if (canDeleteWorktree) {
+          pendingConfirm.push(removal);
+        }
+      }
+      refreshArchivedThreadsForEnvironment(environmentId);
+      if (pendingConfirm.length > 0 && localApi != null) {
+        const confirmed = await localApi.dialogs.confirm(
+          [
+            `这些会话独占 ${pendingConfirm.length} 个工作树：`,
+            ...pendingConfirm.map((entry) => entry.displayPath ?? entry.path),
+            "",
+            "同时删除工作树？",
+          ].join("\n"),
+          { variant: "destructive" },
+        );
+        if (confirmed) {
+          worktreeRemovals.push(
+            ...pendingConfirm.map((removal) => ({ environmentId, ...removal })),
+          );
+        }
+      }
+    }
+
+    if (fallbackEnvironmentId !== null) {
+      const fallbackThread =
+        fallbackThreadId !== null
+          ? readThreadShell(scopeThreadRef(fallbackEnvironmentId, fallbackThreadId))
+          : null;
+      await navigateAfterThreadDeletion(() =>
+        fallbackThread
+          ? router.navigate({
+              to: "/$environmentId/$threadId",
+              params: buildThreadRouteParams(
+                scopeThreadRef(fallbackThread.environmentId, fallbackThread.id),
+              ),
+              replace: true,
+            })
+          : router.navigate({ to: "/", replace: true }),
+      );
+    }
+
+    const refreshedCwds = new Set<string>();
+    for (const removal of worktreeRemovals) {
+      const removeResult = readEnvironmentScope(removal.environmentId, AuthSourceControlWriteScope)
+        ? await removeWorktree({
+            environmentId: removal.environmentId,
+            input: {
+              cwd: removal.project.workspaceRoot,
+              path: removal.path,
+              force: true,
+            },
+          })
+        : AsyncResult.failure(
+            Cause.fail(
+              new EnvironmentAuthorizationError({
+                message: "此连接已无法移除工作树。",
+                requiredScope: AuthSourceControlWriteScope,
+              }),
+            ),
+          );
+      const refreshResult =
+        removeResult._tag === "Success" && !refreshedCwds.has(removal.project.workspaceRoot)
+          ? await refreshVcsStatus({
+              environmentId: removal.environmentId,
+              input: { cwd: removal.project.workspaceRoot },
+            })
+          : null;
+      if (removeResult._tag === "Success") refreshedCwds.add(removal.project.workspaceRoot);
+      const cleanupFailure =
+        removeResult._tag === "Failure"
+          ? removeResult
+          : refreshResult?._tag === "Failure"
+            ? refreshResult
+            : null;
+      if (cleanupFailure) {
+        const error = squashAtomCommandFailure(cleanupFailure);
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title:
+              removeResult._tag === "Failure"
+                ? "无法删除工作树"
+                : "工作树已删除，但刷新 Git 状态失败",
+            description: error instanceof Error ? error.message : "发生错误。",
+          }),
+        );
+      }
+    }
+    return { deletedKeys, failures };
+  };
+
+  /** Batch mark-unread; falls back to per-thread local marking while a server config is not loaded. */
+  const markThreadsUnread = async (
+    targets: ReadonlyArray<{ readonly environmentId: EnvironmentId; readonly id: ThreadId }>,
+  ): Promise<readonly string[]> => {
+    const failures: string[] = [];
+    const groups = new Map<EnvironmentId, ThreadId[]>();
+    for (const target of targets) {
+      const group = groups.get(target.environmentId);
+      if (group) group.push(target.id);
+      else groups.set(target.environmentId, [target.id]);
+    }
+    for (const [environmentId, threadIds] of groups) {
+      if (!readEnvironmentServerConfigLoaded(environmentId)) {
+        for (const threadId of threadIds) {
+          markThreadUnread(scopeThreadRef(environmentId, threadId));
+        }
+        continue;
+      }
+      const result = await batchThreadsMutation({
+        environmentId,
+        input: { operation: "mark-unread", threadIds },
+      });
+      if (result._tag === "Failure") {
+        if (isAtomCommandInterrupted(result)) break;
+        const error = squashAtomCommandFailure(result);
+        failures.push(error instanceof Error ? error.message : "请求失败");
+        continue;
+      }
+      for (const item of result.value.batch?.items ?? []) {
+        if (item.status === "rejected") {
+          const title =
+            readThreadShell(scopeThreadRef(environmentId, item.threadId))?.title ?? item.threadId;
+          failures.push(`${title} 没有可标为未读的已完成轮次`);
+        }
+      }
+    }
+    return failures;
+  };
+
   const unsettleThread = async (target: ScopedThreadRef) => {
     if (!readEnvironmentServerConfigLoaded(target.environmentId)) {
       return AsyncResult.failure(
@@ -990,6 +1280,8 @@ export function useThreadActions() {
   };
 
   return {
+    deleteThreads,
+    markThreadsUnread,
     archiveThread,
     unarchiveThread,
     deleteThread,

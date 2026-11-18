@@ -25,6 +25,7 @@ import {
   type InterruptThreadTurnInput,
   type UpdateThreadMetadataInput,
   archiveThread,
+  batchThreads,
   closeGuestShare,
   resolveGuestMessage,
   cancelQueuedRun,
@@ -195,6 +196,16 @@ export function createThreadEnvironmentAtoms<R, E>(
       execute: unarchiveThread,
       scheduler,
       concurrency,
+    }),
+    batch: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:batch",
+      execute: batchThreads,
+      scheduler,
+      concurrency: {
+        mode: "serial",
+        key: ({ environmentId, input }) =>
+          JSON.stringify([environmentId, input.operation, ...input.threadIds]),
+      },
     }),
     settle: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:settle",

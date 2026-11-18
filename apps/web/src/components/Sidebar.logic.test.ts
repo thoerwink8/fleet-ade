@@ -8,6 +8,8 @@ import { AsyncResult } from "effect/reactivity";
 import {
   shouldCreateNewThreadInCurrentProject,
   deleteSelectedThreadEntries,
+  applyThreadBatch,
+  batchDeleteConfirmText,
   getFallbackThreadIdAfterDelete,
   hasUnseenCompletion,
   resolveSidebarRowThreadId,
@@ -133,6 +135,32 @@ describe("deleteSelectedThreadEntries", () => {
       deletedThreadKeys: testCase.deletedThreadKeys,
       firstFailure: testCase.firstFailure,
     });
+  });
+});
+
+describe("applyThreadBatch", () => {
+  it("reports a running thread and drops only applied rows from the selection", async () => {
+    const environmentId = EnvironmentId.make("environment-batch");
+    const running = ThreadId.make("running");
+    const idle = ThreadId.make("idle");
+    const outcome = await applyThreadBatch({
+      threads: [
+        { environmentId, id: running, title: "Running", key: "running-key" },
+        { environmentId, id: idle, title: "Idle", key: "idle-key" },
+      ],
+      dispatch: async () =>
+        AsyncResult.success({
+          batch: {
+            items: [
+              { threadId: running, status: "running" },
+              { threadId: idle, status: "applied" },
+            ],
+          },
+        }),
+    });
+    expect(batchDeleteConfirmText(2)).toBe("删除 2 个会话？\n删除不可恢复。\n想留着的请改用归档。");
+    expect([...outcome.prunedKeys]).toEqual(["idle-key"]);
+    expect(outcome.failures).toEqual(["Running 正在跑，未删除"]);
   });
 });
 

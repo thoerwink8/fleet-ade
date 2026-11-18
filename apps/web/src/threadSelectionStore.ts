@@ -3,6 +3,7 @@ import { create } from "zustand";
 export interface ThreadSelectionState {
   selectedThreadKeys: ReadonlySet<string>;
   anchorThreadKey: string | null;
+  visibleThreadKeys: readonly string[];
 }
 
 interface ThreadSelectionStore extends ThreadSelectionState {
@@ -11,8 +12,10 @@ interface ThreadSelectionStore extends ThreadSelectionState {
   rangeSelectTo: (threadKey: string, orderedThreadKeys: readonly string[]) => void;
   clearSelection: () => void;
   removeFromSelection: (threadKeys: readonly string[]) => void;
+  replaceSelection: (threadKeys: readonly string[]) => void;
   setAnchor: (threadKey: string) => void;
   hasSelection: () => boolean;
+  setVisibleThreadKeys: (threadKeys: readonly string[]) => void;
 }
 
 const EMPTY_SET = new Set<string>();
@@ -28,6 +31,7 @@ export function getThreadKeysToDeselectAfterDelete(
 export const useThreadSelectionStore = create<ThreadSelectionStore>((set, get) => ({
   selectedThreadKeys: EMPTY_SET,
   anchorThreadKey: null,
+  visibleThreadKeys: [],
 
   toggleThread: (threadKey) => {
     set((state) => {
@@ -78,6 +82,29 @@ export const useThreadSelectionStore = create<ThreadSelectionStore>((set, get) =
     const state = get();
     if (state.selectedThreadKeys.size === 0 && state.anchorThreadKey === null) return;
     set({ selectedThreadKeys: EMPTY_SET, anchorThreadKey: null });
+  },
+
+  replaceSelection: (threadKeys) => {
+    set({
+      selectedThreadKeys: threadKeys.length === 0 ? EMPTY_SET : new Set(threadKeys),
+      anchorThreadKey: threadKeys[0] ?? null,
+    });
+  },
+  setVisibleThreadKeys: (threadKeys) => {
+    const current = get().visibleThreadKeys;
+    if (
+      current.length === threadKeys.length &&
+      current.every((key, index) => key === threadKeys[index])
+    ) {
+      return;
+    }
+    // A range anchor that left the visible list (filtered out, deleted) cannot anchor
+    // a shift-range; derive its validity here instead of watching order changes.
+    const anchorThreadKey =
+      get().anchorThreadKey !== null && !threadKeys.includes(get().anchorThreadKey!)
+        ? null
+        : get().anchorThreadKey;
+    set({ visibleThreadKeys: threadKeys, anchorThreadKey });
   },
 
   setAnchor: (threadKey) => {

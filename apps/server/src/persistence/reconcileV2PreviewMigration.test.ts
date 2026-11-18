@@ -44,6 +44,7 @@ describe("V2 preview upgrade", () => {
         [97, "PipelineDailyBrief"],
         [98, "PipelineRunClaimToken"],
         [99, "PipelineRunController"],
+        [100, "CommandReceiptResult"],
       ]);
       const after = yield* sql`SELECT * FROM pipeline_runs`;
       assert.deepStrictEqual(
@@ -150,6 +151,7 @@ describe("V2 preview upgrade", () => {
         [97, "PipelineDailyBrief"],
         [98, "PipelineRunClaimToken"],
         [99, "PipelineRunController"],
+        [100, "CommandReceiptResult"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -170,6 +172,21 @@ describe("V2 preview upgrade", () => {
         VALUES ('github', 'github.com', 'owner/repo', 1, 'viewer', 'file.ts', 'revision', '2026-09-17')
       `;
       assert.strictEqual((yield* sql`SELECT * FROM pull_request_files_viewed`).length, 1);
+    }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+  );
+  it.effect("upgrades an existing command receipt table with batch results", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* runMigrations({ toMigrationInclusive: 99 });
+      const before = yield* sql<{
+        readonly name: string;
+      }>`PRAGMA table_info(orchestration_command_receipts)`;
+      assert.isFalse(before.some((column) => column.name === "result"));
+      assert.deepStrictEqual(yield* runMigrations(), [[100, "CommandReceiptResult"]]);
+      const after = yield* sql<{
+        readonly name: string;
+      }>`PRAGMA table_info(orchestration_command_receipts)`;
+      assert.isTrue(after.some((column) => column.name === "result"));
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
 
@@ -272,6 +289,7 @@ describe("V2 preview upgrade", () => {
         [97, "PipelineDailyBrief"],
         [98, "PipelineRunClaimToken"],
         [99, "PipelineRunController"],
+        [100, "CommandReceiptResult"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
