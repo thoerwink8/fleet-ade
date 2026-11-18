@@ -221,6 +221,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --text-title--line-height: var(--line-height-title);
   --text-dialog-title: var(--font-size-dialog-title);
   --text-dialog-title--line-height: var(--line-height-dialog-title);
+  /* The composer line height, 20px at the default 14px prompt size and proportional above it. */
+  --leading-prompt: calc(10 / 7);
   /* Motion. drawer is the decelerating curve for surfaces that slide or pop in
      (composer context, pills). */
   --inset-shadow-control-highlight: 0 1px rgb(255 255 255 / 16%);
