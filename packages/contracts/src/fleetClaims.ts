@@ -2,7 +2,6 @@ import * as Schema from "effect/Schema";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 export const FleetClaimKey = Schema.Struct({
-  fleetId: TrimmedNonEmptyString,
   repo: TrimmedNonEmptyString,
   issue: Schema.Int.check(Schema.isGreaterThan(0)),
   taskId: TrimmedNonEmptyString,
@@ -10,6 +9,7 @@ export const FleetClaimKey = Schema.Struct({
 export type FleetClaimKey = typeof FleetClaimKey.Type;
 
 export const FleetClaim = Schema.Struct({
+  fleetId: TrimmedNonEmptyString,
   ...FleetClaimKey.fields,
   holder: TrimmedNonEmptyString,
   attempt: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -20,14 +20,12 @@ export type FleetClaim = typeof FleetClaim.Type;
 
 export const FleetClaimClaimInput = Schema.Struct({
   ...FleetClaimKey.fields,
-  holder: TrimmedNonEmptyString,
   idempotencyKey: TrimmedNonEmptyString,
 });
 export type FleetClaimClaimInput = typeof FleetClaimClaimInput.Type;
 
 export const FleetClaimLeaseInput = Schema.Struct({
   ...FleetClaimKey.fields,
-  holder: TrimmedNonEmptyString,
   attempt: Schema.Int.check(Schema.isGreaterThan(0)),
   fencing: TrimmedNonEmptyString,
   idempotencyKey: TrimmedNonEmptyString,

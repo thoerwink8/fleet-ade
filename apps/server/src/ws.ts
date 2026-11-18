@@ -2533,9 +2533,9 @@ export const layerWsRpc = (
           Effect.annotateCurrentSpan({ "orchestration_v2.thread_id": input.threadId }).pipe(
             Effect.andThen(peerLinkRequests.answer(input)),
           ),
-        [WS_METHODS.fleetClaimsClaim]: (input) => fleetClaims.claim(input),
-        [WS_METHODS.fleetClaimsRenew]: (input) => fleetClaims.renew(input),
-        [WS_METHODS.fleetClaimsRelease]: (input) => fleetClaims.release(input),
+        [WS_METHODS.fleetClaimsClaim]: (input) => fleetClaims.claim(currentSessionId, input),
+        [WS_METHODS.fleetClaimsRenew]: (input) => fleetClaims.renew(currentSessionId, input),
+        [WS_METHODS.fleetClaimsRelease]: (input) => fleetClaims.release(currentSessionId, input),
         [WS_METHODS.serverUpdateSettings]:
           /* Request instrumentation already owns the span; keep this helper in that context. */
           Effect.fnUntraced(function* ({ patch, providerInstanceMutation }) {

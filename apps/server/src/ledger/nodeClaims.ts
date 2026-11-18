@@ -61,7 +61,7 @@ export type ClaimOutcome =
 export const leaseUntilFrom = (nowMs: number) =>
   DateTime.formatIso(DateTime.add(DateTime.makeUnsafe(nowMs), { milliseconds: LOCAL_LEASE_MS }));
 
-const REPO = /^[\w.-]+\/[\w.-]+$/;
+export const REPO = /^[\w.-]+\/[\w.-]+$/;
 
 const Repo = Schema.String.check(Schema.isPattern(REPO));
 const Issue = Schema.Int.check(Schema.isGreaterThan(0));
@@ -112,10 +112,15 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
       `;
       if (registered.length === 0) return { status: 404, code: "unknown_repo" } as const;
       const held = (yield* sql`
-        SELECT claimed_by AS claimedBy, lease_until AS leaseUntil FROM node_claims
-        WHERE fleet_id = 'legacy' AND task_id = 'root'
-          AND lower(repo) = lower(${input.repo}) AND issue = ${input.issue} AND state = 'running'
-      `) as readonly { readonly claimedBy: string; readonly leaseUntil: string }[];
+        SELECT fleet_id AS fleetId, claimed_by AS claimedBy, lease_until AS leaseUntil
+        FROM node_claims
+        WHERE task_id = 'root' AND lower(repo) = lower(${input.repo})
+          AND issue = ${input.issue} AND state = 'running'
+      `) as readonly {
+        readonly fleetId: string;
+        readonly claimedBy: string;
+        readonly leaseUntil: string;
+      }[];
       if (input.action === "finish") {
         const token = input.token;
         const removed = yield* sql`
@@ -130,6 +135,9 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
         return { status: 200, code: "ok", leaseUntil: null } as const;
       }
       if (input.action === "renew") {
+        if (held.some((row) => row.fleetId !== "legacy")) {
+          return { status: 409, code: "engine_has_it" } as const;
+        }
         if (
           held.some((row) => row.claimedBy !== input.claimedBy && leaseHeld(row.leaseUntil, nowMs))
         ) {
@@ -148,7 +156,7 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
         `;
         return { status: 200, code: "ok", leaseUntil: input.leaseUntil } as const;
       }
-      if (held.some((row) => leaseHeld(row.leaseUntil, nowMs))) {
+      if (held.some((row) => row.fleetId !== "legacy" || leaseHeld(row.leaseUntil, nowMs))) {
         return { status: 409, code: "engine_has_it" } as const;
       }
       yield* sql`

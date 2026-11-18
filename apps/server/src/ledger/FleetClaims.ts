@@ -1,16 +1,6 @@
-import * as Context from "effect/Context";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as SecureRandom from "effect/crypto/SecureRandom";
-import * as Schema from "effect/Schema";
-import * as SqlClient from "effect/sql/SqlClient";
-import * as NodeReads from "./nodeReads.ts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
-import * as ServerConfig from "../config.ts";
-// @effect-diagnostics nodeBuiltinImport:off -- joins the ledger file under the state directory.
-import * as NodePath from "node:path";
 import {
+  EnvironmentId,
   FleetClaim,
   FleetClaimClaimInput,
   FleetClaimClaimResult,
@@ -19,6 +9,18 @@ import {
   FleetClaimLeaseInput,
   FleetClaimLeaseResult,
 } from "@t3tools/contracts";
+import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as SqlClient from "effect/sql/SqlClient";
+// @effect-diagnostics nodeBuiltinImport:off -- joins the ledger file under the state directory.
+import * as NodePath from "node:path";
+
+import * as ServerConfig from "../config.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as NodeClaims from "./nodeClaims.ts";
+import * as NodeReads from "./nodeReads.ts";
 
 interface ClaimRow {
   readonly fleet_id: string;
@@ -28,7 +30,7 @@ interface ClaimRow {
   readonly claimed_by: string;
   readonly lease_until: string;
   readonly attempt: number;
-  readonly fencing: string;
+  readonly fencing: string | null;
   readonly state: string | null;
   readonly claim_idempotency_key: string | null;
   readonly renew_idempotency_key: string | null;
@@ -36,48 +38,67 @@ interface ClaimRow {
   readonly release_idempotency_key: string | null;
 }
 
-const isFleetClaimsError = Schema.is(FleetClaimsError);
-
 const LEASE_MS = 90_000;
 
 export class FleetClaims extends Context.Service<
   FleetClaims,
   {
     readonly claim: (
+      holder: string,
       input: FleetClaimClaimInput,
     ) => Effect.Effect<FleetClaimClaimResult, FleetClaimsError>;
     readonly renew: (
+      holder: string,
       input: FleetClaimLeaseInput,
     ) => Effect.Effect<FleetClaimLeaseResult, FleetClaimsError>;
     readonly release: (
+      holder: string,
       input: FleetClaimLeaseInput,
     ) => Effect.Effect<FleetClaimLeaseResult, FleetClaimsError>;
   }
 >()("t3/ledger/FleetClaims") {}
+
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  const random = yield* SecureRandom.SecureRandom;
+  const environment = yield* ServerEnvironment.ServerEnvironmentIdentity;
+  const fleetId = yield* environment.getEnvironmentId;
   yield* NodeReads.migrate;
-  const error = (cause: unknown) =>
+
+  const storageError = (cause: unknown) =>
     new FleetClaimsError({
       reason: "storage",
       message: "Fleet claims storage is unavailable.",
       cause,
     });
+  const canonicalRepo = Effect.fn("FleetClaims.canonicalRepo")(function* (repo: string) {
+    if (!NodeClaims.REPO.test(repo)) {
+      return yield* new FleetClaimsError({
+        reason: "unknown-repo",
+        message: "The repository is not registered for this environment.",
+      });
+    }
+    const [owner, name] = repo.split("/");
+    const rows = yield* sql<{ readonly owner: string; readonly name: string }>`
+      SELECT owner, name FROM repos
+      WHERE lower(owner) = lower(${owner}) AND lower(name) = lower(${name})
+      LIMIT 1
+    `.pipe(Effect.mapError(storageError));
+    const registered = rows[0];
+    if (registered === undefined) {
+      return yield* new FleetClaimsError({
+        reason: "unknown-repo",
+        message: "The repository is not registered for this environment.",
+      });
+    }
+    return `${registered.owner}/${registered.name}`;
+  });
   const read = (key: FleetClaimKey) =>
     sql<ClaimRow>`
       SELECT fleet_id, repo, issue, task_id, claimed_by, lease_until, attempt, fencing, state,
-        claim_idempotency_key, renew_idempotency_key, renew_lease_until,
-        release_idempotency_key FROM node_claims WHERE fleet_id = ${key.fleetId}
-        AND repo = ${key.repo} AND issue = ${key.issue} AND task_id = ${key.taskId}
-    `.pipe(Effect.mapError(error));
-  const registered = (repo: string) => {
-    const [owner, name] = repo.split("/");
-    return sql`SELECT 1 FROM repos WHERE owner = ${owner} AND name = ${name} LIMIT 1`.pipe(
-      Effect.mapError(error),
-      Effect.map((rows) => rows.length > 0),
-    );
-  };
+        claim_idempotency_key, renew_idempotency_key, renew_lease_until, release_idempotency_key
+      FROM node_claims
+      WHERE repo = ${key.repo} AND issue = ${key.issue} AND task_id = ${key.taskId}
+    `.pipe(Effect.mapError(storageError));
   const toClaim = (row: ClaimRow): FleetClaim => ({
     fleetId: row.fleet_id,
     repo: row.repo,
@@ -85,93 +106,97 @@ const make = Effect.gen(function* () {
     taskId: row.task_id,
     holder: row.claimed_by,
     attempt: row.attempt,
-    fencing: row.fencing,
+    fencing: row.fencing ?? String(row.attempt),
     leaseUntil: row.lease_until,
   });
-  const claim = Effect.fn("FleetClaims.claim")(function* (input: FleetClaimClaimInput) {
+
+  const claim = Effect.fn("FleetClaims.claim")(function* (
+    holder: string,
+    input: FleetClaimClaimInput,
+  ) {
     const now = DateTime.toEpochMillis(yield* DateTime.now);
     const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + LEASE_MS));
+    const repo = yield* canonicalRepo(input.repo);
+    const key = { ...input, repo };
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
-          if (!(yield* registered(input.repo))) {
-            return yield* new FleetClaimsError({
-              reason: "unknown-repo",
-              message: "The repository is not registered for this environment.",
-            });
-          }
-          const current = (yield* read(input))[0];
-          if (
-            current !== undefined &&
-            current.claimed_by === input.holder &&
-            current.claim_idempotency_key === input.idempotencyKey
-          ) {
-            return { outcome: "claimed" as const, claim: toClaim(current) };
-          }
-          if (
+          const current = (yield* read(key))[0];
+          const active =
             current !== undefined &&
             current.state === "running" &&
-            Date.parse(current.lease_until) > now
+            Date.parse(current.lease_until) > now;
+          if (
+            current !== undefined &&
+            current.claimed_by === holder &&
+            current.claim_idempotency_key === input.idempotencyKey
           ) {
-            return { outcome: "already-held" as const, claim: null };
+            return active
+              ? { outcome: "claimed" as const, claim: toClaim(current) }
+              : { outcome: "stale" as const, claim: null };
+          }
+          if (active) {
+            return {
+              outcome: "already-held" as const,
+              claim: current.claimed_by === holder ? toClaim(current) : null,
+            };
           }
           const attempt = (current?.attempt ?? 0) + 1;
-          const fence = yield* random.randomBytes(16).pipe(
-            Effect.map((bytes) => Buffer.from(bytes).toString("hex")),
-            Effect.mapError(error),
-          );
+          const fencing = String(attempt);
           yield* sql`
-          INSERT INTO node_claims (
-            fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing,
-            attempt, claim_idempotency_key, renew_idempotency_key, renew_lease_until,
-            release_idempotency_key
-          ) VALUES (
-            ${input.fleetId}, ${input.repo}, ${input.issue}, ${input.taskId}, ${input.holder},
-            ${leaseUntil}, 'fleet', 'running', ${fence}, ${attempt}, ${input.idempotencyKey},
-            NULL, NULL, NULL
-          ) ON CONFLICT(fleet_id, repo, issue, task_id) DO UPDATE SET
-            claimed_by = excluded.claimed_by,
-            lease_until = excluded.lease_until,
-            executor = excluded.executor,
-            state = excluded.state,
-            fencing = excluded.fencing,
-            attempt = excluded.attempt,
-            claim_idempotency_key = excluded.claim_idempotency_key,
-            renew_idempotency_key = NULL,
-            renew_lease_until = NULL,
-            release_idempotency_key = NULL
-        `;
+            INSERT INTO node_claims (
+              fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing,
+              attempt, claim_idempotency_key, renew_idempotency_key, renew_lease_until,
+              release_idempotency_key
+            ) VALUES (
+              ${fleetId}, ${repo}, ${input.issue}, ${input.taskId}, ${holder}, ${leaseUntil},
+              'fleet', 'running', ${fencing}, ${attempt}, ${input.idempotencyKey}, NULL, NULL, NULL
+            ) ON CONFLICT(repo, issue, task_id) DO UPDATE SET
+              fleet_id = excluded.fleet_id, claimed_by = excluded.claimed_by,
+              lease_until = excluded.lease_until, executor = excluded.executor,
+              state = excluded.state, fencing = excluded.fencing, attempt = excluded.attempt,
+              claim_idempotency_key = excluded.claim_idempotency_key,
+              renew_idempotency_key = NULL, renew_lease_until = NULL, release_idempotency_key = NULL
+          `;
           return {
             outcome: "claimed" as const,
             claim: {
-              fleetId: input.fleetId,
-              repo: input.repo,
+              fleetId,
+              repo,
               issue: input.issue,
               taskId: input.taskId,
-              holder: input.holder,
+              holder,
               attempt,
-              fencing: fence,
+              fencing,
               leaseUntil,
             },
           };
         }),
       )
-      .pipe(Effect.mapError((cause) => (isFleetClaimsError(cause) ? cause : error(cause))));
+      .pipe(Effect.mapError(storageError));
   });
-  const renew = Effect.fn("FleetClaims.renew")(function* (input: FleetClaimLeaseInput) {
+
+  const renew = Effect.fn("FleetClaims.renew")(function* (
+    holder: string,
+    input: FleetClaimLeaseInput,
+  ) {
     const now = DateTime.toEpochMillis(yield* DateTime.now);
     const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + LEASE_MS));
+    const repo = yield* canonicalRepo(input.repo);
+    const key = { ...input, repo };
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
-          const current = (yield* read(input))[0];
+          const current = (yield* read(key))[0];
           const matches =
             current !== undefined &&
-            current.claimed_by === input.holder &&
+            current.claimed_by === holder &&
             current.attempt === input.attempt &&
             current.fencing === input.fencing;
+          const active =
+            matches && current.state === "running" && Date.parse(current.lease_until) > now;
+          if (!active) return { outcome: "stale" as const, claim: null };
           if (
-            matches &&
             current.renew_idempotency_key === input.idempotencyKey &&
             current.renew_lease_until !== null
           ) {
@@ -180,16 +205,13 @@ const make = Effect.gen(function* () {
               claim: toClaim({ ...current, lease_until: current.renew_lease_until }),
             };
           }
-          if (!matches || current.state !== "running" || Date.parse(current.lease_until) <= now) {
-            return { outcome: "stale" as const, claim: null };
-          }
           yield* sql`
-          UPDATE node_claims SET lease_until = ${leaseUntil},
-            renew_idempotency_key = ${input.idempotencyKey}, renew_lease_until = ${leaseUntil}
-          WHERE fleet_id = ${input.fleetId} AND repo = ${input.repo} AND issue = ${input.issue}
-            AND task_id = ${input.taskId} AND claimed_by = ${input.holder}
-            AND attempt = ${input.attempt} AND fencing = ${input.fencing} AND state = 'running'
-        `;
+            UPDATE node_claims SET lease_until = ${leaseUntil},
+              renew_idempotency_key = ${input.idempotencyKey}, renew_lease_until = ${leaseUntil}
+            WHERE repo = ${repo} AND issue = ${input.issue} AND task_id = ${input.taskId}
+              AND claimed_by = ${holder} AND attempt = ${input.attempt}
+              AND fencing = ${input.fencing} AND state = 'running'
+          `;
           return {
             outcome: "renewed" as const,
             claim: toClaim({
@@ -201,48 +223,56 @@ const make = Effect.gen(function* () {
           };
         }),
       )
-      .pipe(Effect.mapError(error));
+      .pipe(Effect.mapError(storageError));
   });
-  const release = Effect.fn("FleetClaims.release")(function* (input: FleetClaimLeaseInput) {
+
+  const release = Effect.fn("FleetClaims.release")(function* (
+    holder: string,
+    input: FleetClaimLeaseInput,
+  ) {
+    const repo = yield* canonicalRepo(input.repo);
+    const key = { ...input, repo };
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
-          const current = (yield* read(input))[0];
+          const current = (yield* read(key))[0];
           const matches =
             current !== undefined &&
-            current.claimed_by === input.holder &&
+            current.claimed_by === holder &&
             current.attempt === input.attempt &&
             current.fencing === input.fencing;
-          if (matches && current.release_idempotency_key === input.idempotencyKey) {
-            return { outcome: "released" as const, claim: null };
-          }
           if (!matches || current.state !== "running") {
             return { outcome: "stale" as const, claim: null };
           }
           yield* sql`
-          UPDATE node_claims SET state = 'released', release_idempotency_key = ${input.idempotencyKey}
-          WHERE fleet_id = ${input.fleetId} AND repo = ${input.repo} AND issue = ${input.issue}
-            AND task_id = ${input.taskId} AND claimed_by = ${input.holder}
-            AND attempt = ${input.attempt} AND fencing = ${input.fencing} AND state = 'running'
-        `;
+            UPDATE node_claims SET state = 'released', release_idempotency_key = ${input.idempotencyKey}
+            WHERE repo = ${repo} AND issue = ${input.issue} AND task_id = ${input.taskId}
+              AND claimed_by = ${holder} AND attempt = ${input.attempt}
+              AND fencing = ${input.fencing} AND state = 'running'
+          `;
           return { outcome: "released" as const, claim: null };
         }),
       )
-      .pipe(Effect.mapError(error));
+      .pipe(Effect.mapError(storageError));
   });
+
   return FleetClaims.of({ claim, renew, release });
 });
 
 export const layer = Layer.unwrap(
   Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>
     Layer.effect(FleetClaims, make).pipe(
-      Layer.provide(SecureRandom.layerWebCrypto),
       Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),
     ),
   ),
 );
 
-export const layerForTest = Layer.effect(FleetClaims, make).pipe(
-  Layer.provide(SecureRandom.layerWebCrypto),
-  Layer.provideMerge(NodeSqliteClient.layer({ filename: ":memory:" })),
-);
+export const layerForTest = (filename = ":memory:", fleetId = "coordinator") =>
+  Layer.effect(FleetClaims, make).pipe(
+    Layer.provide(
+      Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+        getEnvironmentId: Effect.succeed(EnvironmentId.make(fleetId)),
+      }),
+    ),
+    Layer.provideMerge(NodeSqliteClient.layer({ filename })),
+  );

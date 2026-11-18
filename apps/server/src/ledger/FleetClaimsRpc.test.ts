@@ -12,7 +12,6 @@ import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
-import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import {
@@ -33,11 +32,7 @@ const claimsLayer = Layer.effectDiscard(
     const sql = yield* SqlClient.SqlClient;
     yield* sql`INSERT INTO repos (owner, name) VALUES ('example', 'one'), ('other', 'repo')`;
   }),
-).pipe(Layer.provideMerge(FleetClaims.layerForTest));
-
-const threadsLayer = Layer.mock(ThreadManagement.ThreadManagementService)({
-  getThreadShell: () => Effect.succeed(null),
-});
+).pipe(Layer.provideMerge(FleetClaims.layerForTest()));
 
 const claim = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetClaimClaimInput) =>
   client.call({
@@ -57,12 +52,10 @@ const release = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetCla
     success: FleetClaimLeaseResult,
   });
 
-const claimInput = (repo: string, taskId: string, holder: string, idempotencyKey: string) => ({
-  fleetId: "fleet-a",
+const claimInput = (repo: string, taskId: string, idempotencyKey: string) => ({
   repo,
   issue: 7,
   taskId,
-  holder,
   idempotencyKey,
 });
 
@@ -71,10 +64,7 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
     Effect.gen(function* () {
       const peer = yield* servePeer(
         coordinator,
-        McpHttpServer.layerFleetClaimsToolkit.pipe(
-          Layer.provide(claimsLayer),
-          Layer.provide(threadsLayer),
-        ),
+        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
       );
       const aContext = yield* layerLinkingEnvironment(nodeA).pipe(Layer.build);
       const bContext = yield* layerLinkingEnvironment(nodeB).pipe(Layer.build);
@@ -85,28 +75,29 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
       yield* linkTo(aLinks, peer);
       yield* linkTo(bLinks, peer);
 
-      const held = yield* claim(aClient, claimInput("example/one", "root", "node-a", "a-root"));
+      const held = yield* claim(aClient, claimInput("example/one", "root", "a-root"));
       expect(held.outcome).toBe("claimed");
-      expect(
-        (yield* claim(bClient, claimInput("example/one", "root", "node-b", "b-root"))).outcome,
-      ).toBe("already-held");
-      expect(
-        (yield* claim(bClient, claimInput("example/one", "child-1", "node-b", "b-child"))).outcome,
-      ).toBe("claimed");
-      expect(
-        (yield* claim(bClient, claimInput("other/repo", "root", "node-b", "b-other"))).outcome,
-      ).toBe("claimed");
+      expect(held.claim?.holder).not.toBe("node-a");
+      expect((yield* claim(bClient, claimInput("example/one", "root", "b-root"))).outcome).toBe(
+        "already-held",
+      );
+      const child = yield* claim(bClient, claimInput("example/one", "child-1", "b-child"));
+      expect(child.outcome).toBe("claimed");
+      expect(child.claim?.holder).not.toBe("node-b");
+      expect(child.claim?.holder).not.toBe(held.claim?.holder);
+      expect((yield* claim(bClient, claimInput("other/repo", "root", "b-other"))).outcome).toBe(
+        "claimed",
+      );
 
       expect(
         (yield* release(aClient, {
-          ...claimInput("example/one", "root", "node-a", "a-release"),
+          ...claimInput("example/one", "root", "a-release"),
           attempt: held.claim!.attempt,
           fencing: held.claim!.fencing,
         })).outcome,
       ).toBe("released");
       expect(
-        (yield* claim(bClient, claimInput("example/one", "root", "node-b", "b-root-2"))).claim
-          ?.attempt,
+        (yield* claim(bClient, claimInput("example/one", "root", "b-root-2"))).claim?.attempt,
       ).toBe(2);
 
       const revoked = (yield* peer.linkedSessions).find(
@@ -114,10 +105,9 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
       );
       expect(revoked).toBeDefined();
       yield* peer.auth.revokeSession(revoked!.sessionId);
-      const denied = yield* claim(
-        bClient,
-        claimInput("example/one", "child-2", "node-b", "revoked"),
-      ).pipe(Effect.flip);
+      const denied = yield* claim(bClient, claimInput("example/one", "child-2", "revoked")).pipe(
+        Effect.flip,
+      );
       expect(denied.code).toBe("capability_denied");
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),

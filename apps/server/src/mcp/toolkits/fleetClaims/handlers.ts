@@ -6,7 +6,7 @@ import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import { FleetClaimsToolkit } from "./tools.ts";
 
-const requireLinkedClient = McpInvocationContext.McpInvocationContext.pipe(
+const linkedClient = McpInvocationContext.McpInvocationContext.pipe(
   Effect.filterOrFail(
     (scope) => scope.client?.linked === true,
     () =>
@@ -24,32 +24,32 @@ const fromFleetClaimsError = (error: FleetClaimsError) =>
   });
 
 const handlers = {
-  fleet_claim: McpToolAccess.writes(
-    (input) =>
-      Effect.gen(function* () {
-        yield* requireLinkedClient;
-        const claims = yield* FleetClaims.FleetClaims;
-        return yield* claims.claim(input).pipe(Effect.mapError(fromFleetClaimsError));
-      }),
-    { linkedCallers: "allowed" },
+  fleet_claim: McpToolAccess.writesForLinkedClient((input) =>
+    Effect.gen(function* () {
+      const scope = yield* linkedClient;
+      const claims = yield* FleetClaims.FleetClaims;
+      return yield* claims
+        .claim(scope.client!.sessionId, input)
+        .pipe(Effect.mapError(fromFleetClaimsError));
+    }),
   ),
-  fleet_renew: McpToolAccess.writes(
-    (input) =>
-      Effect.gen(function* () {
-        yield* requireLinkedClient;
-        const claims = yield* FleetClaims.FleetClaims;
-        return yield* claims.renew(input).pipe(Effect.mapError(fromFleetClaimsError));
-      }),
-    { linkedCallers: "allowed" },
+  fleet_renew: McpToolAccess.writesForLinkedClient((input) =>
+    Effect.gen(function* () {
+      const scope = yield* linkedClient;
+      const claims = yield* FleetClaims.FleetClaims;
+      return yield* claims
+        .renew(scope.client!.sessionId, input)
+        .pipe(Effect.mapError(fromFleetClaimsError));
+    }),
   ),
-  fleet_release: McpToolAccess.writes(
-    (input) =>
-      Effect.gen(function* () {
-        yield* requireLinkedClient;
-        const claims = yield* FleetClaims.FleetClaims;
-        return yield* claims.release(input).pipe(Effect.mapError(fromFleetClaimsError));
-      }),
-    { linkedCallers: "allowed" },
+  fleet_release: McpToolAccess.writesForLinkedClient((input) =>
+    Effect.gen(function* () {
+      const scope = yield* linkedClient;
+      const claims = yield* FleetClaims.FleetClaims;
+      return yield* claims
+        .release(scope.client!.sessionId, input)
+        .pipe(Effect.mapError(fromFleetClaimsError));
+    }),
   ),
 } satisfies McpToolAccess.Handlers<typeof FleetClaimsToolkit.tools>;
 

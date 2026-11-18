@@ -9,13 +9,8 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 
 import * as FleetClaims from "../../../ledger/FleetClaims.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
-import * as ThreadManagement from "../../../orchestration-v2/ThreadManagementService.ts";
 
-const dependencies = [
-  FleetClaims.FleetClaims,
-  McpInvocationContext.McpInvocationContext,
-  ThreadManagement.ThreadManagementService,
-];
+const dependencies = [FleetClaims.FleetClaims, McpInvocationContext.McpInvocationContext];
 
 const FleetClaimTool = Tool.make("fleet_claim", {
   description: "Claims one fleet task lease on this coordinator.",
