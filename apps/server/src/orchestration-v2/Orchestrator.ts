@@ -14521,6 +14521,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               threadId,
               ...(command.onlyIfUnused === true ? { onlyIfUnused: true } : {}),
             },
+            effectScope: `${command.commandId}:${threadId}`,
             projection,
             attachmentIds: yield* projectionStore
               .getThreadAttachmentIds(threadId)

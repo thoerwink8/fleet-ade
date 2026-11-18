@@ -23,6 +23,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
   readonly attachmentIds: ReadonlyArray<string>;
   readonly now: DateTime.Utc;
   readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
+  readonly effectScope?: string;
 }): Effect.fn.Return<ThreadDeletionPlan, IdAllocator.IdAllocatorV2Error> {
   const { command, projection, now, idAllocator } = input;
   const events: Array<OrchestrationV2DomainEvent> = [];
@@ -182,8 +183,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     }
   }
 
-  // Batch deletes share one commandId across threads; the threadId keeps each cleanup unique.
-  const effectScope = `${command.commandId}:${command.threadId}`;
+  const effectScope = input.effectScope ?? command.commandId;
   for (const session of projection.providerSessions) {
     // An errored session can still own a reusable live runtime.
     if (session.status === "stopped") continue;
