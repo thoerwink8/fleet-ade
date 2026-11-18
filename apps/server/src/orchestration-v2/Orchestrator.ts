@@ -627,6 +627,8 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.auto-settle.set":
     case "thread.pin":
     case "thread.unpin":
+    case "thread.commander.mark":
+    case "thread.commander.unmark":
     case "thread.pin.reorder":
     case "thread.active.reorder":
     case "thread.tag.set":
@@ -3954,6 +3956,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           | "thread.auto-settle.set"
           | "thread.pin"
           | "thread.unpin"
+          | "thread.commander.mark"
+          | "thread.commander.unmark"
           | "thread.pin.reorder"
           | "thread.tag.set"
           | "thread.active.reorder"
@@ -3991,6 +3995,12 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         commandType: command.type,
         cause: `Thread ${command.threadId} is deleted.`,
       });
+    }
+    if (
+      (command.type === "thread.commander.mark" && thread.commander === true) ||
+      (command.type === "thread.commander.unmark" && thread.commander !== true)
+    ) {
+      return;
     }
     if (
       command.type === "thread.pull-request.watch" &&
@@ -4566,6 +4576,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             updatedAt: alreadyUnpinned ? thread.updatedAt : now,
           };
         }
+        case "thread.commander.mark":
+          return { ...thread, commander: true };
+        case "thread.commander.unmark":
+          return { ...thread, commander: false };
         case "thread.pin.reorder": {
           const keyUnchanged = thread.pinOrderKey === command.orderKey;
           return {
@@ -5005,6 +5019,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return "thread.pinned" as const;
         case "thread.unpin":
           return "thread.unpinned" as const;
+        case "thread.commander.mark":
+          return "thread.commander-marked" as const;
+        case "thread.commander.unmark":
+          return "thread.commander-unmarked" as const;
         case "thread.pin.reorder":
           return "thread.pin-reordered" as const;
         case "thread.active.reorder":
@@ -14614,6 +14632,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.auto-settle.set":
       case "thread.pin":
       case "thread.unpin":
+      case "thread.commander.mark":
+      case "thread.commander.unmark":
       case "thread.pin.reorder":
       case "thread.active.reorder":
       case "thread.tag.set":
@@ -14998,6 +15018,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           command.type === "subagent.stop" ||
           // Closing a share again, or after it ended, is not an error.
           command.type === "thread.guest-share.close" ||
+          // Marking or unmarking again leaves the thread as it is.
+          command.type === "thread.commander.mark" ||
+          command.type === "thread.commander.unmark" ||
           (command.type === "thread.delete" && command.onlyIfUnused === true),
         (_planned) =>
           new OrchestratorDispatchError({
