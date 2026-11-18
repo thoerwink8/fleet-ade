@@ -1,6 +1,4 @@
 import {
-  FLEET_HEARTBEAT_INTERVAL_MS,
-  FLEET_LEASE_CONFIRMED_WINDOW_MS,
   FleetClaim,
   FleetClaimHeartbeatInput,
   FleetClaimHeartbeatResult,
@@ -38,6 +36,22 @@ export class FleetHeartbeatTransport extends Context.Service<
     ) => Effect.Effect<FleetClaimHeartbeatResult, FleetHeartbeatUnconfirmed>;
   }
 >()("t3/ledger/FleetHeartbeat/FleetHeartbeatTransport") {}
+export interface FleetHeartbeatConfig {
+  readonly heartbeatIntervalMs: number;
+  readonly transportTimeoutMs: number;
+  readonly confirmedWindowMs: number;
+}
+
+export const defaultFleetHeartbeatConfig: FleetHeartbeatConfig = {
+  heartbeatIntervalMs: 30_000,
+  transportTimeoutMs: 10_000,
+  confirmedWindowMs: 45_000,
+};
+
+export class FleetHeartbeatConfigService extends Context.Service<
+  FleetHeartbeatConfigService,
+  FleetHeartbeatConfig
+>()("t3/ledger/FleetHeartbeat/FleetHeartbeatConfig") {}
 
 interface HeldLease {
   readonly claim: FleetClaim;
@@ -63,6 +77,7 @@ export class FleetHeartbeat extends Context.Service<
 
 const make = Effect.gen(function* () {
   const transport = yield* FleetHeartbeatTransport;
+  const config = yield* FleetHeartbeatConfigService;
   const held = yield* Ref.make(new Map<string, HeldLease>());
   const sequence = yield* Ref.make(0);
   const applied = yield* Ref.make(0);
@@ -77,7 +92,7 @@ const make = Effect.gen(function* () {
     if (
       record.phase === "confirmed" &&
       record.confirmedAt !== null &&
-      now - record.confirmedAt <= FLEET_LEASE_CONFIRMED_WINDOW_MS
+      now - record.confirmedAt <= config.confirmedWindowMs
     ) {
       return "confirmed";
     }
@@ -85,10 +100,9 @@ const make = Effect.gen(function* () {
   };
 
   const observe = Effect.fn("FleetHeartbeat.observe")(function* (claim: FleetClaim) {
-    const now = DateTime.toEpochMillis(yield* DateTime.now);
     yield* Ref.update(held, (current) => {
       const next = new Map(current);
-      next.set(leaseId(claim), { claim, phase: "confirmed", confirmedAt: now });
+      next.set(leaseId(claim), { claim, phase: "unconfirmed", confirmedAt: null });
       return next;
     });
   });
@@ -114,18 +128,24 @@ const make = Effect.gen(function* () {
       for (const item of result.results) {
         const id = leaseId(item);
         const previous = next.get(id);
-        if (item.outcome === "renewed" && item.claim !== null) {
+        if (previous !== undefined && previous.claim.attempt !== item.attempt) continue;
+        if (
+          previous !== undefined &&
+          previous.claim.attempt === item.attempt &&
+          item.outcome === "renewed" &&
+          item.claim !== null
+        ) {
           next.set(id, { claim: item.claim, phase: "confirmed", confirmedAt: now });
           continue;
         }
         if (
-          item.outcome === "taken-over" ||
-          item.outcome === "revoked" ||
-          item.outcome === "not-owned"
+          previous !== undefined &&
+          previous.claim.attempt === item.attempt &&
+          (item.outcome === "taken-over" ||
+            item.outcome === "revoked" ||
+            item.outcome === "not-owned")
         ) {
-          if (previous !== undefined) {
-            next.set(id, { ...previous, phase: "lost", confirmedAt: null });
-          }
+          next.set(id, { ...previous, phase: "lost", confirmedAt: null });
           continue;
         }
         if (previous !== undefined) {
@@ -152,20 +172,17 @@ const make = Effect.gen(function* () {
         ? { ...counts, cycles: counts.cycles + 1 }
         : { ...counts, retries: counts.retries + 1 },
     );
-    const result = yield* transport.send(input).pipe(
+    const sentAt = DateTime.toEpochMillis(yield* DateTime.now);
+    yield* transport.send(input).pipe(
+      Effect.timeoutOrElse({
+        duration: Duration.millis(config.transportTimeoutMs),
+        orElse: () => Effect.fail(new FleetHeartbeatUnconfirmed({ reason: "timeout" })),
+      }),
       Effect.tap((value) =>
         Ref.modify(applied, (current) => {
           if (value.sequence <= current) return [false, current] as const;
           return [true, value.sequence] as const;
-        }).pipe(
-          Effect.flatMap((fresh) =>
-            fresh
-              ? DateTime.now.pipe(
-                  Effect.flatMap((now) => applyResult(value, DateTime.toEpochMillis(now))),
-                )
-              : Effect.void,
-          ),
-        ),
+        }).pipe(Effect.flatMap((fresh) => (fresh ? applyResult(value, sentAt) : Effect.void))),
       ),
       Effect.catch((error) =>
         Ref.modify(applied, (current) => {
@@ -192,13 +209,12 @@ const make = Effect.gen(function* () {
         ),
       ),
     );
-    return result;
   });
 
   const beat = send("cycle");
   const retry = send("retry");
   const run = beat.pipe(
-    Effect.repeat(Schedule.spaced(Duration.millis(FLEET_HEARTBEAT_INTERVAL_MS))),
+    Effect.repeat(Schedule.spaced(Duration.millis(config.heartbeatIntervalMs))),
     Effect.asVoid,
   );
   const outbound = Ref.get(outboundCounts);
@@ -217,8 +233,12 @@ const make = Effect.gen(function* () {
 
 export const layer = Layer.effect(FleetHeartbeat, make);
 
+const layerWithDefaults = layer.pipe(
+  Layer.provide(Layer.succeed(FleetHeartbeatConfigService, defaultFleetHeartbeatConfig)),
+);
+
 /** No leases are tracked, so pipeline writes that are not fleet-held stay open. */
-export const layerUntracked = layer.pipe(
+export const layerUntracked = layerWithDefaults.pipe(
   Layer.provide(
     Layer.succeed(FleetHeartbeatTransport, {
       send: Effect.fn("FleetHeartbeatTransport.send")(() =>

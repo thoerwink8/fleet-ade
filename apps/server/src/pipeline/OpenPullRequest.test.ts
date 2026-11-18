@@ -13,11 +13,16 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as FleetClaimsTransport from "../ledger/FleetClaimsTransport.ts";
+import { EnvironmentId, FleetClaimHeartbeatResult } from "@t3tools/contracts";
 import * as FleetHeartbeat from "../ledger/FleetHeartbeat.ts";
+import * as FleetClaims from "../ledger/FleetClaims.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
+import * as Context from "effect/Context";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import {
   CiCheckReadError,
@@ -119,6 +124,33 @@ const tickLayer = (input: {
         })),
       ),
   } as unknown as ProjectionStore.ProjectionStoreV2["Service"]);
+  const fleetClaims = Layer.succeed(FleetClaims.FleetClaims, {
+    claim: (
+      _caller: unknown,
+      input: { readonly repo: string; readonly issue: number; readonly taskId: string },
+    ) =>
+      Effect.succeed({
+        outcome: "claimed" as const,
+        claim: {
+          fleetId: "test-fleet",
+          repo: input.repo.toLowerCase(),
+          issue: input.issue,
+          taskId: input.taskId,
+          holder: "pipeline",
+          holderEnvironment: "test-environment",
+          attempt: 1,
+          fencing: "1",
+          leaseUntil: "2099-01-01T00:00:00.000Z",
+        },
+      }),
+    renew: () => Effect.die("unused"),
+    release: () => Effect.die("unused"),
+    heartbeat: () => Effect.die("unused"),
+    revoke: () => Effect.void,
+  } as unknown as FleetClaims.FleetClaims["Service"]);
+  const identity = Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+    getEnvironmentId: Effect.succeed(EnvironmentId.make("test-environment")),
+  });
   return layer.pipe(
     Layer.provide(budgetLayer),
     Layer.provide(
@@ -131,6 +163,9 @@ const tickLayer = (input: {
     Layer.provide(projections),
     Layer.provide(settings),
     Layer.provide(issues),
+    Layer.provide(FleetHeartbeat.layerUntracked),
+    Layer.provide(fleetClaims),
+    Layer.provide(identity),
     Layer.provideMerge(runs),
   );
 };
@@ -944,5 +979,29 @@ describe("CiCheckReader", () => {
         ),
       ),
     ),
+  );
+});
+describe("Fleet heartbeat production transport", () => {
+  it.effect("sends one batched heartbeat through the coordinator ledger", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<ReadonlyArray<string>>([]);
+      const claims = Layer.succeed(FleetClaims.FleetClaims, {
+        heartbeat: (_environmentId: string, input: unknown) =>
+          Ref.update(calls, (current) => [...current, JSON.stringify(input)]).pipe(
+            Effect.as({ sequence: 1, results: [] } as FleetClaimHeartbeatResult),
+          ),
+      } as unknown as FleetClaims.FleetClaims["Service"]);
+      const environment = Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+        getEnvironmentId: Effect.succeed(EnvironmentId.make("coordinator")),
+      });
+      const context = yield* FleetClaimsTransport.layer.pipe(
+        Layer.provide(claims),
+        Layer.provide(environment),
+        Layer.build,
+      );
+      const transport = Context.get(context, FleetHeartbeat.FleetHeartbeatTransport);
+      yield* transport.send({ sequence: 1, leases: [] });
+      assert.deepStrictEqual(yield* Ref.get(calls), [JSON.stringify({ sequence: 1, leases: [] })]);
+    }),
   );
 });

@@ -57,8 +57,120 @@ const renewed = (
 const layer = (send: Send) =>
   FleetHeartbeat.layer.pipe(
     Layer.provide(Layer.succeed(FleetHeartbeat.FleetHeartbeatTransport, { send })),
+    Layer.provide(
+      Layer.succeed(
+        FleetHeartbeat.FleetHeartbeatConfigService,
+        FleetHeartbeat.defaultFleetHeartbeatConfig,
+      ),
+    ),
   );
+it.effect("observe starts unconfirmed", () =>
+  Effect.gen(function* () {
+    const send: Send = (input) => Effect.succeed(renewed(input));
+    yield* Effect.gen(function* () {
+      const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+      yield* heartbeat.observe(claim("initial"));
+      assert.strictEqual(yield* heartbeat.confirmation(key("initial")), "unconfirmed");
+      yield* heartbeat.beat;
+      assert.strictEqual(yield* heartbeat.confirmation(key("initial")), "confirmed");
+    }).pipe(Effect.provide(layer(send)));
+  }),
+);
 
+it.effect("attempt mismatch is ignored", () =>
+  Effect.gen(function* () {
+    const send: Send = (input) =>
+      input.sequence === 1
+        ? Effect.succeed(renewed(input))
+        : Effect.succeed({
+            sequence: input.sequence,
+            results: input.leases.map((lease) => ({
+              ...key(lease.taskId),
+              attempt: lease.attempt + 1,
+              outcome: "renewed" as const,
+              claim: {
+                ...claim(lease.taskId, lease.attempt + 1),
+                leaseUntil: "1970-01-01T00:03:00.000Z",
+              },
+            })),
+          });
+    yield* Effect.gen(function* () {
+      const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+      yield* heartbeat.observe(claim("attempt"));
+      yield* heartbeat.beat;
+      assert.strictEqual(yield* heartbeat.confirmation(key("attempt")), "confirmed");
+      yield* heartbeat.beat;
+      assert.strictEqual(yield* heartbeat.confirmation(key("attempt")), "confirmed");
+    }).pipe(Effect.provide(layer(send)));
+  }),
+);
+
+it.effect("transport timeout is ten seconds", () =>
+  Effect.gen(function* () {
+    const completed = yield* Deferred.make<void>();
+    const send: Send = () =>
+      Effect.never.pipe(Effect.ensuring(Deferred.succeed(completed, undefined)));
+    yield* Effect.gen(function* () {
+      const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+      yield* heartbeat.observe(claim("timeout"));
+      yield* heartbeat.beat.pipe(Effect.forkDetach);
+      yield* TestClock.adjust(Duration.seconds(10));
+      yield* Deferred.await(completed);
+      assert.strictEqual(yield* heartbeat.confirmation(key("timeout")), "unconfirmed");
+    }).pipe(Effect.provide(layer(send)));
+  }),
+);
+
+it.effect("late response does not extend send-time confirmation window", () =>
+  Effect.gen(function* () {
+    const response = yield* Deferred.make<void>();
+    const send: Send = (input) => Deferred.await(response).pipe(Effect.as(renewed(input)));
+    yield* Effect.gen(function* () {
+      const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+      yield* heartbeat.observe(claim("late"));
+      const beat = yield* heartbeat.beat.pipe(Effect.forkDetach);
+      yield* TestClock.adjust(Duration.seconds(46));
+      yield* Deferred.succeed(response, undefined);
+      yield* Fiber.join(beat);
+      assert.strictEqual(yield* heartbeat.confirmation(key("late")), "unconfirmed");
+    }).pipe(Effect.provide(layer(send)));
+  }),
+);
+
+it.effect("not-owned and revoked become lost", () =>
+  Effect.gen(function* () {
+    const send: Send = (input) => Effect.succeed(renewed(input, ["not-owned", "revoked"]));
+    yield* Effect.gen(function* () {
+      const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+      yield* heartbeat.observe(claim("not-owned"));
+      yield* heartbeat.observe(claim("revoked"));
+      yield* heartbeat.beat;
+      assert.strictEqual(yield* heartbeat.confirmation(key("not-owned")), "lost");
+      assert.strictEqual(yield* heartbeat.confirmation(key("revoked")), "lost");
+    }).pipe(Effect.provide(layer(send)));
+  }),
+);
+
+it.effect("run sends 50 leases once per cycle", () =>
+  Effect.gen(function* () {
+    const calls = yield* Queue.unbounded<FleetClaimHeartbeatInput>();
+    const send: Send = (input) =>
+      Queue.offer(calls, input).pipe(Effect.andThen(Effect.succeed(renewed(input))));
+    yield* Effect.gen(function* () {
+      const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+      yield* Effect.forEach(
+        Array.from({ length: 50 }, (_, index) => index),
+        (index) => heartbeat.observe(claim(`run-${index}`)),
+      );
+      const runner = yield* heartbeat.run.pipe(Effect.forkDetach);
+      assert.strictEqual((yield* Queue.take(calls)).leases.length, 50);
+      yield* TestClock.adjust(Duration.millis(FLEET_HEARTBEAT_INTERVAL_MS));
+      assert.strictEqual((yield* Queue.take(calls)).leases.length, 50);
+      assert.strictEqual(yield* Queue.size(calls), 0);
+      yield* Fiber.interrupt(runner);
+    }).pipe(Effect.provide(layer(send)));
+  }),
+);
 it.effect("一次心跳里成功和 stale 一起回来，超时不会变成接管", () =>
   Effect.gen(function* () {
     const calls = yield* Ref.make<ReadonlyArray<FleetClaimHeartbeatInput>>([]);

@@ -108,6 +108,7 @@ import Migration0097 from "./Migrations/097_PipelineDailyBrief.ts";
 import Migration0098 from "./Migrations/098_PipelineRunClaimToken.ts";
 import Migration0099 from "./Migrations/099_PipelineRunController.ts";
 import Migration0100 from "./Migrations/100_CommandReceiptResult.ts";
+import Migration0101 from "./Migrations/101_AuthPeerEnvironmentBinding.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -211,6 +212,7 @@ const migrationEntries = [
   [98, "PipelineRunClaimToken", Migration0098],
   [99, "PipelineRunController", Migration0099],
   [100, "CommandReceiptResult", Migration0100],
+  [101, "AuthPeerEnvironmentBinding", Migration0101],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);

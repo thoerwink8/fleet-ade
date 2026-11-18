@@ -450,6 +450,7 @@ const make = Effect.gen(function* () {
   const mintCode = Effect.fn("McpOAuth.mintCode")(function* (
     authorization: AuthorizationRequest,
     access: AuthMcpClientAccess,
+    peerEnvironmentId?: string,
   ) {
     const now = yield* Clock.currentTimeMillis;
     const code = Buffer.from(yield* random.randomBytes(32)).toString("base64url");
@@ -459,9 +460,7 @@ const make = Effect.gen(function* () {
         clientId: authorization.client.clientId,
         clientName: authorization.client.name,
         peerLink: authorization.client.peerLink,
-        ...(authorization.client.environmentId === undefined
-          ? {}
-          : { environmentId: authorization.client.environmentId }),
+        ...(peerEnvironmentId === undefined ? {} : { environmentId: peerEnvironmentId }),
         redirectUri: authorization.redirectUri,
         codeChallenge: authorization.codeChallenge,
         resource: authorization.resource,
@@ -476,6 +475,7 @@ const make = Effect.gen(function* () {
   const approve: McpOAuth["Service"]["approve"] = Effect.fn("McpOAuth.approve")(function* (input) {
     const { decision } = input;
     let access = decision.access;
+    let peerEnvironmentId: string | undefined;
     if (decision._tag === "pairing-code") {
       // An approval code is for one app's sign-in, never for linking another environment.
       if (input.authorization.client.peerLink && parseMcpApprovalCode(decision.code)) {
@@ -483,19 +483,29 @@ const make = Effect.gen(function* () {
           description: "Linking needs a plain pairing code, not an app approval code.",
         });
       }
-      access = yield* environmentAuth.consumeMcpApprovalCode(decision.code, decision.access).pipe(
-        Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (cause) =>
-          Effect.logError("MCP approval code check failed.", { cause }).pipe(
-            Effect.andThen(
-              Effect.fail(
-                new McpOAuthPageError({
-                  description: "The code could not be checked. Try again.",
-                }),
+      const consumed = yield* environmentAuth
+        .consumeMcpApprovalCode(
+          decision.code,
+          decision.access,
+          input.authorization.client.peerLink
+            ? input.authorization.client.environmentId
+            : undefined,
+        )
+        .pipe(
+          Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (cause) =>
+            Effect.logError("MCP approval code check failed.", { cause }).pipe(
+              Effect.andThen(
+                Effect.fail(
+                  new McpOAuthPageError({
+                    description: "The code could not be checked. Try again.",
+                  }),
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
+      access = consumed.access;
+      peerEnvironmentId = consumed.peerEnvironmentId;
     } else {
       const session = yield* approvingSession(input.request, input.authorization);
       if (
@@ -508,7 +518,7 @@ const make = Effect.gen(function* () {
         });
       }
     }
-    const code = yield* mintCode(input.authorization, access);
+    const code = yield* mintCode(input.authorization, access, peerEnvironmentId);
     yield* Effect.logInfo("Approved an MCP client sign-in.", {
       client: input.authorization.client.name,
       access,

@@ -348,6 +348,94 @@ it.live("signs in with a pairing code and issues a token only /mcp accepts", () 
     }),
   ),
 );
+it.live("uses the pairing record identity instead of DCR self-report", () =>
+  withRoutes((handler, auth) =>
+    Effect.gen(function* () {
+      const registered = yield* handler(
+        at("/oauth/mcp/register", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: encodeJson({
+            client_name: "Peer",
+            redirect_uris: [REDIRECT],
+            software_id: MCP_PEER_LINK_SOFTWARE_ID,
+            t3_environment_id: "forged-environment",
+          }),
+        }),
+      ).pipe(Effect.flatMap(json<{ client_id: string }>));
+      const params = authorizeParams(registered.client_id);
+      const pairing = yield* auth.createPairingLink({ peerEnvironmentId: "trusted-environment" });
+      const approved = yield* decide(handler, params, {
+        _tag: "pairing-code",
+        access: "auto",
+        code: pairing.credential,
+      });
+      const code = new URL(approved.redirectTo!).searchParams.get("code")!;
+      const tokenResponse = yield* handler(
+        at(
+          "/oauth/mcp/token",
+          form({
+            grant_type: "authorization_code",
+            code,
+            redirect_uri: params.redirect_uri,
+            client_id: registered.client_id,
+            code_verifier: verifier,
+          }),
+        ),
+      );
+      const token = (yield* json<{ access_token: string }>(tokenResponse)).access_token;
+      const client = yield* auth.authenticateMcpClient(
+        HttpServerRequest.fromWeb(at("/mcp", { headers: { authorization: `Bearer ${token}` } })),
+      );
+      expect(client).toMatchObject({ peerLink: true, environmentId: "trusted-environment" });
+    }),
+  ),
+);
+it.live("rejects a second active pairing for the same peer environment", () =>
+  withRoutes((handler, auth) =>
+    Effect.gen(function* () {
+      const registered = yield* handler(
+        at("/oauth/mcp/register", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: encodeJson({
+            client_name: "Peer",
+            redirect_uris: [REDIRECT],
+            software_id: MCP_PEER_LINK_SOFTWARE_ID,
+          }),
+        }),
+      ).pipe(Effect.flatMap(json<{ client_id: string }>));
+      const params = authorizeParams(registered.client_id);
+      const first = yield* auth.createPairingLink({ peerEnvironmentId: "same-environment" });
+      const second = yield* auth.createPairingLink({ peerEnvironmentId: "same-environment" });
+      const approved = yield* decide(handler, params, {
+        _tag: "pairing-code",
+        access: "auto",
+        code: first.credential,
+      });
+      const code = new URL(approved.redirectTo!).searchParams.get("code")!;
+      yield* handler(
+        at(
+          "/oauth/mcp/token",
+          form({
+            grant_type: "authorization_code",
+            code,
+            redirect_uri: params.redirect_uri,
+            client_id: registered.client_id,
+            code_verifier: verifier,
+          }),
+        ),
+      );
+      expect(
+        (yield* decide(handler, params, {
+          _tag: "pairing-code",
+          access: "auto",
+          code: second.credential,
+        })).status,
+      ).toBe(400);
+    }),
+  ),
+);
 
 it.live("signs in a hosted agent with an https callback that asked for a client secret", () =>
   withRoutes((handler, auth) =>

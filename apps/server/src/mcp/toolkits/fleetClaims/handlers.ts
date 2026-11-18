@@ -17,6 +17,11 @@ const linkedClient = McpInvocationContext.McpInvocationContext.pipe(
   ),
 );
 
+export const missingLinkedEnvironment = () =>
+  new OrchestratorMcpFailure({
+    code: "invalid_request",
+    message: "旧链接，请重新链接",
+  });
 const fromFleetClaimsError = (error: FleetClaimsError) =>
   new OrchestratorMcpFailure({
     code: error.reason === "unknown-repo" ? "invalid_request" : "orchestration_error",
@@ -28,12 +33,7 @@ const handlers = {
     Effect.gen(function* () {
       const scope = yield* linkedClient;
       const environmentId = scope.client?.environmentId;
-      if (environmentId === undefined) {
-        return yield* new OrchestratorMcpFailure({
-          code: "invalid_request",
-          message: "Fleet control RPCs require the linked environment identity.",
-        });
-      }
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
         .claim({ sessionId: scope.client!.sessionId, environmentId }, input)
@@ -44,12 +44,7 @@ const handlers = {
     Effect.gen(function* () {
       const scope = yield* linkedClient;
       const environmentId = scope.client?.environmentId;
-      if (environmentId === undefined) {
-        return yield* new OrchestratorMcpFailure({
-          code: "invalid_request",
-          message: "Fleet control RPCs require the linked environment identity.",
-        });
-      }
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
         .renew({ sessionId: scope.client!.sessionId, environmentId }, input)
@@ -60,12 +55,7 @@ const handlers = {
     Effect.gen(function* () {
       const scope = yield* linkedClient;
       const environmentId = scope.client?.environmentId;
-      if (environmentId === undefined) {
-        return yield* new OrchestratorMcpFailure({
-          code: "invalid_request",
-          message: "Fleet control RPCs require the linked environment identity.",
-        });
-      }
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
         .release({ sessionId: scope.client!.sessionId, environmentId }, input)
@@ -76,12 +66,7 @@ const handlers = {
     Effect.gen(function* () {
       const scope = yield* linkedClient;
       const environmentId = scope.client?.environmentId;
-      if (environmentId === undefined) {
-        return yield* new OrchestratorMcpFailure({
-          code: "invalid_request",
-          message: "Fleet control RPCs require the linked environment identity.",
-        });
-      }
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
         .heartbeat(environmentId, input)

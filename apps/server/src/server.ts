@@ -748,6 +748,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   layerProviderInstallationRefresh,
   ProviderInstallation.layer,
   ReplayMarkers.layer,
+  FleetClaims.layer,
   layerPipelineRuns,
   layerPipelineBudget,
   layerColdVerify,

@@ -84,7 +84,6 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.fleetClaimsClaim]: AuthAccessWriteScope,
   [WS_METHODS.fleetClaimsRenew]: AuthAccessWriteScope,
   [WS_METHODS.fleetClaimsRelease]: AuthAccessWriteScope,
-  [WS_METHODS.fleetClaimsHeartbeat]: AuthAccessWriteScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

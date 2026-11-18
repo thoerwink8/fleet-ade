@@ -30,6 +30,8 @@ export const AuthPairingLinkRecord = Schema.Struct({
   subject: Schema.String,
   label: Schema.NullOr(Schema.String),
   proofKeyThumbprint: Schema.NullOr(Schema.String),
+  /** Set once when a peer pairing is approved. */
+  peerEnvironmentId: Schema.NullOr(Schema.String),
   createdAt: Schema.DateTimeUtcFromString,
   expiresAt: Schema.DateTimeUtcFromString,
   consumedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
@@ -45,6 +47,7 @@ export const CreateAuthPairingLinkInput = Schema.Struct({
   subject: Schema.String,
   label: Schema.NullOr(Schema.String),
   proofKeyThumbprint: Schema.NullOr(Schema.String),
+  peerEnvironmentId: Schema.optionalKey(Schema.NullOr(Schema.String)),
   createdAt: Schema.DateTimeUtcFromString,
   expiresAt: Schema.DateTimeUtcFromString,
 });
@@ -53,6 +56,7 @@ export type CreateAuthPairingLinkInput = typeof CreateAuthPairingLinkInput.Type;
 export const ConsumeAuthPairingLinkInput = Schema.Struct({
   credential: Schema.String,
   proofKeyThumbprint: Schema.NullOr(Schema.String),
+  peerEnvironmentId: Schema.optionalKey(Schema.NullOr(Schema.String)),
   requestedScopes: Schema.optionalKey(AuthEnvironmentScopes),
   requiredScopes: Schema.optionalKey(AuthEnvironmentScopes),
   /** Also spends a code with exactly this `mcp-approval:` subject. Others are always refused. */
@@ -86,6 +90,7 @@ const AuthPairingLinkRawDbRow = Schema.Struct({
   subject: Schema.Unknown,
   label: Schema.Unknown,
   proofKeyThumbprint: Schema.Unknown,
+  peerEnvironmentId: Schema.Unknown,
   createdAt: Schema.Unknown,
   expiresAt: Schema.Unknown,
   consumedAt: Schema.Unknown,
@@ -146,6 +151,7 @@ export const make = Effect.gen(function* () {
           subject,
           label,
           proof_key_thumbprint,
+          peer_environment_id,
           created_at,
           expires_at,
           consumed_at,
@@ -157,8 +163,9 @@ export const make = Effect.gen(function* () {
           ${input.method},
           ${JSON.stringify(input.scopes)},
           ${input.subject},
-          ${input.label},
-          ${input.proofKeyThumbprint},
+          ${input.label ?? null},
+          ${input.proofKeyThumbprint ?? null},
+          ${input.peerEnvironmentId ?? null},
           ${input.createdAt},
           ${input.expiresAt},
           NULL,
@@ -173,6 +180,7 @@ export const make = Effect.gen(function* () {
     execute: ({
       credential,
       proofKeyThumbprint,
+      peerEnvironmentId,
       requestedScopes,
       requiredScopes,
       mcpApprovalSubject,
@@ -181,7 +189,8 @@ export const make = Effect.gen(function* () {
     }) =>
       sql`
         UPDATE auth_pairing_links
-        SET consumed_at = ${consumedAt}
+        SET consumed_at = ${consumedAt},
+            peer_environment_id = COALESCE(peer_environment_id, ${peerEnvironmentId ?? null})
         WHERE credential = ${credential}
           AND revoked_at IS NULL
           AND consumed_at IS NULL
@@ -216,6 +225,7 @@ export const make = Effect.gen(function* () {
           subject AS "subject",
           label AS "label",
           proof_key_thumbprint AS "proofKeyThumbprint",
+          peer_environment_id AS "peerEnvironmentId",
           created_at AS "createdAt",
           expires_at AS "expiresAt",
           consumed_at AS "consumedAt",
@@ -236,6 +246,7 @@ export const make = Effect.gen(function* () {
           subject AS "subject",
           label AS "label",
           proof_key_thumbprint AS "proofKeyThumbprint",
+          peer_environment_id AS "peerEnvironmentId",
           created_at AS "createdAt",
           expires_at AS "expiresAt",
           consumed_at AS "consumedAt",
@@ -275,6 +286,7 @@ export const make = Effect.gen(function* () {
           subject AS "subject",
           label AS "label",
           proof_key_thumbprint AS "proofKeyThumbprint",
+          peer_environment_id AS "peerEnvironmentId",
           created_at AS "createdAt",
           expires_at AS "expiresAt",
           consumed_at AS "consumedAt",

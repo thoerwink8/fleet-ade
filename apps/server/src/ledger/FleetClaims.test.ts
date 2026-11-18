@@ -399,3 +399,79 @@ it.effect("心跳不改 legacy 行，重放已释放的租约也不再续上", (
     assert.strictEqual(replay.results[0]?.outcome, "released");
   }).pipe(Effect.provide(ledgerLayer)),
 );
+it.effect("撤销环境后 claim、renew、release 全部拒绝", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    yield* claims.revoke("node-a");
+    const deniedClaim = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
+    assert.strictEqual(deniedClaim.outcome, "stale");
+
+    const allowed = yield* claims.claim(caller("node-b"), input("child-1", "claim-b"));
+    const lease = input("child-1", "renew-a", allowed.claim!.attempt, allowed.claim!.fencing);
+    yield* claims.revoke("node-b");
+    assert.strictEqual((yield* claims.renew(caller("node-b"), lease)).outcome, "stale");
+    assert.strictEqual((yield* claims.release(caller("node-b"), lease)).outcome, "stale");
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+
+it.effect("旧 holder_environment=NULL 不再按 session 认领、续期或释放", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const sql = yield* SqlClient.SqlClient;
+    yield* NodeClaims.apply(
+      sql,
+      {
+        action: "claim",
+        repo: "example/one",
+        issue: 9,
+        title: "单 9",
+        claimedBy: "session-a",
+        leaseUntil: "9999-01-01T00:00:00.000Z",
+      },
+      0,
+    );
+    const lease = input("root", "legacy", 1, "1");
+    const sameSession = caller("node-a", "session-a");
+    const claim = yield* claims.claim(sameSession, {
+      ...lease,
+      issue: 9,
+      idempotencyKey: "claim-new",
+    });
+    assert.strictEqual(claim.outcome, "already-held");
+    assert.strictEqual((yield* claims.renew(sameSession, { ...lease, issue: 9 })).outcome, "stale");
+    assert.strictEqual(
+      (yield* claims.release(sameSession, { ...lease, issue: 9 })).outcome,
+      "stale",
+    );
+    assert.strictEqual(
+      (yield* sql`SELECT holder_environment, state FROM node_claims WHERE issue = 9`)[0]
+        ?.holder_environment,
+      null,
+    );
+    assert.strictEqual(
+      (yield* sql`SELECT holder_environment, state FROM node_claims WHERE issue = 9`)[0]?.state,
+      "running",
+    );
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+it.effect("claim 和 renew 使用服务端配置的 fleet lease TTL", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const claimed = yield* claims.claim(caller("node-a"), input("root", "claim-configured"));
+    assert.strictEqual(claimed.claim?.leaseUntil, "1970-01-01T00:00:15.000Z");
+    const renewed = yield* claims.renew(
+      caller("node-a"),
+      input("root", "renew-configured", claimed.claim!.attempt, claimed.claim!.fencing),
+    );
+    assert.strictEqual(renewed.claim?.leaseUntil, "1970-01-01T00:00:15.000Z");
+  }).pipe(
+    Effect.provide(
+      Layer.effectDiscard(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient;
+          yield* sql`INSERT INTO repos (owner, name) VALUES ('example', 'one')`;
+        }),
+      ).pipe(Layer.provideMerge(FleetClaims.layerForTest(":memory:", "coordinator", 15_000))),
+    ),
+  ),
+);

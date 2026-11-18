@@ -45,6 +45,7 @@ describe("V2 preview upgrade", () => {
         [98, "PipelineRunClaimToken"],
         [99, "PipelineRunController"],
         [100, "CommandReceiptResult"],
+        [101, "AuthPeerEnvironmentBinding"],
       ]);
       const after = yield* sql`SELECT * FROM pipeline_runs`;
       assert.deepStrictEqual(
@@ -152,6 +153,7 @@ describe("V2 preview upgrade", () => {
         [98, "PipelineRunClaimToken"],
         [99, "PipelineRunController"],
         [100, "CommandReceiptResult"],
+        [101, "AuthPeerEnvironmentBinding"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -182,7 +184,10 @@ describe("V2 preview upgrade", () => {
         readonly name: string;
       }>`PRAGMA table_info(orchestration_command_receipts)`;
       assert.isFalse(before.some((column) => column.name === "result"));
-      assert.deepStrictEqual(yield* runMigrations(), [[100, "CommandReceiptResult"]]);
+      assert.deepStrictEqual(yield* runMigrations(), [
+        [100, "CommandReceiptResult"],
+        [101, "AuthPeerEnvironmentBinding"],
+      ]);
       const after = yield* sql<{
         readonly name: string;
       }>`PRAGMA table_info(orchestration_command_receipts)`;
@@ -290,6 +295,7 @@ describe("V2 preview upgrade", () => {
         [98, "PipelineRunClaimToken"],
         [99, "PipelineRunController"],
         [100, "CommandReceiptResult"],
+        [101, "AuthPeerEnvironmentBinding"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

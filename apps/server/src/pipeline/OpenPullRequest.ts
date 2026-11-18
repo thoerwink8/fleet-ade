@@ -24,6 +24,9 @@ import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import { parseRepo } from "./repoAllowlist.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as FleetHeartbeat from "../ledger/FleetHeartbeat.ts";
+import * as FleetClaims from "../ledger/FleetClaims.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as FleetClaimsTransport from "../ledger/FleetClaimsTransport.ts";
 
 const BASE_BRANCH = "main";
 
@@ -188,16 +191,12 @@ const makeOpener = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
-  const externalWritePaused = (key: FleetClaimKey) =>
-    heartbeat
-      .holds(key)
-      .pipe(
-        Effect.flatMap((held) =>
-          held
-            ? heartbeat.canWriteExternally(key).pipe(Effect.map((allowed) => !allowed))
-            : Effect.succeed(false),
-        ),
-      );
+  const externalWritePaused = Effect.fn("OpenPullRequest.externalWritePaused")(function* (
+    key: FleetClaimKey,
+  ) {
+    const held = yield* heartbeat.holds(key);
+    return held ? !(yield* heartbeat.canWriteExternally(key)) : false;
+  });
   const open = Effect.fn("OpenPullRequest.open")(function* (draft: PullRequestDraft) {
     const logged = yield* driver
       .execute({
@@ -353,7 +352,9 @@ const make = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const opener = yield* PullRequestOpener;
   const reader = yield* CiCheckReader;
-
+  const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+  const claims = yield* FleetClaims.FleetClaims;
+  const environment = yield* ServerEnvironment.ServerEnvironmentIdentity;
   const writeDetail = (
     issueNumber: number,
     current: string | null,
@@ -399,6 +400,25 @@ const make = Effect.gen(function* () {
         yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
         continue;
       }
+      const claimed = yield* claims
+        .claim(
+          {
+            sessionId: `pipeline:${repo.slug}:${run.issueNumber}`,
+            environmentId: yield* environment.getEnvironmentId,
+          },
+          {
+            repo: repo.slug,
+            issue: run.issueNumber,
+            taskId: "root",
+            idempotencyKey: `pipeline:${repo.slug}:${run.issueNumber}`,
+          },
+        )
+        .pipe(Effect.exit);
+      if (Exit.isFailure(claimed) || claimed.value.claim === null) {
+        yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
+        continue;
+      }
+      yield* heartbeat.observe(claimed.value.claim);
 
       let headSha = run.headSha;
       let status = run.status;
@@ -420,7 +440,7 @@ const make = Effect.gen(function* () {
             title: run.title,
             issueBody: issue.value.body,
             headSha,
-            claimKey: { repo: run.repository, issue: run.issueNumber, taskId: "root" },
+            claimKey: { repo: claimed.value.claim.repo, issue: run.issueNumber, taskId: "root" },
           })
           .pipe(Effect.exit);
         if (Exit.isFailure(opened)) {
@@ -509,7 +529,7 @@ export const layer = Layer.effect(OpenPullRequest, make);
 
 export const layerLive = layer.pipe(
   Layer.provide(layerOpener),
-  Layer.provide(FleetHeartbeat.layerUntracked),
+  Layer.provide(FleetHeartbeat.layer.pipe(Layer.provide(FleetClaimsTransport.layer))),
   Layer.provide(layerReader),
   Layer.provide(issuesLayer),
   Layer.provide(GitHubRest.layerWithDependencies),
@@ -519,6 +539,8 @@ export const layerLive = layer.pipe(
 export const layerWorker = Layer.effectDiscard(
   Effect.gen(function* () {
     const opening = yield* OpenPullRequest;
+    const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+    yield* forkParked(heartbeat.run);
     yield* forkParked(
       opening.tick.pipe(
         Effect.catchCause((cause) =>

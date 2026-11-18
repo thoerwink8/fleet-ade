@@ -72,7 +72,7 @@ export class FleetClaims extends Context.Service<
   }
 >()("t3/ledger/FleetClaims") {}
 
-const make = Effect.gen(function* () {
+const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
   const sql = yield* SqlClient.SqlClient;
   const environment = yield* ServerEnvironment.ServerEnvironmentIdentity;
   const fleetId = yield* environment.getEnvironmentId;
@@ -114,6 +114,10 @@ const make = Effect.gen(function* () {
       FROM node_claims
       WHERE repo = ${key.repo} AND issue = ${key.issue} AND task_id = ${key.taskId}
     `.pipe(Effect.mapError(storageError));
+  const isRevoked = (environmentId: string) =>
+    sql`SELECT 1 FROM fleet_revoked_environments WHERE environment_id = ${environmentId} LIMIT 1`.pipe(
+      Effect.mapError(storageError),
+    );
   const toClaim = (row: ClaimRow): FleetClaim => ({
     fleetId: row.fleet_id,
     repo: row.repo,
@@ -126,8 +130,7 @@ const make = Effect.gen(function* () {
     ...(row.holder_environment === null ? {} : { holderEnvironment: row.holder_environment }),
   });
   const sameEnvironment = (row: ClaimRow, caller: FleetCaller) =>
-    row.holder_environment === caller.environmentId ||
-    (row.holder_environment === null && row.claimed_by === caller.sessionId);
+    row.holder_environment === caller.environmentId;
   const itemResult = (
     item: {
       readonly repo: string;
@@ -151,8 +154,11 @@ const make = Effect.gen(function* () {
     caller: FleetCaller,
     input: FleetClaimClaimInput,
   ) {
+    if ((yield* isRevoked(caller.environmentId)).length > 0) {
+      return { outcome: "stale" as const, claim: null };
+    }
     const now = DateTime.toEpochMillis(yield* DateTime.now);
-    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + FLEET_LEASE_TTL_MS));
+    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + leaseTtlMs));
     const repo = yield* canonicalRepo(input.repo);
     const key = { ...input, repo };
     return yield* sql
@@ -220,8 +226,11 @@ const make = Effect.gen(function* () {
     caller: FleetCaller,
     input: FleetClaimLeaseInput,
   ) {
+    if ((yield* isRevoked(caller.environmentId)).length > 0) {
+      return { outcome: "stale" as const, claim: null };
+    }
     const now = DateTime.toEpochMillis(yield* DateTime.now);
-    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + FLEET_LEASE_TTL_MS));
+    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + leaseTtlMs));
     const repo = yield* canonicalRepo(input.repo);
     const key = { ...input, repo };
     return yield* sql
@@ -250,16 +259,12 @@ const make = Effect.gen(function* () {
               renew_idempotency_key = ${input.idempotencyKey}, renew_lease_until = ${leaseUntil}
             WHERE repo = ${repo} AND issue = ${input.issue} AND task_id = ${input.taskId}
               AND attempt = ${input.attempt} AND fencing = ${input.fencing} AND state = 'running'
-              AND (
-                holder_environment = ${caller.environmentId}
-                OR (holder_environment IS NULL AND claimed_by = ${caller.sessionId})
-              )
+              AND holder_environment = ${caller.environmentId}
           `;
           return {
             outcome: "renewed" as const,
             claim: toClaim({
               ...current,
-              holder_environment: current.holder_environment ?? caller.environmentId,
               lease_until: leaseUntil,
               renew_idempotency_key: input.idempotencyKey,
               renew_lease_until: leaseUntil,
@@ -274,6 +279,9 @@ const make = Effect.gen(function* () {
     caller: FleetCaller,
     input: FleetClaimLeaseInput,
   ) {
+    if ((yield* isRevoked(caller.environmentId)).length > 0) {
+      return { outcome: "stale" as const, claim: null };
+    }
     const repo = yield* canonicalRepo(input.repo);
     const key = { ...input, repo };
     return yield* sql
@@ -292,10 +300,7 @@ const make = Effect.gen(function* () {
             UPDATE node_claims SET state = 'released', release_idempotency_key = ${input.idempotencyKey}
             WHERE repo = ${repo} AND issue = ${input.issue} AND task_id = ${input.taskId}
               AND attempt = ${input.attempt} AND fencing = ${input.fencing} AND state = 'running'
-              AND (
-                holder_environment = ${caller.environmentId}
-                OR (holder_environment IS NULL AND claimed_by = ${caller.sessionId})
-              )
+              AND holder_environment = ${caller.environmentId}
           `;
           return { outcome: "released" as const, claim: null };
         }),
@@ -318,7 +323,7 @@ const make = Effect.gen(function* () {
     }
     const now = DateTime.toEpochMillis(yield* DateTime.now);
     const nowIso = DateTime.formatIso(DateTime.makeUnsafe(now));
-    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + FLEET_LEASE_TTL_MS));
+    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + leaseTtlMs));
     const canonical = yield* Effect.forEach(input.leases, (item) =>
       Effect.map(canonicalRepo(item.repo), (repo) => ({ ...item, repo })),
     );
@@ -403,15 +408,19 @@ const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.unwrap(
-  Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>
-    Layer.effect(FleetClaims, make).pipe(
+  Effect.map(ServerConfig.ServerConfig, ({ stateDir, fleetLeaseTtlMs }) =>
+    Layer.effect(FleetClaims, make(fleetLeaseTtlMs ?? FLEET_LEASE_TTL_MS)).pipe(
       Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),
     ),
   ),
 );
 
-export const layerForTest = (filename = ":memory:", fleetId = "coordinator") =>
-  Layer.effect(FleetClaims, make).pipe(
+export const layerForTest = (
+  filename = ":memory:",
+  fleetId = "coordinator",
+  fleetLeaseTtlMs = FLEET_LEASE_TTL_MS,
+) =>
+  Layer.effect(FleetClaims, make(fleetLeaseTtlMs)).pipe(
     Layer.provide(
       Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
         getEnvironmentId: Effect.succeed(EnvironmentId.make(fleetId)),
