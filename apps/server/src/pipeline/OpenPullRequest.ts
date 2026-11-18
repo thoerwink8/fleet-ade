@@ -1,4 +1,4 @@
-import { PipelineRunsError, ServerSettingsError } from "@t3tools/contracts";
+import { FleetClaimKey, PipelineRunsError, ServerSettingsError } from "@t3tools/contracts";
 import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -23,6 +23,7 @@ import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import { parseRepo } from "./repoAllowlist.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as FleetHeartbeat from "../ledger/FleetHeartbeat.ts";
 
 const BASE_BRANCH = "main";
 
@@ -135,6 +136,7 @@ export interface PullRequestDraft {
   /** 任务单原文。改动一节只从这里的「怎么算做完」取。 */
   readonly issueBody: string;
   readonly headSha: string;
+  readonly claimKey: FleetClaimKey;
 }
 
 /**
@@ -185,7 +187,17 @@ const makeOpener = Effect.gen(function* () {
   const registry = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-
+  const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
+  const externalWritePaused = (key: FleetClaimKey) =>
+    heartbeat
+      .holds(key)
+      .pipe(
+        Effect.flatMap((held) =>
+          held
+            ? heartbeat.canWriteExternally(key).pipe(Effect.map((allowed) => !allowed))
+            : Effect.succeed(false),
+        ),
+      );
   const open = Effect.fn("OpenPullRequest.open")(function* (draft: PullRequestDraft) {
     const logged = yield* driver
       .execute({
@@ -202,6 +214,9 @@ const makeOpener = Effect.gen(function* () {
       changes: acceptanceItems(draft.issueBody),
       verification: recordedChecks(logged.stdout.split("\u0000")),
     });
+    if (yield* externalWritePaused(draft.claimKey)) {
+      return yield* failOpen("lease is not confirmed");
+    }
     const pushedBranch = yield* git
       .runStackedAction({
         actionId: `pipeline-pr-${draft.branch}`,
@@ -242,6 +257,9 @@ const makeOpener = Effect.gen(function* () {
     const created = yield* Effect.gen(function* () {
       const bodyFile = path.join(directory, "body.md");
       yield* fileSystem.writeFileString(bodyFile, body);
+      if (yield* externalWritePaused(draft.claimKey)) {
+        return yield* failOpen("lease is not confirmed");
+      }
       yield* provider.createChangeRequest({
         cwd: draft.cwd,
         baseRefName: BASE_BRANCH,
@@ -402,6 +420,7 @@ const make = Effect.gen(function* () {
             title: run.title,
             issueBody: issue.value.body,
             headSha,
+            claimKey: { repo: run.repository, issue: run.issueNumber, taskId: "root" },
           })
           .pipe(Effect.exit);
         if (Exit.isFailure(opened)) {
@@ -490,6 +509,7 @@ export const layer = Layer.effect(OpenPullRequest, make);
 
 export const layerLive = layer.pipe(
   Layer.provide(layerOpener),
+  Layer.provide(FleetHeartbeat.layerUntracked),
   Layer.provide(layerReader),
   Layer.provide(issuesLayer),
   Layer.provide(GitHubRest.layerWithDependencies),

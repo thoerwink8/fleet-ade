@@ -96,6 +96,7 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.fleetClaimsClaim]: AuthAccessWriteScope,
   [WS_METHODS.fleetClaimsRenew]: AuthAccessWriteScope,
   [WS_METHODS.fleetClaimsRelease]: AuthAccessWriteScope,
+  [WS_METHODS.fleetClaimsHeartbeat]: AuthAccessWriteScope,
   [WS_METHODS.serverUpdateSettings]: AuthSettingsWriteScope,
   [WS_METHODS.serverSearchAcpRegistry]: AuthOrchestrationReadScope,
   [WS_METHODS.serverPrepareAcpRegistryAgent]: AuthProvidersManageScope,

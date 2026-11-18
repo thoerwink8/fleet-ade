@@ -19,6 +19,8 @@ import {
 import {
   FleetClaimClaimInput,
   FleetClaimClaimResult,
+  FleetClaimHeartbeatInput,
+  FleetClaimHeartbeatResult,
   FleetClaimLeaseInput,
   FleetClaimLeaseResult,
   FleetClaimsError,
@@ -537,6 +539,7 @@ export const WS_METHODS = {
   fleetClaimsClaim: "fleetClaims.claim",
   fleetClaimsRenew: "fleetClaims.renew",
   fleetClaimsRelease: "fleetClaims.release",
+  fleetClaimsHeartbeat: "fleetClaims.heartbeat",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverCheckSecretSource: "server.checkSecretSource",
@@ -900,6 +903,12 @@ const WsFleetClaimsRenewRpc = Rpc.make(WS_METHODS.fleetClaimsRenew, {
 const WsFleetClaimsReleaseRpc = Rpc.make(WS_METHODS.fleetClaimsRelease, {
   payload: FleetClaimLeaseInput,
   success: FleetClaimLeaseResult,
+  error: Schema.Union([FleetClaimsError, EnvironmentAuthorizationError]),
+});
+
+const WsFleetClaimsHeartbeatRpc = Rpc.make(WS_METHODS.fleetClaimsHeartbeat, {
+  payload: FleetClaimHeartbeatInput,
+  success: FleetClaimHeartbeatResult,
   error: Schema.Union([FleetClaimsError, EnvironmentAuthorizationError]),
 });
 
@@ -2193,6 +2202,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsFleetClaimsClaimRpc,
   WsFleetClaimsRenewRpc,
   WsFleetClaimsReleaseRpc,
+  WsFleetClaimsHeartbeatRpc,
   WsServerDiscoverSourceControlRpc,
   WsServerCheckSecretSourceRpc,
   WsServerSearchAcpRegistryRpc,

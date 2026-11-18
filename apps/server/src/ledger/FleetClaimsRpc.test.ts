@@ -2,13 +2,16 @@ import { NodeHttpServer } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
 import {
   FleetClaimClaimResult,
+  FleetClaimHeartbeatResult,
   FleetClaimLeaseResult,
   type FleetClaimClaimInput,
+  type FleetClaimHeartbeatInput,
   type FleetClaimLeaseInput,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
@@ -52,6 +55,18 @@ const release = (client: PeerMcpClient.PeerMcpClient["Service"], input: FleetCla
     success: FleetClaimLeaseResult,
   });
 
+const heartbeat = (
+  client: PeerMcpClient.PeerMcpClient["Service"],
+  input: FleetClaimHeartbeatInput,
+) =>
+  client.call({
+    environmentId: coordinator.environmentId,
+    tool: "fleet_heartbeat",
+    arguments: input,
+    limits,
+    success: FleetClaimHeartbeatResult,
+  });
+
 const claimInput = (repo: string, taskId: string, idempotencyKey: string) => ({
   repo,
   issue: 7,
@@ -78,6 +93,7 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
       const held = yield* claim(aClient, claimInput("example/one", "root", "a-root"));
       expect(held.outcome).toBe("claimed");
       expect(held.claim?.holder).not.toBe("node-a");
+      expect(held.claim?.holderEnvironment).toBe(nodeA.environmentId);
       expect((yield* claim(bClient, claimInput("example/one", "root", "b-root"))).outcome).toBe(
         "already-held",
       );
@@ -100,6 +116,41 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
         (yield* claim(bClient, claimInput("example/one", "root", "b-root-2"))).claim?.attempt,
       ).toBe(2);
 
+      const beat = yield* heartbeat(aClient, {
+        sequence: 1,
+        leases: [
+          {
+            repo: "example/one",
+            issue: 7,
+            taskId: "child-1",
+            attempt: child.claim!.attempt,
+            fencing: child.claim!.fencing,
+          },
+          {
+            repo: "example/one",
+            issue: 7,
+            taskId: "released-root",
+            attempt: 2,
+            fencing: "2",
+          },
+        ],
+      });
+      expect(beat.results.map((item) => item.outcome)).toEqual(["not-owned", "not-claimed"]);
+      const own = yield* heartbeat(bClient, {
+        sequence: 1,
+        leases: [
+          {
+            repo: "example/one",
+            issue: 7,
+            taskId: "child-1",
+            attempt: child.claim!.attempt,
+            fencing: child.claim!.fencing,
+          },
+        ],
+      });
+      expect(own.results[0]?.outcome).toBe("renewed");
+      expect(own.results[0]?.claim?.holderEnvironment).toBe(nodeB.environmentId);
+
       const revoked = (yield* peer.linkedSessions).find(
         (session) => session.client.label === "T3 Code · Node B",
       );
@@ -109,6 +160,41 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
         Effect.flip,
       );
       expect(denied.code).toBe("capability_denied");
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("协调者按服务端时钟判定过期租约的心跳", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const peer = yield* servePeer(
+        coordinator,
+        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
+      );
+      const aContext = yield* layerLinkingEnvironment(nodeA).pipe(Layer.build);
+      const aLinks = Context.get(aContext, PeerLinks.PeerLinks);
+      const aClient = Context.get(aContext, PeerMcpClient.PeerMcpClient);
+      yield* linkTo(aLinks, peer);
+
+      const held = yield* claim(aClient, claimInput("example/one", "root", "a-root"));
+      expect(held.outcome).toBe("claimed");
+      yield* TestClock.adjust("91 seconds");
+      const late = yield* heartbeat(aClient, {
+        sequence: 1,
+        leases: [
+          {
+            repo: "example/one",
+            issue: 7,
+            taskId: "root",
+            attempt: held.claim!.attempt,
+            fencing: held.claim!.fencing,
+          },
+        ],
+      });
+      expect(late.results[0]?.outcome).toBe("expired");
+      const taken = yield* claim(aClient, claimInput("example/one", "root", "a-root-2"));
+      expect(taken.outcome).toBe("claimed");
+      expect(taken.claim?.attempt).toBe(2);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

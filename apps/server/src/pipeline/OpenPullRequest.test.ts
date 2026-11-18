@@ -13,6 +13,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
+import * as FleetHeartbeat from "../ledger/FleetHeartbeat.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -570,6 +571,7 @@ const changeRequest = (number: number, headSha: string): ChangeRequest =>
     updatedAt: Option.none(),
   }) as ChangeRequest;
 
+const claimKey = { repo: "acme/widgets", issue: 6, taskId: "root" };
 const openerLayer = (input: {
   readonly listed: Effect.Effect<ReadonlyArray<ChangeRequest>>;
   readonly onCreate: (bodyFile: string) => Effect.Effect<void>;
@@ -577,6 +579,7 @@ const openerLayer = (input: {
   readonly created: Ref.Ref<ReadonlyArray<string>>;
   readonly pushed?: GitRunStackedActionResult;
   readonly subjects?: string;
+  readonly heartbeat?: Layer.Layer<FleetHeartbeat.FleetHeartbeat>;
 }) =>
   layerOpener.pipe(
     Layer.provide(
@@ -627,6 +630,7 @@ const openerLayer = (input: {
     ),
     Layer.provide(NodeFileSystem.layer),
     Layer.provide(NodePath.layer),
+    Layer.provide(input.heartbeat ?? FleetHeartbeat.layerUntracked),
   );
 
 describe("PullRequestOpener", () => {
@@ -642,6 +646,7 @@ describe("PullRequestOpener", () => {
           title: "fix tests",
           issueBody: issue(6).body,
           headSha: SHA,
+          claimKey,
         });
         assert.strictEqual(opened.number, 21);
         assert.strictEqual(opened.headSha, SHA);
@@ -682,6 +687,7 @@ describe("PullRequestOpener", () => {
           title: "fix tests",
           issueBody: issue(6).body,
           headSha: SHA,
+          claimKey,
         });
         assert.strictEqual(opened.number, 21);
         assert.deepStrictEqual(yield* Ref.get(created), []);
@@ -711,6 +717,7 @@ describe("PullRequestOpener", () => {
             title: "fix tests",
             issueBody: issue(6).body,
             headSha: SHA,
+            claimKey,
           })
           .pipe(Effect.flip);
         assert.strictEqual(error._tag, "PullRequestOpenError");
@@ -754,6 +761,7 @@ describe("PullRequestOpener", () => {
           title: "fix tests",
           issueBody,
           headSha: SHA,
+          claimKey,
         });
       }).pipe(
         Effect.provide(
@@ -785,6 +793,47 @@ describe("PullRequestOpener", () => {
           }),
         ),
       );
+    }),
+  );
+
+  it.effect("does not push while a held lease is unconfirmed", () =>
+    Effect.gen(function* () {
+      const actions = yield* Ref.make<ReadonlyArray<string>>([]);
+      const created = yield* Ref.make<ReadonlyArray<string>>([]);
+      const error = yield* Effect.gen(function* () {
+        const opener = yield* PullRequestOpener;
+        return yield* opener
+          .open({
+            cwd: "/wt/6",
+            branch: BRANCH,
+            title: "fix tests",
+            issueBody: issue(6).body,
+            headSha: SHA,
+            claimKey,
+          })
+          .pipe(Effect.flip);
+      }).pipe(
+        Effect.provide(
+          openerLayer({
+            actions,
+            created,
+            listed: Effect.succeed([]),
+            onCreate: () => Effect.die("should not create"),
+            heartbeat: Layer.succeed(FleetHeartbeat.FleetHeartbeat, {
+              observe: () => Effect.void,
+              beat: Effect.void,
+              retry: Effect.void,
+              run: Effect.void,
+              holds: () => Effect.succeed(true),
+              canWriteExternally: () => Effect.succeed(false),
+              confirmation: () => Effect.succeed("unconfirmed"),
+              outbound: Effect.succeed({ cycles: 0, retries: 0 }),
+            }),
+          }),
+        ),
+      );
+      assert.strictEqual(error.message, "lease is not confirmed");
+      assert.deepStrictEqual(yield* Ref.get(actions), []);
     }),
   );
 });

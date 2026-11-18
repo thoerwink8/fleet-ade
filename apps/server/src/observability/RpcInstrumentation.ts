@@ -237,6 +237,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.fleetClaimsClaim]: "peerLinks",
   [WS_METHODS.fleetClaimsRenew]: "peerLinks",
   [WS_METHODS.fleetClaimsRelease]: "peerLinks",
+  [WS_METHODS.fleetClaimsHeartbeat]: "peerLinks",
 } as const satisfies Readonly<Record<WsRpcMethod, string>>;
 
 const RPC_SPAN_PREFIX = "ws.rpc";

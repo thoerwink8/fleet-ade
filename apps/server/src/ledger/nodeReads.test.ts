@@ -447,12 +447,51 @@ it.effect("迁移旧 node_claims 去重并保留一条 repo issue task 租约", 
       readonly name: string;
       readonly pk: number;
     }[];
+    expect(columns.map((column) => column.name)).toContain("holder_environment");
     expect(
       columns
         .filter((column) => column.pk > 0)
         .toSorted((a, b) => a.pk - b.pk)
         .map((column) => column.name),
     ).toEqual(["repo", "issue", "task_id"]);
+    expect(
+      yield* sql`SELECT name FROM sqlite_master WHERE name = 'fleet_revoked_environments'`,
+    ).toEqual([{ name: "fleet_revoked_environments" }]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("迁移给同键新表补 holder_environment 列且不丢行", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`
+      CREATE TABLE node_claims (
+        fleet_id TEXT NOT NULL, repo TEXT NOT NULL, issue INTEGER NOT NULL, task_id TEXT NOT NULL,
+        claimed_by TEXT NOT NULL, lease_until TEXT NOT NULL, executor TEXT, state TEXT,
+        fencing TEXT, attempt INTEGER NOT NULL, claim_idempotency_key TEXT,
+        renew_idempotency_key TEXT, renew_lease_until TEXT, release_idempotency_key TEXT,
+        PRIMARY KEY (repo, issue, task_id)
+      )
+    `;
+    yield* sql`
+      INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, executor,
+        state, fencing, attempt)
+      VALUES ('fleet-b', 'example/one', 7, 'root', 'current', '2026-11-19T00:01:30.000Z', 'fleet',
+        'running', '2', 2)
+    `;
+    yield* NodeReads.migrate;
+    const rows = yield* sql`
+      SELECT repo, issue, task_id, claimed_by, attempt, holder_environment FROM node_claims
+    `;
+    expect(rows).toEqual([
+      {
+        repo: "example/one",
+        issue: 7,
+        task_id: "root",
+        claimed_by: "current",
+        attempt: 2,
+        holder_environment: null,
+      },
+    ]);
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );
 

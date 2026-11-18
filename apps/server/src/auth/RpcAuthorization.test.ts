@@ -51,6 +51,7 @@ describe("RPC authorization scopes", () => {
       WS_METHODS.fleetClaimsClaim,
       WS_METHODS.fleetClaimsRenew,
       WS_METHODS.fleetClaimsRelease,
+      WS_METHODS.fleetClaimsHeartbeat,
     ]) {
       expect(requiredScopeForRpcMethod(method)).toBe(AuthAccessWriteScope);
     }

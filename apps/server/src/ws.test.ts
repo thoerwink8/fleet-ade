@@ -174,6 +174,8 @@ const fleetClaimsStub = Layer.succeed(
     claim: () => Effect.succeed({ outcome: "claimed" as const, claim: null }),
     renew: () => Effect.succeed({ outcome: "renewed" as const, claim: null }),
     release: () => Effect.succeed({ outcome: "released" as const, claim: null }),
+    heartbeat: () => Effect.succeed({ sequence: 1, results: [] }),
+    revoke: () => Effect.void,
   }),
 );
 

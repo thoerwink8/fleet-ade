@@ -27,27 +27,64 @@ const handlers = {
   fleet_claim: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Fleet control RPCs require the linked environment identity.",
+        });
+      }
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
-        .claim(scope.client!.sessionId, input)
+        .claim({ sessionId: scope.client!.sessionId, environmentId }, input)
         .pipe(Effect.mapError(fromFleetClaimsError));
     }),
   ),
   fleet_renew: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Fleet control RPCs require the linked environment identity.",
+        });
+      }
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
-        .renew(scope.client!.sessionId, input)
+        .renew({ sessionId: scope.client!.sessionId, environmentId }, input)
         .pipe(Effect.mapError(fromFleetClaimsError));
     }),
   ),
   fleet_release: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Fleet control RPCs require the linked environment identity.",
+        });
+      }
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
-        .release(scope.client!.sessionId, input)
+        .release({ sessionId: scope.client!.sessionId, environmentId }, input)
+        .pipe(Effect.mapError(fromFleetClaimsError));
+    }),
+  ),
+  fleet_heartbeat: McpToolAccess.writesForLinkedClient((input) =>
+    Effect.gen(function* () {
+      const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Fleet control RPCs require the linked environment identity.",
+        });
+      }
+      const claims = yield* FleetClaims.FleetClaims;
+      return yield* claims
+        .heartbeat(environmentId, input)
         .pipe(Effect.mapError(fromFleetClaimsError));
     }),
   ),

@@ -143,6 +143,8 @@ const ClientIdPayload = Schema.Struct({
   r: Schema.Array(Schema.String),
   /** Registered as another T3 Code environment's peer link. */
   p: Schema.optionalKey(Schema.Literal(1)),
+  /** Peer link's environment, signed so a later call cannot swap it. */
+  e: Schema.optionalKey(Schema.String),
 });
 const decodeClientIdPayload = Schema.decodeUnknownOption(Schema.fromJsonString(ClientIdPayload));
 
@@ -151,6 +153,7 @@ export interface McpOAuthClient {
   readonly name: string;
   readonly redirectUris: ReadonlyArray<string>;
   readonly peerLink: boolean;
+  readonly environmentId?: string;
 }
 
 export class McpOAuthPageError extends Schema.TaggedError<McpOAuthPageError>()(
@@ -185,6 +188,7 @@ interface PendingCode {
   readonly clientId: string;
   readonly clientName: string;
   readonly peerLink: boolean;
+  readonly environmentId?: string;
   readonly redirectUri: string;
   readonly codeChallenge: string;
   readonly resource: string;
@@ -269,9 +273,20 @@ const make = Effect.gen(function* () {
 
   const sign = (domain: string, payload: string) => signer.sign(`${domain}.${payload}`);
 
-  const signClientId = (name: string, redirectUris: ReadonlyArray<string>, peerLink: boolean) => {
+  const signClientId = (
+    name: string,
+    redirectUris: ReadonlyArray<string>,
+    peerLink: boolean,
+    environmentId?: string,
+  ) => {
     const body = base64UrlEncode(
-      JSON.stringify({ v: 1, n: name, r: redirectUris, ...(peerLink ? { p: 1 } : {}) }),
+      JSON.stringify({
+        v: 1,
+        n: name,
+        r: redirectUris,
+        ...(peerLink ? { p: 1 } : {}),
+        ...(environmentId === undefined ? {} : { e: environmentId }),
+      }),
     );
     return sign("mcp-client-id", body).pipe(Effect.map((signature) => `${body}.${signature}`));
   };
@@ -293,6 +308,7 @@ const make = Effect.gen(function* () {
           name: payload.n,
           redirectUris: payload.r,
           peerLink: payload.p === 1,
+          ...(payload.p === 1 && payload.e !== undefined ? { environmentId: payload.e } : {}),
         })),
       ),
     );
@@ -347,11 +363,18 @@ const make = Effect.gen(function* () {
             "Linked environments is off on that machine. Turn it on in its Settings → Labs.",
         });
       }
+      const environmentId =
+        peerLink &&
+        metadata.t3_environment_id !== undefined &&
+        metadata.t3_environment_id.trim() !== ""
+          ? metadata.t3_environment_id.trim()
+          : undefined;
       return {
-        clientId: yield* signClientId(name, redirectUris, peerLink),
+        clientId: yield* signClientId(name, redirectUris, peerLink, environmentId),
         name,
         redirectUris,
         peerLink,
+        ...(environmentId === undefined ? {} : { environmentId }),
       };
     },
   );
@@ -436,6 +459,9 @@ const make = Effect.gen(function* () {
         clientId: authorization.client.clientId,
         clientName: authorization.client.name,
         peerLink: authorization.client.peerLink,
+        ...(authorization.client.environmentId === undefined
+          ? {}
+          : { environmentId: authorization.client.environmentId }),
         redirectUri: authorization.redirectUri,
         codeChallenge: authorization.codeChallenge,
         resource: authorization.resource,
@@ -546,6 +572,9 @@ const make = Effect.gen(function* () {
           label: pending.clientName,
           access: pending.access,
           peerLink: pending.peerLink,
+          ...(pending.environmentId === undefined
+            ? {}
+            : { peerEnvironmentId: pending.environmentId }),
           client: deriveAuthClientMetadata({ request }),
         })
         .pipe(
@@ -606,6 +635,9 @@ export const layerMcpClientAuthenticator = Layer.effect(
                     label: client.label,
                     access: client.access,
                     linked: client.peerLink,
+                    ...(client.environmentId === undefined
+                      ? {}
+                      : { environmentId: client.environmentId }),
                     ...(Option.isSome(hostedAppUrl) && !client.peerLink
                       ? { hostedAppUrl: hostedAppUrl.value }
                       : {}),
