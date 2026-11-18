@@ -395,12 +395,6 @@ function SegmentTriggers({
             style={paceMark.tick}
           />
         ) : null}
-        <span
-          aria-hidden
-          className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-md text-3xs leading-none font-semibold text-foreground/80 tabular-nums @2xl/pool:hidden"
-        >
-          {index}
-        </span>
         <div className="relative hidden h-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md px-2 text-xs @2xl/pool:flex">
           {showAccountName ? (
             <AccountName
@@ -434,19 +428,17 @@ function SegmentTriggers({
           ) : null}
         </div>
       </PopoverTrigger>
-      <LegendRow payload={payload} color={color} now={now} index={index} />
+      <LegendRow payload={payload} now={now} index={index} />
     </>
   );
 }
 
 function LegendRow({
   payload,
-  color,
   now,
   index,
 }: {
   readonly payload: SegmentPayload;
-  readonly color: string;
   readonly now: number;
   readonly index: number;
 }) {
@@ -463,15 +455,6 @@ function LegendRow({
       render={<Button variant="ghost" size="compact" />}
       className="min-w-0 @2xl/pool:hidden"
     >
-      <span className="relative inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-3xs leading-none font-semibold text-foreground/80 tabular-nums">
-        <span
-          aria-hidden
-          className="absolute inset-0 rounded-sm opacity-35"
-          style={{ backgroundColor: color }}
-        />
-        <span className="sr-only">分段 </span>
-        <span className="relative">{index}</span>
-      </span>
       <AccountName account={account} className="min-w-0 truncate font-medium text-foreground" />
       <span className="shrink-0 font-semibold text-foreground tabular-nums">{remaining}%</span>
       <span className="ms-auto flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground tabular-nums">

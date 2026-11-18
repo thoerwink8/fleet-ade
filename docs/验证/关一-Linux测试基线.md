@@ -167,4 +167,4 @@ server：
 
 ### 环境缺件，补上后通过
 
-`vercel-deployment-output.test.cjs` 里三条 marketing（plain URL、lockfile warning、trailing diagnostic）：脚本报 `jq: command not found`，退出码 127。装上 `jq` 1.7 后这三条和其余发布检查一起通过。
+`vercel-deployment-output.test.cjs` 里三条（plain URL、lockfile warning、trailing diagnostic）：脚本报 `jq: command not found`，退出码 127。装上 `jq` 1.7 后这三条和其余发布检查一起通过。
