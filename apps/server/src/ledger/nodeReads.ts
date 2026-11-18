@@ -61,16 +61,72 @@ export const migrate = Effect.gen(function* () {
       received_at TEXT NOT NULL
     )
   `;
-  yield* sql`
-    CREATE TABLE IF NOT EXISTS node_claims (
+  const claimColumns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
+    readonly name: string;
+    readonly pk: number;
+  }[];
+  const createFleetClaims = sql`
+    CREATE TABLE node_claims (
+      fleet_id TEXT NOT NULL DEFAULT 'legacy',
       repo TEXT NOT NULL,
       issue INTEGER NOT NULL,
+      task_id TEXT NOT NULL DEFAULT 'root',
       claimed_by TEXT NOT NULL,
       lease_until TEXT NOT NULL,
       executor TEXT,
       state TEXT,
-      fencing TEXT
+      fencing TEXT,
+      attempt INTEGER NOT NULL DEFAULT 1,
+      claim_idempotency_key TEXT,
+      renew_idempotency_key TEXT,
+      renew_lease_until TEXT,
+      release_idempotency_key TEXT,
+      PRIMARY KEY (fleet_id, repo, issue, task_id)
     )
+  `;
+  if (claimColumns.length === 0) {
+    yield* createFleetClaims;
+  } else {
+    const primaryKey = claimColumns
+      .filter((column) => column.pk > 0)
+      .toSorted((left, right) => left.pk - right.pk)
+      .map((column) => column.name);
+    const currentNames = new Set(claimColumns.map((column) => column.name));
+    const currentSchema =
+      primaryKey.join(",") === "fleet_id,repo,issue,task_id" &&
+      [
+        "attempt",
+        "claim_idempotency_key",
+        "renew_idempotency_key",
+        "renew_lease_until",
+        "release_idempotency_key",
+      ].every((column) => currentNames.has(column));
+    if (!currentSchema) {
+      const fleetId = currentNames.has("fleet_id") ? sql`fleet_id` : sql`'legacy'`;
+      const taskId = currentNames.has("task_id") ? sql`task_id` : sql`'root'`;
+      const attempt = currentNames.has("attempt") ? sql`attempt` : sql`1`;
+      const claimKey = currentNames.has("idempotency_key")
+        ? sql`idempotency_key`
+        : currentNames.has("claim_idempotency_key")
+          ? sql`claim_idempotency_key`
+          : sql`NULL`;
+      yield* sql`ALTER TABLE node_claims RENAME TO node_claims_before_fleet`;
+      yield* createFleetClaims;
+      yield* sql`
+        INSERT INTO node_claims (
+          fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing, attempt,
+          claim_idempotency_key
+        )
+        SELECT ${fleetId}, repo, issue, ${taskId}, claimed_by, lease_until, executor, state, fencing,
+          ${attempt}, ${claimKey}
+        FROM node_claims_before_fleet
+      `;
+      yield* sql`DROP TABLE node_claims_before_fleet`;
+    }
+  }
+  yield* sql`
+    CREATE INDEX IF NOT EXISTS idx_node_claims_holder
+    ON node_claims (fleet_id, claimed_by, state)
   `;
 });
 
@@ -270,6 +326,7 @@ const routes = (
       }>`
         SELECT repo, issue, claimed_by AS claimedBy, lease_until AS leaseUntil
         FROM node_claims
+        WHERE state = 'running'
       `.pipe(
         Effect.mapError(() =>
           reject(

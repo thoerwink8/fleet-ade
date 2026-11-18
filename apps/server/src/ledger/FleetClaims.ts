@@ -29,7 +29,11 @@ interface ClaimRow {
   readonly lease_until: string;
   readonly attempt: number;
   readonly fencing: string;
-  readonly idempotency_key: string | null;
+  readonly state: string | null;
+  readonly claim_idempotency_key: string | null;
+  readonly renew_idempotency_key: string | null;
+  readonly renew_lease_until: string | null;
+  readonly release_idempotency_key: string | null;
 }
 
 const isFleetClaimsError = Schema.is(FleetClaimsError);
@@ -54,17 +58,6 @@ const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const random = yield* SecureRandom.SecureRandom;
   yield* NodeReads.migrate;
-  const columns = yield* sql<{ readonly name: string }>`PRAGMA table_info(node_claims)`;
-  const columnNames = new Set(columns.map((column) => column.name));
-  if (!columnNames.has("fleet_id"))
-    yield* sql`ALTER TABLE node_claims ADD COLUMN fleet_id TEXT NOT NULL DEFAULT 'legacy'`;
-  if (!columnNames.has("task_id"))
-    yield* sql`ALTER TABLE node_claims ADD COLUMN task_id TEXT NOT NULL DEFAULT 'root'`;
-  if (!columnNames.has("attempt"))
-    yield* sql`ALTER TABLE node_claims ADD COLUMN attempt INTEGER NOT NULL DEFAULT 1`;
-  if (!columnNames.has("idempotency_key"))
-    yield* sql`ALTER TABLE node_claims ADD COLUMN idempotency_key TEXT`;
-  yield* sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_node_claims_fleet_key ON node_claims (fleet_id, repo, issue, task_id)`;
   const error = (cause: unknown) =>
     new FleetClaimsError({
       reason: "storage",
@@ -72,9 +65,12 @@ const make = Effect.gen(function* () {
       cause,
     });
   const read = (key: FleetClaimKey) =>
-    sql<ClaimRow>`SELECT fleet_id, repo, issue, task_id, claimed_by, lease_until, attempt, fencing, idempotency_key FROM node_claims WHERE fleet_id = ${key.fleetId} AND repo = ${key.repo} AND issue = ${key.issue} AND task_id = ${key.taskId}`.pipe(
-      Effect.mapError(error),
-    );
+    sql<ClaimRow>`
+      SELECT fleet_id, repo, issue, task_id, claimed_by, lease_until, attempt, fencing, state,
+        claim_idempotency_key, renew_idempotency_key, renew_lease_until,
+        release_idempotency_key FROM node_claims WHERE fleet_id = ${key.fleetId}
+        AND repo = ${key.repo} AND issue = ${key.issue} AND task_id = ${key.taskId}
+    `.pipe(Effect.mapError(error));
   const registered = (repo: string) => {
     const [owner, name] = repo.split("/");
     return sql`SELECT 1 FROM repos WHERE owner = ${owner} AND name = ${name} LIMIT 1`.pipe(
@@ -95,10 +91,6 @@ const make = Effect.gen(function* () {
   const claim = Effect.fn("FleetClaims.claim")(function* (input: FleetClaimClaimInput) {
     const now = DateTime.toEpochMillis(yield* DateTime.now);
     const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + LEASE_MS));
-    const fence = yield* random.randomBytes(16).pipe(
-      Effect.map((bytes) => Buffer.from(bytes).toString("hex")),
-      Effect.mapError(error),
-    );
     return yield* sql
       .withTransaction(
         Effect.gen(function* () {
@@ -109,30 +101,58 @@ const make = Effect.gen(function* () {
             });
           }
           const current = (yield* read(input))[0];
-          if (current !== undefined && Date.parse(current.lease_until) > now) {
-            if (
-              current.claimed_by === input.holder &&
-              current.idempotency_key === input.idempotencyKey
-            ) {
-              return { outcome: "claimed" as const, claim: toClaim(current) };
-            }
+          if (
+            current !== undefined &&
+            current.claimed_by === input.holder &&
+            current.claim_idempotency_key === input.idempotencyKey
+          ) {
+            return { outcome: "claimed" as const, claim: toClaim(current) };
+          }
+          if (
+            current !== undefined &&
+            current.state === "running" &&
+            Date.parse(current.lease_until) > now
+          ) {
             return { outcome: "already-held" as const, claim: null };
           }
           const attempt = (current?.attempt ?? 0) + 1;
-          yield* sql`INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing, attempt, idempotency_key) VALUES (${input.fleetId}, ${input.repo}, ${input.issue}, ${input.taskId}, ${input.holder}, ${leaseUntil}, 'fleet', 'running', ${fence}, ${attempt}, ${input.idempotencyKey}) ON CONFLICT(fleet_id, repo, issue, task_id) DO UPDATE SET claimed_by = excluded.claimed_by, lease_until = excluded.lease_until, executor = excluded.executor, state = excluded.state, fencing = excluded.fencing, attempt = excluded.attempt, idempotency_key = excluded.idempotency_key`;
+          const fence = yield* random.randomBytes(16).pipe(
+            Effect.map((bytes) => Buffer.from(bytes).toString("hex")),
+            Effect.mapError(error),
+          );
+          yield* sql`
+          INSERT INTO node_claims (
+            fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing,
+            attempt, claim_idempotency_key, renew_idempotency_key, renew_lease_until,
+            release_idempotency_key
+          ) VALUES (
+            ${input.fleetId}, ${input.repo}, ${input.issue}, ${input.taskId}, ${input.holder},
+            ${leaseUntil}, 'fleet', 'running', ${fence}, ${attempt}, ${input.idempotencyKey},
+            NULL, NULL, NULL
+          ) ON CONFLICT(fleet_id, repo, issue, task_id) DO UPDATE SET
+            claimed_by = excluded.claimed_by,
+            lease_until = excluded.lease_until,
+            executor = excluded.executor,
+            state = excluded.state,
+            fencing = excluded.fencing,
+            attempt = excluded.attempt,
+            claim_idempotency_key = excluded.claim_idempotency_key,
+            renew_idempotency_key = NULL,
+            renew_lease_until = NULL,
+            release_idempotency_key = NULL
+        `;
           return {
             outcome: "claimed" as const,
-            claim: toClaim({
-              fleet_id: input.fleetId,
+            claim: {
+              fleetId: input.fleetId,
               repo: input.repo,
               issue: input.issue,
-              task_id: input.taskId,
-              claimed_by: input.holder,
-              lease_until: leaseUntil,
+              taskId: input.taskId,
+              holder: input.holder,
               attempt,
               fencing: fence,
-              idempotency_key: input.idempotencyKey,
-            }),
+              leaseUntil,
+            },
           };
         }),
       )
@@ -145,19 +165,39 @@ const make = Effect.gen(function* () {
       .withTransaction(
         Effect.gen(function* () {
           const current = (yield* read(input))[0];
+          const matches =
+            current !== undefined &&
+            current.claimed_by === input.holder &&
+            current.attempt === input.attempt &&
+            current.fencing === input.fencing;
           if (
-            current === undefined ||
-            current.claimed_by !== input.holder ||
-            current.attempt !== input.attempt ||
-            current.fencing !== input.fencing ||
-            Date.parse(current.lease_until) <= now
+            matches &&
+            current.renew_idempotency_key === input.idempotencyKey &&
+            current.renew_lease_until !== null
           ) {
+            return {
+              outcome: "renewed" as const,
+              claim: toClaim({ ...current, lease_until: current.renew_lease_until }),
+            };
+          }
+          if (!matches || current.state !== "running" || Date.parse(current.lease_until) <= now) {
             return { outcome: "stale" as const, claim: null };
           }
-          yield* sql`UPDATE node_claims SET lease_until = ${leaseUntil} WHERE fleet_id = ${input.fleetId} AND repo = ${input.repo} AND issue = ${input.issue} AND task_id = ${input.taskId} AND attempt = ${input.attempt} AND fencing = ${input.fencing}`;
+          yield* sql`
+          UPDATE node_claims SET lease_until = ${leaseUntil},
+            renew_idempotency_key = ${input.idempotencyKey}, renew_lease_until = ${leaseUntil}
+          WHERE fleet_id = ${input.fleetId} AND repo = ${input.repo} AND issue = ${input.issue}
+            AND task_id = ${input.taskId} AND claimed_by = ${input.holder}
+            AND attempt = ${input.attempt} AND fencing = ${input.fencing} AND state = 'running'
+        `;
           return {
             outcome: "renewed" as const,
-            claim: toClaim({ ...current, lease_until: leaseUntil }),
+            claim: toClaim({
+              ...current,
+              lease_until: leaseUntil,
+              renew_idempotency_key: input.idempotencyKey,
+              renew_lease_until: leaseUntil,
+            }),
           };
         }),
       )
@@ -168,15 +208,23 @@ const make = Effect.gen(function* () {
       .withTransaction(
         Effect.gen(function* () {
           const current = (yield* read(input))[0];
-          if (
-            current === undefined ||
-            current.claimed_by !== input.holder ||
-            current.attempt !== input.attempt ||
-            current.fencing !== input.fencing
-          ) {
+          const matches =
+            current !== undefined &&
+            current.claimed_by === input.holder &&
+            current.attempt === input.attempt &&
+            current.fencing === input.fencing;
+          if (matches && current.release_idempotency_key === input.idempotencyKey) {
+            return { outcome: "released" as const, claim: null };
+          }
+          if (!matches || current.state !== "running") {
             return { outcome: "stale" as const, claim: null };
           }
-          yield* sql`DELETE FROM node_claims WHERE fleet_id = ${input.fleetId} AND repo = ${input.repo} AND issue = ${input.issue} AND task_id = ${input.taskId} AND attempt = ${input.attempt} AND fencing = ${input.fencing}`;
+          yield* sql`
+          UPDATE node_claims SET state = 'released', release_idempotency_key = ${input.idempotencyKey}
+          WHERE fleet_id = ${input.fleetId} AND repo = ${input.repo} AND issue = ${input.issue}
+            AND task_id = ${input.taskId} AND claimed_by = ${input.holder}
+            AND attempt = ${input.attempt} AND fencing = ${input.fencing} AND state = 'running'
+        `;
           return { outcome: "released" as const, claim: null };
         }),
       )

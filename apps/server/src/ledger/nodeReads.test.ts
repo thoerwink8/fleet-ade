@@ -429,3 +429,61 @@ it.effect("有效但没有 orchestration:read 的凭证读三个口是 403", () 
     }),
   ),
 );
+
+it.effect("把旧 node_claims 迁移到机群复合主键且保留数据", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`
+      CREATE TABLE node_claims (
+        repo TEXT NOT NULL,
+        issue INTEGER NOT NULL,
+        claimed_by TEXT NOT NULL,
+        lease_until TEXT NOT NULL,
+        executor TEXT,
+        state TEXT,
+        fencing TEXT
+      )
+    `;
+    yield* sql`
+      INSERT INTO node_claims (repo, issue, claimed_by, lease_until, executor, state, fencing)
+      VALUES ('example/one', 7, 'pipeline', '2026-11-19T00:00:00.000Z', 'local', 'running', 'fence')
+    `;
+
+    yield* NodeReads.migrate;
+
+    const columns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
+      readonly name: string;
+      readonly pk: number;
+    }[];
+    expect(
+      columns
+        .filter((column) => column.pk > 0)
+        .toSorted((left, right) => left.pk - right.pk)
+        .map((column) => column.name),
+    ).toEqual(["fleet_id", "repo", "issue", "task_id"]);
+    expect(
+      yield* sql`
+        SELECT fleet_id, repo, issue, task_id, claimed_by, attempt, fencing FROM node_claims
+      `,
+    ).toEqual([
+      {
+        fleet_id: "legacy",
+        repo: "example/one",
+        issue: 7,
+        task_id: "root",
+        claimed_by: "pipeline",
+        attempt: 1,
+        fencing: "fence",
+      },
+    ]);
+    yield* sql`
+      INSERT INTO node_claims (
+        fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing, attempt
+      ) VALUES (
+        'fleet-a', 'example/one', 7, 'child-1', 'node-a', '2026-11-19T00:01:30.000Z',
+        'fleet', 'running', 'fence-2', 1
+      )
+    `;
+    expect((yield* sql`SELECT task_id FROM node_claims ORDER BY task_id`).length).toBe(2);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
