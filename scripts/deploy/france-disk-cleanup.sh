@@ -30,15 +30,15 @@ cleanup_pipeline_worktrees() {
   git -C "${repo_root}" -c safe.directory="${repo_root}" worktree list --porcelain | awk '/^worktree / {print substr($0, 10)}' \
     | while IFS= read -r worktree; do
       [[ -n "${worktree}" ]] || continue
-      branch=$(git -C "${worktree}" branch --show-current 2>/dev/null || true)
+      branch=$(git -C "${worktree}" -c safe.directory="${repo_root}" branch --show-current 2>/dev/null || true)
       pr_json=$(sudo -u ade env PATH="${ADE_HOME}/.local/bin:${ADE_HOME}/.local/node/bin:/usr/bin:/bin" \
         gh pr list --repo thoerwink8/fleet-ade --state all --head "${branch}" --json state --limit 1 2>/dev/null || true)
       if printf '%s' "${pr_json}" | grep -Eq '"state":"(MERGED|CLOSED)"'; then
         echo "Removing closed pipeline worktree ${worktree} (${branch})..."
-        git -C "${repo_root}" worktree remove --force "${worktree}"
+        git -C "${repo_root}" -c safe.directory="${repo_root}" worktree remove --force "${worktree}"
       fi
     done
-  git -C "${repo_root}" worktree prune
+  git -C "${repo_root}" -c safe.directory="${repo_root}" worktree prune
 }
 
 cleanup_old_tmp() {
