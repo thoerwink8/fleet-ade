@@ -702,7 +702,7 @@ export function makeProviderSettingsSchema<const Fields extends Schema.Struct.Fi
 const CONTEXT_THRESHOLD_PERCENT = /^(?:|[1-9]\d?|100)$/;
 
 /** Empty means half the model window. Each provider form shows the same control. */
-export function contextThresholdPercentSetting() {
+function contextThresholdPercentSetting() {
   return TrimmedString.check(Schema.isPattern(CONTEXT_THRESHOLD_PERCENT)).pipe(
     Schema.withDecodingDefault(Effect.succeed("")),
     Schema.annotateKey({
@@ -1738,9 +1738,7 @@ export const providerInstanceConfigEnabledFlag = (config: unknown): boolean | un
 
 // Must match each driver's enabled decoding default.
 const DEFAULT_DISABLED_PROVIDER_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set(
-  ["cursor", "grok", "fx", "kiro", "muse", "pi", "opencode", "antigravity"].map((driver) =>
-    ProviderDriverKind.make(driver),
-  ),
+  ["grok", "antigravity"].map((driver) => ProviderDriverKind.make(driver)),
 );
 
 const DEFAULT_ENABLED_DEFAULT_INSTANCES: ReadonlySet<ProviderInstanceId> = new Set(

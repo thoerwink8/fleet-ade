@@ -8,11 +8,7 @@ const LOCAL_PROVIDER_LABEL: Readonly<Record<UsageProviderKind, string>> = {
   claude: "Claude",
   codex: "Codex",
   grok: "Grok",
-  cursor: "Cursor",
-  opencode: "OpenCode",
   antigravity: "Antigravity",
-  pi: "Pi",
-  muse: "Muse",
 };
 
 function formatCount(value: number): string {

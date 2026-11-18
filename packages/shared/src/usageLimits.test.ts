@@ -10,8 +10,6 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   type LimitAccount,
-  displayLimitWindows,
-  cursorUsageWindowDetails,
   collectProviderUsageLimits,
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
@@ -126,60 +124,10 @@ describe("new thread model fallback", () => {
     ).toBeDefined();
   });
   it.each([
-    ["cursor", ["autoPercentUsed"], "claude-opus-5-5", false, undefined, undefined],
-    ["cursor", ["autoPercentUsed"], "composer-2.5", false, undefined, undefined],
-    ["cursor", ["autoPercentUsed", "apiPercentUsed"], "composer-2.5", true, undefined, undefined],
     ["antigravity", ["gemini-weekly"], "claude-opus-5-5", false, undefined, undefined],
     ["antigravity", ["3p-weekly"], "claude-opus-5-5", true, undefined, undefined],
     ["antigravity", ["gemini-weekly"], "antigravity-default", true, undefined, undefined],
     ["codex", ["individual"], "gpt-5.5", true, undefined, undefined],
-    ["opencode", ["go_weekly"], "opencode/big-pickle", false, undefined, undefined],
-    ["opencode", ["go_weekly"], "opencode-go/big-pickle", true, undefined, undefined],
-    ["opencode", ["budget_model"], "opencode/other", false, ["opencode/limited"], undefined],
-    ["opencode", ["budget_model"], "opencode/limited", true, ["opencode/limited"], undefined],
-    [
-      "opencode",
-      ["budget_set"],
-      "other/model",
-      false,
-      ["opencode/limited", "opencode/second"],
-      undefined,
-    ],
-    [
-      "opencode",
-      ["budget_set"],
-      "opencode/second",
-      true,
-      ["opencode/limited", "opencode/second"],
-      undefined,
-    ],
-    ["opencode", ["budget_empty"], "opencode/other", false, [], undefined],
-    [
-      "opencode",
-      ["budget_all"],
-      "anthropic/claude",
-      false,
-      undefined,
-      ["opencode", "console-custom"],
-    ],
-    [
-      "opencode",
-      ["budget_all"],
-      "opencode-go/model",
-      false,
-      undefined,
-      ["opencode", "console-custom"],
-    ],
-    ["opencode", ["budget_all"], "opencode/model", true, undefined, ["opencode", "console-custom"]],
-    [
-      "opencode",
-      ["budget_all"],
-      "console-custom/model",
-      true,
-      undefined,
-      ["opencode", "console-custom"],
-    ],
-    ["opencode", ["budget_all"], "opencode/model", false, undefined, []],
   ] as const)(
     "matches %s pools %s to %s",
     (driver, ids, model, usesFallback, modelIds, providerIds) => {
@@ -1056,47 +1004,6 @@ describe("pooled account columns", () => {
       row.columns.map((member) => (member.window ? member.account.key : null)),
     );
 
-  it.each([
-    {
-      reports: [
-        [14, 14],
-        [14, 14],
-      ],
-      ids: ["autoPercentUsed"],
-      remaining: [86],
-      label: null,
-    },
-    {
-      reports: [
-        [14, 14],
-        [80, 70],
-      ],
-      ids: ["totalPercentUsed", "autoPercentUsed"],
-      remaining: [53, 58],
-      label: "Cursor Models",
-    },
-    {
-      reports: [[undefined, 14]],
-      ids: ["autoPercentUsed"],
-      remaining: [86],
-      label: "Cursor Models",
-    },
-    { reports: [[14, undefined]], ids: ["totalPercentUsed"], remaining: [86], label: null },
-  ])("preserves Cursor totals and scope for $reports", ({ reports, ids, remaining, label }) => {
-    const accounts = reports.map(([total, auto], index) => ({
-      ...account(String(index), [
-        ...(total === undefined ? [] : [{ ...weekly, id: "totalPercentUsed", usedPercent: total }]),
-        ...(auto === undefined ? [] : [{ ...weekly, id: "autoPercentUsed", usedPercent: auto }]),
-      ]),
-      driver: ProviderDriverKind.make("cursor"),
-    }));
-    const pool = collectLimitPools(accounts, now)[0]!;
-    const visible = displayLimitWindows(pool);
-    expect(visible.map((window) => window.id)).toEqual(ids);
-    expect(visible.map((window) => window.remainingPercent)).toEqual(remaining);
-    expect(cursorUsageWindowDetails(ids.at(-1)!, pool)?.label).toBe(label);
-  });
-
   // regression: #20349 sessions stay visible while the weekly quota is exhausted
   it.each([
     ["claudeAgent", "13:00", 40, "14:00", 100],
@@ -1146,12 +1053,10 @@ describe("pooled account columns", () => {
         { ...weekly, usedPercent: 99 },
         { ...weekly, id: "seven_day_fable", usedPercent: 40 },
       ]),
-      { ...blocked, key: "cursor", driver: ProviderDriverKind.make("cursor") },
     ];
     const snapshot = structuredClone(accounts);
-    const [claude, cursor] = collectLimitPools(accounts, now);
+    const [claude] = collectLimitPools(accounts, now);
     expect.soft(claude?.windows.map((row) => row.remainingPercent)).toEqual([40, 1, 70]);
-    expect.soft(cursor?.windows.map((row) => row.remainingPercent)).toEqual([60, 0, 80]);
     expect(accounts).toEqual(snapshot);
   });
 

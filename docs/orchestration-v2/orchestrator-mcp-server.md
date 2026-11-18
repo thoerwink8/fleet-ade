@@ -97,15 +97,6 @@ Claude receives an HTTP MCP server in its query options:
 The adapter logs only whether MCP configuration exists; it does not log the
 server headers or token.
 
-### Cursor Agent SDK V2
-
-Cursor receives the same authenticated HTTP MCP endpoint through the SDK's
-`mcpServers` on `Agent.create` / `Agent.resume` and each `send`. With
-`@cursor/sdk` 1.0.39+, send-level servers replace only the create-time inline
-set; ambient servers from `settingSources` (`project`, `user`, `team`, `mdm`,
-`plugins`) stay available. The adapter passes the authorization header to the
-SDK but projects only redacted option metadata into protocol diagnostics.
-
 ### Grok ACP V2
 
 Grok receives the authenticated HTTP MCP endpoint through the ACP
@@ -148,49 +139,13 @@ forking uses portable context when native `session/fork` is unavailable, and
 subagents use orchestrator-owned child threads. Registry agents do not receive
 provider-specific extensions; those remain in flavors such as Grok.
 
-### Pi V2
-
-T3 keeps a provider-session HTTP bridge even when Pi supports native MCP.
-`mcp.json` entries override native registrations, and native MCP's default
-60-second request timeout can interrupt long-running T3 tools. The bridge owns
-the injected endpoint and credential and forwards Pi's cancellation signal.
-
-When a provider session credential exists, the adapter writes a T3-owned
-extension into the server cache and spawns
-`pi --mode rpc --extension <cache>/pi-t3-mcp-extension.ts` with:
-
-```text
-T3_MCP_URL=http://127.0.0.1:<port>/mcp
-T3_MCP_BEARER_TOKEN=<provider-session-token>
-```
-
-The extension preserves public names under `mcp__t3-code__` for saved loadouts
-and tool selectors. Modern Pi also receives hidden `mcp__t3_code__` aliases,
-which reserve the normalized namespace against configured MCP servers without
-adding declarations or search results. On Pi 0.99+,
-`orchestrator_capabilities`, `delegate_task`, and `task_status` remain directly
-available; optional tools are discovered through Pi's builtin `tool_search`.
-On older Pi or without builtin search, all tools remain directly available.
-The bridge calls the original MCP tool name over HTTP. Follow-up requests send
-`mcp-protocol-version: 2025-06-18`; Effect's MCP transport returns 400
-without it. The first turn of a session also receives the shared T3
-orchestration instructions.
-
-Pi keeps ownership of native extension discovery. T3 does not replace Pi's
-`subagent` tool or reproduce Pi's package and project-trust loader. Durable
-delegation goes through the namespaced T3 MCP `delegate_task` tool and the
-shared orchestration child-thread lifecycle. When Pi's example `subagent`
-extension is installed, the adapter observes its documented `details.results`
-shape and projects task cards with no child thread id. Unknown result shapes
-remain ordinary dynamic tool output.
-
 ### Provider Support
 
 A provider instance can run child tasks when its live `ProviderInstance`
 exposes a V2 `orchestrationAdapter` — the same registration the orchestrator
 resolves when a `delegated_task.request` executes. That covers Codex, Claude
-Agent SDK, Cursor Agent SDK, Grok, generic registry agents over ACP, OpenCode,
-OpenCode 2, Pi, Antigravity, and any future driver that builds an adapter.
+Agent SDK, Grok, generic registry agents over ACP, Antigravity, and any
+future driver that builds an adapter.
 Capability discovery still reports other registered provider instances, but
 marks them unavailable for orchestration when no adapter resolves. This keeps
 provider selection model-visible without allowing a request that cannot run.

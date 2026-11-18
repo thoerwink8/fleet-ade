@@ -57,11 +57,11 @@ const CONFIG = {
 
 const PRICING = { status: "unavailable" as const, source: "test", fetchedAt: null, knownModels: 0 };
 
-const cursorSource = (refreshing: boolean): UsageSource => ({
+const antigravitySource = (refreshing: boolean): UsageSource => ({
   fingerprint: {
-    hostId: "cursor.com",
-    provider: "cursor",
-    resolvedHomePath: "cursor-account:abc",
+    hostId: "antigravity.example",
+    provider: "antigravity",
+    resolvedHomePath: "antigravity-account:abc",
     volumeId: "abc",
   },
   status: "ok",
@@ -235,7 +235,7 @@ const makeRefreshingHarness = Effect.fn("ServerUsageTest.makeRefreshingHarness")
     // The saved answer differs from the plain one, so a test can tell which was kept.
     (input) => [
       {
-        ...cursorSource(input.awaitRefresh !== true),
+        ...antigravitySource(input.awaitRefresh !== true),
         ...(input.provisional === true ? { scannedFiles: 0 } : {}),
       },
     ],
@@ -295,7 +295,7 @@ it.effect("keeps the cached usage summary when the awaited refresh fails", () =>
     const summary = harness.summary();
     const unmount = harness.registry.mount(summary);
     expect((yield* settledSummary(harness.registry, summary)).sources).toEqual([
-      cursorSource(true),
+      antigravitySource(true),
     ]);
     expect(AsyncResult.isSuccess(harness.registry.get(summary))).toBe(true);
     // The saved answer is followed by a plain read before the one that waits for Cursor.

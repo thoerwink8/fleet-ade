@@ -116,14 +116,8 @@ export type CustomModelSetting = typeof CustomModelSetting.Type;
 
 const CODEX_DRIVER_KIND = ProviderDriverKind.make("codex");
 const CLAUDE_DRIVER_KIND = ProviderDriverKind.make("claudeAgent");
-const CURSOR_DRIVER_KIND = ProviderDriverKind.make("cursor");
 const GROK_DRIVER_KIND = ProviderDriverKind.make("grok");
-const FX_DRIVER_KIND = ProviderDriverKind.make("fx");
-const KIRO_DRIVER_KIND = ProviderDriverKind.make("kiro");
-const MUSE_DRIVER_KIND = ProviderDriverKind.make("muse");
-const PI_DRIVER_KIND = ProviderDriverKind.make("pi");
 const ACP_REGISTRY_DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
-const OPENCODE_DRIVER_KIND = ProviderDriverKind.make("opencode");
 
 export const DEFAULT_MODEL = "gpt-6-astra";
 
@@ -138,23 +132,12 @@ export const DEFAULT_TEXT_GENERATION_MODEL = "gpt-6-luna";
 export const ANTIGRAVITY_DEFAULT_MODEL = "antigravity-default";
 export const DEFAULT_TEXT_GENERATION_REASONING_EFFORT = "low";
 
-/** Let Muse pick the account's default model. Never send this ID to Muse. */
-export const MUSE_DEFAULT_MODEL = "default";
-
 export const DEFAULT_MODEL_BY_PROVIDER: Partial<Record<ProviderDriverKind, string>> = {
   [CODEX_DRIVER_KIND]: DEFAULT_MODEL,
   [CLAUDE_DRIVER_KIND]: "claude-opus-5-5",
-  [CURSOR_DRIVER_KIND]: "auto",
   // Product slug meaning the current session model, never an ACP model id.
   [GROK_DRIVER_KIND]: "grok-build",
-  [FX_DRIVER_KIND]: "default",
-  // Keeps the Kiro session's current model; real models come from its `model` config option.
-  [KIRO_DRIVER_KIND]: "default",
-  [MUSE_DRIVER_KIND]: MUSE_DEFAULT_MODEL,
   [ACP_REGISTRY_DRIVER_KIND]: "default",
-  // "default" defers to the user's own Pi settings.json model selection.
-  [PI_DRIVER_KIND]: "default",
-  [OPENCODE_DRIVER_KIND]: "openai/gpt-5",
   [ProviderDriverKind.make("antigravity")]: ANTIGRAVITY_DEFAULT_MODEL,
 };
 
@@ -164,8 +147,6 @@ export const DEFAULT_TEXT_GENERATION_MODEL_BY_PROVIDER: Partial<
   [CODEX_DRIVER_KIND]: DEFAULT_TEXT_GENERATION_MODEL,
   [ProviderDriverKind.make("antigravity")]: ANTIGRAVITY_DEFAULT_MODEL,
   [CLAUDE_DRIVER_KIND]: "claude-haiku-5-5",
-  [CURSOR_DRIVER_KIND]: "composer-2",
-  [OPENCODE_DRIVER_KIND]: "opencode/big-pickle",
 };
 
 export const MODEL_SLUG_ALIASES_BY_PROVIDER: Partial<
@@ -180,30 +161,22 @@ export const MODEL_SLUG_ALIASES_BY_PROVIDER: Partial<
     "gpt-5.3-spark": "gpt-5.3-codex-spark",
   },
   [CLAUDE_DRIVER_KIND]: {},
-  [CURSOR_DRIVER_KIND]: {
-    composer: "composer-2",
-    "composer-1.5": "composer-1.5",
-    "composer-1": "composer-1.5",
-    "opus-4.6-thinking": "claude-opus-4-6",
-    "opus-4.6": "claude-opus-4-6",
-    "sonnet-4.6-thinking": "claude-sonnet-4-6",
-    "sonnet-4.6": "claude-sonnet-4-6",
-    "opus-4.5-thinking": "claude-opus-4-5",
-    "opus-4.5": "claude-opus-4-5",
-  },
-  [OPENCODE_DRIVER_KIND]: {},
 };
 
+/**
+ * Names for drivers this build runs, plus drivers removed from it. Stored threads and settings
+ * still name the removed ones; callers show the name and treat the driver as unsupported.
+ */
 export const PROVIDER_DISPLAY_NAMES: Partial<Record<ProviderDriverKind, string>> = {
   [ProviderDriverKind.make("antigravity")]: "Antigravity",
   [CODEX_DRIVER_KIND]: "Codex",
   [CLAUDE_DRIVER_KIND]: "Claude",
-  [CURSOR_DRIVER_KIND]: "Cursor",
+  [ProviderDriverKind.make("cursor")]: "Cursor",
   [GROK_DRIVER_KIND]: "Grok",
-  [FX_DRIVER_KIND]: "fx",
-  [KIRO_DRIVER_KIND]: "Kiro",
-  [MUSE_DRIVER_KIND]: "Muse Code",
+  [ProviderDriverKind.make("fx")]: "fx",
+  [ProviderDriverKind.make("kiro")]: "Kiro",
+  [ProviderDriverKind.make("muse")]: "Muse Code",
   [ACP_REGISTRY_DRIVER_KIND]: "ACP Registry",
-  [PI_DRIVER_KIND]: "Pi",
-  [OPENCODE_DRIVER_KIND]: "OpenCode",
+  [ProviderDriverKind.make("pi")]: "Pi",
+  [ProviderDriverKind.make("opencode")]: "OpenCode",
 };

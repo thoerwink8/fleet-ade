@@ -42,11 +42,6 @@ export function exhaustedUsageWindow(
   );
   if (model === undefined) return exhausted[0];
   switch (provider?.driver) {
-    case "cursor": {
-      const api = exhausted.find((window) => window.id === "apiPercentUsed");
-      const auto = exhausted.find((window) => window.id === "autoPercentUsed");
-      return /^(auto|default|grok|composer)/.test(model) ? auto && api : api;
-    }
     case "antigravity": {
       const family = model.match(/^(gemini|claude|gpt)-/)?.[1];
       return exhausted.find((window) => {
@@ -66,10 +61,6 @@ export function exhaustedUsageWindow(
       );
       return exhausted.find((window) => window.id !== "individual" || !hasPlanWindows);
     }
-    case "opencode":
-      return exhausted.find(
-        (window) => !window.id.startsWith("go_") || model.startsWith("opencode-go/"),
-      );
     default:
       return exhausted[0];
   }
@@ -121,37 +112,6 @@ export const CHATGPT_WORKSPACE_USAGE_LIMIT_CODE =
 
 export function usesChatGptSharing(provider: ServerProvider | null | undefined): boolean {
   return provider?.auth.status === "authenticated" && provider.auth.subscriptionSharing === true;
-}
-
-export const CURSOR_USAGE_WINDOWS = [
-  {
-    id: "totalPercentUsed",
-    label: "Overall",
-    description: "All usage on your plan this billing cycle.",
-  },
-  {
-    id: "autoPercentUsed",
-    label: "Cursor Models",
-    description: "Grok, Composer, and Auto use this allowance.",
-  },
-  {
-    id: "apiPercentUsed",
-    label: "Other Models",
-    description: "Usage allowance for third-party models such as Claude, GPT, and Gemini.",
-  },
-] as const;
-
-export function cursorUsageWindowDetails(id: string, pool: LimitPool) {
-  const details = CURSOR_USAGE_WINDOWS.find((window) => window.id === id);
-  return details &&
-    ((pool.windows.length === 1 && id === "totalPercentUsed") || hasDuplicateCursorTotal(pool))
-    ? { ...details, label: null, description: undefined }
-    : details;
-}
-
-function cursorUsageWindowRank(id: string): number {
-  const rank = CURSOR_USAGE_WINDOWS.findIndex((window) => window.id === id);
-  return rank < 0 ? CURSOR_USAGE_WINDOWS.length : rank;
 }
 
 function providersWithLimits(providers: readonly ServerProvider[]): readonly ServerProvider[] {
@@ -455,26 +415,6 @@ export interface LimitPool {
   readonly windows: readonly LimitPoolWindow[];
 }
 
-function hasDuplicateCursorTotal(pool: LimitPool): boolean {
-  if (pool.windows.length !== 2) return false;
-  const total = pool.windows.find((window) => window.id === "totalPercentUsed");
-  const auto = pool.windows.find((window) => window.id === "autoPercentUsed");
-  return (
-    total !== undefined &&
-    auto !== undefined &&
-    total.members.length === auto.members.length &&
-    total.members.every(({ account, window }) =>
-      account.limits.windows.some(
-        (candidate) =>
-          candidate.id === auto.id &&
-          candidate.kind === auto.kind &&
-          candidate.usedPercent === window.usedPercent &&
-          candidate.resetsAt === window.resetsAt,
-      ),
-    )
-  );
-}
-
 export function displayLimitWindows(pool: LimitPool) {
   if (pool.driver === "antigravity") {
     return [...pool.windows].sort(
@@ -486,13 +426,7 @@ export function displayLimitWindows(pool: LimitPool) {
         WINDOW_KIND_ORDER[left.kind] - WINDOW_KIND_ORDER[right.kind],
     );
   }
-  if (pool.driver !== "cursor") return pool.windows;
-  const hasAuto = pool.windows.some((window) => window.id === "autoPercentUsed");
-  const hasApi = pool.windows.some((window) => window.id === "apiPercentUsed");
-  const hideTotal = (hasAuto && hasApi) || hasDuplicateCursorTotal(pool);
-  return pool.windows
-    .filter((window) => !hideTotal || window.id !== "totalPercentUsed")
-    .sort((left, right) => cursorUsageWindowRank(left.id) - cursorUsageWindowRank(right.id));
+  return pool.windows;
 }
 
 const WINDOW_KIND_ORDER: Record<ServerProviderUsageWindow["kind"], number> = {

@@ -61,16 +61,9 @@ export function isModelSelectionProviderEnabled(
   return isUnconfiguredDefaultInstanceEnabled(selection.instanceId);
 }
 
-const TEXT_GENERATION_FALLBACK_DRIVERS = [
-  "codex",
-  "claudeAgent",
-  "cursor",
-  "grok",
-  "muse",
-  "pi",
-  "opencode",
-  "antigravity",
-].map((driver) => ProviderDriverKind.make(driver));
+const TEXT_GENERATION_FALLBACK_DRIVERS = ["codex", "claudeAgent", "grok", "antigravity"].map(
+  (driver) => ProviderDriverKind.make(driver),
+);
 
 /** Configured instances come after every default instance, so they only win when no default qualifies. */
 export function fallbackTextGenerationModelSelection(

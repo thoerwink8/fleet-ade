@@ -145,15 +145,9 @@ runtime, adapter normalization, orchestration, persistence, and projections rema
 The generic ACP Registry harness retargets protocol-standard ACP transcripts;
 provider-extension transcripts remain scoped to the flavor that owns the extension.
 
-OpenCode fixtures replace the SDK client at its HTTP/SSE boundary. They must preserve races between
-request responses and SSE events, because user messages and terminal `session.status` events can
-arrive before the corresponding `promptAsync` or `abort` response. Subagent fixtures must retain
-both parent and child session ids so root-only terminal behavior remains testable.
-
 Provider transcript recorders live with the server orchestration testkit, not with provider client
 packages. Use `bun run record:codex-replay -- --scenario <name>` for Codex app-server transcripts
-and `bun run record:claude-replay -- --scenario <name>` for Claude Agent SDK transcripts. Use
-`pnpm --filter t3 record:cursor-replay --scenario <name>` for Cursor Agent SDK transcripts.
+and `bun run record:claude-replay -- --scenario <name>` for Claude Agent SDK transcripts.
 
 ## Contract Test Levels
 

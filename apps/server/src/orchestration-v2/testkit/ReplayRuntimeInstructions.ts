@@ -7,17 +7,11 @@ export function materializeReplayTranscriptRuntimeInstructions(
   runtime: { readonly driver: ProviderDriverKind; readonly model: string },
 ): ProviderReplayTranscript {
   const harness =
-    runtime.driver === "cursor"
-      ? "Cursor"
-      : runtime.driver === "grok"
-        ? "Grok"
-        : runtime.driver === "kiro"
-          ? "Kiro"
-          : runtime.driver === "acpRegistry"
-            ? "acpRegistry"
-            : runtime.driver === "fx"
-              ? "fx"
-              : undefined;
+    runtime.driver === "grok"
+      ? "Grok"
+      : runtime.driver === "acpRegistry"
+        ? "acpRegistry"
+        : undefined;
   if (harness === undefined) return transcript;
   const instructions = buildRuntimeInstructions({ harness, model: runtime.model });
   // The notes name the model, so each prompt expects the ones for its session's current model.
@@ -55,7 +49,6 @@ export function materializeReplayTranscriptRuntimeInstructions(
         readonly compactionsAtSend: number;
       }
     | undefined;
-  let pendingKiroCompact: { readonly sessionId: unknown } | undefined;
 
   return {
     ...transcript,
@@ -85,17 +78,6 @@ export function materializeReplayTranscriptRuntimeInstructions(
           }
           pendingPrompt = undefined;
         }
-        if (
-          frame?.kind === "response" &&
-          frame.method === "_kiro/session/compact" &&
-          pendingKiroCompact
-        ) {
-          // Kiro's adapter accepts only `{ success: true }`.
-          if (isRecord(frame.result) && frame.result.success === true) {
-            markCompacted(pendingKiroCompact.sessionId);
-          }
-          pendingKiroCompact = undefined;
-        }
         const update =
           frame?.method === "session/update" && isRecord(frame.params)
             ? frame.params.update
@@ -120,17 +102,6 @@ export function materializeReplayTranscriptRuntimeInstructions(
       const frame = entry.frame;
       if (typeof frame !== "object" || frame === null) return entry;
       if (
-        runtime.driver === "cursor" &&
-        "type" in frame &&
-        frame.type === "run.start" &&
-        "message" in frame &&
-        typeof frame.message === "string"
-      ) {
-        return frame.message.endsWith(instructions)
-          ? entry
-          : { ...entry, frame: { ...frame, message: `${frame.message}\n\n${instructions}` } };
-      }
-      if (
         "method" in frame &&
         (frame.method === "session/close" || frame.method === "initialize")
       ) {
@@ -139,7 +110,6 @@ export function materializeReplayTranscriptRuntimeInstructions(
         completedCompactionIds.clear();
         openCompactions.clear();
         pendingPrompt = undefined;
-        pendingKiroCompact = undefined;
         return entry;
       }
       const params = "params" in frame && isRecord(frame.params) ? frame.params : undefined;
@@ -153,18 +123,6 @@ export function materializeReplayTranscriptRuntimeInstructions(
             : undefined;
       if (typeof selectedModel === "string") {
         sessionModels.set(params?.sessionId, selectedModel);
-        return entry;
-      }
-      if (
-        "method" in frame &&
-        frame.method === "_kiro/session/compact" &&
-        "params" in frame &&
-        typeof frame.params === "object" &&
-        frame.params !== null &&
-        "sessionId" in frame.params
-      ) {
-        // Once it succeeds, Kiro's native compaction makes the next prompt resend them.
-        pendingKiroCompact = { sessionId: frame.params.sessionId };
         return entry;
       }
       if (

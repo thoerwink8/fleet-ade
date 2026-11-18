@@ -190,14 +190,6 @@ describe("scan cache round trip", () => {
           },
         }),
       });
-      original.set("/gone-pi.jsonl", {
-        ...original.get("/gone.jsonl")!,
-        size: 256,
-        provider: "pi",
-        records: [record({ provider: "pi", model: "anthropic/claude-fable-5" })],
-        malformedRecords: 3,
-        position: position({ state: { sessionId: "session-a" } }),
-      });
       const cleanCodex = {
         ...original.get("/gone-codex.jsonl")!,
         malformedRecords: 0,
@@ -244,15 +236,6 @@ describe("scan cache round trip", () => {
         size: -1,
         position: { resumeOffset: 0, guardLength: 0, guardHash: 0, state: null },
       });
-      expect(restored.get("/gone-pi.jsonl")).toEqual(
-        version >= 6
-          ? original.get("/gone-pi.jsonl")
-          : {
-              ...original.get("/gone-pi.jsonl"),
-              size: -1,
-              position: { resumeOffset: 0, guardLength: 0, guardHash: 0, state: null },
-            },
-      );
     },
   );
 
