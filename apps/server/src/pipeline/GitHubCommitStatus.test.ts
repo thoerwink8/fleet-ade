@@ -32,6 +32,37 @@ interface Seen {
   readonly path: string;
   readonly request: unknown;
   readonly status: number;
+  /** 回包可覆盖，用来造回执对不上的情形。 */
+  readonly receipt?: { readonly url?: string };
+}
+
+/**
+ * GitHub「创建提交状态」的真实回包：sha 只在 url 末段（…/statuses/<sha>），没有 sha 字段。
+ * 夹具照这个写，按不存在的字段核对会在这里红。
+ */
+function receiptOf(input: GitHubRest.GitHubRestInput, row: Seen): string {
+  const request = row.request as
+    | { readonly state?: string; readonly description?: string }
+    | undefined;
+  return JSON.stringify({
+    url: row.receipt?.url ?? `https://api.github.com/${input.path}`,
+    avatar_url: "https://avatars.githubusercontent.com/in/1?v=4",
+    id: 18764329190,
+    node_id: "SC_kwDOJ1mq2M8AAAAEPi9aJg",
+    state: request?.state ?? "failure",
+    description: request?.description ?? null,
+    target_url: null,
+    context: COLD_VERIFY_CONTEXT,
+    created_at: "2026-11-18T03:12:41Z",
+    updated_at: "2026-11-18T03:12:41Z",
+    creator: {
+      login: "fleet-ade[bot]",
+      id: 1234567,
+      node_id: "BOT_kgDOBAkADw",
+      type: "Bot",
+      site_admin: false,
+    },
+  });
 }
 
 /** 替换现成 GitHubRest，不发网络。登录仍由它走 GitHubCredentials，这里只看写状态拿到的 sha 和失败怎么回。 */
@@ -44,16 +75,10 @@ function restOf(answer: (input: GitHubRest.GitHubRestInput) => Effect.Effect<See
         Effect.gen(function* () {
           const row = yield* answer(input);
           seen.push(row);
-          const request = row.request as { readonly state?: string } | undefined;
           return {
             status: row.status,
             headers: {},
-            body: JSON.stringify({
-              sha: input.path.split("/").at(-1),
-              state: request?.state ?? "failure",
-              context: COLD_VERIFY_CONTEXT,
-              description: null,
-            }),
+            body: receiptOf(input, row),
             truncated: false,
             invalidUtf8: false,
           };
@@ -115,6 +140,30 @@ describe("GitHubCommitStatus", () => {
       expect(error._tag).toBe("CommitStatusWriteError");
       expect(error.sha).toBe(SHA);
       expect(error.reason).toBe("GitHub 回了 HTTP 500");
+      expect(error.reason).not.toMatch(/已通过|已验|success/);
+    }),
+  );
+
+  it.effect("回执 url 末段是别的 sha 时判没写上，不拿「回包能解出来」冒充写对了", () =>
+    Effect.gen(function* () {
+      const outcome = judgeColdVerify(blocking);
+      const { layer } = restOf((input) =>
+        Effect.succeed({
+          path: input.path,
+          request: input.body,
+          status: 201,
+          receipt: {
+            url: `https://api.github.com/repos/thoerwink8/fleet-ade/statuses/${OTHER_SHA}`,
+          },
+        }),
+      );
+
+      const error = yield* GitHubCommitStatus.use((status) =>
+        status.writeColdVerify(target, outcome),
+      ).pipe(Effect.provide(layer), Effect.flip);
+
+      expect(error._tag).toBe("CommitStatusWriteError");
+      expect(error.reason).toContain("sha");
       expect(error.reason).not.toMatch(/已通过|已验|success/);
     }),
   );

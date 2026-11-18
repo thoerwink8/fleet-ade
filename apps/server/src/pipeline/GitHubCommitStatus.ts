@@ -49,14 +49,20 @@ export interface CommitStatusTarget {
   readonly sha: string;
 }
 
+/** GitHub「创建提交状态」的回包字段。它不返回 sha，提交挂在 url 末段（…/statuses/<sha>）。 */
 const StatusReceipt = Schema.Struct({
-  sha: Schema.String,
+  url: Schema.String,
   state: CommitStatusState,
   context: Schema.String,
   description: Schema.NullOr(Schema.String),
 });
 
 const decodeReceipt = Schema.decodeUnknownOption(Schema.fromJsonString(StatusReceipt));
+
+const receiptSha = (url: string): string | undefined => {
+  const segment = url.split("/").at(-1);
+  return segment !== undefined && SHA.test(segment) ? segment : undefined;
+};
 
 function fit(text: string): string {
   const chars = [...text.replace(/\s+/g, " ").trim()];
@@ -163,7 +169,7 @@ const make = Effect.gen(function* () {
       Option.isNone(receipt) ||
       receipt.value.context !== COLD_VERIFY_CONTEXT ||
       receipt.value.state !== planned.state ||
-      receipt.value.sha !== target.sha
+      receiptSha(receipt.value.url) !== target.sha
     ) {
       return yield* fail("回执对不上这次要写的 sha、上下文或状态");
     }
