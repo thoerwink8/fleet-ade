@@ -269,13 +269,24 @@ describe("ColdVerifySession", () => {
             'thoerwink8/fleet-ade', 8, '单 8', 'verify', ${SHA}, ${NOW}
           )
         `;
+          yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, head_sha, updated_at, detail, stuck_reason
+          ) VALUES (
+            'thoerwink8/fleet-ade', 7, '单 7', 'stuck', ${SHA}, ${NOW}, '第 1 轮仍没验成', '冷验收不过'
+          )
+        `;
           yield* (yield* ColdVerifySession).tick;
           const listed = (yield* runs.list).runs;
           const plain = listed.find((run) => run.issueNumber === 8);
+          const legacy = listed.find((run) => run.issueNumber === 7);
           const supervised = listed.find((run) => run.issueNumber === 9);
           const opened = yield* Ref.get(handles.opened);
           assert.strictEqual(plain?.status, "verify");
           assert.strictEqual(plain?.detail, null);
+          assert.strictEqual(legacy?.status, "stuck");
+          assert.strictEqual(legacy?.stuckReason, "冷验收不过");
+          assert.strictEqual(legacy?.detail, "第 1 轮仍没验成");
           assert.strictEqual(opened.length, 1);
           assert.strictEqual(opened[0]?.text.includes("任务 #9"), true);
           assert.strictEqual(

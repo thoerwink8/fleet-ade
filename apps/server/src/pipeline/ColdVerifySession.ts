@@ -333,10 +333,12 @@ const make = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
 
   const verifyRuns = Effect.fn("ColdVerifySession.verifyRuns")(function* () {
+    const current = yield* settings.getSettings;
     for (const run of (yield* runs.list).runs) {
       const legacy = LEGACY_INCONCLUSIVE.exec(run.detail ?? "");
       const round = legacy === null ? 0 : Number(legacy[1]);
       if (
+        shouldAdvancePipelineRun(current.pipelineEnabled, run) &&
         run.status === "stuck" &&
         run.stuckReason === STUCK_COLD_VERIFY &&
         run.headSha !== null &&
