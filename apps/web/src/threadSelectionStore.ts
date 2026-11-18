@@ -12,7 +12,6 @@ interface ThreadSelectionStore extends ThreadSelectionState {
   rangeSelectTo: (threadKey: string, orderedThreadKeys: readonly string[]) => void;
   clearSelection: () => void;
   removeFromSelection: (threadKeys: readonly string[]) => void;
-  clearAnchor: () => void;
   replaceSelection: (threadKeys: readonly string[]) => void;
   setAnchor: (threadKey: string) => void;
   hasSelection: () => boolean;
@@ -85,10 +84,6 @@ export const useThreadSelectionStore = create<ThreadSelectionStore>((set, get) =
     set({ selectedThreadKeys: EMPTY_SET, anchorThreadKey: null });
   },
 
-  clearAnchor: () => {
-    if (get().anchorThreadKey === null) return;
-    set({ anchorThreadKey: null });
-  },
   replaceSelection: (threadKeys) => {
     set({
       selectedThreadKeys: threadKeys.length === 0 ? EMPTY_SET : new Set(threadKeys),
@@ -103,7 +98,13 @@ export const useThreadSelectionStore = create<ThreadSelectionStore>((set, get) =
     ) {
       return;
     }
-    set({ visibleThreadKeys: threadKeys });
+    // A range anchor that left the visible list (filtered out, deleted) cannot anchor
+    // a shift-range; derive its validity here instead of watching order changes.
+    const anchorThreadKey =
+      get().anchorThreadKey !== null && !threadKeys.includes(get().anchorThreadKey!)
+        ? null
+        : get().anchorThreadKey;
+    set({ visibleThreadKeys: threadKeys, anchorThreadKey });
   },
 
   setAnchor: (threadKey) => {

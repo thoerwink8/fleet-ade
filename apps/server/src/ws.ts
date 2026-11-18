@@ -1770,6 +1770,7 @@ export const layerWsRpc = (
           threadLinkMetadata: true,
           shellOlderSettled: true,
           threadResumeCompletionMarker: true,
+          threadBatchCommands: true,
           threadSnapshotPagination: true,
           threadFind: true,
           threadFindProgressive: true,

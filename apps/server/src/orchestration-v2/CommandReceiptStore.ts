@@ -1,4 +1,10 @@
-import { CommandId, NonNegativeInt, ProjectId, ThreadId } from "@t3tools/contracts";
+import {
+  CommandId,
+  NonNegativeInt,
+  OrchestrationV2BatchThreadResult,
+  ProjectId,
+  ThreadId,
+} from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -48,6 +54,8 @@ export const CommandReceiptV2 = Schema.Struct({
   resultSequence: NonNegativeInt,
   status: CommandReceiptV2Status,
   error: Schema.NullOr(Schema.String),
+  /** The batch command's recorded per-item outcome; replays return it verbatim. */
+  batch: Schema.optional(OrchestrationV2BatchThreadResult),
 });
 export type CommandReceiptV2 = typeof CommandReceiptV2.Type;
 
@@ -99,6 +107,10 @@ const decodeProjectReceipt = Schema.decodeUnknownEffect(
   })),
 );
 
+const decodeReceiptResult = Schema.decodeUnknownSync(
+  Schema.fromJsonString(OrchestrationV2BatchThreadResult),
+);
+
 function fromApplicationReceipt(receipt: OrchestrationCommandReceipts.OrchestrationCommandReceipt) {
   return decodeReceipt({
     commandId: receipt.commandId,
@@ -108,6 +120,7 @@ function fromApplicationReceipt(receipt: OrchestrationCommandReceipts.Orchestrat
     resultSequence: receipt.resultSequence,
     status: receipt.status,
     error: receipt.error,
+    ...(receipt.result === null ? {} : { batch: decodeReceiptResult(receipt.result) }),
   });
 }
 
@@ -124,6 +137,8 @@ function toApplicationReceipt(
     resultSequence: receipt.resultSequence,
     status: receipt.status,
     error: receipt.error,
+    result:
+      "batch" in receipt && receipt.batch !== undefined ? JSON.stringify(receipt.batch) : null,
   };
 }
 

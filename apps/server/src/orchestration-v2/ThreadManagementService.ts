@@ -111,7 +111,12 @@ function existingThreadIdsForCommand(
     case "thread.mark-unread":
       return [];
     case "thread.batch":
-      return command.threadIds;
+      // Deletes read each thread's imported transcript when they decide `onlyIfUnused`;
+      // archives and unread marks act on the shell and runs alone, so per-thread
+      // hydration there would pay for history the command never reads.
+      return command.operation === "delete" && command.onlyIfUnused === true
+        ? command.threadIds
+        : [];
     case "thread.fork":
       return [command.sourceThreadId];
     case "thread.merge_back":

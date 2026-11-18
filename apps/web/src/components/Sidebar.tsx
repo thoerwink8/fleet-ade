@@ -931,6 +931,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     reorderActiveThread,
     markThreadUnread,
     archiveThread,
+    markThreadsUnread,
+    deleteThreads,
     deleteThread,
   } = useThreadActions();
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -1816,7 +1818,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   };
   const dndSensors = useSensors(useSensor(SidebarPointerSensor, pointerSensorOptions));
   const sectionByThreadKeyRef = useRef(sectionByThreadKey);
-  const previousVisibleOrderRef = useRef<string | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- publishes committed list data to refs read by stable drag and sweep callbacks
   useLayoutEffect(() => {
     projectGroupsRef.current = projectGroups;
@@ -1825,11 +1826,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     settledThreadKeysRef.current = settledThreadKeys;
     snoozedThreadKeysRef.current = snoozedThreadKeys;
     sectionByThreadKeyRef.current = sectionByThreadKey;
-    const nextOrder = orderedThreadKeys.join("\n");
-    if (previousVisibleOrderRef.current !== null && previousVisibleOrderRef.current !== nextOrder) {
-      useThreadSelectionStore.getState().clearAnchor();
-    }
-    previousVisibleOrderRef.current = nextOrder;
     useThreadSelectionStore.getState().setVisibleThreadKeys(orderedThreadKeys);
   });
   const startActionSweep = useStableCallback(
@@ -2509,14 +2505,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         useThreadSelectionStore.getState().replaceSelection(orderedThreadKeysRef.current);
         return;
       }
-      if (clicked.value === "mark-unread") {
-        for (const threadKey of threadKeys) {
-          const thread = threadByKeyRef.current.get(threadKey);
-          if (thread) markThreadUnread(scopeThreadRef(thread.environmentId, thread.id));
-        }
-        clearSelection();
-        return;
-      }
       const batchTargets = threadKeys.flatMap((threadKey) => {
         const thread = threadByKeyRef.current.get(threadKey);
         return thread
@@ -2530,7 +2518,21 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             ]
           : [];
       });
-      const finishBatch = async (operation: "archive" | "unarchive" | "delete") => {
+      if (clicked.value === "mark-unread") {
+        const failures = await markThreadsUnread(batchTargets);
+        if (failures.length > 0) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: "有会话未能标为未读",
+              description: failures.join("\n"),
+            }),
+          );
+        }
+        clearSelection();
+        return;
+      }
+      const finishBatch = async (operation: "archive" | "unarchive") => {
         const { prunedKeys, failures } = await applyThreadBatch({
           threads: batchTargets,
           dispatch: (group) =>
@@ -2543,7 +2545,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: operation === "delete" ? "有会话未能删除" : "有会话未处理",
+              title: "有会话未处理",
               description: failures.join("\n"),
             }),
           );
@@ -2576,10 +2578,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         )
       )
         return;
-      await finishBatch("delete");
+      const { deletedKeys, failures } = await deleteThreads(batchTargets);
+      if (failures.length > 0) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "有会话未能删除",
+            description: failures.join("\n"),
+          }),
+        );
+      }
+      removeFromSelection([...deletedKeys]);
     },
   );
-
   const handleDraftContextMenu = useStableCallback(
     (draftId: DraftId, position: { x: number; y: number }) => {
       void (async () => {

@@ -3186,7 +3186,7 @@ export const OrchestrationV2Command = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("thread.batch"),
     commandId: CommandId,
-    operation: Schema.Literals(["archive", "unarchive", "delete"]),
+    operation: Schema.Literals(["archive", "unarchive", "delete", "mark-unread"]),
     threadIds: Schema.Array(ThreadId).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
     /** Delete only threads with no runs and no messages. */
     onlyIfUnused: Schema.optional(Schema.Boolean),
@@ -3876,7 +3876,7 @@ export const OrchestrationV2BatchThreadItemResult = Schema.Struct({
 });
 export type OrchestrationV2BatchThreadItemResult = typeof OrchestrationV2BatchThreadItemResult.Type;
 export const OrchestrationV2BatchThreadResult = Schema.Struct({
-  operation: Schema.Literals(["archive", "unarchive", "delete"]),
+  operation: Schema.Literals(["archive", "unarchive", "delete", "mark-unread"]),
   items: Schema.Array(OrchestrationV2BatchThreadItemResult),
   appliedCount: NonNegativeInt,
   rejectedCount: NonNegativeInt,

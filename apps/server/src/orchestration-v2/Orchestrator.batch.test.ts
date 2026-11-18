@@ -60,6 +60,23 @@ const createThread = Effect.fn("test.batch.createThread")(function* (name: strin
   return threadId;
 });
 
+const queueRun = Effect.fn("test.batch.queueRun")(function* (threadId: ThreadId, name: string) {
+  const orchestrator = yield* Orchestrator.OrchestratorV2;
+  yield* orchestrator.dispatch({
+    type: "message.dispatch",
+    commandId: CommandId.make(`queue-${name}`),
+    threadId,
+    messageId: MessageId.make(`queue-${name}`),
+    text: "Still queued",
+    attachments: [],
+    dispatchMode: { type: "defer_start" },
+    createdBy: "user",
+    creationSource: "web",
+  });
+  const projections = yield* ProjectionStore.ProjectionStoreV2;
+  return (yield* projections.getThreadProjection(threadId)).runs.at(-1)!;
+});
+
 it.effect("one batch reports each thread and does not fail the rest", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
@@ -95,6 +112,8 @@ it.effect("one batch reports each thread and does not fail the rest", () =>
       threadIds: [live, already, missing, live],
     });
     assert.equal(replay.replayed, true);
+    // The retry sees the same per-item outcome the first answer reported.
+    assert.deepEqual(replay.batch, first.batch);
     assert.deepEqual((yield* projections.getThread(live)).archivedAt, archivedAt);
 
     const restored = yield* orchestrator.dispatch({
@@ -112,23 +131,93 @@ it.effect("one batch reports each thread and does not fail the rest", () =>
   }).pipe(Effect.provide(layerTest)),
 );
 
+it.effect("batch archive enqueues one cleanup effect set per archived thread", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const first = yield* createThread("batch-archive-fx-a");
+    const second = yield* createThread("batch-archive-fx-b");
+    const commandId = CommandId.make("batch-archive-fx");
+    yield* orchestrator.dispatch({
+      type: "thread.batch",
+      commandId,
+      operation: "archive",
+      threadIds: [first, second],
+    });
+    const effects = yield* outbox.listByCommandId(commandId);
+    const terminalCleanups = effects.filter((effect) => effect.request.type === "terminal.cleanup");
+    assert.deepEqual(
+      terminalCleanups.map((effect) => effect.threadId).toSorted(),
+      [first, second].toSorted(),
+    );
+    // Effect ids collide under `ON CONFLICT DO NOTHING`; each row must name its thread.
+    assert.equal(new Set(effects.map((effect) => effect.id)).size, effects.length);
+    for (const effect of effects) {
+      assert.include(effect.id, String(effect.threadId));
+    }
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("batch archive refuses a thread with a queued run", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const queued = yield* createThread("batch-archive-queued");
+    const idle = yield* createThread("batch-archive-idle");
+    yield* queueRun(queued, "archive-queued");
+    const result = yield* orchestrator.dispatch({
+      type: "thread.batch",
+      commandId: CommandId.make("batch-archive-running"),
+      operation: "archive",
+      threadIds: [queued, idle],
+    });
+    assert.deepEqual(
+      result.batch?.items.map((item) => item.status),
+      ["running", "applied"],
+    );
+    assert.equal(result.batch?.rejectedCount, 1);
+    assert.isNull((yield* projections.getThread(queued)).archivedAt);
+    assert.isNotNull((yield* projections.getThread(idle)).archivedAt);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("batch mark-unread rewinds only threads with a completed run", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const unreadable = yield* createThread("batch-unread-empty");
+    const read = yield* createThread("batch-unread-ok");
+    const run = yield* queueRun(read, "unread-ok");
+    yield* orchestrator.dispatch({
+      type: "run.interrupt",
+      commandId: CommandId.make("unread-ok-interrupt"),
+      threadId: read,
+      runId: run.id,
+    });
+    const completedAt = (yield* projections.getThreadProjection(read)).runs.at(-1)?.completedAt;
+    assert.ok(completedAt);
+    const result = yield* orchestrator.dispatch({
+      type: "thread.batch",
+      commandId: CommandId.make("batch-mark-unread"),
+      operation: "mark-unread",
+      threadIds: [unreadable, read],
+    });
+    assert.deepEqual(
+      result.batch?.items.map((item) => item.status),
+      ["rejected", "applied"],
+    );
+    assert.ok((yield* projections.getThread(read)).lastVisitedAt! < completedAt);
+    assert.isNull((yield* projections.getThread(unreadable)).lastVisitedAt);
+  }).pipe(Effect.provide(layerTest)),
+);
+
 it.effect("batch delete refuses a queued run and deletes the idle thread", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     const running = yield* createThread("batch-running");
     const idle = yield* createThread("batch-idle");
-    yield* orchestrator.dispatch({
-      type: "message.dispatch",
-      commandId: CommandId.make("queue-batch-running"),
-      threadId: running,
-      messageId: MessageId.make("queue-batch-running"),
-      text: "Still queued",
-      attachments: [],
-      dispatchMode: { type: "defer_start" },
-      createdBy: "user",
-      creationSource: "web",
-    });
+    yield* queueRun(running, "batch-running");
     const deleted = yield* orchestrator.dispatch({
       type: "thread.delete",
       commandId: CommandId.make("delete-idle-first"),
@@ -153,6 +242,57 @@ it.effect("batch delete refuses a queued run and deletes the idle thread", () =>
     assert.equal(result.batch?.appliedCount, 0);
     assert.equal(result.batch?.rejectedCount, 1);
     assert.isNull((yield* projections.getThread(running)).deletedAt);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("batch delete plans full cleanup for every thread and side chat", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const parent = yield* createThread("batch-delete-parent");
+    const other = yield* createThread("batch-delete-other");
+    const sideChat = ThreadId.make("batch-delete-side-chat");
+    yield* orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make("batch-delete-fork"),
+      sourceThreadId: parent,
+      targetThreadId: sideChat,
+      sideChat: true,
+      sourcePoint: { type: "latest_stable" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const commandId = CommandId.make("batch-delete-plan");
+    const result = yield* orchestrator.dispatch({
+      type: "thread.batch",
+      commandId,
+      operation: "delete",
+      threadIds: [parent, other],
+    });
+    assert.deepEqual(
+      result.batch?.items.map((item) => item.status),
+      ["applied", "applied"],
+    );
+    assert.isNotNull((yield* projections.getThread(parent)).deletedAt);
+    assert.isNotNull((yield* projections.getThread(other)).deletedAt);
+    // The parent's side chat is deleted with it.
+    assert.isNotNull((yield* projections.getThread(sideChat)).deletedAt);
+
+    const effects = yield* outbox.listByCommandId(commandId);
+    const kinds = ["terminal.cleanup", "scheduled-tasks.cleanup", "preview.cleanup"] as const;
+    for (const threadId of [parent, other, sideChat]) {
+      for (const kind of kinds) {
+        assert.ok(
+          effects.some((effect) => effect.threadId === threadId && effect.request.type === kind),
+          `missing ${kind} for ${threadId}`,
+        );
+      }
+    }
+    assert.equal(new Set(effects.map((effect) => effect.id)).size, effects.length);
+    for (const effect of effects) {
+      assert.include(effect.id, String(effect.threadId));
+    }
   }).pipe(Effect.provide(layerTest)),
 );
 
@@ -183,5 +323,6 @@ it.effect("a batch that changes nothing still accepts the command", () =>
       threadIds: [threadId],
     });
     assert.equal(replay.replayed, true);
+    assert.deepEqual(replay.batch, result.batch);
   }).pipe(Effect.provide(layerTest)),
 );

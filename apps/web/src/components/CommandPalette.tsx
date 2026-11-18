@@ -134,6 +134,7 @@ import { pickTriageEnvironment } from "../lib/triageTarget";
 import { useNewProject } from "../hooks/useNewProject";
 import { useOrderWhileOpen } from "../hooks/useOrderWhileOpen";
 import { reportProjectFailure, useProjectPin } from "../hooks/useProjectGroupUpdate";
+import { useThreadActions } from "../hooks/useThreadActions";
 import {
   useEnvironmentProviders,
   useEnvironments,
@@ -420,9 +421,7 @@ function OpenCommandPaletteDialog(props: {
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const batchThreads = useOrchestrationCommand(threadEnvironment.batch, { reportFailure: false });
-  const markSelectedUnread = useOrchestrationCommand(threadEnvironment.markUnread, {
-    reportFailure: false,
-  });
+  const { deleteThreads, markThreadsUnread } = useThreadActions();
   // Keyed by palette session: the intent and restored search only seed this
   // mount, and closing must not change what the closing palette shows.
   const [initialSearch] = useState(
@@ -1819,6 +1818,20 @@ function OpenCommandPaletteDialog(props: {
       ];
     });
   const runSelectionBatch = async (operation: "archive" | "unarchive" | "delete") => {
+    if (operation === "delete") {
+      const { failures } = await deleteThreads(selectedBatchThreads());
+      if (failures.length > 0) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "有会话未能删除",
+            description: failures.join("\n"),
+          }),
+        );
+      }
+      useThreadSelectionStore.getState().clearSelection();
+      return;
+    }
     const { failures } = await applyThreadBatch({
       threads: selectedBatchThreads(),
       dispatch: (group) =>
@@ -1831,7 +1844,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: operation === "delete" ? "有会话未能删除" : "有会话未处理",
+          title: "有会话未处理",
           description: failures.join("\n"),
         }),
       );
@@ -1881,14 +1894,16 @@ function OpenCommandPaletteDialog(props: {
             searchTerms: ["unread", "未读"],
             icon: <MessageSquareIcon className={ITEM_ICON_CLASS} />,
             run: async () => {
-              await Promise.all(
-                selectedBatchThreads().map((thread) =>
-                  markSelectedUnread({
-                    environmentId: thread.environmentId,
-                    input: { threadId: thread.id },
+              const failures = await markThreadsUnread(selectedBatchThreads());
+              if (failures.length > 0) {
+                toastManager.add(
+                  stackedThreadToast({
+                    type: "error",
+                    title: "有会话未能标为未读",
+                    description: failures.join("\n"),
                   }),
-                ),
-              );
+                );
+              }
               useThreadSelectionStore.getState().clearSelection();
             },
           },

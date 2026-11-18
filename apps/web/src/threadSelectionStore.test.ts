@@ -71,12 +71,19 @@ describe("threadSelectionStore", () => {
     });
   });
 
-  describe("clearAnchor", () => {
-    it("clears the range anchor after the visible order changes", () => {
+  describe("setVisibleThreadKeys", () => {
+    it("drops the anchor once it leaves the visible list", () => {
       const store = useThreadSelectionStore.getState();
       store.setAnchor(THREAD_B);
-      store.clearAnchor();
+      store.setVisibleThreadKeys([THREAD_C, THREAD_D]);
       expect(useThreadSelectionStore.getState().anchorThreadKey).toBeNull();
+    });
+
+    it("keeps the anchor while it stays visible", () => {
+      const store = useThreadSelectionStore.getState();
+      store.setAnchor(THREAD_B);
+      store.setVisibleThreadKeys([THREAD_A, THREAD_B, THREAD_C]);
+      expect(useThreadSelectionStore.getState().anchorThreadKey).toBe(THREAD_B);
     });
   });
 
