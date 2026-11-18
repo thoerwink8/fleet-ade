@@ -84,7 +84,6 @@ export interface McpClientSession {
   readonly access: AuthMcpClientAccess;
   /** Another T3 Code environment's link, whose work here stays within it. */
   readonly peerLink: boolean;
-  /** Present when the peer link registered its environment id. */
   readonly environmentId?: string;
 }
 
@@ -434,12 +433,7 @@ export const serverAuthInvalidRequestReason = (
 export class ServerAuthMcpApprovalCodeError extends Schema.TaggedError<ServerAuthMcpApprovalCodeError>()(
   "ServerAuthMcpApprovalCodeError",
   {
-    reason: Schema.Literals([
-      "unknown_or_used",
-      "not_a_pairing_code",
-      "insufficient_scope",
-      "environment_already_linked",
-    ]),
+    reason: Schema.Literals(["unknown_or_used", "not_a_pairing_code", "insufficient_scope"]),
   },
 ) {
   override get message(): string {
@@ -447,9 +441,7 @@ export class ServerAuthMcpApprovalCodeError extends Schema.TaggedError<ServerAut
       ? "That pairing code cannot grant this access. It has not been used, so choose an access level it grants, or create a code with the standard scopes."
       : this.reason === "not_a_pairing_code"
         ? "That is not a one-time pairing code."
-        : this.reason === "environment_already_linked"
-          ? "That environment is already linked."
-          : "That pairing code is unknown, expired, or already used.";
+        : "That pairing code is unknown, expired, or already used.";
   }
 }
 
@@ -499,7 +491,6 @@ export class EnvironmentAuth extends Context.Service<
       readonly scopes?: ReadonlyArray<AuthEnvironmentScope>;
       readonly subject?: string;
       readonly proofKeyThumbprint?: string;
-      readonly peerEnvironmentId?: string;
       readonly purpose?: "startup";
       readonly mcpApproval?: AuthMcpClientAccess;
     }) => Effect.Effect<
@@ -564,7 +555,6 @@ export class EnvironmentAuth extends Context.Service<
       readonly label: string;
       readonly access: AuthMcpClientAccess;
       readonly peerLink: boolean;
-      readonly peerEnvironmentId?: string;
       readonly client: AuthClientMetadata;
     }) => Effect.Effect<
       {
@@ -581,9 +571,8 @@ export class EnvironmentAuth extends Context.Service<
     readonly consumeMcpApprovalCode: (
       code: string,
       access: AuthMcpClientAccess,
-      peerEnvironmentId?: string,
     ) => Effect.Effect<
-      { readonly access: AuthMcpClientAccess; readonly peerEnvironmentId?: string },
+      { readonly access: AuthMcpClientAccess },
       ServerAuthMcpApprovalCodeError | ServerAuthInternalError
     >;
   }
@@ -927,7 +916,7 @@ export const make = Effect.gen(function* () {
 
   type ResolvedBootstrapGrant = Pick<
     PairingGrantStore.BootstrapGrant,
-    "scopes" | "subject" | "label" | "proofKeyThumbprint" | "peerEnvironmentId"
+    "scopes" | "subject" | "label" | "proofKeyThumbprint"
   > & {
     readonly method: PairingGrantStore.BootstrapGrant["method"] | "reusable-dev-token";
   };
@@ -935,7 +924,6 @@ export const make = Effect.gen(function* () {
     credential: string,
     input?: {
       readonly proofKeyThumbprint?: string;
-      readonly peerEnvironmentId?: string;
       readonly requestedScopes?: ReadonlyArray<AuthEnvironmentScope>;
       readonly requiredScopes?: ReadonlyArray<AuthEnvironmentScope>;
       /** Only an agent sign-in opts in to spending a code issued for it. */
@@ -1053,7 +1041,6 @@ export const make = Effect.gen(function* () {
         ...(input?.ttl ? { ttl: input.ttl } : {}),
         ...(input?.label ? { label: input.label } : {}),
         ...(input?.proofKeyThumbprint ? { proofKeyThumbprint: input.proofKeyThumbprint } : {}),
-        ...(input?.peerEnvironmentId ? { peerEnvironmentId: input.peerEnvironmentId } : {}),
         ...(input?.purpose ? { purpose: input.purpose } : {}),
         ...(input?.mcpApproval ? { mcpApproval: input.mcpApproval } : {}),
       });
@@ -1336,17 +1323,21 @@ export const make = Effect.gen(function* () {
       mapSessionVerificationErrors,
       Effect.flatMap((session) =>
         session.subject === MCP_CLIENT_SUBJECT && session.method === "bearer-access-token"
-          ? Effect.succeed({
-              sessionId: session.sessionId,
-              label: session.client.label ?? "MCP client",
-              access: session.scopes.includes(AuthOrchestrationOperateScope)
-                ? (session.runtimeModeCeiling ?? "approval-required")
-                : "read-only",
-              peerLink: session.peerLink === true,
-              ...(session.peerEnvironmentId === undefined
-                ? {}
-                : { environmentId: session.peerEnvironmentId }),
-            } satisfies McpClientSession)
+          ? session.peerLink === true && session.peerIdentity === undefined
+            ? Effect.fail(
+                new ServerAuthInvalidCredentialError({ diagnostic: "旧链接，请重新链接" }),
+              )
+            : Effect.succeed({
+                sessionId: session.sessionId,
+                label: session.client.label ?? "MCP client",
+                access: session.scopes.includes(AuthOrchestrationOperateScope)
+                  ? (session.runtimeModeCeiling ?? "approval-required")
+                  : "read-only",
+                peerLink: session.peerLink === true,
+                ...(session.peerIdentity === undefined
+                  ? {}
+                  : { environmentId: session.peerIdentity }),
+              } satisfies McpClientSession)
           : Effect.fail(
               new ServerAuthInvalidCredentialError({
                 diagnostic: "Only MCP client sessions are accepted here.",
@@ -1366,9 +1357,6 @@ export const make = Effect.gen(function* () {
         ttl: MCP_CLIENT_SESSION_TTL,
         ...(input.access === "read-only" ? {} : { runtimeModeCeiling: input.access }),
         peerLink: input.peerLink,
-        ...(input.peerEnvironmentId === undefined
-          ? {}
-          : { peerEnvironmentId: input.peerEnvironmentId }),
         client: { ...input.client, label: input.label, deviceType: "bot" },
       })
       .pipe(
@@ -1384,11 +1372,9 @@ export const make = Effect.gen(function* () {
   const consumeMcpApprovalCode: EnvironmentAuth["Service"]["consumeMcpApprovalCode"] = (
     code,
     access,
-    peerEnvironmentId,
   ) =>
     resolveBootstrapGrant(code.trim(), {
       requiredScopes: mcpClientScopes(access),
-      ...(peerEnvironmentId === undefined ? {} : { peerEnvironmentId }),
       mcpApproval: access,
     }).pipe(
       Effect.catchTags({
@@ -1400,28 +1386,7 @@ export const make = Effect.gen(function* () {
       Effect.flatMap((grant) =>
         grant.method !== "one-time-token" && grant.method !== "reusable-dev-token"
           ? Effect.fail(new ServerAuthMcpApprovalCodeError({ reason: "not_a_pairing_code" }))
-          : grant.proofKeyThumbprint !== undefined
-            ? Effect.fail(new ServerAuthMcpApprovalCodeError({ reason: "not_a_pairing_code" }))
-            : Effect.gen(function* () {
-                const environmentId = grant.peerEnvironmentId;
-                const alreadyLinked =
-                  environmentId === undefined
-                    ? false
-                    : yield* sessions
-                        .hasActivePeerEnvironment(environmentId)
-                        .pipe(
-                          Effect.mapError((cause) => new ServerAuthSessionsListError({ cause })),
-                        );
-                if (alreadyLinked) {
-                  return yield* new ServerAuthMcpApprovalCodeError({
-                    reason: "environment_already_linked",
-                  });
-                }
-                return {
-                  access: mcpApprovalLevel(grant.subject) ?? access,
-                  ...(environmentId === undefined ? {} : { peerEnvironmentId: environmentId }),
-                };
-              }),
+          : Effect.succeed({ access: mcpApprovalLevel(grant.subject) ?? access }),
       ),
       Effect.withSpan("EnvironmentAuth.consumeMcpApprovalCode"),
     );

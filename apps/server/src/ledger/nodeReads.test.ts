@@ -454,9 +454,6 @@ it.effect("迁移旧 node_claims 去重并保留一条 repo issue task 租约", 
         .toSorted((a, b) => a.pk - b.pk)
         .map((column) => column.name),
     ).toEqual(["repo", "issue", "task_id"]);
-    expect(
-      yield* sql`SELECT name FROM sqlite_master WHERE name = 'fleet_revoked_environments'`,
-    ).toEqual([{ name: "fleet_revoked_environments" }]);
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );
 

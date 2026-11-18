@@ -1,7 +1,6 @@
 import {
   AuthEnvironmentMaintainScope,
   AuthDiagnosticsReadScope,
-  AuthAccessWriteScope,
   AuthFilesystemReadScope,
   AuthProvidersManageScope,
   AuthSettingsWriteScope,
@@ -46,15 +45,6 @@ describe("RPC authorization scopes", () => {
     }
   });
 
-  it("keeps fleet claim writes behind access write scope", () => {
-    for (const method of [
-      WS_METHODS.fleetClaimsClaim,
-      WS_METHODS.fleetClaimsRenew,
-      WS_METHODS.fleetClaimsRelease,
-    ]) {
-      expect(requiredScopeForRpcMethod(method)).toBe(AuthAccessWriteScope);
-    }
-  });
   it("does not expose fleet claim heartbeat over WS", () => {
     const heartbeatMethod = "fleetClaims.heartbeat";
     expect(WsRpcGroup.requests.has(heartbeatMethod)).toBe(false);

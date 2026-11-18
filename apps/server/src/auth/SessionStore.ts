@@ -60,8 +60,7 @@ export interface VerifiedSession {
   readonly runtimeModeCeiling?: RuntimeMode;
   /** An MCP client that is another T3 Code environment's peer link. */
   readonly peerLink?: true;
-  /** Environment id signed into a peer-link session. Absent on older tokens. */
-  readonly peerEnvironmentId?: string;
+  readonly peerIdentity?: string;
 }
 
 export interface VerifiedWebSocketTicket extends VerifiedSession {
@@ -384,7 +383,6 @@ export class SessionStore extends Context.Service<
       readonly proofKeyThumbprint?: string;
       readonly runtimeModeCeiling?: RuntimeMode;
       readonly peerLink?: boolean;
-      readonly peerEnvironmentId?: string;
       readonly replaceActiveForSubjectAndMethod?: boolean;
       readonly replaceSessionId?: AuthSessionId;
     }) => Effect.Effect<IssuedSession, SessionCredentialInternalError>;
@@ -410,9 +408,6 @@ export class SessionStore extends Context.Service<
       ReadonlyArray<AuthClientSession>,
       SessionCredentialInternalError
     >;
-    readonly hasActivePeerEnvironment: (
-      environmentId: string,
-    ) => Effect.Effect<boolean, SessionCredentialInternalError>;
     readonly streamChanges: Stream.Stream<SessionCredentialChange>;
     /** Completes when a live socket's session is revoked or expires without a renewal for its DPoP key. */
     readonly awaitInvalidation: (
@@ -669,7 +664,7 @@ const make = Effect.gen(function* () {
         ...(input?.proofKeyThumbprint ? { jkt: input.proofKeyThumbprint } : {}),
         ...(input?.runtimeModeCeiling ? { rtc: input.runtimeModeCeiling } : {}),
         ...(input?.peerLink === true ? { plk: 1 as const } : {}),
-        ...(input?.peerEnvironmentId !== undefined ? { env: input.peerEnvironmentId } : {}),
+        ...(input?.peerLink === true ? { env: sessionId } : {}),
         iat: issuedAt.epochMilliseconds,
         exp: expiresAt.epochMilliseconds,
       };
@@ -696,7 +691,6 @@ const make = Effect.gen(function* () {
         scopes: claims.scopes,
         method: claims.method,
         peerLink: claims.plk === 1,
-        peerEnvironmentId: claims.env ?? null,
         client: {
           label: client.label ?? null,
           ipAddress: client.ipAddress ?? null,
@@ -854,7 +848,7 @@ const make = Effect.gen(function* () {
         ...(claims.jkt ? { proofKeyThumbprint: claims.jkt } : {}),
         ...(claims.rtc ? { runtimeModeCeiling: claims.rtc } : {}),
         ...(claims.plk === 1 ? { peerLink: true as const } : {}),
-        ...(claims.env !== undefined ? { peerEnvironmentId: claims.env } : {}),
+        ...(claims.env !== undefined ? { peerIdentity: claims.env } : {}),
       } satisfies VerifiedSession;
     },
   );
@@ -994,20 +988,6 @@ const make = Effect.gen(function* () {
     },
     Effect.mapError((cause) => new ActiveSessionsListError({ cause })),
   );
-  const hasActivePeerEnvironment: SessionStore["Service"]["hasActivePeerEnvironment"] = Effect.fn(
-    "SessionStore.hasActivePeerEnvironment",
-  )(
-    function* (environmentId) {
-      const now = yield* DateTime.now;
-      const connectedSessions = yield* Ref.get(connectedSessionsRef);
-      const rows = yield* authSessions.listActive({
-        now,
-        connectedSessionIds: Array.from(connectedSessions.keys()),
-      });
-      return rows.some((row) => row.peerLink && row.peerEnvironmentId === environmentId);
-    },
-    Effect.mapError((cause) => new ActiveSessionsListError({ cause })),
-  );
 
   const revoke: SessionStore["Service"]["revoke"] = Effect.fn("SessionStore.revoke")(
     function* (sessionId) {
@@ -1131,7 +1111,6 @@ const make = Effect.gen(function* () {
     issueWebSocketToken,
     verifyWebSocketToken,
     listActive,
-    hasActivePeerEnvironment,
     awaitInvalidation,
     get streamChanges() {
       return Stream.fromPubSub(changesPubSub);

@@ -80,10 +80,6 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.peerLinksUnlink]: AuthAccessWriteScope,
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,
-  // Fleet claims write the shared ledger, like an access grant does.
-  [WS_METHODS.fleetClaimsClaim]: AuthAccessWriteScope,
-  [WS_METHODS.fleetClaimsRenew]: AuthAccessWriteScope,
-  [WS_METHODS.fleetClaimsRelease]: AuthAccessWriteScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

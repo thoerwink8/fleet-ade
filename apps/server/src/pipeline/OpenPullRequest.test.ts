@@ -13,16 +13,10 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
-import * as FleetClaimsTransport from "../ledger/FleetClaimsTransport.ts";
-import { EnvironmentId, FleetClaimHeartbeatResult } from "@t3tools/contracts";
-import * as FleetHeartbeat from "../ledger/FleetHeartbeat.ts";
-import * as FleetClaims from "../ledger/FleetClaims.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
-import * as Context from "effect/Context";
-import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import {
   CiCheckReadError,
@@ -124,33 +118,6 @@ const tickLayer = (input: {
         })),
       ),
   } as unknown as ProjectionStore.ProjectionStoreV2["Service"]);
-  const fleetClaims = Layer.succeed(FleetClaims.FleetClaims, {
-    claim: (
-      _caller: unknown,
-      input: { readonly repo: string; readonly issue: number; readonly taskId: string },
-    ) =>
-      Effect.succeed({
-        outcome: "claimed" as const,
-        claim: {
-          fleetId: "test-fleet",
-          repo: input.repo.toLowerCase(),
-          issue: input.issue,
-          taskId: input.taskId,
-          holder: "pipeline",
-          holderEnvironment: "test-environment",
-          attempt: 1,
-          fencing: "1",
-          leaseUntil: "2099-01-01T00:00:00.000Z",
-        },
-      }),
-    renew: () => Effect.die("unused"),
-    release: () => Effect.die("unused"),
-    heartbeat: () => Effect.die("unused"),
-    revoke: () => Effect.void,
-  } as unknown as FleetClaims.FleetClaims["Service"]);
-  const identity = Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
-    getEnvironmentId: Effect.succeed(EnvironmentId.make("test-environment")),
-  });
   return layer.pipe(
     Layer.provide(budgetLayer),
     Layer.provide(
@@ -163,9 +130,6 @@ const tickLayer = (input: {
     Layer.provide(projections),
     Layer.provide(settings),
     Layer.provide(issues),
-    Layer.provide(FleetHeartbeat.layerUntracked),
-    Layer.provide(fleetClaims),
-    Layer.provide(identity),
     Layer.provideMerge(runs),
   );
 };
@@ -614,7 +578,6 @@ const openerLayer = (input: {
   readonly created: Ref.Ref<ReadonlyArray<string>>;
   readonly pushed?: GitRunStackedActionResult;
   readonly subjects?: string;
-  readonly heartbeat?: Layer.Layer<FleetHeartbeat.FleetHeartbeat>;
 }) =>
   layerOpener.pipe(
     Layer.provide(
@@ -665,7 +628,6 @@ const openerLayer = (input: {
     ),
     Layer.provide(NodeFileSystem.layer),
     Layer.provide(NodePath.layer),
-    Layer.provide(input.heartbeat ?? FleetHeartbeat.layerUntracked),
   );
 
 describe("PullRequestOpener", () => {
@@ -830,47 +792,6 @@ describe("PullRequestOpener", () => {
       );
     }),
   );
-
-  it.effect("does not push while a held lease is unconfirmed", () =>
-    Effect.gen(function* () {
-      const actions = yield* Ref.make<ReadonlyArray<string>>([]);
-      const created = yield* Ref.make<ReadonlyArray<string>>([]);
-      const error = yield* Effect.gen(function* () {
-        const opener = yield* PullRequestOpener;
-        return yield* opener
-          .open({
-            cwd: "/wt/6",
-            branch: BRANCH,
-            title: "fix tests",
-            issueBody: issue(6).body,
-            headSha: SHA,
-            claimKey,
-          })
-          .pipe(Effect.flip);
-      }).pipe(
-        Effect.provide(
-          openerLayer({
-            actions,
-            created,
-            listed: Effect.succeed([]),
-            onCreate: () => Effect.die("should not create"),
-            heartbeat: Layer.succeed(FleetHeartbeat.FleetHeartbeat, {
-              observe: () => Effect.void,
-              beat: Effect.void,
-              retry: Effect.void,
-              run: Effect.void,
-              holds: () => Effect.succeed(true),
-              canWriteExternally: () => Effect.succeed(false),
-              confirmation: () => Effect.succeed("unconfirmed"),
-              outbound: Effect.succeed({ cycles: 0, retries: 0 }),
-            }),
-          }),
-        ),
-      );
-      assert.strictEqual(error.message, "lease is not confirmed");
-      assert.deepStrictEqual(yield* Ref.get(actions), []);
-    }),
-  );
 });
 
 describe("CiCheckReader", () => {
@@ -979,29 +900,5 @@ describe("CiCheckReader", () => {
         ),
       ),
     ),
-  );
-});
-describe("Fleet heartbeat production transport", () => {
-  it.effect("sends one batched heartbeat through the coordinator ledger", () =>
-    Effect.gen(function* () {
-      const calls = yield* Ref.make<ReadonlyArray<string>>([]);
-      const claims = Layer.succeed(FleetClaims.FleetClaims, {
-        heartbeat: (_environmentId: string, input: unknown) =>
-          Ref.update(calls, (current) => [...current, JSON.stringify(input)]).pipe(
-            Effect.as({ sequence: 1, results: [] } as FleetClaimHeartbeatResult),
-          ),
-      } as unknown as FleetClaims.FleetClaims["Service"]);
-      const environment = Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
-        getEnvironmentId: Effect.succeed(EnvironmentId.make("coordinator")),
-      });
-      const context = yield* FleetClaimsTransport.layer.pipe(
-        Layer.provide(claims),
-        Layer.provide(environment),
-        Layer.build,
-      );
-      const transport = Context.get(context, FleetHeartbeat.FleetHeartbeatTransport);
-      yield* transport.send({ sequence: 1, leases: [] });
-      assert.deepStrictEqual(yield* Ref.get(calls), [JSON.stringify({ sequence: 1, leases: [] })]);
-    }),
   );
 });

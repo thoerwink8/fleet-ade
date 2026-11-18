@@ -17,7 +17,7 @@ const linkedClient = McpInvocationContext.McpInvocationContext.pipe(
   ),
 );
 
-export const missingLinkedEnvironment = () =>
+const missingLinkedEnvironment = () =>
   new OrchestratorMcpFailure({
     code: "invalid_request",
     message: "旧链接，请重新链接",

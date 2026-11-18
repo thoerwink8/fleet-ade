@@ -51,7 +51,7 @@ export const defaultFleetHeartbeatConfig: FleetHeartbeatConfig = {
 export class FleetHeartbeatConfigService extends Context.Service<
   FleetHeartbeatConfigService,
   FleetHeartbeatConfig
->()("t3/ledger/FleetHeartbeat/FleetHeartbeatConfig") {}
+>()("t3/ledger/FleetHeartbeat/FleetHeartbeatConfigService") {}
 
 interface HeldLease {
   readonly claim: FleetClaim;
@@ -141,9 +141,7 @@ const make = Effect.gen(function* () {
         if (
           previous !== undefined &&
           previous.claim.attempt === item.attempt &&
-          (item.outcome === "taken-over" ||
-            item.outcome === "revoked" ||
-            item.outcome === "not-owned")
+          (item.outcome === "taken-over" || item.outcome === "not-owned")
         ) {
           next.set(id, { ...previous, phase: "lost", confirmedAt: null });
           continue;
@@ -232,18 +230,3 @@ const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(FleetHeartbeat, make);
-
-const layerWithDefaults = layer.pipe(
-  Layer.provide(Layer.succeed(FleetHeartbeatConfigService, defaultFleetHeartbeatConfig)),
-);
-
-/** No leases are tracked, so pipeline writes that are not fleet-held stay open. */
-export const layerUntracked = layerWithDefaults.pipe(
-  Layer.provide(
-    Layer.succeed(FleetHeartbeatTransport, {
-      send: Effect.fn("FleetHeartbeatTransport.send")(() =>
-        Effect.die(new Error("Fleet heartbeat transport is not configured.")),
-      ),
-    }),
-  ),
-);

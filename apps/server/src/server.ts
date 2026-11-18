@@ -184,6 +184,7 @@ import * as CloudHttp from "./cloud/http.ts";
 import * as GuestHttp from "./guest/http.ts";
 import * as LedgerNotes from "./ledger/notes.ts";
 import * as FleetClaims from "./ledger/FleetClaims.ts";
+import * as FleetHeartbeat from "./ledger/FleetHeartbeat.ts";
 import * as CloudLink from "./cloud/CloudLink.ts";
 import * as ConnectReachability from "./cloud/ConnectReachability.ts";
 import { pendingServiceUpdateExists } from "./cloud/updateHandoff.ts";
@@ -749,6 +750,10 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ProviderInstallation.layer,
   ReplayMarkers.layer,
   FleetClaims.layer,
+  Layer.succeed(
+    FleetHeartbeat.FleetHeartbeatConfigService,
+    FleetHeartbeat.defaultFleetHeartbeatConfig,
+  ),
   layerPipelineRuns,
   layerPipelineBudget,
   layerColdVerify,

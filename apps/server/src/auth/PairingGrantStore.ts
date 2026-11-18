@@ -35,8 +35,6 @@ export interface BootstrapGrant {
   readonly subject: string;
   readonly label?: string;
   readonly proofKeyThumbprint?: string;
-  /** Identity bound to the pairing record at approval. */
-  readonly peerEnvironmentId?: string;
   readonly expiresAt: DateTime.DateTime;
 }
 
@@ -221,7 +219,6 @@ export class PairingGrantStore extends Context.Service<
       readonly subject?: string;
       readonly label?: string;
       readonly proofKeyThumbprint?: string;
-      readonly peerEnvironmentId?: string;
       readonly purpose?: "startup";
       /** Issues a hidden `<LEVEL>-` code that only an agent sign-in at this level can spend. */
       readonly mcpApproval?: AuthMcpClientAccess;
@@ -236,7 +233,6 @@ export class PairingGrantStore extends Context.Service<
       credential: string,
       input?: {
         readonly proofKeyThumbprint?: string;
-        readonly peerEnvironmentId?: string;
         readonly requestedScopes?: ReadonlyArray<AuthEnvironmentScope>;
         /** All scopes must be granted; requestedScopes only requires an overlap for OAuth. */
         readonly requiredScopes?: ReadonlyArray<AuthEnvironmentScope>;
@@ -430,7 +426,6 @@ const make = Effect.gen(function* () {
         subject,
         label: input?.label ?? null,
         proofKeyThumbprint: input?.proofKeyThumbprint ?? null,
-        peerEnvironmentId: input?.peerEnvironmentId ?? null,
         createdAt: now,
         expiresAt: expiresAt,
       })
@@ -575,7 +570,6 @@ const make = Effect.gen(function* () {
         .consumeAvailable({
           credential: pairingCredential,
           proofKeyThumbprint: input?.proofKeyThumbprint ?? null,
-          peerEnvironmentId: input?.peerEnvironmentId ?? null,
           ...(input?.requestedScopes !== undefined
             ? { requestedScopes: input.requestedScopes }
             : {}),
@@ -601,9 +595,6 @@ const make = Effect.gen(function* () {
           ...(consumed.value.label ? { label: consumed.value.label } : {}),
           ...(consumed.value.proofKeyThumbprint
             ? { proofKeyThumbprint: consumed.value.proofKeyThumbprint }
-            : {}),
-          ...(consumed.value.peerEnvironmentId
-            ? { peerEnvironmentId: consumed.value.peerEnvironmentId }
             : {}),
           expiresAt: consumed.value.expiresAt,
         } satisfies BootstrapGrant;

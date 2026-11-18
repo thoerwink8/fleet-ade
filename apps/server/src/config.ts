@@ -109,7 +109,6 @@ export class ServerConfig extends Context.Service<
     readonly tailscaleServeEnabled: boolean;
     readonly tailscaleServePort: number;
     readonly maxConcurrentSessions?: number | undefined;
-    readonly fleetLeaseTtlMs?: number | undefined;
   }
 >()("t3/config/ServerConfig") {
   static readonly layerTest = (
@@ -263,7 +262,6 @@ const makeTest = Effect.fn("ServerConfig.makeTest")(function* (
     logWebSocketEvents: false,
     tailscaleServeEnabled: false,
     tailscaleServePort: 443,
-    fleetLeaseTtlMs: undefined,
     port: 0,
     host: undefined,
     desktopBootstrapToken: undefined,

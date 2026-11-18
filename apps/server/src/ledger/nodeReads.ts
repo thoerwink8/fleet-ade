@@ -172,11 +172,6 @@ export const migrate = Effect.gen(function* () {
       if (!migrated.some((column) => column.name === "holder_environment")) {
         yield* sql`ALTER TABLE node_claims ADD COLUMN holder_environment TEXT`;
       }
-      yield* sql`
-        CREATE TABLE IF NOT EXISTS fleet_revoked_environments (
-          environment_id TEXT PRIMARY KEY
-        )
-      `;
     }),
   );
 });

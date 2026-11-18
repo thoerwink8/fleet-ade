@@ -1,11 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { assert, it } from "@effect/vitest";
-import {
-  FLEET_HEARTBEAT_INTERVAL_MS,
-  FLEET_LEASE_CONFIRMED_WINDOW_MS,
-  FLEET_LEASE_TTL_MS,
-} from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -247,9 +242,6 @@ it.effect("两个文件连接并发 claim 仍只有一个成功", () =>
 );
 it.effect("一次心跳同时续上自己的租约并拒绝别人的", () =>
   Effect.gen(function* () {
-    assert.strictEqual(FLEET_HEARTBEAT_INTERVAL_MS, 30_000);
-    assert.strictEqual(FLEET_LEASE_TTL_MS, 90_000);
-    assert.strictEqual(FLEET_LEASE_CONFIRMED_WINDOW_MS, 45_000);
     const claims = yield* FleetClaims.FleetClaims;
     const owned = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
     const foreign = yield* claims.claim(caller("node-b"), input("child-1", "claim-b"));
@@ -324,27 +316,15 @@ it.effect("89 秒发出、91 秒才到的心跳按服务端时钟算过期", () 
   }).pipe(Effect.provide(ledgerLayer)),
 );
 
-it.effect("释放、撤销和伪造环境各有自己的结果，且不改租约", () =>
+it.effect("释放和伪造环境各有自己的结果，且不改租约", () =>
   Effect.gen(function* () {
     const claims = yield* FleetClaims.FleetClaims;
     const sql = yield* SqlClient.SqlClient;
     const held = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
     yield* claims.claim(caller("node-b"), input("child-1", "claim-b"));
     yield* claims.release(caller("node-a"), input("root", "release-a", 1, held.claim!.fencing));
-    yield* claims.revoke("node-b");
     const before =
       yield* sql`SELECT task_id, lease_until, attempt FROM node_claims ORDER BY task_id`;
-    const result = yield* claims.heartbeat("node-b", {
-      sequence: 4,
-      leases: [
-        { repo: "example/one", issue: 7, taskId: "child-1", attempt: 1, fencing: "1" },
-        { repo: "example/one", issue: 7, taskId: "root", attempt: 1, fencing: "1" },
-      ],
-    });
-    assert.deepEqual(
-      result.results.map((item) => item.outcome),
-      ["revoked", "revoked"],
-    );
     const released = yield* claims.heartbeat("node-a", {
       sequence: 5,
       leases: [{ repo: "example/one", issue: 7, taskId: "root", attempt: 1, fencing: "1" }],
@@ -397,20 +377,6 @@ it.effect("心跳不改 legacy 行，重放已释放的租约也不再续上", (
       beat("node-a", [{ taskId: "root", attempt: 1 }], 2).input,
     );
     assert.strictEqual(replay.results[0]?.outcome, "released");
-  }).pipe(Effect.provide(ledgerLayer)),
-);
-it.effect("撤销环境后 claim、renew、release 全部拒绝", () =>
-  Effect.gen(function* () {
-    const claims = yield* FleetClaims.FleetClaims;
-    yield* claims.revoke("node-a");
-    const deniedClaim = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
-    assert.strictEqual(deniedClaim.outcome, "stale");
-
-    const allowed = yield* claims.claim(caller("node-b"), input("child-1", "claim-b"));
-    const lease = input("child-1", "renew-a", allowed.claim!.attempt, allowed.claim!.fencing);
-    yield* claims.revoke("node-b");
-    assert.strictEqual((yield* claims.renew(caller("node-b"), lease)).outcome, "stale");
-    assert.strictEqual((yield* claims.release(caller("node-b"), lease)).outcome, "stale");
   }).pipe(Effect.provide(ledgerLayer)),
 );
 

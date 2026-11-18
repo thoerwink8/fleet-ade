@@ -1,7 +1,6 @@
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import {
   EnvironmentId,
-  FLEET_LEASE_TTL_MS,
   FleetClaim,
   FleetClaimClaimInput,
   FleetClaimClaimResult,
@@ -26,6 +25,7 @@ import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as NodeClaims from "./nodeClaims.ts";
 import * as NodeReads from "./nodeReads.ts";
 
+const FLEET_LEASE_TTL_MS = 90_000;
 interface ClaimRow {
   readonly fleet_id: string;
   readonly repo: string;
@@ -68,7 +68,6 @@ export class FleetClaims extends Context.Service<
       environmentId: string,
       input: FleetClaimHeartbeatInput,
     ) => Effect.Effect<FleetClaimHeartbeatResult, FleetClaimsError>;
-    readonly revoke: (environmentId: string) => Effect.Effect<void, FleetClaimsError>;
   }
 >()("t3/ledger/FleetClaims") {}
 
@@ -114,10 +113,6 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
       FROM node_claims
       WHERE repo = ${key.repo} AND issue = ${key.issue} AND task_id = ${key.taskId}
     `.pipe(Effect.mapError(storageError));
-  const isRevoked = (environmentId: string) =>
-    sql`SELECT 1 FROM fleet_revoked_environments WHERE environment_id = ${environmentId} LIMIT 1`.pipe(
-      Effect.mapError(storageError),
-    );
   const toClaim = (row: ClaimRow): FleetClaim => ({
     fleetId: row.fleet_id,
     repo: row.repo,
@@ -154,9 +149,6 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     caller: FleetCaller,
     input: FleetClaimClaimInput,
   ) {
-    if ((yield* isRevoked(caller.environmentId)).length > 0) {
-      return { outcome: "stale" as const, claim: null };
-    }
     const now = DateTime.toEpochMillis(yield* DateTime.now);
     const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + leaseTtlMs));
     const repo = yield* canonicalRepo(input.repo);
@@ -226,9 +218,6 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     caller: FleetCaller,
     input: FleetClaimLeaseInput,
   ) {
-    if ((yield* isRevoked(caller.environmentId)).length > 0) {
-      return { outcome: "stale" as const, claim: null };
-    }
     const now = DateTime.toEpochMillis(yield* DateTime.now);
     const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + leaseTtlMs));
     const repo = yield* canonicalRepo(input.repo);
@@ -279,9 +268,6 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     caller: FleetCaller,
     input: FleetClaimLeaseInput,
   ) {
-    if ((yield* isRevoked(caller.environmentId)).length > 0) {
-      return { outcome: "stale" as const, claim: null };
-    }
     const repo = yield* canonicalRepo(input.repo);
     const key = { ...input, repo };
     return yield* sql
@@ -312,15 +298,6 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     environmentId: string,
     input: FleetClaimHeartbeatInput,
   ) {
-    const revoked = yield* sql<{ readonly environment_id: string }>`
-      SELECT environment_id FROM fleet_revoked_environments WHERE environment_id = ${environmentId}
-    `.pipe(Effect.mapError(storageError));
-    if (revoked.length > 0) {
-      return {
-        sequence: input.sequence,
-        results: input.leases.map((item) => itemResult(item, "revoked", null)),
-      };
-    }
     const now = DateTime.toEpochMillis(yield* DateTime.now);
     const nowIso = DateTime.formatIso(DateTime.makeUnsafe(now));
     const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + leaseTtlMs));
@@ -397,19 +374,12 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     return { sequence: input.sequence, results };
   });
 
-  const revoke = Effect.fn("FleetClaims.revoke")(function* (environmentId: string) {
-    yield* sql`
-      INSERT INTO fleet_revoked_environments (environment_id) VALUES (${environmentId})
-      ON CONFLICT(environment_id) DO NOTHING
-    `.pipe(Effect.mapError(storageError));
-  });
-
-  return FleetClaims.of({ claim, renew, release, heartbeat, revoke });
+  return FleetClaims.of({ claim, renew, release, heartbeat });
 });
 
 export const layer = Layer.unwrap(
-  Effect.map(ServerConfig.ServerConfig, ({ stateDir, fleetLeaseTtlMs }) =>
-    Layer.effect(FleetClaims, make(fleetLeaseTtlMs ?? FLEET_LEASE_TTL_MS)).pipe(
+  Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>
+    Layer.effect(FleetClaims, make(FLEET_LEASE_TTL_MS)).pipe(
       Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),
     ),
   ),
@@ -418,9 +388,9 @@ export const layer = Layer.unwrap(
 export const layerForTest = (
   filename = ":memory:",
   fleetId = "coordinator",
-  fleetLeaseTtlMs = FLEET_LEASE_TTL_MS,
+  leaseTtlMs = FLEET_LEASE_TTL_MS,
 ) =>
-  Layer.effect(FleetClaims, make(fleetLeaseTtlMs)).pipe(
+  Layer.effect(FleetClaims, make(leaseTtlMs)).pipe(
     Layer.provide(
       Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
         getEnvironmentId: Effect.succeed(EnvironmentId.make(fleetId)),

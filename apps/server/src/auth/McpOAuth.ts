@@ -141,10 +141,7 @@ const ClientIdPayload = Schema.Struct({
   v: Schema.Literal(1),
   n: Schema.String,
   r: Schema.Array(Schema.String),
-  /** Registered as another T3 Code environment's peer link. */
   p: Schema.optionalKey(Schema.Literal(1)),
-  /** Peer link's environment, signed so a later call cannot swap it. */
-  e: Schema.optionalKey(Schema.String),
 });
 const decodeClientIdPayload = Schema.decodeUnknownOption(Schema.fromJsonString(ClientIdPayload));
 
@@ -153,7 +150,6 @@ export interface McpOAuthClient {
   readonly name: string;
   readonly redirectUris: ReadonlyArray<string>;
   readonly peerLink: boolean;
-  readonly environmentId?: string;
 }
 
 export class McpOAuthPageError extends Schema.TaggedError<McpOAuthPageError>()(
@@ -188,7 +184,6 @@ interface PendingCode {
   readonly clientId: string;
   readonly clientName: string;
   readonly peerLink: boolean;
-  readonly environmentId?: string;
   readonly redirectUri: string;
   readonly codeChallenge: string;
   readonly resource: string;
@@ -273,19 +268,13 @@ const make = Effect.gen(function* () {
 
   const sign = (domain: string, payload: string) => signer.sign(`${domain}.${payload}`);
 
-  const signClientId = (
-    name: string,
-    redirectUris: ReadonlyArray<string>,
-    peerLink: boolean,
-    environmentId?: string,
-  ) => {
+  const signClientId = (name: string, redirectUris: ReadonlyArray<string>, peerLink: boolean) => {
     const body = base64UrlEncode(
       JSON.stringify({
         v: 1,
         n: name,
         r: redirectUris,
         ...(peerLink ? { p: 1 } : {}),
-        ...(environmentId === undefined ? {} : { e: environmentId }),
       }),
     );
     return sign("mcp-client-id", body).pipe(Effect.map((signature) => `${body}.${signature}`));
@@ -308,7 +297,6 @@ const make = Effect.gen(function* () {
           name: payload.n,
           redirectUris: payload.r,
           peerLink: payload.p === 1,
-          ...(payload.p === 1 && payload.e !== undefined ? { environmentId: payload.e } : {}),
         })),
       ),
     );
@@ -363,18 +351,11 @@ const make = Effect.gen(function* () {
             "Linked environments is off on that machine. Turn it on in its Settings → Labs.",
         });
       }
-      const environmentId =
-        peerLink &&
-        metadata.t3_environment_id !== undefined &&
-        metadata.t3_environment_id.trim() !== ""
-          ? metadata.t3_environment_id.trim()
-          : undefined;
       return {
-        clientId: yield* signClientId(name, redirectUris, peerLink, environmentId),
+        clientId: yield* signClientId(name, redirectUris, peerLink),
         name,
         redirectUris,
         peerLink,
-        ...(environmentId === undefined ? {} : { environmentId }),
       };
     },
   );
@@ -450,7 +431,6 @@ const make = Effect.gen(function* () {
   const mintCode = Effect.fn("McpOAuth.mintCode")(function* (
     authorization: AuthorizationRequest,
     access: AuthMcpClientAccess,
-    peerEnvironmentId?: string,
   ) {
     const now = yield* Clock.currentTimeMillis;
     const code = Buffer.from(yield* random.randomBytes(32)).toString("base64url");
@@ -460,7 +440,6 @@ const make = Effect.gen(function* () {
         clientId: authorization.client.clientId,
         clientName: authorization.client.name,
         peerLink: authorization.client.peerLink,
-        ...(peerEnvironmentId === undefined ? {} : { environmentId: peerEnvironmentId }),
         redirectUri: authorization.redirectUri,
         codeChallenge: authorization.codeChallenge,
         resource: authorization.resource,
@@ -475,7 +454,6 @@ const make = Effect.gen(function* () {
   const approve: McpOAuth["Service"]["approve"] = Effect.fn("McpOAuth.approve")(function* (input) {
     const { decision } = input;
     let access = decision.access;
-    let peerEnvironmentId: string | undefined;
     if (decision._tag === "pairing-code") {
       // An approval code is for one app's sign-in, never for linking another environment.
       if (input.authorization.client.peerLink && parseMcpApprovalCode(decision.code)) {
@@ -484,13 +462,7 @@ const make = Effect.gen(function* () {
         });
       }
       const consumed = yield* environmentAuth
-        .consumeMcpApprovalCode(
-          decision.code,
-          decision.access,
-          input.authorization.client.peerLink
-            ? input.authorization.client.environmentId
-            : undefined,
-        )
+        .consumeMcpApprovalCode(decision.code, decision.access)
         .pipe(
           Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (cause) =>
             Effect.logError("MCP approval code check failed.", { cause }).pipe(
@@ -505,7 +477,6 @@ const make = Effect.gen(function* () {
           ),
         );
       access = consumed.access;
-      peerEnvironmentId = consumed.peerEnvironmentId;
     } else {
       const session = yield* approvingSession(input.request, input.authorization);
       if (
@@ -518,7 +489,7 @@ const make = Effect.gen(function* () {
         });
       }
     }
-    const code = yield* mintCode(input.authorization, access, peerEnvironmentId);
+    const code = yield* mintCode(input.authorization, access);
     yield* Effect.logInfo("Approved an MCP client sign-in.", {
       client: input.authorization.client.name,
       access,
@@ -582,9 +553,6 @@ const make = Effect.gen(function* () {
           label: pending.clientName,
           access: pending.access,
           peerLink: pending.peerLink,
-          ...(pending.environmentId === undefined
-            ? {}
-            : { peerEnvironmentId: pending.environmentId }),
           client: deriveAuthClientMetadata({ request }),
         })
         .pipe(

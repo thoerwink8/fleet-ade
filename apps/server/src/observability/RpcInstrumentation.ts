@@ -234,9 +234,6 @@ const RPC_AGGREGATES = {
   [WS_METHODS.subscribeServerLifecycle]: "server",
   [WS_METHODS.subscribeAuthAccess]: "auth",
   [WS_METHODS.pipelineRunsList]: "pipeline",
-  [WS_METHODS.fleetClaimsClaim]: "peerLinks",
-  [WS_METHODS.fleetClaimsRenew]: "peerLinks",
-  [WS_METHODS.fleetClaimsRelease]: "peerLinks",
 } as const satisfies Readonly<Record<WsRpcMethod, string>>;
 
 const RPC_SPAN_PREFIX = "ws.rpc";

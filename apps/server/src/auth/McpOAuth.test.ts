@@ -348,7 +348,7 @@ it.live("signs in with a pairing code and issues a token only /mcp accepts", () 
     }),
   ),
 );
-it.live("uses the pairing record identity instead of DCR self-report", () =>
+it.live("uses a coordinator-generated session identity instead of DCR self-report", () =>
   withRoutes((handler, auth) =>
     Effect.gen(function* () {
       const registered = yield* handler(
@@ -359,12 +359,11 @@ it.live("uses the pairing record identity instead of DCR self-report", () =>
             client_name: "Peer",
             redirect_uris: [REDIRECT],
             software_id: MCP_PEER_LINK_SOFTWARE_ID,
-            t3_environment_id: "forged-environment",
           }),
         }),
       ).pipe(Effect.flatMap(json<{ client_id: string }>));
       const params = authorizeParams(registered.client_id);
-      const pairing = yield* auth.createPairingLink({ peerEnvironmentId: "trusted-environment" });
+      const pairing = yield* auth.createPairingLink();
       const approved = yield* decide(handler, params, {
         _tag: "pairing-code",
         access: "auto",
@@ -387,52 +386,22 @@ it.live("uses the pairing record identity instead of DCR self-report", () =>
       const client = yield* auth.authenticateMcpClient(
         HttpServerRequest.fromWeb(at("/mcp", { headers: { authorization: `Bearer ${token}` } })),
       );
-      expect(client).toMatchObject({ peerLink: true, environmentId: "trusted-environment" });
+      expect(client.peerLink).toBe(true);
+      expect(client.environmentId).toBe(client.sessionId);
     }),
   ),
 );
-it.live("rejects a second active pairing for the same peer environment", () =>
-  withRoutes((handler, auth) =>
+it.live("rejects approving with an unknown pairing code", () =>
+  withRoutes((handler) =>
     Effect.gen(function* () {
-      const registered = yield* handler(
-        at("/oauth/mcp/register", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: encodeJson({
-            client_name: "Peer",
-            redirect_uris: [REDIRECT],
-            software_id: MCP_PEER_LINK_SOFTWARE_ID,
-          }),
-        }),
-      ).pipe(Effect.flatMap(json<{ client_id: string }>));
-      const params = authorizeParams(registered.client_id);
-      const first = yield* auth.createPairingLink({ peerEnvironmentId: "same-environment" });
-      const second = yield* auth.createPairingLink({ peerEnvironmentId: "same-environment" });
-      const approved = yield* decide(handler, params, {
+      const clientId = yield* registeredClientId(handler);
+      const params = authorizeParams(clientId);
+      const response = yield* decide(handler, params, {
         _tag: "pairing-code",
         access: "auto",
-        code: first.credential,
+        code: "not-a-issued-code",
       });
-      const code = new URL(approved.redirectTo!).searchParams.get("code")!;
-      yield* handler(
-        at(
-          "/oauth/mcp/token",
-          form({
-            grant_type: "authorization_code",
-            code,
-            redirect_uri: params.redirect_uri,
-            client_id: registered.client_id,
-            code_verifier: verifier,
-          }),
-        ),
-      );
-      expect(
-        (yield* decide(handler, params, {
-          _tag: "pairing-code",
-          access: "auto",
-          code: second.credential,
-        })).status,
-      ).toBe(400);
+      expect(response.status).toBe(400);
     }),
   ),
 );

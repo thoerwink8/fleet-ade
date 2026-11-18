@@ -45,13 +45,6 @@ export const FleetClaimLeaseResult = Schema.Struct({
 });
 export type FleetClaimLeaseResult = typeof FleetClaimLeaseResult.Type;
 
-/** One machine, one request. Not per lease and not per session. */
-export const FLEET_HEARTBEAT_INTERVAL_MS = 30_000;
-/** Lease expiry is the coordinator clock plus this duration. */
-export const FLEET_LEASE_TTL_MS = 90_000;
-/** A renewal counts as confirmed only inside this window. */
-export const FLEET_LEASE_CONFIRMED_WINDOW_MS = 45_000;
-
 export const FleetClaimHeartbeatItem = Schema.Struct({
   ...FleetClaimKey.fields,
   attempt: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -72,7 +65,6 @@ export const FleetClaimHeartbeatOutcome = Schema.Literals([
   "released",
   "not-claimed",
   "not-owned",
-  "revoked",
 ]);
 export type FleetClaimHeartbeatOutcome = typeof FleetClaimHeartbeatOutcome.Type;
 

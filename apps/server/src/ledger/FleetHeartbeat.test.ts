@@ -1,7 +1,5 @@
 import { assert, it } from "@effect/vitest";
 import {
-  FLEET_HEARTBEAT_INTERVAL_MS,
-  FLEET_LEASE_CONFIRMED_WINDOW_MS,
   FleetClaim,
   FleetClaimHeartbeatInput,
   FleetClaimHeartbeatResult,
@@ -77,7 +75,7 @@ it.effect("observe starts unconfirmed", () =>
   }),
 );
 
-it.effect("attempt mismatch is ignored", () =>
+it.effect("a takeover answered with a newer attempt is ignored", () =>
   Effect.gen(function* () {
     const send: Send = (input) =>
       input.sequence === 1
@@ -87,11 +85,8 @@ it.effect("attempt mismatch is ignored", () =>
             results: input.leases.map((lease) => ({
               ...key(lease.taskId),
               attempt: lease.attempt + 1,
-              outcome: "renewed" as const,
-              claim: {
-                ...claim(lease.taskId, lease.attempt + 1),
-                leaseUntil: "1970-01-01T00:03:00.000Z",
-              },
+              outcome: "taken-over" as const,
+              claim: null,
             })),
           });
     yield* Effect.gen(function* () {
@@ -121,7 +116,7 @@ it.effect("transport timeout is ten seconds", () =>
   }),
 );
 
-it.effect("late response does not extend send-time confirmation window", () =>
+it.effect("late response does not extend the send-time confirmation window", () =>
   Effect.gen(function* () {
     const response = yield* Deferred.make<void>();
     const send: Send = (input) => Deferred.await(response).pipe(Effect.as(renewed(input)));
@@ -129,24 +124,28 @@ it.effect("late response does not extend send-time confirmation window", () =>
       const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
       yield* heartbeat.observe(claim("late"));
       const beat = yield* heartbeat.beat.pipe(Effect.forkDetach);
-      yield* TestClock.adjust(Duration.seconds(46));
+      yield* TestClock.adjust(Duration.seconds(9));
       yield* Deferred.succeed(response, undefined);
       yield* Fiber.join(beat);
+      assert.strictEqual(yield* heartbeat.confirmation(key("late")), "confirmed");
+      yield* TestClock.adjust(
+        Duration.millis(FleetHeartbeat.defaultFleetHeartbeatConfig.confirmedWindowMs - 9_000),
+      );
+      assert.strictEqual(yield* heartbeat.confirmation(key("late")), "confirmed");
+      yield* TestClock.adjust(Duration.millis(1));
       assert.strictEqual(yield* heartbeat.confirmation(key("late")), "unconfirmed");
     }).pipe(Effect.provide(layer(send)));
   }),
 );
 
-it.effect("not-owned and revoked become lost", () =>
+it.effect("not-owned becomes lost", () =>
   Effect.gen(function* () {
-    const send: Send = (input) => Effect.succeed(renewed(input, ["not-owned", "revoked"]));
+    const send: Send = (input) => Effect.succeed(renewed(input, ["not-owned"]));
     yield* Effect.gen(function* () {
       const heartbeat = yield* FleetHeartbeat.FleetHeartbeat;
       yield* heartbeat.observe(claim("not-owned"));
-      yield* heartbeat.observe(claim("revoked"));
       yield* heartbeat.beat;
       assert.strictEqual(yield* heartbeat.confirmation(key("not-owned")), "lost");
-      assert.strictEqual(yield* heartbeat.confirmation(key("revoked")), "lost");
     }).pipe(Effect.provide(layer(send)));
   }),
 );
@@ -164,7 +163,9 @@ it.effect("run sends 50 leases once per cycle", () =>
       );
       const runner = yield* heartbeat.run.pipe(Effect.forkDetach);
       assert.strictEqual((yield* Queue.take(calls)).leases.length, 50);
-      yield* TestClock.adjust(Duration.millis(FLEET_HEARTBEAT_INTERVAL_MS));
+      yield* TestClock.adjust(
+        Duration.millis(FleetHeartbeat.defaultFleetHeartbeatConfig.heartbeatIntervalMs),
+      );
       assert.strictEqual((yield* Queue.take(calls)).leases.length, 50);
       assert.strictEqual(yield* Queue.size(calls), 0);
       yield* Fiber.interrupt(runner);
@@ -293,7 +294,9 @@ it.effect("确认超过 45 秒变未确认，周期仍是 30 秒", () =>
       yield* heartbeat.beat;
       yield* Queue.take(calls);
       assert.strictEqual(yield* heartbeat.canWriteExternally(key("root")), true);
-      yield* TestClock.adjust(Duration.millis(FLEET_LEASE_CONFIRMED_WINDOW_MS));
+      yield* TestClock.adjust(
+        Duration.millis(FleetHeartbeat.defaultFleetHeartbeatConfig.confirmedWindowMs),
+      );
       assert.strictEqual(yield* heartbeat.canWriteExternally(key("root")), true);
       yield* TestClock.adjust(Duration.millis(1));
       assert.strictEqual(yield* heartbeat.canWriteExternally(key("root")), false);
@@ -301,9 +304,13 @@ it.effect("确认超过 45 秒变未确认，周期仍是 30 秒", () =>
 
       const runner = yield* heartbeat.run.pipe(Effect.forkDetach);
       yield* Queue.take(calls);
-      yield* TestClock.adjust(Duration.millis(FLEET_HEARTBEAT_INTERVAL_MS));
+      yield* TestClock.adjust(
+        Duration.millis(FleetHeartbeat.defaultFleetHeartbeatConfig.heartbeatIntervalMs),
+      );
       yield* Queue.take(calls);
-      yield* TestClock.adjust(Duration.millis(FLEET_HEARTBEAT_INTERVAL_MS));
+      yield* TestClock.adjust(
+        Duration.millis(FleetHeartbeat.defaultFleetHeartbeatConfig.heartbeatIntervalMs),
+      );
       yield* Queue.take(calls);
       assert.strictEqual(yield* Queue.size(calls), 0);
       yield* Fiber.interrupt(runner);
