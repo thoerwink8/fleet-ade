@@ -259,7 +259,7 @@ systemd-run --wait --pipe --collect \
   -E OTEL_SDK_DISABLED=true \
   -E T3CODE_OTEL_SDK_DISABLED=true \
   -E DO_NOT_TRACK=1 \
-  /bin/bash -lc "pnpm install --frozen-lockfile && ./node_modules/.bin/vp run --filter t3 build"
+  /bin/bash -lc "pnpm store prune && pnpm install --frozen-lockfile && ./node_modules/.bin/vp run --filter t3 build"
 
 echo "[6/9] Installing t3 CLI wrapper and merging headless server settings..."
 cat >"${ADE_HOME}/.local/bin/t3" <<'EOF'
@@ -327,10 +327,21 @@ const next = {
 fs.writeFileSync(settingsPath, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o640 });
 NODE
 
-echo "[7/9] Installing systemd units (ade.slice + fleet-ade.service)..."
+echo "[7/9] Installing systemd units (ade.slice + fleet-ade.service + cleanup timer + journald cap)..."
 install -m 0644 "${APP_DIR}/scripts/deploy/ade.slice" /etc/systemd/system/ade.slice
 install -m 0644 "${APP_DIR}/scripts/deploy/fleet-ade.service" /etc/systemd/system/fleet-ade.service
+install -m 0644 "${APP_DIR}/scripts/deploy/fleet-ade-disk-cleanup.service" /etc/systemd/system/fleet-ade-disk-cleanup.service
+install -m 0644 "${APP_DIR}/scripts/deploy/fleet-ade-disk-cleanup.timer" /etc/systemd/system/fleet-ade-disk-cleanup.timer
+install -d -m 0755 /usr/local/lib/fleet-ade
+install -m 0755 "${APP_DIR}/scripts/deploy/france-disk-cleanup.sh" /usr/local/lib/fleet-ade/france-disk-cleanup.sh
+install -d -m 0755 /etc/systemd/journald.conf.d
+cat >/etc/systemd/journald.conf.d/99-fleet-ade.conf <<'EOF'
+[Journal]
+SystemMaxUse=500M
+EOF
 systemctl daemon-reload
+systemctl restart systemd-journald
+systemctl enable --now fleet-ade-disk-cleanup.timer
 systemctl enable ade.slice fleet-ade.service
 
 echo "[8/9] Restricting firewall port ${ADE_PORT}/tcp strictly to WireGuard interface ${WG_IFACE}..."

@@ -1,0 +1,6 @@
+[Unit]
+Description=Fleet ADE weekly rebuildable disk cleanup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/fleet-ade/france-disk-cleanup.sh
