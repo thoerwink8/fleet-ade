@@ -160,6 +160,7 @@ const releaseChecks = [
 ];
 
 const steps: Step[] = [
+  vpStep("fmt", ["fmt", "--check", "--no-error-on-unmatched-pattern"]),
   vpStep("lint", ["lint", "--report-unused-disable-directives"]),
   nodeStep("ui-no-english", ["scripts/ui-no-english.ts"]),
   vpStep("typecheck", ["run", "-r", "--cache", "--concurrency-limit", "4", "typecheck"]),
