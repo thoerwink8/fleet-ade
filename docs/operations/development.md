@@ -225,7 +225,7 @@ and runs in headless Chromium with the React Compiler on, like the app. There is
 
 TypeScript workspaces typecheck with `effect-tsgo tsrs --noEmit` from `@effect/tsgo`: the
 [tsrs](https://github.com/oxc-project/tsrs) checker with Effect diagnostics, quick fixes, and
-refactors built in. Only `apps/marketing` installs `typescript`, for Astro. VS Code's TypeScript 7
+refactors built in. Workspaces do not install the `typescript` package. VS Code's TypeScript 7
 extension starts the same checker through `.vscode/tsdk/tsgo` (`js/ts.tsdk.path`), a POSIX
 script, so on Windows open the workspace through WSL.
 

@@ -1,30 +1,15 @@
 import type { OrchestrationV2ProviderFailureClass } from "@t3tools/contracts";
 import {
   CHATGPT_USAGE_LIMIT_CODE,
-  CHATGPT_WORKSPACE_ADMIN_REQUEST,
   CHATGPT_WORKSPACE_USAGE_LIMIT_CODE,
 } from "@t3tools/shared/usageLimits";
 import { memo } from "react";
-import { writeTextToClipboard } from "../../hooks/useCopyToClipboard";
 import { Alert, AlertAction, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
-import { toastManager } from "../ui/toast";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import { OpenAI } from "../Icons";
 import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
 import { ExpandableText } from "../settings/ExpandableText";
-
-export function copyAdminRequest() {
-  void writeTextToClipboard(CHATGPT_WORKSPACE_ADMIN_REQUEST, "admin request").then(
-    () =>
-      toastManager.add({
-        type: "success",
-        title: "已复制申请",
-        description: "请把它发送给你的工作区管理员。",
-      }),
-    () => toastManager.add({ type: "error", title: "无法复制申请" }),
-  );
-}
 
 export function getThreadErrorBannerMessage(error: string): string {
   let payload: unknown;
@@ -81,8 +66,8 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   onDismiss?: () => void;
 }) {
   if (!error) return null;
-  const workspaceLimit = errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE;
-  const chatGptLimit = workspaceLimit || errorCode === CHATGPT_USAGE_LIMIT_CODE;
+  const chatGptLimit =
+    errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE || errorCode === CHATGPT_USAGE_LIMIT_CODE;
   const variant = errorClass === "usage_limit" || chatGptLimit ? "warning" : "error";
   return (
     <div className="pointer-events-auto mx-auto w-fit max-w-[min(48rem,calc(100%-2rem))] pt-3">
@@ -94,29 +79,14 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         )}
         <AlertDescription>
           {chatGptLimit ? (
-            <div className="space-y-1">
-              <p className="font-medium">已达到 ChatGPT 用量上限</p>
-              {workspaceLimit ? (
-                <p>
-                  {
-                    "你已达到工作区允许在其他应用中使用 ChatGPT 套餐的上限。复制一份申请，请工作区管理员提高用量限制。"
-                  }
-                </p>
-              ) : null}
-            </div>
+            <p className="font-medium">已达到 ChatGPT 用量上限</p>
           ) : (
             <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />
           )}
         </AlertDescription>
         {(chatGptLimit || onDismiss) && (
           <AlertAction>
-            {workspaceLimit ? (
-              <Button variant="default" size="sm" onClick={copyAdminRequest}>
-                复制给管理员的申请
-              </Button>
-            ) : chatGptLimit ? (
-              <ChatGptUsageButton variant="default" size="sm" />
-            ) : null}
+            {chatGptLimit ? <ChatGptUsageButton variant="default" size="sm" /> : null}
             {onDismiss ? (
               <Button variant="ghost" size="icon-xs" aria-label="关闭错误" onClick={onDismiss}>
                 <XIcon />

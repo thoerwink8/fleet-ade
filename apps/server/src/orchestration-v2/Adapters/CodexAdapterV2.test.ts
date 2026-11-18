@@ -6701,7 +6701,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       usedBefore: 100,
       expectedClass: "usage_limit",
       expectedCode: "subscription_sharing_workplace_individual_usage_limit_exceeded",
-      expectedMessage: "workspace admin",
+      expectedMessage: "Usage settings",
     },
     // regression: #25333 ChatGPT sharing limit prose classifies as a usage limit
     {

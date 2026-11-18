@@ -15,11 +15,10 @@ import { useState } from "react";
 import { useDeadlinePassed } from "../../hooks/useDeadline";
 import { OpenAI } from "../Icons";
 import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
-import { Button, InlineButton } from "../ui/button";
+import { InlineButton } from "../ui/button";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { toastManager } from "../ui/toast";
 import type { ComposerBannerStackItem } from "./ComposerBannerStack";
-import { copyAdminRequest } from "./ThreadErrorBanner";
 
 type RecoveryProps = {
   runId: RunId;
@@ -51,8 +50,8 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
     !settled && !requestPending && resetAt !== null && Date.parse(resetAt) > Date.parse(stoppedAt);
   const resumes =
     canSchedule && recovery?.runId === runId && recovery.resetAt === resetAt && recovery.autoResume;
-  const workspaceLimit = errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE;
-  const chatGptLimit = workspaceLimit || errorCode === CHATGPT_USAGE_LIMIT_CODE;
+  const chatGptLimit =
+    errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE || errorCode === CHATGPT_USAGE_LIMIT_CODE;
   const recoveryActions = canSchedule ? (
     <RecoveryActions key={`${runId}:${resetAt}`} {...props} />
   ) : null;
@@ -84,19 +83,11 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
     group: "environment",
     icon: <OpenAI aria-hidden="true" />,
     title: "已达到 ChatGPT 用量上限",
-    description: workspaceLimit
-      ? "你已达到工作区允许在其他应用中使用 ChatGPT 套餐的上限。"
-      : resetDescription,
+    description: resetDescription,
     actions: (
       <>
         {recoveryActions}
-        {workspaceLimit ? (
-          <Button size="xs" variant="ghost" onClick={copyAdminRequest}>
-            复制给管理员的申请
-          </Button>
-        ) : (
-          <ChatGptUsageButton size="xs" variant="ghost" />
-        )}
+        <ChatGptUsageButton size="xs" variant="ghost" />
       </>
     ),
   };
