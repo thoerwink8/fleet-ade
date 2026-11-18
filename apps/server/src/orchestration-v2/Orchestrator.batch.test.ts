@@ -204,7 +204,7 @@ it.effect("batch mark-unread rewinds only threads with a completed run", () =>
     });
     assert.deepEqual(
       result.batch?.items.map((item) => item.status),
-      ["rejected", "applied"],
+      ["already_target", "applied"],
     );
     assert.ok((yield* projections.getThread(read)).lastVisitedAt! < completedAt);
     assert.isNull((yield* projections.getThread(unreadable)).lastVisitedAt);

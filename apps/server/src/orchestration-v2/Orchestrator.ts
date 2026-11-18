@@ -14564,6 +14564,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         items.push({ threadId, status: "deleted" });
         continue;
       }
+      if (command.operation === "mark-unread") {
+        const shell = yield* projectionStore
+          .getThreadShell(threadId)
+          .pipe(Effect.mapError((cause) => new OrchestratorProjectionError({ threadId, cause })));
+        if (shell?.latestRunCompletedAt === null || shell === null) {
+          items.push({ threadId, status: "already_target" });
+          continue;
+        }
+      }
       if (command.operation === "delete") {
         const records = yield* projectionStore
           .getThreadRecords(threadId, ["runs", "messages"])
