@@ -149,6 +149,41 @@ describe("PipelineRuns", () => {
     ),
   );
 
+  it.effect("显式启动不依赖流水线开关且同控制线程幂等拒绝抢占", () =>
+    Effect.gen(function* () {
+      const runs = yield* PipelineRuns;
+      const first = yield* runs.startSupervised({
+        issueNumber: 7,
+        repository: "thoerwink8/fleet-ade",
+        controllerThreadId: "controller-a",
+      });
+      assert.strictEqual(first.status, "started");
+      if (first.status !== "started") return;
+      const same = yield* runs.startSupervised({
+        issueNumber: 7,
+        repository: "thoerwink8/fleet-ade",
+        controllerThreadId: "controller-a",
+      });
+      assert.strictEqual(same.status, "started");
+      if (same.status !== "started") return;
+      assert.strictEqual(same.run.id, first.run.id);
+      const other = yield* runs.startSupervised({
+        issueNumber: 7,
+        repository: "thoerwink8/fleet-ade",
+        controllerThreadId: "controller-b",
+      });
+      assert.deepStrictEqual(other, { status: "rejected", code: "conflict" });
+    }).pipe(
+      Effect.provide(
+        pipelineLayer({
+          issues: Effect.succeed([issue(7)]),
+          usage: readable(),
+          enabled: false,
+        }),
+      ),
+    ),
+  );
+
   it.effect("读单失败不建运行", () =>
     Effect.gen(function* () {
       const runs = yield* PipelineRuns;

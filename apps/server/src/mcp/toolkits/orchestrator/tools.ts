@@ -37,6 +37,13 @@ import {
   ThreadMetadataMcpUpdateInput,
   ThreadMetadataMcpUpdateResult,
   TrimmedNonEmptyString,
+  PipelineRun,
+  PipelineSupervisionCleanupResult,
+  PipelineSupervisionSendResult,
+  PipelineSupervisionSendInput,
+  PipelineSupervisionStartInput,
+  PipelineSupervisionVerdictInput,
+  PipelineSupervisionVerdictResult,
 } from "@t3tools/contracts";
 import { McpSchema, Tool, Toolkit } from "effect/ai";
 import * as Schema from "effect/Schema";
@@ -48,9 +55,8 @@ import * as PeerLinkRequests from "../../../peer/PeerLinkRequests.ts";
 import * as PeerLinks from "../../../peer/PeerLinks.ts";
 import * as RemoteDelegation from "../../../peer/RemoteDelegation.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
-import * as OrchestratorMcpService from "../../OrchestratorMcpService.ts";
 import * as ThreadMetadataMcpService from "../../ThreadMetadataMcpService.ts";
-
+import * as OrchestratorMcpService from "../../OrchestratorMcpService.ts";
 const dependencies = [
   McpInvocationContext.McpInvocationContext,
   ThreadManagementService.ThreadManagementService,
@@ -356,6 +362,75 @@ const EnvironmentUnlinkTool = Tool.make("t3_environment_unlink", {
   .annotate(Tool.Idempotent, true)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOff);
 
+const supervisionDependencies = dependencies;
+
+const PipelineStartTool = Tool.make("t3_pipeline_start", {
+  description:
+    "Start one supervised pipeline run for an allowlisted issue in this project. Pass only `issueNumber`. The server derives the controller, project, repository, and provider. `delivery` later reports orchestration acceptance, not provider execution. An existing run is never adopted.",
+  parameters: PipelineSupervisionStartInput,
+  success: PipelineRun,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: supervisionDependencies,
+})
+  .annotate(Tool.Title, "Start a supervised pipeline run")
+  .annotate(Tool.Destructive, true)
+  .annotate(Tool.OpenWorld, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromSubagents);
+
+const PipelineStatusTool = Tool.make("t3_pipeline_status", {
+  description:
+    "Read the active supervised run this controller started for `issueNumber`. It does not reveal another controller's run.",
+  parameters: PipelineSupervisionStartInput,
+  success: PipelineRun,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: supervisionDependencies,
+})
+  .annotate(Tool.Title, "Read a supervised pipeline run")
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Idempotent, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromSubagents);
+
+const PipelineSendTool = Tool.make("t3_pipeline_send", {
+  description:
+    "Send a correction to this controller's pipeline worker. Returns the real delivery: started, queued, steered, or restarted. queued and steered mean the command was accepted, not that the provider executed it.",
+  parameters: PipelineSupervisionSendInput,
+  success: PipelineSupervisionSendResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: supervisionDependencies,
+})
+  .annotate(Tool.Title, "Correct a supervised pipeline worker")
+  .annotate(Tool.Destructive, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromSubagents);
+
+const PipelineVerdictTool = Tool.make("t3_pipeline_accept", {
+  description:
+    "Accept or reject this controller's active run at its current head. The server records that head; a later head clears the verdict. Acceptance is not merge authorization.",
+  parameters: PipelineSupervisionVerdictInput,
+  success: PipelineSupervisionVerdictResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: supervisionDependencies,
+})
+  .annotate(Tool.Title, "Judge a supervised pipeline run")
+  .annotate(Tool.Destructive, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromSubagents);
+
+const PipelineCleanupTool = Tool.make("t3_pipeline_cleanup", {
+  description:
+    "After the current head is accepted, archive its idle worker through thread deletion and existing storage cleanup. Running, shared, dirty, or unknown work is retained with its reason and can be retried. This never deletes a worktree directly.",
+  parameters: PipelineSupervisionStartInput,
+  success: PipelineSupervisionCleanupResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: supervisionDependencies,
+})
+  .annotate(Tool.Title, "Archive an accepted pipeline worker")
+  .annotate(Tool.Destructive, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromSubagents);
+
 export const OrchestratorToolkit = Toolkit.make(
   OrchestratorCapabilitiesTool,
   DelegateTaskTool,
@@ -374,6 +449,11 @@ export const OrchestratorToolkit = Toolkit.make(
   ThreadSendTool,
   ThreadWaitTool,
   ThreadInterruptTool,
+  PipelineStartTool,
+  PipelineStatusTool,
+  PipelineSendTool,
+  PipelineVerdictTool,
+  PipelineCleanupTool,
   EnvironmentLinksTool,
   EnvironmentLinkTool,
   EnvironmentUnlinkTool,

@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /** One active run per issue until it is merged or a person cancels and closes it out. */
 export const PIPELINE_RUN_STATUSES = [
@@ -107,3 +108,39 @@ export class PipelineRunsError extends Schema.TaggedError<PipelineRunsError>()(
     return "Pipeline runs could not be read.";
   }
 }
+
+export const PipelineSupervisionStartInput = Schema.Struct({
+  issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export type PipelineSupervisionStartInput = typeof PipelineSupervisionStartInput.Type;
+
+export const PipelineSupervisionSendInput = Schema.Struct({
+  issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
+  message: TrimmedNonEmptyString.check(Schema.isMaxLength(100_000)),
+  mode: Schema.optional(Schema.Literals(["auto", "queue", "steer", "restart"])),
+});
+export type PipelineSupervisionSendInput = typeof PipelineSupervisionSendInput.Type;
+
+export const PipelineSupervisionSendResult = Schema.Struct({
+  delivery: Schema.Literals(["started", "queued", "steered", "restarted"]),
+  status: Schema.String,
+});
+export type PipelineSupervisionSendResult = typeof PipelineSupervisionSendResult.Type;
+
+export const PipelineSupervisionVerdictInput = Schema.Struct({
+  issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
+  verdict: Schema.Literals(["accepted", "rejected"]),
+});
+export type PipelineSupervisionVerdictInput = typeof PipelineSupervisionVerdictInput.Type;
+
+export const PipelineSupervisionVerdictResult = Schema.Struct({
+  verdict: Schema.Literals(["accepted", "rejected"]),
+  headSha: Schema.String,
+});
+export type PipelineSupervisionVerdictResult = typeof PipelineSupervisionVerdictResult.Type;
+
+export const PipelineSupervisionCleanupResult = Schema.Struct({
+  outcome: Schema.Literals(["deleted", "retained", "retryable"]),
+  reason: Schema.String,
+});
+export type PipelineSupervisionCleanupResult = typeof PipelineSupervisionCleanupResult.Type;

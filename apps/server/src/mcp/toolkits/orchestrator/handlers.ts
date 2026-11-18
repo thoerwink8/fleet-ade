@@ -11,6 +11,23 @@ import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as OrchestratorMcpService from "../../OrchestratorMcpService.ts";
 import * as ThreadMetadataMcpService from "../../ThreadMetadataMcpService.ts";
+import * as PipelineSupervision from "../../../pipeline/PipelineSupervision.ts";
+
+const requirePipelineSupervision = Effect.serviceOption(
+  PipelineSupervision.PipelineSupervision,
+).pipe(
+  Effect.flatMap((service) =>
+    Effect.fromOption(service).pipe(
+      Effect.mapError(
+        () =>
+          new OrchestratorMcpFailure({
+            code: "orchestration_error",
+            message: "Supervised pipeline support is unavailable in this server context.",
+          }),
+      ),
+    ),
+  ),
+);
 
 const handlers = {
   orchestrator_capabilities: McpToolAccess.reads((input) =>
@@ -226,6 +243,41 @@ const handlers = {
           ),
         );
       return { environmentId, removed };
+    }),
+  ),
+  t3_pipeline_start: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* requirePipelineSupervision;
+      return yield* service.start(scope, input);
+    }),
+  ),
+  t3_pipeline_status: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* requirePipelineSupervision;
+      return yield* service.status(scope, input);
+    }),
+  ),
+  t3_pipeline_send: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* requirePipelineSupervision;
+      return yield* service.send(scope, input);
+    }),
+  ),
+  t3_pipeline_accept: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* requirePipelineSupervision;
+      return yield* service.verdict(scope, input);
+    }),
+  ),
+  t3_pipeline_cleanup: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* requirePipelineSupervision;
+      return yield* service.cleanup(scope, input);
     }),
   ),
   t3_thread_interrupt: McpToolAccess.writesThreads(
