@@ -1,4 +1,4 @@
-import { DEFAULT_PIPELINE_REPOS, parsePipelineRepo } from "@t3tools/contracts";
+import { DEFAULT_PIPELINE_REPOS, parsePipelineRepo } from "@t3tools/contracts/settings";
 
 /** The repository that stays on `pipeline/` branches and is not marked 「本机做」. */
 export const DEFAULT_REPO = DEFAULT_PIPELINE_REPOS[0];
