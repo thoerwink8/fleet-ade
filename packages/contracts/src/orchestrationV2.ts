@@ -509,6 +509,8 @@ export const OrchestrationV2AppThread = Schema.Struct({
   limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecovery)),
   guestShare: Schema.optional(Schema.NullOr(ThreadGuestShare)),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+  /** Absent on threads written before commander marks; not a commander. */
+  commander: Schema.optional(Schema.Boolean),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
@@ -1953,6 +1955,8 @@ export const OrchestrationV2DomainEvent = Schema.Union([
       "thread.pinned",
       "thread.auto-settle-set",
       "thread.unpinned",
+      "thread.commander-marked",
+      "thread.commander-unmarked",
       "thread.pin-reordered",
       "thread.active-reordered",
       "thread.tags-updated",
@@ -2209,6 +2213,8 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   snoozedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecovery)),
   pinnedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+  /** Absent on threads written before commander marks; not a commander. */
+  commander: Schema.optional(Schema.Boolean),
   autoSettleDisabledAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
   pinOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
   activeOrderKey: Schema.optional(Schema.NullOr(TrimmedNonEmptyString)),
@@ -2886,6 +2892,8 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
       "thread.pinned",
       "thread.auto-settle-set",
       "thread.unpinned",
+      "thread.commander-marked",
+      "thread.commander-unmarked",
       "thread.pin-reordered",
       "thread.active-reordered",
       "thread.tags-updated",
@@ -3128,6 +3136,16 @@ export const OrchestrationV2Command = Schema.Union([
   }),
   Schema.Struct({
     type: Schema.Literal("thread.unpin"),
+    commandId: CommandId,
+    threadId: ThreadId,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("thread.commander.mark"),
+    commandId: CommandId,
+    threadId: ThreadId,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("thread.commander.unmark"),
     commandId: CommandId,
     threadId: ThreadId,
   }),

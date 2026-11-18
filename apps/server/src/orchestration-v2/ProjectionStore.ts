@@ -915,6 +915,8 @@ export function applyToProjection(
     // Reordering and PR refreshes preserve the orchestrator's activity timestamp.
     case "thread.active-reordered":
     case "thread.tags-updated":
+    case "thread.commander-marked":
+    case "thread.commander-unmarked":
     case "thread.pull-request-synced":
       return {
         ...base,
@@ -1805,6 +1807,7 @@ export function threadShellFromProjection(
     snoozedUntil: projection.thread.snoozedUntil ?? null,
     snoozedAt: projection.thread.snoozedAt ?? null,
     pinnedAt: projection.thread.pinnedAt ?? null,
+    commander: projection.thread.commander === true,
 
     autoSettleDisabledAt: projection.thread.autoSettleDisabledAt ?? null,
     pinOrderKey: projection.thread.pinOrderKey ?? null,
@@ -2102,6 +2105,7 @@ function shellFromState(input: {
     snoozedUntil: input.state.thread.snoozedUntil ?? null,
     snoozedAt: input.state.thread.snoozedAt ?? null,
     pinnedAt: input.state.thread.pinnedAt ?? null,
+    commander: input.state.thread.commander === true,
 
     autoSettleDisabledAt: input.state.thread.autoSettleDisabledAt ?? null,
     pinOrderKey: input.state.thread.pinOrderKey ?? null,
@@ -2256,6 +2260,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             case "thread.pin-reordered":
             case "thread.active-reordered":
             case "thread.tags-updated":
+            case "thread.commander-marked":
+            case "thread.commander-unmarked":
             case "thread.visited":
             case "thread.marked-unread":
             case "thread.metadata-updated":
@@ -3073,6 +3079,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             event.type !== "thread.pin-reordered" &&
             event.type !== "thread.active-reordered" &&
             event.type !== "thread.tags-updated" &&
+            event.type !== "thread.commander-marked" &&
+            event.type !== "thread.commander-unmarked" &&
             event.type !== "thread.visited" &&
             event.type !== "thread.marked-unread" &&
             event.type !== "thread.metadata-updated" &&
