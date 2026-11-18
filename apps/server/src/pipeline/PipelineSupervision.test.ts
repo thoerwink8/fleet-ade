@@ -9,13 +9,11 @@ import {
   type OrchestrationV2Run,
   type OrchestrationV2ThreadShell,
   type Project,
-  type StorageCleanupReport,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
-import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
@@ -23,7 +21,6 @@ import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.t
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import * as StorageCleanup from "../storageCleanup.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import { PipelineSupervision, layer as supervisionLayer } from "./PipelineSupervision.ts";
 import { PipelineGitHubIssues, PipelineIssuesIncompleteError } from "./GitHubIssues.ts";
@@ -145,10 +142,7 @@ const message = (threadId: ThreadId): ThreadManagement.ThreadManagementSendResul
   creationSource: "mcp",
 });
 
-const layer = (
-  shells: ReadonlyMap<ThreadId, OrchestrationV2ThreadShell | null>,
-  cleanup: StorageCleanupReport,
-) => {
+const layer = (shells: ReadonlyMap<ThreadId, OrchestrationV2ThreadShell | null>) => {
   const projectionThread = (threadId: ThreadId) => {
     const current = shells.get(threadId) ?? shell(threadId);
     const {
@@ -186,12 +180,6 @@ const layer = (
   const projects = Layer.mock(ProjectService.ProjectService)({
     getById: () => Effect.succeedSome(project),
   });
-  const cleanupLayer = Layer.succeed(StorageCleanup.StorageCleanup, {
-    runNow: Effect.succeed(cleanup),
-    latestReport: Effect.succeed(cleanup),
-    reports: Stream.succeed(cleanup),
-    drain: Effect.void,
-  });
   const runs = runsLayer.pipe(
     Layer.provide(
       Layer.succeed(
@@ -228,33 +216,10 @@ const layer = (
   return supervisionLayer.pipe(
     Layer.provide(threads),
     Layer.provide(projects),
-    Layer.provide(cleanupLayer),
     Layer.provideMerge(runs),
     Layer.provideMerge(ServerSettings.layerTest({ pipelineRepos: [repository] })),
   );
 };
-
-const report = (outcome: "removed" | "kept" | "failed"): StorageCleanupReport => ({
-  trigger: "manual",
-  startedAt: "2026-11-18T00:00:00.000Z",
-  finishedAt: "2026-11-18T00:00:01.000Z",
-  entries: [
-    {
-      kind: "worktree",
-      outcome,
-      reason: outcome === "removed" ? "Inactive for 30 days" : "still needed",
-      path: "/worktrees/worker",
-      projectPath: null,
-      threadId: workerId,
-      threadTitle: workerId,
-      bytes: null,
-      files: null,
-    },
-  ],
-  counts: { removed: outcome === "removed" ? 1 : 0, kept: outcome === "kept" ? 1 : 0, failed: 0 },
-  omittedCount: 0,
-  bytesFreed: 0,
-});
 
 describe("PipelineSupervision", () => {
   it.effect("授权控制线程、拒绝抢占并如实回报投递", () =>
@@ -272,7 +237,23 @@ describe("PipelineSupervision", () => {
         issueNumber: 81,
         message: "继续",
       });
-      assert.deepStrictEqual(sent, { delivery: "queued", status: "queued" });
+      assert.deepStrictEqual(sent, {
+        delivery: "queued",
+        threadId: workerId,
+        messageId: MessageId.make(`message:${workerId}`),
+        runId: RunId.make(`run:${workerId}`),
+        status: "queued",
+      });
+      const status = yield* supervision.status(scope(controllerId), { issueNumber: 81 });
+      assert.strictEqual(status.run.id, started.id);
+      assert.deepStrictEqual(status.worker, {
+        threadId: workerId,
+        latestRunId: RunId.make(`run:${workerId}`),
+        activeRunId: RunId.make(`run:${workerId}`),
+        status: "running",
+        latestMessage: null,
+        lastError: null,
+      });
     }).pipe(
       Effect.provide(
         layer(
@@ -280,32 +261,59 @@ describe("PipelineSupervision", () => {
             [controllerId, shell(controllerId)],
             [workerId, shell(workerId)],
           ]),
-          report("kept"),
         ),
       ),
     ),
   );
 
-  it.effect("只清理当前头已验收且清理报告确认删除的工作树", () =>
+  it.effect("拒绝旧头验收并接受同一头验收", () =>
+    Effect.gen(function* () {
+      const supervision = yield* PipelineSupervision;
+      const started = yield* supervision.start(scope(controllerId), { issueNumber: 81 });
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`UPDATE pipeline_runs SET head_sha = 'abc' WHERE id = ${started.id}`;
+      const staleReview = {
+        issueNumber: 81,
+        verdict: "accepted" as const,
+        expectedHeadSha: "abc",
+      };
+      yield* sql`UPDATE pipeline_runs SET head_sha = 'def' WHERE id = ${started.id}`;
+      const stale = yield* Effect.exit(supervision.verdict(scope(controllerId), staleReview));
+      assert.strictEqual(Exit.isFailure(stale), true);
+      const accepted = yield* supervision.verdict(scope(controllerId), {
+        issueNumber: 81,
+        verdict: "accepted",
+        expectedHeadSha: "def",
+      });
+      assert.deepStrictEqual(accepted, { verdict: "accepted", headSha: "def" });
+    }).pipe(Effect.provide(layer(new Map([[controllerId, shell(controllerId)]])))),
+  );
+
+  it.effect("未合并时保留工人，合并后才按现有生命周期安全清理", () =>
     Effect.gen(function* () {
       const supervision = yield* PipelineSupervision;
       const started = yield* supervision.start(scope(controllerId), { issueNumber: 81 });
       const sql = yield* SqlClient.SqlClient;
       yield* sql`UPDATE pipeline_runs SET thread_id = ${workerId}, head_sha = 'abc' WHERE id = ${started.id}`;
-      const refused = yield* Effect.exit(
-        supervision.cleanup(scope(controllerId), { issueNumber: 81 }),
-      );
-      assert.strictEqual(Exit.isFailure(refused), true);
       const accepted = yield* supervision.verdict(scope(controllerId), {
         issueNumber: 81,
         verdict: "accepted",
+        expectedHeadSha: "abc",
       });
       assert.deepStrictEqual(accepted, { verdict: "accepted", headSha: "abc" });
-      const cleaned = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
-      assert.deepStrictEqual(cleaned, { outcome: "deleted", reason: "Inactive for 30 days" });
+      const beforeMerge = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
+      assert.deepStrictEqual(beforeMerge, {
+        outcome: "retained",
+        reason: "Pipeline run has not been merged.",
+      });
       const stored = yield* PipelineRuns;
-      const current = (yield* stored.list).runs.find((run) => run.id === started.id);
-      assert.strictEqual(current?.status === "merged", false);
+      yield* stored.note(81, { status: "merged" }, repository);
+      const cleaned = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
+      assert.deepStrictEqual(cleaned, {
+        outcome: "retained",
+        reason:
+          "Worker deletion requested; existing lifecycle cleanup will remove its worktree only when safe.",
+      });
     }).pipe(
       Effect.provide(
         layer(
@@ -320,7 +328,6 @@ describe("PipelineSupervision", () => {
               }),
             ],
           ]),
-          report("removed"),
         ),
       ),
     ),

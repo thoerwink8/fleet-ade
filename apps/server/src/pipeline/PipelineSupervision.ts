@@ -10,7 +10,7 @@ import type { McpInvocationScope } from "../mcp/McpInvocationContext.ts";
 import { ThreadManagementService } from "../orchestration-v2/ThreadManagementService.ts";
 import { ProjectService } from "../project/ProjectService.ts";
 import { ServerSettingsService } from "../serverSettings.ts";
-import { StorageCleanup, storageCleanupThreadIdle } from "../storageCleanup.ts";
+import { storageCleanupThreadIdle } from "../storageCleanup.ts";
 import { PipelineRuns } from "./PipelineRuns.ts";
 import { resolveInteractionMode, resolveRuntimeMode } from "../mcp/delegatedTaskModes.ts";
 
@@ -24,7 +24,6 @@ export const make = Effect.gen(function* () {
   const settings = yield* ServerSettingsService;
   const runs = yield* PipelineRuns;
   const sql = yield* SqlClient.SqlClient;
-  const cleanup = yield* StorageCleanup;
   const authorize = Effect.fn("PipelineSupervision.authorize")(function* (
     scope: McpInvocationScope,
   ) {
@@ -64,17 +63,18 @@ export const make = Effect.gen(function* () {
   const owned = Effect.fn("PipelineSupervision.owned")(function* (
     scope: McpInvocationScope,
     issueNumber: number,
+    includeMerged = false,
   ) {
     const context = yield* authorize(scope);
     const run = (yield* runs.list.pipe(Effect.mapError(failed))).runs.find(
       (candidate) =>
         candidate.repository === context.repository &&
         candidate.issueNumber === issueNumber &&
-        candidate.status !== "merged" &&
+        (includeMerged || candidate.status !== "merged") &&
         !(candidate.status === "stuck" && candidate.stuckReason === "取消"),
     );
     if (run === undefined || run.controllerThreadId !== context.caller.id)
-      return yield* denied("No active run belongs to this controller.");
+      return yield* denied("No run belongs to this controller in the requested lifecycle.");
     return { ...context, run };
   });
   return {
@@ -98,7 +98,24 @@ export const make = Effect.gen(function* () {
       scope: McpInvocationScope,
       input: { issueNumber: number },
     ) {
-      return (yield* owned(scope, input.issueNumber)).run;
+      const { caller, run } = yield* owned(scope, input.issueNumber);
+      if (run.threadId === null) return { run, worker: null };
+      const worker = yield* threads
+        .getThreadShell(ThreadId.make(run.threadId))
+        .pipe(Effect.mapError(failed));
+      if (worker === null || worker.projectId !== caller.projectId)
+        return yield* denied("Worker does not belong to the controller project.");
+      return {
+        run,
+        worker: {
+          threadId: worker.id,
+          latestRunId: worker.latestRunId,
+          activeRunId: worker.activeRunId,
+          status: worker.status,
+          latestMessage: worker.latestVisibleMessage,
+          lastError: worker.lastError ?? null,
+        },
+      };
     }),
     send: Effect.fn("PipelineSupervision.send")(function* (
       scope: McpInvocationScope,
@@ -131,40 +148,52 @@ export const make = Effect.gen(function* () {
           creationSource: "mcp",
         })
         .pipe(Effect.mapError(failed));
-      return { delivery: result.delivery, status: result.run.status };
+      return {
+        delivery: result.delivery,
+        threadId,
+        messageId: result.message.id,
+        runId: result.run.id,
+        status: result.run.status,
+      };
     }),
     verdict: Effect.fn("PipelineSupervision.verdict")(function* (
       scope: McpInvocationScope,
       input: {
         issueNumber: number;
         verdict: "accepted" | "rejected";
+        expectedHeadSha: string;
       },
     ) {
       const { caller, run } = yield* owned(scope, input.issueNumber);
       if (run.headSha === null) return yield* denied("The current run has no head to judge.");
+      if (run.headSha !== input.expectedHeadSha)
+        return yield* denied("The reviewed head is no longer current.");
       const updated = yield* sql<{
         id: number;
       }>`UPDATE pipeline_runs SET controller_verdict = ${input.verdict},
-        accepted_head_sha = ${input.verdict === "accepted" ? run.headSha : null}
-        WHERE id = ${run.id} AND controller_thread_id = ${caller.id} AND head_sha = ${run.headSha}
+        accepted_head_sha = ${input.verdict === "accepted" ? input.expectedHeadSha : null}
+        WHERE id = ${run.id} AND controller_thread_id = ${caller.id}
+        AND head_sha = ${input.expectedHeadSha}
         AND status != 'merged' AND NOT (status = 'stuck' AND stuck_reason = '取消') RETURNING id`.pipe(
         Effect.mapError(failed),
       );
       if (updated.length !== 1)
         return yield* denied("Run or head changed before the verdict was recorded.");
-      return { verdict: input.verdict, headSha: run.headSha };
+      return { verdict: input.verdict, headSha: input.expectedHeadSha };
     }),
     cleanup: Effect.fn("PipelineSupervision.cleanup")(function* (
       scope: McpInvocationScope,
       input: { issueNumber: number },
     ) {
-      const { caller, run, current } = yield* owned(scope, input.issueNumber);
+      const { caller, run, current } = yield* owned(scope, input.issueNumber, true);
       if (
         run.controllerVerdict !== "accepted" ||
         run.headSha === null ||
         run.acceptedHeadSha !== run.headSha
       )
         return yield* denied("Cleanup requires acceptance of the current head.");
+      if (run.status !== "merged")
+        return { outcome: "retained" as const, reason: "Pipeline run has not been merged." };
       if (run.threadId === null)
         return { outcome: "retained" as const, reason: "The worker has not started." };
       const threadId = ThreadId.make(run.threadId);
@@ -190,21 +219,10 @@ export const make = Effect.gen(function* () {
           })
           .pipe(Effect.mapError(failed));
       }
-      const report = yield* cleanup.runNow.pipe(Effect.mapError(failed));
-      const entry = report.entries.find(
-        (entry) =>
-          entry.kind === "worktree" &&
-          (entry.threadId === threadId || entry.path === worker.worktreePath),
-      );
       return {
-        outcome:
-          entry?.outcome === "removed"
-            ? ("deleted" as const)
-            : entry?.outcome === "failed"
-              ? ("retryable" as const)
-              : ("retained" as const),
+        outcome: "retained" as const,
         reason:
-          entry?.reason ?? "StorageCleanup did not report this worktree; no removal is confirmed.",
+          "Worker deletion requested; existing lifecycle cleanup will remove its worktree only when safe.",
       };
     }),
   };

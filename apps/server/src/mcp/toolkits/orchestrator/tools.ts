@@ -42,6 +42,7 @@ import {
   PipelineSupervisionSendResult,
   PipelineSupervisionSendInput,
   PipelineSupervisionStartInput,
+  PipelineSupervisionStatusResult,
   PipelineSupervisionVerdictInput,
   PipelineSupervisionVerdictResult,
 } from "@t3tools/contracts";
@@ -366,7 +367,7 @@ const supervisionDependencies = dependencies;
 
 const PipelineStartTool = Tool.make("t3_pipeline_start", {
   description:
-    "Start one supervised pipeline run for an allowlisted issue in this project. Pass only `issueNumber`. The server derives the controller, project, repository, and provider. `delivery` later reports orchestration acceptance, not provider execution. An existing run is never adopted.",
+    "Start one supervised pipeline run for an allowlisted issue in this project. Pass only `issueNumber`; the server derives the controller, repository, and provider. Existing runs are never adopted.",
   parameters: PipelineSupervisionStartInput,
   success: PipelineRun,
   failure: OrchestratorMcpFailure,
@@ -380,9 +381,9 @@ const PipelineStartTool = Tool.make("t3_pipeline_start", {
 
 const PipelineStatusTool = Tool.make("t3_pipeline_status", {
   description:
-    "Read the active supervised run this controller started for `issueNumber`. It does not reveal another controller's run.",
+    "Read this controller's supervised run and worker receipt. The worker includes stable thread/run IDs and latest visible output for `t3_thread_wait` and `t3_thread_read`; no other controller's run is exposed.",
   parameters: PipelineSupervisionStartInput,
-  success: PipelineRun,
+  success: PipelineSupervisionStatusResult,
   failure: OrchestratorMcpFailure,
   failureMode: "return",
   dependencies: supervisionDependencies,
@@ -407,7 +408,7 @@ const PipelineSendTool = Tool.make("t3_pipeline_send", {
 
 const PipelineVerdictTool = Tool.make("t3_pipeline_accept", {
   description:
-    "Accept or reject this controller's active run at its current head. The server records that head; a later head clears the verdict. Acceptance is not merge authorization.",
+    "Accept or reject the exact reviewed head of this controller's active run. Pass `expectedHeadSha`; a changed head is rejected. Acceptance is not merge authorization.",
   parameters: PipelineSupervisionVerdictInput,
   success: PipelineSupervisionVerdictResult,
   failure: OrchestratorMcpFailure,
@@ -420,7 +421,7 @@ const PipelineVerdictTool = Tool.make("t3_pipeline_accept", {
 
 const PipelineCleanupTool = Tool.make("t3_pipeline_cleanup", {
   description:
-    "After the current head is accepted, archive its idle worker through thread deletion and existing storage cleanup. Running, shared, dirty, or unknown work is retained with its reason and can be retried. This never deletes a worktree directly.",
+    "After the accepted head is confirmed merged, delete its idle worker through the existing lifecycle. Active or unknown work is retained; worktree cleanup remains guarded and asynchronous.",
   parameters: PipelineSupervisionStartInput,
   success: PipelineSupervisionCleanupResult,
   failure: OrchestratorMcpFailure,

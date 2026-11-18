@@ -1,5 +1,10 @@
 import * as Schema from "effect/Schema";
-import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { MessageId, RunId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import {
+  OrchestrationV2LatestVisibleMessageSummary,
+  OrchestrationV2RunStatus,
+  OrchestrationV2ShellThreadStatus,
+} from "./orchestrationV2.ts";
 
 /** One active run per issue until it is merged or a person cancels and closes it out. */
 export const PIPELINE_RUN_STATUSES = [
@@ -123,13 +128,33 @@ export type PipelineSupervisionSendInput = typeof PipelineSupervisionSendInput.T
 
 export const PipelineSupervisionSendResult = Schema.Struct({
   delivery: Schema.Literals(["started", "queued", "steered", "restarted"]),
-  status: Schema.String,
+  threadId: ThreadId,
+  messageId: MessageId,
+  runId: RunId,
+  status: OrchestrationV2RunStatus,
 });
 export type PipelineSupervisionSendResult = typeof PipelineSupervisionSendResult.Type;
+
+export const PipelineSupervisionWorkerStatus = Schema.Struct({
+  threadId: ThreadId,
+  latestRunId: Schema.NullOr(RunId),
+  activeRunId: Schema.NullOr(RunId),
+  status: OrchestrationV2ShellThreadStatus,
+  latestMessage: Schema.NullOr(OrchestrationV2LatestVisibleMessageSummary),
+  lastError: Schema.NullOr(Schema.String),
+});
+export type PipelineSupervisionWorkerStatus = typeof PipelineSupervisionWorkerStatus.Type;
+
+export const PipelineSupervisionStatusResult = Schema.Struct({
+  run: PipelineRun,
+  worker: Schema.NullOr(PipelineSupervisionWorkerStatus),
+});
+export type PipelineSupervisionStatusResult = typeof PipelineSupervisionStatusResult.Type;
 
 export const PipelineSupervisionVerdictInput = Schema.Struct({
   issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
   verdict: Schema.Literals(["accepted", "rejected"]),
+  expectedHeadSha: TrimmedNonEmptyString,
 });
 export type PipelineSupervisionVerdictInput = typeof PipelineSupervisionVerdictInput.Type;
 

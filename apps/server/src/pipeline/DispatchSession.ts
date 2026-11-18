@@ -55,6 +55,7 @@ interface OpenRun {
   readonly sessionStartedAt: string | null;
   readonly sessionEndedAt: string | null;
   readonly renewedOnce: boolean;
+  readonly controllerThreadId: string | null;
 }
 
 const OpenRunRow = Schema.Struct({
@@ -67,6 +68,7 @@ const OpenRunRow = Schema.Struct({
   sessionStartedAt: Schema.NullOr(Schema.String),
   sessionEndedAt: Schema.NullOr(Schema.String),
   renewedOnce: Schema.Boolean,
+  controllerThreadId: Schema.NullOr(Schema.String),
 });
 
 export interface DispatchedSession {
@@ -280,15 +282,16 @@ const make = Effect.gen(function* () {
 
   const tick = Effect.gen(function* () {
     const current = yield* settings.getSettings;
-    if (!current.pipelineEnabled) return;
+    const pending = yield* openRuns();
+    if (!current.pipelineEnabled && pending.every((run) => run.controllerThreadId === null)) return;
     const now = yield* DateTime.now;
     const nowIso = DateTime.formatIso(now);
     const timeout = Duration.toMillis(Duration.minutes(current.pipelineSessionTimeoutMinutes));
-    const pending = yield* openRuns();
     const ends = yield* inbox.list;
     const endByThread = new Map(ends.map((entry) => [entry.threadId, entry]));
 
     for (const run of pending) {
+      if (!current.pipelineEnabled && run.controllerThreadId === null) continue;
       if (run.status === "session") {
         if (run.sessionEndedAt !== null) continue;
         const entry =

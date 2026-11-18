@@ -534,6 +534,34 @@ const make = Effect.gen(function* () {
       ),
     );
   });
+  const releaseUnstoredClaim = Effect.fn("PipelineRuns.releaseUnstoredClaim")(function* (claim: {
+    readonly repository: string;
+    readonly issueNumber: number;
+    readonly token: string;
+  }) {
+    const released = yield* Effect.exit(
+      ClaimLease.releaseClaim(claims, {
+        repo: claim.repository,
+        issue: claim.issueNumber,
+        token: claim.token,
+      }),
+    );
+    if (Exit.isFailure(released)) {
+      yield* Effect.logError("pipeline.claim.release-orphaned", {
+        issue: claim.issueNumber,
+        token: claim.token,
+        cause: Cause.pretty(released.cause),
+      });
+      return;
+    }
+    if (released.value.status !== 200 && released.value.code !== "not_claimed") {
+      yield* Effect.logError("pipeline.claim.release-orphaned", {
+        issue: claim.issueNumber,
+        token: claim.token,
+        cause: released.value.code,
+      });
+    }
+  });
 
   const releasePending = Effect.fn("PipelineRuns.releasePending")(function* () {
     const pending = yield* sql<{
@@ -707,26 +735,11 @@ const make = Effect.gen(function* () {
         }),
       );
       if (Exit.isFailure(stored) || stored.value === undefined) {
-        const released = yield* Effect.exit(
-          ClaimLease.releaseClaim(claims, {
-            repo: repository,
-            issue: issue.number,
-            token: leased.token,
-          }),
-        );
-        if (Exit.isFailure(released)) {
-          yield* Effect.logError("pipeline.claim.release-orphaned", {
-            issue: issue.number,
-            token: leased.token,
-            cause: Cause.pretty(released.cause),
-          });
-        } else if (released.value.status !== 200 && released.value.code !== "not_claimed") {
-          yield* Effect.logError("pipeline.claim.release-orphaned", {
-            issue: issue.number,
-            token: leased.token,
-            cause: released.value.code,
-          });
-        }
+        yield* releaseUnstoredClaim({
+          repository,
+          issueNumber: issue.number,
+          token: leased.token,
+        });
         if (Exit.isFailure(stored)) return yield* Effect.failCause(stored.cause);
         continue;
       }
@@ -819,13 +832,11 @@ const make = Effect.gen(function* () {
       }),
     );
     if (Exit.isFailure(stored) || stored.value === undefined) {
-      yield* Effect.exit(
-        ClaimLease.releaseClaim(claims, {
-          repo: repo.slug,
-          issue: issue.number,
-          token: leased.token,
-        }),
-      );
+      yield* releaseUnstoredClaim({
+        repository: repo.slug,
+        issueNumber: issue.number,
+        token: leased.token,
+      });
       if (Exit.isFailure(stored)) return yield* Effect.failCause(stored.cause);
       return { status: "rejected", code: "conflict" as const };
     }
