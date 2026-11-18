@@ -43,6 +43,7 @@ describe("V2 preview upgrade", () => {
         [96, "PipelineCandidatesExhausted"],
         [97, "PipelineDailyBrief"],
         [98, "PipelineRunClaimToken"],
+        [99, "PipelineRunController"],
       ]);
       const after = yield* sql`SELECT * FROM pipeline_runs`;
       assert.deepStrictEqual(
@@ -53,6 +54,9 @@ describe("V2 preview upgrade", () => {
             notified_reason: _notifiedReason,
             notify_note: _notifyNote,
             claim_token: _claimToken,
+            controller_thread_id: _controllerThreadId,
+            accepted_head_sha: _acceptedHeadSha,
+            controller_verdict: _controllerVerdict,
             ...rest
           } = row;
           return rest;
@@ -60,7 +64,8 @@ describe("V2 preview upgrade", () => {
         before,
       );
       assert.deepStrictEqual(
-        yield* sql`SELECT commit_note, ci_queue_note, notified_reason, notify_note, claim_token FROM pipeline_runs WHERE id = 28`,
+        yield* sql`SELECT commit_note, ci_queue_note, notified_reason, notify_note, claim_token,
+          controller_thread_id, accepted_head_sha, controller_verdict FROM pipeline_runs WHERE id = 28`,
         [
           {
             commit_note: null,
@@ -68,6 +73,9 @@ describe("V2 preview upgrade", () => {
             notified_reason: null,
             notify_note: null,
             claim_token: null,
+            controller_thread_id: null,
+            accepted_head_sha: null,
+            controller_verdict: null,
           },
         ],
       );
@@ -141,6 +149,7 @@ describe("V2 preview upgrade", () => {
         [96, "PipelineCandidatesExhausted"],
         [97, "PipelineDailyBrief"],
         [98, "PipelineRunClaimToken"],
+        [99, "PipelineRunController"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -262,6 +271,7 @@ describe("V2 preview upgrade", () => {
         [96, "PipelineCandidatesExhausted"],
         [97, "PipelineDailyBrief"],
         [98, "PipelineRunClaimToken"],
+        [99, "PipelineRunController"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

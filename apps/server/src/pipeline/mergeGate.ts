@@ -19,6 +19,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { PipelineBudget } from "./budget.ts";
 import { PIPELINE_HOST } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import { parseRepo } from "./repoAllowlist.ts";
 import standardPathsFile from "./standard-paths.json" with { type: "json" };
 
@@ -53,6 +54,9 @@ export interface MergeGateFacts {
   readonly coldVerify: HeadCheck;
   readonly paths: ReadonlyArray<string>;
   readonly autoMerge: boolean;
+  readonly supervised?: boolean;
+  readonly controllerVerdict?: "accepted" | "rejected" | null;
+  readonly acceptedHeadSha?: string | null;
 }
 
 export type MergeGateDecision =
@@ -102,6 +106,12 @@ export const decideMerge = (
   const onThisHead = (check: RequiredCheck): boolean =>
     check.state === "success" && check.sha === facts.headSha;
   if (
+    facts.supervised === true &&
+    (facts.controllerVerdict !== "accepted" || facts.acceptedHeadSha !== facts.headSha)
+  ) {
+    return { kind: "hold" };
+  }
+  if (
     !facts.checks.some((check) => check.name === CI_CHECK_NAME && onThisHead(check)) ||
     !facts.checks.every(onThisHead) ||
     facts.coldVerify.state !== "success" ||
@@ -109,7 +119,7 @@ export const decideMerge = (
   ) {
     return { kind: "hold" };
   }
-  return facts.autoMerge ? { kind: "merge" } : { kind: "mergeable" };
+  return facts.supervised === true || !facts.autoMerge ? { kind: "mergeable" } : { kind: "merge" };
 };
 
 export interface MergeGateObservation {
@@ -380,11 +390,11 @@ const make = Effect.gen(function* () {
 
   const tick = Effect.gen(function* () {
     const current = yield* settings.getSettings;
-    if (!current.pipelineEnabled) return;
     const listed = yield* runs.list;
     const attempted = new Set<string>();
 
     for (const run of listed.runs) {
+      if (!shouldAdvancePipelineRun(current.pipelineEnabled, run)) continue;
       if (run.status !== "checks" && run.status !== "verify" && run.status !== "mergeable") {
         continue;
       }
@@ -433,6 +443,9 @@ const make = Effect.gen(function* () {
         },
         paths: observed.value.paths,
         autoMerge: current.pipelineAutoMerge,
+        supervised: run.controllerThreadId !== null,
+        controllerVerdict: run.controllerVerdict,
+        acceptedHeadSha: run.acceptedHeadSha,
       });
       if (decision.kind === "hold") continue;
       if (decision.kind === "unread") {

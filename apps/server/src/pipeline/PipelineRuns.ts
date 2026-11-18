@@ -72,6 +72,9 @@ const RunRow = Schema.Struct({
   notifiedReason: Schema.NullOr(Schema.String),
   notifyNote: Schema.NullOr(Schema.String),
   threadId: Schema.NullOr(Schema.String),
+  controllerThreadId: Schema.NullOr(Schema.String),
+  acceptedHeadSha: Schema.NullOr(Schema.String),
+  controllerVerdict: Schema.NullOr(Schema.Literals(["accepted", "rejected"])),
   prNumber: Schema.NullOr(Schema.Int),
   headSha: Schema.NullOr(Schema.String),
   updatedAt: Schema.String,
@@ -152,9 +155,24 @@ export interface PipelineRunNote {
   readonly renewedOnce?: boolean;
 }
 
+export type StartSupervisedCode =
+  | "disabled"
+  | "repository_denied"
+  | "ineligible"
+  | "conflict"
+  | "claim_rejected";
+export type StartSupervisedResult =
+  | { readonly status: "started"; readonly run: PipelineRun }
+  | { readonly status: "rejected"; readonly code: StartSupervisedCode };
+
 interface PipelineRunsShape {
   readonly tick: Effect.Effect<void, PipelineRunsError>;
   readonly list: Effect.Effect<PipelineRunList, PipelineRunsError>;
+  readonly startSupervised: (input: {
+    readonly issueNumber: number;
+    readonly repository: string;
+    readonly controllerThreadId: string;
+  }) => Effect.Effect<StartSupervisedResult, PipelineRunsError>;
   readonly note: (
     issueNumber: number,
     patch: PipelineRunNote,
@@ -273,6 +291,9 @@ const SELECT_RUNS = `
     notified_reason AS notifiedReason,
     notify_note AS notifyNote,
     thread_id AS threadId,
+    controller_thread_id AS controllerThreadId,
+    accepted_head_sha AS acceptedHeadSha,
+    controller_verdict AS controllerVerdict,
     pr_number AS prNumber,
     head_sha AS headSha,
     updated_at AS updatedAt,
@@ -364,11 +385,12 @@ const make = Effect.gen(function* () {
     readonly status: "claimed" | "stuck";
     readonly stuckReason: PipelineStuckReason | null;
     readonly claimToken?: string | null;
+    readonly controllerThreadId?: string;
   }) {
     const at = yield* nowIso();
     const inserted = yield* sql<{ readonly id: number }>`
       INSERT INTO pipeline_runs (
-        repository, issue_number, title, status, stuck_reason, updated_at, claim_token
+        repository, issue_number, title, status, stuck_reason, updated_at, claim_token, controller_thread_id
       )
       VALUES (
         ${input.repository},
@@ -377,7 +399,8 @@ const make = Effect.gen(function* () {
         ${input.status},
         ${input.stuckReason},
         ${at},
-        ${input.claimToken ?? null}
+        ${input.claimToken ?? null},
+        ${input.controllerThreadId ?? null}
       )
       RETURNING id
     `.pipe(
@@ -510,6 +533,34 @@ const make = Effect.gen(function* () {
         }),
       ),
     );
+  });
+  const releaseUnstoredClaim = Effect.fn("PipelineRuns.releaseUnstoredClaim")(function* (claim: {
+    readonly repository: string;
+    readonly issueNumber: number;
+    readonly token: string;
+  }) {
+    const released = yield* Effect.exit(
+      ClaimLease.releaseClaim(claims, {
+        repo: claim.repository,
+        issue: claim.issueNumber,
+        token: claim.token,
+      }),
+    );
+    if (Exit.isFailure(released)) {
+      yield* Effect.logError("pipeline.claim.release-orphaned", {
+        issue: claim.issueNumber,
+        token: claim.token,
+        cause: Cause.pretty(released.cause),
+      });
+      return;
+    }
+    if (released.value.status !== 200 && released.value.code !== "not_claimed") {
+      yield* Effect.logError("pipeline.claim.release-orphaned", {
+        issue: claim.issueNumber,
+        token: claim.token,
+        cause: released.value.code,
+      });
+    }
   });
 
   const releasePending = Effect.fn("PipelineRuns.releasePending")(function* () {
@@ -684,26 +735,11 @@ const make = Effect.gen(function* () {
         }),
       );
       if (Exit.isFailure(stored) || stored.value === undefined) {
-        const released = yield* Effect.exit(
-          ClaimLease.releaseClaim(claims, {
-            repo: repository,
-            issue: issue.number,
-            token: leased.token,
-          }),
-        );
-        if (Exit.isFailure(released)) {
-          yield* Effect.logError("pipeline.claim.release-orphaned", {
-            issue: issue.number,
-            token: leased.token,
-            cause: Cause.pretty(released.cause),
-          });
-        } else if (released.value.status !== 200 && released.value.code !== "not_claimed") {
-          yield* Effect.logError("pipeline.claim.release-orphaned", {
-            issue: issue.number,
-            token: leased.token,
-            cause: released.value.code,
-          });
-        }
+        yield* releaseUnstoredClaim({
+          repository,
+          issueNumber: issue.number,
+          token: leased.token,
+        });
         if (Exit.isFailure(stored)) return yield* Effect.failCause(stored.cause);
         continue;
       }
@@ -735,6 +771,80 @@ const make = Effect.gen(function* () {
       costLabel: PIPELINE_COST_LABEL,
     }).pipe(Effect.mapError(sqlFailure));
   }).pipe(Effect.withSpan("PipelineRuns.list"));
+
+  const startSupervised: PipelineRunsShape["startSupervised"] = Effect.fn(
+    "PipelineRuns.startSupervised",
+  )(function* (input) {
+    const current = yield* settings.getSettings.pipe(Effect.mapError(sqlFailure));
+    const repo = parseRepo(input.repository);
+    if (repo === undefined || !current.pipelineRepos.includes(repo.slug))
+      return { status: "rejected", code: "repository_denied" as const };
+    const existing = (yield* list).runs.find(
+      (run) =>
+        run.repository === repo.slug && run.issueNumber === input.issueNumber && isActiveRun(run),
+    );
+    if (existing !== undefined) {
+      return existing.controllerThreadId === input.controllerThreadId
+        ? { status: "started", run: existing }
+        : { status: "rejected", code: "conflict" as const };
+    }
+    const candidates = yield* issues.listEligible(repo).pipe(Effect.mapError(sqlFailure));
+    const issue = candidates.find((candidate) => candidate.number === input.issueNumber);
+    if (issue === undefined) return { status: "rejected", code: "ineligible" as const };
+    const prerequisiteState = new Map();
+    for (const number of prerequisiteIssueNumbers(issue.body)) {
+      const read = yield* Effect.exit(issues.read(number, repo));
+      prerequisiteState.set(
+        number,
+        Exit.isSuccess(read) ? (read.value.state ?? "unread") : "unread",
+      );
+    }
+    const now = yield* DateTime.now;
+    const decision = decideIntake(
+      { ...issue, author: issue.author ?? null, createdAt: issue.createdAt ?? null },
+      {
+        whitelist: yield* ports.readWhitelist.pipe(Effect.mapError(sqlFailure)),
+        openedAt: current.pipelineEnabledAt ?? DateTime.formatIso(now),
+        now,
+        prerequisiteState: (number) => prerequisiteState.get(number) ?? "unread",
+      },
+    );
+    if (
+      !decision.pull ||
+      issue.body.includes(WORKFLOWS_PATH) ||
+      acceptanceItemCount(issue.body) < 1
+    )
+      return { status: "rejected", code: "ineligible" as const };
+    const leased = yield* ClaimLease.claimForRun(claims, {
+      repo: repo.slug,
+      issue: issue.number,
+      title: issue.title,
+    });
+    if (leased.status !== 200) return { status: "rejected", code: "claim_rejected" as const };
+    const stored = yield* Effect.exit(
+      insertRun({
+        issue,
+        repository: repo.slug,
+        status: "claimed",
+        stuckReason: null,
+        claimToken: leased.token,
+        controllerThreadId: input.controllerThreadId,
+      }),
+    );
+    if (Exit.isFailure(stored) || stored.value === undefined) {
+      yield* releaseUnstoredClaim({
+        repository: repo.slug,
+        issueNumber: issue.number,
+        token: leased.token,
+      });
+      if (Exit.isFailure(stored)) return yield* Effect.failCause(stored.cause);
+      return { status: "rejected", code: "conflict" as const };
+    }
+    const run = (yield* list).runs.find((candidate) => candidate.id === stored.value);
+    if (run === undefined)
+      return yield* new PipelineRunsError({ cause: "stored supervised run is unreadable" });
+    return { status: "started", run };
+  });
 
   const note: PipelineRunsShape["note"] = Effect.fn("PipelineRuns.note")(function* (
     issueNumber: number,
@@ -795,13 +905,15 @@ const make = Effect.gen(function* () {
         : patch.ciQueueNote === undefined
           ? target.ciQueueNote
           : patch.ciQueueNote;
+    const nextHead = patch.headSha === undefined ? target.headSha : patch.headSha;
+    const verdictStale = nextHead !== target.headSha;
     yield* sql`
       UPDATE pipeline_runs SET
         status = ${nextStatus},
         stuck_reason = ${nextReason},
         thread_id = ${patch.threadId === undefined ? target.threadId : patch.threadId},
         pr_number = ${patch.prNumber === undefined ? target.prNumber : patch.prNumber},
-        head_sha = ${patch.headSha === undefined ? target.headSha : patch.headSha},
+        head_sha = ${nextHead},
         session_started_at = ${
           patch.sessionStartedAt === undefined ? target.sessionStartedAt : patch.sessionStartedAt
         },
@@ -814,6 +926,8 @@ const make = Effect.gen(function* () {
         ci_queue_note = ${ciQueueNote},
         detail = ${patch.detail === undefined ? target.detail : patch.detail},
         renewed_once = ${patch.renewedOnce === true ? 1 : target.renewedOnce},
+        controller_verdict = ${verdictStale ? null : target.controllerVerdict},
+        accepted_head_sha = ${verdictStale ? null : target.acceptedHeadSha},
         updated_at = ${at}
       WHERE id = ${target.id}
     `.pipe(Effect.mapError(sqlFailure));
@@ -852,7 +966,7 @@ const make = Effect.gen(function* () {
     }
   });
 
-  return PipelineRuns.of({ tick, list, note });
+  return PipelineRuns.of({ tick, list, note, startSupervised });
 });
 
 export const layer = Layer.effect(PipelineRuns, make);

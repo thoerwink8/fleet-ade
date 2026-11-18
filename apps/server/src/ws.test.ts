@@ -186,6 +186,8 @@ const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
             lastTick: null,
             costLabel: "折算",
           }),
+          startSupervised: () =>
+            Effect.succeed({ status: "rejected" as const, code: "ineligible" as const }),
           note: () => Effect.void,
         }),
       ),

@@ -2630,6 +2630,7 @@ describe("ClaudeAdapterV2 native fork", () => {
       const configDir = yield* fileSystem.makeTempDirectoryScoped({
         prefix: "t3-claude-root-change-",
       });
+      const workspaceRoot = NodePath.resolve("workspace");
       const sourceSessionId = "11111111-1111-4111-8111-111111111111";
       const sourceCursor = "aaaaaaaa-0000-4000-8000-000000000002";
       const projectDir = NodePath.join(configDir, "projects", "-old-workspace");
@@ -2724,7 +2725,7 @@ describe("ClaudeAdapterV2 native fork", () => {
         runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: "full-access",
           interactionMode: "default",
-          cwd: "/workspace",
+          cwd: workspaceRoot,
         }),
       });
       const sourceProviderThread = yield* runtime.ensureThread({
@@ -2736,7 +2737,7 @@ describe("ClaudeAdapterV2 native fork", () => {
         runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: "full-access",
           interactionMode: "default",
-          cwd: "/workspace",
+          cwd: workspaceRoot,
         }),
       });
       const now = yield* DateTime.now;
@@ -2837,13 +2838,13 @@ describe("ClaudeAdapterV2 native fork", () => {
         runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: "full-access",
           interactionMode: "default",
-          cwd: "/workspace",
+          cwd: workspaceRoot,
         }),
       });
 
       assert.equal(openedQueries[0]?.options.resume, forkedSessionId);
       assert.equal(openedQueries[0]?.options.sessionId, undefined);
-      assert.equal(openedQueries[0]?.options.cwd, NodePath.resolve("/workspace"));
+      assert.equal(openedQueries[0]?.options.cwd, workspaceRoot);
     }).pipe(
       Effect.provide(
         Layer.mergeAll(

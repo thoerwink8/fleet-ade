@@ -149,6 +149,41 @@ describe("PipelineRuns", () => {
     ),
   );
 
+  it.effect("显式启动不依赖流水线开关且同控制线程幂等拒绝抢占", () =>
+    Effect.gen(function* () {
+      const runs = yield* PipelineRuns;
+      const first = yield* runs.startSupervised({
+        issueNumber: 7,
+        repository: "thoerwink8/fleet-ade",
+        controllerThreadId: "controller-a",
+      });
+      assert.strictEqual(first.status, "started");
+      if (first.status !== "started") return;
+      const same = yield* runs.startSupervised({
+        issueNumber: 7,
+        repository: "thoerwink8/fleet-ade",
+        controllerThreadId: "controller-a",
+      });
+      assert.strictEqual(same.status, "started");
+      if (same.status !== "started") return;
+      assert.strictEqual(same.run.id, first.run.id);
+      const other = yield* runs.startSupervised({
+        issueNumber: 7,
+        repository: "thoerwink8/fleet-ade",
+        controllerThreadId: "controller-b",
+      });
+      assert.deepStrictEqual(other, { status: "rejected", code: "conflict" });
+    }).pipe(
+      Effect.provide(
+        pipelineLayer({
+          issues: Effect.succeed([issue(7)]),
+          usage: readable(),
+          enabled: false,
+        }),
+      ),
+    ),
+  );
+
   it.effect("读单失败不建运行", () =>
     Effect.gen(function* () {
       const runs = yield* PipelineRuns;
@@ -584,5 +619,44 @@ describe("PipelineRuns", () => {
       assert.strictEqual(second.runs[0]?.commitCount, 3);
       assert.strictEqual(second.lastTick?.outcome, "ok");
     }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+  );
+
+  it.effect("旧监督记录换头就作废验收，自动运行保持不受监督", () =>
+    Effect.gen(function* () {
+      const runs = yield* PipelineRuns;
+      yield* runs.tick;
+      yield* runs.note(1, {
+        threadId: "worker-1",
+        headSha: "abc",
+        status: "checks",
+        prNumber: 1,
+      });
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`
+        UPDATE pipeline_runs SET
+          controller_thread_id = 'legacy-controller',
+          controller_verdict = 'accepted',
+          accepted_head_sha = 'abc'
+        WHERE issue_number = 1
+      `;
+      yield* runs.note(1, { headSha: "def" });
+      const cleared = (yield* runs.list).runs.find((run) => run.issueNumber === 1);
+      assert.equal(cleared?.headSha, "def");
+      assert.equal(cleared?.controllerThreadId, "legacy-controller");
+      assert.equal(cleared?.controllerVerdict, null);
+      assert.equal(cleared?.acceptedHeadSha, null);
+      yield* runs.note(2, { threadId: "worker-2", status: "checks" });
+      const automatic = (yield* runs.list).runs.find((run) => run.issueNumber === 2);
+      assert.equal(automatic?.controllerThreadId, null);
+      assert.equal(automatic?.controllerVerdict, null);
+      assert.equal(automatic?.acceptedHeadSha, null);
+    }).pipe(
+      Effect.provide(
+        pipelineLayer({
+          issues: Effect.succeed([issue(1), issue(2)]),
+          usage: readable(),
+        }),
+      ),
+    ),
   );
 });

@@ -227,6 +227,46 @@ describe("DispatchSession", () => {
     ),
   );
 
+  it.effect("开关关着只派发可信受监督运行", () =>
+    run(
+      { pipelineEnabled: false, pipelineAuthorModel: [MODEL] },
+      [issue(5)],
+      ({ opened, created }) =>
+        Effect.gen(function* () {
+          const runs = yield* PipelineRuns;
+          const started = yield* runs.startSupervised({
+            issueNumber: 5,
+            repository: "thoerwink8/fleet-ade",
+            controllerThreadId: "thread:controller",
+          });
+          assert.strictEqual(started.status, "started");
+          yield* (yield* DispatchSession.DispatchSession).tick;
+          assert.strictEqual((yield* Ref.get(opened)).length, 1);
+          assert.strictEqual((yield* Ref.get(created)).length, 1);
+          const dispatched = (yield* runs.list).runs[0];
+          assert.strictEqual(dispatched?.status, "session");
+          assert.strictEqual(dispatched?.controllerThreadId, "thread:controller");
+        }),
+    ),
+  );
+
+  it.effect("开关关闭后不派发既有普通认领", () =>
+    run(enabled, [issue(5)], ({ opened, created }) =>
+      Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        yield* runs.tick;
+        yield* (yield* ServerSettings.ServerSettingsService).updateSettings({
+          pipelineEnabled: false,
+        });
+        yield* (yield* DispatchSession.DispatchSession).tick;
+        assert.deepEqual(yield* Ref.get(opened), []);
+        assert.deepEqual(yield* Ref.get(created), []);
+        assert.strictEqual((yield* runs.list).runs[0]?.status, "claimed");
+        assert.strictEqual((yield* runs.list).runs[0]?.controllerThreadId, null);
+      }),
+    ),
+  );
+
   it.effect("没配模型卡住且没有树", () =>
     run({ pipelineEnabled: true, pipelineAuthorModel: [] }, [issue(5)], ({ created }) =>
       Effect.gen(function* () {

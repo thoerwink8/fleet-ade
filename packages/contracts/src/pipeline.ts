@@ -1,4 +1,10 @@
 import * as Schema from "effect/Schema";
+import { MessageId, RunId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import {
+  OrchestrationV2LatestVisibleMessageSummary,
+  OrchestrationV2RunStatus,
+  OrchestrationV2ShellThreadStatus,
+} from "./orchestrationV2.ts";
 
 /** One active run per issue until it is merged or a person cancels and closes it out. */
 export const PIPELINE_RUN_STATUSES = [
@@ -48,6 +54,9 @@ export const PipelineRun = Schema.Struct({
   stuckReason: Schema.NullOr(Schema.Literals(PIPELINE_STUCK_REASONS)),
   notifyNote: Schema.NullOr(Schema.String),
   threadId: NullableText,
+  controllerThreadId: NullableText,
+  acceptedHeadSha: NullableText,
+  controllerVerdict: Schema.NullOr(Schema.Literals(["accepted", "rejected"])),
   prNumber: NullableInt,
   headSha: NullableText,
   updatedAt: Schema.String,
@@ -104,3 +113,59 @@ export class PipelineRunsError extends Schema.TaggedError<PipelineRunsError>()(
     return "Pipeline runs could not be read.";
   }
 }
+
+export const PipelineSupervisionStartInput = Schema.Struct({
+  issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+export type PipelineSupervisionStartInput = typeof PipelineSupervisionStartInput.Type;
+
+export const PipelineSupervisionSendInput = Schema.Struct({
+  issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
+  message: TrimmedNonEmptyString.check(Schema.isMaxLength(100_000)),
+  mode: Schema.optional(Schema.Literals(["auto", "queue", "steer", "restart"])),
+});
+export type PipelineSupervisionSendInput = typeof PipelineSupervisionSendInput.Type;
+
+export const PipelineSupervisionSendResult = Schema.Struct({
+  delivery: Schema.Literals(["started", "queued", "steered", "restarted"]),
+  threadId: ThreadId,
+  messageId: MessageId,
+  runId: RunId,
+  status: OrchestrationV2RunStatus,
+});
+export type PipelineSupervisionSendResult = typeof PipelineSupervisionSendResult.Type;
+
+export const PipelineSupervisionWorkerStatus = Schema.Struct({
+  threadId: ThreadId,
+  latestRunId: Schema.NullOr(RunId),
+  activeRunId: Schema.NullOr(RunId),
+  status: OrchestrationV2ShellThreadStatus,
+  latestMessage: Schema.NullOr(OrchestrationV2LatestVisibleMessageSummary),
+  lastError: Schema.NullOr(Schema.String),
+});
+export type PipelineSupervisionWorkerStatus = typeof PipelineSupervisionWorkerStatus.Type;
+
+export const PipelineSupervisionStatusResult = Schema.Struct({
+  run: PipelineRun,
+  worker: Schema.NullOr(PipelineSupervisionWorkerStatus),
+});
+export type PipelineSupervisionStatusResult = typeof PipelineSupervisionStatusResult.Type;
+
+export const PipelineSupervisionVerdictInput = Schema.Struct({
+  issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
+  verdict: Schema.Literals(["accepted", "rejected"]),
+  expectedHeadSha: TrimmedNonEmptyString,
+});
+export type PipelineSupervisionVerdictInput = typeof PipelineSupervisionVerdictInput.Type;
+
+export const PipelineSupervisionVerdictResult = Schema.Struct({
+  verdict: Schema.Literals(["accepted", "rejected"]),
+  headSha: Schema.String,
+});
+export type PipelineSupervisionVerdictResult = typeof PipelineSupervisionVerdictResult.Type;
+
+export const PipelineSupervisionCleanupResult = Schema.Struct({
+  outcome: Schema.Literals(["deleted", "retained", "retryable"]),
+  reason: Schema.String,
+});
+export type PipelineSupervisionCleanupResult = typeof PipelineSupervisionCleanupResult.Type;
