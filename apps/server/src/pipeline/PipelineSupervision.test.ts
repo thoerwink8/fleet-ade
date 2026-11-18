@@ -14,6 +14,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
@@ -22,6 +23,13 @@ import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
+import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
+import {
+  MergeGate,
+  MergeGateReader,
+  PullRequestMerger,
+  layer as mergeGateLayer,
+} from "./mergeGate.ts";
 import { PipelineSupervision, layer as supervisionLayer } from "./PipelineSupervision.ts";
 import { PipelineGitHubIssues, PipelineIssuesIncompleteError } from "./GitHubIssues.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
@@ -142,7 +150,10 @@ const message = (threadId: ThreadId): ThreadManagement.ThreadManagementSendResul
   creationSource: "mcp",
 });
 
-const layer = (shells: ReadonlyMap<ThreadId, OrchestrationV2ThreadShell | null>) => {
+const layer = (
+  shells: ReadonlyMap<ThreadId, OrchestrationV2ThreadShell | null>,
+  mergeCalls?: Ref.Ref<ReadonlyArray<number>>,
+) => {
   const projectionThread = (threadId: ThreadId) => {
     const current = shells.get(threadId) ?? shell(threadId);
     const {
@@ -213,11 +224,82 @@ const layer = (shells: ReadonlyMap<ThreadId, OrchestrationV2ThreadShell | null>)
     Layer.provide(ClaimLease.layerPort({ repos: [repository] })),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
-  return supervisionLayer.pipe(
+  if (mergeCalls === undefined) {
+    return Layer.mergeAll(supervisionLayer, mergeGateLayer).pipe(
+      Layer.provide(threads),
+      Layer.provide(projects),
+      Layer.provide(budgetLayer),
+      Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
+      Layer.provide(
+        Layer.succeed(MergeGateReader, {
+          read: () => Effect.die("merge gate is not used by this test"),
+        }),
+      ),
+      Layer.provide(
+        Layer.succeed(PullRequestMerger, {
+          merge: () => Effect.die("merge gate is not used by this test"),
+        }),
+      ),
+      Layer.provideMerge(runs),
+      Layer.provideMerge(ServerSettings.layerTest({ pipelineRepos: [repository] })),
+    );
+  }
+  const settings = ServerSettings.layerTest({
+    pipelineEnabled: false,
+    pipelineAutoMerge: true,
+    pipelineRepos: [repository],
+  });
+  const gatedRuns = runsLayer.pipe(
+    Layer.provide(
+      Layer.succeed(
+        PipelineGitHubIssues,
+        PipelineGitHubIssues.of({
+          addLabel: () => Effect.die("unexpected label write"),
+          listEligible: () =>
+            Effect.succeed([
+              {
+                number: 81,
+                title: "监督运行",
+                body: "## 怎么算做完\n- 跑通测试\n",
+                labels: ["交给 ADE"],
+                author: { login: "thoerwink8", id: 1, type: "User" },
+              },
+            ]),
+          read: () => Effect.fail(new PipelineIssuesIncompleteError({ reason: "capped" })),
+        }),
+      ),
+    ),
+    Layer.provide(
+      Layer.succeed(PipelineUsage, PipelineUsage.of({ read: () => Effect.succeed([]) })),
+    ),
+    Layer.provide(settings),
+    Layer.provide(layerPortsDefault),
+    Layer.provide(ClaimLease.layerPort({ repos: [repository] })),
+    Layer.provideMerge(SqlitePersistence.layerMemory),
+  );
+  return Layer.mergeAll(supervisionLayer, mergeGateLayer).pipe(
     Layer.provide(threads),
     Layer.provide(projects),
-    Layer.provideMerge(runs),
-    Layer.provideMerge(ServerSettings.layerTest({ pipelineRepos: [repository] })),
+    Layer.provide(budgetLayer),
+    Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
+    Layer.provide(
+      Layer.succeed(MergeGateReader, {
+        read: (entry) =>
+          Effect.succeed({
+            checks: [{ name: "CI", state: "success" as const }],
+            coldVerify: "success" as const,
+            paths: ["apps/server/src/pipeline/mergeGate.ts"],
+            merged: entry.number === 18,
+          }),
+      }),
+    ),
+    Layer.provide(
+      Layer.succeed(PullRequestMerger, {
+        merge: (entry) => Ref.update(mergeCalls, (current) => [...current, entry.number]),
+      }),
+    ),
+    Layer.provideMerge(gatedRuns),
+    Layer.provideMerge(settings),
   );
 };
 
@@ -331,5 +413,66 @@ describe("PipelineSupervision", () => {
         ),
       ),
     ),
+  );
+
+  it.effect("开关关闭时人工合并经合并闸回读后清理才可达", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<ReadonlyArray<number>>([]);
+      yield* Effect.gen(function* () {
+        const supervision = yield* PipelineSupervision;
+        const gate = yield* MergeGate;
+        const stored = yield* PipelineRuns;
+        yield* supervision.start(scope(controllerId), { issueNumber: 81 });
+        yield* stored.note(
+          81,
+          { status: "verify", prNumber: 18, headSha: "abc", threadId: workerId },
+          repository,
+        );
+        const accepted = yield* supervision.verdict(scope(controllerId), {
+          issueNumber: 81,
+          verdict: "accepted",
+          expectedHeadSha: "abc",
+        });
+        assert.deepStrictEqual(accepted, { verdict: "accepted", headSha: "abc" });
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, pr_number, head_sha, updated_at
+          ) VALUES (
+            ${repository}, 82, '普通运行', 'verify', 99, 'abc', '2026-11-18T00:00:00.000Z'
+          )
+        `;
+        yield* gate.tick;
+        const listed = (yield* stored.list).runs;
+        const supervised = listed.find((run) => run.issueNumber === 81);
+        const plain = listed.find((run) => run.issueNumber === 82);
+        assert.strictEqual(supervised?.status, "merged");
+        assert.strictEqual(plain?.status, "verify");
+        assert.deepStrictEqual(yield* Ref.get(calls), []);
+        const cleaned = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
+        assert.deepStrictEqual(cleaned, {
+          outcome: "retained",
+          reason:
+            "Worker deletion requested; existing lifecycle cleanup will remove its worktree only when safe.",
+        });
+      }).pipe(
+        Effect.provide(
+          layer(
+            new Map([
+              [controllerId, shell(controllerId)],
+              [
+                workerId,
+                shell(workerId, {
+                  activeRunId: null,
+                  status: "idle",
+                  latestUserMessageAt: DateTime.makeUnsafe("2026-10-01T00:00:00.000Z"),
+                }),
+              ],
+            ]),
+            calls,
+          ),
+        ),
+      );
+    }),
   );
 });

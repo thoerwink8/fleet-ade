@@ -29,6 +29,7 @@ import { PipelineGitHubIssues, type PipelineIssue } from "./GitHubIssues.ts";
 import { DEFAULT_REPO, LOCAL_LABEL, parseRepo, worktreeBranch } from "./repoAllowlist.ts";
 import { PipelineBudget } from "./budget.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import { SessionEndInbox, type SessionEndEntry } from "./SessionEndInbox.ts";
 import { orderedCandidates, pickRouteCandidate } from "./routeCandidates.ts";
 
@@ -283,7 +284,7 @@ const make = Effect.gen(function* () {
   const tick = Effect.gen(function* () {
     const current = yield* settings.getSettings;
     const pending = yield* openRuns();
-    if (!current.pipelineEnabled && pending.every((run) => run.controllerThreadId === null)) return;
+    if (pending.every((run) => !shouldAdvancePipelineRun(current.pipelineEnabled, run))) return;
     const now = yield* DateTime.now;
     const nowIso = DateTime.formatIso(now);
     const timeout = Duration.toMillis(Duration.minutes(current.pipelineSessionTimeoutMinutes));
@@ -291,7 +292,7 @@ const make = Effect.gen(function* () {
     const endByThread = new Map(ends.map((entry) => [entry.threadId, entry]));
 
     for (const run of pending) {
-      if (!current.pipelineEnabled && run.controllerThreadId === null) continue;
+      if (!shouldAdvancePipelineRun(current.pipelineEnabled, run)) continue;
       if (run.status === "session") {
         if (run.sessionEndedAt !== null) continue;
         const entry =

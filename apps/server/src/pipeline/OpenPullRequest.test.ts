@@ -187,6 +187,62 @@ describe("OpenPullRequest", () => {
       );
     }),
   );
+
+  it.effect("全局开关关闭时只给有控制线程的运行开 PR", () =>
+    Effect.gen(function* () {
+      const opened = yield* Ref.make<ReadonlyArray<PullRequestDraft>>([]);
+      const reads = yield* Ref.make<ReadonlyArray<string>>([]);
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const sql = yield* SqlClient.SqlClient;
+        const started = yield* runs.startSupervised({
+          issueNumber: 7,
+          repository: "thoerwink8/fleet-ade",
+          controllerThreadId: "thread:controller",
+        });
+        assert.strictEqual(started.status, "started");
+        yield* runs.note(
+          7,
+          {
+            status: "session",
+            threadId: "thread:supervised",
+            sessionEndedAt: ENDED_AT,
+            headSha: SHA,
+          },
+          "thoerwink8/fleet-ade",
+        );
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, thread_id, head_sha, session_ended_at, updated_at
+          ) VALUES (
+            'thoerwink8/fleet-ade', 6, 'fix tests', 'session', 'thread:plain', ${SHA}, ${ENDED_AT}, ${ENDED_AT}
+          )
+        `;
+        yield* (yield* OpenPullRequest).tick;
+        const listed = (yield* runs.list).runs;
+        const plain = listed.find((run) => run.issueNumber === 6);
+        const supervised = listed.find((run) => run.issueNumber === 7);
+        assert.strictEqual(plain?.status, "session");
+        assert.strictEqual(plain?.prNumber, null);
+        const drafts = yield* Ref.get(opened);
+        assert.strictEqual(drafts.length, 1);
+        assert.strictEqual(drafts[0]?.cwd, "/wt/supervised");
+        assert.strictEqual(supervised?.prNumber, 7);
+        assert.strictEqual(supervised?.status, "verify");
+      }).pipe(
+        Effect.provide(
+          tickLayer({
+            issues: [issue(6), issue(7)],
+            enabled: false,
+            opened,
+            reads,
+            worktrees: [{ threadId: "thread:supervised", worktreePath: "/wt/supervised" }],
+            read: () => Effect.succeed({ kind: "success" }),
+          }),
+        ),
+      );
+    }),
+  );
   it.effect("does not open a pull request when the head is unknown", () =>
     Effect.gen(function* () {
       const opened = yield* Ref.make<ReadonlyArray<PullRequestDraft>>([]);

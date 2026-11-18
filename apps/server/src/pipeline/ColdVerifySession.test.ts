@@ -108,6 +108,7 @@ const harness = (
     readonly author: ReadonlyArray<ModelSelection>;
     readonly verifier: ReadonlyArray<ModelSelection>;
     readonly repos?: ReadonlyArray<string>;
+    readonly enabled?: boolean;
   },
   handles: Handles,
   openFails = false,
@@ -124,7 +125,7 @@ const harness = (
   );
   const usage = Layer.succeed(PipelineUsage, PipelineUsage.of({ read: () => Effect.succeed([]) }));
   const settings = ServerSettings.layerTest({
-    pipelineEnabled: true,
+    pipelineEnabled: models.enabled ?? true,
     pipelineAuthorModel: models.author,
     pipelineVerifierModel: models.verifier,
     ...(models.repos === undefined ? {} : { pipelineRepos: models.repos }),
@@ -219,6 +220,7 @@ const run = <E, R>(
     readonly author: ReadonlyArray<ModelSelection>;
     readonly verifier: ReadonlyArray<ModelSelection>;
     readonly repos?: ReadonlyArray<string>;
+    readonly enabled?: boolean;
   },
   body: (handles: Handles) => Effect.Effect<void, E, R>,
   openFails = false,
@@ -246,6 +248,46 @@ const tick = Effect.gen(function* () {
 });
 
 describe("ColdVerifySession", () => {
+  it.effect("全局开关关闭时只派有控制线程的冷验", () =>
+    run(
+      { author: [AUTHOR], verifier: [VERIFIER], enabled: false },
+      (handles) =>
+        Effect.gen(function* () {
+          const runs = yield* PipelineRuns;
+          const sql = yield* SqlClient.SqlClient;
+          const started = yield* runs.startSupervised({
+            issueNumber: 9,
+            repository: "thoerwink8/fleet-ade",
+            controllerThreadId: "thread:controller",
+          });
+          assert.strictEqual(started.status, "started");
+          yield* runs.note(9, { status: "verify", headSha: SHA, stuckReason: null });
+          yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, head_sha, updated_at
+          ) VALUES (
+            'thoerwink8/fleet-ade', 8, '单 8', 'verify', ${SHA}, ${NOW}
+          )
+        `;
+          yield* (yield* ColdVerifySession).tick;
+          const listed = (yield* runs.list).runs;
+          const plain = listed.find((run) => run.issueNumber === 8);
+          const supervised = listed.find((run) => run.issueNumber === 9);
+          const opened = yield* Ref.get(handles.opened);
+          assert.strictEqual(plain?.status, "verify");
+          assert.strictEqual(plain?.detail, null);
+          assert.strictEqual(opened.length, 1);
+          assert.strictEqual(opened[0]?.text.includes("任务 #9"), true);
+          assert.strictEqual(
+            opened.some((request) => request.text.includes("任务 #8")),
+            false,
+          );
+          assert.strictEqual(supervised?.detail?.includes("已派第:1:次:1:"), true);
+        }),
+      false,
+      [issue(8), issue(9)],
+    ),
+  );
   it.effect("跨仓同号冷验选自己的项目并只写自己的状态", () =>
     run(
       { author: [AUTHOR], verifier: [VERIFIER], repos: ["thoerwink8/fleet-ade", "acme/widgets"] },

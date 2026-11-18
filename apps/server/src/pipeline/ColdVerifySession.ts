@@ -34,6 +34,7 @@ import {
 } from "./GitHubCommitStatus.ts";
 import { parseRepo } from "./repoAllowlist.ts";
 import { MAX_OPEN_SESSIONS, PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import {
   orderedCandidates,
   pickRouteCandidate,
@@ -61,6 +62,7 @@ const VerifyRunRow = Schema.Struct({
   threadId: Schema.NullOr(Schema.String),
   headSha: Schema.String,
   detail: Schema.NullOr(Schema.String),
+  controllerThreadId: Schema.NullOr(Schema.String),
 });
 
 const decodeVerifyRuns = Schema.decodeUnknownEffect(Schema.Array(VerifyRunRow));
@@ -367,6 +369,7 @@ const make = Effect.gen(function* () {
                 threadId: run.threadId,
                 headSha: run.headSha,
                 detail: run.detail,
+                controllerThreadId: run.controllerThreadId,
               },
             ]
           : [],
@@ -395,8 +398,9 @@ const make = Effect.gen(function* () {
 
   const tick = Effect.gen(function* () {
     const current = yield* settings.getSettings;
-    if (!current.pipelineEnabled) return;
-    const pending = yield* verifyRuns();
+    const pending = (yield* verifyRuns()).filter((run) =>
+      shouldAdvancePipelineRun(current.pipelineEnabled, run),
+    );
     const refused = verifierRefused(current.pipelineVerifierModel, current.pipelineAuthorModel);
     const ends = yield* inbox.list;
     const endByThread = new Map(ends.map((entry) => [entry.threadId, entry]));

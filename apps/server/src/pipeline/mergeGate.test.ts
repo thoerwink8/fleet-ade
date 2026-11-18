@@ -229,12 +229,14 @@ describe("decideMerge", () => {
 
 const gateLayer = (input: {
   readonly autoMerge: boolean;
+  readonly enabled?: boolean;
   readonly observe: (headSha: string) => Effect.Effect<MergeGateObservation, MergeGateReadError>;
   readonly merge: (call: MergeCall) => Effect.Effect<void, MergeRequestError>;
   readonly calls: Ref.Ref<ReadonlyArray<MergeCall>>;
+  readonly read?: MergeGateReader["Service"]["read"];
 }) => {
   const settings = ServerSettings.layerTest({
-    pipelineEnabled: true,
+    pipelineEnabled: input.enabled ?? true,
     pipelineAutoMerge: input.autoMerge,
   });
   const runs = runsLayer.pipe(
@@ -252,7 +254,7 @@ const gateLayer = (input: {
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   const reader = Layer.succeed(MergeGateReader, {
-    read: (entry) => input.observe(entry.headSha),
+    read: input.read ?? ((entry) => input.observe(entry.headSha)),
   });
   const merger = Layer.succeed(PullRequestMerger, {
     merge: (entry) =>
@@ -345,6 +347,69 @@ describe("MergeGate", () => {
             observe: (headSha) => Effect.succeed(seen(headSha, passing(true))),
             merge: () => Effect.fail(new MergeRequestError()),
             calls,
+          }),
+        ),
+      );
+    }),
+  );
+
+  it.effect("开关关闭时回读受监督运行的已合并 PR，普通运行不推进且不调用合并", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<ReadonlyArray<MergeCall>>([]);
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const gate = yield* MergeGate;
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, pr_number, head_sha, updated_at
+          ) VALUES (
+            'thoerwink8/fleet-ade', 9, '单 9', 'verify', 18, ${HEAD}, '2026-11-16T00:00:00.000Z'
+          )
+        `;
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, pr_number, head_sha, thread_id,
+            controller_thread_id, controller_verdict, accepted_head_sha, updated_at
+          ) VALUES (
+            'thoerwink8/fleet-ade', 10, '已人工合并', 'verify', 19, ${HEAD},
+            'thread:worker-10', 'thread:controller', 'accepted', ${HEAD}, '2026-11-16T00:00:00.000Z'
+          )
+        `;
+        yield* sql`
+          INSERT INTO pipeline_runs (
+            repository, issue_number, title, status, pr_number, head_sha, thread_id,
+            controller_thread_id, controller_verdict, accepted_head_sha, updated_at
+          ) VALUES (
+            'thoerwink8/fleet-ade', 11, '尚未合并', 'verify', 20, ${HEAD},
+            'thread:worker-11', 'thread:controller', 'accepted', ${HEAD}, '2026-11-16T00:00:00.000Z'
+          )
+        `;
+        yield* gate.tick;
+        const listed = (yield* runs.list).runs;
+        assert.strictEqual(listed.find((run) => run.issueNumber === 9)?.status, "verify");
+        assert.strictEqual(listed.find((run) => run.issueNumber === 10)?.status, "merged");
+        assert.strictEqual(listed.find((run) => run.issueNumber === 11)?.status, "mergeable");
+        assert.deepStrictEqual(yield* Ref.get(calls), []);
+      }).pipe(
+        Effect.provide(
+          gateLayer({
+            autoMerge: true,
+            enabled: false,
+            observe: () => Effect.die("read override owns this test"),
+            merge: () => Effect.die("supervised run must not auto-merge"),
+            calls,
+            read: (entry) => {
+              if (entry.number === 18) {
+                return Effect.die("ordinary run was read while pipeline is off");
+              }
+              return Effect.succeed({
+                checks: [{ name: "CI", state: "success" as const }],
+                coldVerify: "success" as const,
+                paths: ["apps/server/src/pipeline/mergeGate.ts"],
+                merged: entry.number === 19,
+              });
+            },
           }),
         ),
       );

@@ -19,6 +19,7 @@ import * as ServerSettings from "../serverSettings.ts";
 import { PipelineBudget } from "./budget.ts";
 import { PIPELINE_HOST } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import { parseRepo } from "./repoAllowlist.ts";
 import standardPathsFile from "./standard-paths.json" with { type: "json" };
 
@@ -389,11 +390,11 @@ const make = Effect.gen(function* () {
 
   const tick = Effect.gen(function* () {
     const current = yield* settings.getSettings;
-    if (!current.pipelineEnabled) return;
     const listed = yield* runs.list;
     const attempted = new Set<string>();
 
     for (const run of listed.runs) {
+      if (!shouldAdvancePipelineRun(current.pipelineEnabled, run)) continue;
       if (run.status !== "checks" && run.status !== "verify" && run.status !== "mergeable") {
         continue;
       }

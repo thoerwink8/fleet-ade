@@ -20,6 +20,7 @@ import { PipelineBudget } from "./budget.ts";
 import { sessionBranch } from "./DispatchSession.ts";
 import { PIPELINE_HOST, PipelineGitHubIssues, layer as issuesLayer } from "./GitHubIssues.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
+import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import { parseRepo } from "./repoAllowlist.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 
@@ -343,7 +344,7 @@ const make = Effect.gen(function* () {
   ) => (current === next ? Effect.void : runs.note(issueNumber, { detail: next }, repository));
 
   const tick = Effect.gen(function* () {
-    if (!(yield* settings.getSettings).pipelineEnabled) return;
+    const current = yield* settings.getSettings;
     const listed = yield* runs.list;
     const paths = yield* projections
       .getThreadWorktreePaths({ includeArchived: true })
@@ -351,6 +352,7 @@ const make = Effect.gen(function* () {
     const cwdByThread = new Map(paths.map((entry) => [String(entry.threadId), entry.worktreePath]));
 
     for (const run of listed.runs) {
+      if (!shouldAdvancePipelineRun(current.pipelineEnabled, run)) continue;
       if (run.status !== "session" && run.status !== "pr-open" && run.status !== "checks") continue;
       if (run.status === "session" && run.sessionEndedAt === null) continue;
       const repo = parseRepo(run.repository);
