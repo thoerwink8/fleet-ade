@@ -163,14 +163,24 @@ const cases: ReadonlyArray<{
     decision: hold,
   },
   {
-    name: "受监督的运行接受了当前头，自动合关着，停在可合",
+    name: "受监督的运行接受了当前头，自动合开着也只停在可合",
     facts: {
-      ...passing(false),
+      ...passing(true),
       supervised: true,
       controllerVerdict: "accepted",
       acceptedHeadSha: HEAD,
     },
     decision: { kind: "mergeable" },
+  },
+  {
+    name: "受监督的运行被拒绝时不可合",
+    facts: {
+      ...passing(true),
+      supervised: true,
+      controllerVerdict: "rejected",
+      acceptedHeadSha: null,
+    },
+    decision: hold,
   },
 ];
 
@@ -295,6 +305,49 @@ describe("MergeGate", () => {
             autoMerge: true,
             observe: (headSha) => Effect.succeed(seen(headSha, passing(true))),
             merge: () => Effect.void,
+            calls,
+          }),
+        ),
+      );
+    }),
+  );
+  it.effect("受监督且已接受的运行，自动合开着仍不调用合并", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<ReadonlyArray<MergeCall>>([]);
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const gate = yield* MergeGate;
+        yield* runs.tick;
+        yield* runs.note(9, {
+          status: "verify",
+          threadId: "pipeline-worker",
+          prNumber: 18,
+          headSha: HEAD,
+        });
+        yield* runs.bindController({
+          repository: "thoerwink8/fleet-ade",
+          workerThreadId: "pipeline-worker",
+          controllerThreadId: "authorized-controller",
+        });
+        yield* runs.recordControllerVerdict({
+          repository: "thoerwink8/fleet-ade",
+          workerThreadId: "pipeline-worker",
+          controllerThreadId: "authorized-controller",
+          verdict: "accepted",
+          headSha: HEAD,
+        });
+        yield* gate.tick;
+        const run = (yield* runs.list).runs.find((item) => item.issueNumber === 9);
+        assert.strictEqual(run?.status, "mergeable");
+        assert.strictEqual(run?.controllerVerdict, "accepted");
+        assert.strictEqual(run?.acceptedHeadSha, HEAD);
+        assert.deepStrictEqual(yield* Ref.get(calls), []);
+      }).pipe(
+        Effect.provide(
+          gateLayer({
+            autoMerge: true,
+            observe: (headSha) => Effect.succeed(seen(headSha, passing(true))),
+            merge: () => Effect.fail(new MergeRequestError()),
             calls,
           }),
         ),

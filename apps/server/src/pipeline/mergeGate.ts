@@ -118,7 +118,7 @@ export const decideMerge = (
   ) {
     return { kind: "hold" };
   }
-  return facts.autoMerge ? { kind: "merge" } : { kind: "mergeable" };
+  return facts.supervised === true || !facts.autoMerge ? { kind: "mergeable" } : { kind: "merge" };
 };
 
 export interface MergeGateObservation {
