@@ -75,7 +75,7 @@ const layerFor = (
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.die("unused") })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return Layer.mergeAll(

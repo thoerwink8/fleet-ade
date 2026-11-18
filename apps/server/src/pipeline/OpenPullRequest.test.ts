@@ -92,7 +92,7 @@ const tickLayer = (input: {
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => input.usage ?? Effect.succeed([]) })),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: input.repos ?? ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   const opener = Layer.succeed(PullRequestOpener, {

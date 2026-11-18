@@ -67,7 +67,7 @@ const pipelineLayer = <E, R>(brief: Layer.Layer<DailyBrief, E, R>) =>
     ),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 

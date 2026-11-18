@@ -65,7 +65,7 @@ const harness = (options: { readonly webhook: string | undefined; readonly statu
     ),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 };

@@ -160,7 +160,7 @@ export type StartSupervisedCode =
   | "repository_denied"
   | "ineligible"
   | "conflict"
-  | "claim_rejected";
+  | Extract<ClaimLease.ClaimResult, { readonly status: 404 | 409 | 503 }>["code"];
 export type StartSupervisedResult =
   | { readonly status: "started"; readonly run: PipelineRun }
   | { readonly status: "rejected"; readonly code: StartSupervisedCode };
@@ -609,6 +609,7 @@ const make = Effect.gen(function* () {
       const wrote = yield* Effect.exit(settings.updateSettings({ pipelineEnabledAt: stamped }));
       openedAt = Exit.isSuccess(wrote) ? stamped : null;
     }
+    yield* claims.register(current.pipelineRepos).pipe(Effect.mapError(sqlFailure));
     yield* refreshUsage();
     const repos = current.pipelineRepos.flatMap((slug) => {
       const parsed = parseRepo(slug);
@@ -815,12 +816,13 @@ const make = Effect.gen(function* () {
       acceptanceItemCount(issue.body) < 1
     )
       return { status: "rejected", code: "ineligible" as const };
+    yield* claims.register([repo.slug]).pipe(Effect.mapError(sqlFailure));
     const leased = yield* ClaimLease.claimForRun(claims, {
       repo: repo.slug,
       issue: issue.number,
       title: issue.title,
     });
-    if (leased.status !== 200) return { status: "rejected", code: "claim_rejected" as const };
+    if (leased.status !== 200) return { status: "rejected", code: leased.code };
     const stored = yield* Effect.exit(
       insertRun({
         issue,

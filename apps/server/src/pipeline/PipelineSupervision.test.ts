@@ -221,7 +221,7 @@ const layer = (
       }),
     ),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: [repository] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   if (mergeCalls === undefined) {
@@ -274,7 +274,7 @@ const layer = (
     ),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: [repository] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return Layer.mergeAll(supervisionLayer, mergeGateLayer).pipe(

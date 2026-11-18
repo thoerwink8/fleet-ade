@@ -202,7 +202,7 @@ const harness = (
     Layer.provide(usage),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: models.repos ?? ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(memory),
   );
   return coldLayer.pipe(
