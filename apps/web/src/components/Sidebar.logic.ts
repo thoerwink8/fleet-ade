@@ -733,16 +733,7 @@ export function buildBulkUnpinContextMenuItem(input: {
 }
 
 export interface ThreadStatusPill {
-  label:
-    | "运行中"
-    | "正在连接"
-    | "已完成"
-    | "失败"
-    | "待批准"
-    | "待输入"
-    | "访客请求"
-    | "等待中"
-    | "计划已就绪";
+  label: "运行中" | "正在连接" | "已完成" | "失败" | "待批准" | "待输入" | "等待中" | "计划已就绪";
   colorClass: string;
   dotClass: string;
   pulse: boolean;
@@ -754,7 +745,6 @@ type ThreadStatusInput = Pick<
   | "hasPendingApprovals"
   | "hasPendingUserInput"
   | "pendingSubagentRequest"
-  | "pendingGuestMessageCount"
   | "interactionMode"
   | "latestRun"
   | "runtime"
@@ -1002,7 +992,6 @@ export function resolveAdjacentThreadId<T>(input: {
 export type SidebarThreadStatus =
   | "approval"
   | "input"
-  | "request"
   | "preparing"
   | "working"
   | "waiting"
@@ -1017,12 +1006,7 @@ export function shouldRecedeSidebarThread(input: {
   isActive: boolean;
   isSelected: boolean;
 }): boolean {
-  if (
-    input.isActive ||
-    input.isSelected ||
-    input.status === "input" ||
-    input.status === "request"
-  ) {
+  if (input.isActive || input.isSelected || input.status === "input") {
     return false;
   }
   if (input.status === "preparing" || input.status === "working" || input.status === "waiting") {
@@ -1039,7 +1023,6 @@ type SidebarThreadStatusInput = Pick<
   | "hasPendingApprovals"
   | "hasPendingUserInput"
   | "pendingSubagentRequest"
-  | "pendingGuestMessageCount"
   | "runtime"
   | "blockedOnThreadWait"
 >;
@@ -1050,10 +1033,6 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   }
   if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
     return "input";
-  }
-  // A guest is waiting on the owner; the agent's own requests come first.
-  if ((thread.pendingGuestMessageCount ?? 0) > 0) {
-    return "request";
   }
   if (thread.runtime?.status === "running" && thread.blockedOnThreadWait === true) {
     return "waiting";
@@ -1078,8 +1057,7 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
 
 /** What the window title says the open thread is doing, in the words its announcer uses. */
 export function resolveWindowTitleThreadStatus(thread: SidebarThreadStatusInput): string | null {
-  // A guest waiting doesn't hide that the agent is still working.
-  switch (resolveSidebarThreadStatus({ ...thread, pendingGuestMessageCount: 0 })) {
+  switch (resolveSidebarThreadStatus(thread)) {
     case "approval":
       return THREAD_STATUS_TEXT.approval;
     case "input":
@@ -1103,12 +1081,7 @@ export function resolveSidebarFolderDot(
   threads: ReadonlyArray<ThreadStatusInput & SidebarThreadStatusInput>,
 ): "attention" | "failed" | "unread" | "working" | null {
   const statuses = new Set(threads.map(resolveSidebarThreadStatus));
-  if (
-    statuses.has("input") ||
-    statuses.has("approval") ||
-    statuses.has("request") ||
-    statuses.has("limited")
-  ) {
+  if (statuses.has("input") || statuses.has("approval") || statuses.has("limited")) {
     return "attention";
   }
   if (statuses.has("failed")) return "failed";
@@ -1177,7 +1150,6 @@ export type SidebarV2TopStatusKind =
   | "failed"
   | "limited"
   | "input"
-  | "request"
   | "waiting"
   | "woke"
   | "working";
@@ -1315,16 +1287,6 @@ export function resolveThreadStatusPill(input: {
       pulse: false,
     };
   }
-
-  if ((thread.pendingGuestMessageCount ?? 0) > 0) {
-    return {
-      label: "访客请求",
-      colorClass: "text-guest-foreground",
-      dotClass: "bg-guest",
-      pulse: false,
-    };
-  }
-
   if (
     (thread.runtime?.status === "running" && thread.blockedOnThreadWait !== true) ||
     thread.runtime?.status === "waiting"
