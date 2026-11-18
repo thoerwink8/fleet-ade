@@ -154,7 +154,7 @@ const message = (threadId: ThreadId): ThreadManagement.ThreadManagementSendResul
 type RemovedWorktree = {
   readonly cwd: string;
   readonly path: string;
-  readonly force?: boolean;
+  readonly force?: boolean | undefined;
 };
 
 const layer = (
