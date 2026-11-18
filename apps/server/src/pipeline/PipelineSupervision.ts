@@ -1,6 +1,7 @@
 import { CommandId, MessageId, OrchestratorMcpFailure, ThreadId } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as DateTime from "effect/DateTime";
@@ -10,6 +11,7 @@ import type { McpInvocationScope } from "../mcp/McpInvocationContext.ts";
 import { ThreadManagementService } from "../orchestration-v2/ThreadManagementService.ts";
 import { ProjectService } from "../project/ProjectService.ts";
 import { ServerSettingsService } from "../serverSettings.ts";
+import { GitWorkflowService } from "../git/GitWorkflowService.ts";
 import { storageCleanupThreadIdle } from "../storageCleanup.ts";
 import { PipelineRuns } from "./PipelineRuns.ts";
 import { resolveInteractionMode, resolveRuntimeMode } from "../mcp/delegatedTaskModes.ts";
@@ -23,6 +25,7 @@ export const make = Effect.gen(function* () {
   const projects = yield* ProjectService;
   const settings = yield* ServerSettingsService;
   const runs = yield* PipelineRuns;
+  const git = yield* GitWorkflowService;
   const sql = yield* SqlClient.SqlClient;
   const authorize = Effect.fn("PipelineSupervision.authorize")(function* (
     scope: McpInvocationScope,
@@ -219,10 +222,29 @@ export const make = Effect.gen(function* () {
           })
           .pipe(Effect.mapError(failed));
       }
+      if (worker.worktreePath !== null) {
+        const project = yield* projects.getById(worker.projectId).pipe(Effect.mapError(failed));
+        if (Option.isNone(project)) return yield* denied("Worker project is unavailable.");
+        const removed = yield* git
+          .removeWorktree({
+            cwd: project.value.workspaceRoot,
+            path: worker.worktreePath,
+            force: true,
+          })
+          .pipe(Effect.exit);
+        if (Exit.isFailure(removed)) {
+          return {
+            outcome: "retryable" as const,
+            reason: "Worker deleted, but its worktree could not be removed.",
+          };
+        }
+      }
       return {
-        outcome: "retained" as const,
+        outcome: "deleted" as const,
         reason:
-          "Worker deletion requested; existing lifecycle cleanup will remove its worktree only when safe.",
+          worker.worktreePath === null
+            ? "Worker deleted; it had no worktree."
+            : "Worker deleted and its worktree removed.",
       };
     }),
   };

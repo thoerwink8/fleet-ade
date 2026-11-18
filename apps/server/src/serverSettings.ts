@@ -1,27 +1,29 @@
 import {
-  DEFAULT_SERVER_SETTINGS,
   ModelSelection,
   ProjectId,
   ProjectScript,
-  keepUnknownOverrideKeys,
-  ProjectSettingsOverrides,
   type ProviderInstanceConfig,
   type ProviderInstanceMutation,
   defaultInstanceIdForDriver,
   isProviderDriverKind,
   ProviderDriverKind,
   ProviderInstanceId,
+  type ManagedPolicySummary,
+  isSecretReference,
+  type SecretReference,
+} from "@t3tools/contracts";
+import {
+  DEFAULT_SERVER_SETTINGS,
+  keepUnknownOverrideKeys,
+  ProjectSettingsOverrides,
   resolveProviderInstanceEnabled,
   ResponseStreamingMode,
   ServerSettings,
   ServerSettingsError,
   type ServerSettingsPatch,
-  type ManagedPolicySummary,
   globalIdleCompaction,
-  isSecretReference,
-  type SecretReference,
   withIdleCompaction,
-} from "@t3tools/contracts";
+} from "@t3tools/contracts/settings";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";

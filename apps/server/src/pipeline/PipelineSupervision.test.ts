@@ -31,6 +31,7 @@ import {
   layer as mergeGateLayer,
 } from "./mergeGate.ts";
 import { PipelineSupervision, layer as supervisionLayer } from "./PipelineSupervision.ts";
+import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import { PipelineGitHubIssues, PipelineIssuesIncompleteError } from "./GitHubIssues.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import * as ClaimLease from "./claimLease.ts";
@@ -150,9 +151,16 @@ const message = (threadId: ThreadId): ThreadManagement.ThreadManagementSendResul
   creationSource: "mcp",
 });
 
+type RemovedWorktree = {
+  readonly cwd: string;
+  readonly path: string;
+  readonly force?: boolean | undefined;
+};
+
 const layer = (
   shells: ReadonlyMap<ThreadId, OrchestrationV2ThreadShell | null>,
   mergeCalls?: Ref.Ref<ReadonlyArray<number>>,
+  removedWorktrees?: Ref.Ref<ReadonlyArray<RemovedWorktree>>,
 ) => {
   const projectionThread = (threadId: ThreadId) => {
     const current = shells.get(threadId) ?? shell(threadId);
@@ -224,9 +232,16 @@ const layer = (
     Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
+  const git = Layer.mock(GitWorkflowService.GitWorkflowService)({
+    removeWorktree: (input) =>
+      removedWorktrees === undefined
+        ? Effect.void
+        : Ref.update(removedWorktrees, (current) => [...current, input]).pipe(Effect.asVoid),
+  });
   if (mergeCalls === undefined) {
     return Layer.mergeAll(supervisionLayer, mergeGateLayer).pipe(
       Layer.provide(threads),
+      Layer.provide(git),
       Layer.provide(projects),
       Layer.provide(budgetLayer),
       Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
@@ -279,6 +294,7 @@ const layer = (
   );
   return Layer.mergeAll(supervisionLayer, mergeGateLayer).pipe(
     Layer.provide(threads),
+    Layer.provide(git),
     Layer.provide(projects),
     Layer.provide(budgetLayer),
     Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
@@ -371,53 +387,65 @@ describe("PipelineSupervision", () => {
     }).pipe(Effect.provide(layer(new Map([[controllerId, shell(controllerId)]])))),
   );
 
-  it.effect("未合并时保留工人，合并后才按现有生命周期安全清理", () =>
+  it.effect("未合并时保留工人，合并后连工作树一起删", () =>
     Effect.gen(function* () {
-      const supervision = yield* PipelineSupervision;
-      const started = yield* supervision.start(scope(controllerId), { issueNumber: 81 });
-      const sql = yield* SqlClient.SqlClient;
-      yield* sql`UPDATE pipeline_runs SET thread_id = ${workerId}, head_sha = 'abc' WHERE id = ${started.id}`;
-      const accepted = yield* supervision.verdict(scope(controllerId), {
-        issueNumber: 81,
-        verdict: "accepted",
-        expectedHeadSha: "abc",
-      });
-      assert.deepStrictEqual(accepted, { verdict: "accepted", headSha: "abc" });
-      const beforeMerge = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
-      assert.deepStrictEqual(beforeMerge, {
-        outcome: "retained",
-        reason: "Pipeline run has not been merged.",
-      });
-      const stored = yield* PipelineRuns;
-      yield* stored.note(81, { status: "merged" }, repository);
-      const cleaned = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
-      assert.deepStrictEqual(cleaned, {
-        outcome: "retained",
-        reason:
-          "Worker deletion requested; existing lifecycle cleanup will remove its worktree only when safe.",
-      });
-    }).pipe(
-      Effect.provide(
-        layer(
-          new Map([
-            [controllerId, shell(controllerId)],
-            [
-              workerId,
-              shell(workerId, {
-                activeRunId: null,
-                status: "idle",
-                latestUserMessageAt: DateTime.makeUnsafe("2026-10-01T00:00:00.000Z"),
-              }),
-            ],
-          ]),
+      const removed = yield* Ref.make<ReadonlyArray<RemovedWorktree>>([]);
+      yield* Effect.gen(function* () {
+        const supervision = yield* PipelineSupervision;
+        const started = yield* supervision.start(scope(controllerId), { issueNumber: 81 });
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`UPDATE pipeline_runs SET thread_id = ${workerId}, head_sha = 'abc' WHERE id = ${started.id}`;
+        const accepted = yield* supervision.verdict(scope(controllerId), {
+          issueNumber: 81,
+          verdict: "accepted",
+          expectedHeadSha: "abc",
+        });
+        assert.deepStrictEqual(accepted, { verdict: "accepted", headSha: "abc" });
+        const beforeMerge = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
+        assert.deepStrictEqual(beforeMerge, {
+          outcome: "retained",
+          reason: "Pipeline run has not been merged.",
+        });
+        const stored = yield* PipelineRuns;
+        yield* stored.note(81, { status: "merged" }, repository);
+        const cleaned = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
+        assert.deepStrictEqual(cleaned, {
+          outcome: "deleted",
+          reason: "Worker deleted and its worktree removed.",
+        });
+        assert.deepStrictEqual(yield* Ref.get(removed), [
+          {
+            cwd: "/repos/thoerwink8/fleet-ade",
+            path: "/worktrees/worker",
+            force: true,
+          },
+        ]);
+      }).pipe(
+        Effect.provide(
+          layer(
+            new Map([
+              [controllerId, shell(controllerId)],
+              [
+                workerId,
+                shell(workerId, {
+                  activeRunId: null,
+                  status: "idle",
+                  latestUserMessageAt: DateTime.makeUnsafe("2026-10-01T00:00:00.000Z"),
+                }),
+              ],
+            ]),
+            undefined,
+            removed,
+          ),
         ),
-      ),
-    ),
+      );
+    }),
   );
 
   it.effect("开关关闭时人工合并经合并闸回读后清理才可达", () =>
     Effect.gen(function* () {
       const calls = yield* Ref.make<ReadonlyArray<number>>([]);
+      const removed = yield* Ref.make<ReadonlyArray<RemovedWorktree>>([]);
       yield* Effect.gen(function* () {
         const supervision = yield* PipelineSupervision;
         const gate = yield* MergeGate;
@@ -451,10 +479,16 @@ describe("PipelineSupervision", () => {
         assert.deepStrictEqual(yield* Ref.get(calls), []);
         const cleaned = yield* supervision.cleanup(scope(controllerId), { issueNumber: 81 });
         assert.deepStrictEqual(cleaned, {
-          outcome: "retained",
-          reason:
-            "Worker deletion requested; existing lifecycle cleanup will remove its worktree only when safe.",
+          outcome: "deleted",
+          reason: "Worker deleted and its worktree removed.",
         });
+        assert.deepStrictEqual(yield* Ref.get(removed), [
+          {
+            cwd: "/repos/thoerwink8/fleet-ade",
+            path: "/worktrees/worker",
+            force: true,
+          },
+        ]);
       }).pipe(
         Effect.provide(
           layer(
@@ -470,6 +504,7 @@ describe("PipelineSupervision", () => {
               ],
             ]),
             calls,
+            removed,
           ),
         ),
       );

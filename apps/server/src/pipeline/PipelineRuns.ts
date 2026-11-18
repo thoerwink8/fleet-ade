@@ -9,7 +9,7 @@ import {
   type PipelineRun,
   type PipelineRunStatus,
   type PipelineStuckReason,
-} from "@t3tools/contracts";
+} from "@t3tools/contracts/pipeline";
 import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";

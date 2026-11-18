@@ -42,10 +42,59 @@ if [[ -z "${FLEET_ADE_WG_HOST:-}" ]]; then
 fi
 WG_HOST="${FLEET_ADE_WG_HOST}"
 ADE_PORT="${FLEET_ADE_PORT:-3773}"
+# 8 GiB. Measured 2026-11-18: the live app tree and its newest backup were
+# each 4.5 GiB, and this disk is ext4, so the backup copy needs new blocks
+# (cp --reflink does not share them). server/dist plus web/dist were 0.6 GiB.
+# Issue #96 completed an update once 9.4 GiB was free. 8 GiB is that copy
+# plus build scratch; node_modules stays hardlinked to the pnpm store.
+BUILD_REQUIRED_FREE_BYTES="${FLEET_ADE_BUILD_FREE_BYTES:-8589934592}"
+
+BACKUP_DIR=""
+backup_dir() {
+  if [[ -z "${BACKUP_DIR}" ]]; then
+    BACKUP_DIR="$(mktemp -d /var/lib/fleet-ade/backup-XXXXXXXX)"
+  fi
+}
+
+prune_release_backups() {
+  local root="$1" keep="$2" path
+  find "${root}" -mindepth 1 -maxdepth 1 -type d -name 'backup-*' -printf '%T@ %p\n' 2>/dev/null \
+    | sort -rn | tail -n "+$((keep + 1))" | cut -d' ' -f2- \
+    | while IFS= read -r path; do
+      echo "Removing old release backup ${path}..."
+      rm -rf -- "${path}"
+    done
+}
+
+free_bytes() {
+  df --output=avail -B1 "${APP_DIR}" | tail -n 1
+}
+
+require_build_free_space() {
+  local available_bytes
+  available_bytes="$(free_bytes)"
+  if ((available_bytes < BUILD_REQUIRED_FREE_BYTES)); then
+    echo "Free space ${available_bytes} is below ${BUILD_REQUIRED_FREE_BYTES}; cleaning rebuildable files..."
+    # The new backup is created just below, so one older copy is enough until then.
+    prune_release_backups /var/lib/fleet-ade 1
+    if [[ -x /usr/local/lib/fleet-ade/france-disk-cleanup.sh ]]; then
+      /usr/local/lib/fleet-ade/france-disk-cleanup.sh
+    fi
+    available_bytes="$(free_bytes)"
+  fi
+  if ((available_bytes < BUILD_REQUIRED_FREE_BYTES)); then
+    echo "ERROR: ${available_bytes} bytes free; build requires ${BUILD_REQUIRED_FREE_BYTES} bytes." >&2
+    exit 1
+  fi
+  echo "Build space check: ${available_bytes} bytes free; ${BUILD_REQUIRED_FREE_BYTES} required."
+}
 
 PREV_SHA="$(sudo -u "${ADE_USER}" git -C "${APP_DIR}" rev-parse HEAD)"
-BACKUP_DIR="$(mktemp -d /var/lib/fleet-ade/backup-XXXXXXXX)"
+require_build_free_space
+prune_release_backups /var/lib/fleet-ade 1
+backup_dir
 echo "Backing up the current release to ${BACKUP_DIR} before changing it..."
+
 cp -a --reflink=auto "${APP_DIR}" "${BACKUP_DIR}/app"
 cp -a /etc/fleet-ade "${BACKUP_DIR}/config"
 cp -a /etc/systemd/system/fleet-ade.service "${BACKUP_DIR}/fleet-ade.service"
@@ -116,7 +165,7 @@ systemd-run --wait --pipe --collect \
   -E OTEL_SDK_DISABLED=true \
   -E T3CODE_OTEL_SDK_DISABLED=true \
   -E DO_NOT_TRACK=1 \
-  /bin/bash -lc "pnpm install --frozen-lockfile && ./node_modules/.bin/vp run --filter t3 build"
+  /bin/bash -lc "pnpm store prune && pnpm install --frozen-lockfile && ./node_modules/.bin/vp run --filter t3 build"
 
 echo "[3/4] Refreshing wrappers, GitHub App credential helper & systemd unit definitions and restarting fleet-ade.service..."
 
@@ -149,7 +198,18 @@ chown -R "${ADE_USER}:${ADE_USER}" "${ADE_HOME}/.cache" "${ADE_HOME}/.local/bin"
 
 install -m 0644 "${APP_DIR}/scripts/deploy/ade.slice" /etc/systemd/system/ade.slice
 install -m 0644 "${APP_DIR}/scripts/deploy/fleet-ade.service" /etc/systemd/system/fleet-ade.service
+install -m 0644 "${APP_DIR}/scripts/deploy/fleet-ade-disk-cleanup.service" /etc/systemd/system/fleet-ade-disk-cleanup.service
+install -d -m 0755 /usr/local/lib/fleet-ade
+install -m 0755 "${APP_DIR}/scripts/deploy/france-disk-cleanup.sh" /usr/local/lib/fleet-ade/france-disk-cleanup.sh
+install -m 0644 "${APP_DIR}/scripts/deploy/fleet-ade-disk-cleanup.timer" /etc/systemd/system/fleet-ade-disk-cleanup.timer
+install -d -m 0755 /etc/systemd/journald.conf.d
+cat >/etc/systemd/journald.conf.d/99-fleet-ade.conf <<'EOF'
+[Journal]
+SystemMaxUse=500M
+EOF
 systemctl daemon-reload
+systemctl restart systemd-journald
+systemctl enable --now fleet-ade-disk-cleanup.timer
 systemctl restart fleet-ade.service
 
 echo "[4/4] Verifying readiness on http://${WG_HOST}:${ADE_PORT}..."

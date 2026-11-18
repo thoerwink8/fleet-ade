@@ -421,7 +421,7 @@ const PipelineVerdictTool = Tool.make("t3_pipeline_accept", {
 
 const PipelineCleanupTool = Tool.make("t3_pipeline_cleanup", {
   description:
-    "After the accepted head is confirmed merged, delete its idle worker through the existing lifecycle. Active or unknown work is retained; worktree cleanup remains guarded and asynchronous.",
+    "After the accepted head is confirmed merged and the worker is idle, delete that worker and its worktree, including node_modules. Active or unknown work is retained.",
   parameters: PipelineSupervisionStartInput,
   success: PipelineSupervisionCleanupResult,
   failure: OrchestratorMcpFailure,
