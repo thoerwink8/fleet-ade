@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
-# Weekly cleanup for rebuildable France VPS artifacts. Run as root.
+# Weekly cleanup for rebuildable France VPS artifacts that have no producer
+# limit of their own. Run as root. Each step matches a measured pile
+# (2026-11-18): release backups under /var/lib/fleet-ade/backup-* (3.3–4.5 GiB
+# each; deploy itself keeps 2), closed pipeline worktrees, /tmp files older
+# than 7 days (1.7 GiB of build leftovers), apt cache, ade and root pnpm
+# stores (2.5 GiB and 0.7 GiB), root npm cache (3.1 GiB), and the
+# fleet-agent-carpool pnpm store (5.9 GiB). Journal vacuum matches the 500M
+# cap. It does not touch Postgres, ADE userdata, magpie data, or the
+# fleet-dao engine archive (that archive has its own 20 GiB retention).
 set -euo pipefail
 
 ROOT=/var/lib/fleet-ade
 ADE_HOME=/home/ade
+CARPOOL_HOME=/home/fleet-agent-carpool
 KEEP_RELEASE_BACKUPS=2
 TMP_AGE_DAYS=7
 
@@ -29,7 +38,7 @@ cleanup_pipeline_worktrees() {
   [[ -d "${repo_root}/.git" ]] || return 0
   git -C "${repo_root}" -c safe.directory="${repo_root}" worktree list --porcelain | awk '/^worktree / {print substr($0, 10)}' \
     | while IFS= read -r worktree; do
-      [[ -n "${worktree}" ]] || continue
+      [[ -n "${worktree}" && "${worktree}" != "${repo_root}" ]] || continue
       branch=$(git -C "${worktree}" -c safe.directory="${repo_root}" branch --show-current 2>/dev/null || true)
       pr_json=$(sudo -u ade env PATH="${ADE_HOME}/.local/bin:${ADE_HOME}/.local/node/bin:/usr/bin:/bin" \
         gh pr list --repo thoerwink8/fleet-ade --state all --head "${branch}" --json state --limit 1 2>/dev/null || true)
@@ -46,12 +55,39 @@ cleanup_old_tmp() {
 }
 
 cleanup_caches() {
-  if [[ -x "${ADE_HOME}/.local/bin/pnpm" ]]; then
-    sudo -u ade env HOME="${ADE_HOME}" XDG_CACHE_HOME="${ADE_HOME}/.cache" "${ADE_HOME}/.local/bin/pnpm" store prune
+  prune_pnpm_store "${ADE_HOME}"
+  prune_pnpm_store "${CARPOOL_HOME}"
+  if [[ -x /usr/local/bin/pnpm ]]; then
+    /usr/local/bin/pnpm store prune || true
+  elif [[ -x /usr/bin/pnpm ]]; then
+    pnpm store prune || true
+  fi
+  if [[ -x /usr/bin/npm ]]; then
+    npm cache clean --force || true
   fi
   if [[ -x /usr/bin/apt-get ]]; then
     apt-get clean
   fi
+}
+
+prune_pnpm_store() {
+  local home=$1 pnpm owner
+  [[ -d "${home}" ]] || return 0
+  pnpm="$(find_pnpm "${home}")"
+  [[ -n "${pnpm}" ]] || return 0
+  owner="$(stat -c %U "${home}")"
+  sudo -u "${owner}" env HOME="${home}" XDG_CACHE_HOME="${home}/.cache" "${pnpm}" store prune || true
+}
+
+find_pnpm() {
+  local home=$1 candidate
+  for candidate in "${home}/.local/bin/pnpm" "${home}/.local/share/pnpm/pnpm" /usr/local/bin/pnpm; do
+    if [[ -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+  return 0
 }
 
 require_root

@@ -42,6 +42,11 @@ if [[ -z "${FLEET_ADE_WG_HOST:-}" ]]; then
 fi
 WG_HOST="${FLEET_ADE_WG_HOST}"
 ADE_PORT="${FLEET_ADE_PORT:-3773}"
+# 8 GiB. Measured 2026-11-18: the live app tree and its newest backup were
+# each 4.5 GiB, and this disk is ext4, so the backup copy needs new blocks
+# (cp --reflink does not share them). server/dist plus web/dist were 0.6 GiB.
+# Issue #96 completed an update once 9.4 GiB was free. 8 GiB is that copy
+# plus build scratch; node_modules stays hardlinked to the pnpm store.
 BUILD_REQUIRED_FREE_BYTES="${FLEET_ADE_BUILD_FREE_BYTES:-8589934592}"
 
 BACKUP_DIR=""
@@ -61,9 +66,22 @@ prune_release_backups() {
     done
 }
 
+free_bytes() {
+  df --output=avail -B1 "${APP_DIR}" | tail -n 1
+}
+
 require_build_free_space() {
   local available_bytes
-  available_bytes=$(df --output=avail -B1 "${APP_DIR}" | tail -n 1)
+  available_bytes="$(free_bytes)"
+  if ((available_bytes < BUILD_REQUIRED_FREE_BYTES)); then
+    echo "Free space ${available_bytes} is below ${BUILD_REQUIRED_FREE_BYTES}; cleaning rebuildable files..."
+    # The new backup is created just below, so one older copy is enough until then.
+    prune_release_backups /var/lib/fleet-ade 1
+    if [[ -x /usr/local/lib/fleet-ade/france-disk-cleanup.sh ]]; then
+      /usr/local/lib/fleet-ade/france-disk-cleanup.sh
+    fi
+    available_bytes="$(free_bytes)"
+  fi
   if ((available_bytes < BUILD_REQUIRED_FREE_BYTES)); then
     echo "ERROR: ${available_bytes} bytes free; build requires ${BUILD_REQUIRED_FREE_BYTES} bytes." >&2
     exit 1
@@ -72,10 +90,11 @@ require_build_free_space() {
 }
 
 PREV_SHA="$(sudo -u "${ADE_USER}" git -C "${APP_DIR}" rev-parse HEAD)"
+require_build_free_space
 prune_release_backups /var/lib/fleet-ade 1
 backup_dir
 echo "Backing up the current release to ${BACKUP_DIR} before changing it..."
-require_build_free_space
+
 cp -a --reflink=auto "${APP_DIR}" "${BACKUP_DIR}/app"
 cp -a /etc/fleet-ade "${BACKUP_DIR}/config"
 cp -a /etc/systemd/system/fleet-ade.service "${BACKUP_DIR}/fleet-ade.service"
