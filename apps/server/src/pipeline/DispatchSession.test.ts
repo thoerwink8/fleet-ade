@@ -128,7 +128,7 @@ const sessionLayer = (
     Layer.provide(usage),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(memory),
   );
   return DispatchSession.layer.pipe(

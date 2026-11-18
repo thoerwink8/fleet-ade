@@ -27,6 +27,7 @@ import {
   claimForRun,
   layerPort,
   layerLive,
+  registerRepos,
   type ClaimAttempt,
   type ClaimWrite,
 } from "./claimLease.ts";
@@ -180,7 +181,11 @@ const recordingPort = (options: {
         yield* Ref.set(seen, [{ write, result }]);
         return result;
       });
-      return ClaimLeasePort.of({ apply, attempts: Ref.get(seen) });
+      return ClaimLeasePort.of({
+        apply,
+        register: (repos) => registerRepos(sql, repos),
+        attempts: Ref.get(seen),
+      });
     }),
   );
 
@@ -217,7 +222,7 @@ it.effect("第一次认领成功才有一条运行；同一仓同一单第二次
     assert.strictEqual(attempts.length, 1);
     assert.strictEqual(attempts[0]?.result.status, 409);
     assert.strictEqual((yield* sql`SELECT issue FROM node_claims`).length, 1);
-  }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: ["thoerwink8/fleet-ade"] })))),
+  }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );
 
 it.effect("端口回 503 时不建运行", () =>
@@ -241,19 +246,78 @@ it.effect("账本租约读失败回 503，不建运行也不覆盖原租约", ()
     assert.strictEqual(attempts[0]?.result.status, 503);
     assert.strictEqual(attempts[0]?.result.code, "local_claims_unreadable");
     assert.strictEqual(yield* runCount, 0);
-  }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: ["thoerwink8/fleet-ade"] })))),
+  }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );
 
-it.effect("未登记仓回 404 时不建运行", () =>
+it.effect("生产层按白名单登记仓：repos 空时监控启动认领成功", () =>
   Effect.gen(function* () {
-    const runs = yield* PipelineRuns;
-    const port = yield* ClaimLeasePort;
-    yield* runs.tick;
-    const attempts = yield* port.attempts;
-    assert.strictEqual(attempts[0]?.result.status, 404);
-    assert.strictEqual(attempts[0]?.result.code, "unknown_repo");
-    assert.strictEqual(yield* runCount, 0);
-  }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: [] })))),
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* fs.makeTempDirectoryScoped();
+    yield* Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      yield* Effect.gen(function* () {
+        const runs = yield* PipelineRuns;
+        const started = yield* runs.startSupervised({
+          issueNumber: 7,
+          repository: "thoerwink8/fleet-ade",
+          controllerThreadId: "controller-a",
+        });
+        assert.strictEqual(started.status, "started");
+        const ledger = NodeSqliteClient.layer({
+          filename: path.join(config.stateDir, "ledger.sqlite"),
+        });
+        const repos = yield* Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient;
+          return yield* sql<{ readonly owner: string; readonly name: string }>`
+            SELECT owner, name FROM repos
+          `;
+        }).pipe(Effect.provide(ledger));
+        assert.deepEqual(repos, [{ owner: "thoerwink8", name: "fleet-ade" }]);
+      }).pipe(Effect.provide(pipelineLayer(layerLive)));
+    }).pipe(Effect.provide(ServerConfig.layerTest(directory, directory)));
+  }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);
+
+it.effect("登记只跟白名单走：白名单外的仓认领仍是 unknown_repo", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const directory = yield* fs.makeTempDirectoryScoped();
+    const layer = pipelineLayer(layerLive).pipe(
+      Layer.provide(ServerConfig.layerTest(directory, directory)),
+    );
+    yield* Effect.gen(function* () {
+      const port = yield* ClaimLeasePort;
+      yield* (yield* PipelineRuns).tick;
+      const other = yield* claimForRun(port, { repo: "acme/widgets", issue: 9, title: "单 9" });
+      assert.strictEqual(other.status, 404);
+      assert.strictEqual(other.code, "unknown_repo");
+    }).pipe(Effect.provide(layer));
+  }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
+);
+
+it.effect("监控启动把认领回来的 404 如实报成 unknown_repo", () =>
+  Effect.gen(function* () {
+    const started = yield* (yield* PipelineRuns).startSupervised({
+      issueNumber: 7,
+      repository: "thoerwink8/fleet-ade",
+      controllerThreadId: "controller-a",
+    });
+    assert.deepStrictEqual(started, { status: "rejected", code: "unknown_repo" });
+  }).pipe(
+    Effect.provide(
+      pipelineLayer(
+        Layer.succeed(
+          ClaimLeasePort,
+          ClaimLeasePort.of({
+            apply: () => Effect.succeed({ status: 404, code: "unknown_repo" } as const),
+            register: () => Effect.void,
+            attempts: Effect.succeed([]),
+          }),
+        ),
+      ),
+    ),
+  ),
 );
 
 it.effect("leaseUntil 只出现在 claims 端口的写入参数里，不写进运行记录的字段", () =>
@@ -277,7 +341,7 @@ it.effect("leaseUntil 只出现在 claims 端口的写入参数里，不写进�
     const columns = Object.keys(rows[0] ?? {});
     assert.strictEqual(columns.includes("lease_until"), false);
     assert.strictEqual(columns.includes("leaseUntil"), false);
-  }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: ["thoerwink8/fleet-ade"] })))),
+  }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );
 
 it.effect("账本已有租约阻止建运行，成功认领对独立账本连接可见，主库不建租约表", () =>
@@ -293,7 +357,6 @@ it.effect("账本已有租约阻止建运行，成功认领对独立账本连接
       yield* Effect.gen(function* () {
         yield* NodeReads.migrate;
         const sql = yield* SqlClient.SqlClient;
-        yield* sql`INSERT INTO repos (owner, name) VALUES ('thoerwink8', 'fleet-ade')`;
         yield* sql`INSERT INTO node_claims (repo, issue, claimed_by, lease_until)
           VALUES ('thoerwink8/fleet-ade', 7, 'other-node', '9999-01-01T00:00:00.000Z')`;
       }).pipe(Effect.provide(ledger));
@@ -347,13 +410,7 @@ it.effect("两小时后另一执行方重新认领，旧运行结束不删新租
       assert.strictEqual(released.write.token, token);
       assert.strictEqual(Object.hasOwn(released.write, "leaseUntil"), false);
     }
-  }).pipe(
-    Effect.provide(
-      pipelineLayer(layerPort({ repos: ["thoerwink8/fleet-ade"] })).pipe(
-        Layer.provideMerge(TestClock.layer()),
-      ),
-    ),
-  ),
+  }).pipe(Effect.provide(pipelineLayer(layerPort()).pipe(Layer.provideMerge(TestClock.layer())))),
 );
 
 it.effect("释放 503 后下一 tick 即使管道关掉也放掉原租约", () =>
@@ -434,7 +491,7 @@ it.effect("同持有者换 token 时不删新租约，之后 tick 也不删", ()
     assert.deepEqual(yield* sql`SELECT claimed_by, fencing FROM node_claims WHERE issue = 7`, [
       { claimed_by: "pipeline", fencing: "other-token" },
     ]);
-  }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: [repoName] })))),
+  }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );
 
 it.effect("新持有者时结束运行返回 not_claimed，之后 tick 也不删", () =>
@@ -473,7 +530,7 @@ it.effect("新持有者时结束运行返回 not_claimed，之后 tick 也不删
         },
       ],
     );
-  }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: [repoName] })))),
+  }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );
 
 it.effect("认领写进运行失败时放掉刚拿的租约", () =>
@@ -488,5 +545,5 @@ it.effect("认领写进运行失败时放掉刚拿的租约", () =>
     `;
     yield* Effect.exit((yield* PipelineRuns).tick);
     assert.deepEqual(yield* sql`SELECT issue FROM node_claims`, []);
-  }).pipe(Effect.provide(pipelineLayer(layerPort({ repos: [repoName] })))),
+  }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );

@@ -7,6 +7,7 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
+import type * as SqlError from "effect/sql/SqlError";
 
 import * as ServerConfig from "../config.ts";
 import * as NodeClaims from "../ledger/nodeClaims.ts";
@@ -40,6 +41,8 @@ export interface ClaimAttempt {
 
 export interface ClaimLease {
   readonly apply: (write: ClaimWrite) => Effect.Effect<ClaimResult>;
+  /** The ledger's repo registry follows the pipeline's repo whitelist. */
+  readonly register: (repos: ReadonlyArray<string>) => Effect.Effect<void, SqlError.SqlError>;
   readonly attempts: Effect.Effect<ReadonlyArray<ClaimAttempt>>;
 }
 
@@ -130,22 +133,25 @@ const writer = (sql: SqlClient.SqlClient) =>
       Effect.catchCause(() => Effect.succeed(unavailable)),
     );
   });
+/** Node claims and notes check the ledger's registry, so it has to hold the repos the pipeline serves. */
+export const registerRepos = Effect.fn("claimLease.registerRepos")(function* (
+  sql: SqlClient.SqlClient,
+  repos: ReadonlyArray<string>,
+) {
+  for (const repo of repos) {
+    const [owner, name] = repo.split("/");
+    if (owner === undefined || name === undefined) continue;
+    yield* sql`INSERT OR IGNORE INTO repos (owner, name) VALUES (${owner}, ${name})`;
+  }
+});
 
-/** Test double. `repos` replaces the ledger's repos table; `wired: false` is the unmounted port. */
-export const layerPort = (options?: {
-  readonly repos?: ReadonlyArray<string>;
-  readonly wired?: boolean;
-}) =>
+/** Test double. `wired: false` is the unmounted port. */
+export const layerPort = (options?: { readonly wired?: boolean }) =>
   Layer.effect(
     ClaimLeasePort,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       yield* NodeReads.migrate;
-      for (const repo of options?.repos ?? []) {
-        const [owner, name] = repo.split("/");
-        if (owner === undefined || name === undefined) continue;
-        yield* sql`INSERT OR IGNORE INTO repos (owner, name) VALUES (${owner}, ${name})`;
-      }
       const seen = yield* Ref.make<ReadonlyArray<ClaimAttempt>>([]);
       const record = Effect.fn("claimLease.apply")(function* (write: ClaimWrite) {
         const result =
@@ -155,7 +161,11 @@ export const layerPort = (options?: {
         yield* Ref.set(seen, [{ write, result }]);
         return result;
       });
-      return ClaimLeasePort.of({ apply: record, attempts: Ref.get(seen) });
+      return ClaimLeasePort.of({
+        apply: record,
+        register: Effect.fn("ClaimLeasePort.register")((repos) => registerRepos(sql, repos)),
+        attempts: Ref.get(seen),
+      });
     }),
   );
 /** Production: the pipeline and POST /api/nodes/claims open the same ledger file and the same writer. */
@@ -168,7 +178,11 @@ export const layerLive = Layer.unwrap(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient;
         yield* NodeReads.migrate;
-        return ClaimLeasePort.of({ apply: writer(sql), attempts: Effect.succeed([]) });
+        return ClaimLeasePort.of({
+          apply: writer(sql),
+          register: Effect.fn("ClaimLeasePort.register")((repos) => registerRepos(sql, repos)),
+          attempts: Effect.succeed([]),
+        });
       }),
     ).pipe(
       Layer.provide(NodeSqliteClient.layer({ filename: path.join(stateDir, "ledger.sqlite") })),

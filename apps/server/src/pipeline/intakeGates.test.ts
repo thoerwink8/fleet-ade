@@ -117,7 +117,7 @@ const gateLayer = (
     Layer.provide(
       ServerSettings.layerTest({ pipelineEnabled: true, pipelineEnabledAt: OPENED_AT }),
     ),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 

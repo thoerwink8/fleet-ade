@@ -80,7 +80,7 @@ const pipelineLayer = (options: {
     ),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: options.enabled ?? true })),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 
@@ -600,7 +600,7 @@ describe("PipelineRuns", () => {
         Layer.provide(Layer.succeed(PipelineUsage, PipelineUsage.of({ read: () => readable() }))),
         Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
         Layer.provide(layerPortsDefault),
-        Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+        Layer.provide(ClaimLease.layerPort()),
         Layer.provide(SqlitePersistence.layerFromPath(database)),
         Layer.provideMerge(NodeServices.layer),
       );

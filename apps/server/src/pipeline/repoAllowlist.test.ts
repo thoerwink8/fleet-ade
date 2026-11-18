@@ -154,7 +154,6 @@ const usageLayer = Layer.succeed(
 
 const pipelineLayer = (input: {
   readonly issues: Layer.Layer<PipelineGitHubIssues>;
-  readonly repos: ReadonlyArray<string>;
   readonly pipelineRepos?: ReadonlyArray<string>;
   readonly model?: boolean;
 }) =>
@@ -169,7 +168,7 @@ const pipelineLayer = (input: {
       }),
     ),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: input.repos })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
 
@@ -210,7 +209,6 @@ describe("repo allowlist", () => {
       Effect.provide(
         pipelineLayer({
           issues: remote.layer,
-          repos: ["thoerwink8/fleet-ade", "nope/hidden"],
           pipelineRepos: [],
         }),
       ),
@@ -221,7 +219,6 @@ describe("repo allowlist", () => {
     const remote = github({ "acme/widgets": [githubIssue(7, "fix tests")] }, 1);
     const services = pipelineLayer({
       issues: remote.layer,
-      repos: ["acme/widgets"],
       pipelineRepos: ["acme/widgets"],
     });
     return Effect.gen(function* () {
@@ -243,7 +240,7 @@ describe("repo allowlist", () => {
               ServerSettings.layerTest({ pipelineEnabled: true, pipelineRepos: ["acme/widgets"] }),
             ),
             Layer.provide(layerPortsDefault),
-            Layer.provide(ClaimLease.layerPort({ repos: ["acme/widgets"] })),
+            Layer.provide(ClaimLease.layerPort()),
             Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
           ),
         ),
@@ -292,7 +289,6 @@ describe("repo allowlist", () => {
       Layer.provideMerge(
         pipelineLayer({
           issues: remote.layer,
-          repos: ["acme/widgets"],
           pipelineRepos: ["acme/widgets"],
           model: true,
         }),
@@ -385,7 +381,6 @@ describe("repo allowlist", () => {
       Effect.provide(
         pipelineLayer({
           issues: remote.layer,
-          repos: ["thoerwink8/fleet-ade", "acme/widgets"],
           pipelineRepos: ["thoerwink8/fleet-ade", "acme/widgets"],
         }),
       ),
@@ -441,7 +436,6 @@ describe("repo allowlist", () => {
       Layer.provideMerge(
         pipelineLayer({
           issues: remote.layer,
-          repos: ["thoerwink8/fleet-ade", "acme/widgets"],
           pipelineRepos: ["thoerwink8/fleet-ade", "acme/widgets"],
           model: true,
         }),

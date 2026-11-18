@@ -78,7 +78,7 @@ const stack = (input: {
     Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
     Layer.provide(ServerSettings.layerTest({ pipelineEnabled: true })),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort({ repos: ["thoerwink8/fleet-ade"] })),
+    Layer.provide(ClaimLease.layerPort()),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
   return layer.pipe(
