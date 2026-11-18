@@ -27,7 +27,7 @@ prune_release_backups() {
 cleanup_pipeline_worktrees() {
   local repo_root="${ROOT}/repos/fleet-ade" worktree branch pr_json
   [[ -d "${repo_root}/.git" ]] || return 0
-  git -C "${repo_root}" worktree list --porcelain | awk '/^worktree / {print substr($0, 10)}' \
+  git -C "${repo_root}" -c safe.directory="${repo_root}" worktree list --porcelain | awk '/^worktree / {print substr($0, 10)}' \
     | while IFS= read -r worktree; do
       [[ -n "${worktree}" ]] || continue
       branch=$(git -C "${worktree}" branch --show-current 2>/dev/null || true)
