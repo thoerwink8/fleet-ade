@@ -21,9 +21,6 @@ import { CustomModelEditor } from "./CustomModelEditor";
 const CUSTOM_MODEL_PLACEHOLDER_BY_KIND: Partial<Record<ProviderDriverKind, string>> = {
   [ProviderDriverKind.make("codex")]: "gpt-6.7-codex-ultra-preview",
   [ProviderDriverKind.make("claudeAgent")]: "claude-sonnet-5",
-  [ProviderDriverKind.make("cursor")]: "claude-sonnet-4-6",
-  [ProviderDriverKind.make("opencode")]: "openai/gpt-5",
-  [ProviderDriverKind.make("pi")]: "anthropic/claude-sonnet-5",
 };
 
 const FILTER_THRESHOLD = 8;
@@ -36,7 +33,7 @@ function hasReasoningControl(model: ServerProviderModel): boolean {
 
 // Reasoning is the norm, so only its absence is labeled, and only when other models have it.
 // Custom and null capabilities are fallbacks or user-written, not discovered, so they prove nothing.
-// Alias slugs ("default", Cursor's "auto") defer to the provider's own model choice, so reasoning is unknown.
+// Alias slugs ("default", "auto") defer to the provider's own model choice, so reasoning is unknown.
 function describeModelCapabilities(
   model: ServerProviderModel,
   flagMissingReasoning: boolean,

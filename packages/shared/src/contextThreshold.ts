@@ -68,5 +68,5 @@ export function sessionContextThreshold(input: {
 
 /** These runtimes have no compact setting we can pass, so the session itself asks. */
 export function contextThresholdPrompts(driver: string | null | undefined): boolean {
-  return driver === "antigravity" || driver === "pi";
+  return driver === "antigravity";
 }

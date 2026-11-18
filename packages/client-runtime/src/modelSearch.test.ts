@@ -6,8 +6,8 @@ describe("scoreModelPickerSearch", () => {
   it("ranks exact token matches ahead of fuzzier matches", () => {
     const exactScore = scoreModelPickerSearch(
       {
-        driverKind: "opencode",
-        providerDisplayName: "opencode",
+        driverKind: "acpRegistry",
+        providerDisplayName: "acp",
         name: "Claude Opus 4.7",
         subProvider: "GitHub Copilot",
       },
@@ -15,8 +15,8 @@ describe("scoreModelPickerSearch", () => {
     );
     const fuzzyScore = scoreModelPickerSearch(
       {
-        driverKind: "opencode",
-        providerDisplayName: "opencode",
+        driverKind: "acpRegistry",
+        providerDisplayName: "acp",
         name: "Claude Opus 4.7",
         subProvider: "GitHub Copilot",
       },
@@ -40,8 +40,8 @@ describe("scoreModelPickerSearch", () => {
     );
     const nonFavoriteExactScore = scoreModelPickerSearch(
       {
-        driverKind: "cursor",
-        providerDisplayName: "Cursor",
+        driverKind: "grok",
+        providerDisplayName: "Grok",
         name: "Opus 4.7",
       },
       "opus 4.7",
@@ -110,20 +110,20 @@ const catalog: CatalogModel[] = [
     "Gemini 3.1 Pro (Low)",
   ]),
   {
-    driverKind: "opencode",
-    providerDisplayName: "OpenCode",
+    driverKind: "acpRegistry",
+    providerDisplayName: "ACP",
     name: "Kimi K3",
     subProvider: "Moonshot",
   },
   {
-    driverKind: "opencode",
-    providerDisplayName: "OpenCode",
+    driverKind: "acpRegistry",
+    providerDisplayName: "ACP",
     name: "Kimi K2.5",
     subProvider: "Moonshot",
   },
   {
-    driverKind: "opencode",
-    providerDisplayName: "OpenCode",
+    driverKind: "acpRegistry",
+    providerDisplayName: "ACP",
     name: "Kimi K2",
     subProvider: "Moonshot",
   },

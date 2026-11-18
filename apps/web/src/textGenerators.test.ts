@@ -21,8 +21,8 @@ describe("nextTextGeneratorId", () => {
     const providers = [{ instanceId: ProviderInstanceId.make("openai-3") }];
 
     expect(nextTextGeneratorId("openai", settings, providers)).toBe("openai-4");
-    // A driver's default instance id is taken even before it has a snapshot or config.
-    expect(nextTextGeneratorId("cursor", settings, [])).toBe("cursor-2");
+    // A kept driver's default instance id is taken even before it has a snapshot or config.
+    expect(nextTextGeneratorId("grok", settings, [])).toBe("grok-2");
     expect(nextTextGeneratorId("openrouter", settings, providers)).toBe("openrouter");
   });
 });

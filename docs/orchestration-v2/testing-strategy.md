@@ -119,14 +119,6 @@ Claude replay transcript
   -> Claude Agent SDK query() outbound options and yielded SDKMessage chunks
   -> consumed by ClaudeAdapter
 
-Cursor replay transcript
-  -> Cursor Agent SDK open/send calls and ordered onDelta/run results
-  -> consumed by CursorAdapter
-
-OpenCode replay transcript
-  -> OpenCode SDK requests/responses plus ordered SSE events
-  -> consumed by OpenCodeAdapter
-
 ACP replay transcript
   -> logical JSON-RPC requests/responses/notifications over a strict NDJSON peer
   -> consumed by AcpAdapter and a provider flavor (Grok or ACP Registry)
@@ -219,7 +211,7 @@ Testing infrastructure should be built before production rewrites:
 2. Effect service definitions.
 3. provider runtime transport abstraction.
 4. generic replay runtime.
-5. Codex, Claude, Cursor, OpenCode, and ACP transcript loaders for app-owned provider replay fixtures.
+5. Codex, Claude, and ACP transcript loaders for app-owned provider replay fixtures.
 6. projection reducer tests for core invariants.
 7. full command-to-projection integration tests.
 8. production layers.

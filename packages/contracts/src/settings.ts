@@ -1736,7 +1736,14 @@ export const providerInstanceConfigEnabledFlag = (config: unknown): boolean | un
   return typeof enabled === "boolean" ? enabled : undefined;
 };
 
-// Must match each driver's enabled decoding default.
+// Drivers this build can run. A stored row for anything else stays off, even when it says enabled.
+const REGISTERED_PROVIDER_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set(
+  ["codex", "claudeAgent", "grok", "antigravity", "acpRegistry"].map((driver) =>
+    ProviderDriverKind.make(driver),
+  ),
+);
+
+// Must match each registered driver's enabled decoding default.
 const DEFAULT_DISABLED_PROVIDER_DRIVERS: ReadonlySet<ProviderDriverKind> = new Set(
   ["grok", "antigravity"].map((driver) => ProviderDriverKind.make(driver)),
 );
@@ -1748,17 +1755,19 @@ const DEFAULT_ENABLED_DEFAULT_INSTANCES: ReadonlySet<ProviderInstanceId> = new S
 export const isUnconfiguredDefaultInstanceEnabled = (instanceId: ProviderInstanceId): boolean =>
   DEFAULT_ENABLED_DEFAULT_INSTANCES.has(instanceId);
 
-const defaultEnabledForDriver = (driver: ProviderDriverKind): boolean =>
-  !DEFAULT_DISABLED_PROVIDER_DRIVERS.has(driver);
-
 export const resolveProviderInstanceEnabled = (
   instance: Pick<ProviderInstanceConfig, "driver" | "enabled" | "config">,
 ): boolean => {
+  if (!REGISTERED_PROVIDER_DRIVERS.has(instance.driver)) {
+    return false;
+  }
   const configEnabled = providerInstanceConfigEnabledFlag(instance.config);
   if (instance.enabled === false || configEnabled === false) {
     return false;
   }
-  return instance.enabled ?? configEnabled ?? defaultEnabledForDriver(instance.driver);
+  return (
+    instance.enabled ?? configEnabled ?? !DEFAULT_DISABLED_PROVIDER_DRIVERS.has(instance.driver)
+  );
 };
 
 export const resolveProjectProviderInstanceEnabled = (

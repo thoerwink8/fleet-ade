@@ -285,17 +285,17 @@ it.effect(
 
 it.effect("a launch steps an inherited mode down to the provider's, and refuses one it lacks", () =>
   Effect.gen(function* () {
-    // Pi offers no Auto; a mode a provider lacks would run as Supervised.
-    const pi = ProviderInstanceId.make("pi");
-    const launchPi = Effect.fn("test.launchPi")(function* (runtimeMode?: RuntimeMode) {
+    // Grok offers no Auto; a mode a provider lacks would run as Supervised.
+    const grok = ProviderInstanceId.make("grok");
+    const launchGrok = Effect.fn("test.launchGrok")(function* (runtimeMode?: RuntimeMode) {
       const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
       const { projectId, dependencies } = clientLaunchHarness({
         runtimeModeCeiling: "auto",
         launched,
         providers: [
           {
-            instanceId: pi,
-            driver: ProviderDriverKind.make("pi"),
+            instanceId: grok,
+            driver: ProviderDriverKind.make("grok"),
             enabled: true,
             installed: true,
             status: "ready",
@@ -320,21 +320,21 @@ it.effect("a launch steps an inherited mode down to the provider's, and refuses 
         .handle("t3_thread_launch", {
           projectId,
           title: "修复",
-          modelSelection: { instanceId: pi, model: "pi-model" },
+          modelSelection: { instanceId: grok, model: "grok-model" },
           ...(runtimeMode === undefined ? {} : { runtimeMode }),
         })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
       return { result: result.at(-1)?.result, launched };
     });
 
-    const inherited = yield* launchPi();
+    const inherited = yield* launchGrok();
     expect(inherited.launched[0]?.runtimeMode).toBe("auto-accept-edits");
 
-    const requested = yield* launchPi("auto");
+    const requested = yield* launchGrok("auto");
     expect(requested.result).toMatchObject({ code: "invalid_request" });
     expect(requested.launched).toHaveLength(0);
 
-    const offered = yield* launchPi("approval-required");
+    const offered = yield* launchGrok("approval-required");
     expect(offered.launched[0]?.runtimeMode).toBe("approval-required");
   }),
 );

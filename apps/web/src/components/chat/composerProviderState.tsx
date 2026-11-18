@@ -12,7 +12,6 @@ import {
   getProviderOptionCurrentValue,
   getProviderOptionDescriptors,
   isClaudeUltrathinkPrompt,
-  normalizeModelSlug,
   withImplicitFastModeDefault,
 } from "@t3tools/shared/model";
 
@@ -86,21 +85,6 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
     promptInjectionState = "none",
     includePlanAgent,
   } = input;
-  if (provider === "opencode" || provider === "cursor") {
-    const normalizedModel = normalizeModelSlug(model, provider);
-    const modelIsInCatalog = models.some((candidate) => candidate.slug === normalizedModel);
-    if (!modelIsInCatalog) {
-      const preservedOptions = modelOptions?.filter(
-        (option) => includePlanAgent || option.id !== "agent" || option.value !== "plan",
-      );
-      return {
-        provider,
-        promptEffort: null,
-        modelOptionsForDispatch:
-          preservedOptions && preservedOptions.length > 0 ? preservedOptions : undefined,
-      };
-    }
-  }
   const { caps, selections } = resolveComposerOptionSelections(
     models,
     model,

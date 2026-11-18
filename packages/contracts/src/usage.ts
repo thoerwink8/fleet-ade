@@ -7,7 +7,18 @@ export const USAGE_CONTRACT_VERSION = 6 as const;
 
 export const USAGE_MERGE_COMPATIBLE_SINCE = 4 as const;
 
-export const UsageProviderKind = Schema.Literals(["claude", "codex", "grok", "antigravity"]);
+/**
+ * Adapters this build no longer scans. Old summaries still decode the literals so a
+ * cross-version merge does not fail; display layers omit them from the live list.
+ */
+export const RETIRED_USAGE_PROVIDER_KINDS = ["cursor", "opencode", "pi", "muse"] as const;
+
+const ACTIVE_USAGE_PROVIDER_KINDS = ["claude", "codex", "grok", "antigravity"] as const;
+
+export const UsageProviderKind = Schema.Literals([
+  ...ACTIVE_USAGE_PROVIDER_KINDS,
+  ...RETIRED_USAGE_PROVIDER_KINDS,
+]);
 export type UsageProviderKind = typeof UsageProviderKind.Type;
 
 const USAGE_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;

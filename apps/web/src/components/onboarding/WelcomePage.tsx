@@ -17,6 +17,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import {
   AgentSessionSource,
+  RETIRED_AGENT_SESSION_SOURCES,
   AuthProvidersManageScope,
   AuthRelayReadScope,
   AuthRelayWriteScope,
@@ -1783,9 +1784,13 @@ function ImportCandidateRow({
 const IMPORT_SOURCE_NAMES: Record<AgentSessionSource, string> = {
   claudeAgent: "Claude Code",
   codex: "Codex",
+  pi: "Pi",
 };
+const VISIBLE_IMPORT_SOURCES = AgentSessionSource.literals.filter(
+  (source) => !(RETIRED_AGENT_SESSION_SOURCES as readonly string[]).includes(source),
+);
 const IMPORT_SOURCES_LABEL = new Intl.ListFormat("en", { type: "conjunction" }).format(
-  AgentSessionSource.literals.map((source) => IMPORT_SOURCE_NAMES[source]),
+  VISIBLE_IMPORT_SOURCES.map((source) => IMPORT_SOURCE_NAMES[source]),
 );
 
 function ImportRowMeta({
@@ -1801,7 +1806,7 @@ function ImportRowMeta({
   const age = relative === null ? "" : relative.suffix === null ? "now" : relative.value;
   return (
     <span className="ml-auto grid shrink-0 grid-cols-[1rem_1rem_1rem_2.5rem_2.25rem] items-center gap-x-1 text-xs text-muted-foreground tabular-nums">
-      {AgentSessionSource.literals.map((source) => (
+      {VISIBLE_IMPORT_SOURCES.map((source) => (
         <span key={source} className="flex size-4 items-center justify-center">
           {sources?.includes(source) ? (
             <span role="img" aria-label={IMPORT_SOURCE_NAMES[source]}>

@@ -190,7 +190,7 @@ describe("AddProviderInstanceDialog environment routing", () => {
     });
   });
 
-  it("keeps fx and the ACP Registry under Show more", async () => {
+  it("keeps ACP Registry agents under Show more and does not offer a removed driver", async () => {
     setup();
     await using _screen = await render(dialog());
     expect(radio("Codex")).toBeDefined();
@@ -198,16 +198,8 @@ describe("AddProviderInstanceDialog environment routing", () => {
     expect(document.body.textContent).not.toContain("Use Kilo Code");
 
     await click("显示更多");
+    expect(radio("fx")).toBeUndefined();
     button("Use Kilo Code");
-    await act(async () => radio("fx")!.click());
-    await click("下一步");
-    await click("下一步");
-    await click("添加实例");
-    expect(settingsHooks.mutate).toHaveBeenCalledWith({
-      operation: "create",
-      instanceId: "fx",
-      instance: { driver: "fx", enabled: true, displayName: "fx" },
-    });
   });
 
   it("awaits an atomic create before closing and retains prepared ACP metadata", async () => {

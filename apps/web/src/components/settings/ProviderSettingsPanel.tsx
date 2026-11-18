@@ -1357,14 +1357,6 @@ function ProviderInstanceRow({
             provider={liveProvider}
             readOnly={readOnly}
           />
-        ) : mode === "editor" &&
-          !readOnly &&
-          driver === "cursor" &&
-          liveProvider?.setup?.canAuthenticate === false ? (
-          <SettingsRow
-            title="Cursor 账户"
-            description="正在使用 CURSOR_API_KEY。若要用浏览器登录，请从此提供方的环境中移除该变量。"
-          />
         ) : null
       }
       onUpdate={(next) => actions.updateInstance(instanceId, instance, next)}

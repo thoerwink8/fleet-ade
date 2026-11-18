@@ -281,10 +281,10 @@ describe("pools", () => {
     }
   });
 
-  it("merges OpenCode Go limits from machines with the same API key", () => {
+  it("merges limits from machines with the same API key", () => {
     const go = provider({
-      driver: ProviderDriverKind.make("opencode"),
-      instanceId: ProviderInstanceId.make("opencode"),
+      driver: ProviderDriverKind.make("grok"),
+      instanceId: ProviderInstanceId.make("grok"),
       auth: { status: "authenticated" },
       usageLimits: {
         checkedAt,

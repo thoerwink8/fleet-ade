@@ -568,4 +568,20 @@ describe("mergeUsage", () => {
     expect(merged.sessions).toBe(1);
     expect(merged.providers[0]?.sessions).toBe(1);
   });
+
+  it("decodes a summary whose buckets name providers this build no longer scans", () => {
+    const current = summary([bucket()], [{ provider: "claude", hostId: "old", homePath: "/home" }]);
+    const decoded = decodeSummary({
+      ...current,
+      buckets: [{ ...current.buckets[0], provider: "cursor" }],
+      sources: [
+        {
+          ...current.sources[0],
+          fingerprint: { ...current.sources[0]!.fingerprint, provider: "pi" },
+        },
+      ],
+    });
+    expect(decoded.buckets[0]?.provider).toBe("cursor");
+    expect(decoded.sources[0]?.fingerprint.provider).toBe("pi");
+  });
 });

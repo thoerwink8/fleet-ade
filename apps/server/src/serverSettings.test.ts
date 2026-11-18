@@ -752,13 +752,23 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         enabled: true,
         config: {},
       });
+      assert.isFalse(
+        resolveProviderInstanceEnabled(
+          settings.providerInstances[ProviderInstanceId.make("cursor")]!,
+        ),
+      );
+      assert.isFalse(
+        resolveProviderInstanceEnabled(
+          settings.providerInstances[ProviderInstanceId.make("opencode")]!,
+        ),
+      );
       assert.deepEqual(settings.defaultModelSelection, {
         instanceId: ProviderInstanceId.make("cursor"),
         model: "composer-1",
       });
       assert.deepEqual(settings.textGenerationModelSelection, {
-        instanceId: ProviderInstanceId.make("cursor"),
-        model: "composer-1",
+        instanceId: ProviderInstanceId.make("codex"),
+        model: DEFAULT_SERVER_SETTINGS.textGenerationModelSelection.model,
       });
     }).pipe(Effect.provide(layerServerSettings())),
   );
@@ -2681,7 +2691,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
   (it) => {
     const claude = ProviderDriverKind.make("claudeAgent");
     const codex = ProviderDriverKind.make("codex");
-    const cursor = ProviderDriverKind.make("cursor");
+    const grok = ProviderDriverKind.make("grok");
     const bedrock = { name: "CLAUDE_CODE_USE_BEDROCK", value: "1", sensitive: false };
     const policy: ManagedPolicyDocument = {
       schemaVersion: 1,
@@ -2706,40 +2716,40 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
         const service = yield* ServerSettingsModule.ServerSettingsService;
         const config = yield* ServerConfig.ServerConfig;
         const fs = yield* FileSystem.FileSystem;
-        const cursorId = ProviderInstanceId.make("cursor_work");
+        const grokId = ProviderInstanceId.make("grok_work");
         yield* fs.writeFileString(
           config.settingsPath,
           JSON.stringify({
             providerInstances: {
-              [cursorId]: { driver: cursor, enabled: true },
+              [grokId]: { driver: grok, enabled: true },
               // A default instance id is no proof of its driver.
-              codex: { driver: cursor, enabled: true },
+              codex: { driver: grok, enabled: true },
             },
-            textGenerationModelSelection: { instanceId: cursorId, model: "auto" },
+            textGenerationModelSelection: { instanceId: grokId, model: "auto" },
           }),
         );
 
         const settings = yield* service.getSettings;
         // Never deleted: the instance stays for its threads, and the registry shows it unavailable.
-        assert.equal(settings.providerInstances[cursorId]?.driver, cursor);
+        assert.equal(settings.providerInstances[grokId]?.driver, grok);
         // Built-in text generation does not fall back onto a disallowed driver either.
         assert.equal(settings.textGenerationModelSelection.instanceId, "claudeAgent");
 
         const rejected = yield* service
           .updateProviderInstance({
             operation: "create",
-            instanceId: ProviderInstanceId.make("cursor_new"),
-            instance: { driver: cursor, enabled: true },
+            instanceId: ProviderInstanceId.make("grok_new"),
+            instance: { driver: grok, enabled: true },
           })
           .pipe(Effect.flip);
         assert.equal(rejected.operation, "use-disallowed-provider");
-        assert.equal(rejected.message, "Example Corp's policy does not allow the Cursor provider.");
+        assert.equal(rejected.message, "Example Corp's policy does not allow the Grok provider.");
         // Switching it on for one project is enabling it too.
         const perProject = yield* service
           .updateSettings({
             projectSettingsOverrides: {
               [ProjectId.make("project-a")]: {
-                providerInstances: { [cursorId]: { enabled: true } },
+                providerInstances: { [grokId]: { enabled: true } },
               },
             },
           })
@@ -2749,18 +2759,18 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
         // The client echoes a default instance that was running before it was configured.
         yield* service.updateProviderInstance({
           operation: "upsert",
-          instanceId: ProviderInstanceId.make("cursor"),
-          instance: { driver: cursor, enabled: true },
+          instanceId: ProviderInstanceId.make("grok"),
+          instance: { driver: grok, enabled: true },
         });
 
         // Turning it off, or removing it, is still the user's call.
         yield* service.updateProviderInstance({
           operation: "upsert",
-          instanceId: cursorId,
-          instance: { driver: cursor, enabled: false },
+          instanceId: grokId,
+          instance: { driver: grok, enabled: false },
         });
-        yield* service.updateProviderInstance({ operation: "remove", instanceId: cursorId });
-        assert.isUndefined((yield* service.getSettings).providerInstances[cursorId]);
+        yield* service.updateProviderInstance({ operation: "remove", instanceId: grokId });
+        assert.isUndefined((yield* service.getSettings).providerInstances[grokId]);
       }).pipe(Effect.provide(layerServerSettings(policy))),
     );
 

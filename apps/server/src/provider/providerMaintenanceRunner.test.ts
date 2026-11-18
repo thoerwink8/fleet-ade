@@ -44,10 +44,10 @@ const isServerProviderUpdateError = Schema.is(ServerProviderUpdateError);
 
 const CODEX_DRIVER = ProviderDriverKind.make("codex");
 const NATIVE_CLI_DRIVER = ProviderDriverKind.make("nativeCli");
-const OPENCODE_DRIVER = ProviderDriverKind.make("opencode");
+const GROK_DRIVER = ProviderDriverKind.make("grok");
 const CODEX_INSTANCE_ID = ProviderInstanceId.make("codex");
 const NATIVE_CLI_INSTANCE_ID = ProviderInstanceId.make("nativeCli");
-const OPENCODE_INSTANCE_ID = ProviderInstanceId.make("opencode");
+const GROK_INSTANCE_ID = ProviderInstanceId.make("grok");
 const encoder = new TextEncoder();
 
 // Pin Linux so raw command/args assertions bypass Windows shim resolution.
@@ -65,11 +65,11 @@ function lifecycleFor(provider: ProviderDriverKind): ProviderMaintenanceCapabili
   }
   return makeProviderMaintenanceCapabilities({
     provider,
-    packageName: provider === OPENCODE_DRIVER ? "opencode-ai" : "@openai/codex",
+    packageName: provider === GROK_DRIVER ? "grok-cli" : "@openai/codex",
     updateExecutable: "npm",
     updateArgs:
-      provider === OPENCODE_DRIVER
-        ? ["install", "-g", "opencode-ai@latest"]
+      provider === GROK_DRIVER
+        ? ["install", "-g", "grok-cli@latest"]
         : ["install", "-g", "@openai/codex@latest"],
     updateLockKey: "npm-global",
   });
@@ -95,10 +95,10 @@ const baseNativeCliProvider: ServerProvider = {
   driver: NATIVE_CLI_DRIVER,
 };
 
-const baseOpenCodeProvider: ServerProvider = {
+const baseGrokProvider: ServerProvider = {
   ...baseProvider,
-  instanceId: OPENCODE_INSTANCE_ID,
-  driver: OPENCODE_DRIVER,
+  instanceId: GROK_INSTANCE_ID,
+  driver: GROK_DRIVER,
 };
 
 const layerLatestVersionHttpClient = (version: string) =>
@@ -242,7 +242,7 @@ const makeTestRunner = (
   manifest: ModelManifest.ModelManifestData = {
     version: 1,
     currentModels: {},
-    compatibility: [CODEX_DRIVER, OPENCODE_DRIVER].map((driver) => ({
+    compatibility: [CODEX_DRIVER, GROK_DRIVER].map((driver) => ({
       driver,
       t3CodeRange: ">=0.0.42",
       ranges: [],
@@ -1097,14 +1097,10 @@ describe("providerMaintenanceRunner", () => {
     const log: Array<string> = [];
     return Effect.gen(function* () {
       const { registry } = yield* makeRegistry(
-        [
-          baseProvider,
-          { ...baseProvider, instanceId: CODEX_WORK_INSTANCE_ID },
-          baseOpenCodeProvider,
-        ],
+        [baseProvider, { ...baseProvider, instanceId: CODEX_WORK_INSTANCE_ID }, baseGrokProvider],
         { installedVersionAfterUpdate: "1.0.0" },
       );
-      // OpenCode installs into the same npm prefix, so it shares the lock key but not the package.
+      // Grok installs into the same npm prefix, so it shares the lock key but not the package.
       const updater = yield* makeTestRunner(registry);
       const gate = yield* ProviderInstallationGate.ProviderInstallationGate;
 
@@ -1118,7 +1114,7 @@ describe("providerMaintenanceRunner", () => {
         .pipe(Effect.forkScoped);
       const other = yield* gate
         .execute(
-          OPENCODE_INSTANCE_ID,
+          GROK_INSTANCE_ID,
           Effect.sync(() => log.push("other driver ran")),
         )
         .pipe(Effect.forkScoped);
@@ -1317,10 +1313,10 @@ it.effect.each([
   },
   { mode: "legacy", version: "1.14.20", installation: {}, status: "succeeded" },
 ] as const)(
-  "verifies the $mode OpenCode update using the refreshed installation",
+  "verifies the $mode Grok update using the refreshed installation",
   ({ mode, version, installation, status }) => {
     const calls: string[] = [];
-    const capabilities = lifecycleFor(OPENCODE_DRIVER);
+    const capabilities = lifecycleFor(GROK_DRIVER);
     const pinnedCapabilities = {
       ...capabilities,
       update: { ...capabilities.update!, lockKey: "npm-global:/fixture" },
@@ -1330,7 +1326,7 @@ it.effect.each([
       currentModels: {},
       compatibility: [
         {
-          driver: OPENCODE_DRIVER,
+          driver: GROK_DRIVER,
           t3CodeRange: ">=0.0.42",
           recommendedVersion: "1.14.20",
           ranges: [{ range: "=1.14.20", status: "supported" }],
@@ -1338,7 +1334,7 @@ it.effect.each([
       ],
     };
     return Effect.gen(function* () {
-      const { registry, providersRef } = yield* makeRegistry({ ...baseOpenCodeProvider, version });
+      const { registry, providersRef } = yield* makeRegistry({ ...baseGrokProvider, version });
       const httpClient = yield* HttpClient.HttpClient;
       const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;
       const updater = yield* makeTestRunner(
@@ -1357,7 +1353,7 @@ it.effect.each([
             Effect.gen(function* () {
               assert.strictEqual(calls.length, 1);
               const refreshed = yield* enrichProviderSnapshotWithVersionAdvisory(
-                { ...baseOpenCodeProvider, version, ...installation },
+                { ...baseGrokProvider, version, ...installation },
                 pinnedCapabilities,
               ).pipe(
                 Effect.provideService(HttpClient.HttpClient, httpClient),
@@ -1375,7 +1371,7 @@ it.effect.each([
       );
 
       const result = yield* updater.updateProvider({
-        provider: OPENCODE_DRIVER,
+        provider: GROK_DRIVER,
         ...(mode.startsWith("default") ? {} : { targetVersion: "1.14.20" }),
       });
 
@@ -1383,17 +1379,19 @@ it.effect.each([
         calls,
         mode === "default-precurrent"
           ? []
-          : [`npm install -g opencode-ai@${mode.startsWith("default") ? "latest" : "1.14.20"}`],
+          : [`npm install -g grok-cli@${mode.startsWith("default") ? "latest" : "1.14.20"}`],
       );
       const provider = result.providers[0];
       assert.ok(provider);
       assert.strictEqual(provider.updateState?.status, status);
-      if (mode === "default" || mode === "default-precurrent" || mode === "targeted") {
-        assert.strictEqual(
-          provider.updateState?.message,
-          "OpenCode CLI updated. Restart the configured local OpenCode server to use the new version.",
-        );
-      }
+      assert.strictEqual(
+        provider.updateState?.message,
+        mode === "default-precurrent"
+          ? "Already up to date."
+          : mode === "unknown"
+            ? "Update command completed, but T3 Code could not verify the provider version."
+            : "Provider updated.",
+      );
       assert.strictEqual(provider.version, version);
       assert.strictEqual("installedVersion" in provider, mode !== "legacy");
       if (mode === "default-precurrent") return;

@@ -393,23 +393,10 @@ describe("instance-scoped model selection", () => {
     ).toBe("claude-sonnet-4-6");
   });
 
-  describe.each([
-    {
-      driverName: "opencode",
-      availableModel: "opencode/big-pickle",
-      missingModel: "opencode/kimi-k3",
-    },
-    {
-      driverName: "antigravity",
-      availableModel: "gemini-3.1-pro",
-      missingModel: "gemini-3.1-pro-high",
-    },
-    {
-      driverName: "cursor",
-      availableModel: "auto-smart",
-      missingModel: "claude-opus-5-5",
-    },
-  ])("$driverName catalog gaps", ({ driverName, availableModel, missingModel }) => {
+  describe("antigravity catalog gaps", () => {
+    const driverName = "antigravity";
+    const availableModel = "gemini-3.1-pro";
+    const missingModel = "gemini-3.1-pro-high";
     it("preserves a selected model when a catalog refresh no longer contains it", () => {
       const providers = [
         provider({
@@ -484,7 +471,7 @@ describe("instance-scoped model selection", () => {
     });
   });
 
-  it("falls back from an explicit non-OpenCode draft with a missing model", () => {
+  it("falls back from an explicit draft with a missing model", () => {
     const instanceId = ProviderInstanceId.make("codex");
     const driver = ProviderDriverKind.make("codex");
     const providers = [provider({ provider: driver, instanceId, models: ["gpt-5.6-sol"] })];
@@ -513,59 +500,6 @@ describe("instance-scoped model selection", () => {
 
     expect(state.selectedModel).toBe("gpt-5.6-sol");
     expect(dispatch.modelOptionsForDispatch).toBeUndefined();
-  });
-
-  it("sends a Cursor thread's stored model and options when the catalog lacks them", () => {
-    const instanceId = ProviderInstanceId.make("cursor");
-    const driver = ProviderDriverKind.make("cursor");
-    const stored = createModelSelection(instanceId, "claude-opus-5-5", [
-      { id: "effort", value: "medium" },
-    ]);
-    const providers = [provider({ provider: driver, instanceId, models: ["auto-smart"] })];
-    const state = deriveEffectiveComposerModelState({
-      draft: null,
-      providers,
-      selectedProvider: driver,
-      selectedInstanceId: instanceId,
-      threadModelSelection: stored,
-      projectModelSelection: null,
-      settings: settingsWithProviderInstances(),
-    });
-    const dispatch = getComposerProviderState({
-      provider: driver,
-      model: state.selectedModel,
-      models: providers[0]!.models,
-      modelOptions: state.modelOptions?.[instanceId],
-    });
-
-    expect(
-      createModelSelection(instanceId, state.selectedModel, dispatch.modelOptionsForDispatch),
-    ).toEqual(stored);
-  });
-
-  it("preserves an explicit draft OpenCode selection while the catalog is empty", () => {
-    const instanceId = ProviderInstanceId.make("opencode_work");
-    const driver = ProviderDriverKind.make("opencode");
-    const draftSelection = createModelSelection(instanceId, "openrouter/kimi-k3", [
-      { id: "variant", value: "max" },
-      { id: "agent", value: "build" },
-    ]);
-    const providers = [provider({ provider: driver, instanceId, models: [] })];
-    const state = deriveEffectiveComposerModelState({
-      draft: {
-        activeProvider: instanceId,
-        modelSelectionByProvider: { [instanceId]: draftSelection },
-      },
-      providers,
-      selectedProvider: driver,
-      selectedInstanceId: instanceId,
-      threadModelSelection: null,
-      projectModelSelection: null,
-      settings: settingsWithProviderInstances(),
-    });
-
-    expect(state.selectedModel).toBe("openrouter/kimi-k3");
-    expect(state.modelOptions?.[instanceId]).toEqual(draftSelection.options);
   });
 
   it("preserves the Antigravity model in drafts and existing threads after sign-out", () => {
@@ -718,35 +652,6 @@ describe("instance-scoped model selection", () => {
     ).toEqual([]);
   });
 
-  it("preserves saved options through dispatch when the model is absent from the catalog", () => {
-    const instanceId = ProviderInstanceId.make("opencode");
-    const driver = ProviderDriverKind.make("opencode");
-    const providers = [provider({ provider: driver, instanceId, models: ["opencode/big-pickle"] })];
-    const saved = createModelSelection(instanceId, "opencode/kimi-k3", [
-      { id: "variant", value: "max" },
-      { id: "agent", value: "build" },
-    ]);
-    const state = deriveEffectiveComposerModelState({
-      draft: null,
-      providers,
-      selectedProvider: driver,
-      selectedInstanceId: instanceId,
-      threadModelSelection: saved,
-      projectModelSelection: null,
-      settings: settingsWithProviderInstances(),
-    });
-    const dispatch = getComposerProviderState({
-      provider: driver,
-      model: state.selectedModel,
-      models: providers[0]!.models,
-      modelOptions: state.modelOptions?.[instanceId],
-    });
-
-    expect(
-      createModelSelection(instanceId, state.selectedModel, dispatch.modelOptionsForDispatch),
-    ).toEqual(saved);
-  });
-
   describe("composer model option precedence", () => {
     const instanceId = ProviderInstanceId.make("claudeAgent");
     const driver = ProviderDriverKind.make("claudeAgent");
@@ -856,34 +761,30 @@ describe("instance-scoped model selection", () => {
   });
 
   it("keeps the default instance's draft model off a custom instance of the same driver", () => {
-    const driver = ProviderDriverKind.make("opencode");
-    const defaultInstanceId = ProviderInstanceId.make("opencode");
-    const kimiInstanceId = ProviderInstanceId.make("kimi_api");
-    const kimiModel = "kimi-code-plan-global/k3.1-pro";
+    const driver = ProviderDriverKind.make("grok");
+    const defaultInstanceId = ProviderInstanceId.make("grok");
+    const customInstanceId = ProviderInstanceId.make("grok_work");
+    const customModel = "acme/k3.1-pro";
     const providers = [
-      provider({
-        provider: driver,
-        instanceId: defaultInstanceId,
-        models: ["opencode-go/kimi-k3.1-pro"],
-      }),
-      provider({ provider: driver, instanceId: kimiInstanceId, models: [kimiModel] }),
+      provider({ provider: driver, instanceId: defaultInstanceId, models: ["grok-4.7"] }),
+      provider({ provider: driver, instanceId: customInstanceId, models: [customModel] }),
     ];
     const state = deriveEffectiveComposerModelState({
       draft: {
-        activeProvider: kimiInstanceId,
+        activeProvider: customInstanceId,
         modelSelectionByProvider: {
-          [defaultInstanceId]: createModelSelection(defaultInstanceId, "opencode-go/kimi-k3.1-pro"),
+          [defaultInstanceId]: createModelSelection(defaultInstanceId, "grok-4.7"),
         },
       },
       providers,
       selectedProvider: driver,
-      selectedInstanceId: kimiInstanceId,
+      selectedInstanceId: customInstanceId,
       threadModelSelection: null,
       projectModelSelection: null,
       settings: DEFAULT_UNIFIED_SETTINGS,
     });
 
-    expect(state.selectedModel).toBe(kimiModel);
+    expect(state.selectedModel).toBe(customModel);
   });
 
   it("self-heals a persisted selection pointing at a text-generation-incapable instance", () => {
@@ -954,15 +855,15 @@ describe("instance-scoped model selection", () => {
   });
 
   it("excludes customized extension models while preserving unknown custom and thread models", () => {
-    const pi = provider({
-      provider: ProviderDriverKind.make("pi"),
-      instanceId: "pi",
+    const grok = provider({
+      provider: ProviderDriverKind.make("grok"),
+      instanceId: "grok",
       models: ["default", "demo/demo-model"],
     });
     const providers = [
       {
-        ...pi,
-        models: pi.models.map((model) =>
+        ...grok,
+        models: grok.models.map((model) =>
           model.slug === "demo/demo-model" ? { ...model, supportsTextGeneration: false } : model,
         ),
       },
@@ -970,8 +871,8 @@ describe("instance-scoped model selection", () => {
     const settings: UnifiedSettings = {
       ...DEFAULT_UNIFIED_SETTINGS,
       providerInstances: {
-        [pi.instanceId]: {
-          driver: ProviderDriverKind.make("pi"),
+        [grok.instanceId]: {
+          driver: ProviderDriverKind.make("grok"),
           config: {
             customModels: [
               { slug: "demo/demo-model", name: "My extension model" },
@@ -980,39 +881,44 @@ describe("instance-scoped model selection", () => {
           },
         },
       },
-      textGenerationModelSelection: createModelSelection(pi.instanceId, "demo/demo-model"),
+      textGenerationModelSelection: createModelSelection(grok.instanceId, "demo/demo-model"),
     };
     const supported = providers.filter((provider) => provider.supportsTextGeneration !== false);
     expect(
-      getTextGenerationModelOptionsByInstance(settings, supported, pi.instanceId, "demo/demo-model")
-        .get(pi.instanceId)
+      getTextGenerationModelOptionsByInstance(
+        settings,
+        supported,
+        grok.instanceId,
+        "demo/demo-model",
+      )
+        .get(grok.instanceId)
         ?.map((option) => option.slug),
     ).toEqual(["default", "unknown/model"]);
     expect(resolveAppModelSelectionState(settings, supported)).toEqual(
-      createModelSelection(pi.instanceId, "default"),
+      createModelSelection(grok.instanceId, "default"),
     );
     expect(
       resolveAppModelSelectionState(
         {
           ...settings,
-          textGenerationModelSelection: createModelSelection(pi.instanceId, "unknown/model"),
+          textGenerationModelSelection: createModelSelection(grok.instanceId, "unknown/model"),
         },
         supported,
       ).model,
     ).toBe("unknown/model");
     expect(
       getCustomModelOptionsByInstance(settings, providers)
-        .get(pi.instanceId)
+        .get(grok.instanceId)
         ?.map((option) => option.slug),
     ).toEqual(["default", "demo/demo-model", "unknown/model"]);
   });
 });
 
-describe("resolveAppModelSelectionState with the opencode plan agent", () => {
-  const instanceId = ProviderInstanceId.make("opencode");
-  const model = "opencode/gpt-5.4";
-  const opencode: ServerProvider = {
-    ...provider({ provider: ProviderDriverKind.make("opencode"), instanceId: "opencode" }),
+describe("resolveAppModelSelectionState with the plan agent", () => {
+  const instanceId = ProviderInstanceId.make("grok");
+  const model = "grok-5.4";
+  const grok: ServerProvider = {
+    ...provider({ provider: ProviderDriverKind.make("grok"), instanceId: "grok" }),
     models: [
       {
         slug: model,
@@ -1043,7 +949,7 @@ describe("resolveAppModelSelectionState with the opencode plan agent", () => {
   };
 
   it("keeps a stored plan agent this device did not pick", () => {
-    expect(resolveAppModelSelectionState(settings, [opencode])).toEqual(
+    expect(resolveAppModelSelectionState(settings, [grok])).toEqual(
       createModelSelection(instanceId, model, [{ id: "agent", value: "plan" }]),
     );
   });
@@ -1053,7 +959,7 @@ describe("default model settings and new-thread composer parity", () => {
   it.each([
     ["hidden", "claudeAgent", "claude-opus-5", "claude-opus-5-5", "medium"],
     ["visible", "claudeAgent", "claude-opus-5", "claude-opus-5", "max"],
-    ["unavailable", "opencode", "openrouter/kimi-k3", "openrouter/kimi-k3", null],
+    ["unavailable", "antigravity", "gemini-3.1-pro-high", "gemini-3.1-pro-high", null],
   ] as const)(
     "resolves the %s default and its traits",
     (visibility, kind, model, expectedModel, effort) => {

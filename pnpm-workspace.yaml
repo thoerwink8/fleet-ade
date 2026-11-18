@@ -153,10 +153,6 @@ overrides:
   "@tailwindcss/vite": "catalog:"
   "@types/node": "catalog:"
   effect: "catalog:"
-  # OpenCode 2's protocol and schema packages hard-pin an exact Effect version as a
-  # dependency, and their schemas fail to decode under a second Effect copy.
-  # The `effect` override above already collapses them; these name the edge so it
-  # stays pinned on its own.
   node-abi: 4.33.0
   # The desktop app installs these without a lockfile when it packages them, so
   # pin the native passkey code that runs in its main process.
@@ -199,7 +195,6 @@ patchedDependencies:
   # Electron net requests never emit "socket", so upstream's idle timeout never fires and a
   # stalled update download hangs forever.
   electron-updater@6.8.9: patches/electron-updater@6.8.9.patch
-  # Local agents honor the attribution settings in the user's Cursor CLI cli-config.json.
   # A failed Artifacts.cached effect hangs every later caller: https://github.com/alchemy-run/alchemy/issues/2981
   alchemy@2.0.0-beta.85: patches/alchemy@2.0.0-beta.85.patch
   # iOS: a feed following its end keeps the end through a size-only reflow in one pass.
@@ -225,10 +220,6 @@ permissions:
     skills: false
   drizzle-kit:
     skills: false
-
-# @cursor/sdk finds its platform package (sandbox helper, rg, tree-sitter) by
-# walking up from the entry script for node_modules/@cursor/sdk-<platform>-<arch>.
-# pnpm keeps optional deps inside the virtual store, so hoist it to the root.
 
 minimumReleaseAgeExclude:
   - "@legendapp/list@3.7.2"

@@ -13,6 +13,6 @@ export function retainedModelWhileProviderLocked(
   model: string,
 ): ModelEsque | undefined {
   if (!entry || (entry.enabled && entry.isAvailable) || !model) return undefined;
-  if (entry.driverKind === "opencode" || entry.driverKind === "antigravity") return undefined;
+  if (entry.driverKind === "antigravity") return undefined;
   return entry.models.find((candidate) => candidate.slug === model) ?? { slug: model, name: model };
 }

@@ -1466,9 +1466,9 @@ describe("OrchestratorMcpService provider resolution", () => {
             model: "claude-sonnet-4-6",
           }),
           providerSnapshot({
-            instanceId: ProviderInstanceId.make("pi"),
-            driver: ProviderDriverKind.make("pi"),
-            model: "pi-model",
+            instanceId: ProviderInstanceId.make("grok"),
+            driver: ProviderDriverKind.make("grok"),
+            model: "grok-model",
           }),
           providerSnapshot({
             instanceId: ProviderInstanceId.make("acpRegistry"),
@@ -1507,8 +1507,8 @@ describe("OrchestratorMcpService provider resolution", () => {
           }),
           ServerSettings.layerTest({
             providerInstances: {
-              [ProviderInstanceId.make("pi")]: {
-                driver: ProviderDriverKind.make("pi"),
+              [ProviderInstanceId.make("grok")]: {
+                driver: ProviderDriverKind.make("grok"),
                 enabled: true,
               },
               [ProviderInstanceId.make("acpRegistry")]: {
@@ -1534,7 +1534,7 @@ describe("OrchestratorMcpService provider resolution", () => {
             codexInstanceId,
             projectDisabledInstanceId,
             ProviderInstanceId.make("claudeAgent"),
-            ProviderInstanceId.make("pi"),
+            ProviderInstanceId.make("grok"),
             ProviderInstanceId.make("acpRegistry"),
             antigravityInstanceId,
             disabledAntigravityInstanceId,
@@ -1583,7 +1583,7 @@ describe("OrchestratorMcpService provider resolution", () => {
           for (const instanceId of [
             codexInstanceId,
             ProviderInstanceId.make("claudeAgent"),
-            ProviderInstanceId.make("pi"),
+            ProviderInstanceId.make("grok"),
             ProviderInstanceId.make("acpRegistry"),
             antigravityInstanceId,
           ]) {
@@ -1631,7 +1631,7 @@ describe("OrchestratorMcpService provider resolution", () => {
   );
 
   describe("listed models", () => {
-    const opencodeInstanceId = ProviderInstanceId.make("opencode");
+    const acpInstanceId = ProviderInstanceId.make("acpRegistry");
     const model = (slug: string, extra: Partial<ServerProvider["models"][number]> = {}) => ({
       slug,
       name: slug,
@@ -1639,7 +1639,7 @@ describe("OrchestratorMcpService provider resolution", () => {
       capabilities: null,
       ...extra,
     });
-    const opencodeSlugs = Array.from(
+    const acpSlugs = Array.from(
       { length: 12 },
       (_, index) => `oc/m${String(index + 1).padStart(2, "0")}`,
     );
@@ -1685,11 +1685,11 @@ describe("OrchestratorMcpService provider resolution", () => {
       },
       {
         ...providerSnapshot({
-          instanceId: opencodeInstanceId,
-          driver: ProviderDriverKind.make("opencode"),
+          instanceId: acpInstanceId,
+          driver: ProviderDriverKind.make("acpRegistry"),
         }),
         models: [
-          ...opencodeSlugs.map((slug) => model(slug, { isLegacy: slug === "oc/m03" })),
+          ...acpSlugs.map((slug) => model(slug, { isLegacy: slug === "oc/m03" })),
           model("oc-custom", { isCustom: true }),
         ],
       },
@@ -1715,14 +1715,14 @@ describe("OrchestratorMcpService provider resolution", () => {
                 ServerSettings.layerTest({
                   favorites: [
                     { provider: codexInstanceId, model: "gpt-4" },
-                    { provider: opencodeInstanceId, model: "oc/m10" },
+                    { provider: acpInstanceId, model: "oc/m10" },
                   ],
                   providerModelPreferences: {
-                    [opencodeInstanceId]: { hiddenModels: ["oc/m02"], modelOrder: ["oc/m12"] },
+                    [acpInstanceId]: { hiddenModels: ["oc/m02"], modelOrder: ["oc/m12"] },
                   },
                 }),
                 providerRegistryLayer(catalog),
-                adapterRegistryLayer([codexInstanceId, opencodeInstanceId]),
+                adapterRegistryLayer([codexInstanceId, acpInstanceId]),
                 Layer.mock(ProjectService.ProjectService)({}),
                 Layer.mock(SecretRequests.SecretRequests)({}),
                 Layer.mock(RemoteDelegation.RemoteDelegation)({}),
@@ -1748,7 +1748,7 @@ describe("OrchestratorMcpService provider resolution", () => {
             // gpt-4 is a favorite and gpt-3 is the caller's model; legacy gpt-5 is left out.
             { id: codexInstanceId, models: ["gpt-6", "gpt-4", "gpt-3", "my-alpha"], omitted: 1 },
             {
-              id: opencodeInstanceId,
+              id: acpInstanceId,
               models: [
                 "oc/m12",
                 "oc/m01",
@@ -1771,18 +1771,18 @@ describe("OrchestratorMcpService provider resolution", () => {
       Effect.gen(function* () {
         assert.deepEqual(listing(yield* capabilitiesWith("GPT 5")), [
           { id: codexInstanceId, models: ["gpt-5"], omitted: 0 },
-          { id: opencodeInstanceId, models: [], omitted: 0 },
+          { id: acpInstanceId, models: [], omitted: 0 },
         ]);
-        const opencode = listing(yield* capabilitiesWith("oc/m"))[1];
-        assert.deepEqual(opencode, {
-          id: opencodeInstanceId,
+        const acp = listing(yield* capabilitiesWith("oc/m"))[1];
+        assert.deepEqual(acp, {
+          id: acpInstanceId,
           models: ["oc/m12", "oc/m01", "oc/m03", "oc/m04", "oc/m05", "oc/m06", "oc/m07", "oc/m08"],
           omitted: 3,
         });
         // A word naming the provider matches all its models, so legacy ones stay out.
         assert.deepEqual(listing(yield* capabilitiesWith("Codex")), [
           { id: codexInstanceId, models: ["gpt-6", "gpt-4", "gpt-3", "my-alpha"], omitted: 1 },
-          { id: opencodeInstanceId, models: [], omitted: 0 },
+          { id: acpInstanceId, models: [], omitted: 0 },
         ]);
         assert.deepEqual(listing(yield* capabilitiesWith(" ")), listing(yield* capabilitiesWith()));
         for (const search of ["code", "codex code", "  CODE  "]) {
@@ -1793,7 +1793,7 @@ describe("OrchestratorMcpService provider resolution", () => {
           });
         }
         assert.deepEqual(
-          listing(yield* capabilitiesWith("open"))[1],
+          listing(yield* capabilitiesWith("acp"))[1],
           listing(yield* capabilitiesWith())[1],
         );
         assert.deepEqual(listing(yield* capabilitiesWith("codex gpt 5"))[0], {
@@ -1829,12 +1829,12 @@ describe("OrchestratorMcpService provider resolution", () => {
     "rechecks a delegated model that is %s",
     (availability) =>
       Effect.gen(function* () {
-        const museInstanceId = ProviderInstanceId.make("muse");
-        const model = "muse-wonder-1.0";
+        const grokInstanceId = ProviderInstanceId.make("grok");
+        const model = "grok-wonder-1.0";
         const provider = (advertisedModel: string) =>
           providerSnapshot({
-            instanceId: museInstanceId,
-            driver: ProviderDriverKind.make("muse"),
+            instanceId: grokInstanceId,
+            driver: ProviderDriverKind.make("grok"),
             model: advertisedModel,
           });
         const commands: Array<unknown> = [];
@@ -1844,7 +1844,7 @@ describe("OrchestratorMcpService provider resolution", () => {
           threadId: parentThreadId,
           origin: "app_owned",
           childThreadId,
-          providerInstanceId: museInstanceId,
+          providerInstanceId: grokInstanceId,
           model,
           status: "running",
           result: null,
@@ -1872,15 +1872,15 @@ describe("OrchestratorMcpService provider resolution", () => {
           ServerSettings.layerTest(),
           Layer.mock(ProviderRegistry.ProviderRegistry)({
             getProviders: Effect.succeed([
-              provider(availability === "already advertised" ? model : "muse-spark-1.3"),
+              provider(availability === "already advertised" ? model : "grok-spark-1.3"),
             ]),
             refreshInstance: (instanceId) =>
               Effect.sync(() => {
                 refreshedInstances.push(instanceId);
-                return [provider(availability === "still unavailable" ? "muse-spark-1.3" : model)];
+                return [provider(availability === "still unavailable" ? "grok-spark-1.3" : model)];
               }),
           }),
-          adapterRegistryLayer([museInstanceId]),
+          adapterRegistryLayer([grokInstanceId]),
           Layer.mock(ProjectService.ProjectService)({}),
           Layer.mock(SecretRequests.SecretRequests)({}),
           Layer.mock(RemoteDelegation.RemoteDelegation)({}),
@@ -1890,7 +1890,7 @@ describe("OrchestratorMcpService provider resolution", () => {
           const service = yield* OrchestratorMcpService.OrchestratorMcpService;
           const delegation = service.delegateTask(scope, {
             task: "Review the change.",
-            target: { providerInstanceId: museInstanceId, model },
+            target: { providerInstanceId: grokInstanceId, model },
             mode: "async",
             clientRequestId: availability,
           });
@@ -1903,13 +1903,13 @@ describe("OrchestratorMcpService provider resolution", () => {
             assert.equal(result.model, model);
             assert.equal(commands.length, 1);
             assert.deepEqual((commands[0] as { modelSelection: unknown }).modelSelection, {
-              instanceId: museInstanceId,
+              instanceId: grokInstanceId,
               model,
             });
           }
           assert.deepEqual(
             refreshedInstances,
-            availability === "already advertised" ? [] : [museInstanceId],
+            availability === "already advertised" ? [] : [grokInstanceId],
           );
         }).pipe(Effect.provide(layerOrchestratorService.pipe(Layer.provide(dependencies))));
       }),
@@ -3721,7 +3721,7 @@ describe("OrchestratorMcpService provider resolution", () => {
 
   describe("resolveRuntimeMode", () => {
     const muse = {
-      modelSelection: { instanceId: ProviderInstanceId.make("muse"), model: "muse-model" },
+      modelSelection: { instanceId: ProviderInstanceId.make("grok"), model: "muse-model" },
       supportedRuntimeModes: ["approval-required", "full-access"] as const,
     };
 

@@ -256,8 +256,8 @@ describe("model switch change", () => {
     expect(
       resolveModelSwitchChange(
         {
-          from: selection("pi", { thinking: "low" }),
-          to: selection("pi", { thinking: "high" }),
+          from: selection("mini", { thinking: "low" }),
+          to: selection("mini", { thinking: "high" }),
         },
         [],
       ),

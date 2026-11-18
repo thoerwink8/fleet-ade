@@ -33,21 +33,12 @@ const AGENT_PROBES: Readonly<
     { name: "ChatGPT", url: "https://chatgpt.com" },
   ],
   claudeAgent: [{ name: "Claude", url: "https://api.anthropic.com" }],
-  cursor: [{ name: "Cursor", url: "https://api2.cursor.sh" }],
-  opencode: [{ name: "OpenCode", url: "https://opencode.ai" }],
-  muse: [{ name: "Muse", url: "https://api.meta.ai" }],
 };
 
 const AGENT_LABELS: Readonly<Record<string, string>> = {
   grok: "Grok",
   codex: "Codex",
   claudeAgent: "Claude",
-  cursor: "Cursor",
-  opencode: "OpenCode",
-  pi: "Pi",
-  kiro: "Kiro",
-  muse: "Muse",
-  fx: "fx",
   antigravity: "Antigravity",
 };
 

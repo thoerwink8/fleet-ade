@@ -128,7 +128,7 @@ sessions that hold `device` get a short block from
 [`orchestrationInstructions.ts`](../../packages/provider-core/src/server/orchestrationInstructions.ts)
 through their adapter's instruction channel. It points simulator and emulator UI
 work on local and SSH hosts at the tools; `simctl`, `adb` and ssh stay
-available for what the tools do not cover. Pi and Muse do not send it yet.
+available for what the tools do not cover.
 Claude's native subagents never see the session's system prompt, so a
 `SubagentStart` hook passes them the block, where the runtime runs hooks and the
 subagent's context is not isolated.

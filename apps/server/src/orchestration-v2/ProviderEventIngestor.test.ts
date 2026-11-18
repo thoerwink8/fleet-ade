@@ -235,16 +235,16 @@ it.effect("refreshes the failing instance snapshot after a committed usage_limit
     const adapter = yield* ProviderAdapter.ProviderAdapterV2.pipe(
       Effect.provide(
         Layer.mock(ProviderAdapter.ProviderAdapterV2)({
-          instanceId: ProviderInstanceId.make("cursor-work"),
-          driver: ProviderDriverKind.make("cursor"),
+          instanceId: ProviderInstanceId.make("grok_work"),
+          driver: ProviderDriverKind.make("grok"),
         }),
       ),
     );
     const instance: ProviderInstance = {
-      instanceId: ProviderInstanceId.make("cursor-work"),
-      driverKind: ProviderDriverKind.make("cursor"),
+      instanceId: ProviderInstanceId.make("grok_work"),
+      driverKind: ProviderDriverKind.make("grok"),
       continuationIdentity: {
-        driverKind: ProviderDriverKind.make("cursor"),
+        driverKind: ProviderDriverKind.make("grok"),
         continuationKey: "work",
       },
       enabled: true,

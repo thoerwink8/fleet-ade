@@ -1,15 +1,21 @@
-import type { EnvironmentId, UsageProviderKind } from "@t3tools/contracts";
+import {
+  RETIRED_USAGE_PROVIDER_KINDS,
+  type EnvironmentId,
+  type UsageProviderKind,
+} from "@t3tools/contracts";
 
 import { serverEnvironment } from "../../state/server";
 import { useEnvironmentQuery } from "../../state/query";
 import { ExternalQuotaCards } from "./ExternalQuotaCards";
 
-const LOCAL_PROVIDER_LABEL: Readonly<Record<UsageProviderKind, string>> = {
+const RETIRED_USAGE_PROVIDERS: ReadonlySet<string> = new Set(RETIRED_USAGE_PROVIDER_KINDS);
+
+const LOCAL_PROVIDER_LABEL = {
   claude: "Claude",
   codex: "Codex",
   grok: "Grok",
   antigravity: "Antigravity",
-};
+} as const;
 
 function formatCount(value: number): string {
   if (value >= 10_000) {
@@ -34,10 +40,11 @@ export function ExternalQuotaSection({
   const query = useEnvironmentQuery(
     environmentId === null ? null : serverEnvironment.externalQuotas({ environmentId, input: {} }),
   );
-  const localLines = localProviders.map(
-    (provider) =>
-      `${LOCAL_PROVIDER_LABEL[provider.provider]}：${provider.records} 次，${formatCount(provider.totalTokens)} token`,
-  );
+  const localLines = localProviders.flatMap((provider) => {
+    if (RETIRED_USAGE_PROVIDERS.has(provider.provider)) return [];
+    const label = LOCAL_PROVIDER_LABEL[provider.provider as keyof typeof LOCAL_PROVIDER_LABEL];
+    return [`${label}：${provider.records} 次，${formatCount(provider.totalTokens)} token`];
+  });
   return (
     <ExternalQuotaCards
       agy={query.data?.agy ?? null}

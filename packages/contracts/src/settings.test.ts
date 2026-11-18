@@ -330,8 +330,21 @@ describe("provider enabled defaults", () => {
     const codex = ProviderDriverKind.make("codex");
     expect(resolveProviderInstanceEnabled({ driver: grok, config: {} })).toBe(false);
     expect(resolveProviderInstanceEnabled({ driver: codex, config: {} })).toBe(true);
+    // A driver this build does not register stays off, even when the stored row says enabled.
+    for (const driver of ["cursor", "opencode", "pi", "fx", "kiro", "muse", "ollama"]) {
+      expect(
+        resolveProviderInstanceEnabled({
+          driver: ProviderDriverKind.make(driver),
+          enabled: true,
+          config: { enabled: true },
+        }),
+      ).toBe(false);
+    }
     expect(
-      resolveProviderInstanceEnabled({ driver: ProviderDriverKind.make("ollama"), config: {} }),
+      resolveProviderInstanceEnabled({
+        driver: ProviderDriverKind.make("acpRegistry"),
+        config: {},
+      }),
     ).toBe(true);
     expect(resolveProviderInstanceEnabled({ driver: grok, enabled: true, config: {} })).toBe(true);
     expect(resolveProviderInstanceEnabled({ driver: codex, enabled: false, config: {} })).toBe(
