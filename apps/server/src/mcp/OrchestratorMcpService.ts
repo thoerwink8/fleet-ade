@@ -54,6 +54,10 @@ import {
   type ProviderOptionDescriptor,
   type ProviderOptionSelection,
   ProviderRequestKind,
+  type OrchestratorMcpPipelineBindInput,
+  type OrchestratorMcpPipelineBindResult,
+  type OrchestratorMcpPipelineVerdictInput,
+  type OrchestratorMcpPipelineVerdictResult,
   type RuntimeMode,
   type ScheduledTask,
   type ScheduledTaskUpsertInput,
@@ -110,6 +114,7 @@ import { userFacingDispatchErrorMessage } from "../orchestration-v2/UserFacingEr
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
+import * as PipelineRuns from "../pipeline/PipelineRuns.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import {
   clientModeCeiling,
@@ -224,6 +229,14 @@ export interface OrchestratorMcpServiceShape {
     scope: McpInvocationScope,
     input: OrchestratorMcpThreadInterruptInput,
   ) => Effect.Effect<OrchestratorMcpThreadInterruptResult, OrchestratorMcpFailure>;
+  readonly bindPipelineRun: (
+    scope: McpInvocationScope,
+    input: OrchestratorMcpPipelineBindInput,
+  ) => Effect.Effect<OrchestratorMcpPipelineBindResult, OrchestratorMcpFailure>;
+  readonly recordPipelineVerdict: (
+    scope: McpInvocationScope,
+    input: OrchestratorMcpPipelineVerdictInput,
+  ) => Effect.Effect<OrchestratorMcpPipelineVerdictResult, OrchestratorMcpFailure>;
 }
 
 export class OrchestratorMcpService extends Context.Service<
@@ -1373,6 +1386,39 @@ const make = Effect.gen(function* () {
       : Effect.void;
   };
 
+  const pipelineFailure = (error: { readonly cause: unknown; readonly message: string }) =>
+    failure("invalid_request", typeof error.cause === "string" ? error.cause : error.message);
+
+  const assertSupervisedWorker = Effect.fn("OrchestratorMcpService.assertSupervisedWorker")(
+    function* (callerThreadId: string | null, workerThreadId: ThreadId) {
+      const runs = yield* Effect.serviceOption(PipelineRuns.PipelineRuns);
+      if (Option.isNone(runs)) return;
+      const visible = yield* runs.value
+        .workerVisibleTo({ callerThreadId, workerThreadId })
+        .pipe(Effect.mapError(pipelineFailure));
+      if (!visible) {
+        return yield* failure(
+          "invalid_request",
+          "This pipeline worker is supervised by another thread.",
+        );
+      }
+    },
+  );
+
+  const liveControllerThreadId = Effect.fn("OrchestratorMcpService.liveControllerThreadId")(
+    function* (scope: McpInvocationScope) {
+      const caller = yield* loadCaller(scope, ["runs"]);
+      if (caller.parent === undefined) {
+        return yield* failure(
+          "invalid_request",
+          "Only a live thread can supervise a pipeline run.",
+        );
+      }
+      yield* assertLiveCaller(scope, caller.parent);
+      return caller.parent.thread.id;
+    },
+  );
+
   const loadReadableThread = Effect.fn("OrchestratorMcpService.loadReadableThread")(function* (
     scope: McpInvocationScope,
     threadId: ThreadId,
@@ -1402,6 +1448,7 @@ const make = Effect.gen(function* () {
             "contextTransfers",
           ]);
     const target = yield* records.pipe(Effect.mapError(threadManagementFailure));
+    yield* assertSupervisedWorker(parent?.thread.id ?? null, target.thread.id);
     return { parent, target, shell } as const;
   });
 
@@ -3262,6 +3309,7 @@ const make = Effect.gen(function* () {
     sendToThread: Effect.fn("OrchestratorMcpService.sendToThread")(function* (scope, input) {
       const { parent, limits, target } = yield* loadScopedThread(scope, input.threadId, ["runs"]);
       yield* assertLiveCallerForOtherThread(scope, parent, target);
+      yield* assertSupervisedWorker(parent?.thread.id ?? null, target.thread.id);
       yield* resolveRuntimeMode(limits.runtimeMode, target.thread.runtimeMode);
       yield* resolveInteractionMode(limits.interactionMode, target.thread.interactionMode);
 
@@ -3367,6 +3415,7 @@ const make = Effect.gen(function* () {
     interruptThread: Effect.fn("OrchestratorMcpService.interruptThread")(function* (scope, input) {
       const { parent, limits, target } = yield* loadScopedThread(scope, input.threadId, ["runs"]);
       yield* assertLiveCallerForOtherThread(scope, parent, target);
+      yield* assertSupervisedWorker(parent?.thread.id ?? null, target.thread.id);
       yield* resolveRuntimeMode(limits.runtimeMode, target.thread.runtimeMode);
       yield* resolveInteractionMode(limits.interactionMode, target.thread.interactionMode);
       const key = yield* requestKey(input.clientRequestId);
@@ -3451,6 +3500,49 @@ const make = Effect.gen(function* () {
         status: result.type === "already_terminal" ? result.run.status : "interrupt_requested",
       } satisfies OrchestratorMcpThreadInterruptResult;
     }),
+    bindPipelineRun: Effect.fn("OrchestratorMcpService.bindPipelineRun")(function* (scope, input) {
+      const controllerThreadId = yield* liveControllerThreadId(scope);
+      const runs = yield* Effect.serviceOption(PipelineRuns.PipelineRuns);
+      if (Option.isNone(runs)) {
+        return yield* failure("orchestration_error", "Pipeline runs are not available.");
+      }
+      yield* runs.value
+        .bindController({
+          repository: input.repository,
+          workerThreadId: input.workerThreadId,
+          controllerThreadId,
+        })
+        .pipe(Effect.mapError(pipelineFailure));
+      return {
+        repository: input.repository,
+        workerThreadId: input.workerThreadId,
+        controllerThreadId,
+      } satisfies OrchestratorMcpPipelineBindResult;
+    }),
+    recordPipelineVerdict: Effect.fn("OrchestratorMcpService.recordPipelineVerdict")(
+      function* (scope, input) {
+        const controllerThreadId = yield* liveControllerThreadId(scope);
+        const runs = yield* Effect.serviceOption(PipelineRuns.PipelineRuns);
+        if (Option.isNone(runs)) {
+          return yield* failure("orchestration_error", "Pipeline runs are not available.");
+        }
+        yield* runs.value
+          .recordControllerVerdict({
+            repository: input.repository,
+            workerThreadId: input.workerThreadId,
+            controllerThreadId,
+            verdict: input.verdict,
+            headSha: input.headSha,
+          })
+          .pipe(Effect.mapError(pipelineFailure));
+        return {
+          repository: input.repository,
+          workerThreadId: input.workerThreadId,
+          verdict: input.verdict,
+          headSha: input.headSha,
+        } satisfies OrchestratorMcpPipelineVerdictResult;
+      },
+    ),
   });
 });
 

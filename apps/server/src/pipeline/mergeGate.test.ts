@@ -142,6 +142,36 @@ const cases: ReadonlyArray<{
     facts: passing(false),
     decision: { kind: "mergeable" },
   },
+  {
+    name: "受监督的运行没有当前头的接受结论时不可合",
+    facts: {
+      ...passing(false),
+      supervised: true,
+      controllerVerdict: null,
+      acceptedHeadSha: null,
+    },
+    decision: hold,
+  },
+  {
+    name: "受监督的运行接受的是别的头时不可合",
+    facts: {
+      ...passing(false),
+      supervised: true,
+      controllerVerdict: "accepted",
+      acceptedHeadSha: OLD_HEAD,
+    },
+    decision: hold,
+  },
+  {
+    name: "受监督的运行接受了当前头，自动合关着，停在可合",
+    facts: {
+      ...passing(false),
+      supervised: true,
+      controllerVerdict: "accepted",
+      acceptedHeadSha: HEAD,
+    },
+    decision: { kind: "mergeable" },
+  },
 ];
 
 describe("decideMerge", () => {

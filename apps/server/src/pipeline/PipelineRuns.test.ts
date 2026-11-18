@@ -585,4 +585,75 @@ describe("PipelineRuns", () => {
       assert.strictEqual(second.lastTick?.outcome, "ok");
     }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
   );
+
+  it.effect("只有当前工人能绑定指挥官，换头就作废验收", () =>
+    Effect.gen(function* () {
+      const runs = yield* PipelineRuns;
+      yield* runs.tick;
+      yield* runs.note(1, {
+        threadId: "worker-1",
+        headSha: "abc",
+        status: "checks",
+        prNumber: 1,
+      });
+      const repository = "thoerwink8/fleet-ade";
+      yield* runs.bindController({
+        repository,
+        workerThreadId: "worker-1",
+        controllerThreadId: "controller-1",
+      });
+      const rebound = yield* runs
+        .bindController({
+          repository,
+          workerThreadId: "worker-1",
+          controllerThreadId: "controller-2",
+        })
+        .pipe(Effect.exit);
+      assert.equal(Exit.isFailure(rebound), true);
+      yield* runs.recordControllerVerdict({
+        repository,
+        workerThreadId: "worker-1",
+        controllerThreadId: "controller-1",
+        verdict: "accepted",
+        headSha: "abc",
+      });
+      const accepted = (yield* runs.list).runs.find((run) => run.issueNumber === 1);
+      assert.equal(accepted?.controllerThreadId, "controller-1");
+      assert.equal(accepted?.controllerVerdict, "accepted");
+      assert.equal(accepted?.acceptedHeadSha, "abc");
+      const wrongHead = yield* runs
+        .recordControllerVerdict({
+          repository,
+          workerThreadId: "worker-1",
+          controllerThreadId: "controller-1",
+          verdict: "accepted",
+          headSha: "def",
+        })
+        .pipe(Effect.exit);
+      assert.equal(Exit.isFailure(wrongHead), true);
+      yield* runs.note(1, { headSha: "def" });
+      const cleared = (yield* runs.list).runs.find((run) => run.issueNumber === 1);
+      assert.equal(cleared?.headSha, "def");
+      assert.equal(cleared?.controllerVerdict, null);
+      assert.equal(cleared?.acceptedHeadSha, null);
+      assert.equal(
+        yield* runs.workerVisibleTo({
+          callerThreadId: "controller-1",
+          workerThreadId: "worker-1",
+        }),
+        true,
+      );
+      assert.equal(
+        yield* runs.workerVisibleTo({ callerThreadId: "other", workerThreadId: "worker-1" }),
+        false,
+      );
+    }).pipe(
+      Effect.provide(
+        pipelineLayer({
+          issues: Effect.succeed([issue(1)]),
+          usage: readable(),
+        }),
+      ),
+    ),
+  );
 });

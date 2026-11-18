@@ -53,6 +53,9 @@ export interface MergeGateFacts {
   readonly coldVerify: HeadCheck;
   readonly paths: ReadonlyArray<string>;
   readonly autoMerge: boolean;
+  readonly supervised?: boolean;
+  readonly controllerVerdict?: "accepted" | "rejected" | null;
+  readonly acceptedHeadSha?: string | null;
 }
 
 export type MergeGateDecision =
@@ -101,6 +104,12 @@ export const decideMerge = (
   }
   const onThisHead = (check: RequiredCheck): boolean =>
     check.state === "success" && check.sha === facts.headSha;
+  if (
+    facts.supervised === true &&
+    (facts.controllerVerdict !== "accepted" || facts.acceptedHeadSha !== facts.headSha)
+  ) {
+    return { kind: "hold" };
+  }
   if (
     !facts.checks.some((check) => check.name === CI_CHECK_NAME && onThisHead(check)) ||
     !facts.checks.every(onThisHead) ||
@@ -433,6 +442,9 @@ const make = Effect.gen(function* () {
         },
         paths: observed.value.paths,
         autoMerge: current.pipelineAutoMerge,
+        supervised: run.controllerThreadId !== null,
+        controllerVerdict: run.controllerVerdict,
+        acceptedHeadSha: run.acceptedHeadSha,
       });
       if (decision.kind === "hold") continue;
       if (decision.kind === "unread") {

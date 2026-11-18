@@ -72,6 +72,9 @@ const RunRow = Schema.Struct({
   notifiedReason: Schema.NullOr(Schema.String),
   notifyNote: Schema.NullOr(Schema.String),
   threadId: Schema.NullOr(Schema.String),
+  controllerThreadId: Schema.NullOr(Schema.String),
+  acceptedHeadSha: Schema.NullOr(Schema.String),
+  controllerVerdict: Schema.NullOr(Schema.Literals(["accepted", "rejected"])),
   prNumber: Schema.NullOr(Schema.Int),
   headSha: Schema.NullOr(Schema.String),
   updatedAt: Schema.String,
@@ -160,6 +163,22 @@ interface PipelineRunsShape {
     patch: PipelineRunNote,
     repository?: string,
   ) => Effect.Effect<void, PipelineRunsError>;
+  readonly bindController: (input: {
+    readonly repository: string;
+    readonly workerThreadId: string;
+    readonly controllerThreadId: string;
+  }) => Effect.Effect<void, PipelineRunsError>;
+  readonly recordControllerVerdict: (input: {
+    readonly repository: string;
+    readonly workerThreadId: string;
+    readonly controllerThreadId: string;
+    readonly verdict: "accepted" | "rejected";
+    readonly headSha: string;
+  }) => Effect.Effect<void, PipelineRunsError>;
+  readonly workerVisibleTo: (input: {
+    readonly callerThreadId: string | null;
+    readonly workerThreadId: string;
+  }) => Effect.Effect<boolean, PipelineRunsError>;
 }
 
 export class PipelineRuns extends Context.Service<PipelineRuns, PipelineRunsShape>()(
@@ -273,6 +292,9 @@ const SELECT_RUNS = `
     notified_reason AS notifiedReason,
     notify_note AS notifyNote,
     thread_id AS threadId,
+    controller_thread_id AS controllerThreadId,
+    accepted_head_sha AS acceptedHeadSha,
+    controller_verdict AS controllerVerdict,
     pr_number AS prNumber,
     head_sha AS headSha,
     updated_at AS updatedAt,
@@ -795,13 +817,15 @@ const make = Effect.gen(function* () {
         : patch.ciQueueNote === undefined
           ? target.ciQueueNote
           : patch.ciQueueNote;
+    const nextHead = patch.headSha === undefined ? target.headSha : patch.headSha;
+    const verdictStale = nextHead !== target.headSha;
     yield* sql`
       UPDATE pipeline_runs SET
         status = ${nextStatus},
         stuck_reason = ${nextReason},
         thread_id = ${patch.threadId === undefined ? target.threadId : patch.threadId},
         pr_number = ${patch.prNumber === undefined ? target.prNumber : patch.prNumber},
-        head_sha = ${patch.headSha === undefined ? target.headSha : patch.headSha},
+        head_sha = ${nextHead},
         session_started_at = ${
           patch.sessionStartedAt === undefined ? target.sessionStartedAt : patch.sessionStartedAt
         },
@@ -814,6 +838,8 @@ const make = Effect.gen(function* () {
         ci_queue_note = ${ciQueueNote},
         detail = ${patch.detail === undefined ? target.detail : patch.detail},
         renewed_once = ${patch.renewedOnce === true ? 1 : target.renewedOnce},
+        controller_verdict = ${verdictStale ? null : target.controllerVerdict},
+        accepted_head_sha = ${verdictStale ? null : target.acceptedHeadSha},
         updated_at = ${at}
       WHERE id = ${target.id}
     `.pipe(Effect.mapError(sqlFailure));
@@ -852,7 +878,67 @@ const make = Effect.gen(function* () {
     }
   });
 
-  return PipelineRuns.of({ tick, list, note });
+  const bindController: PipelineRunsShape["bindController"] = Effect.fn(
+    "PipelineRuns.bindController",
+  )(function* (input) {
+    const rows = yield* sql`
+        UPDATE pipeline_runs SET controller_thread_id = ${input.controllerThreadId}
+        WHERE repository = ${input.repository}
+          AND thread_id = ${input.workerThreadId}
+          AND status NOT IN ('merged', 'stuck')
+          AND thread_id != ${input.controllerThreadId}
+          AND (controller_thread_id IS NULL OR controller_thread_id = ${input.controllerThreadId})
+        RETURNING id
+      `.pipe(Effect.mapError(sqlFailure));
+    if (rows.length !== 1) {
+      return yield* new PipelineRunsError({ cause: "run is unavailable or already supervised" });
+    }
+  });
+
+  const recordControllerVerdict: PipelineRunsShape["recordControllerVerdict"] = Effect.fn(
+    "PipelineRuns.recordControllerVerdict",
+  )(function* (input) {
+    const at = yield* nowIso();
+    const rows = yield* sql`
+      UPDATE pipeline_runs SET
+        controller_verdict = ${input.verdict},
+        accepted_head_sha = ${input.verdict === "accepted" ? input.headSha : null},
+        updated_at = ${at}
+      WHERE repository = ${input.repository}
+        AND thread_id = ${input.workerThreadId}
+        AND controller_thread_id = ${input.controllerThreadId}
+        AND head_sha = ${input.headSha}
+        AND status NOT IN ('merged', 'stuck')
+      RETURNING id
+    `.pipe(Effect.mapError(sqlFailure));
+    if (rows.length !== 1) {
+      return yield* new PipelineRunsError({
+        cause: "run is not bound to this controller or the head differs",
+      });
+    }
+  });
+
+  const workerVisibleTo: PipelineRunsShape["workerVisibleTo"] = Effect.fn(
+    "PipelineRuns.workerVisibleTo",
+  )(function* (input) {
+    const rows = yield* sql<{ readonly controllerThreadId: string }>`
+      SELECT controller_thread_id AS controllerThreadId
+      FROM pipeline_runs
+      WHERE thread_id = ${input.workerThreadId}
+        AND status NOT IN ('merged', 'stuck')
+        AND controller_thread_id IS NOT NULL
+    `.pipe(Effect.mapError(sqlFailure));
+    return rows.every((row) => row.controllerThreadId === input.callerThreadId);
+  });
+
+  return PipelineRuns.of({
+    tick,
+    list,
+    note,
+    bindController,
+    recordControllerVerdict,
+    workerVisibleTo,
+  });
 });
 
 export const layer = Layer.effect(PipelineRuns, make);

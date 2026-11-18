@@ -237,6 +237,20 @@ const handlers = {
         return yield* service.interruptThread(scope, input);
       }),
   ),
+  t3_pipeline_bind: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+      return yield* service.bindPipelineRun(scope, input);
+    }),
+  ),
+  t3_pipeline_verdict: McpToolAccess.actsAsCaller((input) =>
+    Effect.gen(function* () {
+      const scope = yield* McpInvocationContext.McpInvocationContext;
+      const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+      return yield* service.recordPipelineVerdict(scope, input);
+    }),
+  ),
 } satisfies McpToolAccess.Handlers<typeof OrchestratorToolkit.tools>;
 
 export const layer = McpToolAccess.toLayer(OrchestratorToolkit, handlers);
