@@ -611,37 +611,6 @@ export const OrchestratorMcpThreadInterruptResult = Schema.Struct({
 });
 export type OrchestratorMcpThreadInterruptResult = typeof OrchestratorMcpThreadInterruptResult.Type;
 
-export const OrchestratorMcpPipelineBindInput = Schema.Struct({
-  environmentId: OrchestratorMcpEnvironmentTarget,
-  repository: TrimmedNonEmptyString.check(Schema.isMaxLength(200)),
-  workerThreadId: ThreadId,
-});
-export type OrchestratorMcpPipelineBindInput = typeof OrchestratorMcpPipelineBindInput.Type;
-
-export const OrchestratorMcpPipelineBindResult = Schema.Struct({
-  repository: Schema.String,
-  workerThreadId: ThreadId,
-  controllerThreadId: ThreadId,
-});
-export type OrchestratorMcpPipelineBindResult = typeof OrchestratorMcpPipelineBindResult.Type;
-
-export const OrchestratorMcpPipelineVerdictInput = Schema.Struct({
-  environmentId: OrchestratorMcpEnvironmentTarget,
-  repository: TrimmedNonEmptyString.check(Schema.isMaxLength(200)),
-  workerThreadId: ThreadId,
-  verdict: Schema.Literals(["accepted", "rejected"]),
-  headSha: TrimmedNonEmptyString.check(Schema.isMaxLength(64)),
-});
-export type OrchestratorMcpPipelineVerdictInput = typeof OrchestratorMcpPipelineVerdictInput.Type;
-
-export const OrchestratorMcpPipelineVerdictResult = Schema.Struct({
-  repository: Schema.String,
-  workerThreadId: ThreadId,
-  verdict: Schema.Literals(["accepted", "rejected"]),
-  headSha: Schema.String,
-});
-export type OrchestratorMcpPipelineVerdictResult = typeof OrchestratorMcpPipelineVerdictResult.Type;
-
 export const OrchestratorMcpCapabilitiesInput = Schema.Struct({
   environmentId: OrchestratorMcpEnvironmentTarget,
   search: Schema.optional(

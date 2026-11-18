@@ -586,7 +586,7 @@ describe("PipelineRuns", () => {
     }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
   );
 
-  it.effect("只有当前工人能绑定指挥官，换头就作废验收", () =>
+  it.effect("旧监督记录换头就作废验收，自动运行保持不受监督", () =>
     Effect.gen(function* () {
       const runs = yield* PipelineRuns;
       yield* runs.tick;
@@ -596,61 +596,29 @@ describe("PipelineRuns", () => {
         status: "checks",
         prNumber: 1,
       });
-      const repository = "thoerwink8/fleet-ade";
-      yield* runs.bindController({
-        repository,
-        workerThreadId: "worker-1",
-        controllerThreadId: "controller-1",
-      });
-      const rebound = yield* runs
-        .bindController({
-          repository,
-          workerThreadId: "worker-1",
-          controllerThreadId: "controller-2",
-        })
-        .pipe(Effect.exit);
-      assert.equal(Exit.isFailure(rebound), true);
-      yield* runs.recordControllerVerdict({
-        repository,
-        workerThreadId: "worker-1",
-        controllerThreadId: "controller-1",
-        verdict: "accepted",
-        headSha: "abc",
-      });
-      const accepted = (yield* runs.list).runs.find((run) => run.issueNumber === 1);
-      assert.equal(accepted?.controllerThreadId, "controller-1");
-      assert.equal(accepted?.controllerVerdict, "accepted");
-      assert.equal(accepted?.acceptedHeadSha, "abc");
-      const wrongHead = yield* runs
-        .recordControllerVerdict({
-          repository,
-          workerThreadId: "worker-1",
-          controllerThreadId: "controller-1",
-          verdict: "accepted",
-          headSha: "def",
-        })
-        .pipe(Effect.exit);
-      assert.equal(Exit.isFailure(wrongHead), true);
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`
+        UPDATE pipeline_runs SET
+          controller_thread_id = 'legacy-controller',
+          controller_verdict = 'accepted',
+          accepted_head_sha = 'abc'
+        WHERE issue_number = 1
+      `;
       yield* runs.note(1, { headSha: "def" });
       const cleared = (yield* runs.list).runs.find((run) => run.issueNumber === 1);
       assert.equal(cleared?.headSha, "def");
+      assert.equal(cleared?.controllerThreadId, "legacy-controller");
       assert.equal(cleared?.controllerVerdict, null);
       assert.equal(cleared?.acceptedHeadSha, null);
-      assert.equal(
-        yield* runs.workerVisibleTo({
-          callerThreadId: "controller-1",
-          workerThreadId: "worker-1",
-        }),
-        true,
-      );
-      assert.equal(
-        yield* runs.workerVisibleTo({ callerThreadId: "other", workerThreadId: "worker-1" }),
-        false,
-      );
+      yield* runs.note(2, { threadId: "worker-2", status: "checks" });
+      const automatic = (yield* runs.list).runs.find((run) => run.issueNumber === 2);
+      assert.equal(automatic?.controllerThreadId, null);
+      assert.equal(automatic?.controllerVerdict, null);
+      assert.equal(automatic?.acceptedHeadSha, null);
     }).pipe(
       Effect.provide(
         pipelineLayer({
-          issues: Effect.succeed([issue(1)]),
+          issues: Effect.succeed([issue(1), issue(2)]),
           usage: readable(),
         }),
       ),

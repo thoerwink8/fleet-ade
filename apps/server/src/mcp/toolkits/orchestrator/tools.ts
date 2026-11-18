@@ -34,10 +34,6 @@ import {
   OrchestratorMcpThreadSendResult,
   OrchestratorMcpThreadWaitInput,
   OrchestratorMcpThreadWaitResult,
-  OrchestratorMcpPipelineBindInput,
-  OrchestratorMcpPipelineBindResult,
-  OrchestratorMcpPipelineVerdictInput,
-  OrchestratorMcpPipelineVerdictResult,
   ThreadMetadataMcpUpdateInput,
   ThreadMetadataMcpUpdateResult,
   TrimmedNonEmptyString,
@@ -318,32 +314,6 @@ const ThreadInterruptTool = Tool.make("t3_thread_interrupt", {
   .annotate(Tool.Title, "Interrupt a T3 thread")
   .annotate(Tool.Destructive, true);
 
-const PipelineBindTool = Tool.make("t3_pipeline_bind", {
-  description:
-    "Bind this live thread as the controller of one active pipeline worker. Pass the repository and worker thread, never an internal run id. The same controller may repeat the binding; another controller cannot take it.",
-  parameters: OrchestratorMcpPipelineBindInput,
-  success: OrchestratorMcpPipelineBindResult,
-  failure: OrchestratorMcpFailure,
-  failureMode: "return",
-  dependencies,
-})
-  .annotate(Tool.Title, "Supervise a pipeline worker")
-  .annotate(Tool.Destructive, true)
-  .annotate(Tool.Idempotent, true);
-
-const PipelineVerdictTool = Tool.make("t3_pipeline_verdict", {
-  description:
-    "Record this controller's acceptance or rejection of the bound worker's exact current head. Acceptance is not human review, does not merge, and stops applying when the head changes.",
-  parameters: OrchestratorMcpPipelineVerdictInput,
-  success: OrchestratorMcpPipelineVerdictResult,
-  failure: OrchestratorMcpFailure,
-  failureMode: "return",
-  dependencies,
-})
-  .annotate(Tool.Title, "Record a pipeline head verdict")
-  .annotate(Tool.Destructive, true)
-  .annotate(Tool.Idempotent, true);
-
 const EnvironmentLinksTool = Tool.make("t3_environment_links", {
   description:
     "List linked environments (the user's other machines) and whether each answers now. Pass one's `environmentId` to a tool to act there; `delegate_task` takes `target.environmentId`. Expired: link it again with `t3_environment_link`.",
@@ -404,8 +374,6 @@ export const OrchestratorToolkit = Toolkit.make(
   ThreadSendTool,
   ThreadWaitTool,
   ThreadInterruptTool,
-  PipelineBindTool,
-  PipelineVerdictTool,
   EnvironmentLinksTool,
   EnvironmentLinkTool,
   EnvironmentUnlinkTool,

@@ -324,18 +324,14 @@ describe("MergeGate", () => {
           prNumber: 18,
           headSha: HEAD,
         });
-        yield* runs.bindController({
-          repository: "thoerwink8/fleet-ade",
-          workerThreadId: "pipeline-worker",
-          controllerThreadId: "authorized-controller",
-        });
-        yield* runs.recordControllerVerdict({
-          repository: "thoerwink8/fleet-ade",
-          workerThreadId: "pipeline-worker",
-          controllerThreadId: "authorized-controller",
-          verdict: "accepted",
-          headSha: HEAD,
-        });
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`
+          UPDATE pipeline_runs SET
+            controller_thread_id = 'legacy-controller',
+            controller_verdict = 'accepted',
+            accepted_head_sha = ${HEAD}
+          WHERE issue_number = 9
+        `;
         yield* gate.tick;
         const run = (yield* runs.list).runs.find((item) => item.issueNumber === 9);
         assert.strictEqual(run?.status, "mergeable");
