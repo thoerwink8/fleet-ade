@@ -110,6 +110,8 @@ function existingThreadIdsForCommand(
     case "thread.visit":
     case "thread.mark-unread":
       return [];
+    case "thread.batch":
+      return command.threadIds;
     case "thread.fork":
       return [command.sourceThreadId];
     case "thread.merge_back":

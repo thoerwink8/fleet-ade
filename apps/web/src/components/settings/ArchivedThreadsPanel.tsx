@@ -9,9 +9,12 @@ import {
   settlePromise,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
+import { readLocalApi } from "../../localApi";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { useThreadActions } from "../../hooks/useThreadActions";
-import { readLocalApi } from "../../localApi";
+import { threadEnvironment } from "../../state/threads";
+import { useOrchestrationCommand } from "../../state/use-orchestration-command";
+import { applyThreadBatch } from "../Sidebar.logic";
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";
 import { RelativeTime } from "../RelativeTime";
 import { Button } from "../ui/button";
@@ -32,6 +35,7 @@ type ArchiveAction = (typeof ARCHIVE_ACTIONS)[number]["action"];
 export function ArchivedThreadsPanel() {
   const { scope, groups: projectGroups, environments } = useSettingsScope();
   const { unarchiveThread, confirmAndDeleteThread } = useThreadActions();
+  const batchThreads = useOrchestrationCommand(threadEnvironment.batch, { reportFailure: false });
   const pendingActionsRef = useRef(new Set<string>());
   const [pendingKeys, setPendingKeys] = useState<ReadonlySet<string>>(() => new Set());
   const {
@@ -147,6 +151,31 @@ export function ArchivedThreadsPanel() {
     );
   };
 
+  const unarchiveGroup = async (threads: readonly ArchivedThread[]) => {
+    const { prunedKeys, failures } = await applyThreadBatch({
+      threads: threads.map((thread) => ({
+        environmentId: thread.environmentId,
+        id: thread.id,
+        title: thread.title,
+        key: scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+      })),
+      dispatch: (group) =>
+        batchThreads({
+          environmentId: group.environmentId,
+          input: { operation: "unarchive", threadIds: group.threadIds },
+        }),
+    });
+    if (prunedKeys.size > 0) refreshArchivedThreads();
+    if (failures.length > 0) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "有会话未能取消归档",
+          description: failures.join("\n"),
+        }),
+      );
+    }
+  };
   const handleThreadAction = async (action: ArchiveAction, thread: ArchivedThread) => {
     const target = scopeThreadRef(thread.environmentId, thread.id);
     const key = scopedThreadKey(target);
@@ -222,6 +251,16 @@ export function ArchivedThreadsPanel() {
             id={index === 0 ? searchableSetting("archive").id : undefined}
             title={title}
             icon={<ProjectFavicon project={project} />}
+            headerAction={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void unarchiveGroup(projectThreads)}
+              >
+                {`取消归档（${projectThreads.length}）`}
+              </Button>
+            }
           >
             {projectThreads.map((thread) => {
               const threadKey = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));

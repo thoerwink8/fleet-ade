@@ -3184,6 +3184,14 @@ export const OrchestrationV2Command = Schema.Union([
     threadId: ThreadId,
   }),
   Schema.Struct({
+    type: Schema.Literal("thread.batch"),
+    commandId: CommandId,
+    operation: Schema.Literals(["archive", "unarchive", "delete"]),
+    threadIds: Schema.Array(ThreadId).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+    /** Delete only threads with no runs and no messages. */
+    onlyIfUnused: Schema.optional(Schema.Boolean),
+  }),
+  Schema.Struct({
     type: Schema.Literal("thread.metadata.update"),
     commandId: CommandId,
     threadId: ThreadId,
@@ -3853,8 +3861,30 @@ export const OrchestrationV2ThreadLaunchResult = Schema.Struct({
 });
 export type OrchestrationV2ThreadLaunchResult = typeof OrchestrationV2ThreadLaunchResult.Type;
 
+export const OrchestrationV2BatchThreadItemStatus = Schema.Literals([
+  "applied",
+  "already_target",
+  "not_found",
+  "deleted",
+  "running",
+  "rejected",
+]);
+export type OrchestrationV2BatchThreadItemStatus = typeof OrchestrationV2BatchThreadItemStatus.Type;
+export const OrchestrationV2BatchThreadItemResult = Schema.Struct({
+  threadId: ThreadId,
+  status: OrchestrationV2BatchThreadItemStatus,
+});
+export type OrchestrationV2BatchThreadItemResult = typeof OrchestrationV2BatchThreadItemResult.Type;
+export const OrchestrationV2BatchThreadResult = Schema.Struct({
+  operation: Schema.Literals(["archive", "unarchive", "delete"]),
+  items: Schema.Array(OrchestrationV2BatchThreadItemResult),
+  appliedCount: NonNegativeInt,
+  rejectedCount: NonNegativeInt,
+});
+export type OrchestrationV2BatchThreadResult = typeof OrchestrationV2BatchThreadResult.Type;
 export const OrchestrationV2DispatchCommandResult = Schema.Struct({
   sequence: NonNegativeInt,
+  batch: Schema.optional(OrchestrationV2BatchThreadResult),
 });
 export type OrchestrationV2DispatchCommandResult = typeof OrchestrationV2DispatchCommandResult.Type;
 

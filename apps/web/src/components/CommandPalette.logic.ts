@@ -766,11 +766,21 @@ export function getCommandPaletteMode(input: {
   return input.isBrowsing ? "root-browse" : "root";
 }
 
+function selectionPaletteLabel(count: number): string | null {
+  return count > 0 ? `已选 ${count} 个` : null;
+}
+
 export function buildRootGroups(input: {
   actionItems: ReadonlyArray<CommandPaletteActionItem | CommandPaletteSubmenuItem>;
   recentThreadItems: ReadonlyArray<CommandPaletteActionItem>;
+  selectionCount?: number;
+  selectionItems?: ReadonlyArray<CommandPaletteActionItem | CommandPaletteSubmenuItem>;
 }): CommandPaletteGroup[] {
   const groups: CommandPaletteGroup[] = [];
+  const selectionLabel = selectionPaletteLabel(input.selectionCount ?? 0);
+  if (selectionLabel && input.selectionItems && input.selectionItems.length > 0) {
+    groups.push({ value: "selection", label: selectionLabel, items: input.selectionItems });
+  }
   if (input.actionItems.length > 0) {
     groups.push({ value: "actions", label: "操作", items: input.actionItems });
   }

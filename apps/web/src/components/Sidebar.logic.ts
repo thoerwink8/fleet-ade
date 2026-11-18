@@ -7,6 +7,7 @@ import { threadPullRequestSearchTerms } from "@t3tools/shared/threadPullRequests
 import * as React from "react";
 import {
   isAtomCommandInterrupted,
+  squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
 import { defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit/sortable";
@@ -579,6 +580,81 @@ export async function deleteSelectedThreadEntries<
   }
 
   return { deletedThreadKeys, firstFailure };
+}
+
+export function batchDeleteConfirmText(count: number): string {
+  return [`删除 ${count} 个会话？`, "删除不可恢复。", "想留着的请改用归档。"].join("\n");
+}
+
+function batchItemFailureLines(
+  items: ReadonlyArray<{ readonly status: string; readonly title: string }>,
+): string[] {
+  return items.flatMap((item) => {
+    if (item.status === "running") return [`${item.title} 正在跑，未删除`];
+    if (item.status === "rejected") return [`${item.title} 未处理`];
+    return [];
+  });
+}
+
+function groupThreadIdsByEnvironment(
+  threads: readonly { readonly environmentId: EnvironmentId; readonly id: ThreadId }[],
+): ReadonlyArray<{ readonly environmentId: EnvironmentId; readonly threadIds: ThreadId[] }> {
+  const groups = new Map<EnvironmentId, ThreadId[]>();
+  for (const thread of threads) {
+    const ids = groups.get(thread.environmentId);
+    if (ids) ids.push(thread.id);
+    else groups.set(thread.environmentId, [thread.id]);
+  }
+  return [...groups].map(([environmentId, threadIds]) => ({ environmentId, threadIds }));
+}
+
+export async function applyThreadBatch(input: {
+  readonly threads: ReadonlyArray<{
+    readonly environmentId: EnvironmentId;
+    readonly id: ThreadId;
+    readonly title: string;
+    readonly key: string;
+  }>;
+  readonly dispatch: (group: {
+    readonly environmentId: EnvironmentId;
+    readonly threadIds: ReadonlyArray<ThreadId>;
+  }) => Promise<AtomCommandResult<unknown, unknown>>;
+}): Promise<{ readonly prunedKeys: ReadonlySet<string>; readonly failures: readonly string[] }> {
+  const prunedKeys = new Set<string>();
+  const failures: string[] = [];
+  const keyById = new Map(input.threads.map((thread) => [String(thread.id), thread.key]));
+  const titleById = new Map(input.threads.map((thread) => [String(thread.id), thread.title]));
+  for (const group of groupThreadIdsByEnvironment(input.threads)) {
+    const result = await input.dispatch(group);
+    if (result._tag === "Failure") {
+      if (isAtomCommandInterrupted(result)) break;
+      const error = squashAtomCommandFailure(result);
+      failures.push(error instanceof Error ? error.message : "请求失败");
+      continue;
+    }
+    // The atom wraps the RPC payload; `batch` lives on the dispatch result, not the envelope.
+    const value = result.value as {
+      readonly batch?: {
+        readonly items: ReadonlyArray<{ readonly threadId: string; readonly status: string }>;
+      };
+    };
+    for (const item of value.batch?.items ?? []) {
+      if (item.status !== "applied" && item.status !== "deleted" && item.status !== "not_found") {
+        continue;
+      }
+      const key = keyById.get(item.threadId);
+      if (key) prunedKeys.add(key);
+    }
+    failures.push(
+      ...batchItemFailureLines(
+        (value.batch?.items ?? []).map((item) => ({
+          status: item.status,
+          title: titleById.get(item.threadId) ?? item.threadId,
+        })),
+      ),
+    );
+  }
+  return { prunedKeys, failures };
 }
 
 export function isSidebarHiddenThread(thread: Pick<SidebarThreadSummary, "lineage">): boolean {

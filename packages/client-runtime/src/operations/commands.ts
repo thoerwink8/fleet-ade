@@ -101,6 +101,11 @@ export interface DeleteThreadInput extends ThreadCommandInput {
 }
 export type ArchiveThreadInput = ThreadCommandInput;
 export type UnarchiveThreadInput = ThreadCommandInput;
+export interface BatchThreadInput extends CommandMetadata {
+  readonly operation: "archive" | "unarchive" | "delete";
+  readonly threadIds: ReadonlyArray<ThreadId>;
+  readonly onlyIfUnused?: boolean;
+}
 export type SettleThreadInput = ThreadCommandInput;
 
 export interface UnsettleThreadInput extends ThreadCommandInput {
@@ -552,6 +557,18 @@ export const archiveThread = Effect.fn("EnvironmentCommands.archiveThread")(func
   input: ArchiveThreadInput,
 ) {
   return yield* simpleThreadCommand("thread.archive", input);
+});
+export const batchThreads = Effect.fn("EnvironmentCommands.batchThreads")(function* (
+  input: BatchThreadInput,
+) {
+  const commandId = yield* allocateCommandId(input);
+  return yield* dispatch({
+    type: "thread.batch",
+    commandId,
+    operation: input.operation,
+    threadIds: input.threadIds,
+    ...(input.onlyIfUnused === undefined ? {} : { onlyIfUnused: input.onlyIfUnused }),
+  });
 });
 
 export const unarchiveThread = Effect.fn("EnvironmentCommands.unarchiveThread")(function* (

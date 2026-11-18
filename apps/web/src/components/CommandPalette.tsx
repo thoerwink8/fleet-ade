@@ -4,6 +4,7 @@ import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 
 import {
   scopedThreadKey,
+  parseScopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
 } from "@t3tools/client-runtime/environment";
@@ -145,6 +146,7 @@ import {
   useProjects,
   useServerConfigs,
   useVisibleThreadShells,
+  readThreadShell,
   waitForProject,
 } from "../state/entities";
 import { visibleLinkedThreads } from "@t3tools/client-runtime/state/threads";
@@ -227,7 +229,8 @@ import {
   type SearchOverlayMode,
 } from "./CommandPalette.logic";
 import { resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
-import { isSidebarHiddenThread } from "./Sidebar.logic";
+import { isSidebarHiddenThread, applyThreadBatch, batchDeleteConfirmText } from "./Sidebar.logic";
+import { useThreadSelectionStore } from "../threadSelectionStore";
 import { CommandPaletteContent, type PendingInputSelection } from "./CommandPaletteContent";
 import {
   selectCommandPaletteClientSettings,
@@ -415,6 +418,11 @@ function OpenCommandPaletteDialog(props: {
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { openChildSearch, setOpen } = props;
+  const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
+  const batchThreads = useOrchestrationCommand(threadEnvironment.batch, { reportFailure: false });
+  const markSelectedUnread = useOrchestrationCommand(threadEnvironment.markUnread, {
+    reportFailure: false,
+  });
   // Keyed by palette session: the intent and restored search only seed this
   // mount, and closing must not change what the closing palette shows.
   const [initialSearch] = useState(
@@ -1796,7 +1804,119 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
-  const rootGroups = buildRootGroups({ actionItems, recentThreadItems });
+  const selectedBatchThreads = () =>
+    [...useThreadSelectionStore.getState().selectedThreadKeys].flatMap((key) => {
+      const ref = parseScopedThreadKey(key);
+      if (!ref) return [];
+      const shell = readThreadShell(ref);
+      return [
+        {
+          environmentId: ref.environmentId,
+          id: ref.threadId,
+          title: shell?.title ?? ref.threadId,
+          key,
+        },
+      ];
+    });
+  const runSelectionBatch = async (operation: "archive" | "unarchive" | "delete") => {
+    const { failures } = await applyThreadBatch({
+      threads: selectedBatchThreads(),
+      dispatch: (group) =>
+        batchThreads({
+          environmentId: group.environmentId,
+          input: { operation, threadIds: group.threadIds },
+        }),
+    });
+    if (failures.length > 0) {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: operation === "delete" ? "有会话未能删除" : "有会话未处理",
+          description: failures.join("\n"),
+        }),
+      );
+    }
+    useThreadSelectionStore.getState().clearSelection();
+  };
+  const selectionItems: CommandPaletteActionItem[] =
+    selectedThreadCount === 0
+      ? []
+      : [
+          {
+            kind: "action",
+            value: "selection:select-all",
+            title: "全选当前列表",
+            searchTerms: ["select all", "全选"],
+            icon: <ListTreeIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              useThreadSelectionStore
+                .getState()
+                .replaceSelection(useThreadSelectionStore.getState().visibleThreadKeys);
+            },
+          },
+          {
+            kind: "action",
+            value: "selection:archive",
+            title: "归档已选",
+            searchTerms: ["archive", "归档"],
+            icon: <FolderIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              await runSelectionBatch("archive");
+            },
+          },
+          {
+            kind: "action",
+            value: "selection:unarchive",
+            title: "取消归档已选",
+            searchTerms: ["unarchive", "取消归档"],
+            icon: <FolderIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              await runSelectionBatch("unarchive");
+            },
+          },
+          {
+            kind: "action",
+            value: "selection:mark-unread",
+            title: "标为未读",
+            searchTerms: ["unread", "未读"],
+            icon: <MessageSquareIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              await Promise.all(
+                selectedBatchThreads().map((thread) =>
+                  markSelectedUnread({
+                    environmentId: thread.environmentId,
+                    input: { threadId: thread.id },
+                  }),
+                ),
+              );
+              useThreadSelectionStore.getState().clearSelection();
+            },
+          },
+          {
+            kind: "action",
+            value: "selection:delete",
+            title: "删除已选",
+            searchTerms: ["delete", "删除"],
+            icon: <FolderIcon className={ITEM_ICON_CLASS} />,
+            run: async () => {
+              const count = useThreadSelectionStore.getState().selectedThreadKeys.size;
+              const confirmed = await readLocalApi()?.dialogs.confirm(
+                batchDeleteConfirmText(count),
+                {
+                  variant: "destructive",
+                },
+              );
+              if (!confirmed) return;
+              await runSelectionBatch("delete");
+            },
+          },
+        ];
+  const rootGroups = buildRootGroups({
+    actionItems,
+    recentThreadItems,
+    selectionCount: selectedThreadCount,
+    selectionItems,
+  });
   // Every setting goes to the palette's own matcher, so settings get the same
   // word starts and typo tolerance as threads.
   const settingsSearchItems: CommandPaletteActionItem[] = settingsForThisPlatform(

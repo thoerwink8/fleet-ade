@@ -15,6 +15,7 @@ import {
   createCommandPaletteSearchState,
   reduceCommandPaletteSearchState,
   type CommandPaletteUiState,
+  buildRootGroups,
 } from "./CommandPalette.logic";
 
 describe("linked pull request thread navigation", () => {
@@ -56,6 +57,28 @@ describe("linked pull request thread navigation", () => {
     expect(items[0]?.description).toBe("已归档的会话");
     await items[0]?.run();
     expect(runThread).toHaveBeenCalledWith({ environmentId, id });
+  });
+});
+
+describe("selection group", () => {
+  it("shows how many threads are selected", () => {
+    const groups = buildRootGroups({
+      actionItems: [],
+      recentThreadItems: [],
+      selectionCount: 3,
+      selectionItems: [
+        {
+          kind: "action",
+          value: "selection:archive",
+          title: "归档已选",
+          searchTerms: [],
+          icon: null,
+          run: async () => {},
+        },
+      ],
+    });
+    expect(groups[0]?.label).toBe("已选 3 个");
+    expect(groups[0]?.items).toHaveLength(1);
   });
 });
 

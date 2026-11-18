@@ -71,6 +71,27 @@ describe("threadSelectionStore", () => {
     });
   });
 
+  describe("clearAnchor", () => {
+    it("clears the range anchor after the visible order changes", () => {
+      const store = useThreadSelectionStore.getState();
+      store.setAnchor(THREAD_B);
+      store.clearAnchor();
+      expect(useThreadSelectionStore.getState().anchorThreadKey).toBeNull();
+    });
+  });
+
+  describe("replaceSelection", () => {
+    it("keeps only the threads in the current filtered list", () => {
+      const store = useThreadSelectionStore.getState();
+      store.toggleThread(THREAD_A);
+      store.replaceSelection([THREAD_C, THREAD_D]);
+      expect([...useThreadSelectionStore.getState().selectedThreadKeys]).toEqual([
+        THREAD_C,
+        THREAD_D,
+      ]);
+      expect(useThreadSelectionStore.getState().anchorThreadKey).toBe(THREAD_C);
+    });
+  });
   describe("rangeSelectTo", () => {
     it("keeps anchor stable across multiple range selects", () => {
       const store = useThreadSelectionStore.getState();
