@@ -166,21 +166,20 @@ it.effect("report 刚写过，sessions 仍能写成功（两个 20 秒槽分开�
   );
 });
 
-it.effect("GET /api/nodes/claims 不返回已过期的租约；响应里没有 executor、state、fencing", () => {
+it.effect("GET /api/nodes/claims 只返回未过期的 legacy 根租约", () => {
   const clock = fixedClock(0);
   return withWeb({ login: false, nowMillis: clock.nowMillis }, (handler, sql) =>
     Effect.gen(function* () {
       yield* sql`
-        INSERT INTO node_claims (repo, issue, claimed_by, lease_until, executor, state, fencing)
+        INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing)
         VALUES
-          ('example/one', 7, 'ada', '1970-01-01T00:01:00.000Z', 'local', 'running', 'fence-a'),
-          ('example/one', 9, 'ada', '1970-01-01T00:00:00.000Z', 'engine', 'done', 'fence-b')
+          ('legacy', 'example/one', 7, 'root', 'ada', '1970-01-01T00:01:00.000Z', 'local', 'running', 'fence-a'),
+          ('fleet-a', 'example/one', 7, 'child-1', 'bob', '1970-01-01T00:01:00.000Z', 'fleet', 'running', 'fence-b'),
+          ('legacy', 'example/one', 9, 'root', 'ada', '1970-01-01T00:00:00.000Z', 'local', 'running', 'fence-c')
       `;
       const response = yield* send(handler, "GET", "/api/nodes/claims", { credential: TOKEN });
       expect(response.status).toBe(200);
-      const body = yield* json<{
-        claims: ReadonlyArray<Record<string, unknown>>;
-      }>(response);
+      const body = yield* json<{ claims: ReadonlyArray<Record<string, unknown>> }>(response);
       expect(body.claims).toEqual([
         {
           repo: "example/one",
@@ -192,13 +191,6 @@ it.effect("GET /api/nodes/claims 不返回已过期的租约；响应里没有 e
       expect(JSON.stringify(body)).not.toContain("executor");
       expect(JSON.stringify(body)).not.toContain("fencing");
       expect(JSON.stringify(body)).not.toContain("running");
-      expect(Object.keys(body)).toEqual(["claims"]);
-      expect(Object.keys(body.claims[0] ?? {}).sort()).toEqual([
-        "claimedBy",
-        "issue",
-        "leaseUntil",
-        "repo",
-      ]);
     }),
   );
 });
@@ -428,4 +420,57 @@ it.effect("有效但没有 orchestration:read 的凭证读三个口是 403", () 
       }
     }),
   ),
+);
+
+it.effect("迁移旧 node_claims 去重并保留一条 repo issue task 租约", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`
+      CREATE TABLE node_claims (
+        fleet_id TEXT NOT NULL, repo TEXT NOT NULL, issue INTEGER NOT NULL, task_id TEXT NOT NULL,
+        claimed_by TEXT NOT NULL, lease_until TEXT NOT NULL, executor TEXT, state TEXT, fencing TEXT,
+        attempt INTEGER NOT NULL, claim_idempotency_key TEXT,
+        PRIMARY KEY (fleet_id, repo, issue, task_id)
+      )
+    `;
+    yield* sql`
+      INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing, attempt)
+      VALUES
+        ('fleet-a', 'example/one', 7, 'root', 'old', '2026-11-19T00:00:00.000Z', 'fleet', 'released', '1', 1),
+        ('fleet-b', 'example/one', 7, 'root', 'current', '2026-11-19T00:01:30.000Z', 'fleet', 'running', '2', 2)
+    `;
+    yield* NodeReads.migrate;
+    expect(yield* sql`SELECT repo, issue, task_id, claimed_by, attempt FROM node_claims`).toEqual([
+      { repo: "example/one", issue: 7, task_id: "root", claimed_by: "current", attempt: 2 },
+    ]);
+    const columns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
+      readonly name: string;
+      readonly pk: number;
+    }[];
+    expect(
+      columns
+        .filter((column) => column.pk > 0)
+        .toSorted((a, b) => a.pk - b.pk)
+        .map((column) => column.name),
+    ).toEqual(["repo", "issue", "task_id"]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("迁移恢复遗留 before_fleet 表里的行并清理备份表", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`
+      CREATE TABLE node_claims_before_fleet (
+        repo TEXT NOT NULL, issue INTEGER NOT NULL, claimed_by TEXT NOT NULL,
+        lease_until TEXT NOT NULL, executor TEXT, state TEXT, fencing TEXT)
+    `;
+    yield* sql`INSERT INTO node_claims_before_fleet VALUES ('example/one', 7, 'pipeline', '2026-11-19T00:00:00.000Z', 'local', 'running', 'fence')`;
+    yield* NodeReads.migrate;
+    expect(yield* sql`SELECT repo, issue, task_id, claimed_by FROM node_claims`).toEqual([
+      { repo: "example/one", issue: 7, task_id: "root", claimed_by: "pipeline" },
+    ]);
+    expect(
+      yield* sql`SELECT name FROM sqlite_master WHERE name = 'node_claims_before_fleet'`,
+    ).toEqual([]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );

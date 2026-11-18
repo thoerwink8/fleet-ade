@@ -17,6 +17,13 @@ import {
   McpAppUpdateModelContextInput,
 } from "./mcpApps.ts";
 import {
+  FleetClaimClaimInput,
+  FleetClaimClaimResult,
+  FleetClaimLeaseInput,
+  FleetClaimLeaseResult,
+  FleetClaimsError,
+} from "./fleetClaims.ts";
+import {
   PeerLink,
   PeerLinkCreateInput,
   PeerLinkError,
@@ -527,6 +534,9 @@ export const WS_METHODS = {
   peerLinksLink: "peerLinks.link",
   peerLinksUnlink: "peerLinks.unlink",
   peerLinksAnswerRequest: "peerLinks.answerRequest",
+  fleetClaimsClaim: "fleetClaims.claim",
+  fleetClaimsRenew: "fleetClaims.renew",
+  fleetClaimsRelease: "fleetClaims.release",
   serverUpdateSettings: "server.updateSettings",
   serverDiscoverSourceControl: "server.discoverSourceControl",
   serverCheckSecretSource: "server.checkSecretSource",
@@ -874,6 +884,23 @@ const WsPeerLinksUnlinkRpc = Rpc.make(WS_METHODS.peerLinksUnlink, {
 const WsPeerLinksAnswerRequestRpc = Rpc.make(WS_METHODS.peerLinksAnswerRequest, {
   payload: PeerLinkRequestAnswerInput,
   error: Schema.Union([PeerLinkRequestError, EnvironmentAuthorizationError]),
+});
+const WsFleetClaimsClaimRpc = Rpc.make(WS_METHODS.fleetClaimsClaim, {
+  payload: FleetClaimClaimInput,
+  success: FleetClaimClaimResult,
+  error: Schema.Union([FleetClaimsError, EnvironmentAuthorizationError]),
+});
+
+const WsFleetClaimsRenewRpc = Rpc.make(WS_METHODS.fleetClaimsRenew, {
+  payload: FleetClaimLeaseInput,
+  success: FleetClaimLeaseResult,
+  error: Schema.Union([FleetClaimsError, EnvironmentAuthorizationError]),
+});
+
+const WsFleetClaimsReleaseRpc = Rpc.make(WS_METHODS.fleetClaimsRelease, {
+  payload: FleetClaimLeaseInput,
+  success: FleetClaimLeaseResult,
+  error: Schema.Union([FleetClaimsError, EnvironmentAuthorizationError]),
 });
 
 const WsServerUpdateSettingsRpc = Rpc.make(WS_METHODS.serverUpdateSettings, {
@@ -2163,6 +2190,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsPeerLinksLinkRpc,
   WsPeerLinksUnlinkRpc,
   WsPeerLinksAnswerRequestRpc,
+  WsFleetClaimsClaimRpc,
+  WsFleetClaimsRenewRpc,
+  WsFleetClaimsReleaseRpc,
   WsServerDiscoverSourceControlRpc,
   WsServerCheckSecretSourceRpc,
   WsServerSearchAcpRegistryRpc,

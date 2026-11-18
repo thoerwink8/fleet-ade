@@ -183,6 +183,27 @@ export const writes = <P, A, E, R>(
     () => orchestratingCaller,
   );
 
+/** Changes coordinator state for an authenticated linked environment, never for a thread caller. */
+export const writesForLinkedClient = <P, A, E, R>(
+  handle: (params: P) => Effect.Effect<A, E, R>,
+) => {
+  const check = refuseReadOnlyClient.pipe(
+    Effect.andThen(McpInvocationContext.McpInvocationContext),
+    Effect.filterOrFail(
+      (scope) => scope.client?.linked === true,
+      () =>
+        new OrchestratorMcpFailure({
+          code: "capability_denied",
+          message: "This operation accepts linked T3 environments only.",
+        }),
+    ),
+  );
+  return declare(
+    (params: P) => check.pipe(Effect.flatMap(() => handle(params))),
+    () => check,
+  );
+};
+
 /** Requires handler capability checks, not thread control; linked work is refused the same way. */
 export const writesWithCapability = <P, A, E, R>(handle: (params: P) => Effect.Effect<A, E, R>) =>
   declare(

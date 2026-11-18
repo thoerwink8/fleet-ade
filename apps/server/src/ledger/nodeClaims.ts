@@ -61,7 +61,7 @@ export type ClaimOutcome =
 export const leaseUntilFrom = (nowMs: number) =>
   DateTime.formatIso(DateTime.add(DateTime.makeUnsafe(nowMs), { milliseconds: LOCAL_LEASE_MS }));
 
-const REPO = /^[\w.-]+\/[\w.-]+$/;
+export const REPO = /^[\w.-]+\/[\w.-]+$/;
 
 const Repo = Schema.String.check(Schema.isPattern(REPO));
 const Issue = Schema.Int.check(Schema.isGreaterThan(0));
@@ -95,13 +95,7 @@ const leaseHeld = (leaseUntil: string, nowMs: number) => {
   return Number.isNaN(until) || until > nowMs;
 };
 
-const heldBy = (sql: SqlClient.SqlClient, repo: string, issue: number) =>
-  sql<{ readonly claimedBy: string; readonly leaseUntil: string }>`
-    SELECT claimed_by AS claimedBy, lease_until AS leaseUntil FROM node_claims
-    WHERE lower(repo) = lower(${repo}) AND issue = ${issue}
-  `;
-
-/** The only writer of node_claims. The HTTP claim route and the pipeline both call this. */
+/** The only writer of legacy node claims. Fleet claims use FleetClaims through the coordinator. */
 export const apply = Effect.fn("nodeClaims.apply")(function* (
   sql: SqlClient.SqlClient,
   input: ClaimInput,
@@ -117,12 +111,22 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
         LIMIT 1
       `;
       if (registered.length === 0) return { status: 404, code: "unknown_repo" } as const;
-      const held = yield* heldBy(sql, input.repo, input.issue);
+      const held = (yield* sql`
+        SELECT fleet_id AS fleetId, claimed_by AS claimedBy, lease_until AS leaseUntil
+        FROM node_claims
+        WHERE task_id = 'root' AND lower(repo) = lower(${input.repo})
+          AND issue = ${input.issue} AND state = 'running'
+      `) as readonly {
+        readonly fleetId: string;
+        readonly claimedBy: string;
+        readonly leaseUntil: string;
+      }[];
       if (input.action === "finish") {
         const token = input.token;
-        const removed = yield* sql<{ readonly issue: number }>`
+        const removed = yield* sql`
           DELETE FROM node_claims
-          WHERE lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
+          WHERE fleet_id = 'legacy' AND task_id = 'root'
+            AND lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
             AND claimed_by = ${input.claimedBy}
             ${token !== undefined ? sql`AND fencing = ${token}` : sql``}
           RETURNING issue
@@ -131,6 +135,9 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
         return { status: 200, code: "ok", leaseUntil: null } as const;
       }
       if (input.action === "renew") {
+        if (held.some((row) => row.fleetId !== "legacy")) {
+          return { status: 409, code: "engine_has_it" } as const;
+        }
         if (
           held.some((row) => row.claimedBy !== input.claimedBy && leaseHeld(row.leaseUntil, nowMs))
         ) {
@@ -143,28 +150,26 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
         }
         yield* sql`
           UPDATE node_claims SET lease_until = ${input.leaseUntil}
-          WHERE lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
+          WHERE fleet_id = 'legacy' AND task_id = 'root'
+            AND lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
             AND claimed_by = ${input.claimedBy}
         `;
         return { status: 200, code: "ok", leaseUntil: input.leaseUntil } as const;
       }
-      if (held.some((row) => leaseHeld(row.leaseUntil, nowMs))) {
+      if (held.some((row) => row.fleetId !== "legacy" || leaseHeld(row.leaseUntil, nowMs))) {
         return { status: 409, code: "engine_has_it" } as const;
       }
       yield* sql`
-        DELETE FROM node_claims
-        WHERE lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
+        DELETE FROM node_claims WHERE fleet_id = 'legacy' AND task_id = 'root'
+          AND lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
       `;
       yield* sql`
-        INSERT INTO node_claims (repo, issue, claimed_by, lease_until, executor, state, fencing)
-        VALUES (
-          ${input.repo},
-          ${input.issue},
-          ${input.claimedBy},
-          ${input.leaseUntil},
-          'local',
-          'running',
-          ${input.token ?? null}
+        INSERT INTO node_claims (
+          fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing, attempt,
+          claim_idempotency_key, renew_idempotency_key, renew_lease_until, release_idempotency_key 
+        ) VALUES (
+          'legacy', ${input.repo}, ${input.issue}, 'root', ${input.claimedBy}, ${input.leaseUntil},
+          'local', 'running', ${input.token ?? null}, 1, NULL, NULL, NULL, NULL 
         )
       `;
       return { status: 200, code: "ok", leaseUntil: input.leaseUntil } as const;
