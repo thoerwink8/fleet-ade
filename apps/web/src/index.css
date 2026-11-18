@@ -120,7 +120,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
   --desktop-window-right-resize-inset: 0px;
-  --workspace-topbar-height: 52px;
+  --workspace-topbar-height: 48px;
   --workspace-controls-top: 0px;
   --workspace-controls-left: calc(env(safe-area-inset-left) + 0.5rem);
   --workspace-controls-right: calc(env(safe-area-inset-right) + 0.75rem);
@@ -128,8 +128,24 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.25rem;
   --workspace-titlebar-scroll-fade-height: 1.5rem;
-  --chat-content-max-width: 60rem;
+  /* Written in px so a changed root font size cannot shift the reading column. */
+  --chat-content-max-width: 760px;
+  /* Type scale (size / line height). prose: message body. row: list main rows,
+     composer input. ui: secondary text, buttons, menu items. meta: timestamps,
+     status text, group labels. */
   --font-size-prose: 0.9375rem;
+  --line-height-prose: calc(var(--font-size-prose) * 1.6);
+  --font-size-row: 0.875rem;
+  --line-height-row: 1.25rem;
+  --font-size-ui: 0.8125rem;
+  --line-height-ui: 1.25rem;
+  --font-size-meta: 0.75rem;
+  --line-height-meta: 1rem;
+  /* Page header title, and dialog or sheet title. */
+  --font-size-title: 0.9375rem;
+  --line-height-title: 1.5rem;
+  --font-size-dialog-title: 1rem;
+  --line-height-dialog-title: 1.5rem;
   --thread-details-panel-width: 17.5rem;
   /* The prompt on phones: iOS zooms into any input under 16px on focus. */
   --font-size-prompt-touch: max(var(--font-size-prompt, 1rem), 16px);
@@ -156,7 +172,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
 .wco {
   --native-titlebar-height: env(titlebar-area-height, 0px);
-  --workspace-topbar-height: max(40px, env(titlebar-area-height, 52px));
+  --workspace-topbar-height: max(40px, env(titlebar-area-height, 48px));
   --workspace-controls-top: env(titlebar-area-y, 0px);
   --workspace-controls-left: calc(env(titlebar-area-x, 0px) + 0.75rem);
   --workspace-controls-right: calc(
@@ -171,11 +187,15 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
    the variables and Settings -> Appearance can override them at runtime. The
    default stacks are mirrored in `appearanceFonts.ts`. */
 @theme {
+  /* System CJK faces sit before Inter so Chinese and Latin text come from the same
+     platform family; Inter only serves platforms with none of them. */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+    "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Inter Variable", system-ui,
+    sans-serif;
   --font-mono:
-    ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    "Cascadia Mono", ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono",
+    "Microsoft YaHei UI", monospace;
 }
 
 @theme inline {
@@ -190,6 +210,17 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --text-4xs--line-height: 1;
   --text-5xs: 0.4375rem;
   --text-5xs--line-height: 1;
+  /* The type scale from :root, as text-row, text-ui, text-meta and title utilities. */
+  --text-row: var(--font-size-row);
+  --text-row--line-height: var(--line-height-row);
+  --text-ui: var(--font-size-ui);
+  --text-ui--line-height: var(--line-height-ui);
+  --text-meta: var(--font-size-meta);
+  --text-meta--line-height: var(--line-height-meta);
+  --text-title: var(--font-size-title);
+  --text-title--line-height: var(--line-height-title);
+  --text-dialog-title: var(--font-size-dialog-title);
+  --text-dialog-title--line-height: var(--line-height-dialog-title);
   /* Motion. drawer is the decelerating curve for surfaces that slide or pop in
      (composer context, pills). */
   --inset-shadow-control-highlight: 0 1px rgb(255 255 255 / 16%);
@@ -263,6 +294,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-muted: var(--muted);
   --color-placeholder: var(--contrast-placeholder);
   --color-secondary-label: var(--contrast-secondary-label);
+  --color-faint-foreground: var(--faint-foreground);
   --color-icon-muted: var(--contrast-icon-muted);
   --color-secondary-foreground: var(--contrast-secondary-foreground);
   --color-secondary: var(--secondary);
@@ -1115,7 +1147,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 :root {
   color-scheme: light;
   --radius: 0.5rem;
-  --background: var(--color-zinc-25);
+  /* Four surfaces, back to front: sidebar, page, card and input, popover. Light mode
+     paints the page a cool light gray so white cards and inputs stand off it. */
+  --background: oklch(0.972 0.003 270);
   --app-chrome-background: var(--background);
   --toolbar-background: var(--app-chrome-background);
   --toolbar-foreground: var(--foreground);
@@ -1131,12 +1165,15 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --popover-foreground: var(--color-zinc-900);
   --primary: oklch(0.488 0.217 264);
   --primary-foreground: var(--color-white);
-  --secondary: var(--color-zinc-50);
+  --secondary: oklch(0.952 0.004 270);
   --secondary-foreground: var(--color-zinc-800);
-  --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
+  --muted: oklch(0.952 0.004 270);
+  /* Four text tiers: foreground, secondary-label (passes AA on every surface),
+     muted-foreground, faint-foreground (separators and shortcut keys). */
+  --muted-foreground: oklch(0.5 0.012 270);
   --placeholder: var(--muted-foreground);
-  --secondary-label: var(--muted-foreground);
+  --secondary-label: oklch(0.415 0.012 270);
+  --faint-foreground: color-mix(in srgb, var(--muted-foreground) 50%, var(--background));
   --icon-muted: var(--muted-foreground);
   /* One step past the accent, so a user turn stands off the near-white canvas. */
   --message-surface: color-mix(in srgb, var(--color-zinc-200) 55%, var(--color-zinc-100));
@@ -1144,7 +1181,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --message-action: var(--primary);
   --message-action-foreground: var(--primary-foreground);
   --message-action-hover: color-mix(in srgb, var(--primary) 90%, var(--background));
-  --accent: var(--color-zinc-100);
+  --accent: oklch(0.935 0.004 270);
   --accent-foreground: var(--color-zinc-900);
   --error: var(--color-red-500);
   --error-foreground: var(--color-red-700);
@@ -1170,13 +1207,13 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --update-foreground: var(--primary);
   /* Keep every sidebar primitive on the same light surface hierarchy, including
      portaled mobile sheets and settings navigation outside the app sidebar. */
-  --sidebar: var(--color-zinc-50);
+  --sidebar: oklch(0.952 0.004 270);
   --sidebar-foreground: var(--foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
-  --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: var(--color-zinc-25);
-  --sidebar-row-active: var(--color-white);
-  --sidebar-row-selected: var(--color-white);
+  --sidebar-control-surface: var(--card);
+  --sidebar-row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --sidebar-row-active: var(--card);
+  --sidebar-row-selected: var(--card);
   --sidebar-border: var(--border);
   --sidebar-stage-fade: var(--sidebar);
   --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
@@ -1197,13 +1234,14 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --foreground: var(--color-neutral-100);
     --card: oklch(0.205 0.007 260);
     --card-foreground: var(--color-neutral-100);
-    --popover: oklch(0.24 0.008 260);
+    --popover: oklch(0.238 0.008 260);
     --popover-foreground: var(--color-neutral-100);
     --primary: oklch(0.571 0.21 264);
     --secondary: --alpha(var(--color-white) / 5%);
     --secondary-foreground: var(--color-neutral-100);
     --muted: oklch(0.19 0.006 260);
     --muted-foreground: var(--color-neutral-400);
+    --secondary-label: oklch(0.77 0.01 260);
     --accent: --alpha(var(--color-white) / 6%);
     --accent-foreground: var(--color-neutral-100);
     /* A user turn sits above the composer tone, level with the selected sidebar row. */
@@ -1220,63 +1258,35 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --warning-foreground: var(--color-amber-400);
     --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
     --update-foreground: var(--color-blue-400);
-    --sidebar: var(--card);
+    --sidebar: oklch(0.152 0.006 260);
     --sidebar-control-surface: var(--muted);
     --sidebar-row-hover: var(--accent);
     --sidebar-row-active: var(--accent);
     --sidebar-row-selected: oklch(0.245 0.009 260);
-    --sidebar-stage-fade: var(--card);
     --terminal-cursor: rgb(180 203 255);
     --terminal-selection-background: rgb(180 203 255 / 25%);
   }
 }
 
-/* Keep both sidebar implementations (default and legacy) on the same quiet
-   zinc hierarchy: zinc-50 navigation, zinc-25 hover, and white selected/raised
-   surfaces. */
+/* Controls inside the sidebar (search field, buttons) sit on the card surface, so
+   they stand off the sidebar tone in both modes. The sidebar's own surface, rows and
+   text tiers come from :root. */
 [data-app-sidebar] {
-  --background: var(--color-zinc-25);
-  --foreground: var(--color-zinc-900);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-900);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-50);
-  --muted-foreground: var(--color-zinc-500);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-300);
-  --sidebar: var(--color-zinc-50);
-  --sidebar-foreground: var(--color-zinc-900);
-  --sidebar-muted-foreground: var(--color-zinc-500);
-  --sidebar-control-surface: var(--color-zinc-100);
-  --sidebar-row-hover: var(--color-zinc-25);
-  --sidebar-row-active: var(--color-white);
-  --sidebar-row-selected: var(--color-white);
-  --sidebar-border: var(--color-zinc-200);
-  --sidebar-stage-fade: var(--sidebar);
+  --background: var(--card);
 
   @variant dark {
-    --background: oklch(0.205 0.007 260);
     --foreground: #f1f3f7;
-    --card: oklch(0.205 0.007 260);
     --card-foreground: var(--foreground);
     --accent: oklch(0.24 0.008 260);
     --accent-foreground: #f7f9ff;
     --muted: oklch(0.18 0.006 260);
     --muted-foreground: #a8adb8;
-    --border: rgb(255 255 255 / 9%);
     --input: rgb(255 255 255 / 16%);
-    --sidebar: var(--card);
     --sidebar-foreground: var(--foreground);
     --sidebar-muted-foreground: var(--muted-foreground);
     --sidebar-control-surface: var(--muted);
     --sidebar-row-hover: color-mix(in srgb, var(--contrast-foreground) 7%, transparent);
     --sidebar-row-active: color-mix(in srgb, var(--contrast-foreground) 11%, transparent);
-    --sidebar-row-selected: oklch(0.245 0.009 260);
-    --sidebar-border: var(--border);
-    --sidebar-stage-fade: var(--card);
-    /* Row metadata sits a step below read titles (75% white). */
-    --secondary-label: #969ba6;
   }
 }
 
@@ -1886,7 +1896,7 @@ code {
 .chat-markdown .chat-markdown-table-container,
 .composer-tiptap ul,
 .composer-tiptap ol {
-  margin: 0.65rem 0;
+  margin: 0.75rem 0;
 }
 
 .chat-markdown-math-display .katex-display {
@@ -1899,7 +1909,7 @@ code {
 :is(.chat-markdown, .composer-tiptap) h4,
 :is(.chat-markdown, .composer-tiptap) h5,
 :is(.chat-markdown, .composer-tiptap) h6 {
-  margin: 1.25rem 0 0.5rem;
+  margin: 1.5rem 0 0.5rem;
   font-weight: 600;
   line-height: 1.3;
   color: var(--contrast-foreground);
@@ -2018,7 +2028,7 @@ code {
 }
 
 .chat-markdown li + li {
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
 
 /* GitHub-style task lists: the checkbox replaces the list marker. */
@@ -2091,7 +2101,7 @@ code {
 }
 
 .composer-tiptap blockquote {
-  margin: 0.65rem 0;
+  margin: 0.75rem 0;
 }
 
 /* Surface borders can blend into dark message bubbles; rules need a readable color. */
@@ -2102,7 +2112,7 @@ code {
 }
 
 .composer-tiptap hr {
-  margin: 0.65rem 0;
+  margin: 0.75rem 0;
 }
 
 /* Block spacing separates blocks, not the draft from the composer edge. A
@@ -2122,7 +2132,7 @@ code {
 }
 
 .chat-markdown section[data-footnotes] {
-  margin-top: 1.25rem;
+  margin-top: 1.5rem;
   border-top: 1px solid var(--contrast-border);
   padding-top: 0.75rem;
   color: var(--contrast-muted-foreground);
@@ -2134,7 +2144,7 @@ code {
 }
 
 .chat-markdown section[data-footnotes] li + li {
-  margin-top: 0.35rem;
+  margin-top: 0.25rem;
 }
 
 .chat-markdown a[data-footnote-ref],
@@ -2154,16 +2164,26 @@ code {
   border-radius: 0.3125rem;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  background: color-mix(in srgb, var(--contrast-foreground) 10%, transparent);
+  background: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
   padding: 2px 6px;
   color: var(--contrast-foreground);
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  font-size: var(--font-size-ui);
+  font-weight: 400;
+  line-height: var(--line-height-ui);
+
+  /* A heavy white block on dark; keep it a faint tint. */
+  @variant dark {
+    background: color-mix(in srgb, var(--contrast-foreground) 6%, transparent);
+  }
 }
 
 .chat-markdown.user-message-markdown :not(pre) > code {
-  background: color-mix(in srgb, var(--contrast-message-foreground) 10%, transparent);
+  background: color-mix(in srgb, var(--contrast-message-foreground) 8%, transparent);
   color: var(--contrast-message-foreground);
+
+  @variant dark {
+    background: color-mix(in srgb, var(--contrast-message-foreground) 6%, transparent);
+  }
 }
 
 .chat-markdown strong {
@@ -2590,10 +2610,10 @@ code {
 @layer components {
   .chat-markdown-prose {
     font-size: var(--font-size-prose, 0.9375rem);
-    line-height: 1.75;
+    line-height: var(--line-height-prose);
   }
   .chat-command-text {
-    font-size: 0.8125rem;
+    font-size: var(--font-size-ui);
   }
   .chat-composer-lane {
     padding-inline-start: calc(
