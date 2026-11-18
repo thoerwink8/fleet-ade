@@ -183,6 +183,7 @@ import * as EnvironmentAuthPolicy from "./auth/EnvironmentAuthPolicy.ts";
 import * as CloudHttp from "./cloud/http.ts";
 import * as GuestHttp from "./guest/http.ts";
 import * as LedgerNotes from "./ledger/notes.ts";
+import * as FleetClaims from "./ledger/FleetClaims.ts";
 import * as CloudLink from "./cloud/CloudLink.ts";
 import * as ConnectReachability from "./cloud/ConnectReachability.ts";
 import { pendingServiceUpdateExists } from "./cloud/updateHandoff.ts";
@@ -914,6 +915,7 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provideMerge(PeerLinks.layer),
     ),
   ),
+  Layer.provide(FleetClaims.layer),
   Layer.provide(
     SpeechService.layer.pipe(
       Layer.provide(layerServerSettings),

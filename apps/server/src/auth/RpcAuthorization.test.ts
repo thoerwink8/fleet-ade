@@ -1,6 +1,7 @@
 import {
   AuthEnvironmentMaintainScope,
   AuthDiagnosticsReadScope,
+  AuthAccessWriteScope,
   AuthFilesystemReadScope,
   AuthProvidersManageScope,
   AuthSettingsWriteScope,
@@ -45,6 +46,15 @@ describe("RPC authorization scopes", () => {
     }
   });
 
+  it("keeps fleet claim writes behind access write scope", () => {
+    for (const method of [
+      WS_METHODS.fleetClaimsClaim,
+      WS_METHODS.fleetClaimsRenew,
+      WS_METHODS.fleetClaimsRelease,
+    ]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthAccessWriteScope);
+    }
+  });
   it("keeps triage, which seeds an agent that reads logs and the database, behind operate scope", () => {
     expect(requiredScopeForRpcMethod(WS_METHODS.serverPrepareTriage)).toBe(
       AuthOrchestrationOperateScope,
