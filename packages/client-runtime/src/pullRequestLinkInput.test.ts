@@ -123,7 +123,7 @@ describe("resolveLinkPullRequestInput", () => {
         hasProject: () => true,
       }),
     ).toEqual({
-      error: "Paste a full URL; this project's host has no known merge request URL.",
+      error: "Paste a full URL; this project's host has no known 不再支持 URL.",
     });
   });
 
@@ -169,8 +169,8 @@ describe("parsePullRequestReference", () => {
   it.each([
     "https://code.example.com/group/project/-/merge_requests/42",
     "http://git.internal/group/sub/project/-/merge_requests/7",
-  ])("accepts self-hosted GitLab merge request URL %s", (url) => {
-    expect(parsePullRequestReference(url)).toBe(url);
+  ])("does not treat retired merge request URL %s as a checkout reference", (url) => {
+    expect(parsePullRequestReference(url)).toBeNull();
   });
 
   it.each([
@@ -185,8 +185,8 @@ describe("parsePullRequestReference", () => {
     expect(parsePullRequestReference("gh pr checkout 42")).toBe("42");
   });
 
-  it("accepts glab mr checkout commands with raw numbers", () => {
-    expect(parsePullRequestReference("glab mr checkout 42")).toBe("42");
+  it("does not accept glab mr checkout commands", () => {
+    expect(parsePullRequestReference("glab mr checkout 42")).toBeNull();
   });
 
   it("accepts az repos pr checkout commands with equals-style ids", () => {

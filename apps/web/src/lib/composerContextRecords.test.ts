@@ -398,7 +398,7 @@ describe("pullRequestContextKindLabel", () => {
     );
     expect(
       pullRequestContextKindLabel(comment("https://gitlab.com/acme/app/-/merge_requests/7", true)),
-    ).toBe("Draft merge request");
+    ).toBe("Draft 不再支持");
   });
 });
 

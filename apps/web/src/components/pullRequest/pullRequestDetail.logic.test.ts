@@ -426,7 +426,7 @@ describe("pull request timeline", () => {
         .filter((event) => event.kind === "opened" || event.kind === "closed")
         .map((event) => event.title);
     expect(titles("github")).toEqual(["已关闭 Pull request", "opened this pull request"]);
-    expect(titles("gitlab")).toEqual(["已关闭 Merge request", "opened this merge request"]);
+    expect(titles("gitlab")).toEqual(["已关闭 不再支持", "opened this 不再支持"]);
   });
 
   it("groups conversation sections without crossing commits or PR updates", () => {
@@ -798,9 +798,9 @@ describe("fix findings handoff", () => {
       reviewThreads: [],
       checks: [],
     });
-    expect(handoff.prompt).toContain("Fix the actionable findings on MR #42");
-    expect(handoff.prompt).toContain("The MR branch is `feat/page`");
-    expect(handoff.prompt).toContain("inspect the merge request and its failing checks");
+    expect(handoff.prompt).toContain("Fix the actionable findings on 不再支持 #42");
+    expect(handoff.prompt).toContain("The 不再支持 branch is `feat/page`");
+    expect(handoff.prompt).toContain("inspect the 不再支持 and its failing checks");
     expect(handoff.prompt).not.toMatch(/\bPR\b|pull request/u);
   });
 });
@@ -1065,15 +1065,15 @@ describe("asking about a change rather than working on it", () => {
       title: "Add the page",
       url: "https://gitlab.com/pingdotgg/t3code/-/merge_requests/42",
     });
-    expect(handoff.prompt).toBe("Explain this merge request.");
-    expect(handoff.reviewComments[0]?.text).toContain("The merge request is #42");
+    expect(handoff.prompt).toBe("Explain this 不再支持.");
+    expect(handoff.reviewComments[0]?.text).toContain("The 不再支持 is #42");
     expect(handoff.reviewComments[0]?.text).not.toContain("pull request");
     expect(
       buildResolveConflictsPrompt({
         ...base,
         url: "https://gitlab.com/pingdotgg/t3code/-/merge_requests/42",
       }),
-    ).toMatch(/^MR #42 /u);
+    ).toMatch(/^不再支持 #42 /u);
   });
 });
 

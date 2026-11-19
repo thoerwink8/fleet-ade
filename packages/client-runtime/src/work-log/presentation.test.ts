@@ -173,16 +173,16 @@ describe("resolveWorkEntryToolPresentation", () => {
   });
 
   it.each([
-    ["https://github.com/acme/web/pull/7", "PR #7"],
-    ["https://gitlab.com/acme/web/-/merge_requests/7", "MR #7"],
-  ])("names a linked change request with its host's term (%s)", (url, target) => {
+    ["https://github.com/acme/web/pull/7", "已关联 PR #7"],
+    ["https://gitlab.com/acme/web/-/merge_requests/7", "已关联不再支持 #7"],
+  ])("names a linked change request with its host's term (%s)", (url, displayName) => {
     expect(
       resolveWorkEntryToolPresentation({
         label: "T3-code.link_pull_request",
         toolLifecycleStatus: "completed",
         toolData: { arguments: { url } },
       })?.displayName,
-    ).toMatch(new RegExp(` ${target}$`));
+    ).toBe(displayName);
   });
 
   it("does not brand unknown tools or another server's matching tool name", () => {

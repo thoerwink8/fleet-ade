@@ -195,14 +195,17 @@ describe("when: the ref is on GitLab", () => {
     },
   };
 
-  it("names merge requests in actions and the default-ref dialog", () => {
+  it("names a retired host as unsupported instead of a merge request", () => {
     const ahead = status({ ...gitLab, hasUpstream: false, aheadCount: 2 });
-    assert.equal(resolveQuickAction(ahead, false).label, "推送并创建 MR");
+    assert.equal(resolveQuickAction(ahead, false).label, "推送并创建 不再支持");
     assert.equal(
       resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false).label,
-      "提交、推送并创建 MR",
+      "提交、推送并创建 不再支持",
     );
-    assert.equal(buildMenuItems(ahead, false).find((item) => item.id === "pr")?.label, "创建 MR");
+    assert.equal(
+      buildMenuItems(ahead, false).find((item) => item.id === "pr")?.label,
+      "创建 不再支持",
+    );
 
     const copy = resolveDefaultBranchActionDialogCopy({
       action: "create_pr",
@@ -210,8 +213,8 @@ describe("when: the ref is on GitLab", () => {
       includesCommit: false,
       terminology: sourceControlClients.get("gitlab").changeRequest,
     });
-    assert.equal(copy.title, "在默认引用上推送并创建 MR？");
-    assert.include(copy.description, "并创建merge request");
+    assert.equal(copy.title, "在默认引用上推送并创建 不再支持？");
+    assert.include(copy.description, "并创建不再支持");
   });
 });
 

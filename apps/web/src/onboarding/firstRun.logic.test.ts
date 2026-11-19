@@ -1,90 +1,58 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  isFirstRunWorkspaceProvenanceAuthoritative,
-  isFreshFirstRunWorkspace,
-  resolveFirstRunDecision,
-  transitionFirstRunGateState,
-} from "./firstRun.logic";
+import { resolveFirstRunDecision, transitionFirstRunGateState } from "./firstRun.logic";
 
-const freshWorkspace = {
+const confirmedWorkspace = {
   enabled: true,
   hydrated: true,
   completed: false,
   bootstrapped: true,
   authoritative: true,
   workspaceAuthoritative: true,
-  workspaceProvenanceAuthoritative: true,
   catalogReady: true,
   serverConfigAvailable: true,
-  workspaceFresh: true,
-  projectCount: 1,
-  threadCount: 1,
 } as const;
 
 describe("resolveFirstRunDecision", () => {
-  it("opens the wizard for an authoritative fresh workspace", () => {
-    expect(resolveFirstRunDecision(freshWorkspace)).toEqual({
-      decision: "wizard",
-      persistCompletion: false,
-    });
-  });
-
-  it("does not permanently complete onboarding from cached project counts", () => {
-    expect(
-      resolveFirstRunDecision({
-        ...freshWorkspace,
-        authoritative: false,
-        projectCount: 3,
-        workspaceFresh: false,
-      }),
-    ).toEqual({
-      decision: "app",
-      persistCompletion: false,
-    });
-  });
-
-  it("backfills completion once existing projects are confirmed by the server", () => {
-    expect(
-      resolveFirstRunDecision({
-        ...freshWorkspace,
-        projectCount: 3,
-        workspaceFresh: false,
-      }),
-    ).toEqual({
+  it("opens the session page for a confirmed fresh workspace", () => {
+    expect(resolveFirstRunDecision(confirmedWorkspace)).toEqual({
       decision: "app",
       persistCompletion: true,
     });
   });
 
-  it("waits when the initial welcome is pending and opens the wizard after completion", () => {
-    const pendingProvenance = isFirstRunWorkspaceProvenanceAuthoritative({
-      welcomeReceived: true,
-      bootstrapStatus: "pending",
-    });
+  it("does not permanently complete onboarding before the server confirms the workspace", () => {
     expect(
       resolveFirstRunDecision({
-        ...freshWorkspace,
-        workspaceProvenanceAuthoritative: pendingProvenance,
+        ...confirmedWorkspace,
+        authoritative: false,
       }),
-    ).toEqual({ decision: "pending", persistCompletion: false });
+    ).toEqual({
+      decision: "app",
+      persistCompletion: false,
+    });
+  });
 
-    const completedProvenance = isFirstRunWorkspaceProvenanceAuthoritative({
-      welcomeReceived: true,
-      bootstrapStatus: "complete",
+  it("backfills completion once the server confirms an existing workspace", () => {
+    expect(resolveFirstRunDecision(confirmedWorkspace)).toEqual({
+      decision: "app",
+      persistCompletion: true,
     });
+  });
+
+  it("enters the app while bootstrap provenance is still pending", () => {
     expect(
       resolveFirstRunDecision({
-        ...freshWorkspace,
-        workspaceProvenanceAuthoritative: completedProvenance,
+        ...confirmedWorkspace,
+        workspaceAuthoritative: false,
       }),
-    ).toEqual({ decision: "wizard", persistCompletion: false });
+    ).toEqual({ decision: "app", persistCompletion: false });
   });
 
   it("does not wait for server data after onboarding is already complete", () => {
     expect(
       resolveFirstRunDecision({
-        ...freshWorkspace,
+        ...confirmedWorkspace,
         authoritative: false,
         bootstrapped: false,
         completed: true,
@@ -95,16 +63,14 @@ describe("resolveFirstRunDecision", () => {
       persistCompletion: false,
     });
   });
-});
 
-describe("isFirstRunWorkspaceProvenanceAuthoritative", () => {
-  it("accepts a legacy welcome without bootstrap status", () => {
+  it("waits until client settings have loaded", () => {
     expect(
-      isFirstRunWorkspaceProvenanceAuthoritative({
-        welcomeReceived: true,
-        bootstrapStatus: null,
+      resolveFirstRunDecision({
+        ...confirmedWorkspace,
+        hydrated: false,
       }),
-    ).toBe(true);
+    ).toEqual({ decision: "pending", persistCompletion: false });
   });
 });
 
@@ -115,129 +81,21 @@ describe("transitionFirstRunGateState", () => {
     ).toEqual({ decision: "pending", stalled: true });
   });
 
-  it.each([
-    { previous: "app", workspaceFresh: true, decision: "wizard" },
-    { previous: "wizard", workspaceFresh: false, decision: "app" },
-  ] as const)(
-    "updates $previous to $decision when authoritative workspace evidence changes",
-    ({ previous, workspaceFresh, decision }) => {
-      const evidence = resolveFirstRunDecision({ ...freshWorkspace, workspaceFresh });
-      expect(
-        transitionFirstRunGateState(
-          { decision: previous, stalled: false },
-          { type: "evidence", decision: evidence.decision },
-        ),
-      ).toEqual({ decision, stalled: false });
-    },
-  );
+  it("updates pending to app when settings have loaded", () => {
+    expect(
+      transitionFirstRunGateState(
+        { decision: "pending", stalled: false },
+        { type: "evidence", decision: "app" },
+      ),
+    ).toEqual({ decision: "app", stalled: false });
+  });
 
   // regression: #19680 unchanged gate evidence must not produce a new state
-  it.each(["pending", "app", "wizard"] as const)(
+  it.each(["pending", "app"] as const)(
     "preserves state identity for unchanged %s evidence",
     (decision) => {
       const state = { decision, stalled: false };
       expect(transitionFirstRunGateState(state, { type: "evidence", decision })).toBe(state);
     },
   );
-});
-
-const primaryEnvironmentId = "primary-environment";
-const bootstrapProject = {
-  id: "bootstrap-project",
-  environmentId: primaryEnvironmentId,
-  workspaceRoot: "/projects/current",
-};
-const bootstrapThread = {
-  id: "bootstrap-thread",
-  projectId: bootstrapProject.id,
-  environmentId: primaryEnvironmentId,
-  latestRun: null,
-  latestUserMessageAt: null,
-  runtime: null,
-};
-
-const freshBootstrap = {
-  primaryEnvironmentId,
-  serverCwd: "/projects/current",
-  bootstrapProjectId: bootstrapProject.id,
-  bootstrapThreadId: bootstrapThread.id,
-  bootstrapProjectCreated: true,
-  bootstrapThreadCreated: true,
-  projects: [bootstrapProject],
-  threads: [bootstrapThread],
-};
-
-describe("isFreshFirstRunWorkspace", () => {
-  it("accepts only the unused project and thread created from the server cwd", () => {
-    expect(
-      isFreshFirstRunWorkspace({
-        primaryEnvironmentId,
-        serverCwd: "/projects/current/",
-        bootstrapProjectId: bootstrapProject.id,
-        bootstrapThreadId: bootstrapThread.id,
-        bootstrapProjectCreated: true,
-        bootstrapThreadCreated: true,
-        projects: [bootstrapProject],
-        threads: [bootstrapThread],
-      }),
-    ).toBe(true);
-  });
-
-  it("rejects an existing unused cwd project and thread reused by startup", () => {
-    expect(
-      isFreshFirstRunWorkspace({
-        primaryEnvironmentId,
-        serverCwd: "/projects/current",
-        bootstrapProjectId: bootstrapProject.id,
-        bootstrapThreadId: bootstrapThread.id,
-        bootstrapProjectCreated: false,
-        bootstrapThreadCreated: false,
-        projects: [bootstrapProject],
-        threads: [bootstrapThread],
-      }),
-    ).toBe(false);
-  });
-
-  it("rejects a nonempty workspace when an older server omits creation provenance", () => {
-    expect(
-      isFreshFirstRunWorkspace({
-        primaryEnvironmentId,
-        serverCwd: "/projects/current",
-        bootstrapProjectId: bootstrapProject.id,
-        bootstrapThreadId: bootstrapThread.id,
-        projects: [bootstrapProject],
-        threads: [bootstrapThread],
-      }),
-    ).toBe(false);
-  });
-
-  it("normalizes Windows project paths before checking the bootstrap workspace", () => {
-    expect(
-      isFreshFirstRunWorkspace({
-        primaryEnvironmentId,
-        serverCwd: "C:\\Projects\\Current\\",
-        bootstrapProjectId: bootstrapProject.id,
-        bootstrapThreadId: bootstrapThread.id,
-        bootstrapProjectCreated: true,
-        bootstrapThreadCreated: true,
-        projects: [{ ...bootstrapProject, workspaceRoot: "c:/projects/current" }],
-        threads: [bootstrapThread],
-      }),
-    ).toBe(true);
-  });
-
-  it("rejects a bootstrap thread that already has a user message", () => {
-    expect(
-      isFreshFirstRunWorkspace({
-        ...freshBootstrap,
-        projects: [bootstrapProject],
-        threads: [
-          {
-            ...bootstrapThread,
-            latestUserMessageAt: "2026-08-23T12:00:00.000Z",
-          },
-        ],
-      }),
-    ).toBe(false);
-  });
 });

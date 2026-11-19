@@ -9,6 +9,20 @@ export const SourceControlProviderKind = TrimmedNonEmptyString.check(
 ).pipe(Schema.brand("SourceControlProviderKind"));
 export type SourceControlProviderKind = typeof SourceControlProviderKind.Type;
 
+/**
+ * Hosts this build no longer runs. Old settings and events still decode these
+ * kinds; callers show `UNSUPPORTED_SOURCE_CONTROL_LABEL` and do not call the host.
+ */
+const RETIRED_SOURCE_CONTROL_KINDS = ["gitlab", "gitee", "jira", "confluence", "sentry"] as const;
+
+export const UNSUPPORTED_SOURCE_CONTROL_LABEL = "不再支持";
+
+const RETIRED_SOURCE_CONTROL_KIND_SET: ReadonlySet<string> = new Set(RETIRED_SOURCE_CONTROL_KINDS);
+
+export function isRetiredSourceControlKind(kind: string): boolean {
+  return RETIRED_SOURCE_CONTROL_KIND_SET.has(kind);
+}
+
 export const SourceControlProviderInfo = Schema.Struct({
   kind: SourceControlProviderKind,
   name: TrimmedNonEmptyString,

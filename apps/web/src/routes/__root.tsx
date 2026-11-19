@@ -133,9 +133,7 @@ function RootRouteBranch() {
   const primaryEnvironmentAuthenticated = authGateState.status === "authenticated";
   // A sync IPC read; the setting only changes across a relaunch.
   const [localEnvironmentDisabled] = useState(isLocalEnvironmentDisabled);
-  // Once true, stays true: a visit to /welcome means the bootstrap already chose a route.
-  const [returningFromWelcome, setReturningFromWelcome] = useState(pathname === "/welcome");
-  if (pathname === "/welcome" && !returningFromWelcome) setReturningFromWelcome(true);
+
   const hostedPromptLinkLanding = useHostedPromptLinkLanding(
     authGateState.status === "hosted-static",
   );
@@ -149,18 +147,15 @@ function RootRouteBranch() {
     return <Outlet />;
   }
 
-  // Handle links before onboarding redirects lose them.
+  // Handle links before a redirect loses them.
   if (hostedPromptLinkLanding !== null) {
     return hostedPromptLinkLanding;
   }
 
-  const isWelcome = pathname === "/welcome";
   if (authGateState.status !== "authenticated" && authGateState.status !== "hosted-static") {
     return <Outlet />;
   }
 
-  // Settings can reopen /welcome mid-session, so it mounts everything the app does except the
-  // first-run gate and the event router, whose first navigation would leave the page.
   const appHosts = (
     <>
       {primaryEnvironmentAuthenticated ? <DesktopAppActivationCoordinator /> : null}
@@ -183,8 +178,7 @@ function RootRouteBranch() {
   );
   const appShell = (
     <CommandPalette>
-      {/* Setup starts with an empty workspace, so the Welcome page has no thread list. */}
-      <AppSidebarLayout showSidebar={!isWelcome}>
+      <AppSidebarLayout showSidebar>
         <Outlet />
       </AppSidebarLayout>
     </CommandPalette>
@@ -193,24 +187,15 @@ function RootRouteBranch() {
   return (
     <>
       <ChatGptWelcomeCoordinator />
-      {isWelcome ? (
-        <>
-          {appHosts}
-          {appShell}
-        </>
-      ) : (
-        <FirstRunGate
-          enabled={primaryEnvironmentAuthenticated}
-          hostedStatic={authGateState.status === "hosted-static"}
-        >
-          {appHosts}
-          {primaryEnvironmentAuthenticated ? (
-            <EventRouter skipInitialBootstrapNavigation={returningFromWelcome} />
-          ) : null}
-          {appShell}
-        </FirstRunGate>
-      )}
-      {/* Above both shells and the router, so drafts survive navigation, including to /welcome. */}
+      <FirstRunGate
+        enabled={primaryEnvironmentAuthenticated}
+        hostedStatic={authGateState.status === "hosted-static"}
+      >
+        {appHosts}
+        {primaryEnvironmentAuthenticated ? <EventRouter /> : null}
+        {appShell}
+      </FirstRunGate>
+      {/* Above the shell and the router, so drafts survive navigation. */}
       <ThemeEditorHost />
     </>
   );
@@ -310,11 +295,7 @@ function errorReport(error: unknown, pathname: string): string {
   return lines.join("\n");
 }
 
-function EventRouter({
-  skipInitialBootstrapNavigation,
-}: {
-  readonly skipInitialBootstrapNavigation: boolean;
-}) {
+function EventRouter() {
   const navigate = useNavigate();
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
@@ -322,7 +303,6 @@ function EventRouter({
   const serverWelcome = useAtomValue(primaryServerWelcomeAtom);
   const readPathname = useEffectEvent(() => pathname);
   const handledBootstrapThreadIdRef = useRef<string | null>(null);
-  const skipInitialBootstrapNavigationRef = useRef(skipInitialBootstrapNavigation);
 
   const handleWelcome = useEffectEvent((payload: ServerLifecycleWelcomePayload | null) => {
     if (!payload) return;
@@ -349,11 +329,7 @@ function EventRouter({
       if (readPathname() !== "/") {
         return;
       }
-      if (skipInitialBootstrapNavigationRef.current) {
-        skipInitialBootstrapNavigationRef.current = false;
-        handledBootstrapThreadIdRef.current = payload.bootstrapThreadId;
-        return;
-      }
+
       if (handledBootstrapThreadIdRef.current === payload.bootstrapThreadId) {
         return;
       }

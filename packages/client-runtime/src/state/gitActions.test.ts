@@ -58,16 +58,18 @@ describe("git action copy", () => {
     ).toBe("No local commits to include in a PR.");
   });
 
-  it("says MR for a GitLab ref", () => {
+  it("does not offer a merge request on a retired host", () => {
     expect(resolveQuickAction(status({ ...gitLab, aheadCount: 1 }), false).label).toBe(
-      "推送并创建 MR",
+      "推送并创建 不再支持",
     );
     expect(
       resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false).label,
-    ).toBe("提交、推送并创建 MR");
-    expect(resolveQuickAction(status({ ...gitLab, pr: openPr }), false).label).toBe("View MR");
+    ).toBe("提交、推送并创建 不再支持");
+    expect(resolveQuickAction(status({ ...gitLab, pr: openPr }), false).label).toBe(
+      "View 不再支持",
+    );
     const [, , prItem] = buildMenuItems(status(gitLab), false);
-    expect(prItem?.label).toBe("创建 MR");
+    expect(prItem?.label).toBe("创建 不再支持");
     expect(
       getGitActionDisabledReason({
         item: prItem!,
@@ -75,7 +77,7 @@ describe("git action copy", () => {
         isBusy: false,
         hasOriginRemote: true,
       }),
-    ).toBe("No local commits to include in an MR.");
+    ).toBe("No local commits to include in 不再支持.");
   });
 
   it("names the host's change request in the default-branch dialog", () => {
@@ -91,6 +93,6 @@ describe("git action copy", () => {
         ...input,
         terminology: sourceControlClients.get("gitlab").changeRequest,
       }).continueLabel,
-    ).toBe("提交、推送并创建 MR");
+    ).toBe("提交、推送并创建 不再支持");
   });
 });
