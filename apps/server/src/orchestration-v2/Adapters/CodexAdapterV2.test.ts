@@ -1399,7 +1399,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             Effect.flatMap((context) =>
               Effect.service(CodexClient.CodexAppServerClient).pipe(
                 Effect.map((client) =>
-                  withCodexReplayChildMetadata(client, transcript, readChildMetadata, driver),
+                  withCodexReplayChildMetadata(client, transcript, readChildMetadata),
                 ),
                 Effect.map(
                   (client) =>
