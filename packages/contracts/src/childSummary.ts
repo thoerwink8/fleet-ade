@@ -76,6 +76,12 @@ export const CommandChildrenPage = Schema.Struct({
   nextCursor: Schema.NullOr(Schema.String),
 });
 export type CommandChildrenPage = typeof CommandChildrenPage.Type;
+/** Stream payload: the initial snapshot replays as `upsert`s; `deleted` removes a row. */
+export const ChildSummaryStreamEvent = Schema.Union([
+  Schema.Struct({ _tag: Schema.Literal("upsert"), row: ChildSummaryListItem }),
+  Schema.Struct({ _tag: Schema.Literal("deleted"), threadId: ThreadId }),
+]);
+export type ChildSummaryStreamEvent = typeof ChildSummaryStreamEvent.Type;
 
 export const CommandChildDetailInput = Schema.Struct({
   threadId: ThreadId,

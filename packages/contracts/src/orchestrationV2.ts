@@ -66,7 +66,7 @@ import {
 } from "./threadPullRequest.ts";
 import {
   ChildSummaryDetail,
-  ChildSummaryListItem,
+  ChildSummaryStreamEvent,
   CommandChildDetailInput,
   CommandChildrenInput,
   CommandChildrenPage,
@@ -4512,7 +4512,7 @@ export const OrchestrationV2RpcSchemas = {
   },
   subscribeCommandChildren: {
     input: CommandChildrenInput,
-    output: ChildSummaryListItem,
+    output: ChildSummaryStreamEvent,
   },
 } as const;
 

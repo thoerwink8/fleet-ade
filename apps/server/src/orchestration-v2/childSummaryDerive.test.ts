@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest";
-import { CHILD_SUMMARY_PAGE_SIZE, ThreadId, type ChildSummaryListItem } from "@t3tools/contracts";
+import { ThreadId, type ChildSummaryListItem } from "@t3tools/contracts";
 
 import {
   deriveChildSummary,
@@ -7,7 +7,6 @@ import {
   emptyPushLane,
   flushPush,
   offerPush,
-  pageChildSummaries,
   toSummaryItem,
   type SummaryFacts,
 } from "./childSummaryDerive.ts";
@@ -21,14 +20,10 @@ const base = (patch: Partial<SummaryFacts> = {}): SummaryFacts => ({
   createdAtMs: 0,
   activityAtMs: 0,
   status: "running",
-  role: "coding",
-  unreachable: false,
-  previousActivity: null,
   approvalCommand: null,
   waitingForAnswer: false,
   items: [],
   goal: "把登录改好",
-  avoid: null,
   taskText: null,
   branch: "local/112",
   pr: null,
@@ -150,9 +145,6 @@ it("maps queue, failure, cancel, and pull-request conclusions", () => {
   assert.strictEqual(completed.conclusion, "没有 PR");
   assert.strictEqual(completed.activity, "没有 PR");
   assert.strictEqual(completed.needsYou, false);
-  const other = deriveChildSummary(base({ status: "completed", role: "other" }), 0).list;
-  assert.strictEqual(other.conclusion, "没有 PR");
-  assert.strictEqual(other.reason, "已完成");
   assert.strictEqual(
     deriveChildSummary(base({ status: "completed", pr: { number: 4, state: "open" } }), 0).list
       .conclusion,
@@ -173,17 +165,6 @@ it("maps queue, failure, cancel, and pull-request conclusions", () => {
       .conclusion,
     "合并状态未知",
   );
-});
-
-it("keeps the last sentence when the row cannot be reached", () => {
-  const lost = deriveChildSummary(
-    base({ unreachable: true, previousActivity: "在改 a.ts" }),
-    0,
-  ).list;
-  assert.strictEqual(lost.phase, "卡住");
-  assert.strictEqual(lost.reason, "连不上");
-  assert.strictEqual(lost.activity, "在改 a.ts");
-  assert.strictEqual(lost.needsYou, false);
 });
 
 it("counts grandchildren on the row and does not invent an outlook", () => {
@@ -252,50 +233,24 @@ it("pushes a needs-you change without waiting", () => {
   assert.strictEqual(approval.emit?.needsYou, true);
 });
 
-it("pages by created time and id without duplicates or gaps", () => {
-  const rows = Array.from({ length: CHILD_SUMMARY_PAGE_SIZE + 25 }, (_, index) => ({
-    createdAtMs: index < 10 ? 5 : index,
-    threadId: `thread:${String(index).padStart(3, "0")}`,
-  }));
-  const seen: string[] = [];
-  let cursor: string | null = null;
-  do {
-    const page: ReturnType<typeof pageChildSummaries> = pageChildSummaries(rows, cursor);
-    if (page === null) assert.fail("cursor rejected");
-    seen.push(...page.rows.map((item: { readonly threadId: string }) => item.threadId));
-    cursor = page.nextCursor;
-  } while (cursor !== null);
-  const expected = [...rows]
-    .sort((left, right) =>
-      left.createdAtMs === right.createdAtMs
-        ? left.threadId < right.threadId
-          ? -1
-          : 1
-        : left.createdAtMs - right.createdAtMs,
-    )
-    .map((item) => item.threadId);
-  assert.deepStrictEqual(seen, expected);
-  assert.strictEqual(new Set(seen).size, seen.length);
-  assert.strictEqual(pageChildSummaries(rows, "nope"), null);
-});
-
-it("refuses a correction once a delegated child is no longer running", () => {
+it("refuses a send once a delegated child was stopped", () => {
   const delegated = {
     lineage: { relationshipToParent: "subagent" as const },
     creationSource: "server",
-    status: "completed",
+    status: "cancelled",
   };
   assert.strictEqual(delegateCorrectionRefusal(delegated), "这条已经停了");
   assert.strictEqual(
-    delegateCorrectionRefusal({ ...delegated, status: "running", activityRunStatus: "running" }),
-    undefined,
+    delegateCorrectionRefusal({ ...delegated, status: "interrupted" }),
+    "这条已经停了",
   );
-  assert.strictEqual(delegateCorrectionRefusal({ ...delegated, status: "queued" }), "这条已经停了");
+  assert.strictEqual(delegateCorrectionRefusal({ ...delegated, status: "completed" }), undefined);
+  assert.strictEqual(delegateCorrectionRefusal({ ...delegated, status: "running" }), undefined);
   assert.strictEqual(
     delegateCorrectionRefusal({
       lineage: { relationshipToParent: null },
       creationSource: "web",
-      status: "completed",
+      status: "cancelled",
     }),
     undefined,
   );

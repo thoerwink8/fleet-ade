@@ -35,9 +35,13 @@ import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import type * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts";
 import { liveThreadShell } from "./McpToolAccess.testkit.ts";
 
 const layerOrchestratorService = OrchestratorMcpService.layer.pipe(
+  Layer.provide(ChildSessionSummary.layer),
+  Layer.provide(SqlitePersistence.layerMemory),
   Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
   Layer.provide(Layer.mock(GitVcsDriver.GitVcsDriver)({})),
 );
@@ -1099,6 +1103,78 @@ it("requestSecret saves a pasted value to a file without opening a card", async 
     expect(asRef.message).not.toContain("482916");
     expect(saved).toHaveLength(1);
     expect(dispatched).toEqual([]);
+  }).pipe(Effect.provide(layer), Effect.runPromise);
+});
+
+it("commandChildren reads another thread and refuses a missing one", async () => {
+  const foreignThreadId = ThreadId.make("thread-mcp-command-children-foreign");
+  const parentProjection = {
+    thread: baseThread({
+      threadId: parentThreadId,
+      title: "Parent",
+      instanceId: parentInstanceId,
+      model: "gpt-5.4",
+    }),
+    runs: [],
+    visibleTurnItems: [],
+    providerTurns: [],
+    runtimeRequests: [],
+    messages: [],
+    contextTransfers: [],
+    subagents: [],
+    updatedAt: now,
+  } as unknown as OrchestrationV2ThreadProjection;
+  const foreignProjection = {
+    ...parentProjection,
+    thread: { ...parentProjection.thread, id: foreignThreadId },
+  } as unknown as OrchestrationV2ThreadProjection;
+
+  const layer = layerOrchestratorService.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          getThreadRecords: (threadId) =>
+            threadId === parentThreadId
+              ? Effect.succeed(parentProjection)
+              : Effect.succeed(foreignProjection),
+          getThreadShell: (threadId) =>
+            Effect.succeed(
+              threadId === foreignThreadId || threadId === parentThreadId
+                ? (liveThreadShell(threadId) as unknown as OrchestrationV2ThreadShell)
+                : null,
+            ),
+          getProjectThreadRecords: (input) =>
+            input.threadId === foreignThreadId
+              ? Effect.succeed(foreignProjection)
+              : Effect.fail(
+                  new ThreadManagementService.ThreadManagementThreadNotFoundError({
+                    projectId: input.projectId,
+                    threadId: input.threadId,
+                  }),
+                ),
+        } satisfies Partial<ThreadManagementService.ThreadManagementService["Service"]>),
+        ServerSettings.layerTest(),
+        Layer.mock(ProviderRegistry.ProviderRegistry)({
+          getProviders: Effect.succeed([]),
+        } satisfies Partial<ProviderRegistry.ProviderRegistry["Service"]>),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+        Layer.mock(ProviderAdapterRegistry.ProviderAdapterRegistryV2)({}),
+        NodeCrypto.layer,
+      ),
+    ),
+  );
+
+  await Effect.gen(function* () {
+    const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+    const page = yield* service.commandChildren(makeScope(), { threadId: foreignThreadId });
+    expect(page.children).toEqual([]);
+    const missing = yield* service
+      .commandChildren(makeScope(), { threadId: ThreadId.make("thread-mcp-missing") })
+      .pipe(Effect.flip);
+    expect(missing.code).toBe("thread_not_found");
   }).pipe(Effect.provide(layer), Effect.runPromise);
 });
 

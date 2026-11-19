@@ -1,10 +1,22 @@
-import { Clock, Context, DateTime, Effect, Layer, PubSub, Schedule, Stream } from "effect";
+import {
+  Clock,
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  PubSub,
+  Schedule,
+  Scope,
+  Semaphore,
+  Stream,
+} from "effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import {
   CHILD_SUMMARY_IDLE_MS,
   CHILD_SUMMARY_PAGE_SIZE,
   type ChildSummaryDetail,
   type ChildSummaryListItem,
+  type ChildSummaryStreamEvent,
   ChildSummaryCursorError,
   ChildSummaryReadError,
   type CommandChildrenPage,
@@ -18,7 +30,6 @@ import {
   deriveChildSummary,
   emptyPushLane,
   flushPush,
-  isDelegateTaskChild,
   offerPush,
   parseChildSummaryCursor,
   toSummaryItem,
@@ -58,8 +69,6 @@ interface SummaryRow {
   readonly branch: string | null;
   readonly prNumber: number | null;
   readonly prState: string | null;
-  readonly runStatus: string;
-  readonly role: string;
   readonly grandchildCount: number;
   readonly grandchildNote: string | null;
   readonly createdAtMs: number;
@@ -140,10 +149,7 @@ function sameContent(
   );
 }
 
-const SELECT_COLUMNS = sqlColumnList();
-
-function sqlColumnList(): string {
-  return `
+const SELECT_COLUMNS = `
     thread_id AS threadId,
     parent_thread_id AS parentThreadId,
     revision,
@@ -160,8 +166,6 @@ function sqlColumnList(): string {
     branch,
     pr_number AS prNumber,
     pr_state AS prState,
-    run_status AS runStatus,
-    role,
     grandchild_count AS grandchildCount,
     grandchild_note AS grandchildNote,
     created_at_ms AS createdAtMs,
@@ -169,7 +173,6 @@ function sqlColumnList(): string {
     idle_eligible AS idleEligible,
     updated_at AS updatedAt
   `;
-}
 
 const RELEVANT_ITEM_TYPES = [
   "file_change",
@@ -201,13 +204,24 @@ interface ItemRow {
   readonly prompt: string | null;
 }
 
+interface ChildSessionSummaryInternalShape {
+  readonly note: (facts: SummaryFacts) => Effect.Effect<void, ChildSummaryReadError>;
+  readonly recompute: (
+    threadId: ThreadId,
+    shell: OrchestrationV2ThreadShell | null,
+  ) => Effect.Effect<void, ChildSummaryReadError>;
+  readonly markIdle: () => Effect.Effect<void, ChildSummaryReadError>;
+}
+
+/** Implementation surface for workers and tests; not part of the read contract. */
+export class ChildSessionSummaryInternal extends Context.Service<
+  ChildSessionSummaryInternal,
+  ChildSessionSummaryInternalShape
+>()("t3/orchestration-v2/ChildSessionSummary/ChildSessionSummaryInternal") {}
+
 export class ChildSessionSummary extends Context.Service<
   ChildSessionSummary,
   {
-    readonly note: (facts: SummaryFacts) => Effect.Effect<void, ChildSummaryReadError>;
-    readonly recompute: (
-      threadId: ThreadId,
-    ) => Effect.Effect<void, ChildSummaryReadError, ProjectionStoreV2>;
     readonly list: (options: {
       readonly threadId: ThreadId;
       readonly cursor?: string | undefined;
@@ -215,15 +229,23 @@ export class ChildSessionSummary extends Context.Service<
     readonly detail: (options: {
       readonly threadId: ThreadId;
     }) => Effect.Effect<ChildSummaryDetail | null, ChildSummaryReadError>;
-    readonly subscribe: (threadId: ThreadId) => Stream.Stream<ChildSummaryListItem>;
-    readonly markIdle: () => Effect.Effect<void, ChildSummaryReadError>;
+    readonly subscribe: (
+      threadId: ThreadId,
+    ) => Stream.Stream<ChildSummaryStreamEvent, ChildSummaryReadError>;
   }
 >()("t3/orchestration-v2/ChildSessionSummary") {
-  static readonly layer = Layer.effect(
-    ChildSessionSummary,
+  static readonly layer: Layer.Layer<
+    ChildSessionSummary | ChildSessionSummaryInternal,
+    never,
+    SqlClient.SqlClient
+  > = Layer.effectContext(
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      const pubsub = yield* PubSub.unbounded<ChildSummaryListItem>();
+      const layerScope = yield* Effect.scope;
+      const pubsub = yield* PubSub.unbounded<ChildSummaryStreamEvent>();
+      // Idle and write paths share one permit so a stale-then-write pair cannot
+      // interleave a lower revision between read and update.
+      const writeSemaphore = yield* Semaphore.make(1);
       const lanes = new Map<string, StoredLane>();
 
       const readError = (error: unknown) =>
@@ -237,32 +259,33 @@ export class ChildSessionSummary extends Context.Service<
         const nowMs = yield* Clock.currentTimeMillis;
         const stored = lanes.get(row.threadId) ?? { lane: emptyPushLane, token: 0 };
         const offered = offerPush(stored.lane, row, nowMs);
-        lanes.set(row.threadId, {
-          lane: offered.lane,
-          token: offered.emit === null ? stored.token : stored.token + 1,
-        });
         if (offered.emit !== null) {
-          yield* PubSub.publish(pubsub, offered.emit);
+          // Urgent and terminal rows publish at once; a lane with nothing pending is done.
+          if (offered.lane.pending === null) lanes.delete(row.threadId);
+          else lanes.set(row.threadId, { lane: offered.lane, token: stored.token });
+          yield* PubSub.publish(pubsub, { _tag: "upsert", row: offered.emit });
           return;
         }
         const armMs = offered.armMs;
-        if (armMs !== null) {
-          const token = stored.token;
-          yield* Effect.forkDetach(
-            Effect.gen(function* () {
-              yield* Effect.sleep(armMs);
-              const current = lanes.get(row.threadId);
-              if (current === undefined || current.token !== token) return;
-              const now = yield* Clock.currentTimeMillis;
-              const flushed = flushPush(current.lane, now);
-              lanes.set(row.threadId, {
-                lane: flushed.lane,
-                token: flushed.emit === null ? current.token : current.token + 1,
-              });
-              if (flushed.emit !== null) yield* PubSub.publish(pubsub, flushed.emit);
-            }),
-          );
+        if (armMs === null) {
+          lanes.set(row.threadId, { lane: offered.lane, token: stored.token });
+          return;
         }
+        lanes.set(row.threadId, { lane: offered.lane, token: stored.token + 1 });
+        yield* forkParked(
+          Effect.gen(function* () {
+            yield* Effect.sleep(armMs);
+            const current = lanes.get(row.threadId);
+            if (current === undefined || current.token !== stored.token + 1) return;
+            const now = yield* Clock.currentTimeMillis;
+            const flushed = flushPush(current.lane, now);
+            if (flushed.lane.pending === null) lanes.delete(row.threadId);
+            else lanes.set(row.threadId, { lane: flushed.lane, token: current.token });
+            if (flushed.emit !== null) {
+              yield* PubSub.publish(pubsub, { _tag: "upsert", row: flushed.emit });
+            }
+          }),
+        ).pipe(Effect.provideService(Scope.Scope, layerScope));
       });
 
       const getRow = (threadId: ThreadId) =>
@@ -271,116 +294,112 @@ export class ChildSessionSummary extends Context.Service<
           Effect.mapError(readError),
         );
 
-      const note = Effect.fn("ChildSessionSummary.note")(function* (facts: SummaryFacts) {
-        const nowMs = yield* Clock.currentTimeMillis;
-        const derived = deriveChildSummary(facts, nowMs);
-        const previous = yield* getRow(facts.threadId);
-        if (
-          previous !== null &&
-          sameContent(previous, derived.list, derived.detail, facts.pr?.state ?? null)
-        ) {
-          return;
-        }
-        const revision = previous === null ? 1 : previous.revision + 1;
-        const updatedAt = isoOf(nowMs);
-        const filesJson = filesJsonOf(derived.detail.files);
-        yield* sql`
-          INSERT INTO child_session_summary (
-            thread_id, parent_thread_id, revision, phase, reason, conclusion, needs_you,
-            activity, goal_summary, goal, avoid, files_json, latest_command, branch,
-            pr_number, pr_state, run_status, role, grandchild_count, grandchild_note,
-            created_at_ms, activity_at_ms, idle_eligible, updated_at
-          ) VALUES (
-            ${facts.threadId}, ${facts.parentThreadId}, ${revision}, ${derived.list.phase},
-            ${derived.list.reason}, ${derived.list.conclusion}, ${derived.list.needsYou ? 1 : 0},
-            ${derived.list.activity}, ${derived.list.goalSummary}, ${derived.detail.goal},
-            ${derived.detail.avoid}, ${filesJson},
-            ${derived.detail.latestCommand}, ${derived.detail.branch},
-            ${derived.detail.prNumber}, ${facts.pr?.state ?? null}, ${facts.status}, ${facts.role},
-            ${derived.list.grandchildCount}, ${derived.list.grandchildNote},
-            ${facts.createdAtMs}, ${facts.activityAtMs}, ${derived.idleEligible ? 1 : 0},
-            ${updatedAt}
-          )
-          ON CONFLICT(thread_id) DO UPDATE SET
-            parent_thread_id = excluded.parent_thread_id,
-            revision = excluded.revision,
-            phase = excluded.phase,
-            reason = excluded.reason,
-            conclusion = excluded.conclusion,
-            needs_you = excluded.needs_you,
-            activity = excluded.activity,
-            goal_summary = excluded.goal_summary,
-            goal = excluded.goal,
-            avoid = excluded.avoid,
-            files_json = excluded.files_json,
-            latest_command = excluded.latest_command,
-            branch = excluded.branch,
-            pr_number = excluded.pr_number,
-            pr_state = excluded.pr_state,
-            run_status = excluded.run_status,
-            role = excluded.role,
-            grandchild_count = excluded.grandchild_count,
-            grandchild_note = excluded.grandchild_note,
-            created_at_ms = excluded.created_at_ms,
-            activity_at_ms = excluded.activity_at_ms,
-            idle_eligible = excluded.idle_eligible,
-            updated_at = excluded.updated_at
-        `.pipe(Effect.mapError(readError));
-        yield* publish({
-          ...derived.list,
-          revision,
-          updatedAt,
-        });
-      });
+      const note = Effect.fn("ChildSessionSummary.note")((facts: SummaryFacts) =>
+        writeSemaphore.withPermits(1)(
+          Effect.gen(function* () {
+            const nowMs = yield* Clock.currentTimeMillis;
+            const derived = deriveChildSummary(facts, nowMs);
+            const previous = yield* getRow(facts.threadId);
+            if (
+              previous !== null &&
+              sameContent(previous, derived.list, derived.detail, facts.pr?.state ?? null)
+            ) {
+              return;
+            }
+            const revision = previous === null ? 1 : previous.revision + 1;
+            const updatedAt = isoOf(nowMs);
+            const filesJson = filesJsonOf(derived.detail.files);
+            yield* sql`
+              INSERT INTO child_session_summary (
+                thread_id, parent_thread_id, revision, phase, reason, conclusion, needs_you,
+                activity, goal_summary, goal, avoid, files_json, latest_command, branch,
+                pr_number, pr_state, grandchild_count, grandchild_note,
+                created_at_ms, activity_at_ms, idle_eligible, updated_at
+              ) VALUES (
+                ${facts.threadId}, ${facts.parentThreadId}, ${revision}, ${derived.list.phase},
+                ${derived.list.reason}, ${derived.list.conclusion}, ${derived.list.needsYou ? 1 : 0},
+                ${derived.list.activity}, ${derived.list.goalSummary}, ${derived.detail.goal},
+                ${derived.detail.avoid}, ${filesJson},
+                ${derived.detail.latestCommand}, ${derived.detail.branch},
+                ${derived.detail.prNumber}, ${facts.pr?.state ?? null},
+                ${derived.list.grandchildCount}, ${derived.list.grandchildNote},
+                ${facts.createdAtMs}, ${facts.activityAtMs}, ${derived.idleEligible ? 1 : 0},
+                ${updatedAt}
+              )
+              ON CONFLICT(thread_id) DO UPDATE SET
+                parent_thread_id = excluded.parent_thread_id,
+                revision = excluded.revision,
+                phase = excluded.phase,
+                reason = excluded.reason,
+                conclusion = excluded.conclusion,
+                needs_you = excluded.needs_you,
+                activity = excluded.activity,
+                goal_summary = excluded.goal_summary,
+                goal = excluded.goal,
+                avoid = excluded.avoid,
+                files_json = excluded.files_json,
+                latest_command = excluded.latest_command,
+                branch = excluded.branch,
+                pr_number = excluded.pr_number,
+                pr_state = excluded.pr_state,
+                grandchild_count = excluded.grandchild_count,
+                grandchild_note = excluded.grandchild_note,
+                created_at_ms = excluded.created_at_ms,
+                activity_at_ms = excluded.activity_at_ms,
+                idle_eligible = excluded.idle_eligible,
+                updated_at = excluded.updated_at
+            `.pipe(Effect.mapError(readError));
+            yield* publish({ ...derived.list, revision, updatedAt });
+          }),
+        ),
+      );
 
       const buildFacts = Effect.fn("ChildSessionSummary.buildFacts")(function* (
         shell: OrchestrationV2ThreadShell,
         parentThreadId: ThreadId,
       ) {
         const items = yield* sql<ItemRow>`
-          SELECT
-            type,
-            status,
-            json_extract(payload_json, '$.fileName') AS fileName,
-            json_extract(payload_json, '$.additions') AS additions,
-            json_extract(payload_json, '$.deletions') AS deletions,
-            json_extract(payload_json, '$.input') AS command,
-            json_extract(payload_json, '$.text') AS text,
-            coalesce(
-              json_extract(payload_json, '$.patterns[0]'),
-              json_extract(payload_json, '$.pattern')
-            ) AS pattern,
-            json_extract(payload_json, '$.title') AS title,
-            json_extract(payload_json, '$.requestKind') AS requestKind,
-            json_extract(payload_json, '$.requestId') AS requestId,
-            json_extract(payload_json, '$.prompt') AS prompt
-          FROM orchestration_v2_projection_turn_items
-          WHERE thread_id = ${shell.id}
-            AND type IN ${sql.in(RELEVANT_ITEM_TYPES)}
-          ORDER BY ordinal DESC
-          LIMIT 40
-        `.pipe(Effect.mapError(readError));
+            SELECT
+              type,
+              status,
+              json_extract(payload_json, '$.fileName') AS fileName,
+              json_extract(payload_json, '$.additions') AS additions,
+              json_extract(payload_json, '$.deletions') AS deletions,
+              json_extract(payload_json, '$.input') AS command,
+              json_extract(payload_json, '$.text') AS text,
+              coalesce(
+                json_extract(payload_json, '$.patterns[0]'),
+                json_extract(payload_json, '$.pattern')
+              ) AS pattern,
+              json_extract(payload_json, '$.title') AS title,
+              json_extract(payload_json, '$.requestKind') AS requestKind,
+              json_extract(payload_json, '$.requestId') AS requestId,
+              json_extract(payload_json, '$.prompt') AS prompt
+            FROM orchestration_v2_projection_turn_items
+            WHERE thread_id = ${shell.id}
+              AND type IN ${sql.in(RELEVANT_ITEM_TYPES)}
+            ORDER BY ordinal DESC
+            LIMIT 40
+          `;
         const lastUser = yield* sql<{ readonly text: string | null }>`
-          SELECT json_extract(payload_json, '$.text') AS text
-          FROM orchestration_v2_projection_turn_items
-          WHERE thread_id = ${shell.id} AND type = 'user_message'
-          ORDER BY ordinal DESC
-          LIMIT 1
-        `.pipe(Effect.mapError(readError));
+            SELECT json_extract(payload_json, '$.text') AS text
+            FROM orchestration_v2_projection_turn_items
+            WHERE thread_id = ${shell.id} AND type = 'user_message'
+            ORDER BY ordinal DESC
+            LIMIT 1
+          `;
         const activity = yield* sql<{ readonly latest: string | null }>`
-          SELECT max(updated_at) AS latest
-          FROM orchestration_v2_projection_turn_items
-          WHERE thread_id = ${shell.id}
-        `.pipe(Effect.mapError(readError));
+            SELECT max(updated_at) AS latest
+            FROM orchestration_v2_projection_turn_items
+            WHERE thread_id = ${shell.id}
+          `;
+        // Grandchildren read back from summary rows: one indexed lookup, never a
+        // payload_json scan of every projected thread.
         const grandchildren = yield* sql<{ readonly total: number }>`
-          SELECT count(*) AS total
-          FROM orchestration_v2_projection_threads
-          WHERE json_extract(payload_json, '$.lineage.parentThreadId') = ${shell.id}
-            AND json_extract(payload_json, '$.lineage.relationshipToParent') = 'subagent'
-            AND json_extract(payload_json, '$.creationSource') != 'provider'
-            AND deleted_at IS NULL
-            AND archived_at IS NULL
-        `.pipe(Effect.mapError(readError));
+            SELECT count(*) AS total
+            FROM child_session_summary
+            WHERE parent_thread_id = ${shell.id}
+          `;
 
         const pending = shell.pendingRuntimeRequest;
         const approval =
@@ -425,14 +444,18 @@ export class ChildSessionSummary extends Context.Service<
         const itemUpdated = activity[0]?.latest;
         const itemUpdatedMs =
           itemUpdated === null || itemUpdated === undefined ? 0 : Date.parse(itemUpdated);
-        const statusChanged =
-          shell.latestRunCompletedAt ??
-          shell.activityRunStartedAt ??
-          shell.latestRunStartedAt ??
-          null;
+        const statusChanged = Math.max(
+          shell.latestRunCompletedAt == null
+            ? 0
+            : DateTime.toEpochMillis(shell.latestRunCompletedAt),
+          shell.activityRunStartedAt == null
+            ? 0
+            : DateTime.toEpochMillis(shell.activityRunStartedAt),
+          shell.latestRunStartedAt == null ? 0 : DateTime.toEpochMillis(shell.latestRunStartedAt),
+        );
         const activityAtMs = Math.max(
           DateTime.toEpochMillis(shell.createdAt),
-          statusChanged === null ? 0 : DateTime.toEpochMillis(statusChanged),
+          statusChanged,
           Number.isNaN(itemUpdatedMs) ? 0 : itemUpdatedMs,
         );
 
@@ -440,86 +463,69 @@ export class ChildSessionSummary extends Context.Service<
           shell.pullRequests?.find((link) => link.snapshot !== null) ??
           shell.pullRequests?.[0] ??
           null;
-        const previous = yield* getRow(shell.id);
-        const facts: SummaryFacts = {
+        return {
           threadId: shell.id,
           parentThreadId,
           createdAtMs: DateTime.toEpochMillis(shell.createdAt),
           activityAtMs,
           status: shell.status,
-          role: "coding",
-          unreachable: false,
-          previousActivity: previous?.activity ?? null,
           approvalCommand,
           waitingForAnswer,
           items: summaryItems,
           goal: shell.goal?.objective ?? shell.title ?? lastUser[0]?.text ?? null,
-          avoid: null,
           taskText: lastUser[0]?.text ?? null,
           branch: shell.branch ?? null,
           pr: pr === null ? null : { number: pr.number, state: pr.snapshot?.state ?? "unknown" },
           grandchildCount: Number(grandchildren[0]?.total ?? 0),
-        };
-        return facts;
-      });
+        } satisfies SummaryFacts;
+      }, Effect.mapError(readError));
 
-      const recompute: (
+      const recompute = Effect.fn("ChildSessionSummary.recompute")(function* (
         threadId: ThreadId,
-      ) => Effect.Effect<void, ChildSummaryReadError, ProjectionStoreV2> = Effect.fn(
-        "ChildSessionSummary.recompute",
-      )(function* (threadId: ThreadId) {
-        const projectionStore = yield* ProjectionStoreV2;
-        const shell = yield* projectionStore
-          .getThreadShell(threadId)
-          .pipe(Effect.mapError(readError));
+        shell: OrchestrationV2ThreadShell | null,
+      ) {
         if (shell === null || shell.deletedAt !== null) {
           yield* sql`DELETE FROM child_session_summary WHERE thread_id = ${threadId}`.pipe(
             Effect.mapError(readError),
           );
+          lanes.delete(threadId);
+          yield* PubSub.publish(pubsub, { _tag: "deleted", threadId });
           return;
         }
         const parentId = shell.lineage.parentThreadId;
-        if (shell.lineage.relationshipToParent !== "subagent" || parentId === null) {
-          return;
-        }
-        const parentShell = yield* projectionStore
-          .getThreadShell(parentId)
-          .pipe(Effect.orElseSucceed(() => null));
-        if (parentShell !== null && parentShell.lineage.relationshipToParent === "subagent") {
-          // A grandchild is only a count on its parent's row.
-          yield* sql`DELETE FROM child_session_summary WHERE thread_id = ${shell.id}`.pipe(
-            Effect.mapError(readError),
-          );
-          yield* recompute(parentId).pipe(Effect.orElseSucceed(() => undefined));
-          return;
-        }
-        if (!isDelegateTaskChild(shell)) return;
+        if (shell.lineage.relationshipToParent !== "subagent" || parentId === null) return;
         const facts = yield* buildFacts(shell, parentId);
         yield* note(facts);
       });
 
       const markIdle = Effect.fn("ChildSessionSummary.markIdle")(function* () {
-        const nowMs = yield* Clock.currentTimeMillis;
-        const stale = yield* sql<SummaryRow>`
-          SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary
-          WHERE phase = '在做' AND idle_eligible = 1 AND activity_at_ms <= ${nowMs - CHILD_SUMMARY_IDLE_MS}
-        `.pipe(Effect.mapError(readError));
-        for (const row of stale) {
-          const updatedAt = isoOf(nowMs);
-          const revision = row.revision + 1;
-          yield* sql`
-            UPDATE child_session_summary
-            SET phase = '卡住', reason = '没动静', revision = ${revision}, updated_at = ${updatedAt}
-            WHERE thread_id = ${row.threadId}
-          `.pipe(Effect.mapError(readError));
-          yield* publish({
-            ...storedRowToItem(row),
-            phase: "卡住",
-            reason: "没动静",
-            revision,
-            updatedAt,
-          });
-        }
+        yield* writeSemaphore.withPermits(1)(
+          Effect.gen(function* () {
+            const nowMs = yield* Clock.currentTimeMillis;
+            const stale = yield* sql<SummaryRow>`
+              SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary
+              WHERE phase = '在做' AND idle_eligible = 1 AND activity_at_ms <= ${nowMs - CHILD_SUMMARY_IDLE_MS}
+            `.pipe(Effect.mapError(readError));
+            for (const row of stale) {
+              const updatedAt = isoOf(nowMs);
+              const updated = yield* sql<{ readonly revision: number }>`
+                UPDATE child_session_summary
+                SET phase = '卡住', reason = '没动静', revision = revision + 1, updated_at = ${updatedAt}
+                WHERE thread_id = ${row.threadId} AND phase = '在做'
+                RETURNING revision
+              `.pipe(Effect.mapError(readError));
+              const revision = updated[0]?.revision;
+              if (revision === undefined) continue;
+              yield* publish({
+                ...storedRowToItem(row),
+                phase: "卡住",
+                reason: "没动静",
+                revision,
+                updatedAt,
+              });
+            }
+          }),
+        );
       });
 
       const list = Effect.fn("ChildSessionSummary.list")(function* (options: {
@@ -565,38 +571,86 @@ export class ChildSessionSummary extends Context.Service<
       });
 
       const subscribe = (threadId: ThreadId) =>
-        Stream.fromPubSub(pubsub).pipe(Stream.filter((row) => row.parentThreadId === threadId));
+        Stream.unwrap(
+          Effect.gen(function* () {
+            // The queue is open before the snapshot, so a write between them is
+            // never missed; a later delete event still overrides a pushed row.
+            const subscription = yield* PubSub.subscribe(pubsub);
+            const snapshot = yield* sql<SummaryRow>`
+              SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary
+              WHERE parent_thread_id = ${threadId}
+              ORDER BY created_at_ms ASC, thread_id ASC
+            `.pipe(Effect.mapError(readError));
+            return Stream.concat(
+              Stream.fromIterable(
+                snapshot.map((row): ChildSummaryStreamEvent => ({
+                  _tag: "upsert",
+                  row: storedRowToItem(row),
+                })),
+              ),
+              Stream.fromSubscription(subscription).pipe(
+                Stream.filter(
+                  (event) =>
+                    event._tag === "deleted" ||
+                    (event._tag === "upsert" && event.row.parentThreadId === threadId),
+                ),
+              ),
+            );
+          }),
+        );
 
-      return ChildSessionSummary.of({
-        note,
-        recompute,
-        list,
-        detail,
-        subscribe,
-        markIdle,
-      });
+      return Context.make(
+        ChildSessionSummary,
+        ChildSessionSummary.of({ list, detail, subscribe }),
+      ).pipe(
+        Context.add(
+          ChildSessionSummaryInternal,
+          ChildSessionSummaryInternal.of({ note, recompute, markIdle }),
+        ),
+      );
     }),
   );
 
   static readonly layerWorker = Layer.effectDiscard(
     Effect.gen(function* () {
       const eventSink = yield* EventSinkV2;
-      const service = yield* ChildSessionSummary;
+      const projectionStore = yield* ProjectionStoreV2;
+      const internal = yield* ChildSessionSummaryInternal;
       const sql = yield* SqlClient.SqlClient;
+      // Read the high-water mark first, then sweep: events committed during the
+      // sweep still land in the subscription below instead of being skipped.
+      const highWater = yield* eventSink.latestSequence({}).pipe(Effect.orElseSucceed(() => 0));
       const children = yield* sql<{ readonly threadId: string }>`
         SELECT thread_id AS threadId
         FROM orchestration_v2_projection_threads
         WHERE json_extract(payload_json, '$.lineage.relationshipToParent') = 'subagent'
           AND json_extract(payload_json, '$.creationSource') != 'provider'
+          AND deleted_at IS NULL
+          AND archived_at IS NULL
       `.pipe(Effect.orElseSucceed(() => [] as { readonly threadId: string }[]));
-      for (const child of children) {
-        yield* service.recompute(ThreadId.make(child.threadId)).pipe(Effect.ignore);
-      }
-      const highWater = yield* eventSink.latestSequence({}).pipe(Effect.orElseSucceed(() => 0));
+      yield* forkParked(
+        Effect.forEach(
+          children,
+          (child) =>
+            Effect.gen(function* () {
+              const threadId = ThreadId.make(child.threadId);
+              const shell = yield* projectionStore
+                .getThreadShell(threadId)
+                .pipe(Effect.orElseSucceed(() => null));
+              yield* internal.recompute(threadId, shell).pipe(Effect.ignore);
+            }),
+          { discard: true },
+        ),
+      );
       yield* forkParked(
         Stream.runForEach(eventSink.stream({ afterSequence: highWater }), (stored) =>
           ACTIVITY_EVENTS[stored.event.type] === true
-            ? service.recompute(stored.event.threadId).pipe(Effect.ignore)
+            ? Effect.gen(function* () {
+                const shell = yield* projectionStore
+                  .getThreadShell(stored.event.threadId)
+                  .pipe(Effect.orElseSucceed(() => null));
+                yield* internal.recompute(stored.event.threadId, shell).pipe(Effect.ignore);
+              })
             : Effect.void,
         ),
       );
@@ -605,9 +659,9 @@ export class ChildSessionSummary extends Context.Service<
 
   static readonly layerIdle = Layer.effectDiscard(
     Effect.gen(function* () {
-      const service = yield* ChildSessionSummary;
+      const internal = yield* ChildSessionSummaryInternal;
       yield* forkParked(
-        service.markIdle().pipe(Effect.ignore, Effect.repeat(Schedule.spaced("30 seconds"))),
+        internal.markIdle().pipe(Effect.ignore, Effect.repeat(Schedule.spaced("30 seconds"))),
       );
     }),
   ).pipe(Layer.provide(ChildSessionSummary.layer));

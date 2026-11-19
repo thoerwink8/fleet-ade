@@ -22,8 +22,6 @@ export default Effect.gen(function* () {
       branch TEXT,
       pr_number INTEGER,
       pr_state TEXT,
-      run_status TEXT NOT NULL,
-      role TEXT NOT NULL,
       grandchild_count INTEGER NOT NULL DEFAULT 0,
       grandchild_note TEXT,
       created_at_ms INTEGER NOT NULL,
@@ -35,5 +33,9 @@ export default Effect.gen(function* () {
   yield* sql`
     CREATE INDEX child_session_summary_parent_idx
     ON child_session_summary(parent_thread_id, created_at_ms, thread_id)
+  `;
+  yield* sql`
+    CREATE INDEX child_session_summary_idle_idx
+    ON child_session_summary(phase, idle_eligible, activity_at_ms, thread_id)
   `;
 });

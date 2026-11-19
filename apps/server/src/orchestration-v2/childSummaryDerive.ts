@@ -1,7 +1,7 @@
 import {
   CHILD_SUMMARY_GOAL_LIMIT,
   CHILD_SUMMARY_LINE_LIMIT,
-  CHILD_SUMMARY_PAGE_SIZE,
+  CHILD_SUMMARY_IDLE_MS,
   CHILD_SUMMARY_PUSH_MS,
   type ChildSummaryConclusion,
   type ChildSummaryDetail,
@@ -11,11 +11,18 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 
+const STOPPED_DELEGATE_STATUSES: Readonly<Record<string, true>> = {
+  cancelled: true,
+  interrupted: true,
+  rolled_back: true,
+};
+
 const LIVE_STATUSES: Readonly<Record<string, true>> = {
   preparing: true,
   starting: true,
   running: true,
   waiting: true,
+  queued: true,
 };
 
 export interface SummaryItem {
@@ -44,15 +51,11 @@ export interface SummaryFacts {
   readonly createdAtMs: number;
   readonly activityAtMs: number;
   readonly status: string;
-  readonly role: "coding" | "other";
-  readonly unreachable: boolean;
-  readonly previousActivity: string | null;
-  /** Set when a command approval is waiting. Other approvals are not "要你看". */
+  /** Set when a command approval is waiting. Other approvals are not needs-you. */
   readonly approvalCommand: string | null;
   readonly waitingForAnswer: boolean;
   readonly items: readonly SummaryItem[];
   readonly goal: string | null;
-  readonly avoid: string | null;
   readonly taskText: string | null;
   readonly branch: string | null;
   readonly pr: {
@@ -141,11 +144,7 @@ function doneConclusion(facts: SummaryFacts): {
   readonly conclusion: ChildSummaryConclusion;
   readonly reason: string;
 } {
-  if (facts.pr === null) {
-    return facts.role === "coding"
-      ? { conclusion: "没有 PR", reason: "没有 PR" }
-      : { conclusion: "没有 PR", reason: "已完成" };
-  }
+  if (facts.pr === null) return { conclusion: "没有 PR", reason: "没有 PR" };
   switch (facts.pr.state) {
     case "merged":
       return { conclusion: "已合并", reason: "已合并" };
@@ -179,11 +178,7 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
   let needsYou = false;
   let activity = activityFromItems(facts);
 
-  if (facts.unreachable) {
-    phase = "卡住";
-    reason = "连不上";
-    activity = facts.previousActivity ?? "连不上";
-  } else if (facts.status === "failed") {
+  if (facts.status === "failed") {
     phase = "卡住";
     reason = "失败";
     activity = "失败";
@@ -224,7 +219,7 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
     !unfinishedCommand(facts) &&
     LIVE_STATUSES[facts.status] === true;
 
-  if (idleEligible && nowMs - facts.activityAtMs >= 3 * 60 * 1000) {
+  if (idleEligible && nowMs - facts.activityAtMs >= CHILD_SUMMARY_IDLE_MS) {
     phase = "卡住";
     reason = "没动静";
   }
@@ -247,7 +242,7 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
     detail: {
       ...list,
       goal,
-      avoid: facts.avoid?.trim() || "没有写别碰",
+      avoid: "没有写别碰",
       files,
       latestCommand: command,
       branch: facts.branch,
@@ -356,36 +351,6 @@ export function parseChildSummaryCursor(
   return { createdAtMs, threadId };
 }
 
-export function pageChildSummaries<
-  T extends { readonly createdAtMs: number; readonly threadId: string },
->(
-  rows: readonly T[],
-  cursor: string | null,
-): { readonly rows: readonly T[]; readonly nextCursor: string | null } | null {
-  const sorted = [...rows].sort((left, right) => {
-    if (left.createdAtMs !== right.createdAtMs) return left.createdAtMs - right.createdAtMs;
-    return left.threadId < right.threadId ? -1 : left.threadId > right.threadId ? 1 : 0;
-  });
-  let start = 0;
-  if (cursor !== null) {
-    const parsed = parseChildSummaryCursor(cursor);
-    if (parsed === null) return null;
-    start = sorted.findIndex(
-      (row) =>
-        row.createdAtMs > parsed.createdAtMs ||
-        (row.createdAtMs === parsed.createdAtMs && row.threadId > parsed.threadId),
-    );
-    if (start < 0) start = sorted.length;
-  }
-  const slice = sorted.slice(start, start + CHILD_SUMMARY_PAGE_SIZE);
-  const last = slice[slice.length - 1];
-  const more = start + CHILD_SUMMARY_PAGE_SIZE < sorted.length;
-  return {
-    rows: slice,
-    nextCursor: more && last !== undefined ? childSummaryCursor(last) : null,
-  };
-}
-
 export function isDelegateTaskChild(thread: {
   readonly lineage: { readonly relationshipToParent: string | null };
   readonly creationSource: string;
@@ -401,11 +366,9 @@ export function delegateCorrectionRefusal(thread: {
   readonly creationSource: string;
   readonly delegatedFrom?: unknown;
   readonly status: string;
-  readonly activityRunStatus?: string | null | undefined;
 }): string | undefined {
   if (!isDelegateTaskChild(thread)) return undefined;
-  const status = thread.activityRunStatus ?? thread.status;
-  return LIVE_STATUSES[status] === true ? undefined : "这条已经停了";
+  return STOPPED_DELEGATE_STATUSES[thread.status] === true ? "这条已经停了" : undefined;
 }
 
 /** Drops diff and command output. Newest-first payloads become one summary item. */
