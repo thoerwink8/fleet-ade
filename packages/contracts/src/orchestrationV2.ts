@@ -65,6 +65,13 @@ import {
   ThreadPullRequestWatch,
 } from "./threadPullRequest.ts";
 import {
+  ChildSummaryDetail,
+  ChildSummaryListItem,
+  CommandChildDetailInput,
+  CommandChildrenInput,
+  CommandChildrenPage,
+} from "./childSummary.ts";
+import {
   ProviderApprovalDecision,
   ProviderApprovalFullAccessOverride,
   ProviderApprovalOption,
@@ -3743,6 +3750,9 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   subscribeThread: "orchestration.subscribeThread",
   subscribeCommandOutput: "orchestration.subscribeCommandOutput",
   subscribePromptSuggestion: "orchestration.subscribePromptSuggestion",
+  commandChildren: "orchestration.commandChildren",
+  commandChildDetail: "orchestration.commandChildDetail",
+  subscribeCommandChildren: "orchestration.subscribeCommandChildren",
 } as const;
 
 export const OrchestrationV2SubscribeCommandOutputInput = Schema.Struct({
@@ -4491,6 +4501,18 @@ export const OrchestrationV2RpcSchemas = {
   subscribePromptSuggestion: {
     input: OrchestrationV2SubscribePromptSuggestionInput,
     output: OrchestrationV2PromptSuggestion,
+  },
+  commandChildren: {
+    input: CommandChildrenInput,
+    output: CommandChildrenPage,
+  },
+  commandChildDetail: {
+    input: CommandChildDetailInput,
+    output: Schema.NullOr(ChildSummaryDetail),
+  },
+  subscribeCommandChildren: {
+    input: CommandChildrenInput,
+    output: ChildSummaryListItem,
   },
 } as const;
 

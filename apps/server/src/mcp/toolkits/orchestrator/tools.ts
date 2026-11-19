@@ -44,6 +44,8 @@ import {
   PipelineSupervisionStartInput,
   PipelineSupervisionStatusResult,
   PipelineSupervisionVerdictInput,
+  CommandChildrenInput,
+  CommandChildrenPage,
   PipelineSupervisionVerdictResult,
 } from "@t3tools/contracts";
 import { McpSchema, Tool, Toolkit } from "effect/ai";
@@ -295,6 +297,20 @@ const ThreadSendTool = Tool.make("t3_thread_send", {
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
 
+const CommandChildrenTool = Tool.make("t3_command_children", {
+  description:
+    "One live row per direct child of a commander thread: 在做/卡住/做完, one line of what it does now, its conclusion when done, and whether it waits on the user. Page with `cursor`. Read-only; transcripts stay in `t3_thread_read`.",
+  parameters: CommandChildrenInput,
+  success: CommandChildrenPage,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies,
+})
+  .annotate(Tool.Title, "List child session rows")
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true);
+
 const ThreadWaitTool = Tool.make("t3_thread_wait", {
   description:
     "Wait for a thread's run to finish. No `runId`: latest. Idle: at once. On timeout, with `next` end your turn; without, call again.",
@@ -454,6 +470,7 @@ export const OrchestratorToolkit = Toolkit.make(
   PipelineStatusTool,
   PipelineSendTool,
   PipelineVerdictTool,
+  CommandChildrenTool,
   PipelineCleanupTool,
   EnvironmentLinksTool,
   EnvironmentLinkTool,

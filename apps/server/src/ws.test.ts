@@ -152,6 +152,7 @@ import * as LegacyV1ThreadImporter from "./orchestration-v2/legacy/LegacyV1Threa
 import * as ThreadCommandExecutor from "./orchestration-v2/ThreadCommandExecutor.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { projectIdentitiesDigest } from "./orchestration-v2/ShellStream.ts";
+import { ChildSessionSummary } from "./orchestration-v2/ChildSessionSummary.ts";
 import * as OrchestrationEventStore from "./persistence/OrchestrationEventStore.ts";
 import * as SqlitePersistence from "./persistence/Sqlite.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
@@ -189,6 +190,19 @@ const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
           startSupervised: () =>
             Effect.succeed({ status: "rejected" as const, code: "ineligible" as const }),
           note: () => Effect.void,
+        }),
+      ),
+    ),
+    Layer.provide(
+      Layer.succeed(
+        ChildSessionSummary,
+        ChildSessionSummary.of({
+          note: () => Effect.void,
+          recompute: () => Effect.void,
+          list: () => Effect.succeed({ children: [], nextCursor: null }),
+          detail: () => Effect.succeed(null),
+          subscribe: () => Stream.empty,
+          markIdle: () => Effect.void,
         }),
       ),
     ),

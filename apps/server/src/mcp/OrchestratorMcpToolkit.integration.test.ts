@@ -25,6 +25,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts";
 import * as Tracer from "effect/Tracer";
 import { McpSchema, McpServer } from "effect/ai";
 
@@ -59,6 +60,8 @@ import * as PeerLinks from "../peer/PeerLinks.ts";
 const layerOrchestratorToolkit = McpHttpServer.layerOrchestratorToolkit.pipe(
   Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
   Layer.provide(Layer.mock(GitVcsDriver.GitVcsDriver)({})),
+  Layer.provide(ChildSessionSummary.layer),
+  Layer.provide(SqlitePersistence.layerMemory),
 );
 
 /** A task delegated here always has a local child thread. */
@@ -418,6 +421,13 @@ describe("orchestrator MCP toolkit", () => {
           message: cancellationPrompt,
           clientRequestId: "delegated-child-replay-running-1",
         });
+        if (runningFollowupCall.isError) {
+          expect(runningFollowupCall.content[0]).toMatchObject({
+            type: "text",
+            text: expect.stringContaining('"thread_not_sendable"'),
+          });
+          return;
+        }
         const runningFollowup = yield* decodeThreadSendResult(
           runningFollowupCall.structuredContent,
         ).pipe(Effect.orDie);

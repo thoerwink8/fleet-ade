@@ -109,6 +109,10 @@ import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import { isSnoozed } from "../orchestration-v2/ThreadSettlementService.ts";
 import { userFacingDispatchErrorMessage } from "../orchestration-v2/UserFacingErrors.ts";
+import {
+  delegateCorrectionRefusal,
+  isDelegateTaskChild,
+} from "../orchestration-v2/childSummaryDerive.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
@@ -3326,6 +3330,15 @@ const make = Effect.gen(function* () {
       yield* assertLiveCallerForOtherThread(scope, parent, target);
       yield* resolveRuntimeMode(limits.runtimeMode, target.thread.runtimeMode);
       yield* resolveInteractionMode(limits.interactionMode, target.thread.interactionMode);
+      if (isDelegateTaskChild(target.thread)) {
+        const shell = yield* threadManagement
+          .getThreadShell(input.threadId)
+          .pipe(Effect.mapError(threadManagementFailure));
+        const refusal = shell === null ? "这条已经停了" : delegateCorrectionRefusal(shell);
+        if (refusal !== undefined) {
+          return yield* failure("thread_not_sendable", refusal);
+        }
+      }
 
       const mode = input.mode ?? "auto";
       const key = yield* requestKey(input.clientRequestId);

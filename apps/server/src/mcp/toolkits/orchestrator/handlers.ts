@@ -10,6 +10,7 @@ import { readCaller } from "../../threadAccess.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as OrchestratorMcpService from "../../OrchestratorMcpService.ts";
+import { ChildSessionSummary } from "../../../orchestration-v2/ChildSessionSummary.ts";
 import * as ThreadMetadataMcpService from "../../ThreadMetadataMcpService.ts";
 import * as PipelineSupervision from "../../../pipeline/PipelineSupervision.ts";
 
@@ -23,6 +24,19 @@ const requirePipelineSupervision = Effect.serviceOption(
           new OrchestratorMcpFailure({
             code: "orchestration_error",
             message: "Supervised pipeline support is unavailable in this server context.",
+          }),
+      ),
+    ),
+  ),
+);
+const requireChildSessionSummary = Effect.serviceOption(ChildSessionSummary).pipe(
+  Effect.flatMap((service) =>
+    Effect.fromOption(service).pipe(
+      Effect.mapError(
+        () =>
+          new OrchestratorMcpFailure({
+            code: "orchestration_error",
+            message: "Child session summaries are unavailable in this server context.",
           }),
       ),
     ),
@@ -213,6 +227,19 @@ const handlers = {
       const scope = yield* McpInvocationContext.McpInvocationContext;
       const service = yield* OrchestratorMcpService.OrchestratorMcpService;
       return yield* service.waitForThread(scope, input);
+    }),
+  ),
+  t3_command_children: McpToolAccess.reads((input) =>
+    Effect.gen(function* () {
+      const service = yield* requireChildSessionSummary;
+      return yield* service
+        .list({ threadId: input.threadId, cursor: input.cursor })
+        .pipe(
+          Effect.mapError(
+            (error) =>
+              new OrchestratorMcpFailure({ code: "orchestration_error", message: error.message }),
+          ),
+        );
     }),
   ),
   t3_environment_links: McpToolAccess.reads(() =>

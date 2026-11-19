@@ -1,0 +1,614 @@
+import { Clock, Context, DateTime, Effect, Layer, PubSub, Schedule, Stream } from "effect";
+import * as SqlClient from "effect/sql/SqlClient";
+import {
+  CHILD_SUMMARY_IDLE_MS,
+  CHILD_SUMMARY_PAGE_SIZE,
+  type ChildSummaryDetail,
+  type ChildSummaryListItem,
+  ChildSummaryCursorError,
+  ChildSummaryReadError,
+  type CommandChildrenPage,
+  type OrchestrationV2ThreadShell,
+  ThreadId,
+} from "@t3tools/contracts";
+
+import { forkParked } from "../serverActivation.ts";
+import {
+  childSummaryCursor,
+  deriveChildSummary,
+  emptyPushLane,
+  flushPush,
+  isDelegateTaskChild,
+  offerPush,
+  parseChildSummaryCursor,
+  toSummaryItem,
+  type PushLane,
+  type SummaryFacts,
+  type SummaryItem,
+} from "./childSummaryDerive.ts";
+import { EventSinkV2 } from "./EventSink.ts";
+import { ProjectionStoreV2 } from "./ProjectionStore.ts";
+
+const ACTIVITY_EVENTS: Readonly<Record<string, true>> = {
+  "thread.created": true,
+  "thread.metadata-updated": true,
+  "thread.pull-request-synced": true,
+  "thread.pull-request-link-updated": true,
+  "run.created": true,
+  "run.updated": true,
+  "runtime-request.updated": true,
+  "turn-item.updated": true,
+  "subagent.updated": true,
+};
+
+interface SummaryRow {
+  readonly threadId: ThreadId;
+  readonly parentThreadId: ThreadId;
+  readonly revision: number;
+  readonly phase: ChildSummaryListItem["phase"];
+  readonly reason: string;
+  readonly conclusion: ChildSummaryListItem["conclusion"];
+  readonly needsYou: number;
+  readonly activity: string;
+  readonly goalSummary: string;
+  readonly goal: string;
+  readonly avoid: string;
+  readonly filesJson: string;
+  readonly latestCommand: string | null;
+  readonly branch: string | null;
+  readonly prNumber: number | null;
+  readonly prState: string | null;
+  readonly runStatus: string;
+  readonly role: string;
+  readonly grandchildCount: number;
+  readonly grandchildNote: string | null;
+  readonly createdAtMs: number;
+  readonly activityAtMs: number;
+  readonly idleEligible: number;
+  readonly updatedAt: string;
+}
+
+function storedRowToItem(row: SummaryRow): ChildSummaryListItem {
+  return {
+    threadId: row.threadId,
+    parentThreadId: row.parentThreadId,
+    revision: row.revision,
+    phase: row.phase,
+    reason: row.reason,
+    conclusion: row.conclusion,
+    needsYou: row.needsYou === 1,
+    activity: row.activity,
+    goalSummary: row.goalSummary,
+    grandchildCount: row.grandchildCount,
+    grandchildNote: row.grandchildNote,
+    createdAtMs: row.createdAtMs,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function filesJsonOf(files: ChildSummaryDetail["files"]): string {
+  return JSON.stringify(files);
+}
+
+function storedRowToDetail(row: SummaryRow): ChildSummaryDetail {
+  let files: ChildSummaryDetail["files"] = [];
+  try {
+    const parsed: unknown = JSON.parse(row.filesJson);
+    if (Array.isArray(parsed)) files = parsed as ChildSummaryDetail["files"];
+  } catch {
+    files = [];
+  }
+  return {
+    ...storedRowToItem(row),
+    goal: row.goal,
+    avoid: row.avoid,
+    files,
+    latestCommand: row.latestCommand,
+    branch: row.branch,
+    prNumber: row.prNumber,
+    outlook: null,
+  };
+}
+
+function isoOf(epochMillis: number): string {
+  return DateTime.formatIso(DateTime.makeUnsafe(epochMillis));
+}
+
+function sameContent(
+  previous: SummaryRow,
+  list: Omit<ChildSummaryListItem, "revision" | "updatedAt">,
+  detail: Omit<ChildSummaryDetail, "revision" | "updatedAt">,
+  prState: string | null,
+): boolean {
+  return (
+    previous.phase === list.phase &&
+    previous.reason === list.reason &&
+    previous.conclusion === list.conclusion &&
+    (previous.needsYou === 1) === list.needsYou &&
+    previous.activity === list.activity &&
+    previous.goalSummary === list.goalSummary &&
+    previous.grandchildCount === list.grandchildCount &&
+    previous.grandchildNote === list.grandchildNote &&
+    previous.createdAtMs === list.createdAtMs &&
+    previous.goal === detail.goal &&
+    previous.avoid === detail.avoid &&
+    previous.filesJson === filesJsonOf(detail.files) &&
+    previous.latestCommand === detail.latestCommand &&
+    previous.branch === detail.branch &&
+    previous.prNumber === detail.prNumber &&
+    previous.prState === prState
+  );
+}
+
+const SELECT_COLUMNS = sqlColumnList();
+
+function sqlColumnList(): string {
+  return `
+    thread_id AS threadId,
+    parent_thread_id AS parentThreadId,
+    revision,
+    phase,
+    reason,
+    conclusion,
+    needs_you AS needsYou,
+    activity,
+    goal_summary AS goalSummary,
+    goal,
+    avoid,
+    files_json AS filesJson,
+    latest_command AS latestCommand,
+    branch,
+    pr_number AS prNumber,
+    pr_state AS prState,
+    run_status AS runStatus,
+    role,
+    grandchild_count AS grandchildCount,
+    grandchild_note AS grandchildNote,
+    created_at_ms AS createdAtMs,
+    activity_at_ms AS activityAtMs,
+    idle_eligible AS idleEligible,
+    updated_at AS updatedAt
+  `;
+}
+
+const RELEVANT_ITEM_TYPES = [
+  "file_change",
+  "command_execution",
+  "assistant_message",
+  "file_search",
+  "web_search",
+  "todo_list",
+  "approval_request",
+];
+
+interface StoredLane {
+  lane: PushLane;
+  token: number;
+}
+
+interface ItemRow {
+  readonly type: string;
+  readonly status: string;
+  readonly fileName: string | null;
+  readonly additions: number | null;
+  readonly deletions: number | null;
+  readonly command: string | null;
+  readonly text: string | null;
+  readonly pattern: string | null;
+  readonly title: string | null;
+  readonly requestKind: string | null;
+  readonly requestId: string | null;
+  readonly prompt: string | null;
+}
+
+export class ChildSessionSummary extends Context.Service<
+  ChildSessionSummary,
+  {
+    readonly note: (facts: SummaryFacts) => Effect.Effect<void, ChildSummaryReadError>;
+    readonly recompute: (
+      threadId: ThreadId,
+    ) => Effect.Effect<void, ChildSummaryReadError, ProjectionStoreV2>;
+    readonly list: (options: {
+      readonly threadId: ThreadId;
+      readonly cursor?: string | undefined;
+    }) => Effect.Effect<CommandChildrenPage, ChildSummaryReadError | ChildSummaryCursorError>;
+    readonly detail: (options: {
+      readonly threadId: ThreadId;
+    }) => Effect.Effect<ChildSummaryDetail | null, ChildSummaryReadError>;
+    readonly subscribe: (threadId: ThreadId) => Stream.Stream<ChildSummaryListItem>;
+    readonly markIdle: () => Effect.Effect<void, ChildSummaryReadError>;
+  }
+>()("t3/orchestration-v2/ChildSessionSummary") {
+  static readonly layer = Layer.effect(
+    ChildSessionSummary,
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const pubsub = yield* PubSub.unbounded<ChildSummaryListItem>();
+      const lanes = new Map<string, StoredLane>();
+
+      const readError = (error: unknown) =>
+        new ChildSummaryReadError({
+          cause: error instanceof Error ? error.cause : undefined,
+        });
+
+      const publish = Effect.fn("ChildSessionSummary.publish")(function* (
+        row: ChildSummaryListItem,
+      ) {
+        const nowMs = yield* Clock.currentTimeMillis;
+        const stored = lanes.get(row.threadId) ?? { lane: emptyPushLane, token: 0 };
+        const offered = offerPush(stored.lane, row, nowMs);
+        lanes.set(row.threadId, {
+          lane: offered.lane,
+          token: offered.emit === null ? stored.token : stored.token + 1,
+        });
+        if (offered.emit !== null) {
+          yield* PubSub.publish(pubsub, offered.emit);
+          return;
+        }
+        const armMs = offered.armMs;
+        if (armMs !== null) {
+          const token = stored.token;
+          yield* Effect.forkDetach(
+            Effect.gen(function* () {
+              yield* Effect.sleep(armMs);
+              const current = lanes.get(row.threadId);
+              if (current === undefined || current.token !== token) return;
+              const now = yield* Clock.currentTimeMillis;
+              const flushed = flushPush(current.lane, now);
+              lanes.set(row.threadId, {
+                lane: flushed.lane,
+                token: flushed.emit === null ? current.token : current.token + 1,
+              });
+              if (flushed.emit !== null) yield* PubSub.publish(pubsub, flushed.emit);
+            }),
+          );
+        }
+      });
+
+      const getRow = (threadId: ThreadId) =>
+        sql<SummaryRow>`SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary WHERE thread_id = ${threadId}`.pipe(
+          Effect.map((rows) => rows[0] ?? null),
+          Effect.mapError(readError),
+        );
+
+      const note = Effect.fn("ChildSessionSummary.note")(function* (facts: SummaryFacts) {
+        const nowMs = yield* Clock.currentTimeMillis;
+        const derived = deriveChildSummary(facts, nowMs);
+        const previous = yield* getRow(facts.threadId);
+        if (
+          previous !== null &&
+          sameContent(previous, derived.list, derived.detail, facts.pr?.state ?? null)
+        ) {
+          return;
+        }
+        const revision = previous === null ? 1 : previous.revision + 1;
+        const updatedAt = isoOf(nowMs);
+        const filesJson = filesJsonOf(derived.detail.files);
+        yield* sql`
+          INSERT INTO child_session_summary (
+            thread_id, parent_thread_id, revision, phase, reason, conclusion, needs_you,
+            activity, goal_summary, goal, avoid, files_json, latest_command, branch,
+            pr_number, pr_state, run_status, role, grandchild_count, grandchild_note,
+            created_at_ms, activity_at_ms, idle_eligible, updated_at
+          ) VALUES (
+            ${facts.threadId}, ${facts.parentThreadId}, ${revision}, ${derived.list.phase},
+            ${derived.list.reason}, ${derived.list.conclusion}, ${derived.list.needsYou ? 1 : 0},
+            ${derived.list.activity}, ${derived.list.goalSummary}, ${derived.detail.goal},
+            ${derived.detail.avoid}, ${filesJson},
+            ${derived.detail.latestCommand}, ${derived.detail.branch},
+            ${derived.detail.prNumber}, ${facts.pr?.state ?? null}, ${facts.status}, ${facts.role},
+            ${derived.list.grandchildCount}, ${derived.list.grandchildNote},
+            ${facts.createdAtMs}, ${facts.activityAtMs}, ${derived.idleEligible ? 1 : 0},
+            ${updatedAt}
+          )
+          ON CONFLICT(thread_id) DO UPDATE SET
+            parent_thread_id = excluded.parent_thread_id,
+            revision = excluded.revision,
+            phase = excluded.phase,
+            reason = excluded.reason,
+            conclusion = excluded.conclusion,
+            needs_you = excluded.needs_you,
+            activity = excluded.activity,
+            goal_summary = excluded.goal_summary,
+            goal = excluded.goal,
+            avoid = excluded.avoid,
+            files_json = excluded.files_json,
+            latest_command = excluded.latest_command,
+            branch = excluded.branch,
+            pr_number = excluded.pr_number,
+            pr_state = excluded.pr_state,
+            run_status = excluded.run_status,
+            role = excluded.role,
+            grandchild_count = excluded.grandchild_count,
+            grandchild_note = excluded.grandchild_note,
+            created_at_ms = excluded.created_at_ms,
+            activity_at_ms = excluded.activity_at_ms,
+            idle_eligible = excluded.idle_eligible,
+            updated_at = excluded.updated_at
+        `.pipe(Effect.mapError(readError));
+        yield* publish({
+          ...derived.list,
+          revision,
+          updatedAt,
+        });
+      });
+
+      const buildFacts = Effect.fn("ChildSessionSummary.buildFacts")(function* (
+        shell: OrchestrationV2ThreadShell,
+        parentThreadId: ThreadId,
+      ) {
+        const items = yield* sql<ItemRow>`
+          SELECT
+            type,
+            status,
+            json_extract(payload_json, '$.fileName') AS fileName,
+            json_extract(payload_json, '$.additions') AS additions,
+            json_extract(payload_json, '$.deletions') AS deletions,
+            json_extract(payload_json, '$.input') AS command,
+            json_extract(payload_json, '$.text') AS text,
+            coalesce(
+              json_extract(payload_json, '$.patterns[0]'),
+              json_extract(payload_json, '$.pattern')
+            ) AS pattern,
+            json_extract(payload_json, '$.title') AS title,
+            json_extract(payload_json, '$.requestKind') AS requestKind,
+            json_extract(payload_json, '$.requestId') AS requestId,
+            json_extract(payload_json, '$.prompt') AS prompt
+          FROM orchestration_v2_projection_turn_items
+          WHERE thread_id = ${shell.id}
+            AND type IN ${sql.in(RELEVANT_ITEM_TYPES)}
+          ORDER BY ordinal DESC
+          LIMIT 40
+        `.pipe(Effect.mapError(readError));
+        const lastUser = yield* sql<{ readonly text: string | null }>`
+          SELECT json_extract(payload_json, '$.text') AS text
+          FROM orchestration_v2_projection_turn_items
+          WHERE thread_id = ${shell.id} AND type = 'user_message'
+          ORDER BY ordinal DESC
+          LIMIT 1
+        `.pipe(Effect.mapError(readError));
+        const activity = yield* sql<{ readonly latest: string | null }>`
+          SELECT max(updated_at) AS latest
+          FROM orchestration_v2_projection_turn_items
+          WHERE thread_id = ${shell.id}
+        `.pipe(Effect.mapError(readError));
+        const grandchildren = yield* sql<{ readonly total: number }>`
+          SELECT count(*) AS total
+          FROM orchestration_v2_projection_threads
+          WHERE json_extract(payload_json, '$.lineage.parentThreadId') = ${shell.id}
+            AND json_extract(payload_json, '$.lineage.relationshipToParent') = 'subagent'
+            AND json_extract(payload_json, '$.creationSource') != 'provider'
+            AND deleted_at IS NULL
+            AND archived_at IS NULL
+        `.pipe(Effect.mapError(readError));
+
+        const pending = shell.pendingRuntimeRequest;
+        const approval =
+          pending !== null && pending.kind === "command" && pending.blocking !== false
+            ? pending
+            : null;
+        const waitingForAnswer =
+          pending !== null && pending.kind === "user_input" && pending.blocking !== false;
+        const approvalItem =
+          approval === null
+            ? null
+            : (items.find(
+                (item: ItemRow) =>
+                  item.type === "approval_request" && item.requestId === approval.id,
+              ) ?? null);
+        const approvalCommand =
+          approval === null
+            ? null
+            : (approvalItem?.prompt ??
+              approvalItem?.title ??
+              items.find((item: ItemRow) => item.type === "command_execution")?.command ??
+              "命令");
+
+        const summaryItems: SummaryItem[] = [];
+        for (const row of items) {
+          if (row.type === "approval_request") continue;
+          summaryItems.push(
+            toSummaryItem({
+              type: row.type,
+              status: row.status,
+              fileName: row.fileName ?? undefined,
+              additions: row.additions ?? undefined,
+              deletions: row.deletions ?? undefined,
+              input: row.command ?? undefined,
+              text: row.text ?? undefined,
+              pattern: row.pattern ?? undefined,
+              title: row.title ?? undefined,
+            }),
+          );
+        }
+
+        const itemUpdated = activity[0]?.latest;
+        const itemUpdatedMs =
+          itemUpdated === null || itemUpdated === undefined ? 0 : Date.parse(itemUpdated);
+        const statusChanged =
+          shell.latestRunCompletedAt ??
+          shell.activityRunStartedAt ??
+          shell.latestRunStartedAt ??
+          null;
+        const activityAtMs = Math.max(
+          DateTime.toEpochMillis(shell.createdAt),
+          statusChanged === null ? 0 : DateTime.toEpochMillis(statusChanged),
+          Number.isNaN(itemUpdatedMs) ? 0 : itemUpdatedMs,
+        );
+
+        const pr =
+          shell.pullRequests?.find((link) => link.snapshot !== null) ??
+          shell.pullRequests?.[0] ??
+          null;
+        const previous = yield* getRow(shell.id);
+        const facts: SummaryFacts = {
+          threadId: shell.id,
+          parentThreadId,
+          createdAtMs: DateTime.toEpochMillis(shell.createdAt),
+          activityAtMs,
+          status: shell.status,
+          role: "coding",
+          unreachable: false,
+          previousActivity: previous?.activity ?? null,
+          approvalCommand,
+          waitingForAnswer,
+          items: summaryItems,
+          goal: shell.goal?.objective ?? shell.title ?? lastUser[0]?.text ?? null,
+          avoid: null,
+          taskText: lastUser[0]?.text ?? null,
+          branch: shell.branch ?? null,
+          pr: pr === null ? null : { number: pr.number, state: pr.snapshot?.state ?? "unknown" },
+          grandchildCount: Number(grandchildren[0]?.total ?? 0),
+        };
+        return facts;
+      });
+
+      const recompute: (
+        threadId: ThreadId,
+      ) => Effect.Effect<void, ChildSummaryReadError, ProjectionStoreV2> = Effect.fn(
+        "ChildSessionSummary.recompute",
+      )(function* (threadId: ThreadId) {
+        const projectionStore = yield* ProjectionStoreV2;
+        const shell = yield* projectionStore
+          .getThreadShell(threadId)
+          .pipe(Effect.mapError(readError));
+        if (shell === null || shell.deletedAt !== null) {
+          yield* sql`DELETE FROM child_session_summary WHERE thread_id = ${threadId}`.pipe(
+            Effect.mapError(readError),
+          );
+          return;
+        }
+        const parentId = shell.lineage.parentThreadId;
+        if (shell.lineage.relationshipToParent !== "subagent" || parentId === null) {
+          return;
+        }
+        const parentShell = yield* projectionStore
+          .getThreadShell(parentId)
+          .pipe(Effect.orElseSucceed(() => null));
+        if (parentShell !== null && parentShell.lineage.relationshipToParent === "subagent") {
+          // A grandchild is only a count on its parent's row.
+          yield* sql`DELETE FROM child_session_summary WHERE thread_id = ${shell.id}`.pipe(
+            Effect.mapError(readError),
+          );
+          yield* recompute(parentId).pipe(Effect.orElseSucceed(() => undefined));
+          return;
+        }
+        if (!isDelegateTaskChild(shell)) return;
+        const facts = yield* buildFacts(shell, parentId);
+        yield* note(facts);
+      });
+
+      const markIdle = Effect.fn("ChildSessionSummary.markIdle")(function* () {
+        const nowMs = yield* Clock.currentTimeMillis;
+        const stale = yield* sql<SummaryRow>`
+          SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary
+          WHERE phase = '在做' AND idle_eligible = 1 AND activity_at_ms <= ${nowMs - CHILD_SUMMARY_IDLE_MS}
+        `.pipe(Effect.mapError(readError));
+        for (const row of stale) {
+          const updatedAt = isoOf(nowMs);
+          const revision = row.revision + 1;
+          yield* sql`
+            UPDATE child_session_summary
+            SET phase = '卡住', reason = '没动静', revision = ${revision}, updated_at = ${updatedAt}
+            WHERE thread_id = ${row.threadId}
+          `.pipe(Effect.mapError(readError));
+          yield* publish({
+            ...storedRowToItem(row),
+            phase: "卡住",
+            reason: "没动静",
+            revision,
+            updatedAt,
+          });
+        }
+      });
+
+      const list = Effect.fn("ChildSessionSummary.list")(function* (options: {
+        readonly threadId: ThreadId;
+        readonly cursor?: string | undefined;
+      }) {
+        const parsed =
+          options.cursor === undefined ? null : parseChildSummaryCursor(options.cursor);
+        if (options.cursor !== undefined && parsed === null) {
+          return yield* new ChildSummaryCursorError();
+        }
+        const rows = yield* (
+          parsed === null
+            ? sql<SummaryRow>`
+              SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary
+              WHERE parent_thread_id = ${options.threadId}
+              ORDER BY created_at_ms ASC, thread_id ASC
+              LIMIT ${CHILD_SUMMARY_PAGE_SIZE + 1}
+            `
+            : sql<SummaryRow>`
+              SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary
+              WHERE parent_thread_id = ${options.threadId}
+                AND (created_at_ms > ${parsed.createdAtMs}
+                  OR (created_at_ms = ${parsed.createdAtMs} AND thread_id > ${parsed.threadId}))
+              ORDER BY created_at_ms ASC, thread_id ASC
+              LIMIT ${CHILD_SUMMARY_PAGE_SIZE + 1}
+            `
+        ).pipe(Effect.mapError(readError));
+        const page = rows.slice(0, CHILD_SUMMARY_PAGE_SIZE);
+        const last = page[page.length - 1];
+        const nextCursor =
+          rows.length > CHILD_SUMMARY_PAGE_SIZE && last !== undefined
+            ? childSummaryCursor(last)
+            : null;
+        return { children: page.map(storedRowToItem), nextCursor };
+      });
+
+      const detail = Effect.fn("ChildSessionSummary.detail")(function* (options: {
+        readonly threadId: ThreadId;
+      }) {
+        const row = yield* getRow(options.threadId);
+        return row === null ? null : storedRowToDetail(row);
+      });
+
+      const subscribe = (threadId: ThreadId) =>
+        Stream.fromPubSub(pubsub).pipe(Stream.filter((row) => row.parentThreadId === threadId));
+
+      return ChildSessionSummary.of({
+        note,
+        recompute,
+        list,
+        detail,
+        subscribe,
+        markIdle,
+      });
+    }),
+  );
+
+  static readonly layerWorker = Layer.effectDiscard(
+    Effect.gen(function* () {
+      const eventSink = yield* EventSinkV2;
+      const service = yield* ChildSessionSummary;
+      const sql = yield* SqlClient.SqlClient;
+      const children = yield* sql<{ readonly threadId: string }>`
+        SELECT thread_id AS threadId
+        FROM orchestration_v2_projection_threads
+        WHERE json_extract(payload_json, '$.lineage.relationshipToParent') = 'subagent'
+          AND json_extract(payload_json, '$.creationSource') != 'provider'
+      `.pipe(Effect.orElseSucceed(() => [] as { readonly threadId: string }[]));
+      for (const child of children) {
+        yield* service.recompute(ThreadId.make(child.threadId)).pipe(Effect.ignore);
+      }
+      const highWater = yield* eventSink.latestSequence({}).pipe(Effect.orElseSucceed(() => 0));
+      yield* forkParked(
+        Stream.runForEach(eventSink.stream({ afterSequence: highWater }), (stored) =>
+          ACTIVITY_EVENTS[stored.event.type] === true
+            ? service.recompute(stored.event.threadId).pipe(Effect.ignore)
+            : Effect.void,
+        ),
+      );
+    }),
+  ).pipe(Layer.provide(ChildSessionSummary.layer));
+
+  static readonly layerIdle = Layer.effectDiscard(
+    Effect.gen(function* () {
+      const service = yield* ChildSessionSummary;
+      yield* forkParked(
+        service.markIdle().pipe(Effect.ignore, Effect.repeat(Schedule.spaced("30 seconds"))),
+      );
+    }),
+  ).pipe(Layer.provide(ChildSessionSummary.layer));
+}

@@ -233,6 +233,7 @@ import {
   OrchestrationV2RpcSchemas,
   OrchestrationV2ThreadLaunchError,
 } from "./orchestrationV2.ts";
+import { ChildSummaryCursorError, ChildSummaryReadError } from "./childSummary.ts";
 import {
   ProjectCreateNewInput,
   ProjectCreateNewResult,
@@ -2000,6 +2001,35 @@ const WsFleetSummarySubscribeRpc = Rpc.make(WS_METHODS.fleetSummarySubscribe, {
   stream: true,
 });
 
+const WsOrchestrationV2CommandChildrenRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.commandChildren, {
+  payload: OrchestrationV2RpcSchemas.commandChildren.input,
+  success: OrchestrationV2RpcSchemas.commandChildren.output,
+  error: Schema.Union([
+    ChildSummaryReadError,
+    ChildSummaryCursorError,
+    EnvironmentAuthorizationError,
+  ]),
+});
+
+const WsOrchestrationV2CommandChildDetailRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.commandChildDetail,
+  {
+    payload: OrchestrationV2RpcSchemas.commandChildDetail.input,
+    success: OrchestrationV2RpcSchemas.commandChildDetail.output,
+    error: Schema.Union([ChildSummaryReadError, EnvironmentAuthorizationError]),
+  },
+);
+
+const WsOrchestrationV2SubscribeCommandChildrenRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren,
+  {
+    payload: OrchestrationV2RpcSchemas.subscribeCommandChildren.input,
+    success: OrchestrationV2RpcSchemas.subscribeCommandChildren.output,
+    error: Schema.Union([ChildSummaryReadError, EnvironmentAuthorizationError]),
+    stream: true,
+  },
+);
+
 const WsSubscribeTerminalMetadataRpc = Rpc.make(WS_METHODS.subscribeTerminalMetadata, {
   payload: Schema.Struct({}),
   success: TerminalMetadataStreamEvent,
@@ -2350,4 +2380,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeThreadRpc,
   WsOrchestrationV2SubscribeCommandOutputRpc,
   WsOrchestrationV2SubscribePromptSuggestionRpc,
+  WsOrchestrationV2CommandChildrenRpc,
+  WsOrchestrationV2CommandChildDetailRpc,
+  WsOrchestrationV2SubscribeCommandChildrenRpc,
 ).middleware(RpcScopeAuthorization);
