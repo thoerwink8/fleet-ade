@@ -880,12 +880,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["cli terminal shell path install command line"],
     desktopOnly: true,
   },
-  {
-    id: "mobile-app",
-    title: "移动应用",
-    to: "/settings/about",
-    searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
-  },
 
   {
     id: "telemetry-export",

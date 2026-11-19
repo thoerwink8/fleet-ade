@@ -155,7 +155,6 @@ function serverShardStep(shard: string): Step {
 
 const releaseChecks = [
   ".github/scripts/check-nightly-release.test.cjs",
-  ".github/scripts/mobile-preview-comment.test.cjs",
   ".github/scripts/test-delta.test.cjs",
 ];
 
