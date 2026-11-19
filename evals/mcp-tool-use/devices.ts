@@ -774,26 +774,26 @@ export const makeDeviceTools = Effect.fn("evaluateMcpToolUse.makeDeviceTools")(f
       });
     }),
   );
-  const context = yield* Layer.build(
-    McpHttpServer.layerDeviceToolkit.pipe(
-      Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
-      Layer.provideMerge(devices),
-      Layer.provideMerge(
-        Layer.mergeAll(
-          liveThreadsLayer,
-          Layer.mock(ProjectService.ProjectService)({ getById: () => Effect.succeedNone }),
-          ServerSettingsService.layerTest({
-            enableDeviceSupport: true,
-            enableAgentDeviceAccess: world.deviceAgentAccess !== false,
-            deviceOnboardingCompleted: true,
-          }),
-        ),
+  const toolkit = McpHttpServer.layerDeviceToolkit.pipe(
+    Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
+    Layer.provideMerge(devices),
+    Layer.provideMerge(
+      Layer.mergeAll(
+        liveThreadsLayer,
+        Layer.mock(ProjectService.ProjectService)({ getById: () => Effect.succeedNone }),
+        ServerSettingsService.layerTest({
+          enableDeviceSupport: true,
+          enableAgentDeviceAccess: world.deviceAgentAccess !== false,
+          deviceOnboardingCompleted: true,
+        }),
       ),
-      Layer.provideMerge(config),
-      Layer.provideMerge(files),
-      // A simulated POSIX world joins launcher and state paths with POSIX even on a Windows host.
-      ...(environment.platform === "win32" ? [] : [Layer.provideMerge(Path.layer)]),
     ),
+    Layer.provideMerge(config),
+    Layer.provideMerge(files),
+  );
+  // A simulated POSIX world joins launcher and state paths with POSIX even on a Windows host.
+  const context = yield* Layer.build(
+    environment.platform === "win32" ? toolkit : toolkit.pipe(Layer.provideMerge(Path.layer)),
   );
   type Entry = Parameters<McpServer.McpServer["Service"]["addTool"]>[0];
   // The registry keeps each tool's handler; its public type lists only definitions.
