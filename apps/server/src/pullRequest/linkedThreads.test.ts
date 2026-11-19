@@ -171,8 +171,8 @@ it.effect(
       ).toEqual(["forgejo-other-port"]);
       expect(
         (yield* listLinkedPullRequestThreads({
-          host: "org.visualstudio.com",
-          repository: "project/_git/web",
+          host: "dev.azure.com",
+          repository: "org/project/_git/web",
           number: 7,
         })).threads.map((thread) => thread.id),
       ).toEqual(["azure"]);

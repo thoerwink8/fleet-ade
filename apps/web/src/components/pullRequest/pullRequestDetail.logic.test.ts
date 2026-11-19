@@ -57,7 +57,7 @@ import {
 import type { ReviewCommentContext } from "~/reviewCommentContext";
 
 describe("pull request checkout commands", () => {
-  it("quotes shell metacharacters in Forgejo repository URLs", () => {
+  it("offers no checkout command for a retired host", () => {
     expect(
       pullRequestCheckoutCommand(
         SourceControlProviderKind.make("forgejo"),
@@ -66,9 +66,7 @@ describe("pull request checkout commands", () => {
         null,
         "https://forgejo.local/maria/repo'$(echo nope)",
       ),
-    ).toBe(
-      "git fetch 'https://forgejo.local/maria/repo'\\''$(echo nope)' refs/pull/42/head && git checkout -B pulls/42 FETCH_HEAD",
-    );
+    ).toBeNull();
   });
 
   const reference = (host?: string): PullRequestRef => ({
@@ -1791,29 +1789,6 @@ describe("cached pull request detail", () => {
     ).toBeNull();
   });
 
-  it("keeps Forgejo ports isolated when recovering legacy snapshots", () => {
-    const storage = makeStorage();
-    const cached = detail({
-      provider: SourceControlProviderKind.make("forgejo"),
-      url: "https://forge.example:8443/acme/web/pulls/7",
-    });
-    writePullRequestDetailSnapshot(storage, "env-1", reference, cached);
-    const resolved = { ...reference, host: "forge.example:8443" };
-    expect(readPullRequestDetailSnapshot(storage, "env-1", resolved)?.title).toBe(cached.title);
-    expect(
-      readPullRequestDetailSnapshot(storage, "env-1", {
-        ...reference,
-        host: "forge.example:9443",
-      }),
-    ).toBeNull();
-    expect(
-      readPullRequestDetailSnapshot(storage, "env-1", {
-        ...reference,
-        host: "forge.example",
-      }),
-    ).toBeNull();
-  });
-
   // regression: #12168 cached PR details were missed across entry points on custom ports
   it.each(["github", "gitlab"] as const)(
     "retains portless %s snapshot identities for custom web ports",
@@ -1909,14 +1884,8 @@ describe("single-PR merge compatibility during stack discovery", () => {
 });
 
 describe("readableFailure", () => {
-  it("replaces a host tool's bare failure with the hint, for every host", () => {
-    for (const message of [
-      "GitHub CLI failed.",
-      "Azure DevOps API failed",
-      "Forgejo command failed",
-    ]) {
-      expect(readableFailure(new Error(message), "请重试。")).toBe("请重试。");
-    }
+  it("replaces a host tool's bare failure with the hint", () => {
+    expect(readableFailure(new Error("GitHub CLI failed."), "请重试。")).toBe("请重试。");
     expect(readableFailure(new Error("Branch is protected."), "请重试。")).toBe(
       "Branch is protected.",
     );

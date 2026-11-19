@@ -13,7 +13,14 @@ export type SourceControlProviderKind = typeof SourceControlProviderKind.Type;
  * Hosts this build no longer runs. Old settings and events still decode these
  * kinds; callers show `UNSUPPORTED_SOURCE_CONTROL_LABEL` and do not call the host.
  */
-const RETIRED_SOURCE_CONTROL_KINDS = ["gitlab"] as const;
+const RETIRED_SOURCE_CONTROL_KINDS = [
+  "gitlab",
+  "forgejo",
+  "gitcafe",
+  "bitbucket",
+  "azure-devops",
+  "cursor-origin",
+] as const;
 
 export const UNSUPPORTED_SOURCE_CONTROL_LABEL = "不再支持";
 

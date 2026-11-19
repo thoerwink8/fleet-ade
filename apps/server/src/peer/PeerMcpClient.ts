@@ -86,8 +86,7 @@ const fromLinkError = (error: PeerLinkError) =>
 /** Not final, so a task already running there resumes once the beta is on there again. */
 const linkedEnvironmentsOffThere = new OrchestratorMcpFailure({
   code: "orchestration_error",
-  message:
-    "The linked environment has Linked environments turned off. Turn it on in its Settings → Labs.",
+  message: "The linked environment has Linked environments turned off.",
 });
 
 const stoppedAnswering = new OrchestratorMcpFailure({

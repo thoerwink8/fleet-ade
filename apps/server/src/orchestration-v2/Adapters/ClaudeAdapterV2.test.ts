@@ -3394,7 +3394,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     readonly forkSession?: ClaudeAdapterV2.ClaudeAgentSdkQueryRunnerShape["forkSession"];
     readonly allocateSessionId?: Effect.Effect<string>;
     readonly offer?: (message: SDKUserMessage) => Effect.Effect<void>;
-    readonly promptSuggestions?: boolean;
   }) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -3569,7 +3568,6 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         providerSessionId: ProviderSessionId.make("provider-session-claude-wake"),
         modelSelection: CLAUDE_TEST_MODEL_SELECTION,
         runtimePolicy: CLAUDE_TEST_RUNTIME_POLICY,
-        promptSuggestions: Effect.succeed(options?.promptSuggestions === true),
       });
       const providerThread = yield* runtime.ensureThread({
         threadId,
@@ -8789,7 +8787,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     "asks Claude for suggestions only on threads a person drives (%s)",
     (lineage) =>
       Effect.gen(function* () {
-        const harness = yield* makeWakeHarnessWithOptions({ promptSuggestions: true });
+        const harness = yield* makeWakeHarnessWithOptions();
         const base = makeClaudeTestTurnInput({
           threadId: harness.threadId,
           providerThread: harness.providerThread,

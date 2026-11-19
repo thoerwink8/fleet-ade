@@ -207,44 +207,44 @@ const sha = "a".repeat(40);
 const commitUrl = `https://github.com/Effect-TS/effect/pull/9339/commits/${sha}`;
 const threadRef = scopeThreadRef(environmentId, ThreadId.make("thread"));
 
-it.each([
-  ["github.com", "pull/9339/commits"],
-  ["code.example.com:8443", "commit"],
-])("opens a %s/%s commit in the active thread's Diff pane after discovery", async (host, path) => {
-  setup();
-  state.routeParams = { environmentId: "local", threadId: "thread" };
-  await using _coordinator = await mount(`https://${host}/Effect-TS/effect/${path}/${sha}`);
-  expect(state.preview).not.toHaveBeenCalled();
+it.each([["github.com", "pull/9339/commits"]])(
+  "opens a %s/%s commit in the active thread's Diff pane after discovery",
+  async (host, path) => {
+    setup();
+    state.routeParams = { environmentId: "local", threadId: "thread" };
+    await using _coordinator = await mount(`https://${host}/Effect-TS/effect/${path}/${sha}`);
+    expect(state.preview).not.toHaveBeenCalled();
 
-  state.projects = [
-    {
-      ...project,
-      repositoryIdentity: {
-        ...project.repositoryIdentity,
-        canonicalKey: `${host}/effect-ts/effect`,
-        locator: {
-          ...project.repositoryIdentity?.locator,
-          remoteUrl: `https://${host}/Effect-TS/effect.git`,
+    state.projects = [
+      {
+        ...project,
+        repositoryIdentity: {
+          ...project.repositoryIdentity,
+          canonicalKey: `${host}/effect-ts/effect`,
+          locator: {
+            ...project.repositoryIdentity?.locator,
+            remoteUrl: `https://${host}/Effect-TS/effect.git`,
+          },
         },
-      },
-    } as EnvironmentProject,
-  ];
-  await act(async () => appAtomRegistry.set(discoverySettled, true));
-  await vi.waitFor(() => {
-    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, threadRef)).toBe(
-      "diff",
-    );
-  });
-  expect(
-    selectThreadDiffPanelSelection(useDiffPanelStore.getState().byThreadKey, threadRef),
-  ).toMatchObject({ kind: "commit", sha });
-  expect(state.preview).toHaveBeenCalledExactlyOnceWith({
-    environmentId,
-    input: expect.objectContaining({ cwd: "/workspace/effect", commitSha: sha }),
-  });
-  expect(state.navigate).not.toHaveBeenCalled();
-  expect(state.openLink).not.toHaveBeenCalled();
-});
+      } as EnvironmentProject,
+    ];
+    await act(async () => appAtomRegistry.set(discoverySettled, true));
+    await vi.waitFor(() => {
+      expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, threadRef)).toBe(
+        "diff",
+      );
+    });
+    expect(
+      selectThreadDiffPanelSelection(useDiffPanelStore.getState().byThreadKey, threadRef),
+    ).toMatchObject({ kind: "commit", sha });
+    expect(state.preview).toHaveBeenCalledExactlyOnceWith({
+      environmentId,
+      input: expect.objectContaining({ cwd: "/workspace/effect", commitSha: sha }),
+    });
+    expect(state.navigate).not.toHaveBeenCalled();
+    expect(state.openLink).not.toHaveBeenCalled();
+  },
+);
 
 it("opens a PR commit the workspace lacks in the thread's PR panel", async () => {
   setup();

@@ -274,7 +274,21 @@ interface SubscriptionOptions<TTag extends EnvironmentSubscriptionRpcTag> {
   ) => Effect.Effect<void, never, never>;
   readonly retryExpectedFailureAfter?: Duration.Input;
   readonly resubscribe?: Stream.Stream<unknown, never, never>;
+  /**
+   * Park without the "lost its transport" warning when the stream fails only with an
+   * RpcClientDefect — an incompatible/missing method on an older server, not a dead socket.
+   */
+  readonly quietOnRpcDefect?: boolean;
 }
+
+const isRpcDefectCause = (cause: Cause.Cause<unknown>): boolean =>
+  cause.reasons.length > 0 &&
+  cause.reasons.every(
+    (reason) =>
+      reason._tag === "Fail" &&
+      isRpcClientError(reason.error) &&
+      reason.error.reason._tag === "RpcClientDefect",
+  );
 
 function subscribeDynamicMapped<TTag extends EnvironmentSubscriptionRpcTag, A>(
   tag: TTag,
@@ -363,6 +377,12 @@ function subscribeDynamicMapped<TTag extends EnvironmentSubscriptionRpcTag, A>(
                         cause.reasons.every(
                           (reason) => reason._tag === "Fail" && isRpcClientError(reason.error),
                         );
+                      // An older server without this method fails the stream with an
+                      // RpcClientDefect. Opted-in subscriptions park quietly instead of logging a
+                      // misleading transport warning once per session.
+                      if (options?.quietOnRpcDefect === true && isRpcDefectCause(cause)) {
+                        return Stream.empty;
+                      }
                       if (isTransportFailure) {
                         return Stream.fromEffect(
                           Effect.logWarning(

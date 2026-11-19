@@ -494,26 +494,6 @@ describe("merging the environments' own listings", () => {
     },
   );
 
-  it("keeps Azure pull requests from distinct projects with the same repository name and number", () => {
-    const first = entry({
-      provider: SourceControlProviderKind.make("azure-devops"),
-      host: "dev.azure.com",
-      repository: "web",
-      number: 4,
-      projectId: "azure-first" as ProjectId,
-      url: "https://dev.azure.com/acme/first/_git/web/pullrequest/4",
-    });
-    const second = {
-      ...first,
-      projectId: "azure-second" as ProjectId,
-      url: "https://dev.azure.com/acme/second/_git/web/pullrequest/4",
-    };
-    const merged = mergePullRequestLists([[ENV_1, answer({ entries: [first, second] })]]);
-    expect(merged?.entries).toEqual(
-      [first, second].map((entry) => ({ ...entry, environmentId: ENV_1 })),
-    );
-  });
-
   // regression: #6490 one environment's error showed on every environment
   it("keeps project errors scoped to the environment that reported them", () => {
     const error = {
@@ -764,17 +744,11 @@ describe("pull request quick actions", () => {
     ...(actions === undefined ? {} : { actions }),
   });
 
-  it("offers what each host reports, and the host's own set when a server reports none", () => {
+  it("offers GitHub's own actions when a server reports none", () => {
     const actionsOf = pullRequestHostActions([
-      summary("bitbucket.org", "bitbucket", ["merge", "close"]),
       summary("github.com", "github"),
       summary("gitlab.com", "gitlab"),
     ]);
-    const bitbucket = actionsOf({
-      host: "bitbucket.org",
-      provider: SourceControlProviderKind.make("bitbucket"),
-    });
-    expect(pullRequestQuickActions({ state: "closed", isDraft: false }, bitbucket)).toEqual([]);
     const github = actionsOf({
       host: "github.com",
       provider: SourceControlProviderKind.make("github"),
@@ -814,42 +788,6 @@ describe("refresh page size", () => {
 });
 
 describe("findProjectForRepository", () => {
-  it("resolves Azure bare names using matching project and environment scope", () => {
-    const azure = (id: string, environmentId: string, path: string) => ({
-      id,
-      environmentId,
-      repositoryIdentity: {
-        canonicalKey: `dev.azure.com/${path}`,
-        locator: { source: "git-remote" as const, remoteName: "origin", remoteUrl: "" },
-        provider: SourceControlProviderKind.make("azure-devops"),
-        displayName: path,
-        owner: "contoso",
-        name: path.split("/").at(-1)!,
-      },
-    });
-    const payments = azure("p1", ENV_1, "contoso/payments/_git/api");
-    const billing = azure("p2", ENV_1, "contoso/billing/_git/api");
-    const remoteBilling = azure("p2", ENV_2, "contoso/billing/_git/api");
-    const unrelated = azure("p3", ENV_2, "contoso/billing/_git/web");
-    const projects = [payments, billing, remoteBilling, unrelated];
-
-    expect(findProjectForRepository(projects, { repository: "api" })).toBe(payments);
-    expect(
-      findProjectForRepository(projects, {
-        repository: "api",
-        scopedProjectId: "p2",
-        scopedEnvironmentId: ENV_2,
-      }),
-    ).toBe(remoteBilling);
-    expect(
-      findProjectForRepository(projects, {
-        repository: "api",
-        scopedProjectId: "p3",
-        scopedEnvironmentId: ENV_2,
-      }),
-    ).toBe(payments);
-  });
-
   it("keeps repository matches on the selected environment when project IDs overlap", () => {
     const project = (id: string, environmentId: string, repository: string) => ({
       id,

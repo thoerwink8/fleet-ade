@@ -60,6 +60,7 @@ it.layer(NodeServices.layer)("ManagedPolicy.load", (it) => {
     "boringSidebarEnabled",
     "boringSidebarMultilineRows",
     "linkedEnvironmentsEnabled",
+    "promptSuggestionsEnabled",
   ])("accepts the retired %s setting in deployed policies", (key) =>
     Effect.gen(function* () {
       const policy = yield* loadFrom(

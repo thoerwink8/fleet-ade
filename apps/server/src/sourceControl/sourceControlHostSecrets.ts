@@ -2,23 +2,47 @@ import {
   isSecretReference,
   secretReferencesInSettings,
   secretSettingsFields,
+  SettingsSecretValue,
   type SecretReference,
   type ServerSettings,
 } from "@t3tools/contracts";
 import type * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 
 import { resolveSettingsSecrets } from "../secrets/settingsSecretValue.ts";
 
 import { sourceControlDefinitions } from "./sourceControlDefinitions.ts";
 
+/**
+ * Credential fields of retired hosts, frozen at removal so settings kept on disk stay secrets:
+ * they still move into the secret store, redact for clients, and collect references.
+ */
+const RETIRED_HOST_SETTINGS_SCHEMAS = [
+  ["gitcafe", Schema.Struct({ token: SettingsSecretValue })],
+  [
+    "bitbucket",
+    Schema.Struct({
+      accessToken: SettingsSecretValue,
+      apiToken: SettingsSecretValue,
+    }),
+  ],
+] as const;
+
+const hostSettingsSchemas = new Map([
+  ...RETIRED_HOST_SETTINGS_SCHEMAS,
+  ...sourceControlDefinitions.definitions.flatMap((definition) =>
+    definition.settings ? [[definition.kind as string, definition.settings] as const] : [],
+  ),
+]);
+
 export const SOURCE_CONTROL_HOST_SECRET_FIELDS: ReadonlyMap<
   string,
   ReadonlyArray<string>
 > = new Map(
-  sourceControlDefinitions.definitions.flatMap((definition) => {
-    const fields = definition.settings ? secretSettingsFields(definition.settings) : [];
-    return fields.length > 0 ? [[definition.kind, fields] as const] : [];
+  [...hostSettingsSchemas].flatMap(([kind, schema]) => {
+    const fields = secretSettingsFields(schema);
+    return fields.length > 0 ? [[kind, fields] as const] : [];
   }),
 );
 
@@ -66,12 +90,6 @@ export function writeSecretFieldValues(
 }
 
 type SourceControlHostsSettings = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
-
-const hostSettingsSchemas = new Map(
-  sourceControlDefinitions.definitions.flatMap((definition) =>
-    definition.settings ? [[definition.kind as string, definition.settings] as const] : [],
-  ),
-);
 
 /** Every secret provider reference held in any host kind's credential fields. */
 export function collectSourceControlHostSecretReferences(

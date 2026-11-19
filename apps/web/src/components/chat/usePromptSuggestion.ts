@@ -3,7 +3,6 @@ import { useSyncExternalStore } from "react";
 
 import type { Thread } from "../../types";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { useServerConfigs } from "../../state/entities";
 import { orchestrationEnvironment } from "../../state/orchestration";
 import { useEnvironmentQuery } from "../../state/query";
 import { announcedRun } from "@t3tools/client-runtime/state/thread-activity-announcement";
@@ -57,13 +56,11 @@ export function usePromptSuggestion(
   thread: Thread | undefined,
   runs: ReadonlyArray<OrchestrationV2Run>,
 ): { readonly suggestion: string | null; readonly dismiss: () => void } {
-  // Older servers decode the missing setting as false, so true also proves the method exists.
-  const enabled = useServerConfigs().get(environmentId)?.settings.promptSuggestionsEnabled === true;
   // Tab is the only way to accept one, so skip devices with no mouse or trackpad at all.
   const hasFinePointer = useMediaQuery("(any-pointer: fine)");
   const { data } = useEnvironmentQuery(
     // A local draft has no run, and so no suggestion, until its first send.
-    enabled && hasFinePointer && thread?.latestRun
+    hasFinePointer && thread?.latestRun
       ? orchestrationEnvironment.v2.promptSuggestion({
           environmentId,
           input: { threadId: thread.id },

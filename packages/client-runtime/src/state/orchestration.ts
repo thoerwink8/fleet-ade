@@ -174,11 +174,13 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
             Stream.filter((view) => view !== EMPTY_COMMAND_OUTPUT),
           ),
       }),
-      // The open thread's predicted next prompt, while its composer is mounted.
+      // The open thread's predicted next prompt, while its composer is mounted. An older server
+      // lacks the method, so park quietly instead of logging a transport warning each session.
       promptSuggestion: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
         label: "environment-data:orchestration-v2:prompt-suggestion",
         tag: ORCHESTRATION_V2_WS_METHODS.subscribePromptSuggestion,
         idleTtlMs: 0,
+        quietOnRpcDefect: true,
       }),
     },
     turnDiff: createEnvironmentRpcQueryAtomFamily(runtime, {

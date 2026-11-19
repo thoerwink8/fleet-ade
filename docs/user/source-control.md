@@ -1,7 +1,7 @@
 # Source control
 
-T3 Code integrates with GitHub, Forgejo, Gitea, Bitbucket, Azure DevOps, GitCafe, and Cursor
-Origin to clone and publish repositories, create pull requests, and review changes.
+T3 Code integrates with GitHub to clone and publish repositories, create pull requests, and review
+changes.
 
 ## Review turn changes
 
@@ -44,97 +44,6 @@ over that choice; a host turned off stays off either way.
 For GitHub Enterprise, sign in with `gh auth login --hostname YOUR_HOST`. T3 Code treats a
 custom server name as GitHub once it has a credential for that host.
 
-### Forgejo and Gitea
-
-Install [Forgejo CLI (`fj`)](https://codeberg.org/forgejo-contrib/forgejo-cli) or
-[Gitea CLI (`tea`)](https://gitea.com/gitea/tea) 0.16 or later on your T3 Code server.
-Sign in with `fj --host https://your-server auth add-token` or `tea login add`.
-Repeat for each server you use, including Codeberg.
-
-T3 Code prefers a matching `fj` login and falls back to `tea` when `fj` is unavailable
-or has no login for that server. Once an account is selected, failed actions stay on that
-account. Settings shows the detected CLI. Forgejo and Gitea share one integration entry.
-Servers hosted under a URL subpath, such as `https://example.com/forgejo`, use `tea` because
-fj 0.6 does not preserve the subpath when checking its account.
-
-When cloning or publishing, use a full repository URL to select a specific server.
-You can use `owner/repo` when only one fj server is configured, or with your default `tea`
-login when fj is unavailable or unconfigured. With multiple fj servers, use the full URL.
-If you have multiple `tea` accounts on one server, select one with
-`tea login default <login-name>`. Git push and clone also need Git credentials or an SSH key
-for that server.
-
-### Bitbucket
-
-Open **Settings → Source control**, expand **Bitbucket**, and enter one of:
-
-- **Access token**: a token created for one repository, project, or workspace. It can only reach
-  what it was created for.
-- **Atlassian account email** and **API token**: an Atlassian API token for your account. It can
-  reach every repository you can. Give it read/write access to repositories and pull requests, plus
-  user read access (`read:user:bitbucket`).
-
-A field saves when you leave it, and applies right away. The access token wins when both are saved.
-Credentials are saved on the environment's server, so select a remote environment to configure
-it. Saved tokens can't be viewed again; enter a new one to replace it, or choose **Remove** to clear
-everything saved for Bitbucket.
-
-If no credentials are saved, T3 Code falls back to these variables in the server's environment.
-Restart the server after changing them:
-
-```bash
-export T3CODE_BITBUCKET_ACCESS_TOKEN="your-access-token"
-# or
-export T3CODE_BITBUCKET_EMAIL="you@example.com"
-export T3CODE_BITBUCKET_API_TOKEN="your-token"
-```
-
-For a background service, put these `KEY=VALUE` entries in
-[`service.env`](./background-service.md#configure-the-service-environment)
-under T3 home, then run `t3 service restart`. Service installation and updates
-preserve that file.
-
-### Azure DevOps
-
-Install [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/), add the DevOps extension, and sign in:
-
-```bash
-az extension add --name azure-devops
-az login
-```
-
-### GitCafe
-
-Install the GitCafe CLI and sign in:
-
-```bash
-bun install -g @gitcafe/cli
-cafe auth login --host https://git.cafe/api
-```
-
-Alternatively, open **Settings → Source control**, expand **GitCafe**, and enter a token. It is
-kept in the server's secret store, applies right away, and is used before `CAFE_TOKEN` and the
-`cafe` login. Or set `CAFE_TOKEN` in the server's environment and restart it. Both tokens are only
-sent to `git.cafe`; `CAFE_TOKEN` follows `CAFE_HOST` if you set it. Repositories on
-`staging.git.cafe` need their own login with `--host https://staging.git.cafe/api`.
-
-Line comments are not available for GitCafe pull requests yet.
-Merging a stack lands it through GitCafe, and updating a branch restacks the layers above it.
-
-### Cursor Origin
-
-Install the [Origin CLI](https://cursor.com/docs/origin/cli) and sign in. Signing in also sets up Git
-credentials for `origin.cursor.com`:
-
-```bash
-curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
-origin auth login
-```
-
-If cloning or pushing asks for a username, run `origin auth setup-git` to point Git at the CLI's
-credentials again. Origin repositories use HTTPS and are published privately. Repositories mirrored
-from GitHub keep their pull requests on GitHub; open those from the GitHub remote.
-
 ## Start, clone, or publish a project
 
 To start from nothing, choose **New project** in the command palette (`Cmd/Ctrl+K`), or
@@ -146,12 +55,8 @@ like `pinball-stats` for "Pinball Stats". Turn on **Create private repository on
 publish it. If Git has no name or email on that machine, the project is created without the
 first commit.
 
-Use **Add Project** in the command palette (`Cmd/Ctrl+K`) to clone a repository. Choose a hosting
-provider or paste a Git URL, then choose where to save it. Only GitHub is listed at first. To list
-another provider here and in **Publish Repository**, turn on its switch under
-**Settings → Source control**. A branch or file page copied from GitHub,
-GitCafe, Codeberg or Bitbucket also works: T3 Code clones that repository's default branch.
-On other hosts, paste the repository's clone URL. The project opens right away while the
+Use **Add Project** in the command palette (`Cmd/Ctrl+K`) to clone a repository. Paste the
+repository's clone URL, then choose where to save it. The project opens right away while the
 clone runs in the background: you can write your first prompt, and sending waits until the files
 are in place. A toast tracks progress and lets you cancel; if the clone fails, retry it from the
 toast or from the banner above the composer. When the host refuses the machine's SSH key, T3 Code
@@ -202,18 +107,8 @@ Previously loaded lists, review details, guides, and diff pages remain readable 
 without a connection, including after restarting the app. Saved content refreshes when the
 environment reconnects; submitting changes requires a connection.
 
-Enable **Remove agent credits when merging** in Settings → Source control to remove recognized
-agent co-author and generated-by lines from GitHub merge and squash commit messages. Human
-co-authors stay credited. The setting is off by default and projects can override it. It also
-applies to auto-merge, but not merge queues or native stack merges. Original commits keep their
-messages, so merge and rebase can still retain agent credits in those commits.
-
-On web and desktop, hold **Shift** in the GitHub pull request list for quick actions.
-To close several, press **Close**, drag across the rows in the same group, and release.
-Press **Escape** before releasing to cancel. Failed closes stay in the list so you can retry them.
-
-GitHub and Azure DevOps support auto-merge while checks are outstanding. GitHub also
-supports approving waiting fork workflows and opening a revert pull request for a merged change.
+GitHub supports auto-merge while checks are outstanding, approving waiting fork workflows, and
+opening a revert pull request for a merged change.
 
 Pull request sharing is off by default. In Settings → Environments → Pull request sharing (Pull
 request routing under Environments on mobile), choose **Read PRs** or **Read and act** for each
@@ -231,9 +126,6 @@ Credentials stay on their machines. Previously verified credentials remain usabl
 for ten minutes during a GitHub outage; new credentials must be verified first. An action with
 an uncertain result is never automatically retried elsewhere. Listings, diffs, and checkout or
 PR creation from Git actions continue to use the project's environment.
-
-For Azure DevOps, use the host website to change comments. Bitbucket does not support reopening a
-declined pull request.
 
 ### Review guides
 
@@ -276,18 +168,14 @@ running count. A tick belongs to the pull request rather than to a commit, so sc
 single commit keeps them. A file pushed to after you cleared it comes back marked **Changed**.
 
 On GitHub these are GitHub's own viewed marks, so a review carries between T3 Code and github.com
-in either direction. Forgejo, Bitbucket, Azure DevOps, and Cursor Origin expose no record
-T3 Code can read, so the server you are connected to keeps them instead: they follow you across the
-apps connected to that server, but the host's own site will not show them, and the count reads **viewed in T3 Code**.
+in either direction.
 
 On mobile, open a changed file and mark it viewed from its header. Viewed files collapse,
 and their marks follow the same rules as on web and desktop.
 
 ## Troubleshooting
 
-- **Not authenticated:** run the provider's login command on the server, then rescan. For Bitbucket,
-  check the credentials saved in Settings → Source control, or confirm the running server received
-  the environment variables.
+- **Not authenticated:** run `gh auth login` on the server, then rescan.
 - **GitHub sign-in cannot be verified:** update GitHub CLI to at least 2.81.0, or save a token in Settings → Source control.
 - **Push fails despite a connected account:** check the Git remote's credentials. SSH and HTTPS
   remotes can require separate setup from the hosting provider's API access.
@@ -338,8 +226,7 @@ up to a person. That includes a workflow waiting for a maintainer to approve it,
 once someone does. The watch stays on and still wakes the agent on new comments, failed checks or
 conflicts, and a watched thread never auto-settles.
 
-Cross-repository links use a project on the same host. Azure DevOps reviews require a project checked
-out from the matching organization and repository.
+Cross-repository links use a project on the same host.
 
 ## GitHub stacks
 

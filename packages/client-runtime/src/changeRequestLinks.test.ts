@@ -18,11 +18,11 @@ describe("findProjectForChangeRequest", () => {
   const project = (identity: Record<string, unknown>) =>
     ({ id: "p1", repositoryIdentity: identity }) as never;
 
-  it("matches a nested GitLab group by the whole path below the host", () => {
+  it("matches a repository nested below the host by the whole path", () => {
     const projects = [
       project({
-        canonicalKey: "gitlab.com/t3tools/platform/t3code",
-        provider: SourceControlProviderKind.make("gitlab"),
+        canonicalKey: "github.com/t3tools/platform/t3code",
+        provider: SourceControlProviderKind.make("github"),
         displayName: "t3tools/platform/t3code",
         owner: "t3tools",
         name: "t3code",
@@ -30,7 +30,7 @@ describe("findProjectForChangeRequest", () => {
     ];
     expect(
       findProjectForChangeRequest(projects, {
-        host: "gitlab.com",
+        host: "github.com",
         repository: "t3tools/platform/t3code",
         number: 42,
       }),
@@ -207,7 +207,7 @@ describe("projectChangeRequestUrl", () => {
     );
   });
 
-  it("builds the project's own Azure repository from its full path, not its short selector", () => {
+  it("builds nothing for a retired host whose URL shape is gone", () => {
     const azure: RepositoryIdentity = {
       canonicalKey: "dev.azure.com/org/project/_git/web",
       provider: SourceControlProviderKind.make("azure-devops"),
@@ -219,9 +219,7 @@ describe("projectChangeRequestUrl", () => {
         remoteUrl: "https://dev.azure.com/org/project/_git/web",
       },
     };
-    expect(projectChangeRequestUrl(azure, "web", 42)).toBe(
-      "https://dev.azure.com/org/project/_git/web/pullrequest/42",
-    );
+    expect(projectChangeRequestUrl(azure, "web", 42)).toBeNull();
   });
 
   it("builds nothing without a project host that knows its URL shape", () => {

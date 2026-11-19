@@ -82,7 +82,7 @@ describe("threadPullRequestKeysEqual", () => {
     ).toBe(false);
   });
 
-  it("recovers Azure repository keys from stored URLs", () => {
+  it("reads the stored host alone when a retired host no longer respells the key", () => {
     const own = link(7, {
       host: "dev.azure.com",
       repository: "org-a/project/_git/web",
@@ -90,7 +90,7 @@ describe("threadPullRequestKeysEqual", () => {
     });
     expect(legacyThreadPullRequestKey({ ...own, repository: "web" })).toEqual({
       host: "dev.azure.com",
-      repository: "org-a/project/_git/web",
+      repository: "web",
       number: 7,
     });
     expect(
@@ -99,7 +99,7 @@ describe("threadPullRequestKeysEqual", () => {
         repository: "DefaultCollection/project/_git/web",
         number: 7,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 

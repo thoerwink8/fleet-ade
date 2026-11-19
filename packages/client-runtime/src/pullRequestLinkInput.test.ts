@@ -15,38 +15,11 @@ const project = {
 };
 
 describe("resolveLinkPullRequestInput", () => {
-  it.each(["git.cafe", "staging.git.cafe"])("canonicalizes both GitCafe routes on %s", (host) => {
-    for (const [repository, route] of [
-      ["web", "pull"],
-      ["web", "pulls"],
-      ["pull", "pull"],
-      ["pull", "pulls"],
-      ["pulls", "pull"],
-      ["pulls", "pulls"],
-    ]) {
-      const url = `https://${host}/acme/${repository}/${route}/42`;
-      expect(
-        sourceControlClients.get("gitcafe").parseChangeRequestUrl(new URL(url)),
-      ).not.toBeNull();
-      expect(parsePullRequestReference(url)).toBe(url);
-      expect(
-        resolveLinkPullRequestInput({ reference: url, project: null, hasProject: () => true }),
-      ).toEqual({
-        link: {
-          host,
-          repository: `acme/${repository}`,
-          number: 42,
-          url: `https://${host}/acme/${repository}/pulls/42`,
-        },
-      });
-    }
-  });
-
   it.each([
     ["https://bitbucket.org/acme/web/pull-requests/42", "bitbucket.org"],
     ["https://github.acme.test/acme/web/pull/42", "github.acme.test"],
     ["https://git.acme.test/acme/web/-/merge_requests/42", "git.acme.test"],
-  ])("links supported host URL %s without a thread project", (url, host) => {
+  ])("links a parseable URL on %s without a thread project", (url, host) => {
     expect(
       resolveLinkPullRequestInput({
         reference: ` ${url} `,
@@ -56,7 +29,7 @@ describe("resolveLinkPullRequestInput", () => {
     ).toEqual({ link: { host, repository: "acme/web", number: 42, url } });
   });
 
-  it("validates the full Azure repository when resolving a browser URL", () => {
+  it("validates the full retired Azure repository when resolving a browser URL", () => {
     const hasProject = (reference: { host: string; repository: string }) =>
       reference.host === "dev.azure.com" && reference.repository === "org-a/project/_git/web";
     expect(
@@ -75,26 +48,21 @@ describe("resolveLinkPullRequestInput", () => {
     ).toMatchObject({ error: expect.stringContaining("org-b/project/_git/web") });
   });
 
-  it("resolves bare Azure numbers into canonical browser URLs", () => {
+  it("cannot resolve a bare number on a retired host with no URL of its own", () => {
     expect(
       resolveLinkPullRequestInput({
         reference: "#42",
         project: {
-          host: "ssh.dev.azure.com",
-          repository: "v3/org/project/web",
+          host: "dev.azure.com",
+          repository: "org/project/_git/web",
           terminology: sourceControlClients.get("azure-devops").changeRequest,
           webUrl: (number) =>
-            changeRequestWebUrl("azure-devops", "ssh.dev.azure.com", "v3/org/project/web", number),
+            changeRequestWebUrl("azure-devops", "dev.azure.com", "org/project/_git/web", number),
         },
         hasProject: () => true,
       }),
-    ).toMatchObject({
-      link: {
-        host: "dev.azure.com",
-        repository: "org/project/_git/web",
-        number: 42,
-        url: "https://dev.azure.com/org/project/_git/web/pullrequest/42",
-      },
+    ).toEqual({
+      error: "Paste a full URL; this project's host has no known change request URL.",
     });
   });
 
@@ -155,15 +123,15 @@ describe("resolveLinkPullRequestInput", () => {
 });
 
 describe("parsePullRequestReference", () => {
-  it("accepts legacy Azure DevOps pull request URLs", () => {
+  it("does not treat retired Azure DevOps pull request URLs as checkout references", () => {
     expect(
       parsePullRequestReference("https://acme.visualstudio.com/project/_git/t3code/pullrequest/42"),
-    ).toBe("https://acme.visualstudio.com/project/_git/t3code/pullrequest/42");
+    ).toBeNull();
     expect(
       parsePullRequestReference(
         "https://acme.visualstudio.com/DefaultCollection/project/_git/t3code/pullrequest/42",
       ),
-    ).toBe("https://acme.visualstudio.com/DefaultCollection/project/_git/t3code/pullrequest/42");
+    ).toBeNull();
   });
 
   it.each([
@@ -187,16 +155,6 @@ describe("parsePullRequestReference", () => {
 
   it("does not accept glab mr checkout commands", () => {
     expect(parsePullRequestReference("glab mr checkout 42")).toBeNull();
-  });
-
-  it("accepts az repos pr checkout commands with equals-style ids", () => {
-    expect(parsePullRequestReference("az repos pr checkout --id=42")).toBe("42");
-  });
-
-  it("accepts az repos pr checkout commands with extra flags", () => {
-    expect(parsePullRequestReference("az repos pr checkout --id 42 --remote-name origin")).toBe(
-      "42",
-    );
   });
 
   it("rejects non-pull-request input", () => {

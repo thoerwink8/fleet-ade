@@ -21,15 +21,7 @@ means the read could not say. A provider's `getFileRevisions` converts on the wa
 host looked at and has no version for arrives as the empty string, and absence is kept for what
 the provider never got to look at. Absence below the boundary does not survive it.
 
-What "never got to look at" is belongs to the host, and the contract cannot know any of them:
-
-- [Azure DevOps](../../packages/source-control-azure-devops/src/server/AzureDevOpsPullRequestProvider.ts) reads every
-  version off one iteration listing, so a change too long to follow to its end leaves the paths
-  past that point out.
-- [Bitbucket](../../packages/source-control-bitbucket/src/server/BitbucketPullRequestApi.ts) reads them off the
-  pull request's own patch, the only place it states a file's version, so a patch cut short at the
-  byte ceiling leaves the paths past the cut out.
-
+What "never got to look at" is belongs to the host, and the contract cannot know any of them.
 Those facts stay with their providers. The contract states only that absence means the read
 could not say, which is the half a provider must convert to.
 

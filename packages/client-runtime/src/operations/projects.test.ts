@@ -85,7 +85,6 @@ describe("add project shared logic", () => {
   it("clones the repository when given a page URL copied from the browser", () => {
     for (const [pageUrl, pageRoute, repository] of [
       ["https://github.com/pingdotgg/t3code/tree/main", "/tree/", "t3code"],
-      ["https://git.cafe/pingdotgg/t3code/tree/main", "/tree/", "t3code"],
       ["https://github.com/pingdotgg/t3code/tree/release.git", "/tree/", "t3code"],
     ] as const) {
       const cloneUrl = normalizePastedCloneUrl(pageUrl);
@@ -96,15 +95,14 @@ describe("add project shared logic", () => {
       "https://gitlab.com/gitlab-org/gitlab-runner/-/tree/main",
       "https://gitlab.example.test/g/p/-/blob/main/src/branch/x",
       "https://code.company.test/g/p/-/tree/main",
+      "https://git.cafe/pingdotgg/t3code/tree/main",
+      "https://alice:example@bitbucket.org/workspace/repo/src/master/",
     ]) {
       expect(normalizePastedCloneUrl(retiredPage)).toBe(retiredPage);
     }
-    expect(
-      normalizePastedCloneUrl("https://alice:example@bitbucket.org/workspace/repo/src/master/"),
-    ).toBe("https://alice:example@bitbucket.org/workspace/repo");
   });
 
-  it("uses HTTPS for repositories selected through a provider", () => {
+  it("uses a provider's own transport, SSH on a retired host", () => {
     expect(
       getDefaultCloneUrl({
         provider: SourceControlProviderKind.make("github"),
@@ -118,7 +116,7 @@ describe("add project shared logic", () => {
         url: "https://forgejo.example.test:8443/owner/repo.git",
         sshUrl: "ssh://git@forgejo.example.test:2222/owner/repo.git",
       }),
-    ).toBe("https://forgejo.example.test:8443/owner/repo.git");
+    ).toBe("ssh://git@forgejo.example.test:2222/owner/repo.git");
   });
 
   it("derives the clone folder name from any pasted clone URL", () => {

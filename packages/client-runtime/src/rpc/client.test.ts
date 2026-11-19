@@ -16,6 +16,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as SubscriptionRef from "effect/SubscriptionRef";
+import * as Logger from "effect/Logger";
 import { RpcClientError } from "effect/rpc";
 
 import {
@@ -412,6 +413,93 @@ describe("environment RPC", () => {
         yield* Fiber.interrupt(subscriptionFiber);
 
         expect(inputs).toBe(2);
+      }),
+  );
+  it.effect("parks without a warning when quietOnRpcDefect sees an RpcClientDefect", () =>
+    Effect.gen(function* () {
+      const messages: Array<unknown> = [];
+      const logger = Logger.make(({ message }) => messages.push(message));
+      const subscriptions: string[] = [];
+      const subscribed = yield* Deferred.make<void>();
+      const defect = new RpcClientError.RpcClientError({
+        reason: new RpcClientError.RpcClientDefect({
+          message: "method subscribePromptSuggestion not found",
+          cause: new Error("unknown method"),
+        }),
+      });
+      const client = {
+        [WS_METHODS.subscribeTerminalMetadata]: () => {
+          subscriptions.push("first");
+          Deferred.doneUnsafe(subscribed, Effect.void);
+          return Stream.fail(defect);
+        },
+      } as unknown as WsRpcProtocolClient;
+      const { activeSession, retryCount, supervisor } = yield* makeHarness();
+
+      yield* SubscriptionRef.set(activeSession, Option.some(session(client)));
+      const subscriptionFiber = yield* subscribe(
+        WS_METHODS.subscribeTerminalMetadata,
+        {},
+        {
+          quietOnRpcDefect: true,
+        },
+      ).pipe(
+        Stream.runDrain,
+        Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+        Effect.provide(Logger.layer([logger], { mergeWithExisting: false })),
+        Effect.forkChild,
+      );
+
+      // The defect parks the stream; it does not complete, resubscribe, or retry.
+      yield* Deferred.await(subscribed);
+      yield* TestClock.adjust("1 hour");
+      expect(subscriptionFiber.pollUnsafe()).toBeUndefined();
+      expect(subscriptions).toEqual(["first"]);
+      expect(yield* Ref.get(retryCount)).toBe(0);
+      expect(messages).toEqual([]);
+      yield* Fiber.interrupt(subscriptionFiber);
+    }),
+  );
+
+  it.effect(
+    "warns on the same RpcClientDefect through the transport branch without the opt-in",
+    () =>
+      Effect.gen(function* () {
+        const messages: Array<unknown> = [];
+        const logger = Logger.make(({ message }) => messages.push(message));
+        const subscriptions: string[] = [];
+        const defect = new RpcClientError.RpcClientError({
+          reason: new RpcClientError.RpcClientDefect({
+            message: "method subscribePromptSuggestion not found",
+            cause: new Error("unknown method"),
+          }),
+        });
+        const client = {
+          [WS_METHODS.subscribeTerminalMetadata]: () => {
+            subscriptions.push("first");
+            return Stream.fail(defect);
+          },
+        } as unknown as WsRpcProtocolClient;
+        const { activeSession, retryCount, supervisor } = yield* makeHarness();
+
+        yield* SubscriptionRef.set(activeSession, Option.some(session(client)));
+        const subscriptionFiber = yield* subscribe(WS_METHODS.subscribeTerminalMetadata, {}).pipe(
+          Stream.runDrain,
+          Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+          Effect.provide(Logger.layer([logger], { mergeWithExisting: false })),
+          Effect.forkChild,
+        );
+
+        // Without the opt-in the same defect takes the transport branch and logs a warning.
+        yield* Effect.yieldNow;
+        yield* TestClock.adjust("1 hour");
+        expect(subscriptionFiber.pollUnsafe()).toBeUndefined();
+        expect(subscriptions).toEqual(["first"]);
+        expect(yield* Ref.get(retryCount)).toBe(0);
+        expect(messages.map((entry) => (Array.isArray(entry) ? entry[0] : entry))).toEqual([
+          "Durable RPC subscription lost its transport; waiting for the next session.",
+        ]);
+        yield* Fiber.interrupt(subscriptionFiber);
       }),
   );
 });

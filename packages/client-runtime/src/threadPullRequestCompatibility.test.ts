@@ -21,7 +21,7 @@ const capabilities = { repositoryIdentity: true } satisfies ExecutionEnvironment
 
 describe("thread pull request capability negotiation", () => {
   it.each([true, false])(
-    "preserves Forgejo ports in a multi-link mutation: linked=%s",
+    "preserves retired Forgejo ports in a multi-link mutation: linked=%s",
     (linked) => {
       const mutation = planThreadPullRequestMutation({
         ...input,

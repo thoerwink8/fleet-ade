@@ -1002,6 +1002,11 @@ export function createEnvironmentRpcSubscriptionAtomFamily<
     readonly idleTtlMs?: number;
     readonly completeWhen?: (value: B) => boolean;
     readonly completedTtlMs?: number;
+    /**
+     * Park without the "lost its transport" warning when an older server lacks this method; the
+     * subscription stays quiet until the next session. Forwarded to `subscribe`.
+     */
+    readonly quietOnRpcDefect?: boolean;
     readonly transform?: (
       stream: Stream.Stream<
         EnvironmentRpcStreamValue<TTag>,
@@ -1021,7 +1026,11 @@ export function createEnvironmentRpcSubscriptionAtomFamily<
     ...(options.completedTtlMs === undefined ? {} : { completedTtlMs: options.completedTtlMs }),
     ...(options.idleTtlMs === undefined ? {} : { idleTtlMs: options.idleTtlMs }),
     subscribe: (input: EnvironmentRpcInput<TTag>) => {
-      const stream = subscribe(options.tag, input);
+      const stream = subscribe(
+        options.tag,
+        input,
+        options.quietOnRpcDefect === true ? { quietOnRpcDefect: true } : undefined,
+      );
       return options.transform === undefined
         ? (stream as Stream.Stream<
             B,

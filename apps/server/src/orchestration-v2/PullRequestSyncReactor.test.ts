@@ -852,10 +852,7 @@ describe("PullRequestSyncReactor", () => {
     }),
   );
 
-  it.effect.each([
-    { provider: "github" as const, updatedAt: "2026-08-28T00:00:00.000Z" },
-    { provider: "forgejo" as const, updatedAt: "2026-08-27T00:00:00.000Z" },
-  ])("persists unknown mergeability for $provider at $updatedAt", ({ provider, updatedAt }) =>
+  it.effect("persists unknown mergeability", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse(NOW));
       const fixture = yield* makeHarness({
@@ -867,8 +864,8 @@ describe("PullRequestSyncReactor", () => {
         summary: (input) =>
           Effect.succeed(
             makeSummary(input, {
-              provider: SourceControlProviderKind.make(provider),
-              updatedAt,
+              provider: SourceControlProviderKind.make("github"),
+              updatedAt: "2026-08-28T00:00:00.000Z",
               mergeability: "unknown",
             }),
           ),
@@ -1766,11 +1763,7 @@ describe("PullRequestSyncReactor", () => {
     }),
   );
 
-  it.effect.each([
-    "gh pr merge 7 --squash 2>&1 | tail -3",
-    "cafe pr merge 7 --squash",
-    "az repos pr update --id 7 --status completed",
-  ])("reads open links fresh only for a thread that ran `%s`", (mergeCommand) =>
+  it.effect("reads open links fresh only for a thread that ran a merge command", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse(NOW));
       const state = yield* Ref.make<PullRequestSummary["state"]>("open");
@@ -1798,7 +1791,7 @@ describe("PullRequestSyncReactor", () => {
         yield* Queue.offerAll(fixture.domainEvents, [
           commandRan(ThreadId.make("other"), "gh pr view 9"),
           runUpdated(ThreadId.make("other"), "completed"),
-          commandRan(ThreadId.make("agent"), mergeCommand),
+          commandRan(ThreadId.make("agent"), "gh pr merge 7 --squash"),
           runUpdated(ThreadId.make("agent"), "completed"),
         ]);
         yield* Queue.take(fixture.snapshotReads);
