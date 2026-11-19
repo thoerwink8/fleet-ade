@@ -159,7 +159,9 @@ it.effect("拒绝没有摘要读取权限的客户端", () =>
       ),
     );
 
-    const denied = yield* client[WS_METHODS.fleetSummarySubscribe]({}).pipe(Effect.flip);
+    const denied = yield* Stream.runDrain(client[WS_METHODS.fleetSummarySubscribe]({})).pipe(
+      Effect.flip,
+    );
     expect(denied).toMatchObject({
       _tag: "EnvironmentAuthorizationError",
       requiredPermission: AuthOrchestrationReadScope,
