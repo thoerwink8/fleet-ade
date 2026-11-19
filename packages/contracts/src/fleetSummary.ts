@@ -76,9 +76,9 @@ export const FleetSummaryTombstoneKey = Schema.Struct({
 export type FleetSummaryTombstoneKey = typeof FleetSummaryTombstoneKey.Type;
 
 const reportFields = {
-  title: Schema.String,
+  title: Schema.String.check(Schema.isMaxLength(200)),
   sessionRun: FleetSummarySessionRun,
-  reason: Schema.String,
+  reason: Schema.String.check(Schema.isMaxLength(200)),
   needsYou: Schema.Boolean,
   lastProgress: Schema.String,
 };
@@ -179,7 +179,7 @@ export type FleetSummaryChangeEvent = typeof FleetSummaryChangeEvent.Type;
 export class FleetSummaryError extends Schema.TaggedError<FleetSummaryError>()(
   "FleetSummaryError",
   {
-    reason: Schema.Literals(["storage", "unknown-repo"]),
+    reason: Schema.Literals(["storage", "unknown-repo", "lease-required"]),
     message: Schema.String,
     cause: Schema.optional(Schema.Defect()),
   },

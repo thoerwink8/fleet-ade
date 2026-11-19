@@ -1,3 +1,4 @@
+import type { FleetSummaryWriteResult } from "@t3tools/contracts";
 import * as ProviderRegistry from "../../../provider/ProviderRegistry.ts";
 import { expect, it } from "@effect/vitest";
 import {
@@ -24,6 +25,15 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Context from "effect/Context";
+import * as Schema from "effect/Schema";
+import * as DateTime from "effect/DateTime";
+import { FleetSummaryReportInput } from "@t3tools/contracts";
+import * as FleetSummary from "../../../ledger/FleetSummary.ts";
+import * as FleetSummaryReporter from "../../../ledger/FleetSummaryReporter.ts";
+import * as Orchestrator from "../../../orchestration-v2/Orchestrator.ts";
+import * as ProjectionStore from "../../../orchestration-v2/ProjectionStore.ts";
+import * as PeerMcpClient from "../../../peer/PeerMcpClient.ts";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/process";
 import * as TestClock from "effect/testing/TestClock";
@@ -46,6 +56,9 @@ import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import * as ProjectHandlers from "./handlers.ts";
 import { ProjectToolkit } from "./tools.ts";
+const decodeSummaryReport = Schema.decodeUnknownEffect(FleetSummaryReportInput);
+const decodePeerResult = <A>(schema: Schema.Decoder<A>, result: FleetSummaryWriteResult) =>
+  Schema.decodeEffect(schema)(result);
 
 const clientLaunchHarness = (input: {
   readonly runtimeModeCeiling: RuntimeMode;
@@ -60,6 +73,7 @@ const clientLaunchHarness = (input: {
   readonly hostedAppUrl?: string;
   /** The orchestrator refuses the new thread's mode, as under a managed ceiling. */
   readonly refusedByCeiling?: true;
+  readonly linked?: boolean;
 }) => {
   const projectId = ProjectId.make("project:client-target");
   const modelSelection = {
@@ -71,6 +85,7 @@ const clientLaunchHarness = (input: {
     model: input.overrideModel === undefined ? modelSelection : null,
   };
   const layerDependencies = Layer.mergeAll(
+    Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({}),
     Layer.mock(ProviderRegistry.ProviderRegistry)({
       getProviders: Effect.succeed(input.providers ?? []),
     }),
@@ -97,6 +112,7 @@ const clientLaunchHarness = (input: {
         label: "Claude Code",
         access: input.runtimeModeCeiling,
         hostedAppUrl: input.hostedAppUrl,
+        ...(input.linked ? { linked: true, environmentId: "coordinator" } : {}),
       },
       issuedAt: 0,
       capabilities: new Set(["orchestration" as const]),
@@ -904,4 +920,75 @@ it.effect("an update the project refuses tells the agent why", () =>
 
     expect(refused.at(-1)?.result).toMatchObject({ code: "invalid_request", message: detail });
   }),
+);
+
+it.effect("a linked launch publishes its shell even when launch events preceded registration", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+      const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+      const summaryContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
+      const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
+      const reporterContext = yield* FleetSummaryReporter.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.empty }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: (threadId) => {
+                const launch = launched.find((entry) => entry.threadId === threadId);
+                return Effect.succeed(
+                  launch === undefined
+                    ? null
+                    : ({
+                        id: threadId,
+                        title: launch.title,
+                        status: "idle",
+                        pendingRuntimeRequest: null,
+                        lastError: null,
+                        latestVisibleMessage: null,
+                        createdAt: DateTime.makeUnsafe(0),
+                      } as OrchestrationV2ThreadShell),
+                );
+              },
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: (request) =>
+                Effect.gen(function* () {
+                  const input = yield* decodeSummaryReport(request.arguments);
+                  const result = yield* summary.report("executor", input);
+                  return yield* decodePeerResult(request.success, result);
+                }).pipe(Effect.orDie),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const dependencies = Layer.merge(harness.dependencies, Layer.succeedContext(reporterContext));
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+      const result = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Linked shell",
+          projectId: harness.projectId,
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
+      expect(result.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+      expect(launched).toHaveLength(1);
+      const events = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
+      expect(events[0]?.type).toBe("snapshot");
+      if (events[0]?.type === "snapshot") {
+        expect(events[0].rows).toHaveLength(1);
+        expect(events[0].rows[0]).toMatchObject({
+          threadId: launched[0]?.threadId,
+          title: "Linked shell",
+          phase: "working",
+        });
+      }
+    }),
+  ),
 );

@@ -7,6 +7,7 @@ import {
   type OrchestrationV2ThreadProjection,
   type OrchestrationV2ThreadDetailSnapshot,
   type OrchestrationV2ThreadStreamItem,
+  type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
@@ -54,8 +55,11 @@ const SNAPSHOT: OrchestrationV2ThreadDetailSnapshot = { snapshotSequence: 7, pro
 const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?: {
   readonly snapshot?: OrchestrationV2ThreadDetailSnapshot;
   readonly socketSnapshot?: false;
+  readonly additionalTarget?: PrimaryConnectionTarget;
 }) {
   const subscriptions = yield* Queue.unbounded<{
+    readonly environmentId: EnvironmentId;
+    readonly threadId: ScopedThreadRef["threadId"];
     readonly afterSequence: number | undefined;
     readonly events: Queue.Queue<OrchestrationV2ThreadStreamItem>;
     readonly closed: Deferred.Deferred<void>;
@@ -70,61 +74,90 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
   let diskLoads = 0;
   let opened = 0;
   let active = 0;
-  const client = {
-    [ORCHESTRATION_V2_WS_METHODS.subscribeThread]: (input: { readonly afterSequence?: number }) =>
-      Stream.unwrap(
-        Effect.gen(function* () {
-          const events = yield* Queue.unbounded<OrchestrationV2ThreadStreamItem>();
-          const closed = yield* Deferred.make<void>();
-          yield* Effect.acquireRelease(
-            Effect.sync(() => {
-              opened += 1;
-              active += 1;
+  const subscriptionCalls: ScopedThreadRef[] = [];
+  const targets = options?.additionalTarget ? [TARGET, options.additionalTarget] : [TARGET];
+  const supervisors = new Map(
+    yield* Effect.forEach(targets, (target) =>
+      Effect.gen(function* () {
+        const client = {
+          [ORCHESTRATION_V2_WS_METHODS.subscribeThread]: (input: {
+            readonly threadId: ScopedThreadRef["threadId"];
+            readonly afterSequence?: number;
+          }) =>
+            Stream.unwrap(
+              Effect.gen(function* () {
+                const events = yield* Queue.unbounded<OrchestrationV2ThreadStreamItem>();
+                const closed = yield* Deferred.make<void>();
+                yield* Effect.acquireRelease(
+                  Effect.sync(() => {
+                    subscriptionCalls.push({
+                      environmentId: target.environmentId,
+                      threadId: input.threadId,
+                    });
+                    opened += 1;
+                    active += 1;
+                  }),
+                  () =>
+                    Effect.sync(() => {
+                      active -= 1;
+                    }).pipe(Effect.andThen(Deferred.succeed(closed, undefined))),
+                );
+                yield* Queue.offer(subscriptions, {
+                  environmentId: target.environmentId,
+                  threadId: input.threadId,
+                  afterSequence: input.afterSequence,
+                  events,
+                  closed,
+                });
+                // Like a paging server, a fresh subscribe opens with the bounded snapshot.
+                if (input.afterSequence === undefined && options?.socketSnapshot !== false) {
+                  yield* Queue.offer(events, { kind: "snapshot", ...snapshot });
+                }
+                return Stream.fromQueue(events);
+              }),
+            ),
+        } as unknown as WsRpcProtocolClient;
+        const session: RpcSession = {
+          client,
+          initialConfig: Effect.succeed({
+            threadResumeCompletionMarker: true,
+            threadSnapshotPagination: true,
+          } as never),
+          subscribeServerConfig: (input = {}) => client.subscribeServerConfig(input),
+          ready: Effect.void,
+          probe: Effect.void,
+          inboundFrames: Effect.succeed(0),
+          closed: Effect.never,
+        };
+        const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
+          target,
+          state: yield* SubscriptionRef.make(AVAILABLE_CONNECTION_STATE),
+          session: yield* SubscriptionRef.make(Option.some(session)),
+          prepared: yield* SubscriptionRef.make<Option.Option<PreparedConnection>>(
+            Option.some({
+              environmentId: target.environmentId,
+              label: target.label,
+              httpBaseUrl: target.httpBaseUrl,
+              socketUrl: target.wsBaseUrl,
+              httpAuthorization: null,
+              target,
             }),
-            () =>
-              Effect.sync(() => {
-                active -= 1;
-              }).pipe(Effect.andThen(Deferred.succeed(closed, undefined))),
-          );
-          yield* Queue.offer(subscriptions, { afterSequence: input.afterSequence, events, closed });
-          // Like a paging server, a fresh subscribe opens with the bounded snapshot.
-          if (input.afterSequence === undefined && options?.socketSnapshot !== false) {
-            yield* Queue.offer(events, { kind: "snapshot", ...snapshot });
-          }
-          return Stream.fromQueue(events);
-        }),
-      ),
-  } as unknown as WsRpcProtocolClient;
-  const session: RpcSession = {
-    client,
-    initialConfig: Effect.succeed({
-      threadResumeCompletionMarker: true,
-      threadSnapshotPagination: true,
-    } as never),
-    subscribeServerConfig: (input = {}) => client.subscribeServerConfig(input),
-    ready: Effect.void,
-    probe: Effect.void,
-    inboundFrames: Effect.succeed(0),
-    closed: Effect.never,
-  };
-  const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
-    target: TARGET,
-    state: yield* SubscriptionRef.make(AVAILABLE_CONNECTION_STATE),
-    session: yield* SubscriptionRef.make(Option.some(session)),
-    prepared: yield* SubscriptionRef.make<Option.Option<PreparedConnection>>(
-      Option.some({
-        environmentId: TARGET.environmentId,
-        label: TARGET.label,
-        httpBaseUrl: TARGET.httpBaseUrl,
-        socketUrl: TARGET.wsBaseUrl,
-        httpAuthorization: null,
-        target: TARGET,
+          ),
+          connect: Effect.void,
+          disconnect: Effect.void,
+          retryNow: Effect.void,
+        });
+        return [target.environmentId, supervisor] as const;
       }),
     ),
-    connect: Effect.void,
-    disconnect: Effect.void,
-    retryNow: Effect.void,
-  });
+  );
+  const supervisorFor = (environmentId: EnvironmentId) => {
+    const supervisor = supervisors.get(environmentId);
+    if (supervisor === undefined) {
+      throw new Error(`Unexpected environment: ${environmentId}`);
+    }
+    return supervisor;
+  };
   const environmentRegistry = EnvironmentRegistry.EnvironmentRegistry.of({
     entries: yield* SubscriptionRef.make<ReadonlyMap<EnvironmentId, ConnectionCatalogEntry>>(
       new Map(),
@@ -141,14 +174,26 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
     retryNow: () => Effect.void,
     setEnabled: () => Effect.die("Unexpected environment toggle"),
     setCompatibility: () => Effect.die("Unexpected compatibility update"),
-    state: () => SubscriptionRef.get(supervisor.state),
-    stateChanges: () => SubscriptionRef.changes(supervisor.state),
-    run: (_environmentId, effect) =>
-      Effect.provideService(effect, EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-    runStream: (_environmentId, stream) =>
-      Stream.provideService(stream, EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-    followStream: (_environmentId, stream) =>
-      Stream.provideService(stream, EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+    state: (environmentId) => SubscriptionRef.get(supervisorFor(environmentId).state),
+    stateChanges: (environmentId) => SubscriptionRef.changes(supervisorFor(environmentId).state),
+    run: (environmentId, effect) =>
+      Effect.provideService(
+        effect,
+        EnvironmentSupervisor.EnvironmentSupervisor,
+        supervisorFor(environmentId),
+      ),
+    runStream: (environmentId, stream) =>
+      Stream.provideService(
+        stream,
+        EnvironmentSupervisor.EnvironmentSupervisor,
+        supervisorFor(environmentId),
+      ),
+    followStream: (environmentId, stream) =>
+      Stream.provideService(
+        stream,
+        EnvironmentSupervisor.EnvironmentSupervisor,
+        supervisorFor(environmentId),
+      ),
   });
   const historyController = yield* Effect.service(
     ThreadHistoryController.ThreadHistoryController,
@@ -231,6 +276,7 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
     details,
     ref,
     subscriptions,
+    subscriptionCalls,
     olderLoads,
     loadEarlier: () => historyController.loadEarlier(TARGET.environmentId, THREAD_ID),
     counts: () => ({ httpLoads, diskLoads, opened, active }),
@@ -261,6 +307,38 @@ describe("createEnvironmentThreadStateAtoms", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
+
+  it.effect("subscribes detail only in its executing environment and unsubscribes on close", () =>
+    Effect.gen(function* () {
+      const executingTarget = new PrimaryConnectionTarget({
+        environmentId: EnvironmentId.make("env-b"),
+        label: "Executing environment",
+        httpBaseUrl: "https://env-b.example.test",
+        wsBaseUrl: "wss://env-b.example.test",
+      });
+      const h = yield* makeHarness({ additionalTarget: executingTarget });
+      const ref: ScopedThreadRef = {
+        environmentId: executingTarget.environmentId,
+        threadId: THREAD_ID,
+      };
+      const stateAtom = h.details.stateAtom(ref);
+      const unmount = h.registry.mount(stateAtom);
+      const subscription = yield* Queue.take(h.subscriptions);
+      expect(subscription.environmentId).toBe(executingTarget.environmentId);
+      expect(subscription.threadId).toBe(THREAD_ID);
+      yield* Queue.offer(subscription.events, { kind: "synchronized" });
+      yield* observeState(h.registry, stateAtom, (state) => state.status === "live");
+      expect(h.subscriptionCalls).toEqual([ref]);
+      expect(h.subscriptionCalls.some((call) => call.environmentId === TARGET.environmentId)).toBe(
+        false,
+      );
+
+      unmount();
+      yield* Deferred.await(subscription.closed);
+      expect(h.counts()).toEqual({ httpLoads: 0, diskLoads: 1, opened: 1, active: 0 });
+      expect(h.subscriptionCalls).toEqual([ref]);
+    }),
+  );
 
   it.effect("keeps warm data and resumes a completed cursor without loading another snapshot", () =>
     Effect.gen(function* () {

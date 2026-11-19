@@ -1031,7 +1031,7 @@ export const layerFleetClaimsToolkit = toolkitRegistration(
   FleetClaimsToolkit,
   FleetClaimsHandlers.layer,
 );
-const layerFleetSummaryToolkit = toolkitRegistration(
+export const layerFleetSummaryToolkit = toolkitRegistration(
   FleetSummaryToolkit,
   FleetSummaryHandlers.layer,
 );

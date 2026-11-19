@@ -7,6 +7,7 @@ import {
   FleetSummaryError,
   FleetSummaryEvent,
   FleetSummaryReportInput,
+  FleetSummaryResyncEvent,
   FleetSummaryRow,
   FleetSummarySubscribeInput,
   FleetSummaryTombstoneKey,
@@ -20,6 +21,7 @@ import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Semaphore from "effect/Semaphore";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Scope from "effect/Scope";
@@ -88,6 +90,8 @@ export class FleetSummary extends Context.Service<
       stale: boolean,
       reason?: string,
     ) => Effect.Effect<FleetSummaryWriteResult, FleetSummaryError>;
+    /** Task rows without their exact live lease become stale; recovery clears it. */
+    readonly sweepStale: Effect.Effect<void, FleetSummaryError>;
   }
 >()("t3/ledger/FleetSummary") {}
 
@@ -158,49 +162,6 @@ const make = Effect.fn("FleetSummary.make")(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* NodeReads.migrate;
   yield* sql`PRAGMA journal_mode = WAL`;
-  yield* sql`
-    CREATE TABLE IF NOT EXISTS fleet_summary_meta (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      revision INTEGER NOT NULL
-    )
-  `;
-  yield* sql`INSERT OR IGNORE INTO fleet_summary_meta (id, revision) VALUES (1, 0)`;
-  yield* sql`
-    CREATE TABLE IF NOT EXISTS fleet_summary_rows (
-      row_id TEXT PRIMARY KEY,
-      environment_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      repo TEXT,
-      issue INTEGER,
-      task_id TEXT,
-      thread_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      phase TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      needs_you INTEGER NOT NULL,
-      last_progress TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      stale INTEGER NOT NULL DEFAULT 0,
-      stale_reason TEXT,
-      revision INTEGER NOT NULL
-    )
-  `;
-  yield* sql`
-    CREATE TABLE IF NOT EXISTS fleet_summary_changes (
-      revision INTEGER PRIMARY KEY,
-      event_type TEXT NOT NULL,
-      row_id TEXT,
-      payload TEXT NOT NULL
-    )
-  `;
-  yield* sql`
-    CREATE INDEX IF NOT EXISTS idx_fleet_summary_rows_order
-    ON fleet_summary_rows (row_id)
-  `;
-  yield* sql`
-    CREATE INDEX IF NOT EXISTS idx_fleet_summary_rows_environment
-    ON fleet_summary_rows (environment_id)
-  `;
 
   const storageError = (cause: unknown) =>
     new FleetSummaryError({
@@ -255,6 +216,7 @@ const make = Effect.fn("FleetSummary.make")(function* () {
   });
 
   const hub = yield* PubSub.unbounded<FleetSummaryChangeEvent>();
+  const publishLock = yield* Semaphore.make(1);
   const publish = (events: ReadonlyArray<FleetSummaryChangeEvent>) =>
     Effect.forEach(events, (event) => PubSub.publish(hub, event), { discard: true });
 
@@ -295,90 +257,109 @@ const make = Effect.fn("FleetSummary.make")(function* () {
     Effect.mapError(storageError),
   );
 
-  const replay = (after: number) =>
+  const replay = (after: number, through: number) =>
     sql<ChangeRecord>`
       SELECT revision, event_type, row_id, payload FROM fleet_summary_changes
-      WHERE revision > ${after} ORDER BY revision
+      WHERE revision > ${after} AND revision <= ${through} ORDER BY revision
     `.pipe(
       Effect.map((rows) => rows.map((row) => decodeChange(row.payload))),
       Effect.mapError(storageError),
     );
 
-  /** Slow consumers keep at most the latest 200 changes, replacing the same row. */
-  const boundedLive = (subscription: Stream.Stream<FleetSummaryChangeEvent>) =>
-    Stream.unwrap(
-      Effect.gen(function* () {
-        const signals = yield* Queue.unbounded<void>();
-        const state = yield* Ref.make({
-          events: [] as Array<FleetSummaryChangeEvent>,
-          notified: false,
-        });
-        yield* Effect.forkScoped(
-          Stream.runForEach(subscription, (event) =>
-            Ref.modify(state, (current) => {
-              const id = event.type === "upsert" ? rowIdOfRow(event.row) : rowIdOfKey(event.key);
-              const index = current.events.findIndex((queued) => sameRow(queued, id));
-              const events =
-                index >= 0
-                  ? current.events.map((queued, at) => (at === index ? event : queued))
-                  : current.events.length >= FLEET_SUMMARY_SUBSCRIBER_QUEUE_LIMIT
-                    ? [...current.events.slice(1), event]
-                    : [...current.events, event];
-              const notify = !current.notified;
-              return [notify, { events, notified: current.notified || notify }] as const;
-            }).pipe(
-              Effect.flatMap((notify) => (notify ? Queue.offer(signals, undefined) : Effect.void)),
-            ),
-          ),
-          { startImmediately: true },
-        );
-        return Stream.fromQueue(signals).pipe(
-          Stream.mapEffect(() =>
-            Ref.modify(state, (current) => {
-              const [event, ...events] = current.events;
-              return [
-                { event, more: events.length > 0 },
-                { events, notified: events.length > 0 },
-              ] as const;
-            }).pipe(
-              Effect.flatMap(({ event, more }) =>
-                event === undefined
-                  ? Effect.die("summary queue signal without event")
-                  : (more ? Queue.offer(signals, undefined) : Effect.void).pipe(Effect.as(event)),
-              ),
-            ),
-          ),
-        );
-      }),
+  /** Slow consumers keep at most the latest 200 changes, then require a full resync. */
+  const boundedLive = Effect.fn("FleetSummary.boundedLive")(function* (
+    subscription: Stream.Stream<FleetSummaryChangeEvent>,
+  ) {
+    const signals = yield* Queue.unbounded<void>();
+    type LiveEvent = FleetSummaryChangeEvent | FleetSummaryResyncEvent;
+    const state = yield* Ref.make<{
+      events: Array<LiveEvent>;
+      notified: boolean;
+      closed: boolean;
+    }>({ events: [], notified: false, closed: false });
+    yield* Effect.forkScoped(
+      Stream.runForEach(subscription, (event) =>
+        Ref.modify(state, (current) => {
+          if (current.closed) return [false, current] as const;
+          const id = event.type === "upsert" ? rowIdOfRow(event.row) : rowIdOfKey(event.key);
+          const index = current.events.findIndex(
+            (queued) => queued.type !== "resync" && sameRow(queued, id),
+          );
+          if (index >= 0) {
+            const events: Array<LiveEvent> = [
+              ...current.events.filter((_, at) => at !== index),
+              event,
+            ];
+            const notify = !current.notified;
+            return [notify, { ...current, events, notified: current.notified || notify }] as const;
+          }
+          if (current.events.length >= FLEET_SUMMARY_SUBSCRIBER_QUEUE_LIMIT) {
+            const resync: FleetSummaryResyncEvent = { type: "resync", reason: "gap" };
+            const next: { events: Array<LiveEvent>; notified: boolean; closed: boolean } = {
+              events: [resync],
+              notified: true,
+              closed: true,
+            };
+            return [!current.notified, next] as const;
+          }
+          const events: Array<LiveEvent> = [...current.events, event];
+          const notify = !current.notified;
+          return [notify, { ...current, events, notified: current.notified || notify }] as const;
+        }).pipe(
+          Effect.flatMap((notify) => (notify ? Queue.offer(signals, undefined) : Effect.void)),
+        ),
+      ),
+      { startImmediately: true },
     );
+    return Stream.fromQueue(signals).pipe(
+      Stream.mapEffect(() =>
+        Ref.modify(state, (current) => {
+          const [event, ...events] = current.events;
+          return [
+            { event, more: events.length > 0 },
+            { ...current, events, notified: events.length > 0 },
+          ] as const;
+        }).pipe(
+          Effect.flatMap(({ event, more }) =>
+            event === undefined
+              ? Effect.die("summary queue signal without event")
+              : (more ? Queue.offer(signals, undefined) : Effect.void).pipe(Effect.as(event)),
+          ),
+        ),
+      ),
+      Stream.takeUntil((event) => event.type === "resync"),
+    );
+  });
 
   const subscribe = Effect.fn("FleetSummary.subscribe")(function* (
     input: FleetSummarySubscribeInput,
   ) {
+    const subscription = yield* PubSub.subscribe(hub);
+    const live = yield* boundedLive(Stream.fromSubscription(subscription));
     const current = (yield* readMeta).revision;
+    const after = (revision: number) =>
+      live.pipe(Stream.filter((event) => event.type === "resync" || event.revision > revision));
     const cursor = input.cursor;
     if (cursor !== undefined && cursor > current) {
       return Stream.make({ type: "resync", reason: "gap" });
     }
-    const subscription = yield* PubSub.subscribe(hub);
-    const live = Stream.fromSubscription(subscription);
-    if (cursor !== undefined && cursor === current) return boundedLive(live);
+    if (cursor !== undefined && cursor === current) return after(current);
 
     if (cursor !== undefined && cursor < current) {
       const oldest = yield* retainedOldest;
       if (oldest === undefined || cursor + 1 < oldest) {
         return Stream.make({ type: "resync", reason: "expired" });
       }
-      const changes = yield* replay(cursor);
+      const changes = yield* replay(cursor, current);
       const missing = changes.some((change, index) => change.revision !== cursor + index + 1);
-      if (missing || (changes.length > 0 && changes[0]!.revision !== cursor + 1)) {
+      if (missing || changes.at(-1)?.revision !== current) {
         return Stream.make({ type: "resync", reason: "gap" });
       }
-      return Stream.concat(Stream.fromIterable(changes), boundedLive(live));
+      return Stream.concat(Stream.fromIterable(changes), after(current));
     }
 
-    const { pages } = yield* snapshotPages;
-    return Stream.concat(Stream.fromIterable(pages), boundedLive(live));
+    const snapshot = yield* snapshotPages;
+    return Stream.concat(Stream.fromIterable(snapshot.pages), after(snapshot.revision));
   });
 
   const nextRevision = sql<{ readonly revision: number }>`
@@ -423,75 +404,90 @@ const make = Effect.fn("FleetSummary.make")(function* () {
       input.type === "upsert-task" || input.type === "delete-task"
         ? { ...input, repo: yield* canonicalRepo(input.repo) }
         : input;
+    if (canonical.type === "upsert-task") {
+      const lease = yield* sql`
+        SELECT 1 AS held FROM node_claims
+        WHERE repo = ${canonical.repo} AND issue = ${canonical.issue} AND task_id = ${canonical.taskId}
+          AND holder_environment = ${callerEnvironmentId} AND state = 'running' AND lease_until > ${now}
+        LIMIT 1
+      `.pipe(Effect.mapError(storageError));
+      if (lease[0] === undefined) {
+        return yield* new FleetSummaryError({
+          reason: "lease-required",
+          message: "The caller does not hold this task lease.",
+        });
+      }
+    }
     const rowId = rowIdOf(callerEnvironmentId, canonical);
-    const result = yield* sql
-      .withTransaction(
-        Effect.gen(function* () {
-          const existing = yield* rowById(rowId);
-          if (canonical.type === "delete-task" || canonical.type === "delete-adhoc") {
-            if (existing === undefined) {
-              const current = yield* meta;
-              return { revision: current.revision, changed: false, events: [] };
-            }
-            const revision = yield* nextRevision;
-            yield* sql`DELETE FROM fleet_summary_rows WHERE row_id = ${rowId}`;
-            const event: FleetSummaryChangeEvent = {
-              type: "tombstone",
-              revision,
-              key: keyOfRow(existing),
-            };
-            yield* recordChange(revision, event);
-            return { revision, changed: true, events: [event] };
-          }
+    return yield* publishLock.withPermits(1)(
+      Effect.gen(function* () {
+        const result = yield* sql
+          .withTransaction(
+            Effect.gen(function* () {
+              const existing = yield* rowById(rowId);
+              if (canonical.type === "delete-task" || canonical.type === "delete-adhoc") {
+                if (existing === undefined) {
+                  const current = yield* meta;
+                  return { revision: current.revision, changed: false, events: [] };
+                }
+                const revision = yield* nextRevision;
+                yield* sql`DELETE FROM fleet_summary_rows WHERE row_id = ${rowId}`;
+                const event: FleetSummaryChangeEvent = {
+                  type: "tombstone",
+                  revision,
+                  key: keyOfRow(existing),
+                };
+                yield* recordChange(revision, event);
+                return { revision, changed: true, events: [event] };
+              }
 
-          const nextRow: FleetSummaryRow = {
-            environmentId: callerEnvironmentId,
-            ...(canonical.type === "upsert-task"
-              ? { repo: canonical.repo, issue: canonical.issue, taskId: canonical.taskId }
-              : {}),
-            threadId: canonical.threadId,
-            title: canonical.title,
-            phase: phaseFromSessionRun(canonical.sessionRun),
-            reason: canonical.reason,
-            needsYou: canonical.needsYou,
-            lastProgress: progress(canonical.lastProgress),
-            updatedAt: now,
-            stale: existing?.stale ?? false,
-            ...(existing?.staleReason === undefined ? {} : { staleReason: existing.staleReason }),
-            revision: 0,
-          };
-          if (existing !== undefined && sameReported(existing, nextRow)) {
-            const current = yield* meta;
-            return { revision: current.revision, changed: false, events: [] };
-          }
-          const revision = yield* nextRevision;
-          const row = { ...nextRow, revision };
-          yield* sql`
-            INSERT INTO fleet_summary_rows (
+              const nextRow: FleetSummaryRow = {
+                environmentId: callerEnvironmentId,
+                ...(canonical.type === "upsert-task"
+                  ? { repo: canonical.repo, issue: canonical.issue, taskId: canonical.taskId }
+                  : {}),
+                threadId: canonical.threadId,
+                title: canonical.title,
+                phase: phaseFromSessionRun(canonical.sessionRun),
+                reason: canonical.reason,
+                needsYou: canonical.needsYou,
+                lastProgress: progress(canonical.lastProgress),
+                updatedAt: now,
+                stale: canonical.type === "upsert-task" ? false : (existing?.stale ?? false),
+                ...(canonical.type === "upsert-task" || existing?.staleReason === undefined
+                  ? {}
+                  : { staleReason: existing.staleReason }),
+                revision: 0,
+              };
+              if (existing !== undefined && sameReported(existing, nextRow)) {
+                const current = yield* meta;
+                return { revision: current.revision, changed: false, events: [] };
+              }
+              const revision = yield* nextRevision;
+              const row = { ...nextRow, revision };
+              yield* sql`INSERT INTO fleet_summary_rows (
               row_id, environment_id, kind, repo, issue, task_id, thread_id, title, phase,
-              reason, needs_you, last_progress, updated_at, stale, stale_reason, revision
-            ) VALUES (
-              ${rowId}, ${row.environmentId}, ${row.repo !== undefined ? "task" : "adhoc"}, ${row.repo ?? null},
-              ${row.issue ?? null}, ${row.taskId ?? null}, ${row.threadId}, ${row.title},
-              ${row.phase}, ${row.reason}, ${row.needsYou ? 1 : 0}, ${row.lastProgress},
-              ${row.updatedAt}, ${row.stale ? 1 : 0}, ${row.staleReason ?? null}, ${revision}
-            )
-            ON CONFLICT(row_id) DO UPDATE SET
-              environment_id = excluded.environment_id, kind = excluded.kind, repo = excluded.repo,
-              issue = excluded.issue, task_id = excluded.task_id, thread_id = excluded.thread_id,
-              title = excluded.title, phase = excluded.phase, reason = excluded.reason,
-              needs_you = excluded.needs_you, last_progress = excluded.last_progress,
-              updated_at = excluded.updated_at, stale = excluded.stale,
-              stale_reason = excluded.stale_reason, revision = excluded.revision
-          `;
-          const event: FleetSummaryChangeEvent = { type: "upsert", revision, row };
-          yield* recordChange(revision, event);
-          return { revision, changed: true, events: [event] };
-        }),
-      )
-      .pipe(Effect.mapError(storageError));
-    yield* publish(result.events);
-    return { revision: result.revision, changed: result.changed };
+              reason, needs_you, last_progress, updated_at, stale, stale_reason, revision)
+              VALUES (${rowId}, ${row.environmentId}, ${row.repo !== undefined ? "task" : "adhoc"},
+                ${row.repo ?? null}, ${row.issue ?? null}, ${row.taskId ?? null}, ${row.threadId},
+                ${row.title}, ${row.phase}, ${row.reason}, ${row.needsYou ? 1 : 0}, ${row.lastProgress},
+                ${row.updatedAt}, ${row.stale ? 1 : 0}, ${row.staleReason ?? null}, ${revision})
+              ON CONFLICT(row_id) DO UPDATE SET environment_id = excluded.environment_id,
+                kind = excluded.kind, repo = excluded.repo, issue = excluded.issue,
+                task_id = excluded.task_id, thread_id = excluded.thread_id, title = excluded.title,
+                phase = excluded.phase, reason = excluded.reason, needs_you = excluded.needs_you,
+                last_progress = excluded.last_progress, updated_at = excluded.updated_at,
+                stale = excluded.stale, stale_reason = excluded.stale_reason, revision = excluded.revision`;
+              const event: FleetSummaryChangeEvent = { type: "upsert", revision, row };
+              yield* recordChange(revision, event);
+              return { revision, changed: true, events: [event] };
+            }),
+          )
+          .pipe(Effect.mapError(storageError));
+        yield* publish(result.events);
+        return { revision: result.revision, changed: result.changed };
+      }),
+    );
   });
 
   const markEnvironmentStale = Effect.fn("FleetSummary.markEnvironmentStale")(function* (
@@ -499,49 +495,91 @@ const make = Effect.fn("FleetSummary.make")(function* () {
     stale: boolean,
     reason?: string,
   ) {
-    const result = yield* sql
-      .withTransaction(
-        Effect.gen(function* () {
-          const rows = yield* sql<RowRecord>`
-            SELECT row_id, environment_id, kind, repo, issue, task_id, thread_id, title, phase,
-              reason, needs_you, last_progress, updated_at, stale, stale_reason, revision
-            FROM fleet_summary_rows WHERE environment_id = ${environmentId} ORDER BY row_id
-          `;
-          const current = rows.map(toRow);
-          const wanted = current.filter(
-            (row) =>
-              row.stale !== stale || (stale && row.staleReason !== (reason ?? "unreachable")),
-          );
-          if (wanted.length === 0) {
-            const latest = yield* meta;
-            return { revision: latest.revision, changed: false, events: [] };
-          }
-          const events: Array<FleetSummaryChangeEvent> = [];
-          for (const row of wanted) {
-            const revision = yield* nextRevision;
-            const next = {
-              ...row,
-              stale,
-              staleReason: stale ? (reason ?? "unreachable") : undefined,
-              revision,
-            };
-            yield* sql`
-              UPDATE fleet_summary_rows SET stale = ${next.stale ? 1 : 0},
+    return yield* publishLock.withPermits(1)(
+      Effect.gen(function* () {
+        const result = yield* sql
+          .withTransaction(
+            Effect.gen(function* () {
+              const rows =
+                yield* sql<RowRecord>`SELECT row_id, environment_id, kind, repo, issue, task_id,
+              thread_id, title, phase, reason, needs_you, last_progress, updated_at, stale, stale_reason, revision
+              FROM fleet_summary_rows WHERE environment_id = ${environmentId} ORDER BY row_id`;
+              const current = rows.map(toRow);
+              const wanted = current.filter(
+                (row) =>
+                  row.stale !== stale || (stale && row.staleReason !== (reason ?? "unreachable")),
+              );
+              if (wanted.length === 0) {
+                const latest = yield* meta;
+                return { revision: latest.revision, changed: false, events: [] };
+              }
+              const events: Array<FleetSummaryChangeEvent> = [];
+              for (const row of wanted) {
+                const revision = yield* nextRevision;
+                const next = {
+                  ...row,
+                  stale,
+                  staleReason: stale ? (reason ?? "unreachable") : undefined,
+                  revision,
+                };
+                yield* sql`UPDATE fleet_summary_rows SET stale = ${next.stale ? 1 : 0},
                 stale_reason = ${next.staleReason ?? null}, revision = ${revision}
-              WHERE row_id = ${rowIdOfRow(row)}
-            `;
-            yield* recordChange(revision, { type: "upsert", revision, row: next });
-            events.push({ type: "upsert", revision, row: next });
-          }
-          return { revision: events.at(-1)!.revision, changed: true, events };
-        }),
-      )
-      .pipe(Effect.mapError(storageError));
-    yield* publish(result.events);
-    return { revision: result.revision, changed: result.changed };
+                WHERE row_id = ${rowIdOfRow(row)}`;
+                yield* recordChange(revision, { type: "upsert", revision, row: next });
+                events.push({ type: "upsert", revision, row: next });
+              }
+              return { revision: events.at(-1)!.revision, changed: true, events };
+            }),
+          )
+          .pipe(Effect.mapError(storageError));
+        yield* publish(result.events);
+        return { revision: result.revision, changed: result.changed };
+      }),
+    );
   });
 
-  return FleetSummary.of({ report, subscribe, markEnvironmentStale });
+  /** Lease freshness is task-specific and never changes session phase or adhoc rows. */
+  const sweepStale = publishLock.withPermits(1)(
+    Effect.gen(function* () {
+      const now = DateTime.formatIso(yield* DateTime.now);
+      const events = yield* sql
+        .withTransaction(
+          Effect.gen(function* () {
+            const rows = yield* sql<RowRecord & { readonly has_lease: number }>`
+            SELECT summary.*, EXISTS (
+              SELECT 1 FROM node_claims AS claim
+              WHERE claim.repo = summary.repo AND claim.issue = summary.issue
+                AND claim.task_id = summary.task_id
+                AND claim.holder_environment = summary.environment_id
+                AND claim.state = 'running' AND claim.lease_until > ${now}
+            ) AS has_lease
+            FROM fleet_summary_rows AS summary WHERE summary.kind = 'task'
+            ORDER BY summary.row_id
+          `;
+            const changes: Array<FleetSummaryChangeEvent> = [];
+            for (const record of rows) {
+              const row = toRow(record);
+              const stale = record.has_lease === 0;
+              const staleReason = stale ? "lease lost" : undefined;
+              if (row.stale === stale && row.staleReason === staleReason) continue;
+              const revision = yield* nextRevision;
+              const next = { ...row, stale, staleReason, revision };
+              yield* sql`UPDATE fleet_summary_rows SET stale = ${stale ? 1 : 0},
+              stale_reason = ${staleReason ?? null}, revision = ${revision}
+              WHERE row_id = ${rowIdOfRow(row)}`;
+              const event: FleetSummaryChangeEvent = { type: "upsert", revision, row: next };
+              yield* recordChange(revision, event);
+              changes.push(event);
+            }
+            return changes;
+          }),
+        )
+        .pipe(Effect.mapError(storageError));
+      yield* publish(events);
+    }),
+  );
+
+  return FleetSummary.of({ report, subscribe, markEnvironmentStale, sweepStale });
 });
 
 const rowIdOfRow = (row: FleetSummaryRow) =>

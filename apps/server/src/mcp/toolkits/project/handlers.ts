@@ -1,5 +1,6 @@
 import {
   CommandId,
+  EnvironmentId,
   MessageId,
   ThreadId,
   OrchestratorMcpFailure,
@@ -29,6 +30,7 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { resolveRuntimeMode } from "../../delegatedTaskModes.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
+import * as FleetSummaryReporter from "../../../ledger/FleetSummaryReporter.ts";
 import * as OrchestrationMcp from "../../OrchestratorMcpService.ts";
 import { newCommandId, readCaller, resolveProjectId, unavailable } from "../../threadAccess.ts";
 import { ProjectToolkit } from "./tools.ts";
@@ -304,6 +306,14 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         );
         const thread = result.projection.thread;
         const run = result.projection.runs.find((run) => run.userMessageId === messageId);
+        if (
+          linkOrigin !== undefined &&
+          scope.client?.linked === true &&
+          scope.client.environmentId !== undefined
+        ) {
+          const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
+          yield* reporter.trackAdhoc(thread.id, EnvironmentId.make(scope.client.environmentId));
+        }
         return {
           threadId: thread.id,
           link: McpInvocationContext.threadLinkFor(scope, thread.id, thread.title),

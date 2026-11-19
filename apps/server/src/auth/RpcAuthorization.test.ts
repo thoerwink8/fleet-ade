@@ -148,7 +148,14 @@ describe("RPC scope middleware", () => {
 it.effect("拒绝没有摘要读取权限的客户端", () =>
   Effect.gen(function* () {
     const group = WsRpcGroup.omit(
-      ...[...WsRpcGroup.requests.keys()].filter((tag) => tag !== WS_METHODS.fleetSummarySubscribe),
+      ...[...WsRpcGroup.requests.keys()].filter(
+        (
+          tag,
+        ): tag is Exclude<
+          keyof typeof RPC_REQUIRED_SCOPES,
+          typeof WS_METHODS.fleetSummarySubscribe
+        > => tag !== WS_METHODS.fleetSummarySubscribe,
+      ),
     );
     const client = yield* RpcTest.makeClient(group).pipe(
       Effect.provide(

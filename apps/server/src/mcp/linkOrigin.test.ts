@@ -20,6 +20,7 @@ import * as Option from "effect/Option";
 import { McpSchema, McpServer } from "effect/ai";
 
 import * as ServerConfig from "../config.ts";
+import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
 import { CodexProviderCapabilitiesV2 } from "../orchestration-v2/Adapters/CodexAdapterV2.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
@@ -131,7 +132,14 @@ const layerTools = Layer.mergeAll(
       list: () => Effect.succeed([]),
     }),
   ),
-  Layer.provide(Layer.mock(ScheduledTaskService.ScheduledTaskService)({})),
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+      Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+        trackAdhoc: () => Effect.void,
+      }),
+    ),
+  ),
   Layer.provide(
     Layer.mock(ProjectService.ProjectService)({
       getById: (id) =>

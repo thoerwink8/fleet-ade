@@ -21,6 +21,7 @@ import * as Ref from "effect/Ref";
 import { McpSchema, McpServer } from "effect/ai";
 
 import * as ServerConfig from "../config.ts";
+import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
 import * as ThreadLaunch from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as ThreadSearch from "../orchestration-v2/ThreadSearch.ts";
@@ -250,8 +251,15 @@ const serveBox = (seen: Ref.Ref<Seen>, linkSession: Ref.Ref<string>) =>
       Layer.provide(ServerSettings.layerTest()),
       Layer.provide(Layer.mock(PeerForwarding.PeerForwarding)({})),
       Layer.provide(Layer.mock(RemoteDelegation.RemoteDelegation)({})),
-      Layer.provide(Layer.mock(PeerLinkRequests.PeerLinkRequests)({})),
-      Layer.provide(Layer.mock(PeerLinks.PeerLinks)({})),
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.mock(PeerLinkRequests.PeerLinkRequests)({}),
+          Layer.mock(PeerLinks.PeerLinks)({}),
+          Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+            trackAdhoc: () => Effect.void,
+          }),
+        ),
+      ),
     ),
   );
 
@@ -334,6 +342,9 @@ const makeLaptop = Effect.gen(function* () {
           followUp: (_scope, _environmentId, _request, sent) => Effect.succeed(sent),
         }),
         Layer.mock(PeerLinkRequests.PeerLinkRequests)({}),
+        Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+          trackAdhoc: () => Effect.void,
+        }),
       ),
     ),
     Layer.fresh,
