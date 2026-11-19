@@ -45,6 +45,8 @@ const ACTIVITY_EVENTS: Readonly<Record<string, true>> = {
   "thread.metadata-updated": true,
   "thread.pull-request-synced": true,
   "thread.pull-request-link-updated": true,
+  "thread.deleted": true,
+  "thread.archived": true,
   "run.created": true,
   "run.updated": true,
   "runtime-request.updated": true,
@@ -485,11 +487,18 @@ export class ChildSessionSummary extends Context.Service<
         shell: OrchestrationV2ThreadShell | null,
       ) {
         if (shell === null || shell.deletedAt !== null) {
+          const previous = yield* getRow(threadId);
           yield* sql`DELETE FROM child_session_summary WHERE thread_id = ${threadId}`.pipe(
             Effect.mapError(readError),
           );
           lanes.delete(threadId);
-          yield* PubSub.publish(pubsub, { _tag: "deleted", threadId });
+          if (previous !== null) {
+            yield* PubSub.publish(pubsub, {
+              _tag: "deleted",
+              threadId,
+              parentThreadId: previous.parentThreadId,
+            });
+          }
           return;
         }
         const parentId = shell.lineage.parentThreadId;
@@ -591,7 +600,7 @@ export class ChildSessionSummary extends Context.Service<
               Stream.fromSubscription(subscription).pipe(
                 Stream.filter(
                   (event) =>
-                    event._tag === "deleted" ||
+                    (event._tag === "deleted" && event.parentThreadId === threadId) ||
                     (event._tag === "upsert" && event.row.parentThreadId === threadId),
                 ),
               ),
@@ -617,42 +626,61 @@ export class ChildSessionSummary extends Context.Service<
       const projectionStore = yield* ProjectionStoreV2;
       const internal = yield* ChildSessionSummaryInternal;
       const sql = yield* SqlClient.SqlClient;
-      // Read the high-water mark first, then sweep: events committed during the
-      // sweep still land in the subscription below instead of being skipped.
-      const highWater = yield* eventSink.latestSequence({}).pipe(Effect.orElseSucceed(() => 0));
-      const children = yield* sql<{ readonly threadId: string }>`
-        SELECT thread_id AS threadId
-        FROM orchestration_v2_projection_threads
-        WHERE json_extract(payload_json, '$.lineage.relationshipToParent') = 'subagent'
-          AND json_extract(payload_json, '$.creationSource') != 'provider'
-          AND deleted_at IS NULL
-          AND archived_at IS NULL
-      `.pipe(Effect.orElseSucceed(() => [] as { readonly threadId: string }[]));
+      const highWater = yield* eventSink.latestSequence({});
       yield* forkParked(
-        Effect.forEach(
-          children,
-          (child) =>
-            Effect.gen(function* () {
+        Effect.gen(function* () {
+          const children = yield* sql<{ readonly threadId: string }>`
+            SELECT thread_id AS threadId
+            FROM orchestration_v2_projection_threads
+            WHERE json_extract(payload_json, '$.lineage.relationshipToParent') = 'subagent'
+              AND json_extract(payload_json, '$.creationSource') != 'provider'
+              AND deleted_at IS NULL
+              AND archived_at IS NULL
+          `;
+          const liveIds = new Set(children.map((child) => child.threadId));
+          const rows = yield* sql<{ readonly threadId: string }>`
+            SELECT thread_id AS threadId FROM child_session_summary
+          `;
+          for (const row of rows) {
+            if (!liveIds.has(row.threadId)) {
+              yield* internal.recompute(ThreadId.make(row.threadId), null).pipe(Effect.ignore);
+            }
+          }
+          yield* Effect.forEach(
+            children,
+            (child) => {
               const threadId = ThreadId.make(child.threadId);
-              const shell = yield* projectionStore
-                .getThreadShell(threadId)
-                .pipe(Effect.orElseSucceed(() => null));
-              yield* internal.recompute(threadId, shell).pipe(Effect.ignore);
-            }),
-          { discard: true },
-        ),
-      );
-      yield* forkParked(
-        Stream.runForEach(eventSink.stream({ afterSequence: highWater }), (stored) =>
-          ACTIVITY_EVENTS[stored.event.type] === true
-            ? Effect.gen(function* () {
-                const shell = yield* projectionStore
-                  .getThreadShell(stored.event.threadId)
-                  .pipe(Effect.orElseSucceed(() => null));
-                yield* internal.recompute(stored.event.threadId, shell).pipe(Effect.ignore);
-              })
-            : Effect.void,
-        ),
+              return projectionStore.getThreadShell(threadId).pipe(
+                Effect.matchEffect({
+                  onFailure: (error) =>
+                    Effect.logWarning("child-summary.startup-shell-read-failed", {
+                      threadId,
+                      error,
+                    }),
+                  onSuccess: (shell) => internal.recompute(threadId, shell).pipe(Effect.ignore),
+                }),
+              );
+            },
+            { discard: true },
+          );
+          yield* Stream.runForEach(eventSink.stream({ afterSequence: highWater }), (stored) => {
+            if (ACTIVITY_EVENTS[stored.event.type] !== true) return Effect.void;
+            if (stored.event.type === "thread.deleted" || stored.event.type === "thread.archived") {
+              return internal.recompute(stored.event.threadId, null).pipe(Effect.ignore);
+            }
+            return projectionStore.getThreadShell(stored.event.threadId).pipe(
+              Effect.matchEffect({
+                onFailure: (error) =>
+                  Effect.logWarning("child-summary.event-shell-read-failed", {
+                    threadId: stored.event.threadId,
+                    error,
+                  }),
+                onSuccess: (shell) =>
+                  internal.recompute(stored.event.threadId, shell).pipe(Effect.ignore),
+              }),
+            );
+          });
+        }),
       );
     }),
   ).pipe(Layer.provide(ChildSessionSummary.layer));

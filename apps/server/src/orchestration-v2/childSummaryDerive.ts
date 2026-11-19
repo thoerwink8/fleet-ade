@@ -360,6 +360,18 @@ export function isDelegateTaskChild(thread: {
   return thread.lineage.relationshipToParent === "subagent" && thread.creationSource !== "provider";
 }
 
+export function isLocalDelegateTaskChild(thread: {
+  readonly lineage: { readonly relationshipToParent: string | null };
+  readonly creationSource: string;
+  readonly delegatedFrom?: unknown;
+}): boolean {
+  return (
+    thread.delegatedFrom == null &&
+    thread.lineage.relationshipToParent === "subagent" &&
+    thread.creationSource !== "provider"
+  );
+}
+
 /** Undefined means the existing send may proceed. A stopped delegate cannot be restarted here. */
 export function delegateCorrectionRefusal(thread: {
   readonly lineage: { readonly relationshipToParent: string | null };

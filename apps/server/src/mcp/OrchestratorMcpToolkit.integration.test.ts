@@ -432,11 +432,11 @@ describe("orchestrator MCP toolkit", () => {
         const queuedFollowup = yield* decodeThreadSendResult(
           queuedFollowupCall.structuredContent,
         ).pipe(Effect.orDie);
-        expect(["queued", "started"]).toContain(queuedFollowup.delivery);
+        expect(queuedFollowup.delivery).toBe("queued");
 
         const interruptCall = yield* invoke("t3_thread_interrupt", {
           threadId: localChild(delegated.childThreadId),
-          runId: queuedFollowup.runId,
+          runId: runningFollowup.runId,
           reason: "Interrupts on a delegated child are refused.",
           clientRequestId: "interrupt-delegated-child-replay-1",
         });
@@ -456,6 +456,11 @@ describe("orchestrator MCP toolkit", () => {
           runningFollowup.taskId,
           queuedFollowup.taskId,
         ]);
+        const pendingStatusCall = yield* invoke("task_status", { taskId: delegated.taskId });
+        const pendingStatus = yield* decodeDelegateTaskResult(
+          pendingStatusCall.structuredContent,
+        ).pipe(Effect.orDie);
+        expect(pendingStatus.hasPendingChildRuns).toBe(true);
         yield* orchestrator
           .streamStoredEventsFrom({
             threadId: localChild(delegated.childThreadId),
@@ -526,6 +531,9 @@ describe("orchestrator MCP toolkit", () => {
             ),
           );
         const finishedParent = yield* orchestrator.getThreadProjection(parentThreadId);
+        expect(
+          finishedParent.contextTransfers.filter((transfer) => transfer.type === "subagent_result"),
+        ).toHaveLength(3);
         const finalStatusCall = yield* invoke("task_status", {
           taskId: delegated.taskId,
         });

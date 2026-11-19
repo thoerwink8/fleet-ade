@@ -1178,6 +1178,101 @@ it("commandChildren reads another thread and refuses a missing one", async () =>
   }).pipe(Effect.provide(layer), Effect.runPromise);
 });
 
+it("local delegated children reject interrupt and stopped send, ordinary threads still interrupt", async () => {
+  const ordinaryThreadId = ThreadId.make("thread-mcp-ordinary");
+  const childShell = {
+    ...liveThreadShell(childThreadId),
+    status: "cancelled",
+    lineage: {
+      parentThreadId,
+      relationshipToParent: "subagent",
+      rootThreadId: parentThreadId,
+    },
+    creationSource: "mcp",
+  } as unknown as OrchestrationV2ThreadShell;
+  const ordinaryShell = liveThreadShell(ordinaryThreadId);
+  const parentProjection = {
+    thread: liveThreadShell(parentThreadId),
+    runs: [makeRun({ id: activeRunId, ordinal: 1, status: "running" })],
+    subagents: [],
+  } as unknown as OrchestrationV2ThreadProjection;
+  const childProjection = {
+    thread: { ...childShell, status: "running" },
+    runs: [makeRun({ id: childRunId, ordinal: 1, status: "running" })],
+    subagents: [],
+  } as unknown as OrchestrationV2ThreadProjection;
+  const ordinaryProjection = {
+    thread: ordinaryShell,
+    runs: [makeRun({ id: RunId.make("run-mcp-ordinary"), ordinal: 1, status: "running" })],
+    subagents: [],
+  } as unknown as OrchestrationV2ThreadProjection;
+  let interruptCalls = 0;
+  let sendCalls = 0;
+  const layer = layerOrchestratorService.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          getThreadRecords: (threadId) =>
+            Effect.succeed(
+              threadId === parentThreadId
+                ? parentProjection
+                : threadId === childThreadId
+                  ? childProjection
+                  : ordinaryProjection,
+            ),
+          getProjectThreadRecords: (input) =>
+            Effect.succeed(input.threadId === childThreadId ? childProjection : ordinaryProjection),
+          getThreadShell: (threadId) =>
+            Effect.succeed(
+              threadId === childThreadId
+                ? childShell
+                : threadId === ordinaryThreadId
+                  ? ordinaryShell
+                  : liveThreadShell(parentThreadId),
+            ),
+          interruptThread: () =>
+            Effect.sync(() => {
+              interruptCalls += 1;
+              return { type: "interrupted", run: ordinaryProjection.runs[0] };
+            }) as never,
+          sendToThread: () =>
+            Effect.sync(() => {
+              sendCalls += 1;
+              return {
+                run: { id: RunId.make("run-mcp-send"), status: "queued" },
+                delivery: "queued",
+              };
+            }) as never,
+        } satisfies Partial<ThreadManagementService.ThreadManagementService["Service"]>),
+        ServerSettings.layerTest(),
+        Layer.mock(ProviderRegistry.ProviderRegistry)({ getProviders: Effect.succeed([]) }),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+        Layer.mock(ProviderAdapterRegistry.ProviderAdapterRegistryV2)({
+          list: () => Effect.succeed([]),
+        }),
+        NodeCrypto.layer,
+      ),
+    ),
+  );
+  await Effect.gen(function* () {
+    const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+    const refusedInterrupt = yield* service
+      .interruptThread(makeScope(), { threadId: childThreadId, runId: childRunId })
+      .pipe(Effect.flip);
+    expect(refusedInterrupt.code).toBe("thread_not_interruptible");
+    const refusedSend = yield* service
+      .sendToThread(makeScope(), { threadId: childThreadId, message: "retry" })
+      .pipe(Effect.flip);
+    expect(refusedSend.code).toBe("thread_not_sendable");
+    const ordinary = yield* service.interruptThread(makeScope(), { threadId: ordinaryThreadId });
+    expect(ordinary.status).toBe("interrupt_requested");
+    expect(interruptCalls).toBe(1);
+    expect(sendCalls).toBe(0);
+  }).pipe(Effect.provide(layer), Effect.runPromise);
+});
 it("requestSecret returns the unsaved note for a declined, cancelled or timed-out card", async () => {
   const outcomes = ["declined", "cancelled", "pending"] as const;
   const results = await Effect.forEach(outcomes, (outcome) => {

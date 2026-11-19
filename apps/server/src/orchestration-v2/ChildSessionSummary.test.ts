@@ -1,5 +1,10 @@
 import { assert, it } from "@effect/vitest";
-import { CHILD_SUMMARY_PAGE_SIZE, ChildSummaryCursorError, ThreadId } from "@t3tools/contracts";
+import {
+  CHILD_SUMMARY_PAGE_SIZE,
+  ChildSummaryCursorError,
+  ThreadId,
+  type ChildSummaryStreamEvent,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
@@ -90,9 +95,11 @@ it.layer(layerTest)("child session summaries", (it) => {
       const parent = ThreadId.make("thread:sub-parent");
       const child = ThreadId.make("thread:sub-child");
       yield* internal.note(factsFor(child, parent, 0));
-      const queue = yield* Stream.toQueue(service.subscribe(parent), {
-        capacity: "unbounded",
-      });
+      const queue = yield* Queue.unbounded<ChildSummaryStreamEvent>();
+      yield* service.subscribe(parent).pipe(
+        Stream.runForEach((event) => Queue.offer(queue, event)),
+        Effect.forkScoped({ startImmediately: true }),
+      );
       const first = yield* Queue.take(queue);
       assert.ok(first._tag === "upsert");
       if (first._tag === "upsert") {
@@ -103,6 +110,7 @@ it.layer(layerTest)("child session summaries", (it) => {
       assert.ok(second._tag === "deleted");
       if (second._tag === "deleted") {
         assert.strictEqual(second.threadId, child);
+        assert.strictEqual(second.parentThreadId, parent);
       }
     }),
   );

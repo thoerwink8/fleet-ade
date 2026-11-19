@@ -115,6 +115,7 @@ import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts"
 import {
   delegateCorrectionRefusal,
   isDelegateTaskChild,
+  isLocalDelegateTaskChild,
 } from "../orchestration-v2/childSummaryDerive.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
@@ -3461,7 +3462,7 @@ const make = Effect.gen(function* () {
       yield* assertLiveCallerForOtherThread(scope, parent, target);
       yield* resolveRuntimeMode(limits.runtimeMode, target.thread.runtimeMode);
       yield* resolveInteractionMode(limits.interactionMode, target.thread.interactionMode);
-      if (isDelegateTaskChild(target.thread)) {
+      if (isLocalDelegateTaskChild(target.thread)) {
         return yield* failure("thread_not_interruptible", "委托子会话请用 task_cancel。");
       }
       const key = yield* requestKey(input.clientRequestId);

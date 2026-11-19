@@ -234,10 +234,12 @@ const boxToolkitLayer = (thread: BoxThread) => {
     Effect.gen(function* () {
       if ((yield* Ref.get(thread.launched)) !== threadId) return null;
       const linkOrigin = yield* Ref.get(thread.linkOrigin);
+      const delegatedFrom = yield* Ref.get(thread.delegatedFrom);
       return {
         ...liveThreadShell(threadId, { runtimeMode: "full-access" }),
         projectId: boxProject,
         ...(linkOrigin === null ? {} : { linkOrigin }),
+        ...(delegatedFrom === null ? {} : { delegatedFrom }),
       };
     });
   const runOf = (status: OrchestrationV2Run["status"]) =>
