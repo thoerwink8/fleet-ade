@@ -2164,7 +2164,6 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         const emitProviderEvent = (event: ProviderAdapter.ProviderAdapterV2Event) =>
           Queue.offer(events, event).pipe(Effect.asVoid);
 
-        const promptSuggestionsEnabled = input.promptSuggestions ?? Effect.succeed(false);
         // Best effort: older Codex lacks thread/sample, and a sample fails once the user sends again.
         // Delegated threads share this session but have no one typing, so they never sample.
         const samplePromptSuggestion = Effect.fn("CodexAdapterV2.samplePromptSuggestion")(
@@ -2173,10 +2172,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             nativeThreadId: string,
             nativeTurnId: string,
           ) {
-            if (
-              isDelegatedAppThread(context.input.appThread) ||
-              !(yield* promptSuggestionsEnabled)
-            ) {
+            if (isDelegatedAppThread(context.input.appThread)) {
               return;
             }
             const response = yield* client.raw.request("thread/sample", {

@@ -44,9 +44,6 @@ const linkSubject = (host: string) => () =>
 const PROVIDERS = [
   fakeSourceControlProvider("github", { resolveLink: linkSubject("github") }),
   fakeSourceControlProvider("gitlab", { resolveLink: linkSubject("gitlab") }),
-  fakeSourceControlProvider("forgejo"),
-  fakeSourceControlProvider("bitbucket"),
-  fakeSourceControlProvider("azure-devops"),
 ];
 
 /** A host CLI that claims every server it is signed in to, as `glab` does. */
@@ -485,12 +482,13 @@ it.effect("answers discovery without waiting on a hosting API that stalls", () =
   Effect.gen(function* () {
     const registry = yield* makeRegistry({
       remotes: [],
+      providers: [...PROVIDERS, fakeSourceControlProvider("gitcafe")],
       discovery: [
         claimingCli("gitlab"),
         {
           type: "api",
-          kind: kind("bitbucket"),
-          label: "Bitbucket",
+          kind: kind("gitcafe"),
+          label: "GitCafe",
           installHint: "unused",
           probeAuth: Effect.never,
         },
@@ -499,9 +497,9 @@ it.effect("answers discovery without waiting on a hosting API that stalls", () =
     const discovering = yield* registry.discover.pipe(Effect.forkChild);
     yield* TestClock.adjust("3 seconds");
     const items = yield* Fiber.join(discovering);
-    const bitbucket = items.find((item) => item.kind === "bitbucket");
-    assert.strictEqual(bitbucket?.status, "available");
-    assert.strictEqual(bitbucket?.auth.status, "unknown");
+    const stalled = items.find((item) => item.kind === "gitcafe");
+    assert.strictEqual(stalled?.status, "available");
+    assert.strictEqual(stalled?.auth.status, "unknown");
     assert.strictEqual(items.find((item) => item.kind === "gitlab")?.status, "available");
   }),
 );

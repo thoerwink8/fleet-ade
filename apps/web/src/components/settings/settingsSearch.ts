@@ -37,7 +37,6 @@ export type SettingsPath =
   | "/settings/access"
   | "/settings/secrets"
   | "/settings/maintenance"
-  | "/settings/labs"
   | "/settings/about"
   | "/settings/archived";
 
@@ -111,7 +110,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/access": "共享与访问",
   "/settings/secrets": "凭据",
   "/settings/maintenance": "维护",
-  "/settings/labs": "实验功能",
   "/settings/about": "关于",
   "/settings/voice": "语音",
   "/settings/archived": "归档",
@@ -162,7 +160,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   {
     heading: "更多",
     headingHidden: true,
-    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
+    paths: ["/settings/maintenance", "/settings/about", "/settings/archived"],
   },
 ];
 
@@ -472,13 +470,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "运行中分组",
     to: "/settings/general",
     searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
-  },
-  {
-    id: "prompt-suggestions-beta",
-    title: "建议下一条提示词",
-    to: "/settings/labs",
-    scope: "environment",
-    searchTerms: ["beta tab autocomplete predict next message claude codex ghost text"],
   },
   {
     id: "tool-call-visibility",
@@ -1325,7 +1316,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/secrets": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
-  "/settings/labs": null,
   "/settings/about": null,
   "/settings/archived": "project-defaults",
 };
@@ -1333,7 +1323,8 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
 const RENAMED_SETTINGS_PATHS: Readonly<Record<string, SettingsPath>> = {
   "/settings/integrations": "/settings/browser",
   "/settings/storage": "/settings/maintenance",
-  "/settings/beta": "/settings/labs",
+  "/settings/beta": "/settings/maintenance",
+  "/settings/labs": "/settings/maintenance",
 };
 const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
   "/settings/general",

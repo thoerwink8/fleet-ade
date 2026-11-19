@@ -1010,8 +1010,8 @@ it.effect.each([
   },
   {
     provider: "unknown",
-    host: "forge.example",
-    remoteUrl: "http://forge.example:3000/team/repo.git",
+    host: "ssh.forge.example",
+    remoteUrl: "ssh://git@ssh.forge.example:2222/team/repo.git",
   },
 ])(
   "identifies every worktree behind an unavailable refined Forgejo authority",
@@ -2304,74 +2304,11 @@ it.effect("routes Azure reads and writes through the requested organization's ch
     };
     yield* service.summary(reference, { recoverTransientFailure: false });
     yield* service.runAction({ ...reference, action: "merge" });
-    assert.deepStrictEqual(seen, ["read /org-b web", "write /org-b web", "read /org-b web"]);
-  }),
-);
-
-it.effect.each([
-  {
-    host: "ssh.dev.azure.com",
-    repository: "v3/org-b/project/web",
-    remoteUrl: "git@ssh.dev.azure.com:v3/org-b/project/web",
-  },
-  {
-    host: "vs-ssh.visualstudio.com",
-    repository: "v3/org-b/project/web",
-    remoteUrl: "git@vs-ssh.visualstudio.com:v3/org-b/project/web",
-  },
-  {
-    host: "org-b.visualstudio.com",
-    repository: "DefaultCollection/project/_git/web",
-    remoteUrl: "https://org-b.visualstudio.com/DefaultCollection/project/_git/web",
-  },
-])("routes Azure URL reads and writes through a $host checkout", (checkout) =>
-  Effect.gen(function* () {
-    const seen: string[] = [];
-    const target = project({
-      id: "target",
-      title: "target",
-      workspaceRoot: "/target",
-      provider: SourceControlProviderKind.make("azure-devops"),
-      ...checkout,
-    });
-    const service = yield* makeService({
-      projects: [
-        ...["org-a/project/_git/web", "org-b/other-project/_git/web"].map((repository) =>
-          project({
-            id: repository,
-            title: repository,
-            workspaceRoot: `/${repository}`,
-            provider: SourceControlProviderKind.make("azure-devops"),
-            host: "dev.azure.com",
-            repository,
-          }),
-        ),
-        target,
-      ],
-      providers: [
-        fakePullRequestProvider(SourceControlProviderKind.make("azure-devops"), {
-          ...keyedByCanonicalKey,
-          getChangeRequestSummary: (input) =>
-            Effect.sync(() => {
-              seen.push(`read ${input.cwd} ${input.repository}`);
-              return changeRequest(7, "2026-07-02T00:00:00Z");
-            }),
-          runAction: (input) =>
-            Effect.sync(() => {
-              seen.push(`write ${input.cwd} ${input.repository}`);
-            }),
-        }),
-      ],
-    });
-    const reference = {
-      projectId: "org-a/project/_git/web" as ProjectId,
-      host: "dev.azure.com",
-      repository: "org-b/project/_git/web",
-      number: 7,
-    };
-    yield* service.summary(reference, { recoverTransientFailure: false });
-    yield* service.runAction({ ...reference, action: "merge" });
-    assert.deepStrictEqual(seen, ["read /target web", "write /target web", "read /target web"]);
+    assert.deepStrictEqual(seen, [
+      "read /org-b org-b/project/_git/web",
+      "write /org-b org-b/project/_git/web",
+      "read /org-b org-b/project/_git/web",
+    ]);
   }),
 );
 
@@ -4263,7 +4200,7 @@ it.effect("keeps hosted Forgejo marks with their repository instead of the servi
         workspaceRoot: "/first",
         repository: "reviewer/first",
         provider: SourceControlProviderKind.make("forgejo"),
-        host: "forge.example",
+        host: "forge.example:3000",
         remoteUrl: "https://forge.example:3000/reviewer/first.git",
       }),
     ];
@@ -4311,7 +4248,7 @@ it.effect("keeps hosted Forgejo marks with their repository instead of the servi
         workspaceRoot: "/second",
         repository: "reviewer/second",
         provider: SourceControlProviderKind.make("forgejo"),
-        host: "forge.example",
+        host: "forge.example:3000",
         remoteUrl: "https://forge.example:3000/reviewer/second.git",
       }),
     );
@@ -4565,8 +4502,16 @@ const AZURE_PAIR = [
   }),
 ];
 
-const AZURE_PLATFORM = { projectId: "p1" as ProjectId, repository: "web", number: 1 };
-const AZURE_OTHER = { projectId: "p2" as ProjectId, repository: "web", number: 1 };
+const AZURE_PLATFORM = {
+  projectId: "p1" as ProjectId,
+  repository: "acme/platform/_git/web",
+  number: 1,
+};
+const AZURE_OTHER = {
+  projectId: "p2" as ProjectId,
+  repository: "acme/other/_git/web",
+  number: 1,
+};
 
 it.effect("keeps the marks of two Azure repositories of the same name apart", () =>
   Effect.gen(function* () {

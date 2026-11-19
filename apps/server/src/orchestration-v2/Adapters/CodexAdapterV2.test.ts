@@ -1369,7 +1369,6 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     readChildMetadata?: Parameters<typeof withCodexReplayChildMetadata>[2],
     beforeEmitInbound?: CodexReplay.CodexAppServerReplayDriver["beforeEmitInbound"],
     onUsageLimits?: CodexAdapterV2.CodexAdapterV2Options["onUsageLimits"],
-    promptSuggestions: Effect.Effect<boolean> = Effect.succeed(false),
     onNotification: (method: string) => Effect.Effect<void> = () => Effect.void,
     models?: CodexAdapterV2.CodexAdapterV2Options["models"],
   ) =>
@@ -1452,7 +1451,6 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         providerSessionId: ProviderSessionId.make(`provider-session-${transcript.scenario}`),
         modelSelection: CODEX_TEST_MODEL_SELECTION,
         runtimePolicy: CODEX_TEST_RUNTIME_POLICY,
-        promptSuggestions,
       });
       const providerThread = yield* runtime.ensureThread({
         threadId,
@@ -2037,7 +2035,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     ),
   );
 
-  it.effect.each(["subagent", "remote", "toggled-off"] as const)(
+  it.effect.each(["subagent", "remote"] as const)(
     "never samples a suggestion for a %s thread",
     (delegation) =>
       Effect.gen(function* () {
@@ -2066,7 +2064,6 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         });
         // The second turn is a barrier: a stray sample from the first turn is sent before it ends.
         const requests: Array<string> = [];
-        const enabled = yield* Ref.make(true);
         const harness = yield* makeCodexReplayHarness(
           makeCodexReplayTranscript({
             scenario: `prompt-suggestion-${delegation}`,
@@ -2079,13 +2076,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           }),
           undefined,
           (method) => Effect.sync(() => requests.push(method)),
-          undefined,
-          undefined,
-          undefined,
-          Ref.get(enabled),
         );
-        // The flag is read per turn: turning it off after the session opened stops sampling.
-        if (delegation === "toggled-off") yield* Ref.set(enabled, false);
         const base = makeCodexTestTurnInput({
           threadId: harness.threadId,
           providerThread: harness.providerThread,
@@ -2097,25 +2088,23 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         const turn = {
           ...base,
           appThread:
-            delegation === "toggled-off"
-              ? base.appThread
-              : delegation === "subagent"
-                ? {
-                    ...base.appThread,
-                    lineage: {
-                      parentThreadId,
-                      relationshipToParent: "subagent" as const,
-                      rootThreadId: parentThreadId,
-                    },
-                  }
-                : {
-                    ...base.appThread,
-                    delegatedFrom: {
-                      environmentId: EnvironmentId.make("environment-codex-suggestion-parent"),
-                      threadId: parentThreadId,
-                      title: "Parent",
-                    },
+            delegation === "subagent"
+              ? {
+                  ...base.appThread,
+                  lineage: {
+                    parentThreadId,
+                    relationshipToParent: "subagent" as const,
+                    rootThreadId: parentThreadId,
                   },
+                }
+              : {
+                  ...base.appThread,
+                  delegatedFrom: {
+                    environmentId: EnvironmentId.make("environment-codex-suggestion-parent"),
+                    threadId: parentThreadId,
+                    title: "Parent",
+                  },
+                },
         };
         yield* harness.runtime.startTurn(turn);
         yield* harness.awaitTerminal(1);
@@ -2197,15 +2186,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           },
         ],
       });
-      const harness = yield* makeCodexReplayHarness(
-        transcript,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        Effect.succeed(true),
-      );
+      const harness = yield* makeCodexReplayHarness(transcript);
       const turnInput = makeCodexTestTurnInput({
         threadId: harness.threadId,
         providerThread: harness.providerThread,

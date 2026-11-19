@@ -457,7 +457,7 @@ export function defineSourceControl<const Definition extends SourceControlDefini
   return definition;
 }
 
-export function isChangeRequestAuthorityOfProject(
+function isChangeRequestAuthorityOfProject(
   identity: ChangeRequestProjectIdentity,
   link: ChangeRequestLink | CommitLink,
 ): boolean {
@@ -550,10 +550,25 @@ function unknownRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo
 }
 
 function retiredRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo | null {
-  if (!(remote.hostname === "gitlab.com" || remote.hostname.split(".").includes("gitlab"))) {
-    return null;
-  }
-  const kind = "gitlab";
+  const { hostname } = remote;
+  const labels = hostname.split(".");
+  const kind =
+    hostname === "gitlab.com" || labels.includes("gitlab")
+      ? "gitlab"
+      : hostname === "git.cafe" || hostname === "staging.git.cafe"
+        ? "gitcafe"
+        : hostname === "origin.cursor.com"
+          ? "cursor-origin"
+          : hostname === "codeberg.org" || labels.includes("forgejo") || labels.includes("gitea")
+            ? "forgejo"
+            : hostname === "dev.azure.com" ||
+                hostname.endsWith(".dev.azure.com") ||
+                hostname.endsWith(".visualstudio.com")
+              ? "azure-devops"
+              : hostname === "bitbucket.org" || labels.includes("bitbucket")
+                ? "bitbucket"
+                : null;
+  if (kind === null) return null;
   return {
     kind: SourceControlProviderKind.make(kind),
     name: UNSUPPORTED_SOURCE_CONTROL_LABEL,
@@ -704,14 +719,60 @@ function inOrder(
   return [...first, ...definitions.filter((definition) => !first.includes(definition))];
 }
 
-// Old GitLab merge request URLs still parse so stored history reads as unsupported, not as GitHub.
+// Retired routes preserve stored links without letting GitHub's any-host parser claim them.
 const RETIRED_GITLAB_CHANGE_REQUEST_PATH =
   /^\/([^/]+(?:\/[^/]+)+)\/-\/merge_requests\/(\d+)(?:\/|$)/u;
 
 function retiredParsedChangeRequest(url: URL): ParsedChangeRequest | null {
-  const link = parseChangeRequestPath(url, RETIRED_GITLAB_CHANGE_REQUEST_PATH);
+  const hostname = url.hostname.toLowerCase();
+  let kind: string;
+  let route: RegExp;
+  if (RETIRED_GITLAB_CHANGE_REQUEST_PATH.test(url.pathname)) {
+    kind = "gitlab";
+    route = RETIRED_GITLAB_CHANGE_REQUEST_PATH;
+  } else if (/\/pullrequest\//u.test(url.pathname)) {
+    kind = "azure-devops";
+    route = /^\/((?:[^/]+\/)*_git\/[^/]+)\/pullrequest\/(\d+)(?:\/|$)/u;
+  } else if (
+    (hostname === "cursor.com" || hostname === "www.cursor.com") &&
+    /^\/codebase\/[^/]+\/[^/]+\/pull\/\d+(?:\/|$)/u.test(url.pathname)
+  ) {
+    const link = parseChangeRequestPath(url, /^\/codebase\/([^/]+\/[^/]+)\/pull\/(\d+)(?:\/|$)/u);
+    return link === null
+      ? null
+      : {
+          definition: retiredSourceControlClient("cursor-origin"),
+          link: {
+            ...link,
+            host: "origin.cursor.com",
+            repositoryUrl: `https://cursor.com/codebase/${link.repository}`,
+          },
+        };
+  } else if (
+    (hostname === "git.cafe" || hostname === "staging.git.cafe") &&
+    /^\/[^/]+\/[^/]+\/pulls?\/\d+(?:\/|$)/u.test(url.pathname)
+  ) {
+    kind = "gitcafe";
+    route = /^\/([^/]+\/[^/]+)\/pulls?\/(\d+)(?:\/|$)/u;
+  } else if (
+    hostname.split(".").includes("bitbucket") &&
+    /^\/[^/]+\/[^/]+\/pull-requests\/\d+(?:\/|$)/u.test(url.pathname)
+  ) {
+    kind = "bitbucket";
+    route = /^\/([^/]+\/[^/]+)\/pull-requests\/(\d+)(?:\/|$)/u;
+  } else {
+    kind = "forgejo";
+    route = /^\/([^/]+(?:\/[^/]+)+)\/pulls\/(\d+)(?:\/|$)/u;
+  }
+  const link = parseChangeRequestPath(url, route);
   if (link === null) return null;
-  return { definition: retiredSourceControlClient("gitlab"), link };
+  return {
+    definition: retiredSourceControlClient(kind),
+    link:
+      kind === "forgejo" || (kind === "azure-devops" && url.port !== "")
+        ? { ...link, authority: url.host.toLowerCase() }
+        : link,
+  };
 }
 
 /**
@@ -747,11 +808,13 @@ export function makeSourceControlDefinitionRegistry(
   const parseChangeRequestUrl = (value: string): ParsedChangeRequest | null => {
     const url = httpUrl(value);
     if (url === null) return null;
+    const retired = retiredParsedChangeRequest(url);
+    if (retired !== null) return retired;
     for (const definition of claimOrder) {
       const link = definition.parseChangeRequestUrl(url);
       if (link !== null) return { definition, link };
     }
-    return retiredParsedChangeRequest(url);
+    return null;
   };
   return {
     definitions,
@@ -805,7 +868,7 @@ export function makeSourceControlDefinitionRegistry(
         const candidate = definition.changeRequestUrlFromReferenceAutolink(url);
         if (candidate !== null) return candidate;
       }
-      if (RETIRED_GITLAB_CHANGE_REQUEST_PATH.test(url.pathname)) return url.toString();
+      if (retiredParsedChangeRequest(url) !== null) return url.toString();
       return null;
     },
     repositoryUrlFromPage: (value) => {
@@ -829,11 +892,13 @@ export function makeSourceControlDefinitionRegistry(
     recognizeRemote: (remoteUrl) => {
       const remote = parseGitRemoteHost(remoteUrl);
       if (remote === null) return null;
+      const retired = retiredRemoteProvider(remote);
+      if (retired !== null) return retired;
       for (const definition of recognitionOrder) {
         const provider = definition.recognizeRemote(remote);
         if (provider !== null) return provider;
       }
-      return retiredRemoteProvider(remote) ?? unknownRemoteProvider(remote);
+      return unknownRemoteProvider(remote);
     },
     repositoryKeyFromRemote: (remoteUrl) => {
       const key = normalizeGitRemoteUrl(remoteUrl);

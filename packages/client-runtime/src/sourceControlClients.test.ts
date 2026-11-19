@@ -1,4 +1,8 @@
-import { ProjectId, SourceControlProviderKind } from "@t3tools/contracts";
+import {
+  ProjectId,
+  SourceControlProviderKind,
+  UNSUPPORTED_SOURCE_CONTROL_LABEL,
+} from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import { appSignInTargetForRemote, sourceControlClients } from "./sourceControlClients.ts";
@@ -21,7 +25,7 @@ describe("sourceControlClients.parseChangeRequestUrl", () => {
     });
   });
 
-  it("reads a GitCafe pull request at its canonical /pull/ path and the older /pulls/ path", () => {
+  it("reads a retired GitCafe pull request at both old routes", () => {
     for (const path of ["pull", "pulls"]) {
       const url = `https://git.cafe/PingDotGG/T3Code/${path}/23897`;
       expect(parse(url), path).toEqual({
@@ -38,7 +42,7 @@ describe("sourceControlClients.parseChangeRequestUrl", () => {
     });
   });
 
-  it("reads a Cursor Origin pull request under Origin's git host, not as GitHub's /pull/", () => {
+  it("reads a retired Cursor Origin pull request under Origin's git host, not as GitHub's /pull/", () => {
     for (const url of [
       "https://cursor.com/codebase/Acme.Team/Web-App/pull/42",
       "http://www.cursor.com/codebase/Acme.Team/Web-App/pull/42/files?w=1#diff",
@@ -59,13 +63,14 @@ describe("sourceControlClients.parseChangeRequestUrl", () => {
     expect(kindOf("https://github.com/acme/web/pull/42")).toBe("github");
   });
 
-  it("reads Forgejo URLs even when the hostname contains github", () => {
+  it("reads retired Forgejo URLs even when the hostname contains github", () => {
     expect(parse("https://github.internal/team/repo/pulls/7")).toEqual({
       host: "github.internal",
       authority: "github.internal",
       repository: "team/repo",
       number: 7,
     });
+    expect(kindOf("https://github.internal/team/repo/pulls/7")).toBe("forgejo");
   });
 
   it("reads a GitHub pull request on any host, so GitHub Enterprise works on its own name", () => {
@@ -82,7 +87,7 @@ describe("sourceControlClients.parseChangeRequestUrl", () => {
     ).toBe("https://code.github.example.com/acme/web/pull/42");
   });
 
-  it("reads a GitLab merge request on any host, nested groups and all", () => {
+  it("reads a retired GitLab merge request on any host, nested groups and all", () => {
     expect(parse("https://gitlab.com/t3tools/platform/t3code/-/merge_requests/42")).toEqual({
       host: "gitlab.com",
       repository: "t3tools/platform/t3code",
@@ -100,7 +105,7 @@ describe("sourceControlClients.parseChangeRequestUrl", () => {
     ).toBe("https://gitlab.com/team/apps/web/-/merge_requests/42");
   });
 
-  it("reads Bitbucket and both Azure DevOps URL forms", () => {
+  it("reads retired Bitbucket and both Azure DevOps URL forms", () => {
     expect(parse("https://bitbucket.org/workspace/repo/pull-requests/5")).toEqual({
       host: "bitbucket.org",
       repository: "workspace/repo",
@@ -118,7 +123,7 @@ describe("sourceControlClients.parseChangeRequestUrl", () => {
     });
   });
 
-  it("reads Azure DevOps Server links and keeps servers on different ports distinct", () => {
+  it("reads retired Azure DevOps Server links and keeps servers on different ports distinct", () => {
     for (const host of ["scm.example.test", "git.cafe", "code.bitbucket.example.test"]) {
       const repository = "tfs/collection/project/_git/repo";
       const linked = {
@@ -205,7 +210,7 @@ describe("sourceControlClients.isSameChangeRequest", () => {
     ["http://forge.example:3000/git/team/repo/pulls/42/files", true],
     ["http://forge.example:4000/git/team/repo/pulls/42", false],
     ["http://forge.example/git/team/repo/pulls/42", false],
-  ])("matches Forgejo links by web authority: %s", (url, expected) => {
+  ])("matches retired Forgejo links by web authority: %s", (url, expected) => {
     expect(
       sourceControlClients.isSameChangeRequest(
         "http://forge.example:3000/git/team/repo/pulls/42",
@@ -214,7 +219,7 @@ describe("sourceControlClients.isSameChangeRequest", () => {
     ).toBe(expected);
   });
 
-  it("keeps Forgejo and GitHub path shapes distinct on a GitHub-named host", () => {
+  it("keeps retired Forgejo and GitHub path shapes distinct on a GitHub-named host", () => {
     expect(
       sourceControlClients.isSameChangeRequest(
         "https://github.internal/team/repo/pulls/42",
@@ -235,47 +240,34 @@ describe("change request URLs built from a parsed link", () => {
     });
   };
 
-  it.each([
-    [
-      "http://git.example.test:3000/team/repo/pulls/42/files",
-      "http://git.example.test:3000/team/repo/pulls/43",
-    ],
-    ["https://github.com/pull/1/pull/42/files", "https://github.com/pull/1/pull/43"],
-    [
-      "https://dev.azure.com/acme/project/_git/web/pullrequest/42?view=files",
-      "https://dev.azure.com/acme/project/_git/web/pullrequest/43",
-    ],
-  ])("builds a canonical sibling of %s", (url, expected) => {
-    expect(sibling(url, 43)).toBe(expected);
+  it("builds a canonical GitHub sibling", () => {
+    expect(sibling("https://github.com/pull/1/pull/42/files", 43)).toBe(
+      "https://github.com/pull/1/pull/43",
+    );
   });
 
   it.each([
-    ["ssh.dev.azure.com", "v3/org/project/web"],
-    ["org.visualstudio.com", "defaultcollection/project/_git/web"],
-    ["dev.azure.com", "org/project/_git/web"],
-  ])("reads back the Azure browser URL built from the remote %s/%s", (host, repository) => {
-    const url = sourceControlClients
-      .get("azure-devops")
-      .changeRequestUrl({ host, repository, number: 42 });
-    expect(parse(url!)).toEqual({
-      host: "dev.azure.com",
-      repository: "org/project/_git/web",
-      number: 42,
-    });
+    "http://git.example.test:3000/team/repo/pulls/42/files",
+    "https://dev.azure.com/acme/project/_git/web/pullrequest/42?view=files",
+  ])("builds no sibling on a retired host: %s", (url) => {
+    expect(sibling(url, 43)).toBeNull();
   });
 });
 
 describe("sourceControlClients.recognizeRemote", () => {
   const kindOfRemote = (url: string) => sourceControlClients.recognizeRemote(url)?.kind ?? null;
 
-  it("asks hosts in a fixed order when one hostname carries several hosts' labels", () => {
+  it("retired hosts claim their hostnames before GitHub reads the rest", () => {
     expect(kindOfRemote("https://gitea.github.example/o/r")).toBe("forgejo");
-    expect(kindOfRemote("https://forgejo.gitlab.example/o/r")).toBe("forgejo");
-    expect(kindOfRemote("https://gitlab.github.example/o/r")).toBe("github");
-    expect(kindOfRemote("https://bitbucket.gitlab.example/o/r")).toBe("bitbucket");
+    expect(kindOfRemote("https://forgejo.gitlab.example/o/r")).toBe("gitlab");
+    expect(kindOfRemote("https://gitlab.github.example/o/r")).toBe("gitlab");
+    expect(kindOfRemote("https://bitbucket.gitlab.example/o/r")).toBe("gitlab");
     expect(kindOfRemote("https://bitbucket.visualstudio.com/p/_git/r")).toBe("azure-devops");
     expect(kindOfRemote("git@git.cafe:pingdotgg/t3code.git")).toBe("gitcafe");
     expect(kindOfRemote("https://origin.cursor.com/acme/web.git")).toBe("cursor-origin");
+    expect(sourceControlClients.recognizeRemote("https://gitlab.com/acme/web.git")?.name).toBe(
+      UNSUPPORTED_SOURCE_CONTROL_LABEL,
+    );
   });
 
   it("reads a remote no host claims as an unknown host, and a local path as no host", () => {
@@ -304,35 +296,32 @@ describe("sourceControlClients repository keys", () => {
     ["ssh://git@gitlab.company.com:2222/team/project.git", "gitlab.company.com/team/project"],
     [
       "git@ssh.dev.azure.com:v3/T3Tools/Platform/T3Code",
-      "dev.azure.com/t3tools/platform/_git/t3code",
+      "ssh.dev.azure.com/v3/t3tools/platform/t3code",
     ],
     [
       "T3Tools@vs-ssh.visualstudio.com:v3/T3Tools/Platform/T3Code",
-      "t3tools.visualstudio.com/platform/_git/t3code",
+      "vs-ssh.visualstudio.com/v3/t3tools/platform/t3code",
     ],
     [
       "https://T3Tools.visualstudio.com/DefaultCollection/Platform/_git/T3Code",
       "t3tools.visualstudio.com/defaultcollection/platform/_git/t3code",
     ],
     ["git@ssh.dev.azure.com:v3/o/p", "ssh.dev.azure.com/v3/o/p"],
-    ["ssh.dev.azure.com/v3/o/p/r", "ssh.dev.azure.com/v3/o/p/r"],
     ["C:/repos/project", "c:/repos/project"],
   ])("keys %s as %s", (remote, key) => {
     expect(sourceControlClients.repositoryKeyFromRemote(remote)).toBe(key);
   });
 
-  it("compares Azure DevOps spellings on dev.azure.com and leaves other keys alone", () => {
+  it("leaves every key alone without a host that respells it", () => {
     expect(
       sourceControlClients.canonicalRepositoryKey(
         "org.visualstudio.com/defaultcollection/project/_git/repo",
       ),
-    ).toBe("dev.azure.com/org/project/_git/repo");
-    expect(sourceControlClients.findByRepositoryKey("dev.azure.com/o/r")?.kind).toBe(
-      "azure-devops",
-    );
+    ).toBe("org.visualstudio.com/defaultcollection/project/_git/repo");
     expect(sourceControlClients.canonicalRepositoryKey("tfs.corp.example/c/p/_git/r")).toBe(
       "tfs.corp.example/c/p/_git/r",
     );
+    expect(sourceControlClients.findByRepositoryKey("dev.azure.com/o/r")).toBeUndefined();
     expect(sourceControlClients.findByRepositoryKey("github.com/o/r")).toBeUndefined();
   });
 });
@@ -343,8 +332,8 @@ describe("sourceControlClients project hosts", () => {
     locator: { remoteUrl: "http://forge.example:3000/team/repo.git" },
   };
 
-  it("keeps an HTTP remote's port for Forgejo only, and falls back to the kind without a key", () => {
-    expect(sourceControlClients.changeRequestHost(identity, "forgejo")).toBe("forge.example:3000");
+  it("reads the host from the key for any kind, and falls back to the kind without a key", () => {
+    expect(sourceControlClients.changeRequestHost(identity, "forgejo")).toBe("forge.example");
     expect(sourceControlClients.changeRequestHost(identity, "gitlab")).toBe("forge.example");
     expect(sourceControlClients.changeRequestHost(identity, undefined)).toBe("forge.example");
     expect(
@@ -355,7 +344,7 @@ describe("sourceControlClients project hosts", () => {
     ).toBe("github");
   });
 
-  it("selects a repository by its path except where the host's tools take a name", () => {
+  it("selects a repository by its path whatever the provider", () => {
     const repository = {
       displayName: "group/subgroup/service",
       owner: "group",
@@ -373,18 +362,18 @@ describe("sourceControlClients project hosts", () => {
         ...repository,
         provider: SourceControlProviderKind.make("azure-devops"),
       }),
-    ).toBe("service");
+    ).toBe("group/subgroup/service");
     expect(sourceControlClients.repositorySelector({ owner: "o", name: "r" })).toBe("o/r");
   });
 });
 
 describe("sourceControlClients.findByPublicDomain", () => {
-  it("names the host a link is on, subdomains included", () => {
+  it("names the host a link is on, subdomains included, and no retired host", () => {
     const kindOf = (hostname: string) => sourceControlClients.findByPublicDomain(hostname)?.kind;
     expect(kindOf("gist.github.com")).toBe("github");
     expect(kindOf("GitLab.com")).toBeUndefined();
-    expect(kindOf("codeberg.org")).toBe("forgejo");
-    expect(kindOf("git.cafe")).toBe("gitcafe");
+    expect(kindOf("codeberg.org")).toBeUndefined();
+    expect(kindOf("git.cafe")).toBeUndefined();
     expect(kindOf("notgithub.com")).toBeUndefined();
     expect(kindOf("github.com.example")).toBeUndefined();
   });

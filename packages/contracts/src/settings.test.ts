@@ -41,6 +41,18 @@ const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const encodeServerSettingsPatch = Schema.encodeSync(ServerSettingsPatch);
 const decodeClaudeSettings = Schema.decodeUnknownSync(ClaudeSettings);
 
+describe("retired client settings", () => {
+  it("decodes stored client settings that still name the old sidebar switches", () => {
+    const decoded = decodeClientSettings({
+      boringSidebarEnabled: true,
+      boringSidebarMultilineRows: false,
+    });
+    expect(decoded).not.toHaveProperty("boringSidebarEnabled");
+    expect(decoded).not.toHaveProperty("boringSidebarMultilineRows");
+    expect(decoded.notificationMode).toBe("off");
+  });
+});
+
 describe("storage cleanup settings", () => {
   it("keeps cleanup disabled for existing installations", () => {
     expect(decodeServerSettings({}).worktreeCleanup).toBeNull();

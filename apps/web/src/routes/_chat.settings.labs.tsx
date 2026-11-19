@@ -1,4 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { LabsSettingsPanel } from "../components/settings/LabsSettingsPanel";
 
-export const Route = createFileRoute("/_chat/settings/labs")({ component: LabsSettingsPanel });
+// The settings route redirects legacy links to maintenance.
+export const Route = createFileRoute("/_chat/settings/labs")({});
