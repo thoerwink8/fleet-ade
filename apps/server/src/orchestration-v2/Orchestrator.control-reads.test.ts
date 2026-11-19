@@ -64,6 +64,19 @@ const layerTest = Layer.mergeAll(
     {
       databaseLayer: layerDatabase,
       runEffectWorker: false,
+    },
+  ),
+);
+const layerConcurrencyLimitTest = Layer.mergeAll(
+  layerDatabase,
+  ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+  EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
+  ProviderReplayHarness.layerWithRegistry(
+    { name: "control-reads-concurrency-limit" },
+    ProviderAdapterRegistry.layerFromAdapters([adapter]),
+    {
+      databaseLayer: layerDatabase,
+      runEffectWorker: false,
       settingsOverrides: { dispatchConcurrencyLimit: 1 },
     },
   ),
@@ -1357,7 +1370,7 @@ it.effect("counts accepted queued delegations against the commander limit", () =
       assert.equal(rejected.limit, 1);
     }
     assert.lengthOf((yield* projections.getThreadProjection(parentThreadId)).subagents, 1);
-  }).pipe(Effect.provide(layerTest)),
+  }).pipe(Effect.provide(layerConcurrencyLimitTest)),
 );
 
 it.effect("wakes the parent once when its delegated task asks a question", () =>

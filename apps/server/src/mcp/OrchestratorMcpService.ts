@@ -68,7 +68,6 @@ import {
 } from "@t3tools/contracts";
 import { resolveDispatchAssignment } from "@t3tools/shared/projectSettings";
 import { OrchestratorDispatchConcurrencyLimitError } from "../orchestration-v2/Orchestrator.ts";
-import { remoteDelegateCommandId } from "../peer/RemoteDelegation.ts";
 import { getProviderOptionCurrentValue, withLegacyUltracodeEffort } from "@t3tools/shared/model";
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { runRanAfter } from "@t3tools/shared/orchestrationV2ThreadError";
@@ -2603,18 +2602,10 @@ const make = Effect.gen(function* () {
       if (input.target !== undefined && environmentId !== undefined) {
         yield* requireCapability(callerScope);
         const scope = yield* requireThreadScope(callerScope, "delegate_task");
-        const parent = yield* loadThreadRecords(scope.thread.threadId, []);
-        const replay =
-          input.clientRequestId !== undefined &&
-          (yield* threadManagement.hasReceipt(
-            remoteDelegateCommandId(scope.requestNamespace, input.clientRequestId),
-          ));
-        const filled = replay ? input : yield* fillCommanderDispatchModel(parent.thread, input);
-        const remoteTarget = filled.target ?? input.target;
         // The task's child runs as an ordinary thread there; this thread keeps the task.
         const { taskId } = yield* remoteDelegation.delegate(scope, {
-          ...filled,
-          target: { ...remoteTarget, environmentId },
+          ...input,
+          target: { ...input.target, environmentId },
         });
         return yield* input.mode === "wait"
           ? awaitTask(scope, taskId, taskId, input.timeoutMs)

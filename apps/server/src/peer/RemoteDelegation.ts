@@ -19,6 +19,7 @@ import {
   type RunId,
   type ThreadId,
 } from "@t3tools/contracts";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
@@ -47,11 +48,12 @@ import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.t
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as PeerForwarding from "./PeerForwarding.ts";
 import * as PeerLinks from "./PeerLinks.ts";
 
-export function remoteDelegateCommandId(requestNamespace: string, key: string): CommandId {
+function remoteDelegateCommandId(requestNamespace: string, key: string): CommandId {
   return CommandId.make(
     `command:mcp:${encodeURIComponent(requestNamespace)}:remote-delegate:${encodeURIComponent(key)}`,
   );
@@ -157,6 +159,7 @@ const make = Effect.gen(function* () {
   const links = yield* PeerLinks.PeerLinks;
   const threads = yield* ThreadManagement.ThreadManagementService;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
+  const serverSettings = yield* ServerSettings.ServerSettingsService;
   const projects = yield* ProjectService.ProjectService;
   const repositoryIdentities = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
   const random = yield* SecureRandom.SecureRandom;
@@ -287,6 +290,36 @@ const make = Effect.gen(function* () {
         });
       }
       const parentNodeId = parentRun.rootNodeId;
+      if (parent.thread.commander === true) {
+        const settings = yield* serverSettings.getSettings.pipe(
+          Effect.mapError(
+            () =>
+              new OrchestratorMcpFailure({
+                code: "orchestration_error",
+                message: "Unable to read server settings.",
+              }),
+          ),
+        );
+        const limit = resolveProjectSettings(settings, parent.thread.projectId).settings
+          .dispatchConcurrencyLimit;
+        if (limit !== null) {
+          const open = yield* projections.countOpenAppOwnedDelegations(scope.thread.threadId).pipe(
+            Effect.mapError(
+              () =>
+                new OrchestratorMcpFailure({
+                  code: "orchestration_error",
+                  message: "Unable to read delegated task state.",
+                }),
+            ),
+          );
+          if (open >= limit) {
+            return yield* new OrchestratorMcpFailure({
+              code: "concurrency-limit",
+              message: `The commander concurrency limit of ${limit} has been reached.`,
+            });
+          }
+        }
+      }
       // A worktree there would branch from a commit this checkout has and the
       // other may not, so a remote task runs in that project's checkout.
       if (input.isolation === "worktree") {
@@ -296,28 +329,17 @@ const make = Effect.gen(function* () {
             'A task in a linked environment runs in that project\'s checkout; isolation "worktree" is not supported there. Omit isolation, or use t3_thread_launch with environmentId and a worktree workspaceStrategy.',
         });
       }
-      const dispatchSelection =
-        input.dispatchRole === undefined ||
-        target.model !== undefined ||
-        target.options !== undefined ||
-        target.providerInstanceId !== undefined ||
-        target.driverKind !== undefined
-          ? undefined
-          : (yield* forwarding.call(scope, RemoteCapabilitiesTool, target.environmentId, {}))
-              .dispatch?.roles[input.dispatchRole];
       const inherited = parent.thread.modelSelection;
       const instanceId =
         target.driverKind === undefined
-          ? (target.providerInstanceId ?? dispatchSelection?.instanceId ?? inherited.instanceId)
+          ? (target.providerInstanceId ?? inherited.instanceId)
           : yield* resolveRemoteInstance(scope, target.environmentId, {
               driverKind: target.driverKind,
               providerInstanceId: target.providerInstanceId,
               inheritedInstanceId: inherited.instanceId,
             });
       const model =
-        target.model ??
-        dispatchSelection?.model ??
-        (instanceId === inherited.instanceId ? inherited.model : undefined);
+        target.model ?? (instanceId === inherited.instanceId ? inherited.model : undefined);
       if (model === undefined) {
         return yield* new OrchestratorMcpFailure({
           code: "target_required",
@@ -326,7 +348,6 @@ const make = Effect.gen(function* () {
       }
       const options =
         target.options ??
-        dispatchSelection?.options ??
         (instanceId === inherited.instanceId && model === inherited.model
           ? inherited.options
           : undefined);

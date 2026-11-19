@@ -108,7 +108,6 @@ import { AdvancedSettings } from "./AdvancedSettings";
 import { PullRequestLinksOpenInAppSetting } from "./IntegrationsSettings";
 import { StorageCleanupSections } from "./StorageSettings";
 import { UpdateTrackSwitchDialog } from "./UpdateTrackSwitchDialog";
-import { CommanderSettingsSection } from "./CommanderSettings";
 import { environmentIdsKey } from "~/state/environmentAtomList";
 import { environmentSessionStatesAtom } from "~/state/session";
 import { useCheckProviderUpdates } from "../ProviderUpdatesAction";
@@ -1864,7 +1863,6 @@ export function ThreadsSettingsPanel() {
         </SettingsSection>
       ) : null}
 
-      <CommanderSettingsSection />
       <SettingsSection id="text-generation" title="文本生成">
         <SettingsRow
           serverScoped
