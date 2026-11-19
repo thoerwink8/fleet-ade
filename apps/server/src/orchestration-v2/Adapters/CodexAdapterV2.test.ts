@@ -1365,7 +1365,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     transcript: CodexReplay.CodexAppServerReplayTranscript,
     onEvent: (event: ProviderAdapter.ProviderAdapterV2Event) => Effect.Effect<unknown> = () =>
       Effect.void,
-    onRequest: (method: string, params: unknown) => Effect.Effect<void> = () => Effect.void,
+    onRequest: (method: string, _params: unknown) => Effect.Effect<void> = () => Effect.void,
     readChildMetadata?: Parameters<typeof withCodexReplayChildMetadata>[2],
     beforeEmitInbound?: CodexReplay.CodexAppServerReplayDriver["beforeEmitInbound"],
     onUsageLimits?: CodexAdapterV2.CodexAdapterV2Options["onUsageLimits"],
@@ -2908,7 +2908,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       const harness = yield* makeCodexReplayHarness(
         transcript,
         undefined,
-        (method) =>
+        (method: string) =>
           method === "thread/inject_items"
             ? Effect.sync(() => wireOrder.push(method)).pipe(
                 Effect.andThen(Deferred.succeed(restoreRequested, undefined)),
@@ -2917,8 +2917,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        (method) =>
+        (method: string) =>
           Effect.sync(() => {
             if (method === "item/completed" || method === "turn/completed") wireOrder.push(method);
           }),

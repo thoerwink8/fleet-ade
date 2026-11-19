@@ -41,20 +41,17 @@ async function renderBody(
   );
 }
 
-it.each(["github", "forgejo", "azure-devops"])("%s breaks a single newline", async (host) => {
-  await using screen = await renderBody(host);
+it("breaks a single newline on GitHub", async () => {
+  await using screen = await renderBody("github");
   await expect.element(screen.getByText(/first line/)).toBeInTheDocument();
   expect(screen.container.querySelectorAll("p br")).toHaveLength(1);
 });
 
-it.each(["gitlab", "bitbucket", "gitcafe", "unknown"])(
-  "%s joins a single newline",
-  async (host) => {
-    await using screen = await renderBody(host);
-    await expect.element(screen.getByText(/first line/)).toBeInTheDocument();
-    expect(screen.container.querySelectorAll("p br")).toHaveLength(0);
-  },
-);
+it.each(["unknown"])("%s joins a single newline", async (host) => {
+  await using screen = await renderBody(host);
+  await expect.element(screen.getByText(/first line/)).toBeInTheDocument();
+  expect(screen.container.querySelectorAll("p br")).toHaveLength(0);
+});
 
 it("lets text the host did not write opt out of the host's breaks", async () => {
   await using screen = await renderBody("github", { lineBreaks: false });

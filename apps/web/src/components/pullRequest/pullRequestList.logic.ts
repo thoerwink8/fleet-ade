@@ -1007,7 +1007,7 @@ export function findProjectForRepository<
       sourceControlClients.changeRequestHost(identity, identity.provider) === host
     );
   });
-  // Azure repository names can collide across projects on the same host.
+  // A scoped project wins when several projects share the repository name.
   const scoped = findScopedProject(candidates, input.scopedEnvironmentId, input.scopedProjectId);
   return scoped ?? candidates[0];
 }
