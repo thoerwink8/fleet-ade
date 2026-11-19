@@ -321,6 +321,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-sidebar-row-hover: var(--sidebar-row-hover);
   --color-sidebar-row-active: var(--sidebar-row-active);
   --color-sidebar-row-selected: var(--sidebar-row-selected);
+  --color-sidebar-row-current: var(--sidebar-row-current);
+  --color-sidebar-row-current-border: var(--sidebar-row-current-border);
   --color-sidebar-border: var(--contrast-sidebar-border);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -1216,6 +1218,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --sidebar-row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
   --sidebar-row-active: var(--card);
   --sidebar-row-selected: var(--card);
+  --sidebar-row-current: color-mix(in srgb, var(--primary) 8%, var(--card));
+  --sidebar-row-current-border: color-mix(in srgb, var(--primary) 20%, var(--border));
   --sidebar-border: var(--border);
   --sidebar-stage-fade: var(--sidebar);
   --code-background: color-mix(in srgb, var(--card) 90%, var(--background));
@@ -1265,6 +1269,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --sidebar-row-hover: var(--accent);
     --sidebar-row-active: var(--accent);
     --sidebar-row-selected: oklch(0.245 0.009 260);
+    --sidebar-row-current: color-mix(in srgb, var(--primary) 16%, var(--card));
+    --sidebar-row-current-border: color-mix(in srgb, var(--primary) 30%, transparent);
     --terminal-cursor: rgb(180 203 255);
     --terminal-selection-background: rgb(180 203 255 / 25%);
   }

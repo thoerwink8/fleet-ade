@@ -16,6 +16,7 @@ export function CollapsibleSectionHeader({
   tone = "muted",
   variant = "default",
   compact = false,
+  icon,
   accessory,
   ...buttonProps
 }: Omit<ComponentProps<"button">, "className" | "style" | "aria-expanded"> & {
@@ -24,6 +25,8 @@ export function CollapsibleSectionHeader({
   variant?: "default" | "panel";
   /** A 24px row in the 12/16 meta type, for group labels between list rows. */
   compact?: boolean;
+  /** A decorative glyph before the label. */
+  icon?: ReactNode;
   accessory?: ReactNode;
 }) {
   return (
@@ -38,6 +41,11 @@ export function CollapsibleSectionHeader({
         tones[tone].label,
       )}
     >
+      {icon ? (
+        <span aria-hidden className="flex shrink-0">
+          {icon}
+        </span>
+      ) : null}
       <span className="min-w-0 truncate">{children}</span>
       <span
         aria-hidden

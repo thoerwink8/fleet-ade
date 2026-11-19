@@ -199,9 +199,9 @@ type RowStatusDot = {
   label: string;
 };
 
-// The second row of a card names the state in three words (在做 / 卡住 / 做完); only
+// Every card names its state on the second row (在做 / 卡住 / 做完 / 空闲); only
 // a state that needs a person (approval, input) gets the accent dot.
-function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowStatusDot | null {
+function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowStatusDot {
   switch (status) {
     case "preparing":
     case "working":
@@ -216,7 +216,7 @@ function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowS
     case "failed":
       return { variant: "dot-blocked", label: "卡住" };
     case "ready":
-      return hasRun ? { variant: "dot-done", label: "做完" } : null;
+      return { variant: "dot-done", label: hasRun ? "做完" : "空闲" };
   }
 }
 
@@ -1005,7 +1005,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       !props.isActive &&
       "[&:not(:hover):not(:focus-within)_*]:text-secondary-label",
     props.isActive
-      ? "bg-sidebar-row-active text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/60"
+      ? variant === "card"
+        ? "border-sidebar-row-current-border bg-sidebar-row-current text-sidebar-foreground"
+        : "bg-sidebar-row-active text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/60"
       : isSelected || props.sweepAction !== null
         ? "bg-sidebar-row-selected text-sidebar-foreground ring-1 ring-inset ring-sidebar-border/60"
         : hasUnsentDraft
@@ -1637,15 +1639,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               {props.sweepAction !== null ? dragDestination : null}
             </div>
             <div className="flex h-4 min-w-0 items-center gap-2 text-meta text-secondary-label">
-              {rowStatus ? (
-                <Badge variant={rowStatus.variant}>
-                  {/* Not a live region: a collapsed sidebar is inert, so
+              <Badge variant={rowStatus.variant}>
+                {/* Not a live region: a collapsed sidebar is inert, so
                     BackgroundThreadAnnouncer and the open thread's
                     timeline speak status changes instead. */}
-                  {rowStatus.label}
-                  {rowStatusDuration}
-                </Badge>
-              ) : null}
+                {rowStatus.label}
+                {rowStatusDuration}
+              </Badge>
               <span className="min-w-0 truncate text-muted-foreground">
                 {reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel}
               </span>

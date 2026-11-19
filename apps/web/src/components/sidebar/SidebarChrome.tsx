@@ -48,8 +48,10 @@ import { observeResize } from "~/lib/observeResize";
 
 export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   isElectron,
+  actions,
 }: {
   isElectron: boolean;
+  actions?: ReactNode;
 }) {
   const stageLabel = useEnvironmentStageLabel();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
@@ -95,6 +97,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
           </div>
         ) : null}
       </div>
+      {actions ? <div className="relative z-10 flex shrink-0 items-center">{actions}</div> : null}
     </div>
   );
 });
