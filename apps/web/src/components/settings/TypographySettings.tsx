@@ -348,7 +348,7 @@ function ChatReadingSizeRow() {
   return (
     <SettingsRow
       title="正文阅读字号"
-      description="会话回复中 Markdown 正文的字号档位（行高 1.75）。"
+      description="会话回复中 Markdown 正文的字号档位（行高 1.6）。"
       resetAction={
         readingSize !== DEFAULT_CHAT_READING_SIZE ? (
           <SettingResetButton

@@ -134,7 +134,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
      composer input. ui: secondary text, buttons, menu items. meta: timestamps,
      status text, group labels. */
   --font-size-prose: 0.9375rem;
-  --line-height-prose: calc(var(--font-size-prose) * 1.6);
+  --line-height-prose: 1.6;
   --font-size-row: 0.875rem;
   --line-height-row: 1.25rem;
   --font-size-ui: 0.8125rem;
@@ -143,7 +143,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --line-height-meta: 1rem;
   /* Page header title, and dialog or sheet title. */
   --font-size-title: 0.9375rem;
-  --line-height-title: 1.5rem;
+  --line-height-title: 1.375rem;
   --font-size-dialog-title: 1rem;
   --line-height-dialog-title: 1.5rem;
   --thread-details-panel-width: 17.5rem;
@@ -187,14 +187,14 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
    the variables and Settings -> Appearance can override them at runtime. The
    default stacks are mirrored in `appearanceFonts.ts`. */
 @theme {
-  /* System CJK faces sit before Inter so Chinese and Latin text come from the same
-     platform family; Inter only serves platforms with none of them. */
+  /* Apple tokens come first so macOS chooses SF Pro / PingFang SC; Windows skips
+     them and falls onto Segoe UI Variable Text + Microsoft YaHei UI. */
   --font-sans:
-    "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC",
+    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Inter Variable", system-ui,
     sans-serif;
   --font-mono:
-    "Cascadia Mono", ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono",
+    "Cascadia Mono", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "PingFang SC",
     "Microsoft YaHei UI", monospace;
 }
 
@@ -221,8 +221,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --text-title--line-height: var(--line-height-title);
   --text-dialog-title: var(--font-size-dialog-title);
   --text-dialog-title--line-height: var(--line-height-dialog-title);
-  /* The composer line height, 20px at the default 14px prompt size and proportional above it. */
-  --leading-prompt: calc(10 / 7);
+  /* The composer line height, 21px at the default 14px prompt size and proportional above it. */
+  --leading-prompt: 1.5;
   /* Motion. drawer is the decelerating curve for surfaces that slide or pop in
      (composer context, pills). */
   --inset-shadow-control-highlight: 0 1px rgb(255 255 255 / 16%);
@@ -1174,9 +1174,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --muted: oklch(0.952 0.004 270);
   /* Four text tiers: foreground, secondary-label (passes AA on every surface),
      muted-foreground, faint-foreground (separators and shortcut keys). */
-  --muted-foreground: oklch(0.5 0.012 270);
+  --muted-foreground: oklch(0.44 0.012 270);
   --placeholder: var(--muted-foreground);
-  --secondary-label: oklch(0.415 0.012 270);
+  --secondary-label: oklch(0.36 0.012 270);
   --faint-foreground: color-mix(in srgb, var(--muted-foreground) 50%, var(--background));
   --icon-muted: var(--muted-foreground);
   /* One step past the accent, so a user turn stands off the near-white canvas. */
@@ -1246,8 +1246,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --secondary: --alpha(var(--color-white) / 5%);
     --secondary-foreground: var(--color-neutral-100);
     --muted: oklch(0.19 0.006 260);
-    --muted-foreground: var(--color-neutral-400);
-    --secondary-label: oklch(0.77 0.01 260);
+    --muted-foreground: oklch(0.75 0.008 260);
+    --secondary-label: oklch(0.83 0.008 260);
     --accent: --alpha(var(--color-white) / 6%);
     --accent-foreground: var(--color-neutral-100);
     /* A user turn sits above the composer tone, level with the selected sidebar row. */
@@ -1288,7 +1288,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     --accent: oklch(0.24 0.008 260);
     --accent-foreground: #f7f9ff;
     --muted: oklch(0.18 0.006 260);
-    --muted-foreground: #a8adb8;
+    --muted-foreground: #b0b5c0;
     --input: rgb(255 255 255 / 16%);
     --sidebar-foreground: var(--foreground);
     --sidebar-muted-foreground: var(--muted-foreground);
@@ -1736,6 +1736,7 @@ body {
   /* Reference the theme token (not a literal stack) so the Settings ->
      Appearance runtime override of --font-sans reaches all interface text. */
   font-family: var(--font-sans);
+  line-height: 1.5;
   margin: 0;
   padding: 0;
 }
@@ -1917,32 +1918,38 @@ code {
 :is(.chat-markdown, .composer-tiptap) h4,
 :is(.chat-markdown, .composer-tiptap) h5,
 :is(.chat-markdown, .composer-tiptap) h6 {
-  margin: 1.5rem 0 0.5rem;
+  margin: 1.25em 0 0.45em;
   font-weight: 600;
-  line-height: 1.3;
   color: var(--contrast-foreground);
 }
 
 :is(.chat-markdown, .composer-tiptap) h1 {
-  font-size: 1.25rem;
+  font-size: 1.333em;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
 }
 
 :is(.chat-markdown, .composer-tiptap) h2 {
-  font-size: 1.125rem;
+  font-size: 1.2em;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 
 :is(.chat-markdown, .composer-tiptap) h3 {
-  font-size: 1rem;
+  font-size: 1.067em;
+  line-height: 1.4;
 }
 
-:is(.chat-markdown, .composer-tiptap) h4,
+:is(.chat-markdown, .composer-tiptap) h4 {
+  font-size: 1em;
+  line-height: 1.45;
+}
+
 :is(.chat-markdown, .composer-tiptap) h5,
 :is(.chat-markdown, .composer-tiptap) h6 {
-  font-size: 0.875rem;
-}
-
-:is(.chat-markdown, .composer-tiptap) h6 {
-  color: var(--contrast-muted-foreground);
+  font-size: 0.933em;
+  line-height: 1.45;
+  color: var(--contrast-secondary-label);
 }
 
 :is(.chat-markdown, .composer-tiptap) ul {
@@ -2174,9 +2181,9 @@ code {
   background: color-mix(in srgb, var(--contrast-foreground) 5.5%, transparent);
   padding: 2px 6px;
   color: var(--contrast-foreground);
-  font-size: var(--font-size-ui);
+  font-size: 0.875em;
   font-weight: 400;
-  line-height: var(--line-height-ui);
+  line-height: 1.45;
 
   /* A heavy white block on dark; keep it a faint tint. */
   @variant dark {
@@ -2204,6 +2211,7 @@ code {
   border-radius: 0.5rem;
   background: var(--muted);
   padding: 0.8rem 0.9rem;
+  line-height: 1.55;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--contrast-border) 78%, transparent) transparent;
 }
@@ -2212,6 +2220,7 @@ code {
   border: none;
   background: transparent;
   padding: 0;
+  line-height: 1.55;
 }
 
 .chat-markdown pre::-webkit-scrollbar {
@@ -2232,6 +2241,7 @@ code {
   border: none;
   border-radius: 0;
   background: transparent;
+  line-height: 1.55;
 }
 
 :is(.chat-markdown, .composer-tiptap) .chat-markdown-codeblock[data-wrap="true"] pre {
@@ -2297,7 +2307,8 @@ code {
   overflow-wrap: normal;
   word-break: normal;
   /* One step under 15px prose. */
-  font-size: 0.875rem;
+  font-size: var(--font-size-row);
+  line-height: 1.5;
 }
 
 /* Top-aligned so wrapped rows share a first line, and the outer columns sit

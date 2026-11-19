@@ -240,7 +240,7 @@ export function SettingsSection({
           className="flex min-h-7 items-start justify-between gap-4 px-3 sm:px-4"
         >
           <div className="flex min-w-0 items-center gap-1">
-            <h2 className="flex min-h-7 items-center gap-2 text-base font-semibold text-foreground">
+            <h2 className="flex min-h-7 items-center gap-2 text-dialog-title font-semibold text-foreground">
               {icon}
               {title}
             </h2>
@@ -503,7 +503,7 @@ export function SettingsRow({
       <div className="flex flex-col gap-3 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_auto] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-8">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-h-5 items-center gap-1.5">
-            <h3 className="text-sm font-medium text-foreground">{title}</h3>
+            <h3 className="text-row font-semibold text-foreground">{title}</h3>
             {renderedInheritance ? (
               <span
                 className={cn(
@@ -522,12 +522,12 @@ export function SettingsRow({
             </span>
           </div>
           {description ? (
-            <p className="max-w-2xl text-pretty text-xs leading-normal text-muted-foreground">
+            <p className="max-w-2xl text-pretty text-ui leading-relaxed text-muted-foreground">
               {description}
             </p>
           ) : null}
           {renderedStatus ? (
-            <div className="pt-0.5 text-xs text-muted-foreground">{renderedStatus}</div>
+            <div className="pt-0.5 text-meta text-muted-foreground">{renderedStatus}</div>
           ) : null}
         </div>
         {renderedControl ? (

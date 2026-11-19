@@ -265,7 +265,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
           <div className="flex flex-col gap-2">
             <div
               className={cn(
-                "flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+                "flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-row font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
                 !compactSearchOpen && "max-md:hidden",
               )}
             >
@@ -319,7 +319,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
             {isSearching && results.length === 0 ? (
               <p
                 role="status"
-                className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
+                className="px-2 py-6 text-center text-ui text-sidebar-muted-foreground"
               >
                 未找到设置
               </p>
@@ -349,10 +349,10 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                     >
                       <SettingsSectionIcon to={item.to} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-sidebar-foreground">
+                        <span className="block truncate text-row font-medium text-sidebar-foreground">
                           {item.title}
                         </span>
-                        <span className="block truncate text-2xs text-sidebar-muted-foreground/75">
+                        <span className="block truncate text-meta text-sidebar-muted-foreground">
                           {SETTINGS_SECTION_LABELS[item.to]}
                         </span>
                       </span>
@@ -383,7 +383,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                       <h3
                         id={`settings-nav-group-${index}`}
                         className={cn(
-                          "px-2 text-xs font-medium text-sidebar-muted-foreground/80",
+                          "px-2 text-meta font-semibold text-sidebar-muted-foreground",
                           group.headingHidden ? "sr-only" : !compactSearchOpen && "max-md:sr-only",
                         )}
                       >

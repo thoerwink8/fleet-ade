@@ -116,7 +116,7 @@ export function ComposerPermissionsSection(props: {
   const descriptionId = useId();
   return (
     <div data-composer-permissions className="grid w-72 gap-1.5 px-2 py-1.5">
-      <div className="font-medium text-muted-foreground text-xs">权限</div>
+      <div className="font-semibold text-muted-foreground text-meta">权限</div>
       <MenuPrimitive.RadioGroup
         aria-label="权限"
         value={props.runtimeMode}
@@ -170,14 +170,14 @@ export function ComposerPermissionsSection(props: {
         <span
           className={
             shownMode === props.runtimeMode
-              ? "text-foreground text-sm"
-              : "text-muted-foreground text-sm"
+              ? "text-foreground text-row"
+              : "text-muted-foreground text-row"
           }
         >
           {shown.label}
         </span>
         {/* Two lines reserved so the menu does not shift while you preview modes. */}
-        <span className="min-h-8 text-muted-foreground text-xs leading-4">
+        <span className="min-h-8 text-muted-foreground text-meta">
           {shown.disabledReason ?? shown.description}
         </span>
       </div>

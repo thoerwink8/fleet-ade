@@ -1841,8 +1841,7 @@ function ChatMarkdown({
       ref={bindMarkdownRef}
       className={cn(
         "chat-markdown w-full min-w-0 [overflow-wrap:anywhere] [word-break:break-word]",
-        !inline &&
-          "chat-markdown-prose text-foreground/[calc(90%+var(--appearance-contrast-boost)/10)]",
+        !inline && "chat-markdown-prose text-foreground",
         className,
       )}
       data-streaming={componentState.isStreaming ? "" : undefined}

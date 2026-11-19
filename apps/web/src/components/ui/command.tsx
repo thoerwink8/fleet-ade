@@ -212,7 +212,7 @@ function CommandShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
   return (
     <kbd
       className={cn(
-        "ms-auto font-medium font-sans text-secondary-label text-xs tracking-widest",
+        "ms-auto font-medium font-sans text-secondary-label text-meta tracking-normal",
         className,
       )}
       data-slot="command-shortcut"
@@ -225,7 +225,7 @@ function CommandFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "relative flex items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] border-t border-foreground/[0.07] bg-foreground/[0.025] px-[var(--command-content-inset)] py-2.5 font-medium text-sm text-muted-foreground [&_[data-slot=kbd-group]]:font-sans [&_[data-slot=kbd]]:bg-foreground/[0.08] [&_[data-slot=kbd]]:text-foreground [&_[data-slot=kbd]]:ring-0",
+        "relative flex items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] border-t border-foreground/[0.07] bg-foreground/[0.025] px-[var(--command-content-inset)] py-2.5 font-normal text-row text-muted-foreground [&_[data-slot=kbd-group]]:font-sans [&_[data-slot=kbd]]:bg-foreground/[0.08] [&_[data-slot=kbd]]:text-foreground [&_[data-slot=kbd]]:ring-0",
         className,
       )}
       data-slot="command-footer"
@@ -243,7 +243,7 @@ function CommandFooterAction({
       {...props}
       variant="ghost-muted"
       size="xs"
-      className={cn("h-auto px-2 text-xs hover:bg-transparent", className)}
+      className={cn("h-auto px-2 text-meta hover:bg-transparent", className)}
     />
   );
 }
