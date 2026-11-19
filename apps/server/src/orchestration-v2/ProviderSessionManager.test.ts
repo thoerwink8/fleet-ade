@@ -4655,11 +4655,11 @@ it.effect.each([
         assert.equal((yield* Ref.get(state)).resumeCount, ++resumeCount);
         yield* resumeSecondThread;
         assert.equal((yield* Ref.get(state)).resumeCount, ++resumeCount);
-        // regression: #26722 a Linked environments change reloads only the idle thread's tools.
+        // The retired linkedEnvironmentsEnabled flag no longer reloads the idle thread.
         yield* settings.updateSettings({ linkedEnvironmentsEnabled: true });
         yield* resumeSecondThread;
-        assert.equal((yield* Ref.get(state)).resumeCount, ++resumeCount);
-        assert.deepEqual((yield* Ref.get(state)).unloadedNativeThreadIds, ["native-thread"]);
+        assert.equal((yield* Ref.get(state)).resumeCount, resumeCount);
+        assert.deepEqual((yield* Ref.get(state)).unloadedNativeThreadIds, []);
         const subscribe = firstRuntime.subscribeEvents;
         assert.isDefined(subscribe);
         if (subscribe === undefined) return;
@@ -4693,7 +4693,7 @@ it.effect.each([
         yield* resumeSecondThread;
         assert.equal((yield* Ref.get(state)).resumeCount, ++resumeCount);
 
-        assert.deepEqual((yield* Ref.get(state)).unloadedNativeThreadIds, ["native-thread"]);
+        assert.deepEqual((yield* Ref.get(state)).unloadedNativeThreadIds, []);
 
         const reloadCases = [
           {
@@ -4732,10 +4732,7 @@ it.effect.each([
         assert.isTrue(Option.isSome(yield* manager.get(providerSessionId)));
         assert.equal((yield* Ref.get(state)).closeCount, 0);
         assert.equal((yield* Ref.get(state)).interruptCount, 1);
-        assert.deepEqual((yield* Ref.get(state)).unloadedNativeThreadIds, [
-          "native-thread",
-          "native-thread",
-        ]);
+        assert.deepEqual((yield* Ref.get(state)).unloadedNativeThreadIds, ["native-thread"]);
 
         yield* manager.detach({ providerSessionId, threadId: secondThreadId });
         yield* TestClock.adjust("1 second");
@@ -5320,7 +5317,7 @@ it.effect(
 );
 
 it.effect(
-  "ProviderSessionManagerV2 rejects a second thread when the provider runtime is exclusive, and reopens it when Linked environments changes",
+  "ProviderSessionManagerV2 rejects a second thread when the provider runtime is exclusive",
   () =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
@@ -5372,7 +5369,7 @@ it.effect(
         assert.equal(error._tag, "ProviderSessionOpenError");
         assert.equal((yield* Ref.get(state)).openCount, 1);
 
-        // regression: #26722 an exclusive runtime configures MCP at open, so it reopens.
+        // The retired linkedEnvironmentsEnabled flag no longer forces a reopen.
         yield* settings.updateSettings({ linkedEnvironmentsEnabled: true });
         yield* manager.open({
           threadId: firstThreadId,
@@ -5380,8 +5377,8 @@ it.effect(
           modelSelection,
           runtimePolicy,
         });
-        assert.equal((yield* Ref.get(state)).openCount, 2);
-        assert.equal((yield* Ref.get(state)).closeCount, 1);
+        assert.equal((yield* Ref.get(state)).openCount, 1);
+        assert.equal((yield* Ref.get(state)).closeCount, 0);
       });
 
       yield* effect.pipe(

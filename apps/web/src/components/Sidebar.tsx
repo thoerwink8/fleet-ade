@@ -988,8 +988,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       );
     },
   });
-  const boringSidebarEnabled = useClientSettings((settings) => settings.boringSidebarEnabled);
-  const folderRowsMultiline = useClientSettings((settings) => settings.boringSidebarMultilineRows);
   const newThreadContext = useHandleNewThread();
   // Row callbacks capture only the handler; the rest of the context changes with the route.
   const { handleNewThread } = newThreadContext;
@@ -1353,14 +1351,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     threads: listedThreads,
     delegatedUnderParent,
     routeRowThreadKey,
-    folderGroups: boringSidebarEnabled
-      ? scopedProjectGroups.length === 0
-        ? // An archived project keeps a folder for its active threads, below the rest.
-          [...scopeGroups, ...projectGroups.filter((project) => project.archived)]
-        : scopedProjectGroups
-      : null,
-    keepEmptyFolders: (group) =>
-      scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
+    folderGroups: null,
+    keepEmptyFolders: () => true,
   });
 
   // Ranked across environments as the palette ranks them, so one
@@ -3389,13 +3381,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           section === "pinned" ||
                           section === "working" ||
                           section === "settled";
-                        const rowVariant = folderRow
-                          ? folderRowsMultiline
-                            ? "folder-multiline"
-                            : "folder"
-                          : isCard
-                            ? "card"
-                            : "slim";
+                        const rowVariant = folderRow ? "folder" : isCard ? "card" : "slim";
                         return (
                           <SortableThreadRow
                             key={threadKey}

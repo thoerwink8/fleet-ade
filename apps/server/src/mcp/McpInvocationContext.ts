@@ -141,8 +141,6 @@ export interface McpInvocationScope {
   readonly requestNamespace: string;
   readonly thread: McpThreadCaller | undefined;
   readonly client: McpClientCaller | undefined;
-  /** False while the Linked environments beta is off here; `/mcp` reads it per request. */
-  readonly linkedEnvironments?: boolean;
 }
 
 /**
@@ -175,13 +173,6 @@ export const hiddenFromSubagents = (): boolean => {
   const fiber = Fiber.getCurrent();
   const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
   return scope?.thread?.subagent !== true;
-};
-
-/** `McpSchema.EnabledWhen` for tools that only serve links, hidden while the beta is off. */
-export const hiddenWhileLinksOff = (): boolean => {
-  const fiber = Fiber.getCurrent();
-  const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
-  return scope?.linkedEnvironments !== false;
 };
 
 /** `McpSchema.EnabledWhen` for coordinator RPCs that only linked T3 environments call. */

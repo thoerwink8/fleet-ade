@@ -34,11 +34,9 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import { Tool } from "effect/ai";
-import * as McpSchema from "effect/ai/McpSchema";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import { taskPrompt } from "../../apps/server/src/mcp/delegatedTaskModes.ts";
-import * as McpInvocationContext from "../../apps/server/src/mcp/McpInvocationContext.ts";
 import { advertisedJsonSchema } from "../../apps/server/src/mcp/advertisedJsonSchema.ts";
 import * as Contracts from "@t3tools/contracts";
 import {
@@ -479,14 +477,6 @@ const PREVIEW_TOOLS = new Set(
 );
 const decodePreviewError = Schema.decodeUnknownOption(PreviewAutomationError);
 const previewFailure = (mock: unknown) => Option.getOrUndefined(decodePreviewError(mock));
-const enabledWhen = (predicate: () => boolean) =>
-  new Set(
-    t3SourceTools
-      .filter(
-        (tool) => Context.getOrUndefined(tool.annotations, McpSchema.EnabledWhen) === predicate,
-      )
-      .map((tool) => `${T3_PREFIX}${tool.name}`),
-  );
 // Claude Code loads a tool whose `_meta` sets anthropic/alwaysLoad up front instead of deferring it.
 const alwaysLoaded = new Set(
   t3SourceTools
@@ -507,16 +497,8 @@ export const savesPastedSecrets = t3Tools.some(
 /** A request_secret call that hands T3 a pasted secret, on a ref that takes one. */
 const pastedSecret = (name: string, input: Readonly<Record<string, unknown>>) =>
   savesPastedSecrets && name === "request_secret" && typeof input.value === "string";
-// T3 does not offer these to a delegated child, so its harness never lists them.
-const hiddenFromSubagents = enabledWhen(McpInvocationContext.hiddenFromSubagents);
-// The Linked environments beta starts off, and T3 lists its tools only while it is on.
-const hiddenWhileLinksOff = enabledWhen(McpInvocationContext.hiddenWhileLinksOff);
-const visibleT3Tools = (options: { readonly subagent?: boolean; readonly links?: boolean }) =>
-  t3Tools.filter(
-    (tool) =>
-      (options.links === true || !hiddenWhileLinksOff.has(tool.name)) &&
-      !(options.subagent === true && hiddenFromSubagents.has(tool.name)),
-  );
+const visibleT3Tools = (options: { readonly subagent?: boolean }) =>
+  t3Tools.filter((tool) => !(options.subagent === true && hiddenFromSubagents.has(tool.name)));
 
 /**
  * T3's Claude Code options for an eval thread: its system prompt append and its hooks. `device` and
@@ -2554,7 +2536,6 @@ const main = Effect.gen(function* () {
     role: McpToolUseCase["setup"]["role"],
     deviceAccess: boolean,
     browserAccess: boolean,
-    links: boolean,
   ): Effect.Effect<Base, Schema.SchemaError> =>
     codex
       ? decodeCodexCapture(template).pipe(
@@ -2564,7 +2545,6 @@ const main = Effect.gen(function* () {
               keepUserInstructions,
               effort: flags.effort,
               subagent: role === "delegated-child",
-              links,
               deviceAccess,
               browserAccess,
             }),
@@ -2576,8 +2556,6 @@ const main = Effect.gen(function* () {
               model: flags.model,
               keepUserInstructions,
               subagent: role === "delegated-child",
-              nativeSubagent: role === "native-subagent",
-              links,
               deviceAccess,
               browserAccess,
             });
@@ -2590,19 +2568,18 @@ const main = Effect.gen(function* () {
         );
   // Codex has no native subagents; its cases with that role run as top-level threads.
   const baseKey = ({ setup }: McpToolUseCase) =>
-    `${codex && setup.role === "native-subagent" ? "top" : setup.role}:${setup.world?.deviceAgentAccess !== false}:${setup.world?.browserAgentAccess !== false}:${setup.linkedEnvironments === true}`;
-  const base = yield* buildFor("top", true, true, false);
-  const bases = new Map<string, Base>([["top:true:true:false", base]]);
+    `${codex && setup.role === "native-subagent" ? "top" : setup.role}:${setup.world?.deviceAgentAccess !== false}:${setup.world?.browserAgentAccess !== false}`;
+  const base = yield* buildFor("top", true, true);
+  const bases = new Map<string, Base>([["top:true:true", base]]);
   for (const testCase of selected) {
     const key = baseKey(testCase);
     if (bases.has(key)) continue;
-    const [role = "top", device, browser, links] = key.split(":") as [
+    const [role = "top", device, browser] = key.split(":") as [
       McpToolUseCase["setup"]["role"],
       string,
       string,
-      string,
     ];
-    bases.set(key, yield* buildFor(role, device === "true", browser === "true", links === "true"));
+    bases.set(key, yield* buildFor(role, device === "true", browser === "true"));
   }
   const baseFor = (testCase: McpToolUseCase) => bases.get(baseKey(testCase)) ?? base;
   const effort = flags.effort ?? base.codex?.reasoning.effort ?? "high";

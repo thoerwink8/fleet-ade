@@ -52,7 +52,7 @@
    sudo bash scripts/deploy/france-install.sh <40位提交SHA> [--github-app-source <App JSON>]
    ```
 
-   脚本会自动完成：建 `ade` 用户与目录、校验并安装 Node `26.12.1` + `pnpm@12.14.0`、配好 GitHub App 凭据与 git 凭据助手（第 4 节）、在临时构建 cgroup 中编译 `t3`、合并 `settings.json`（开启 `linkedEnvironmentsEnabled: true` 与 `maxConcurrentSessions: 2`）、安装 `ade.slice` 与 `fleet-ade.service`、配置 `ufw` 仅在 `wg-fleet` 放行 `3773/tcp`、启动服务并校验监听地址。
+   脚本会自动完成：建 `ade` 用户与目录、校验并安装 Node `26.12.1` + `pnpm@12.14.0`、配好 GitHub App 凭据与 git 凭据助手（第 4 节）、在临时构建 cgroup 中编译 `t3`、合并 `settings.json`（设置 `maxConcurrentSessions: 2`；机器互连始终开启）、安装 `ade.slice` 与 `fleet-ade.service`、配置 `ufw` 仅在 `wg-fleet` 放行 `3773/tcp`、启动服务并校验监听地址。
 
 ### 4.1 GitHub App 凭据（`ade` 推 PR 用）
 
@@ -99,7 +99,7 @@ sudo bash /var/lib/fleet-ade/app/scripts/deploy/france-update.sh <新的40位提
    ```
 
 3. **在本机 ADE 配对**：
-   - 在本机 ADE 设置中开启机器互连（`linkedEnvironmentsEnabled`）；
+   - 机器互连始终开启，无需配置 `linkedEnvironmentsEnabled`；
    - 在环境列表中添加远端环境，填入上一步输出的 `http://192.0.2.2:3773/pair#token=...` 配对地址，完成后状态显示为「已连接」。
 4. **查看与立即撤销会话**：
 

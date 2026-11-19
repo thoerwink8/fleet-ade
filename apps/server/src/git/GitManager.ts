@@ -786,19 +786,8 @@ export const make = Effect.gen(function* () {
     return result;
   });
   const readWorktreeCreationSettings = serverSettingsService.getSettings.pipe(
-    Effect.map((settings) => ({
-      worktreesDirectory: settings.worktreesDirectory,
-      fastCheckout: settings.fastWorktreeCheckout,
-    })),
+    Effect.map((settings) => ({ worktreesDirectory: settings.worktreesDirectory })),
     Effect.orElseSucceed(() => ({ worktreesDirectory: "" })),
-  );
-  // Turning fast checkout off deletes its cache right away, not at the next worktree.
-  yield* serverSettingsService.streamChanges.pipe(
-    Stream.map((settings) => settings.fastWorktreeCheckout),
-    Stream.changes,
-    Stream.filter((enabled) => !enabled),
-    Stream.runForEach(() => gitCore.clearWorktreeCheckoutCache),
-    Effect.forkScoped,
   );
   const createWorktree: GitManager["Service"]["createWorktree"] = Effect.fn(
     "GitManager.createWorktree",

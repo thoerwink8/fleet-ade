@@ -266,8 +266,6 @@ const deviceServiceStateFields = {
   supportsToolInspection: Schema.optional(Schema.Boolean),
   /** Servers from before EAS hosts ignore `easDeviceHosts`, so clients offer them only when set. */
   supportsEasHosts: Schema.optional(Schema.Boolean),
-  /** Servers from before Simlock hosts ignore `simlockDeviceHosts`. */
-  supportsSimlockHosts: Schema.optional(Schema.Boolean),
   hostStatus: DeviceHostStatus,
   hostStatusDetail: Schema.optional(Schema.String),
   hostStatuses: DeviceHostStatuses,

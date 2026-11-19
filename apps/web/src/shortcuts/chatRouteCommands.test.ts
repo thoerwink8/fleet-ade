@@ -1,9 +1,8 @@
-import { DEFAULT_CLIENT_SETTINGS, EnvironmentId, ProjectId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import * as commandPalette from "../commandPaletteBus";
-import * as settings from "../hooks/useSettings";
 import * as storage from "../hooks/useLocalStorage";
 import * as threadActions from "../lib/chatThreadActions";
 import * as entities from "../state/entities";
@@ -29,15 +28,10 @@ function project(id: string): Project {
 
 describe("new thread commands", () => {
   it.each([
-    { mode: "normal", count: 2, command: "chat.new", picker: true },
-    { mode: "boring", count: 2, command: "chat.new", picker: true },
-    { mode: "boring", count: 1, command: "chat.new", picker: false },
-    { mode: "boring", count: 2, command: "chat.newLocal", picker: false },
-  ] as const)("$mode sidebar, $count projects, $command: picker=$picker", (scenario) => {
-    using _settings = vi.spyOn(settings, "getClientSettings").mockReturnValue({
-      ...DEFAULT_CLIENT_SETTINGS,
-      boringSidebarEnabled: scenario.mode === "boring",
-    });
+    { count: 2, command: "chat.new", picker: true },
+    { count: 1, command: "chat.new", picker: false },
+    { count: 2, command: "chat.newLocal", picker: false },
+  ] as const)("$count projects, $command: picker=$picker", (scenario) => {
     using _projects = vi
       .spyOn(entities, "readProjects")
       .mockReturnValue([project("active"), project("idle")].slice(0, scenario.count));

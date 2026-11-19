@@ -3,13 +3,7 @@ import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection
 import * as shelfHooks from "../state/olderSettledShelf";
 import { createWorkspaceFocusController, workspaceAreaProps } from "../lib/workspaceFocus";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import {
-  DEFAULT_CLIENT_SETTINGS,
-  EnvironmentId,
-  ProjectId,
-  ThreadId,
-  type ScopedThreadRef,
-} from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
 import { isMacPlatform } from "@t3tools/shared/keybindings";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
@@ -76,18 +70,13 @@ function project(id: string): Project {
 
 describe("sidebar header new thread", () => {
   it.each([
-    { mode: "normal", count: 2, shift: false, picker: true },
-    { mode: "boring", count: 2, shift: false, picker: true },
-    { mode: "boring", count: 2, shift: true, picker: false },
-    { mode: "boring", count: 1, shift: false, picker: false },
-  ] as const)("$mode sidebar, $count projects, shift=$shift: picker=$picker", async (scenario) => {
+    { count: 2, shift: false, picker: true },
+    { count: 2, shift: true, picker: false },
+    { count: 1, shift: false, picker: false },
+  ] as const)("$count projects, shift=$shift: picker=$picker", async (scenario) => {
     using stack = new DisposableStack();
     const previousSettings = getClientSettings();
     stack.defer(() => __setClientSettingsForTests(previousSettings));
-    __setClientSettingsForTests({
-      ...DEFAULT_CLIENT_SETTINGS,
-      boringSidebarEnabled: scenario.mode === "boring",
-    });
     const projects = [project("active"), project("idle")].slice(0, scenario.count);
     const currentProjectRef = {
       environmentId: projects[0]!.environmentId,

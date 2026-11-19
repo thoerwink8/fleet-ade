@@ -25,7 +25,6 @@ import {
   type DeviceSimlockIdentityInput,
   type DeviceHostConfig,
   type EasDeviceHostConfig,
-  type SimlockDeviceHostConfig,
   type SshDeviceHostConfig,
   type DeviceHostSummary,
   LOCAL_DEVICE_HOST_ID,
@@ -315,7 +314,6 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
       supportsToolUpdate: installTool !== undefined,
       supportsToolInspection: true,
       supportsEasHosts: true,
-      supportsSimlockHosts: true,
       hosts: initialHosts,
       hostStatus: initialSettings.enabled ? "idle" : "disabled",
       hostStatuses: {},
@@ -1553,18 +1551,12 @@ export const make = Effect.gen(function* () {
     );
   });
   const changes = yield* settings.subscribeChanges;
-  // Each kind has its own settings list; an id two lists share stays the first one's.
   const configuredHosts = (value: {
     readonly deviceHosts: ReadonlyArray<SshDeviceHostConfig>;
     readonly easDeviceHosts: ReadonlyArray<EasDeviceHostConfig>;
-    readonly simlockDeviceHosts: ReadonlyArray<SimlockDeviceHostConfig>;
-    readonly simlockDeviceHostsEnabled: boolean;
   }): ReadonlyArray<DeviceHostConfig> => {
     const hosts: Array<DeviceHostConfig> = [...value.deviceHosts];
-    for (const host of [
-      ...value.easDeviceHosts,
-      ...(value.simlockDeviceHostsEnabled ? value.simlockDeviceHosts : []),
-    ]) {
+    for (const host of value.easDeviceHosts) {
       if (!hosts.some((existing) => existing.id === host.id)) hosts.push(host);
     }
     return hosts;
