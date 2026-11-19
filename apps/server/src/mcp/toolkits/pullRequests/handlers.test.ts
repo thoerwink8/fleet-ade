@@ -332,38 +332,59 @@ describe("pull request toolkit handlers", () => {
     }),
   );
 
-  it.effect("builds the URL in the project host's own shape", () =>
+  it.effect("builds the URL in the GitHub project's host shape", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness({
         project: makeProject({
-          canonicalKey: "gitlab.com/group/sub/project",
+          canonicalKey: "github.com/group/project",
           locator: {
             source: "git-remote",
             remoteName: "origin",
-            remoteUrl: "git@gitlab.com:group/sub/project.git",
+            remoteUrl: "git@github.com:group/project.git",
           },
-          provider: SourceControlProviderKind.make("gitlab"),
-          displayName: "group/sub/project",
+          provider: SourceControlProviderKind.make("github"),
+          displayName: "group/project",
         }),
       });
       const result = yield* harness.call("link_pull_request", {
-        repository: "group/sub/project",
+        repository: "group/project",
         number: 42,
       });
-      expect(result.url).toBe("https://gitlab.com/group/sub/project/-/merge_requests/42");
-      expect(result.host).toBe("gitlab.com");
+      expect(result.url).toBe("https://github.com/group/project/pull/42");
+      expect(result.host).toBe("github.com");
       const other = yield* harness.call("link_pull_request", {
-        host: "gitlab.example.test",
+        host: "github.example.test",
         repository: "team/repo",
         number: 7,
       });
-      expect(other.url).toBe("https://gitlab.example.test/team/repo/-/merge_requests/7");
+      expect(other.url).toBe("https://github.example.test/team/repo/pull/7");
       const onGitHub = yield* harness.call("link_pull_request", {
         host: "github.com",
         repository: "acme/web",
         number: 9,
       });
       expect(onGitHub.url).toBe("https://github.com/acme/web/pull/9");
+    }),
+  );
+
+  it.effect("cannot build a URL for a retired host", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness({
+        project: makeProject({
+          canonicalKey: "gitlab.com/group/project",
+          locator: {
+            source: "git-remote",
+            remoteName: "origin",
+            remoteUrl: "git@gitlab.com:group/project.git",
+          },
+          provider: SourceControlProviderKind.make("gitlab"),
+          displayName: "group/project",
+        }),
+      });
+      const error = yield* harness
+        .call("link_pull_request", { repository: "group/project", number: 42 })
+        .pipe(Effect.flip);
+      expect(error).toMatchObject({ _tag: "PullRequestUrlUnavailableError" });
     }),
   );
 

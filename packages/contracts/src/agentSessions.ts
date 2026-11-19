@@ -5,7 +5,7 @@ import { ProviderInstanceId } from "./providerInstance.ts";
 /**
  * `pi` stays so an old imported-transcript row still decodes. The import UI does not offer it.
  */
-export const RETIRED_AGENT_SESSION_SOURCES = ["pi"] as const;
+const RETIRED_AGENT_SESSION_SOURCES = ["pi"] as const;
 const ACTIVE_AGENT_SESSION_SOURCES = ["claudeAgent", "codex"] as const;
 export const AgentSessionSource = Schema.Literals([
   ...ACTIVE_AGENT_SESSION_SOURCES,

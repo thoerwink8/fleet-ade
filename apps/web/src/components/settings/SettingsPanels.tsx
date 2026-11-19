@@ -72,11 +72,7 @@ import {
 import { useTextGenerationTargets } from "../../textGenerators";
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { isMacPlatform } from "../../lib/utils";
-import {
-  useEnvironmentProviders,
-  useEnvironments,
-  usePrimaryEnvironmentId,
-} from "../../state/environments";
+import { useEnvironmentProviders, useEnvironments } from "../../state/environments";
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import { Button } from "../ui/button";
 import { DraftInput } from "../ui/draft-input";
@@ -2160,8 +2156,7 @@ export function MaintenanceSettingsPanel() {
 
 export function AboutSettingsPanel() {
   const primaryPolicy = usePrimaryManagedPolicy();
-  // The Welcome page sets up this computer, so it needs one.
-  const primaryEnvironmentId = usePrimaryEnvironmentId();
+
   return (
     <SettingsPageContainer>
       <SettingsSection id="about" title="应用">
@@ -2196,17 +2191,6 @@ export function AboutSettingsPanel() {
           </>
         )}
         <MobileAppSettingsRow />
-        {primaryEnvironmentId === null ? null : (
-          <SettingsRow
-            {...searchableSetting("welcome-page")}
-            description="查看你的智能体、导入项目并设置手机。"
-            control={
-              <Button size="sm" variant="outline" render={<Link to="/welcome" />}>
-                打开
-              </Button>
-            }
-          />
-        )}
       </SettingsSection>
 
       <SettingsSection id="legal" title="法律信息">

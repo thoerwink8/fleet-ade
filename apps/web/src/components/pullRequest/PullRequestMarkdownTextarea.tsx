@@ -161,7 +161,7 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   else if (ref) ref.current = value;
 }
 
-/** A markdown textarea for pull request text that completes `@login`, `#123` and GitLab `!123`. */
+/** A markdown textarea for pull request text that completes `@login` and `#123`. */
 export function PullRequestMarkdownTextarea({
   ref,
   value,

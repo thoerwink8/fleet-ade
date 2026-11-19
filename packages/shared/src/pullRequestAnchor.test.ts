@@ -91,7 +91,6 @@ it("keeps the commit scope of a PR diff permalink", () => {
   expect(pullRequestLinkCommit(`${url}/files#diff-abcR5`)).toBeNull();
 });
 
-const gitlab = "https://gitlab.com/group/repo/-/merge_requests/7";
 it.each([
   [`${url}/files`, "code"],
   [`${url}/files/`, "code"],
@@ -99,9 +98,6 @@ it.each([
   [`${url}/commits/${"a".repeat(40)}`, "code"],
   [`${url}/commits`, "commits"],
   [`${url}/checks?check_run_id=1`, "checks"],
-  [`${gitlab}/diffs`, "code"],
-  [`${gitlab}/commits`, "commits"],
-  [`${gitlab}/pipelines`, "checks"],
 ] as const)("keeps unknown and missing hashes in the tab %s names", (path, kind) => {
   for (const hash of ["", "#unknown", "#diff-abcR0", "#diff-abcR9999999999999999999", "#%ZZ"]) {
     expect(parsePullRequestAnchor(`${path}${hash}`)).toEqual({ kind });
@@ -132,23 +128,4 @@ it("finds a review with no text of its own through the earliest comment it poste
     "pullrequestreview-8",
   );
   expect(resolvePullRequestReviewAnchor("issuecomment-9", [], threads)).toBe("issuecomment-9");
-});
-
-it("reads GitLab merge request file and line anchors", () => {
-  const path = "internal/commands/issuable/view/issuable_view_test.go";
-  const digest = "0cd3702f060909d3161d1095b8347d4d07671427";
-  expect(pullRequestDiffPathMatches(digest, path)).toBe(true);
-  expect(parsePullRequestAnchor(`${gitlab}/diffs#${digest}`)).toEqual({
-    kind: "diff",
-    digest,
-    range: null,
-  });
-  expect(parsePullRequestAnchor(`${gitlab}/diffs#${digest}_248_253`)).toEqual({
-    kind: "diff",
-    digest,
-    range: { start: 253, side: "right", end: 253, endSide: "right" },
-  });
-  expect(parsePullRequestAnchor(`${gitlab}/diffs#${digest}_12_0`)).toMatchObject({
-    range: { start: 12, side: "left" },
-  });
 });

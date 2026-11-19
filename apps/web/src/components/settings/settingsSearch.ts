@@ -886,13 +886,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/about",
     searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
   },
-  {
-    id: "welcome-page",
-    title: "欢迎页",
-    to: "/settings/about",
-    primaryEnvironmentOnly: true,
-    searchTerms: ["onboarding setup first run getting started agents import projects"],
-  },
+
   {
     id: "telemetry-export",
     title: "OpenTelemetry 导出",

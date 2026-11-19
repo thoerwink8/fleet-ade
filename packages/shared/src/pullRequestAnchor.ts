@@ -37,20 +37,17 @@ function normalizePullRequestCommentAnchor(anchor: string): string {
   );
 }
 
-// GitHub pull request tabs and their GitLab merge request equivalents.
 function pullRequestPathTab(pathname: string): PullRequestAnchor | null {
-  const tab = /\/(?:pull|-\/merge_requests)\/\d+\/([a-z]+)(?:\/(.*))?$/i.exec(pathname);
+  const tab = /\/pull\/\d+\/([a-z]+)(?:\/(.*))?$/i.exec(pathname);
   const rest = tab?.[2] ?? "";
   switch (tab?.[1]?.toLowerCase()) {
     case "files":
     case "changes":
-    case "diffs":
       return { kind: "code" };
     case "commits":
       if (rest === "") return { kind: "commits" };
       return /^[a-f0-9]{40}\/?$/i.test(rest) ? { kind: "code" } : null;
     case "checks":
-    case "pipelines":
       return rest === "" ? { kind: "checks" } : null;
     default:
       return null;
@@ -89,19 +86,6 @@ export function parsePullRequestAnchor(url: string | null | undefined): PullRequ
           }
         : null,
     };
-  }
-  // GitLab: SHA-1 of the path, then old and new line counters. A removed line still carries a
-  // new counter, so the new side wins unless the file has none (a 0 for a deleted file).
-  const gitlab = /^([a-f0-9]{40})(?:_(\d+)_(\d+))?$/i.exec(anchor);
-  if (gitlab) {
-    const digest = (gitlab[1] ?? "").toLowerCase();
-    if (!gitlab[2]) return { kind: "diff", digest, range: null };
-    const newLine = Number(gitlab[3]);
-    const oldLine = Number(gitlab[2]);
-    const side = newLine >= 1 ? "right" : "left";
-    const line = side === "right" ? newLine : oldLine;
-    if (!Number.isSafeInteger(line) || line < 1) return fallback;
-    return { kind: "diff", digest, range: { start: line, side, end: line, endSide: side } };
   }
   if (
     /^(?:(?:issuecomment-|pullrequestreview-|discussion_r|r|commitcomment-|event-|note_|comment-)\d+|discussion-diff-\d+(?:[LR]\d+(?:-[LR]\d+)?)?)$/i.test(

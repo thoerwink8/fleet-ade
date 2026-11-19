@@ -1,6 +1,6 @@
 # Source control
 
-T3 Code integrates with GitHub, GitLab, Forgejo, Gitea, Bitbucket, Azure DevOps, GitCafe, and Cursor
+T3 Code integrates with GitHub, Forgejo, Gitea, Bitbucket, Azure DevOps, GitCafe, and Cursor
 Origin to clone and publish repositories, create pull requests, and review changes.
 
 ## Review turn changes
@@ -63,14 +63,6 @@ login when fj is unavailable or unconfigured. With multiple fj servers, use the 
 If you have multiple `tea` accounts on one server, select one with
 `tea login default <login-name>`. Git push and clone also need Git credentials or an SSH key
 for that server.
-
-### GitLab
-
-Install [GitLab CLI](https://gitlab.com/gitlab-org/cli), then sign in:
-
-```bash
-glab auth login
-```
 
 ### Bitbucket
 
@@ -158,7 +150,7 @@ Use **Add Project** in the command palette (`Cmd/Ctrl+K`) to clone a repository.
 provider or paste a Git URL, then choose where to save it. Only GitHub is listed at first. To list
 another provider here and in **Publish Repository**, turn on its switch under
 **Settings → Source control**. A branch or file page copied from GitHub,
-GitLab, GitCafe, Codeberg or Bitbucket also works: T3 Code clones that repository's default branch.
+GitCafe, Codeberg or Bitbucket also works: T3 Code clones that repository's default branch.
 On other hosts, paste the repository's clone URL. The project opens right away while the
 clone runs in the background: you can write your first prompt, and sending waits until the files
 are in place. A toast tracks progress and lets you cancel; if the clone fails, retry it from the
@@ -196,7 +188,6 @@ Open **Pull requests** to review changes and comments, request reviewers, check 
 or merge. You can edit review titles and descriptions and your own comments where the host allows it.
 Where you can edit a description, you can also tick its checkboxes from the Summary tab
 (the Overview tab on mobile).
-GitLab calls these merge requests.
 
 A link to part of a pull request opens that part: a comment or review is marked in the activity, a
 changed-line link opens the file at those lines, a checks link opens the checks, and a commit link
@@ -221,7 +212,7 @@ On web and desktop, hold **Shift** in the GitHub pull request list for quick act
 To close several, press **Close**, drag across the rows in the same group, and release.
 Press **Escape** before releasing to cancel. Failed closes stay in the list so you can retry them.
 
-GitHub, GitLab, and Azure DevOps support auto-merge while checks are outstanding. GitHub also
+GitHub and Azure DevOps support auto-merge while checks are outstanding. GitHub also
 supports approving waiting fork workflows and opening a revert pull request for a merged change.
 
 Pull request sharing is off by default. In Settings → Environments → Pull request sharing (Pull
@@ -285,7 +276,7 @@ running count. A tick belongs to the pull request rather than to a commit, so sc
 single commit keeps them. A file pushed to after you cleared it comes back marked **Changed**.
 
 On GitHub these are GitHub's own viewed marks, so a review carries between T3 Code and github.com
-in either direction. Forgejo, GitLab, Bitbucket, Azure DevOps, and Cursor Origin expose no record
+in either direction. Forgejo, Bitbucket, Azure DevOps, and Cursor Origin expose no record
 T3 Code can read, so the server you are connected to keeps them instead: they follow you across the
 apps connected to that server, but the host's own site will not show them, and the count reads **viewed in T3 Code**.
 
@@ -308,7 +299,7 @@ and their marks follow the same rules as on web and desktop.
 A thread can hold several pull requests, including reviews from another repository on the same host.
 Use **Link pull request** in the command palette or **Linked pull requests** panel, or right-click a
 pull request link in the conversation. Creating a pull request from Git actions links it automatically,
-and so does an agent creating one with `gh pr create` or `glab mr create`. Agents can link other
+and so does an agent creating one with `gh pr create`. Agents can link other
 pull requests with the `link_pull_request` tool.
 
 Use **Link pull request to thread** in the command palette to keep a pull request with the thread. From a review

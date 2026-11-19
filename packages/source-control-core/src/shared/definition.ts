@@ -4,7 +4,9 @@ import {
   type RepositoryIdentity,
   secretSetting,
   SettingsSecretValue,
+  isRetiredSourceControlKind,
   SourceControlProviderKind,
+  UNSUPPORTED_SOURCE_CONTROL_LABEL,
   type SourceControlProviderInfo,
   TrimmedNonEmptyString,
   TrimmedString,
@@ -539,12 +541,39 @@ export function parseGitRemoteHost(remoteUrl: string): GitRemoteHost | null {
 }
 
 /** What a remote on a host no definition claims reads as. */
-export function unknownRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo {
+function unknownRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo {
   return {
     kind: SourceControlProviderKind.make("unknown"),
     name: remote.host,
     baseUrl: `https://${remote.host}`,
   };
+}
+
+function retiredRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo | null {
+  if (!(remote.hostname === "gitlab.com" || remote.hostname.split(".").includes("gitlab"))) {
+    return null;
+  }
+  const kind = "gitlab";
+  return {
+    kind: SourceControlProviderKind.make(kind),
+    name: UNSUPPORTED_SOURCE_CONTROL_LABEL,
+    baseUrl: `https://${remote.host}`,
+  };
+}
+
+const retiredClients = new Map<string, SourceControlDefinition>();
+
+function retiredSourceControlClient(kind: string): SourceControlDefinition {
+  const cached = retiredClients.get(kind);
+  if (cached !== undefined) return cached;
+  const client: SourceControlDefinition = {
+    ...UNKNOWN_SOURCE_CONTROL_CLIENT,
+    kind: SourceControlProviderKind.make(kind),
+    label: UNSUPPORTED_SOURCE_CONTROL_LABEL,
+    pickerLabel: UNSUPPORTED_SOURCE_CONTROL_LABEL,
+  };
+  retiredClients.set(kind, client);
+  return client;
 }
 
 /** What `definition` alone makes of a remote, for a host's own code that asks only about itself. */
@@ -675,6 +704,16 @@ function inOrder(
   return [...first, ...definitions.filter((definition) => !first.includes(definition))];
 }
 
+// Old GitLab merge request URLs still parse so stored history reads as unsupported, not as GitHub.
+const RETIRED_GITLAB_CHANGE_REQUEST_PATH =
+  /^\/([^/]+(?:\/[^/]+)+)\/-\/merge_requests\/(\d+)(?:\/|$)/u;
+
+function retiredParsedChangeRequest(url: URL): ParsedChangeRequest | null {
+  const link = parseChangeRequestPath(url, RETIRED_GITLAB_CHANGE_REQUEST_PATH);
+  if (link === null) return null;
+  return { definition: retiredSourceControlClient("gitlab"), link };
+}
+
 /**
  * `definitions` sets display order and the fallback for repositories with an unknown host.
  * Claim host-specific URL routes before hosts that accept them on any hostname.
@@ -712,12 +751,14 @@ export function makeSourceControlDefinitionRegistry(
       const link = definition.parseChangeRequestUrl(url);
       if (link !== null) return { definition, link };
     }
-    return null;
+    return retiredParsedChangeRequest(url);
   };
   return {
     definitions,
     get: (kind) =>
-      (kind == null ? definitions[0] : byKind.get(kind)) ?? UNKNOWN_SOURCE_CONTROL_CLIENT,
+      kind != null && isRetiredSourceControlKind(kind)
+        ? retiredSourceControlClient(kind)
+        : ((kind == null ? definitions[0] : byKind.get(kind)) ?? UNKNOWN_SOURCE_CONTROL_CLIENT),
     find: (kind) => byKind.get(kind),
     findByPublicHost: (hostname) => {
       const host = hostname.toLowerCase();
@@ -764,6 +805,7 @@ export function makeSourceControlDefinitionRegistry(
         const candidate = definition.changeRequestUrlFromReferenceAutolink(url);
         if (candidate !== null) return candidate;
       }
+      if (RETIRED_GITLAB_CHANGE_REQUEST_PATH.test(url.pathname)) return url.toString();
       return null;
     },
     repositoryUrlFromPage: (value) => {
@@ -791,7 +833,7 @@ export function makeSourceControlDefinitionRegistry(
         const provider = definition.recognizeRemote(remote);
         if (provider !== null) return provider;
       }
-      return unknownRemoteProvider(remote);
+      return retiredRemoteProvider(remote) ?? unknownRemoteProvider(remote);
     },
     repositoryKeyFromRemote: (remoteUrl) => {
       const key = normalizeGitRemoteUrl(remoteUrl);

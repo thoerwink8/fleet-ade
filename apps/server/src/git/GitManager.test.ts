@@ -6051,31 +6051,31 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
     }),
   );
 
-  it.effect("creates a merge request worktree from the host's own head ref", () =>
+  it.effect("creates a pull request worktree from the host's own head ref", () =>
     Effect.gen(function* () {
       const repoDir = yield* makeTempDir("t3code-git-manager-");
       yield* initRepo(repoDir);
       const remoteDir = yield* createBareRemote();
       yield* runGit(repoDir, ["remote", "add", "origin", remoteDir]);
       yield* runGit(repoDir, ["push", "-u", "origin", "main"]);
-      yield* runGit(repoDir, ["checkout", "-b", "feature/mr-ref-only"]);
-      NodeFS.writeFileSync(NodePath.join(repoDir, "mr.txt"), "merge request\n");
-      yield* runGit(repoDir, ["add", "mr.txt"]);
-      yield* runGit(repoDir, ["commit", "-m", "Merge request ref only"]);
+      yield* runGit(repoDir, ["checkout", "-b", "feature/pr-ref-only"]);
+      NodeFS.writeFileSync(NodePath.join(repoDir, "pr.txt"), "pull request\n");
+      yield* runGit(repoDir, ["add", "pr.txt"]);
+      yield* runGit(repoDir, ["commit", "-m", "Pull request ref only"]);
       const head = (yield* runGit(repoDir, ["rev-parse", "HEAD"])).stdout.trim();
-      yield* runGit(repoDir, ["push", "origin", "HEAD:refs/merge-requests/93/head"]);
+      yield* runGit(repoDir, ["push", "origin", "HEAD:refs/pull/93/head"]);
       yield* runGit(repoDir, ["checkout", "main"]);
-      yield* runGit(repoDir, ["branch", "-D", "feature/mr-ref-only"]);
+      yield* runGit(repoDir, ["branch", "-D", "feature/pr-ref-only"]);
 
       const { manager } = yield* makeManager({
         providerScenario: {
-          kind: "gitlab",
+          kind: "github",
           pullRequest: {
             number: 93,
-            title: "Merge request ref only",
-            url: "https://gitlab.com/pingdotgg/codething-mvp/-/merge_requests/93",
+            title: "Pull request ref only",
+            url: "https://github.com/pingdotgg/codething-mvp/pull/93",
             baseRefName: "main",
-            headRefName: "feature/mr-ref-only",
+            headRefName: "feature/pr-ref-only",
             state: "open",
           },
         },

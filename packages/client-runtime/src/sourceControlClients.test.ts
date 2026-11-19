@@ -272,7 +272,7 @@ describe("sourceControlClients.recognizeRemote", () => {
     expect(kindOfRemote("https://gitea.github.example/o/r")).toBe("forgejo");
     expect(kindOfRemote("https://forgejo.gitlab.example/o/r")).toBe("forgejo");
     expect(kindOfRemote("https://gitlab.github.example/o/r")).toBe("github");
-    expect(kindOfRemote("https://bitbucket.gitlab.example/o/r")).toBe("gitlab");
+    expect(kindOfRemote("https://bitbucket.gitlab.example/o/r")).toBe("bitbucket");
     expect(kindOfRemote("https://bitbucket.visualstudio.com/p/_git/r")).toBe("azure-devops");
     expect(kindOfRemote("git@git.cafe:pingdotgg/t3code.git")).toBe("gitcafe");
     expect(kindOfRemote("https://origin.cursor.com/acme/web.git")).toBe("cursor-origin");
@@ -382,7 +382,7 @@ describe("sourceControlClients.findByPublicDomain", () => {
   it("names the host a link is on, subdomains included", () => {
     const kindOf = (hostname: string) => sourceControlClients.findByPublicDomain(hostname)?.kind;
     expect(kindOf("gist.github.com")).toBe("github");
-    expect(kindOf("GitLab.com")).toBe("gitlab");
+    expect(kindOf("GitLab.com")).toBeUndefined();
     expect(kindOf("codeberg.org")).toBe("forgejo");
     expect(kindOf("git.cafe")).toBe("gitcafe");
     expect(kindOf("notgithub.com")).toBeUndefined();
