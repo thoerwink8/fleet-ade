@@ -1737,7 +1737,6 @@ body {
      Appearance runtime override of --font-sans reaches all interface text. */
   font-family: var(--font-sans);
   line-height: 1.5;
-  text-rendering: optimizeLegibility;
   margin: 0;
   padding: 0;
 }
@@ -1950,7 +1949,7 @@ code {
 :is(.chat-markdown, .composer-tiptap) h6 {
   font-size: 0.933em;
   line-height: 1.45;
-  color: var(--secondary-label);
+  color: var(--contrast-secondary-label);
 }
 
 :is(.chat-markdown, .composer-tiptap) ul {
@@ -2066,7 +2065,6 @@ code {
 
 .chat-markdown a {
   text-decoration: none;
-  line-height: inherit;
 }
 
 /* Triple-click selection stops at block-level boxes, flex items included, so file chips in

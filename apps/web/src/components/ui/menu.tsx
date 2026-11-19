@@ -97,7 +97,7 @@ function MenuSearchInput({
         )}
         <Input
           {...props}
-          className="rounded-none bg-transparent text-ui [&_input]:h-6.5 [&_input]:ps-5 [&_input]:font-sans [&_input]:leading-6.5"
+          className="rounded-none bg-transparent text-row [&_input]:h-6.5 [&_input]:ps-5 [&_input]:font-sans [&_input]:leading-6.5"
           size="sm"
           unstyled
           onKeyDown={(event) => {

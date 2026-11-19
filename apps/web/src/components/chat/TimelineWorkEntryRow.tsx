@@ -543,7 +543,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       }
       label={
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="flex min-w-0 w-full items-center gap-1.5 text-ui leading-normal">
+          <p className="flex min-w-0 w-full items-center gap-1.5 text-row leading-normal">
             <span
               className={cn(
                 answerPreview || reasoningTokenLabel ? "min-w-0" : "min-w-0 flex-1",
@@ -600,7 +600,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           {createdThread ? (
             <button
               type="button"
-              className="shrink-0 rounded-sm text-ui text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="shrink-0 rounded-sm text-row text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               aria-label={`打开 ${createdThread.title ?? "已创建会话"}`}
               onClick={(event) => {
                 event.stopPropagation();

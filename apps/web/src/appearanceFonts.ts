@@ -265,6 +265,13 @@ function widthsMatch(left: number, right: number): boolean {
   return Math.abs(left - right) < 0.01;
 }
 
+function isApplePlatform(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent)
+  );
+}
+
 function resolveGenericFamilyLabel(generic: string): string | null {
   const lower = generic.toLowerCase();
   if (lower === "serif") return null;
@@ -279,7 +286,7 @@ function resolveGenericFamilyLabel(generic: string): string | null {
     }
   }
   // Unnameable Apple faces need -apple-system metrics to distinguish the UI face from SF Mono.
-  if (/mac|iphone|ipad|ipod/i.test(navigator.platform)) {
+  if (isApplePlatform()) {
     const systemWidth = measureDomProbeWidth("-apple-system");
     if (systemWidth !== null && widthsMatch(genericWidth, systemWidth)) return "SF Pro";
     return monoLike ? "SF Mono" : "SF Pro";
@@ -288,9 +295,7 @@ function resolveGenericFamilyLabel(generic: string): string | null {
 }
 
 export function resolveDefaultFamilyLabel(stack: string): string | null {
-  const isApple =
-    typeof navigator !== "undefined" &&
-    /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
+  const isApple = isApplePlatform();
   for (const raw of stack.split(",")) {
     const family = raw.trim().replace(/^(['"])(.*)\1$/, "$2");
     if (family.length === 0) continue;

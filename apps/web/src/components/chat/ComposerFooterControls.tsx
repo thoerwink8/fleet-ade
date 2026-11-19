@@ -170,8 +170,8 @@ export function ComposerPermissionsSection(props: {
         <span
           className={
             shownMode === props.runtimeMode
-              ? "text-foreground text-ui"
-              : "text-muted-foreground text-ui"
+              ? "text-foreground text-row"
+              : "text-muted-foreground text-row"
           }
         >
           {shown.label}

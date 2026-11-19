@@ -54,7 +54,7 @@ function WorkLogLine({ icon, label, trailing, wrapLabel }: RowContent) {
   return (
     <div
       className={cn(
-        "flex min-h-6 min-w-0 gap-1.5 text-ui leading-normal select-none [&_*]:select-none",
+        "flex min-h-6 min-w-0 gap-1.5 text-row leading-normal select-none [&_*]:select-none",
         wrapLabel ? "items-start" : "items-center",
       )}
     >
