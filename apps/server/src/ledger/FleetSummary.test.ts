@@ -306,23 +306,6 @@ it.effect("重建同一 filename 后 revision 不回退", () =>
   ),
 );
 
-it.effect("markEnvironmentStale 只改 stale，不改 phase", () =>
-  serviceTest(
-    Effect.gen(function* () {
-      const summary = yield* FleetSummary.FleetSummary;
-      yield* summary.report("environment-a", task("root", { sessionRun: "waiting" }));
-      const result = yield* summary.markEnvironmentStale("environment-a", true, "lease lost");
-      expect(result.changed).toBe(true);
-      const event = yield* first(yield* summary.subscribe({ cursor: 1 }));
-      expect(event?.type).toBe("upsert");
-      if (event?.type === "upsert") {
-        expect(event.row.phase).toBe("stuck");
-        expect(event.row.stale).toBe(true);
-        expect(event.row.staleReason).toBe("lease lost");
-      }
-    }),
-  ),
-);
 it.effect("订阅返回后延迟消费仍限制队列，溢出返回 resync 且不丢 tombstone", () =>
   serviceTest(
     Effect.gen(function* () {
@@ -340,6 +323,10 @@ it.effect("订阅返回后延迟消费仍限制队列，溢出返回 resync 且�
       });
       const events = yield* Stream.runCollect(live);
       expect(events).toEqual([{ type: "resync", reason: "gap" }]);
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      assert(snapshot?.type === "snapshot");
+      expect(snapshot.rows).toHaveLength(200);
+      expect(snapshot.rows.some((row) => row.taskId === "root")).toBe(false);
     }),
   ),
 );
@@ -402,7 +389,6 @@ it.effect("任务行随租约状态转 stale，租约恢复后自动清除", () 
       yield* summary.report("environment-a", task("other"));
       yield* summary.report("environment-a", adhoc("adhoc-a"));
       yield* summary.report("environment-b", adhoc("adhoc-b"));
-      yield* summary.markEnvironmentStale("environment-b", true, "disconnected");
 
       // One expired task must not be hidden by another live lease in the same environment.
       yield* holdLease("root", "1970-01-01T00:00:00.000Z");
@@ -416,10 +402,7 @@ it.effect("任务行随租约状态转 stale，租约恢复后自动清除", () 
       });
       expect(stale.find((row) => row.taskId === "other")).toMatchObject({ stale: false });
       expect(stale.find((row) => row.threadId === "adhoc-a")).toMatchObject({ stale: false });
-      expect(stale.find((row) => row.threadId === "adhoc-b")).toMatchObject({
-        stale: true,
-        staleReason: "disconnected",
-      });
+      expect(stale.find((row) => row.threadId === "adhoc-b")).toMatchObject({ stale: false });
 
       yield* holdLease("root");
       yield* summary.sweepStale;

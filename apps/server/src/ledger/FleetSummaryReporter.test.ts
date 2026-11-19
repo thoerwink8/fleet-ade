@@ -20,6 +20,11 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
+import * as Scheduler from "../scheduling/Scheduler.ts";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
 
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
@@ -102,13 +107,14 @@ const linkingEnvironment = (
 ) =>
   Effect.gen(function* () {
     const reporterDeps = Layer.mergeAll(
+      Scheduler.layer,
       Layer.mock(Orchestrator.OrchestratorV2)({}),
       Layer.mock(ProjectionStore.ProjectionStoreV2)({
         getThreadShell: (threadId: ThreadId) =>
           Effect.map(Ref.get(shells), (map) => map.get(threadId) ?? null),
       }),
     );
-    const context = yield* FleetSummaryReporter.layer.pipe(
+    const context = yield* FleetSummaryReporter.layerForTest().pipe(
       Layer.provideMerge(reporterDeps),
       Layer.provideMerge(layerLinkingEnvironment(node)),
       Layer.build,
@@ -318,15 +324,17 @@ it.effect(
             text: "P".repeat(180),
           } as OrchestrationV2ThreadShell["latestVisibleMessage"],
         });
+        const currentShell = yield* Ref.make(current);
         const failure = yield* Ref.make<"invalid_request" | "orchestration_error" | null>(
           "invalid_request",
         );
-        const reporterContext = yield* FleetSummaryReporter.layer.pipe(
+        const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
           Layer.provide(
             Layer.mergeAll(
-              Layer.mock(Orchestrator.OrchestratorV2)({}),
+              Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+              Scheduler.layer,
               Layer.mock(ProjectionStore.ProjectionStoreV2)({
-                getThreadShell: () => Effect.succeed(current),
+                getThreadShell: () => Ref.get(currentShell),
               }),
               Layer.mock(PeerMcpClient.PeerMcpClient)({
                 call: (request) =>
@@ -344,6 +352,8 @@ it.effect(
           Layer.build,
         );
         const reporter = Context.get(reporterContext, FleetSummaryReporter.FleetSummaryReporter);
+        yield* reporter.start();
+        yield* TestClock.adjust("5 seconds");
         const snapshot = () =>
           Effect.gen(function* () {
             const events = yield* Stream.runCollect(
@@ -358,7 +368,7 @@ it.effect(
         expect((yield* snapshot()).rows).toEqual([]);
         yield* Ref.set(failure, null);
         // The unchanged shell must still be eligible after a rejected send.
-        yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+        yield* TestClock.adjust("5 seconds");
         const sent = yield* snapshot();
         expect(sent.rows).toHaveLength(1);
         expect(sent.rows[0]).toMatchObject({
@@ -369,12 +379,16 @@ it.effect(
         });
         yield* reporter.handle(fakeEvent(threadId, "run.updated"));
         expect((yield* snapshot()).revision).toBe(sent.revision);
+        // A missed event still converges from the current projection on the next tick.
+        yield* Ref.set(currentShell, { ...current, title: "Changed without an event" });
+        yield* TestClock.adjust("5 seconds");
+        expect((yield* snapshot()).rows[0]?.title).toBe("Changed without an event");
 
         yield* Ref.set(failure, "orchestration_error");
         yield* reporter.untrack(threadId);
         expect((yield* snapshot()).rows).toHaveLength(1);
         yield* Ref.set(failure, null);
-        yield* reporter.untrack(threadId);
+        yield* TestClock.adjust("5 seconds");
         expect((yield* snapshot()).rows).toEqual([]);
         // A successful tombstone really unregisters; a later event cannot resurrect it.
         yield* reporter.handle(fakeEvent(threadId, "run.updated"));
@@ -385,4 +399,117 @@ it.effect(
         expect((yield* snapshot()).rows).toHaveLength(1);
       }),
     ),
+);
+
+it.effect("file-backed registrations survive reconstruction and update the original row", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "fleet-reporter-" });
+      const filename = path.join(directory, "ledger.sqlite");
+      const threadId = ThreadId.make("persisted-registration");
+      const current = yield* Ref.make(shell(threadId, "running"));
+      const calls = yield* Ref.make<Array<FleetSummaryReportInput>>([]);
+      const fail = yield* Ref.make(false);
+      const summaryContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
+      const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
+      const summarySql = Context.get(summaryContext, SqlClient.SqlClient);
+      const deps = Layer.mergeAll(
+        Scheduler.layer,
+        Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+        Layer.mock(ProjectionStore.ProjectionStoreV2)({ getThreadShell: () => Ref.get(current) }),
+        Layer.mock(PeerMcpClient.PeerMcpClient)({
+          call: (request) =>
+            Effect.gen(function* () {
+              if (yield* Ref.get(fail))
+                return yield* new OrchestratorMcpFailure({
+                  code: "orchestration_error",
+                  message: "offline",
+                });
+              const input = yield* decodeSummaryReport(request.arguments).pipe(Effect.orDie);
+              yield* Ref.update(calls, (items) => [...items, input]);
+              const result = yield* summary.report("executor", input).pipe(Effect.orDie);
+              return yield* decodePeerResult(request.success, result).pipe(Effect.orDie);
+            }),
+        }),
+      );
+      const build = () =>
+        FleetSummaryReporter.layerForTest(filename).pipe(
+          Layer.provide(deps),
+          Layer.fresh,
+          Layer.build,
+        );
+      // Each build has a fresh service; only the file carries registrations across scopes.
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const context = yield* build();
+          yield* Context.get(context, FleetSummaryReporter.FleetSummaryReporter).trackAdhoc(
+            threadId,
+            EnvironmentId.make("coordinator"),
+          );
+        }),
+      );
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const context = yield* build();
+          const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
+          yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+          expect(yield* Ref.get(calls)).toHaveLength(1);
+          yield* Ref.set(current, shell(threadId, "failed", { title: "Changed after restart" }));
+          yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+          expect(yield* Ref.get(calls)).toHaveLength(2);
+          expect((yield* Ref.get(calls))[1]).toMatchObject({
+            type: "upsert-adhoc",
+            threadId,
+            title: "Changed after restart",
+          });
+          expect(yield* summarySql`SELECT thread_id, title FROM fleet_summary_rows`).toEqual([
+            { thread_id: threadId, title: "Changed after restart" },
+          ]);
+          yield* Ref.set(fail, true);
+          yield* reporter.untrack(threadId);
+        }),
+      );
+      yield* Ref.set(fail, false);
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const reporter = Context.get(yield* build(), FleetSummaryReporter.FleetSummaryReporter);
+          yield* reporter.start();
+          yield* TestClock.adjust("5 seconds");
+          expect((yield* Ref.get(calls)).at(-1)).toMatchObject({ type: "delete-adhoc", threadId });
+        }),
+      );
+    }).pipe(Effect.provide(NodeServices.layer)),
+  ),
+);
+
+it.effect("a failed event subscription is reopened instead of silently stopping", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const subscriptions = yield* Ref.make(0);
+      const streamDomainEvents = Stream.suspend(() =>
+        Stream.unwrap(
+          Effect.gen(function* () {
+            const count = yield* Ref.updateAndGet(subscriptions, (n) => n + 1);
+            return count === 1 ? Stream.die("controlled subscription failure") : Stream.never;
+          }),
+        ),
+      );
+      const context = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Scheduler.layer,
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({}),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({}),
+          ),
+        ),
+        Layer.build,
+      );
+      yield* Context.get(context, FleetSummaryReporter.FleetSummaryReporter).start();
+      yield* TestClock.adjust("5 seconds");
+      expect(yield* Ref.get(subscriptions)).toBeGreaterThanOrEqual(2);
+    }),
+  ),
 );

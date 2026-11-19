@@ -100,6 +100,18 @@ export const migrate = Effect.gen(function* () {
     CREATE INDEX IF NOT EXISTS idx_fleet_summary_rows_environment
     ON fleet_summary_rows (environment_id)
   `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS fleet_summary_registrations (
+      thread_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      coordinator TEXT NOT NULL,
+      repo TEXT,
+      issue INTEGER,
+      task_id TEXT,
+      sent TEXT,
+      deleting INTEGER NOT NULL DEFAULT 0
+    )
+  `;
   yield* sql.withTransaction(
     Effect.gen(function* () {
       const claimColumns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {

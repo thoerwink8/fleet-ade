@@ -34,6 +34,7 @@ import * as FleetSummaryReporter from "../../../ledger/FleetSummaryReporter.ts";
 import * as Orchestrator from "../../../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../../../orchestration-v2/ProjectionStore.ts";
 import * as PeerMcpClient from "../../../peer/PeerMcpClient.ts";
+import * as Scheduler from "../../../scheduling/Scheduler.ts";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/process";
 import * as TestClock from "effect/testing/TestClock";
@@ -922,16 +923,20 @@ it.effect("an update the project refuses tells the agent why", () =>
   }),
 );
 
-it.effect("a linked launch publishes its shell even when launch events preceded registration", () =>
+it.effect("a linked launch returns while its initial summary report waits on the peer", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
       const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+      const reporting = yield* Deferred.make<void>();
+      const allowReport = yield* Deferred.make<void>();
+      const reported = yield* Deferred.make<void>();
       const summaryContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
       const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
-      const reporterContext = yield* FleetSummaryReporter.layer.pipe(
+      const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
         Layer.provide(
           Layer.mergeAll(
+            Scheduler.layer,
             Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.empty }),
             Layer.mock(ProjectionStore.ProjectionStoreV2)({
               getThreadShell: (threadId) => {
@@ -954,9 +959,13 @@ it.effect("a linked launch publishes its shell even when launch events preceded 
             Layer.mock(PeerMcpClient.PeerMcpClient)({
               call: (request) =>
                 Effect.gen(function* () {
+                  yield* Deferred.succeed(reporting, undefined);
+                  yield* Deferred.await(allowReport);
                   const input = yield* decodeSummaryReport(request.arguments);
                   const result = yield* summary.report("executor", input);
-                  return yield* decodePeerResult(request.success, result);
+                  const decoded = yield* decodePeerResult(request.success, result);
+                  yield* Deferred.succeed(reported, undefined);
+                  return decoded;
                 }).pipe(Effect.orDie),
             }),
           ),
@@ -964,6 +973,7 @@ it.effect("a linked launch publishes its shell even when launch events preceded 
         Layer.build,
       );
       const dependencies = Layer.merge(harness.dependencies, Layer.succeedContext(reporterContext));
+      const dependencyContext = yield* Layer.build(dependencies);
       const toolkit = yield* ProjectToolkit.pipe(
         Effect.provide(
           McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
@@ -976,8 +986,19 @@ it.effect("a linked launch publishes its shell even when launch events preceded 
           title: "Linked shell",
           projectId: harness.projectId,
         })
-        .pipe(Stream.unwrap, Stream.runCollect, Effect.provide(dependencies));
-      expect(result.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+        .pipe(
+          Stream.unwrap,
+          Stream.runCollect,
+          Effect.provideContext(dependencyContext),
+          Effect.forkScoped,
+        );
+      yield* Deferred.await(reporting);
+      yield* TestClock.adjust("1 second");
+      expect(result.pollUnsafe()).toBeDefined();
+      yield* Deferred.succeed(allowReport, undefined);
+      const response = yield* Fiber.join(result);
+      yield* Deferred.await(reported);
+      expect(response.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
       expect(launched).toHaveLength(1);
       const events = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
       expect(events[0]?.type).toBe("snapshot");

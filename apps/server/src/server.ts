@@ -747,6 +747,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ).pipe(
     // Export this instance to the MCP handlers; its tracking map must be shared.
     Layer.provideMerge(FleetSummaryReporter.layer),
+    Layer.provide(Scheduler.layer),
     Layer.provide(ProjectionStoreV2.layer),
     Layer.provideMerge(PeerMcpClient.layer),
     Layer.provideMerge(PeerLinks.layer),
@@ -924,7 +925,7 @@ const layerMakeRoutes = Layer.mergeAll(
   ),
   Layer.provide(FleetClaims.layer),
   // Same layer reference as the startup consumer: one memoized tracking map.
-  Layer.provide(FleetSummaryReporter.layer),
+  Layer.provide(FleetSummaryReporter.layer.pipe(Layer.provide(Scheduler.layer))),
   Layer.provide(
     SpeechService.layer.pipe(
       Layer.provide(layerServerSettings),

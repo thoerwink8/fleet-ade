@@ -84,12 +84,6 @@ export class FleetSummary extends Context.Service<
       FleetSummaryError,
       Scope.Scope
     >;
-    /** A lost lease marks rows stale; the session's phase is not rewritten. */
-    readonly markEnvironmentStale: (
-      environmentId: string,
-      stale: boolean,
-      reason?: string,
-    ) => Effect.Effect<FleetSummaryWriteResult, FleetSummaryError>;
     /** Task rows without their exact live lease become stale; recovery clears it. */
     readonly sweepStale: Effect.Effect<void, FleetSummaryError>;
   }
@@ -490,54 +484,6 @@ const make = Effect.fn("FleetSummary.make")(function* () {
     );
   });
 
-  const markEnvironmentStale = Effect.fn("FleetSummary.markEnvironmentStale")(function* (
-    environmentId: string,
-    stale: boolean,
-    reason?: string,
-  ) {
-    return yield* publishLock.withPermits(1)(
-      Effect.gen(function* () {
-        const result = yield* sql
-          .withTransaction(
-            Effect.gen(function* () {
-              const rows =
-                yield* sql<RowRecord>`SELECT row_id, environment_id, kind, repo, issue, task_id,
-              thread_id, title, phase, reason, needs_you, last_progress, updated_at, stale, stale_reason, revision
-              FROM fleet_summary_rows WHERE environment_id = ${environmentId} ORDER BY row_id`;
-              const current = rows.map(toRow);
-              const wanted = current.filter(
-                (row) =>
-                  row.stale !== stale || (stale && row.staleReason !== (reason ?? "unreachable")),
-              );
-              if (wanted.length === 0) {
-                const latest = yield* meta;
-                return { revision: latest.revision, changed: false, events: [] };
-              }
-              const events: Array<FleetSummaryChangeEvent> = [];
-              for (const row of wanted) {
-                const revision = yield* nextRevision;
-                const next = {
-                  ...row,
-                  stale,
-                  staleReason: stale ? (reason ?? "unreachable") : undefined,
-                  revision,
-                };
-                yield* sql`UPDATE fleet_summary_rows SET stale = ${next.stale ? 1 : 0},
-                stale_reason = ${next.staleReason ?? null}, revision = ${revision}
-                WHERE row_id = ${rowIdOfRow(row)}`;
-                yield* recordChange(revision, { type: "upsert", revision, row: next });
-                events.push({ type: "upsert", revision, row: next });
-              }
-              return { revision: events.at(-1)!.revision, changed: true, events };
-            }),
-          )
-          .pipe(Effect.mapError(storageError));
-        yield* publish(result.events);
-        return { revision: result.revision, changed: result.changed };
-      }),
-    );
-  });
-
   /** Lease freshness is task-specific and never changes session phase or adhoc rows. */
   const sweepStale = publishLock.withPermits(1)(
     Effect.gen(function* () {
@@ -579,7 +525,7 @@ const make = Effect.fn("FleetSummary.make")(function* () {
     }),
   );
 
-  return FleetSummary.of({ report, subscribe, markEnvironmentStale, sweepStale });
+  return FleetSummary.of({ report, subscribe, sweepStale });
 });
 
 const rowIdOfRow = (row: FleetSummaryRow) =>
