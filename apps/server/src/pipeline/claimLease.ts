@@ -130,7 +130,10 @@ const writer = (sql: SqlClient.SqlClient) =>
               ? ({ status: 409, code: "not_claimed" } as const)
               : ({ status: 409, code: "engine_has_it" } as const),
       ),
-      Effect.catchCause(() => Effect.succeed(unavailable)),
+      Effect.catchTags({
+        SqlError: (cause) =>
+          Effect.logError("Failed to read local claims", cause).pipe(Effect.as(unavailable)),
+      }),
     );
   });
 /** Node claims and notes check the ledger's registry, so it has to hold the repos the pipeline serves. */
