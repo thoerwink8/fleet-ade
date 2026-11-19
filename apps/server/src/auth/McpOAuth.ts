@@ -257,10 +257,6 @@ const make = Effect.gen(function* () {
   const random = yield* SecureRandom.SecureRandom;
   const digester = yield* Digest.Digest;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
-  const linksEnabled = serverSettings.getSettings.pipe(
-    Effect.map((settings) => settings.linkedEnvironmentsEnabled),
-    Effect.orElseSucceed(() => false),
-  );
   const signer = yield* PayloadSigner.fromSecret(
     yield* secretStore.getOrCreateRandom(SIGNING_SECRET_NAME, 32).pipe(Effect.orDie),
   );
@@ -344,13 +340,6 @@ const make = Effect.gen(function* () {
       }
       // RFC 7591 allows ignoring unsupported registration options; all clients use public PKCE.
       const peerLink = metadata.software_id === MCP_PEER_LINK_SOFTWARE_ID;
-      if (peerLink && !(yield* linksEnabled)) {
-        return yield* new AuthMcpRegistrationError({
-          error: "invalid_client_metadata",
-          error_description:
-            "Linked environments is off on that machine. Turn it on in its Settings → Labs.",
-        });
-      }
       return {
         clientId: yield* signClientId(name, redirectUris, peerLink),
         name,

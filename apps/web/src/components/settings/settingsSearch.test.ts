@@ -242,7 +242,7 @@ describe("settings search targets", () => {
     for (const scope of ["all", "environment", "project"] as const) {
       expect(isSettingsSearchScopeAvailable("project-defaults", scope)).toBe(true);
     }
-    for (const id of ["tool-call-visibility", "boring-sidebar"]) {
+    for (const id of ["tool-call-visibility", "working-shelf"]) {
       expect(getSettingsSearchTargetScope(id)!.scope).toBeNull();
     }
   });

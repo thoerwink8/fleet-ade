@@ -9,6 +9,7 @@ import type { EnvironmentPresentation } from "./connection/presentation.ts";
 import type { RelayDiscoveredEnvironment } from "./relay/discovery.ts";
 import {
   ANOTHER_ADDRESS,
+  rankMachinesByHint,
   linkableMachines,
   linkedEnvironmentNames,
   linkRequestAnswerInput,
@@ -17,7 +18,7 @@ import {
   linkRequestInitialMachine,
   linkRequestTarget,
   linkRequestTargetName,
-  rankMachinesByHint,
+  offersLinkedEnvironments,
 } from "./linkRequest.ts";
 
 const item = {
@@ -26,6 +27,17 @@ const item = {
 };
 const asked = { url: "https://box.example.ts.net", label: "Box" };
 const accessLabel = (access: string) => `<${access}>`;
+
+describe("offersLinkedEnvironments", () => {
+  it("offers links regardless of the retired linkedEnvironmentsEnabled flag", () => {
+    const config = {
+      environment: { capabilities: { peerLinks: true } },
+      settings: { linkedEnvironmentsEnabled: false },
+    } as unknown as ServerConfig;
+    expect(offersLinkedEnvironments(config)).toBe(true);
+    expect(offersLinkedEnvironments(null)).toBe(false);
+  });
+});
 
 describe("linkRequestDisplay", () => {
   it("names the environment linked and the access the user chose", () => {

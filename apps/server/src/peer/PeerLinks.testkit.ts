@@ -81,7 +81,7 @@ export const servePeer = <E, R>(
     });
     const authContext = yield* EnvironmentAuth.layer.pipe(
       Layer.provide(ManagedPolicy.layerTest()),
-      Layer.provideMerge(ServerSettings.layerTest({ linkedEnvironmentsEnabled: true })),
+      Layer.provideMerge(ServerSettings.layerTest()),
       Layer.provide(Sqlite.layerMemory),
       Layer.provideMerge(ServerSecretStore.layer),
       Layer.provideMerge(ServerEnvironment.layerIdentity),
@@ -197,7 +197,7 @@ export const layerLinkingEnvironment = <E = never>(
 ) =>
   PeerMcpClient.layer.pipe(
     Layer.provideMerge(PeerLinks.layer),
-    Layer.provideMerge(ServerSettings.layerTest({ linkedEnvironmentsEnabled: true })),
+    Layer.provideMerge(ServerSettings.layerTest()),
     Layer.provideMerge(database),
     Layer.provide(Layer.mergeAll(secrets, FetchHttpClient.layer)),
     // Peers here are served on 127.0.0.1, so only `localhost` stands for this machine.

@@ -18,6 +18,7 @@ import { projectComposerContextForProvider } from "@t3tools/shared/composerConte
 import {
   answerToolCall,
   buildBase,
+  claudeRoleOptions,
   buildMessages,
   failedEarly,
   executeCodex,
@@ -663,25 +664,16 @@ it("rebuilds the template from this checkout and sends a child T3's task prompt"
   assert.notEqual(prompt?.text, childCase.prompt);
 });
 
-it("lists link tools only while a case turns the beta on, and sends chips as T3 projects them", () => {
-  const off = buildBase(template, { model: "claude-sonnet-5-5", keepUserInstructions: false });
-  const on = buildBase(template, {
-    model: "claude-sonnet-5-5",
-    keepUserInstructions: false,
-    links: true,
-  });
-  assert.notInclude(
-    off.t3.map((tool) => tool.name),
-    "mcp__t3-code__t3_environment_link",
-  );
+it("lists link tools now that linked environments is always on, and sends chips as T3 projects them", () => {
+  const base = buildBase(template, { model: "claude-sonnet-5-5", keepUserInstructions: false });
   assert.include(
-    on.t3.map((tool) => tool.name),
+    base.t3.map((tool) => tool.name),
     "mcp__t3-code__t3_environment_link",
   );
 
   const testCase: McpToolUseCase = {
     ...childCase,
-    setup: { role: "top", linkedEnvironments: true },
+    setup: { role: "top" },
     prompt: "Continue [Deploy](t3-context://v1/thread/thread_deploy)",
     promptContext: {
       records: [
@@ -697,7 +689,7 @@ it("lists link tools only while a case turns the beta on, and sends chips as T3 
       ],
     },
   };
-  const prompt = buildMessages(makeSample(testCase, on)).at(-1)?.content.at(-1);
+  const prompt = buildMessages(makeSample(testCase, base)).at(-1)?.content.at(-1);
   assert.equal(
     prompt?.text,
     projectComposerContextForProvider({ text: testCase.prompt, ...testCase.promptContext! }),
@@ -2155,7 +2147,7 @@ it("gives native children hook context while excluding the parent's T3 append an
   const child = buildBase(template, {
     model: "claude-sonnet-5-5",
     keepUserInstructions: false,
-    nativeSubagent: true,
+    ...claudeRoleOptions(testCase.setup.role),
   });
   assert.notInclude(
     child.system.map((block) => block.text).join("\n"),

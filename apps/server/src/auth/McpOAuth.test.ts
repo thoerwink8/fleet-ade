@@ -68,7 +68,7 @@ const makeLayerRoutes = (
       Layer.provide(
         McpOAuthHttp.layer.pipe(
           Layer.provide(McpOAuth.layer),
-          Layer.provide(ServerSettings.layerTest({ linkedEnvironmentsEnabled: true })),
+          Layer.provide(ServerSettings.layerTest()),
           Layer.provide(
             Layer.mock(CloudLink.CloudLink)({ linkState: () => Effect.succeed(linkState) }),
           ),

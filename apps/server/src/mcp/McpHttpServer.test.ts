@@ -17,7 +17,6 @@ import {
   RuntimeMode,
   ThreadId,
 } from "@t3tools/contracts";
-import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -1389,7 +1388,7 @@ it.effect("accepts case-insensitive MCP bearer schemes and diagnoses rejected cr
   );
 });
 
-it.effect("hides tools for links and refuses another environment while the beta is off", () =>
+it.effect("lists link tools for every scope and forwards calls to another environment", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const token = "linksToken";
@@ -1411,7 +1410,7 @@ it.effect("hides tools for links and refuses another environment while the beta 
           success: Schema.Struct({ links: Schema.Number }),
           failure: OrchestratorMcpFailure,
           failureMode: "return",
-        }).annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOff),
+        }),
         Tool.make("where", {
           description: "Says where it ran.",
           parameters: Schema.Struct({ environmentId: OrchestratorMcpEnvironmentTarget }),
@@ -1420,8 +1419,6 @@ it.effect("hides tools for links and refuses another environment while the beta 
           failureMode: "return",
         }),
       );
-      const settingsContext = yield* Layer.build(ServerSettings.layerTest());
-      const settings = Context.get(settingsContext, ServerSettings.ServerSettingsService);
       const serverLayer = McpHttpServer.layerMcpTransport(
         McpHttpServer.toolkitRegistration(
           LinksToolkit,
@@ -1431,7 +1428,7 @@ it.effect("hides tools for links and refuses another environment while the beta 
           }),
         ),
       ).pipe(
-        Layer.provide(Layer.succeedContext(settingsContext)),
+        Layer.provide(ServerSettings.layerTest({ linkedEnvironmentsEnabled: false })),
         Layer.provide(McpToolAccessTestkit.liveThreadsLayer),
         Layer.provide(
           Layer.mock(McpSessionRegistry.McpSessionRegistry)({
@@ -1493,20 +1490,13 @@ it.effect("hides tools for links and refuses another environment while the beta 
         );
       const elsewhere = EnvironmentId.make("environment-elsewhere");
 
-      expect(yield* listed()).toEqual(["where"]);
-      expect(yield* ranIn(elsewhere)).toMatchObject({
-        isError: true,
-        content: [{ text: expect.stringContaining("Linked environments is off on this machine") }],
-      });
-      expect((yield* ranIn(environmentId)).structuredContent).toEqual({ ranIn: "here" });
-
-      yield* settings.updateSettings({ linkedEnvironmentsEnabled: true });
       expect(yield* listed()).toEqual(["links", "where"]);
-      // On, the call goes on to the forwarding, which this server lacks.
+      // Linked environments stay on: the call goes on to the forwarding, which this server lacks.
       expect(yield* ranIn(elsewhere)).toMatchObject({
         isError: true,
         content: [{ text: expect.stringContaining("cannot reach linked environments") }],
       });
+      expect((yield* ranIn(environmentId)).structuredContent).toEqual({ ranIn: "here" });
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

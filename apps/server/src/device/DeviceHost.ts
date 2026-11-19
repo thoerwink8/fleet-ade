@@ -91,8 +91,6 @@ export interface AgentDeviceBinding extends AgentDaemonEndpoint {
   readonly session?: string;
   /** agent-device state holding that session's connection. */
   readonly stateDir?: string;
-  /** agent-device accepts installs into the session only from the directory that opened it. */
-  readonly installDirectory?: string;
 }
 
 /** Where the proxy sends a device hub request, for hosts that serve several upstreams. */

@@ -411,7 +411,6 @@ function DeviceMiniPlayer({
             deviceDescription={`${hostLabel} · ${device?.version ?? source.platform}`}
             visible
             viewId={viewId}
-            serveSimOnly={host?.kind === "simlock"}
           />
         </div>
       )}

@@ -74,10 +74,6 @@ const serveSimApiSchema = Schema.Struct({
 const decodeServeSimApi = Schema.decodeUnknownOption(serveSimApiSchema);
 const decodeWebRtcSettings = Schema.decodeUnknownOption(webRtcSettingsSchema);
 type WebRtcSettings = typeof webRtcSettingsSchema.Type;
-const decodeLeaseEnd = Schema.decodeUnknownOption(
-  Schema.fromJsonString(Schema.Struct({ reason: Schema.String })),
-);
-const leaseEnded = (reason: string) => `Device lease ended: ${reason}`;
 const decodeTransportLocked = Schema.decodeUnknownOption(
   Schema.Struct({
     error: Schema.Literal("stream_transport_locked"),
@@ -123,8 +119,6 @@ export interface DeviceStreamTarget {
   readonly preferMjpeg?: boolean;
   readonly panelId?: 1 | 3;
   readonly videoOnly?: boolean;
-  /** The host speaks only serve-sim's AVCC stream and input socket, on both platforms (Simlock). */
-  readonly serveSimOnly?: boolean;
 }
 
 export type DeviceHardwareButton = "home" | "back" | "recents" | "power" | "appSwitcher";
@@ -253,7 +247,7 @@ export function scanAccessUnit(buf: Uint8Array): { isKey: boolean; sps: Uint8Arr
 }
 
 export type AvccChunk = {
-  readonly type: "description" | "keyframe" | "delta" | "seed" | "end";
+  readonly type: "description" | "keyframe" | "delta" | "seed";
   readonly payload: Uint8Array;
 };
 
@@ -262,8 +256,6 @@ const AVCC_TAGS: Record<number, AvccChunk["type"] | undefined> = {
   2: "keyframe",
   3: "delta",
   4: "seed",
-  // Simlock's final frame on a lease that ended, carrying `{ reason }`.
-  7: "end",
 };
 
 export class AvccDemuxer {
@@ -412,16 +404,13 @@ export function createDeviceStreamClient(
 ): DeviceStreamClient {
   const { access, platform, deviceId } = target;
   const sink = "present" in output ? output : createCanvasFrameSink(output);
-  // Android normally streams over serve-emu's socket; a serve-sim-only host serves it like iOS.
-  const serveSimOnly = target.serveSimOnly === true;
-  const avcc = platform === "ios" || serveSimOnly;
+  const avcc = platform === "ios";
   const vendor = avcc ? "/vendor/serve-sim" : "/vendor/serve-emu";
   const device = encodeURIComponent(deviceId);
   const httpUrl = (path: string) =>
     withDeviceHubQuery(`${access.httpBase}${vendor}${path}`, access);
   const wsUrl = (path: string) => withDeviceHubQuery(`${access.wsBase}${vendor}${path}`, access);
-  const useWebCodecs =
-    isWebCodecsSupported() && !(platform === "ios" && target.preferMjpeg && !serveSimOnly);
+  const useWebCodecs = isWebCodecsSupported() && !(platform === "ios" && target.preferMjpeg);
 
   let stopped = true;
   let socket: WebSocket | null = null;
@@ -600,11 +589,7 @@ export function createDeviceStreamClient(
   };
 
   const recoverDecoder = () => {
-    if (serveSimOnly) {
-      // A new AVCC request starts a fresh capture with a keyframe; there is no MJPEG.
-      closeDecoder();
-      controller?.abort();
-    } else if (platform === "ios") fallBackToMjpeg();
+    if (platform === "ios") fallBackToMjpeg();
     else {
       closeDecoder();
       connecting("视频解码器已重启。");
@@ -722,7 +707,6 @@ export function createDeviceStreamClient(
       videoGeneration === feedGeneration &&
       controller === videoController;
     let retryDetail: string | undefined;
-    let leaseEnd: string | undefined;
     try {
       const response = await fetch(httpUrl(videoPath), {
         signal: videoController.signal,
@@ -795,12 +779,7 @@ export function createDeviceStreamClient(
               if (!configured) {
                 await reader.cancel().catch(() => {});
                 if (!isCurrent()) return;
-                if (serveSimOnly)
-                  setStatus(
-                    "error",
-                    `此浏览器无法解码此设备的 ${avcCodecString(chunk.payload)} 视频流。`,
-                  );
-                else if (target.videoOnly)
+                if (target.videoOnly)
                   setStatus(
                     "error",
                     `此浏览器无法解码 Duo 面板的 ${avcCodecString(chunk.payload)} 视频流。`,
@@ -814,11 +793,6 @@ export function createDeviceStreamClient(
             case "delta":
               decode(chunk.type === "keyframe", chunk.payload);
               break;
-            case "end": {
-              const end = decodeLeaseEnd(decoder.decode(chunk.payload));
-              leaseEnd = Option.isSome(end) ? end.value.reason : "ended";
-              break;
-            }
           }
         }
       }
@@ -829,7 +803,6 @@ export function createDeviceStreamClient(
         : (cause as Error).message;
     }
     if (isCurrent()) {
-      if (leaseEnd !== undefined) return fail(leaseEnded(leaseEnd));
       controller = null;
       videoController.abort();
       closeDecoder();
@@ -1108,7 +1081,7 @@ export function createDeviceStreamClient(
   const connectIosInput = async () => {
     if (stopped) return;
     const session = generation;
-    if (!serveSimOnly) await primeIosHelper(session);
+    await primeIosHelper(session);
     if (stopped || generation !== session) return;
     const ws = new WebSocket(wsUrl(`/helper/ws?device=${device}`));
     ws.binaryType = "arraybuffer";
@@ -1175,7 +1148,6 @@ export function createDeviceStreamClient(
       duoControl.clear();
       rotationCursor = null;
       if (stopped) return;
-      if (event.code === 4001) return fail(leaseEnded(event.reason || "ended"));
       events.onInputConnected(
         false,
         event.reason || (event.code === 1006 ? "input socket refused" : `closed ${event.code}`),
@@ -1289,11 +1261,7 @@ export function createDeviceStreamClient(
     iosInputAdmitted = false;
     iosInputUnavailable = false;
     connecting();
-    if (serveSimOnly) {
-      if (!target.videoOnly) void connectIosInput();
-      if (useWebCodecs) void readIosVideo();
-      else fail("此浏览器无法解码该设备的画面（WebCodecs 不可用）。");
-    } else if (platform === "ios") {
+    if (platform === "ios") {
       if (!target.videoOnly) void connectIosInput();
       if (useWebCodecs) void readIosVideo();
       else fallBackToMjpeg();
@@ -1432,9 +1400,7 @@ export function createDeviceStreamClient(
               ? "app_switcher"
               : button === "power"
                 ? "lock"
-                : button === "back" && platform === "android"
-                  ? "back"
-                  : null;
+                : null;
         if (name) send(taggedJson(IOS_MSG_BUTTON, { button: name }));
         return;
       }

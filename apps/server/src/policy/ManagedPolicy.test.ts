@@ -54,6 +54,28 @@ it.layer(NodeServices.layer)("ManagedPolicy.load", (it) => {
     }),
   );
 
+  it.effect.each([
+    "fastWorktreeCheckout",
+    "simlockDeviceHostsEnabled",
+    "boringSidebarEnabled",
+    "boringSidebarMultilineRows",
+    "linkedEnvironmentsEnabled",
+  ])("accepts the retired %s setting in deployed policies", (key) =>
+    Effect.gen(function* () {
+      const policy = yield* loadFrom(
+        JSON.stringify({
+          schemaVersion: 1,
+          organization: "Example Corp",
+          settings: { [key]: { value: true, locked: true } },
+        }),
+      );
+      assert.equal(
+        policy.settings.applyLocks(DEFAULT_SERVER_SETTINGS).enableDeviceSupport,
+        DEFAULT_SERVER_SETTINGS.enableDeviceSupport,
+      );
+    }),
+  );
+
   it.effect("tells clients which capabilities the policy switches off", () =>
     Effect.gen(function* () {
       const policy = yield* loadFrom(

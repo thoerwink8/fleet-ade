@@ -70,7 +70,6 @@ export interface SettingsSearchItem {
   readonly wslAvailableOnly?: boolean;
   readonly managedTunnelOnly?: boolean;
   readonly peerLinksOnly?: boolean;
-  readonly fastWorktreeCheckoutOnly?: boolean;
   readonly textGeneratorsOnly?: boolean;
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
@@ -86,7 +85,6 @@ export interface SettingsSearchAvailability {
   readonly hasThreadAutoSettlement: boolean;
   readonly managedTunnelActive?: boolean;
   readonly hasPeerLinkHost?: boolean;
-  readonly hasFastWorktreeCheckoutEnvironment?: boolean;
   /** An environment without a provider allow-list, which hides text generators. */
   readonly hasTextGeneratorsEnvironment?: boolean;
   readonly hasPrimaryEnvironment?: boolean;
@@ -476,18 +474,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
   },
   {
-    id: "boring-sidebar",
-    title: "简洁侧边栏（按项目分组）",
+    id: "prompt-suggestions-beta",
+    title: "建议下一条提示词",
     to: "/settings/labs",
-    searchTerms: ["beta folders project tree classic sidebar"],
-  },
-  {
-    id: "boring-sidebar-multiline",
-    title: "双行文件夹列表",
-    to: "/settings/labs",
-    // Shown inside the boring sidebar row only while it is on, so search lands on the parent.
-    targetId: "boring-sidebar",
-    searchTerms: ["beta boring sidebar folder rows multiline branch pull request details"],
+    scope: "environment",
+    searchTerms: ["beta tab autocomplete predict next message claude codex ghost text"],
   },
   {
     id: "tool-call-visibility",
@@ -512,35 +503,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [
       "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar thread status order working approval",
     ],
-  },
-  {
-    id: "linked-environments-beta",
-    title: "关联环境",
-    to: "/settings/labs",
-    scope: "environment",
-    searchTerms: ["beta link another machine vps peer agents work there delegate"],
-  },
-  {
-    id: "prompt-suggestions-beta",
-    title: "建议下一条提示词",
-    to: "/settings/labs",
-    scope: "environment",
-    searchTerms: ["beta tab autocomplete predict next message claude codex ghost text"],
-  },
-  {
-    id: "simlock-hosts",
-    title: "Simlock 设备主机（早期测试）",
-    to: "/settings/labs",
-    scope: "environment",
-    searchTerms: ["beta alpha simlock callstack simulator emulator ios android pool lease gateway"],
-  },
-  {
-    id: "worktree-fast-checkout",
-    title: "快速创建工作树",
-    to: "/settings/labs",
-    scope: "environment",
-    fastWorktreeCheckoutOnly: true,
-    searchTerms: ["beta fast worktree checkout clone apfs copy-on-write cache macos speed"],
   },
   {
     id: "voice-transcription-destination",
@@ -997,7 +959,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "设备来源",
     to: "/settings/devices",
     searchTerms: [
-      "device hosts ssh remote mac mini identity key connection eas expo cloud simlock pool gateway local simulators",
+      "device hosts ssh remote mac mini identity key connection eas expo cloud local simulators",
     ],
   },
   {
@@ -1490,8 +1452,6 @@ export function filterAvailableSettingsSearchItems(
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
       (!item.managedTunnelOnly || availability.managedTunnelActive === true) &&
       (!item.peerLinksOnly || availability.hasPeerLinkHost === true) &&
-      (!item.fastWorktreeCheckoutOnly ||
-        availability.hasFastWorktreeCheckoutEnvironment === true) &&
       (!item.textGeneratorsOnly || availability.hasTextGeneratorsEnvironment === true),
   );
 }

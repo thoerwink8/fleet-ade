@@ -296,7 +296,6 @@ const existingGrok =
     : {};
 const next = {
   ...current,
-  linkedEnvironmentsEnabled: true,
   maxConcurrentSessions,
   enableProviderUpdateChecks: false,
   providerInstances: {
