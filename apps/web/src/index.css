@@ -2168,11 +2168,10 @@ code {
 }
 
 .chat-markdown :not(pre) > code {
-  border: 1px solid transparent;
-  border-radius: 0.3125rem;
+  border-radius: var(--radius-sm);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  background: color-mix(in srgb, var(--contrast-foreground) 8%, transparent);
+  background: color-mix(in srgb, var(--contrast-foreground) 5.5%, transparent);
   padding: 2px 6px;
   color: var(--contrast-foreground);
   font-size: var(--font-size-ui);
@@ -2186,7 +2185,7 @@ code {
 }
 
 .chat-markdown.user-message-markdown :not(pre) > code {
-  background: color-mix(in srgb, var(--contrast-message-foreground) 8%, transparent);
+  background: color-mix(in srgb, var(--contrast-message-foreground) 6%, transparent);
   color: var(--contrast-message-foreground);
 
   @variant dark {
@@ -2195,7 +2194,7 @@ code {
 }
 
 .chat-markdown strong {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .chat-markdown pre {

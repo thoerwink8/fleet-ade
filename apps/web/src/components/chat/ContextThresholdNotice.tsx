@@ -33,10 +33,11 @@ export function ContextThresholdNotice({
     autoCompactThreshold,
     percentRaw: contextThresholdPercentFromConfig(config),
   });
-  if (view.thresholdTokens == null) return null;
-  const prompt = view.over && contextThresholdPrompts(driver);
+  // The header shows the share of the window; this line only speaks once the threshold is crossed.
+  if (view.thresholdTokens == null || !view.over) return null;
+  const prompt = contextThresholdPrompts(driver);
   return (
-    <p className="px-3 pb-1 text-xs text-muted-foreground">
+    <p className="px-3 pb-1 text-meta text-muted-foreground">
       {`上下文 已用 ${formatCount(usedTokens)} / 阈值 ${formatCount(view.thresholdTokens)}`}
       {prompt ? "。已超过阈值，建议压缩或新开一轮。" : null}
     </p>

@@ -106,7 +106,6 @@ export function ComposerControlsBar(props: {
     handleRuntimeModeChange,
     composerControlsCollapsed,
     composerControlsHidden,
-    restingHiddenBlockCount: measuredHiddenBlockCount,
     iconOnlyBlockCount,
     showProviderUnavailable,
     providerSetupInstanceId,
@@ -139,11 +138,7 @@ export function ComposerControlsBar(props: {
     hiddenBlockIds: hiddenRestingBlockIds,
     overflowShowsPermissions,
     pickerOwnsModeShortcut,
-  } = resolveComposerControlsOwnership({
-    matchesDefault: accessMatchesDefault || props.permissionsShownInStrip,
-    collapsed: composerControlsCollapsed,
-    measuredHiddenBlockCount,
-  });
+  } = resolveComposerControlsOwnership();
   const controlSize = composerControlsCollapsed ? "xs" : "sm";
   const applyThreadModelPick = useApplyThreadModelPick();
   const applyRouteThreadModelPick = useStableCallback(() => applyThreadModelPick(routeThreadRef));
@@ -188,7 +183,7 @@ export function ComposerControlsBar(props: {
       compact={false}
       isComposerOwned
       // The trigger grows away from this edge when its model or effort label changes.
-      popupAlign={composerControlsCollapsed ? "start" : "end"}
+      popupAlign="start"
       disabled={providerCatalogPending || isSendBusy}
       multipleModelsEnabled={multipleModelsEnabled}
       multipleModelSelections={multipleModelSelections}
@@ -214,6 +209,8 @@ export function ComposerControlsBar(props: {
       triggerClassName={cn(
         "group/model-trigger",
         MODEL_TRIGGER_STATES,
+        // One quiet 13px control: the model name in the foreground, effort and the rest in grey.
+        "rounded-md bg-foreground/4 font-normal text-secondary-label text-ui sm:text-ui [&_[data-chat-provider-model-picker-label]]:font-medium [&_[data-chat-provider-model-picker-label]]:text-foreground",
         composerControlsCollapsed ? "min-w-13 shrink text-xs!" : "min-w-13",
       )}
       triggerSuffix={effort.suffix}

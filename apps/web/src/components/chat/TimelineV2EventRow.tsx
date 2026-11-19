@@ -7,10 +7,11 @@ import {
   summarizeSubagentStatuses,
 } from "@t3tools/client-runtime/state/subagent-display";
 import { memo, use, useState } from "react";
-import { ChevronDownIcon } from "lucide-react";
+import { isOrchestrationV2WorkActive } from "@t3tools/contracts";
+import { ChevronDownIcon, WorkflowIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from "../ui/collapsible";
-import { EnvironmentSubagentAvatar, SubagentElapsed, V2LifecycleRow } from "./V2LifecycleRow";
+import { SubagentElapsed, V2LifecycleRow } from "./V2LifecycleRow";
 import { LinkRequestCard } from "./LinkRequestCard";
 import { SecretRequestCard } from "./SecretRequestCard";
 import { TimelineRowCtx, type TimelineRow } from "./timelineRowContext";
@@ -82,6 +83,14 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
   const summary = subagentGroupSummary(agents);
   const label = `${members.length} ${members.length === 1 ? "subagent" : "subagents"}`;
   const statusSummary = summarizeSubagentStatuses(agents.map(({ status }) => status));
+  const activeCount = agents.filter(({ status }) => isOrchestrationV2WorkActive(status)).length;
+  const doneCount = agents.filter(({ status }) => status === "completed").length;
+  const countsLabel = [
+    activeCount > 0 ? `${activeCount} 在做` : null,
+    doneCount > 0 ? `${doneCount} 做完` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const toggleExpanded = (open: boolean) => {
     ctx.onToggleWorkEntry(row.id, expanded);
     if (open) ctx.workGroupViewState.expandedEntries.add(groupId);
@@ -90,74 +99,52 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
   };
   return (
     <WorkLogBlock continues={row.continuesWorkLog}>
-      <Collapsible open={expanded} onOpenChange={toggleExpanded} data-subagent-group>
-        {/* pr-3.25 matches the panel border, padding, and row inset so the times line up. */}
-        <CollapsibleTrigger
-          aria-label={label}
-          aria-description={statusSummary}
-          className={cn(
-            "flex w-full min-w-0 items-center gap-2.5 py-2 pr-3.25 text-left transition-opacity hover:opacity-100",
-            expanded || summary.active
-              ? "text-foreground opacity-100"
-              : "text-muted-foreground opacity-55",
-          )}
-        >
-          <span className="flex shrink-0 items-center -space-x-1.5" aria-hidden>
-            {agents.slice(0, 3).map(({ item, status }) => (
-              <EnvironmentSubagentAvatar
-                key={item.id}
-                environmentId={ctx.activeThreadEnvironmentId}
-                providerInstanceId={item.providerInstanceId}
-                driver={item.driver}
-                remote={item.remoteChild}
-                status={agents.length === 1 ? status : undefined}
-              />
-            ))}
-            {agents.length > 3 ? (
-              <span className="relative inline-flex size-6 items-center justify-center rounded-full bg-muted text-3xs font-medium text-muted-foreground ring-2 ring-background">
-                +{agents.length - 3}
-              </span>
-            ) : null}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs font-semibold">{label}</span>
+      <div className="my-2 overflow-hidden rounded-lg border border-border bg-card">
+        <Collapsible open={expanded} onOpenChange={toggleExpanded} data-subagent-group>
+          <CollapsibleTrigger
+            aria-label={label}
+            aria-description={statusSummary}
+            className="flex h-9 w-full min-w-0 items-center gap-2 px-3 text-left text-ui text-foreground"
+          >
+            <WorkflowIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate font-medium">并行子任务</span>
             <span
               className={cn(
-                "block truncate text-3xs text-muted-foreground",
-                summary.active ? "text-info" : summary.failed && "text-destructive",
+                "shrink-0 text-meta tabular-nums",
+                summary.failed ? "text-destructive" : "text-secondary-label",
               )}
             >
-              {statusSummary}
+              {countsLabel || statusSummary}
             </span>
-          </span>
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            <SubagentElapsed agent={subagentGroupTiming(agents)} />
-          </span>
-          <ChevronDownIcon
-            aria-hidden
-            className={cn(
-              "size-3.5 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180",
-            )}
-          />
-        </CollapsibleTrigger>
-        {/* Virtualized rows must settle before disclosure scroll anchoring resumes. */}
-        <CollapsiblePanel animate={false}>
-          {expanded ? (
-            <div className="mt-1 mb-1 rounded-lg border border-border/60 bg-card/30 p-1">
-              {members.map((item) => (
-                <V2LifecycleRow
-                  environmentId={ctx.activeThreadEnvironmentId}
-                  key={item.id}
-                  item={item}
-                  runs={ctx.runs}
-                  onOpenThread={ctx.onOpenThread}
-                />
-              ))}
-            </div>
-          ) : null}
-        </CollapsiblePanel>
-      </Collapsible>
+            <span className="shrink-0 text-meta text-muted-foreground tabular-nums">
+              <SubagentElapsed agent={subagentGroupTiming(agents)} />
+            </span>
+            <ChevronDownIcon
+              aria-hidden
+              className={cn(
+                "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                expanded && "rotate-180",
+              )}
+            />
+          </CollapsibleTrigger>
+          {/* Virtualized rows must settle before disclosure scroll anchoring resumes. */}
+          <CollapsiblePanel animate={false}>
+            {expanded ? (
+              <div className="border-t border-border p-1">
+                {members.map((item) => (
+                  <V2LifecycleRow
+                    environmentId={ctx.activeThreadEnvironmentId}
+                    key={item.id}
+                    item={item}
+                    runs={ctx.runs}
+                    onOpenThread={ctx.onOpenThread}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </CollapsiblePanel>
+        </Collapsible>
+      </div>
     </WorkLogBlock>
   );
 });

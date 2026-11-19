@@ -3,6 +3,7 @@ import {
   type EnvironmentId,
   type ScopedThreadRef,
   type ThreadId,
+  type ThreadLinkedPullRequest,
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
@@ -18,6 +19,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { isTrailingDoubleClick } from "../Sidebar.logic";
 import { Badge } from "../ui/badge";
@@ -39,6 +41,8 @@ import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
+import { issueNumberFromBranch } from "./threadHeaderMeta.logic";
+import { ThreadHeaderChips } from "./ThreadHeaderMeta";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -53,6 +57,11 @@ interface ChatHeaderProps {
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
   onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
+  /** The thread's branch, as a tag after the title. */
+  branch?: string | null | undefined;
+  pullRequest?: Pick<ThreadLinkedPullRequest, "number" | "url"> | null | undefined;
+  /** Sits at the right edge, left of the window's panel toggles. */
+  trailing?: ReactNode;
 }
 
 function resolveRenameCommit(input: {
@@ -78,6 +87,9 @@ export const ChatHeader = memo(function ChatHeader({
   onNewThreadInProject,
   onOpenProjectSettings,
   onFindInThread,
+  branch = null,
+  pullRequest = null,
+  trailing,
 }: ChatHeaderProps) {
   const activeProjectName = activeProject?.isScratch ? "无项目" : activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
@@ -242,19 +254,17 @@ export const ChatHeader = memo(function ChatHeader({
   return (
     <div
       ref={breadcrumbContainerRef}
-      className={cn(
-        "flex min-w-0 flex-1 items-center gap-2 sm:gap-3",
-        rightPanelOpen ? "pr-10" : "pr-24",
-      )}
+      className={cn("flex min-w-0 flex-1 items-center gap-2", rightPanelOpen ? "pr-10" : "pr-24")}
       onContextMenu={handleHeaderContextMenu}
     >
       <WorkspaceBreadcrumb
         ariaLabel="会话路径导航"
-        className="flex-1 overflow-clip [overflow-clip-margin:2px]"
+        className="min-w-0 shrink overflow-clip [overflow-clip-margin:2px]"
+        listClassName="gap-2 sm:gap-2"
       >
         {activeProject ? (
           <>
-            <WorkspaceBreadcrumbItem className="shrink">
+            <WorkspaceBreadcrumbItem className="shrink font-normal text-secondary-label">
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -262,7 +272,7 @@ export const ChatHeader = memo(function ChatHeader({
                       type="button"
                       aria-label={`在 ${activeProjectName} 中新建会话`}
                       onClick={onNewThreadInProject}
-                      className="inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      className="inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-sm text-secondary-label transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                     />
                   }
                 >
@@ -388,6 +398,12 @@ export const ChatHeader = memo(function ChatHeader({
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
+      <ThreadHeaderChips
+        issueNumber={issueNumberFromBranch(branch)}
+        branch={branch}
+        pullRequest={pullRequest}
+      />
+      {trailing ? <div className="ms-auto flex shrink-0 items-center">{trailing}</div> : null}
     </div>
   );
 });
