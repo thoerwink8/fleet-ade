@@ -123,7 +123,7 @@ describe("resolveLinkPullRequestInput", () => {
         hasProject: () => true,
       }),
     ).toEqual({
-      error: "Paste a full URL; this project's host has no known 不再支持 URL.",
+      error: "Paste a full URL; this project's host has no known change request URL.",
     });
   });
 
