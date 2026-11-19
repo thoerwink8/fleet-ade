@@ -4,10 +4,10 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "~/lib/utils";
 
-// Status as a 6px dot plus plain text instead of a filled pill. The accent color is kept
+// Status as a 6px dot plus plain text instead of a filled pill, on the 12/16 meta line. The accent color is kept
 // for the one state that needs a person (attention); every other state stays neutral.
 const statusDot =
-  "h-auto min-w-0 gap-1.5 sm:h-auto sm:min-w-0 border-transparent bg-transparent px-0 font-normal before:size-1.5 before:shrink-0 before:rounded-full";
+  "h-4 min-w-0 gap-1 border-0 bg-transparent px-0 text-meta font-normal sm:h-4 sm:min-w-0 sm:text-meta before:size-1.5 before:shrink-0 before:rounded-full";
 
 const badgeVariants = cva(
   "relative inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-sm border border-transparent font-medium outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 [button&,a&]:cursor-pointer [button&,a&]:pointer-coarse:after:absolute [button&,a&]:pointer-coarse:after:size-full [button&,a&]:pointer-coarse:after:min-h-11 [button&,a&]:pointer-coarse:after:min-w-11",

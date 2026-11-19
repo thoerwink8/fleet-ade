@@ -71,7 +71,6 @@ import { useThreadSelectionStore } from "../../threadSelectionStore";
 import { useNowMinute } from "../../hooks/useNowMinute";
 import { useNowSecond } from "../../hooks/useNowSecond";
 import { vcsEnvironment, vcsBranchRevalidation } from "../../state/vcs";
-import { orchestrationEnvironment } from "../../state/orchestration";
 import { useEnvironmentQuery } from "../../state/query";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
 import { formatRelativeTimeLabel, parseTimestampDate } from "../../timestampFormat";
@@ -86,6 +85,7 @@ import {
   resolveSidebarRowAccessibility,
   type SidebarDropVerb,
   resolveSidebarThreadStatus,
+  type SidebarThreadStatus,
   resolveThreadLastVisitedAt,
   shouldRecedeSidebarThread,
   resolveWorkingStartedAt,
@@ -115,6 +115,7 @@ import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { getTriggerDisplayModelName } from "../chat/providerIconUtils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { useThreadRunningTerminalIds } from "../../state/terminalSessions";
+import { Badge } from "../ui/badge";
 import { InlineButton } from "../ui/button";
 import { Kbd } from "../ui/kbd";
 import { Menu, MenuItem, MenuItemDetail, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
@@ -193,28 +194,30 @@ function extractReasoningEffortLabel(
   return null;
 }
 
-function extractLatestMessagePreview(
-  thread: SidebarThreadSummary,
-  fallbackText?: string | null,
-): string | null {
-  const raw = thread.source?.latestVisibleMessage?.text ?? fallbackText;
-  if (!raw) return null;
-  const cleaned = raw
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/^[#>*\-\d.]+\s+/gm, "")
-    .replace(/[`*_~]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned || cleaned === thread.title.trim()) return null;
-  return cleaned.length > 140 ? `${cleaned.slice(0, 140)}…` : cleaned;
-}
+type RowStatusDot = {
+  variant: "dot-attention" | "dot-active" | "dot-blocked" | "dot-waiting" | "dot-done";
+  label: string;
+};
 
-function estimateTurnCount(thread: SidebarThreadSummary): number {
-  const count = thread.visibleItemCount ?? 0;
-  if (count <= 0) return 0;
-  return Math.max(1, Math.ceil(count / 2));
+// The second row of a card names the state in three words (在做 / 卡住 / 做完); only
+// a state that needs a person (approval, input) gets the accent dot.
+function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowStatusDot | null {
+  switch (status) {
+    case "preparing":
+    case "working":
+      return { variant: "dot-active", label: "在做" };
+    case "waiting":
+      return { variant: "dot-waiting", label: "等待中" };
+    case "approval":
+      return { variant: "dot-attention", label: "待批准" };
+    case "input":
+      return { variant: "dot-attention", label: "待输入" };
+    case "limited":
+    case "failed":
+      return { variant: "dot-blocked", label: "卡住" };
+    case "ready":
+      return hasRun ? { variant: "dot-done", label: "做完" } : null;
+  }
 }
 
 function SidebarProviderStack(props: {
@@ -750,29 +753,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     JSON.stringify([thread.environmentId, gitCwd]),
     gitStatus.data,
   );
-  const inlineLatestMessageText = thread.source?.latestVisibleMessage?.text ?? null;
-  const previewTarget =
-    variant === "card" &&
-    leaseLiveStatus &&
-    inlineLatestMessageText === null &&
-    (thread.visibleItemCount ?? 0) > 0
-      ? {
-          environmentId: thread.environmentId,
-          input: {
-            threadId: thread.id,
-            visibleItemCount: thread.visibleItemCount ?? 0,
-          },
-        }
-      : null;
-  const latestPreviewQuery = useEnvironmentQuery(
-    previewTarget === null
-      ? null
-      : orchestrationEnvironment.threadLatestMessagePreview(previewTarget),
-  );
-  const retainedPreviewText = useRetainedValue(
-    JSON.stringify([thread.environmentId, thread.id]),
-    latestPreviewQuery.data ?? undefined,
-  );
   const checkoutThread = withoutRemovedCheckout(thread, visibleGitStatus);
   const pr = linkedPullRequestStatus?.pr ?? null;
   const supportsMultiplePullRequests = useSupportsMultiplePullRequests(thread.environmentId);
@@ -1018,7 +998,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
 
   const rowSurfaceClassName = cn(
     "group/sidebar-row relative w-full cursor-pointer overflow-hidden text-left outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-    variant === "card" ? "rounded-lg" : "rounded-md",
+    // The card keeps the 1px transparent border of the sample page, so rows are 58px tall.
+    variant === "card" ? "rounded-lg border border-transparent" : "rounded-md",
     variant !== "card" &&
       variantAction === "unsettle" &&
       !props.isActive &&
@@ -1090,10 +1071,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     <span
       aria-hidden
       className={cn(
-        "min-w-0 flex-1 text-start text-sm transition-opacity motion-reduce:transition-none",
-        variant === "card" || !shouldRecede ? "font-medium" : "font-normal",
+        "min-w-0 flex-1 text-start text-row transition-opacity motion-reduce:transition-none",
+        (variant === "card" ? props.isActive || isUnread : !shouldRecede)
+          ? "font-medium"
+          : "font-normal",
         variant === "card"
-          ? "truncate text-foreground"
+          ? "truncate text-sidebar-foreground"
           : variant !== "slim"
             ? cn(
                 "truncate",
@@ -1465,19 +1448,30 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     );
   }
 
-  const messagePreview = extractLatestMessagePreview(thread, retainedPreviewText ?? null);
   const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
-  const turnCount = estimateTurnCount(thread);
-  const isRunningLive = status === "preparing" || status === "working";
+  const rowStatus = resolveRowStatusDot(
+    status,
+    thread.latestRun != null || (thread.visibleItemCount ?? 0) > 0,
+  );
+  const rowStatusDuration =
+    status === "preparing" || status === "working" ? (
+      <span aria-hidden>
+        <WorkingDuration startedAt={resolveWorkingStartedAt(thread)} />
+      </span>
+    ) : status === "waiting" ? (
+      <span aria-hidden>
+        <WorkingDuration startedAt={thread.latestRun?.completedAt ?? null} />
+      </span>
+    ) : null;
 
   return (
     <li
       data-thread-item={threadKey}
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
+      // Row 58px (1 + 8 + 20 + 4 + 16 + 8 + 1) plus the 4px gap the li padding leaves.
       className={cn(
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_86px]",
-        messagePreview === null && "[contain-intrinsic-size:auto_62px]",
+        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_62px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1503,11 +1497,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           }
         >
           {accessibleTitle}
-          <div className="relative z-10 px-2.5 py-2">
-            <div className="flex min-w-0 items-center gap-1.5">
-              {isRunningLive ? (
-                <span aria-hidden className="size-2 shrink-0 rounded-full bg-success" />
-              ) : null}
+          <div className="relative z-10 flex flex-col gap-1 px-3 py-2">
+            <div className="flex h-5 min-w-0 items-center gap-2">
               {draftIndicator}
               {pinIndicator}
               {title}
@@ -1521,7 +1512,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "group/sidebar-status-slot relative ml-auto flex h-5 min-w-8 shrink-0 items-stretch justify-end text-xs",
+                    "group/sidebar-status-slot relative ml-auto flex h-5 min-w-8 shrink-0 items-stretch justify-end text-meta",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1531,54 +1522,30 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                       isWokeStatus
                         ? "pointer-events-auto"
                         : "pointer-events-none group-has-[:focus-visible]/sidebar-status-slot:absolute group-has-[:focus-visible]/sidebar-status-slot:right-0 group-has-[:focus-visible]/sidebar-status-slot:opacity-0 group-any-hover/sidebar-row:absolute group-any-hover/sidebar-row:right-0 group-any-hover/sidebar-row:opacity-0",
-                      "flex items-center self-center justify-self-end tabular-nums text-secondary-label",
+                      "flex items-center self-center justify-self-end tabular-nums text-muted-foreground",
                       snoozeMenuOpen && "pointer-events-none absolute right-0 opacity-0",
                     )}
                   >
-                    {topStatus ? (
-                      isWokeStatus ? (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <button
-                                type="button"
-                                aria-label="忽略已唤醒通知"
-                                onClick={handleAcknowledgeWokeClick}
-                                className={cn(
-                                  "inline-flex cursor-pointer items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                                  topStatus.className,
-                                )}
-                              >
-                                <AlarmClockIcon aria-hidden className="size-3.5 shrink-0" />
-                                <span role="status">{topStatus.label}</span>
-                              </button>
-                            }
-                          />
-                          <TooltipPopup side="top">忽略已唤醒通知</TooltipPopup>
-                        </Tooltip>
-                      ) : (
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 font-medium",
-                            topStatus.className,
-                          )}
-                        >
-                          <TopStatusIcon icon={topStatus.icon} className="size-3.5" />
-                          {/* Not a live region: a collapsed sidebar is inert, so
-                            BackgroundThreadAnnouncer and the open thread's
-                            timeline speak status changes instead. */}
-                          {topStatus.label}
-                          {status === "preparing" || status === "working" ? (
-                            <span aria-hidden>
-                              <WorkingDuration startedAt={resolveWorkingStartedAt(thread)} />
-                            </span>
-                          ) : status === "waiting" ? (
-                            <span aria-hidden>
-                              <WorkingDuration startedAt={thread.latestRun?.completedAt ?? null} />
-                            </span>
-                          ) : null}
-                        </span>
-                      )
+                    {isWokeStatus && topStatus ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              aria-label="忽略已唤醒通知"
+                              onClick={handleAcknowledgeWokeClick}
+                              className={cn(
+                                "inline-flex cursor-pointer items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                                topStatus.className,
+                              )}
+                            >
+                              <AlarmClockIcon aria-hidden className="size-3.5 shrink-0" />
+                              <span role="status">{topStatus.label}</span>
+                            </button>
+                          }
+                        />
+                        <TooltipPopup side="top">忽略已唤醒通知</TooltipPopup>
+                      </Tooltip>
                     ) : (
                       <RelativeTimeLabel
                         timestamp={
@@ -1669,47 +1636,23 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               )}
               {props.sweepAction !== null ? dragDestination : null}
             </div>
-            {messagePreview ? (
-              <p
-                aria-hidden
-                className="mt-1 line-clamp-2 text-xs leading-normal text-sidebar-muted-foreground"
-                dir={textDirection(messagePreview)}
-              >
-                {messagePreview}
-              </p>
-            ) : null}
-            <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-secondary-label">
-              <SidebarProviderStack
-                thread={thread}
-                providerEntryByInstanceId={props.providerEntryByInstanceId}
-              />
-              <span className="min-w-0 truncate text-xs text-secondary-label">
+            <div className="flex h-4 min-w-0 items-center gap-2 text-meta text-secondary-label">
+              {rowStatus ? (
+                <Badge variant={rowStatus.variant}>
+                  {/* Not a live region: a collapsed sidebar is inert, so
+                    BackgroundThreadAnnouncer and the open thread's
+                    timeline speak status changes instead. */}
+                  {rowStatus.label}
+                  {rowStatusDuration}
+                </Badge>
+              ) : null}
+              <span className="min-w-0 truncate text-muted-foreground">
                 {reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel}
               </span>
-              {checkoutThread.branch ? (
-                <span className="inline-flex max-w-24 shrink-0 items-center gap-0.5 truncate text-secondary-label/80">
-                  <ThreadWorktreeIndicator thread={checkoutThread} />
-                  <span className="truncate">{checkoutThread.branch}</span>
-                </span>
-              ) : null}
-              {terminalStatusIcon}
-              {prBadge}
-              {diff ? (
-                <span className="shrink-0 font-mono">
-                  <span className="text-diff-addition-foreground">
-                    +{formatDiffCount(diff.insertions)}
-                  </span>{" "}
-                  <span className="text-diff-deletion-foreground">
-                    −{formatDiffCount(diff.deletions)}
-                  </span>
-                </span>
-              ) : null}
-              <span
-                aria-hidden
-                className="ml-auto inline-flex shrink-0 items-center gap-1.5 tabular-nums text-secondary-label"
-              >
+              <span className="ml-auto inline-flex shrink-0 items-center gap-2 tabular-nums text-muted-foreground">
                 {remoteMachineIcon}
-                {turnCount > 0 ? <span>{turnCount} 轮</span> : null}
+                {terminalStatusIcon}
+                {prBadge}
               </span>
             </div>
           </div>

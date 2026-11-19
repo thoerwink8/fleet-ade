@@ -27,7 +27,7 @@ import { resolveSidebarState, type ResponsiveSidebarState } from "./sidebarState
 import * as Schema from "effect/Schema";
 import { announceSidebarVisibility } from "~/lib/accessibilityAnnouncements";
 
-const SIDEBAR_WIDTH = "18.75rem";
+const SIDEBAR_WIDTH = "264px";
 const SIDEBAR_WIDTH_MOBILE = "calc(100vw - var(--spacing) * 3)";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_RESIZE_DEFAULT_MIN_WIDTH = 16 * 16;
@@ -659,11 +659,19 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
+// `bar` is the 48px strip with a top rule that closes the sidebar list.
+function SidebarFooter({
+  className,
+  size = "default",
+  ...props
+}: React.ComponentProps<"div"> & { size?: "default" | "bar" }) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 px-[var(--sidebar-content-inset)] pt-1 pb-[var(--sidebar-content-inset)]",
+        "flex flex-col gap-2",
+        size === "bar"
+          ? "min-h-12 justify-center border-t border-sidebar-border px-3 py-1"
+          : "px-[var(--sidebar-content-inset)] pt-1 pb-[var(--sidebar-content-inset)]",
         className,
       )}
       data-sidebar="footer"
@@ -707,11 +715,17 @@ function SidebarContent({
   );
 }
 
-function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
+// `header` is the search strip under the topbar: 12px sides, flush to the topbar, 12px below.
+function SidebarGroup({
+  className,
+  size = "default",
+  ...props
+}: React.ComponentProps<"div"> & { size?: "default" | "header" }) {
   return (
     <div
       className={cn(
-        "relative flex w-full min-w-0 flex-col p-[var(--sidebar-content-inset)]",
+        "relative flex w-full min-w-0 flex-col",
+        size === "header" ? "px-3 pt-0 pb-3" : "p-[var(--sidebar-content-inset)]",
         className,
       )}
       data-sidebar="group"
