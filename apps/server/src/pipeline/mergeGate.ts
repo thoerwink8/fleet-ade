@@ -304,7 +304,7 @@ const makeReader = Effect.gen(function* () {
       Effect.mapError(() => new MergeGateReadError()),
     );
     if (decodedPull.head.sha !== input.headSha) return yield* new MergeGateReadError();
-    if (decodedFiles.length === 100) return yield* new MergeGateReadError();
+    if (/rel="next"/.test(files.headers["link"] ?? "")) return yield* new MergeGateReadError();
     const checks = workflowChecks(decodedRuns, input.headSha);
     const coldVerify = coldState(decodedStatus, input.headSha);
     if (checks === undefined || coldVerify === undefined) return yield* new MergeGateReadError();

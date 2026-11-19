@@ -661,6 +661,113 @@ describe("MergeGate", () => {
       }).pipe(Effect.provide(live));
     }),
   );
+  it.effect.each([
+    {
+      name: "刚好 100 个文件且没有下一页时仍按正常合并判断走",
+      fileCount: 100,
+      link: undefined,
+      status: "merged",
+      detail: null,
+      mergeCalls: 1,
+    },
+    {
+      name: "100 个文件但还有下一页时记成没查成",
+      fileCount: 100,
+      link: `</pulls/18/files?page=2>; rel="next"`,
+      status: "verify",
+      detail: "没查成",
+      mergeCalls: 0,
+    },
+    {
+      name: "文件不足一页却还有下一页时记成没查成",
+      fileCount: 1,
+      link: `</pulls/18/files?page=2>; rel="next"`,
+      status: "verify",
+      detail: "没查成",
+      mergeCalls: 0,
+    },
+  ])("$name", (row) =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<ReadonlyArray<MergeCall>>([]);
+      const files = Array.from({ length: row.fileCount }, (_, index) => ({
+        filename: `apps/server/src/pipeline/file${index}.ts`,
+      }));
+      const rest = Layer.succeed(GitHubRest.GitHubRest, {
+        rest: (request: { readonly method?: string; readonly path: string }) => {
+          const body = request.path.includes("/actions/runs")
+            ? {
+                total_count: 1,
+                workflow_runs: [
+                  {
+                    id: 1,
+                    name: "CI",
+                    head_sha: HEAD,
+                    status: "completed",
+                    conclusion: "success",
+                  },
+                ],
+              }
+            : request.path.includes("/status")
+              ? { sha: HEAD, statuses: [{ context: "cold-verify", state: "success" }] }
+              : request.path.includes("/files")
+                ? files
+                : request.path.includes("/pulls/")
+                  ? { additions: 0, merged: false, head: { sha: HEAD } }
+                  : {};
+          const response = {
+            status: 200,
+            headers: row.link === undefined ? {} : { link: row.link },
+            body: JSON.stringify(body),
+            truncated: false,
+            invalidUtf8: false,
+          };
+          return request.method === "PUT"
+            ? Ref.update(calls, (items) => [
+                ...items,
+                { number: 18, headSha: HEAD, repository: "thoerwink8/fleet-ade" },
+              ]).pipe(Effect.as(response))
+            : Effect.succeed(response);
+        },
+        credential: () => Effect.die("unused"),
+        appCredential: () => Effect.die("unused"),
+      } as GitHubRest.GitHubRest["Service"]);
+      const settings = ServerSettings.layerTest({
+        pipelineEnabled: true,
+        pipelineAutoMerge: true,
+      });
+      const runs = runsLayer.pipe(
+        Layer.provide(
+          Layer.succeed(PipelineGitHubIssues, {
+            addLabel: () => Effect.die("unexpected label write"),
+            listEligible: () => Effect.succeed([issue(9)]),
+            read: () => Effect.die("unused"),
+          }),
+        ),
+        Layer.provide(Layer.succeed(PipelineUsage, { read: () => Effect.succeed([]) })),
+        Layer.provide(settings),
+        Layer.provide(layerPortsDefault),
+        Layer.provide(ClaimLease.layerPort()),
+        Layer.provideMerge(SqlitePersistence.layerMemory),
+      );
+      const live = layerLive.pipe(
+        Layer.provide(budgetLive),
+        Layer.provide(rest),
+        Layer.provide(settings),
+        Layer.provideMerge(runs),
+      );
+      yield* Effect.gen(function* () {
+        const stored = yield* PipelineRuns;
+        const gate = yield* MergeGate;
+        yield* stored.tick;
+        yield* stored.note(9, { status: "verify", prNumber: 18, headSha: HEAD });
+        yield* gate.tick;
+        const run = (yield* stored.list).runs.find((item) => item.issueNumber === 9);
+        assert.strictEqual(run?.status, row.status);
+        assert.strictEqual(run?.detail, row.detail);
+        assert.strictEqual((yield* Ref.get(calls)).length, row.mergeCalls);
+      }).pipe(Effect.provide(live));
+    }),
+  );
 });
 
 describe("workflowChecks", () => {

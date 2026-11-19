@@ -1,6 +1,9 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import { assert, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
+import * as Exit from "effect/Exit";
+import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as TestClock from "effect/testing/TestClock";
 import * as Effect from "effect/Effect";
@@ -246,6 +249,22 @@ it.effect("账本租约读失败回 503，不建运行也不覆盖原租约", ()
     assert.strictEqual(attempts[0]?.result.status, 503);
     assert.strictEqual(attempts[0]?.result.code, "local_claims_unreadable");
     assert.strictEqual(yield* runCount, 0);
+  }).pipe(Effect.provide(pipelineLayer(layerPort()))),
+);
+
+it.effect("认领中的非 SQL 缺陷继续抛出，不转成 503", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const port = yield* ClaimLeasePort;
+    const defect = new Error("claim transaction defect");
+    using _transaction = vi
+      .spyOn(sql, "withTransaction")
+      .mockImplementation(() => Effect.die(defect));
+    const result = yield* Effect.exit(
+      claimForRun(port, { repo: repoName, issue: 7, title: "单 7" }),
+    );
+    assert(Exit.isFailure(result));
+    assert.strictEqual(Cause.squash(result.cause), defect);
   }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );
 
