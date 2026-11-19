@@ -141,7 +141,7 @@ export function PullRequestReviewForm({
     onSubmitted();
   };
 
-  // Forgejo requires a summary when requesting changes, even with inline comments.
+  // A host can require a summary when requesting changes, even with inline comments.
   const canSubmit = (verdict: PullRequestReviewVerdict, summary: string, commentCount: number) =>
     verdict === "request-changes" && requestChangesSummaryRequired
       ? summary.trim().length > 0

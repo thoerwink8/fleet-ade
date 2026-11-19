@@ -549,31 +549,44 @@ function unknownRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo
   };
 }
 
-function retiredRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo | null {
-  const { hostname } = remote;
-  const labels = hostname.split(".");
-  const kind =
-    hostname === "gitlab.com" || labels.includes("gitlab")
-      ? "gitlab"
-      : hostname === "git.cafe" || hostname === "staging.git.cafe"
-        ? "gitcafe"
-        : hostname === "origin.cursor.com"
-          ? "cursor-origin"
-          : hostname === "codeberg.org" || labels.includes("forgejo") || labels.includes("gitea")
-            ? "forgejo"
-            : hostname === "dev.azure.com" ||
-                hostname.endsWith(".dev.azure.com") ||
-                hostname.endsWith(".visualstudio.com")
-              ? "azure-devops"
-              : hostname === "bitbucket.org" || labels.includes("bitbucket")
-                ? "bitbucket"
-                : null;
-  if (kind === null) return null;
+function retiredRemoteInfo(remote: GitRemoteHost, kind: string): SourceControlProviderInfo {
   return {
     kind: SourceControlProviderKind.make(kind),
     name: UNSUPPORTED_SOURCE_CONTROL_LABEL,
     baseUrl: `https://${remote.host}`,
   };
+}
+
+// Main recognized these before GitHub, so a GitHub Enterprise name keeps its host.
+function retiredRemoteBeforeGitHub(remote: GitRemoteHost): SourceControlProviderInfo | null {
+  const { hostname } = remote;
+  const labels = hostname.split(".");
+  const kind =
+    hostname === "git.cafe" || hostname === "staging.git.cafe"
+      ? "gitcafe"
+      : hostname === "origin.cursor.com"
+        ? "cursor-origin"
+        : hostname === "codeberg.org" || labels.includes("forgejo") || labels.includes("gitea")
+          ? "forgejo"
+          : null;
+  return kind === null ? null : retiredRemoteInfo(remote, kind);
+}
+
+// Main recognized these after GitHub, with GitLab last.
+function retiredRemoteAfterGitHub(remote: GitRemoteHost): SourceControlProviderInfo | null {
+  const { hostname } = remote;
+  const labels = hostname.split(".");
+  const kind =
+    hostname === "dev.azure.com" ||
+    hostname.endsWith(".dev.azure.com") ||
+    hostname.endsWith(".visualstudio.com")
+      ? "azure-devops"
+      : hostname === "bitbucket.org" || labels.includes("bitbucket")
+        ? "bitbucket"
+        : hostname === "gitlab.com" || labels.includes("gitlab")
+          ? "gitlab"
+          : null;
+  return kind === null ? null : retiredRemoteInfo(remote, kind);
 }
 
 const retiredClients = new Map<string, SourceControlDefinition>();
@@ -892,13 +905,13 @@ export function makeSourceControlDefinitionRegistry(
     recognizeRemote: (remoteUrl) => {
       const remote = parseGitRemoteHost(remoteUrl);
       if (remote === null) return null;
-      const retired = retiredRemoteProvider(remote);
-      if (retired !== null) return retired;
+      const before = retiredRemoteBeforeGitHub(remote);
+      if (before !== null) return before;
       for (const definition of recognitionOrder) {
         const provider = definition.recognizeRemote(remote);
         if (provider !== null) return provider;
       }
-      return unknownRemoteProvider(remote);
+      return retiredRemoteAfterGitHub(remote) ?? unknownRemoteProvider(remote);
     },
     repositoryKeyFromRemote: (remoteUrl) => {
       const key = normalizeGitRemoteUrl(remoteUrl);

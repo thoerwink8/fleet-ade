@@ -257,11 +257,11 @@ describe("change request URLs built from a parsed link", () => {
 describe("sourceControlClients.recognizeRemote", () => {
   const kindOfRemote = (url: string) => sourceControlClients.recognizeRemote(url)?.kind ?? null;
 
-  it("retired hosts claim their hostnames before GitHub reads the rest", () => {
+  it("asks hosts in a fixed order when one hostname carries several hosts' labels", () => {
     expect(kindOfRemote("https://gitea.github.example/o/r")).toBe("forgejo");
-    expect(kindOfRemote("https://forgejo.gitlab.example/o/r")).toBe("gitlab");
-    expect(kindOfRemote("https://gitlab.github.example/o/r")).toBe("gitlab");
-    expect(kindOfRemote("https://bitbucket.gitlab.example/o/r")).toBe("gitlab");
+    expect(kindOfRemote("https://forgejo.gitlab.example/o/r")).toBe("forgejo");
+    expect(kindOfRemote("https://gitlab.github.example/o/r")).toBe("github");
+    expect(kindOfRemote("https://bitbucket.gitlab.example/o/r")).toBe("bitbucket");
     expect(kindOfRemote("https://bitbucket.visualstudio.com/p/_git/r")).toBe("azure-devops");
     expect(kindOfRemote("git@git.cafe:pingdotgg/t3code.git")).toBe("gitcafe");
     expect(kindOfRemote("https://origin.cursor.com/acme/web.git")).toBe("cursor-origin");

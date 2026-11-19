@@ -897,7 +897,7 @@ export function PullRequestSummaryTab({
                   })}
                 </span>
               )}
-              {/* Azure DevOps accepts reviewers but cannot list candidates. */}
+              {/* Offer the picker only when this host can request reviewers and list candidates. */}
               {detail.capabilities.reviewers.request &&
               detail.capabilities.reviewers.listCandidates ? (
                 <PullRequestReviewerPicker

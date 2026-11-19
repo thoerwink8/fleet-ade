@@ -1623,7 +1623,7 @@ export const ServerSettings = Schema.Struct({
   maxConcurrentSessions: Schema.NullOr(MaxConcurrentSessions).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
-  /** Retired switch; decoded for stored settings and policy compatibility, but ignored. */
+  /** Pinned on. Decoded for stored settings and policy compatibility; the stored value is ignored. */
   promptSuggestionsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   sidebarAutoSettleKeepPullRequests: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
