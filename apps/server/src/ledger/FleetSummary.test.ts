@@ -143,6 +143,35 @@ it.effect("任务键和 adhoc 键包含环境身份，删除产生 tombstone", (
     }),
   ),
 );
+it.effect("双环境订阅汇总四行且更新只推对应行", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      yield* summary.report("environment-a", task("task-a"));
+      yield* summary.report("environment-a", adhoc("adhoc-a"));
+      yield* summary.report("environment-b", task("task-b"));
+      yield* summary.report("environment-b", adhoc("adhoc-b"));
+
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      assert(snapshot?.type === "snapshot");
+      expect(snapshot.rows).toHaveLength(4);
+      expect(new Set(snapshot.rows.map((row) => row.environmentId))).toEqual(
+        new Set(["environment-a", "environment-b"]),
+      );
+
+      const live = yield* summary.subscribe({ cursor: snapshot.revision });
+      yield* summary.report(
+        "environment-b",
+        adhoc("adhoc-b", { reason: "needs attention", needsYou: true }),
+      );
+      const change = yield* first(live);
+      expect(change).toMatchObject({
+        type: "upsert",
+        row: { environmentId: "environment-b", threadId: "adhoc-b", reason: "needs attention" },
+      });
+    }),
+  ),
+);
 
 it.effect("快照分页每页不超过 200 行，并携带同一 revision", () =>
   serviceTest(

@@ -145,6 +145,27 @@ describe("RPC scope middleware", () => {
     }),
   );
 });
+it.effect("拒绝没有摘要读取权限的客户端", () =>
+  Effect.gen(function* () {
+    const group = WsRpcGroup.omit(
+      ...[...WsRpcGroup.requests.keys()].filter((tag) => tag !== WS_METHODS.fleetSummarySubscribe),
+    );
+    const client = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          group.toLayerHandler(WS_METHODS.fleetSummarySubscribe, () => Stream.empty),
+          RpcAuthorization.layer([]),
+        ),
+      ),
+    );
+
+    const denied = yield* client[WS_METHODS.fleetSummarySubscribe]({}).pipe(Effect.flip);
+    expect(denied).toMatchObject({
+      _tag: "EnvironmentAuthorizationError",
+      requiredPermission: AuthOrchestrationReadScope,
+    });
+  }),
+);
 
 it.effect.each([WS_METHODS.subscribeVcsBranch, WS_METHODS.subscribeVcsStatus] as const)(
   "enforces read permission on stream %s",
