@@ -12,11 +12,11 @@ import {
 import * as Schema from "effect/Schema";
 
 export const DEFAULT_SANS_FONT_STACK =
-  '"Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Inter Variable", system-ui, sans-serif';
+  '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Inter Variable", system-ui, sans-serif';
 
 // Some engines map `ui-monospace` to a proportional font, so prefer concrete names.
 export const DEFAULT_CODE_FONT_STACK =
-  '"Cascadia Mono", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "Microsoft YaHei UI", monospace';
+  '"Cascadia Mono", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "PingFang SC", "Microsoft YaHei UI", monospace';
 
 export const TYPOGRAPHY_ADVANCED_STORAGE_KEY = "t3code:typography-advanced";
 export const CHAT_READING_SIZE_STORAGE_KEY = "t3code:chat-reading-size";
@@ -216,6 +216,7 @@ export function isMonospaceFamily(family: string): boolean {
 }
 
 const SANS_GENERIC_CANDIDATES = [
+  "Segoe UI Variable Text",
   "Segoe UI",
   "Roboto",
   "Noto Sans",
@@ -287,9 +288,13 @@ function resolveGenericFamilyLabel(generic: string): string | null {
 }
 
 export function resolveDefaultFamilyLabel(stack: string): string | null {
+  const isApple =
+    typeof navigator !== "undefined" &&
+    /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
   for (const raw of stack.split(",")) {
     const family = raw.trim().replace(/^(['"])(.*)\1$/, "$2");
     if (family.length === 0) continue;
+    if (/^(-apple-system|BlinkMacSystemFont)$/i.test(family) && !isApple) continue;
     if (
       /^(system-ui|sans-serif|serif|monospace|ui-monospace|-apple-system|BlinkMacSystemFont)$/i.test(
         family,

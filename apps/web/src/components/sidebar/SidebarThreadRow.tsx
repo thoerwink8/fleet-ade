@@ -1001,7 +1001,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       className={cn(
         "min-w-0 flex-1 text-start text-row transition-opacity motion-reduce:transition-none",
         (variant === "card" ? props.isActive || isUnread : !shouldRecede)
-          ? "font-medium"
+          ? "font-semibold"
           : "font-normal",
         variant === "card"
           ? "truncate text-sidebar-foreground"

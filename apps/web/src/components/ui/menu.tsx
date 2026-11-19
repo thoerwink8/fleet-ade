@@ -97,7 +97,7 @@ function MenuSearchInput({
         )}
         <Input
           {...props}
-          className="rounded-none bg-transparent text-sm [&_input]:h-6.5 [&_input]:ps-5 [&_input]:font-sans [&_input]:leading-6.5"
+          className="rounded-none bg-transparent text-ui [&_input]:h-6.5 [&_input]:ps-5 [&_input]:font-sans [&_input]:leading-6.5"
           size="sm"
           unstyled
           onKeyDown={(event) => {
@@ -134,7 +134,7 @@ function MenuItem({
           buttonVariants({
             variant: "ghost",
             size: "compact",
-            className: "h-auto min-h-7 w-full sm:text-xs",
+            className: "h-auto min-h-7 w-full sm:text-meta",
           }),
         density === "touch" && "min-h-10 sm:min-h-10",
         className,
@@ -274,7 +274,7 @@ function MenuGroupLabel({
   return (
     <MenuPrimitive.GroupLabel
       className={cn(
-        "px-2 py-1.5 font-medium text-muted-foreground text-xs data-inset:ps-9 sm:data-inset:ps-8",
+        "px-2 py-1.5 font-semibold text-muted-foreground text-meta data-inset:ps-9 sm:data-inset:ps-8",
         className,
       )}
       data-inset={inset}
@@ -298,7 +298,7 @@ function MenuShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
   return (
     <kbd
       className={cn(
-        "ms-auto font-medium font-sans text-secondary-label text-xs tracking-widest",
+        "ms-auto font-medium font-sans text-secondary-label text-meta tracking-normal",
         className,
       )}
       data-slot="menu-shortcut"

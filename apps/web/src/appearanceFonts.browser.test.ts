@@ -80,8 +80,9 @@ describe("applyAppearanceFontVariables", () => {
       }
     };
     try {
-      // `0. ` in a 14px monospace font is about 25px, past the 20px default.
-      expect(gutter("monospace")).toBeGreaterThan(24);
+      // `0. ` in a 14px 0.6em monospace face is ~25px; generic `monospace` on zh-CN Windows (NSimSun) is 21px, still past the 20px default.
+      expect(gutter('"Courier New", monospace')).toBeGreaterThan(24);
+      expect(gutter("monospace")).toBeGreaterThan(20);
       expect(gutter("sans-serif")).toBe(20);
     } finally {
       if (style === null) root.removeAttribute("style");

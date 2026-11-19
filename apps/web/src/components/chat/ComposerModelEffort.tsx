@@ -182,7 +182,7 @@ export function describeComposerEffort(
 }
 
 const COLUMN_ROW =
-  "flex h-8 w-full shrink-0 cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-sm text-foreground outline-none hover:bg-foreground/[0.09] focus-visible:bg-foreground/[0.09] disabled:cursor-not-allowed disabled:opacity-64";
+  "flex h-8 w-full shrink-0 cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-ui text-foreground outline-none hover:bg-foreground/[0.09] focus-visible:bg-foreground/[0.09] disabled:cursor-not-allowed disabled:opacity-64";
 
 function ColumnRow(props: {
   label: string;
@@ -474,7 +474,7 @@ function OptionSwitchRow(props: {
 
 function NoEffortRow() {
   return (
-    <div className="flex h-8 items-center px-2 text-muted-foreground text-sm">
+    <div className="flex h-8 items-center px-2 text-muted-foreground text-ui">
       没有可选的推理强度
     </div>
   );
@@ -492,11 +492,11 @@ export function ComposerEffortColumn(props: { traits: TraitsSelectionInput | nul
     <>
       {/* Matches the search row's box, so one rule runs across the top of the popup. */}
       <div className="shrink-0 px-3 pt-2.5">
-        <div className="flex h-8.25 -translate-y-px items-center gap-2 border-b border-border/70 pb-1.5 text-sm">
+        <div className="flex h-8.25 -translate-y-px items-center gap-2 border-b border-border/70 pb-1.5 text-ui">
           <span className="text-muted-foreground">
             {controls?.effort?.descriptor.label ?? (controls?.others.length ? "选项" : "推理强度")}
           </span>
-          <span className="ms-auto min-w-0 truncate text-muted-foreground text-xs">
+          <span className="ms-auto min-w-0 truncate text-muted-foreground text-meta">
             {picker.modelLabel}
           </span>
         </div>
