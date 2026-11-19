@@ -1196,7 +1196,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --destructive-foreground: var(--error-foreground);
   --info: var(--color-blue-500);
   --info-foreground: var(--color-blue-700);
-  /* Messages from a guest link, and the sidebar Request status. */
+  /* Messages sent for a guest, kept for threads that still carry them. */
   --guest: var(--color-fuchsia-500);
   --guest-foreground: var(--color-fuchsia-600);
   --guest-surface: color-mix(in srgb, var(--guest) 14%, var(--message-surface));

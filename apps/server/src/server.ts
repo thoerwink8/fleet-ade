@@ -181,7 +181,6 @@ import {
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as EnvironmentAuthPolicy from "./auth/EnvironmentAuthPolicy.ts";
 import * as CloudHttp from "./cloud/http.ts";
-import * as GuestHttp from "./guest/http.ts";
 import * as LedgerNotes from "./ledger/notes.ts";
 import * as FleetClaims from "./ledger/FleetClaims.ts";
 import * as CloudLink from "./cloud/CloudLink.ts";
@@ -875,7 +874,6 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerHttp.layerOtlpTracesProxyRoute,
     ServerHttp.layerAssetRoute,
     ServerHttp.layerAttachmentUploadRoute,
-    GuestHttp.layer,
     DeviceHubProxy.layer,
     LedgerNotes.routeLayer,
     ServerBrowserStream.routeLayer,

@@ -514,13 +514,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
-    id: "guest-links",
-    title: "访客链接",
-    to: "/settings/labs",
-    scope: "environment",
-    searchTerms: ["beta share guest invite link teammate watch t3 connect tunnel"],
-  },
-  {
     id: "linked-environments-beta",
     title: "关联环境",
     to: "/settings/labs",

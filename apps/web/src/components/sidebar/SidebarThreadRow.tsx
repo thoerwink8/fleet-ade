@@ -52,7 +52,6 @@ import {
   SquarePenIcon,
   TerminalIcon,
   Undo2Icon,
-  UserRoundIcon,
   XIcon,
 } from "lucide-react";
 import {
@@ -562,7 +561,6 @@ const TOP_STATUS_ICONS = {
   working: CircleDashedIcon,
   waiting: CircleDotDashedIcon,
   input: MessageCircleQuestionIcon,
-  request: UserRoundIcon,
   approval: ShieldQuestionIcon,
   failed: CircleAlertIcon,
   done: CircleCheckIcon,
@@ -827,37 +825,31 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 icon: "input" as const,
                 className: "text-indigo-600 dark:text-indigo-300",
               }
-            : status === "request"
+            : status === "limited"
               ? {
-                  label: "待响应",
-                  icon: "request" as const,
-                  className: "text-guest-foreground",
+                  label: "受限",
+                  icon: "failed" as const,
+                  className: "text-warning-foreground",
                 }
-              : status === "limited"
+              : status === "failed"
                 ? {
-                    label: "受限",
+                    label: "失败",
                     icon: "failed" as const,
-                    className: "text-warning-foreground",
+                    className: "text-error-foreground",
                   }
-                : status === "failed"
+                : isWoke
                   ? {
-                      label: "失败",
-                      icon: "failed" as const,
-                      className: "text-error-foreground",
+                      label: "已唤醒",
+                      icon: "woke" as const,
+                      className: "text-warning-foreground",
                     }
-                  : isWoke
+                  : isUnread
                     ? {
-                        label: "已唤醒",
-                        icon: "woke" as const,
-                        className: "text-warning-foreground",
+                        label: "完成",
+                        icon: "done" as const,
+                        className: "text-success-foreground",
                       }
-                    : isUnread
-                      ? {
-                          label: "完成",
-                          icon: "done" as const,
-                          className: "text-success-foreground",
-                        }
-                      : null;
+                    : null;
   const isWokeStatus = topStatus?.icon === "woke";
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({
@@ -1115,7 +1107,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 "truncate group-focus-within/sidebar-row:text-foreground group-hover/sidebar-row:text-foreground",
                 shouldRecede
                   ? "text-secondary-label"
-                  : props.isActive || isWoke || status === "input" || status === "request"
+                  : props.isActive || isWoke || status === "input"
                     ? "text-foreground"
                     : isUnread
                       ? "text-muted-foreground"

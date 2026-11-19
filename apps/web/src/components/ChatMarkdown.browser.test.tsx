@@ -11,7 +11,6 @@ import { filesystemEnvironment } from "../state/filesystem";
 import { useRightPanelStore } from "../rightPanelStore";
 import { remarkEnableOrderedListNumbers } from "@t3tools/shared/markdownPipeline";
 import { setMarkdownTaskChecked } from "@t3tools/shared/markdownTaskList";
-import { HostImageUrlContext } from "./chat/hostImageUrl";
 
 const { workspaceSearch, filesystemMetadata } = vi.hoisted(() => ({
   workspaceSearch: vi.fn(),
@@ -202,50 +201,6 @@ it("shows unavailable audio when a workspace embed has no thread", async () => {
   expect(screen.container.textContent).toContain("音频不可用");
   expect(screen.container.textContent).not.toContain("Loading audio");
   expect(screen.container.querySelector("audio")).toBeNull();
-});
-
-it("loads a host image through the page's own route when there is no environment", async () => {
-  setup();
-  const pixel =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-  const hostImageUrl = vi.fn((_path: string) => pixel);
-  await using screen = await render(
-    <HostImageUrlContext value={hostImageUrl}>
-      <ChatMarkdown cwd={undefined} text="![Shot](</work/my shot.png>)" />
-    </HostImageUrlContext>,
-  );
-  await expect.element(screen.getByAltText("Shot")).toHaveAttribute("src", pixel);
-  expect(new Set(hostImageUrl.mock.calls.map(([path]) => path))).toEqual(
-    new Set(["/work/my shot.png"]),
-  );
-});
-
-it("loads the <picture> source for the current theme through the image route", async () => {
-  setup();
-  const pixel =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-  const hostImageUrl = (path: string) => `${pixel}#${path}`;
-  await using screen = await render(
-    <HostImageUrlContext value={hostImageUrl}>
-      <ChatMarkdown
-        cwd={undefined}
-        text={
-          '<picture><source media="(prefers-color-scheme: dark)" srcset="/work/dark.png"><img src="/work/light.png" alt="Shot"></picture>'
-        }
-      />
-    </HostImageUrlContext>,
-  );
-  await expect
-    .element(screen.getByAltText("Shot"))
-    .toHaveAttribute("src", `${pixel}#/work/light.png`);
-
-  await act(() => {
-    appearance.value = "dark";
-    for (const listener of appearance.listeners) listener();
-  });
-  await expect
-    .element(screen.getByAltText("Shot"))
-    .toHaveAttribute("src", `${pixel}#/work/dark.png`);
 });
 
 it("reuses the parse of a streaming reply's finished blocks when it remounts", async () => {

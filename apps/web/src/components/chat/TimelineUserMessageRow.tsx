@@ -883,7 +883,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           row.groupedWithNext && "rounded-br-md",
           BUBBLE_CHIP_CLASS_NAME,
           userMessage.attribution === "guest"
-            ? guestBubbleClassName(false)
+            ? guestBubbleClassName()
             : !mediaOnly && !fileCardsOnly && !audioOnly && "bg-message",
           !folded && !mediaOnly && !fileCardsOnly && !audioOnly && "p-3",
           folded && expanded && "w-full",

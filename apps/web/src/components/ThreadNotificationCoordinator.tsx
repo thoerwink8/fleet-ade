@@ -150,9 +150,7 @@ export function startThreadNotifications(
             ? "已达到用量上限"
             : status === "failed"
               ? "会话失败"
-              : status === "request"
-                ? "访客请求"
-                : "需要输入";
+              : "需要输入";
     if (hasNotificationSound(mode)) {
       void playNotificationSound(kind, () =>
         hasNotificationSound(getClientSettings().notificationMode),
@@ -266,11 +264,7 @@ export function startThreadNotifications(
       let status = resolveSidebarThreadStatus(thread);
       if (status === "ready" && thread.latestRun?.status === "failed") status = "failed";
       const needsAttention =
-        status === "input" ||
-        status === "request" ||
-        status === "approval" ||
-        status === "failed" ||
-        status === "limited";
+        status === "input" || status === "approval" || status === "failed" || status === "limited";
       const requestId = needsAttention ? resolveBackgroundThreadRequest(thread).requestId : null;
       // Queued messages become the latest run while a request stays pending, so a request
       // with an id is keyed by that id alone and announces once.

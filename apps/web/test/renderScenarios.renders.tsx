@@ -142,14 +142,26 @@ async function quiet() {
   );
 }
 
-// Off the guest page the connection runtime retries a missing environment on timers, and
-// its atom updates commit at varying times. On it, the runtime fails once and stays quiet.
-function onGuestPage(): Disposable {
-  const previous = `${window.location.pathname}${window.location.search}`;
-  window.history.replaceState(window.history.state, "", "/guest?share=render-scenarios");
-  return {
-    [Symbol.dispose]: () => window.history.replaceState(window.history.state, "", previous),
-  };
+// A failed environment connection retries on timers, and its atom updates commit at
+// varying times. A socket that never opens keeps every environment atom pending and
+// the tree quiet.
+function stayOffline(): Disposable {
+  const socket = vi.spyOn(window, "WebSocket").mockImplementation(
+    () =>
+      ({
+        readyState: WebSocket.CONNECTING,
+        binaryType: "blob",
+        bufferedAmount: 0,
+        extensions: "",
+        protocol: "",
+        url: "",
+        addEventListener() {},
+        removeEventListener() {},
+        send() {},
+        close() {},
+      }) as unknown as WebSocket,
+  );
+  return { [Symbol.dispose]: () => socket.mockRestore() };
 }
 
 // A first mount loads lazy modules, web fonts and syntax highlighting at varying times.
@@ -168,7 +180,7 @@ async function report(scenario: string) {
 }
 
 it("mount-thread", async () => {
-  using _guest = onGuestPage();
+  using _offline = stayOffline();
   const timeline = timelineFor();
   await warmUp(timelineFor()("thread-warm", history("thread-warm")), sizedContainer());
   startCounting();
@@ -180,7 +192,7 @@ it("mount-thread", async () => {
 });
 
 it("stream-assistant-turn", async () => {
-  using _guest = onGuestPage();
+  using _offline = stayOffline();
   const timeline = timelineFor();
   const base = history("thread-a");
   const streamed = (text: string) => [
@@ -211,7 +223,7 @@ it("stream-assistant-turn", async () => {
 // are not reported: the minimap's follow-up renders sometimes split across two frames,
 // so the commit count varies by one while the renders stay identical.
 it("switch-thread", async () => {
-  using _guest = onGuestPage();
+  using _offline = stayOffline();
   const timeline = timelineFor();
   const a = history("thread-a");
   const b = history("thread-b");
@@ -267,7 +279,7 @@ function Composer() {
 }
 
 it("type-in-composer", async () => {
-  using _guest = onGuestPage();
+  using _offline = stayOffline();
   await warmUp(<Composer />);
   await using screen = await render(<Composer />);
   const editor = screen.getByRole("textbox");

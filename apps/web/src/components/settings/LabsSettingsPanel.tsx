@@ -1,17 +1,11 @@
-import { useAuth } from "@clerk/react";
 import { Link } from "@tanstack/react-router";
-import { managedCapabilityDenial } from "@t3tools/contracts";
 
-import { hasCloudPublicConfig } from "~/cloud/publicConfig";
-import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
-import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
-import { useOptionalSettingsScope, useSettingsScope } from "./SettingsScopeContext";
-import { firstManagedDenial, usePrimaryManagedPolicy } from "~/state/managedPolicy";
+import { useSettingsScope } from "./SettingsScopeContext";
 
 /** Features still settling in. */
 export function LabsSettingsPanel() {
@@ -19,8 +13,6 @@ export function LabsSettingsPanel() {
     <SettingsPageContainer>
       <SettingsSection id="beta" title="测试版">
         <BoringSidebarRow />
-        {/* Clerk is only mounted when this build has T3 Connect. */}
-        {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
         <LinkedEnvironmentsRow />
         <PromptSuggestionsRow />
         <SimlockHostsRow />
@@ -69,66 +61,6 @@ function BoringSidebarMultilineRow() {
             updateSettings({ boringSidebarMultilineRows: Boolean(checked) })
           }
           aria-label="双行文件夹列表"
-        />
-      }
-    />
-  );
-}
-
-/** Signed out of T3 Connect, the row offers to sign in instead of its switch. */
-function GuestLinksRowWithSignIn() {
-  const { isSignedIn } = useAuth();
-  const { openAuthPrompt } = useT3ConnectAuthPrompt();
-  // `isSignedIn` is undefined until Clerk loads.
-  if (isSignedIn !== false) return <GuestLinksRow />;
-  return (
-    <SettingsRow
-      {...searchableSetting("guest-links")}
-      description="与访客共享会话，访客可在浏览器中实时查看，并发送需要你批准的消息。登录 T3 Connect 后即可使用访客链接。"
-      control={
-        <Button size="sm" variant="outline" onClick={openAuthPrompt}>
-          登录
-        </Button>
-      }
-    />
-  );
-}
-
-function GuestLinksRow() {
-  const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
-  const scope = useOptionalSettingsScope();
-  const primaryPolicy = usePrimaryManagedPolicy();
-  // Guests arrive through T3 Connect, so a policy that turns Connect off turns this off too.
-  const connectDenial = firstManagedDenial(
-    scope
-      ? scope.connectedEnvironments.map((environment) => environment.serverConfig?.managedPolicy)
-      : [primaryPolicy],
-    (policy) => managedCapabilityDenial(policy, "connect"),
-  );
-  return (
-    <SettingsRow
-      serverScoped
-      {...searchableSetting("guest-links")}
-      settingKeys={["guestSharingEnabled"]}
-      // Turning guest links off still works without T3 Connect.
-      managed={settings.guestSharingEnabled ? undefined : connectDenial}
-      description={
-        <>
-          把会话分享给访客。对方在浏览器里实时观看，发送的消息需要你批准。需要 T3
-          Connect：请登录，并在{" "}
-          <Link to="/settings/access" className="underline underline-offset-2">
-            共享与访问
-          </Link>
-          。关闭后，所有访客链接都将停止工作。
-        </>
-      }
-      control={
-        <ScopedSwitch
-          settingKeys={["guestSharingEnabled"]}
-          checked={settings.guestSharingEnabled}
-          onCheckedChange={(checked) => updateSettings({ guestSharingEnabled: Boolean(checked) })}
-          aria-label="访客链接"
         />
       }
     />
