@@ -269,6 +269,23 @@ export function layerProviderReplay<Transcript extends ProviderReplayTranscript,
   return layerWithRegistry(scenario, layerRegistry, options);
 }
 
+export interface ProviderReplayHarnessOptions {
+  readonly databaseLayer?: Layer.Layer<
+    SqlClient.SqlClient,
+    MigrationError | PlatformError.PlatformError | SqlError
+  >;
+  readonly runEffectWorker?: boolean;
+  readonly runContinuationWorker?: boolean;
+  readonly recoverOnStartup?: boolean;
+  readonly continueThreadsAfterServerUpdate?: boolean;
+  readonly settingsOverrides?: DeepPartial<ContractServerSettings>;
+  /** Lets a test hold a projection read open to order concurrent dispatches. */
+  readonly wrapProjectionStore?: (
+    store: ProjectionStore.ProjectionStoreV2Shape,
+  ) => ProjectionStore.ProjectionStoreV2Shape;
+  readonly managedPolicy?: ManagedPolicyDocument;
+}
+
 export function layerWithRegistry<Error>(
   scenario: Pick<OrchestratorV2ProviderReplayScenario, "name" | "runtimePolicyOverride">,
   registryLayer: Layer.Layer<
@@ -276,22 +293,7 @@ export function layerWithRegistry<Error>(
     Error,
     McpProviderSessions.McpProviderSessions
   >,
-  options: {
-    readonly databaseLayer?: Layer.Layer<
-      SqlClient.SqlClient,
-      MigrationError | PlatformError.PlatformError | SqlError
-    >;
-    readonly runEffectWorker?: boolean;
-    readonly runContinuationWorker?: boolean;
-    readonly recoverOnStartup?: boolean;
-    readonly continueThreadsAfterServerUpdate?: boolean;
-    readonly settingsOverrides?: DeepPartial<ContractServerSettings>;
-    /** Lets a test hold a projection read open to order concurrent dispatches. */
-    readonly wrapProjectionStore?: (
-      store: ProjectionStore.ProjectionStoreV2Shape,
-    ) => ProjectionStore.ProjectionStoreV2Shape;
-    readonly managedPolicy?: ManagedPolicyDocument;
-  } = {},
+  options: ProviderReplayHarnessOptions = {},
 ): Layer.Layer<
   | Orchestrator.OrchestratorV2
   | EffectOutbox.EffectOutboxV2

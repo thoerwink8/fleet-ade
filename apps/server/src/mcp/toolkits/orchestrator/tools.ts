@@ -95,7 +95,7 @@ const OrchestratorCapabilitiesTool = Tool.make("orchestrator_capabilities", {
 
 const DelegateTaskTool = Tool.make("delegate_task", {
   description:
-    "Start one child agent with `task`; no parent history. Use `isolation:'worktree'` for a separate checkout or PR. On commander threads, omit `model` to use the role model from `orchestrator_capabilities.dispatch` (default `code`). `readonly` selects only the model. Keep `taskId` for status/cancel. No secrets in `task`.",
+    "Start one child agent with `task`; no parent history. Use `isolation:'worktree'` for a separate checkout or PR. Keep `taskId` for status/cancel. No secrets in `task`.",
   parameters: OrchestratorMcpDelegateTaskInput,
   success: OrchestratorMcpDelegateTaskResult,
   failure: OrchestratorMcpFailure,
