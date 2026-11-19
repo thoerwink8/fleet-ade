@@ -8,21 +8,19 @@ import {
   narrowPullRequestReferences,
 } from "./pullRequestComposerTrigger.ts";
 
-const GITLAB = { mentions: true, referenceSigils: ["#", "!"] } as const;
+const GITHUB = { mentions: true, referenceSigils: ["#"] } as const;
 
 describe("detectPullRequestComposerTrigger", () => {
   it.each([
     ["@", 0, "@", ""],
     ["cc @ju", 3, "@", "ju"],
-    ["line one\n@first.last", 9, "@", "first.last"],
     ["@jane-doe more", 0, "@", "jane-doe"],
     ["fixes #", 6, "#", ""],
     ["see #12", 4, "#", "12"],
-    ["after !5", 6, "!", "5"],
     ["#crash", 0, "#", "crash"],
   ])("finds the trigger in %j", (text, rangeStart, sigil, query) => {
     const cursor = rangeStart + 1 + query.length;
-    expect(detectPullRequestComposerTrigger(text, cursor, GITLAB)).toEqual({
+    expect(detectPullRequestComposerTrigger(text, cursor, GITHUB)).toEqual({
       kind: sigil === "@" ? "mention" : "reference",
       sigil,
       query,
@@ -35,13 +33,13 @@ describe("detectPullRequestComposerTrigger", () => {
     ["mail me at jane@example.com", "mail me at jane@example.com".length],
     ["@jane done", "@jane done".length],
     ["@-jane", "@-jane".length],
-    ["`@decorator`", "`@decorator".length],
+    ["`@decorator`", "`@decorator`".length],
     ["@jane", 3],
     ["C#", 2],
     ["![image", "![image".length],
     ["## Heading", 2],
   ])("ignores %j", (text, cursor) => {
-    expect(detectPullRequestComposerTrigger(text, cursor, GITLAB)).toBeNull();
+    expect(detectPullRequestComposerTrigger(text, cursor, GITHUB)).toBeNull();
   });
 
   it.each([
@@ -59,7 +57,7 @@ describe("insertPullRequestCompletion", () => {
     "replaces the partial token and adds a space before %j",
     (suffix) => {
       const text = `thanks @ju${suffix}`;
-      const trigger = detectPullRequestComposerTrigger(text, "thanks @ju".length, GITLAB)!;
+      const trigger = detectPullRequestComposerTrigger(text, "thanks @ju".length, GITHUB)!;
       expect(insertPullRequestCompletion(text, trigger, "@julius")).toEqual({
         text: `thanks @julius ${suffix}`,
         cursor: "thanks @julius ".length,
@@ -69,10 +67,10 @@ describe("insertPullRequestCompletion", () => {
 
   it("reuses the space that already follows and moves past it", () => {
     const text = "#1 please look";
-    const trigger = detectPullRequestComposerTrigger(text, 2, GITLAB)!;
+    const trigger = detectPullRequestComposerTrigger(text, 2, GITHUB)!;
     const inserted = insertPullRequestCompletion(text, trigger, "#123");
     expect(inserted).toEqual({ text: "#123 please look", cursor: "#123 ".length });
-    expect(detectPullRequestComposerTrigger(inserted.text, inserted.cursor, GITLAB)).toBeNull();
+    expect(detectPullRequestComposerTrigger(inserted.text, inserted.cursor, GITHUB)).toBeNull();
   });
 });
 

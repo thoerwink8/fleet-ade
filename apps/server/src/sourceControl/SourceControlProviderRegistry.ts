@@ -81,9 +81,9 @@ function unsupportedProvider(
   // Binding context does not create a second provider-operation span.
   return SourceControlProvider.SourceControlProvider.of({
     kind,
-    // Unknown hosts have no readable change requests; return none to avoid poll warnings on every refresh.
+    // Unknown and retired hosts have no readable change requests; return none to avoid poll warnings on every refresh.
     listChangeRequests: (input) =>
-      kind === "unknown"
+      kind === "unknown" || isRetiredSourceControlKind(kind)
         ? Effect.succeed([])
         : new SourceControlProviderError({
             provider: kind,

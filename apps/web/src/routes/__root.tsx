@@ -187,10 +187,7 @@ function RootRouteBranch() {
   return (
     <>
       <ChatGptWelcomeCoordinator />
-      <FirstRunGate
-        enabled={primaryEnvironmentAuthenticated}
-        hostedStatic={authGateState.status === "hosted-static"}
-      >
+      <FirstRunGate>
         {appHosts}
         {primaryEnvironmentAuthenticated ? <EventRouter /> : null}
         {appShell}

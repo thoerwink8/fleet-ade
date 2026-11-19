@@ -109,7 +109,7 @@ server 是冷缓存，八片都是 `0% cache hit`。退出码 1 的两片各有�
 
 | 包                                                                                                                                                                                      | 文件数 | 这几组的用例数（都是 0 失败） |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------- |
-| packages/source-control-gitlab、packages/provider-muse、infra/task-cache                                                                                                                | 各 11  | 262、107、41                  |
+| packages/provider-muse、infra/task-cache                                                                                                                                                | 各 11  | 107、41                       |
 | packages/source-control-azure-devops、packages/provider-pi                                                                                                                              | 各 7   | 105、214                      |
 | packages/source-control-gitcafe、packages/source-control-forgejo、packages/source-control-bitbucket、packages/provider-grok、packages/provider-acp-registry、packages/effect-acp、evals | 各 6   | 87、84、97、76、76、1016、116 |
 | packages/source-control-core、packages/provider-fx、packages/effect-codex-app-server                                                                                                    | 各 5   | 20、55、59                    |

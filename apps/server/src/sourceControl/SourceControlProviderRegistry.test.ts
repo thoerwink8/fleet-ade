@@ -89,9 +89,11 @@ function makeRegistry(input: {
     readonly url: string;
   }>;
   readonly discovery?: ReadonlyArray<SourceControlProviderDiscoverySpec>;
+  readonly providers?: ReadonlyArray<(typeof PROVIDERS)[number]>;
   readonly run?: SourceControlHost.SourceControlHost["Service"]["process"]["run"];
   readonly settings?: Partial<ServerSettings.ServerSettingsService["Service"]>;
 }) {
+  const providers = input.providers ?? PROVIDERS;
   const driver = {
     listRemotes: () =>
       Effect.succeed({
@@ -110,7 +112,7 @@ function makeRegistry(input: {
 
   const discovery = input.discovery ?? [claimingCli("gitlab")];
   return SourceControlProviderRegistry.makeWithProviders(
-    PROVIDERS.map((provider) => ({
+    providers.map((provider) => ({
       kind: provider.kind,
       provider,
       discovery: discovery.find((spec) => spec.kind === provider.kind) ?? {
@@ -348,6 +350,21 @@ const resolveUnknown = (
     },
   });
 
+it.effect("does not poll a retired provider for change requests", () =>
+  Effect.gen(function* () {
+    const registry = yield* makeRegistry({
+      remotes: [],
+      providers: PROVIDERS.filter((provider) => provider.kind !== "gitlab"),
+    });
+    const provider = yield* registry.get(kind("gitlab"));
+    const changeRequests = yield* provider.listChangeRequests({
+      cwd: "/repo",
+      headSelector: "main",
+      state: "open",
+    });
+    assert.deepStrictEqual(changeRequests, []);
+  }),
+);
 it.effect("asks once for every checkout of a server no integration claims", () =>
   Effect.gen(function* () {
     const asked: Array<string> = [];

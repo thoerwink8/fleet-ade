@@ -286,7 +286,7 @@ export type PullRequestReviewerCapabilities = typeof PullRequestReviewerCapabili
 export const PullRequestViewedFilesStore = Schema.Literals(["host", "environment"]);
 export type PullRequestViewedFilesStore = typeof PullRequestViewedFilesStore.Type;
 
-/** `#` references issues (and GitHub pull requests); `!` references GitLab merge requests. */
+/** `#` references issues (and GitHub pull requests); `!` is retained only to decode old GitLab data. */
 export const PullRequestReferenceSigil = Schema.Literals(["#", "!"]);
 export type PullRequestReferenceSigil = typeof PullRequestReferenceSigil.Type;
 

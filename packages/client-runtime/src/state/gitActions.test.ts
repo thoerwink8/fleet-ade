@@ -58,18 +58,18 @@ describe("git action copy", () => {
     ).toBe("No local commits to include in a PR.");
   });
 
-  it("does not offer a merge request on a retired host", () => {
+  it("uses generic change-request wording on a retired host", () => {
     expect(resolveQuickAction(status({ ...gitLab, aheadCount: 1 }), false).label).toBe(
-      "推送并创建 不再支持",
+      "推送并创建 change request",
     );
     expect(
       resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false).label,
-    ).toBe("提交、推送并创建 不再支持");
+    ).toBe("提交、推送并创建 change request");
     expect(resolveQuickAction(status({ ...gitLab, pr: openPr }), false).label).toBe(
-      "View 不再支持",
+      "View change request",
     );
     const [, , prItem] = buildMenuItems(status(gitLab), false);
-    expect(prItem?.label).toBe("创建 不再支持");
+    expect(prItem?.label).toBe("创建 change request");
     expect(
       getGitActionDisabledReason({
         item: prItem!,
@@ -77,7 +77,7 @@ describe("git action copy", () => {
         isBusy: false,
         hasOriginRemote: true,
       }),
-    ).toBe("No local commits to include in 不再支持.");
+    ).toBe("No local commits to include in a change request.");
   });
 
   it("names the host's change request in the default-branch dialog", () => {
@@ -93,6 +93,6 @@ describe("git action copy", () => {
         ...input,
         terminology: sourceControlClients.get("gitlab").changeRequest,
       }).continueLabel,
-    ).toBe("提交、推送并创建 不再支持");
+    ).toBe("提交、推送并创建 change request");
   });
 });

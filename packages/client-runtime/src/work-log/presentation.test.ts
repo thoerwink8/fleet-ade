@@ -174,7 +174,7 @@ describe("resolveWorkEntryToolPresentation", () => {
 
   it.each([
     ["https://github.com/acme/web/pull/7", "已关联 PR #7"],
-    ["https://gitlab.com/acme/web/-/merge_requests/7", "已关联不再支持 #7"],
+    ["https://gitlab.com/acme/web/-/merge_requests/7", "已关联 change request #7"],
   ])("names a linked change request with its host's term (%s)", (url, displayName) => {
     expect(
       resolveWorkEntryToolPresentation({

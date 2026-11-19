@@ -550,13 +550,10 @@ function unknownRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo
 }
 
 function retiredRemoteProvider(remote: GitRemoteHost): SourceControlProviderInfo | null {
-  const kind =
-    remote.hostname === "gitlab.com" || remote.hostname.split(".").includes("gitlab")
-      ? "gitlab"
-      : remote.hostname === "gitee.com" || remote.hostname.endsWith(".gitee.com")
-        ? "gitee"
-        : null;
-  if (kind === null) return null;
+  if (!(remote.hostname === "gitlab.com" || remote.hostname.split(".").includes("gitlab"))) {
+    return null;
+  }
+  const kind = "gitlab";
   return {
     kind: SourceControlProviderKind.make(kind),
     name: UNSUPPORTED_SOURCE_CONTROL_LABEL,
@@ -574,12 +571,6 @@ function retiredSourceControlClient(kind: string): SourceControlDefinition {
     kind: SourceControlProviderKind.make(kind),
     label: UNSUPPORTED_SOURCE_CONTROL_LABEL,
     pickerLabel: UNSUPPORTED_SOURCE_CONTROL_LABEL,
-    changeRequest: {
-      shortLabel: UNSUPPORTED_SOURCE_CONTROL_LABEL,
-      shortLabelWithArticle: UNSUPPORTED_SOURCE_CONTROL_LABEL,
-      singular: UNSUPPORTED_SOURCE_CONTROL_LABEL,
-      plural: UNSUPPORTED_SOURCE_CONTROL_LABEL,
-    },
   };
   retiredClients.set(kind, client);
   return client;

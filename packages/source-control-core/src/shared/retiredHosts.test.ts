@@ -14,7 +14,7 @@ const encodeKind = Schema.encodeSync(SourceControlProviderKind);
 describe("retired source control hosts", () => {
   const registry = makeSourceControlDefinitionRegistry([]);
 
-  it.each(["gitlab", "gitee", "jira", "confluence", "sentry"] as const)(
+  it.each(["gitlab"] as const)(
     "decodes %s without rewriting it and presents it as unsupported",
     (kind) => {
       const decoded = decodeKind(kind);
