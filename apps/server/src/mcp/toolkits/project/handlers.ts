@@ -312,9 +312,13 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
           scope.client.environmentId !== undefined
         ) {
           const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
-          yield* reporter
-            .trackAdhoc(thread.id, EnvironmentId.make(scope.client.environmentId))
-            .pipe(Effect.forkDetach);
+          if (input.fleetTask !== undefined) {
+            yield* reporter.trackTask(thread.id, input.fleetTask);
+          } else {
+            yield* reporter
+              .trackAdhoc(thread.id, EnvironmentId.make(scope.client.environmentId))
+              .pipe(Effect.forkDetach);
+          }
         }
         return {
           threadId: thread.id,

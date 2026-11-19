@@ -751,12 +751,16 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
     Layer.provide(ProjectionStoreV2.layer),
     Layer.provideMerge(PeerMcpClient.layer),
     Layer.provideMerge(PeerLinks.layer),
+    // Same layer values as below: one shared summary and claims instance.
+    Layer.provideMerge(FleetSummary.layer),
+    Layer.provideMerge(FleetClaims.layer),
   ),
   Layer.effectDiscard(
     Effect.gen(function* () {
       const scheduler = yield* Scheduler.Scheduler;
       const summary = yield* FleetSummary.FleetSummary;
       yield* scheduler.register("fleet-summary-stale", summary.sweepStale);
+      yield* scheduler.register("fleet-summary-cleanup", summary.cleanupDone);
     }),
   ).pipe(Layer.provide(Scheduler.layer), Layer.provide(FleetSummary.layer)),
   ProviderUsageLimitsIngestion.layer,

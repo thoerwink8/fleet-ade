@@ -437,3 +437,143 @@ it.effect("任务上报要求调用方持有该任务租约", () =>
     }),
   ),
 );
+
+it.effect("清理只删除超过保留期的终态行并推送一次 tombstone", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      yield* summary.report("environment-a", adhoc("old", { sessionRun: "completed" }));
+      yield* summary.report("environment-a", adhoc("active"));
+      yield* TestClock.adjust("24 hours");
+      yield* summary.report("environment-a", adhoc("recent", { sessionRun: "failed" }));
+      const stream = yield* summary.subscribe({});
+      const snapshot = yield* first(stream);
+      if (snapshot?.type !== "snapshot") throw new Error("Expected snapshot");
+      const changes = yield* summary.subscribe({ cursor: snapshot.revision });
+      yield* summary.cleanupDone;
+      const deletion = yield* first(changes);
+      expect(deletion).toMatchObject({ type: "tombstone", key: { threadId: "old" } });
+      yield* summary.cleanupDone;
+      const after = yield* first(yield* summary.subscribe({}));
+      if (after?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(after.rows.map((row) => row.threadId).sort()).toEqual(["active", "recent"]);
+      expect(after.revision).toBe(snapshot.revision + 1);
+    }),
+  ),
+);
+
+it.effect("按心跳识别掉线并恢复，不覆盖已完成和其他原因", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      const sql = yield* SqlClient.SqlClient;
+      yield* summary.report("environment-a", adhoc("a"));
+      yield* summary.report("environment-b", adhoc("b"));
+      yield* summary.report("environment-a", adhoc("done", { sessionRun: "failed" }));
+      yield* summary.report("environment-a", adhoc("other"));
+      yield* sql`UPDATE fleet_summary_rows SET stale = 1, stale_reason = 'other' WHERE thread_id = 'other'`;
+      yield* sql`INSERT INTO fleet_environment_heartbeats (environment_id, last_seen) VALUES ('environment-a', '1970-01-01T00:00:00.000Z'), ('environment-b', '1970-01-01T00:01:00.000Z')`;
+      yield* TestClock.adjust("100 seconds");
+      yield* summary.sweepStale;
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      if (snapshot?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(snapshot.rows.find((row) => row.threadId === "a")).toMatchObject({
+        stale: true,
+        staleReason: "environment offline",
+      });
+      expect(snapshot.rows.find((row) => row.threadId === "b")).toMatchObject({ stale: false });
+      expect(snapshot.rows.find((row) => row.threadId === "done")).toMatchObject({
+        stale: false,
+        phase: "done",
+      });
+      expect(snapshot.rows.find((row) => row.threadId === "other")).toMatchObject({
+        stale: true,
+        staleReason: "other",
+      });
+      yield* sql`UPDATE fleet_environment_heartbeats SET last_seen = '1970-01-01T00:01:40.000Z' WHERE environment_id = 'environment-a'`;
+      yield* summary.report("environment-a", adhoc("other", { title: "Changed" }));
+      yield* summary.sweepStale;
+      const recovered = yield* first(yield* summary.subscribe({}));
+      if (recovered?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(recovered.rows.find((row) => row.threadId === "a")).toMatchObject({ stale: false });
+      expect(recovered.rows.find((row) => row.threadId === "other")).toMatchObject({
+        stale: true,
+        staleReason: "other",
+      });
+    }),
+  ),
+);
+
+it.effect("释放或过期后同线程终态仍可上报，失败不被吞", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      const sql = yield* SqlClient.SqlClient;
+      yield* summary.report("environment-a", task("root"));
+      yield* sql`UPDATE node_claims SET state = 'released' WHERE task_id = 'root'`;
+      yield* summary.report(
+        "environment-a",
+        task("root", { sessionRun: "failed", reason: "failed" }),
+      );
+      const duplicate = yield* summary.report(
+        "environment-a",
+        task("root", { sessionRun: "failed", reason: "failed" }),
+      );
+      expect(duplicate.changed).toBe(false);
+      yield* summary.report("environment-a", task("other"));
+      yield* sql`UPDATE node_claims SET lease_until = '1970-01-01T00:00:00.000Z' WHERE task_id = 'other'`;
+      yield* summary.report("environment-a", task("other", { sessionRun: "completed" }));
+      yield* summary.sweepStale;
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      if (snapshot?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(snapshot.rows.find((row) => row.taskId === "root")).toMatchObject({
+        phase: "done",
+        reason: "failed",
+        stale: false,
+      });
+      expect(snapshot.rows.find((row) => row.taskId === "other")).toMatchObject({
+        phase: "done",
+        stale: false,
+      });
+    }),
+  ),
+);
+
+it.effect("同键重领后旧线程删除不影响新摘要行", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      yield* summary.report("environment-a", task("root", { attempt: 1, fencing: "1" }));
+      const stream = yield* summary.subscribe({});
+      const snapshot = yield* first(stream);
+      if (snapshot?.type !== "snapshot") throw new Error("Expected snapshot");
+      const removed = yield* summary.report("environment-a", {
+        type: "delete-task",
+        repo: "EXAMPLE/ONE",
+        issue: 7,
+        taskId: "root",
+        threadId: "new-thread",
+      });
+      expect(removed.changed).toBe(false);
+      const after = yield* first(yield* summary.subscribe({}));
+      if (after?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(after.rows).toHaveLength(1);
+      expect(after.rows[0]?.threadId).toBe("thread-root");
+    }),
+  ),
+);
+
+it.effect("同一机器重新领单后旧租约不能覆盖新线程", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      const sql = yield* SqlClient.SqlClient;
+      yield* summary.report("environment-a", task("root", { attempt: 1, fencing: "1" }));
+      yield* sql`UPDATE node_claims SET attempt = 2, fencing = '2' WHERE task_id = 'root'`;
+      const error = yield* summary
+        .report("environment-a", task("root", { attempt: 1, fencing: "1", sessionRun: "failed" }))
+        .pipe(Effect.flip);
+      expect(error.reason).toBe("lease-required");
+    }),
+  ),
+);

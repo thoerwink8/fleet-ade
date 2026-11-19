@@ -150,7 +150,7 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     input: FleetClaimClaimInput,
   ) {
     const now = DateTime.toEpochMillis(yield* DateTime.now);
-    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + leaseTtlMs));
+    const leaseUntil = DateTime.formatIso(DateTime.makeUnsafe(now + (input.leaseMs ?? leaseTtlMs)));
     const repo = yield* canonicalRepo(input.repo);
     const key = { ...input, repo };
     return yield* sql
@@ -307,6 +307,11 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
     const results = yield* sql
       .withTransaction(
         Effect.gen(function* () {
+          yield* sql`
+            INSERT INTO fleet_environment_heartbeats (environment_id, last_seen)
+            VALUES (${environmentId}, ${nowIso})
+            ON CONFLICT(environment_id) DO UPDATE SET last_seen = excluded.last_seen
+          `;
           const decided: Array<FleetClaimHeartbeatItemResult> = [];
           for (const item of canonical) {
             const key = { repo: item.repo, issue: item.issue, taskId: item.taskId };
@@ -376,6 +381,9 @@ const make = Effect.fn("FleetClaims.make")(function* (leaseTtlMs: number) {
 
   return FleetClaims.of({ claim, renew, release, heartbeat });
 });
+
+/** Same service on the caller's ambient SqlClient: one connection per ledger. */
+export const layerShared = Layer.effect(FleetClaims, make(FLEET_LEASE_TTL_MS));
 
 export const layer = Layer.unwrap(
   Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>

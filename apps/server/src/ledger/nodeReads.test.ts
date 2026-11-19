@@ -422,6 +422,28 @@ it.effect("有效但没有 orchestration:read 的凭证读三个口是 403", () 
   ),
 );
 
+it.effect("旧摘要登记迁移后保留数据并允许多个协调者", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE fleet_summary_registrations (
+      thread_id TEXT PRIMARY KEY, kind TEXT NOT NULL, coordinator TEXT NOT NULL,
+      repo TEXT, issue INTEGER, task_id TEXT, sent TEXT, deleting INTEGER NOT NULL DEFAULT 0
+    )`;
+    yield* sql`INSERT INTO fleet_summary_registrations (thread_id, kind, coordinator)
+      VALUES ('thread-1', 'adhoc', 'coordinator-a')`;
+    yield* NodeReads.migrate;
+    yield* NodeReads.migrate;
+    yield* sql`INSERT INTO fleet_summary_registrations (thread_id, kind, coordinator)
+      VALUES ('thread-1', 'adhoc', 'coordinator-b')`;
+    expect(
+      yield* sql`SELECT thread_id, coordinator FROM fleet_summary_registrations ORDER BY coordinator`,
+    ).toEqual([
+      { thread_id: "thread-1", coordinator: "coordinator-a" },
+      { thread_id: "thread-1", coordinator: "coordinator-b" },
+    ]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
 it.effect("迁移旧 node_claims 去重并保留一条 repo issue task 租约", () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;

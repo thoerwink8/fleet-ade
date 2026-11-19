@@ -33,8 +33,10 @@ import * as ServerConfig from "../config.ts";
 import * as NodeClaims from "./nodeClaims.ts";
 import * as NodeReads from "./nodeReads.ts";
 
+const isFleetSummaryError = Schema.is(FleetSummaryError);
 /** A stalled consumer retains at most the latest change per row. */
 const FLEET_SUMMARY_SUBSCRIBER_QUEUE_LIMIT = 200;
+const FLEET_SUMMARY_DONE_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 interface RowRecord {
   readonly environment_id: string;
@@ -86,16 +88,17 @@ export class FleetSummary extends Context.Service<
     >;
     /** Task rows without their exact live lease become stale; recovery clears it. */
     readonly sweepStale: Effect.Effect<void, FleetSummaryError>;
+    readonly cleanupDone: Effect.Effect<void, FleetSummaryError>;
   }
 >()("t3/ledger/FleetSummary") {}
 
 const rowIdOf = (
   environmentId: string,
   input: Pick<FleetSummaryReportInput, "type"> & {
-    readonly repo?: string;
-    readonly issue?: number;
-    readonly taskId?: string;
-    readonly threadId?: string;
+    readonly repo?: string | undefined;
+    readonly issue?: number | undefined;
+    readonly taskId?: string | undefined;
+    readonly threadId?: string | undefined;
   },
 ) => {
   switch (input.type) {
@@ -398,29 +401,46 @@ const make = Effect.fn("FleetSummary.make")(function* () {
       input.type === "upsert-task" || input.type === "delete-task"
         ? { ...input, repo: yield* canonicalRepo(input.repo) }
         : input;
-    if (canonical.type === "upsert-task") {
-      const lease = yield* sql`
-        SELECT 1 AS held FROM node_claims
-        WHERE repo = ${canonical.repo} AND issue = ${canonical.issue} AND task_id = ${canonical.taskId}
-          AND holder_environment = ${callerEnvironmentId} AND state = 'running' AND lease_until > ${now}
-        LIMIT 1
-      `.pipe(Effect.mapError(storageError));
-      if (lease[0] === undefined) {
-        return yield* new FleetSummaryError({
-          reason: "lease-required",
-          message: "The caller does not hold this task lease.",
-        });
-      }
-    }
     const rowId = rowIdOf(callerEnvironmentId, canonical);
     return yield* publishLock.withPermits(1)(
       Effect.gen(function* () {
         const result = yield* sql
           .withTransaction(
             Effect.gen(function* () {
+              if (canonical.type === "upsert-task") {
+                const lease = yield* sql`
+        SELECT 1 AS held FROM node_claims AS claim
+        WHERE claim.repo = ${canonical.repo} AND claim.issue = ${canonical.issue} AND claim.task_id = ${canonical.taskId}
+          AND claim.holder_environment = ${callerEnvironmentId}
+          AND ((${canonical.attempt ?? null} IS NOT NULL AND ${canonical.fencing ?? null} IS NOT NULL
+            AND claim.attempt = ${canonical.attempt ?? null} AND claim.fencing = ${canonical.fencing ?? null})
+            OR (${canonical.attempt ?? null} IS NULL AND ${canonical.fencing ?? null} IS NULL AND claim.attempt = 1))
+          AND ((claim.state = 'running' AND claim.lease_until > ${now}) OR (
+            ${phaseFromSessionRun(canonical.sessionRun) === "done" ? 1 : 0} = 1 AND EXISTS (
+              SELECT 1 FROM fleet_summary_rows AS row WHERE row.environment_id = ${callerEnvironmentId}
+                AND row.repo = claim.repo AND row.issue = claim.issue AND row.task_id = claim.task_id
+                AND row.thread_id = ${canonical.threadId}
+            )
+          )) LIMIT 1
+      `.pipe(Effect.mapError(storageError));
+                if (lease[0] === undefined) {
+                  return yield* new FleetSummaryError({
+                    reason: "lease-required",
+                    message: "The caller does not hold this task lease.",
+                  });
+                }
+              }
               const existing = yield* rowById(rowId);
               if (canonical.type === "delete-task" || canonical.type === "delete-adhoc") {
                 if (existing === undefined) {
+                  const current = yield* meta;
+                  return { revision: current.revision, changed: false, events: [] };
+                }
+                if (
+                  canonical.type === "delete-task" &&
+                  canonical.threadId !== undefined &&
+                  existing.threadId !== canonical.threadId
+                ) {
                   const current = yield* meta;
                   return { revision: current.revision, changed: false, events: [] };
                 }
@@ -435,6 +455,10 @@ const make = Effect.fn("FleetSummary.make")(function* () {
                 return { revision, changed: true, events: [event] };
               }
 
+              const preserveStale =
+                existing?.staleReason !== undefined &&
+                existing.staleReason !== "lease lost" &&
+                existing.staleReason !== "environment offline";
               const nextRow: FleetSummaryRow = {
                 environmentId: callerEnvironmentId,
                 ...(canonical.type === "upsert-task"
@@ -447,10 +471,18 @@ const make = Effect.fn("FleetSummary.make")(function* () {
                 needsYou: canonical.needsYou,
                 lastProgress: progress(canonical.lastProgress),
                 updatedAt: now,
-                stale: canonical.type === "upsert-task" ? false : (existing?.stale ?? false),
-                ...(canonical.type === "upsert-task" || existing?.staleReason === undefined
-                  ? {}
-                  : { staleReason: existing.staleReason }),
+                stale: preserveStale
+                  ? existing.stale
+                  : phaseFromSessionRun(canonical.sessionRun) === "done" ||
+                      canonical.type === "upsert-task"
+                    ? false
+                    : (existing?.stale ?? false),
+                ...(existing?.staleReason !== undefined &&
+                (preserveStale ||
+                  (phaseFromSessionRun(canonical.sessionRun) !== "done" &&
+                    canonical.type !== "upsert-task"))
+                  ? { staleReason: existing.staleReason }
+                  : {}),
                 revision: 0,
               };
               if (existing !== undefined && sameReported(existing, nextRow)) {
@@ -477,7 +509,9 @@ const make = Effect.fn("FleetSummary.make")(function* () {
               return { revision, changed: true, events: [event] };
             }),
           )
-          .pipe(Effect.mapError(storageError));
+          .pipe(
+            Effect.mapError((error) => (isFleetSummaryError(error) ? error : storageError(error))),
+          );
         yield* publish(result.events);
         return { revision: result.revision, changed: result.changed };
       }),
@@ -488,25 +522,43 @@ const make = Effect.fn("FleetSummary.make")(function* () {
   const sweepStale = publishLock.withPermits(1)(
     Effect.gen(function* () {
       const now = DateTime.formatIso(yield* DateTime.now);
+      const heartbeatCutoff = DateTime.formatIso(DateTime.makeUnsafe(Date.parse(now) - 90_000));
       const events = yield* sql
         .withTransaction(
           Effect.gen(function* () {
-            const rows = yield* sql<RowRecord & { readonly has_lease: number }>`
-            SELECT summary.*, EXISTS (
-              SELECT 1 FROM node_claims AS claim
-              WHERE claim.repo = summary.repo AND claim.issue = summary.issue
-                AND claim.task_id = summary.task_id
-                AND claim.holder_environment = summary.environment_id
-                AND claim.state = 'running' AND claim.lease_until > ${now}
-            ) AS has_lease
-            FROM fleet_summary_rows AS summary WHERE summary.kind = 'task'
-            ORDER BY summary.row_id
-          `;
+            const rows = yield* sql<
+              RowRecord & { readonly has_lease: number; readonly offline: number }
+            >`
+              SELECT summary.*, EXISTS (
+                SELECT 1 FROM node_claims AS claim
+                WHERE claim.repo = summary.repo AND claim.issue = summary.issue
+                  AND claim.task_id = summary.task_id
+                  AND claim.holder_environment = summary.environment_id
+                  AND claim.state = 'running' AND claim.lease_until > ${now}
+              ) AS has_lease, COALESCE((
+                SELECT heartbeat.last_seen <= ${heartbeatCutoff}
+                FROM fleet_environment_heartbeats AS heartbeat
+                WHERE heartbeat.environment_id = summary.environment_id
+              ), summary.updated_at <= ${heartbeatCutoff}) AS offline
+              FROM fleet_summary_rows AS summary ORDER BY summary.row_id
+            `;
             const changes: Array<FleetSummaryChangeEvent> = [];
             for (const record of rows) {
               const row = toRow(record);
-              const stale = record.has_lease === 0;
-              const staleReason = stale ? "lease lost" : undefined;
+              if (row.phase === "done") continue;
+              if (
+                row.staleReason !== undefined &&
+                row.staleReason !== "lease lost" &&
+                row.staleReason !== "environment offline"
+              )
+                continue;
+              const staleReason =
+                record.offline === 1
+                  ? "environment offline"
+                  : record.kind === "task" && record.has_lease === 0
+                    ? "lease lost"
+                    : undefined;
+              const stale = staleReason !== undefined;
               if (row.stale === stale && row.staleReason === staleReason) continue;
               const revision = yield* nextRevision;
               const next = { ...row, stale, staleReason, revision };
@@ -525,7 +577,39 @@ const make = Effect.fn("FleetSummary.make")(function* () {
     }),
   );
 
-  return FleetSummary.of({ report, subscribe, sweepStale });
+  const cleanupDone = publishLock.withPermits(1)(
+    Effect.gen(function* () {
+      const now = DateTime.toEpochMillis(yield* DateTime.now);
+      const cutoff = DateTime.formatIso(DateTime.makeUnsafe(now - FLEET_SUMMARY_DONE_RETENTION_MS));
+      const events = yield* sql
+        .withTransaction(
+          Effect.gen(function* () {
+            const rows = yield* sql<RowRecord>`
+            SELECT * FROM fleet_summary_rows
+            WHERE phase = 'done' AND updated_at <= ${cutoff} ORDER BY row_id
+          `;
+            const changes: Array<FleetSummaryChangeEvent> = [];
+            for (const record of rows) {
+              const row = toRow(record);
+              const revision = yield* nextRevision;
+              yield* sql`DELETE FROM fleet_summary_rows WHERE row_id = ${rowIdOfRow(row)}`;
+              const event: FleetSummaryChangeEvent = {
+                type: "tombstone",
+                revision,
+                key: keyOfRow(row),
+              };
+              yield* recordChange(revision, event);
+              changes.push(event);
+            }
+            return changes;
+          }),
+        )
+        .pipe(Effect.mapError(storageError));
+      yield* publish(events);
+    }),
+  );
+
+  return FleetSummary.of({ report, subscribe, sweepStale, cleanupDone });
 });
 
 const rowIdOfRow = (row: FleetSummaryRow) =>

@@ -62,6 +62,12 @@ export const migrate = Effect.gen(function* () {
     )
   `;
   yield* sql`
+    CREATE TABLE IF NOT EXISTS fleet_environment_heartbeats (
+      environment_id TEXT PRIMARY KEY,
+      last_seen TEXT NOT NULL
+    )
+  `;
+  yield* sql`
     CREATE TABLE IF NOT EXISTS fleet_summary_meta (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       revision INTEGER NOT NULL
@@ -100,18 +106,55 @@ export const migrate = Effect.gen(function* () {
     CREATE INDEX IF NOT EXISTS idx_fleet_summary_rows_environment
     ON fleet_summary_rows (environment_id)
   `;
-  yield* sql`
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      const registrationColumns =
+        (yield* sql`PRAGMA table_info(fleet_summary_registrations)`) as readonly {
+          readonly name: string;
+          readonly pk: number;
+        }[];
+      const registrationPk = registrationColumns
+        .filter((column) => column.pk > 0)
+        .toSorted((left, right) => left.pk - right.pk)
+        .map((column) => column.name);
+      if (registrationColumns.length > 0 && registrationPk.join(",") !== "thread_id,coordinator")
+        yield* sql`ALTER TABLE fleet_summary_registrations RENAME TO fleet_summary_registrations_before_fleet`;
+      yield* sql`
     CREATE TABLE IF NOT EXISTS fleet_summary_registrations (
-      thread_id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL,
       kind TEXT NOT NULL,
       coordinator TEXT NOT NULL,
       repo TEXT,
       issue INTEGER,
       task_id TEXT,
       sent TEXT,
-      deleting INTEGER NOT NULL DEFAULT 0
+      deleting INTEGER NOT NULL DEFAULT 0,
+      attempt INTEGER,
+      fencing TEXT,
+      PRIMARY KEY (thread_id, coordinator)
     )
   `;
+      const registrationBackup =
+        (yield* sql`PRAGMA table_info(fleet_summary_registrations_before_fleet)`) as readonly {
+          readonly name: string;
+        }[];
+      if (registrationBackup.length > 0) {
+        const backupNames = new Set(registrationBackup.map((column) => column.name));
+        yield* sql`
+      INSERT INTO fleet_summary_registrations (
+        thread_id, kind, coordinator, repo, issue, task_id, sent, deleting, attempt, fencing
+      )
+      SELECT thread_id, kind, coordinator, repo, issue, task_id, sent, deleting,
+        ${backupNames.has("attempt") ? sql`attempt` : sql`NULL`},
+        ${backupNames.has("fencing") ? sql`fencing` : sql`NULL`}
+      FROM fleet_summary_registrations_before_fleet
+      WHERE true
+      ON CONFLICT(thread_id, coordinator) DO NOTHING
+    `;
+        yield* sql`DROP TABLE fleet_summary_registrations_before_fleet`;
+      }
+    }),
+  );
   yield* sql.withTransaction(
     Effect.gen(function* () {
       const claimColumns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {

@@ -17,6 +17,9 @@ import * as Path from "effect/Path";
 import * as ServerConfig from "../config.ts";
 import * as NodeClaims from "../ledger/nodeClaims.ts";
 import * as NodeReads from "../ledger/nodeReads.ts";
+import { EnvironmentId } from "@t3tools/contracts";
+import * as FleetClaims from "../ledger/FleetClaims.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 
 import * as ServerSettings from "../serverSettings.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -28,9 +31,12 @@ import {
 import {
   ClaimLeasePort,
   claimForRun,
+  decodeLeaseToken,
+  fleetPortLayer,
   layerPort,
   layerLive,
   registerRepos,
+  releaseClaim,
   type ClaimAttempt,
   type ClaimWrite,
 } from "./claimLease.ts";
@@ -74,6 +80,16 @@ const pipelineLayer = <E, R>(claims: Layer.Layer<ClaimLeasePort, E, R>) =>
     Layer.provide(layerPortsDefault),
     Layer.provideMerge(SqlitePersistence.layerMemory),
   );
+
+const testIdentity = Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+  getEnvironmentId: Effect.succeed(EnvironmentId.make("pipeline-env")),
+});
+
+const fleetLayer = fleetPortLayer.pipe(
+  Layer.provideMerge(FleetClaims.layerShared),
+  Layer.provide(testIdentity),
+  Layer.provideMerge(NodeSqliteClient.layer({ filename: ":memory:" })),
+);
 
 const runCount = Effect.gen(function* () {
   return (yield* (yield* PipelineRuns).list).runs.length;
@@ -268,6 +284,50 @@ it.effect("认领中的非 SQL 缺陷继续抛出，不转成 503", () =>
   }).pipe(Effect.provide(pipelineLayer(layerPort()))),
 );
 
+it.effect("生产认领走机群租约，令牌绑定租约后精确释放并可重领", () =>
+  Effect.gen(function* () {
+    const port = yield* ClaimLeasePort;
+    yield* port.register(["example/one"]);
+    const first = yield* claimForRun(port, { repo: "example/one", issue: 7, title: "单 7" });
+    if (first.status !== 200) throw new Error(`first claim rejected: ${first.code}`);
+    const held = decodeLeaseToken(first.token);
+    assert.strictEqual(held.attempt, 1);
+    assert.strictEqual(held.holderEnvironment, "pipeline-env");
+    const contested = yield* claimForRun(port, { repo: "example/one", issue: 7, title: "单 7" });
+    assert.strictEqual(contested.status, 409);
+    const released = yield* releaseClaim(port, {
+      repo: "example/one",
+      issue: 7,
+      token: first.token,
+    });
+    assert.strictEqual(released.status, 200);
+    const repeated = yield* releaseClaim(port, {
+      repo: "example/one",
+      issue: 7,
+      token: first.token,
+    });
+    assert.strictEqual(repeated.status, 409);
+    const second = yield* claimForRun(port, { repo: "example/one", issue: 7, title: "单 7" });
+    if (second.status !== 200) throw new Error(`second claim rejected: ${second.code}`);
+    const reclaimed = decodeLeaseToken(second.token);
+    assert.strictEqual(reclaimed.attempt, 2);
+    const claims = yield* FleetClaims.FleetClaims;
+    const heartbeat = yield* claims.heartbeat("pipeline-env", {
+      sequence: 1,
+      leases: [
+        {
+          repo: "example/one",
+          issue: 7,
+          taskId: "root",
+          attempt: 2,
+          fencing: reclaimed.fencing,
+        },
+      ],
+    });
+    assert.strictEqual(heartbeat.results[0]?.outcome, "renewed");
+  }).pipe(Effect.provide(fleetLayer)),
+);
+
 it.effect("生产层按白名单登记仓：repos 空时监控启动认领成功", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -293,7 +353,7 @@ it.effect("生产层按白名单登记仓：repos 空时监控启动认领成功
           `;
         }).pipe(Effect.provide(ledger));
         assert.deepEqual(repos, [{ owner: "thoerwink8", name: "fleet-ade" }]);
-      }).pipe(Effect.provide(pipelineLayer(layerLive)));
+      }).pipe(Effect.provide(pipelineLayer(layerLive).pipe(Layer.provide(testIdentity))));
     }).pipe(Effect.provide(ServerConfig.layerTest(directory, directory)));
   }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
 );
@@ -303,6 +363,7 @@ it.effect("登记只跟白名单走：白名单外的仓认领仍是 unknown_rep
     const fs = yield* FileSystem.FileSystem;
     const directory = yield* fs.makeTempDirectoryScoped();
     const layer = pipelineLayer(layerLive).pipe(
+      Layer.provide(testIdentity),
       Layer.provide(ServerConfig.layerTest(directory, directory)),
     );
     yield* Effect.gen(function* () {
@@ -396,7 +457,7 @@ it.effect("账本已有租约阻止建运行，成功认领对独立账本连接
           return yield* sql`SELECT issue, lease_until FROM node_claims`;
         }).pipe(Effect.provide(ledger));
         assert.deepEqual(held, [{ issue: 7, lease_until: "1970-01-01T02:00:00.000Z" }]);
-      }).pipe(Effect.provide(pipelineLayer(layerLive)));
+      }).pipe(Effect.provide(pipelineLayer(layerLive).pipe(Layer.provide(testIdentity))));
     }).pipe(Effect.provide(ServerConfig.layerTest(directory, directory)));
   }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
 );

@@ -259,6 +259,10 @@ it.effect("一次心跳同时续上自己的租约并拒绝别人的", () =>
     );
     const sql = yield* SqlClient.SqlClient;
     assert.strictEqual(
+      (yield* sql`SELECT environment_id FROM fleet_environment_heartbeats`)[0]?.environment_id,
+      "node-a",
+    );
+    assert.strictEqual(
       (yield* sql<{ readonly lease_until: string }>`
         SELECT lease_until FROM node_claims WHERE task_id = 'child-1'
       `)[0]?.lease_until,

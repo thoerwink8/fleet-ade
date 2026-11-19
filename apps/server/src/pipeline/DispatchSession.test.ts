@@ -13,6 +13,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as TestClock from "effect/testing/TestClock";
+import * as MigrationError from "effect/sql/Migrator";
+import * as SqlError from "effect/sql/SqlError";
 
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -25,6 +27,11 @@ import * as ClaimLease from "./claimLease.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import { SessionEndInbox, layer as inboxLayer, type SessionEndStatus } from "./SessionEndInbox.ts";
+import { EnvironmentId, type FleetClaim } from "@t3tools/contracts";
+import * as SqlClient from "effect/sql/SqlClient";
+import * as FleetClaims from "../ledger/FleetClaims.ts";
+import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 
 const MODEL: ModelSelection = { instanceId: ProviderInstanceId.make("test-model"), model: "test" };
 const NOW = "2026-11-16T00:00:00.000Z";
@@ -79,6 +86,14 @@ const sessionLayer = (
   visible: Ref.Ref<ReadonlyArray<PipelineIssue>>,
   opened: Ref.Ref<ReadonlyArray<DispatchSession.DispatchedSession>>,
   created: Ref.Ref<ReadonlyArray<string>>,
+  options?: {
+    readonly claims?: Layer.Layer<
+      ClaimLease.ClaimLeasePort | FleetClaims.FleetClaims,
+      MigrationError.MigrationError | SqlError.SqlError,
+      SqlClient.SqlClient
+    >;
+    readonly reporter?: Layer.Layer<FleetSummaryReporter.FleetSummaryReporter>;
+  },
 ) => {
   const memory = SqlitePersistence.layerMemory;
   const issues = Layer.succeed(
@@ -128,10 +143,10 @@ const sessionLayer = (
     Layer.provide(usage),
     Layer.provide(settings),
     Layer.provide(layerPortsDefault),
-    Layer.provide(ClaimLease.layerPort()),
+    Layer.provide(options?.claims ?? ClaimLease.layerPort()),
     Layer.provideMerge(memory),
   );
-  return DispatchSession.layer.pipe(
+  const base = DispatchSession.layer.pipe(
     Layer.provide(budgetLayer),
     Layer.provide(
       Layer.succeed(PullRequestAdditions, {
@@ -145,19 +160,21 @@ const sessionLayer = (
     Layer.provideMerge(settings),
     Layer.provideMerge(shared),
   );
+  return options?.reporter === undefined ? base : base.pipe(Layer.provide(options.reporter));
 };
 
 const run = <E, R>(
   patch: PipelinePatch,
   issues: ReadonlyArray<PipelineIssue>,
   body: (handles: Handles) => Effect.Effect<void, E, R>,
+  options?: Parameters<typeof sessionLayer>[4],
 ) =>
   Effect.gen(function* () {
     const opened = yield* Ref.make<ReadonlyArray<DispatchSession.DispatchedSession>>([]);
     const created = yield* Ref.make<ReadonlyArray<string>>([]);
     const visible = yield* Ref.make(issues);
     yield* body({ opened, created, visible }).pipe(
-      Effect.provide(sessionLayer(patch, visible, opened, created)),
+      Effect.provide(sessionLayer(patch, visible, opened, created, options)),
     );
   });
 
@@ -194,6 +211,42 @@ const recordEnd = (
     });
     yield* (yield* DispatchSession.DispatchSession).tick;
   });
+
+describe("fleet lease binding", () => {
+  it.effect("领取机群租约的运行派发后向自身摘要登记为任务行", () => {
+    const tracked = { value: [] as Array<{ threadId: string; claim: FleetClaim }> };
+    const claimsLayer = ClaimLease.fleetPortLayer.pipe(
+      Layer.provideMerge(FleetClaims.layerShared),
+      Layer.provide(
+        Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+          getEnvironmentId: Effect.succeed(EnvironmentId.make("pipeline-env")),
+        }),
+      ),
+    );
+    const reporterLayer = Layer.succeed(FleetSummaryReporter.FleetSummaryReporter, {
+      trackTask: (threadId: ThreadId, claim: FleetClaim) =>
+        Effect.sync(() => tracked.value.push({ threadId, claim })),
+      trackAdhoc: () => Effect.void,
+      untrack: () => Effect.void,
+      handle: () => Effect.void,
+      start: () => Effect.void,
+    });
+    return run(
+      enabled,
+      [issue(7)],
+      () =>
+        Effect.gen(function* () {
+          const opened = yield* openClaimed;
+          const bindings = tracked.value;
+          assert.strictEqual(bindings.length, 1);
+          assert.strictEqual(bindings[0]?.threadId, opened.threadId);
+          assert.strictEqual(bindings[0]?.claim.repo, "thoerwink8/fleet-ade");
+          assert.strictEqual(bindings[0]?.claim.attempt, 1);
+        }),
+      { claims: claimsLayer, reporter: reporterLayer },
+    );
+  });
+});
 
 describe("DispatchSession", () => {
   it.effect("移出允许列表后仍接收已运行会话的结束事件，不派发新认领", () =>

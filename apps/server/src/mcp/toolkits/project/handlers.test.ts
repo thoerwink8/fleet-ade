@@ -35,6 +35,7 @@ import * as Orchestrator from "../../../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../../../orchestration-v2/ProjectionStore.ts";
 import * as PeerMcpClient from "../../../peer/PeerMcpClient.ts";
 import * as Scheduler from "../../../scheduling/Scheduler.ts";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/process";
 import * as TestClock from "effect/testing/TestClock";
@@ -1010,6 +1011,102 @@ it.effect("a linked launch returns while its initial summary report waits on the
           phase: "working",
         });
       }
+    }),
+  ),
+);
+
+it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc row", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+      const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+      const summaryContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
+      const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
+      const reporting = yield* Deferred.make<void>();
+      const allowReport = yield* Deferred.make<void>();
+      const reported = yield* Deferred.make<void>();
+      const coordinatorSql = Context.get(summaryContext, SqlClient.SqlClient);
+      yield* coordinatorSql`INSERT INTO repos (owner, name) VALUES ('example', 'one')`;
+      yield* coordinatorSql`
+        INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, holder_environment,
+          lease_until, executor, state, fencing, attempt, claim_idempotency_key)
+        VALUES ('coordinator', 'example/one', 7, 'task-x', 'session-a', 'executor',
+          '2999-01-01T00:00:00.000Z', 'fleet', 'running', '1', 1, 'key-x')`;
+      const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Scheduler.layer,
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.empty }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: (threadId) =>
+                Effect.succeed(
+                  launched.some((entry) => entry.threadId === threadId)
+                    ? ({
+                        id: threadId,
+                        title: "Leased work",
+                        status: "running",
+                        pendingRuntimeRequest: null,
+                        lastError: null,
+                        latestVisibleMessage: null,
+                        createdAt: DateTime.makeUnsafe(0),
+                      } as OrchestrationV2ThreadShell)
+                    : null,
+                ),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: (request) =>
+                Effect.gen(function* () {
+                  yield* Deferred.succeed(reporting, undefined);
+                  yield* Deferred.await(allowReport);
+                  const input = yield* decodeSummaryReport(request.arguments);
+                  const result = yield* summary.report("executor", input);
+                  const decoded = yield* decodePeerResult(request.success, result);
+                  yield* Deferred.succeed(reported, undefined);
+                  return decoded;
+                }).pipe(Effect.orDie),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const dependencies = Layer.merge(harness.dependencies, Layer.succeedContext(reporterContext));
+      const dependencyContext = yield* Layer.build(dependencies);
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+      const response = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Leased work",
+          projectId: harness.projectId,
+          fleetTask: {
+            fleetId: "coordinator",
+            repo: "example/one",
+            issue: 7,
+            taskId: "task-x",
+            holder: "session-a",
+            attempt: 1,
+            fencing: "1",
+            leaseUntil: "2999-01-01T00:00:00.000Z",
+          },
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(response.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+      yield* Deferred.await(reporting);
+      yield* Deferred.succeed(allowReport, undefined);
+      yield* Deferred.await(reported);
+      const events = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
+      if (events[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(events[0].rows).toEqual([
+        expect.objectContaining({
+          taskId: "task-x",
+          threadId: launched[0]?.threadId,
+          phase: "working",
+        }),
+      ]);
     }),
   ),
 );

@@ -11,6 +11,7 @@ import {
   EnvironmentId,
   FleetSummaryReportInput,
   OrchestratorMcpFailure,
+  type PeerLinkSummary,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -30,6 +31,7 @@ import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import {
   descriptorOf,
@@ -49,6 +51,8 @@ const at = DateTime.makeUnsafe(1_700_000_000_000);
 const decodeSummaryReport = Schema.decodeUnknownEffect(FleetSummaryReportInput);
 const decodePeerResult = <A>(schema: Schema.Decoder<A>, result: FleetSummaryWriteResult) =>
   Schema.decodeEffect(schema)(result);
+const decodeHeartbeatResult = <A>(schema: Schema.Decoder<A>, sequence: unknown) =>
+  Schema.decodeEffect(schema)({ sequence, results: [] });
 
 const claimsLayer = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -291,6 +295,65 @@ it.effect("两台互连环境通过真实 MCP 上报各自摘要行，改动只�
         expect(tombstones[0].key.threadId).toBe(adhocThreadA);
         expect(tombstones[0].key.environmentId).toBe(holderA);
       }
+
+      // node-b stops heartbeating; only its rows turn stale.
+      yield* Context.get(summaryContext, SqlClient.SqlClient)`
+        INSERT INTO fleet_environment_heartbeats (environment_id, last_seen) VALUES
+          (${holderA}, '2999-01-01T00:00:00.000Z'),
+          (${holderB}, '1970-01-01T00:00:00.000Z')`;
+      yield* TestClock.adjust("100 seconds");
+      yield* coordinatorSummary.sweepStale;
+      const staleSnapshot = yield* Stream.runCollect(
+        (yield* coordinatorSummary.subscribe({})).pipe(Stream.take(1)),
+      );
+      const staleRows = staleSnapshot.flatMap((event) =>
+        event.type === "snapshot" ? event.rows : [],
+      );
+      expect(staleRows.find((row) => row.taskId === "a-task")?.stale).toBe(false);
+      expect(staleRows.find((row) => row.taskId === "b-task")?.stale).toBe(false);
+      expect(staleRows.find((row) => row.threadId === adhocThreadB)).toMatchObject({
+        stale: true,
+        staleReason: "environment offline",
+      });
+      yield* Context.get(summaryContext, SqlClient.SqlClient)`
+        UPDATE fleet_environment_heartbeats SET last_seen = '2999-01-01T00:00:00.000Z'
+        WHERE environment_id = ${holderB}`;
+      yield* coordinatorSummary.sweepStale;
+      const recovered = yield* Stream.runCollect(
+        (yield* coordinatorSummary.subscribe({})).pipe(Stream.take(1)),
+      );
+      expect(
+        recovered
+          .flatMap((event) => (event.type === "snapshot" ? event.rows : []))
+          .every((row) => !row.stale),
+      ).toBe(true);
+
+      // The remaining rows finish, age past retention, and are published as tombstones.
+      yield* Ref.update(bShells, (map) => {
+        const next = new Map(map);
+        next.set(adhocThreadB, shell(adhocThreadB, "completed", { title: "B 的随手活" }));
+        return next;
+      });
+      yield* b.reporter.handle(fakeEvent(adhocThreadB, "run.updated"));
+      const doneCursor = yield* Stream.runCollect(
+        (yield* coordinatorSummary.subscribe({})).pipe(Stream.take(1)),
+      );
+      const cleanupLive = yield* coordinatorSummary.subscribe({
+        cursor: doneCursor[0]?.type === "snapshot" ? doneCursor[0].revision : 0,
+      });
+      yield* TestClock.adjust("25 hours");
+      yield* coordinatorSummary.cleanupDone;
+      const cleanupEvents = yield* Stream.runCollect(cleanupLive.pipe(Stream.take(3)));
+      expect(cleanupEvents.every((event) => event.type === "tombstone")).toBe(true);
+      expect(
+        cleanupEvents
+          .map((event) => (event.type === "tombstone" ? event.key.threadId : ""))
+          .toSorted(),
+      ).toEqual([taskThreadA, taskThreadB, adhocThreadB].toSorted());
+      const empty = yield* Stream.runCollect(
+        (yield* coordinatorSummary.subscribe({})).pipe(Stream.take(1)),
+      );
+      expect(empty.flatMap((event) => (event.type === "snapshot" ? event.rows : []))).toEqual([]);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
@@ -325,6 +388,9 @@ it.effect(
           } as OrchestrationV2ThreadShell["latestVisibleMessage"],
         });
         const currentShell = yield* Ref.make(current);
+        const heartbeats = yield* Ref.make<
+          Array<{ environmentId: string; arguments: Record<string, unknown> }>
+        >([]);
         const failure = yield* Ref.make<"invalid_request" | "orchestration_error" | null>(
           "invalid_request",
         );
@@ -339,6 +405,16 @@ it.effect(
               Layer.mock(PeerMcpClient.PeerMcpClient)({
                 call: (request) =>
                   Effect.gen(function* () {
+                    if (request.tool === "fleet_heartbeat") {
+                      yield* Ref.update(heartbeats, (items) => [
+                        ...items,
+                        { environmentId: request.environmentId, arguments: request.arguments },
+                      ]);
+                      return yield* decodeHeartbeatResult(
+                        request.success,
+                        request.arguments.sequence,
+                      ).pipe(Effect.orDie);
+                    }
                     const code = yield* Ref.get(failure);
                     if (code !== null)
                       return yield* new OrchestratorMcpFailure({ code, message: "unavailable" });
@@ -385,7 +461,7 @@ it.effect(
         expect((yield* snapshot()).rows[0]?.title).toBe("Changed without an event");
 
         yield* Ref.set(failure, "orchestration_error");
-        yield* reporter.untrack(threadId);
+        yield* reporter.handle(fakeEvent(threadId, "thread.archived"));
         expect((yield* snapshot()).rows).toHaveLength(1);
         yield* Ref.set(failure, null);
         yield* TestClock.adjust("5 seconds");
@@ -396,7 +472,38 @@ it.effect(
 
         // Registration itself publishes an existing shell without waiting for another event.
         yield* reporter.trackAdhoc(threadId, EnvironmentId.make("coordinator"));
+        yield* TestClock.adjust("30 seconds");
+        expect((yield* Ref.get(heartbeats)).at(-1)).toMatchObject({
+          environmentId: "coordinator",
+          arguments: { leases: [] },
+        });
         expect((yield* snapshot()).rows).toHaveLength(1);
+
+        // A leased task renews its claim on every heartbeat.
+        const coordinatorSql = Context.get(summaryContext, SqlClient.SqlClient);
+        yield* coordinatorSql`INSERT INTO repos (owner, name) VALUES ('example', 'one')`;
+        yield* coordinatorSql`
+          INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, holder_environment,
+            lease_until, executor, state, fencing, attempt, claim_idempotency_key)
+          VALUES ('coordinator', 'example/one', 7, 't-1', 'session-a', 'executor',
+            '2999-01-01T00:00:00.000Z', 'fleet', 'running', '2', 2, 'fixture')`;
+        const taskThread = ThreadId.make("leased-task");
+        yield* Ref.set(currentShell, shell(taskThread, "running", { title: "Leased" }));
+        yield* reporter.trackTask(taskThread, {
+          fleetId: "coordinator",
+          repo: "example/one",
+          issue: 7,
+          taskId: "t-1",
+          holder: "session-a",
+          attempt: 2,
+          fencing: "2",
+          leaseUntil: "2999-01-01T00:00:00.000Z",
+        });
+        yield* TestClock.adjust("30 seconds");
+        const lastBeat = (yield* Ref.get(heartbeats)).at(-1);
+        expect(lastBeat?.arguments.leases).toEqual([
+          { repo: "example/one", issue: 7, taskId: "t-1", attempt: 2, fencing: "2" },
+        ]);
       }),
     ),
 );
@@ -512,4 +619,81 @@ it.effect("a failed event subscription is reopened instead of silently stopping"
       expect(yield* Ref.get(subscriptions)).toBeGreaterThanOrEqual(2);
     }),
   ),
+);
+
+it.effect(
+  "self-coordination registers locally, heartbeats itself, and sweeps ad hoc sessions",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const selfId = EnvironmentId.make("self");
+        const summaryContext = yield* FleetSummary.layerForTest(
+          "file:fleet-self?mode=memory&cache=shared",
+        ).pipe(Layer.build);
+        const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
+        const claimsContext = yield* FleetClaims.layerForTest(
+          "file:fleet-self?mode=memory&cache=shared",
+          selfId,
+        ).pipe(Layer.build);
+        const localThread = ThreadId.make("local-thread");
+        const peerCalls = yield* Ref.make(0);
+        const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              Scheduler.layer,
+              Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+                getEnvironmentId: Effect.succeed(selfId),
+              }),
+              Layer.succeedContext(summaryContext),
+              Layer.succeedContext(claimsContext),
+              Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+              Layer.mock(ProjectionStore.ProjectionStoreV2)({
+                getThreadShell: () => Effect.succeed(shell(localThread, "running")),
+                listActiveShellIndex: () =>
+                  Effect.succeed([{ id: localThread } as ProjectionStore.ActiveShellIndexEntry]),
+              }),
+              Layer.mock(PeerLinks.PeerLinks)({
+                list: Effect.succeed([] as ReadonlyArray<PeerLinkSummary>),
+              }),
+              Layer.mock(PeerMcpClient.PeerMcpClient)({
+                call: () => Ref.updateAndGet(peerCalls, (n) => n + 1).pipe(Effect.as({})),
+              }),
+            ),
+          ),
+          Layer.build,
+        );
+        const reporter = Context.get(reporterContext, FleetSummaryReporter.FleetSummaryReporter);
+        yield* reporter.start();
+        yield* TestClock.adjust("30 seconds");
+
+        // The local thread became an ad hoc row in this environment's own summary.
+        const events = yield* Stream.runCollect(
+          (yield* summary.subscribe({})).pipe(Stream.take(1)),
+        );
+        if (events[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(events[0].rows).toEqual([
+          expect.objectContaining({
+            environmentId: selfId,
+            threadId: localThread,
+            phase: "working",
+          }),
+        ]);
+        // It heartbeated itself, so its row never sweeps stale while the server lives.
+        yield* TestClock.adjust("10 minutes");
+        yield* summary.sweepStale;
+        const later = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
+        if (later[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(later[0].rows[0]?.stale).toBe(false);
+        // Nothing was routed over a peer link.
+        expect(yield* Ref.get(peerCalls)).toBe(0);
+
+        // A shell update flows to the self row too.
+        yield* reporter.handle(fakeEvent(localThread, "run.updated"));
+        const updated = yield* Stream.runCollect(
+          (yield* summary.subscribe({})).pipe(Stream.take(1)),
+        );
+        if (updated[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(updated[0].rows).toHaveLength(1);
+      }),
+    ),
 );

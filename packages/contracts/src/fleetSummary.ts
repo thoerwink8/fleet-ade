@@ -89,6 +89,8 @@ export const FleetSummaryUpsertTask = Schema.Struct({
   issue: PositiveInt,
   taskId: TrimmedNonEmptyString,
   threadId: TrimmedNonEmptyString,
+  attempt: Schema.optional(PositiveInt),
+  fencing: Schema.optional(TrimmedNonEmptyString),
   ...reportFields,
 });
 export type FleetSummaryUpsertTask = typeof FleetSummaryUpsertTask.Type;
@@ -105,6 +107,7 @@ export const FleetSummaryDeleteTask = Schema.Struct({
   repo: TrimmedNonEmptyString,
   issue: PositiveInt,
   taskId: TrimmedNonEmptyString,
+  threadId: Schema.optional(TrimmedNonEmptyString),
 });
 export type FleetSummaryDeleteTask = typeof FleetSummaryDeleteTask.Type;
 

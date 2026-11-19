@@ -17,6 +17,7 @@ import {
   OrchestratorMcpClientRequestId,
   OrchestratorMcpEnvironmentTarget,
   OrchestratorMcpFailure,
+  FleetClaim,
   SourceControlCloneRepositoryInput,
   SourceControlCloneRepositoryResult,
 } from "@t3tools/contracts";
@@ -154,6 +155,12 @@ const ThreadLaunchTool = Tool.make("t3_thread_launch", {
     clientRequestId: Schema.optional(OrchestratorMcpClientRequestId),
     /** Set by a linked environment launching its agent's delegated task here; ignored otherwise. */
     delegatedFrom: Schema.optional(OrchestrationV2DelegatedFrom),
+    /**
+     * The fleet lease this thread runs under, from `fleet_claim` on its
+     * coordinator: registers the task row and renews the lease on heartbeats.
+     * Only honored for linked environments.
+     */
+    fleetTask: Schema.optional(FleetClaim),
   }),
   success: Schema.Struct({
     threadId: ThreadId,
