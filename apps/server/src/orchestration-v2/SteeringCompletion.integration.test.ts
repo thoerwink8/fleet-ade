@@ -512,7 +512,9 @@ const nextTurnSelectionHarness = Effect.fn("nextTurnSelectionHarness")(function*
     turn: ProviderAdapter.ProviderAdapterV2SteerInput,
   ) => Effect.Effect<void, ProviderAdapter.ProviderAdapterV2Error> = () => Effect.void,
 ) {
-  const driver = ProviderDriverKind.make(nativeGoals === undefined ? "codex" : "opencode");
+  // Antigravity is the retained driver whose /goal support follows supportsNativeGoals.
+  // Codex and Claude always run goals natively, so they cannot express the unsupported case.
+  const driver = ProviderDriverKind.make(nativeGoals === undefined ? "codex" : "antigravity");
   const cwd = yield* checkpointWorkspace(name);
   const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
   const started: ProviderAdapter.ProviderAdapterV2TurnInput[] = [];
