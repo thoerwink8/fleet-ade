@@ -155,3 +155,28 @@ it.effect("新持有者即使 fencing 相同也不删；不带 token 的 finish 
     assert.deepEqual(yield* sql`SELECT issue FROM node_claims WHERE issue = 7`, [{ issue: 7 }]);
   }).pipe(withLedger),
 );
+
+it.effect("已释放或过期记录拒绝 HTTP 操作且保留记录", () =>
+  Effect.gen(function* () {
+    const sql = yield* seed;
+    for (const state of ["released", "running"]) {
+      yield* sql`DELETE FROM node_claims`;
+      yield* sql`INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, attempt)
+        VALUES ('legacy', ${repo}, 7, 'root', 'node-a', ${leaseUntil}, 'local', ${state}, 1)`;
+      const before = yield* sql`SELECT * FROM node_claims`;
+      for (const action of ["claim", "renew", "finish"] as const) {
+        const request =
+          action === "claim"
+            ? { action, repo, issue: 7, title: "test", claimedBy: "node-a", leaseUntil }
+            : action === "renew"
+              ? { action, repo, issue: 7, claimedBy: "node-a", leaseUntil }
+              : { action, repo, issue: 7, claimedBy: "node-a", outcome: "done" as const };
+        assert.strictEqual(
+          (yield* NodeClaims.apply(sql, request, Date.parse(leaseUntil) + 1)).status,
+          409,
+        );
+        assert.deepEqual(yield* sql`SELECT * FROM node_claims`, before);
+      }
+    }
+  }).pipe(withLedger),
+);

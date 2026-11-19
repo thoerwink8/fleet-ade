@@ -116,6 +116,14 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         const scope = yield* McpInvocationContext.McpInvocationContext;
         const context = yield* readCaller();
         const { caller } = context;
+        if (
+          input.fleetTask !== undefined &&
+          (scope.client?.linked !== true || input.fleetTask.fleetId !== scope.client.environmentId)
+        )
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "fleetTask fleetId must match the linked coordinator environment.",
+          });
         // A retry with the same key replays the first launch: the ids derive
         // from the caller and the key, and the launch service replays a
         // command it already accepted.
@@ -313,7 +321,12 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         ) {
           const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
           if (input.fleetTask !== undefined) {
-            yield* reporter.trackTask(thread.id, input.fleetTask);
+            yield* reporter.trackTask(thread.id, input.fleetTask).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("fleet task registration failed", { threadId: thread.id, cause }),
+              ),
+              Effect.forkDetach,
+            );
           } else {
             yield* reporter
               .trackAdhoc(thread.id, EnvironmentId.make(scope.client.environmentId))

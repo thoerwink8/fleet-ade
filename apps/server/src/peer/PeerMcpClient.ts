@@ -7,7 +7,10 @@ import {
   type RuntimeMode,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
+import * as Digest from "effect/crypto/Digest";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
@@ -17,6 +20,8 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as PeerChallengeRegistry from "./PeerChallengeRegistry.ts";
 import * as PeerLinks from "./PeerLinks.ts";
 
 /** The only MCP protocol version a T3 Code `/mcp` registers. */
@@ -24,6 +29,19 @@ const PROTOCOL_VERSION = "2025-06-18";
 
 /** A title can be any length; the header carrying it stays well under HTTP header limits. */
 const SENDER_TITLE_MAX_LENGTH = 200;
+
+export const PEER_IDENTITY_HEADER = "t3-peer-identity";
+export const PEER_CHALLENGE_HEADER = "t3-peer-challenge";
+export const PEER_PROOF_HEADER = "t3-peer-proof";
+
+const identityTools: Record<string, true> = {
+  fleet_claim: true,
+  fleet_renew: true,
+  fleet_release: true,
+  fleet_heartbeat: true,
+  t3_thread_launch: true,
+  fleet_summary_report: true,
+};
 
 /** The limits a call carries to the peer: the calling agent's modes here. */
 export interface PeerCallLimits {
@@ -45,6 +63,8 @@ export class PeerMcpClient extends Context.Service<
       readonly tool: string;
       readonly arguments: Record<string, unknown>;
       readonly limits: PeerCallLimits;
+      /** Internal proof requests must never start another identity challenge. */
+      readonly proof?: boolean;
       /** The thread here the call is made for, sent as `T3-Sender-Thread`. */
       readonly sender?: OrchestrationV2LinkedSender;
       readonly success: S;
@@ -107,6 +127,10 @@ const responseJson = (contentType: string | undefined, text: string) =>
 const make = Effect.gen(function* () {
   const links = yield* PeerLinks.PeerLinks;
   const httpClient = yield* HttpClient.HttpClient;
+  const registry = yield* PeerChallengeRegistry.PeerChallengeRegistry;
+  const environment = yield* ServerEnvironment.ServerEnvironment;
+  const random = yield* SecureRandom.SecureRandom;
+  const digester = yield* Digest.Digest;
   // One MCP session per peer and address, reused across calls. The peer keeps
   // sessions in memory, so a restart there answers 404 and we start a new one.
   const sessions = yield* Ref.make<ReadonlyMap<string, string>>(new Map());
@@ -186,8 +210,22 @@ const make = Effect.gen(function* () {
                 .join("/"),
             };
       const sessionKey = `${input.environmentId} ${resolved.url}`;
-      const callOnce = (sessionId: string) =>
-        post(
+      const callOnce = Effect.fn("PeerMcpClient.callOnce")(function* (sessionId: string) {
+        const isProof = input.proof === true || input.tool === "fleet_peer_proof";
+        let challenge: string | undefined;
+        let identityHeaders: Record<string, string> = {};
+        if (!isProof && Object.hasOwn(identityTools, input.tool)) {
+          challenge = Base64Url.encode(yield* random.randomBytes(32).pipe(Effect.orDie));
+          const bearerDigest = Base64Url.encode(
+            yield* digester
+              .digest(Digest.sha256, new TextEncoder().encode(resolved.token))
+              .pipe(Effect.orDie),
+          );
+          const self = yield* environment.getEnvironmentId;
+          yield* registry.register(challenge, input.environmentId, bearerDigest);
+          identityHeaders = { [PEER_IDENTITY_HEADER]: self, [PEER_CHALLENGE_HEADER]: challenge };
+        }
+        const request = post(
           resolved.url,
           resolved.token,
           {
@@ -199,10 +237,16 @@ const make = Effect.gen(function* () {
           {
             ...limitHeader,
             ...senderHeader,
+            ...identityHeaders,
+            ...(isProof ? { [PEER_PROOF_HEADER]: "1" } : {}),
             "mcp-session-id": sessionId,
             "mcp-protocol-version": PROTOCOL_VERSION,
           },
         );
+        return yield* challenge !== undefined
+          ? request.pipe(Effect.ensuring(registry.remove(challenge)))
+          : request;
+      });
       const existing = (yield* Ref.get(sessions)).get(sessionKey);
       const sessionId = existing ?? (yield* openSession(resolved.url, resolved.token, limitHeader));
       // The initialized session outlives a tool request, including a long wait or cancellation.

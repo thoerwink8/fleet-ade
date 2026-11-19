@@ -31,10 +31,12 @@ import * as DateTime from "effect/DateTime";
 import { FleetSummaryReportInput } from "@t3tools/contracts";
 import * as FleetSummary from "../../../ledger/FleetSummary.ts";
 import * as FleetSummaryReporter from "../../../ledger/FleetSummaryReporter.ts";
+import * as FleetClaims from "../../../ledger/FleetClaims.ts";
 import * as Orchestrator from "../../../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../../../orchestration-v2/ProjectionStore.ts";
 import * as PeerMcpClient from "../../../peer/PeerMcpClient.ts";
 import * as Scheduler from "../../../scheduling/Scheduler.ts";
+import * as ServerEnvironment from "../../../environment/ServerEnvironment.ts";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/process";
@@ -938,6 +940,11 @@ it.effect("a linked launch returns while its initial summary report waits on the
         Layer.provide(
           Layer.mergeAll(
             Scheduler.layer,
+            Layer.succeed(FleetSummary.FleetSummary, summary),
+            Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+              getEnvironmentId: Effect.succeed(EnvironmentId.make("executor")),
+            }),
+            Layer.mock(FleetClaims.FleetClaims)({}),
             Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.empty }),
             Layer.mock(ProjectionStore.ProjectionStoreV2)({
               getThreadShell: (threadId) => {
@@ -948,7 +955,7 @@ it.effect("a linked launch returns while its initial summary report waits on the
                     : ({
                         id: threadId,
                         title: launch.title,
-                        status: "idle",
+                        status: "running",
                         pendingRuntimeRequest: null,
                         lastError: null,
                         latestVisibleMessage: null,
@@ -1032,10 +1039,20 @@ it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc
           lease_until, executor, state, fencing, attempt, claim_idempotency_key)
         VALUES ('coordinator', 'example/one', 7, 'task-x', 'session-a', 'executor',
           '2999-01-01T00:00:00.000Z', 'fleet', 'running', '1', 1, 'key-x')`;
+      yield* coordinatorSql`
+        INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, holder_environment,
+          lease_until, executor, state, fencing, attempt, claim_idempotency_key)
+        VALUES ('coordinator', 'example/one', 8, 'task-y', 'session-a', 'executor',
+          '2999-01-01T00:00:00.000Z', 'fleet', 'running', '1', 1, 'key-y')`;
       const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
         Layer.provide(
           Layer.mergeAll(
             Scheduler.layer,
+            Layer.succeed(FleetSummary.FleetSummary, summary),
+            Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+              getEnvironmentId: Effect.succeed(EnvironmentId.make("executor")),
+            }),
+            Layer.mock(FleetClaims.FleetClaims)({}),
             Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.empty }),
             Layer.mock(ProjectionStore.ProjectionStoreV2)({
               getThreadShell: (threadId) =>
@@ -1078,35 +1095,118 @@ it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc
           ),
         ),
       );
+      const claim = {
+        fleetId: "coordinator",
+        repo: "example/one",
+        issue: 7,
+        taskId: "task-x",
+        holder: "session-a",
+        attempt: 1,
+        fencing: "1",
+        leaseUntil: "2999-01-01T00:00:00.000Z",
+      };
+      const refused = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Wrong coordinator",
+          projectId: harness.projectId,
+          fleetTask: { ...claim, fleetId: "other-coordinator" },
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(refused.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+      expect(launched).toHaveLength(0);
       const response = yield* toolkit
         .handle("t3_thread_launch", {
           title: "Leased work",
           projectId: harness.projectId,
-          fleetTask: {
-            fleetId: "coordinator",
-            repo: "example/one",
-            issue: 7,
-            taskId: "task-x",
-            holder: "session-a",
-            attempt: 1,
-            fencing: "1",
-            leaseUntil: "2999-01-01T00:00:00.000Z",
-          },
+          fleetTask: claim,
         })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
       expect(response.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
       yield* Deferred.await(reporting);
+      // The first report holds the reporter's send lane while the peer is blocked.
+      // Another registration must not hold up its already-created thread.
+      const second = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Another leased thread",
+          projectId: harness.projectId,
+          fleetTask: { ...claim, issue: 8, taskId: "task-y" },
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(second.at(-1)?.result).toMatchObject({ threadId: launched[1]?.threadId });
+      expect(launched).toHaveLength(2);
       yield* Deferred.succeed(allowReport, undefined);
       yield* Deferred.await(reported);
       const events = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
       if (events[0]?.type !== "snapshot") throw new Error("Expected snapshot");
-      expect(events[0].rows).toEqual([
-        expect.objectContaining({
-          taskId: "task-x",
-          threadId: launched[0]?.threadId,
-          phase: "working",
+      expect(events[0].rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            taskId: "task-x",
+            threadId: launched[0]?.threadId,
+            phase: "working",
+          }),
+        ]),
+      );
+    }),
+  ),
+);
+
+it.effect("a failed fleet registration does not fail a launch and a replay registers again", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+      const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+      const failed = yield* Deferred.make<void>();
+      const registered = yield* Deferred.make<ThreadId>();
+      let attempts = 0;
+      const dependencies = Layer.merge(
+        harness.dependencies,
+        Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+          trackTask: (threadId) =>
+            Effect.gen(function* () {
+              attempts += 1;
+              if (attempts === 1) {
+                yield* Deferred.succeed(failed, undefined);
+                return yield* Effect.die(new Error("registration persistence failed"));
+              }
+              yield* Deferred.succeed(registered, threadId);
+            }),
         }),
-      ]);
+      );
+      const dependencyContext = yield* Layer.build(dependencies);
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+      const input = {
+        title: "Leased work",
+        projectId: harness.projectId,
+        clientRequestId: "retry-registration",
+        fleetTask: {
+          fleetId: "coordinator",
+          repo: "example/one",
+          issue: 7,
+          taskId: "task-x",
+          holder: "session-a",
+          attempt: 1,
+          fencing: "1",
+          leaseUntil: "2999-01-01T00:00:00.000Z",
+        },
+      };
+      const first = yield* toolkit
+        .handle("t3_thread_launch", input)
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      yield* Deferred.await(failed);
+      expect(first.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+      const replay = yield* toolkit
+        .handle("t3_thread_launch", input)
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(replay.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+      expect(yield* Deferred.await(registered)).toBe(launched[0]?.threadId);
+      expect(attempts).toBe(2);
     }),
   ),
 );

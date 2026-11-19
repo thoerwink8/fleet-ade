@@ -277,6 +277,117 @@ it.effect("一次心跳同时续上自己的租约并拒绝别人的", () =>
   }).pipe(Effect.provide(ledgerLayer)),
 );
 
+it.effect("legacy session heartbeat renews its lease without recording an environment", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const sessionId = "legacy-session";
+    const claimed = yield* claims.claim(caller(sessionId), input("root", "legacy-claim"));
+    yield* TestClock.adjust("5 seconds");
+    const result = yield* claims.heartbeat(
+      sessionId,
+      beat(sessionId, [{ taskId: "root", attempt: claimed.claim!.attempt }]).input,
+      false,
+    );
+    assert.strictEqual(result.results[0]?.outcome, "renewed");
+    assert.notStrictEqual(result.results[0]?.claim?.leaseUntil, claimed.claim?.leaseUntil);
+    const sql = yield* SqlClient.SqlClient;
+    const heartbeats = yield* sql`SELECT environment_id FROM fleet_environment_heartbeats`;
+    assert.strictEqual(heartbeats.length, 0);
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+
+it.effect("a proven environment preserves only its own session's legacy leases", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const session = "legacy-session";
+    const environment = "real-environment";
+    const claimed = yield* claims.claim(caller(session), input("root", "legacy-claim"));
+    const lease = input("root", "renew", claimed.claim!.attempt, claimed.claim!.fencing);
+    const heartbeat = beat(environment, [
+      { taskId: "root", attempt: claimed.claim!.attempt },
+    ]).input;
+    const otherSession = caller(environment, "other-session");
+    const impersonator = caller(session, "other-session");
+
+    assert.strictEqual((yield* claims.renew(otherSession, lease)).outcome, "stale");
+    assert.strictEqual((yield* claims.release(impersonator, lease)).outcome, "stale");
+    assert.strictEqual(
+      (yield* claims.heartbeat(session, heartbeat, false, "other-session")).results[0]?.outcome,
+      "not-owned",
+    );
+    assert.strictEqual(
+      (yield* claims.renew(caller(environment, session), lease)).outcome,
+      "renewed",
+    );
+    assert.strictEqual(
+      (yield* claims.heartbeat(environment, heartbeat, true, session)).results[0]?.outcome,
+      "renewed",
+    );
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{ readonly environment_id: string }>`
+      SELECT environment_id FROM fleet_environment_heartbeats
+    `;
+    assert.deepEqual(
+      rows.map((row) => row.environment_id),
+      [environment],
+    );
+    assert.strictEqual(
+      (yield* claims.release(caller(environment, session), { ...lease, idempotencyKey: "release" }))
+        .outcome,
+      "released",
+    );
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+
+it.effect("心跳不会缩短两小时租约", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const claimed = yield* claims.claim(caller("node-a"), input("root", "long"), {
+      leaseMs: 2 * 60 * 60 * 1000,
+    });
+    yield* TestClock.adjust("5 seconds");
+    const result = yield* claims.heartbeat(
+      "node-a",
+      beat("node-a", [{ taskId: "root", attempt: 1 }]).input,
+    );
+    assert.strictEqual(result.results[0]?.claim?.leaseUntil, claimed.claim?.leaseUntil);
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{
+      readonly lease_until: string;
+    }>`SELECT lease_until FROM node_claims WHERE task_id = 'root'`;
+    assert.strictEqual(rows[0]?.lease_until, claimed.claim?.leaseUntil);
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+
+it.effect("心跳跳过未注册仓库并记录机器心跳，仍续期其他租约", () =>
+  Effect.gen(function* () {
+    const claims = yield* FleetClaims.FleetClaims;
+    const sql = yield* SqlClient.SqlClient;
+    const held = yield* claims.claim(caller("node-a"), input("root", "claim-a"));
+    const result = yield* claims.heartbeat("node-a", {
+      sequence: 1,
+      leases: [
+        { repo: "missing/repo", issue: 7, taskId: "root", attempt: 1, fencing: "1" },
+        {
+          repo: "example/one",
+          issue: 7,
+          taskId: "root",
+          attempt: held.claim!.attempt,
+          fencing: held.claim!.fencing,
+        },
+      ],
+    });
+    assert.deepEqual(
+      result.results.map((item) => item.outcome),
+      ["renewed"],
+    );
+    assert.strictEqual(
+      (yield* sql`SELECT environment_id FROM fleet_environment_heartbeats`)[0]?.environment_id,
+      "node-a",
+    );
+  }).pipe(Effect.provide(ledgerLayer)),
+);
+
 it.effect("断开 60 秒不能抢，满 90 秒才能领，原机器再续期是 taken-over", () =>
   Effect.gen(function* () {
     const claims = yield* FleetClaims.FleetClaims;

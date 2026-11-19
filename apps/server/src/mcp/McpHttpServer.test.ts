@@ -46,6 +46,7 @@ import * as DeviceService from "../device/DeviceService.ts";
 import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReviewGuideService.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as ServerConfig from "../config.ts";
+import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
 import * as McpHttpServer from "./McpHttpServer.ts";
@@ -1321,7 +1322,11 @@ it.effect("accepts case-insensitive MCP bearer schemes and diagnoses rejected cr
       });
       yield* HttpRouter.serve(
         McpHttpServer.layerMcpTransport(Layer.empty).pipe(
-          Layer.provide(McpOAuth.layerMcpClientAuthenticator),
+          Layer.provide(
+            McpOAuth.layerMcpClientAuthenticator.pipe(
+              Layer.provide(Layer.mock(PeerMcpClient.PeerMcpClient)({})),
+            ),
+          ),
           Layer.provide(ServerSettings.layerTest()),
         ),
         { disableListenLog: true, disableLogger: true },

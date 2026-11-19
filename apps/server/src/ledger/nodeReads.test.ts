@@ -444,6 +444,20 @@ it.effect("旧摘要登记迁移后保留数据并允许多个协调者", () =>
   }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
 );
 
+it.effect("migration rolls back all changes when a later schema change fails", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE node_claims (repo TEXT, issue INTEGER, task_id TEXT)`;
+    yield* sql`CREATE TABLE node_claims_before_fleet (repo TEXT)`;
+    const result = yield* Effect.exit(NodeReads.migrate);
+    expect(result._tag).toBe("Failure");
+    const tables = yield* sql<{
+      name: string;
+    }>`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('fleet_summary_meta', 'node_claims') ORDER BY name`;
+    expect(tables.map((table) => table.name)).toEqual(["node_claims"]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
 it.effect("迁移旧 node_claims 去重并保留一条 repo issue task 租约", () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;

@@ -6,6 +6,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { McpSchema, McpServer } from "effect/ai";
 
 import * as FleetClaims from "../../../ledger/FleetClaims.ts";
+import * as PeerChallengeRegistry from "../../../peer/PeerChallengeRegistry.ts";
 import * as McpHttpServer from "../../McpHttpServer.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
@@ -19,6 +20,7 @@ const claimsLayer = Layer.effectDiscard(
 const serverLayer = McpHttpServer.layerFleetClaimsToolkit.pipe(
   Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
   Layer.provideMerge(claimsLayer),
+  Layer.provide(PeerChallengeRegistry.layer),
 );
 
 const mcpClient = McpSchema.McpServerClient.of({

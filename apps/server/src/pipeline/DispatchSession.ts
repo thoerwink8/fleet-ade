@@ -137,7 +137,7 @@ const make = Effect.gen(function* () {
   const projects = yield* ProjectService.ProjectService;
   const git = yield* GitWorkflowService.GitWorkflowService;
   const opener = yield* SessionOpener;
-  const reporter = yield* Effect.serviceOption(FleetSummaryReporter.FleetSummaryReporter);
+  const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
 
   const openRuns = Effect.fn("DispatchSession.openRuns")(function* () {
     const listed = yield* runs.list;
@@ -149,7 +149,7 @@ const make = Effect.gen(function* () {
   // The run's claim token is the durable binding; re-track every tick so a crash
   // between open and the first registration reconciles on the next pass.
   const bindLease = Effect.fn("DispatchSession.bindLease")(function* (run: OpenRun) {
-    if (run.threadId === null || Option.isNone(reporter)) return;
+    if (run.threadId === null) return;
     const claimToken = yield* runs
       .claimTokenForRun(run.id)
       .pipe(
@@ -165,7 +165,7 @@ const make = Effect.gen(function* () {
       catch: () => undefined,
     }).pipe(Effect.option);
     if (Option.isNone(claim)) return;
-    yield* reporter.value.trackTask(ThreadId.make(run.threadId), claim.value).pipe(
+    yield* reporter.trackTask(ThreadId.make(run.threadId), claim.value).pipe(
       Effect.catchCause((cause) =>
         Effect.logWarning("pipeline.dispatch.lease-bind-failed", {
           issueNumber: run.issueNumber,

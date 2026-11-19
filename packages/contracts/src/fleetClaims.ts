@@ -22,7 +22,6 @@ export type FleetClaim = typeof FleetClaim.Type;
 export const FleetClaimClaimInput = Schema.Struct({
   ...FleetClaimKey.fields,
   idempotencyKey: TrimmedNonEmptyString,
-  leaseMs: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
 });
 export type FleetClaimClaimInput = typeof FleetClaimClaimInput.Type;
 

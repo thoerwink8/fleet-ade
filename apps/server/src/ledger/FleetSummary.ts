@@ -26,17 +26,16 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
-// @effect-diagnostics nodeBuiltinImport:off -- joins the ledger file under the state directory.
-import * as NodePath from "node:path";
 
-import * as ServerConfig from "../config.ts";
 import * as NodeClaims from "./nodeClaims.ts";
 import * as NodeReads from "./nodeReads.ts";
+import * as LedgerDb from "./LedgerDb.ts";
 
 const isFleetSummaryError = Schema.is(FleetSummaryError);
 /** A stalled consumer retains at most the latest change per row. */
 const FLEET_SUMMARY_SUBSCRIBER_QUEUE_LIMIT = 200;
 const FLEET_SUMMARY_DONE_RETENTION_MS = 24 * 60 * 60 * 1000;
+const FLEET_ENVIRONMENT_HEARTBEAT_TTL_MS = 90_000;
 
 interface RowRecord {
   readonly environment_id: string;
@@ -412,9 +411,8 @@ const make = Effect.fn("FleetSummary.make")(function* () {
         SELECT 1 AS held FROM node_claims AS claim
         WHERE claim.repo = ${canonical.repo} AND claim.issue = ${canonical.issue} AND claim.task_id = ${canonical.taskId}
           AND claim.holder_environment = ${callerEnvironmentId}
-          AND ((${canonical.attempt ?? null} IS NOT NULL AND ${canonical.fencing ?? null} IS NOT NULL
-            AND claim.attempt = ${canonical.attempt ?? null} AND claim.fencing = ${canonical.fencing ?? null})
-            OR (${canonical.attempt ?? null} IS NULL AND ${canonical.fencing ?? null} IS NULL AND claim.attempt = 1))
+          AND (${canonical.attempt ?? null} IS NULL OR claim.attempt = ${canonical.attempt ?? null})
+          AND (${canonical.fencing ?? null} IS NULL OR claim.fencing = ${canonical.fencing ?? null})
           AND ((claim.state = 'running' AND claim.lease_until > ${now}) OR (
             ${phaseFromSessionRun(canonical.sessionRun) === "done" ? 1 : 0} = 1 AND EXISTS (
               SELECT 1 FROM fleet_summary_rows AS row WHERE row.environment_id = ${callerEnvironmentId}
@@ -521,8 +519,11 @@ const make = Effect.fn("FleetSummary.make")(function* () {
   /** Lease freshness is task-specific and never changes session phase or adhoc rows. */
   const sweepStale = publishLock.withPermits(1)(
     Effect.gen(function* () {
-      const now = DateTime.formatIso(yield* DateTime.now);
-      const heartbeatCutoff = DateTime.formatIso(DateTime.makeUnsafe(Date.parse(now) - 90_000));
+      const nowDate = yield* DateTime.now;
+      const now = DateTime.formatIso(nowDate);
+      const heartbeatCutoff = DateTime.formatIso(
+        DateTime.makeUnsafe(DateTime.toEpochMillis(nowDate) - FLEET_ENVIRONMENT_HEARTBEAT_TTL_MS),
+      );
       const events = yield* sql
         .withTransaction(
           Effect.gen(function* () {
@@ -625,13 +626,7 @@ const rowIdOfKey = (key: FleetSummaryTombstoneKey) =>
 const sameRow = (event: FleetSummaryChangeEvent, rowId: string) =>
   (event.type === "upsert" ? rowIdOfRow(event.row) : rowIdOfKey(event.key)) === rowId;
 
-export const layer = Layer.unwrap(
-  Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>
-    Layer.effect(FleetSummary, make()).pipe(
-      Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),
-    ),
-  ),
-);
+export const layer = Layer.effect(FleetSummary, make()).pipe(Layer.provide(LedgerDb.layer));
 
 export const layerForTest = (filename = ":memory:") =>
   Layer.effect(FleetSummary, make()).pipe(Layer.provideMerge(NodeSqliteClient.layer({ filename })));

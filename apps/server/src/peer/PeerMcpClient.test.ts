@@ -1,4 +1,5 @@
 import { NodeHttpServer } from "@effect/platform-node";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import { expect, it } from "@effect/vitest";
 import {
   EnvironmentId,
@@ -20,6 +21,8 @@ import { Tool, Toolkit } from "effect/ai";
 import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as PeerChallengeRegistry from "./PeerChallengeRegistry.ts";
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
@@ -55,6 +58,11 @@ const probeThrough = Effect.fn(function* (http: HttpClient.HttpClient) {
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(HttpClient.HttpClient, http),
+          PeerChallengeRegistry.layer,
+          Layer.mock(ServerEnvironment.ServerEnvironment)({
+            getEnvironmentId: Effect.succeed(EnvironmentId.make("self")),
+          }),
+          NodeCrypto.layer,
           Layer.mock(PeerLinks.PeerLinks)({
             resolve: () =>
               Effect.succeed({
@@ -245,18 +253,22 @@ it.effect("keeps a link healthy when the peer refuses a call", () =>
 it.effect("renews a missing peer session once and reuses its replacement", () =>
   Effect.gen(function* () {
     const sessionHeaders: Array<string | undefined> = [];
-    const statuses = [200, 202, 404, 200, 202, 200, 200, 200];
+    const challenges: Array<string | undefined> = [];
+    const identities: Array<string | undefined> = [];
+    const statuses = [200, 202, 404, 200, 202, 200, 200, 200, 200, 200];
     const outcomes: Array<string | null> = [];
     const http = HttpClient.make((request) =>
       Effect.sync(() => {
         const index = sessionHeaders.length;
         sessionHeaders.push(request.headers["mcp-session-id"]);
+        challenges.push(request.headers[PeerMcpClient.PEER_CHALLENGE_HEADER]);
+        identities.push(request.headers[PeerMcpClient.PEER_IDENTITY_HEADER]);
         const status = statuses[index];
         if (status === undefined) throw new Error("Unexpected retry");
         return HttpClientResponse.fromWeb(
           request,
           new Response(
-            index === 7
+            index === 9
               ? "{}"
               : index >= 5
                 ? JSON.stringify({
@@ -283,7 +295,12 @@ it.effect("renews a missing peer session once and reuses its replacement", () =>
       PeerMcpClient.layer.pipe(
         Layer.provide(
           Layer.mergeAll(
+            PeerChallengeRegistry.layer,
+            Layer.mock(ServerEnvironment.ServerEnvironment)({
+              getEnvironmentId: Effect.succeed(EnvironmentId.make("self")),
+            }),
             Layer.succeed(HttpClient.HttpClient, http),
+            NodeCrypto.layer,
             Layer.mock(PeerLinks.PeerLinks)({
               resolve: () =>
                 Effect.succeed({
@@ -307,11 +324,16 @@ it.effect("renews a missing peer session once and reuses its replacement", () =>
       ),
     );
     const client = Context.get(context, PeerMcpClient.PeerMcpClient);
-    for (let call = 0; call < 2; call++) {
+    for (const tool of [
+      "fleet_claim",
+      "t3_thread_launch",
+      "fleet_summary_report",
+      "fleet_heartbeat",
+    ]) {
       expect(
         yield* client.call({
           environmentId: box.environmentId,
-          tool: "probe",
+          tool,
           arguments: {},
           limits: { runtimeMode: "approval-required", interactionMode: "plan" },
           success: Result,
@@ -322,13 +344,13 @@ it.effect("renews a missing peer session once and reuses its replacement", () =>
     const empty = yield* client
       .call({
         environmentId: box.environmentId,
-        tool: "probe",
+        tool: "fleet_claim",
         arguments: {},
         limits: { runtimeMode: "approval-required", interactionMode: "plan" },
         success: Result,
       })
       .pipe(Effect.flip);
-    expect(outcomes).toEqual([null, null, empty.message]);
+    expect(outcomes).toEqual([null, null, null, null, empty.message]);
     expect(sessionHeaders).toEqual([
       undefined,
       "old",
@@ -338,7 +360,25 @@ it.effect("renews a missing peer session once and reuses its replacement", () =>
       "renewed",
       "renewed",
       "renewed",
+      "renewed",
+      "renewed",
     ]);
+    expect(identities).toEqual([
+      undefined,
+      undefined,
+      "self",
+      undefined,
+      undefined,
+      "self",
+      "self",
+      "self",
+      "self",
+      "self",
+    ]);
+    const issued = challenges.filter((value): value is string => value !== undefined);
+    expect(issued).toHaveLength(6);
+    expect(new Set(issued).size).toBe(6);
+    expect(issued.every((value) => /^[A-Za-z0-9_-]{43}$/.test(value))).toBe(true);
   }),
 );
 

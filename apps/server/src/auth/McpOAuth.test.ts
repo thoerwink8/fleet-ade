@@ -6,21 +6,26 @@ import {
   type AuthCreatePairingCredentialInput,
   type EnvironmentCloudLinkStateResult,
   EnvironmentHttpApi,
+  EnvironmentId,
   MCP_PEER_LINK_SOFTWARE_ID,
   mcpClientScopes,
+  OrchestratorMcpFailure,
 } from "@t3tools/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
+import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Etag from "effect/http/Etag";
 import * as HttpPlatform from "effect/http/HttpPlatform";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
+import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 
 import * as CloudLink from "../cloud/CloudLink.ts";
@@ -28,6 +33,8 @@ import * as ServerConfig from "../config.ts";
 import { makeDpopKey } from "./dpop.testkit.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as McpHttpServer from "../mcp/McpHttpServer.ts";
+import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import * as Sqlite from "../persistence/Sqlite.ts";
 import * as EnvironmentAuth from "./EnvironmentAuth.ts";
 import * as McpOAuth from "./McpOAuth.ts";
@@ -55,9 +62,21 @@ const notLinked: EnvironmentCloudLinkStateResult = {
   relayIssuer: null,
   publishAgentActivity: false,
 };
+const noPeer = Layer.mergeAll(
+  Layer.mock(PeerMcpClient.PeerMcpClient)({
+    call: () =>
+      Effect.fail(
+        new OrchestratorMcpFailure({ code: "orchestration_error", message: "No reverse link" }),
+      ),
+  }),
+  Layer.mock(ServerEnvironment.ServerEnvironment)({
+    getEnvironmentId: Effect.succeed(EnvironmentId.make("self-env")),
+  }),
+);
 const makeLayerRoutes = (
   capture: (auth: EnvironmentAuth.EnvironmentAuth["Service"]) => void,
   linkState: EnvironmentCloudLinkStateResult,
+  peer?: Layer.Layer<PeerMcpClient.PeerMcpClient | ServerEnvironment.ServerEnvironment>,
 ) =>
   Layer.mergeAll(
     Layer.effectDiscard(
@@ -67,7 +86,7 @@ const makeLayerRoutes = (
       Layer.provide(AuthHttp.layer),
       Layer.provide(
         McpOAuthHttp.layer.pipe(
-          Layer.provide(McpOAuth.layer),
+          Layer.provide(McpOAuth.layer.pipe(Layer.provide(peer ?? noPeer))),
           Layer.provide(ServerSettings.layerTest()),
           Layer.provide(
             Layer.mock(CloudLink.CloudLink)({ linkState: () => Effect.succeed(linkState) }),
@@ -93,6 +112,7 @@ const ORIGIN = "https://box.example.ts.net";
 const REDIRECT = "http://localhost/callback";
 const verifier = "a".repeat(43) + "-verifier-for-tests";
 const challenge = "DeB41nTVkPwpbbYecrnqtVq7VXLezustdHAK4SWt13c";
+const decodeProofResult = Schema.decodeEffect(Schema.Struct({ environmentId: EnvironmentId }));
 
 const at = (path: string, init?: RequestInit) =>
   new Request(`http://127.0.0.1${path}`, {
@@ -110,14 +130,19 @@ type Handler = (request: Request) => Effect.Effect<Response>;
 const withRoutes = <A, E>(
   use: (handler: Handler, auth: EnvironmentAuth.EnvironmentAuth["Service"]) => Effect.Effect<A, E>,
   linkState = notLinked,
+  peer?: Layer.Layer<PeerMcpClient.PeerMcpClient | ServerEnvironment.ServerEnvironment>,
 ) =>
   Effect.gen(function* () {
     const random = yield* SecureRandom.SecureRandom;
     const context = Context.make(SecureRandom.SecureRandom, random);
     let routerAuth: EnvironmentAuth.EnvironmentAuth["Service"] | undefined;
-    const layerRoutes = makeLayerRoutes((auth) => {
-      routerAuth = auth;
-    }, linkState);
+    const layerRoutes = makeLayerRoutes(
+      (auth) => {
+        routerAuth = auth;
+      },
+      linkState,
+      peer,
+    );
     return yield* Effect.acquireUseRelease(
       Effect.sync(() => HttpRouter.toWebHandler(layerRoutes, { disableLogger: true })),
       (web) =>
@@ -348,7 +373,7 @@ it.live("signs in with a pairing code and issues a token only /mcp accepts", () 
     }),
   ),
 );
-it.live("uses a coordinator-generated session identity instead of DCR self-report", () =>
+it.live("does not treat a linked session ID as an authenticated environment identity", () =>
   withRoutes((handler, auth) =>
     Effect.gen(function* () {
       const registered = yield* handler(
@@ -387,7 +412,63 @@ it.live("uses a coordinator-generated session identity instead of DCR self-repor
         HttpServerRequest.fromWeb(at("/mcp", { headers: { authorization: `Bearer ${token}` } })),
       );
       expect(client.peerLink).toBe(true);
-      expect(client.environmentId).toBe(client.sessionId);
+      expect(client.environmentId).toBeUndefined();
+      const calls = yield* Ref.make<ReadonlyArray<Record<string, unknown>>>([]);
+      const answer = yield* Ref.make("peer-env");
+      const peer = Layer.mock(PeerMcpClient.PeerMcpClient)({
+        call: (input) =>
+          Effect.gen(function* () {
+            yield* Ref.update(calls, (items) => [...items, input.arguments]);
+            return yield* decodeProofResult({ environmentId: yield* Ref.get(answer) }).pipe(
+              Effect.orDie,
+            );
+          }),
+      });
+      const authenticatorLayer = McpOAuth.layerMcpClientAuthenticator.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(EnvironmentAuth.EnvironmentAuth, auth),
+            Layer.mock(ServerEnvironment.ServerEnvironment)({
+              getEnvironmentId: Effect.succeed(EnvironmentId.make("self-env")),
+            }),
+            peer,
+            NodeCrypto.layer,
+          ),
+        ),
+      );
+      yield* Effect.gen(function* () {
+        const authenticator = yield* McpHttpServer.McpClientAuthenticator;
+        const request = (headers: Record<string, string>) =>
+          HttpServerRequest.fromWeb(
+            at("/mcp", {
+              headers: { authorization: `Bearer ${token}`, ...headers },
+            }),
+          );
+        const identity = {
+          [PeerMcpClient.PEER_IDENTITY_HEADER]: "peer-env",
+          [PeerMcpClient.PEER_CHALLENGE_HEADER]: challenge,
+        };
+        const proven = yield* authenticator.authenticate(request(identity));
+        expect(proven?.client?.environmentId).toBe("peer-env");
+        const proofCalls = yield* Ref.get(calls);
+        expect(proofCalls).toHaveLength(1);
+        expect(proofCalls[0]).toMatchObject({ challenge, target: "self-env" });
+        const digester = yield* Digest.Digest;
+        const expectedDigest = Base64Url.encode(
+          yield* digester.digest(Digest.sha256, new TextEncoder().encode(token)),
+        );
+        expect(proofCalls[0]?.bearerDigest).toBe(expectedDigest);
+        const plain = yield* authenticator.authenticate(request({}));
+        expect(plain?.client?.environmentId).toBeUndefined();
+        const suppressed = yield* authenticator.authenticate(
+          request({ ...identity, [PeerMcpClient.PEER_PROOF_HEADER]: "1" }),
+        );
+        expect(suppressed?.client?.environmentId).toBeUndefined();
+        expect(yield* Ref.get(calls)).toHaveLength(1);
+        yield* Ref.set(answer, "different-env");
+        const spoofed = yield* authenticator.authenticate(request(identity));
+        expect(spoofed?.client?.environmentId).toBeUndefined();
+      }).pipe(Effect.provide(Layer.mergeAll(authenticatorLayer, NodeCrypto.layer)));
     }),
   ),
 );
@@ -856,3 +937,159 @@ it("matches loopback redirects on everything but the port, and https redirects e
   expect(matches("https://bot.example/cb", "https://bot.example/cb?x=1")).toBe(false);
   expect(matches("https://bot.example/cb", "https://evil.example/cb")).toBe(false);
 });
+
+it.live("binds a proven peer identity to its link token and nothing else", () =>
+  Effect.gen(function* () {
+    const proofs = yield* Ref.make<
+      ReadonlyArray<{
+        environmentId: string;
+        tool: string;
+        arguments: Record<string, unknown>;
+        limits: PeerMcpClient.PeerCallLimits;
+      }>
+    >([]);
+    const proofResult = yield* Ref.make<
+      { readonly environmentId: string } | { readonly unreachable: true }
+    >({ environmentId: "peer-env" });
+    const peers = Layer.mergeAll(
+      Layer.mock(PeerMcpClient.PeerMcpClient)({
+        call: (input) =>
+          Effect.gen(function* () {
+            yield* Ref.update(proofs, (items) => [
+              ...items,
+              {
+                environmentId: input.environmentId,
+                tool: input.tool,
+                arguments: input.arguments,
+                limits: input.limits,
+              },
+            ]);
+            const result = yield* Ref.get(proofResult);
+            if ("unreachable" in result) {
+              return yield* new OrchestratorMcpFailure({
+                code: "orchestration_error",
+                message: "peer unreachable",
+              });
+            }
+            return yield* decodeProofResult(result).pipe(Effect.orDie);
+          }),
+      }),
+      Layer.mock(ServerEnvironment.ServerEnvironment)({
+        getEnvironmentId: Effect.succeed(EnvironmentId.make("self-env")),
+      }),
+    );
+    yield* withRoutes(
+      (handler, auth) =>
+        Effect.gen(function* () {
+          const exchange = (clientId: string, code: string, codeVerifier: string) =>
+            handler(
+              at(
+                "/oauth/mcp/token",
+                form({
+                  grant_type: "authorization_code",
+                  code,
+                  redirect_uri: REDIRECT,
+                  client_id: clientId,
+                  code_verifier: codeVerifier,
+                  resource: `${ORIGIN}/mcp`,
+                }),
+              ),
+            );
+          const authenticate = (token: string) =>
+            auth.authenticateMcpClient(
+              HttpServerRequest.fromWeb(
+                at("/mcp", { headers: { authorization: `Bearer ${token}` } }),
+              ),
+            );
+          const linkedSignIn = () =>
+            Effect.gen(function* () {
+              const registered = yield* handler(
+                at("/oauth/mcp/register", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: encodeJson({
+                    client_name: "Peer",
+                    redirect_uris: [REDIRECT],
+                    software_id: MCP_PEER_LINK_SOFTWARE_ID,
+                  }),
+                }),
+              ).pipe(Effect.flatMap(json<{ client_id: string }>));
+              const params = {
+                ...authorizeParams(registered.client_id, REDIRECT),
+                peer_environment_id: "peer-env",
+              };
+              const pairing = yield* auth.createPairingLink();
+              const approved = yield* decide(handler, params, {
+                _tag: "pairing-code",
+                access: "auto",
+                code: pairing.credential,
+              });
+              expect(approved.status).toBe(200);
+              const code = new URL(approved.redirectTo!).searchParams.get("code")!;
+              return { clientId: registered.client_id, code };
+            });
+
+          const proven = yield* linkedSignIn();
+          const proofCalls = yield* Ref.get(proofs);
+          expect(proofCalls).toHaveLength(1);
+          expect(proofCalls[0]).toMatchObject({
+            environmentId: "peer-env",
+            tool: "fleet_peer_proof",
+            arguments: { challenge, target: "self-env" },
+            limits: { runtimeMode: "approval-required", interactionMode: "default" },
+          });
+          const tokenResponse = yield* exchange(proven.clientId, proven.code, verifier);
+          expect(tokenResponse.status).toBe(200);
+          const linked = yield* authenticate(
+            (yield* json<{ access_token: string }>(tokenResponse)).access_token,
+          );
+          expect(linked.peerLink).toBe(true);
+          expect(linked.environmentId).toBe("peer-env");
+
+          for (const result of [{ environmentId: "other-env" }, { unreachable: true as const }]) {
+            yield* Ref.set(proofResult, result);
+            const unproven = yield* linkedSignIn();
+            const unprovenToken = yield* exchange(unproven.clientId, unproven.code, verifier);
+            expect(unprovenToken.status).toBe(200);
+            const anonymous = yield* authenticate(
+              (yield* json<{ access_token: string }>(unprovenToken)).access_token,
+            );
+            expect(anonymous.peerLink).toBe(true);
+            expect(anonymous.environmentId).toBeUndefined();
+          }
+
+          yield* Ref.set(proofResult, { environmentId: "peer-env" });
+          const pkce = yield* linkedSignIn();
+          const wrongVerifier = yield* exchange(pkce.clientId, pkce.code, "b".repeat(64));
+          expect(wrongVerifier.status).toBe(400);
+          expect(yield* json<unknown>(wrongVerifier)).toMatchObject({ error: "invalid_grant" });
+          expect((yield* exchange(pkce.clientId, pkce.code, verifier)).status).toBe(400);
+
+          const proofCount = (yield* Ref.get(proofs)).length;
+          const clientId = yield* registeredClientId(handler);
+          const params = {
+            ...authorizeParams(clientId, REDIRECT),
+            peer_environment_id: "peer-env",
+          };
+          const pairing = yield* auth.issuePairingCredential();
+          const approved = yield* decide(handler, params, {
+            _tag: "pairing-code",
+            access: "auto",
+            code: pairing.credential,
+          });
+          expect(approved.status).toBe(200);
+          const code = new URL(approved.redirectTo!).searchParams.get("code")!;
+          const ordinaryToken = yield* exchange(clientId, code, verifier);
+          expect(ordinaryToken.status).toBe(200);
+          const ordinary = yield* authenticate(
+            (yield* json<{ access_token: string }>(ordinaryToken)).access_token,
+          );
+          expect(ordinary.peerLink).toBe(false);
+          expect(ordinary.environmentId).toBeUndefined();
+          expect((yield* Ref.get(proofs)).length).toBe(proofCount);
+        }),
+      notLinked,
+      peers,
+    );
+  }),
+);

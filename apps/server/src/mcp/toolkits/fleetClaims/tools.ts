@@ -1,4 +1,5 @@
 import {
+  EnvironmentId,
   FleetClaimClaimInput,
   FleetClaimClaimResult,
   FleetClaimHeartbeatInput,
@@ -7,9 +8,11 @@ import {
   FleetClaimLeaseResult,
   OrchestratorMcpFailure,
 } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { McpSchema, Tool, Toolkit } from "effect/ai";
 
 import * as FleetClaims from "../../../ledger/FleetClaims.ts";
+import * as PeerChallengeRegistry from "../../../peer/PeerChallengeRegistry.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
 const dependencies = [FleetClaims.FleetClaims, McpInvocationContext.McpInvocationContext];
@@ -70,9 +73,34 @@ const FleetHeartbeatTool = Tool.make("fleet_heartbeat", {
   .annotate(Tool.Idempotent, true)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
 
+export const FleetPeerProofInput = Schema.Struct({
+  challenge: Schema.String,
+  target: EnvironmentId,
+  bearerDigest: Schema.optional(Schema.String),
+});
+export const FleetPeerProofResult = Schema.Struct({ environmentId: EnvironmentId });
+
+const FleetPeerProofTool = Tool.make("fleet_peer_proof", {
+  description: "Prove a pending peer link challenge to its coordinator.",
+  parameters: FleetPeerProofInput,
+  success: FleetPeerProofResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: [
+    PeerChallengeRegistry.PeerChallengeRegistry,
+    McpInvocationContext.McpInvocationContext,
+  ],
+})
+  .annotate(Tool.Title, "Prove peer link")
+  .annotate(Tool.Readonly, false)
+  .annotate(Tool.Destructive, true)
+  .annotate(Tool.Idempotent, false)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
+
 export const FleetClaimsToolkit = Toolkit.make(
   FleetClaimTool,
   FleetRenewTool,
   FleetReleaseTool,
   FleetHeartbeatTool,
+  FleetPeerProofTool,
 );

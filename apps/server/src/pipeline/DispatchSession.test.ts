@@ -160,7 +160,9 @@ const sessionLayer = (
     Layer.provideMerge(settings),
     Layer.provideMerge(shared),
   );
-  return options?.reporter === undefined ? base : base.pipe(Layer.provide(options.reporter));
+  return base.pipe(
+    Layer.provide(options?.reporter ?? Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({})),
+  );
 };
 
 const run = <E, R>(

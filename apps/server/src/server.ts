@@ -88,6 +88,7 @@ import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
+import * as PeerChallengeRegistry from "./peer/PeerChallengeRegistry.ts";
 import * as PeerMcpClient from "./peer/PeerMcpClient.ts";
 import * as McpSessionRegistry from "./mcp/McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
@@ -672,10 +673,21 @@ const layerPipelineBudget = PipelineBudget.layerWorker.pipe(
   Layer.provide(GitHubRest.layerWithDependencies),
   Layer.provide(layerPipelineRuns),
 );
+export const layerFleetSummaryReporter = FleetSummaryReporter.layer.pipe(
+  Layer.provide(Scheduler.layer),
+  Layer.provide(ProjectionStoreV2.layer),
+  Layer.provide(PeerMcpClient.layer),
+  Layer.provide(PeerLinks.layer),
+  Layer.provide(PeerChallengeRegistry.layer),
+  Layer.provide(FleetSummary.layer),
+  Layer.provide(FleetClaims.layer),
+  Layer.provide(layerServerEnvironment),
+);
 const layerDispatchSession = DispatchSession.layerWorker.pipe(
   Layer.provideMerge(DispatchSession.layerLive),
   Layer.provide(layerPipelineRuns),
   Layer.provide(layerPipelineBudget),
+  Layer.provide(layerFleetSummaryReporter),
 );
 const layerOpenPullRequest = OpenPullRequest.layerWorker.pipe(
   Layer.provideMerge(OpenPullRequest.layerLive),
@@ -746,14 +758,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
     }),
   ).pipe(
     // Export this instance to the MCP handlers; its tracking map must be shared.
-    Layer.provideMerge(FleetSummaryReporter.layer),
-    Layer.provide(Scheduler.layer),
-    Layer.provide(ProjectionStoreV2.layer),
-    Layer.provideMerge(PeerMcpClient.layer),
-    Layer.provideMerge(PeerLinks.layer),
-    // Same layer values as below: one shared summary and claims instance.
-    Layer.provideMerge(FleetSummary.layer),
-    Layer.provideMerge(FleetClaims.layer),
+    Layer.provideMerge(layerFleetSummaryReporter),
   ),
   Layer.effectDiscard(
     Effect.gen(function* () {
@@ -903,48 +908,48 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.effectDiscard(
     RemoteDelegation.RemoteDelegation.pipe(Effect.flatMap((remote) => remote.start())),
   ),
-).pipe(
-  Layer.provide(
-    PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
-  ),
-  // delegate_task to a linked environment, from /mcp and the follower above.
-  Layer.provide(RemoteDelegation.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
-  // Links agents ask for: shown in a thread from /mcp, answered over WebSocket.
-  Layer.provide(PeerLinkRequests.layer),
-  // Share the service so HTTP/WS clients single-flight reads and invalidate each other's cached patches.
-  Layer.provide(layerPullRequestService),
-  // The same activity instance RunExecutionService reports to, by layer memoization.
-  Layer.provide(
-    ServerBrowser.layer.pipe(
-      Layer.provide(Layer.merge(DesktopBrowserChannel.layer, PreviewAgentActivity.layer)),
+)
+  .pipe(
+    Layer.provide(
+      PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
     ),
-  ),
-  Layer.provide(PreviewBrowser.layer),
-  // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
-  Layer.provide(
-    PeerForwarding.layer.pipe(
-      Layer.provideMerge(PeerMcpClient.layer),
-      Layer.provideMerge(PeerLinks.layer),
+    // delegate_task to a linked environment, from /mcp and the follower above.
+    Layer.provide(RemoteDelegation.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+    // Links agents ask for: shown in a thread from /mcp, answered over WebSocket.
+    Layer.provide(PeerLinkRequests.layer),
+    // Share the service so HTTP/WS clients single-flight reads and invalidate each other's cached patches.
+    Layer.provide(layerPullRequestService),
+    // The same activity instance RunExecutionService reports to, by layer memoization.
+    Layer.provide(
+      ServerBrowser.layer.pipe(
+        Layer.provide(Layer.merge(DesktopBrowserChannel.layer, PreviewAgentActivity.layer)),
+      ),
     ),
-  ),
-  Layer.provide(FleetClaims.layer),
-  // Same layer reference as the startup consumer: one memoized tracking map.
-  Layer.provide(FleetSummaryReporter.layer.pipe(Layer.provide(Scheduler.layer))),
-  Layer.provide(
-    SpeechService.layer.pipe(
-      Layer.provide(layerServerSettings),
-      Layer.provide(SpeechModelStore.layer),
+    Layer.provide(PreviewBrowser.layer),
+    // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
+    Layer.provide(PeerForwarding.layer),
+    Layer.provide(PeerMcpClient.layer),
+    Layer.provide(PeerLinks.layer),
+    Layer.provide(PeerChallengeRegistry.layer),
+    Layer.provide(FleetClaims.layer),
+    Layer.provide(layerFleetSummaryReporter),
+    Layer.provide(
+      SpeechService.layer.pipe(
+        Layer.provide(layerServerSettings),
+        Layer.provide(SpeechModelStore.layer),
+      ),
     ),
-  ),
-  Layer.provide(CloudSpeech.layer.pipe(Layer.provide(SecretResolver.layer))),
-  Layer.provide(layerServerSettings),
-  Layer.provide(PipelineSupervision.layer),
-  Layer.provide(PreviewAutomationBroker.layer),
-  Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
-  Layer.provide(layerCommandReadiness),
-  Layer.provide(ServerHttp.layerBrowserApiCors),
-  Layer.provide(ServerHttp.layerHttpCompression),
-);
+    Layer.provide(CloudSpeech.layer.pipe(Layer.provide(SecretResolver.layer))),
+  )
+  .pipe(
+    Layer.provide(layerServerSettings),
+    Layer.provide(PipelineSupervision.layer),
+    Layer.provide(PreviewAutomationBroker.layer),
+    Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
+    Layer.provide(layerCommandReadiness),
+    Layer.provide(ServerHttp.layerBrowserApiCors),
+    Layer.provide(ServerHttp.layerHttpCompression),
+  );
 
 const layerMakeServer = Layer.unwrap(
   Effect.gen(function* () {

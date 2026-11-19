@@ -531,6 +531,8 @@ export const AuthMcpAuthorizationRequest = Schema.Struct({
   code_challenge_method: Schema.optionalKey(Schema.String),
   state: Schema.optionalKey(Schema.RedactedFromValue(Schema.String)),
   resource: Schema.optionalKey(Schema.String),
+  /** Untrusted routing hint; identity is established separately over a paired link. */
+  peer_environment_id: Schema.optionalKey(Schema.String),
 });
 export type AuthMcpAuthorizationRequest = typeof AuthMcpAuthorizationRequest.Type;
 

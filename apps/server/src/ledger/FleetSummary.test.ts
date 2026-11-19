@@ -539,6 +539,30 @@ it.effect("释放或过期后同线程终态仍可上报，失败不被吞", () 
   ),
 );
 
+it.effect("已标 lease lost 后同一线程仍可上报终态", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      const sql = yield* SqlClient.SqlClient;
+      yield* summary.report("environment-a", task("root"));
+      yield* sql`UPDATE node_claims SET lease_until = '1970-01-01T00:00:00.000Z' WHERE task_id = 'root'`;
+      yield* summary.sweepStale;
+      const marked = yield* summary.report(
+        "environment-a",
+        task("root", { sessionRun: "failed", reason: "failed" }),
+      );
+      expect(marked.changed).toBe(true);
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      if (snapshot?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(snapshot.rows.find((row) => row.taskId === "root")).toMatchObject({
+        phase: "done",
+        reason: "failed",
+        stale: false,
+      });
+    }),
+  ),
+);
+
 it.effect("同键重领后旧线程删除不影响新摘要行", () =>
   serviceTest(
     Effect.gen(function* () {
@@ -574,6 +598,27 @@ it.effect("同一机器重新领单后旧租约不能覆盖新线程", () =>
         .report("environment-a", task("root", { attempt: 1, fencing: "1", sessionRun: "failed" }))
         .pipe(Effect.flip);
       expect(error.reason).toBe("lease-required");
+      const fencingOnly = yield* summary.report(
+        "environment-a",
+        task("root", { fencing: "2", threadId: "new-thread" }),
+      );
+      expect(fencingOnly.changed).toBe(true);
+      for (const credentials of [{ fencing: "1" }, { attempt: 1, fencing: "2" }]) {
+        const rejected = yield* summary
+          .report("environment-a", task("root", { ...credentials, threadId: "old-thread" }))
+          .pipe(Effect.flip);
+        expect(rejected.reason).toBe("lease-required");
+      }
+      const legacy = yield* summary.report("environment-a", task("root", { threadId: "legacy" }));
+      expect(legacy.changed).toBe(true);
+      const attemptOnly = yield* summary.report(
+        "environment-a",
+        task("root", { attempt: 2, threadId: "new-thread" }),
+      );
+      expect(attemptOnly.changed).toBe(true);
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      if (snapshot?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(snapshot.rows[0]?.threadId).toBe("new-thread");
     }),
   ),
 );

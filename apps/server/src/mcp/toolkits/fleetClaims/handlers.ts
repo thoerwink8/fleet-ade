@@ -2,6 +2,7 @@ import { FleetClaimsError, OrchestratorMcpFailure } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 
 import * as FleetClaims from "../../../ledger/FleetClaims.ts";
+import * as PeerChallengeRegistry from "../../../peer/PeerChallengeRegistry.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
 import { FleetClaimsToolkit } from "./tools.ts";
@@ -43,8 +44,8 @@ const handlers = {
   fleet_renew: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
-      const environmentId = scope.client?.environmentId;
-      if (environmentId === undefined) return yield* missingLinkedEnvironment();
+      // Old leases were owned by this signed session ID, not a machine ID.
+      const environmentId = scope.client?.environmentId ?? scope.client!.sessionId;
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
         .renew({ sessionId: scope.client!.sessionId, environmentId }, input)
@@ -54,8 +55,7 @@ const handlers = {
   fleet_release: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
-      const environmentId = scope.client?.environmentId;
-      if (environmentId === undefined) return yield* missingLinkedEnvironment();
+      const environmentId = scope.client?.environmentId ?? scope.client!.sessionId;
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
         .release({ sessionId: scope.client!.sessionId, environmentId }, input)
@@ -65,12 +65,29 @@ const handlers = {
   fleet_heartbeat: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
-      const environmentId = scope.client?.environmentId;
-      if (environmentId === undefined) return yield* missingLinkedEnvironment();
+      const environmentId = scope.client?.environmentId ?? scope.client!.sessionId;
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
-        .heartbeat(environmentId, input)
+        .heartbeat(
+          environmentId,
+          input,
+          scope.client?.environmentId !== undefined,
+          scope.client!.sessionId,
+        )
         .pipe(Effect.mapError(fromFleetClaimsError));
+    }),
+  ),
+  fleet_peer_proof: McpToolAccess.reads((input) =>
+    Effect.gen(function* () {
+      const scope = yield* linkedClient;
+      const registry = yield* PeerChallengeRegistry.PeerChallengeRegistry;
+      if (!(yield* registry.consume(input.challenge, input.target, input.bearerDigest))) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message: "Peer link challenge is invalid, expired, or already used.",
+        });
+      }
+      return { environmentId: scope.environmentId };
     }),
   ),
 } satisfies McpToolAccess.Handlers<typeof FleetClaimsToolkit.tools>;

@@ -328,6 +328,40 @@ it.effect("生产认领走机群租约，令牌绑定租约后精确释放并可
   }).pipe(Effect.provide(fleetLayer)),
 );
 
+it.effect("机群端口仍可释放旧 UUID 租约并续期旧记录", () =>
+  Effect.gen(function* () {
+    const port = yield* ClaimLeasePort;
+    const sql = yield* SqlClient.SqlClient;
+    yield* port.register(["example/one"]);
+    const token = "a14a2c4d-11aa-4aab-8ccd-123456789abc";
+    yield* NodeClaims.apply(
+      sql,
+      {
+        action: "claim",
+        repo: "example/one",
+        issue: 7,
+        title: "test",
+        claimedBy: "pipeline",
+        leaseUntil: "9999-01-01T00:00:00.000Z",
+        token,
+      },
+      0,
+    );
+    const renewed = yield* port.apply({
+      action: "renew",
+      repo: "example/one",
+      issue: 7,
+      leaseUntil: "9999-01-02T00:00:00.000Z",
+    });
+    assert.strictEqual(renewed.status, 200);
+    assert.strictEqual(
+      (yield* releaseClaim(port, { repo: "example/one", issue: 7, token })).status,
+      200,
+    );
+    assert.strictEqual((yield* sql`SELECT issue FROM node_claims`).length, 0);
+  }).pipe(Effect.provide(fleetLayer)),
+);
+
 it.effect("生产层按白名单登记仓：repos 空时监控启动认领成功", () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

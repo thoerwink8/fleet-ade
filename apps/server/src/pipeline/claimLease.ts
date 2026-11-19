@@ -1,22 +1,20 @@
-import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Option from "effect/Option";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Schema from "effect/Schema";
 import type * as SqlError from "effect/sql/SqlError";
 
-import * as ServerConfig from "../config.ts";
 import * as NodeClaims from "../ledger/nodeClaims.ts";
 import { FleetClaim, FleetClaimsError } from "@t3tools/contracts";
 import * as FleetClaims from "../ledger/FleetClaims.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as NodeReads from "../ledger/nodeReads.ts";
+import * as LedgerDb from "../ledger/LedgerDb.ts";
 
 /** The pipeline's holder id. A node token's id is a different holder. */
 const PIPELINE_CLAIMED_BY = "pipeline";
@@ -168,13 +166,16 @@ const fleetWriter = (
     const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
     return yield* Effect.gen(function* () {
       if (write.action === "claim") {
-        const claimed = yield* claims.claim(caller, {
-          repo: write.repo,
-          issue: write.issue,
-          taskId: "root",
-          idempotencyKey: write.token ?? SecureRandom.uuidV4Unsafe(),
-          leaseMs: Math.max(1, Date.parse(write.leaseUntil) - nowMs),
-        });
+        const claimed = yield* claims.claim(
+          caller,
+          {
+            repo: write.repo,
+            issue: write.issue,
+            taskId: "root",
+            idempotencyKey: write.token ?? SecureRandom.uuidV4Unsafe(),
+          },
+          { leaseMs: Math.max(1, Date.parse(write.leaseUntil) - nowMs) },
+        );
         if (claimed.outcome !== "claimed" || claimed.claim === null) {
           return { status: 409, code: "engine_has_it" } as const;
         }
@@ -185,18 +186,15 @@ const fleetWriter = (
           leaseToken: encodeLeaseToken(claimed.claim),
         } as const;
       }
-      if (write.action === "renew" || write.action === "finish") {
+      if (write.action === "renew") return yield* writer(sql)(write);
+      if (write.action === "finish") {
         const claim = yield* Effect.try({
-          try: () => decodeLeaseToken(write.action === "finish" ? write.token : ""),
+          try: () => decodeLeaseToken(write.token),
           catch: () => undefined,
         }).pipe(Effect.option);
         if (Option.isNone(claim)) {
           // Rows claimed before the fleet switch still release through the legacy writer.
           return yield* writer(sql)(write);
-        }
-        if (write.action === "renew") {
-          // Fleet leases renew through the reporter's heartbeat; no caller renew path.
-          return { status: 409, code: "not_claimed" } as const;
         }
         const released = yield* claims.release(caller, {
           repo: write.repo,
@@ -276,14 +274,7 @@ export const layerPort = (options?: { readonly wired?: boolean }) =>
     }),
   );
 /** Production: claims go through the fleet ledger; the run keeps the lease JSON as its token. */
-export const layerLive = Layer.unwrap(
-  Effect.gen(function* () {
-    const { stateDir } = yield* ServerConfig.ServerConfig;
-    const path = yield* Path.Path;
-    const filename = path.join(stateDir, "ledger.sqlite");
-    return fleetPortLayer.pipe(
-      Layer.provideMerge(FleetClaims.layerShared),
-      Layer.provide(NodeSqliteClient.layer({ filename })),
-    );
-  }),
+export const layerLive = fleetPortLayer.pipe(
+  Layer.provideMerge(FleetClaims.layer),
+  Layer.provide(LedgerDb.layer),
 );
