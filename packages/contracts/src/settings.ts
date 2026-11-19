@@ -1199,6 +1199,10 @@ export const WorktreeCleanup = Schema.NullOr(
 );
 export type WorktreeCleanup = typeof WorktreeCleanup.Type;
 
+/** Role on `delegate_task`. An empty cell uses the project's default model. */
+export const DispatchRole = Schema.Literals(["code", "review", "readonly", "plan"]);
+export type DispatchRole = typeof DispatchRole.Type;
+
 export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "worktreeCleanup",
   "defaultModelSelection",
@@ -1227,6 +1231,11 @@ export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "continueThreadsAfterServerUpdate",
   "responseStreamingMode",
   "speechProjectCustomWords",
+  "dispatchCodeModelSelection",
+  "dispatchReviewModelSelection",
+  "dispatchReadonlyModelSelection",
+  "dispatchPlanModelSelection",
+  "dispatchConcurrencyLimit",
 ] as const;
 export type ProjectScopedServerSettingKey = (typeof PROJECT_SCOPED_SERVER_SETTING_KEYS)[number];
 
@@ -1265,6 +1274,11 @@ export const ProjectSettingsOverrides = Schema.Struct({
   continueThreadsAfterServerUpdate: Schema.optionalKey(Schema.Boolean),
   responseStreamingMode: Schema.optionalKey(ResponseStreamingMode),
   speechProjectCustomWords: Schema.optionalKey(SpeechCustomWords),
+  dispatchCodeModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchReviewModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchReadonlyModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchPlanModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchConcurrencyLimit: Schema.optionalKey(Schema.NullOr(PositiveInt)),
   providerInstances: Schema.optionalKey(
     Schema.Record(ProviderInstanceId, ProjectProviderInstanceOverride),
   ),
@@ -1295,6 +1309,11 @@ const NULLABLE_PROJECT_SETTINGS_OVERRIDES: ReadonlySet<ProjectScopedServerSettin
   "reviewGuideModelSelection",
   "pullRequestMergeMethod",
   "sidebarAutoSettleAfterDays",
+  "dispatchCodeModelSelection",
+  "dispatchReviewModelSelection",
+  "dispatchReadonlyModelSelection",
+  "dispatchPlanModelSelection",
+  "dispatchConcurrencyLimit",
 ]);
 
 /** Reclaimable bytes from which the offline `t3 doctor` repair is worth suggesting. */
@@ -1661,6 +1680,22 @@ export const ServerSettings = Schema.Struct({
         ],
       }),
     ),
+  ),
+  // Null cell uses defaultModelSelection. Null concurrency does not cap a commander.
+  dispatchCodeModelSelection: Schema.NullOr(ModelSelection).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  dispatchReviewModelSelection: Schema.NullOr(ModelSelection).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  dispatchReadonlyModelSelection: Schema.NullOr(ModelSelection).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  dispatchPlanModelSelection: Schema.NullOr(ModelSelection).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  dispatchConcurrencyLimit: Schema.NullOr(PositiveInt).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   threadTitleInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   branchNamingMode: BranchNamingMode.pipe(
@@ -2074,6 +2109,11 @@ export const ServerSettingsPatch = Schema.Struct({
   addProjectBaseDirectory: Schema.optionalKey(TrimmedString),
   ghqCloneLayout: Schema.optionalKey(Schema.Boolean),
   textGenerationModelSelection: Schema.optionalKey(ModelSelectionPatch),
+  dispatchCodeModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchReviewModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchReadonlyModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchPlanModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  dispatchConcurrencyLimit: Schema.optionalKey(Schema.NullOr(PositiveInt)),
   threadTitleInstructions: Schema.optionalKey(TrimmedString),
   branchNamingMode: Schema.optionalKey(BranchNamingMode),
   branchNamePrefix: Schema.optionalKey(TrimmedString),

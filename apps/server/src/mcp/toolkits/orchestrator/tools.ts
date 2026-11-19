@@ -81,7 +81,7 @@ const threadMetadataDependencies = [
 
 const OrchestratorCapabilitiesTool = Tool.make("orchestrator_capabilities", {
   description:
-    "List providers, models, options, and runtime modes for `delegate_task`. Short list. `search` finds others. Any catalog model works.",
+    "List providers, models, options, and runtime modes for `delegate_task`. Short list. `search` finds others. Any catalog model works. A commander thread also gets `dispatch`: the model each role uses, and the open-delegation cap.",
   parameters: OrchestratorMcpCapabilitiesInput,
   success: OrchestratorMcpCapabilitiesResult,
   failure: OrchestratorMcpFailure,
@@ -95,7 +95,7 @@ const OrchestratorCapabilitiesTool = Tool.make("orchestrator_capabilities", {
 
 const DelegateTaskTool = Tool.make("delegate_task", {
   description:
-    "Start one child agent with only `task`. No parent history. Separate checkout or PR per child: `isolation:'worktree'`. Keep `taskId` for `task_status` and `task_cancel`. No secrets in `task`.",
+    "Start one child agent with only `task`; no parent history. `isolation:'worktree'` gives a separate checkout or PR. Keep `taskId` for status/cancel. No secrets in `task`.",
   parameters: OrchestratorMcpDelegateTaskInput,
   success: OrchestratorMcpDelegateTaskResult,
   failure: OrchestratorMcpFailure,

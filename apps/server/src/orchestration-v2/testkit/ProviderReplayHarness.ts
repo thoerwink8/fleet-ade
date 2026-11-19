@@ -6,6 +6,7 @@ import type {
   ManagedPolicyDocument,
   ProviderDriverKind,
   ProviderReplayTranscript,
+  ServerSettings as ContractServerSettings,
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -15,6 +16,7 @@ import * as PlatformError from "effect/PlatformError";
 import type * as Scope from "effect/Scope";
 import type * as SqlClient from "effect/sql/SqlClient";
 import type { MigrationError } from "effect/sql/Migrator";
+import type { DeepPartial } from "@t3tools/shared/Struct";
 import type { SqlError } from "effect/sql/SqlError";
 
 import * as CheckpointStore from "../../checkpointing/CheckpointStore.ts";
@@ -267,6 +269,23 @@ export function layerProviderReplay<Transcript extends ProviderReplayTranscript,
   return layerWithRegistry(scenario, layerRegistry, options);
 }
 
+export interface ProviderReplayHarnessOptions {
+  readonly databaseLayer?: Layer.Layer<
+    SqlClient.SqlClient,
+    MigrationError | PlatformError.PlatformError | SqlError
+  >;
+  readonly runEffectWorker?: boolean;
+  readonly runContinuationWorker?: boolean;
+  readonly recoverOnStartup?: boolean;
+  readonly continueThreadsAfterServerUpdate?: boolean;
+  readonly settingsOverrides?: DeepPartial<ContractServerSettings>;
+  /** Lets a test hold a projection read open to order concurrent dispatches. */
+  readonly wrapProjectionStore?: (
+    store: ProjectionStore.ProjectionStoreV2Shape,
+  ) => ProjectionStore.ProjectionStoreV2Shape;
+  readonly managedPolicy?: ManagedPolicyDocument;
+}
+
 export function layerWithRegistry<Error>(
   scenario: Pick<OrchestratorV2ProviderReplayScenario, "name" | "runtimePolicyOverride">,
   registryLayer: Layer.Layer<
@@ -274,21 +293,7 @@ export function layerWithRegistry<Error>(
     Error,
     McpProviderSessions.McpProviderSessions
   >,
-  options: {
-    readonly databaseLayer?: Layer.Layer<
-      SqlClient.SqlClient,
-      MigrationError | PlatformError.PlatformError | SqlError
-    >;
-    readonly runEffectWorker?: boolean;
-    readonly runContinuationWorker?: boolean;
-    readonly recoverOnStartup?: boolean;
-    readonly continueThreadsAfterServerUpdate?: boolean;
-    /** Lets a test hold a projection read open to order concurrent dispatches. */
-    readonly wrapProjectionStore?: (
-      store: ProjectionStore.ProjectionStoreV2Shape,
-    ) => ProjectionStore.ProjectionStoreV2Shape;
-    readonly managedPolicy?: ManagedPolicyDocument;
-  } = {},
+  options: ProviderReplayHarnessOptions = {},
 ): Layer.Layer<
   | Orchestrator.OrchestratorV2
   | EffectOutbox.EffectOutboxV2
@@ -324,6 +329,7 @@ export function layerWithRegistry<Error>(
           ...(options.continueThreadsAfterServerUpdate === undefined
             ? {}
             : { continueThreadsAfterServerUpdate: options.continueThreadsAfterServerUpdate }),
+          ...options.settingsOverrides,
         },
         policy.summary,
       ),

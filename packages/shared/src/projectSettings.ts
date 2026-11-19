@@ -4,6 +4,7 @@ import {
   PROJECT_SCOPED_SERVER_SETTING_KEYS,
   type ProjectFileBackedSettingKey,
   type ProjectId,
+  type DispatchRole,
   type ProjectScopedServerSettingKey,
   type ProjectSettingsOverrides,
   resolveProjectProviderInstanceEnabled,
@@ -256,5 +257,38 @@ export function resolveWorktreeCleanup(
     worktreeOnMerge,
     worktreeOnDelete,
     worktreeUnchanged,
+  };
+}
+
+const DISPATCH_ROLE_KEYS = {
+  code: "dispatchCodeModelSelection",
+  review: "dispatchReviewModelSelection",
+  readonly: "dispatchReadonlyModelSelection",
+  plan: "dispatchPlanModelSelection",
+} as const satisfies Record<DispatchRole, ProjectScopedServerSettingKey>;
+
+export interface ResolvedDispatchAssignment {
+  /** Empty cell and empty default are null. Otherwise the model a new delegation of that role uses. */
+  readonly roles: Readonly<Record<DispatchRole, ModelSelection | null>>;
+  /** Null does not cap open delegations. */
+  readonly concurrencyLimit: number | null;
+}
+
+/** Project cells cover only the keys that project wrote. An empty cell uses `defaultModelSelection`. */
+export function resolveDispatchAssignment(
+  settings: ServerSettings,
+  projectId: ProjectId | null,
+): ResolvedDispatchAssignment {
+  const resolved = resolveProjectSettings(settings, projectId).settings;
+  const fallback = resolved.defaultModelSelection;
+  const roleModel = (role: DispatchRole) => resolved[DISPATCH_ROLE_KEYS[role]] ?? fallback;
+  return {
+    roles: {
+      code: roleModel("code"),
+      review: roleModel("review"),
+      readonly: roleModel("readonly"),
+      plan: roleModel("plan"),
+    },
+    concurrencyLimit: resolved.dispatchConcurrencyLimit,
   };
 }

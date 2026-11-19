@@ -66,6 +66,8 @@ import {
   resolveProjectProviderInstanceEnabled,
   SECRET_REQUEST_UNSAVED_NOTE,
 } from "@t3tools/contracts";
+import { resolveDispatchAssignment } from "@t3tools/shared/projectSettings";
+import { OrchestratorDispatchConcurrencyLimitError } from "../orchestration-v2/Orchestrator.ts";
 import { getProviderOptionCurrentValue, withLegacyUltracodeEffort } from "@t3tools/shared/model";
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { runRanAfter } from "@t3tools/shared/orchestrationV2ThreadError";
@@ -235,6 +237,23 @@ const isThreadManagementError = Schema.is(ThreadManagementService.ThreadManageme
 
 function failure(code: OrchestratorMcpFailure["code"], message: string): OrchestratorMcpFailure {
   return new OrchestratorMcpFailure({ code, message });
+}
+
+const isConcurrencyLimit = Schema.is(OrchestratorDispatchConcurrencyLimitError);
+
+function delegationDispatchFailure(error: {
+  readonly _tag: string;
+  readonly message?: string;
+}): OrchestratorMcpFailure {
+  if (isConcurrencyLimit(error)) {
+    return new OrchestratorMcpFailure({
+      code: "concurrency-limit",
+      message: error.message,
+    });
+  }
+  return error._tag === "ThreadManagementProviderInstanceDisabledError"
+    ? threadManagementFailure(error)
+    : failure("orchestration_error", `Unable to create delegated task: ${errorMessage(error)}`);
 }
 
 function threadManagementFailure(error: unknown): OrchestratorMcpFailure {
@@ -1213,6 +1232,47 @@ const make = Effect.gen(function* () {
           ),
         )
       : Effect.succeed(project.defaultModelSelection);
+
+  const fillCommanderDispatchModel = Effect.fn("OrchestratorMcpService.fillCommanderDispatchModel")(
+    function* (
+      thread: {
+        readonly commander?: boolean | undefined;
+        readonly projectId: ProjectId;
+      },
+      input: OrchestratorMcpDelegateTaskInput,
+    ) {
+      const target = input.target;
+      if (
+        thread.commander !== true ||
+        target?.model !== undefined ||
+        target?.options !== undefined ||
+        target?.providerInstanceId !== undefined ||
+        target?.driverKind !== undefined
+      ) {
+        return input;
+      }
+      const settings = yield* serverSettings.getSettings.pipe(
+        Effect.mapError(() => failure("orchestration_error", "Unable to read server settings.")),
+      );
+      const role = input.dispatchRole ?? "code";
+      const selection = resolveDispatchAssignment(settings, thread.projectId).roles[role];
+      if (selection === null) {
+        return yield* failure(
+          "model_unavailable",
+          `Dispatch role ${role} has no model, and project ${thread.projectId} has no default model.`,
+        );
+      }
+      return {
+        ...input,
+        target: {
+          ...target,
+          providerInstanceId: selection.instanceId,
+          model: selection.model,
+          ...(selection.options === undefined ? {} : { options: selection.options }),
+        },
+      };
+    },
+  );
   const secretRequests = yield* SecretRequests.SecretRequests;
 
   const requireCapability = (scope: McpInvocationScope) =>
@@ -2468,6 +2528,9 @@ const make = Effect.gen(function* () {
           ) ?? [],
         runtimeMode: limits.runtimeMode,
         interactionMode: limits.interactionMode,
+        ...(parent?.thread.commander !== true
+          ? {}
+          : { dispatch: resolveDispatchAssignment(settings, parent.thread.projectId) }),
         providers: providers.map((provider) => {
           // Snapshots list instances any project enables; delegate_task checks the caller's project.
           const enabledForCaller =
@@ -2577,12 +2640,22 @@ const make = Effect.gen(function* () {
         operation: "delegate-task",
       });
       const isRetryOfAcceptedDelegation = yield* threadManagement.hasReceipt(commandId);
-      const target = yield* resolveTargetRechecking({
-        parent,
-        target: input.target,
-        providers,
-        skipProjectEnablementFilter: isRetryOfAcceptedDelegation,
-      });
+      const request = isRetryOfAcceptedDelegation
+        ? input
+        : yield* fillCommanderDispatchModel(parent.thread, input);
+      // A retry replays the accepted command. Resolving again would follow settings
+      // that no longer match the snapshot stored on that command.
+      const target = isRetryOfAcceptedDelegation
+        ? {
+            modelSelection: parent.thread.modelSelection,
+            supportedRuntimeModes: undefined,
+          }
+        : yield* resolveTargetRechecking({
+            parent,
+            target: request.target,
+            providers,
+            skipProjectEnablementFilter: false,
+          });
       const runtimeMode = yield* resolveRuntimeMode(
         parent.thread.runtimeMode,
         input.runtimeMode,
@@ -2645,16 +2718,7 @@ const make = Effect.gen(function* () {
           // gives up the wait (timeout, cancelled call) and upgrades the wake.
           completionWake: input.mode === "wait" ? "settled_only" : "always",
         })
-        .pipe(
-          Effect.mapError((error) =>
-            error._tag === "ThreadManagementProviderInstanceDisabledError"
-              ? threadManagementFailure(error)
-              : failure(
-                  "orchestration_error",
-                  `Unable to create delegated task: ${errorMessage(error)}`,
-                ),
-          ),
-        );
+        .pipe(Effect.mapError(delegationDispatchFailure));
       const taskEvent = result.storedEvents.find(
         (stored) =>
           stored.event.type === "subagent.updated" && stored.event.payload.origin === "app_owned",

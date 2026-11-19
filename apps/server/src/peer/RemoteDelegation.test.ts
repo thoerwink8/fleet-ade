@@ -25,6 +25,8 @@ import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
+import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -644,17 +646,24 @@ const makeLaptop = (
   >,
   /** The laptop's links from before a restart, which keep their sessions there. */
   kept?: Context.Context<Layer.Success<ReturnType<typeof layerLinkingEnvironment>>>,
+  replayOptions?: ProviderReplayHarness.ProviderReplayHarnessOptions,
 ) =>
   Effect.gen(function* () {
     const linking = kept ?? (yield* layerLinkingEnvironment(laptop).pipe(Layer.build));
     const layerDatabase = Layer.succeedContext(database);
     const layerOrchestrator = Layer.mergeAll(
       layerDatabase,
-      ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+      Layer.effect(
+        ProjectionStore.ProjectionStoreV2,
+        Effect.map(
+          ProjectionStore.ProjectionStoreV2,
+          (store) => replayOptions?.wrapProjectionStore?.(store) ?? store,
+        ),
+      ).pipe(Layer.provide(ProjectionStore.layer), Layer.provide(layerDatabase)),
       ProviderReplayHarness.layerWithRegistry(
         { name: "remote-delegation-laptop" },
         ProviderAdapterRegistry.layerFromAdapters([adapter]),
-        { databaseLayer: layerDatabase, runEffectWorker: false },
+        { databaseLayer: layerDatabase, runEffectWorker: false, ...replayOptions },
       ),
     ).pipe(
       Layer.provide(
@@ -1280,6 +1289,118 @@ it.effect("refuses worktree isolation for a task there before launching anything
       expect(result.isError).toBe(true);
       expect(JSON.stringify(result.content)).toContain("isolation");
       expect(yield* Ref.get(thread.launched)).toBeNull();
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+it.effect("refuses remote delegation at the local concurrency cap before launching", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const thread = yield* makeBoxThread;
+      const b = yield* serveBox(thread);
+      const offers = yield* SubscriptionRef.make<
+        ReadonlyArray<ProviderContinuationRequests.ProviderContinuationRequest>
+      >([]);
+      const database = yield* SqlitePersistence.layerMemory.pipe(Layer.build);
+      const a = yield* makeLaptop(database, offers);
+      yield* linkTo(a.links, b, "auto");
+      yield* seedParent(a);
+      yield* a.settings.updateSettings({ dispatchConcurrencyLimit: 1 });
+      yield* a.orchestrator.dispatch({
+        type: "thread.commander.mark",
+        commandId: CommandId.make("command:mark:laptop-parent"),
+        threadId: parentThreadId,
+      });
+
+      yield* delegateToBox(a);
+      const second = yield* a.call("delegate_task", {
+        task: "Run another suite on the box.",
+        target: {
+          environmentId: box.environmentId,
+          providerInstanceId: instanceId,
+          model: "gpt-5.4",
+        },
+        mode: "async",
+        clientRequestId: "second-suite-on-box",
+      });
+      expect(second.isError).toBe(true);
+      expect(JSON.stringify(second.content)).toContain("concurrency-limit");
+      expect(yield* Ref.get(thread.message)).toBe("Run the full suite on the box.");
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect("two fibers racing one open delegation slot accept one and refuse one", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const countArrivals = yield* Queue.unbounded<number>();
+      const releaseCounts = yield* Deferred.make<void>();
+      const countCalls = yield* Ref.make(0);
+      const thread = yield* makeBoxThread;
+      const b = yield* serveBox(thread);
+      const offers = yield* SubscriptionRef.make<
+        ReadonlyArray<ProviderContinuationRequests.ProviderContinuationRequest>
+      >([]);
+      const database = yield* SqlitePersistence.layerMemory.pipe(Layer.build);
+      const a = yield* makeLaptop(database, offers, undefined, {
+        settingsOverrides: { dispatchConcurrencyLimit: 1 },
+        wrapProjectionStore: (store) => ({
+          ...store,
+          countOpenAppOwnedDelegations: (parentThreadId) =>
+            Effect.gen(function* () {
+              const ordinal = yield* Ref.updateAndGet(countCalls, (count) => count + 1);
+              const open = yield* store.countOpenAppOwnedDelegations(parentThreadId);
+              if (ordinal === 1 || ordinal === 2) {
+                yield* Queue.offer(countArrivals, ordinal);
+                yield* Deferred.await(releaseCounts);
+              }
+              return open;
+            }),
+        }),
+      });
+      yield* linkTo(a.links, b, "full-access");
+      yield* seedParent(a);
+      yield* a.settings.updateSettings({ dispatchConcurrencyLimit: 1 });
+      yield* a.orchestrator.dispatch({
+        type: "thread.commander.mark",
+        commandId: CommandId.make("command:mark:laptop-parent"),
+        threadId: parentThreadId,
+      });
+
+      const delegate = (clientRequestId: string) =>
+        a.remote
+          .delegate(
+            { ...parentScope, thread: parentScope.thread! },
+            {
+              task: `Run ${clientRequestId} on the box.`,
+              target: {
+                environmentId: box.environmentId,
+                providerInstanceId: instanceId,
+                model: "gpt-5.4",
+              },
+              mode: "async",
+              clientRequestId,
+            },
+          )
+          .pipe(Effect.result);
+      const first = yield* delegate("first-suite-on-box").pipe(
+        Effect.forkChild({ startImmediately: true }),
+      );
+      const second = yield* delegate("second-suite-on-box").pipe(
+        Effect.forkChild({ startImmediately: true }),
+      );
+      expect(yield* Queue.take(countArrivals)).toBe(1);
+      expect(yield* Queue.take(countArrivals)).toBe(2);
+      expect(yield* Ref.get(thread.launched)).toBeNull();
+      yield* Deferred.succeed(releaseCounts, undefined);
+      const results = [yield* Fiber.join(first), yield* Fiber.join(second)];
+
+      const refused = results.filter(Result.isFailure);
+      const accepted = results.filter(Result.isSuccess);
+      expect(accepted).toHaveLength(1);
+      expect(refused).toHaveLength(1);
+      expect(refused[0]!.failure.code).toBe("concurrency-limit");
+      expect((yield* a.orchestrator.getThreadProjection(parentThreadId)).subagents).toHaveLength(1);
+      yield* Deferred.await(thread.interruptedOnce);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

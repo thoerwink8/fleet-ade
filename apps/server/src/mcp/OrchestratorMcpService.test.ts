@@ -1185,6 +1185,7 @@ describe("OrchestratorMcpService provider resolution", () => {
     readonly instanceId: ProviderInstanceId;
     readonly driver: ProviderDriverKind;
     readonly model?: string;
+    readonly models?: ReadonlyArray<string>;
     readonly enabled?: boolean;
   }): ServerProvider => ({
     instanceId: input.instanceId,
@@ -1196,10 +1197,12 @@ describe("OrchestratorMcpService provider resolution", () => {
     auth: { status: input.enabled === false ? "unknown" : "authenticated" },
     ...(input.enabled === false ? { message: "Provider is disabled in T3 Code settings." } : {}),
     checkedAt: "2026-09-13T00:00:00.000Z",
-    models:
-      input.model === undefined
-        ? []
-        : [{ slug: input.model, name: input.model, isCustom: false, capabilities: null }],
+    models: (input.models ?? (input.model === undefined ? [] : [input.model])).map((slug) => ({
+      slug,
+      name: slug,
+      isCustom: false,
+      capabilities: null,
+    })),
     slashCommands: [],
     skills: [],
   });
@@ -1258,6 +1261,14 @@ describe("OrchestratorMcpService provider resolution", () => {
       contextTransfers: [],
       subagents,
     }) as unknown as OrchestrationV2ThreadProjection;
+
+  const commanderProjection = (
+    subagents: ReadonlyArray<unknown>,
+    modelSelection: Parameters<typeof parentProjection>[1],
+  ): OrchestrationV2ThreadProjection => ({
+    ...parentProjection(subagents, modelSelection),
+    thread: { ...parentProjection(subagents, modelSelection).thread, commander: true },
+  });
 
   const childProjection = {
     thread: { id: childThreadId, title: "Child" },
@@ -2404,6 +2415,7 @@ describe("OrchestratorMcpService provider resolution", () => {
           Layer.provideMerge(layerSettings),
         );
         const waiting = yield* Deferred.make<void>();
+        const remoteInput = yield* Ref.make({ target: undefined as unknown });
         const layerWatchedThreads = Layer.effect(
           ThreadManagementService.ThreadManagementService,
           Effect.gen(function* () {
@@ -2431,6 +2443,7 @@ describe("OrchestratorMcpService provider resolution", () => {
             return Layer.mock(RemoteDelegation.RemoteDelegation)({
               delegate: (_scope, input) =>
                 Effect.gen(function* () {
+                  yield* Ref.set(remoteInput, { target: input.target });
                   const run = (yield* orchestrator.getThreadProjection(parentThreadId)).runs[0]!;
                   yield* orchestrator.dispatch({
                     type: "delegated_task.remote.request",
@@ -2508,6 +2521,10 @@ describe("OrchestratorMcpService provider resolution", () => {
           yield* Deferred.await(waiting);
           // A steered Claude parent cancels the tools/call, which interrupts this fiber.
           yield* Fiber.interrupt(call);
+          if (placement === "remote") {
+            const delegatedInput = yield* Ref.get(remoteInput);
+            assert.deepEqual(delegatedInput.target, { environmentId: remoteChild.environmentId });
+          }
           const parent = yield* orchestrator.getThreadProjection(parentThreadId);
           const task = parent.subagents.find((subagent) => subagent.origin === "app_owned");
           assert.equal(task?.status, "running");
@@ -3663,6 +3680,337 @@ describe("OrchestratorMcpService provider resolution", () => {
           options: [inherited.options[0]],
         });
       }).pipe(Effect.provide(layerOrchestratorService.pipe(Layer.provide(dependencies))));
+    }),
+  );
+
+  it.effect.each([
+    {
+      name: "review role",
+      dispatchRole: "review" as const,
+      overrides: {
+        dispatchReviewModelSelection: {
+          instanceId: "claudeAgent",
+          model: "claude-opus-4-6",
+        },
+      },
+      expected: { instanceId: "claudeAgent", model: "claude-opus-4-6" },
+    },
+    {
+      name: "default code role",
+      dispatchRole: undefined,
+      overrides: {
+        dispatchCodeModelSelection: {
+          instanceId: "claudeAgent",
+          model: "claude-sonnet-4-6",
+        },
+      },
+      expected: { instanceId: "claudeAgent", model: "claude-sonnet-4-6" },
+    },
+  ])(
+    "a commander's role cell supplies the model when the target leaves it out ($name)",
+    ({ dispatchRole, overrides, expected }) =>
+      Effect.gen(function* () {
+        const commands: Array<{ readonly modelSelection?: unknown }> = [];
+        const claudeInstanceId = ProviderInstanceId.make("claudeAgent");
+        const task = {
+          id: taskId,
+          threadId: parentThreadId,
+          origin: "app_owned",
+          childThreadId,
+          providerInstanceId: claudeInstanceId,
+          model: expected.model,
+          status: "running",
+          result: null,
+        };
+        const dependencies = Layer.mergeAll(
+          NodeServices.layer,
+          NodeCrypto.layer,
+          Layer.mock(ThreadManagementService.ThreadManagementService)({
+            hasReceipt: () => Effect.succeed(false),
+            assertProviderInstanceEnabled: () => Effect.void,
+            getThreadRecords: (threadId) =>
+              Effect.succeed(
+                threadId === childThreadId
+                  ? childProjection
+                  : commanderProjection([task], { instanceId: codexInstanceId, model: "gpt-5.4" }),
+              ),
+            dispatch: (command) =>
+              Effect.sync(() => {
+                commands.push(command as { readonly modelSelection?: unknown });
+                return {
+                  sequence: 1,
+                  storedEvents: [{ event: { type: "subagent.updated", payload: task } }],
+                } as never;
+              }),
+          }),
+          ServerSettings.layerTest(overrides),
+          providerRegistryLayer([
+            providerSnapshot({
+              instanceId: codexInstanceId,
+              driver: ProviderDriverKind.make("codex"),
+              model: "gpt-5.4",
+            }),
+            providerSnapshot({
+              instanceId: claudeInstanceId,
+              driver: ProviderDriverKind.make("claudeAgent"),
+              model: expected.model,
+            }),
+          ]),
+          adapterRegistryLayer([codexInstanceId, claudeInstanceId]),
+          Layer.mock(ProjectService.ProjectService)({}),
+          Layer.mock(SecretRequests.SecretRequests)({}),
+          Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+          Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+        );
+        yield* Effect.gen(function* () {
+          const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+          yield* service.delegateTask(scope, {
+            task: "Review the change.",
+            mode: "async",
+            clientRequestId: "role-cell",
+            ...(dispatchRole === undefined ? {} : { dispatchRole }),
+          });
+          assert.deepEqual(commands[0]?.modelSelection, expected);
+        }).pipe(Effect.provide(layerOrchestratorService.pipe(Layer.provide(dependencies))));
+      }),
+  );
+
+  it.effect("an explicit model overrides the commander's role cell only for that call", () =>
+    Effect.gen(function* () {
+      const commands: Array<{ readonly modelSelection?: unknown }> = [];
+      const claudeInstanceId = ProviderInstanceId.make("claudeAgent");
+      const task = {
+        id: taskId,
+        threadId: parentThreadId,
+        origin: "app_owned",
+        childThreadId,
+        providerInstanceId: claudeInstanceId,
+        model: "claude-opus-4-6",
+        status: "running",
+        result: null,
+      };
+      const dependencies = Layer.mergeAll(
+        NodeServices.layer,
+        NodeCrypto.layer,
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          hasReceipt: () => Effect.succeed(false),
+          assertProviderInstanceEnabled: () => Effect.void,
+          getThreadRecords: (threadId) =>
+            Effect.succeed(
+              threadId === childThreadId
+                ? childProjection
+                : commanderProjection([task], { instanceId: codexInstanceId, model: "gpt-5.4" }),
+            ),
+          dispatch: (command) =>
+            Effect.sync(() => {
+              commands.push(command as { readonly modelSelection?: unknown });
+              return {
+                sequence: 1,
+                storedEvents: [{ event: { type: "subagent.updated", payload: task } }],
+              } as never;
+            }),
+        }),
+        ServerSettings.layerTest({
+          dispatchCodeModelSelection: {
+            instanceId: claudeInstanceId,
+            model: "claude-sonnet-4-6",
+          },
+        }),
+        providerRegistryLayer([
+          providerSnapshot({
+            instanceId: codexInstanceId,
+            driver: ProviderDriverKind.make("codex"),
+            model: "gpt-5.4",
+          }),
+          providerSnapshot({
+            instanceId: claudeInstanceId,
+            driver: ProviderDriverKind.make("claudeAgent"),
+            models: ["claude-opus-4-6", "claude-sonnet-4-6"],
+          }),
+        ]),
+        adapterRegistryLayer([codexInstanceId, claudeInstanceId]),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+      );
+      yield* Effect.gen(function* () {
+        const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+        yield* service.delegateTask(scope, {
+          task: "Review the change.",
+          target: {
+            providerInstanceId: claudeInstanceId,
+            model: "claude-opus-4-6",
+          },
+          mode: "async",
+          clientRequestId: "explicit-once",
+        });
+        yield* service.delegateTask(scope, {
+          task: "Review the next change.",
+          mode: "async",
+          clientRequestId: "default-after",
+        });
+        assert.deepEqual(commands[0]?.modelSelection, {
+          instanceId: claudeInstanceId,
+          model: "claude-opus-4-6",
+        });
+        assert.deepEqual(commands[1]?.modelSelection, {
+          instanceId: claudeInstanceId,
+          model: "claude-sonnet-4-6",
+        });
+      }).pipe(Effect.provide(layerOrchestratorService.pipe(Layer.provide(dependencies))));
+    }),
+  );
+
+  it.effect("a retry replays the accepted delegation without re-reading the role cell", () =>
+    Effect.gen(function* () {
+      const commands: Array<{ readonly modelSelection?: unknown }> = [];
+      const claudeInstanceId = ProviderInstanceId.make("claudeAgent");
+      const accepted = yield* Ref.make(false);
+      const parentModelSelection = { instanceId: codexInstanceId, model: "gpt-5.4" };
+      const task = {
+        id: taskId,
+        threadId: parentThreadId,
+        origin: "app_owned",
+        childThreadId,
+        providerInstanceId: claudeInstanceId,
+        model: "claude-sonnet-4-6",
+        status: "running",
+        result: null,
+      };
+      const dependencies = Layer.mergeAll(
+        NodeServices.layer,
+        NodeCrypto.layer,
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          hasReceipt: () => Ref.get(accepted),
+          assertProviderInstanceEnabled: () => Effect.void,
+          getThreadRecords: (threadId) =>
+            Effect.succeed(
+              threadId === childThreadId
+                ? childProjection
+                : commanderProjection([task], parentModelSelection),
+            ),
+          dispatch: (command) =>
+            Effect.sync(() => {
+              commands.push(command as { readonly modelSelection?: unknown });
+              return {
+                sequence: 1,
+                storedEvents: [{ event: { type: "subagent.updated", payload: task } }],
+              } as never;
+            }),
+        }),
+        ServerSettings.layerTest({
+          dispatchCodeModelSelection: {
+            instanceId: claudeInstanceId,
+            model: "claude-sonnet-4-6",
+          },
+        }),
+        providerRegistryLayer([
+          providerSnapshot({
+            instanceId: codexInstanceId,
+            driver: ProviderDriverKind.make("codex"),
+            model: "gpt-5.4",
+          }),
+          providerSnapshot({
+            instanceId: claudeInstanceId,
+            driver: ProviderDriverKind.make("claudeAgent"),
+            model: "claude-sonnet-4-6",
+          }),
+        ]),
+        adapterRegistryLayer([codexInstanceId, claudeInstanceId]),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+      );
+      yield* Effect.gen(function* () {
+        const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+        yield* service.delegateTask(scope, {
+          task: "Review the change.",
+          mode: "async",
+          clientRequestId: "accepted-once",
+        });
+        yield* Ref.set(accepted, true);
+        const settings = yield* ServerSettings.ServerSettingsService;
+        yield* settings.updateSettings({
+          dispatchCodeModelSelection: {
+            instanceId: claudeInstanceId,
+            model: "claude-opus-4-6",
+          },
+        });
+        yield* service.delegateTask(scope, {
+          task: "Review the change.",
+          mode: "async",
+          clientRequestId: "accepted-once",
+        });
+        assert.deepEqual(commands[0]?.modelSelection, {
+          instanceId: claudeInstanceId,
+          model: "claude-sonnet-4-6",
+        });
+        // The retry skips resolution and re-dispatches the parent's snapshot; the
+        // sink replays the accepted command rather than the changed role cell.
+        assert.deepEqual(commands[1]?.modelSelection, parentModelSelection);
+      }).pipe(Effect.provide(layerOrchestratorService.pipe(Layer.provideMerge(dependencies))));
+    }),
+  );
+
+  it.effect("maps a dispatch-level concurrency refusal to concurrency-limit", () =>
+    Effect.gen(function* () {
+      const dependencies = Layer.mergeAll(
+        NodeServices.layer,
+        NodeCrypto.layer,
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          hasReceipt: () => Effect.succeed(false),
+          assertProviderInstanceEnabled: () => Effect.void,
+          getThreadRecords: (threadId) =>
+            Effect.succeed(
+              threadId === parentThreadId
+                ? commanderProjection([], { instanceId: codexInstanceId, model: "gpt-5.4" })
+                : childProjection,
+            ),
+          dispatch: () =>
+            new Orchestrator.OrchestratorDispatchConcurrencyLimitError({
+              commandId: CommandId.make("command:mcp-limit"),
+              threadId: parentThreadId,
+              open: 1,
+              limit: 1,
+            }),
+        }),
+        ServerSettings.layerTest({
+          dispatchCodeModelSelection: {
+            instanceId: ProviderInstanceId.make("claudeAgent"),
+            model: "claude-sonnet-4-6",
+          },
+        }),
+        providerRegistryLayer([
+          providerSnapshot({
+            instanceId: codexInstanceId,
+            driver: ProviderDriverKind.make("codex"),
+            model: "gpt-5.4",
+          }),
+          providerSnapshot({
+            instanceId: ProviderInstanceId.make("claudeAgent"),
+            driver: ProviderDriverKind.make("claudeAgent"),
+            model: "claude-sonnet-4-6",
+          }),
+        ]),
+        adapterRegistryLayer([codexInstanceId, ProviderInstanceId.make("claudeAgent")]),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+      );
+      const error = yield* Effect.gen(function* () {
+        const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+        return yield* service
+          .delegateTask(scope, {
+            task: "Review the change.",
+            mode: "async",
+            clientRequestId: "limited",
+          })
+          .pipe(Effect.flip);
+      }).pipe(Effect.provide(layerOrchestratorService.pipe(Layer.provide(dependencies))));
+      assert.equal(error.code, "concurrency-limit");
     }),
   );
 
