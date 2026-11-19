@@ -141,7 +141,6 @@ const ClientIdPayload = Schema.Struct({
   v: Schema.Literal(1),
   n: Schema.String,
   r: Schema.Array(Schema.String),
-  /** Registered as another T3 Code environment's peer link. */
   p: Schema.optionalKey(Schema.Literal(1)),
 });
 const decodeClientIdPayload = Schema.decodeUnknownOption(Schema.fromJsonString(ClientIdPayload));
@@ -271,7 +270,12 @@ const make = Effect.gen(function* () {
 
   const signClientId = (name: string, redirectUris: ReadonlyArray<string>, peerLink: boolean) => {
     const body = base64UrlEncode(
-      JSON.stringify({ v: 1, n: name, r: redirectUris, ...(peerLink ? { p: 1 } : {}) }),
+      JSON.stringify({
+        v: 1,
+        n: name,
+        r: redirectUris,
+        ...(peerLink ? { p: 1 } : {}),
+      }),
     );
     return sign("mcp-client-id", body).pipe(Effect.map((signature) => `${body}.${signature}`));
   };
@@ -457,19 +461,22 @@ const make = Effect.gen(function* () {
           description: "Linking needs a plain pairing code, not an app approval code.",
         });
       }
-      access = yield* environmentAuth.consumeMcpApprovalCode(decision.code, decision.access).pipe(
-        Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (cause) =>
-          Effect.logError("MCP approval code check failed.", { cause }).pipe(
-            Effect.andThen(
-              Effect.fail(
-                new McpOAuthPageError({
-                  description: "The code could not be checked. Try again.",
-                }),
+      const consumed = yield* environmentAuth
+        .consumeMcpApprovalCode(decision.code, decision.access)
+        .pipe(
+          Effect.catchIf(EnvironmentAuth.isServerAuthInternalError, (cause) =>
+            Effect.logError("MCP approval code check failed.", { cause }).pipe(
+              Effect.andThen(
+                Effect.fail(
+                  new McpOAuthPageError({
+                    description: "The code could not be checked. Try again.",
+                  }),
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
+      access = consumed.access;
     } else {
       const session = yield* approvingSession(input.request, input.authorization);
       if (
@@ -606,6 +613,9 @@ export const layerMcpClientAuthenticator = Layer.effect(
                     label: client.label,
                     access: client.access,
                     linked: client.peerLink,
+                    ...(client.environmentId === undefined
+                      ? {}
+                      : { environmentId: client.environmentId }),
                     ...(Option.isSome(hostedAppUrl) && !client.peerLink
                       ? { hostedAppUrl: hostedAppUrl.value }
                       : {}),

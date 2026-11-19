@@ -99,6 +99,7 @@ export const migrate = Effect.gen(function* () {
           issue INTEGER NOT NULL,
           task_id TEXT NOT NULL DEFAULT 'root',
           claimed_by TEXT NOT NULL,
+          holder_environment TEXT,
           lease_until TEXT NOT NULL,
           executor TEXT,
           state TEXT NOT NULL DEFAULT 'running',
@@ -136,15 +137,16 @@ export const migrate = Effect.gen(function* () {
           : sql`NULL`;
         yield* sql`
           INSERT INTO node_claims (
-            fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing,
-            attempt, claim_idempotency_key, renew_idempotency_key, renew_lease_until,
-            release_idempotency_key
+            fleet_id, repo, issue, task_id, claimed_by, holder_environment, lease_until, executor,
+            state, fencing, attempt, claim_idempotency_key, renew_idempotency_key,
+            renew_lease_until, release_idempotency_key
           )
-          SELECT fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing,
-            attempt, claim_idempotency_key, renew_idempotency_key, renew_lease_until,
-            release_idempotency_key
+          SELECT fleet_id, repo, issue, task_id, claimed_by, holder_environment, lease_until,
+            executor, state, fencing, attempt, claim_idempotency_key, renew_idempotency_key,
+            renew_lease_until, release_idempotency_key
           FROM (
             SELECT ${fleetId} AS fleet_id, repo, issue, ${taskId} AS task_id, claimed_by,
+              ${sourceNames.has("holder_environment") ? sql`holder_environment` : sql`NULL`} AS holder_environment,
               lease_until, executor, COALESCE(state, 'running') AS state, fencing,
               ${attempt} AS attempt, ${claimKey} AS claim_idempotency_key,
               ${renewKey} AS renew_idempotency_key, ${renewUntil} AS renew_lease_until,
@@ -164,6 +166,12 @@ export const migrate = Effect.gen(function* () {
         CREATE INDEX IF NOT EXISTS idx_node_claims_holder
         ON node_claims (claimed_by, state)
       `;
+      const migrated = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
+        readonly name: string;
+      }[];
+      if (!migrated.some((column) => column.name === "holder_environment")) {
+        yield* sql`ALTER TABLE node_claims ADD COLUMN holder_environment TEXT`;
+      }
     }),
   );
 });

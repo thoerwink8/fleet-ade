@@ -165,16 +165,6 @@ import {
   withLateConfigDiscovery,
 } from "./ws.ts";
 import * as PipelineRuns from "./pipeline/PipelineRuns.ts";
-import * as FleetClaims from "./ledger/FleetClaims.ts";
-
-const fleetClaimsStub = Layer.succeed(
-  FleetClaims.FleetClaims,
-  FleetClaims.FleetClaims.of({
-    claim: () => Effect.succeed({ outcome: "claimed" as const, claim: null }),
-    renew: () => Effect.succeed({ outcome: "renewed" as const, claim: null }),
-    release: () => Effect.succeed({ outcome: "released" as const, claim: null }),
-  }),
-);
 
 const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
   makeLayerWsRpc(...args).pipe(
@@ -201,7 +191,6 @@ const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
         }),
       ),
     ),
-    Layer.provide(fleetClaimsStub),
   );
 
 const snapshotConfig = (fields: Partial<ServerConfig>) =>

@@ -570,6 +570,7 @@ const changeRequest = (number: number, headSha: string): ChangeRequest =>
     updatedAt: Option.none(),
   }) as ChangeRequest;
 
+const claimKey = { repo: "acme/widgets", issue: 6, taskId: "root" };
 const openerLayer = (input: {
   readonly listed: Effect.Effect<ReadonlyArray<ChangeRequest>>;
   readonly onCreate: (bodyFile: string) => Effect.Effect<void>;
@@ -642,6 +643,7 @@ describe("PullRequestOpener", () => {
           title: "fix tests",
           issueBody: issue(6).body,
           headSha: SHA,
+          claimKey,
         });
         assert.strictEqual(opened.number, 21);
         assert.strictEqual(opened.headSha, SHA);
@@ -682,6 +684,7 @@ describe("PullRequestOpener", () => {
           title: "fix tests",
           issueBody: issue(6).body,
           headSha: SHA,
+          claimKey,
         });
         assert.strictEqual(opened.number, 21);
         assert.deepStrictEqual(yield* Ref.get(created), []);
@@ -711,6 +714,7 @@ describe("PullRequestOpener", () => {
             title: "fix tests",
             issueBody: issue(6).body,
             headSha: SHA,
+            claimKey,
           })
           .pipe(Effect.flip);
         assert.strictEqual(error._tag, "PullRequestOpenError");
@@ -754,6 +758,7 @@ describe("PullRequestOpener", () => {
           title: "fix tests",
           issueBody,
           headSha: SHA,
+          claimKey,
         });
       }).pipe(
         Effect.provide(

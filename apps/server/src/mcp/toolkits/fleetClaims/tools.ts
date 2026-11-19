@@ -1,6 +1,8 @@
 import {
   FleetClaimClaimInput,
   FleetClaimClaimResult,
+  FleetClaimHeartbeatInput,
+  FleetClaimHeartbeatResult,
   FleetClaimLeaseInput,
   FleetClaimLeaseResult,
   OrchestratorMcpFailure,
@@ -54,4 +56,23 @@ const FleetReleaseTool = Tool.make("fleet_release", {
   .annotate(Tool.Idempotent, true)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
 
-export const FleetClaimsToolkit = Toolkit.make(FleetClaimTool, FleetRenewTool, FleetReleaseTool);
+const FleetHeartbeatTool = Tool.make("fleet_heartbeat", {
+  description: "Renews every fleet lease this linked environment still holds, in one request.",
+  parameters: FleetClaimHeartbeatInput,
+  success: FleetClaimHeartbeatResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies,
+})
+  .annotate(Tool.Title, "Heartbeat fleet leases")
+  .annotate(Tool.Readonly, false)
+  .annotate(Tool.Destructive, true)
+  .annotate(Tool.Idempotent, true)
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
+
+export const FleetClaimsToolkit = Toolkit.make(
+  FleetClaimTool,
+  FleetRenewTool,
+  FleetReleaseTool,
+  FleetHeartbeatTool,
+);

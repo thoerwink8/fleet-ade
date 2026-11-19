@@ -1,4 +1,4 @@
-import { PipelineRunsError, ServerSettingsError } from "@t3tools/contracts";
+import { FleetClaimKey, PipelineRunsError, ServerSettingsError } from "@t3tools/contracts";
 import * as GitHubRest from "@t3tools/source-control-github/server/GitHubRest";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -135,6 +135,7 @@ export interface PullRequestDraft {
   /** 任务单原文。改动一节只从这里的「怎么算做完」取。 */
   readonly issueBody: string;
   readonly headSha: string;
+  readonly claimKey: FleetClaimKey;
 }
 
 /**
@@ -185,7 +186,6 @@ const makeOpener = Effect.gen(function* () {
   const registry = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-
   const open = Effect.fn("OpenPullRequest.open")(function* (draft: PullRequestDraft) {
     const logged = yield* driver
       .execute({
@@ -335,7 +335,6 @@ const make = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const opener = yield* PullRequestOpener;
   const reader = yield* CiCheckReader;
-
   const writeDetail = (
     issueNumber: number,
     current: string | null,
@@ -381,7 +380,6 @@ const make = Effect.gen(function* () {
         yield* writeDetail(run.issueNumber, run.detail, UNREAD, run.repository);
         continue;
       }
-
       let headSha = run.headSha;
       let status = run.status;
       if (run.prNumber === null) {
@@ -402,6 +400,7 @@ const make = Effect.gen(function* () {
             title: run.title,
             issueBody: issue.value.body,
             headSha,
+            claimKey: { repo: repo.slug, issue: run.issueNumber, taskId: "root" },
           })
           .pipe(Effect.exit);
         if (Exit.isFailure(opened)) {
@@ -487,7 +486,6 @@ const make = Effect.gen(function* () {
 });
 
 export const layer = Layer.effect(OpenPullRequest, make);
-
 export const layerLive = layer.pipe(
   Layer.provide(layerOpener),
   Layer.provide(layerReader),

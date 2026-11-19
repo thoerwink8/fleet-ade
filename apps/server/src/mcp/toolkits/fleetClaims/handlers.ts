@@ -17,6 +17,11 @@ const linkedClient = McpInvocationContext.McpInvocationContext.pipe(
   ),
 );
 
+const missingLinkedEnvironment = () =>
+  new OrchestratorMcpFailure({
+    code: "invalid_request",
+    message: "旧链接，请重新链接",
+  });
 const fromFleetClaimsError = (error: FleetClaimsError) =>
   new OrchestratorMcpFailure({
     code: error.reason === "unknown-repo" ? "invalid_request" : "orchestration_error",
@@ -27,27 +32,44 @@ const handlers = {
   fleet_claim: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
-        .claim(scope.client!.sessionId, input)
+        .claim({ sessionId: scope.client!.sessionId, environmentId }, input)
         .pipe(Effect.mapError(fromFleetClaimsError));
     }),
   ),
   fleet_renew: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
-        .renew(scope.client!.sessionId, input)
+        .renew({ sessionId: scope.client!.sessionId, environmentId }, input)
         .pipe(Effect.mapError(fromFleetClaimsError));
     }),
   ),
   fleet_release: McpToolAccess.writesForLinkedClient((input) =>
     Effect.gen(function* () {
       const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
       const claims = yield* FleetClaims.FleetClaims;
       return yield* claims
-        .release(scope.client!.sessionId, input)
+        .release({ sessionId: scope.client!.sessionId, environmentId }, input)
+        .pipe(Effect.mapError(fromFleetClaimsError));
+    }),
+  ),
+  fleet_heartbeat: McpToolAccess.writesForLinkedClient((input) =>
+    Effect.gen(function* () {
+      const scope = yield* linkedClient;
+      const environmentId = scope.client?.environmentId;
+      if (environmentId === undefined) return yield* missingLinkedEnvironment();
+      const claims = yield* FleetClaims.FleetClaims;
+      return yield* claims
+        .heartbeat(environmentId, input)
         .pipe(Effect.mapError(fromFleetClaimsError));
     }),
   ),

@@ -60,6 +60,7 @@ export interface VerifiedSession {
   readonly runtimeModeCeiling?: RuntimeMode;
   /** An MCP client that is another T3 Code environment's peer link. */
   readonly peerLink?: true;
+  readonly peerIdentity?: string;
 }
 
 export interface VerifiedWebSocketTicket extends VerifiedSession {
@@ -439,6 +440,7 @@ const SessionClaims = Schema.Struct({
   rtc: Schema.optionalKey(RuntimeMode),
   /** Signed, so a client cannot shed its peer link's limits. */
   plk: Schema.optionalKey(Schema.Literal(1)),
+  env: Schema.optionalKey(Schema.String),
   iat: Schema.Number,
   exp: Schema.Number,
 });
@@ -662,6 +664,7 @@ const make = Effect.gen(function* () {
         ...(input?.proofKeyThumbprint ? { jkt: input.proofKeyThumbprint } : {}),
         ...(input?.runtimeModeCeiling ? { rtc: input.runtimeModeCeiling } : {}),
         ...(input?.peerLink === true ? { plk: 1 as const } : {}),
+        ...(input?.peerLink === true ? { env: sessionId } : {}),
         iat: issuedAt.epochMilliseconds,
         exp: expiresAt.epochMilliseconds,
       };
@@ -687,6 +690,7 @@ const make = Effect.gen(function* () {
         subject: claims.sub,
         scopes: claims.scopes,
         method: claims.method,
+        peerLink: claims.plk === 1,
         client: {
           label: client.label ?? null,
           ipAddress: client.ipAddress ?? null,
@@ -844,6 +848,7 @@ const make = Effect.gen(function* () {
         ...(claims.jkt ? { proofKeyThumbprint: claims.jkt } : {}),
         ...(claims.rtc ? { runtimeModeCeiling: claims.rtc } : {}),
         ...(claims.plk === 1 ? { peerLink: true as const } : {}),
+        ...(claims.env !== undefined ? { peerIdentity: claims.env } : {}),
       } satisfies VerifiedSession;
     },
   );

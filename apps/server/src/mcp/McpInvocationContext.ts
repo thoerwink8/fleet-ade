@@ -41,6 +41,8 @@ export interface McpClientCaller {
    * session as `linkOrigin`, and it changes only that work (`linkOrigin.ts`).
    */
   readonly linked?: boolean | undefined;
+  /** Environment id signed into this peer link. Not taken from the tool arguments. */
+  readonly environmentId?: string;
   /**
    * Narrower modes the client asked for on this request (`T3-Mode-Limit`):
    * another environment passing on the limits of the agent it calls for.
