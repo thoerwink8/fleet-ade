@@ -24,6 +24,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
@@ -39,6 +40,7 @@ import {
   resolveRuntimeMode,
   taskPrompt,
 } from "../mcp/delegatedTaskModes.ts";
+import { OrchestratorDispatchConcurrencyLimitError } from "../orchestration-v2/Orchestrator.ts";
 import { followUpOwnerRun } from "../orchestration-v2/CommandPolicy.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
@@ -48,6 +50,14 @@ import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolv
 import { forkParked } from "../serverActivation.ts";
 import * as PeerForwarding from "./PeerForwarding.ts";
 import * as PeerLinks from "./PeerLinks.ts";
+
+export function remoteDelegateCommandId(requestNamespace: string, key: string): CommandId {
+  return CommandId.make(
+    `command:mcp:${encodeURIComponent(requestNamespace)}:remote-delegate:${encodeURIComponent(key)}`,
+  );
+}
+
+const isConcurrencyLimit = Schema.is(OrchestratorDispatchConcurrencyLimitError);
 
 /** How long one follow of a remote task waits on its thread there before checking again. */
 const FOLLOW_WAIT_MS = 10 * 60 * 1_000;
@@ -253,6 +263,7 @@ const make = Effect.gen(function* () {
 
   const delegate: RemoteDelegation["Service"]["delegate"] = Effect.fn("RemoteDelegation.delegate")(
     function* (scope, input) {
+      const { target } = input;
       const parent = yield* threads.getThreadRecords(scope.thread.threadId, ["runs"]).pipe(
         Effect.mapError(
           () =>
@@ -276,7 +287,6 @@ const make = Effect.gen(function* () {
         });
       }
       const parentNodeId = parentRun.rootNodeId;
-      const { target } = input;
       // A worktree there would branch from a commit this checkout has and the
       // other may not, so a remote task runs in that project's checkout.
       if (input.isolation === "worktree") {
@@ -286,19 +296,28 @@ const make = Effect.gen(function* () {
             'A task in a linked environment runs in that project\'s checkout; isolation "worktree" is not supported there. Omit isolation, or use t3_thread_launch with environmentId and a worktree workspaceStrategy.',
         });
       }
-      // The provider and model inherit as they do for a task here. Another
-      // provider there has no model to inherit, so the caller names one.
+      const dispatchSelection =
+        input.dispatchRole === undefined ||
+        target.model !== undefined ||
+        target.options !== undefined ||
+        target.providerInstanceId !== undefined ||
+        target.driverKind !== undefined
+          ? undefined
+          : (yield* forwarding.call(scope, RemoteCapabilitiesTool, target.environmentId, {}))
+              .dispatch?.roles[input.dispatchRole];
       const inherited = parent.thread.modelSelection;
       const instanceId =
         target.driverKind === undefined
-          ? (target.providerInstanceId ?? inherited.instanceId)
+          ? (target.providerInstanceId ?? dispatchSelection?.instanceId ?? inherited.instanceId)
           : yield* resolveRemoteInstance(scope, target.environmentId, {
               driverKind: target.driverKind,
               providerInstanceId: target.providerInstanceId,
               inheritedInstanceId: inherited.instanceId,
             });
       const model =
-        target.model ?? (instanceId === inherited.instanceId ? inherited.model : undefined);
+        target.model ??
+        dispatchSelection?.model ??
+        (instanceId === inherited.instanceId ? inherited.model : undefined);
       if (model === undefined) {
         return yield* new OrchestratorMcpFailure({
           code: "target_required",
@@ -307,6 +326,7 @@ const make = Effect.gen(function* () {
       }
       const options =
         target.options ??
+        dispatchSelection?.options ??
         (instanceId === inherited.instanceId && model === inherited.model
           ? inherited.options
           : undefined);
@@ -357,9 +377,7 @@ const make = Effect.gen(function* () {
         Effect.map(Option.getOrUndefined),
         Effect.orElseSucceed(() => undefined),
       );
-      const commandId = CommandId.make(
-        `command:mcp:${encodeURIComponent(scope.requestNamespace)}:remote-delegate:${encodeURIComponent(key)}`,
-      );
+      const commandId = remoteDelegateCommandId(scope.requestNamespace, key);
       const remoteChild: OrchestrationV2RemoteTaskChild = {
         environmentId: target.environmentId,
         threadId: launched.threadId,
@@ -390,12 +408,16 @@ const make = Effect.gen(function* () {
               cause,
             }),
           ),
-          Effect.mapError(
-            () =>
-              new OrchestratorMcpFailure({
-                code: "orchestration_error",
-                message: "Unable to record the delegated task.",
-              }),
+          Effect.mapError((cause) =>
+            isConcurrencyLimit(cause)
+              ? new OrchestratorMcpFailure({
+                  code: "concurrency-limit",
+                  message: cause.message,
+                })
+              : new OrchestratorMcpFailure({
+                  code: "orchestration_error",
+                  message: "Unable to record the delegated task.",
+                }),
           ),
           // Nothing here follows a thread the task was never recorded for, so stop it there.
           // A crash between the launch and this record still leaves it running there

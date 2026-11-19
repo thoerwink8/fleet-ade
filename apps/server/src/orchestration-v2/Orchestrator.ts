@@ -27,6 +27,8 @@ import {
   isOrchestrationV2WorkActive,
   isProviderNativeSubagentThread,
   MessageId,
+  NonNegativeInt,
+  PositiveInt,
   type NodeId,
   type ModelSelection,
   OrchestrationV2Command,
@@ -78,6 +80,7 @@ import {
   managedRuntimeModeCeilingMessage,
 } from "@t3tools/contracts";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { modelSwitchSince } from "./modelSwitch.ts";
 import { combinePullRequestWatchWakes, type PullRequestWatchWake } from "./pullRequestWatch.ts";
@@ -326,6 +329,20 @@ export class OrchestratorRuntimeModeAboveCeilingError extends Schema.TaggedError
   }
 }
 
+export class OrchestratorDispatchConcurrencyLimitError extends Schema.TaggedError<OrchestratorDispatchConcurrencyLimitError>()(
+  "OrchestratorDispatchConcurrencyLimitError",
+  {
+    commandId: CommandId,
+    threadId: ThreadId,
+    open: NonNegativeInt,
+    limit: PositiveInt,
+  },
+) {
+  override get message(): string {
+    return `Commander thread ${this.threadId} already has ${this.open} accepted delegations; the limit is ${this.limit}.`;
+  }
+}
+
 export class OrchestratorCommandPreviouslyRejectedError extends Schema.TaggedError<OrchestratorCommandPreviouslyRejectedError>()(
   "OrchestratorCommandPreviouslyRejectedError",
   {
@@ -366,6 +383,7 @@ export const OrchestratorV2Error = Schema.Union([
   OrchestratorThreadAboveModeLimitError,
   OrchestratorProviderSelectionBusyError,
   OrchestratorRuntimeModeAboveCeilingError,
+  OrchestratorDispatchConcurrencyLimitError,
 ]);
 export type OrchestratorV2Error = typeof OrchestratorV2Error.Type;
 
@@ -9010,6 +9028,36 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     yield* Ref.update(effects, (existing) => [...existing, pendingEffect]);
   });
 
+  const refuseCommanderConcurrency = Effect.fn("orchestrationV2.dispatch.commanderConcurrency")(
+    function* (
+      command: {
+        readonly commandId: CommandId;
+        readonly parentThreadId: ThreadId;
+      },
+      thread: Pick<OrchestrationV2ThreadProjection["thread"], "commander" | "projectId">,
+    ) {
+      if (thread.commander !== true) return;
+      const settings = yield* serverSettings.getSettings.pipe(Effect.orDie);
+      const limit = resolveProjectSettings(settings, thread.projectId).settings
+        .dispatchConcurrencyLimit;
+      if (limit === null) return;
+      const open = yield* projectionStore
+        .countOpenAppOwnedDelegations(command.parentThreadId)
+        .pipe(
+          Effect.mapError(
+            (cause) => new OrchestratorProjectionError({ threadId: command.parentThreadId, cause }),
+          ),
+        );
+      if (open < limit) return;
+      return yield* new OrchestratorDispatchConcurrencyLimitError({
+        commandId: command.commandId,
+        threadId: command.parentThreadId,
+        open,
+        limit,
+      });
+    },
+  );
+
   const dispatchDelegatedTaskRequest = Effect.fn("orchestrationV2.dispatch.delegatedTaskRequest")(
     function* (
       command: Extract<OrchestrationV2Command, { readonly type: "delegated_task.request" }>,
@@ -9063,6 +9111,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           cause: `Parent node ${command.parentNodeId} is not part of active run ${parentRun.id}.`,
         });
       }
+      yield* refuseCommanderConcurrency(command, parentProjection.thread);
 
       const targetAdapter = yield* providerAdapters.get(command.modelSelection.instanceId).pipe(
         Effect.mapError(
@@ -9126,6 +9175,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         prompt: command.task,
         title: command.title ?? null,
         model: command.modelSelection.model,
+        modelSelection: command.modelSelection,
         ...(command.completionWake === undefined ? {} : { completionWake: command.completionWake }),
         status: "running",
         result: null,
@@ -9495,6 +9545,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cause: `Parent run ${command.parentRunId} is stopping.`,
       });
     }
+    yield* refuseCommanderConcurrency(command, parentProjection.thread);
     const now = yield* DateTime.now;
     const taskNodeId = idAllocator.derive.delegatedTaskNode({ commandId: command.commandId });
     const taskTurnItemId = idAllocator.derive.delegatedTaskTurnItem({
@@ -9555,6 +9606,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         prompt: command.task,
         title: command.title ?? null,
         model: command.modelSelection.model,
+        modelSelection: command.modelSelection,
         ...(command.completionWake === undefined ? {} : { completionWake: command.completionWake }),
         status: "running",
         result: null,
@@ -15116,7 +15168,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           // Refusals depend on modes the user can change; a recorded rejection would block the retry.
           if (
             cause._tag === "OrchestratorThreadAboveModeLimitError" ||
-            cause._tag === "OrchestratorRuntimeModeAboveCeilingError"
+            cause._tag === "OrchestratorRuntimeModeAboveCeilingError" ||
+            cause._tag === "OrchestratorDispatchConcurrencyLimitError"
           ) {
             return yield* cause;
           }

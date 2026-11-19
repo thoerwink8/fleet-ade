@@ -9,6 +9,7 @@ import { createModelSelection } from "./model.ts";
 import {
   clearProjectSettingsOverrides,
   hasProjectSettingsOverrides,
+  resolveDispatchAssignment,
   resolveNewThreadEnvMode,
   resolveProjectSettings,
   resolveSendEnvMode,
@@ -181,6 +182,40 @@ describe("resolveProjectSettings", () => {
     expect(
       resolveProjectSettings(settings, projectId).settings.textGenerationModelSelection.instanceId,
     ).toBe(codexWork);
+  });
+});
+
+describe("resolveDispatchAssignment", () => {
+  it("uses project role cells and falls back to the default model", () => {
+    const defaultSelection = createModelSelection(ProviderInstanceId.make("codex"), "default");
+    const reviewSelection = createModelSelection(ProviderInstanceId.make("claudeAgent"), "review");
+    const settings = applyServerSettingsPatch(
+      {
+        ...DEFAULT_SERVER_SETTINGS,
+        defaultModelSelection: defaultSelection,
+        dispatchConcurrencyLimit: 3,
+      },
+      {
+        projectSettingsOverrides: {
+          [projectId]: {
+            dispatchCodeModelSelection: null,
+            dispatchReviewModelSelection: reviewSelection,
+            dispatchConcurrencyLimit: 5,
+          },
+        },
+      },
+    );
+    const resolved = resolveDispatchAssignment(settings, projectId);
+    expect(resolved.roles.code).toEqual(defaultSelection);
+    expect(resolved.roles.review).toEqual(reviewSelection);
+    expect(resolved.roles.readonly).toEqual(defaultSelection);
+    expect(resolved.roles.plan).toEqual(defaultSelection);
+    expect(resolved.concurrencyLimit).toBe(5);
+  });
+
+  it("uses the environment cap when the project has no override", () => {
+    const settings = { ...DEFAULT_SERVER_SETTINGS, dispatchConcurrencyLimit: 3 };
+    expect(resolveDispatchAssignment(settings, otherProjectId).concurrencyLimit).toBe(3);
   });
 });
 

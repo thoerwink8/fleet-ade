@@ -61,7 +61,11 @@ const layerTest = Layer.mergeAll(
   ProviderReplayHarness.layerWithRegistry(
     { name: "control-reads" },
     ProviderAdapterRegistry.layerFromAdapters([adapter]),
-    { databaseLayer: layerDatabase, runEffectWorker: false },
+    {
+      databaseLayer: layerDatabase,
+      runEffectWorker: false,
+      settingsOverrides: { dispatchConcurrencyLimit: 1 },
+    },
   ),
 );
 
@@ -1282,6 +1286,77 @@ it.effect("keeps delegated child pull-request links independent of the parent", 
     const parentAfterChildLink = yield* projections.getThreadProjection(parentThreadId);
     assert.deepEqual(parentAfterChildLink.thread.linkedPullRequest, parentPullRequest);
     assert.deepEqual(parentAfterChildLink.thread.pullRequests, parent.thread.pullRequests);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("counts accepted queued delegations against the commander limit", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const parentThreadId = ThreadId.make("thread:commander-limit");
+    const projectId = ProjectId.make("project:commander-limit");
+    yield* orchestrator.dispatch({
+      type: "thread.create",
+      commandId: CommandId.make("create-commander-limit"),
+      threadId: parentThreadId,
+      projectId,
+      title: "Commander",
+      modelSelection,
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      branch: null,
+      worktreePath: null,
+      createdBy: "user",
+      creationSource: "web",
+    });
+    yield* orchestrator.dispatch({
+      type: "thread.commander.mark",
+      commandId: CommandId.make("mark-commander-limit"),
+      threadId: parentThreadId,
+    });
+    assert.equal((yield* projections.getThreadProjection(parentThreadId)).thread.commander, true);
+    yield* orchestrator.dispatch({
+      type: "message.dispatch",
+      commandId: CommandId.make("start-commander-limit"),
+      threadId: parentThreadId,
+      messageId: MessageId.make("message:commander-limit"),
+      text: "Delegate two tasks",
+      attachments: [],
+      dispatchMode: { type: "start_immediately" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const parentRun = (yield* projections.getThreadProjection(parentThreadId)).runs[0]!;
+    const delegation = {
+      type: "delegated_task.request" as const,
+      parentThreadId,
+      parentRunId: parentRun.id,
+      parentNodeId: parentRun.rootNodeId!,
+      task: "Review the changes",
+      modelSelection,
+      runtimeMode: "full-access" as const,
+      interactionMode: "default" as const,
+      createdBy: "agent" as const,
+      creationSource: "mcp" as const,
+    };
+    yield* orchestrator.dispatch({
+      ...delegation,
+      commandId: CommandId.make("delegate-commander-limit-first"),
+    });
+    const accepted = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
+    assert.deepEqual(accepted.modelSelection, modelSelection);
+    const rejected = yield* orchestrator
+      .dispatch({
+        ...delegation,
+        commandId: CommandId.make("delegate-commander-limit-second"),
+      })
+      .pipe(Effect.flip);
+    assert.equal(rejected._tag, "OrchestratorDispatchConcurrencyLimitError");
+    if (rejected._tag === "OrchestratorDispatchConcurrencyLimitError") {
+      assert.equal(rejected.open, 1);
+      assert.equal(rejected.limit, 1);
+    }
+    assert.lengthOf((yield* projections.getThreadProjection(parentThreadId)).subagents, 1);
   }).pipe(Effect.provide(layerTest)),
 );
 

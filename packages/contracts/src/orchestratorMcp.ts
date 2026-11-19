@@ -25,6 +25,8 @@ import {
   ScheduledTaskSchedule,
   ScheduledTaskUpsertSchedule,
 } from "./scheduledTask.ts";
+import { ModelSelection } from "./modelSelection.ts";
+import { DispatchRole } from "./settings.ts";
 import { ProviderInteractionMode, ProviderRequestKind, RuntimeMode } from "./providerPolicy.ts";
 import { PullRequestState } from "./pullRequest.ts";
 import {
@@ -171,6 +173,12 @@ export const OrchestratorMcpDelegateTaskInput = Schema.Struct({
   target: Schema.optional(OrchestratorMcpTarget),
   title: Schema.optional(OrchestratorMcpTitle),
   role: Schema.optional(OrchestratorMcpTaskRole),
+  dispatchRole: Schema.optional(
+    DispatchRole.annotate({
+      description:
+        "code (default), review, readonly, or plan. On a commander thread, an omitted model uses that role's assignment. readonly only picks the model; it does not limit tools.",
+    }),
+  ),
   isolation: Schema.optional(
     Schema.Literals(["shared", "worktree"]).annotate({
       description:
@@ -688,6 +696,18 @@ export const OrchestratorMcpCapabilitiesResult = Schema.Struct({
     scheduledTasks: Schema.Boolean,
     maxBatchThreads: Schema.Number,
   }),
+  /** Present on a commander thread: the models a delegation will use, and its open-task cap. */
+  dispatch: Schema.optional(
+    Schema.Struct({
+      roles: Schema.Struct({
+        code: Schema.NullOr(ModelSelection),
+        review: Schema.NullOr(ModelSelection),
+        readonly: Schema.NullOr(ModelSelection),
+        plan: Schema.NullOr(ModelSelection),
+      }),
+      concurrencyLimit: Schema.NullOr(PositiveInt),
+    }),
+  ),
 });
 export type OrchestratorMcpCapabilitiesResult = typeof OrchestratorMcpCapabilitiesResult.Type;
 
@@ -941,6 +961,7 @@ export class OrchestratorMcpFailure extends Schema.TaggedError<OrchestratorMcpFa
       "thread_not_interruptible",
       "invalid_request",
       "orchestration_error",
+      "concurrency-limit",
       "thread_credential_required",
       "target_required",
     ]),
