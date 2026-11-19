@@ -34,10 +34,12 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import { Tool } from "effect/ai";
+import * as McpSchema from "effect/ai/McpSchema";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import { taskPrompt } from "../../apps/server/src/mcp/delegatedTaskModes.ts";
 import { advertisedJsonSchema } from "../../apps/server/src/mcp/advertisedJsonSchema.ts";
+import * as McpInvocationContext from "../../apps/server/src/mcp/McpInvocationContext.ts";
 import * as Contracts from "@t3tools/contracts";
 import {
   EnvironmentId,
@@ -477,6 +479,16 @@ const PREVIEW_TOOLS = new Set(
 );
 const decodePreviewError = Schema.decodeUnknownOption(PreviewAutomationError);
 const previewFailure = (mock: unknown) => Option.getOrUndefined(decodePreviewError(mock));
+const enabledWhen = (predicate: () => boolean) =>
+  new Set(
+    t3SourceTools
+      .filter(
+        (tool) => Context.getOrUndefined(tool.annotations, McpSchema.EnabledWhen) === predicate,
+      )
+      .map((tool) => `${T3_PREFIX}${tool.name}`),
+  );
+// T3 does not offer these to a delegated child, so its harness never lists them.
+const hiddenFromSubagents = enabledWhen(McpInvocationContext.hiddenFromSubagents);
 // Claude Code loads a tool whose `_meta` sets anthropic/alwaysLoad up front instead of deferring it.
 const alwaysLoaded = new Set(
   t3SourceTools
@@ -606,7 +618,6 @@ export const buildBase = (
     readonly model: Model;
     readonly keepUserInstructions: boolean;
     readonly subagent?: boolean;
-    readonly links?: boolean;
     /** A native subagent starts from its task: T3 appends nothing to its system prompt. */
     readonly nativeSubagent?: boolean;
     /** false: the thread has no agent device access, so T3's text leaves devices out. */
@@ -702,7 +713,6 @@ const buildCodexBase = (
     readonly keepUserInstructions: boolean;
     readonly effort?: string | undefined;
     readonly subagent?: boolean;
-    readonly links?: boolean;
     /** false: the thread has no agent device access, so T3's text leaves devices out. */
     readonly deviceAccess?: boolean;
     /** false: the thread has no agent browser access, so T3's text leaves the browser out. */
