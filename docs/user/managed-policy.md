@@ -257,8 +257,7 @@ so restart T3 Code after that.
 ### Providers
 
 `providers.allowedDrivers` lists the providers that may run, by ID: `codex` (Codex),
-`claudeAgent` (Claude), `cursor` (Cursor), `grok` (Grok), `opencode` (OpenCode), `antigravity`
-(Antigravity), `fx` (fx), `kiro` (Kiro), `pi` (Pi), `muse` (Muse Code), and `acpRegistry` (ACP
+`claudeAgent` (Claude), `grok` (Grok), `antigravity` (Antigravity), and `acpRegistry` (ACP
 Registry).
 `t3 policy check` rejects an ID this version does not know. Threads on other providers stay,
 marked unavailable, and users can still turn those providers off.
@@ -269,8 +268,7 @@ that routes Claude through Amazon Bedrock or a base URL for a company gateway. `
 change the fields you set. With `"locked": false`, the fields fill in only what the user left
 empty. A `codex` entry that is locked, or any `codex` entry under `maxRuntimeMode`, also rules out
 [Connect with ChatGPT](./providers-codex.md#connect-with-chatgpt), since that runtime would skip
-your fields. In the same way, an `opencode` entry like that rules out a server URL, so OpenCode
-starts the binary you set.
+your fields.
 
 ### Updates
 

@@ -11,31 +11,6 @@ session or catalog state. For a new driver, start with [adding a provider](./add
 
 ## Process and account isolation
 
-The `opencode` driver probes the installed version and runs the 1.x or 2.x runtime. OpenCode's MCP
-registrations are directory-scoped, while T3's MCP connection is thread-scoped, so threads in one
-directory must not share one T3 MCP entry.
-
-- **1.x** uses one T3-managed chat server per thread, so threads cannot replace each other's
-  connection. Catalog and text-generation work can share the
-  [instance-owned helper](../../packages/provider-opencode/src/server/OpenCodeServerOwner.ts), which closes
-  after an idle period. See the [1.x adapter](../../packages/provider-opencode/src/server/adapter.ts).
-- **2.x** serves every directory from one
-  [server per instance](../../packages/provider-opencode/src/server/v2/OpenCode2Server.ts). Each thread
-  registers its own `t3-code-<thread>` MCP entry, and session permission rules deny every other
-  thread's entry. See the [2.x adapter](../../packages/provider-opencode/src/server/v2/adapter.ts).
-
-External OpenCode servers remain externally owned and can require an external restart to pick up
-configuration changes. OpenCode stores "always" approval grants for the whole project. Automatic
-full-access replies use `once` so they cannot widen a supervised thread's permissions on a shared
-server. On 2.x, a session-wide approval also replies `once` and becomes T3's own rule on that session.
-
-Pi runs the user's own `pi` install in RPC mode and owns native extension, package, and project
-trust discovery. T3 injects only its namespaced MCP bridge, so a Pi session behaves as it does in
-the Pi TUI. Pi session files back native resume, rollback, and same-instance thread forks.
-Forks use Pi's CLI in the destination directory because RPC session switching retains the source
-session's cwd. Provider switches still use portable handoff summaries.
-See the [adapter](../../packages/provider-pi/src/server/adapter.ts).
-
 Antigravity separates account profiles per instance while sharing installed executables across the
 environment. It forces file-based credential storage because the native macOS keychain entry would
 otherwise be shared across instances. The launch environment removes ambient Google credentials,
@@ -86,18 +61,17 @@ and npm are proven by the real path (symlinks followed): a versioned keg or cask
 Native installer layouts and the global directories of pnpm, Bun, Yarn, and Vite+ may match on
 either the resolved path or its real target, since those installers place real files or their own
 symlinks there. Volta is proven by its `volta-shim` link plus the package's image directory. When
-nothing is proven, Pi's and Grok's own updaters (`pi update --self`, `grok update`) run instead,
-because each detects its installer itself; the runner's version check catches an updater that exits
-0 without updating. Claude, Codex, and OpenCode updaters only act on their own native layout, so
-those providers stay manual-only unless that layout is proven. Mise is checked
+nothing is proven, Grok's own updater (`grok update`) runs instead, because it detects its installer
+itself; the runner's version check catches an updater that exits 0 without updating. Claude,
+Codex, and Antigravity updaters only act on their own native layout, so those providers stay
+manual-only unless that layout is proven. Mise is checked
 first, since a `mise x` wrapper can sit at a native installer's path, and `MISE_DATA_DIR` can put
 installs anywhere, so `mise which` is asked whenever mise is on `PATH`. Each driver names its fixed
 mise tool; mise must resolve the binary and list it in an active install of that tool requested as
 `latest`, which gets `mise upgrade <tool>`. T3 Code keeps launching the configured path, so that
 path must be a shim or under the tool's `latest` link, which the upgrade repoints: a version
 directory (including one `mise activate` put on `PATH`) would keep running the old binary until mise
-prunes it. Everything else mise touches (fixed version paths, pinned tools, wrappers, OpenCode 1.x,
-whose mise tool crosses into 2.x) stays manual-only, so T3 Code never edits mise config. Nix store installs stay manual-only too, since the store is read-only. `mise latest` supplies the version, because settings such as
+prunes it. Everything else mise touches (fixed version paths, pinned tools, wrappers) stays manual-only, so T3 Code never edits mise config. Nix store installs stay manual-only too, since the store is read-only. `mise latest` supplies the version, because settings such as
 `minimum_release_age` can hold mise behind npm. A Grok cask whose Homebrew prefix
 cannot be verified also stays manual-only: `grok update` would install a second copy. npm updates pin `--prefix` because the
 `npm` on `PATH` can belong to a different Node than the one that owns the provider. Homebrew

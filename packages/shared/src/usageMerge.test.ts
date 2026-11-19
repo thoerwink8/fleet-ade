@@ -78,27 +78,27 @@ function environment(id: string, usageSummary: UsageSummary): EnvironmentUsage {
 }
 
 describe("mergeUsage", () => {
-  it("counts a Cursor account once across servers while retaining each server's other providers", () => {
+  it("counts an Antigravity account once across servers while retaining each server's other providers", () => {
     const account = {
-      provider: "cursor" as const,
-      hostId: "cursor.com",
-      homePath: "cursor-account:account-hash",
+      provider: "antigravity" as const,
+      hostId: "antigravity.example",
+      homePath: "antigravity-account:account-hash",
       volumeId: "account-hash",
     };
     const merged = mergeUsage(
       [
         environment(
           "mac",
-          summary([bucket({ provider: "cursor", sourcePath: account.homePath })], [account]),
+          summary([bucket({ provider: "antigravity", sourcePath: account.homePath })], [account]),
         ),
         environment(
           "linux",
           summary(
             [
-              bucket({ provider: "cursor", sourcePath: account.homePath }),
-              bucket({ provider: "opencode", sourcePath: "/opencode" }),
+              bucket({ provider: "antigravity", sourcePath: account.homePath }),
+              bucket({ provider: "grok", sourcePath: "/grok" }),
             ],
-            [account, { provider: "opencode", hostId: "linux", homePath: "/opencode" }],
+            [account, { provider: "grok", hostId: "linux", homePath: "/grok" }],
           ),
         ),
       ],
@@ -107,8 +107,8 @@ describe("mergeUsage", () => {
     expect(
       merged.providers.map((provider) => [provider.provider, provider.costUsd]).sort(),
     ).toEqual([
-      ["cursor", 10],
-      ["opencode", 10],
+      ["antigravity", 10],
+      ["grok", 10],
     ]);
     expect(merged.duplicateSources).toHaveLength(1);
   });
@@ -165,12 +165,12 @@ describe("mergeUsage", () => {
 
   it("counts overlapping provider roots once while keeping each environment's unique root", () => {
     const source = (homePath: string) => ({
-      provider: "opencode" as const,
+      provider: "grok" as const,
       hostId: "host",
       homePath,
     });
     const usage = (sourcePath: string, costUsd: number) =>
-      bucket({ provider: "opencode", sourcePath, costUsd });
+      bucket({ provider: "grok", sourcePath, costUsd });
     const merged = mergeUsage(
       [
         environment(
@@ -567,5 +567,21 @@ describe("mergeUsage", () => {
 
     expect(merged.sessions).toBe(1);
     expect(merged.providers[0]?.sessions).toBe(1);
+  });
+
+  it("decodes a summary whose buckets name providers this build no longer scans", () => {
+    const current = summary([bucket()], [{ provider: "claude", hostId: "old", homePath: "/home" }]);
+    const decoded = decodeSummary({
+      ...current,
+      buckets: [{ ...current.buckets[0], provider: "cursor" }],
+      sources: [
+        {
+          ...current.sources[0],
+          fingerprint: { ...current.sources[0]!.fingerprint, provider: "pi" },
+        },
+      ],
+    });
+    expect(decoded.buckets[0]?.provider).toBe("cursor");
+    expect(decoded.sources[0]?.fingerprint.provider).toBe("pi");
   });
 });

@@ -30,9 +30,6 @@ const ROOTS = [
   "packages/client-runtime/src/state/subagentDisplay.ts",
   "packages/client-runtime/src/state/threadExecution.ts",
   "packages/provider-core/src/server/providerAuthFlow.ts",
-  "packages/provider-cursor/src/server/auth.ts",
-  "packages/provider-cursor/src/server/status.ts",
-  "packages/provider-cursor/src/server/textGeneration.ts",
   "packages/provider-acp-registry/src/server/auth.ts",
   "apps/server/src/provider/Drivers/CodexManagedProvider.ts",
   "packages/shared/src/orchestrationTiming.ts",
@@ -319,9 +316,6 @@ for (const file of files.filter(included)) {
   const serverCopy =
     rel.endsWith("/UserFacingErrors.ts") ||
     rel.endsWith("/providerAuthFlow.ts") ||
-    rel.endsWith("/provider-cursor/src/server/auth.ts") ||
-    rel.endsWith("/provider-cursor/src/server/status.ts") ||
-    rel.endsWith("/provider-cursor/src/server/textGeneration.ts") ||
     rel.endsWith("/provider-acp-registry/src/server/auth.ts") ||
     rel.endsWith("/CodexManagedProvider.ts") ||
     rel.endsWith("/CodexAuthCallbackPage.ts") ||

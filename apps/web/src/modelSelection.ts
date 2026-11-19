@@ -80,7 +80,7 @@ function appendUnavailableDynamicModelSelection(
   selectedModel: string | null | undefined,
   hiddenModels: ReadonlyArray<string>,
 ): AppModelOption[] {
-  if (provider !== "opencode" && provider !== "antigravity" && provider !== "cursor") {
+  if (provider !== "antigravity") {
     return options;
   }
   const slug = normalizeCustomModelSlug(selectedModel);
@@ -282,19 +282,14 @@ export function resolveAppModelSelectionForInstance(
   if (resolvedSelection) {
     return resolvedSelection;
   }
-  if (
-    resolutionOptions?.preserveUnavailableSelection &&
-    (entry.driverKind === "opencode" ||
-      entry.driverKind === "antigravity" ||
-      entry.driverKind === "cursor")
-  ) {
+  if (resolutionOptions?.preserveUnavailableSelection && entry.driverKind === "antigravity") {
     const unavailableSelection = normalizeCustomModelSlug(selectedModel);
     const hiddenModels = readInstanceModelPreferences(settings, entry.instanceId).hiddenModels;
     if (
       unavailableSelection &&
       !hiddenModels.includes(unavailableSelection) &&
       resolveSelectableModel(entry.driverKind, selectedModel, entry.models) === null &&
-      (entry.driverKind !== "antigravity" || unavailableSelection !== ANTIGRAVITY_DEFAULT_MODEL)
+      unavailableSelection !== ANTIGRAVITY_DEFAULT_MODEL
     ) {
       return unavailableSelection;
     }

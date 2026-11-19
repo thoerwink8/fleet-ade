@@ -36,7 +36,7 @@ export interface Request<S extends Schema.Top> {
 
 const INVESTIGATION_TIMEOUT_MS = 15 * 60_000;
 
-export const investigationUnsupported = (operation: Operation, provider: string) =>
+const investigationUnsupported = (operation: Operation, provider: string) =>
   new TextGenerationError({
     operation,
     detail: `${provider} cannot investigate a checkout read-only. Choose another review guide model, or source control writer model when none is set.`,
@@ -71,7 +71,7 @@ export const decodeJsonReply = <S extends Schema.Top>(
   );
 };
 
-export const generatedThreadTitle = (raw: string) => {
+const generatedThreadTitle = (raw: string) => {
   const title = sanitizeThreadTitle(raw);
   // Some models echo the output schema's key instead of a title.
   return title.toLowerCase() === "title"

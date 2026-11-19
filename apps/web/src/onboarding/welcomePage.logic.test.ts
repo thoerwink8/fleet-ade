@@ -179,11 +179,14 @@ describe("cliTerminalStep", () => {
 
 describe("turnedOnInstance", () => {
   it("turns an agent on even when older settings keep it off inside its config", () => {
-    const pi = ProviderDriverKind.make("pi");
-    expect(resolveProviderInstanceEnabled(turnedOnInstance({ driver: pi }))).toBe(true);
-    const migrated = turnedOnInstance({ driver: pi, config: { enabled: false, binaryPath: "pi" } });
+    const grok = ProviderDriverKind.make("grok");
+    expect(resolveProviderInstanceEnabled(turnedOnInstance({ driver: grok }))).toBe(true);
+    const migrated = turnedOnInstance({
+      driver: grok,
+      config: { enabled: false, binaryPath: "grok" },
+    });
     expect(resolveProviderInstanceEnabled(migrated)).toBe(true);
-    expect(migrated.config).toEqual({ enabled: true, binaryPath: "pi" });
+    expect(migrated.config).toEqual({ enabled: true, binaryPath: "grok" });
   });
 });
 

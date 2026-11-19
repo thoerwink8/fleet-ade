@@ -203,7 +203,9 @@ export function UsagePage() {
   const [priceDialog, setPriceDialog] = useState<{ readonly model?: string } | null>(null);
   const [selectedEnvironmentIds, setSelectedEnvironmentIds] =
     useState<ReadonlySet<EnvironmentId> | null>(null);
-  const hiddenProviders = new Set(preferences.hiddenProviders);
+  const hiddenProviders = new Set<UsageProviderKind>(
+    preferences.hiddenProviders as UsageProviderKind[],
+  );
   const { days: windowDays, window } = windowSelection;
   const isPast24Hours = windowDays === 1;
   const {

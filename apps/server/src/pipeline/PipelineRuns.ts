@@ -1042,13 +1042,11 @@ export const layerUsageAt = (sessionsRoot: string | undefined) =>
           const session = yield* decodeNativeSession(rows[0]!.payload);
           if (session.nativeThreadRef === null) return yield* new PipelineUsageUnreadable();
           const nativeId = session.nativeThreadRef.nativeId;
-          // pi stores the transcript path. omp stores only the session uuid.
+          // omp stores only the session uuid; the transcript lives under its sessions root.
           const transcript =
-            session.driver === "pi"
-              ? nativeId
-              : session.driver === "acpRegistry"
-                ? yield* findOmpTranscript(nativeId)
-                : yield* new PipelineUsageUnreadable();
+            session.driver === "acpRegistry"
+              ? yield* findOmpTranscript(nativeId)
+              : yield* new PipelineUsageUnreadable();
           const start = Date.parse(run.sessionStartedAt ?? "");
           const end = Date.parse(run.sessionEndedAt ?? "");
           if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
@@ -1086,7 +1084,7 @@ export const layerUsageAt = (sessionsRoot: string | undefined) =>
     }),
   );
 
-export const layerUsage = layerUsageAt(undefined);
+const layerUsage = layerUsageAt(undefined);
 
 export const layerLive = layer.pipe(
   Layer.provide(ClaimLease.layerLive),

@@ -21,7 +21,6 @@ import {
   PipelineUsage,
   PipelineUsageUnreadable,
   layer as runsLayer,
-  layerUsage,
   layerUsageAt,
   type UsageRecord,
 } from "./PipelineRuns.ts";
@@ -343,67 +342,6 @@ describe("PipelineRuns", () => {
           ]),
         }),
       ),
-    ),
-  );
-
-  it.effect("会话原始记录按窗口读取，费用未知不填零，缺失用量不放行", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const sql = yield* SqlClient.SqlClient;
-      const directory = yield* fs.makeTempDirectoryScoped();
-      const file = path.join(directory, "session.jsonl");
-      const message = (timestamp: string, input?: number) =>
-        JSON.stringify({
-          type: "message",
-          timestamp,
-          message: { role: "assistant", provider: "magpie", model: "group/test", usage: { input } },
-        });
-      yield* fs.writeFileString(
-        file,
-        [
-          message("2026-01-01T00:00:00.000Z", 500),
-          message("2026-01-01T00:10:00.000Z", 10),
-          message("2026-01-01T00:20:00.000Z", 1),
-          message("2026-01-01T00:21:00.000Z", 800),
-        ].join("\n"),
-      );
-      yield* sql`INSERT INTO orchestration_v2_projection_provider_threads
-        (provider_thread_id, thread_id, provider, status, updated_at, payload_json)
-        VALUES ('native-7', 'thread-7', 'pi', 'idle', '2026-01-01',
-          ${JSON.stringify({ driver: "pi", nativeThreadRef: { nativeId: file } })})`;
-      const usage = yield* PipelineUsage;
-      const window = {
-        threadId: "thread-7",
-        sessionStartedAt: "2026-01-01T00:10:00.000Z",
-        sessionEndedAt: "2026-01-01T00:20:00.000Z",
-      };
-      const records = yield* usage.read(window);
-      assert.deepEqual(
-        records.map((item) => item.inputTokens),
-        [10, 1],
-      );
-      assert.isTrue(records.every((item) => item.convertedCost === null));
-      assert.isTrue(records.every((item) => item.outputTokens === null));
-      assert.isTrue(
-        Exit.isFailure(yield* Effect.exit(usage.read({ ...window, threadId: "other" }))),
-      );
-      yield* fs.writeFileString(file, message("2026-01-01T00:15:00.000Z"));
-      assert.isTrue(Exit.isFailure(yield* Effect.exit(usage.read(window))));
-      yield* fs.writeFileString(file, "");
-      assert.isTrue(Exit.isFailure(yield* Effect.exit(usage.read(window))));
-      yield* fs.writeFileString(file, message("2026-01-01T00:15:00.000Z", 0));
-      assert.strictEqual((yield* usage.read(window))[0]?.inputTokens, 0);
-      yield* fs.remove(file);
-      assert.isTrue(Exit.isFailure(yield* Effect.exit(usage.read(window))));
-    }).pipe(
-      Effect.provide(
-        layerUsage.pipe(
-          Layer.provideMerge(SqlitePersistence.layerMemory),
-          Layer.provideMerge(NodeServices.layer),
-        ),
-      ),
-      Effect.scoped,
     ),
   );
 

@@ -1,4 +1,5 @@
 import {
+  PROVIDER_DISPLAY_NAMES,
   ProviderDriverKind,
   type ProviderInstanceId,
   type ServerProvider,
@@ -23,7 +24,11 @@ export const buildUnavailableProviderSnapshot = Effect.fn(
   "unavailableProviderSnapshot.buildUnavailableProviderSnapshot",
 )(function* (input: UnavailableProviderSnapshotInput): Effect.fn.Return<ServerProvider> {
   const checkedAt = input.checkedAt ?? (yield* nowIso);
-  const displayName = input.displayName?.trim() || (input.driverKind as string);
+  const driver =
+    typeof input.driverKind === "string"
+      ? ProviderDriverKind.make(input.driverKind)
+      : input.driverKind;
+  const displayName = input.displayName?.trim() || PROVIDER_DISPLAY_NAMES[driver] || String(driver);
 
   // No driver ran, so its setup capabilities are still unknown.
   const { setup: _setup, ...base } = buildServerProvider({
@@ -45,10 +50,7 @@ export const buildUnavailableProviderSnapshot = Effect.fn(
     ...base,
     instanceId: input.instanceId,
     ...(input.accentColor ? { accentColor: input.accentColor } : {}),
-    driver:
-      typeof input.driverKind === "string"
-        ? ProviderDriverKind.make(input.driverKind)
-        : input.driverKind,
+    driver,
     availability: "unavailable",
     unavailableReason: input.reason,
   };

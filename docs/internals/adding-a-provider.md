@@ -13,8 +13,8 @@ whether a turn runs. This page lists the decisions and evidence a new driver nee
   [shared ACP adapter](../../packages/provider-acp/src/server/adapter.ts), like Grok
   and Antigravity. Never add agent-id checks to the generic registry adapter.
 - **Other protocols** get a native adapter that implements
-  [`ProviderAdapterV2`](../../packages/provider-core/src/server/ProviderAdapter.ts), like Codex,
-  Claude, Cursor, OpenCode, Pi, and Muse.
+  [`ProviderAdapterV2`](../../packages/provider-core/src/server/ProviderAdapter.ts), like Codex and
+  Claude.
 
 Provider-specific behavior stays in the adapter and driver. Orchestration and clients read
 capabilities, never the driver kind.
@@ -27,7 +27,7 @@ capabilities, never the driver kind.
   at runtime is a bug.
 - **Permission modes.** Offer only modes the provider enforces natively, through
   `supportedRuntimeModes` in the provider presentation ([Grok](../../packages/provider-grok/src/server/status.ts)
-  and [Pi](../../packages/provider-pi/src/server/status.ts) are examples). Do not imitate a missing
+  and [Codex](../../apps/server/src/provider/Drivers/CodexManagedProvider.ts) are examples). Do not imitate a missing
   mode by answering approvals in T3: T3's check is weaker than the agent's own enforcement. The
   server runs an unoffered stored mode as Supervised
   ([`RuntimePolicy.ts`](../../apps/server/src/orchestration-v2/RuntimePolicy.ts)).
@@ -104,7 +104,7 @@ produce catches them.
 ## Where a driver plugs in
 
 A provider lives in its own `packages/provider-<name>` package, with
-[Pi](../../packages/provider-pi) as the reference. Drivers not moved yet still live in
+[Grok](../../packages/provider-grok) as the reference. Drivers not moved yet still live in
 [`provider/Drivers`](../../apps/server/src/provider/Drivers).
 
 - **Package exports.** `./settings` holds the instance settings schema, built with

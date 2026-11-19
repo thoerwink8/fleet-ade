@@ -9,18 +9,18 @@ import {
 const models = [
   { id: "traex:gpt", name: "GPT-6.1", driverKind: "codex", providerDisplayName: "Traex" },
   {
-    id: "opencode:traex-gpt",
+    id: "grok:traex-gpt",
     name: "GPT-6.1",
     subProvider: "Traex",
-    driverKind: "opencode",
-    providerDisplayName: "OpenCode",
+    driverKind: "grok",
+    providerDisplayName: "Grok",
   },
   {
-    id: "opencode:opus",
+    id: "grok:opus",
     name: "Claude Opus 5.5",
     subProvider: "Anthropic",
-    driverKind: "opencode",
-    providerDisplayName: "OpenCode",
+    driverKind: "grok",
+    providerDisplayName: "Grok",
   },
   {
     id: "claude:opus",
@@ -43,17 +43,17 @@ describe("rankComposerModelMentions", () => {
   );
 
   it("finds a model under every provider that serves it", () => {
-    expect(rank("gpt").toSorted()).toEqual(["opencode:traex-gpt", "traex:gpt"]);
+    expect(rank("gpt").toSorted()).toEqual(["grok:traex-gpt", "traex:gpt"]);
   });
 
   it("splits words a mention joins with :, / or -", () => {
-    expect(rank("opencode:traex")).toEqual(["opencode:traex-gpt"]);
-    expect(rank("opencode/gpt")).toEqual(["opencode:traex-gpt"]);
-    expect(rank("opencode-gpt")).toEqual(["opencode:traex-gpt"]);
+    expect(rank("grok:traex")).toEqual(["grok:traex-gpt"]);
+    expect(rank("grok/gpt")).toEqual(["grok:traex-gpt"]);
+    expect(rank("grok-gpt")).toEqual(["grok:traex-gpt"]);
   });
 
   it("keeps a hyphenated model name whole when it matches", () => {
-    expect(rank("gpt-6.1").toSorted()).toEqual(["opencode:traex-gpt", "traex:gpt"]);
+    expect(rank("gpt-6.1").toSorted()).toEqual(["grok:traex-gpt", "traex:gpt"]);
   });
 
   it.each(["src", "g", "agent", "pus"])(
@@ -66,16 +66,16 @@ describe("rankComposerModelMentions", () => {
 
 describe("collectComposerModelMentions", () => {
   it("reads back what formatComposerModelMention writes, inside prose", () => {
-    const text = `use ${formatComposerModelMention("opencode", "anthropic/opus")}, then model:codex/gpt-5.4.`;
+    const text = `use ${formatComposerModelMention("grok", "anthropic/opus")}, then model:codex/gpt-5.4.`;
     expect(collectComposerModelMentions(text)).toEqual([
       {
-        instanceId: "opencode",
+        instanceId: "grok",
         model: "anthropic/opus",
-        source: "model:opencode/anthropic/opus",
+        source: "model:grok/anthropic/opus",
         start: 4,
-        end: 33,
+        end: 29,
       },
-      { instanceId: "codex", model: "gpt-5.4", source: "model:codex/gpt-5.4", start: 40, end: 59 },
+      { instanceId: "codex", model: "gpt-5.4", source: "model:codex/gpt-5.4", start: 36, end: 55 },
     ]);
   });
 
@@ -84,7 +84,7 @@ describe("collectComposerModelMentions", () => {
     ['"model:codex/gpt-6.1"', ["codex/gpt-6.1"]],
     ["model:codex/gpt-6.1,model:claudeAgent/sonnet", ["codex/gpt-6.1", "claudeAgent/sonnet"]],
     ["model:codex/gpt-6.1's output", ["codex/gpt-6.1"]],
-    ["model:opencode/foo(bar)", ["opencode/foo(bar)"]],
+    ["model:grok/foo(bar)", ["grok/foo(bar)"]],
     ["(model:codex/GPT-6.1-Sol[1m]).", ["codex/GPT-6.1-Sol[1m]"]],
     ["model:codex/gpt-6.1" + ")".repeat(128), ["codex/gpt-6.1"]],
   ])("bounds the reference in %s", (text, expected) => {

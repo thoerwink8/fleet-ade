@@ -105,12 +105,6 @@ export interface ServerProviderPresentation {
 
 export type ServerProviderDraft = Omit<ServerProvider, "instanceId" | "driver">;
 
-export function nonEmptyTrimmed(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
 export function isCommandMissingCause(error: unknown): boolean {
   if (isProviderCommandNotFoundError(error)) return true;
   return error instanceof PlatformError.PlatformError && error.reason._tag === "NotFound";
@@ -216,55 +210,6 @@ export function providerModelsFromSettings(
   return [...resolvedBuiltInModels, ...customEntries];
 }
 
-export function buildSelectOptionDescriptor(input: {
-  readonly id: string;
-  readonly label: string;
-  readonly options:
-    | ReadonlyArray<{
-        value: string;
-        label: string;
-        description?: string | undefined;
-        isDefault?: boolean | undefined;
-      }>
-    | undefined;
-  readonly description?: string;
-  readonly promptInjectedValues?: ReadonlyArray<string>;
-}) {
-  const options = (input.options ?? []).map((option) => ({
-    id: option.value,
-    label: option.label,
-    ...(option.description ? { description: option.description } : {}),
-    ...(option.isDefault ? { isDefault: true } : {}),
-  }));
-  const currentValue = options.find((option) => option.isDefault)?.id;
-  return {
-    id: input.id,
-    label: input.label,
-    type: "select" as const,
-    options,
-    ...(currentValue ? { currentValue } : {}),
-    ...(input.description ? { description: input.description } : {}),
-    ...(input.promptInjectedValues && input.promptInjectedValues.length > 0
-      ? { promptInjectedValues: [...input.promptInjectedValues] }
-      : {}),
-  };
-}
-
-export function buildBooleanOptionDescriptor(input: {
-  readonly id: string;
-  readonly label: string;
-  readonly currentValue?: boolean;
-  readonly description?: string;
-}) {
-  return {
-    id: input.id,
-    label: input.label,
-    type: "boolean" as const,
-    ...(input.description ? { description: input.description } : {}),
-    ...(typeof input.currentValue === "boolean" ? { currentValue: input.currentValue } : {}),
-  };
-}
-
 export function buildServerProvider(input: {
   driver?: ProviderDriverKind;
   presentation: ServerProviderPresentation;
@@ -318,7 +263,7 @@ export function buildServerProvider(input: {
   };
 }
 
-export const collectStreamAsString = <E>(
+const collectStreamAsString = <E>(
   stream: Stream.Stream<Uint8Array, E>,
   options?: { readonly maxBytes?: number | undefined },
 ): Effect.Effect<string, E> =>

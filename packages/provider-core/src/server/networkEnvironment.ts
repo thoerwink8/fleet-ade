@@ -21,12 +21,6 @@ const AGENT_STEMS: Readonly<Record<string, readonly string[]>> = {
   grok: ["grok"],
   codex: ["codex"],
   claudeAgent: ["claude", "reclaude"],
-  cursor: ["cursor-agent", "cursor"],
-  opencode: ["opencode"],
-  pi: ["pi"],
-  kiro: ["kiro-cli", "kiro"],
-  muse: ["muse"],
-  fx: ["fx"],
   antigravity: ["antigravity", "agy"],
 };
 

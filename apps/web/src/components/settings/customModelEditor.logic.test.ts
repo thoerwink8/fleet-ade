@@ -141,8 +141,8 @@ describe("customModelEditor.logic", () => {
     expect(
       presets.capabilities?.optionDescriptors?.some((option) => option.id === "contextWindow"),
     ).toBe(false);
-    const cursorCopy = descriptorsFromCapabilities(capabilities, ProviderDriverKind.make("cursor"));
-    expect(cursorCopy.map((option) => option.id)).toEqual(["contextWindow", "thinking"]);
+    const grokCopy = descriptorsFromCapabilities(capabilities, ProviderDriverKind.make("grok"));
+    expect(grokCopy.map((option) => option.id)).toEqual(["contextWindow", "thinking"]);
     const authored = { slug: "custom", name: "Custom", capabilities };
     expect(
       definitionFromDraft(draftFromDefinition(authored)).capabilities?.optionDescriptors?.[0],

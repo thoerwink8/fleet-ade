@@ -2253,8 +2253,8 @@ describe("storage cleanup reports and local file policies", () => {
             occurredAt: at(0),
             payload: {
               id: ProviderSessionId.make("session-1"),
-              driver: ProviderDriverKind.make("pi"),
-              providerInstanceId: ProviderInstanceId.make("pi"),
+              driver: ProviderDriverKind.make("grok"),
+              providerInstanceId: ProviderInstanceId.make("grok"),
               status,
               cwd: fixture.worktree,
               model: null,

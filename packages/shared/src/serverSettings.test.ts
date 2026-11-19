@@ -34,31 +34,6 @@ const decodeServerSettingsPatch = Schema.decodeUnknownSync(ServerSettingsPatch);
 const FOLDED_SERVER_SETTINGS = { ...DEFAULT_SERVER_SETTINGS, projectSettingsFolded: true };
 
 describe("fallbackTextGenerationModelSelection", () => {
-  it("uses Big Pickle when only OpenCode is enabled", () => {
-    expect(
-      fallbackTextGenerationModelSelection({}, (instanceId) => instanceId === "opencode"),
-    ).toEqual({ instanceId: "opencode", model: "opencode/big-pickle" });
-    const threadDefault = {
-      instanceId: ProviderInstanceId.make("opencode"),
-      model: "opencode-go/glm-5.3",
-    };
-    const providerInstances = {
-      [threadDefault.instanceId]: {
-        driver: ProviderDriverKind.make("opencode"),
-        config: { customModels: [threadDefault.model] },
-      },
-    };
-    // An exhausted Go quota leaves the custom model unusable but Big Pickle still works.
-    expect(
-      fallbackTextGenerationModelSelection(
-        providerInstances,
-        (instanceId, _driver, model) =>
-          instanceId === "opencode" && !model.startsWith("opencode-go/"),
-        { defaultModelSelection: threadDefault },
-      ),
-    ).toEqual({ instanceId: "opencode", model: "opencode/big-pickle" });
-  });
-
   it("replaces and clears the fallback without carrying model options", () => {
     const fallbackModelSelection = { instanceId: ProviderInstanceId.make("codex"), model: "new" };
     const settings = applyServerSettingsPatch(

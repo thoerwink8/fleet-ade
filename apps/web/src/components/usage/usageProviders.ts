@@ -1,7 +1,8 @@
-import type { UsageProviderKind } from "@t3tools/contracts";
-
-import { ProviderDriverKind } from "@t3tools/contracts";
-
+import {
+  RETIRED_USAGE_PROVIDER_KINDS,
+  type UsageProviderKind,
+  ProviderDriverKind,
+} from "@t3tools/contracts";
 import type { UsageMetric } from "./usageShortcuts";
 
 type UsageProviderPresentation = {
@@ -26,30 +27,38 @@ export const PROVIDER_PRESENTATION = {
     color: "color-mix(in oklab, var(--contrast-foreground) 72%, var(--background))",
     driverKind: ProviderDriverKind.make("grok"),
   },
-  cursor: { label: "Cursor", color: "#8b8b8b", driverKind: ProviderDriverKind.make("cursor") },
-  opencode: {
-    label: "OpenCode",
-    color: "#5b9bbd",
-    driverKind: ProviderDriverKind.make("opencode"),
-  },
   antigravity: {
     label: "Antigravity",
     color: "#8c7bd1",
     driverKind: ProviderDriverKind.make("antigravity"),
   },
+  cursor: {
+    label: "Cursor",
+    color: "var(--contrast-foreground)",
+    driverKind: ProviderDriverKind.make("cursor"),
+  },
+  opencode: {
+    label: "OpenCode",
+    color: "var(--contrast-foreground)",
+    driverKind: ProviderDriverKind.make("opencode"),
+  },
   pi: {
     label: "Pi",
-    color: "#4d9f8a",
+    color: "var(--contrast-foreground)",
     driverKind: ProviderDriverKind.make("pi"),
   },
   muse: {
     label: "Muse Code",
-    color: "#0866ff",
+    color: "var(--contrast-foreground)",
     driverKind: ProviderDriverKind.make("muse"),
   },
 } satisfies Record<UsageProviderKind, UsageProviderPresentation>;
 
-export const PROVIDER_ORDER = Object.keys(PROVIDER_PRESENTATION) as UsageProviderKind[];
+const RETIRED_USAGE_PROVIDERS: ReadonlySet<string> = new Set(RETIRED_USAGE_PROVIDER_KINDS);
+
+export const PROVIDER_ORDER = (Object.keys(PROVIDER_PRESENTATION) as UsageProviderKind[]).filter(
+  (provider) => !RETIRED_USAGE_PROVIDERS.has(provider),
+);
 
 export function providersWithUsage(
   totals: readonly {

@@ -56,55 +56,7 @@ const provider: ServerProvider = {
 };
 
 describe("provider compatibility", () => {
-  it("keeps releases before V2 on the OpenCode 1 policy they shipped with", () => {
-    // Older builds fetch main's manifest; their V1 orchestrator cannot drive OpenCode 2.
-    const opencode = ProviderDriverKind.make("opencode");
-    for (const [version, expected] of [
-      ["1.14.19", "supported"],
-      ["2.0.18", "broken"],
-      ["1.14.18", "broken"],
-    ] as const) {
-      const advisory = resolveProviderCompatibility(
-        ModelManifest.BUNDLED_MODEL_MANIFEST.compatibility,
-        opencode,
-        version,
-        "0.0.45",
-      );
-      assert.strictEqual(advisory?.status, expected, `OpenCode ${version} on 0.0.45`);
-      assert.strictEqual(advisory?.recommendedVersion, "1.14.19");
-    }
-    assert.isUndefined(
-      resolveProviderCompatibility(
-        ModelManifest.BUNDLED_MODEL_MANIFEST.compatibility,
-        ProviderDriverKind.make("pi"),
-        "1.0.0",
-        "0.0.45",
-      ),
-    );
-  });
-
-  it("compares Cursor build dates without treating semver prereleases as stable", () => {
-    const cursor = ProviderDriverKind.make("cursor");
-    const cursorPolicy: ProviderCompatibilityPolicy = {
-      driver: cursor,
-      t3CodeRange: policy.t3CodeRange,
-      ranges: [
-        { range: "<2026.05.09", status: "unsupported" },
-        { range: ">=2026.05.09", status: "supported" },
-      ],
-    };
-    for (const [version, expected] of [
-      ["2026.05.08-a1b2c3d", "unsupported"],
-      ["2026.05.09-a1b2c3d", "supported"],
-      ["2026.09.22-f2b0fcd", "supported"],
-      ["2026.05.09", "supported"],
-      ["2026.05.09-beta.1", "unknown"],
-    ] as const) {
-      assert.strictEqual(
-        resolveProviderCompatibility([cursorPolicy], cursor, version)?.status,
-        expected,
-      );
-    }
+  it("leaves a semver prerelease unknown", () => {
     assert.strictEqual(
       resolveProviderCompatibility([policy], driver, "2.0.0-a1b2c3d")?.status,
       "unknown",

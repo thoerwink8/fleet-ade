@@ -71,15 +71,15 @@ describe("usageProgress", () => {
   });
 
   it("names a slow source without dimming once its environment answers from cache", () => {
-    const partway = environment("a", { isPending: true, summary: summary(["cursor"]) });
-    expect(usageEnvironmentProgress(partway)).toEqual({ phase: "partway", providers: ["cursor"] });
+    const partway = environment("a", { isPending: true, summary: summary(["grok"]) });
+    expect(usageEnvironmentProgress(partway)).toEqual({ phase: "partway", providers: ["grok"] });
     expect(usageProgress([partway, environment("b")], options)).toEqual({
       dimmed: false,
-      label: "正在更新 cursor label…",
+      label: "正在更新 grok label…",
     });
     expect(
       usageProgress(
-        [partway, environment("b", { isPending: true, summary: summary(["cursor", "grok"]) })],
+        [partway, environment("b", { isPending: true, summary: summary(["grok", "antigravity"]) })],
         options,
       ),
     ).toEqual({ dimmed: false, label: "正在更新 2 个提供方…" });

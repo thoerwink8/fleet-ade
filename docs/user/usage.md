@@ -8,7 +8,7 @@ On mobile, choose **Usage** in the workspace navigation.
 
 ## Understand your usage
 
-**Usage** combines Codex, Claude Code, Grok Build, OpenCode, Antigravity, Pi, Muse Code, and Cursor history
+**Usage** combines Codex, Claude Code, Grok Build, and Antigravity history
 from your connected environments. It shows token use, cache savings, model breakdowns, and estimated API-equivalent
 cost, split by token type and by speed. These estimates are not your subscription bill.
 **Premium** is what Fast and Ultrafast requests cost above standard rates. Cost that cannot be
@@ -20,24 +20,14 @@ record are missing from the totals.
 Text generation (thread titles, commit messages, PR text, branch names and review guides) is not in
 the totals for Codex or Claude Code 2.0.63 and newer, because those runs save no session history.
 
-OpenCode reads its SQLite database and older JSON history. Antigravity reads local conversation
-databases, including T3-managed profiles. Set `OPENCODE_DATA_DIR` or `ANTIGRAVITY_DATA_DIR` on the
-server to read a different data directory; comma-separated paths read multiple directories.
-
-Cursor reads account usage from Cursor's API for the account you signed in with in T3 or set as
-`CURSOR_API_KEY`. This includes headless T3 sessions and desktop usage across machines; the same
-account counts once across connected environments. T3 does not estimate missing tokens from
-conversation text.
+Antigravity reads local conversation databases, including T3-managed profiles. Set
+`ANTIGRAVITY_DATA_DIR` on the server to read a different data directory; comma-separated paths read
+multiple directories.
 
 Usage includes each configured account's history, including disabled accounts. Custom homes follow
 the account's home setting or its `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, or `GROK_HOME` environment
-variable. Pi reads `~/.pi/agent/sessions`, or the `sessions` directory under
-`PI_CODING_AGENT_DIR`. Set `PI_CODING_AGENT_SESSION_DIR` to read a different session directory.
-To include sessions saved through `--session-dir` or Pi's `sessionDir` setting, set this environment
-variable to the same directory. Pi includes recorded tool and summary costs under `Tools/summaries`.
-Muse Code reads native session history, including child sessions, from the home reported by the
-configured Muse CLI. Its environment settings, including `XDG_DATA_HOME`, apply. Models without
-known prices still contribute tokens and appear as unpriced; set custom prices to estimate their cost.
+variable. Models without known prices still contribute tokens and appear as unpriced; set custom
+prices to estimate their cost.
 Use absolute paths or `~/` paths in the account's environment settings; relative environment paths
 depend on each project's working directory and cannot be reliably discovered by Usage. Accounts
 sharing a history directory count once.
@@ -51,8 +41,7 @@ your app understands. Update the app to include newly supported providers.
 
 On web and desktop, use the environment dropdown to filter costs, tokens, and limits. All
 environments are selected by default. The dropdown shows which environments are still scanning;
-results appear as each one responds, and figures still updating are dimmed. Cursor shows its last
-saved totals first, then updates them when Cursor's API responds.
+results appear as each one responds, and figures still updating are dimmed.
 
 If recent work is missing or a new model shows no cost, refresh to rescan session history and
 update model pricing.
@@ -99,9 +88,8 @@ To count only some models, or to leave some out, add `usageModelFilter` to the s
 ```
 
 `include` keeps only the listed models and `exclude` leaves the listed models out. `provider` is
-one of `claude`, `codex`, `cursor`, `grok`, `opencode`, `antigravity`, `pi`, or `muse`; omit it
-to match a model ID from any provider. Use the model ID that Usage shows without **Map to**, such
-as a provider-prefixed ID for Pi. Filters apply before **Map to**, so a model you leave out is not
+one of `claude`, `codex`, `grok`, or `antigravity`; omit it
+to match a model ID from any provider. Filters apply before **Map to**, so a model you leave out is not
 counted under its mapped name. Usage applies each environment's own filter. Remove the setting to
 show every model again.
 
@@ -150,23 +138,9 @@ row to see when it resets and your pace. Turn on **Context window** to also show
 context use against the model's limit. A tick on the bar marks where the provider compacts
 automatically, when it reports that point.
 
-OpenCode Go reports its session, weekly, and monthly allowance when OpenCode runs locally in
-the environment. T3 cannot report limits for external OpenCode servers because their credentials
-belong to the remote server. Limits need an OpenCode Go API key, or an OpenCode Console connected
-in OpenCode with an API key. A Console browser sign-in alone does not report them. You can also add
-your Go API key as `OPENCODE_API_KEY` in the OpenCode instance's **Environment variables**, then
-refresh provider status. Cursor reports
-its monthly allowance, including separate Auto and API usage, for `CURSOR_AUTH_TOKEN` when it is set,
-otherwise for the account you signed in with in T3 or set as `CURSOR_API_KEY`.
-Sign-in and API keys report limits only with Cursor's default API endpoint. If you configure a custom
-Cursor endpoint, use an explicit `CURSOR_AUTH_TOKEN` for limits.
-
 Grok reports the remaining subscription allowance and reset time for its current billing period
 after signing in with `grok login`. Explicit `XAI_API_KEY` connections and custom authentication
 or endpoint configurations do not report subscription limits.
-
-Muse Code reports its session and weekly windows and its tier once the Muse CLI has run in a thread.
-Until then it shows no limits. Readings are not kept across a server restart.
 
 API-key accounts may not report subscription limits. This also applies to Claude connections
 using a proxy through `ANTHROPIC_AUTH_TOKEN`.

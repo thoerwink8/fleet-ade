@@ -166,7 +166,7 @@ describe("resolvePromptLinkModelSelection", () => {
       exact: false,
     });
     expect(
-      resolvePromptLinkModelSelection(providers, { provider: "cursor", model: null }),
+      resolvePromptLinkModelSelection(providers, { provider: "grok", model: null }),
     ).toBeNull();
   });
 });

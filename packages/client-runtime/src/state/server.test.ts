@@ -1803,7 +1803,7 @@ describe("provider setup commands", () => {
 
       void atoms.updateProvider.run(registry, {
         environmentId: TARGET.environmentId,
-        input: { provider: ProviderDriverKind.make("opencode") },
+        input: { provider: ProviderDriverKind.make("grok") },
       });
       yield* Deferred.await(updateStarted);
       void atoms.mutateProviderInstance.run(registry, {

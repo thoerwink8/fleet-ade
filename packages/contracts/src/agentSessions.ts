@@ -2,7 +2,15 @@ import * as Schema from "effect/Schema";
 import { IsoDateTime, NonNegativeInt, ProjectId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 
-export const AgentSessionSource = Schema.Literals(["claudeAgent", "codex", "pi"]);
+/**
+ * `pi` stays so an old imported-transcript row still decodes. The import UI does not offer it.
+ */
+export const RETIRED_AGENT_SESSION_SOURCES = ["pi"] as const;
+const ACTIVE_AGENT_SESSION_SOURCES = ["claudeAgent", "codex"] as const;
+export const AgentSessionSource = Schema.Literals([
+  ...ACTIVE_AGENT_SESSION_SOURCES,
+  ...RETIRED_AGENT_SESSION_SOURCES,
+]);
 export type AgentSessionSource = typeof AgentSessionSource.Type;
 
 export const AgentSessionImportSource = Schema.Struct({

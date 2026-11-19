@@ -50,13 +50,15 @@ function setup() {
 }
 
 const environmentId = EnvironmentId.make("environment-local");
-const cursor = ProviderInstanceId.make("cursor");
-const stored = createModelSelection(cursor, "claude-opus-5-5", [{ id: "effort", value: "medium" }]);
+const antigravity = ProviderInstanceId.make("antigravity");
+const stored = createModelSelection(antigravity, "claude-opus-5-5", [
+  { id: "effort", value: "medium" },
+]);
 
 const providers: ReadonlyArray<ServerProvider> = [
   {
-    instanceId: cursor,
-    driver: ProviderDriverKind.make("cursor"),
+    instanceId: antigravity,
+    driver: ProviderDriverKind.make("antigravity"),
     enabled: true,
     installed: true,
     version: null,
@@ -70,7 +72,7 @@ const providers: ReadonlyArray<ServerProvider> = [
 ];
 
 // The hook reads only the thread's identity and stored selection.
-function cursorThread(id: string) {
+function antigravityThread(id: string) {
   return { environmentId, id: ThreadId.make(id), modelSelection: stored } as EnvironmentThreadShell;
 }
 
@@ -101,16 +103,16 @@ function Picker(props: {
   return (
     <button
       type="button"
-      onClick={() => onProviderModelSelectStable(cursor, props.model ?? stored.model)}
+      onClick={() => onProviderModelSelectStable(antigravity, props.model ?? stored.model)}
     >
       Pick the model
     </button>
   );
 }
 
-it("keeps a Cursor thread's stored model and options when the user re-picks its unavailable row", async () => {
+it("keeps an Antigravity thread's stored model and options when the user re-picks its unavailable row", async () => {
   setup();
-  const thread = cursorThread("thread-cursor");
+  const thread = antigravityThread("thread-antigravity");
   await using _screen = await render(<Picker thread={thread} runtime={null} />);
   await page.getByRole("button", { name: "Pick the model" }).click();
 
@@ -118,13 +120,13 @@ it("keeps a Cursor thread's stored model and options when the user re-picks its 
     const draft = useComposerDraftStore
       .getState()
       .getComposerDraft(scopeThreadRef(environmentId, thread.id));
-    expect(draft?.modelSelectionByProvider[cursor] ?? thread.modelSelection).toEqual(stored);
+    expect(draft?.modelSelectionByProvider[antigravity] ?? thread.modelSelection).toEqual(stored);
   });
 });
 
 it("switches back to the thread's stored model while the session runs on another instance", async () => {
   setup();
-  const thread = cursorThread("thread-cursor-handoff");
+  const thread = antigravityThread("thread-antigravity-handoff");
   const runtime = { providerInstanceId: ProviderInstanceId.make("codex") } as Parameters<
     typeof useComposerSelection
   >[0]["activeRuntime"];
@@ -135,18 +137,18 @@ it("switches back to the thread's stored model while the session runs on another
     const draft = useComposerDraftStore
       .getState()
       .getComposerDraft(scopeThreadRef(environmentId, thread.id));
-    expect(draft?.activeProvider).toBe(cursor);
+    expect(draft?.activeProvider).toBe(antigravity);
     expect(
       deriveEffectiveComposerModelState({
         draft,
         providers,
-        selectedProvider: ProviderDriverKind.make("cursor"),
-        selectedInstanceId: cursor,
+        selectedProvider: ProviderDriverKind.make("antigravity"),
+        selectedInstanceId: antigravity,
         threadModelSelection: thread.modelSelection,
         projectModelSelection: null,
         settings: DEFAULT_UNIFIED_SETTINGS,
       }),
-    ).toEqual({ selectedModel: stored.model, modelOptions: { [cursor]: stored.options } });
+    ).toEqual({ selectedModel: stored.model, modelOptions: { [antigravity]: stored.options } });
   });
 });
 
@@ -155,7 +157,7 @@ it("saves a re-picked model again when its first save failed", async () => {
   setModelSelection
     .mockResolvedValueOnce(AsyncResult.failure(Cause.fail(new Error("offline"))))
     .mockResolvedValue(AsyncResult.success(undefined));
-  const thread = cursorThread("thread-cursor-retry");
+  const thread = antigravityThread("thread-antigravity-retry");
   appAtomRegistry.set(shellAtom(thread.id), thread);
   await using _screen = await render(
     <AppAtomRegistryProvider>
@@ -170,7 +172,7 @@ it("saves a re-picked model again when its first save failed", async () => {
   const autoSave = expect.objectContaining({
     input: {
       threadId: thread.id,
-      modelSelection: expect.objectContaining({ instanceId: cursor, model: "auto-smart" }),
+      modelSelection: expect.objectContaining({ instanceId: antigravity, model: "auto-smart" }),
     },
   });
   await vi.waitFor(() => expect(setModelSelection.mock.calls).toEqual([[autoSave], [autoSave]]));

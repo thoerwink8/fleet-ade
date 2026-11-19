@@ -41,12 +41,6 @@ const AGENTS = [
   ["grok", "Grok"],
   ["codex", "Codex"],
   ["claudeAgent", "Claude"],
-  ["cursor", "Cursor"],
-  ["opencode", "OpenCode"],
-  ["pi", "Pi"],
-  ["kiro", "Kiro"],
-  ["muse", "Muse"],
-  ["fx", "fx"],
   ["antigravity", "Antigravity"],
 ] as const;
 

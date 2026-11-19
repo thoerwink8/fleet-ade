@@ -57,7 +57,7 @@ export interface ComposerModelMentionOccurrence {
   readonly end: number;
 }
 
-// Instance ids match ProviderInstanceId; model slugs may contain `/`, as in `opencode/anthropic/opus`.
+// Instance ids match ProviderInstanceId; model slugs may contain `/`, as in `grok/anthropic/opus`.
 const MODEL_MENTION_PATTERN = /(?<![^\s,(["'])model:([a-zA-Z][a-zA-Z0-9_-]*)\/([^\s,"']+)/gu;
 const SENTENCE_PUNCTUATION = ".;:!?";
 const CLOSING_BRACKETS: Readonly<Record<string, string>> = { ")": "(", "]": "[" };

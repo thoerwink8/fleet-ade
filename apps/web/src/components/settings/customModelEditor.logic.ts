@@ -74,41 +74,8 @@ export const DESCRIPTOR_PRESETS_BY_KIND: Partial<
     { id: "fastMode", label: "快速模式", type: "boolean" },
     { id: "thinking", label: "思考", type: "boolean" },
   ],
-  [ProviderDriverKind.make("cursor")]: [
-    { id: "reasoning", label: "推理", type: "select", choices: EFFORT_CHOICES },
-    { id: "fastMode", label: "快速模式", type: "boolean" },
-    { id: "thinking", label: "思考", type: "boolean" },
-  ],
   [ProviderDriverKind.make("grok")]: [
     { id: "reasoningEffort", label: "推理", type: "select", choices: EFFORT_CHOICES },
-  ],
-  [ProviderDriverKind.make("pi")]: [
-    {
-      id: "thinking",
-      label: "思考",
-      type: "select",
-      choices: [
-        { id: "off", label: "关闭" },
-        { id: "minimal", label: "Minimal" },
-        { id: "low", label: "Low" },
-        { id: "medium", label: "Medium", isDefault: true },
-        { id: "high", label: "High" },
-        { id: "xhigh", label: "超高" },
-        { id: "max", label: "最大" },
-      ],
-    },
-  ],
-  [ProviderDriverKind.make("opencode")]: [
-    { id: "variant", label: "推理", type: "select", choices: EFFORT_CHOICES },
-    {
-      id: "agent",
-      label: "智能体",
-      type: "select",
-      choices: [
-        { id: "build", label: "构建", isDefault: true },
-        { id: "plan", label: "Plan" },
-      ],
-    },
   ],
 };
 
