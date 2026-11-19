@@ -4,6 +4,8 @@ import { cn } from "../../lib/utils";
 
 const tones = {
   muted: { label: "text-sidebar-muted-foreground", line: "bg-sidebar-border/50" },
+  // The sidebar's group labels: a step darker than muted, still behind the rows.
+  section: { label: "text-secondary-label", line: "bg-sidebar-border/50" },
   emphasized: { label: "text-sidebar-foreground/80", line: "bg-sidebar-foreground/25" },
   accent: { label: "text-primary", line: "bg-primary/50" },
 } as const;
@@ -13,12 +15,18 @@ export function CollapsibleSectionHeader({
   expanded,
   tone = "muted",
   variant = "default",
+  compact = false,
+  icon,
   accessory,
   ...buttonProps
 }: Omit<ComponentProps<"button">, "className" | "style" | "aria-expanded"> & {
   expanded: boolean;
   tone?: keyof typeof tones;
   variant?: "default" | "panel";
+  /** A 24px row in the 12/16 meta type, for group labels between list rows. */
+  compact?: boolean;
+  /** A decorative glyph before the label. */
+  icon?: ReactNode;
   accessory?: ReactNode;
 }) {
   return (
@@ -27,11 +35,17 @@ export function CollapsibleSectionHeader({
       type="button"
       aria-expanded={expanded}
       className={cn(
-        "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md text-left text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70",
+        "flex w-full cursor-pointer items-center gap-2 rounded-md text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70",
+        compact ? "h-6 text-meta" : "h-8 text-xs",
         variant === "panel" ? "ps-2 pe-2.5" : "px-2",
         tones[tone].label,
       )}
     >
+      {icon ? (
+        <span aria-hidden className="flex shrink-0">
+          {icon}
+        </span>
+      ) : null}
       <span className="min-w-0 truncate">{children}</span>
       <span
         aria-hidden

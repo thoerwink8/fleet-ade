@@ -11,6 +11,7 @@ import {
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { isMacPlatform } from "@t3tools/shared/keybindings";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
@@ -55,7 +56,7 @@ vi.mock("../commandPaletteBus", () => ({
   isCommandPaletteOpen: () => false,
 }));
 vi.mock("./sidebar/SidebarChrome", () => ({
-  SidebarChromeHeader: () => null,
+  SidebarChromeHeader: ({ actions }: { actions?: ReactNode }) => <>{actions}</>,
   SidebarChromeFooter: () => null,
 }));
 
