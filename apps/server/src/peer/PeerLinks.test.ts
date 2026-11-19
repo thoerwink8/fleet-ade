@@ -206,41 +206,22 @@ it.effect("links with a pairing code, and the peer holds its agents to the limit
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect(
-  "each machine's Linked environments beta gates links, and a link waits while it is off",
-  () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const b = yield* serveB(box);
-        const a = yield* makeA(laptop);
-        const pairing = yield* b.auth.issuePairingCredential();
-        const link = a.links.link({ url: b.url, pairingCode: pairing.credential, access: "auto" });
+it.effect("a stale linkedEnvironmentsEnabled=false no longer gates links on either side", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const b = yield* serveB(box);
+      const a = yield* makeA(laptop);
+      const pairing = yield* b.auth.issuePairingCredential();
+      const link = a.links.link({ url: b.url, pairingCode: pairing.credential, access: "auto" });
 
-        yield* a.settings.updateSettings({ linkedEnvironmentsEnabled: false });
-        expect(yield* link.pipe(Effect.flip)).toMatchObject({
-          reason: "disabled",
-          message: PeerLinks.LINKED_ENVIRONMENTS_OFF,
-        });
-        expect(yield* Ref.get(b.bearers)).toEqual([]);
+      // The retired server setting decodes but is never read: linking runs anyway.
+      yield* a.settings.updateSettings({ linkedEnvironmentsEnabled: false });
+      yield* link;
 
-        yield* a.settings.updateSettings({ linkedEnvironmentsEnabled: true });
-        yield* b.settings.updateSettings({ linkedEnvironmentsEnabled: false });
-        const refusedThere = yield* link.pipe(Effect.flip);
-        expect(refusedThere.reason).toBe("pairing_rejected");
-        expect(refusedThere.message).toContain("Linked environments is off on that machine");
-        expect(yield* linkedSessions(b)).toEqual([]);
-
-        yield* b.settings.updateSettings({ linkedEnvironmentsEnabled: true });
-        yield* link;
-        yield* b.settings.updateSettings({ linkedEnvironmentsEnabled: false });
-        // Not final, so a task already running there picks up again once it is back on.
-        const waiting = yield* probe(a).pipe(Effect.flip);
-        expect(waiting.code).toBe("orchestration_error");
-        expect(waiting.message).toContain("has Linked environments turned off");
-        yield* b.settings.updateSettings({ linkedEnvironmentsEnabled: true });
-        expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
-      }),
-    ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+      yield* b.settings.updateSettings({ linkedEnvironmentsEnabled: false });
+      expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
 it.effect("a link whose row cannot be stored keeps none of its token", () =>

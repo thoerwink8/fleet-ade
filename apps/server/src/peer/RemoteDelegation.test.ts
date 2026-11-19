@@ -1138,50 +1138,32 @@ it.effect.each(["no active parent run", "a newer run owned by another provider"]
     ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.effect(
-  "with the beta off here, a task already running there still ends, and no new one starts",
-  () =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const thread = yield* makeBoxThread;
-        const b = yield* serveBox(thread);
-        const offers = yield* SubscriptionRef.make<
-          ReadonlyArray<ProviderContinuationRequests.ProviderContinuationRequest>
-        >([]);
-        const database = yield* SqlitePersistence.layerMemory.pipe(Layer.build);
-        const a = yield* makeLaptop(database, offers);
-        yield* linkTo(a.links, b, "full-access");
-        yield* seedParent(a);
-        const delegated = yield* delegateToBox(a);
+it.effect("a stale linkedEnvironmentsEnabled=false no longer stops tasks on a linked machine", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const thread = yield* makeBoxThread;
+      const b = yield* serveBox(thread);
+      const offers = yield* SubscriptionRef.make<
+        ReadonlyArray<ProviderContinuationRequests.ProviderContinuationRequest>
+      >([]);
+      const database = yield* SqlitePersistence.layerMemory.pipe(Layer.build);
+      const a = yield* makeLaptop(database, offers);
+      yield* linkTo(a.links, b, "full-access");
+      yield* seedParent(a);
 
-        yield* a.settings.updateSettings({ linkedEnvironmentsEnabled: false });
-        const refused = yield* a.call("delegate_task", {
-          task: "Run the linter on the box.",
-          target: {
-            environmentId: box.environmentId,
-            providerInstanceId: instanceId,
-            model: "gpt-5.4",
-          },
-          mode: "async",
-          clientRequestId: "lint-on-box",
-        });
-        expect(refused.isError).toBe(true);
-        expect(JSON.stringify(refused.content)).toContain(
-          PeerForwarding.linkedEnvironmentsOff.message,
-        );
-        expect((yield* a.orchestrator.getThreadProjection(parentThreadId)).subagents).toHaveLength(
-          1,
-        );
+      // The retired server setting decodes but is never read: delegation runs anyway.
+      yield* a.settings.updateSettings({ linkedEnvironmentsEnabled: false });
+      const delegated = yield* delegateToBox(a);
 
-        yield* Ref.set(thread.reply, "All 412 tests pass on the box.");
-        yield* Ref.set(thread.status, "completed");
-        yield* Deferred.succeed(thread.finished, undefined);
-        expect(yield* taskResult(a, delegated.taskId)).toMatchObject({
-          status: "completed",
-          result: "All 412 tests pass on the box.",
-        });
-      }),
-    ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+      yield* Ref.set(thread.reply, "All 412 tests pass on the box.");
+      yield* Ref.set(thread.status, "completed");
+      yield* Deferred.succeed(thread.finished, undefined);
+      expect(yield* taskResult(a, delegated.taskId)).toMatchObject({
+        status: "completed",
+        result: "All 412 tests pass on the box.",
+      });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
 it.effect("a task named only by environment inherits the parent's model, within the link", () =>
