@@ -1,7 +1,7 @@
 # Install T3 Code
 
 T3 Code runs coding agents on your computer and lets you control them from its
-desktop, web, or mobile app. Set up the machine where the agents will work first.
+desktop or web app. Set up the machine where the agents will work first.
 
 ## Requirements
 
@@ -60,8 +60,8 @@ run a server there, build it from source with `vp`, which provides the Node vers
 ([Install vp](../operations/development.md#first-checkout)):
 
 ```bash
-git clone https://github.com/pingdotgg/t3code
-cd t3code && vp i && vp run build:desktop
+git clone https://github.com/thoerwink8/fleet-ade
+cd fleet-ade && vp i && vp run build:desktop
 node apps/server/dist/bin.mjs
 ```
 
@@ -70,41 +70,14 @@ update it with `git pull` and a rebuild.
 
 ## Desktop app
 
-Download a release from [GitHub Releases](https://github.com/pingdotgg/t3code/releases),
+Download a release from [GitHub Releases](https://github.com/thoerwink8/fleet-ade/releases),
 or use a package manager:
 
-| Platform           | Install                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| Windows            | `winget install T3Tools.T3Code`                              |
-| Windows (Scoop)    | `scoop install extras/t3code`                                |
-| macOS              | `brew install --cask t3-code`                                |
-| Debian, Ubuntu     | `sudo apt install ./T3-Code-*.deb`                           |
-| Arch Linux         | `yay -S t3code-bin`                                          |
-| Arch Linux nightly | `yay -S t3code-nightly-bin`                                  |
-| Nix                | `nix profile add github:NixOS/nixpkgs/nixos-unstable#t3code` |
-
-### Linux
-
-AppImage and `.deb` downloads are available for x86_64 and ARM64. Check your
-architecture with `uname -m`: for `x86_64`, choose a file ending in
-`x86_64.AppImage` or `amd64.deb`; for `aarch64`, choose `arm64.AppImage` or
-`arm64.deb`.
-
-To launch an AppImage, open a terminal in its download folder. Replace
-`T3-Code.AppImage` below with the exact filename you downloaded:
-
-```bash
-chmod +x ./T3-Code.AppImage
-./T3-Code.AppImage
-```
-
-The `.deb` updates itself like the other desktop builds. It asks for your
-password to install each update. If your desktop has no password prompt, the
-update fails. Download the new `.deb` and install it the same way.
-
-The AUR packages currently support x86_64 only; on ARM64, use the AppImage.
-Update AUR installs with your AUR helper, such as `yay -Syu`, instead of the
-in-app updater.
+| Platform        | Install                         |
+| --------------- | ------------------------------- |
+| Windows         | `winget install T3Tools.T3Code` |
+| Windows (Scoop) | `scoop install extras/t3code`   |
+| macOS           | `brew install --cask t3-code`   |
 
 ### Nix (nixpkgs)
 
@@ -168,24 +141,9 @@ folder paths, so in the web app use **Add project** instead.
 
 ## Mobile app
 
-Install T3 Code from the
-[App Store](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or
-[Google Play](https://play.google.com/store/apps/details?id=com.t3tools.t3code).
-The phone connects to a server on another machine. Follow
-[remote access](./remote-access.md) to link it through T3 Connect or a pairing URL.
-
-Store links and QR codes are also available in **Settings → About → Mobile app**
-on web and desktop. The store apps work with both stable and Nightly servers. Test builds are optional:
-
-- **iPhone and iPad:** TestFlight is invite-only.
-- **Android:** download an APK from the
-  [Android beta releases](https://github.com/pingdotgg/t3code/releases?q=android-beta-).
-
-If the app crashes during launch, open Settings → Diagnostics on the next launch
-that succeeds. It lists startup crashes from the last 7 days with the error and
-component stack that store crash reports leave out. Copy the report and paste it
-into a GitHub issue. Error messages can quote values from the app, so read it over
-before sharing.
+Open the T3 Code web app in your phone's browser to connect to a server on
+another machine. Follow [remote access](./remote-access.md) to link it through
+T3 Connect or a pairing URL.
 
 ## Providers
 
