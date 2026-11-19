@@ -124,7 +124,7 @@ const TaskStatusTool = Tool.make("task_status", {
 
 const TaskCancelTool = Tool.make("task_cancel", {
   description:
-    "Stop one delegated task by `taskId`. Stops its running and queued turns, its delegates, and its PR watches, including later runs in its child thread. A finished task keeps its result. The child thread stays stopped. `t3_thread_send` into it is refused. Delegate a new task instead.",
+    "Stop one delegated task by `taskId`. Stops its running and queued turns, its delegates, and its PR watches, including later runs in its child thread. A finished task keeps its result; its child thread stays stopped and refuses `t3_thread_send`. Delegate a new task instead.",
   parameters: OrchestratorMcpTaskCancelInput,
   success: OrchestratorMcpTaskCancelResult,
   failure: OrchestratorMcpFailure,
@@ -299,7 +299,7 @@ const ThreadSendTool = Tool.make("t3_thread_send", {
 
 const CommandChildrenTool = Tool.make("t3_command_children", {
   description:
-    "One live row per direct child of a commander thread: 在做/卡住/做完, one line of what it does now, its conclusion when done, and whether it waits on the user. Page with `cursor`. Read-only; transcripts stay in `t3_thread_read`.",
+    "One live row per direct child of a commander thread: 在做/卡住/做完, its current line or final conclusion, and whether it waits on the user. Page with `cursor`. Transcripts stay in `t3_thread_read`.",
   parameters: CommandChildrenInput,
   success: CommandChildrenPage,
   failure: OrchestratorMcpFailure,
