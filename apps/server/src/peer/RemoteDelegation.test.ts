@@ -1,5 +1,4 @@
 import * as DocumentText from "../provider/DocumentText.ts";
-import { appendFileSync, writeFileSync } from "node:fs";
 import { NodeHttpServer } from "@effect/platform-node";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -27,6 +26,7 @@ import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Result from "effect/Result";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -653,7 +653,13 @@ const makeLaptop = (
     const layerDatabase = Layer.succeedContext(database);
     const layerOrchestrator = Layer.mergeAll(
       layerDatabase,
-      ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+      Layer.effect(
+        ProjectionStore.ProjectionStoreV2,
+        Effect.map(
+          ProjectionStore.ProjectionStoreV2,
+          (store) => replayOptions?.wrapProjectionStore?.(store) ?? store,
+        ),
+      ).pipe(Layer.provide(ProjectionStore.layer), Layer.provide(layerDatabase)),
       ProviderReplayHarness.layerWithRegistry(
         { name: "remote-delegation-laptop" },
         ProviderAdapterRegistry.layerFromAdapters([adapter]),
@@ -1326,15 +1332,9 @@ it.effect("refuses remote delegation at the local concurrency cap before launchi
 it.effect("two fibers racing one open delegation slot accept one and refuse one", () =>
   Effect.scoped(
     Effect.gen(function* () {
-      // The first two countOpenAppOwnedDelegations calls are the two pre-launch
-      // checks; each reports its arrival, then waits for the release so both
-      // pass the check while the slot is still open. Later calls are the
-      // in-lock recounts, which run free under the parent's dispatch lock.
-      const firstCountArrived = yield* Deferred.make<void>();
-      const secondCountArrived = yield* Deferred.make<void>();
+      const countArrivals = yield* Queue.unbounded<number>();
       const releaseCounts = yield* Deferred.make<void>();
-      let arrivals = 0;
-      writeFileSync("D:/frank/fleet-ade/_tmp/race-gate.log", "");
+      const countCalls = yield* Ref.make(0);
       const thread = yield* makeBoxThread;
       const b = yield* serveBox(thread);
       const offers = yield* SubscriptionRef.make<
@@ -1343,40 +1343,19 @@ it.effect("two fibers racing one open delegation slot accept one and refuse one"
       const database = yield* SqlitePersistence.layerMemory.pipe(Layer.build);
       const a = yield* makeLaptop(database, offers, undefined, {
         settingsOverrides: { dispatchConcurrencyLimit: 1 },
-        wrapProjectionStore: (store) => {
-          const log = (line: string) =>
-            appendFileSync(
-              "D:/frank/fleet-ade/_tmp/race-gate.log",
-              `${Fiber.getCurrent()?.id() ?? "?"} ${line}\n`,
-            );
-          return {
-            ...store,
-            getThreadRecords: (threadId, fields, filter) => {
-              log(`records-start ${threadId} ${String(fields)}`);
-              return store.getThreadRecords(threadId, fields, filter).pipe(
-                Effect.andThen(Effect.sync(() => log(`records-done ${threadId}`))),
-              );
-            },
-            countOpenAppOwnedDelegations: (parentThreadId) => {
-              arrivals += 1;
-              const ordinal = arrivals;
-              log(`count-call ${ordinal}`);
-              return Deferred.succeed(
-                ordinal === 1 ? firstCountArrived : secondCountArrived,
-                undefined,
-              ).pipe(
-                Effect.andThen(
-                  ordinal <= 2
-                    ? Deferred.await(releaseCounts).pipe(
-                        Effect.andThen(Effect.sync(() => log(`count-release ${ordinal}`))),
-                      )
-                    : Effect.void,
-                ),
-                Effect.andThen(store.countOpenAppOwnedDelegations(parentThreadId)),
-              );
-            },
-          };
-        },
+        wrapProjectionStore: (store) => ({
+          ...store,
+          countOpenAppOwnedDelegations: (parentThreadId) =>
+            Effect.gen(function* () {
+              const ordinal = yield* Ref.updateAndGet(countCalls, (count) => count + 1);
+              const open = yield* store.countOpenAppOwnedDelegations(parentThreadId);
+              if (ordinal === 1 || ordinal === 2) {
+                yield* Queue.offer(countArrivals, ordinal);
+                yield* Deferred.await(releaseCounts);
+              }
+              return open;
+            }),
+        }),
       });
       yield* linkTo(a.links, b, "full-access");
       yield* seedParent(a);
@@ -1388,32 +1367,39 @@ it.effect("two fibers racing one open delegation slot accept one and refuse one"
       });
 
       const delegate = (clientRequestId: string) =>
-        a.call("delegate_task", {
-          task: `Run ${clientRequestId} on the box.`,
-          target: {
-            environmentId: box.environmentId,
-            providerInstanceId: instanceId,
-            model: "gpt-5.4",
-          },
-          mode: "async",
-          clientRequestId,
-        });
-      const first = yield* delegate("first-suite-on-box").pipe(Effect.forkChild);
-      // Forking the second only after the first is parked at the count read
-      // makes its arrival the second call to that read.
-      yield* Deferred.await(firstCountArrived);
-      const second = yield* delegate("second-suite-on-box").pipe(Effect.forkChild);
-      yield* Deferred.await(secondCountArrived);
+        a.remote
+          .delegate(
+            { ...parentScope, thread: parentScope.thread! },
+            {
+              task: `Run ${clientRequestId} on the box.`,
+              target: {
+                environmentId: box.environmentId,
+                providerInstanceId: instanceId,
+                model: "gpt-5.4",
+              },
+              mode: "async",
+              clientRequestId,
+            },
+          )
+          .pipe(Effect.result);
+      const first = yield* delegate("first-suite-on-box").pipe(
+        Effect.forkChild({ startImmediately: true }),
+      );
+      const second = yield* delegate("second-suite-on-box").pipe(
+        Effect.forkChild({ startImmediately: true }),
+      );
+      expect(yield* Queue.take(countArrivals)).toBe(1);
+      expect(yield* Queue.take(countArrivals)).toBe(2);
+      expect(yield* Ref.get(thread.launched)).toBeNull();
       yield* Deferred.succeed(releaseCounts, undefined);
       const results = [yield* Fiber.join(first), yield* Fiber.join(second)];
 
-      const refused = results.filter((result) => result.isError === true);
-      const accepted = results.filter((result) => result.isError !== true);
+      const refused = results.filter(Result.isFailure);
+      const accepted = results.filter(Result.isSuccess);
       expect(accepted).toHaveLength(1);
       expect(refused).toHaveLength(1);
-      expect(JSON.stringify(refused[0]!.content)).toContain("concurrency-limit");
+      expect(refused[0]!.failure.code).toBe("concurrency-limit");
       expect((yield* a.orchestrator.getThreadProjection(parentThreadId)).subagents).toHaveLength(1);
-      // The loser still launched there; the refused record stops that thread.
       yield* Deferred.await(thread.interruptedOnce);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
