@@ -18,6 +18,7 @@ import { projectComposerContextForProvider } from "@t3tools/shared/composerConte
 import {
   answerToolCall,
   buildBase,
+  claudeRoleOptions,
   buildMessages,
   failedEarly,
   executeCodex,
@@ -672,7 +673,7 @@ it("lists link tools now that linked environments is always on, and sends chips 
 
   const testCase: McpToolUseCase = {
     ...childCase,
-    setup: { role: "top", linkedEnvironments: true },
+    setup: { role: "top" },
     prompt: "Continue [Deploy](t3-context://v1/thread/thread_deploy)",
     promptContext: {
       records: [
@@ -2146,7 +2147,7 @@ it("gives native children hook context while excluding the parent's T3 append an
   const child = buildBase(template, {
     model: "claude-sonnet-5-5",
     keepUserInstructions: false,
-    nativeSubagent: true,
+    ...claudeRoleOptions(testCase.setup.role),
   });
   assert.notInclude(
     child.system.map((block) => block.text).join("\n"),

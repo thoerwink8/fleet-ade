@@ -118,7 +118,7 @@ export function DeviceControlsRail(props: {
               </Menu>
             ) : null}
           </>
-        ) : props.hostKind === "simlock" ? null : (
+        ) : (
           <RailButton
             tooltipSide={popupSide}
             label="旋转设备"
@@ -194,16 +194,14 @@ export function DeviceControlsRail(props: {
             </RailButton>
           </>
         ) : null}
-        {props.hostKind === "simlock" ? null : (
-          <RailButton
-            tooltipSide={popupSide}
-            label={props.screenshotPending ? "正在截屏" : "保存截图"}
-            disabled={!view.streaming || props.screenshotPending}
-            onClick={props.onScreenshot}
-          >
-            <Camera />
-          </RailButton>
-        )}
+        <RailButton
+          tooltipSide={popupSide}
+          label={props.screenshotPending ? "正在截屏" : "保存截图"}
+          disabled={!view.streaming || props.screenshotPending}
+          onClick={props.onScreenshot}
+        >
+          <Camera />
+        </RailButton>
         <Menu>
           <MenuTrigger
             render={
@@ -229,7 +227,7 @@ export function DeviceControlsRail(props: {
             <MenuSeparator />
             <MenuItem variant="destructive" onClick={props.onPowerOff}>
               <Power />
-              {props.hostKind === "simlock" ? "将设备归还到设备池" : "关闭设备电源"}
+              关闭设备电源
             </MenuItem>
           </MenuPopup>
         </Menu>

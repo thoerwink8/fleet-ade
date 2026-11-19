@@ -734,6 +734,7 @@ export const makeDeviceTools = Effect.fn("evaluateMcpToolUse.makeDeviceTools")(f
         effect.pipe(
           Effect.provideService(FileSystem.FileSystem, fs),
           Effect.provideService(Path.Path, path),
+          Effect.provideService(HostProcess.Platform, environment.platform as NodeJS.Platform),
         );
       const { bindAgentDeviceLauncher: bind, pruneAgentDeviceLaunchers: prune } = launcherApi;
       const launchers: Launchers | undefined =
@@ -790,6 +791,8 @@ export const makeDeviceTools = Effect.fn("evaluateMcpToolUse.makeDeviceTools")(f
       ),
       Layer.provideMerge(config),
       Layer.provideMerge(files),
+      // A simulated POSIX world joins launcher and state paths with POSIX even on a Windows host.
+      ...(environment.platform === "win32" ? [] : [Layer.provideMerge(Path.layer)]),
     ),
   );
   type Entry = Parameters<McpServer.McpServer["Service"]["addTool"]>[0];

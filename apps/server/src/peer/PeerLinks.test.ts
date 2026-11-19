@@ -309,6 +309,37 @@ const serveRaw = <E, R>(
     ),
   );
 
+it.effect("a legacy peer's 403 keeps a linked call retryable", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const b = yield* serveB(box);
+      const front = yield* serveRaw(() =>
+        Effect.succeed(HttpServerResponse.empty({ status: 403 })),
+      );
+      const a = yield* makeA(laptop);
+      const pairing = yield* b.auth.issuePairingCredential();
+      yield* a.links.link({ url: b.url, pairingCode: pairing.credential, access: "auto" });
+      const context = yield* Layer.build(
+        PeerMcpClient.layer.pipe(
+          Layer.provide(
+            Layer.succeed(PeerLinks.PeerLinks, {
+              ...a.links,
+              resolve: (id) =>
+                a.links.resolve(id).pipe(Effect.map((resolved) => ({ ...resolved, url: front }))),
+            }),
+          ),
+          Layer.provide(FetchHttpClient.layer),
+        ),
+      );
+      const legacy = { ...a, peer: Context.get(context, PeerMcpClient.PeerMcpClient) };
+      const refused = yield* probe(legacy).pipe(Effect.flip);
+      expect(refused.code).toBe("orchestration_error");
+      expect(refused.message).toContain("turned off");
+      expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
 it.effect("never follows a peer's redirect with the pairing code", () =>
   Effect.scoped(
     Effect.gen(function* () {

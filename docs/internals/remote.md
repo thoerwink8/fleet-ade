@@ -77,9 +77,10 @@ sees one more OAuth client, lists it in Sharing & access, and revokes it there.
 Unlinking on the linking side only forgets the token.
 
 - **Linked environments are always on.** The retired
-  `linkedEnvironmentsEnabled` is retained only so older settings files decode; runtime always enables linked environments. Older servers may still reject links.
-  reports that as retryable so the task's follower waits rather than failing
-  it.
+  `linkedEnvironmentsEnabled` is retained only so older settings files decode;
+  runtime always enables linked environments. Older peers may still return 403
+  when links are disabled there. `PeerMcpClient` treats that response as retryable
+  so the task's follower waits rather than failing it.
 - **A tool runs in a linked environment when its parameters take
   `OrchestratorMcpEnvironmentTarget`** as `environmentId`.
   [`McpToolAccess.toLayer`](../../apps/server/src/mcp/McpToolAccess.ts) sends

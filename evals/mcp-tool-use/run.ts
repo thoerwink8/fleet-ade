@@ -305,8 +305,6 @@ export const McpToolUseCase = Schema.Struct({
     role: Schema.Literals(["top", "delegated-child", "native-subagent"]),
     /** Runs only on this harness, for cases whose right answer depends on it. */
     harness: Schema.optional(Schema.Literals(["claude", "codex"])),
-    /** The Linked environments beta is on, so T3 lists its link tools. */
-    linkedEnvironments: Schema.optional(Schema.Boolean),
     /** delegate_task `role` for a delegated child. T3 builds the child's first message from it. */
     delegateRole: Schema.optional(OrchestratorMcpTaskRole),
     context: Schema.optional(Schema.String),
@@ -610,6 +608,11 @@ const NATIVE_SCHEMAS: Readonly<Record<string, Omit<ApiTool, "name">>> = {
     },
   },
 };
+
+export const claudeRoleOptions = (role: McpToolUseCase["setup"]["role"]) => ({
+  subagent: role === "delegated-child",
+  nativeSubagent: role === "native-subagent",
+});
 
 /** Rebuilds the parts of a captured request that every case shares. */
 export const buildBase = (
@@ -2565,7 +2568,7 @@ const main = Effect.gen(function* () {
             const built = buildBase(capture.request.provider_native, {
               model: flags.model,
               keepUserInstructions,
-              subagent: role === "delegated-child",
+              ...claudeRoleOptions(role),
               deviceAccess,
               browserAccess,
             });

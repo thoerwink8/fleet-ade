@@ -120,7 +120,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
           worktreesDirectory: true,
           threadAutoSettlementScope: true,
         });
-        expect(descriptor.capabilities).not.toHaveProperty("fastWorktreeCheckout");
       }
     }),
   );

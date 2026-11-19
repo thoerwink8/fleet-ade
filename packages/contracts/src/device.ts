@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
-import { ThreadId, TrimmedNonEmptyString, TrimmedString } from "./baseSchemas.ts";
+import { ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
 import { SettingsSecretValue } from "./settingsSecretValue.ts";
 
 export const DevicePlatform = Schema.Literals(["ios", "android"]);
@@ -130,33 +130,6 @@ export const DeviceEasAccount = Schema.Struct({
   apps: Schema.Array(Schema.Struct({ id: Schema.String, fullName: Schema.String })),
 });
 export type DeviceEasAccount = typeof DeviceEasAccount.Type;
-
-export const DeviceSimlockIdentityInput = Schema.Struct({
-  /** Without one, the gateway this machine's agent-device points at. */
-  gatewayUrl: Schema.optional(TrimmedString),
-  /** A saved Simlock host whose stored token is checked when no new token is given. */
-  hostId: Schema.optional(DeviceHostId),
-  agentToken: Schema.optional(SettingsSecretValue),
-});
-export type DeviceSimlockIdentityInput = typeof DeviceSimlockIdentityInput.Type;
-
-export const DeviceSimlockIdentity = Schema.Struct({
-  gatewayUrl: Schema.String,
-  /** The label the gateway gave the token. */
-  signedInAs: Schema.String,
-  /** `env`: this machine's AGENT_DEVICE_DAEMON_AUTH_TOKEN, used because it targets this gateway. */
-  tokenSource: Schema.Literals(["entered", "settings", "env"]),
-});
-export type DeviceSimlockIdentity = typeof DeviceSimlockIdentity.Type;
-
-export class DeviceSimlockIdentityError extends Schema.TaggedError<DeviceSimlockIdentityError>()(
-  "DeviceSimlockIdentityError",
-  { reason: Schema.String },
-) {
-  override get message(): string {
-    return this.reason;
-  }
-}
 
 /** Checking an Expo credential failed; no device host is involved yet. */
 export class DeviceEasAccountError extends Schema.TaggedError<DeviceEasAccountError>()(
