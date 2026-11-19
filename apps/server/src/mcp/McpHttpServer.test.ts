@@ -30,6 +30,7 @@ import { McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 
 import * as ProjectService from "../project/ProjectService.ts";
+import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as DocumentText from "../provider/DocumentText.ts";
@@ -303,6 +304,9 @@ const layerRecordingTools = (calls: Array<unknown>) => {
         Layer.mock(OrchestratorMcpService.OrchestratorMcpService)({}),
         Layer.mock(ProjectService.ProjectService)({}),
         Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
+        Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+          trackAdhoc: () => Effect.void,
+        }),
         Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
           namedProjectsRoot: process.cwd(),
         }),

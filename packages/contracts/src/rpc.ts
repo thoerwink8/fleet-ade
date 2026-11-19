@@ -411,8 +411,14 @@ import {
 } from "./sourceControl.ts";
 import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
+import {
+  FleetSummaryError,
+  FleetSummaryEvent,
+  FleetSummarySubscribeInput,
+} from "./fleetSummary.ts";
 
 export const WS_METHODS = {
+  fleetSummarySubscribe: "fleetSummary.subscribe",
   projectsListEntries: "projects.listEntries",
   projectsListIgnoredFiles: "projects.listIgnoredFiles",
   projectsReadFile: "projects.readFile",
@@ -1987,6 +1993,12 @@ const WsOrchestrationV2SubscribePromptSuggestionRpc = Rpc.make(
     stream: true,
   },
 );
+const WsFleetSummarySubscribeRpc = Rpc.make(WS_METHODS.fleetSummarySubscribe, {
+  payload: FleetSummarySubscribeInput,
+  success: FleetSummaryEvent,
+  error: Schema.Union([FleetSummaryError, EnvironmentAuthorizationError]),
+  stream: true,
+});
 
 const WsSubscribeTerminalMetadataRpc = Rpc.make(WS_METHODS.subscribeTerminalMetadata, {
   payload: Schema.Struct({}),
@@ -2115,6 +2127,7 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
 ) {}
 
 export const WsRpcGroup = RpcGroup.make(
+  WsFleetSummarySubscribeRpc,
   WsServerProbeRpc,
   WsServerNetworkRpc,
   WsServerGetConfigRpc,

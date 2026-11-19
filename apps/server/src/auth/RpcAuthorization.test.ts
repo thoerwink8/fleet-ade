@@ -145,60 +145,73 @@ describe("RPC scope middleware", () => {
     }),
   );
 });
-
-it.effect.each([WS_METHODS.subscribeVcsBranch, WS_METHODS.subscribeVcsStatus] as const)(
-  "enforces read permission on stream %s",
-  (method) =>
-    Effect.gen(function* () {
-      const group = WsRpcGroup.omit(
-        ...[...WsRpcGroup.requests.keys()].filter(
-          (
-            tag,
-          ): tag is Exclude<
-            keyof typeof RPC_REQUIRED_SCOPES,
-            typeof WS_METHODS.subscribeVcsBranch | typeof WS_METHODS.subscribeVcsStatus
-          > => tag !== WS_METHODS.subscribeVcsBranch && tag !== WS_METHODS.subscribeVcsStatus,
+it.effect.each([
+  WS_METHODS.subscribeVcsBranch,
+  WS_METHODS.subscribeVcsStatus,
+  WS_METHODS.fleetSummarySubscribe,
+] as const)("enforces read permission on stream %s", (method) =>
+  Effect.gen(function* () {
+    const group = WsRpcGroup.omit(
+      ...[...WsRpcGroup.requests.keys()].filter(
+        (
+          tag,
+        ): tag is Exclude<
+          keyof typeof RPC_REQUIRED_SCOPES,
+          | typeof WS_METHODS.subscribeVcsBranch
+          | typeof WS_METHODS.subscribeVcsStatus
+          | typeof WS_METHODS.fleetSummarySubscribe
+        > =>
+          tag !== WS_METHODS.subscribeVcsBranch &&
+          tag !== WS_METHODS.subscribeVcsStatus &&
+          tag !== WS_METHODS.fleetSummarySubscribe,
+      ),
+    );
+    let handled = 0;
+    const handlers = Layer.mergeAll(
+      group.toLayerHandler(WS_METHODS.subscribeVcsBranch, () =>
+        Stream.fromEffect(
+          Effect.sync(() => {
+            handled++;
+            return { refName: "main" };
+          }),
         ),
-      );
-      let handled = 0;
-      const handlers = Layer.mergeAll(
-        group.toLayerHandler(WS_METHODS.subscribeVcsBranch, () =>
-          Stream.fromEffect(
-            Effect.sync(() => {
-              handled++;
-              return { refName: "main" };
-            }),
-          ),
-        ),
-        group.toLayerHandler(WS_METHODS.subscribeVcsStatus, () =>
-          Stream.fromEffect(
-            Effect.sync(() => {
-              handled++;
-            }),
-          ).pipe(Stream.drain),
-        ),
-      );
-      const denied = yield* RpcTest.makeClient(group).pipe(
-        Effect.provide(Layer.merge(handlers, RpcAuthorization.layer([]))),
-      );
-      expect(
-        yield* Stream.runDrain(
-          method === WS_METHODS.subscribeVcsBranch
-            ? denied[method]({ cwd: "/repo" }).pipe(Stream.drain)
-            : denied[method]({ cwd: "/repo" }).pipe(Stream.drain),
-        ).pipe(Effect.flip),
-      ).toMatchObject({ requiredPermission: AuthOrchestrationReadScope });
-      expect(handled).toBe(0);
-      const granted = yield* RpcTest.makeClient(group).pipe(
-        Effect.provide(Layer.merge(handlers, RpcAuthorization.layer([AuthOrchestrationReadScope]))),
-      );
-      yield* Stream.runDrain(
-        method === WS_METHODS.subscribeVcsBranch
-          ? granted[method]({ cwd: "/repo" }).pipe(Stream.drain)
-          : granted[method]({ cwd: "/repo" }).pipe(Stream.drain),
-      );
-      expect(handled).toBe(1);
-    }),
+      ),
+      group.toLayerHandler(WS_METHODS.subscribeVcsStatus, () =>
+        Stream.fromEffect(
+          Effect.sync(() => {
+            handled++;
+          }),
+        ).pipe(Stream.drain),
+      ),
+      group.toLayerHandler(WS_METHODS.fleetSummarySubscribe, () =>
+        Stream.fromEffect(
+          Effect.sync(() => {
+            handled++;
+          }),
+        ).pipe(Stream.drain),
+      ),
+    );
+    const denied = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(Layer.merge(handlers, RpcAuthorization.layer([]))),
+    );
+    expect(
+      yield* method === WS_METHODS.fleetSummarySubscribe
+        ? Stream.runDrain(denied[method]({})).pipe(Effect.flip)
+        : method === WS_METHODS.subscribeVcsBranch
+          ? Stream.runDrain(denied[method]({ cwd: "/repo" })).pipe(Effect.flip)
+          : Stream.runDrain(denied[method]({ cwd: "/repo" })).pipe(Effect.flip),
+    ).toMatchObject({ requiredPermission: AuthOrchestrationReadScope });
+    expect(handled).toBe(0);
+    const granted = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(Layer.merge(handlers, RpcAuthorization.layer([AuthOrchestrationReadScope]))),
+    );
+    yield* method === WS_METHODS.fleetSummarySubscribe
+      ? Stream.runDrain(granted[method]({}))
+      : method === WS_METHODS.subscribeVcsBranch
+        ? Stream.runDrain(granted[method]({ cwd: "/repo" }))
+        : Stream.runDrain(granted[method]({ cwd: "/repo" }));
+    expect(handled).toBe(1);
+  }),
 );
 
 describe("settings mutation authorization", () => {

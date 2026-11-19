@@ -143,6 +143,7 @@ import * as PullRequestReadCache from "./pullRequest/PullRequestReadCache.ts";
 import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as WorktreeSetupTracker from "./project/WorktreeSetupTracker.ts";
+import * as FleetSummary from "./ledger/FleetSummary.ts";
 import * as Observability from "./observability/Observability.ts";
 import * as HeapSnapshot from "./observability/HeapSnapshot.ts";
 import * as EventLoopMonitor from "./observability/EventLoopMonitor.ts";
@@ -182,6 +183,8 @@ import * as CloudHttp from "./cloud/http.ts";
 import * as LedgerNotes from "./ledger/notes.ts";
 import * as FleetClaims from "./ledger/FleetClaims.ts";
 import * as FleetHeartbeat from "./ledger/FleetHeartbeat.ts";
+import * as FleetSummaryReporter from "./ledger/FleetSummaryReporter.ts";
+import * as Scheduler from "./scheduling/Scheduler.ts";
 import * as CloudLink from "./cloud/CloudLink.ts";
 import * as ConnectReachability from "./cloud/ConnectReachability.ts";
 import { pendingServiceUpdateExists } from "./cloud/updateHandoff.ts";
@@ -736,11 +739,32 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
       yield* service.start();
     }),
   ).pipe(Layer.provide(DelegatedTaskQuestionReactor.layer), Layer.provide(ProjectionStoreV2.layer)),
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
+      yield* reporter.start();
+    }),
+  ).pipe(
+    // Export this instance to the MCP handlers; its tracking map must be shared.
+    Layer.provideMerge(FleetSummaryReporter.layer),
+    Layer.provide(Scheduler.layer),
+    Layer.provide(ProjectionStoreV2.layer),
+    Layer.provideMerge(PeerMcpClient.layer),
+    Layer.provideMerge(PeerLinks.layer),
+  ),
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const scheduler = yield* Scheduler.Scheduler;
+      const summary = yield* FleetSummary.FleetSummary;
+      yield* scheduler.register("fleet-summary-stale", summary.sweepStale);
+    }),
+  ).pipe(Layer.provide(Scheduler.layer), Layer.provide(FleetSummary.layer)),
   ProviderUsageLimitsIngestion.layer,
   layerProviderInstallationRefresh,
   ProviderInstallation.layer,
   ReplayMarkers.layer,
   FleetClaims.layer,
+  FleetSummary.layer,
   Layer.succeed(
     FleetHeartbeat.FleetHeartbeatConfigService,
     FleetHeartbeat.defaultFleetHeartbeatConfig,
@@ -900,6 +924,8 @@ const layerMakeRoutes = Layer.mergeAll(
     ),
   ),
   Layer.provide(FleetClaims.layer),
+  // Same layer reference as the startup consumer: one memoized tracking map.
+  Layer.provide(FleetSummaryReporter.layer.pipe(Layer.provide(Scheduler.layer))),
   Layer.provide(
     SpeechService.layer.pipe(
       Layer.provide(layerServerSettings),

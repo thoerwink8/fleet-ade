@@ -61,6 +61,57 @@ export const migrate = Effect.gen(function* () {
       received_at TEXT NOT NULL
     )
   `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS fleet_summary_meta (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      revision INTEGER NOT NULL
+    )
+  `;
+  yield* sql`INSERT OR IGNORE INTO fleet_summary_meta (id, revision) VALUES (1, 0)`;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS fleet_summary_rows (
+      row_id TEXT PRIMARY KEY,
+      environment_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      repo TEXT,
+      issue INTEGER,
+      task_id TEXT,
+      thread_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      phase TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      needs_you INTEGER NOT NULL,
+      last_progress TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      stale INTEGER NOT NULL DEFAULT 0,
+      stale_reason TEXT,
+      revision INTEGER NOT NULL
+    )
+  `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS fleet_summary_changes (
+      revision INTEGER PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      row_id TEXT,
+      payload TEXT NOT NULL
+    )
+  `;
+  yield* sql`
+    CREATE INDEX IF NOT EXISTS idx_fleet_summary_rows_environment
+    ON fleet_summary_rows (environment_id)
+  `;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS fleet_summary_registrations (
+      thread_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      coordinator TEXT NOT NULL,
+      repo TEXT,
+      issue INTEGER,
+      task_id TEXT,
+      sent TEXT,
+      deleting INTEGER NOT NULL DEFAULT 0
+    )
+  `;
   yield* sql.withTransaction(
     Effect.gen(function* () {
       const claimColumns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
