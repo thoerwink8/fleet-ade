@@ -74,7 +74,7 @@ const claimInput = (repo: string, taskId: string, idempotencyKey: string) => ({
   idempotencyKey,
 });
 
-it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤销节点", () =>
+it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签名会话身份", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const peer = yield* servePeer(
@@ -93,7 +93,7 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
       const held = yield* claim(aClient, claimInput("example/one", "root", "a-root"));
       expect(held.outcome).toBe("claimed");
       expect(held.claim?.holder).not.toBe("node-a");
-      expect(held.claim?.holderEnvironment).toBe(nodeA.environmentId);
+      expect(held.claim?.holderEnvironment).toBe(held.claim?.holder);
       expect((yield* claim(bClient, claimInput("example/one", "root", "b-root"))).outcome).toBe(
         "already-held",
       );
@@ -149,16 +149,17 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并拒绝撤�
         ],
       });
       expect(own.results[0]?.outcome).toBe("renewed");
-      expect(own.results[0]?.claim?.holderEnvironment).toBe(nodeB.environmentId);
+      expect(own.results[0]?.claim?.holderEnvironment).toBe(own.results[0]?.claim?.holder);
 
-      const revoked = (yield* peer.linkedSessions).find(
+      const peerSession = (yield* peer.linkedSessions).find(
         (session) => session.client.label === "T3 Code · Node B",
       );
-      expect(revoked).toBeDefined();
-      yield* peer.auth.revokeSession(revoked!.sessionId);
-      const denied = yield* claim(bClient, claimInput("example/one", "child-2", "revoked")).pipe(
-        Effect.flip,
-      );
+      expect(peerSession).toBeDefined();
+      yield* peer.auth.revokeSession(peerSession!.sessionId);
+      const denied = yield* claim(
+        bClient,
+        claimInput("example/one", "child-2", "after-session-invalidation"),
+      ).pipe(Effect.flip);
       expect(denied.code).toBe("capability_denied");
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
