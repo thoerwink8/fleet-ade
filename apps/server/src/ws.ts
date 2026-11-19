@@ -140,6 +140,7 @@ import {
   type ShellApplicationEvent,
 } from "./orchestration-v2/ShellStream.ts";
 import { ORCHESTRATION_V2_PROJECTION_SCHEMA_VERSION } from "./orchestration-v2/ProjectionStore.ts";
+import { ChildSessionSummary } from "./orchestration-v2/ChildSessionSummary.ts";
 import {
   coalesceLiveUpdatedEvents,
   coalesceThreadLiveStream,
@@ -1349,6 +1350,7 @@ export const layerWsRpc = (
         | ServerSettings.ServerSettingsService
         | DocumentText.DocumentText
       >();
+      const childSummaries = yield* ChildSessionSummary;
       const applicationEvents = yield* OrchestrationEventStore.OrchestrationEventStore;
       const projectStore = yield* ProjectStore.ProjectStoreV2;
       const projectService = yield* ProjectService.ProjectService;
@@ -2159,6 +2161,12 @@ export const layerWsRpc = (
           ),
         [ORCHESTRATION_V2_WS_METHODS.subscribePromptSuggestion]: (input) =>
           providerSessionManager.subscribePromptSuggestion(input.threadId),
+        [ORCHESTRATION_V2_WS_METHODS.commandChildren]: (input) =>
+          childSummaries.list({ threadId: input.threadId, cursor: input.cursor }),
+        [ORCHESTRATION_V2_WS_METHODS.commandChildDetail]: (input) =>
+          childSummaries.detail({ threadId: input.threadId }),
+        [ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren]: (input) =>
+          childSummaries.subscribe(input.threadId),
         [WS_METHODS.scheduledTasksSubscribe]: (_input) =>
           scheduledTasks.subscribeList().pipe(Stream.map(withVisibleWebhookUrls)),
         [WS_METHODS.scheduledTasksUpsert]: (input) => scheduledTasks.upsert(input),

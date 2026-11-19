@@ -44,6 +44,8 @@ import {
   PipelineSupervisionStartInput,
   PipelineSupervisionStatusResult,
   PipelineSupervisionVerdictInput,
+  CommandChildrenInput,
+  CommandChildrenPage,
   PipelineSupervisionVerdictResult,
 } from "@t3tools/contracts";
 import { McpSchema, Tool, Toolkit } from "effect/ai";
@@ -122,7 +124,7 @@ const TaskStatusTool = Tool.make("task_status", {
 
 const TaskCancelTool = Tool.make("task_cancel", {
   description:
-    "Stop one delegated task by `taskId`. Stops its running and queued turns, its delegates, and its PR watches, including later runs in its child thread. A finished task keeps its result.",
+    "Stop one delegated task by `taskId`. Stops its running and queued turns, its delegates, and its PR watches, including later runs in its child thread. A finished task keeps its result; its child thread stays stopped and refuses `t3_thread_send`. Delegate a new task instead.",
   parameters: OrchestratorMcpTaskCancelInput,
   success: OrchestratorMcpTaskCancelResult,
   failure: OrchestratorMcpFailure,
@@ -284,7 +286,7 @@ const ThreadUpdateTool = Tool.make("t3_thread_update", {
 
 const ThreadSendTool = Tool.make("t3_thread_send", {
   description:
-    "Send a message to any thread. The target cannot run with broader modes than yours. `mode:'auto'` starts an idle thread, steers a running turn, or queues. `queue`: new turn. `steer`: mid-turn update. `restart`: interrupt and restart. A send to a finished child thread starts a fresh task and returns its `taskId`. In your reply, name it as its `link` verbatim.",
+    "Send a message to any thread. The target cannot run with broader modes than yours. `mode:'auto'` starts an idle thread, steers a running turn, or queues. `queue`: new turn. `steer`: mid-turn update. `restart`: interrupt and restart. A send to a finished child thread starts a fresh task and returns its `taskId`; a child cancelled by `task_cancel` is refused. Delegate a new task instead. In your reply, name it as its `link` verbatim.",
   parameters: OrchestratorMcpThreadSendInput,
   success: OrchestratorMcpThreadSendResult,
   failure: OrchestratorMcpFailure,
@@ -294,6 +296,20 @@ const ThreadSendTool = Tool.make("t3_thread_send", {
   .annotate(Tool.Title, "Send to a T3 thread")
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
+
+const CommandChildrenTool = Tool.make("t3_command_children", {
+  description:
+    "One live row per direct child of a commander thread: 在做/卡住/做完, its current line or final conclusion, and whether it waits on the user. Page with `cursor`. Transcripts stay in `t3_thread_read`.",
+  parameters: CommandChildrenInput,
+  success: CommandChildrenPage,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies,
+})
+  .annotate(Tool.Title, "List child session rows")
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true);
 
 const ThreadWaitTool = Tool.make("t3_thread_wait", {
   description:
@@ -451,6 +467,7 @@ export const OrchestratorToolkit = Toolkit.make(
   PipelineStatusTool,
   PipelineSendTool,
   PipelineVerdictTool,
+  CommandChildrenTool,
   PipelineCleanupTool,
   EnvironmentLinksTool,
   EnvironmentLinkTool,

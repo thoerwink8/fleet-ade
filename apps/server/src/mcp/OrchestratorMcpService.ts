@@ -35,7 +35,8 @@ import {
   type OrchestratorMcpTaskCancelResult,
   type OrchestratorMcpUpdateScheduledTaskInput,
   type OrchestratorMcpListScheduledTasksInput,
-  type ProjectId,
+  type CommandChildrenInput,
+  type CommandChildrenPage,
   type OrchestratorMcpThreadDetail,
   type OrchestratorMcpThreadInterruptInput,
   type OrchestratorMcpThreadInterruptResult,
@@ -50,6 +51,7 @@ import {
   type OrchestratorMcpThreadTimelineItem,
   type OrchestratorMcpThreadWaitInput,
   type OrchestratorMcpThreadWaitResult,
+  type ProjectId,
   type ProviderInteractionMode,
   type ProviderOptionDescriptor,
   type ProviderOptionSelection,
@@ -109,6 +111,12 @@ import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import { isSnoozed } from "../orchestration-v2/ThreadSettlementService.ts";
 import { userFacingDispatchErrorMessage } from "../orchestration-v2/UserFacingErrors.ts";
+import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts";
+import {
+  delegateCorrectionRefusal,
+  isDelegateTaskChild,
+  isLocalDelegateTaskChild,
+} from "../orchestration-v2/childSummaryDerive.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
@@ -214,6 +222,10 @@ export interface OrchestratorMcpServiceShape {
     scope: McpInvocationScope,
     input: OrchestratorMcpThreadReadInput,
   ) => Effect.Effect<OrchestratorMcpThreadReadResult, OrchestratorMcpFailure>;
+  readonly commandChildren: (
+    scope: McpInvocationScope,
+    input: CommandChildrenInput,
+  ) => Effect.Effect<CommandChildrenPage, OrchestratorMcpFailure>;
   readonly sendToThread: (
     scope: McpInvocationScope,
     input: OrchestratorMcpThreadSendInput,
@@ -1206,6 +1218,7 @@ const make = Effect.gen(function* () {
   const gitDriver = yield* GitVcsDriver.GitVcsDriver;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const remoteDelegation = yield* RemoteDelegation.RemoteDelegation;
+  const childSessionSummary = yield* ChildSessionSummary;
 
   const requireProject = (projectId: ProjectId) =>
     projects.getById(projectId).pipe(
@@ -3321,11 +3334,29 @@ const make = Effect.gen(function* () {
         earlierPosition: timeline.hasEarlier || start > 0 ? (items[0]?.position ?? null) : null,
       } satisfies OrchestratorMcpThreadReadResult;
     }),
+    commandChildren: Effect.fn("OrchestratorMcpService.commandChildren")(function* (scope, input) {
+      yield* loadScopedThread(scope, input.threadId, []);
+      return yield* childSessionSummary
+        .list({
+          threadId: input.threadId,
+          cursor: input.cursor,
+        })
+        .pipe(Effect.mapError((error) => failure("orchestration_error", error.message)));
+    }),
     sendToThread: Effect.fn("OrchestratorMcpService.sendToThread")(function* (scope, input) {
       const { parent, limits, target } = yield* loadScopedThread(scope, input.threadId, ["runs"]);
       yield* assertLiveCallerForOtherThread(scope, parent, target);
       yield* resolveRuntimeMode(limits.runtimeMode, target.thread.runtimeMode);
       yield* resolveInteractionMode(limits.interactionMode, target.thread.interactionMode);
+      if (isDelegateTaskChild(target.thread)) {
+        const shell = yield* threadManagement
+          .getThreadShell(input.threadId)
+          .pipe(Effect.mapError(threadManagementFailure));
+        const refusal = shell === null ? "这条已经停了" : delegateCorrectionRefusal(shell);
+        if (refusal !== undefined) {
+          return yield* failure("thread_not_sendable", refusal);
+        }
+      }
 
       const mode = input.mode ?? "auto";
       const key = yield* requestKey(input.clientRequestId);
@@ -3431,6 +3462,9 @@ const make = Effect.gen(function* () {
       yield* assertLiveCallerForOtherThread(scope, parent, target);
       yield* resolveRuntimeMode(limits.runtimeMode, target.thread.runtimeMode);
       yield* resolveInteractionMode(limits.interactionMode, target.thread.interactionMode);
+      if (isLocalDelegateTaskChild(target.thread)) {
+        return yield* failure("thread_not_interruptible", "委托子会话请用 task_cancel。");
+      }
       const key = yield* requestKey(input.clientRequestId);
       // A peer from before `stop` drops it when decoding, so it interrupts
       // the run instead, as this call did then.
@@ -3529,5 +3563,6 @@ export const layer: Layer.Layer<
   | ProjectService.ProjectService
   | SecretRequests.SecretRequests
   | ServerSettings.ServerSettingsService
+  | ChildSessionSummary
   | RemoteDelegation.RemoteDelegation
 > = Layer.effect(OrchestratorMcpService, make);

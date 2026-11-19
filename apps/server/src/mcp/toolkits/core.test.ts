@@ -26,6 +26,8 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as Effect from "effect/Effect";
 import * as TestClock from "effect/testing/TestClock";
 import * as Layer from "effect/Layer";
+import * as SqlitePersistence from "../../persistence/Sqlite.ts";
+import { ChildSessionSummary } from "../../orchestration-v2/ChildSessionSummary.ts";
 import * as Schema from "effect/Schema";
 import { McpAttachmentInput } from "./attachment/input.ts";
 import { McpSchema, McpServer } from "effect/ai";
@@ -67,6 +69,8 @@ import * as PeerLinks from "../../peer/PeerLinks.ts";
 const layerOrchestratorToolkit = McpHttpServer.layerOrchestratorToolkit.pipe(
   Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
   Layer.provide(Layer.mock(GitVcsDriver.GitVcsDriver)({})),
+  Layer.provide(ChildSessionSummary.layer),
+  Layer.provide(SqlitePersistence.layerMemory),
 );
 
 const declaredFailure = (result: McpSchema.CallToolResult) => {

@@ -35,9 +35,13 @@ import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import type * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts";
 import { liveThreadShell } from "./McpToolAccess.testkit.ts";
 
 const layerOrchestratorService = OrchestratorMcpService.layer.pipe(
+  Layer.provide(ChildSessionSummary.layer),
+  Layer.provide(SqlitePersistence.layerMemory),
   Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
   Layer.provide(Layer.mock(GitVcsDriver.GitVcsDriver)({})),
 );
@@ -1102,6 +1106,173 @@ it("requestSecret saves a pasted value to a file without opening a card", async 
   }).pipe(Effect.provide(layer), Effect.runPromise);
 });
 
+it("commandChildren reads another thread and refuses a missing one", async () => {
+  const foreignThreadId = ThreadId.make("thread-mcp-command-children-foreign");
+  const parentProjection = {
+    thread: baseThread({
+      threadId: parentThreadId,
+      title: "Parent",
+      instanceId: parentInstanceId,
+      model: "gpt-5.4",
+    }),
+    runs: [],
+    visibleTurnItems: [],
+    providerTurns: [],
+    runtimeRequests: [],
+    messages: [],
+    contextTransfers: [],
+    subagents: [],
+    updatedAt: now,
+  } as unknown as OrchestrationV2ThreadProjection;
+  const foreignProjection = {
+    ...parentProjection,
+    thread: { ...parentProjection.thread, id: foreignThreadId },
+  } as unknown as OrchestrationV2ThreadProjection;
+
+  const layer = layerOrchestratorService.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          getThreadRecords: (threadId) =>
+            threadId === parentThreadId
+              ? Effect.succeed(parentProjection)
+              : Effect.succeed(foreignProjection),
+          getThreadShell: (threadId) =>
+            Effect.succeed(
+              threadId === foreignThreadId || threadId === parentThreadId
+                ? (liveThreadShell(threadId) as unknown as OrchestrationV2ThreadShell)
+                : null,
+            ),
+          getProjectThreadRecords: (input) =>
+            input.threadId === foreignThreadId
+              ? Effect.succeed(foreignProjection)
+              : Effect.fail(
+                  new ThreadManagementService.ThreadManagementThreadNotFoundError({
+                    projectId: input.projectId,
+                    threadId: input.threadId,
+                  }),
+                ),
+        } satisfies Partial<ThreadManagementService.ThreadManagementService["Service"]>),
+        ServerSettings.layerTest(),
+        Layer.mock(ProviderRegistry.ProviderRegistry)({
+          getProviders: Effect.succeed([]),
+        } satisfies Partial<ProviderRegistry.ProviderRegistry["Service"]>),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+        Layer.mock(ProviderAdapterRegistry.ProviderAdapterRegistryV2)({}),
+        NodeCrypto.layer,
+      ),
+    ),
+  );
+
+  await Effect.gen(function* () {
+    const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+    const page = yield* service.commandChildren(makeScope(), { threadId: foreignThreadId });
+    expect(page.children).toEqual([]);
+    const missing = yield* service
+      .commandChildren(makeScope(), { threadId: ThreadId.make("thread-mcp-missing") })
+      .pipe(Effect.flip);
+    expect(missing.code).toBe("thread_not_found");
+  }).pipe(Effect.provide(layer), Effect.runPromise);
+});
+
+it("local delegated children reject interrupt and stopped send, ordinary threads still interrupt", async () => {
+  const ordinaryThreadId = ThreadId.make("thread-mcp-ordinary");
+  const childShell = {
+    ...liveThreadShell(childThreadId),
+    status: "cancelled",
+    lineage: {
+      parentThreadId,
+      relationshipToParent: "subagent",
+      rootThreadId: parentThreadId,
+    },
+    creationSource: "mcp",
+  } as unknown as OrchestrationV2ThreadShell;
+  const ordinaryShell = liveThreadShell(ordinaryThreadId);
+  const parentProjection = {
+    thread: liveThreadShell(parentThreadId),
+    runs: [makeRun({ id: activeRunId, ordinal: 1, status: "running" })],
+    subagents: [],
+  } as unknown as OrchestrationV2ThreadProjection;
+  const childProjection = {
+    thread: { ...childShell, status: "running" },
+    runs: [makeRun({ id: childRunId, ordinal: 1, status: "running" })],
+    subagents: [],
+  } as unknown as OrchestrationV2ThreadProjection;
+  const ordinaryProjection = {
+    thread: ordinaryShell,
+    runs: [makeRun({ id: RunId.make("run-mcp-ordinary"), ordinal: 1, status: "running" })],
+    subagents: [],
+  } as unknown as OrchestrationV2ThreadProjection;
+  let interruptCalls = 0;
+  let sendCalls = 0;
+  const layer = layerOrchestratorService.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.mock(ThreadManagementService.ThreadManagementService)({
+          getThreadRecords: (threadId) =>
+            Effect.succeed(
+              threadId === parentThreadId
+                ? parentProjection
+                : threadId === childThreadId
+                  ? childProjection
+                  : ordinaryProjection,
+            ),
+          getProjectThreadRecords: (input) =>
+            Effect.succeed(input.threadId === childThreadId ? childProjection : ordinaryProjection),
+          getThreadShell: (threadId) =>
+            Effect.succeed(
+              threadId === childThreadId
+                ? childShell
+                : threadId === ordinaryThreadId
+                  ? ordinaryShell
+                  : liveThreadShell(parentThreadId),
+            ),
+          interruptThread: () =>
+            Effect.sync(() => {
+              interruptCalls += 1;
+              return { type: "interrupted", run: ordinaryProjection.runs[0] };
+            }) as never,
+          sendToThread: () =>
+            Effect.sync(() => {
+              sendCalls += 1;
+              return {
+                run: { id: RunId.make("run-mcp-send"), status: "queued" },
+                delivery: "queued",
+              };
+            }) as never,
+        } satisfies Partial<ThreadManagementService.ThreadManagementService["Service"]>),
+        ServerSettings.layerTest(),
+        Layer.mock(ProviderRegistry.ProviderRegistry)({ getProviders: Effect.succeed([]) }),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(RemoteDelegation.RemoteDelegation)({}),
+        Layer.mock(ScheduledTaskService.ScheduledTaskService)({}),
+        Layer.mock(ProviderAdapterRegistry.ProviderAdapterRegistryV2)({
+          list: () => Effect.succeed([]),
+        }),
+        NodeCrypto.layer,
+      ),
+    ),
+  );
+  await Effect.gen(function* () {
+    const service = yield* OrchestratorMcpService.OrchestratorMcpService;
+    const refusedInterrupt = yield* service
+      .interruptThread(makeScope(), { threadId: childThreadId, runId: childRunId })
+      .pipe(Effect.flip);
+    expect(refusedInterrupt.code).toBe("thread_not_interruptible");
+    const refusedSend = yield* service
+      .sendToThread(makeScope(), { threadId: childThreadId, message: "retry" })
+      .pipe(Effect.flip);
+    expect(refusedSend.code).toBe("thread_not_sendable");
+    const ordinary = yield* service.interruptThread(makeScope(), { threadId: ordinaryThreadId });
+    expect(ordinary.status).toBe("interrupt_requested");
+    expect(interruptCalls).toBe(1);
+    expect(sendCalls).toBe(0);
+  }).pipe(Effect.provide(layer), Effect.runPromise);
+});
 it("requestSecret returns the unsaved note for a declined, cancelled or timed-out card", async () => {
   const outcomes = ["declined", "cancelled", "pending"] as const;
   const results = await Effect.forEach(outcomes, (outcome) => {

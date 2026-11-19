@@ -347,6 +347,10 @@ given, else the calling thread's project. Callers can filter by title, run
 status, and whether app-owned sub-agent threads are included. Results are
 bounded and offset-paginated. Deleted threads are never listed.
 
+### `t3_command_children`
+
+Lists one summary row per direct child of the selected commander thread. Each row reports `在做`, `卡住`, or `做完`, its current activity or conclusion, and whether it needs the user. Use `cursor` for the next page; use `t3_thread_read` for the transcript.
+
 ### `t3_thread_read`
 
 Reads the durable state, recent runs, and visible timeline of any thread in
@@ -425,7 +429,8 @@ Sends a message to any ordinary or delegated thread in the environment:
   the message ahead of other queued messages; an unheld delegated-task result
   that survives the stop still runs first. It is rejected when neither path
   applies: the provider cannot stop a turn, Stop has already reached the turn,
-  or the turn or the new message is `/compact` or `/logout`.
+  or the turn or the new message is `/compact` or `/logout`. A stopped local
+  delegated child rejects sends; use `delegate_task` again.
 
 The target runtime and interaction modes may not be broader than the caller's.
 Stable command and message IDs are derived from `clientRequestId` for
@@ -443,7 +448,9 @@ status and does not cancel work.
 Interrupts a selected active run through the normal V2 `run.interrupt` command.
 Without `runId`, it selects the newest interruptible run. A terminal run is
 returned unchanged, and a thread with no active provider turn returns
-`no_active_run`.
+`no_active_run`. Local delegated children reject this operation; use
+`task_cancel`. Remote delegated children are stopped by the originating
+environment's cancellation path.
 
 ### Scheduled tasks
 

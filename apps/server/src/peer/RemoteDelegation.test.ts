@@ -55,6 +55,7 @@ import * as ThreadLaunch from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
 import * as ProviderReplayHarness from "../orchestration-v2/testkit/ProviderReplayHarness.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as ProjectService from "../project/ProjectService.ts";
@@ -233,10 +234,12 @@ const boxToolkitLayer = (thread: BoxThread) => {
     Effect.gen(function* () {
       if ((yield* Ref.get(thread.launched)) !== threadId) return null;
       const linkOrigin = yield* Ref.get(thread.linkOrigin);
+      const delegatedFrom = yield* Ref.get(thread.delegatedFrom);
       return {
         ...liveThreadShell(threadId, { runtimeMode: "full-access" }),
         projectId: boxProject,
         ...(linkOrigin === null ? {} : { linkOrigin }),
+        ...(delegatedFrom === null ? {} : { delegatedFrom }),
       };
     });
   const runOf = (status: OrchestrationV2Run["status"]) =>
@@ -544,7 +547,7 @@ const boxToolkitLayer = (thread: BoxThread) => {
         ),
       ),
   });
-  return Layer.merge(
+  return Layer.mergeAll(
     McpHttpServer.layerOrchestratorToolkit,
     McpHttpServer.layerProjectRegistration,
   ).pipe(
@@ -552,6 +555,7 @@ const boxToolkitLayer = (thread: BoxThread) => {
     Layer.provide(NodeCrypto.layer),
     Layer.provide(layerBoxThreads),
     Layer.provide(layerBoxLaunches),
+    Layer.provide(ChildSessionSummary.layer.pipe(Layer.provide(SqlitePersistence.layerMemory))),
     Layer.provide(Layer.mock(RemoteDelegation.RemoteDelegation)({})),
     Layer.provide(Layer.mock(PeerForwarding.PeerForwarding)({})),
     Layer.provide(
@@ -716,6 +720,7 @@ const makeLaptop = (
       Layer.provide(Layer.mock(PeerLinkRequests.PeerLinkRequests)({})),
       Layer.provide(NodeCrypto.layer),
       Layer.provideMerge(layerThreads),
+      Layer.provide(ChildSessionSummary.layer.pipe(Layer.provide(layerDatabase))),
       Layer.provide(Layer.mock(ProviderRegistry.ProviderRegistry)({})),
       Layer.provide(Layer.mock(ProviderAdapterRegistry.ProviderAdapterRegistryV2)({})),
       Layer.provide(Layer.mock(ScheduledTaskService.ScheduledTaskService)({})),

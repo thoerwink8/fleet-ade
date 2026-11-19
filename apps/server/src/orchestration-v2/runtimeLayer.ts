@@ -1,4 +1,5 @@
 import * as SessionEndInbox from "../pipeline/SessionEndInbox.ts";
+import { ChildSessionSummary } from "./ChildSessionSummary.ts";
 import * as WorktreeBranchSync from "./WorktreeBranchSync.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
@@ -422,6 +423,11 @@ export const layerProduction = Layer.mergeAll(
       ),
     ),
   ),
+  Layer.mergeAll(
+    ChildSessionSummary.layer,
+    ChildSessionSummary.layerWorker,
+    ChildSessionSummary.layerIdle,
+  ).pipe(Layer.provide(Layer.mergeAll(layerEventSink, ProjectionStore.layer))),
 ).pipe(
   Layer.provide(ResourceCleanupService.layer.pipe(Layer.provide(layerScheduledTaskProvided))),
   Layer.provide(Scheduler.layer),
