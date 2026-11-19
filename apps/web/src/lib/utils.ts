@@ -6,10 +6,10 @@ import { extendTailwindMerge } from "tailwind-merge";
 import { DraftId } from "../composerDraftStore";
 
 // Register extra font sizes and background images so tailwind-merge does not
-// treat text-2xs or bg-composer-seam-below as colors.
+// treat text-2xs, text-ui or bg-composer-seam-below as colors.
 const twMerge = extendTailwindMerge({
   extend: {
-    theme: { text: ["2xs", "3xs", "4xs", "5xs"] },
+    theme: { text: ["2xs", "3xs", "4xs", "5xs", "row", "ui", "meta", "title", "dialog-title"] },
     classGroups: { "bg-image": [{ bg: ["composer-seam-below", "composer-seam-above"] }] },
   },
 });

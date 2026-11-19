@@ -404,9 +404,13 @@ export function getStandardThemeColors(appearance: ThemeAppearance): ThemeColors
   return (standardLightThemeColors ??= decodeThemeColors(T3_CODE_LIGHT_THEME_COLORS));
 }
 
-// index.css paints the light bubble and the three-layer dark hierarchy directly.
+// index.css paints the light page and bubble and the three-layer dark hierarchy directly.
 const STANDARD_WEB_PAINTED_COLORS: Record<ThemeAppearance, Partial<ThemeColors>> = {
-  light: { messageSurface: "#ebebed" },
+  light: {
+    canvas: "oklch(0.972 0.003 270)",
+    surfaceRaised: "oklch(0.9776 0.0024 270)",
+    messageSurface: "#ebebed",
+  },
   dark: {
     canvas: "oklch(0.175 0.006 260)",
     surface: "oklch(0.205 0.007 260)",
