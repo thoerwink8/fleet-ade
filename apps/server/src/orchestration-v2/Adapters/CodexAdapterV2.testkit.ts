@@ -7,6 +7,7 @@ import * as CodexReplay from "effect-codex-app-server/replay";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Predicate from "effect/Predicate";
+import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 
 import * as ServerConfig from "../../config.ts";
@@ -52,6 +53,7 @@ export function withCodexReplayChildMetadata(
     method: "thread/read" | "thread/resume",
   ) => Effect.Effect<unknown, CodexError.CodexAppServerError> = (threadId) =>
     Effect.succeed({ thread: { id: threadId }, model: null }),
+  driver?: CodexReplay.CodexAppServerReplayDriver,
 ): CodexClient.CodexAppServerClient["Service"] {
   const childThreadIds = new Set(
     transcript.entries.flatMap((entry) => {
@@ -71,14 +73,28 @@ export function withCodexReplayChildMetadata(
     ...client,
     raw: {
       ...client.raw,
-      request: (method, params) =>
-        (method === "thread/read" || method === "thread/resume") &&
-        Predicate.isObject(params) &&
-        (method === "thread/read" ? params.includeTurns === false : params.excludeTurns === true) &&
-        typeof params.threadId === "string" &&
-        childThreadIds.has(params.threadId)
+      request: (method, params) => {
+        if (method === "thread/sample" && driver !== undefined) {
+          return Ref.get(driver.state).pipe(
+            Effect.flatMap((state) => {
+              const next = transcript.entries[state.cursor];
+              const frame = next?.type === "expect_outbound" ? next.frame : undefined;
+              return Predicate.isObject(frame) && frame.method === "thread/sample"
+                ? client.raw.request(method, params)
+                : Effect.succeed({ text: "" });
+            }),
+          );
+        }
+        return (method === "thread/read" || method === "thread/resume") &&
+          Predicate.isObject(params) &&
+          (method === "thread/read"
+            ? params.includeTurns === false
+            : params.excludeTurns === true) &&
+          typeof params.threadId === "string" &&
+          childThreadIds.has(params.threadId)
           ? readMetadata(params.threadId, method)
-          : client.raw.request(method, params),
+          : client.raw.request(method, params);
+      },
     },
   };
 }
@@ -117,7 +133,9 @@ export function layer(input: {
           ),
         );
         return yield* Effect.service(CodexClient.CodexAppServerClient).pipe(
-          Effect.map((client) => withCodexReplayChildMetadata(client, input.transcript)),
+          Effect.map((client) =>
+            withCodexReplayChildMetadata(client, input.transcript, undefined, input.driver),
+          ),
           Effect.provide(context),
         );
       }),
