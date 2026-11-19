@@ -151,9 +151,14 @@ export function describeComposerEffort(
         )}
       >
         {word ? (
-          <span data-composer-control-label className="max-w-24 truncate">
-            {word}
-          </span>
+          <>
+            <span aria-hidden className="-me-0.5 text-faint-foreground">
+              ·
+            </span>
+            <span data-composer-control-label className="max-w-24 truncate">
+              {word}
+            </span>
+          </>
         ) : glyph ? (
           <EffortGlyph count={glyph.count} filled={glyph.filled} size={size} />
         ) : null}

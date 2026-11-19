@@ -288,6 +288,8 @@ import { ProviderSubagentBar } from "./chat/ProviderSubagentBar";
 import { getTriggerDisplayModelName } from "./chat/providerIconUtils";
 import { resolveScrollToEndClearance } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
+import { ThreadHeaderContext } from "./chat/ThreadHeaderMeta";
+import { formatHeaderContextPercent } from "./chat/threadHeaderMeta.logic";
 import { useSideChat } from "./chat/useSideChat";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
@@ -3251,6 +3253,7 @@ export default function ChatView(props: ChatViewProps) {
     />
   );
   const threadPanelHeaderControl = <ThreadPanelHeaderControl {...panelToggleControlProps} />;
+  const headerContextPercent = formatHeaderContextPercent(activeContextWindow);
   const panelLayoutControls = (
     <WorkspaceTitlebarControls
       showMaximizeControl={!shouldUsePlanSidebarSheet}
@@ -3295,7 +3298,7 @@ export default function ChatView(props: ChatViewProps) {
             ref={threadPanelPopoverAnchorRef}
             data-chat-header
             className={cn(
-              "relative bg-background [[data-panel-animations=true]_&]:motion-safe:transition-[padding-left] [[data-panel-animations=true]_&]:motion-safe:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:motion-safe:ease-out",
+              "relative border-b border-border bg-background [[data-panel-animations=true]_&]:motion-safe:transition-[padding-left] [[data-panel-animations=true]_&]:motion-safe:duration-(--panel-animation-duration) [[data-panel-animations=true]_&]:motion-safe:ease-out",
               isElectron
                 ? cn(
                     "drag-region flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center px-3 sm:px-5",
@@ -3330,6 +3333,20 @@ export default function ChatView(props: ChatViewProps) {
                 ? { onOpenProjectSettings: handleOpenDraftProjectSettingsStable }
                 : {})}
               {...(threadFindEnabled ? { onFindInThread: openThreadFindStable } : {})}
+              branch={activeThread.branch ?? null}
+              pullRequest={linkedThreadPullRequest ?? null}
+              trailing={
+                headerContextPercent !== null ? (
+                  <ThreadHeaderContext
+                    percent={headerContextPercent}
+                    open={threadPanelOpen}
+                    presentation={threadPanelPresentation}
+                    popoverHandle={threadPanelPopoverHandle}
+                    shortcutLabel={panelToggleControlProps.threadPanelShortcutLabel}
+                    onToggle={toggleThreadPanelStable}
+                  />
+                ) : null
+              }
             />
           </header>
         )}

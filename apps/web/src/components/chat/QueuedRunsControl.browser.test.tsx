@@ -202,22 +202,20 @@ it("shows who sent a queued message and folds automation and agent prompts", asy
   // Four rows collapse the queue.
   await page.getByRole("button", { name: "显示全部 4 条排队消息" }).click();
 
-  const automation = page.getByRole("button", { name: /PR dispatcher/ });
-  await expect.element(automation).toHaveAttribute("aria-expanded", "false");
+  // An automation's row shows its task title; the prompt stays out of the strip.
+  await expect.element(page.getByText("PR dispatcher", { exact: true })).toBeVisible();
   await expect.element(page.getByText(/Follow the runbook/)).not.toBeInTheDocument();
-  await automation.click();
-  await expect.element(page.getByText(/Follow the runbook/)).toBeVisible();
   await expect.element(page.getByRole("link", { name: "打开自动化" })).toBeInTheDocument();
 
-  await expect.element(page.getByRole("button", { name: /Release lead/ })).toBeVisible();
+  await expect.element(page.getByText("Release lead", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "打开会话" }).nth(0).click({ force: true });
   expect(onOpenThread).toHaveBeenCalledExactlyOnceWith("thread:lead", "environment:test");
   // A sender in a connected linked environment keeps the title it sent and opens there.
-  await expect.element(page.getByRole("button", { name: /Title when sent/ })).toBeVisible();
+  await expect.element(page.getByText("Title when sent", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "打开会话" }).nth(1).click({ force: true });
   expect(onOpenThread).toHaveBeenLastCalledWith("thread:linked-lead", "environment:linked");
 
-  await expect.element(page.getByText("由 T3 Code 发送")).toBeVisible();
+  await expect.element(page.getByText("由 T3 Code 发送 ·", { exact: true })).toBeVisible();
   await expect.element(page.getByText("Continue where you left off.")).toBeVisible();
 });
 
