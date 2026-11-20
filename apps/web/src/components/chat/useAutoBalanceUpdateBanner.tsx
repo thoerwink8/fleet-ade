@@ -80,8 +80,8 @@ export function useAutoBalanceUpdateBanner(
   );
   const count = running || failed || machines.length;
   const status = running ? "running" : failed ? "failed" : "idle";
-  const prefix = running ? "Updating" : failed ? "Could not update" : "Update available for";
-  const title = `${prefix} ${count} ${count === 1 ? "machine" : "machines"}`;
+  const prefix = running ? "正在更新" : failed ? "无法更新" : "可更新";
+  const title = `${prefix} ${count} 台机器`;
   return {
     id: `auto-balance-server-updates-${dismissedNotices.size}`,
     variant: failed ? "error" : "default",

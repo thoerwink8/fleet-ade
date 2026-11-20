@@ -7,23 +7,23 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { VoiceInputPill } from "./VoiceInputPill";
 
 const VOICE_ERROR_LABELS: Record<string, string> = {
-  [MICROPHONE_PERMISSION_ERROR]: "Mic blocked",
-  "Microphone access is required for voice input.": "Mic blocked",
+  [MICROPHONE_PERMISSION_ERROR]: "麦克风被拦截",
+  "Microphone access is required for voice input.": "麦克风被拦截",
   "This draft is no longer available.": "草稿不可用",
-  "Another voice recording is already active.": "Already recording",
+  "Another voice recording is already active.": "已在录音",
   "Voice transcription is not available.": "语音输入不可用",
-  "Voice transcription is still finishing. Try again shortly.": "Still transcribing",
+  "Voice transcription is still finishing. Try again shortly.": "仍在转写",
   "Voice transcription is not available for this language.": "不支持该语言",
-  "Could not prepare voice transcription.": "Couldn’t start",
-  "Could not start voice recording.": "Couldn’t start",
+  "Could not prepare voice transcription.": "无法开始",
+  "Could not start voice recording.": "无法开始",
   "Voice recording was interrupted.": "录音被中断",
-  "Could not finish voice recording.": "Couldn’t finish",
+  "Could not finish voice recording.": "无法完成",
   "Could not transcribe this recording.": "转写失败",
   "Voice transcription on this environment failed.": "转写失败",
   "The draft changed while voice input was running. The transcript was not added.": "草稿已改动",
-  "No speech was detected.": "No speech heard",
-  "Microphone processing failed.": "Mic failed",
-  "The microphone disconnected.": "Mic disconnected",
+  "No speech was detected.": "没有听到语音",
+  "Microphone processing failed.": "麦克风出错",
+  "The microphone disconnected.": "麦克风已断开",
 };
 
 const RETRYABLE_TRANSCRIPTIONS = new Set(["无法转写这段录音。", "此环境上的语音转写失败。"]);
