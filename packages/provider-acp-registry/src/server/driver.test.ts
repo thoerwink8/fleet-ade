@@ -492,7 +492,7 @@ describe("acpRegistrySnapshotReadiness", () => {
         status: "ready",
         version: "1.0.0",
         auth: { status: "unknown" },
-        message: "正在后台初始化 ACP 智能体…",
+        message: "正在后台检查 ACP 智能体…",
       });
     }),
   );

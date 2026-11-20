@@ -489,7 +489,7 @@ export const checkAcpRegistryProviderReadiness = Effect.fn(
   return inspected._tag === "Success" && inspected.success.status === "ready"
     ? {
         ...snapshot,
-        message: "正在后台初始化 ACP 智能体…",
+        message: "正在后台检查 ACP 智能体…",
       }
     : snapshot;
 });

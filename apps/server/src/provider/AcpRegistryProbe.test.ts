@@ -475,55 +475,73 @@ describe("ACP Registry probe", () => {
       }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
-  it.live("does not create a health-probe session even when deletion is advertised", () =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "acp-probe-delete-" });
-      const requestLogPath = NodePath.join(directory, "requests.ndjson");
-      const catalog = AcpRegistrySupport.AcpRegistryCatalog.of({
-        search: () => Effect.die("unused search"),
-        prepare: () => Effect.die("unused prepare"),
-        inspect: () => Effect.die("unused inspect"),
-        uninstallManagedBinary: () => Effect.die("unused uninstall"),
-        resolve: () =>
-          Effect.succeed({
-            agent: {
-              id: "mock-agent",
-              name: "Mock Agent",
-              version: "1.0.0",
-              description: "ACP probe cleanup test agent",
-              distribution: { npx: { package: "mock-agent@1.0.0" } },
-            },
-            distribution: "npx" as const,
-            spawn: {
-              command: "node",
-              args: [mockAgentPath],
-              env: {
-                ...process.env,
-                T3_ACP_V2_MANAGEMENT: "1",
-                T3_ACP_OMIT_INITIALIZE_MODEL_STATE: "1",
-                T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+  it.live.each(["succeeds", "fails"] as const)(
+    "probes session/new, models, and commands when deletion is advertised (delete %s)",
+    (deleteOutcome) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "acp-probe-delete-" });
+        const requestLogPath = NodePath.join(directory, "requests.ndjson");
+        const catalog = AcpRegistrySupport.AcpRegistryCatalog.of({
+          search: () => Effect.die("unused search"),
+          prepare: () => Effect.die("unused prepare"),
+          inspect: () => Effect.die("unused inspect"),
+          uninstallManagedBinary: () => Effect.die("unused uninstall"),
+          resolve: () =>
+            Effect.succeed({
+              agent: {
+                id: "mock-agent",
+                name: "Mock Agent",
+                version: "1.0.0",
+                description: "ACP probe cleanup test agent",
+                distribution: { npx: { package: "mock-agent@1.0.0" } },
               },
-            },
-          }),
-      });
+              distribution: "npx" as const,
+              spawn: {
+                command: "node",
+                args: [mockAgentPath],
+                env: {
+                  ...process.env,
+                  T3_ACP_V2_MANAGEMENT: "1",
+                  T3_ACP_OMIT_INITIALIZE_MODEL_STATE: "1",
+                  T3_ACP_AVAILABLE_COMMANDS: "compact,$workspace-skill",
+                  T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+                  ...(deleteOutcome === "fails" ? { T3_ACP_FAIL_DELETE_SESSION: "1" } : {}),
+                },
+              },
+            }),
+        });
 
-      const result = yield* probeAcpRegistryConfiguration({
-        instanceId,
-        settings: decodeSettings({ agentId: "mock-agent" }),
-        cwd: process.cwd(),
-        environment: process.env,
-      }).pipe(Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog));
-      expect(result.probe.ready).toBe(true);
-      expect(result.probe.sessionManagement.canDelete).toBe(true);
+        const result = yield* probeAcpRegistryConfiguration({
+          instanceId,
+          settings: decodeSettings({ agentId: "mock-agent" }),
+          cwd: process.cwd(),
+          environment: process.env,
+        }).pipe(Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog));
+        expect(result.probe.ready).toBe(true);
+        expect(result.probe.sessionManagement.canDelete).toBe(true);
 
-      const requests = (yield* fs.readFileString(requestLogPath))
-        .split("\n")
-        .filter((line) => line.length > 0)
-        .map((line) => JSON.parse(line));
-      expect(requests.filter((request) => request.method === "session/new")).toEqual([]);
-      expect(requests.filter((request) => request.method === "session/delete")).toEqual([]);
-    }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+        // Models and commands are read from the disposable probe session.
+        expect(result.probe.currentModelId).toBe("default");
+        expect(result.probe.models).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: "composer-2" }),
+            expect.objectContaining({ id: "gpt-5.3-codex[reasoning=medium,fast=false]" }),
+          ]),
+        );
+        expect(result.slashCommands).toEqual([expect.objectContaining({ name: "compact" })]);
+        expect(result.skills).toEqual([expect.objectContaining({ name: "workspace-skill" })]);
+
+        const requests = (yield* fs.readFileString(requestLogPath))
+          .split("\n")
+          .filter((line) => line.length > 0)
+          .map((line) => JSON.parse(line));
+        expect(requests.filter((request) => request.method === "initialize")).toHaveLength(1);
+        expect(requests.filter((request) => request.method === "session/new")).toHaveLength(1);
+        expect(requests.filter((request) => request.method === "session/delete")).toEqual([
+          expect.objectContaining({ params: { sessionId: "mock-session-1" } }),
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
   it("distinguishes authentication failures from generic probe failures", () => {

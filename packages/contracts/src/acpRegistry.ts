@@ -272,7 +272,8 @@ export type AcpRegistryProbeModel = typeof AcpRegistryProbeModel.Type;
 
 export const AcpRegistryProbeResult = Schema.Struct({
   instanceId: ProviderInstanceId,
-  // `ready` means initialize succeeded. It does not prove authentication or that a session can be created.
+  // `ready` means initialize succeeded; agents advertising session/delete also created a
+  // probe session. Deletion is attempted but may fail; authentication is not guaranteed.
   ready: Schema.Literal(true),
   icon: Schema.NullOr(AcpRegistryUrl),
   authMethods: Schema.Array(AcpRegistryProbeAuthMethod).check(Schema.isMaxLength(32)),
