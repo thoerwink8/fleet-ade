@@ -422,6 +422,30 @@ it.effect("有效但没有 orchestration:read 的凭证读三个口是 403", () 
   ),
 );
 
+it.effect("摘要迁移不因 UUID 格式或缺少链接而删除真实环境行", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* NodeReads.migrate;
+    const environmentId = "a191e6d5-bb17-4eb1-b6cf-dc1e1d692981";
+    const rowId = `adhoc\n${environmentId}\nthread-1`;
+    yield* sql`INSERT INTO fleet_summary_rows (
+      row_id, environment_id, kind, thread_id, title, phase, reason, needs_you,
+      last_progress, updated_at, revision
+    ) VALUES (${rowId}, ${environmentId}, 'adhoc', 'thread-1', 'Disconnected environment',
+      'working', 'working', 0, 'progress', '2026-11-19T00:00:00.000Z', 1)`;
+    yield* sql`UPDATE fleet_summary_meta SET revision = 1 WHERE id = 1`;
+    yield* NodeReads.migrate;
+    yield* NodeReads.migrate;
+    expect(yield* sql`SELECT row_id, environment_id FROM fleet_summary_rows`).toEqual([
+      { row_id: rowId, environment_id: environmentId },
+    ]);
+    expect(yield* sql`SELECT revision FROM fleet_summary_meta WHERE id = 1`).toEqual([
+      { revision: 1 },
+    ]);
+    expect(yield* sql`SELECT revision FROM fleet_summary_changes`).toEqual([]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
 it.effect("旧摘要登记迁移后保留数据并允许多个协调者", () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;

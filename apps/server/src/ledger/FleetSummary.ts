@@ -1,5 +1,6 @@
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import {
+  AuthSessionId,
   FLEET_SUMMARY_PAGE_SIZE,
   FLEET_SUMMARY_PROGRESS_LIMIT,
   FLEET_SUMMARY_RETENTION,
@@ -19,6 +20,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
+import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Semaphore from "effect/Semaphore";
@@ -29,6 +31,7 @@ import * as Stream from "effect/Stream";
 
 import * as NodeClaims from "./nodeClaims.ts";
 import * as NodeReads from "./nodeReads.ts";
+import * as AuthSessions from "../persistence/AuthSessions.ts";
 import * as LedgerDb from "./LedgerDb.ts";
 
 const isFleetSummaryError = Schema.is(FleetSummaryError);
@@ -154,17 +157,19 @@ const sameReported = (current: FleetSummaryRow, next: FleetSummaryRow) =>
   current.stale === next.stale &&
   current.staleReason === next.staleReason;
 
-const make = Effect.fn("FleetSummary.make")(function* () {
+type IsLegacySession = (id: string) => Effect.Effect<boolean, FleetSummaryError>;
+
+const storageError = (cause: unknown) =>
+  new FleetSummaryError({
+    reason: "storage",
+    message: "Fleet summary storage is unavailable.",
+    cause,
+  });
+
+const make = Effect.fn("FleetSummary.make")(function* (isLegacySession: IsLegacySession) {
   const sql = yield* SqlClient.SqlClient;
   yield* NodeReads.migrate;
   yield* sql`PRAGMA journal_mode = WAL`;
-
-  const storageError = (cause: unknown) =>
-    new FleetSummaryError({
-      reason: "storage",
-      message: "Fleet summary storage is unavailable.",
-      cause,
-    });
 
   const meta = sql<MetaRecord>`SELECT id, revision FROM fleet_summary_meta WHERE id = 1`.pipe(
     Effect.flatMap((rows) =>
@@ -390,6 +395,37 @@ const make = Effect.fn("FleetSummary.make")(function* () {
       ),
     );
   };
+
+  // A surviving auth session ID identifies a legacy session-keyed row. Sessions
+  // already removed from the main database cannot be identified this way.
+  yield* sql
+    .withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS fleet_summary_migrations (name TEXT PRIMARY KEY)`;
+        const marker = "remove-session-keyed-rows-v1";
+        const applied =
+          yield* sql`SELECT name FROM fleet_summary_migrations WHERE name = ${marker}`;
+        if (applied.length > 0) return;
+        const candidates = yield* sql<{ readonly environment_id: string }>`
+        SELECT DISTINCT environment_id FROM fleet_summary_rows ORDER BY environment_id
+      `;
+        for (const { environment_id } of candidates) {
+          if (!(yield* isLegacySession(environment_id))) continue;
+          const rows = yield* sql<
+            RowRecord & { readonly row_id: string }
+          >`SELECT * FROM fleet_summary_rows
+          WHERE environment_id = ${environment_id} ORDER BY row_id`;
+          for (const record of rows) {
+            const row = toRow(record);
+            const revision = yield* nextRevision;
+            yield* sql`DELETE FROM fleet_summary_rows WHERE row_id = ${record.row_id}`;
+            yield* recordChange(revision, { type: "tombstone", revision, key: keyOfRow(row) });
+          }
+        }
+        yield* sql`INSERT INTO fleet_summary_migrations (name) VALUES (${marker})`;
+      }),
+    )
+    .pipe(Effect.mapError((error) => (isFleetSummaryError(error) ? error : storageError(error))));
 
   const report = Effect.fn("FleetSummary.report")(function* (
     callerEnvironmentId: string,
@@ -630,7 +666,24 @@ const rowIdOfKey = (key: FleetSummaryTombstoneKey) =>
 const sameRow = (event: FleetSummaryChangeEvent, rowId: string) =>
   (event.type === "upsert" ? rowIdOfRow(event.row) : rowIdOfKey(event.key)) === rowId;
 
-export const layer = Layer.effect(FleetSummary, make()).pipe(Layer.provide(LedgerDb.layer));
+export const layer = Layer.unwrap(
+  Effect.gen(function* () {
+    const sessions = yield* AuthSessions.AuthSessionRepository;
+    return Layer.effect(
+      FleetSummary,
+      make((id) =>
+        sessions
+          .getById({ sessionId: AuthSessionId.make(id) })
+          .pipe(Effect.map(Option.isSome), Effect.mapError(storageError)),
+      ),
+    ).pipe(Layer.provide(LedgerDb.layer));
+  }),
+).pipe(Layer.provide(AuthSessions.layer));
 
-export const layerForTest = (filename = ":memory:") =>
-  Layer.effect(FleetSummary, make()).pipe(Layer.provideMerge(NodeSqliteClient.layer({ filename })));
+export const layerForTest = (
+  filename = ":memory:",
+  isLegacySession: IsLegacySession = () => Effect.succeed(false),
+) =>
+  Layer.effect(FleetSummary, make(isLegacySession)).pipe(
+    Layer.provideMerge(NodeSqliteClient.layer({ filename })),
+  );

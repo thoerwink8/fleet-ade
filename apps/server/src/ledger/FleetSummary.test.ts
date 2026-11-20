@@ -10,6 +10,8 @@ import * as TestClock from "effect/testing/TestClock";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 import { FLEET_SUMMARY_PAGE_SIZE, FLEET_SUMMARY_PROGRESS_LIMIT } from "@t3tools/contracts";
+import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
+import * as NodeReads from "./nodeReads.ts";
 import * as FleetSummary from "./FleetSummary.ts";
 
 const ledgerLayer = Layer.effectDiscard(
@@ -302,6 +304,91 @@ it.effect("重建同一 filename 后 revision 不回退", () =>
       const secondSummary = Context.get(secondContext, FleetSummary.FleetSummary);
       const second = yield* secondSummary.report("environment-a", adhoc("other"));
       expect(second.revision).toBeGreaterThan(write.revision);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  ),
+);
+
+it.effect("旧 session 摘要迁移生成 tombstone，仅执行一次且保留未匹配环境", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "fleet-summary-migration-" });
+      const filename = path.join(directory, "ledger.sqlite");
+      const db = yield* NodeSqliteClient.layer({ filename }).pipe(Layer.build);
+      const sql = Context.get(db, SqlClient.SqlClient);
+      yield* NodeReads.migrate.pipe(Effect.provideService(SqlClient.SqlClient, sql));
+      for (const environmentId of ["old-session", "real-environment"]) {
+        const rowId = `adhoc\n${environmentId}\nthread-1`;
+        yield* sql`INSERT INTO fleet_summary_rows (
+          row_id, environment_id, kind, thread_id, title, phase, reason, needs_you,
+          last_progress, updated_at, revision
+        ) VALUES (${rowId}, ${environmentId}, 'adhoc', 'thread-1', 'Title', 'working',
+          'working', 0, 'progress', '2026-11-19T00:00:00.000Z', 1)`;
+      }
+      yield* sql`UPDATE fleet_summary_meta SET revision = 1 WHERE id = 1`;
+      const lookup = (id: string) => Effect.succeed(id === "old-session");
+      const context = yield* FleetSummary.layerForTest(filename, lookup).pipe(Layer.build);
+      const summary = Context.get(context, FleetSummary.FleetSummary);
+      const events = yield* summary.subscribe({ cursor: 1 }).pipe(Effect.flatMap(first));
+      expect(events).toEqual({
+        type: "tombstone",
+        revision: 2,
+        key: { environmentId: "old-session", threadId: "thread-1" },
+      });
+      expect(yield* sql`SELECT environment_id FROM fleet_summary_rows`).toEqual([
+        { environment_id: "real-environment" },
+      ]);
+      // A later row with a matching ID must not trigger a second migration.
+      yield* summary.report("old-session", adhoc("new-thread"));
+      const restarted = yield* FleetSummary.layerForTest(filename, lookup).pipe(Layer.build);
+      const restartedSummary = Context.get(restarted, FleetSummary.FleetSummary);
+      const snapshot = yield* restartedSummary.subscribe({}).pipe(Effect.flatMap(first));
+      expect(snapshot?.type).toBe("snapshot");
+      if (snapshot?.type === "snapshot") {
+        expect(snapshot.rows.map((row) => row.environmentId).sort()).toEqual([
+          "old-session",
+          "real-environment",
+        ]);
+      }
+      expect(yield* sql`SELECT revision FROM fleet_summary_meta`).toEqual([{ revision: 3 }]);
+    }).pipe(Effect.provide(NodeServices.layer)),
+  ),
+);
+
+it.effect("旧摘要迁移失败时删除、tombstone 和标记一起回滚，可重试", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "fleet-summary-rollback-" });
+      const filename = path.join(directory, "ledger.sqlite");
+      const db = yield* NodeSqliteClient.layer({ filename }).pipe(Layer.build);
+      const sql = Context.get(db, SqlClient.SqlClient);
+      yield* NodeReads.migrate.pipe(Effect.provideService(SqlClient.SqlClient, sql));
+      yield* sql`INSERT INTO fleet_summary_rows (
+        row_id, environment_id, kind, thread_id, title, phase, reason, needs_you,
+        last_progress, updated_at, revision
+      ) VALUES ('adhoc' || char(10) || 'old-session' || char(10) || 'thread-1',
+        'old-session', 'adhoc', 'thread-1', 'Title', 'working', 'working', 0,
+        'progress', '2026-11-19T00:00:00.000Z', 1)`;
+      yield* sql`UPDATE fleet_summary_meta SET revision = 1 WHERE id = 1`;
+      yield* sql`CREATE TRIGGER reject_tombstone BEFORE INSERT ON fleet_summary_changes
+        BEGIN SELECT RAISE(ABORT, 'test failure'); END`;
+      const lookup = () => Effect.succeed(true);
+      const failed = yield* Layer.build(FleetSummary.layerForTest(filename, lookup)).pipe(
+        Effect.flip,
+      );
+      expect(failed).toBeDefined();
+      expect(yield* sql`SELECT environment_id FROM fleet_summary_rows`).toEqual([
+        { environment_id: "old-session" },
+      ]);
+      expect(yield* sql`SELECT revision FROM fleet_summary_meta`).toEqual([{ revision: 1 }]);
+      expect(yield* sql`SELECT revision FROM fleet_summary_changes`).toEqual([]);
+      yield* sql`DROP TRIGGER reject_tombstone`;
+      yield* Layer.build(FleetSummary.layerForTest(filename, lookup));
+      expect(yield* sql`SELECT environment_id FROM fleet_summary_rows`).toEqual([]);
+      expect(yield* sql`SELECT revision FROM fleet_summary_changes`).toEqual([{ revision: 2 }]);
     }).pipe(Effect.provide(NodeServices.layer)),
   ),
 );
