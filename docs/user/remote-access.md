@@ -352,10 +352,13 @@ an address you trust: the code is sent there.
   removes it here.
 - Links last 30 days. Link again with a new pairing code to renew one.
 
-Fleet task claims require an up-to-date linked environment and a working link back to it
-to verify its identity. If verification is temporarily unavailable, retry once the link
-is reachable. Older clients can still renew or release their existing leases, but must
-update before claiming new tasks; pairing again alone does not update the client.
+When one linked environment starts an ordinary thread on another, it attempts to
+prove its identity over the link back. If that proof is temporarily unavailable,
+the thread can still start without a verified machine identity. Fleet task claims
+and threads started with a fleet task require a verified identity instead: ensure
+the coordinator can reach the calling environment over a working link, then retry.
+Older clients can still renew or release their existing leases, but must update
+before claiming new tasks; pairing again alone does not update the client.
 
 An agent can also hand a task to a linked machine with `delegate_task`: it runs
 there as an ordinary thread, in the project with the same repository (or the

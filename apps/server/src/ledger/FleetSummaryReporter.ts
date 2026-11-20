@@ -650,32 +650,6 @@ const make = Effect.gen(function* () {
                         { discard: true },
                       ),
                     ),
-                    Effect.tap(() =>
-                      Effect.gen(function* () {
-                        // A disconnect and relink can both occur between heartbeats,
-                        // so every successful remote heartbeat revalidates live rows.
-                        if (environmentId === selfId) return;
-                        for (const entry of tasks) {
-                          const key = keyFor(entry.threadId, entry.coordinator);
-                          if (pendingTracks.has(key)) continue;
-                          const current = (yield* Ref.get(tracked)).get(key);
-                          if (
-                            current === undefined ||
-                            current.deleting ||
-                            current.lost ||
-                            current.finishing
-                          )
-                            continue;
-                          // A failed revalidation remains eligible for the next scheduler tick.
-                          yield* Ref.update(tracked, (items) => {
-                            const reset: TrackedTask = { ...current };
-                            delete reset.sent;
-                            return new Map(items).set(key, reset);
-                          });
-                          yield* report(key);
-                        }
-                      }),
-                    ),
                     Effect.catch((error) =>
                       Effect.logWarning("fleet heartbeat failed", {
                         environmentId,

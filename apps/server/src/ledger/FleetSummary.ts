@@ -395,7 +395,8 @@ const make = Effect.fn("FleetSummary.make")(function* (keepEnvironments: KeepEnv
   };
 
   // The previous session-lookup migration missed deleted sessions. Run this
-  // independently even on databases where that migration already completed.
+  // independently even if it completed; rows for deleted connections are derived
+  // data and may be discarded, including completed rows. Keep linked environments.
   yield* sql
     .withTransaction(
       Effect.gen(function* () {

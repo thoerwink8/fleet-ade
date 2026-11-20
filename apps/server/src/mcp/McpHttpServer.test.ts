@@ -47,6 +47,7 @@ import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReview
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as ServerConfig from "../config.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
+import { descriptorOf } from "../peer/PeerLinks.testkit.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
 import * as McpHttpServer from "./McpHttpServer.ts";
@@ -61,6 +62,7 @@ import { PreviewToolkit } from "./toolkits/preview/tools.ts";
 import { ProjectToolkit } from "./toolkits/project/tools.ts";
 
 const environmentId = EnvironmentId.make("environment-mcp-test");
+const coordinator = descriptorOf("environment-mcp-test", "Coordinator Test Node");
 const threadId = ThreadId.make("thread-mcp-test");
 const alternateTabId = PreviewTabId.make("tab-mcp-alternate");
 const decodeJsonText = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
@@ -1186,6 +1188,12 @@ it.effect("admits provider and OAuth client credentials and points only clients 
       ).pipe(
         Layer.provide(ServerSettings.layerTest()),
         Layer.provide(
+          Layer.succeed(ServerEnvironment.ServerEnvironment, {
+            getEnvironmentId: Effect.succeed(environmentId),
+            getDescriptor: Effect.succeed(coordinator),
+          }),
+        ),
+        Layer.provide(
           Layer.mock(McpSessionRegistry.McpSessionRegistry)({
             resolve: (token) =>
               Effect.succeed(
@@ -1203,7 +1211,9 @@ it.effect("admits provider and OAuth client credentials and points only clients 
                   ? clientScope
                   : request.headers.authorization === "Bearer proof-unavailable"
                     ? ("identity_unavailable" as const)
-                    : undefined,
+                    : request.headers.authorization === "Bearer proof-conflict"
+                      ? ("identity_conflict" as const)
+                      : undefined,
               ),
           }),
         ),
@@ -1265,6 +1275,18 @@ it.effect("admits provider and OAuth client credentials and points only clients 
       const unavailable = yield* call("proof-unavailable");
       expect(unavailable.status).toBe(503);
       expect(unavailable.headers["www-authenticate"]).toBeUndefined();
+      // An unprovable peer is told which coordinator refused it and that the
+      // coordinator must also be linked back to this machine.
+      const unavailableText = yield* unavailable.text;
+      expect(unavailableText).toContain('"peer_identity_unavailable"');
+      expect(unavailableText).toContain("Coordinator Test Node");
+      expect(unavailableText).toContain(environmentId);
+      expect(unavailableText).toContain("must link back to this environment");
+      const conflict = yield* call("proof-conflict");
+      expect(conflict.status).toBe(503);
+      const conflictText = yield* conflict.text;
+      expect(conflictText).toContain('"peer_identity_conflict"');
+      expect(conflictText).toContain("Coordinator Test Node");
 
       const missing = yield* call(undefined);
       expect(missing.status).toBe(401);

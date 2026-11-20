@@ -498,7 +498,7 @@ it.live("does not treat a linked session ID as an authenticated environment iden
               [PeerMcpClient.PEER_IDENTITY_HEADER]: "different-env",
             }),
           ),
-        ).toBe("identity_unavailable");
+        ).toBe("identity_conflict");
       }).pipe(Effect.provide(Layer.mergeAll(authenticatorLayer, NodeCrypto.layer)));
     }),
   ),

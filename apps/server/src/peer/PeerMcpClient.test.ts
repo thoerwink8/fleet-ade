@@ -51,7 +51,7 @@ const toolkit = Toolkit.make(
 );
 
 /** One `probe` call to a linked peer at a remote address, answered by `http`. */
-const probeThrough = Effect.fn(function* (http: HttpClient.HttpClient) {
+const probeThrough = Effect.fn(function* (http: HttpClient.HttpClient, tool = "probe") {
   const box = descriptorOf("environment-box", "Box");
   const context = yield* Layer.build(
     PeerMcpClient.layer.pipe(
@@ -87,7 +87,7 @@ const probeThrough = Effect.fn(function* (http: HttpClient.HttpClient) {
   );
   return Context.get(context, PeerMcpClient.PeerMcpClient).call({
     environmentId: box.environmentId,
-    tool: "probe",
+    tool,
     arguments: {},
     limits: { runtimeMode: "approval-required", interactionMode: "plan" },
     success: Result,
@@ -334,11 +334,7 @@ it.effect("renews a missing peer session once and reuses its replacement", () =>
         yield* client.call({
           environmentId: box.environmentId,
           tool,
-          arguments:
-            tool === "t3_thread_launch"
-              ? // Only a launch carrying fleet work proves this environment.
-                { fleetTask: { repo: "o/r", issue: 1, taskId: "t", attempt: 1, fencing: "1" } }
-              : {},
+          arguments: {},
           limits: { runtimeMode: "approval-required", interactionMode: "plan" },
           success: Result,
         }),
@@ -384,6 +380,85 @@ it.effect("renews a missing peer session once and reuses its replacement", () =>
     expect(new Set(issued).size).toBe(6);
     expect(issued.every((value) => /^[A-Za-z0-9_-]{43}$/.test(value))).toBe(true);
   }),
+);
+
+it.effect(
+  "retries only ordinary launches without proof after explicit authentication failure",
+  () =>
+    Effect.gen(function* () {
+      const requests: Array<{ identity: string | undefined; challenge: string | undefined }> = [];
+      const http = HttpClient.make((request) =>
+        Effect.sync(() => {
+          const index = requests.length;
+          requests.push({
+            identity: request.headers[PeerMcpClient.PEER_IDENTITY_HEADER],
+            challenge: request.headers[PeerMcpClient.PEER_CHALLENGE_HEADER],
+          });
+          return HttpClientResponse.fromWeb(
+            request,
+            new Response(
+              index === 2 ? '{"error":"peer_identity_unavailable"}' : index >= 3 ? probeResult : "",
+              {
+                status: index === 1 ? 202 : index === 2 ? 503 : 200,
+                headers: { "mcp-session-id": "session" },
+              },
+            ),
+          );
+        }),
+      );
+      const launch = yield* probeThrough(http, "t3_thread_launch");
+      expect(yield* launch).toEqual({ modes: "approval-required/plan" });
+      expect(requests).toHaveLength(4);
+      expect(requests[2]?.identity).toBe("self");
+      expect(requests[2]?.challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      expect(requests[3]).toEqual({ identity: undefined, challenge: undefined });
+    }),
+);
+
+it.effect("does not retry identity-sensitive calls anonymously", () =>
+  Effect.gen(function* () {
+    let requests = 0;
+    const http = HttpClient.make((request) =>
+      Effect.sync(() => {
+        const index = requests++;
+        return HttpClientResponse.fromWeb(
+          request,
+          new Response(index === 2 ? '{"error":"peer_identity_unavailable"}' : "", {
+            status: index === 1 ? 202 : index === 2 ? 503 : 200,
+            headers: { "mcp-session-id": "session" },
+          }),
+        );
+      }),
+    );
+    const heartbeat = yield* probeThrough(http, "fleet_heartbeat");
+    const error = yield* heartbeat.pipe(Effect.flip);
+    expect(error.message).toContain("identity");
+    expect(error.message).toContain("Box");
+    expect(requests).toBe(3);
+  }),
+);
+
+it.effect.each(['{"message":"peer_identity_unavailable"}', '{"error":"peer_identity_conflict"}'])(
+  "does not retry a launch after an unrelated or conflicting 503: %s",
+  (body) =>
+    Effect.gen(function* () {
+      let requests = 0;
+      const http = HttpClient.make((request) =>
+        Effect.sync(() => {
+          const index = requests++;
+          return HttpClientResponse.fromWeb(
+            request,
+            new Response(index === 2 ? body : "", {
+              status: index === 1 ? 202 : index === 2 ? 503 : 200,
+              headers: { "mcp-session-id": "session" },
+            }),
+          );
+        }),
+      );
+      const launch = yield* probeThrough(http, "t3_thread_launch");
+      yield* launch.pipe(Effect.flip);
+      expect(requests).toBe(3);
+    }),
 );
 
 it.effect("bounds the session handshake, not a tool call that waits longer", () =>

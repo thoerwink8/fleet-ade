@@ -552,10 +552,7 @@ it.effect(
         ]);
         yield* coordinatorSql`DELETE FROM fleet_summary_rows WHERE thread_id = ${taskThread}`;
         yield* TestClock.adjust("30 seconds");
-        expect((yield* snapshot()).rows.find((row) => row.threadId === taskThread)).toMatchObject({
-          taskId: "t-1",
-          title: "Leased",
-        });
+        expect((yield* snapshot()).rows.find((row) => row.threadId === taskThread)).toBeUndefined();
       }),
     ),
 );
@@ -632,42 +629,26 @@ it.effect("file-backed registrations survive reconstruction and update the origi
           const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
           yield* reporter.handle(fakeEvent(threadId, "run.updated"));
           expect(yield* Ref.get(calls)).toHaveLength(1);
-          // Coordinator cleanup can remove a genuine row while the reporter is down.
+          // Heartbeats never resend unchanged rows, even after remote cleanup or recovery.
           yield* summarySql`DELETE FROM fleet_summary_rows WHERE thread_id = ${threadId}`;
           yield* reporter.start();
           yield* TestClock.adjust("5 seconds");
-          expect(yield* Ref.get(calls)).toHaveLength(2);
-          expect(yield* summarySql`SELECT thread_id FROM fleet_summary_rows`).toEqual([
-            { thread_id: threadId },
-          ]);
-          yield* reporter.handle(fakeEvent(threadId, "run.updated"));
-          expect(yield* Ref.get(calls)).toHaveLength(2);
-          // A remote unlink/relink can be missed between heartbeat samples.
-          yield* summarySql`DELETE FROM fleet_summary_rows WHERE thread_id = ${threadId}`;
-          yield* TestClock.adjust("30 seconds");
-          expect(yield* Ref.get(calls)).toHaveLength(3);
-          expect(yield* summarySql`SELECT thread_id FROM fleet_summary_rows`).toEqual([
-            { thread_id: threadId },
-          ]);
-          yield* reporter.handle(fakeEvent(threadId, "run.updated"));
-          expect(yield* Ref.get(calls)).toHaveLength(3);
-          // Failed heartbeats leave the saved acknowledgement intact, then recovery
-          // revalidates once the peer answers again.
-          yield* Ref.set(fail, true);
-          yield* summarySql`DELETE FROM fleet_summary_rows WHERE thread_id = ${threadId}`;
-          yield* TestClock.adjust("30 seconds");
-          expect(yield* Ref.get(calls)).toHaveLength(3);
+          expect(yield* Ref.get(calls)).toHaveLength(1);
           expect(yield* summarySql`SELECT thread_id FROM fleet_summary_rows`).toEqual([]);
+          yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+          yield* TestClock.adjust("30 seconds");
+          expect(yield* Ref.get(calls)).toHaveLength(1);
+          yield* Ref.set(fail, true);
+          yield* TestClock.adjust("30 seconds");
+          expect(yield* Ref.get(calls)).toHaveLength(1);
           yield* Ref.set(fail, false);
           yield* TestClock.adjust("30 seconds");
-          expect(yield* Ref.get(calls)).toHaveLength(4);
-          expect(yield* summarySql`SELECT thread_id FROM fleet_summary_rows`).toEqual([
-            { thread_id: threadId },
-          ]);
+          expect(yield* Ref.get(calls)).toHaveLength(1);
+          expect(yield* summarySql`SELECT thread_id FROM fleet_summary_rows`).toEqual([]);
           yield* Ref.set(current, shell(threadId, "running", { title: "Changed after restart" }));
           yield* reporter.handle(fakeEvent(threadId, "run.updated"));
-          expect(yield* Ref.get(calls)).toHaveLength(5);
-          expect((yield* Ref.get(calls))[4]).toMatchObject({
+          expect(yield* Ref.get(calls)).toHaveLength(2);
+          expect((yield* Ref.get(calls))[1]).toMatchObject({
             type: "upsert-adhoc",
             threadId,
             title: "Changed after restart",
@@ -1363,10 +1344,7 @@ it.effect("a remote task removes the local ad hoc row and prevents its recreatio
         "upsert-adhoc",
         "delete-adhoc",
       ]);
-      expect((yield* Ref.get(remoteReports)).map((item) => item.type)).toEqual([
-        "upsert-task",
-        "upsert-task",
-      ]);
+      expect((yield* Ref.get(remoteReports)).map((item) => item.type)).toEqual(["upsert-task"]);
     }),
   ),
 );

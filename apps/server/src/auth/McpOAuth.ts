@@ -646,14 +646,21 @@ export const layerMcpClientAuthenticator = Layer.effect(
                 if (
                   client.peerLink &&
                   !isProof &&
+                  provenId !== undefined &&
+                  Option.isSome(parsedHint) &&
+                  provenId !== parsedHint.value
+                )
+                  return "identity_conflict" as const;
+                if (
+                  client.peerLink &&
+                  !isProof &&
                   (hint !== undefined || challenge !== undefined)
                 ) {
                   if (
                     Option.isNone(parsedHint) ||
                     token === null ||
                     typeof challenge !== "string" ||
-                    !CODE_CHALLENGE_PATTERN.test(challenge) ||
-                    (provenId !== undefined && provenId !== parsedHint.value)
+                    !CODE_CHALLENGE_PATTERN.test(challenge)
                   )
                     return "identity_unavailable" as const;
                   const peerId = parsedHint.value;
@@ -681,7 +688,7 @@ export const layerMcpClientAuthenticator = Layer.effect(
                       if (existing !== undefined) return [existing === peerId, current] as const;
                       return [true, new Map(current).set(client.sessionId, peerId)] as const;
                     });
-                    if (!accepted) return "identity_unavailable" as const;
+                    if (!accepted) return "identity_conflict" as const;
                     provenId = peerId;
                   }
                 }

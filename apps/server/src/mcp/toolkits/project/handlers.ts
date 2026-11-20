@@ -157,6 +157,15 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
             message: "A new thread accepts only pending attachment uploads.",
           });
         if (
+          fleetTask !== undefined &&
+          (input.message === undefined || input.message.trim() === "") &&
+          attachments.length === 0
+        )
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "fleetTask requires a message or pending attachments.",
+          });
+        if (
           input.scratch === true &&
           (input.projectId !== undefined || input.workspaceStrategy !== undefined)
         )

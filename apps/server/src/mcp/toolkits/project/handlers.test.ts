@@ -78,6 +78,8 @@ const clientLaunchHarness = (input: {
   /** The orchestrator refuses the new thread's mode, as under a managed ceiling. */
   readonly refusedByCeiling?: true;
   readonly linked?: boolean;
+  /** A linked session whose coordinator identity was never proven. */
+  readonly unprovenLink?: boolean;
 }) => {
   const projectId = ProjectId.make("project:client-target");
   const modelSelection = {
@@ -116,7 +118,8 @@ const clientLaunchHarness = (input: {
         label: "Claude Code",
         access: input.runtimeModeCeiling,
         hostedAppUrl: input.hostedAppUrl,
-        ...(input.linked ? { linked: true, environmentId: "coordinator" } : {}),
+        ...(input.linked ? { linked: true } : {}),
+        ...(input.linked && !input.unprovenLink ? { environmentId: "coordinator" } : {}),
       },
       issuedAt: 0,
       capabilities: new Set(["orchestration" as const]),
@@ -1052,6 +1055,89 @@ it.effect("a fleet task without a link origin is rejected before launching", () 
   }),
 );
 
+it.effect("a fleet task without a message or attachments is rejected before launching", () =>
+  Effect.gen(function* () {
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+    const registered: Array<unknown> = [];
+    const dependencies = Layer.merge(
+      harness.dependencies,
+      Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+        trackTask: (_threadId, claim) => Effect.sync(() => registered.push(claim)),
+        trackAdhoc: (threadId) => Effect.sync(() => registered.push(threadId)),
+      }),
+    );
+    const dependencyContext = yield* Layer.build(dependencies);
+    const toolkit = yield* ProjectToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(Layer.provide(dependencies)),
+      ),
+    );
+    for (const message of [undefined, ""]) {
+      const response = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Empty fleet task",
+          projectId: harness.projectId,
+          ...(message === undefined ? {} : { message }),
+          fleetTask: JSON.stringify({
+            repo: "example/one",
+            issue: 7,
+            taskId: "task-x",
+            attempt: 1,
+            fencing: "1",
+          }),
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(response.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+    }
+    expect(launched).toHaveLength(0);
+    expect(registered).toHaveLength(0);
+  }),
+);
+
+it.effect("a linked launch without proven coordinator identity rejects fleetTask", () =>
+  Effect.gen(function* () {
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const harness = clientLaunchHarness({
+      runtimeModeCeiling: "auto",
+      launched,
+      linked: true,
+      unprovenLink: true,
+    });
+    const registered: Array<unknown> = [];
+    const dependencies = Layer.merge(
+      harness.dependencies,
+      Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+        trackTask: (_threadId, claim) => Effect.sync(() => registered.push(claim)),
+        trackAdhoc: (threadId) => Effect.sync(() => registered.push(threadId)),
+      }),
+    );
+    const dependencyContext = yield* Layer.build(dependencies);
+    const toolkit = yield* ProjectToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(Layer.provide(dependencies)),
+      ),
+    );
+    const response = yield* toolkit
+      .handle("t3_thread_launch", {
+        title: "Unproven fleet task",
+        projectId: harness.projectId,
+        message: "Work the claim.",
+        fleetTask: JSON.stringify({
+          repo: "example/one",
+          issue: 7,
+          taskId: "task-x",
+          attempt: 1,
+          fencing: "1",
+        }),
+      })
+      .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+    expect(response.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+    expect(launched).toHaveLength(0);
+    expect(registered).toHaveLength(0);
+  }),
+);
+
 it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc row", () =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -1145,6 +1231,7 @@ it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc
         .handle("t3_thread_launch", {
           title: "Leased work",
           projectId: harness.projectId,
+          message: "Work the claim.",
           fleetTask: JSON.stringify(claim),
         })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
@@ -1156,6 +1243,7 @@ it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc
         .handle("t3_thread_launch", {
           title: "Another leased thread",
           projectId: harness.projectId,
+          message: "Work the claim.",
           fleetTask: JSON.stringify({ ...claim, issue: 8, taskId: "task-y" }),
         })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
@@ -1214,6 +1302,7 @@ it.effect("a failed fleet registration does not fail a launch and a replay regis
         title: "Leased work",
         projectId: harness.projectId,
         clientRequestId: "retry-registration",
+        message: "Work the claim.",
         fleetTask: JSON.stringify({
           repo: "example/one",
           issue: 7,

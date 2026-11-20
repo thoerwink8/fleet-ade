@@ -124,6 +124,27 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签�
       expect(held.outcome).toBe("claimed");
       expect(held.claim?.holder).not.toBe("node-a");
       expect(held.claim?.holderEnvironment).toBe("node-a");
+      // Re-pairing replaces the inbound session, but not the environment owning the lease.
+      const originalSession = held.claim!.holder;
+      yield* linkTo(a.links, peer);
+      const relinked = (yield* peer.linkedSessions).find(
+        (session) => session.sessionId !== originalSession,
+      );
+      expect(relinked).toBeDefined();
+      const afterRelink = yield* heartbeat(aClient, {
+        sequence: 1,
+        leases: [
+          {
+            repo: "example/one",
+            issue: 7,
+            taskId: "root",
+            attempt: held.claim!.attempt,
+            fencing: held.claim!.fencing,
+          },
+        ],
+      });
+      expect(afterRelink.results[0]?.outcome).toBe("renewed");
+      expect(afterRelink.results[0]?.claim?.holderEnvironment).toBe("node-a");
       expect((yield* claim(bClient, claimInput("example/one", "root", "b-root"))).outcome).toBe(
         "already-held",
       );

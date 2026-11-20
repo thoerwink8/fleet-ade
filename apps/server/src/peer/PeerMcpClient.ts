@@ -89,6 +89,12 @@ const decodeFailure = Schema.decodeUnknownOption(
     Schema.Struct({ code: OrchestratorMcpFailure.fields.code, message: Schema.String }),
   ),
 );
+const decodeIdentityFailure = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ error: Schema.Literal("peer_identity_unavailable") })),
+);
+const decodeIdentityConflict = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ error: Schema.Literal("peer_identity_conflict") })),
+);
 
 /** A peer link problem, as the agent that asked hears it. */
 const fromLinkError = (error: PeerLinkError) =>
@@ -209,16 +215,17 @@ const make = Effect.gen(function* () {
                 .join("/"),
             };
       const sessionKey = `${input.environmentId} ${resolved.url}`;
-      const callOnce = Effect.fn("PeerMcpClient.callOnce")(function* (sessionId: string) {
+      const callOnce = Effect.fn("PeerMcpClient.callOnce")(function* (
+        sessionId: string,
+        anonymous = false,
+      ) {
         const isProof = input.proof === true || input.tool === "fleet_peer_proof";
         let challenge: string | undefined;
         let identityHeaders: Record<string, string> = {};
         if (
+          !anonymous &&
           !isProof &&
-          (Object.hasOwn(identityTools, input.tool) ||
-            // A launch proves identity only with fleet work: without a lease
-            // ref the callee never reads this environment's identity.
-            (input.tool === "t3_thread_launch" && input.arguments.fleetTask !== undefined))
+          (Object.hasOwn(identityTools, input.tool) || input.tool === "t3_thread_launch")
         ) {
           challenge = Base64Url.encode(yield* random.randomBytes(32).pipe(Effect.orDie));
           const bearerDigest = Base64Url.encode(
@@ -253,16 +260,16 @@ const make = Effect.gen(function* () {
           : request;
       });
       const existing = (yield* Ref.get(sessions)).get(sessionKey);
-      const sessionId = existing ?? (yield* openSession(resolved.url, resolved.token, limitHeader));
+      let sessionId = existing ?? (yield* openSession(resolved.url, resolved.token, limitHeader));
       // The initialized session outlives a tool request, including a long wait or cancellation.
       if (existing === undefined) {
         yield* Ref.update(sessions, (current) => new Map(current).set(sessionKey, sessionId));
       }
       let response = yield* callOnce(sessionId);
       if (response.status === 404) {
-        const renewed = yield* openSession(resolved.url, resolved.token, limitHeader);
-        yield* Ref.update(sessions, (current) => new Map(current).set(sessionKey, renewed));
-        response = yield* callOnce(renewed);
+        sessionId = yield* openSession(resolved.url, resolved.token, limitHeader);
+        yield* Ref.update(sessions, (current) => new Map(current).set(sessionKey, sessionId));
+        response = yield* callOnce(sessionId);
       }
       if (response.status === 401) {
         return yield* new OrchestratorMcpFailure({
@@ -274,11 +281,17 @@ const make = Effect.gen(function* () {
       if (response.status === 403) return yield* linkedEnvironmentsOffThere;
       if (response.status === 503) {
         const text = yield* response.text;
-        if (text.includes('"peer_identity_unavailable"')) {
+        const identityUnavailable = decodeIdentityFailure(text)._tag === "Some";
+        if (
+          identityUnavailable &&
+          input.tool === "t3_thread_launch" &&
+          input.arguments.fleetTask === undefined
+        ) {
+          response = yield* callOnce(sessionId, true);
+        } else if (identityUnavailable || decodeIdentityConflict(text)._tag === "Some") {
           return yield* new OrchestratorMcpFailure({
             code: "orchestration_error",
-            message:
-              "The linked environment could not verify this environment's identity. Check that both environments can reach each other, then retry.",
+            message: `The linked environment ${resolved.link.label} (${input.environmentId}) could not verify this environment's identity. Check that both environments can reach each other, then retry.`,
           });
         }
       }
