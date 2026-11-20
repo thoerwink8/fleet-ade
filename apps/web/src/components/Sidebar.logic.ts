@@ -1049,7 +1049,10 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   if (thread.runtime?.status === "preparing") {
     return "preparing";
   }
-  if (thread.runtime?.status === "queued") {
+  if (
+    thread.runtime?.status === "queued" ||
+    (thread.runtime?.status === "starting" && thread.runtime.awaitingSlot === true)
+  ) {
     return "queued";
   }
   if (
@@ -1242,7 +1245,10 @@ export function resolveThreadStatusPill(input: {
     };
   }
 
-  if (thread.runtime?.status === "queued") {
+  if (
+    thread.runtime?.status === "queued" ||
+    (thread.runtime?.status === "starting" && thread.runtime.awaitingSlot === true)
+  ) {
     return {
       label: "排队",
       colorClass: "text-sidebar-muted-foreground",

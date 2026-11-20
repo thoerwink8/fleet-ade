@@ -620,7 +620,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     ? snoozeWakeLabel(snoozedUntil, { now: `${nowMinute}:00.000Z` })
     : null;
   const threadStatusLine =
-    activeLatestRun?.status === "queued" ? (
+    activeLatestRun?.status === "queued" ||
+    (activeThread?.runtime?.status === "starting" && activeThread.runtime.awaitingSlot === true) ? (
       <ThreadStatusLine icon={<AlarmClockIcon />} label="排队" />
     ) : activeThreadSnoozed ? (
       limitRecoveryHoldsSnooze ? null : (

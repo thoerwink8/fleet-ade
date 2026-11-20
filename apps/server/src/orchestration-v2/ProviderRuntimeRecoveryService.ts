@@ -436,6 +436,7 @@ export const make = Effect.gen(function* () {
           occurredAt: now,
           payload: {
             ...run,
+            ...(run.awaitingSlot === true ? { awaitingSlot: false } : {}),
             status: "queued",
             queueHeld: true,
             ...(retryableRuns.length === 0 ? {} : { queuePosition: index + 1 }),

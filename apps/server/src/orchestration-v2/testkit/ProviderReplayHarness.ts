@@ -548,6 +548,7 @@ export function layerWithRegistry<Error>(
   const layerEffectExecutorProvided = EffectWorker.layerExecutor.pipe(
     Layer.provide(
       Layer.mergeAll(
+        layerEventSinkProvided,
         layerRunFinalizationServiceProvided,
         layerCheckpointRollbackServiceProvided,
         layerProviderSessionManagerProvided,
@@ -561,7 +562,7 @@ export function layerWithRegistry<Error>(
     ),
   );
   const layerEffectWorkerProvided = EffectWorker.layer.pipe(
-    Layer.provide(Layer.merge(layerStores, layerEffectExecutorProvided)),
+    Layer.provide(Layer.mergeAll(layerStores, layerEffectExecutorProvided, layerEventSinkProvided)),
   );
   const layerReplayRuntime = Layer.mergeAll(
     layerEffectOutboxProvided,

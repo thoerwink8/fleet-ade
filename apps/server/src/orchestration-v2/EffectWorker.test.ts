@@ -26,6 +26,7 @@ import * as Stream from "effect/Stream";
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
+import * as EventSink from "./EventSink.ts";
 import * as EffectWorker from "./EffectWorker.ts";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
@@ -76,6 +77,9 @@ function restartEffect(
     lastError: null,
   };
 }
+const layerEventSinkMock = Layer.mock(EventSink.EventSinkV2)({
+  setAwaitingSlot: () => Effect.void,
+});
 
 function layerExecutorFor(input: {
   readonly events: Ref.Ref<ReadonlyArray<string>>;
@@ -84,6 +88,7 @@ function layerExecutorFor(input: {
   readonly continueAfterRestart?: boolean;
   readonly interrupt?: ProviderTurnControlService.ProviderTurnControlServiceV2Shape["interrupt"];
   readonly rollback?: CheckpointRollbackService.CheckpointRollbackServiceV2Shape["execute"];
+  readonly recordSlotClear?: boolean;
   readonly respond?: RuntimeRequestService.RuntimeRequestServiceV2["Service"]["respond"];
 }) {
   const record = (event: string) => Ref.update(input.events, (events) => [...events, event]);
@@ -162,6 +167,9 @@ function layerExecutorFor(input: {
   return EffectWorker.layerExecutor.pipe(
     Layer.provide(
       Layer.mergeAll(
+        Layer.mock(EventSink.EventSinkV2)({
+          setAwaitingSlot: () => (input.recordSlotClear ? record("clear") : Effect.void),
+        }),
         layerDependencies,
         Layer.mock(ThreadManagementService.ThreadManagementService)(input.threads ?? {}),
         ServerSettings.layerTest(
@@ -171,6 +179,22 @@ function layerExecutorFor(input: {
     ),
   );
 }
+
+it.effect("clears a restart slot marker before interrupting the provider", () =>
+  Effect.gen(function* () {
+    const events = yield* Ref.make<ReadonlyArray<string>>([]);
+    const layer = layerExecutorFor({ events, recordSlotClear: true });
+    yield* EffectWorker.OrchestrationEffectExecutorV2.pipe(
+      Effect.flatMap((executor) =>
+        executor.execute(
+          restartEffect(DateTime.makeUnsafe("2026-01-01T00:00:00Z"), { type: "detach" }),
+        ),
+      ),
+      Effect.provide(layer),
+    );
+    assert.deepEqual(yield* Ref.get(events), ["clear", "interrupt", "detach", "start"]);
+  }),
+);
 
 it.effect.each([
   {
@@ -373,7 +397,7 @@ it.effect("requeues a claim when a pre-execution worker check fails", () =>
       }),
     );
     const layerWorker = EffectWorker.layerWithOptions({ workerId }).pipe(
-      Layer.provide(Layer.merge(layerOutbox, layerExecutor)),
+      Layer.provide(Layer.mergeAll(layerOutbox, layerExecutor, layerEventSinkMock)),
     );
 
     const exit = yield* EffectWorker.OrchestrationEffectWorkerV2.pipe(
@@ -443,7 +467,7 @@ it.effect("arms cancellation before the durable pre-execution check", () =>
       }),
     );
     const layerWorker = EffectWorker.layerWithOptions({ workerId }).pipe(
-      Layer.provide(Layer.merge(layerOutbox, layerExecutor)),
+      Layer.provide(Layer.mergeAll(layerOutbox, layerExecutor, layerEventSinkMock)),
     );
 
     const exit = yield* EffectWorker.OrchestrationEffectWorkerV2.pipe(
@@ -509,7 +533,7 @@ it.effect("terminalizes a process-bound claim when success settlement fails", ()
       }),
     );
     const layerWorker = EffectWorker.layerWithOptions({ workerId }).pipe(
-      Layer.provide(Layer.merge(layerOutbox, layerExecutor)),
+      Layer.provide(Layer.mergeAll(layerOutbox, layerExecutor, layerEventSinkMock)),
     );
 
     const exit = yield* EffectWorker.OrchestrationEffectWorkerV2.pipe(
@@ -643,6 +667,7 @@ it.effect("reads the updated concurrent session limit on every claim", () =>
   Effect.gen(function* () {
     const limits = yield* Ref.make<ReadonlyArray<number | undefined>>([]);
     const outbox = Layer.mock(EffectOutbox.EffectOutboxV2)({
+      blockedBySessionLimit: () => Effect.succeed([]),
       claimNext: (input) =>
         Ref.update(limits, (current) => [...current, input.maxConcurrentSessions]).pipe(
           Effect.as(Option.none()),
@@ -654,7 +679,7 @@ it.effect("reads the updated concurrent session limit on every claim", () =>
     );
     const settings = ServerSettings.layerTest({ maxConcurrentSessions: 3 });
     const worker = EffectWorker.layerWithOptions({ maxConcurrentSessions: 2 }).pipe(
-      Layer.provide(Layer.mergeAll(outbox, executor)),
+      Layer.provide(Layer.mergeAll(outbox, executor, layerEventSinkMock)),
       Layer.provideMerge(settings),
     );
     yield* Effect.gen(function* () {

@@ -103,6 +103,7 @@ export interface ThreadRunSummary {
 
 export interface ThreadRuntimeSummary {
   readonly status: OrchestrationV2RunStatus | "idle";
+  readonly awaitingSlot?: boolean;
   readonly activeRunId: RunId | null;
   readonly activityStartedAt?: string | null | undefined;
   readonly providerInstanceId: ProviderInstanceId;
@@ -235,6 +236,7 @@ function shellRuntime(thread: OrchestrationV2ThreadShell): ThreadRuntimeSummary 
   const status = parkAtIdle ? "idle" : (thread.activityRunStatus ?? thread.status);
   return {
     status,
+    awaitingSlot: thread.activityRunAwaitingSlot === true,
     activeRunId: thread.activeRunId,
     activityStartedAt:
       thread.activityRunStartedAt === undefined

@@ -15,6 +15,7 @@ import * as CheckpointCapture from "./CheckpointCaptureService.ts";
 import * as CheckpointRollback from "./CheckpointRollbackService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EffectWorker from "./EffectWorker.ts";
+import * as EventSink from "./EventSink.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderSessions from "./ProviderSessionManager.ts";
 import * as ProviderTurnControl from "./ProviderTurnControlService.ts";
@@ -85,9 +86,13 @@ it.effect.each([
       ),
     ),
   );
+  const eventSinkMock = Layer.mock(EventSink.EventSinkV2)({
+    setAwaitingSlot: () => Effect.void,
+  });
   const executor = EffectWorker.layerExecutor.pipe(
     Layer.provide(
       Layer.mergeAll(
+        eventSinkMock,
         finalization,
         Layer.mock(ProviderSessions.ProviderSessionManagerV2)({}),
         Layer.mock(ProviderTurnControl.ProviderTurnControlServiceV2)({}),
@@ -105,7 +110,9 @@ it.effect.each([
     ),
   );
   const outbox = EffectOutbox.layer.pipe(Layer.provide(SqlitePersistence.layerMemory));
-  const worker = EffectWorker.layer.pipe(Layer.provideMerge(Layer.merge(executor, outbox)));
+  const worker = EffectWorker.layer.pipe(
+    Layer.provideMerge(Layer.mergeAll(executor, outbox, eventSinkMock)),
+  );
 
   return Effect.gen(function* () {
     const queue = yield* EffectOutbox.EffectOutboxV2;

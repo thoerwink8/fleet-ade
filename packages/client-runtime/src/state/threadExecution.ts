@@ -376,6 +376,7 @@ export function deriveThreadStructureRuntime(
         ? "idle"
         : (activityRun?.status ?? "idle"),
     activeRunId,
+    awaitingSlot: liveActivityRun?.awaitingSlot === true,
     activityStartedAt:
       liveActivityRun === null
         ? null

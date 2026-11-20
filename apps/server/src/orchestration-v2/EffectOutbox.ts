@@ -232,6 +232,9 @@ export interface EffectOutboxV2Shape {
     { readonly requeued: number; readonly cancelled: number },
     EffectOutboxError
   >;
+  readonly blockedBySessionLimit: (
+    limit: number,
+  ) => Effect.Effect<ReadonlyArray<OrchestrationEffectV2>, EffectOutboxError>;
   readonly claimNext: (input: {
     readonly workerId: string;
     readonly excludeRestartContinuations?: boolean;
@@ -326,6 +329,16 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
         available,
         Array.from({ length: Math.min(64, Math.max(0, Math.floor(count))) }, () => undefined),
       ).pipe(Effect.asVoid);
+    const sessionLimitBlocked = (limit: number) => sql`(
+      candidate.effect_type IN ('provider-turn.start', 'provider-turn.restart')
+      AND (SELECT COUNT(DISTINCT active_thread.thread_id) FROM (
+        SELECT thread_id FROM orchestration_v2_effect_outbox
+        WHERE status = 'running' AND effect_type IN ('provider-turn.start', 'provider-turn.restart')
+        UNION SELECT thread_id FROM orchestration_v2_projection_runs WHERE status = 'running'
+        UNION SELECT thread_id FROM orchestration_v2_projection_provider_turns
+        WHERE status IN ('starting', 'running', 'waiting')
+      ) AS active_thread WHERE active_thread.thread_id != candidate.thread_id) >= ${limit}
+    )`;
     // Retry backoff must block later effects so turns cannot race a pending rollback.
     const claimableCandidatePredicate = (
       availableBefore?: string,
@@ -381,31 +394,7 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
                 ) < ${maxRunningTitleGenerations}
               )`
         }
-        AND ${
-          maxConcurrentSessions === undefined
-            ? sql`1 = 1`
-            : sql`(
-                candidate.effect_type NOT IN ('provider-turn.start', 'provider-turn.restart')
-                OR (
-                  SELECT COUNT(DISTINCT active_thread.thread_id)
-                  FROM (
-                    SELECT running_turn_effect.thread_id AS thread_id
-                    FROM orchestration_v2_effect_outbox AS running_turn_effect
-                    WHERE running_turn_effect.status = 'running'
-                      AND running_turn_effect.effect_type IN ('provider-turn.start', 'provider-turn.restart')
-                    UNION
-                    SELECT running_run.thread_id AS thread_id
-                    FROM orchestration_v2_projection_runs AS running_run
-                    WHERE running_run.status = 'running'
-                    UNION
-                    SELECT active_pt.thread_id AS thread_id
-                    FROM orchestration_v2_projection_provider_turns AS active_pt
-                    WHERE active_pt.status IN ('starting', 'running', 'waiting')
-                  ) AS active_thread
-                  WHERE active_thread.thread_id != candidate.thread_id
-                ) < ${maxConcurrentSessions}
-              )`
-        }
+        AND ${maxConcurrentSessions === undefined ? sql`1 = 1` : sql`NOT ${sessionLimitBlocked(maxConcurrentSessions)}`}
       `;
 
     const cancellationSignal = (effectId: string) => {
@@ -422,6 +411,23 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
       );
 
     const service: EffectOutboxV2Shape = {
+      blockedBySessionLimit: Effect.fn("EffectOutbox.blockedBySessionLimit")(
+        function* (limit) {
+          const now = DateTime.formatIso(yield* DateTime.now);
+          const rows = yield* sql<EffectRow>`
+          SELECT candidate.* FROM orchestration_v2_effect_outbox candidate
+          JOIN orchestration_v2_projection_runs r ON r.run_id = json_extract(candidate.payload_json, '$.runId')
+            AND r.thread_id = candidate.thread_id
+          WHERE candidate.status = 'pending' AND candidate.available_at <= ${now}
+            AND r.status = 'starting' AND json_extract(r.payload_json, '$.awaitingSlot') IS NOT 1
+            AND ${sessionLimitBlocked(limit)}
+        `;
+          return yield* decodeRows("blocked-by-session-limit", rows);
+        },
+        Effect.mapError(
+          (cause) => new EffectOutboxError({ operation: "blocked-by-session-limit", cause }),
+        ),
+      ),
       enqueue: Effect.fn("EffectOutbox.enqueue")(
         function* (effects) {
           const now = yield* DateTime.now;
