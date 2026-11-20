@@ -1,6 +1,5 @@
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import {
-  AuthSessionId,
   FLEET_SUMMARY_PAGE_SIZE,
   FLEET_SUMMARY_PROGRESS_LIMIT,
   FLEET_SUMMARY_RETENTION,
@@ -20,7 +19,6 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
-import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Semaphore from "effect/Semaphore";
@@ -31,7 +29,7 @@ import * as Stream from "effect/Stream";
 
 import * as NodeClaims from "./nodeClaims.ts";
 import * as NodeReads from "./nodeReads.ts";
-import * as AuthSessions from "../persistence/AuthSessions.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as LedgerDb from "./LedgerDb.ts";
 
 const isFleetSummaryError = Schema.is(FleetSummaryError);
@@ -157,7 +155,7 @@ const sameReported = (current: FleetSummaryRow, next: FleetSummaryRow) =>
   current.stale === next.stale &&
   current.staleReason === next.staleReason;
 
-type IsLegacySession = (id: string) => Effect.Effect<boolean, FleetSummaryError>;
+type KeepEnvironments = Effect.Effect<ReadonlySet<string>, FleetSummaryError>;
 
 const storageError = (cause: unknown) =>
   new FleetSummaryError({
@@ -166,7 +164,7 @@ const storageError = (cause: unknown) =>
     cause,
   });
 
-const make = Effect.fn("FleetSummary.make")(function* (isLegacySession: IsLegacySession) {
+const make = Effect.fn("FleetSummary.make")(function* (keepEnvironments: KeepEnvironments) {
   const sql = yield* SqlClient.SqlClient;
   yield* NodeReads.migrate;
   yield* sql`PRAGMA journal_mode = WAL`;
@@ -396,21 +394,22 @@ const make = Effect.fn("FleetSummary.make")(function* (isLegacySession: IsLegacy
     );
   };
 
-  // A surviving auth session ID identifies a legacy session-keyed row. Sessions
-  // already removed from the main database cannot be identified this way.
+  // The previous session-lookup migration missed deleted sessions. Run this
+  // independently even on databases where that migration already completed.
   yield* sql
     .withTransaction(
       Effect.gen(function* () {
         yield* sql`CREATE TABLE IF NOT EXISTS fleet_summary_migrations (name TEXT PRIMARY KEY)`;
-        const marker = "remove-session-keyed-rows-v1";
+        const marker = "remove-unlinked-summary-rows-v2";
         const applied =
           yield* sql`SELECT name FROM fleet_summary_migrations WHERE name = ${marker}`;
         if (applied.length > 0) return;
+        const keep = yield* keepEnvironments;
         const candidates = yield* sql<{ readonly environment_id: string }>`
         SELECT DISTINCT environment_id FROM fleet_summary_rows ORDER BY environment_id
       `;
         for (const { environment_id } of candidates) {
-          if (!(yield* isLegacySession(environment_id))) continue;
+          if (keep.has(environment_id)) continue;
           const rows = yield* sql<
             RowRecord & { readonly row_id: string }
           >`SELECT * FROM fleet_summary_rows
@@ -666,24 +665,33 @@ const rowIdOfKey = (key: FleetSummaryTombstoneKey) =>
 const sameRow = (event: FleetSummaryChangeEvent, rowId: string) =>
   (event.type === "upsert" ? rowIdOfRow(event.row) : rowIdOfKey(event.key)) === rowId;
 
+/** Read identities from the main database, not the separate ledger connection. */
+export const keepEnvironments = Effect.gen(function* () {
+  const mainSql = yield* SqlClient.SqlClient;
+  const identity = yield* ServerEnvironment.ServerEnvironmentIdentity;
+  const localId = yield* identity.getEnvironmentId;
+  const links = yield* mainSql<{ readonly environment_id: string }>`
+    SELECT environment_id FROM peer_environment_links
+  `;
+  return new Set<string>([localId, ...links.map((link) => link.environment_id)]);
+}).pipe(Effect.mapError(storageError));
+
 export const layer = Layer.unwrap(
   Effect.gen(function* () {
-    const sessions = yield* AuthSessions.AuthSessionRepository;
+    const mainContext = yield* Effect.context<
+      SqlClient.SqlClient | ServerEnvironment.ServerEnvironmentIdentity
+    >();
     return Layer.effect(
       FleetSummary,
-      make((id) =>
-        sessions
-          .getById({ sessionId: AuthSessionId.make(id) })
-          .pipe(Effect.map(Option.isSome), Effect.mapError(storageError)),
-      ),
+      make(keepEnvironments.pipe(Effect.provide(mainContext))),
     ).pipe(Layer.provide(LedgerDb.layer));
   }),
-).pipe(Layer.provide(AuthSessions.layer));
+);
 
 export const layerForTest = (
   filename = ":memory:",
-  isLegacySession: IsLegacySession = () => Effect.succeed(false),
+  keepEnvironments: KeepEnvironments = Effect.succeed(new Set()),
 ) =>
-  Layer.effect(FleetSummary, make(isLegacySession)).pipe(
+  Layer.effect(FleetSummary, make(keepEnvironments)).pipe(
     Layer.provideMerge(NodeSqliteClient.layer({ filename })),
   );

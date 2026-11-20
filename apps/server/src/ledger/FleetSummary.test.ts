@@ -9,10 +9,15 @@ import * as Scope from "effect/Scope";
 import * as TestClock from "effect/testing/TestClock";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
-import { FLEET_SUMMARY_PAGE_SIZE, FLEET_SUMMARY_PROGRESS_LIMIT } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  FLEET_SUMMARY_PAGE_SIZE,
+  FLEET_SUMMARY_PROGRESS_LIMIT,
+} from "@t3tools/contracts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as NodeReads from "./nodeReads.ts";
 import * as FleetSummary from "./FleetSummary.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 
 const ledgerLayer = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -308,7 +313,7 @@ it.effect("重建同一 filename 后 revision 不回退", () =>
   ),
 );
 
-it.effect("旧 session 摘要迁移生成 tombstone，仅执行一次且保留未匹配环境", () =>
+it.effect("旧摘要迁移清除所有集外环境并发 tombstone，保留本机与已链接环境且仅执行一次", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -317,8 +322,19 @@ it.effect("旧 session 摘要迁移生成 tombstone，仅执行一次且保留�
       const filename = path.join(directory, "ledger.sqlite");
       const db = yield* NodeSqliteClient.layer({ filename }).pipe(Layer.build);
       const sql = Context.get(db, SqlClient.SqlClient);
+      const mainDb = yield* NodeSqliteClient.layer({ filename: ":memory:" }).pipe(Layer.build);
+      const mainSql = Context.get(mainDb, SqlClient.SqlClient);
+      yield* mainSql`CREATE TABLE peer_environment_links (environment_id TEXT PRIMARY KEY)`;
+      yield* mainSql`INSERT INTO peer_environment_links VALUES ('linked-environment')`;
       yield* NodeReads.migrate.pipe(Effect.provideService(SqlClient.SqlClient, sql));
-      for (const environmentId of ["old-session", "real-environment"]) {
+      yield* sql`CREATE TABLE fleet_summary_migrations (name TEXT PRIMARY KEY)`;
+      yield* sql`INSERT INTO fleet_summary_migrations VALUES ('remove-session-keyed-rows-v1')`;
+      for (const environmentId of [
+        "old-session",
+        "deleted-session",
+        "local-environment",
+        "linked-environment",
+      ]) {
         const rowId = `adhoc\n${environmentId}\nthread-1`;
         yield* sql`INSERT INTO fleet_summary_rows (
           row_id, environment_id, kind, thread_id, title, phase, reason, needs_you,
@@ -327,31 +343,49 @@ it.effect("旧 session 摘要迁移生成 tombstone，仅执行一次且保留�
           'working', 0, 'progress', '2026-11-19T00:00:00.000Z', 1)`;
       }
       yield* sql`UPDATE fleet_summary_meta SET revision = 1 WHERE id = 1`;
-      const lookup = (id: string) => Effect.succeed(id === "old-session");
-      const context = yield* FleetSummary.layerForTest(filename, lookup).pipe(Layer.build);
+      const keep = FleetSummary.keepEnvironments.pipe(
+        Effect.provideService(SqlClient.SqlClient, mainSql),
+        Effect.provideService(ServerEnvironment.ServerEnvironmentIdentity, {
+          getEnvironmentId: Effect.succeed(EnvironmentId.make("local-environment")),
+        }),
+      );
+      const context = yield* FleetSummary.layerForTest(filename, keep).pipe(Layer.build);
       const summary = Context.get(context, FleetSummary.FleetSummary);
-      const events = yield* summary.subscribe({ cursor: 1 }).pipe(Effect.flatMap(first));
-      expect(events).toEqual({
-        type: "tombstone",
-        revision: 2,
-        key: { environmentId: "old-session", threadId: "thread-1" },
-      });
-      expect(yield* sql`SELECT environment_id FROM fleet_summary_rows`).toEqual([
-        { environment_id: "real-environment" },
+      const events = yield* summary
+        .subscribe({ cursor: 1 })
+        .pipe(Effect.flatMap((stream) => Stream.runCollect(stream.pipe(Stream.take(2)))));
+      expect(events).toEqual([
+        {
+          type: "tombstone",
+          revision: 2,
+          key: { environmentId: "deleted-session", threadId: "thread-1" },
+        },
+        {
+          type: "tombstone",
+          revision: 3,
+          key: { environmentId: "old-session", threadId: "thread-1" },
+        },
+      ]);
+      expect(
+        yield* sql`SELECT environment_id FROM fleet_summary_rows ORDER BY environment_id`,
+      ).toEqual([
+        { environment_id: "linked-environment" },
+        { environment_id: "local-environment" },
       ]);
       // A later row with a matching ID must not trigger a second migration.
       yield* summary.report("old-session", adhoc("new-thread"));
-      const restarted = yield* FleetSummary.layerForTest(filename, lookup).pipe(Layer.build);
+      const restarted = yield* FleetSummary.layerForTest(filename, keep).pipe(Layer.build);
       const restartedSummary = Context.get(restarted, FleetSummary.FleetSummary);
       const snapshot = yield* restartedSummary.subscribe({}).pipe(Effect.flatMap(first));
       expect(snapshot?.type).toBe("snapshot");
       if (snapshot?.type === "snapshot") {
         expect(snapshot.rows.map((row) => row.environmentId).sort()).toEqual([
+          "linked-environment",
+          "local-environment",
           "old-session",
-          "real-environment",
         ]);
       }
-      expect(yield* sql`SELECT revision FROM fleet_summary_meta`).toEqual([{ revision: 3 }]);
+      expect(yield* sql`SELECT revision FROM fleet_summary_meta`).toEqual([{ revision: 4 }]);
     }).pipe(Effect.provide(NodeServices.layer)),
   ),
 );
@@ -375,8 +409,8 @@ it.effect("旧摘要迁移失败时删除、tombstone 和标记一起回滚，�
       yield* sql`UPDATE fleet_summary_meta SET revision = 1 WHERE id = 1`;
       yield* sql`CREATE TRIGGER reject_tombstone BEFORE INSERT ON fleet_summary_changes
         BEGIN SELECT RAISE(ABORT, 'test failure'); END`;
-      const lookup = () => Effect.succeed(true);
-      const failed = yield* Layer.build(FleetSummary.layerForTest(filename, lookup)).pipe(
+      const keep = Effect.succeed(new Set<string>());
+      const failed = yield* Layer.build(FleetSummary.layerForTest(filename, keep)).pipe(
         Effect.flip,
       );
       expect(failed).toBeDefined();
@@ -386,7 +420,7 @@ it.effect("旧摘要迁移失败时删除、tombstone 和标记一起回滚，�
       expect(yield* sql`SELECT revision FROM fleet_summary_meta`).toEqual([{ revision: 1 }]);
       expect(yield* sql`SELECT revision FROM fleet_summary_changes`).toEqual([]);
       yield* sql`DROP TRIGGER reject_tombstone`;
-      yield* Layer.build(FleetSummary.layerForTest(filename, lookup));
+      yield* Layer.build(FleetSummary.layerForTest(filename, keep));
       expect(yield* sql`SELECT environment_id FROM fleet_summary_rows`).toEqual([]);
       expect(yield* sql`SELECT revision FROM fleet_summary_changes`).toEqual([{ revision: 2 }]);
     }).pipe(Effect.provide(NodeServices.layer)),
