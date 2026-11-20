@@ -123,7 +123,9 @@ export function ExternalQuotaCards({
           {reading ? "正在读取" : "刷新"}
         </Button>
       </div>
-      {reading && agy === null ? <p className="text-sm text-muted-foreground">正在读取</p> : null}
+      {reading && agy === null && magpieQuotas === null && magpieUsage === null ? (
+        <p className="text-sm text-muted-foreground">正在读取</p>
+      ) : null}
       {failure ? (
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm text-muted-foreground">{failure}</p>

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { render } from "../../../test/render";
+import { act, fakeTimers, render } from "../../../test/render";
 import { ExternalQuotaCards } from "./ExternalQuotaCards";
 
 describe("ExternalQuotaCards", () => {
@@ -39,25 +39,30 @@ describe("ExternalQuotaCards", () => {
   });
   it("turns a stalled read into a failure with retry", async () => {
     const onRefresh = vi.fn();
-    await using screen = await render(
-      <ExternalQuotaCards
-        pending
-        stallTimeoutMs={25}
-        onRefresh={onRefresh}
-        localLines={[]}
-        agy={null}
-        magpieQuotas={null}
-        magpieUsage={null}
-      />,
-    );
+    const props = {
+      pending: true,
+      stallTimeoutMs: 1_000,
+      onRefresh,
+      localLines: [] as string[],
+      agy: null,
+      magpieQuotas: null,
+      magpieUsage: null,
+    };
+    await using screen = await render(<ExternalQuotaCards {...props} pending={false} />);
+    using _timers = fakeTimers();
 
-    await expect.element(screen.getByRole("button", { name: "正在读取" })).toBeDisabled();
-    await vi.waitFor(() => {
-      expect(screen.getByText(/读取失败：超过 .* 秒没有读到额度数据/)).toBeTruthy();
-    });
-    await screen.getByRole("button", { name: "重试", exact: true }).click();
+    await act(() => screen.rerender(<ExternalQuotaCards {...props} />));
+    expect(screen.getByRole("button", { name: "正在读取" }).element()).toBeDisabled();
+
+    await act(() => vi.advanceTimersByTime(1_000));
+    await expect.element(screen.getByText(/读取失败：超过 .* 秒没有读到额度数据/)).toBeVisible();
+    await act(() =>
+      (
+        screen.getByRole("button", { name: "重试", exact: true }).element() as HTMLButtonElement
+      ).click(),
+    );
     expect(onRefresh).toHaveBeenCalledTimes(1);
-    await expect.element(screen.getByRole("button", { name: "正在读取" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "正在读取" }).element()).toBeDisabled();
   });
 
   it("tells the user how to get local log usage when there is none", async () => {
