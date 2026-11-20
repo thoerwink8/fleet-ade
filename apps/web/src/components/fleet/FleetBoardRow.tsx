@@ -65,7 +65,7 @@ export const FleetBoardRow = memo(function FleetBoardRow({
   return (
     <div
       className={cn(
-        "flex w-full min-w-0 items-center gap-2 rounded-md transition-colors [content-visibility:auto] [contain-intrinsic-block-size:76px]",
+        "flex w-full min-w-0 items-center gap-2 rounded-md transition-colors [content-visibility:auto] [contain-intrinsic-block-size:auto_76px]",
         selected ? "bg-accent" : "hover:bg-accent/60",
       )}
     >

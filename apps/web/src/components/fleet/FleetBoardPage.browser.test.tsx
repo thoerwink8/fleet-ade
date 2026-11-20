@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   ],
   readableIds: ["env-a"] as string[],
   sessionState: { data: {} as Record<string, unknown> | null, hasError: false, isPending: false },
+  retrySummary: vi.fn(async () => {}),
+  retrySession: vi.fn(),
   summary: {
     epoch: 0,
     status: "live",
@@ -85,11 +87,13 @@ function setup(overrides?: {
         },
       ],
     ]);
+  mocks.retrySummary.mockClear();
+  mocks.retrySession.mockClear();
 }
 
 vi.mock("~/state/fleetSummary", () => ({
   useFleetSummary: () => mocks.summary as never,
-  useFleetSummaryRetry: () => async () => {},
+  useFleetSummaryRetry: () => mocks.retrySummary,
 }));
 
 vi.mock("~/state/environments", async (importOriginal) => ({
@@ -105,8 +109,8 @@ vi.mock("~/state/session", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/state/session")>()),
   useEnvironmentsWithScope: () => new Set(mocks.readableIds),
   useEnvironmentSessionState: () => mocks.sessionState,
+  useEnvironmentSessionRetry: () => mocks.retrySession,
 }));
-
 vi.mock("~/state/peerLinks", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/state/peerLinks")>()),
   useLinkedEnvironments: () => new Map(),
@@ -203,5 +207,9 @@ it("shows the read error retry state instead of missing-permission when session 
 
   await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
   await expect.element(page.getByText("读不到机群汇总")).toBeVisible();
-  await expect.element(page.getByRole("button", { name: "重试" })).toBeVisible();
+  const retryButton = page.getByRole("button", { name: "重试" });
+  await expect.element(retryButton).toBeVisible();
+  await retryButton.click();
+  expect(mocks.retrySession).toHaveBeenCalledTimes(1);
+  expect(mocks.retrySummary).not.toHaveBeenCalled();
 });

@@ -22,7 +22,11 @@ import {
 } from "~/state/environments";
 import { useServerConfigs } from "~/state/entities";
 import { useLinkedEnvironments } from "~/state/peerLinks";
-import { useEnvironmentsWithScope, useEnvironmentSessionState } from "~/state/session";
+import {
+  useEnvironmentsWithScope,
+  useEnvironmentSessionRetry,
+  useEnvironmentSessionState,
+} from "~/state/session";
 import { useFleetSummary, useFleetSummaryRetry } from "~/state/fleetSummary";
 import { AuthOrchestrationReadScope } from "@t3tools/contracts";
 
@@ -302,6 +306,7 @@ export function FleetBoardPage() {
       !sourceDisconnected &&
       fleetSourceCandidates.length === 0);
   const retry = useFleetSummaryRetry(sourceEnvironmentId);
+  const retrySession = useEnvironmentSessionRetry(fallbackSourceId);
   const [retryPending, setRetryPending] = useState(false);
   const [doneOpenIds, setDoneOpenIds] = useState<ReadonlySet<string>>(new Set());
   const [doneLimit, setDoneLimit] = useState(50);
@@ -409,6 +414,7 @@ export function FleetBoardPage() {
     </Button>
   );
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const openedRowInSessionRef = useRef(false);
   const handleOpenRow = useStableCallback((selectedKey: string) => {
     openedRowInSessionRef.current = true;
@@ -424,7 +430,9 @@ export function FleetBoardPage() {
     }
     if (key !== undefined) {
       queueMicrotask(() => {
-        const buttons = document.querySelectorAll<HTMLButtonElement>("button[data-fleet-row]");
+        const container = containerRef.current;
+        if (container === null) return;
+        const buttons = container.querySelectorAll<HTMLButtonElement>("button[data-fleet-row]");
         for (const button of buttons) {
           if (button.dataset.fleetRow === key) {
             button.focus();
@@ -437,7 +445,7 @@ export function FleetBoardPage() {
 
   return (
     <AppRouteModal label="机群">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div ref={containerRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex min-h-12 shrink-0 items-center gap-2 border-b ps-5 pe-2">
           <WorkspaceBreadcrumb ariaLabel="机群导航" className="min-w-0 flex-1">
             <WorkspaceBreadcrumbItem>
@@ -577,7 +585,9 @@ export function FleetBoardPage() {
                     disabled={retryPending}
                     onClick={() => {
                       setRetryPending(true);
-                      void Promise.resolve(retry()).finally(() => setRetryPending(false));
+                      void Promise.resolve(sessionReadError ? retrySession() : retry()).finally(
+                        () => setRetryPending(false),
+                      );
                     }}
                   >
                     <RefreshCwIcon aria-hidden />
