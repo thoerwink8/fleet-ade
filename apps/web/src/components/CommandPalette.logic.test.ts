@@ -16,6 +16,7 @@ import {
   reduceCommandPaletteSearchState,
   type CommandPaletteUiState,
   buildRootGroups,
+  commandPaletteDisabledReason,
 } from "./CommandPalette.logic";
 
 describe("linked pull request thread navigation", () => {
@@ -978,5 +979,16 @@ describe("newThreadNoProjectIndex", () => {
   it("keeps a pinned or current scratch project in its own place", () => {
     expect(newThreadNoProjectIndex([entry(false, true, true), entry()])).toBe(0);
     expect(newThreadNoProjectIndex([entry(true), entry(true, false, true), entry()])).toBe(1);
+  });
+});
+
+describe("unavailable commands", () => {
+  it("carries an actionable reason", () => {
+    expect(
+      commandPaletteDisabledReason({ disabled: true, disabledReason: "这个会话还没有 PR。" }),
+    ).toBe("这个会话还没有 PR。");
+    expect(
+      commandPaletteDisabledReason({ disabled: false, disabledReason: "这个会话还没有 PR。" }),
+    ).toBeNull();
   });
 });

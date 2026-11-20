@@ -95,6 +95,7 @@ import {
 } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
+import { toastManager } from "~/components/ui/toast";
 
 import { PreviewPanelShell, type PreviewPanelMode } from "./preview/PreviewPanelShell";
 import { FaviconImage } from "./preview/PreviewFaviconIcon";
@@ -152,6 +153,7 @@ export interface RightPanelTabsProps {
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
   deviceAvailable: boolean;
+  deviceOffered: boolean;
   sideChatAvailable?: boolean;
   /** Overrides the default reason while side chats are available but cannot start. */
   sideChatDisabledReason?: string | null;
@@ -177,7 +179,7 @@ const SURFACE_DISABLED_REASONS = {
   browser: "浏览器预览仅在 T3 Code 桌面应用中可用。",
   terminal: "终端面板仅在项目会话中可用。",
   files: "打开项目后才能使用文件面板。",
-  diff: "差异仅在 Git 仓库的服务器会话中可用。",
+  diff: "还没有文件改动。",
   pullRequest: "此会话的分支尚无 pull request。",
   pullRequests: "此会话没有可用的已关联 pull request。",
   device: "设备仅在会话中可用。",
@@ -202,7 +204,7 @@ const SURFACE_UNAVAILABLE_HINTS = {
   browser: "仅桌面应用可用。",
   terminal: "打开项目后可用。",
   files: "打开项目后可用。",
-  diff: "仅适用于 Git 仓库。",
+  diff: "还没有文件改动。",
   pullRequest: "此分支尚无 pull request。",
   pullRequests: "没有可用的已关联 pull request。",
   device: "在会话中可用。",
@@ -302,7 +304,16 @@ function SurfaceMenuItem(props: {
   const item = (
     <MenuItem
       className={!props.available ? "data-disabled:pointer-events-auto" : undefined}
-      onClick={props.onClick}
+      onClick={() => {
+        if (props.available) props.onClick();
+        else if (props.disabledReason) {
+          toastManager.add({
+            type: "info",
+            title: "面板不可用",
+            description: props.disabledReason,
+          });
+        }
+      }}
       disabled={!props.available}
       aria-keyshortcuts={props.shortcut}
     >
@@ -333,6 +344,7 @@ function RightPanelEmptyState(props: {
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
   deviceAvailable: boolean;
+  deviceOffered: boolean;
   sideChatAvailable: boolean;
   sideChatDisabledReason: string | null;
 }) {
@@ -387,15 +399,19 @@ function RightPanelEmptyState(props: {
       disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequests,
       onClick: props.onAddPullRequests,
     },
-    {
-      label: "设备",
-      description: "查看 iOS 模拟器或 Android 模拟器。",
-      icon: Smartphone,
-      shortcut: "M",
-      available: props.deviceAvailable,
-      disabledReason: SURFACE_UNAVAILABLE_HINTS.device,
-      onClick: props.onAddDevice,
-    },
+    ...(props.deviceOffered
+      ? [
+          {
+            label: "设备",
+            description: "查看 iOS 模拟器或 Android 模拟器。",
+            icon: Smartphone,
+            shortcut: "M",
+            available: props.deviceAvailable,
+            disabledReason: SURFACE_UNAVAILABLE_HINTS.device,
+            onClick: props.onAddDevice,
+          },
+        ]
+      : []),
     ...(props.onAddSideChat
       ? [
           {
@@ -550,15 +566,27 @@ function RightPanelEmptyState(props: {
                 key={action.label}
                 reason={action.disabledReason}
                 trigger={
-                  <div
-                    tabIndex={0}
+                  <button
+                    type="button"
                     aria-disabled="true"
-                    className="flex h-8 w-full cursor-default items-center gap-2.5 rounded-(--control-radius) px-2.5 text-left text-sm opacity-50"
+                    onClick={() =>
+                      toastManager.add({
+                        type: "info",
+                        title: action.label,
+                        description: action.disabledReason,
+                      })
+                    }
+                    className="flex min-h-8 w-full cursor-pointer items-start gap-2.5 rounded-(--control-radius) px-2.5 py-1.5 text-left text-sm opacity-60 hover:bg-accent/40"
                   >
-                    {actionIcon(action, "size-4")}
-                    <span className="min-w-0 flex-1 truncate">{action.label}</span>
+                    {actionIcon(action, "mt-0.5 size-4")}
+                    <span className="min-w-0 flex-1">
+                      <span className="block">{action.label}</span>
+                      <span className="block text-xs leading-4 text-muted-foreground">
+                        {action.disabledReason}
+                      </span>
+                    </span>
                     <Kbd>{action.shortcut}</Kbd>
-                  </div>
+                  </button>
                 }
               />
             ),
@@ -1146,14 +1174,18 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       disabledReason: SURFACE_DISABLED_REASONS.pullRequests,
       onClick: props.onAddPullRequests,
     },
-    {
-      label: "设备",
-      icon: Smartphone,
-      shortcut: "M",
-      available: props.deviceAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.device,
-      onClick: props.onAddDevice,
-    },
+    ...(props.deviceOffered
+      ? [
+          {
+            label: "设备",
+            icon: Smartphone,
+            shortcut: "M",
+            available: props.deviceAvailable,
+            disabledReason: SURFACE_DISABLED_REASONS.device,
+            onClick: props.onAddDevice,
+          },
+        ]
+      : []),
     ...(props.onAddSideChat
       ? [
           {
@@ -1556,6 +1588,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             pullRequestAvailable={props.pullRequestAvailable}
             pullRequestsAvailable={props.pullRequestsAvailable}
             deviceAvailable={props.deviceAvailable}
+            deviceOffered={props.deviceOffered}
             sideChatAvailable={props.sideChatAvailable === true}
             sideChatDisabledReason={props.sideChatDisabledReason ?? null}
           />

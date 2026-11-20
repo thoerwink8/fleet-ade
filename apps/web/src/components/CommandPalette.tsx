@@ -59,7 +59,6 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
   BugIcon,
-  ActivityIcon,
   ListTreeIcon,
   ChartNoAxesColumnIcon,
   CheckIcon,
@@ -1339,18 +1338,6 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
-  if (triageEnvironmentId !== null && canTriage) {
-    actionItems.push({
-      kind: "action",
-      value: "action:triage",
-      searchTerms: ["triage", "bug", "issue", "report", "broken", "debug", "help", "support"],
-      title: "排查 issue",
-      description: "由智能体排查 T3 Code 的问题并协助提交 issue",
-      icon: <BugIcon className={ITEM_ICON_CLASS} />,
-      run: () => startTriage(triageEnvironmentId),
-    });
-  }
-
   if (activeThreadKey !== null && supportsThreadFind) {
     actionItems.push({
       kind: "action",
@@ -1465,6 +1452,7 @@ function OpenCommandPaletteDialog(props: {
       searchTerms: ["pull requests", "linked", "stack", "prs"],
       title: "显示已关联的 PR",
       disabled: visibleThreadPullRequests(activeThread.pullRequests).length === 0,
+      disabledReason: "这个会话还没有 PR。",
       icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
       run: async () => {
         useRightPanelStore.getState().open(threadRef, "pull-requests");
@@ -1519,6 +1507,16 @@ function OpenCommandPaletteDialog(props: {
     shortcutCommand: "filePicker.toggle",
     run: async () => {
       openChildSearch("files", { query, linkedThreadSearch });
+    },
+  });
+  actionItems.push({
+    kind: "action",
+    value: "action:settings",
+    searchTerms: ["settings", "preferences", "configuration", "keybindings"],
+    title: "打开设置",
+    icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/settings" });
     },
   });
 
@@ -1630,34 +1628,6 @@ function OpenCommandPaletteDialog(props: {
 
   actionItems.push({
     kind: "action",
-    value: "action:use-in-another-app",
-    searchTerms: [
-      "mcp",
-      "connector",
-      "another app",
-      "poke",
-      "claude",
-      "chatgpt",
-      "grok",
-      "muse",
-      "instinct",
-      "openclaw",
-      "hermes",
-    ],
-    title: "在其他应用中使用 T3 Code（MCP）",
-    icon: <PlugIcon className={ITEM_ICON_CLASS} />,
-    run: async () => {
-      openUseInAnotherApp(
-        currentProjectEnvironmentId ??
-          (paletteRouteTarget?.kind === "server"
-            ? paletteRouteTarget.threadRef.environmentId
-            : null),
-      );
-    },
-  });
-
-  actionItems.push({
-    kind: "action",
     value: "action:usage",
     searchTerms: ["usage", "use", "tokens", "cost", "spend", "limits", "stats", "analytics"],
     title: "打开用量",
@@ -1665,39 +1635,6 @@ function OpenCommandPaletteDialog(props: {
     shortcutCommand: "usage.open",
     run: async () => {
       await navigate({ to: "/usage" });
-    },
-  });
-
-  actionItems.push({
-    kind: "action",
-    value: "action:engine-status",
-    searchTerms: ["engine", "health", "status", "引擎", "状态"],
-    title: "引擎状态",
-    icon: <ActivityIcon className={ITEM_ICON_CLASS} />,
-    run: async () => {
-      await navigate({ to: "/engine" });
-    },
-  });
-
-  actionItems.push({
-    kind: "action",
-    value: "action:pipeline",
-    searchTerms: ["pipeline", "runs", "stuck", "流水线"],
-    title: "流水线",
-    icon: <ListTreeIcon className={ITEM_ICON_CLASS} />,
-    run: async () => {
-      await navigate({ to: "/pipeline" });
-    },
-  });
-
-  actionItems.push({
-    kind: "action",
-    value: "action:channels",
-    searchTerms: ["channels", "candidates", "routing", "渠道", "候选"],
-    title: "渠道",
-    icon: <PlugIcon className={ITEM_ICON_CLASS} />,
-    run: async () => {
-      await navigate({ to: "/channels" });
     },
   });
 
@@ -1715,17 +1652,6 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
-
-  actionItems.push({
-    kind: "action",
-    value: "action:settings",
-    searchTerms: ["settings", "preferences", "configuration", "keybindings"],
-    title: "打开设置",
-    icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
-    run: async () => {
-      await navigate({ to: "/settings" });
-    },
-  });
 
   // Every group, so an archived project's thread still opens its own settings.
   const currentProjectGroup =
@@ -1782,6 +1708,44 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+  if (triageEnvironmentId !== null && canTriage) {
+    actionItems.push({
+      kind: "action",
+      value: "action:triage",
+      searchTerms: ["triage", "bug", "issue", "report", "broken", "debug", "help", "support"],
+      title: "排查 issue",
+      description: "由智能体排查 T3 Code 的问题并协助提交 issue",
+      icon: <BugIcon className={ITEM_ICON_CLASS} />,
+      run: () => startTriage(triageEnvironmentId),
+    });
+  }
+  actionItems.push({
+    kind: "action",
+    value: "action:use-in-another-app",
+    searchTerms: [
+      "mcp",
+      "connector",
+      "another app",
+      "poke",
+      "claude",
+      "chatgpt",
+      "grok",
+      "muse",
+      "instinct",
+      "openclaw",
+      "hermes",
+    ],
+    title: "在其他应用中使用 T3 Code（MCP）",
+    icon: <PlugIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      openUseInAnotherApp(
+        currentProjectEnvironmentId ??
+          (paletteRouteTarget?.kind === "server"
+            ? paletteRouteTarget.threadRef.environmentId
+            : null),
+      );
+    },
+  });
 
   const selectedBatchThreads = () =>
     [...useThreadSelectionStore.getState().selectedThreadKeys].flatMap((key) => {
@@ -2503,7 +2467,7 @@ function OpenCommandPaletteDialog(props: {
               `new-project:environment:${option.environmentId}`,
               switchNewProjectEnvironment,
             ),
-            ...(isCreatingNewProject ? { disabled: true } : {}),
+            ...(isCreatingNewProject ? { disabled: true, disabledReason: "正在创建项目。" } : {}),
             ...(option.environmentId === newProjectFlow.environmentId
               ? {
                   titleTrailingContent: (
@@ -2574,7 +2538,9 @@ function OpenCommandPaletteDialog(props: {
                     </span>
                   </span>
                 ),
-                ...(isCreatingNewProject ? { disabled: true } : {}),
+                ...(isCreatingNewProject
+                  ? { disabled: true, disabledReason: "正在创建项目。" }
+                  : {}),
                 keepOpen: true,
                 checked: newProjectPublishes,
                 run: async () => {

@@ -6,12 +6,11 @@ import {
 } from "@t3tools/contracts";
 import { formatCount } from "@t3tools/shared/usageFormat";
 
-export type PipelineSection = "needsAction" | "running" | "stuck" | "recentPullRequests";
+export type PipelineSection = "needsAction" | "running" | "stuck";
 
 export interface PipelineGroups {
   readonly running: ReadonlyArray<PipelineRun>;
   readonly stuck: ReadonlyArray<PipelineRun>;
-  readonly recentPullRequests: ReadonlyArray<PipelineRun>;
 }
 
 /** Labels for the status field. Stuck reasons stay the server's own text. */
@@ -41,15 +40,11 @@ export const PIPELINE_STATUS_BADGE = {
   "secondary" | "info" | "warning" | "success" | "destructive"
 >;
 
-/**
- * One list, three views. Stuck runs are not running. A run with a pull request
- * number is listed there even while it is still running.
- */
+/** Stuck runs need a person; every other non-terminal run is still in flight. */
 export function groupPipelineRuns(runs: ReadonlyArray<PipelineRun>): PipelineGroups {
   return {
     running: runs.filter((run) => run.status !== "merged" && run.status !== "stuck"),
     stuck: runs.filter((run) => run.status === "stuck"),
-    recentPullRequests: runs.filter((run) => run.prNumber !== null),
   };
 }
 
@@ -91,11 +86,6 @@ export function pipelineRunElementId(id: number): string {
   return `pipeline-run-${id}`;
 }
 
-export function isPipelineRunLink(
-  section: PipelineSection,
-  run: Pick<PipelineRun, "status">,
-): boolean {
-  if (section === "stuck") return true;
-  if (section === "recentPullRequests") return run.status !== "merged";
-  return false;
+export function isPipelineRunLink(section: PipelineSection): boolean {
+  return section === "stuck";
 }

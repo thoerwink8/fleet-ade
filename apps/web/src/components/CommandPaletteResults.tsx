@@ -6,8 +6,10 @@ import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, type RefObject, useState } from "react";
 import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
+import { toastManager } from "./ui/toast";
 import { shortcutLabelForCommand } from "../keybindings";
 import {
+  commandPaletteDisabledReason,
   type CommandPaletteActionItem,
   type CommandPaletteGroup,
   type CommandPaletteRow,
@@ -201,8 +203,20 @@ function ThreadRowContext({
 function DisabledCommandPaletteResultRow(props: {
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
 }) {
+  const reason =
+    commandPaletteDisabledReason(props.item) ??
+    (typeof props.item.description === "string" ? props.item.description : null);
   return (
-    <div className="flex min-h-8 select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base opacity-64 sm:min-h-7 sm:text-sm">
+    <button
+      type="button"
+      aria-disabled="true"
+      onClick={() => {
+        if (reason !== null) {
+          toastManager.add({ type: "info", title: "命令不可用", description: reason });
+        }
+      }}
+      className="flex min-h-8 w-full select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-base opacity-64 hover:bg-accent/40 sm:min-h-7 sm:text-sm"
+    >
       <CommandPaletteTitleIcon>{props.item.icon}</CommandPaletteTitleIcon>
       {props.item.description || props.item.threadContentMatch ? (
         <span className="flex min-w-0 flex-1 flex-col">
@@ -227,8 +241,11 @@ function DisabledCommandPaletteResultRow(props: {
           <CommandPaletteTitle item={props.item} />
         </span>
       )}
+      {reason !== null && reason !== props.item.description ? (
+        <span className="text-xs text-muted-foreground">{reason}</span>
+      ) : null}
       {props.item.titleTrailingContent}
-    </div>
+    </button>
   );
 }
 

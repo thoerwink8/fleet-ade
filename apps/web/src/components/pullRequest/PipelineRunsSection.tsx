@@ -5,12 +5,9 @@ import { usePrimaryEnvironmentId } from "../../state/environments";
 import { pipelineEnvironment } from "../../state/pipeline";
 import { useEnvironmentQuery } from "../../state/query";
 import { cn } from "../../lib/utils";
-import { AppRouteModal, AppRouteModalClose } from "../AppRouteModal";
-import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { RefreshIcon } from "../ui/refresh-icon";
-import { ScrollArea } from "../ui/scroll-area";
 import {
   formatCiQueue,
   formatCommitCount,
@@ -21,7 +18,7 @@ import {
   PIPELINE_STATUS_LABEL,
   pipelineRunElementId,
   type PipelineSection,
-} from "./PipelinePage.logic";
+} from "./PipelineRunsSection.logic";
 
 function scrollToPipelineRun(event: ReactMouseEvent<HTMLAnchorElement>, id: number) {
   if (
@@ -42,19 +39,28 @@ function RunLinkRow({ run }: { run: PipelineRun }) {
   const elementId = pipelineRunElementId(run.id);
   return (
     <li className="min-w-0 px-3.5 py-2.5 sm:px-4">
-      <a
-        href={`#${elementId}`}
-        onClick={(event) => scrollToPipelineRun(event, run.id)}
-        className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground hover:text-foreground sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-      >
-        <span className="min-w-0 leading-5 break-words text-foreground underline decoration-muted-foreground/60 underline-offset-4">
+      <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <a
+          href={`#${elementId}`}
+          onClick={(event) => scrollToPipelineRun(event, run.id)}
+          className="min-w-0 leading-5 break-words text-foreground underline decoration-muted-foreground/60 underline-offset-4 hover:text-foreground"
+        >
           {run.title}
-        </span>
+        </a>
         <span className="flex shrink-0 items-center gap-2 font-mono text-xs tabular-nums">
           <span>#{run.issueNumber}</span>
-          {run.prNumber !== null ? <span>PR {run.prNumber}</span> : null}
+          {run.prNumber !== null ? (
+            <a
+              href={`https://github.com/${run.repository}/pull/${run.prNumber}`}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-4"
+            >
+              PR {run.prNumber}
+            </a>
+          ) : null}
         </span>
-      </a>
+      </div>
     </li>
   );
 }
@@ -72,10 +78,19 @@ function RunDetailRow({ run }: { run: PipelineRun }) {
           </Badge>
           {run.stuckReason !== null ? <Badge variant="error">{run.stuckReason}</Badge> : null}
         </div>
-        <p className="flex shrink-0 items-center gap-2 font-mono text-xs tabular-nums text-muted-foreground">
+        <div className="flex shrink-0 items-center gap-2 font-mono text-xs tabular-nums text-muted-foreground">
           <span>#{run.issueNumber}</span>
-          {run.prNumber !== null ? <span>PR {run.prNumber}</span> : null}
-        </p>
+          {run.prNumber !== null ? (
+            <a
+              href={`https://github.com/${run.repository}/pull/${run.prNumber}`}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-4"
+            >
+              PR {run.prNumber}
+            </a>
+          ) : null}
+        </div>
       </div>
       <p className="min-w-0 text-sm leading-5 font-medium break-words text-foreground">
         {run.title}
@@ -132,7 +147,7 @@ function RunSection({
         ) : (
           <ul className="min-w-0 divide-y divide-border/50">
             {runs.map((run) =>
-              isPipelineRunLink(section, run) ? (
+              isPipelineRunLink(section) ? (
                 <RunLinkRow key={run.id} run={run} />
               ) : (
                 <RunDetailRow key={run.id} run={run} />
@@ -157,23 +172,16 @@ function PipelineFrame({
   children: ReactNode;
 }) {
   return (
-    <AppRouteModal label="流水线">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden">
-        <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
-          <h1 className="min-w-0 flex-1 truncate text-sm font-medium">流水线</h1>
-          <Button variant="outline" size="sm" disabled={refreshDisabled} onClick={onRefresh}>
-            <RefreshIcon refreshing={pending} />
-            刷新
-          </Button>
-          <AppRouteModalClose />
-        </header>
-        <ScrollArea className="min-h-0 min-w-0 flex-1">
-          <WorkspacePageContainer>
-            <div className="grid min-w-0 gap-8">{children}</div>
-          </WorkspacePageContainer>
-        </ScrollArea>
+    <section aria-label="流水线" className="grid min-w-0 gap-4 rounded-xl border p-4">
+      <div className="flex items-center gap-3">
+        <h2 className="min-w-0 flex-1 text-base font-semibold">流水线</h2>
+        <Button variant="outline" size="sm" disabled={refreshDisabled} onClick={onRefresh}>
+          <RefreshIcon refreshing={pending} />
+          刷新
+        </Button>
       </div>
-    </AppRouteModal>
+      <div className="grid min-w-0 gap-6">{children}</div>
+    </section>
   );
 }
 
@@ -191,19 +199,13 @@ function PipelineConnected({ environmentId }: { environmentId: EnvironmentId }) 
         <RunSection
           section="needsAction"
           title="要你拍的"
-          note="下面卡住的和最近开的 PR 里同一条只放链接。"
+          note="下面卡住的单只放链接。"
           runs={groups.stuck}
           empty="现在没有要你拍的"
           emphasis
         />
         <RunSection section="running" title="在跑的" runs={groups.running} empty="现在没有在跑的" />
         <RunSection section="stuck" title="卡住的" runs={groups.stuck} empty="现在没有卡住的" />
-        <RunSection
-          section="recentPullRequests"
-          title="最近开的 PR"
-          runs={groups.recentPullRequests}
-          empty="还没有开着的 PR"
-        />
       </>
     );
   }
@@ -219,7 +221,7 @@ function PipelineConnected({ environmentId }: { environmentId: EnvironmentId }) 
   );
 }
 
-export function PipelinePage() {
+export function PipelineRunsSection() {
   const environmentId = usePrimaryEnvironmentId();
   if (environmentId === null) {
     return (
