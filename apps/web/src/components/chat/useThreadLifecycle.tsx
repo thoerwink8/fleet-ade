@@ -713,14 +713,8 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       });
     },
   } satisfies ChatShortcutCommands;
-  const unmarkActiveCommander = () => {
-    if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
-    if (!activeThreadShell || !activeThreadRef || !serverConfigLoaded) return;
-    void unmarkCommanderThread(activeThreadRef).then(toastThreadActionFailure("取消指挥失败"));
-  };
   return {
     shortcuts,
-    unmarkActiveCommander,
     acknowledgeActiveThreadWoke,
     activeBranchMismatchKey,
     // A Stop that went unanswered needs the user; one in progress is the thread's work.

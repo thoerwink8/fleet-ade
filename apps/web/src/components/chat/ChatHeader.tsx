@@ -11,7 +11,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { ChevronDownIcon, FlagOffIcon, SettingsIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import {
   memo,
   useEffect,
@@ -23,7 +23,6 @@ import {
 } from "react";
 import { isTrailingDoubleClick } from "../Sidebar.logic";
 import { Badge } from "../ui/badge";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import { useThreadActionMenu } from "~/hooks/useThreadActionMenu";
@@ -50,7 +49,6 @@ interface ChatHeaderProps {
   activeThreadId: ThreadId;
   activeThreadTitle: string;
   activeThreadLinkOrigin?: string | null | undefined;
-  isCommander?: boolean | undefined;
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
   parentThreadLink: { threadId: ThreadId; title: string } | null;
@@ -58,8 +56,6 @@ interface ChatHeaderProps {
   rightPanelOpen: boolean;
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
-  onOpenCommanderSettings?: (() => void) | undefined;
-  onUnmarkCommander?: (() => void) | undefined;
   onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
   /** The thread's branch, as a tag after the title. */
   branch?: string | null | undefined;
@@ -83,7 +79,6 @@ export const ChatHeader = memo(function ChatHeader({
   activeThreadId,
   activeThreadTitle,
   activeThreadLinkOrigin,
-  isCommander = false,
   isServerThread,
   activeProject,
   parentThreadLink,
@@ -91,8 +86,6 @@ export const ChatHeader = memo(function ChatHeader({
   rightPanelOpen,
   onNewThreadInProject,
   onOpenProjectSettings,
-  onOpenCommanderSettings,
-  onUnmarkCommander,
   onFindInThread,
   branch = null,
   pullRequest = null,
@@ -402,29 +395,6 @@ export const ChatHeader = memo(function ChatHeader({
                 由关联环境上的智能体在 {activeThreadLinkOrigin} 发起。
               </TooltipPopup>
             </Tooltip>
-          ) : null}
-          {renamingTitle === null && isCommander ? (
-            <Menu>
-              <MenuTrigger
-                render={<Badge render={<button type="button" />} variant="info" size="sm" />}
-                aria-label="指挥会话操作"
-              >
-                指挥
-              </MenuTrigger>
-              <MenuPopup side="bottom" align="start" sideOffset={6}>
-                <MenuItem onClick={onOpenCommanderSettings}>
-                  <SettingsIcon />
-                  打开「指挥」设置
-                </MenuItem>
-                <MenuItem
-                  disabled={!canOperateThread || !isServerThread || !onUnmarkCommander}
-                  onClick={onUnmarkCommander}
-                >
-                  <FlagOffIcon />
-                  取消指挥
-                </MenuItem>
-              </MenuPopup>
-            </Menu>
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>

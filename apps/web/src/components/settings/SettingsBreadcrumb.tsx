@@ -11,7 +11,6 @@ const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
   ...SETTINGS_SECTION_LABELS,
   "/settings/diagnostics": "诊断",
   "/settings/open-source-licenses": "开源许可",
-  "/settings/commander": "指挥",
 };
 
 function settingsBreadcrumbLabel(pathname: string): string | null {
