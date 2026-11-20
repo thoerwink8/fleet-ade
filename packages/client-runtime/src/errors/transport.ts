@@ -14,6 +14,9 @@ const TRANSPORT_ERROR_PATTERNS = [
     "i",
   ),
   new RegExp(`\\bstopped responding for \\d+s\\. ${escapeRegExp(UNRESPONSIVE_HOST_HINT)}$`, "i"),
+  // Localized variants of the same messages.
+  /(?:已断开连接|无法建立 WebSocket 连接|连接已断开)。?/,
+  new RegExp(`已 \\d+ 秒无响应。${escapeRegExp(UNRESPONSIVE_HOST_HINT)}$`),
   /\bClientProtocolError\b/i,
   /\bRpcClientError\b/i,
   /\bping timeout\b/i,

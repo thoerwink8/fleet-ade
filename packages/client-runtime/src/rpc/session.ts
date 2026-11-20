@@ -211,11 +211,11 @@ export const make = Effect.fn("RpcSessionFactory.make")(function* (
               // The network hint only fits a socket that never opened. Once it
               // opened, the path worked, and a host that goes quiet is more
               // often overloaded or asleep than blocked.
-              detail: !wasConnected
-                ? `${connection.label} could not establish a WebSocket connection.${networkHint}`
-                : timedOut
-                  ? `${connection.label} stopped responding for ${PING_TIMEOUT_SECONDS}s. ${UNRESPONSIVE_HOST_HINT}`
-                  : `${connection.label} disconnected.`,
+            detail: !wasConnected
+              ? `${connection.label} 无法建立 WebSocket 连接。${networkHint}`
+              : timedOut
+                ? `${connection.label} 已 ${PING_TIMEOUT_SECONDS} 秒无响应。${UNRESPONSIVE_HOST_HINT}`
+                : `${connection.label} 已断开连接。`,
               ...socketFailureLocation(via),
             }),
           ),
