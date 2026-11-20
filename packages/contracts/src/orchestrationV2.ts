@@ -724,6 +724,7 @@ export const OrchestrationV2Run = Schema.Struct({
   status: OrchestrationV2RunStatus,
   queuePosition: Schema.optional(Schema.NullOr(PositiveInt)),
   queueHeld: Schema.optional(Schema.Boolean),
+  awaitingSlot: Schema.optional(Schema.Boolean),
   steerWhenReadyRunId: Schema.optional(RunId),
   requestedAt: Schema.DateTimeUtc,
   startedAt: Schema.NullOr(Schema.DateTimeUtc),
@@ -2183,6 +2184,7 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   latestRunBackgroundWake: Schema.optional(Schema.Boolean),
   activeRunId: Schema.NullOr(RunId),
   activityRunStartedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+  activityRunAwaitingSlot: Schema.optional(Schema.Boolean),
   activityRunStatus: Schema.optional(
     Schema.NullOr(Schema.Literals(["preparing", "starting", "running", "waiting"])),
   ),

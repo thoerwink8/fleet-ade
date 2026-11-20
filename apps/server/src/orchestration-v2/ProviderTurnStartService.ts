@@ -278,13 +278,19 @@ export const layer: Layer.Layer<
       readonly willRetry?: boolean;
     }) {
       const { runId } = input;
-      const projection = yield* projectionStore.getTurnStartContext(input.threadId, runId);
-      const run = projection.runs.find((candidate) => candidate.id === runId);
+      let projection = yield* projectionStore.getTurnStartContext(input.threadId, runId);
+      let run = projection.runs.find((candidate) => candidate.id === runId);
       if (run === undefined) {
         return yield* new ProviderTurnStartError({ runId, cause: `Run ${runId} was not found.` });
       }
       if (run.status !== "starting") {
         return;
+      }
+      if (run.awaitingSlot === true) {
+        yield* eventSink.setAwaitingSlot({ threadId: input.threadId, runId, awaiting: false });
+        projection = yield* projectionStore.getTurnStartContext(input.threadId, runId);
+        run = projection.runs.find((candidate) => candidate.id === runId);
+        if (run === undefined || run.status !== "starting") return;
       }
       const rootNode = projection.nodes.find((candidate) => candidate.id === run.rootNodeId);
       const attempt = projection.attempts.find((candidate) => candidate.id === run.activeAttemptId);

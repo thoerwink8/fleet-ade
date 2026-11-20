@@ -12959,7 +12959,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         nodeId: rootNode.id,
         providerInstanceId: run.providerInstanceId,
         occurredAt: now,
-        payload: { ...run, status: "interrupted", completedAt: now },
+        payload: { ...run, status: "interrupted", awaitingSlot: false, completedAt: now },
       });
       // Stop cancels a pending restart, so it must end the turn that restart could not stop.
       const supersededTurn = projection.providerTurns.findLast(

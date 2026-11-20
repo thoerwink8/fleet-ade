@@ -1,6 +1,7 @@
 import {
   CommandId,
   type OrchestrationV2BatchThreadResult,
+  EventId,
   type OrchestrationV2Run,
   OrchestrationV2DomainEvent,
   type OrchestrationV2ProviderThread,
@@ -27,6 +28,7 @@ import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlError from "effect/sql/SqlError";
 
+import { randomUuidV4 } from "@t3tools/provider-core/server/randomUuid";
 import { replayAndBufferProjectedLiveEvents } from "./LiveStreamBudget.ts";
 import type { UnsequencedProjectEvent } from "../persistence/OrchestrationEventStore.ts";
 import { projectStoredEventForWire } from "./WireProjection.ts";
@@ -97,6 +99,12 @@ export interface EventSinkV2Shape {
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<A, E | EventSinkV2Error, R>;
 
+  readonly setAwaitingSlot: (input: {
+    readonly threadId: ThreadId;
+    readonly runId: RunId;
+    readonly effectId?: string;
+    readonly awaiting: boolean;
+  }) => Effect.Effect<void, EventSinkV2Error>;
   readonly write: (input: {
     /** Return no events if another thread owns this native session at commit time. */
     readonly unlessNativeThreadOwned?: Pick<
@@ -1079,6 +1087,45 @@ const layerBase: Layer.Layer<
     return EventSinkV2.of({
       consumeProviderEvents: coordinator.consume,
       withProviderBatch,
+      setAwaitingSlot: (input) =>
+        commitThenPublish(
+          Effect.gen(function* () {
+            const rows = yield* sql<{
+              readonly effect_id: string;
+            }>`SELECT effect_id FROM orchestration_v2_effect_outbox
+            WHERE effect_id = ${input.effectId ?? ""} AND thread_id = ${input.threadId} AND status = 'pending'
+              AND json_extract(payload_json, '$.runId') = ${input.runId}`;
+            if (input.awaiting && rows.length === 0) return { storedEvents: [], outcomes: [] };
+            const run = yield* projectionStore.getRun(input.threadId, input.runId);
+            if (
+              run === undefined ||
+              run.status !== "starting" ||
+              (run.awaitingSlot === true) === input.awaiting
+            )
+              return { storedEvents: [], outcomes: [] };
+            const now = yield* DateTime.now;
+            const eventId = EventId.make(yield* randomUuidV4);
+            const storedEvents = yield* eventStore.append({
+              events: [
+                {
+                  id: eventId,
+                  type: "run.updated",
+                  threadId: input.threadId,
+                  runId: input.runId,
+                  providerInstanceId: run.providerInstanceId,
+                  occurredAt: now,
+                  payload: { ...run, awaitingSlot: input.awaiting },
+                },
+              ],
+            });
+            const outcomes = yield* applyStoredEvents(storedEvents);
+            return { storedEvents, outcomes };
+          }),
+          ({ storedEvents, outcomes }) => publishStoredEvents(storedEvents, outcomes),
+        ).pipe(
+          Effect.asVoid,
+          Effect.mapError((cause) => new EventSinkWriteError({ eventCount: 1, cause })),
+        ),
       write: (input) =>
         writeEffect({ ...input, effects: [] }).pipe(
           Effect.mapError(

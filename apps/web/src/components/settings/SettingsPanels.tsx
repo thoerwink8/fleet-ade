@@ -86,6 +86,7 @@ import {
   getChangedTypographySettingLabels,
   hasChangedBackgroundActivitySettings,
   isProjectGroupingEnabled,
+  parseSessionLimitDraft,
   projectGroupingModeFromToggle,
   readLastEnabledProjectGroupingMode,
   rememberEnabledProjectGroupingMode,
@@ -1655,6 +1656,11 @@ export function ThreadsSettingsPanel() {
   );
   const mixedAddProjectBaseDirectory = useScopedSettingsMixed(["addProjectBaseDirectory"]);
   const mixedTextGenerationModel = useScopedSettingsMixed(["textGenerationModelSelection"]);
+  const mixedMaxConcurrentSessions = useScopedSettingsMixed(["maxConcurrentSessions"]);
+  const startupLimit =
+    connectedEnvironments.length === 1
+      ? connectedEnvironments[0]?.serverConfig?.startupMaxConcurrentSessions
+      : undefined;
 
   return (
     <SettingsPageContainer>
@@ -1723,6 +1729,34 @@ export function ThreadsSettingsPanel() {
           <SnoozePresetsRow />
         </SettingsSection>
       ) : null}
+
+      <SettingsSection id="concurrent-sessions" title="同时运行">
+        <SettingsRow
+          serverScoped
+          settingKeys={["maxConcurrentSessions"]}
+          {...searchableSetting("max-concurrent-sessions")}
+          description={
+            startupLimit === undefined
+              ? "按机器内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。"
+              : `按机器内存估计上限；留空表示设置不限制。此环境的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。`
+          }
+          control={
+            <DraftInput
+              size="sm"
+              type="text"
+              inputMode="numeric"
+              className="w-full sm:w-24"
+              value={mixedMaxConcurrentSessions ? "" : String(settings.maxConcurrentSessions ?? "")}
+              placeholder={mixedMaxConcurrentSessions ? "各不相同" : "不限制"}
+              aria-label="同时运行的会话上限"
+              onCommit={(value) => {
+                const parsed = parseSessionLimitDraft(value);
+                if (parsed !== undefined) updateSettings({ maxConcurrentSessions: parsed });
+              }}
+            />
+          }
+        />
+      </SettingsSection>
 
       <SettingsSection id="usage-limits" title="用量限制">
         <SettingsRow

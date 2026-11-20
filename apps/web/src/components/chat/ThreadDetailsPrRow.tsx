@@ -275,7 +275,7 @@ export function ThreadDetailsPrRow({
         side="top"
         align="start"
         sideOffset={4}
-        variant="glass"
+        variant="surface"
         className="max-w-80 text-left whitespace-normal"
       >
         <div className="flex min-w-0 max-w-80 flex-col gap-2 px-1 py-2">

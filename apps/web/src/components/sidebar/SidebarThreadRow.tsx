@@ -197,6 +197,8 @@ function resolveRowStatusDot(status: SidebarThreadStatus, hasRun: boolean): RowS
     case "preparing":
     case "working":
       return { variant: "dot-active", label: "在做" };
+    case "queued":
+      return { variant: "dot-waiting", label: "排队" };
     case "waiting":
       return { variant: "dot-waiting", label: "等待中" };
     case "approval":
@@ -702,60 +704,62 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     isSelected,
   });
   const topStatus =
-    status === "preparing" || status === "working"
-      ? {
-          label:
-            status === "preparing"
-              ? "正在设置"
-              : thread.goal?.status === "active"
-                ? "目标"
-                : "运行中",
-          icon: "working" as const,
-          className: "text-info-foreground",
-        }
-      : status === "waiting"
+    status === "queued"
+      ? { label: "排队", icon: "waiting" as const, className: "text-muted-foreground" }
+      : status === "preparing" || status === "working"
         ? {
-            label: "等待中",
-            icon: "waiting" as const,
-            className: "text-muted-foreground",
+            label:
+              status === "preparing"
+                ? "正在设置"
+                : thread.goal?.status === "active"
+                  ? "目标"
+                  : "运行中",
+            icon: "working" as const,
+            className: "text-info-foreground",
           }
-        : status === "approval"
+        : status === "waiting"
           ? {
-              label: "待批准",
-              icon: "approval" as const,
-              className: "text-warning-foreground",
+              label: "等待中",
+              icon: "waiting" as const,
+              className: "text-muted-foreground",
             }
-          : status === "input"
+          : status === "approval"
             ? {
-                label: "待输入",
-                icon: "input" as const,
-                className: "text-indigo-600 dark:text-indigo-300",
+                label: "待批准",
+                icon: "approval" as const,
+                className: "text-warning-foreground",
               }
-            : status === "limited"
+            : status === "input"
               ? {
-                  label: "受限",
-                  icon: "failed" as const,
-                  className: "text-warning-foreground",
+                  label: "待输入",
+                  icon: "input" as const,
+                  className: "text-indigo-600 dark:text-indigo-300",
                 }
-              : status === "failed"
+              : status === "limited"
                 ? {
-                    label: "失败",
+                    label: "受限",
                     icon: "failed" as const,
-                    className: "text-error-foreground",
+                    className: "text-warning-foreground",
                   }
-                : isWoke
+                : status === "failed"
                   ? {
-                      label: "已唤醒",
-                      icon: "woke" as const,
-                      className: "text-warning-foreground",
+                      label: "失败",
+                      icon: "failed" as const,
+                      className: "text-error-foreground",
                     }
-                  : isUnread
+                  : isWoke
                     ? {
-                        label: "完成",
-                        icon: "done" as const,
-                        className: "text-success-foreground",
+                        label: "已唤醒",
+                        icon: "woke" as const,
+                        className: "text-warning-foreground",
                       }
-                    : null;
+                    : isUnread
+                      ? {
+                          label: "完成",
+                          icon: "done" as const,
+                          className: "text-success-foreground",
+                        }
+                      : null;
   const isWokeStatus = topStatus?.icon === "woke";
 
   const branchMismatch = resolveLocalCheckoutBranchMismatch({

@@ -963,6 +963,15 @@ function makeLocalCommandHarness(input: {
                 }),
         }),
         Layer.mock(EventSink.EventSinkV2)({
+          setAwaitingSlot: ({ runId: id, awaiting }) =>
+            Effect.sync(() => {
+              projection = {
+                ...projection,
+                runs: projection.runs.map((run) =>
+                  run.id === id ? { ...run, awaitingSlot: awaiting } : run,
+                ),
+              };
+            }),
           writeIfRunCurrent,
           write: ({ events: incoming }) =>
             Effect.sync(() => {
@@ -1280,10 +1289,18 @@ effectIt.effect("recovers an abandoned failed turn before continuing its native 
       text: "继续",
       previousTurn: { runStatus: "failed", turnStatus: "running" },
     });
+    const before = harness.projection();
+    harness.setProjection({
+      ...before,
+      runs: before.runs.map((run) =>
+        run.status === "starting" ? { ...run, awaitingSlot: true } : run,
+      ),
+    });
 
     yield* harness.start;
 
     expect(harness.interruptTurn).toHaveBeenCalledOnce();
+    expect(harness.projection().runs.at(-1)?.awaitingSlot).toBe(false);
     expect(harness.projection().runs.at(-1)?.status).toBe("running");
     expect(harness.projection().providerTurns[0]).toMatchObject({
       status: "interrupted",

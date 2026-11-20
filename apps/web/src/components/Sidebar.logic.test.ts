@@ -252,6 +252,24 @@ describe("resolveSidebarThreadStatus", () => {
 
   const idle = { hasPendingApprovals: false, hasPendingUserInput: false, runtime: null };
 
+  it("shows queued sessions as queued", () => {
+    expect(resolveSidebarThreadStatus({ ...idle, runtime: { ...runtime, status: "queued" } })).toBe(
+      "queued",
+    );
+    expect(
+      resolveSidebarThreadStatus({
+        ...idle,
+        runtime: { ...runtime, status: "starting", awaitingSlot: true },
+      }),
+    ).toBe("queued");
+    expect(
+      resolveSidebarThreadStatus({
+        ...idle,
+        runtime: { ...runtime, status: "starting", awaitingSlot: false },
+      }),
+    ).toBe("working");
+  });
+
   it("prioritizes awaiting input over a running runtime, below approval", () => {
     expect(
       resolveSidebarThreadStatus({

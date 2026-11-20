@@ -626,34 +626,38 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   const snoozeWake = snoozedUntil
     ? snoozeWakeLabel(snoozedUntil, { now: `${nowMinute}:00.000Z` })
     : null;
-  const threadStatusLine = activeThreadSnoozed ? (
-    limitRecoveryHoldsSnooze ? null : (
+  const threadStatusLine =
+    activeLatestRun?.status === "queued" ||
+    (activeThread?.runtime?.status === "starting" && activeThread.runtime.awaitingSlot === true) ? (
+      <ThreadStatusLine icon={<AlarmClockIcon />} label="排队" />
+    ) : activeThreadSnoozed ? (
+      limitRecoveryHoldsSnooze ? null : (
+        <ThreadStatusLine
+          icon={<AlarmClockIcon />}
+          label={snoozeWake && snoozeWake !== "now" ? `已暂缓，还剩 ${snoozeWake}` : "已暂缓"}
+          clockMinute={nowMinute}
+          actionLabel={isUnsnoozing ? "正在唤醒…" : "立即唤醒"}
+          actionDisabled={!canOperateThread || isUnsnoozing}
+          onAction={() => void handleUnsnoozeActiveThreadStable()}
+        />
+      )
+    ) : activeThreadSettled ? (
+      <ThreadStatusLine
+        icon={<CheckCircle2Icon />}
+        label={settledAt ? `已收尾 ${formatRelativeTimeLabel(settledAt)}` : "已收尾"}
+        clockMinute={nowMinute}
+        actionLabel={isUnsettling ? "正在取消收尾…" : "取消收尾"}
+        actionDisabled={!canOperateThread || isUnsettling}
+        onAction={() => void handleUnsettleActiveThreadStable()}
+      />
+    ) : activeThreadWokeVisible ? (
       <ThreadStatusLine
         icon={<AlarmClockIcon />}
-        label={snoozeWake && snoozeWake !== "now" ? `已暂缓，还剩 ${snoozeWake}` : "已暂缓"}
-        clockMinute={nowMinute}
-        actionLabel={isUnsnoozing ? "正在唤醒…" : "立即唤醒"}
-        actionDisabled={!canOperateThread || isUnsnoozing}
-        onAction={() => void handleUnsnoozeActiveThreadStable()}
+        label="已从暂缓中唤醒"
+        actionLabel="忽略"
+        onAction={acknowledgeActiveThreadWokeStable}
       />
-    )
-  ) : activeThreadSettled ? (
-    <ThreadStatusLine
-      icon={<CheckCircle2Icon />}
-      label={settledAt ? `已收尾 ${formatRelativeTimeLabel(settledAt)}` : "已收尾"}
-      clockMinute={nowMinute}
-      actionLabel={isUnsettling ? "正在取消收尾…" : "取消收尾"}
-      actionDisabled={!canOperateThread || isUnsettling}
-      onAction={() => void handleUnsettleActiveThreadStable()}
-    />
-  ) : activeThreadWokeVisible ? (
-    <ThreadStatusLine
-      icon={<AlarmClockIcon />}
-      label="已从暂缓中唤醒"
-      actionLabel="忽略"
-      onAction={acknowledgeActiveThreadWokeStable}
-    />
-  ) : null;
+    ) : null;
   const toastThreadActionFailure =
     (title: string) => (result: AtomCommandResult<unknown, unknown>) => {
       if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return;

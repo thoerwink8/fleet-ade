@@ -454,6 +454,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     scope: "environment-defaults",
   },
   {
+    id: "max-concurrent-sessions",
+    title: "同时运行的会话上限",
+    to: "/settings/threads",
+    searchTerms: ["concurrent session limit memory queue"],
+    environmentOnly: true,
+    scope: "environment-defaults",
+  },
+  {
     id: "snooze-limited-threads",
     title: "暂缓到用量限制重置",
     to: "/settings/threads",

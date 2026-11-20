@@ -1090,7 +1090,7 @@ type ShellThreadRow = {
   readonly latest_run_background_wake: number;
   readonly active_run_id: string | null;
   readonly active_run_status: string | null;
-  readonly activity_run_status: string | null;
+  readonly activity_run_state: string | null;
   readonly activity_run_started_at: string | null;
   readonly last_error: string | null;
   readonly terminal_failure_payload_json: string | null;
@@ -1280,6 +1280,14 @@ const decodePlanJson = Schema.decodeUnknownEffect(
 );
 const decodeTurnItemPayload = Schema.decodeUnknownEffect(
   Schema.fromJsonString(OrchestrationV2TurnItemJsonSchema),
+);
+const decodeShellActivityRunState = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(
+    Schema.Struct({
+      status: Schema.String,
+      awaitingSlot: Schema.optional(Schema.NullOr(Schema.Int)),
+    }),
+  ),
 );
 const decodeCheckpointScopePayload = Schema.decodeUnknownEffect(
   Schema.fromJsonString(OrchestrationV2CheckpointScopeJsonSchema),
@@ -1774,6 +1782,7 @@ export function threadShellFromProjection(
     activeRunId: activeRun?.id ?? null,
     blockedOnThreadWait: deriveBlockedOnThreadWait({ activeRun, turnItems: projection.turnItems }),
     activityRunStatus: activityRun?.status ?? null,
+    activityRunAwaitingSlot: activityRun?.awaitingSlot === true,
     activityRunStartedAt:
       activityRun === null ? null : orchestrationV2RunWorkStartedAt(activityRun),
     status: latestRun?.status ?? "idle",
@@ -1912,6 +1921,7 @@ type ShellThreadState = {
   readonly activeRunId: RunId | null;
   readonly blockedOnThreadWait: boolean;
   readonly activityRunStatus: ShellActivityRunStatus | null;
+  readonly activityRunAwaitingSlot: boolean;
   readonly activityRunStartedAt: DateTime.Utc | null;
   readonly lastError: string | null;
   readonly lastErrorClass: OrchestrationV2ThreadShell["lastErrorClass"];
@@ -2082,6 +2092,7 @@ function shellFromState(input: {
     activeRunId: input.state.activeRunId,
     blockedOnThreadWait: input.state.blockedOnThreadWait,
     activityRunStatus: input.state.activityRunStatus,
+    activityRunAwaitingSlot: input.state.activityRunAwaitingSlot,
     activityRunStartedAt: input.state.activityRunStartedAt,
     status: input.state.latestRunStatus,
     lastError: input.state.lastError,
@@ -7648,7 +7659,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               active.run_id AS active_run_id,
               active.status AS active_run_status,
               (
-                SELECT r.status
+                SELECT json_object('status', r.status, 'awaitingSlot', json_extract(r.payload_json, '$.awaitingSlot'))
                 -- Read active runs by status. Walking the ordinal index to skip this sort
                 -- reads every run of a thread with none active.
                 FROM orchestration_v2_projection_runs r
@@ -7658,7 +7669,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                   AND NOT ${isSilentShellRun("r")}
                 ORDER BY r.ordinal DESC, r.run_id DESC
                 LIMIT 1
-              ) AS activity_run_status,
+              ) AS activity_run_state,
               (
                 -- Mirrors orchestrationV2RunWorkStartedAt.
                 SELECT COALESCE(
@@ -8360,6 +8371,12 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 : DateTime.makeUnsafe(row.blocking_run_completed_at);
           }
         }
+        const activityRunState =
+          row.activity_run_state === null
+            ? null
+            : yield* decodeShellActivityRunState(row.activity_run_state).pipe(
+                Effect.orElseSucceed(() => null),
+              );
         const pendingBackgroundTasks = [
           ...derivePendingBackgroundWork({
             latestRun:
@@ -8398,12 +8415,13 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             row.activity_run_started_at === null
               ? null
               : DateTime.makeUnsafe(row.activity_run_started_at),
+          activityRunAwaitingSlot: activityRunState?.awaitingSlot === 1,
           activityRunStatus:
-            row.activity_run_status === "preparing" ||
-            row.activity_run_status === "starting" ||
-            row.activity_run_status === "running" ||
-            row.activity_run_status === "waiting"
-              ? row.activity_run_status
+            activityRunState?.status === "preparing" ||
+            activityRunState?.status === "starting" ||
+            activityRunState?.status === "running" ||
+            activityRunState?.status === "waiting"
+              ? activityRunState.status
               : null,
           ...threadErrorSummary(
             terminalFailureItem?.type === "error" ? terminalFailureItem.failure : null,
