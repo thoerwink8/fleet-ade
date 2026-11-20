@@ -1065,7 +1065,7 @@ export const make = Effect.gen(function* () {
     if (input?.purpose !== "startup" && !ManagedLimits.allowsRemoteClients(managedPolicy)) {
       return yield* ManagedLimits.refuseRemoteClients(
         managedPolicy,
-        "so this server cannot create pairing links",
+        "因此此服务器不能创建配对链接",
       );
     }
     return yield* issuePairingLink(input);

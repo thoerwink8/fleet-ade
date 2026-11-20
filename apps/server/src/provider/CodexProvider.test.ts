@@ -48,7 +48,7 @@ it("maps current Codex model capability fields", () => {
     },
     {
       id: "serviceTier",
-      label: "Service Tier",
+      label: "服务档位",
       type: "select",
       options: [
         { id: "default", label: "标准" },
@@ -68,10 +68,10 @@ it("maps current Codex model capability fields", () => {
     },
     {
       id: "cyberAccessProgram",
-      label: "Cyber Access",
+      label: "网络访问",
       type: "select",
       options: [
-        { id: "standard", label: "Standard", isDefault: true },
+        { id: "standard", label: "标准", isDefault: true },
         { id: "daybreakBlue", label: "Daybreak Blue" },
       ],
       currentValue: "standard",
@@ -108,7 +108,7 @@ it("uses standard routing when the catalog has no default service tier", () => {
   assert.deepStrictEqual(capabilities.optionDescriptors, [
     {
       id: "serviceTier",
-      label: "Service Tier",
+      label: "服务档位",
       type: "select",
       options: [
         { id: "default", label: "标准", isDefault: true },
@@ -120,7 +120,7 @@ it("uses standard routing when the catalog has no default service tier", () => {
         {
           id: "ultrafast",
           label: "Ultrafast",
-          description: "Even faster, more expensive",
+          description: "更快，价格更高",
         },
       ],
       currentValue: "default",

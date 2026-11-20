@@ -79,15 +79,15 @@ export type ProjectCloneActionResult = typeof ProjectCloneActionResult.Type;
 function projectCloneStageLabel(stage: ProjectCloneStage): string {
   switch (stage) {
     case "connecting":
-      return "Connecting";
+      return "连接中";
     case "counting":
-      return "Counting objects";
+      return "统计对象中";
     case "receiving":
-      return "Receiving objects";
+      return "接收对象中";
     case "resolving":
-      return "Resolving deltas";
+      return "解析增量中";
     case "checkout":
-      return "Checking out files";
+      return "检出文件中";
   }
 }
 
@@ -105,7 +105,7 @@ export function projectCloneProgressSummary(
   const parts = [projectCloneStageLabel(snapshot.stage)];
   if (snapshot.percent !== null) parts.push(`${snapshot.percent}%`);
   // The detail carries git's last transfer speed, which a stall makes a lie.
-  if (snapshot.stalled) parts.push("Stalled");
+  if (snapshot.stalled) parts.push("已停滞");
   else if (snapshot.detail) parts.push(snapshot.detail);
   return parts.join(" · ");
 }

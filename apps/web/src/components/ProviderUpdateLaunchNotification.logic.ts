@@ -232,7 +232,7 @@ export function getProviderUpdateRunOutcome(
     ? { status: "updated", message: restartNotice ? `${label}: ${restartNotice}` : null }
     : {
         status: "failed",
-        line: `${label}: ${updateState?.message ?? "Provider update did not finish."}`,
+        line: `${label}: ${updateState?.message ?? "提供方更新未完成。"}`,
       };
 }
 
@@ -339,10 +339,7 @@ export function getProviderUpdateSidebarPillView(
         activeProviders.length === 1
           ? `正在更新 ${activeProviderName}`
           : `正在更新 ${activeProviders.length} 个提供方`,
-      description:
-        activeProviders.length === 1
-          ? `${formatProviderList(activeProviders)} update in progress.`
-          : `${formatProviderList(activeProviders)} 正在更新。`,
+      description: `${formatProviderList(activeProviders)} 正在更新。`,
     };
   }
 

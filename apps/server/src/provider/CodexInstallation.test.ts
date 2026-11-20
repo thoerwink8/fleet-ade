@@ -355,7 +355,7 @@ it.effect("requires an update before running an older activated managed installa
     );
     const restarted = yield* makeHarness({ baseDir: first.baseDir });
     expect((yield* Effect.flip(restarted.installation.resolve())).detail).toContain(
-      "outside the supported range",
+      "不在此 T3 Code 版本的支持范围内",
     );
     yield* restarted.installation.start;
     expect((yield* terminalState(restarted.installation)).phase).toBe("succeeded");
@@ -473,7 +473,7 @@ it.effect("reports a download timeout and cleans the staging directory", () =>
     yield* TestClock.adjust("45 minutes");
     expect(yield* terminalState(h.installation)).toMatchObject({
       phase: "failed",
-      message: "The Codex download timed out. Retry installation.",
+      message: "Codex 下载超时。请重试安装。",
     });
     expect(h.downloads()).toBe(1);
     expect(yield* h.fs.readDirectory(h.installation.managedDirectory)).toEqual([]);
@@ -506,7 +506,7 @@ it.effect("protects active process leases and removes the runtime after release"
     yield* terminalState(installation);
     const leaseScope = yield* Scope.make();
     yield* installation.acquire().pipe(Effect.provideService(Scope.Scope, leaseScope));
-    expect((yield* Effect.flip(installation.remove())).detail).toContain("Stop Codex sessions");
+    expect((yield* Effect.flip(installation.remove())).detail).toContain("请先停止 Codex 会话");
     yield* Scope.close(leaseScope, Exit.void);
     yield* installation.remove();
     expect(yield* fs.exists(installation.managedDirectory)).toBe(false);

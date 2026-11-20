@@ -103,7 +103,7 @@ export default function Presentation(props: {
           <ChevronLeftIcon className="size-3.5" />
         </FileSurfaceAction>
         <span className="flex-1 text-center text-xs tabular-nums" aria-live="polite">
-          幻灯片 {page + 1} of {opened.slides.length}
+          幻灯片 {page + 1} / {opened.slides.length}
         </span>
         <FileSurfaceAction
           label="下一张幻灯片"

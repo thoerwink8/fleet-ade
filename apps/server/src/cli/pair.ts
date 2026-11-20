@@ -550,10 +550,7 @@ export const pairCommand = Command.make("pair", {
         // Serve stays on after this command exits, so refuse before turning it on.
         const policy = yield* ManagedPolicy.ManagedPolicy.pipe(Effect.provide(ManagedPolicy.layer));
         if (!ManagedLimits.allowsRemoteClients(policy)) {
-          return yield* ManagedLimits.refuseRemoteClients(
-            policy,
-            "so Tailscale Serve cannot be turned on",
-          );
+          return yield* ManagedLimits.refuseRemoteClients(policy, "因此不能开启 Tailscale Serve");
         }
         const resolved = yield* resolveTailscalePairingBase({
           target,

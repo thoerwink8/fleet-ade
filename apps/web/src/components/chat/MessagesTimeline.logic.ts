@@ -37,6 +37,7 @@ import {
   workEntryDisplayIndicatesToolFailure,
   workEntryIndicatesToolSuccess,
   workEntryIndicatesToolNeutralStatus,
+  translateLegacyEnglishLabel,
   workLogEntryIsToolLike,
   type TimelineEntry,
   type WorkLogEntry,
@@ -171,35 +172,6 @@ function workEntryReadPaths(entry: WorkLogEntry, workspaceRoot: string | undefin
   );
 }
 
-function translateLegacyEnglishToolLabel(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed === "Ran command") return "已运行命令";
-  if (trimmed === "Changed files") return "已修改文件";
-  if (trimmed === "Searched files") return "已搜索文件";
-  if (trimmed === "Tool") return "工具";
-  const tasksMatch = /^Tasks (\d+\/\d+.*)$/.exec(trimmed);
-  if (tasksMatch) return `任务 ${tasksMatch[1]}`;
-  const readMatch = /^Read (.+?)(?: \+(\d+) more)?$/.exec(trimmed);
-  if (readMatch) {
-    return `读取 ${readMatch[1]}${readMatch[2] ? ` 等另外 ${readMatch[2]} 个` : ""}`;
-  }
-  const searchFilesInMatch = /^Searched files (.+) in (.+)$/.exec(trimmed);
-  if (searchFilesInMatch) {
-    return `在 ${searchFilesInMatch[2]} 中搜索文件 ${searchFilesInMatch[1]}`;
-  }
-  const searchInMatch = /^Searched (.+) in (.+)$/.exec(trimmed);
-  if (searchInMatch) {
-    return `在 ${searchInMatch[2]} 中搜索 ${searchInMatch[1]}`;
-  }
-  const searchFilesMatch = /^Searched files (.+)$/.exec(trimmed);
-  if (searchFilesMatch) return `搜索文件 ${searchFilesMatch[1]}`;
-  const searchOnlyInMatch = /^Searched in (.+)$/.exec(trimmed);
-  if (searchOnlyInMatch) return `在 ${searchOnlyInMatch[1]} 中搜索`;
-  const searchMatch = /^Searched (.+)$/.exec(trimmed);
-  if (searchMatch) return `搜索 ${searchMatch[1]}`;
-  return value;
-}
-
 export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string | undefined) {
   if (entry.itemType === "system_notice") return entry.label;
   if (entry.itemType === "reasoning" || entry.tone === "thinking") {
@@ -208,12 +180,12 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
   }
   const toolPresentation = resolveWorkEntryToolPresentation(entry);
   if (toolPresentation) return toolPresentation.displayName;
-  if (entry.command?.trim()) return commandDisplayText(entry.command);
+  if (entry.command?.trim()) return translateLegacyEnglishLabel(commandDisplayText(entry.command));
   const action = toolGroupAction(entry);
   if (action === "code-search" || action === "search") {
     const searchLabel =
       entry.itemType === "file_search"
-        ? translateLegacyEnglishToolLabel(entry.label)
+        ? translateLegacyEnglishLabel(entry.label)
         : formatSearchToolLabel(workEntryToolDataRecord(entry));
     if (searchLabel) return searchLabel;
   }
@@ -240,7 +212,7 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
   const item = entry.structuredPayload;
   const title =
     item?.type === "dynamic_tool" ? dynamicToolTitle(item.toolName, item.input, item.title) : null;
-  if (title) return translateLegacyEnglishToolLabel(title);
+  if (title) return translateLegacyEnglishLabel(title);
   const compactDetail = entry.detail?.trim();
   const detailIsSearchOutput =
     (action === "code-search" || action === "search") && /[\r\n]/.test(compactDetail ?? "");
@@ -257,7 +229,7 @@ export function workEntryDisplayLabel(entry: WorkLogEntry, workspaceRoot: string
   if (action === "read" && !entry.viewedImagePath) {
     return "已读取文件";
   }
-  const heading = translateLegacyEnglishToolLabel(
+  const heading = translateLegacyEnglishLabel(
     normalizeCompactToolLabel(entry.toolTitle || entry.label),
   );
   return `${heading.charAt(0).toUpperCase()}${heading.slice(1)}`;

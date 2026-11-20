@@ -84,7 +84,7 @@ export function grokUsageResponseToLimits(
   const window: ServerProviderUsageWindow = {
     id: "subscription",
     kind,
-    label: kind === "weekly" ? "Weekly" : kind === "monthly" ? "Monthly" : "Subscription",
+    label: kind === "weekly" ? "每周" : kind === "monthly" ? "每月" : "订阅",
     usedPercent: clampPercent(usedPercent),
     ...(Option.isSome(reset) ? { resetsAt: DateTime.formatIso(reset.value) } : {}),
     ...(windowDurationMins > 0 ? { windowDurationMins } : {}),
@@ -165,7 +165,7 @@ export const readGrokAccount = Effect.fn("readGrokAccount")(function* (
   const probeFailed = makeUnavailableUsageLimits({
     checkedAt,
     reason: "probeFailed",
-    message: "Grok could not read usage limits.",
+    message: "Grok 无法读取用量限制。",
   });
   const credential = yield* Effect.option(
     readGrokCredential(environment).pipe(Effect.timeout("10 seconds")),
@@ -188,7 +188,7 @@ export const readGrokAccount = Effect.fn("readGrokAccount")(function* (
         return makeUnavailableUsageLimits({
           checkedAt,
           reason: "probeFailed",
-          message: "Switch your xAI account to Privacy Mode to show Grok usage limits.",
+          message: "请将你的 xAI 账号切换到隐私模式（Privacy Mode）以显示 Grok 用量限制。",
         });
       }
     }

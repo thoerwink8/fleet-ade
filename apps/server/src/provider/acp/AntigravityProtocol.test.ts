@@ -160,10 +160,10 @@ describe("Antigravity permissions and questions", () => {
       ],
     } satisfies EffectAcpSchema.RequestPermissionRequest;
     expect(antigravityApprovalOptions(risky)).toEqual([
-      { decision: "accept", label: "Allow once" },
+      { decision: "accept", label: "允许一次" },
       {
         decision: "acceptForSession",
-        label: "Allow for this thread",
+        label: "本会话内允许",
         warning: "Untrusted files could re-run this action without asking.",
       },
       { decision: "decline", label: "拒绝" },
@@ -176,7 +176,7 @@ describe("Antigravity permissions and questions", () => {
     expect(isAntigravityUserInputRequest(questionRequest)).toBe(true);
     expect(extractAntigravityUserInputQuestion(questionRequest)).toEqual({
       id: "interaction_9960062f",
-      header: "Question",
+      header: "问题",
       question: "Which result label should be used for the verification?",
       multiSelect: false,
       allowCustomAnswer: false,

@@ -30,7 +30,7 @@ describe("getProviderSummary", () => {
         message: "The provider process failed to start.",
       }),
     ).toEqual({
-      headline: "Unavailable",
+      headline: "不可用",
       detail: "The provider process failed to start.",
     });
   });
@@ -89,7 +89,7 @@ describe("Antigravity with unchecked sign-in", () => {
       {
         name: "probe failure",
         change: { status: "error" },
-        headline: "Unavailable",
+        headline: "不可用",
         status: "error",
       },
       {

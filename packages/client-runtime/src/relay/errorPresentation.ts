@@ -50,7 +50,7 @@ export function relayProtectedErrorMessage(error: RelayProtectedError): string {
         return "此环境的 T3 Connect 隧道仍在设置中。";
       }
       if (error.reason === "endpoint_provider_not_managed") {
-        return "This environment is linked only to publish agent activity, so it cannot accept connections. On that computer, open Settings > Sharing & access and turn T3 Connect on.";
+        return "此环境仅关联了智能体活动发布，无法接受连接。请在那台电脑上打开「设置 → 共享与访问」，开启 T3 Connect。";
       }
       return error.reason
         ? `中继拒绝了环境连接请求（${error.reason}）。`
@@ -62,8 +62,8 @@ export function relayProtectedErrorMessage(error: RelayProtectedError): string {
     case "RelayEnvironmentLinkFailedError":
       return `中继无法关联环境（${error.reason}）。`;
     case "RelayEnvironmentLinkUnavailableError":
-      return `Relay cannot provision the managed endpoint (${error.reason}).${
-        error.provisioningStage ? ` Failed stage: ${error.provisioningStage}.` : ""
+      return `中继无法开通托管端点（${error.reason}）。${
+        error.provisioningStage ? ` 失败阶段：${error.provisioningStage}。` : ""
       }`;
     case "RelayEnvironmentLinkLimitExceededError":
       return error.maxTunnels < T3CHAT_PLAN_TUNNEL_LIMITS.premier

@@ -464,14 +464,14 @@ export const EnvironmentConnectReachability = Schema.Union([
 ]);
 export type EnvironmentConnectReachability = typeof EnvironmentConnectReachability.Type;
 
-/** "Tunnel connected · 4 connections · QUIC" for a healthy check. */
+/** "隧道已连接 · 4 条连接 · QUIC" for a healthy check. */
 export function formatConnectReachable(
   result: Extract<EnvironmentConnectReachability, { status: "reachable" }>,
 ): string {
   const count = result.readyConnections;
   return [
-    "Tunnel connected",
-    ...(count === null ? [] : [`${count} connection${count === 1 ? "" : "s"}`]),
+    "隧道已连接",
+    ...(count === null ? [] : [`${count} 条连接`]),
     ...(result.protocol ? [result.protocol.toUpperCase()] : []),
   ].join(" · ");
 }

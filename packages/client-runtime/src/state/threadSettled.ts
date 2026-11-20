@@ -228,20 +228,26 @@ function addSnoozeDays(base: Date, days: number): Date {
   return next;
 }
 
-function pluralize(count: number, unit: string): string {
-  return `${count} ${unit}${count === 1 ? "" : "s"}`;
-}
-
-/** "3 hours", "90 minutes", "2 days": the largest unit that divides evenly. */
+/** "3 小时"、"90 分钟"、"2 天"：能整除的最大单位。 */
 function formatSnoozeDuration(minutes: number): string {
-  if (minutes % (24 * 60) === 0) return pluralize(minutes / (24 * 60), "day");
-  if (minutes % 60 === 0) return pluralize(minutes / 60, "hour");
-  return pluralize(minutes, "minute");
+  if (minutes % (24 * 60) === 0) return `${minutes / (24 * 60)} 天`;
+  if (minutes % 60 === 0) return `${minutes / 60} 小时`;
+  return `${minutes} 分钟`;
 }
 
-function capitalize(word: string): string {
-  return word[0]!.toUpperCase() + word.slice(1);
-}
+const WEEKDAY_LABELS: Record<string, string> = {
+  monday: "一",
+  tuesday: "二",
+  wednesday: "三",
+  thursday: "四",
+  friday: "五",
+  saturday: "六",
+  sunday: "日",
+};
+
+// ICU-free: the same weekday names a `zh` locale would print, so tests and
+// machines without full ICU (CI) stay in Chinese.
+const WEEKDAY_SHORT = ["日", "一", "二", "三", "四", "五", "六"] as const;
 
 function snoozePresetDaysAhead(
   setting: Extract<SnoozePresetSetting, { kind: "at" }>,
@@ -252,16 +258,16 @@ function snoozePresetDaysAhead(
   return (WEEKDAY_INDEX[setting.day] - now.getDay() + 7) % 7 || 7;
 }
 
-/** Labels follow the actual day gap, so a Monday option on a Sunday reads "Tomorrow". */
+/** Labels follow the actual day gap, so a Monday option on a Sunday reads "明天". */
 function snoozePresetLabel(setting: SnoozePresetSetting, daysAhead: number): string {
-  if (setting.kind === "after") return `In ${formatSnoozeDuration(setting.minutes)}`;
+  if (setting.kind === "after") return `${formatSnoozeDuration(setting.minutes)}后`;
   if (daysAhead === 0) {
     const hour = Number(setting.time.slice(0, 2));
     return hour < 12 ? "今天上午" : hour < 17 ? "今天下午" : "今天晚上";
   }
   if (daysAhead === 1) return "明天";
-  if (setting.day === "monday") return "下周";
-  return daysAhead === 7 ? `Next ${capitalize(setting.day)}` : capitalize(setting.day);
+  const weekday = WEEKDAY_LABELS[setting.day] ?? setting.day;
+  return setting.day === "monday" || daysAhead === 7 ? `下周${weekday}` : `周${weekday}`;
 }
 
 export function snoozePresetId(setting: SnoozePresetSetting): string {
@@ -287,8 +293,8 @@ export function resolveSnoozePreset(
     if (wake.getTime() <= now.getTime()) return null;
   }
   const label = snoozePresetLabel(setting, daysAhead);
-  // Durations and "Next week" don't name the wake day, so a wake on another day shows it.
-  const labelNamesDay = setting.kind === "at" && label !== "Next week";
+  // Durations don't name the wake day, so a wake on another day shows it.
+  const labelNamesDay = setting.kind === "at";
   const time = formatTime(wake);
   return {
     id: snoozePresetId(setting),
@@ -296,7 +302,7 @@ export function resolveSnoozePreset(
     whenLabel:
       labelNamesDay || wake.toDateString() === now.toDateString()
         ? time
-        : `${wake.toLocaleDateString(undefined, { weekday: "short" })} ${time}`,
+        : `周${WEEKDAY_SHORT[wake.getDay()]} ${time}`,
     snoozedUntil: wake.toISOString(),
   };
 }

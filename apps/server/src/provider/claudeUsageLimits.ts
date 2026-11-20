@@ -23,7 +23,7 @@ const WINDOWS: Readonly<
   Record<string, Pick<ServerProviderUsageWindow, "kind" | "label" | "windowDurationMins">>
 > = {
   five_hour: { kind: "session", label: "会话", windowDurationMins: SESSION_MINS },
-  seven_day: { kind: "weekly", label: "Weekly", windowDurationMins: WEEK_MINS },
+  seven_day: { kind: "weekly", label: "每周", windowDurationMins: WEEK_MINS },
 };
 
 /** Reuse probed display names for streamed bucket types so mid-turn updates target the same row. */
@@ -59,7 +59,7 @@ function scopedWindow(
   return {
     id: scopedWindowId(displayName),
     kind: "weekly",
-    label: `Weekly · ${displayName}`,
+    label: `每周 · ${displayName}`,
     windowDurationMins: WEEK_MINS,
     usedPercent: clampPercent(usedPercent),
     ...(resetsAt ? { resetsAt } : {}),
@@ -206,7 +206,7 @@ export function claudeUsageResponseToLimits(input: {
     windows.push({
       id: "monthly_spend",
       kind: "monthly",
-      label: "Monthly spend",
+      label: "每月支出",
       usedPercent: spendPercent,
     });
   }

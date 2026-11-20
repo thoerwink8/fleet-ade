@@ -229,11 +229,11 @@ function TelemetryExportForm() {
               </div>
               {(saved[key] !== (running?.[key] ?? "") || override?.variable) && (
                 <p className="break-all text-xs text-muted-foreground">
-                  Running: {running?.[key] || "Disabled"}
+                  运行中：{running?.[key] || "已停用"}
                   {override?.variable && (
                     <>
                       {" "}
-                      from <code className="font-mono">{override.variable}</code>
+                      来自 <code className="font-mono">{override.variable}</code>
                     </>
                   )}
                 </p>

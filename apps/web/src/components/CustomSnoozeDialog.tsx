@@ -115,7 +115,7 @@ function CustomSnoozeDialog() {
                 }}
               >
                 <Toggle value="date">日期和时间</Toggle>
-                <Toggle value="duration">Duration</Toggle>
+                <Toggle value="duration">时长</Toggle>
               </ToggleGroup>
               <div className="flex flex-col gap-4">
                 {mode === "date" ? (

@@ -212,10 +212,10 @@ export const make = Effect.fn("RpcSessionFactory.make")(function* (
               // opened, the path worked, and a host that goes quiet is more
               // often overloaded or asleep than blocked.
               detail: !wasConnected
-                ? `${connection.label} could not establish a WebSocket connection.${networkHint}`
+                ? `${connection.label} 无法建立 WebSocket 连接。${networkHint}`
                 : timedOut
-                  ? `${connection.label} stopped responding for ${PING_TIMEOUT_SECONDS}s. ${UNRESPONSIVE_HOST_HINT}`
-                  : `${connection.label} disconnected.`,
+                  ? `${connection.label} 已 ${PING_TIMEOUT_SECONDS} 秒无响应。${UNRESPONSIVE_HOST_HINT}`
+                  : `${connection.label} 已断开连接。`,
               ...socketFailureLocation(via),
             }),
           ),
@@ -293,7 +293,7 @@ export const make = Effect.fn("RpcSessionFactory.make")(function* (
     const serverConfigUpdates = yield* PubSub.sliding<BufferedServerConfigEvent>(64);
     const configSubscriptionEndedError = new ConnectionTransientErrorClass({
       reason: "remote-unavailable",
-      detail: `${connection.label} config subscription ended.`,
+      detail: `${connection.label} 配置订阅已结束。`,
     });
     const serverConfigSource = protocolClient[WS_METHODS.subscribeServerConfig](
       onDemandSnapshots(serverConfigInput),
@@ -405,7 +405,7 @@ export const make = Effect.fn("RpcSessionFactory.make")(function* (
         return Stream.fail(
           new RpcClientError.RpcClientError({
             reason: new RpcClientError.RpcClientDefect({
-              message: `${connection.label} config subscription failed.`,
+              message: `${connection.label} 配置订阅失败。`,
               cause,
             }),
           }),
@@ -417,7 +417,7 @@ export const make = Effect.fn("RpcSessionFactory.make")(function* (
         (cause) =>
           new RpcClientError.RpcClientError({
             reason: new RpcClientError.RpcClientDefect({
-              message: `${connection.label} config subscription failed.`,
+              message: `${connection.label} 配置订阅失败。`,
               cause,
             }),
           }),

@@ -6851,7 +6851,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         assert.isNotNull(projection.nodes[0]?.completedAt);
         const item = projection.turnItems.find((candidate) => candidate.id === preparation.id)!;
         assert.equal(item.status, "cancelled");
-        assert.equal(item.title, "Workspace preparation cancelled");
+        assert.equal(item.title, "工作区准备已取消");
         assert.deepEqual(item.completedAt, cancelledRun.completedAt);
         assert.deepEqual(item.updatedAt, cancelledRun.completedAt);
         assert.isEmpty((yield* orchestrator.getThreadShell(threadId))!.pendingBackgroundTasks);

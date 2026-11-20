@@ -120,7 +120,7 @@ describe("TelemetryExportSettings", () => {
     await expect.element(screen.getByText("由环境设置 · 已连接 · 12 ms")).toBeInTheDocument();
     await expect
       .element(
-        screen.getByText("Running: http://collector/v1/traces from OTEL_EXPORTER_OTLP_ENDPOINT"),
+        screen.getByText("运行中：http://collector/v1/traces 来自 OTEL_EXPORTER_OTLP_ENDPOINT"),
       )
       .toBeInTheDocument();
     expect(checkOtlpEndpoint).toHaveBeenCalledExactlyOnceWith({

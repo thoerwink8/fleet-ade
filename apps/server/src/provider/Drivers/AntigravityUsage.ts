@@ -109,7 +109,7 @@ const make = Effect.gen(function* () {
         dir,
         files: !exists && !failed ? null : result.files.filter((file) => file.root === dir),
         status: failed ? "partial" : "ok",
-        ...(failed ? { message: "Some Antigravity history could not be read." } : {}),
+        ...(failed ? { message: "部分 Antigravity 历史记录无法读取。" } : {}),
       });
     }
     return scanned;

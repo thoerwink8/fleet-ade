@@ -65,8 +65,8 @@ export class BrowserImportPolicyError extends Schema.TaggedError<BrowserImportPo
 ) {
   override get message(): string {
     return this.organization === undefined
-      ? `The managed policy at ${this.policyPath} could not be read, so importing browser cookies is not allowed.`
-      : managedPolicyDeniedMessage(this.organization, "importing browser cookies");
+      ? `无法读取 ${this.policyPath} 处的托管策略，因此不允许导入浏览器 Cookie。`
+      : managedPolicyDeniedMessage(this.organization, "导入浏览器 Cookie");
   }
 }
 

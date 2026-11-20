@@ -381,7 +381,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
   it.effect("lists a blocked driver's instances as unavailable without running them", () =>
     Effect.gen(function* () {
       const instanceId = ProviderInstanceId.make("codex");
-      const reason = "Example Corp's policy does not allow the Codex provider.";
+      const reason = "Example Corp 的策略不允许使用 Codex 提供方。";
       const { registry } = yield* makeProviderInstanceRegistry({
         drivers: [CodexDriver],
         configMap: { [instanceId]: { driver: ProviderDriverKind.make("codex") } },
@@ -657,7 +657,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
       expect(accountChangedFailure).toMatchObject({
         status: "warning",
         auth: { status: "unknown" },
-        message: "Claude Agent CLI failed while checking account status.",
+        message: "Claude Agent CLI 在检查账号状态时失败。",
       });
       expect(accountChangedFailure.checkedAt).not.toBe(first.checkedAt);
       expect(accountChangedFailure.usageLimits).toBeUndefined();
@@ -696,7 +696,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
       expect(repeatedFailure).toMatchObject({
         status: "warning",
         auth: { status: "unknown" },
-        message: "Claude Agent CLI failed while checking account status.",
+        message: "Claude Agent CLI 在检查账号状态时失败。",
       });
       expect(repeatedFailure.slashCommands).not.toEqual(
         expect.arrayContaining([expect.objectContaining({ name: "recovered" })]),

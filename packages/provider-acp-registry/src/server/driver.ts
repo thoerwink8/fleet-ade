@@ -163,14 +163,14 @@ function acpRegistrySnapshotReadiness(
         installed: false,
         version: null,
         status: "error",
-        message: `ACP Registry does not contain agent '${inspection.agentId}'.`,
+        message: `ACP Registry 中没有智能体 '${inspection.agentId}'。`,
       };
     case "unsupported":
       return {
         installed: false,
         version: inspection.version,
         status: "error",
-        message: `ACP Registry agent '${inspection.agentId}' has no compatible distribution for this environment.`,
+        message: `ACP Registry 智能体 '${inspection.agentId}' 没有适配此环境的发行版。`,
       };
     case "missing_runner":
       return {
@@ -179,15 +179,15 @@ function acpRegistrySnapshotReadiness(
         status: "error",
         message:
           inspection.distribution === "local"
-            ? "Local ACP executable is not available on this environment's PATH."
-            : `ACP executable '${inspection.runner}' is not available on this environment's PATH.`,
+            ? "本地 ACP 可执行文件不在此环境的 PATH 上。"
+            : `ACP 可执行文件 '${inspection.runner}' 不在此环境的 PATH 上。`,
       };
     case "unprepared":
       return {
         installed: false,
         version: inspection.version,
         status: "warning",
-        message: `ACP Registry agent '${inspection.agentId}' has not been prepared on this environment.`,
+        message: `ACP Registry 智能体 '${inspection.agentId}' 尚未在此环境上准备好。`,
       };
     case "failed":
       return {
@@ -339,8 +339,8 @@ const buildInitialAcpRegistrySnapshot = Effect.fn("AcpRegistryDriver.buildInitia
       status: "warning",
       auth: { status: "unknown" },
       message: input.settings.enabled
-        ? "Checking ACP Registry agent readiness..."
-        : "ACP Registry is disabled in T3 Code settings.",
+        ? "正在检查 ACP Registry 智能体是否就绪…"
+        : "ACP Registry 已在 T3 Code 设置中停用。",
     });
   },
 );
@@ -427,7 +427,7 @@ export const checkAcpRegistryProviderStatus = Effect.fn("AcpRegistryDriver.check
         checkedAt,
         inspection: {
           status: "failed",
-          message: `Could not inspect ACP Registry agent: ${inspected.failure.message}`,
+          message: `无法检查 ACP Registry 智能体：${inspected.failure.message}`,
         },
       });
     }
@@ -489,7 +489,7 @@ export const checkAcpRegistryProviderReadiness = Effect.fn(
   return inspected._tag === "Success" && inspected.success.status === "ready"
     ? {
         ...snapshot,
-        message: "Checking ACP authentication, models, and commands in the background...",
+        message: "正在后台检查 ACP 认证、模型和命令…",
       }
     : snapshot;
 });

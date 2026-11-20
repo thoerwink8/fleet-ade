@@ -219,7 +219,7 @@ export class CloudLinkTunnelSupersededError extends Schema.TaggedError<CloudLink
   {},
 ) {
   override get message(): string {
-    return "The managed tunnel configuration changed during registration.";
+    return "注册期间托管隧道配置发生了变化。";
   }
 }
 
@@ -232,30 +232,28 @@ export class CloudLinkEndpointUnavailableError extends Schema.TaggedError<CloudL
 ) {
   override get message(): string {
     return this.reason === "runtime-not-started"
-      ? "Managed endpoint runtime could not be started."
-      : "Managed endpoint origin could not be confirmed.";
+      ? "托管端点运行时无法启动。"
+      : "托管端点来源无法确认。";
   }
 }
 
 const INTERNAL_OPERATION_MESSAGES = {
-  "relay-url-unconfigured":
-    "T3CODE_RELAY_URL must be configured as a secure absolute HTTPS origin.",
-  "generate-link-proof": "Could not generate environment link proof.",
-  "persist-relay-config": "Could not persist environment relay configuration.",
-  "register-endpoint-origin": "Could not register the managed endpoint origin.",
-  "resolve-server-origin": "Could not resolve the local server origin.",
-  "persist-desired-link": "Could not persist desired T3 Connect link state.",
-  "sign-recovery-proof": "Could not sign the managed tunnel recovery request.",
-  "unsupported-recovered-tunnel":
-    "T3 Connect returned an unsupported managed tunnel configuration.",
-  "persist-recovered-tunnel": "Could not persist the recovered managed tunnel configuration.",
-  "read-relay-config": "Could not read environment relay configuration.",
-  "remove-relay-config": "Could not remove environment relay configuration.",
-  "update-webhook-settings": "Could not update T3 Connect webhook settings.",
-  "read-preferences": "Could not read environment cloud preferences.",
-  "persist-preferences": "Could not persist environment cloud preferences.",
-  "answer-health": "Could not answer cloud health request.",
-  "issue-credential": "Could not issue cloud connection credential.",
+  "relay-url-unconfigured": "T3CODE_RELAY_URL 必须配置为安全的绝对 HTTPS 地址。",
+  "generate-link-proof": "无法生成环境链接凭证。",
+  "persist-relay-config": "无法保存环境中继配置。",
+  "register-endpoint-origin": "无法注册托管端点来源。",
+  "resolve-server-origin": "无法解析本地服务器地址。",
+  "persist-desired-link": "无法保存期望的 T3 Connect 链接状态。",
+  "sign-recovery-proof": "无法签署托管隧道恢复请求。",
+  "unsupported-recovered-tunnel": "T3 Connect 返回了不支持的托管隧道配置。",
+  "persist-recovered-tunnel": "无法保存恢复的托管隧道配置。",
+  "read-relay-config": "无法读取环境中继配置。",
+  "remove-relay-config": "无法移除环境中继配置。",
+  "update-webhook-settings": "无法更新 T3 Connect webhook 设置。",
+  "read-preferences": "无法读取环境云偏好设置。",
+  "persist-preferences": "无法保存环境云偏好设置。",
+  "answer-health": "无法应答云健康检查请求。",
+  "issue-credential": "无法签发云连接凭证。",
 } as const;
 
 export class CloudLinkInternalError extends Schema.TaggedError<CloudLinkInternalError>()(

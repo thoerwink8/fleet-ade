@@ -301,7 +301,7 @@ it.effect(
       });
       expect(managed.result).toMatchObject({
         code: "invalid_request",
-        message: "Example Corp limits threads to Supervised.",
+        message: "Example Corp 限制会话最高到需审批。",
       });
     }),
 );

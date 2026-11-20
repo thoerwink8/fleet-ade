@@ -167,12 +167,12 @@ function formatClaudeSubscriptionAuthLabel(subscriptionType: string): string {
     return subscriptionLabel;
   }
   if (normalized.startsWith("claude")) {
-    return `${subscriptionLabel} Subscription`;
+    return `${subscriptionLabel} 订阅`;
   }
   if (normalized.endsWith("subscription")) {
     return `Claude ${subscriptionLabel}`;
   }
-  return `Claude ${subscriptionLabel} Subscription`;
+  return `Claude ${subscriptionLabel} 订阅`;
 }
 
 function claudeAuthMetadata(input: {
@@ -652,7 +652,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Claude is disabled in T3 Code settings.",
+        message: "Claude 已在 T3 Code 设置中停用。",
       },
     });
   }
@@ -700,8 +700,8 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         status: "error",
         auth: { status: "unknown" },
         message: isCommandMissingCause(error)
-          ? "Claude Agent CLI (`claude`) was not found on PATH."
-          : "Failed to execute Claude Agent CLI health check.",
+          ? "在 PATH 上找不到 Claude Agent CLI（`claude`）。"
+          : "执行 Claude Agent CLI 健康检查失败。",
       },
     });
   }
@@ -717,8 +717,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         version: null,
         status: "error",
         auth: { status: "unknown" },
-        message:
-          "Claude Agent CLI is installed but failed to run. Timed out while running command.",
+        message: "Claude Agent CLI 已安装但无法运行：命令执行超时。",
       },
     });
   }
@@ -741,7 +740,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         version: parsedVersion,
         status: "error",
         auth: { status: "unknown" },
-        message: "Claude Agent CLI is installed but failed to run.",
+        message: "Claude Agent CLI 已安装但无法运行。",
       },
     });
   }
@@ -787,9 +786,9 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         auth: { status: "unknown" },
         message: probeFailure
           ? Cause.isTimeoutError(probeFailure)
-            ? `Timed out after ${resolveProviderProbeTimeoutMs("claude", CAPABILITIES_PROBE_TIMEOUT_MS, resolvedEnvironment) / 1_000}s while checking Claude account status.`
-            : "Claude Agent CLI failed while checking account status."
-          : "Could not verify Claude authentication status from initialization result.",
+            ? `检查 Claude 账号状态超时（${resolveProviderProbeTimeoutMs("claude", CAPABILITIES_PROBE_TIMEOUT_MS, resolvedEnvironment) / 1_000} 秒）。`
+            : "Claude Agent CLI 在检查账号状态时失败。"
+          : "无法从初始化结果中验证 Claude 的登录状态。",
       },
     });
   }
@@ -818,7 +817,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         auth: { status: "unauthenticated" },
         message:
           configDir === undefined
-            ? "Claude Code is not authenticated. Run `claude auth login` and try again."
+            ? "Claude Code 未登录。请运行 `claude auth login` 后重试。"
             : claudeSignedOutMessage({ configDir, cwd: path.resolve(cwd ?? ".") }),
       },
     });
@@ -827,7 +826,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
   // A proxy's ANTHROPIC_AUTH_TOKEN reads as an API key; the endpoint is what the token is for.
   const authMetadata =
     apiProviderAuthMetadata(capabilities.apiProvider) ??
-    (customApiEndpoint ? { type: "customEndpoint", label: "Custom API endpoint" } : undefined) ??
+    (customApiEndpoint ? { type: "customEndpoint", label: "自定义 API 端点" } : undefined) ??
     claudeAuthMetadata({
       subscriptionType: capabilities.subscriptionType,
       authMethod: capabilities.tokenSource,
@@ -899,7 +898,7 @@ export const makePendingClaudeProvider = Effect.fn("ClaudeProvider.makePendingCl
           version: null,
           status: "warning",
           auth: { status: "unknown" },
-          message: "Claude is disabled in T3 Code settings.",
+          message: "Claude 已在 T3 Code 设置中停用。",
         },
       });
     }
@@ -914,7 +913,7 @@ export const makePendingClaudeProvider = Effect.fn("ClaudeProvider.makePendingCl
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Claude provider status has not been checked in this session yet.",
+        message: "本次会话还没有检查过 Claude 提供方状态。",
       },
     });
   },

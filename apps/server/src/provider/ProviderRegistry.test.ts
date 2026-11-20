@@ -482,7 +482,7 @@ it.layer(
         assert.strictEqual(status.version, "1.0.0");
         assert.strictEqual(status.auth.status, "authenticated");
         assert.strictEqual(status.auth.type, "chatgpt");
-        assert.strictEqual(status.auth.label, "ChatGPT Pro 200 Subscription");
+        assert.strictEqual(status.auth.label, "ChatGPT Pro 200 订阅");
         assert.strictEqual(status.auth.email, "test@example.com");
         assert.deepStrictEqual(status.setup, { canAuthenticate: false, canInstall: false });
         assert.deepStrictEqual(status.models, [
@@ -505,13 +505,13 @@ it.layer(
         assert.deepStrictEqual(status.slashCommands.slice(1), [
           {
             name: "goal",
-            description: "Set a goal Codex keeps working toward until it is done",
-            input: { hint: "Objective, or pause, resume, clear" },
+            description: "设置一个目标，Codex 会持续工作直到完成",
+            input: { hint: "目标，或 pause、resume、clear" },
           },
           {
             name: "feedback",
-            description: "Send this thread and Codex logs to OpenAI",
-            input: { hint: "Describe the issue (optional)" },
+            description: "将此会话和 Codex 日志发送给 OpenAI",
+            input: { hint: "描述问题（可选）" },
           },
         ]);
       }),
@@ -543,13 +543,13 @@ it.layer(
           );
 
         const downgraded = yield* statusWithUsagePlan("free");
-        assert.strictEqual(downgraded.auth.label, "ChatGPT Free Subscription");
+        assert.strictEqual(downgraded.auth.label, "ChatGPT Free 订阅");
 
         const unreported = yield* statusWithUsagePlan(null);
-        assert.strictEqual(unreported.auth.label, "ChatGPT Pro 200 Subscription");
+        assert.strictEqual(unreported.auth.label, "ChatGPT Pro 200 订阅");
 
         const unknown = yield* statusWithUsagePlan("unknown");
-        assert.strictEqual(unknown.auth.label, "ChatGPT Pro 200 Subscription");
+        assert.strictEqual(unknown.auth.label, "ChatGPT Pro 200 订阅");
       }),
     );
 
@@ -568,13 +568,10 @@ it.layer(
 
         assert.strictEqual(status.status, "error");
         assert.strictEqual(status.auth.status, "unauthenticated");
-        assert.strictEqual(
-          status.message,
-          "Codex CLI is not authenticated. Run `codex login` and try again.",
-        );
+        assert.strictEqual(status.message, "Codex CLI 未登录。请运行 `codex login` 后重试。");
         assert.deepStrictEqual(status.usageLimits?.unavailable, {
           reason: "probeFailed",
-          message: "Codex CLI is not authenticated. Run `codex login` and try again.",
+          message: "Codex CLI 未登录。请运行 `codex login` 后重试。",
         });
       }),
     );
@@ -720,7 +717,7 @@ it.layer(
         assert.strictEqual(status.status, "error");
         assert.strictEqual(status.installed, true);
         assert.strictEqual(status.version, "0.1.4161006");
-        assert.match(status.message ?? "", /^Codex app-server provider probe failed: /);
+        assert.match(status.message ?? "", /^Codex app-server 提供方探测失败：/);
         const classified = withBundledCompatibility({
           ...status,
           instanceId: ProviderInstanceId.make("codex"),
@@ -767,7 +764,7 @@ it.layer(
         assert.strictEqual(status.status, "error");
         assert.strictEqual(status.installed, true);
         assert.strictEqual(status.version, null);
-        assert.match(status.message ?? "", /^Codex app-server provider probe failed: /);
+        assert.match(status.message ?? "", /^Codex app-server 提供方探测失败：/);
       }),
     );
 
@@ -796,7 +793,7 @@ it.layer(
         assert.strictEqual(status.version, null);
         assert.strictEqual(status.status, "error");
         assert.strictEqual(status.installed, true);
-        assert.match(status.message ?? "", /^Codex app-server provider probe failed: /);
+        assert.match(status.message ?? "", /^Codex app-server 提供方探测失败：/);
         assert.isTrue(yield* Deferred.isDone(released));
       }),
     );
@@ -3582,14 +3579,14 @@ it.layer(
           if (configDir === undefined) {
             assert.strictEqual(
               status.message,
-              "Claude Code is not authenticated. Run `claude auth login` and try again.",
+              "Claude Code 未登录。请运行 `claude auth login` 后重试。",
             );
           } else {
             // A home path is resolved to a native path; an inherited value is kept literal.
             const expected = homePath ? (yield* Path.Path).resolve(configDir) : configDir;
             assert.include(
               status.message ?? "",
-              `CLAUDE_CONFIG_DIR set to ${JSON.stringify(expected)}`,
+              `CLAUDE_CONFIG_DIR 设为 ${JSON.stringify(expected)}`,
               "a bare `claude auth login` signs in ~/.claude, not this instance's config dir",
             );
           }
@@ -3666,7 +3663,7 @@ it.layer(
         assert.strictEqual(status.status, "ready");
         assert.strictEqual(status.auth.status, "authenticated");
         assert.strictEqual(status.auth.type, "customEndpoint");
-        assert.strictEqual(status.auth.label, "Custom API endpoint");
+        assert.strictEqual(status.auth.label, "自定义 API 端点");
       }).pipe(
         Effect.provide(
           layerMockSpawner((args) => {
@@ -3683,7 +3680,7 @@ it.layer(
         settings: { env: { ANTHROPIC_BASE_URL: "https://hub.example.ts.net:8317" } },
         baseUrl: "https://api.anthropic.com",
         type: "customEndpoint",
-        label: "Custom API endpoint",
+        label: "自定义 API 端点",
       },
       {
         settings: { env: { ANTHROPIC_BASE_URL: "https://api.anthropic.com" } },
@@ -3695,7 +3692,7 @@ it.layer(
         settings: {},
         baseUrl: "https://proxy.example",
         type: "customEndpoint",
-        label: "Custom API endpoint",
+        label: "自定义 API 端点",
       },
     ])(
       "uses the settings endpoint before the process endpoint: $type / $baseUrl",

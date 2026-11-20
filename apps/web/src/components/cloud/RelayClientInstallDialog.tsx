@@ -80,7 +80,7 @@ export function RelayClientInstallDialog() {
                   {activeStep?.label}
                 </p>
                 <p className="shrink-0 tabular-nums text-muted-foreground">
-                  {activeStepIndex + 1} of {installSteps.length}
+                  第 {activeStepIndex + 1} / {installSteps.length} 步
                 </p>
               </div>
               <progress

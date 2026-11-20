@@ -79,7 +79,7 @@ describe("runtime diagnostics in the v2 work log", () => {
     );
 
     expect(workEntryDisplayLabel(entry, undefined)).toBe("正在重试提供方（2/5）");
-    expect(entry.detail).toBe(`${retainedMessage} Retrying in 1.5s.`);
+    expect(entry.detail).toBe(`${retainedMessage} 1.5 秒后重试。`);
   });
 
   it("keeps a diagnostic separate from adjacent tool summaries", () => {

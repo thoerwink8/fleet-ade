@@ -444,7 +444,7 @@ it.effect("a policy without webhook tasks keeps existing ones but refuses saves 
       yield* withService(
         ({ service, launches }) =>
           Effect.gen(function* () {
-            const blocked = "Example Corp's policy does not allow webhook tasks.";
+            const blocked = "Example Corp 的策略不允许webhook 任务。";
             const listed = (yield* service.list()).tasks.find(({ id }) => id === task.id);
             assert.equal(listed?.blockedByPolicy, blocked);
             assert.isTrue(listed?.enabled);

@@ -231,8 +231,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                 value === "local" || value === "worktree"
                   ? resolveEnvModeLabel(value)
                   : unavailable
-                    ? "Unavailable"
-                    : "Mixed"
+                    ? "不可用"
+                    : "混合"
               }
             </SelectValue>
           </SelectTrigger>
@@ -497,7 +497,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                         ? PULL_REQUEST_MERGE_METHOD_LABELS[value]
                         : value === "last"
                           ? "上次选择"
-                          : "Mixed"
+                          : "混合"
                     }
                   </SelectValue>
                 </SelectTrigger>
@@ -559,8 +559,8 @@ export function WorktreeSubmodulesRow() {
                 isWorktreeSubmodules(value)
                   ? WORKTREE_SUBMODULES_LABELS[value]
                   : unavailable
-                    ? "Unavailable"
-                    : "Mixed"
+                    ? "不可用"
+                    : "混合"
               }
             </SelectValue>
           </SelectTrigger>

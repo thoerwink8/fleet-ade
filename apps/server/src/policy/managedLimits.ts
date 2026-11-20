@@ -39,9 +39,7 @@ export class ManagedPolicyRefusedError extends Schema.TaggedError<ManagedPolicyR
   },
 ) {
   override get message(): string {
-    return `${this.organization}'s policy does not allow ${this.action}${
-      this.detail === undefined ? "" : `, ${this.detail}`
-    }.`;
+    return `${this.organization} 的策略不允许${this.action}${this.detail === undefined ? "" : `，${this.detail}`}。`;
   }
 }
 
@@ -52,10 +50,10 @@ const CLIENT_AUTH_POLICY: Record<ManagedPolicyClient, ServerAuthPolicy> = {
 };
 
 const AUTH_POLICY_ACTION: Record<ServerAuthPolicy, string> = {
-  "desktop-managed-local": "the desktop app",
-  "loopback-browser": "browsers on this machine",
-  "remote-reachable": "remote clients",
-  "unsafe-no-auth": "running without authentication",
+  "desktop-managed-local": "使用桌面应用",
+  "loopback-browser": "本机浏览器访问",
+  "remote-reachable": "远程客户端访问",
+  "unsafe-no-auth": "无认证运行",
 };
 
 /** Whether the server may run with `authPolicy`. Any policy file rules out `unsafe-no-auth`. */
@@ -78,7 +76,7 @@ export const allowsConnect = (policy: PolicyDocument) =>
 
 const refuse = (policy: PolicyDocument, action: string, detail?: string) =>
   new ManagedPolicyRefusedError({
-    organization: policy.document?.organization ?? "Your organization",
+    organization: policy.document?.organization ?? "你的组织",
     action,
     ...(detail === undefined ? {} : { detail }),
   });
@@ -114,7 +112,7 @@ export const closeTailscaleServeTo = Effect.fn("managedLimits.closeTailscaleServ
   if (!(yield* (yield* NetService.NetService).canListenOnHost(target.port, target.host))) {
     return yield* refuseRemoteClients(
       policy,
-      `so the server does not start while it cannot bind ${target.host}:${target.port}; if another app holds that port, the server would take over its Tailscale Serve routes`,
+      `因此服务器不会启动：无法绑定 ${target.host}:${target.port}；若其他应用占用该端口，服务器会接管它的 Tailscale Serve 路由`,
     );
   }
   const readRoutes = readTailscaleServeRoutesTo(target).pipe(
@@ -136,8 +134,8 @@ export const closeTailscaleServeTo = Effect.fn("managedLimits.closeTailscaleServ
         policy,
         error._tag === "TailscaleCommandTimeoutError"
           ? // Seen on a Mac where Tailscale is installed but was never set up.
-            "so the server does not start until Tailscale Serve can be checked, and Tailscale did not answer; open Tailscale and finish setting it up, or remove it"
-          : "so the server does not start until Tailscale Serve can be checked",
+            "因此服务器不会启动：需先确认 Tailscale Serve 状态，但 Tailscale 没有应答；请打开 Tailscale 完成设置，或移除它"
+          : "因此服务器不会启动：需先确认 Tailscale Serve 状态",
       ),
     ),
   );
@@ -174,24 +172,23 @@ export const closeTailscaleServeTo = Effect.fn("managedLimits.closeTailscaleServ
   const left = yield* readRoutes;
   if (left.length > 0) {
     const describe = (route: TailscaleServeRoute) => {
-      const where = `port ${route.servePort}${route.mount === undefined ? "" : ` at ${route.mount}`} here`;
+      const where = `端口 ${route.servePort}${route.mount === undefined ? "" : ` 路径 ${route.mount}`}`;
       const off = tailscaleServeOffArgs(route);
-      if (off === undefined) return `${where}; stop the "tailscale serve" command that runs it`;
+      if (off === undefined) return `${where}；请停止运行它的 "tailscale serve" 命令`;
       if (formerName(route)) {
-        return `${where} under ${route.host}, a former name of this machine, which "tailscale serve ... off" cannot reach; run "tailscale serve reset" and set up your other routes again`;
+        return `${where}，位于 ${route.host}（此机器的旧名称），"tailscale serve ... off" 无法触及；请运行 "tailscale serve reset" 并重新设置其他路由`;
       }
       const command = `"tailscale ${off.join(" ")}"`;
-      // Without the current name, `off` might act on another name's route at this path.
       if (currentName === null && route.owner === undefined && route.host !== undefined) {
-        return `${where} under ${route.host}; if that is this machine's current name, turn it off with ${command}`;
+        return `${where}，位于 ${route.host}；若那是此机器的当前名称，用 ${command} 关闭它`;
       }
       return route.ambiguous !== undefined
-        ? `${where}, and its target ${route.ambiguous} might be another service on this port; check it, then turn it off with ${command}`
-        : `${where}; turn it off with ${command}`;
+        ? `${where}，其目标 ${route.ambiguous} 可能是此端口上的其他服务；请检查后用 ${command} 关闭它`
+        : `${where}；用 ${command} 关闭它`;
     };
     return yield* refuseRemoteClients(
       policy,
-      `so the server does not start while Tailscale Serve forwards ${left.map(describe).join(" 和 ")}`,
+      `因此服务器不会启动：Tailscale Serve 仍转发 ${left.map(describe).join(" 和 ")}`,
     );
   }
   yield* Effect.logInfo("Turned off Tailscale Serve the managed policy does not allow", {
@@ -222,8 +219,8 @@ export const checkServerReachability = Effect.fn("managedLimits.checkServerReach
       refuseRemoteClients(
         policy,
         input.privateNetworkOnly === true
-          ? "so the background service cannot listen on private networks; set T3CODE_HOST=127.0.0.1 in its service.env"
-          : `so the server cannot listen on ${input.host === "" ? "every interface" : (input.host ?? "this host")}`,
+          ? "因此后台服务不能在私有网络上监听；请在其 service.env 中设置 T3CODE_HOST=127.0.0.1"
+          : `因此服务器不能在 ${input.host === "" ? "所有接口" : (input.host ?? "此主机")} 上监听`,
       );
     if (!allowsAuthPolicy(policy, input.authPolicy)) {
       return yield* input.authPolicy === "remote-reachable"
@@ -232,7 +229,7 @@ export const checkServerReachability = Effect.fn("managedLimits.checkServerReach
     }
     if (allowsRemoteClients(policy)) return input.host ?? "127.0.0.1";
     if (input.tailscaleServeEnabled) {
-      return yield* refuseRemoteClients(policy, "so Tailscale Serve cannot be turned on");
+      return yield* refuseRemoteClients(policy, "因此不能开启 Tailscale Serve");
     }
     return loopbackBindAddress(input.host) ?? (yield* cannotListen());
   },

@@ -330,8 +330,8 @@ function ExcerptDiff({
         renderHeaderMetadata={() => (
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="tabular-nums">
-              {excerpt.side === "old" ? "被删除的代码，" : ""}showing {slice.shown} of {slice.total}{" "}
-              diff lines
+              {excerpt.side === "old" ? "被删除的代码，" : ""}显示 {slice.shown} / {slice.total}{" "}
+              行差异
             </span>
             <Button
               size="icon-xs"

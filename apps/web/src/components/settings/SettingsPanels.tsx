@@ -276,7 +276,7 @@ function AboutVersionSection() {
       ? !canCheckForUpdate(updateState)
       : isDesktopUpdateButtonDisabled(updateState);
 
-  const actionLabel: Record<string, string> = { download: "Download", install: "Install" };
+  const actionLabel: Record<string, string> = { download: "下载", install: "安装" };
   const statusLabel: Record<string, string> = {
     checking: "正在检查…",
     downloading: "正在下载…",
@@ -1259,7 +1259,7 @@ function ToolCallVisibilityRow() {
 const SCREEN_READER_ANNOUNCEMENTS_LABELS: Record<ScreenReaderAnnouncements, string> = {
   status: "仅状态",
   messages: "状态和消息",
-  everything: "Everything",
+  everything: "全部",
 };
 
 const isScreenReaderAnnouncements = Schema.is(ScreenReaderAnnouncements);
@@ -1573,7 +1573,7 @@ function ScopedCompactIdleThreadsRow() {
             <SelectValue>
               {(value: string | null) =>
                 value === null
-                  ? "Mixed"
+                  ? "混合"
                   : IDLE_COMPACTION_MODES.find((mode) => mode.value === value)?.label
               }
             </SelectValue>
@@ -2031,7 +2031,7 @@ export function ThreadsSettingsPanel() {
                 <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="流式响应">
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
-                      value === null ? "Mixed" : RESPONSE_STREAMING_MODE_LABELS[value]
+                      value === null ? "混合" : RESPONSE_STREAMING_MODE_LABELS[value]
                     }
                   </SelectValue>
                 </SelectTrigger>
@@ -2138,7 +2138,7 @@ export function MaintenanceSettingsPanel() {
             settings.keepAwakeWhileAgentsWork !==
             DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork ? (
               <SettingResetButton
-                label="keep awake while agents work"
+                label="智能体工作时保持唤醒"
                 onClick={() =>
                   updateSettings({
                     keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,

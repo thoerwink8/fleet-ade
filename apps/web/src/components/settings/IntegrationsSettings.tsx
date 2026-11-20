@@ -201,8 +201,8 @@ export const importFailureReason = (cause: unknown): BrowserImportFailureReason 
 export const importPolicyRefusal = (cause: unknown): string | undefined => {
   const message = String((cause as { message?: unknown } | undefined)?.message ?? "");
   return (
-    /The managed policy at .* importing browser cookies is not allowed\./u.exec(message)?.[0] ??
-    /(?:^|: )([^:]*'s policy does not allow importing browser cookies\.)/u.exec(message)?.[1]
+    /无法读取 .* 处的托管策略，因此不允许导入浏览器 Cookie。/u.exec(message)?.[0] ??
+    /(?:^|: )([^:]*的策略不允许导入浏览器 Cookie。)/u.exec(message)?.[1]
   );
 };
 
@@ -456,7 +456,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
                     </Button>
                   }
                 />
-                <TooltipPopup side="top">Rotate</TooltipPopup>
+                <TooltipPopup side="top">旋转</TooltipPopup>
               </Tooltip>
             </div>
           ) : null}

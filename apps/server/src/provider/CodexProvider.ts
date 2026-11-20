@@ -166,11 +166,11 @@ const REASONING_EFFORT_LABELS: Readonly<Record<string, string>> = {
 const DEFAULT_SERVICE_TIER_ID = "default";
 
 const SERVICE_TIER_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  ultrafast: "Even faster, more expensive",
+  ultrafast: "更快，价格更高",
 };
 
 const CYBER_ACCESS_PROGRAM_LABELS: Readonly<Record<string, string>> = {
-  standard: "Standard",
+  standard: "标准",
   daybreakBlue: "Daybreak Blue",
   daybreakRed: "Daybreak Red",
 };
@@ -195,34 +195,34 @@ function codexAccountAuthLabel(
 export function codexPlanLabel(planType: string | null | undefined): string | undefined {
   switch (planType) {
     case "free":
-      return "ChatGPT Free Subscription";
+      return "ChatGPT Free 订阅";
     case "go":
-      return "ChatGPT Go Subscription";
+      return "ChatGPT Go 订阅";
     case "plus":
-      return "ChatGPT Plus Subscription";
+      return "ChatGPT Plus 订阅";
     case "pro":
-      return "ChatGPT Pro 200 Subscription";
+      return "ChatGPT Pro 200 订阅";
     case "prolite":
-      return "ChatGPT Pro 100 Subscription";
+      return "ChatGPT Pro 100 订阅";
     case "promax":
-      return "ChatGPT Pro 500 Subscription";
+      return "ChatGPT Pro 500 订阅";
     case "self_serve_business_prolite":
-      return "ChatGPT Business Premium Subscription";
+      return "ChatGPT Business Premium 订阅";
     case "team":
     case "self_serve_business_usage_based":
     case "business":
-      return "ChatGPT Business Subscription";
+      return "ChatGPT Business 订阅";
     case "ent26":
     case "enterprise_cbp_automation":
     case "enterprise_cbp_usage_based":
     case "enterprise":
-      return "ChatGPT Enterprise Subscription";
+      return "ChatGPT Enterprise 订阅";
     case "edu":
     case "edu_plus":
     case "edu_pro":
-      return "ChatGPT Edu Subscription";
+      return "ChatGPT Edu 订阅";
     case "unknown":
-      return "ChatGPT Subscription";
+      return "ChatGPT 订阅";
     default:
       return undefined;
   }
@@ -282,7 +282,7 @@ export function mapCodexModelCapabilities(
   if (serviceTiers.length > 0) {
     optionDescriptors.push({
       id: "serviceTier",
-      label: "Service Tier",
+      label: "服务档位",
       type: "select",
       options: [
         {
@@ -309,7 +309,7 @@ export function mapCodexModelCapabilities(
     const defaultProgram = hasStandard ? "standard" : cyberAccessPrograms[0];
     optionDescriptors.push({
       id: "cyberAccessProgram",
-      label: "Cyber Access",
+      label: "网络访问",
       type: "select",
       // Standard stays selectable as an opt-out; Codex rejects it visibly when the login cannot use it.
       options: (hasStandard ? cyberAccessPrograms : ["standard", ...cyberAccessPrograms]).map(
@@ -577,7 +577,7 @@ const requestCodexChatGptModels = Effect.fn("requestCodexChatGptModels")(functio
   );
   if (refreshed === undefined) {
     yield* Effect.logWarning(
-      "Codex did not refresh its model catalog in time; using the cached catalog.",
+      "Codex 模型目录刷新超时，继续使用缓存目录。",
     );
     return models;
   }
@@ -683,7 +683,7 @@ const readCodexRateLimits = (
             resetCredits: response.rateLimitResetCredits,
             accountId: response.accountId,
           }
-        : { failure: "Codex did not answer the usage request." },
+        : { failure: "Codex 没有响应用量请求。" },
     ),
     Effect.catch((error) =>
       Effect.logDebug("Codex rate-limit read failed.", { cause: error }).pipe(
@@ -850,7 +850,7 @@ const makePendingCodexProvider = Effect.fn("CodexProvider.makePendingCodexProvid
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex is disabled in T3 Code settings.",
+        message: "Codex 已在 T3 Code 设置中停用。",
       },
     });
   }
@@ -866,7 +866,7 @@ const makePendingCodexProvider = Effect.fn("CodexProvider.makePendingCodexProvid
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "Codex provider status has not been checked in this session yet.",
+      message: "本次会话还没有检查过 Codex 提供方状态。",
     },
   });
 });
@@ -905,8 +905,8 @@ function accountProbeStatus(
       status: "error",
       auth: { status: "unauthenticated" },
       message: codexHome
-        ? `Codex CLI is not authenticated. Run \`codex login\` with CODEX_HOME set to ${quotePath(codexHome)} and try again.`
-        : "Codex CLI is not authenticated. Run `codex login` and try again.",
+        ? `Codex CLI 未登录。请将 CODEX_HOME 设为 ${quotePath(codexHome)} 后运行 \`codex login\`，再重试。`
+        : "Codex CLI 未登录。请运行 `codex login` 后重试。",
     };
   }
 
@@ -951,7 +951,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex is disabled in T3 Code settings.",
+        message: "Codex 已在 T3 Code 设置中停用。",
       },
     });
   }
@@ -999,11 +999,11 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
         status: "error",
         auth: { status: "unknown" },
         message: installed
-          ? `Codex app-server provider probe failed: ${error.message}.`
-          : `Could not start Codex CLI (\`${codexSettings.binaryPath}\`). Check Settings → Providers → Codex → Binary path on the server.` +
+          ? `Codex app-server 提供方探测失败：${error.message}。`
+          : `无法启动 Codex CLI（\`${codexSettings.binaryPath}\`）。请在服务器上检查“设置 → 提供方 → Codex → 可执行文件路径”。` +
             (codexSettings.binaryPath === "codex"
-              ? " Installing ChatGPT or Codex desktop may not add codex to PATH."
-              : " Make sure the configured executable exists and can be run."),
+              ? " 安装 ChatGPT 或 Codex 桌面版可能不会把 codex 加到 PATH。"
+              : " 请确认配置的可执行文件存在且能运行。"),
       },
     });
   }
@@ -1020,7 +1020,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
         version: null,
         status: "error",
         auth: { status: "unknown" },
-        message: "Timed out while checking Codex app-server provider status.",
+        message: "检查 Codex app-server 提供方状态时超时。",
       },
     });
   }
@@ -1067,13 +1067,13 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
       COMPACT_SLASH_COMMAND,
       {
         name: "goal",
-        description: "Set a goal Codex keeps working toward until it is done",
-        input: { hint: "Objective, or pause, resume, clear" },
+        description: "设置一个目标，Codex 会持续工作直到完成",
+        input: { hint: "目标，或 pause、resume、clear" },
       },
       {
         name: "feedback",
-        description: "Send this thread and Codex logs to OpenAI",
-        input: { hint: "Describe the issue (optional)" },
+        description: "将此会话和 Codex 日志发送给 OpenAI",
+        input: { hint: "描述问题（可选）" },
       },
     ],
     probe: {
@@ -1084,7 +1084,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
       ...(accountStatus.message
         ? { message: accountStatus.message }
         : snapshot.models === undefined
-          ? { message: "Codex did not return its model catalog in time." }
+          ? { message: "Codex 没有及时返回它的模型目录。" }
           : {}),
       ...(managedAuth ? {} : { usageLimits }),
     },

@@ -133,7 +133,7 @@ describe("ProjectCloneTracker", () => {
       yield* TestClock.adjust("1 second");
       const stalled = yield* tracker.get(projectId);
       expect(stalled).toMatchObject({ stalled: true, percent: 24 });
-      expect(projectCloneProgressSummary(stalled!)).toBe("Receiving objects · 24% · Stalled");
+      expect(projectCloneProgressSummary(stalled!)).toBe("接收对象中 · 24% · 已停滞");
 
       yield* Deferred.succeed(resumed, undefined);
       yield* Effect.yieldNow;

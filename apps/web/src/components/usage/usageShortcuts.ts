@@ -5,7 +5,7 @@ import { resolveShortcutCommand, type ShortcutEventLike } from "../../keybinding
 export type UsageMetric = UsageChartMetric | "limits";
 export const METRIC_OPTIONS = [
   { value: "cost", label: "费用", command: "usage.cost" },
-  { value: "tokens", label: "Tokens", command: "usage.tokens" },
+  { value: "tokens", label: "词元", command: "usage.tokens" },
   { value: "limits", label: "限制", command: "usage.limits" },
 ] as const satisfies readonly { value: UsageMetric; label: string; command: KeybindingCommand }[];
 

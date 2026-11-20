@@ -324,7 +324,7 @@ export class OrchestratorRuntimeModeAboveCeilingError extends Schema.TaggedError
 ) {
   override get message(): string {
     const limit = managedRuntimeModeCeilingMessage(this.organization, this.maxRuntimeMode);
-    return this.refused === "turn" ? `${limit} Switch this thread's mode to continue.` : limit;
+    return this.refused === "turn" ? `${limit}请切换此会话的模式后继续。` : limit;
   }
 }
 
@@ -742,6 +742,10 @@ function delegatedTasksStopEffect(command: {
 }
 
 const WORKSPACE_PREPARATION_INPUT = "正在准备工作区";
+// Runs created before the title was translated still carry the English input.
+const WORKSPACE_PREPARATION_INPUT_LEGACY = "Preparing workspace";
+const isWorkspacePreparationInput = (input: string | null | undefined): boolean =>
+  input === WORKSPACE_PREPARATION_INPUT || input === WORKSPACE_PREPARATION_INPUT_LEGACY;
 const RUNTIME_REQUEST_DELIVERY_FAILED_MESSAGE =
   "T3 Code could not confirm that your answer reached the agent. If the run stays stuck, stop it and try again.";
 
@@ -5083,7 +5087,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           (item) =>
             item.runId === run.id &&
             item.type === "command_execution" &&
-            item.input === WORKSPACE_PREPARATION_INPUT &&
+            isWorkspacePreparationInput(item.input) &&
             item.status === "running",
         );
         if (preparationItem === undefined) continue;
@@ -5097,7 +5101,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           payload: {
             ...preparationItem,
             status: "cancelled",
-            title: "Workspace preparation cancelled",
+            title: "工作区准备已取消",
             completedAt: now,
             updatedAt: now,
           },
@@ -11425,7 +11429,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       ): candidate is Extract<OrchestrationV2TurnItem, { readonly type: "command_execution" }> =>
         candidate.runId === command.runId &&
         candidate.type === "command_execution" &&
-        candidate.input === WORKSPACE_PREPARATION_INPUT,
+        isWorkspacePreparationInput(candidate.input),
     );
     if (
       run?.status !== (command.type === "prepared-run.retry" ? "failed" : "preparing") ||
@@ -11454,7 +11458,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
-          cause: `Run ${command.runId} is not awaiting workspace preparation.`,
+          cause: `Run ${command.runId} 不在工作区准备中。`,
         });
       }
       const now = yield* DateTime.now;
@@ -11470,7 +11474,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         occurredAt: now,
         payload: {
           ...state.preparationItem,
-          title: command.phase === "worktree" ? "正在准备工作树" : "Starting setup script",
+          title: command.phase === "worktree" ? "正在准备工作树" : "正在运行设置脚本",
           updatedAt: now,
         },
       });
@@ -11493,7 +11497,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
-          cause: `Run ${command.runId} is not awaiting workspace preparation.`,
+        cause: `Run ${command.runId} 不在工作区准备中。`,
         });
       }
       const now = yield* DateTime.now;
@@ -11539,8 +11543,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         payload: {
           ...state.preparationItem,
           status: "completed",
-          title: "Workspace ready",
-          output: "Workspace preparation completed.",
+          title: "工作区已就绪",
+          output: "工作区准备已完成。",
           exitCode: 0,
           completedAt: now,
           updatedAt: now,
@@ -11581,7 +11585,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
         commandType: command.type,
-        cause: `Run ${command.runId} is not awaiting workspace preparation.`,
+        cause: `Run ${command.runId} 不在工作区准备中。`,
       });
     }
     const now = yield* DateTime.now;
@@ -11614,7 +11618,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       payload: {
         ...state.preparationItem,
         status: "failed",
-        title: "Workspace preparation failed",
+        title: "工作区准备失败",
         output: command.failure.message,
         exitCode: 1,
         completedAt: now,
@@ -11642,7 +11646,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         parentItemId: null,
         ordinal: yield* nextTurnItemOrdinal(projection),
         status: "failed",
-        title: "Workspace preparation failed",
+        title: "工作区准备失败",
         startedAt: now,
         completedAt: now,
         updatedAt: now,
@@ -11690,14 +11694,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
         commandType: command.type,
-        cause: `Run ${command.runId} has no failed workspace preparation to retry.`,
+        cause: `Run ${command.runId} 没有可重试的工作区准备失败。`,
       });
     }
     if (projection.runs.some((run) => run.id !== state.run.id && isActiveRun(run))) {
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
         commandType: command.type,
-        cause: "Another run is active on this thread.",
+        cause: "此会话已有正在运行的任务。",
       });
     }
     const now = yield* DateTime.now;
@@ -12887,7 +12891,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         completedAt: now,
         updatedAt: now,
         type: "run_interrupt_result",
-        message: "Run interrupted before provider start",
+        message: "任务在智能体启动前被打断",
       };
       yield* emitEvent({
         type: "turn-item.updated",
@@ -12913,7 +12917,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ): candidate is Extract<OrchestrationV2TurnItem, { readonly type: "command_execution" }> =>
           candidate.runId === run.id &&
           candidate.type === "command_execution" &&
-          candidate.input === WORKSPACE_PREPARATION_INPUT &&
+          isWorkspacePreparationInput(candidate.input) &&
           candidate.status === "running",
       );
       if (preparationItem !== undefined) {
@@ -12927,8 +12931,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           payload: {
             ...preparationItem,
             status: "interrupted",
-            title: "Workspace preparation interrupted",
-            output: command.reason ?? "Interrupted before provider start",
+            title: "工作区准备被打断",
+            output: command.reason ?? "在智能体启动前被打断",
             completedAt: now,
             updatedAt: now,
           },

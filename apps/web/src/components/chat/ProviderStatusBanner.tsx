@@ -166,7 +166,7 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
   const title = isUnauthenticated
     ? `${providerName} 未登录`
     : incompatible
-      ? `${providerName} ${status.version ?? ""} is ${incompatible.status === "broken" ? "known to be broken" : "unsupported"}`
+      ? `${providerName} ${status.version ?? ""} ${incompatible.status === "broken" ? "已知不兼容" : "不受支持"}`
       : `提供方 ${providerName} 状态`;
   const message = incompatible?.message ?? getProviderStatusMessage(status);
   const isWarning =

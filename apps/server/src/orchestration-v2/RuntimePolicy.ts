@@ -47,7 +47,7 @@ export class RuntimePolicyAboveCeilingError extends Schema.TaggedError<RuntimePo
   },
 ) {
   override get message(): string {
-    return `${managedRuntimeModeCeilingMessage(this.organization, this.maxRuntimeMode)} Switch this thread's mode to continue.`;
+    return `${managedRuntimeModeCeilingMessage(this.organization, this.maxRuntimeMode)}请切换此会话的模式后继续。`;
   }
 }
 

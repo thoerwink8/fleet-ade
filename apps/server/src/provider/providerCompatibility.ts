@@ -77,18 +77,18 @@ export function resolveProviderCompatibility(
       : "unknown";
   const message =
     status === "broken"
-      ? "This provider version is known to be incompatible with this T3 Code release."
+      ? "这个提供方版本与此 T3 Code 版本不兼容。"
       : status === "unsupported"
-        ? "This provider version is outside the supported range for this T3 Code release."
+        ? "这个提供方版本不在此 T3 Code 版本的支持范围内。"
         : status === "graceful"
-          ? "This provider version has limited compatibility with this T3 Code release."
+          ? "这个提供方版本与此 T3 Code 版本仅部分兼容。"
           : null;
   const recommendedVersion = policy.recommendedVersion ?? null;
   const recommendedRange = policy.recommendedRange ?? null;
   const recommendation = recommendedVersion ?? recommendedRange;
   return {
     status,
-    message: message && recommendation ? `${message} Use ${recommendation}.` : message,
+    message: message && recommendation ? `${message}使用 ${recommendation}。` : message,
     recommendedVersion,
     recommendedRange,
   };
@@ -121,7 +121,7 @@ export function applyProviderCompatibility(
         compatibilityAdvisory: {
           ...advisory,
           message: needsHomebrewRefresh
-            ? `${advisory.message} Homebrew's local package metadata may be stale. Run brew update && ${updateCommand} on this environment's host, then refresh provider status.`
+            ? `${advisory.message} Homebrew 的本地包信息可能已过期。请在此环境的主机上运行 brew update && ${updateCommand}，然后刷新提供方状态。`
             : advisory.message,
           ...(latestAdvisory ? { latestVersionStatus: latestAdvisory.status } : {}),
         },

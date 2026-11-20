@@ -53,7 +53,7 @@ function kindForDuration(mins: number): ServerProviderUsageWindow["kind"] {
 }
 
 function labelForKind(kind: ServerProviderUsageWindow["kind"]): string {
-  return kind === "session" ? "会话" : kind === "weekly" ? "Weekly" : "Monthly";
+  return kind === "session" ? "会话" : kind === "weekly" ? "每周" : "每月";
 }
 
 /** primary/secondary are positions; without windowDurationMins, paid plans use 5-hour/weekly windows and Free/Go use monthly. */
@@ -89,7 +89,7 @@ function codexRateLimitsToWindows(
     windows.push({
       id: "individual",
       kind: "monthly",
-      label: "Monthly credit limit",
+      label: "每月额度限制",
       usedPercent: clampPercent(100 - individualLimit.remainingPercent),
       ...(resetsAt ? { resetsAt } : {}),
     });
@@ -155,13 +155,13 @@ export function codexRateLimitsToUpdate(
 export function codexRateLimitsFailureMessage(error: CodexErrors.CodexAppServerError): string {
   switch (error._tag) {
     case "CodexAppServerRequestError":
-      return `Codex could not read usage (JSON-RPC ${error.code}).`;
+      return `Codex 无法读取用量（JSON-RPC ${error.code}）。`;
     case "CodexAppServerSpawnError":
-      return "Codex could not be started to read usage.";
+      return "无法启动 Codex 来读取用量。";
     case "CodexAppServerProcessExitedError":
-      return "Codex exited before it could report usage.";
+      return "Codex 在上报用量前退出。";
     default:
-      return "Codex did not answer the usage request.";
+      return "Codex 没有响应用量请求。";
   }
 }
 

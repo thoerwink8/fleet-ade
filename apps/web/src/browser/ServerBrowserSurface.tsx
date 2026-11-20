@@ -112,7 +112,7 @@ async function copyPageText(text: string) {
       type: "info",
       title: "页面复制了文字",
       actionProps: {
-        children: "Copy",
+        children: "复制",
         onClick: () => {
           toastManager.close(id);
           void navigator.clipboard.writeText(text).catch(() => undefined);
@@ -127,7 +127,7 @@ function offerDownload(download: PreviewStreamDownload) {
     type: "info",
     title: `已下载 ${download.fileName}`,
     actionProps: {
-      children: "Save",
+      children: "保存",
       onClick: () => {
         toastManager.close(id);
         const anchor = document.createElement("a");

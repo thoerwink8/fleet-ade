@@ -260,3 +260,9 @@ http
 MagicDNS
 # 窗口管理器名
 Niri
+# Codex goal 命令名
+pause
+# Codex goal 命令名
+resume
+# Codex goal 命令名
+clear

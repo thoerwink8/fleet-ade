@@ -230,7 +230,7 @@ export function SourceControlWritingSettingsSection() {
             <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="提交与 PR 文案">
               <SelectValue>
                 {(value: SourceControlWritingStyleMode | null) =>
-                  value === null ? "Mixed" : MODE_OPTIONS[value].label
+                  value === null ? "混合" : MODE_OPTIONS[value].label
                 }
               </SelectValue>
             </SelectTrigger>

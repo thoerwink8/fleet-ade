@@ -331,7 +331,7 @@ const HUB_PROVIDERS = new Map<string, HubProvider>([
         };
         return {
           ...listedIdentity(account),
-          plan: "Claude Subscription",
+          plan: "Claude 订阅",
           usageLimits: claudeUsageResponseToLimits({
             checkedAt,
             response: { rate_limits_available: true, rate_limits: rateLimits },

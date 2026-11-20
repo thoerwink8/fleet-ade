@@ -10,12 +10,12 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
     source: Schema.Literals(["registry", "local"]).pipe(
       Schema.withDecodingDefault(Effect.succeed("registry")),
       Schema.annotateKey({
-        title: "ACP source",
+        title: "ACP 来源",
         providerSettingsForm: {
           control: "select",
           options: [
             { value: "registry", label: "ACP Registry" },
-            { value: "local", label: "Local command" },
+            { value: "local", label: "本地命令" },
           ],
         },
       }),
@@ -27,8 +27,8 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
     agentId: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "Registry agent ID",
-        description: "Agent identifier from the official ACP Registry, for example 'devin'.",
+        title: "Registry 智能体 ID",
+        description: "官方 ACP Registry 里的智能体标识，例如 'devin'。",
         providerSettingsForm: { placeholder: "devin", clearWhenEmpty: "persist" },
       }),
     ),

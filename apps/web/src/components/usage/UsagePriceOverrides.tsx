@@ -205,8 +205,8 @@ export function UsagePriceOverrides({
     value: string,
   ) =>
     !row.isNew &&
-    cell.placeholder !== "Mixed" &&
-    cell.placeholder !== "Unavailable" &&
+    cell.placeholder !== "各不相同" &&
+    cell.placeholder !== "不可用" &&
     value === cell.value;
   const updateOrDropDraft = (draft: UsagePriceDraft) => {
     if (!draft.isNew && Object.keys(draft.values).length === 0 && draft.alias === undefined)
@@ -335,7 +335,7 @@ export function UsagePriceOverrides({
                 </MenuPopup>
               </Menu>
             </div>
-            <span className="text-xs text-muted-foreground">美元 / 百万 token</span>
+            <span className="text-xs text-muted-foreground">美元 / 百万词元</span>
           </div>
           {selected.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -554,7 +554,7 @@ export function UsagePriceOverrides({
                   ))}
               </datalist>
               <p className="text-xs text-muted-foreground">
-                缓存价格留空时使用输入价格。填 0 表示 token
+                缓存价格留空时使用输入价格。填 0 表示词元
                 免费。被映射的模型，其用量计入映射目标模型。
                 {selected.length > 1
                   ? " 标为“各不相同”的单元格在修改前会保留各环境自己的价格。"

@@ -2761,7 +2761,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
           })
           .pipe(Effect.flip);
         assert.equal(rejected.operation, "use-disallowed-provider");
-        assert.equal(rejected.message, "Example Corp's policy does not allow the Grok provider.");
+        assert.equal(rejected.message, "Example Corp 的策略不允许使用 Grok 提供方。");
         // Switching it on for one project is enabling it too.
         const perProject = yield* service
           .updateSettings({

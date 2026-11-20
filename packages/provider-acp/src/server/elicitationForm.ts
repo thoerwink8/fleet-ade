@@ -119,8 +119,8 @@ function parseField(
       return {
         field: { kind: "boolean" },
         options: [
-          { label: "true", description: "Yes", value: "true" },
-          { label: "false", description: "No", value: "false" },
+          { label: "true", description: "是", value: "true" },
+          { label: "false", description: "否", value: "false" },
         ],
       };
     case "number":

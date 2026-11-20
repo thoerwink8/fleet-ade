@@ -7,10 +7,14 @@ import {
 import type { ThreadStructureTurnItem } from "./models.ts";
 
 const WORKSPACE_PREPARATION_INPUT = "正在准备工作区";
+// Runs created before the title was translated still carry the English input.
+const WORKSPACE_PREPARATION_INPUT_LEGACY = "Preparing workspace";
 
 export function turnItemIsWorkspacePreparation(item: OrchestrationV2TurnItem): boolean {
   return (
-    (item.type === "command_execution" && item.input === WORKSPACE_PREPARATION_INPUT) ||
+    (item.type === "command_execution" &&
+      (item.input === WORKSPACE_PREPARATION_INPUT ||
+        item.input === WORKSPACE_PREPARATION_INPUT_LEGACY)) ||
     (item.type === "error" &&
       item.status === "cancelled" &&
       item.failure.code === ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE)

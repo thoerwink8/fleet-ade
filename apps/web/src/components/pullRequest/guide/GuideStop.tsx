@@ -85,7 +85,7 @@ export function GuideStop({
         <Collapsible open={railOpen} onOpenChange={onRailOpenChange}>
           <header className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground tabular-nums @max-[56rem]/guide:hidden">
-              停止 {index + 1} of {stopCount}
+              第 {index + 1} / {stopCount} 处
             </p>
             <CollapsibleTrigger
               render={
@@ -93,7 +93,7 @@ export function GuideStop({
               }
             >
               <span className="tabular-nums">
-                停止 {index + 1} of {stopCount}
+                第 {index + 1} / {stopCount} 处
               </span>
               <ChevronDownIcon aria-hidden className={cn(railOpen && "rotate-180")} />
             </CollapsibleTrigger>

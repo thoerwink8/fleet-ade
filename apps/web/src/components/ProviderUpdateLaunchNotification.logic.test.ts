@@ -166,7 +166,7 @@ describe("provider update launch notification logic", () => {
       key: "loading:claudeAgent:running",
       tone: "loading",
       title: "正在更新 Claude",
-      description: "Claude update in progress.",
+      description: "Claude 正在更新。",
     });
   });
 

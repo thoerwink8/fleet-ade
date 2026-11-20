@@ -157,13 +157,13 @@ function SecretCheckButton(props: {
 
   if (!supported) return null;
   const description = !canCheck
-    ? "You cannot check secrets on this environment"
+    ? "无法在此环境上检查密钥"
     : state === undefined
-      ? "Check that the secret resolves"
+      ? "检查密钥能否解析"
       : state.status === "checking"
-        ? "Checking the secret"
+        ? "正在检查密钥"
         : state.status === "resolved"
-          ? "Secret resolved"
+          ? "密钥已解析"
           : state.detail;
   return (
     <Tooltip>

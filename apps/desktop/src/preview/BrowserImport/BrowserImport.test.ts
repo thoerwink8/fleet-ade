@@ -143,10 +143,10 @@ describe("BrowserImport.checkBrowserImportPolicy", () => {
       assert.equal(yield* outcome(policy({ browserCookieImport: true })), "allowed");
       assert.equal(
         yield* outcome(policy({ browserCookieImport: false })),
-        "Example Corp's policy does not allow importing browser cookies.",
+        "Example Corp 的策略不允许导入浏览器 Cookie。",
       );
       for (const unreadable of ["{ not json", policy({ notALimit: false })]) {
-        assert.include(yield* outcome(unreadable), "could not be read");
+        assert.include(yield* outcome(unreadable), "无法读取");
       }
     }).pipe(Effect.provide(NodeServices.layer)),
   );

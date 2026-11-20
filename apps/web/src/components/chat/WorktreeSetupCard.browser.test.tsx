@@ -53,14 +53,14 @@ it("ticks the running stage while finished stages keep their duration", async ()
   // Assert synchronously: expect.element polls on timers these tests fake.
   const section = screen.getByRole("region", { name: "工作树设置" });
 
-  expect(section.element().textContent).toContain("Fetch base branch3 秒");
-  expect(section.element().textContent).toContain("Check out files7 秒");
+  expect(section.element().textContent).toContain("拉取基准分支3 秒");
+  expect(section.element().textContent).toContain("检出文件7 秒");
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(5_000);
   });
-  expect(section.element().textContent).toContain("Fetch base branch3 秒");
-  expect(section.element().textContent).toContain("Check out files12 秒");
+  expect(section.element().textContent).toContain("拉取基准分支3 秒");
+  expect(section.element().textContent).toContain("检出文件12 秒");
 });
 
 it("stops a stage interrupted by the setup ending at the setup's end", async () => {
@@ -70,9 +70,9 @@ it("stops a stage interrupted by the setup ending at the setup's end", async () 
   await using screen = await render(card(failed));
   const section = screen.getByRole("region", { name: "工作树设置" });
 
-  expect(section.element().textContent).toContain("Check out files2 秒");
+  expect(section.element().textContent).toContain("检出文件2 秒");
   await act(async () => {
     await vi.advanceTimersByTimeAsync(5_000);
   });
-  expect(section.element().textContent).toContain("Check out files2 秒");
+  expect(section.element().textContent).toContain("检出文件2 秒");
 });

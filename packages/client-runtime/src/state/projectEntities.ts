@@ -17,6 +17,10 @@ import { arrayElementsEqual, parseProjectKey, projectKey, projectRefsEqual } fro
 const EMPTY_PROJECTS: ReadonlyArray<OrchestrationProjectShell> = Object.freeze([]);
 const EMPTY_PROJECT_INDEX: ReadonlyMap<ProjectId, OrchestrationProjectShell> = new Map();
 
+// Projects created before the scratch title was translated still carry "No project".
+const LEGACY_NO_PROJECT_TITLE = "No project";
+const NO_PROJECT_TITLE = "无项目";
+
 export function createEnvironmentProjectAtoms(input: {
   readonly catalogValueAtom: Atom.Atom<EnvironmentCatalogState>;
   readonly snapshotAtom: (
@@ -84,6 +88,7 @@ export function createEnvironmentProjectAtoms(input: {
           : {
               ...scopeProject(ref.environmentId, source),
               ...(scratch ? { isScratch: true as const } : {}),
+              title: source.title === LEGACY_NO_PROJECT_TITLE ? NO_PROJECT_TITLE : source.title,
             };
       return previousValue;
     }).pipe(Atom.withLabel(`environment-project:${key}`));

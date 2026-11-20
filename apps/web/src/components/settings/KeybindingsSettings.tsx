@@ -69,6 +69,7 @@ import {
   type WhenVariableOption,
   unknownWhenVariables,
   whenAstToExpression,
+  whenDisplayLabel,
   whenNodeRemoveLabel,
 } from "./KeybindingsSettings.logic";
 import { SettingsGroup } from "./SettingsGroup";
@@ -265,7 +266,7 @@ function KeybindingConflictWarning({ labels }: { labels: ReadonlyArray<string> }
   const description =
     labels.length === 1
       ? `与 ${labels[0]} 冲突。`
-      : `Conflicts with ${labels.slice(0, 3).join(", ")}${labels.length > 3 ? ", and more" : ""}.`;
+      : `与 ${labels.slice(0, 3).join("、")} 冲突${labels.length > 3 ? "，另有更多" : ""}。`;
 
   return (
     <WarningTooltipIcon label={description}>
@@ -607,7 +608,7 @@ function WhenExpressionBuilder({
     <div className="w-[min(34rem,calc(100vw-2rem))] space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-foreground">When</div>
+          <div className="text-sm font-medium text-foreground">生效条件</div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button type="button" variant="outline" size="compact" onClick={addRootCondition}>
@@ -888,7 +889,7 @@ function WhenClauseControl({
         }
         aria-label={`编辑 ${label} 的生效条件`}
       >
-        <span className="truncate font-mono">{expression || "始终"}</span>
+        <span className="truncate">{whenDisplayLabel(expression)}</span>
         <ChevronDownIcon className="size-3.5 shrink-0 opacity-60" />
       </PopoverTrigger>
       <PopoverContent align="start" sideOffset={6}>
@@ -953,7 +954,7 @@ function KeybindingSourceBadge({ source }: { source: KeybindingRow["source"] }) 
   if (source === "Default") return null;
   return (
     <Badge variant="outline" size="sm">
-      {source}
+      {source === "Custom" ? "自定义" : "项目"}
     </Badge>
   );
 }
@@ -981,7 +982,7 @@ function KeybindingRowWhen({
 }) {
   return (
     <span className="flex h-6 items-center gap-1.5">
-      <span className="text-xs leading-none text-muted-foreground/70">When</span>
+      <span className="text-xs leading-none text-muted-foreground/70">条件</span>
       <WhenClauseControl
         label={commandLabel(row.command)}
         expression={editor.whenDraftExpression}

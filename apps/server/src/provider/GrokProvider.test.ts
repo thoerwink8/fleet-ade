@@ -134,7 +134,7 @@ describe("buildGrokModelCapabilities", () => {
     expect(capabilities.optionDescriptors).toEqual([
       {
         id: "reasoningEffort",
-        label: "Reasoning",
+        label: "推理",
         type: "select",
         currentValue: "medium",
         options: [
@@ -169,7 +169,7 @@ describe("buildGrokModelCapabilities", () => {
     expect(capabilities.optionDescriptors).toEqual([
       {
         id: "reasoningEffort",
-        label: "Reasoning",
+        label: "推理",
         type: "select",
         currentValue: "high",
         options: [
@@ -225,7 +225,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("checkGrokProvide
       expect(snapshot.enabled).toBe(true);
       expect(snapshot.installed).toBe(true);
       expect(snapshot.status).toBe("error");
-      expect(snapshot.message).toBe("Grok CLI is installed but failed to run.");
+      expect(snapshot.message).toBe("Grok CLI 已安装但无法运行。");
       expect(snapshot.message).not.toContain(secretStderr);
     }),
   );
@@ -235,14 +235,14 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("checkGrokProvide
       label: "answers after 6 s",
       versionDelay: "6 seconds",
       version: "1.0.52",
-      message: "Grok CLI is installed but ACP initialize failed. Model options may be incomplete.",
+      message: "Grok CLI 已安装，但 ACP 初始化失败，模型选项可能不完整。",
       probesAfterVersion: true,
     },
     {
       label: "never answers",
       versionDelay: "Infinity",
       version: null,
-      message: "Grok CLI is installed but timed out while running `grok --version`.",
+      message: "Grok CLI 已安装，但运行 `grok --version` 超时。",
       probesAfterVersion: false,
     },
   ] as const)("gives `grok --version` 10 s when it $label", (row) =>
@@ -418,7 +418,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("checkGrokProvide
         ["grok-4.6", true],
         ["grok-4.5", false],
       ]);
-      expect(snapshot.message).toContain("ACP initialize failed");
+      expect(snapshot.message).toContain("ACP 初始化失败");
       expect(snapshot.slashCommands.map((command) => command.name)).toEqual(["compact"]);
     }),
   );
@@ -439,7 +439,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("checkGrokProvide
       );
 
       expect(snapshot.status).toBe("warning");
-      expect(snapshot.message).toContain("did not list any models");
+      expect(snapshot.message).toContain("没有列出任何模型");
       expect(snapshot.models.map((model) => model.slug)).toEqual(["grok-build"]);
     }),
   );
@@ -479,7 +479,7 @@ describe("Grok usage limits", () => {
 
   it("shows zero usage for complete weekly and monthly periods with no percentage", () => {
     for (const [currentPeriod, kind, label, resetsAt, windowDurationMins] of [
-      [weeklyPeriod, "weekly", "Weekly", "2026-09-18T03:10:30.159Z", 7 * 24 * 60],
+      [weeklyPeriod, "weekly", "每周", "2026-09-18T03:10:30.159Z", 7 * 24 * 60],
       [
         {
           type: "USAGE_PERIOD_TYPE_MONTHLY",
@@ -487,7 +487,7 @@ describe("Grok usage limits", () => {
           end: "2026-10-01T00:00:00.000Z",
         },
         "monthly",
-        "Monthly",
+        "每月",
         "2026-10-01T00:00:00.000Z",
         30 * 24 * 60,
       ],
@@ -541,7 +541,7 @@ describe("Grok usage limits", () => {
     }
     expect(
       grokUsageResponseToLimits({ config: { creditUsagePercent: 0 } }, checkedAt).windows,
-    ).toEqual([{ id: "subscription", kind: "other", label: "Subscription", usedPercent: 0 }]);
+    ).toEqual([{ id: "subscription", kind: "other", label: "订阅", usedPercent: 0 }]);
     expect(
       grokUsageResponseToLimits(
         {
@@ -552,7 +552,7 @@ describe("Grok usage limits", () => {
         },
         checkedAt,
       ).windows,
-    ).toEqual([{ id: "subscription", kind: "monthly", label: "Monthly", usedPercent: 100 }]);
+    ).toEqual([{ id: "subscription", kind: "monthly", label: "每月", usedPercent: 100 }]);
   });
 
   it("measures the window from the reported period bounds", () => {
@@ -570,7 +570,7 @@ describe("Grok usage limits", () => {
     ).toEqual({
       id: "subscription",
       kind: "weekly",
-      label: "Weekly",
+      label: "每周",
       usedPercent: 4,
       resetsAt: "2026-10-21T20:51:37.352Z",
       windowDurationMins: 7 * 24 * 60,
@@ -746,7 +746,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("readGrokAccount"
           }).pipe(Effect.provideService(HttpClient.HttpClient, client));
           expect(malformed.unavailable).toEqual({
             reason: "probeFailed",
-            message: "Grok could not read usage limits.",
+            message: "Grok 无法读取用量限制。",
           });
         }
       }),
@@ -774,7 +774,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("readGrokAccount"
         expect(limits.windows).toEqual([]);
         expect(limits.unavailable).toEqual({
           reason: "probeFailed",
-          message: "Grok could not read usage limits.",
+          message: "Grok 无法读取用量限制。",
         });
       }
     }),
@@ -805,7 +805,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("readGrokAccount"
         ),
       );
       expect(limits.unavailable?.reason).toBe("probeFailed");
-      expect(limits.unavailable?.message).toMatch(/Privacy Mode/);
+      expect(limits.unavailable?.message).toMatch(/隐私模式/);
       expect(limits.unavailable?.message).not.toMatch(/WKE=|Grok Build is not supported/);
     }),
   );

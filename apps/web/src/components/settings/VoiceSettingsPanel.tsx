@@ -152,13 +152,13 @@ function CloudSpeechLogo({ provider }: { provider: CloudSpeechProvider }) {
 }
 const formatSize = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 const SHORTCUT_MODES: Record<VoiceShortcutMode, { label: string; hint: string }> = {
-  auto: { label: "自动", hint: "点按切换，按住说话" },
+  auto: { label: "自动", hint: "点按切换，按住说话。" },
   hold: { label: "长按", hint: "按住期间录音" },
   toggle: { label: "开关", hint: "点按开始，再点按停止" },
 };
 const UNLOAD_LABELS: Record<SpeechModelUnloadTimeout, string> = {
-  never: "Never",
-  immediately: "Immediately",
+  never: "从不",
+  immediately: "立即",
   min_2: "2 分钟后",
   min_5: "5 分钟后",
   min_10: "10 分钟后",
@@ -837,10 +837,10 @@ function SpeechModelBrowser(props: {
   );
   const accuracyLanguage = selectedLanguages[0] ?? "en";
   const sortLabels: Record<SpeechModelSort, string> = {
-    recommended: "Recommended",
-    size: "Smallest",
-    accuracy: "Most accurate",
-    speed: "Fastest",
+    recommended: "推荐",
+    size: "最小",
+    accuracy: "最准确",
+    speed: "最快",
   };
   const languagesLabel =
     selectedLanguages.length === 0 ? "所有语言" : selectedLanguages.map(languageLabel).join(", ");
@@ -1275,7 +1275,7 @@ export function VoiceSettingsPanel() {
         "speech-correction-word": cleanupEnabled ? undefined : "speech-post-processing",
       }}
     >
-      <SettingsSection id="voice-input" title="Input">
+      <SettingsSection id="voice-input" title="输入">
         <SettingsRow
           {...searchableSetting("voice-microphone")}
           title="麦克风"
@@ -1587,7 +1587,7 @@ export function VoiceSettingsPanel() {
         <ProjectDictionaryRow />
       </SettingsSection>
 
-      <SettingsSection id={searchableSetting("speech-post-processing").id} title="Cleanup">
+      <SettingsSection id={searchableSetting("speech-post-processing").id} title="清理">
         <SettingsRow
           title="整理转写文本"
           description="默认关闭。只把转写文本和附近的草稿发给整理模型，不发送音频。"
@@ -1626,12 +1626,12 @@ export function VoiceSettingsPanel() {
               >
                 <SelectTrigger size="sm" aria-label="文本整理指令">
                   <SelectValue>
-                    {settings.speechPostProcessingPrompt.mode === "custom" ? "Custom" : "内置"}
+                    {settings.speechPostProcessingPrompt.mode === "custom" ? "自定义" : "内置"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   <SelectItem value="default">内置</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="custom">自定义</SelectItem>
                 </SelectPopup>
               </Select>
             }

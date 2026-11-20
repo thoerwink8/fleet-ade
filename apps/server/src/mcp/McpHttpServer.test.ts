@@ -1532,7 +1532,7 @@ it.effect("lists link tools for every scope and forwards calls to another enviro
       // Linked environments stay on: the call goes on to the forwarding, which this server lacks.
       expect(yield* ranIn(elsewhere)).toMatchObject({
         isError: true,
-        content: [{ text: expect.stringContaining("cannot reach linked environments") }],
+        content: [{ text: expect.stringContaining("无法访问关联的环境") }],
       });
       expect((yield* ranIn(environmentId)).structuredContent).toEqual({ ranIn: "here" });
     }),

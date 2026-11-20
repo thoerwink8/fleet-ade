@@ -32,6 +32,7 @@ const ROOTS = [
   "packages/provider-core/src/server/providerAuthFlow.ts",
   "packages/provider-acp-registry/src/server/auth.ts",
   "apps/server/src/provider/Drivers/CodexManagedProvider.ts",
+  "apps/server/src/provider/CodexProvider.ts",
   "packages/shared/src/orchestrationTiming.ts",
   "packages/shared/src/compactionTitle.ts",
   "packages/provider-acp/src/server/sessionConfig.ts",
@@ -55,13 +56,11 @@ const UI_NAMES = new Set([
   "caption",
   "subtitle",
   "detail",
-  "helperText",
   "actionLabel",
   "buttonLabel",
   "confirmTitle",
   "confirmLabel",
   "dialogTitle",
-  "dialogDescription",
   "searchPlaceholder",
   "statusText",
   "errorText",
@@ -106,6 +105,11 @@ function leftoverEnglishWords(text: string, allowlist: ReadonlyArray<AllowEntry>
     .replace(/\b[A-Za-z]+(?:[/_-][A-Za-z0-9]+)+\b/g, " ");
   return rest.match(/\b[A-Za-z]{3,}\b/g) ?? [];
 }
+
+// Short function words such as a lone ` in` bypass the 3-letter word check in
+// isUserCopy, so JSX text that is exactly one of them is still user copy.
+const SHORT_FUNCTION_WORDS =
+  /^(?:a|an|and|as|at|be|by|do|for|from|go|if|in|is|it|no|of|on|or|so|the|to|up|we|with)$/i;
 
 function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean {
   const plain = text
@@ -370,6 +374,9 @@ for (const file of files.filter(included)) {
         texts.push(reconstructTemplateSample(node), ...templateSpans(node));
       }
     } else if (ts.isJsxText(node)) {
+      if (SHORT_FUNCTION_WORDS.test(node.text.trim())) {
+        findings.push(`${file}:${String(lineOf(source, node))}  ${node.text.trim()}`);
+      }
       texts.push(node.text);
     } else if (ts.isJsxAttribute(node)) {
       const name = node.name.getText(source);

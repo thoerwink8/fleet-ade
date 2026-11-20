@@ -116,6 +116,48 @@ function wrapWhenExpression(node: KeybindingWhenNode): string {
   return `(${whenAstToExpression(node)})`;
 }
 
+const WHEN_IDENTIFIER_LABELS: Readonly<Record<string, string>> = {
+  terminalFocus: "焦点在终端",
+  terminalOpen: "终端已打开",
+  previewOpen: "预览已打开",
+  previewFocus: "焦点在预览",
+  rightPanelOpen: "右侧面板已打开",
+  composerFocus: "焦点在输入框",
+  editableFocus: "焦点在可编辑区域",
+  modelPickerOpen: "模型选择器已打开",
+  turnRunning: "任务正在运行",
+  draftThreadRoute: "在草稿会话页",
+  usagePageOpen: "用量页已打开",
+  isWeb: "网页端",
+  isDesktop: "桌面端",
+  true: "始终",
+  false: "从不",
+};
+
+function whenDisplayAst(node: KeybindingWhenNode): string {
+  switch (node.type) {
+    case "identifier":
+      return WHEN_IDENTIFIER_LABELS[node.name] ?? node.name;
+    case "not": {
+      const inner = whenDisplayAst(node.node);
+      return node.node.type === "identifier" ? `非${inner}` : `非（${inner}）`;
+    }
+    case "and":
+      return `${whenDisplayAst(node.left)}，且${whenDisplayAst(node.right)}`;
+    case "or":
+      return `${whenDisplayAst(node.left)}，或${whenDisplayAst(node.right)}`;
+  }
+}
+
+/** Human-readable rendering of a `when` expression; raw text stays in the editor. */
+export function whenDisplayLabel(expression: string): string {
+  const trimmed = expression.trim();
+  if (trimmed.length === 0) return "始终";
+  const ast = parseKeybindingWhenExpression(trimmed);
+  if (!ast) return trimmed;
+  return whenDisplayAst(ast);
+}
+
 export function parseWhenExpressionDraft(
   expression: string,
 ): { ok: true; value: KeybindingWhenNode | undefined } | { ok: false; message: string } {
@@ -376,30 +418,98 @@ export function buildKeybindingCommandOptions(
   return [...commands].toSorted((left, right) => compareCommands(left, right, commandLabel));
 }
 
+const COMMAND_LABELS: Readonly<Record<string, string>> = {
+  "workspace.focusNext": "聚焦下一个工作区区域",
+  "workspace.focusPrevious": "聚焦上一个工作区区域",
+  "sidebar.toggle": "侧边栏：开关",
+  "navigation.back": "导航：后退",
+  "navigation.forward": "导航：前进",
+  "terminal.toggle": "终端：开关",
+  "terminal.split": "终端：左右分屏",
+  "terminal.splitVertical": "终端：上下分屏",
+  "terminal.new": "终端：新建",
+  "terminal.close": "终端：关闭",
+  "rightPanel.toggle": "右侧面板：开关",
+  "rightPanel.new": "右侧面板：新建",
+  "threadPanel.toggle": "会话面板：开关",
+  "rightPanel.toggleMaximized": "右侧面板：最大化或还原",
+  "rightPanel.close": "右侧面板：关闭",
+  "view.reopenClosed": "重新打开已关闭的标签页",
+  "pullRequest.copyNumber": "拉取请求：复制编号",
+  "diff.toggle": "差异：开关",
+  "preview.toggle": "预览：开关",
+  "preview.refresh": "预览：刷新",
+  "preview.focusUrl": "预览：聚焦 URL",
+  "preview.zoomIn": "预览：放大",
+  "preview.zoomOut": "预览：缩小",
+  "preview.resetZoom": "预览：重置缩放",
+  "preview.find": "预览：在页面上查找",
+  "commandPalette.toggle": "命令面板：开关",
+  "filePicker.toggle": "文件选择器：开关",
+  "projectSearch.toggle": "项目搜索：开关",
+  "usage.open": "用量：打开",
+  "theme.select": "主题：选择",
+  "appearance.cycle": "外观：循环切换",
+  "themeEditor.toggle": "主题编辑器：开关",
+  "composer.stash": "输入框：暂存",
+  "composer.sendAlternate": "输入框：使用相反的排队或引导操作",
+  "composer.sendBackground": "输入框：在后台启动",
+  "composer.sendAndNewThread": "输入框：发送并新建会话",
+  "composer.dictation": "输入框：开始或结束听写",
+  "composer.host": "输入框：切换主机",
+  "composer.cycleHost": "输入框：循环切换主机",
+  "composer.effort": "输入框：切换推理强度",
+  "composer.increaseEffort": "输入框：提高推理强度",
+  "composer.decreaseEffort": "输入框：降低推理强度",
+  "composer.mode": "输入框：切换模式",
+  "composer.workspace": "输入框：切换工作区",
+  "composer.previousWorktree": "输入框：上一个工作树",
+  "composer.branch": "输入框：切换分支",
+  "chat.new": "新建会话",
+  "chat.newLocal": "新建本地会话",
+  "chat.newWithoutProject": "新建无项目会话",
+  "chat.find": "会话：查找",
+  "editor.openFavorite": "编辑器：打开收藏",
+  "usage.cost": "用量：费用",
+  "usage.tokens": "用量：词元",
+  "usage.limits": "用量：限制",
+  "usage.period.day": "用量：过去 24 小时",
+  "usage.period.week": "用量：7 天",
+  "usage.period.month": "用量：30 天",
+  "usage.period.quarter": "用量：90 天",
+  "modelPicker.toggle": "模型选择器：开关",
+  "modelPicker.previousProvider": "模型选择器：上一个提供方",
+  "modelPicker.nextProvider": "模型选择器：下一个提供方",
+  "thread.stop": "会话：停止",
+  "thread.steerQueuedMessage": "队列：发送第一条排队消息",
+  "thread.editQueuedMessage": "队列：编辑最后一条排队消息",
+  "thread.previous": "会话：上一个",
+  "thread.next": "会话：下一个",
+  "thread.copyReference": "PR：复制链接或会话",
+  "thread.settle": "会话：收尾",
+  "thread.pin": "会话：置顶",
+  "thread.regenerateTitle": "会话：重新生成标题",
+  "thread.undo": "会话：撤销",
+  "thread.commander": "标成或取消指挥",
+  "shortcutCheatsheet.toggle": "快捷键速查",
+};
+
 export function commandLabel(command: KeybindingCommand): string {
-  if (command === "workspace.focusNext") return "聚焦下一个工作区区域";
-  if (command === "workspace.focusPrevious") return "聚焦上一个工作区区域";
-  if (command === "composer.sendAlternate") return "输入框：使用相反的排队或引导操作";
-  if (command === "composer.sendBackground") return "输入框：在后台启动";
-  if (command === "composer.sendAndNewThread") return "输入框：发送并新建会话";
-  if (command === "composer.dictation") return "输入框：开始或结束听写";
-  if (command === "thread.steerQueuedMessage") return "队列：发送第一条排队消息";
-  if (command === "thread.editQueuedMessage") return "队列：编辑最后一条排队消息";
-  if (command === "thread.copyReference") return "PR：复制链接或会话";
-  if (command === "thread.commander") return "标成或取消指挥";
+  const explicit = COMMAND_LABELS[String(command)];
+  if (explicit) return explicit;
   const usageMetric = METRIC_OPTIONS.find((option) => option.command === command);
-  if (usageMetric) return `Usage: ${usageMetric.label}`;
+  if (usageMetric) return `用量：${usageMetric.label}`;
   const usagePeriod = WINDOW_OPTIONS.find((option) => option.command === command);
-  if (usagePeriod) return `Usage: Period: ${usagePeriod.label}`;
-  if (command === "view.reopenClosed") return "重新打开已关闭的标签页";
-  if (command === "shortcutCheatsheet.toggle") return "快捷键速查";
-  if (command === "preview.focusUrl") return "预览：聚焦 URL";
-  if (command === "preview.find") return "预览：在页面上查找";
+  if (usagePeriod) return `用量：周期：${usagePeriod.label}`;
   const raw = String(command);
+  if (/^(thread|modelPicker)\.jump\.\d+$/.test(raw)) {
+    const [prefix, , n] = raw.split(".");
+    return prefix === "thread" ? `会话：跳到第 ${n} 条` : `模型选择器：跳到第 ${n} 个提供方`;
+  }
   if (raw.startsWith("script.") && raw.endsWith(".run")) {
     return `运行脚本：${titleCaseCommandSegment(raw.slice("script.".length, -".run".length))}`;
   }
-  return raw.split(".").map(titleCaseCommandSegment).join(": ");
+  return raw;
 }
 
 function titleCaseCommandSegment(segment: string): string {

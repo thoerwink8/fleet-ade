@@ -164,19 +164,19 @@ export function isManagedSettingPath(
 
 /** The one shape users see when policy refuses something: "Example Corp's policy does not allow webhook tasks." */
 export function managedPolicyDeniedMessage(organization: string, capability: string): string {
-  return `${organization}'s policy does not allow ${capability}.`;
+  return `${organization} 的策略不允许${capability}。`;
 }
 
 const RUNTIME_MODE_LABELS: Record<RuntimeMode, string> = {
-  "approval-required": "Supervised",
-  "auto-accept-edits": "Auto-accept edits",
-  auto: "Auto",
-  "full-access": "Full access",
+  "approval-required": "需审批",
+  "auto-accept-edits": "自动接受编辑",
+  auto: "自动",
+  "full-access": "完全访问",
 };
 
-/** "Example Corp limits threads to Auto-accept edits." */
+/** "Example Corp 限制会话最高到自动接受编辑。" */
 export function managedRuntimeModeCeilingMessage(organization: string, ceiling: RuntimeMode) {
-  return `${organization} limits threads to ${RUNTIME_MODE_LABELS[ceiling]}.`;
+  return `${organization} 限制会话最高到${RUNTIME_MODE_LABELS[ceiling]}。`;
 }
 
 /** Why `mode` is unavailable on an environment with `summary`, or undefined when it is allowed. */
@@ -205,10 +205,10 @@ export function clampManagedRuntimeMode(
 }
 
 const CAPABILITY_LABELS = {
-  remoteClients: "connecting from other devices",
+  remoteClients: "从其他设备连接",
   connect: "T3 Connect",
-  webhookTasks: "webhook tasks",
-  browserCookieImport: "importing browser cookies",
+  webhookTasks: "webhook 任务",
+  browserCookieImport: "导入浏览器 Cookie",
 } as const;
 
 /** Why a capability is unavailable on an environment with `summary`, or undefined when allowed. */

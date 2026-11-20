@@ -198,11 +198,11 @@ function ProviderLastChecked({ environmentId }: { environmentId: EnvironmentId }
     <span>
       {lastCheckedRelative.suffix ? (
         <>
-          Checked <span className="font-mono tabular-nums">{lastCheckedRelative.value}</span>{" "}
+          上次检查：<span className="font-mono tabular-nums">{lastCheckedRelative.value}</span>{" "}
           {lastCheckedRelative.suffix}
         </>
       ) : (
-        <>Checked {lastCheckedRelative.value}</>
+        <>上次检查：{lastCheckedRelative.value}</>
       )}
     </span>
   );

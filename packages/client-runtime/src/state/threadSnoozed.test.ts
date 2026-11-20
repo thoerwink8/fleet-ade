@@ -391,7 +391,7 @@ describe("resolveSnoozePresets", () => {
         { kind: "after", minutes: 360 },
         { kind: "after", minutes: 180 },
       ]),
-    ).toEqual(["In 3 hours 23:00", "In 6 hours Thu 2:00", "明天 21:00", "下周 18:00"]);
+    ).toEqual(["3 小时后 23:00", "6 小时后 周四 2:00", "明天 21:00", "下周一 18:00"]);
   });
 
   it("drops a today preset once its time passes and moves a weekday on that day to next week", () => {
@@ -407,7 +407,7 @@ describe("resolveSnoozePresets", () => {
     expect(new Date(presets[0]!.snoozedUntil)).toEqual(localDate(2026, 4, 20, 9));
   });
 
-  it("names the real day gap: a Monday option on Sunday is Tomorrow, a weekday a week out is Next", () => {
+  it("names the real day gap: a Monday option on Sunday is 明天, a weekday a week out is 下周", () => {
     const theo: ReadonlyArray<SnoozePresetSetting> = [
       { kind: "at", day: "tomorrow", time: "21:00" },
       { kind: "at", day: "monday", time: "18:00" },
@@ -417,21 +417,21 @@ describe("resolveSnoozePresets", () => {
     expect(menu(localDate(2026, 8, 30, 14), theo)).toEqual([
       "明天 18:00",
       "明天 21:00",
-      "Friday 17:00",
+      "周五 17:00",
     ]);
     // Friday 10:00: today's 17:00 is a week away.
     expect(menu(localDate(2026, 9, 4, 10), theo)).toEqual([
       "明天 21:00",
-      "下周 18:00",
-      "Next Friday 17:00",
+      "下周一 18:00",
+      "下周五 17:00",
     ]);
   });
 
   it("shows one row when two presets wake at the same time", () => {
-    // Sunday, so Tomorrow 9:00 and Next week 9:00 are the same Monday.
+    // Sunday, so 明天 9:00 and 下周一 9:00 are the same Monday.
     expect(menu(localDate(2026, 8, 30, 7, 1))).toEqual([
-      "In 1 hour 8:01",
-      "In 3 hours 10:01",
+      "1 小时后 8:01",
+      "3 小时后 10:01",
       "今天晚上 18:00",
       "明天 9:00",
     ]);
@@ -445,7 +445,7 @@ describe("resolveSnoozePresets", () => {
         { kind: "after", minutes: 180 },
         { kind: "at", day: "today", time: "18:00" },
       ]),
-    ).toEqual(["In 3 hours 18:00"]);
+    ).toEqual(["3 小时后 18:00"]);
   });
 });
 
@@ -455,7 +455,7 @@ describe("pickSnoozePreset", () => {
       { kind: "at", day: "today", time: "18:30" },
       { kind: "after", minutes: 180 },
     ];
-    // At 15:00 the two differ; at 15:30 "In 3 hours" lands on 18:30 and the menu shows one row.
+    // At 15:00 the two differ; at 15:30 "3 小时后" lands on 18:30 and the menu shows one row.
     const shown = resolveSnoozePresets(localDate(2026, 4, 8, 15), { presets });
     const picked = pickSnoozePreset({
       shown,
