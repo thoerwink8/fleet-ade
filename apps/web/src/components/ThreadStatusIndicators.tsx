@@ -328,7 +328,7 @@ function PullRequestBadge({
       <TooltipPopup
         side="top"
         sideOffset={0}
-        variant="glass"
+        variant="surface"
         className="pointer-events-auto w-80 max-w-[calc(100vw-2rem)] text-left whitespace-normal"
       >
         <div className="-mx-1 max-h-[calc(var(--available-height)-0.5rem-2px)] overflow-y-auto overscroll-contain">

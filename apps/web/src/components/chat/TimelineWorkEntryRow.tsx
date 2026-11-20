@@ -72,7 +72,6 @@ import {
   workEntryRawCommand,
   buildToolCallExpandedBody,
   workEntryIconName,
-  estimateReasoningTokenLabel,
 } from "./TimelineWorkEntryRow.logic";
 
 export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: EnvironmentId) {
@@ -411,7 +410,6 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const isReasoning = workEntry.itemType === "reasoning";
   const isCommandEntry = !isReasoning && toolGroupAction(workEntry) === "command";
   const reasoningSummaryLine = isReasoning ? liveThoughtLine(workEntry.detail ?? "") : "";
-  const reasoningTokenLabel = isReasoning ? estimateReasoningTokenLabel(workEntry.detail) : null;
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
     : "";
@@ -543,10 +541,10 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       }
       label={
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className="flex min-w-0 w-full items-center gap-1.5 text-row leading-normal">
+          <p className="flex w-fit max-w-full min-w-0 items-center gap-1.5 text-row leading-normal">
             <span
               className={cn(
-                answerPreview || reasoningTokenLabel ? "min-w-0" : "min-w-0 flex-1",
+                "min-w-0",
                 "truncate",
                 headingClass,
                 isCommandEntry && "chat-command-text font-mono",
@@ -564,11 +562,6 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
                 previewText
               )}
             </span>
-            {reasoningTokenLabel ? (
-              <span className="shrink-0 font-mono text-meta text-muted-foreground tabular-nums">
-                {reasoningTokenLabel}
-              </span>
-            ) : null}
             {canExpandProjectedItem ? (
               <ChevronRightIcon
                 aria-hidden
