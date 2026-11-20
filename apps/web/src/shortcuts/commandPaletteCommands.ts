@@ -14,6 +14,7 @@ import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { type CommandHandler, type CommandScopeOptions, registerCommands } from "./dispatcher";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { resolveThreadRouteTarget } from "../threadRoutes";
+import { toggleShortcutCheatsheet } from "../components/ShortcutCheatsheet";
 
 function consume(event: KeyboardEvent): void {
   event.preventDefault();
@@ -56,6 +57,25 @@ export function installCommandPaletteCommands(
         consume(event);
         dispatchCommandPalette({ _tag: "BackToCommand" });
       },
+    },
+  );
+
+  // Capture: the terminal encodes Ctrl+/ into the shell on its own keydown, which is
+  // the bubble phase, so this has to run first and stop the event.
+  const disposeCheatsheet = registerCommands(
+    {
+      "shortcutCheatsheet.toggle": (event) => {
+        consume(event);
+        if (event.repeat) return;
+        toggleShortcutCheatsheet();
+      },
+    },
+    {
+      ...options,
+      capture: true,
+      when: (event) =>
+        isCommandPaletteMounted() &&
+        !(event.target instanceof HTMLElement && event.target.closest("[data-keybinding-capture]")),
     },
   );
 
@@ -120,6 +140,7 @@ export function installCommandPaletteCommands(
 
   return () => {
     disposeEscape();
+    disposeCheatsheet();
     disposeCommands();
   };
 }

@@ -9,6 +9,7 @@ import {
   useCommandPaletteMount,
   useCommandPaletteStore,
 } from "../commandPaletteStore";
+import { ShortcutCheatsheetDialog } from "../components/ShortcutCheatsheet";
 import { installCommandPaletteCommands } from "./commandPaletteCommands";
 
 const keybindings = compileResolvedKeybindingsConfig([
@@ -53,6 +54,54 @@ describe("command palette shortcuts", () => {
 
     await screen.rerender(<div />);
     expect(useCommandPaletteStore.getState().open).toBe(false);
+  });
+
+  it("lets shortcut recorders capture mod+/ but opens the cheatsheet from other editable targets", async () => {
+    setup();
+    using _platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
+    const captured: string[] = [];
+    const bindings = compileResolvedKeybindingsConfig([
+      { key: "mod+/", command: "shortcutCheatsheet.toggle" },
+    ]);
+    await using screen = await render(
+      <>
+        <MountedPalette />
+        <ShortcutCheatsheetDialog />
+        <input
+          aria-label="录制快捷键"
+          data-keybinding-capture=""
+          onKeyDown={(event) => {
+            if (event.key === "/") captured.push(event.key);
+          }}
+        />
+        <input aria-label="普通输入框" />
+        <div
+          aria-label="聊天输入框"
+          contentEditable
+          role="textbox"
+          suppressContentEditableWarning
+        />
+      </>,
+      { router: "/" },
+    );
+    using commands = new DisposableStack();
+    commands.defer(installCommandPaletteCommands(screen.router!, { keybindings: () => bindings }));
+
+    page.getByRole("textbox", { name: "录制快捷键" }).element().focus();
+    await userEvent.keyboard("{Control>}/{/Control}");
+    expect(captured).toEqual(["/"]);
+    await expect.element(page.getByRole("heading", { name: "快捷键" })).not.toBeInTheDocument();
+
+    for (const label of ["普通输入框", "聊天输入框"]) {
+      page.getByRole("textbox", { name: label }).element().focus();
+      await userEvent.keyboard("{Control>}/{/Control}");
+      await expect.element(page.getByRole("heading", { name: "快捷键" })).toBeVisible();
+      await vi.waitFor(() => {
+        expect(document.activeElement?.getAttribute("data-slot")).toBe("dialog-panel");
+      });
+      await userEvent.keyboard("{Escape}");
+      await expect.element(page.getByRole("heading", { name: "快捷键" })).not.toBeInTheDocument();
+    }
   });
 
   it("keep a child search open on a composing Escape", async () => {

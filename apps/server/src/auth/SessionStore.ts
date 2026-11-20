@@ -383,6 +383,8 @@ export class SessionStore extends Context.Service<
       readonly proofKeyThumbprint?: string;
       readonly runtimeModeCeiling?: RuntimeMode;
       readonly peerLink?: boolean;
+      /** Verified by the peer-link authorization protocol, never client metadata. */
+      readonly peerIdentity?: string;
       readonly replaceActiveForSubjectAndMethod?: boolean;
       readonly replaceSessionId?: AuthSessionId;
     }) => Effect.Effect<IssuedSession, SessionCredentialInternalError>;
@@ -441,6 +443,8 @@ const SessionClaims = Schema.Struct({
   /** Signed, so a client cannot shed its peer link's limits. */
   plk: Schema.optionalKey(Schema.Literal(1)),
   env: Schema.optionalKey(Schema.String),
+  /** Identity established by a PKCE-bound authenticated peer proof. */
+  pei: Schema.optionalKey(Schema.String),
   iat: Schema.Number,
   exp: Schema.Number,
 });
@@ -664,7 +668,9 @@ const make = Effect.gen(function* () {
         ...(input?.proofKeyThumbprint ? { jkt: input.proofKeyThumbprint } : {}),
         ...(input?.runtimeModeCeiling ? { rtc: input.runtimeModeCeiling } : {}),
         ...(input?.peerLink === true ? { plk: 1 as const } : {}),
-        ...(input?.peerLink === true ? { env: sessionId } : {}),
+        ...(input?.peerLink === true && input.peerIdentity !== undefined
+          ? { pei: input.peerIdentity }
+          : {}),
         iat: issuedAt.epochMilliseconds,
         exp: expiresAt.epochMilliseconds,
       };
@@ -848,7 +854,7 @@ const make = Effect.gen(function* () {
         ...(claims.jkt ? { proofKeyThumbprint: claims.jkt } : {}),
         ...(claims.rtc ? { runtimeModeCeiling: claims.rtc } : {}),
         ...(claims.plk === 1 ? { peerLink: true as const } : {}),
-        ...(claims.env !== undefined ? { peerIdentity: claims.env } : {}),
+        ...(claims.plk === 1 && claims.pei !== undefined ? { peerIdentity: claims.pei } : {}),
       } satisfies VerifiedSession;
     },
   );

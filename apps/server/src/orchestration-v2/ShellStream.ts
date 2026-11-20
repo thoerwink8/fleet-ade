@@ -281,6 +281,7 @@ function omitOlderSettledShellsWith(
   const threads = input.threads.filter(
     (thread) =>
       !isOlderSettledThreadShell(thread, beforeMs) ||
+      thread.commander === true ||
       thread.pinnedAt != null ||
       (thread.snoozedUntil != null && DateTime.toEpochMillis(thread.snoozedUntil) > nowMs) ||
       isLiveSubagentShell(thread) ||
@@ -396,6 +397,7 @@ function shellSubscriberThreadIds(
       : !options.omitOlderSettled ||
           beforeMs === undefined ||
           !isOlderSettledThreadShell(entry, beforeMs) ||
+          entry.commander === true ||
           entry.pinnedAt != null ||
           entry.snoozedUntil != null ||
           entry.mayBeLive ||

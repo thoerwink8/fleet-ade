@@ -66,6 +66,7 @@ import {
   isTerminalSplitVerticalShortcut,
   isTerminalToggleShortcut,
   isThreadNavigationShortcut,
+  resolveShortcutCommand,
   terminalDeleteShortcutData,
   terminalNavigationShortcutData,
 } from "../keybindings";
@@ -936,6 +937,8 @@ function TerminalSessionViewport({
           return false;
         }
         if (
+          resolveShortcutCommand(event, currentKeybindings, options) ===
+            "shortcutCheatsheet.toggle" ||
           isTerminalToggleShortcut(event, currentKeybindings, options) ||
           isTerminalSplitShortcut(event, currentKeybindings, options) ||
           isTerminalSplitVerticalShortcut(event, currentKeybindings, options) ||

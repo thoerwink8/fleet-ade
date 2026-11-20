@@ -66,6 +66,8 @@ import {
   ChevronRightIcon,
   CornerLeftUpIcon,
   FileSearchIcon,
+  FlagIcon,
+  FlagOffIcon,
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
@@ -74,6 +76,7 @@ import {
   MessageSquareIcon,
   PaletteIcon,
   RotateCcwIcon,
+  KeyboardIcon,
   SettingsIcon,
   MonitorIcon,
   PinIcon,
@@ -261,6 +264,7 @@ import { Checkbox } from "./ui/checkbox";
 import { ProjectFilePicker } from "./files/ProjectFilePicker";
 import { openLinkPullRequestDialog } from "./pullRequest/LinkPullRequestDialog";
 import { openUseInAnotherApp } from "./mcp/UseInAnotherAppDialog";
+import { openShortcutCheatsheet } from "./ShortcutCheatsheet";
 import { ProjectContentSearchDialog } from "./search/ProjectContentSearchDialog";
 import { settingsForThisPlatform, SETTINGS_SECTION_LABELS } from "./settings/settingsSearch";
 import { primaryServerKeybindingsAtom } from "../state/server";
@@ -418,7 +422,8 @@ function OpenCommandPaletteDialog(props: {
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const batchThreads = useOrchestrationCommand(threadEnvironment.batch, { reportFailure: false });
-  const { deleteThreads, markThreadsUnread } = useThreadActions();
+  const { deleteThreads, markThreadsUnread, markCommanderThread, unmarkCommanderThread } =
+    useThreadActions();
   // Keyed by palette session: the intent and restored search only seed this
   // mount, and closing must not change what the closing palette shows.
   const [initialSearch] = useState(
@@ -1472,6 +1477,41 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
+  if (
+    activeThread !== null &&
+    activeThreadServerConfig !== undefined &&
+    readEnvironmentScope(activeThread.environmentId, AuthOrchestrationOperateScope)
+  ) {
+    const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
+    const activeThreadShell =
+      threads.find(
+        (candidate) =>
+          candidate.environmentId === activeThread.environmentId &&
+          candidate.id === activeThread.id,
+      ) ?? readThreadShell(threadRef);
+    const isCommander = activeThreadShell?.commander === true;
+    actionItems.push({
+      kind: "action",
+      value: "action:thread-commander",
+      searchTerms: ["指挥", "commander", isCommander ? "取消指挥" : "标成指挥"],
+      title: isCommander ? "取消指挥" : "标成指挥",
+      icon: isCommander ? (
+        <FlagOffIcon className={ITEM_ICON_CLASS} />
+      ) : (
+        <FlagIcon className={ITEM_ICON_CLASS} />
+      ),
+      shortcutCommand: "thread.commander",
+      run: async () => {
+        const result = await (isCommander
+          ? unmarkCommanderThread(threadRef)
+          : markCommanderThread(threadRef));
+        if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+          throw squashAtomCommandFailure(result);
+        }
+      },
+    });
+  }
+
   if (activeThread !== null) {
     const thread = activeThread;
     actionItems.push({
@@ -1716,6 +1756,17 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
+  actionItems.push({
+    kind: "action",
+    value: "action:shortcut-cheatsheet",
+    searchTerms: ["快捷键", "键盘", "速查", "帮助"],
+    title: "快捷键速查",
+    icon: <KeyboardIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "shortcutCheatsheet.toggle",
+    run: async () => {
+      openShortcutCheatsheet();
+    },
+  });
   actionItems.push({
     kind: "action",
     value: "action:settings",

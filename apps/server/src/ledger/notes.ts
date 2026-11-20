@@ -1,10 +1,6 @@
 // Node's hash and fixed-time compare are the check the node token already uses.
 // @effect-diagnostics nodeBuiltinImport:off
 import * as NodeCrypto from "node:crypto";
-// @effect-diagnostics nodeBuiltinImport:off -- joins the ledger file under the state directory.
-import * as NodePath from "node:path";
-
-import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -13,8 +9,8 @@ import * as Schema from "effect/Schema";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import * as ServerConfig from "../config.ts";
 import * as NodeReads from "./nodeReads.ts";
+import * as LedgerDb from "./LedgerDb.ts";
 
 const HEADER = "x-fleet-node-token";
 const NOTE_KINDS = [
@@ -460,18 +456,11 @@ const routes = (sql: SqlClient.SqlClient) => {
 
 export const layerFor = routes;
 
-/** Opens this environment's ledger file and mounts note routes plus node snapshot reads. */
+/** Mount note routes and node snapshot reads on the shared ledger. */
 export const routeLayer = Layer.unwrap(
-  Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>
-    Layer.unwrap(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        yield* migrate;
-        yield* NodeReads.migrate;
-        return Layer.mergeAll(routes(sql), NodeReads.layerLive(sql));
-      }),
-    ).pipe(
-      Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),
-    ),
-  ),
-);
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* NodeReads.migrate;
+    return Layer.mergeAll(routes(sql), NodeReads.layerLive(sql));
+  }),
+).pipe(Layer.provide(LedgerDb.layer));

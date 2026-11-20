@@ -254,7 +254,15 @@ const KEYBINDING_GROUPS = [
   {
     id: "navigation",
     title: "导航",
-    prefixes: ["sidebar", "rightPanel", "commandPalette", "filePicker", "projectSearch", "editor"],
+    prefixes: [
+      "sidebar",
+      "rightPanel",
+      "commandPalette",
+      "shortcutCheatsheet",
+      "filePicker",
+      "projectSearch",
+      "editor",
+    ],
   },
   { id: "threads", title: "会话", prefixes: ["thread", "chat", "pullRequest"] },
   { id: "composer", title: "输入框", prefixes: ["composer", "modelPicker"] },
@@ -482,6 +490,8 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "thread.pin": "会话：置顶",
   "thread.regenerateTitle": "会话：重新生成标题",
   "thread.undo": "会话：撤销",
+  "thread.commander": "标成或取消指挥",
+  "shortcutCheatsheet.toggle": "快捷键速查",
 };
 
 export function commandLabel(command: KeybindingCommand): string {

@@ -31,8 +31,21 @@ export function resolveSettledThreadTimestamp(thread: SettledThreadTimestampInpu
   return resolveThreadActivityTimestamp(thread);
 }
 
+export interface ThreadActivityTimestampInput {
+  readonly latestUserMessageAt?: string | null | undefined;
+  readonly updatedAt: string;
+  readonly latestRun?:
+    | {
+        readonly requestedAt?: string | null | undefined;
+        readonly startedAt?: string | null | undefined;
+        readonly completedAt?: string | null | undefined;
+      }
+    | null
+    | undefined;
+}
+
 export function resolveThreadActivityTimestamp(
-  thread: Pick<EnvironmentThreadShell, "latestUserMessageAt" | "latestRun" | "updatedAt">,
+  thread: ThreadActivityTimestampInput,
 ): string | null {
   let latest: string | null = null;
   let latestMs = Number.NEGATIVE_INFINITY;
@@ -346,4 +359,24 @@ export function sortActiveThreadsByOrderKey<
       (left.environmentId ?? "").localeCompare(right.environmentId ?? "")
     );
   });
+}
+
+export function sortCommanderThreads<
+  T extends ThreadActivityTimestampInput & {
+    readonly id: string;
+    readonly createdAt: string;
+  },
+>(threads: readonly T[]): T[] {
+  if (threads.length < 2) return [...threads];
+  const activityMs = (thread: T): number =>
+    toSortableTimestamp(resolveThreadActivityTimestamp(thread) ?? thread.createdAt) ??
+    Number.NEGATIVE_INFINITY;
+  const updatedMs = (thread: T): number =>
+    toSortableTimestamp(thread.updatedAt) ?? Number.NEGATIVE_INFINITY;
+  return [...threads].sort(
+    (left, right) =>
+      activityMs(right) - activityMs(left) ||
+      updatedMs(right) - updatedMs(left) ||
+      left.id.localeCompare(right.id),
+  );
 }

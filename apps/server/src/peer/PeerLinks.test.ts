@@ -3,6 +3,7 @@ import * as NodeFS from "node:fs";
 // @effect-diagnostics-next-line nodeBuiltinImport:off - A peer with a certificate this machine does not trust.
 import * as NodeHttps from "node:https";
 import { NodeHttpServer } from "@effect/platform-node";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import { type ExecutionEnvironmentDescriptor, OrchestratorMcpFailure } from "@t3tools/contracts";
 import { expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -28,9 +29,11 @@ import {
 } from "effect/http";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as McpToolAccess from "../mcp/McpToolAccess.ts";
+import * as PeerChallengeRegistry from "./PeerChallengeRegistry.ts";
 import * as PeerLinks from "./PeerLinks.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import {
@@ -96,6 +99,8 @@ const makeA = (
       peer: Context.get(context, PeerMcpClient.PeerMcpClient),
       sql: Context.get(context, SqlClient.SqlClient),
       settings: Context.get(context, ServerSettings.ServerSettingsService),
+      environment: Context.get(context, ServerEnvironment.ServerEnvironment),
+      challenges: Context.get(context, PeerChallengeRegistry.PeerChallengeRegistry),
     })),
   );
 
@@ -328,7 +333,9 @@ it.effect("a legacy peer's 403 keeps a linked call retryable", () =>
                 a.links.resolve(id).pipe(Effect.map((resolved) => ({ ...resolved, url: front }))),
             }),
           ),
-          Layer.provide(FetchHttpClient.layer),
+          Layer.provide(Layer.succeed(ServerEnvironment.ServerEnvironment, a.environment)),
+          Layer.provide(Layer.succeed(PeerChallengeRegistry.PeerChallengeRegistry, a.challenges)),
+          Layer.provide(Layer.mergeAll(NodeCrypto.layer, FetchHttpClient.layer)),
         ),
       );
       const legacy = { ...a, peer: Context.get(context, PeerMcpClient.PeerMcpClient) };

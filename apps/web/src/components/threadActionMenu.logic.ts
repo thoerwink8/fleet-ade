@@ -9,6 +9,8 @@ export type ThreadActionMenuId =
   | "project-settings"
   | "pin"
   | "unpin"
+  | "mark-commander"
+  | "unmark-commander"
   | "settle"
   | "unsettle"
   | "auto-settle"
@@ -75,6 +77,7 @@ export interface ThreadActionMenuState {
     readonly isActive: boolean;
   } | null;
   readonly isPinned: boolean;
+  readonly isCommander?: boolean | undefined;
   readonly isSettled: boolean;
   readonly autoSettleEnabled: boolean;
   readonly isSnoozed: boolean;
@@ -87,6 +90,7 @@ export interface ThreadActionMenuState {
     readonly autoSettleOptOut: boolean;
     readonly snooze: boolean;
     readonly pinning: boolean;
+    readonly commander?: boolean | undefined;
     readonly titleRegeneration: boolean;
   };
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
@@ -128,6 +132,13 @@ export function buildThreadActionMenuItems(
           state.isPinned
             ? { id: "unpin" as const, label: "取消置顶会话", icon: "pin-off" }
             : { id: "pin" as const, label: "置顶会话", icon: "pin" },
+        ]
+      : []),
+    ...(state.supports.commander
+      ? [
+          state.isCommander
+            ? { id: "unmark-commander" as const, label: "取消指挥", icon: "flag-off" }
+            : { id: "mark-commander" as const, label: "标成指挥", icon: "flag" },
         ]
       : []),
     ...(state.supports.settlement

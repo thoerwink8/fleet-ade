@@ -181,7 +181,13 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   } = input;
   const navigate = useNavigate();
   const router = useRouter();
-  const { settleThread, pinThread, confirmAndUnpinThread } = useThreadActions();
+  const {
+    settleThread,
+    pinThread,
+    confirmAndUnpinThread,
+    markCommanderThread,
+    unmarkCommanderThread,
+  } = useThreadActions();
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const switchGitRef = useAtomCommand(vcsEnvironment.switchRef, { reportFailure: false });
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -199,6 +205,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
 
   const serverConfigLoaded = serverConfig !== null;
   const activeThreadPinned = serverConfigLoaded && activeThreadShell?.pinnedAt != null;
+  const activeThreadCommander = serverConfigLoaded && activeThreadShell?.commander === true;
   // A clock read in render would stay frozen in the compiler's cache, so the
   // snooze checks read a snapshot that moves when the wake time changes or passes.
   const snoozeClock = new Date(
@@ -683,6 +690,15 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       void (
         activeThreadPinned ? confirmAndUnpinThread(activeThreadRef) : pinThread(activeThreadRef)
       ).then(toastThreadActionFailure(activeThreadPinned ? "取消置顶会话失败" : "置顶会话失败"));
+    },
+    "thread.commander": () => {
+      if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
+      if (!activeThreadShell || !activeThreadRef || !serverConfigLoaded) return;
+      void (
+        activeThreadCommander
+          ? unmarkCommanderThread(activeThreadRef)
+          : markCommanderThread(activeThreadRef)
+      ).then(toastThreadActionFailure(activeThreadCommander ? "取消指挥失败" : "标成指挥失败"));
     },
     "thread.regenerateTitle": () => {
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;

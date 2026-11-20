@@ -6,6 +6,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { McpSchema, McpServer } from "effect/ai";
 
 import * as FleetClaims from "../../../ledger/FleetClaims.ts";
+import * as PeerChallengeRegistry from "../../../peer/PeerChallengeRegistry.ts";
 import * as McpHttpServer from "../../McpHttpServer.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
@@ -19,6 +20,7 @@ const claimsLayer = Layer.effectDiscard(
 const serverLayer = McpHttpServer.layerFleetClaimsToolkit.pipe(
   Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
   Layer.provideMerge(claimsLayer),
+  Layer.provide(PeerChallengeRegistry.layer),
 );
 
 const mcpClient = McpSchema.McpServerClient.of({
@@ -66,14 +68,14 @@ const call = (
 
 const key = { repo: "example/one", issue: 7, taskId: "root" };
 
-it.effect("旧链接没有环境身份，调用真实 handler 要求重新链接", () =>
+it.effect("旧客户端没有环境身份时，提示升级而不是重新链接", () =>
   Effect.gen(function* () {
     const result = yield* call("fleet_claim", linkedClient("old-session"), {
       ...key,
       idempotencyKey: "claim-a",
     });
     expect(result.code).toBe("invalid_request");
-    expect(result.message).toContain("旧链接，请重新链接");
+    expect(result.message).toContain("Update the linked environment");
   }).pipe(Effect.provide(serverLayer)),
 );
 
