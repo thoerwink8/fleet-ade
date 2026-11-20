@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { NonNegativeInt, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import type { OrchestrationV2RuntimeRequest } from "./orchestrationV2.ts";
 
 /** Snapshot pages stay at or under this many rows. */
 export const FLEET_SUMMARY_PAGE_SIZE = 200;
@@ -13,6 +14,17 @@ export const FLEET_SUMMARY_PROGRESS_LIMIT = 120;
 
 export const FleetSummaryPhase = Schema.Literals(["working", "stuck", "done"]);
 export type FleetSummaryPhase = typeof FleetSummaryPhase.Type;
+
+export const isBlockingApproval = (
+  kind: OrchestrationV2RuntimeRequest["kind"],
+  blocking?: boolean,
+): boolean =>
+  blocking !== false &&
+  (kind === "command" ||
+    kind === "file-change" ||
+    kind === "file-read" ||
+    kind === "permission" ||
+    kind === "mcp-elicitation");
 
 /**
  * The executor's own session run. Phase is this mapping, never a lease timeout.
