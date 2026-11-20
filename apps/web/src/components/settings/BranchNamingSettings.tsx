@@ -63,7 +63,7 @@ export function BranchNamingSettings() {
           >
             <SelectTrigger size="sm" aria-label="工作树分支命名">
               <SelectValue>
-                {(value: BranchNamingMode | null) => (value === null ? "Mixed" : MODES[value])}
+                {(value: BranchNamingMode | null) => (value === null ? "混合" : MODES[value])}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>

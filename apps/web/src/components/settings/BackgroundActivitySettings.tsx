@@ -379,7 +379,7 @@ export function BackgroundActivitySettingsRow() {
             <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="后台活动模式">
               <SelectValue>
                 {(value: BackgroundActivityProfileOption | null) =>
-                  value === null ? "Mixed" : BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS[value]
+                  value === null ? "混合" : BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS[value]
                 }
               </SelectValue>
             </SelectTrigger>

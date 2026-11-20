@@ -84,19 +84,19 @@ export function getProviderSummary(provider: ServerProvider | undefined) {
   }
   if (provider.status === "error") {
     return {
-      headline: "Unavailable",
+      headline: "不可用",
       detail: provider.message ?? "提供方未通过启动检查。",
     };
   }
   if (provider.auth.status === "authenticated") {
     const authLabel = provider.auth.label ?? provider.auth.type;
     return {
-      headline: authLabel ? `已认证 · ${authLabel}` : "Authenticated",
+      headline: authLabel ? `已认证 · ${authLabel}` : "已认证",
       detail: provider.message ?? null,
     };
   }
   return {
-    headline: "Available",
+    headline: "可用",
     detail: provider.message ?? null,
   };
 }

@@ -1197,7 +1197,7 @@ function ResourceTelemetryDiagnosticsBody({
                 <DetailRow
                   label="辅助进程"
                   value={Option.match(snapshot.health.sidecarVersion, {
-                    onNone: () => "Unavailable",
+                    onNone: () => "不可用",
                     onSome: (version) =>
                       `${version}${Option.match(snapshot.health.sidecarPid, {
                         onNone: () => "",

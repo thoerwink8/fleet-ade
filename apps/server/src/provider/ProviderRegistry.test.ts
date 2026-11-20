@@ -482,7 +482,7 @@ it.layer(
         assert.strictEqual(status.version, "1.0.0");
         assert.strictEqual(status.auth.status, "authenticated");
         assert.strictEqual(status.auth.type, "chatgpt");
-        assert.strictEqual(status.auth.label, "ChatGPT Pro 200 Subscription");
+        assert.strictEqual(status.auth.label, "ChatGPT Pro 200 订阅");
         assert.strictEqual(status.auth.email, "test@example.com");
         assert.deepStrictEqual(status.setup, { canAuthenticate: false, canInstall: false });
         assert.deepStrictEqual(status.models, [
@@ -543,13 +543,13 @@ it.layer(
           );
 
         const downgraded = yield* statusWithUsagePlan("free");
-        assert.strictEqual(downgraded.auth.label, "ChatGPT Free Subscription");
+        assert.strictEqual(downgraded.auth.label, "ChatGPT Free 订阅");
 
         const unreported = yield* statusWithUsagePlan(null);
-        assert.strictEqual(unreported.auth.label, "ChatGPT Pro 200 Subscription");
+        assert.strictEqual(unreported.auth.label, "ChatGPT Pro 200 订阅");
 
         const unknown = yield* statusWithUsagePlan("unknown");
-        assert.strictEqual(unknown.auth.label, "ChatGPT Pro 200 Subscription");
+        assert.strictEqual(unknown.auth.label, "ChatGPT Pro 200 订阅");
       }),
     );
 

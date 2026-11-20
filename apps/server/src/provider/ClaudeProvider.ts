@@ -167,12 +167,12 @@ function formatClaudeSubscriptionAuthLabel(subscriptionType: string): string {
     return subscriptionLabel;
   }
   if (normalized.startsWith("claude")) {
-    return `${subscriptionLabel} Subscription`;
+    return `${subscriptionLabel} 订阅`;
   }
   if (normalized.endsWith("subscription")) {
     return `Claude ${subscriptionLabel}`;
   }
-  return `Claude ${subscriptionLabel} Subscription`;
+  return `Claude ${subscriptionLabel} 订阅`;
 }
 
 function claudeAuthMetadata(input: {

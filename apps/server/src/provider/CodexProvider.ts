@@ -195,34 +195,34 @@ function codexAccountAuthLabel(
 export function codexPlanLabel(planType: string | null | undefined): string | undefined {
   switch (planType) {
     case "free":
-      return "ChatGPT Free Subscription";
+      return "ChatGPT Free 订阅";
     case "go":
-      return "ChatGPT Go Subscription";
+      return "ChatGPT Go 订阅";
     case "plus":
-      return "ChatGPT Plus Subscription";
+      return "ChatGPT Plus 订阅";
     case "pro":
-      return "ChatGPT Pro 200 Subscription";
+      return "ChatGPT Pro 200 订阅";
     case "prolite":
-      return "ChatGPT Pro 100 Subscription";
+      return "ChatGPT Pro 100 订阅";
     case "promax":
-      return "ChatGPT Pro 500 Subscription";
+      return "ChatGPT Pro 500 订阅";
     case "self_serve_business_prolite":
-      return "ChatGPT Business Premium Subscription";
+      return "ChatGPT Business Premium 订阅";
     case "team":
     case "self_serve_business_usage_based":
     case "business":
-      return "ChatGPT Business Subscription";
+      return "ChatGPT Business 订阅";
     case "ent26":
     case "enterprise_cbp_automation":
     case "enterprise_cbp_usage_based":
     case "enterprise":
-      return "ChatGPT Enterprise Subscription";
+      return "ChatGPT Enterprise 订阅";
     case "edu":
     case "edu_plus":
     case "edu_pro":
-      return "ChatGPT Edu Subscription";
+      return "ChatGPT Edu 订阅";
     case "unknown":
-      return "ChatGPT Subscription";
+      return "ChatGPT 订阅";
     default:
       return undefined;
   }

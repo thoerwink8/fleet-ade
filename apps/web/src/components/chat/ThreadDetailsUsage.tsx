@@ -70,7 +70,7 @@ export function ThreadDetailsUsage({
             label="限制"
             fill={null}
             tone={null}
-            value="Unavailable"
+            value="不可用"
             tooltip={<span className="text-foreground">{notice}</span>}
           />
         ) : (
