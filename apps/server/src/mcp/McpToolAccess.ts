@@ -422,7 +422,7 @@ const takesLinkedEnvironment = (tool: Tool.Any) => {
 
 const linksUnavailable = new OrchestratorMcpFailure({
   code: "orchestration_error",
-  message: "This environment cannot reach linked environments.",
+  message: "此环境无法访问关联的环境。",
 });
 
 /**
