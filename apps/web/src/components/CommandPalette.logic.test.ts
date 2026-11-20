@@ -60,6 +60,40 @@ describe("linked pull request thread navigation", () => {
   });
 });
 
+describe("palette result ordering", () => {
+  it("puts matching actions before settings navigation results", () => {
+    const action = {
+      kind: "action" as const,
+      value: "action:shortcut-cheatsheet",
+      title: "快捷键速查",
+      searchTerms: ["快捷键", "键盘", "速查", "帮助"],
+      icon: null,
+      run: async () => {},
+    };
+    const settings = Array.from({ length: 20 }, (_, index) => ({
+      kind: "action" as const,
+      value: `setting:shortcut-${index}`,
+      title: "快捷键",
+      searchTerms: ["快捷键", "keybindings"],
+      description: "Settings · 快捷键",
+      icon: null,
+      run: async () => {},
+    }));
+
+    const groups = filterCommandPaletteGroups({
+      activeGroups: [{ value: "actions", label: "操作", items: [action] }],
+      query: "快捷键",
+      isInSubmenu: false,
+      projectSearchItems: [],
+      settingsSearchItems: settings,
+      threadSearchItems: [],
+    });
+
+    expect(groups[0]?.value).toBe("actions");
+    expect(groups[0]?.items).toContain(action);
+  });
+});
+
 describe("selection group", () => {
   it("shows how many threads are selected", () => {
     const groups = buildRootGroups({

@@ -70,7 +70,13 @@ export function installCommandPaletteCommands(
         toggleShortcutCheatsheet();
       },
     },
-    { ...options, capture: true, when: isCommandPaletteMounted },
+    {
+      ...options,
+      capture: true,
+      when: (event) =>
+        isCommandPaletteMounted() &&
+        !(event.target instanceof HTMLElement && event.target.closest("[data-keybinding-capture]")),
+    },
   );
 
   const disposeCommands = registerCommands(

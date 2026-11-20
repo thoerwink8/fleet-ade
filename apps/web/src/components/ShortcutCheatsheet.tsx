@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useAtomValue } from "@effect/atom-react";
 import { Link } from "@tanstack/react-router";
 import { create } from "zustand";
@@ -39,43 +40,48 @@ export function ShortcutCheatsheetDialog() {
   const open = useShortcutCheatsheetStore((state) => state.open);
   const setOpen = useShortcutCheatsheetStore((state) => state.setOpen);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const panelRef = useRef<HTMLDivElement>(null);
   const groups = shortcutCheatsheetGroups(keybindings);
   const shortcut = shortcutLabelForCommand(keybindings, "shortcutCheatsheet.toggle");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogPopup className="max-h-[85vh] sm:max-w-xl">
+      <DialogPopup className="max-h-[85vh] sm:max-w-xl" initialFocus={panelRef}>
         <DialogHeader>
           <DialogTitle>快捷键</DialogTitle>
           <DialogDescription>
-            {shortcut ? (
-              <>
-                按 <Kbd variant="outline">{shortcut}</Kbd> 或 Esc 关闭。
-              </>
-            ) : (
-              <>按 Esc 关闭。</>
-            )}{" "}
-            改键后这里跟着变。
+            <span className="block leading-6">
+              {shortcut ? (
+                <>
+                  按 <Kbd variant="outline">{shortcut}</Kbd> 或 Esc 关闭。
+                </>
+              ) : (
+                <>按 Esc 关闭。</>
+              )}{" "}
+              改键后这里跟着变。
+            </span>
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel>
+        <DialogPanel ref={panelRef} tabIndex={-1}>
           {groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">没有已绑定的快捷键。</p>
+            <p className="text-sm leading-6 text-muted-foreground">没有已绑定的快捷键。</p>
           ) : (
             <div className="space-y-5">
               {groups.map((group) => (
                 <section key={group.id} className="space-y-1">
-                  <h3 className="text-xs font-medium text-muted-foreground">{group.title}</h3>
+                  <h3 className="text-sm font-medium leading-6 text-muted-foreground">
+                    {group.title}
+                  </h3>
                   <ul>
                     {group.entries.map((entry) => (
                       <li
                         key={entry.id}
-                        className="flex items-baseline justify-between gap-4 border-b border-border/60 py-1.5 text-sm last:border-b-0"
+                        className="flex items-baseline justify-between gap-4 border-b border-border/60 py-1.5 text-sm leading-6 last:border-b-0"
                       >
                         <span className="min-w-0">
                           <span className="wrap-anywhere">{entry.label}</span>
                           {entry.conflicts.length > 0 ? (
-                            <span className="mt-0.5 block text-xs text-warning">
+                            <span className="mt-0.5 block text-sm leading-6 text-warning">
                               与 {entry.conflicts.join("、")} 冲突
                             </span>
                           ) : null}
@@ -95,7 +101,7 @@ export function ShortcutCheatsheetDialog() {
             </div>
           )}
         </DialogPanel>
-        <div className="px-6 pb-4 text-sm">
+        <div className="px-6 pb-4 text-sm leading-6">
           <Link
             to="/settings/keybindings"
             className="text-muted-foreground underline-offset-2 hover:underline"
