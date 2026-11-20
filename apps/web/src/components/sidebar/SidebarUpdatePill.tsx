@@ -537,7 +537,7 @@ function SidebarUpdateControl() {
             <TooltipPopup
               align="center"
               side="top"
-              variant={showUpdateDetails ? "glass" : "default"}
+              variant={showUpdateDetails ? "surface" : "default"}
             >
               {idleTooltip?.detail ? (
                 <div className="text-left">

@@ -123,7 +123,7 @@ function AssistantForkButton({
         render={
           <Button
             type="button"
-            size="xs"
+            size="icon-sm"
             variant="ghost"
             disabled={busy}
             onClick={() => {
@@ -136,7 +136,7 @@ function AssistantForkButton({
           />
         }
       >
-        <GitForkIcon className={cn("size-3", busy && "animate-pulse")} />
+        <GitForkIcon className={cn("size-3.5", busy && "animate-pulse")} />
       </TooltipTrigger>
       <TooltipPopup side="top">从这条回复分叉</TooltipPopup>
     </Tooltip>
@@ -249,14 +249,14 @@ function AssistantReplyButton({ message, itemId }: { message: ChatMessage; itemI
         render={
           <Button
             type="button"
-            size="xs"
+            size="icon-sm"
             variant="ghost-muted"
             onClick={reply}
             aria-label="回复这条回复"
           />
         }
       >
-        <ReplyIcon className="size-3" />
+        <ReplyIcon className="size-3.5" />
       </TooltipTrigger>
       <TooltipPopup side="top">回复这条回复</TooltipPopup>
     </Tooltip>

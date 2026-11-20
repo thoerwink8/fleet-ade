@@ -5,7 +5,7 @@ import {
 } from "@t3tools/contracts";
 import { memo } from "react";
 import { EllipsisIcon, TriangleAlertIcon } from "lucide-react";
-import { Button, InlineButton } from "../ui/button";
+import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { composerFloatingLayerProps } from "./composerEventScope";
@@ -66,25 +66,16 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             </span>
           </>
         );
-        const button =
-          presentation === "inline" ? (
-            <InlineButton
-              key={option.decision}
-              {...buttonProps}
-              tone={option.decision === "accept" ? "default" : "muted"}
-            >
-              {content}
-            </InlineButton>
-          ) : (
-            <Button
-              key={option.decision}
-              {...buttonProps}
-              size="xs"
-              variant={option.decision === "accept" ? "default" : "outline"}
-            >
-              {content}
-            </Button>
-          );
+        const button = (
+          <Button
+            key={option.decision}
+            {...buttonProps}
+            size={presentation === "inline" ? "action" : "xs"}
+            variant={option.decision === "accept" ? "default" : "outline"}
+          >
+            {content}
+          </Button>
+        );
         return option.warning ? (
           <Tooltip key={option.decision}>
             <TooltipTrigger render={button} />
@@ -99,11 +90,11 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
           <MenuTrigger
             disabled={disabled || isResponding || !canRespond}
             render={
-              presentation === "inline" ? (
-                <InlineButton tone="muted" aria-label="更多审批选项" />
-              ) : (
-                <Button size="icon-xs" variant="outline" aria-label="更多审批选项" />
-              )
+              <Button
+                size={presentation === "inline" ? "action" : "icon-xs"}
+                variant="outline"
+                aria-label="更多审批选项"
+              />
             }
           >
             {presentation === "inline" ? "更多" : <EllipsisIcon />}

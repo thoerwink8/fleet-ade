@@ -1,6 +1,7 @@
 import type { ExternalQuotaGroups, ExternalUsageReport } from "@t3tools/contracts";
 
 import { Button } from "../ui/button";
+import { QUOTA_STALL_TIMEOUT_MS, usePendingStall } from "./usePendingStall";
 
 function formatCount(value: number): string {
   if (value >= 10_000) {
@@ -90,6 +91,8 @@ export function ExternalQuotaCards({
   magpieUsage,
   localLines,
   pending,
+  error = null,
+  stallTimeoutMs = QUOTA_STALL_TIMEOUT_MS,
   onRefresh,
 }: {
   readonly agy: ExternalQuotaGroups | null;
@@ -97,24 +100,48 @@ export function ExternalQuotaCards({
   readonly magpieUsage: ExternalUsageReport | null;
   readonly localLines: readonly string[];
   readonly pending: boolean;
+  readonly error?: string | null;
+  readonly stallTimeoutMs?: number;
   readonly onRefresh: () => void;
 }) {
+  const stall = usePendingStall(pending, stallTimeoutMs);
+  const reading = pending && !stall.stalled;
+  const failure = stall.stalled
+    ? `读取失败：超过 ${stallTimeoutMs / 1000} 秒没有读到额度数据。`
+    : !pending && error
+      ? `读取失败：${error}`
+      : null;
+  const retry = () => {
+    stall.reset();
+    onRefresh();
+  };
   return (
     <div className="flex flex-col gap-4 rounded-xl border p-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-medium">额度与今日用量</h2>
-        <Button size="sm" variant="outline" disabled={pending} onClick={onRefresh}>
-          {pending ? "正在读取" : "刷新"}
+        <Button size="sm" variant="outline" disabled={reading} onClick={retry}>
+          {reading ? "正在读取" : "刷新"}
         </Button>
       </div>
-      {pending && agy === null ? <p className="text-sm text-muted-foreground">正在读取</p> : null}
+      {reading && agy === null ? <p className="text-sm text-muted-foreground">正在读取</p> : null}
+      {failure ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted-foreground">{failure}</p>
+          <Button size="sm" variant="outline" onClick={retry}>
+            重试
+          </Button>
+        </div>
+      ) : null}
       {agy ? <Groups title="Antigravity 额度" report={agy} /> : null}
       {magpieQuotas ? <Groups title="magpie 额度" report={magpieQuotas} /> : null}
       {magpieUsage ? <UsageRows title="magpie 今日用量" rows={magpieUsage} /> : null}
       <section className="flex flex-col gap-1">
         <h3 className="text-sm font-medium">本机日志用量</h3>
         {localLines.length === 0 ? (
-          <p className="text-sm text-muted-foreground">这段时间没有读到本机日志用量。</p>
+          <p className="text-sm text-muted-foreground">
+            这段时间没有读到本机日志用量。先用本机 Claude、Codex 或 Grok
+            跑一次会话，再点「刷新」；已有会话仍读不到，说明本机日志目录不可用。
+          </p>
         ) : (
           localLines.map((line) => (
             <p key={line} className="text-sm">
