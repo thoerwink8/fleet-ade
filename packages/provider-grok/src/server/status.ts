@@ -92,7 +92,7 @@ export const buildInitialGrokProviderSnapshot = Effect.fn(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Grok is disabled in T3 Code settings.",
+        message: "Grok 已在 T3 Code 设置中停用。",
       },
     });
   }
@@ -107,7 +107,7 @@ export const buildInitialGrokProviderSnapshot = Effect.fn(
       version: null,
       status: "warning",
       auth: { status: "unknown" },
-      message: "Checking Grok CLI availability...",
+      message: "正在检查 Grok CLI 是否可用…",
     },
   });
 });
@@ -418,7 +418,7 @@ export const checkGrokProviderStatus = Effect.fn("checkGrokProviderStatus")(func
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Grok is disabled in T3 Code settings.",
+        message: "Grok 已在 T3 Code 设置中停用。",
       },
     });
   }
@@ -453,8 +453,8 @@ export const checkGrokProviderStatus = Effect.fn("checkGrokProviderStatus")(func
         status: "error",
         auth: { status: "unknown" },
         message: isCommandMissingCause(error)
-          ? "Grok CLI (`grok`) is not installed or not on PATH."
-          : "Failed to execute Grok CLI health check.",
+          ? "Grok CLI（`grok`）未安装或不在 PATH 上。"
+          : "执行 Grok CLI 健康检查失败。",
       },
     });
   }
@@ -470,7 +470,7 @@ export const checkGrokProviderStatus = Effect.fn("checkGrokProviderStatus")(func
         version: null,
         status: "error",
         auth: { status: "unknown" },
-        message: "Grok CLI is installed but timed out while running `grok --version`.",
+        message: "Grok CLI 已安装，但运行 `grok --version` 超时。",
       },
     });
   }
@@ -493,7 +493,7 @@ export const checkGrokProviderStatus = Effect.fn("checkGrokProviderStatus")(func
         version,
         status: "error",
         auth: { status: "unknown" },
-        message: "Grok CLI is installed but failed to run.",
+        message: "Grok CLI 已安装但无法运行。",
       },
     });
   }
@@ -544,9 +544,9 @@ export const checkGrokProviderStatus = Effect.fn("checkGrokProviderStatus")(func
       : fallbackModels;
   // The registry replaces cached models on a ready probe, so a fallback-only list must not be ready.
   const incompleteMessage = acpFailed
-    ? "Grok CLI is installed but ACP initialize failed. Model options may be incomplete."
+    ? "Grok CLI 已安装，但 ACP 初始化失败，模型选项可能不完整。"
     : discoveredModels.length === 0
-      ? "Grok CLI did not list any models. Model options may be incomplete."
+      ? "Grok CLI 没有列出任何模型，模型选项可能不完整。"
       : undefined;
 
   if (auth.status === "unauthenticated") {
@@ -561,7 +561,7 @@ export const checkGrokProviderStatus = Effect.fn("checkGrokProviderStatus")(func
         version,
         status: "error",
         auth,
-        message: "Grok CLI is installed but not logged in. Run `grok login`.",
+        message: "Grok CLI 已安装但未登录。请运行 `grok login`。",
       },
     });
   }

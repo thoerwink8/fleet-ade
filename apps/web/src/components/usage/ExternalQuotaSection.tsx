@@ -43,7 +43,7 @@ export function ExternalQuotaSection({
   const localLines = localProviders.flatMap((provider) => {
     if (RETIRED_USAGE_PROVIDERS.has(provider.provider)) return [];
     const label = LOCAL_PROVIDER_LABEL[provider.provider as keyof typeof LOCAL_PROVIDER_LABEL];
-    return [`${label}：${provider.records} 次，${formatCount(provider.totalTokens)} token`];
+    return [`${label}：${provider.records} 次，${formatCount(provider.totalTokens)} 词元`];
   });
   return (
     <ExternalQuotaCards

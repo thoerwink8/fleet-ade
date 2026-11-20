@@ -218,10 +218,10 @@ export function formatShortcutKeyLabel(key: string): string {
   if (key === " ") return "Space";
   if (key.length === 1) return key.toUpperCase();
   if (key === "escape") return "Esc";
-  if (key === "arrowup") return "Up";
-  if (key === "arrowdown") return "Down";
-  if (key === "arrowleft") return "剩余";
-  if (key === "arrowright") return "Right";
+  if (key === "arrowup") return "上";
+  if (key === "arrowdown") return "下";
+  if (key === "arrowleft") return "左";
+  if (key === "arrowright") return "右";
   return key.slice(0, 1).toUpperCase() + key.slice(1);
 }
 

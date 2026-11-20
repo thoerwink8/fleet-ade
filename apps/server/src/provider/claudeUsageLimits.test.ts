@@ -47,7 +47,7 @@ describe("claudeUsageResponseToLimits", () => {
           {
             id: "seven_day",
             kind: "weekly",
-            label: "Weekly",
+            label: "每周",
             usedPercent: 18.4,
             windowDurationMins: 10080,
             resetsAt: "2026-07-24T08:59:00.000Z",
@@ -55,7 +55,7 @@ describe("claudeUsageResponseToLimits", () => {
           {
             id: "seven_day_fable",
             kind: "weekly",
-            label: "Weekly · Fable",
+            label: "每周 · Fable",
             usedPercent: 73,
             windowDurationMins: 10080,
             resetsAt: "2026-07-24T08:59:00.000Z",
@@ -100,7 +100,7 @@ describe("claudeUsageResponseToLimits", () => {
       {
         id: "seven_day",
         kind: "weekly",
-        label: "Weekly",
+        label: "每周",
         usedPercent: 100,
         windowDurationMins: 10080,
       },
@@ -131,7 +131,7 @@ describe("claudeUsageResponseToLimits", () => {
   const monthlyWindow = {
     id: "monthly_spend",
     kind: "monthly",
-    label: "Monthly spend",
+    label: "每月支出",
     usedPercent: expect.closeTo(9.262, 10),
   };
 
@@ -240,7 +240,7 @@ describe("claudeRateLimitEventToUpdate", () => {
         {
           id: "seven_day",
           kind: "weekly",
-          label: "Weekly",
+          label: "每周",
           usedPercent: 85,
           windowDurationMins: 10080,
           resetsAt: "2026-07-14T03:33:20.000Z",
@@ -261,7 +261,7 @@ describe("claudeRateLimitEventToUpdate", () => {
         {
           id: "seven_day_fable",
           kind: "weekly",
-          label: "Weekly · Fable",
+          label: "每周 · Fable",
           usedPercent: 40,
           windowDurationMins: 10080,
         },

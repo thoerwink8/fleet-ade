@@ -617,12 +617,12 @@ function poolWindows(accounts: readonly LimitAccount[], now: number): readonly L
 
 export function limitsNotice(limits: ServerProviderUsageLimits): string | null {
   if (limits.unavailable?.reason === "unsupported") {
-    return limits.unavailable.message ?? "This account has no subscription limits.";
+    return limits.unavailable.message ?? "此账号没有订阅额度限制。";
   }
   if (limits.unavailable?.reason === "probeFailed") {
-    return limits.unavailable.message ?? "Could not read limits.";
+    return limits.unavailable.message ?? "读取额度限制失败。";
   }
-  return limits.windows.length === 0 ? "No limits reported." : null;
+  return limits.windows.length === 0 ? "没有上报额度限制。" : null;
 }
 
 export function remainingPercent(window: ServerProviderUsageWindow): number {
@@ -719,9 +719,9 @@ export function resetCreditChoices(
       const expires = expiresIn(option.expiresAt);
       return {
         key: option.creditId,
-        summary: `${option.label} · ${option.availableCount} left${expires ? ` · expires in ${expires}` : ""}`,
-        actionLabel: "Use",
-        confirmDescription: `${option.label}: ${option.description} This cannot be undone.`,
+        summary: `${option.label} · 剩余 ${option.availableCount} 个${expires ? ` · ${expires} 后过期` : ""}`,
+        actionLabel: "使用",
+        confirmDescription: `${option.label}：${option.description} 此操作不可撤销。`,
         availableCount: option.availableCount,
         input: { ...input, creditId: option.creditId },
       };
@@ -734,13 +734,12 @@ export function resetCreditChoices(
       key: "next",
       summary:
         count === 0
-          ? "No reset credits banked"
+          ? "没有已存的重置额度"
           : compact
-            ? `${count} banked${expires ? ` · expires in ${expires}` : ""}`
-            : `${count} ${count === 1 ? "reset credit" : "reset credits"} banked${expires ? ` · next expires in ${expires}` : ""}`,
-      actionLabel: "Use reset",
-      confirmDescription:
-        "This redeems one credit on your account and clears the current rate-limit windows. It cannot be undone.",
+            ? `已存 ${count} 个${expires ? ` · ${expires} 后过期` : ""}`
+            : `已存 ${count} 个重置额度${expires ? ` · 最近一个 ${expires} 后过期` : ""}`,
+      actionLabel: "使用重置",
+      confirmDescription: "将使用账号上的一个重置额度，并清空当前的限速窗口。此操作不可撤销。",
       availableCount: count,
       input,
     },
@@ -760,7 +759,7 @@ export function formatResetsIn(
 
 export const USAGE_LIMITS_COMMAND = {
   name: "usage-limits",
-  description: "Show this provider's usage limits",
+  description: "查看此提供方的用量限制",
 } satisfies ServerProviderSlashCommand;
 
 export function isUsageLimitsCommand(prompt: string): boolean {
@@ -938,7 +937,7 @@ export function collectProviderUsageLimits(
         id: `${source.id}:${account.id}`,
         driver: account.driver,
         label: `${source.label} · ${hubAccountName(account)}`,
-        sourceLabel: "CLI Proxy",
+        sourceLabel: "CLI 代理",
         ...(account.usageLimits.resetCredits?.nextCreditId
           ? {
               resetCreditInput: {

@@ -275,7 +275,7 @@ function AboutVersionSection() {
       ? !canCheckForUpdate(updateState)
       : isDesktopUpdateButtonDisabled(updateState);
 
-  const actionLabel: Record<string, string> = { download: "Download", install: "Install" };
+  const actionLabel: Record<string, string> = { download: "下载", install: "安装" };
   const statusLabel: Record<string, string> = {
     checking: "正在检查…",
     downloading: "正在下载…",
@@ -1258,7 +1258,7 @@ function ToolCallVisibilityRow() {
 const SCREEN_READER_ANNOUNCEMENTS_LABELS: Record<ScreenReaderAnnouncements, string> = {
   status: "仅状态",
   messages: "状态和消息",
-  everything: "Everything",
+  everything: "全部",
 };
 
 const isScreenReaderAnnouncements = Schema.is(ScreenReaderAnnouncements);
@@ -2104,7 +2104,7 @@ export function MaintenanceSettingsPanel() {
             settings.keepAwakeWhileAgentsWork !==
             DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork ? (
               <SettingResetButton
-                label="keep awake while agents work"
+                label="智能体工作时保持唤醒"
                 onClick={() =>
                   updateSettings({
                     keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,

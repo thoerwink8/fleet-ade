@@ -128,7 +128,7 @@ export const claudeSignedOutMessage = (input: {
 }): string => {
   const configuration =
     input.configDir !== undefined
-      ? ` from ${quotePath(input.cwd)}, with CLAUDE_CONFIG_DIR set to ${quotePath(input.configDir)}`
+      ? `在 ${quotePath(input.cwd)} 中、并把 CLAUDE_CONFIG_DIR 设为 ${quotePath(input.configDir)} 后`
       : "";
-  return `Claude could not authenticate. For subscription login, run \`claude auth login\` on this environment's machine${configuration}, then start a new thread. For API-key authentication, check this instance's configured credentials.`;
+  return `Claude 无法完成认证。订阅登录请在此环境的机器上${configuration}运行 \`claude auth login\`，然后新建会话；API key 认证请检查此实例配置的凭证。`;
 };

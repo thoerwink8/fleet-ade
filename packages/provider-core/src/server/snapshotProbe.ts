@@ -60,7 +60,7 @@ export const resolveProviderProbeTimeoutMs = (
 
 export const COMPACT_SLASH_COMMAND = {
   name: "compact",
-  description: "Summarize the conversation and reduce context usage",
+  description: "总结对话并压缩上下文用量",
 } satisfies ServerProviderSlashCommand;
 
 export interface CommandResult {

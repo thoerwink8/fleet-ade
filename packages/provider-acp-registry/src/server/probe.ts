@@ -563,27 +563,27 @@ function managementFailure(
     if (operation === "list") {
       return new AcpRegistryOperationError({
         reason: "session_list_unsupported",
-        message: "The ACP agent does not advertise session listing.",
+        message: "此 ACP 智能体不支持会话列表。",
         cause: error,
       });
     }
     if (operation === "delete") {
       return new AcpRegistryOperationError({
         reason: "session_delete_unsupported",
-        message: "The ACP agent does not advertise session deletion.",
+        message: "此 ACP 智能体不支持删除会话。",
         cause: error,
       });
     }
     if (operation.startsWith("providers_")) {
       return new AcpRegistryOperationError({
         reason: "providers_unsupported",
-        message: "The ACP agent does not advertise provider configuration.",
+        message: "此 ACP 智能体不支持提供方配置。",
         cause: error,
       });
     }
     return new AcpRegistryOperationError({
       reason: "logout_unsupported",
-      message: "The ACP agent does not advertise logout.",
+      message: "此 ACP 智能体不支持退出登录。",
       cause: error,
     });
   }
@@ -591,13 +591,13 @@ function managementFailure(
   if (classified.reason === "authentication_failed") return classified;
   const failure =
     operation === "delete"
-      ? { reason: "session_delete_failed" as const, message: "Could not delete the ACP session." }
+      ? { reason: "session_delete_failed" as const, message: "无法删除 ACP 会话。" }
       : operation === "providers_list"
-        ? { reason: "providers_list_failed" as const, message: "Could not list ACP providers." }
+        ? { reason: "providers_list_failed" as const, message: "无法列出 ACP 提供方。" }
         : operation === "providers_set" || operation === "providers_disable"
           ? {
               reason: "provider_configuration_failed" as const,
-              message: "Could not update the ACP provider configuration.",
+              message: "无法更新 ACP 提供方配置。",
             }
           : undefined;
   return failure === undefined
@@ -656,7 +656,7 @@ export const listAcpRegistrySessions = Effect.fn("AcpRegistryProbe.listSessions"
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "probe_failed",
-              message: "The ACP session list request timed out.",
+              message: "ACP 会话列表请求超时。",
             }),
           ),
       }),
@@ -678,7 +678,7 @@ export const deleteAcpRegistrySession = Effect.fn("AcpRegistryProbe.deleteSessio
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "session_delete_failed",
-              message: "The ACP session delete request timed out.",
+              message: "ACP 会话删除请求超时。",
             }),
           ),
       }),
@@ -728,7 +728,7 @@ export const listAcpRegistryProviders = Effect.fn("AcpRegistryProbe.listProvider
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "providers_list_failed",
-              message: "The ACP provider list request timed out.",
+              message: "ACP 提供方列表请求超时。",
             }),
           ),
       }),
@@ -755,7 +755,7 @@ export const setAcpRegistryProvider = Effect.fn("AcpRegistryProbe.setProvider")(
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "provider_configuration_failed",
-              message: "The ACP provider configuration request timed out.",
+              message: "ACP 提供方配置请求超时。",
             }),
           ),
       }),
@@ -777,7 +777,7 @@ export const disableAcpRegistryProvider = Effect.fn("AcpRegistryProbe.disablePro
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "provider_configuration_failed",
-              message: "The ACP provider disable request timed out.",
+              message: "ACP 提供方停用请求超时。",
             }),
           ),
       }),
@@ -799,7 +799,7 @@ export const logoutAcpRegistry = Effect.fn("AcpRegistryProbe.logout")(
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "probe_failed",
-              message: "The ACP logout request timed out.",
+              message: "ACP 退出登录请求超时。",
             }),
           ),
       }),

@@ -8,7 +8,7 @@ describe("desktop-approved window capture shortcut labels", () => {
     ["Ctrl+Shift+8", ["Ctrl", "⇧", "8"]],
     ["Meta+F12", ["Super", "F12"]],
     ["<Primary><Alt>Return", ["Ctrl", "Alt", "Enter"]],
-    ["<Super>Left", ["Super", "剩余"]],
+    ["<Super>Left", ["Super", "左"]],
     ["<Control>space", ["Ctrl", "Space"]],
     ["<Control>plus", ["Ctrl", "+"]],
     ["Ctrl++", ["Ctrl", "+"]],

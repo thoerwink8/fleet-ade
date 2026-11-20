@@ -58,9 +58,9 @@ export function UsageModelDialog({
   const hitRate = cacheHitRate(model);
   const perMillion = costPerMillionTokens(model);
   const stats = [
-    { label: "费用", value: costUnknown ? "Unpriced" : formatUsd(model.costUsd) },
-    { label: "Tokens", value: formatTokens(model.totalTokens) },
-    perMillion === null ? null : { label: "每百万 token", value: formatUsd(perMillion) },
+    { label: "费用", value: costUnknown ? "未定价" : formatUsd(model.costUsd) },
+    { label: "词元", value: formatTokens(model.totalTokens) },
+    perMillion === null ? null : { label: "每百万词元", value: formatUsd(perMillion) },
     hitRate === null ? null : { label: "缓存命中", value: formatPercent(hitRate) },
   ].filter((stat) => stat !== null);
 
@@ -120,7 +120,7 @@ export function UsageModelDialog({
                 />
               )}
               <UsageShareBar
-                label="按类型统计的 token"
+                label="按类型统计的词元"
                 segments={tokenTypeSegments(model.tokens)}
                 format={formatTokens}
               />
@@ -138,7 +138,7 @@ export function UsageModelDialog({
         {model.unpricedTokens > 0 ? (
           <DialogFooter variant="bare" className="items-center sm:justify-between">
             <span className="text-xs text-muted-foreground">
-              {formatTokens(model.unpricedTokens)} tokens have no known price
+              {formatTokens(model.unpricedTokens)} 词元没有已知价格
             </span>
             <Button onClick={onSetPrice}>设置价格</Button>
           </DialogFooter>

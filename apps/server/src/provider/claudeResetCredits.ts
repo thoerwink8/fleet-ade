@@ -61,15 +61,14 @@ const ClaimResponse = Schema.Struct({
 });
 
 const RESET_CREDIT_FAILURES = {
-  malformedCredit: "Claude returned a malformed reset credit.",
-  loginUnreadable: "Claude could not read its login.",
-  accountUnreadable: "Claude could not read its account.",
-  signedOut: "Sign in to Claude again to redeem resets.",
-  rateLimited: "Claude is rate limiting resets. Try again soon.",
-  coolingDown: "Claude resets are cooling down. Try again later.",
-  unconfirmed:
-    "Claude could not confirm the reset. If you are still limited in a moment, try again.",
-  requestFailed: "Claude could not redeem the reset.",
+  malformedCredit: "Claude 返回了格式不正确的重置额度。",
+  loginUnreadable: "Claude 无法读取登录信息。",
+  accountUnreadable: "Claude 无法读取账号信息。",
+  signedOut: "请重新登录 Claude 后再兑换重置额度。",
+  rateLimited: "Claude 正在对重置请求限速。请稍后再试。",
+  coolingDown: "Claude 重置功能正在冷却中。请稍后再试。",
+  unconfirmed: "Claude 无法确认重置结果。如果稍后仍然限速，请再试一次。",
+  requestFailed: "Claude 无法兑换重置额度。",
 } as const;
 
 class ClaudeResetCreditError extends Schema.TaggedError<ClaudeResetCreditError>()(
@@ -105,14 +104,14 @@ const isFutureTimestamp = (value: string, nowMs: number) => {
 // Claude Code's own grouping: a grant that gives back weekly usage is a Fable reset, else its
 // declared type, else what it clears.
 const RESET_KINDS = {
-  session: { label: "5-hour reset", description: "Refills your 5-hour limit." },
-  weekly: { label: "Weekly reset", description: "Refills your weekly limit." },
+  session: { label: "5 小时重置", description: "补满你的 5 小时额度。" },
+  weekly: { label: "每周重置", description: "补满你的每周额度。" },
   fable: {
-    label: "Fable reset",
+    label: "Fable 重置",
     description:
-      "Refills your Fable allowance and gives back what Fable used on your weekly limit. It doesn't reset your whole week.",
+      "补满你的 Fable 额度，并归还 Fable 在你的每周额度中用掉的部分，不会重置整个周周期。",
   },
-  full: { label: "Full reset", description: "Refills your 5-hour and weekly limits." },
+  full: { label: "全部重置", description: "补满你的 5 小时和每周额度。" },
 } as const;
 type ResetKind = keyof typeof RESET_KINDS;
 

@@ -218,7 +218,7 @@ export const SnapShotKeyChord = KeybindingShortcut.check(
       shortcut.shiftKey ||
       shortcut.altKey ||
       shortcut.modKey ||
-      "Snapshot shortcut requires a modifier.",
+      "截图快捷键需要一个修饰键。",
   ),
 );
 export type SnapShotKeyChord = typeof SnapShotKeyChord.Type;
@@ -720,16 +720,16 @@ export const CodexSettings = makeProviderSettingsSchema(
     ),
     binaryPath: makeBinaryPathSetting("codex").pipe(
       Schema.annotateKey({
-        title: "Binary path",
-        description: "Path to the Codex binary used by this instance.",
+        title: "可执行文件路径",
+        description: "此实例使用的 Codex 可执行文件路径。",
         providerSettingsForm: { placeholder: "codex", clearWhenEmpty: "omit" },
       }),
     ),
     homePath: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "CODEX_HOME path",
-        description: "Custom Codex home and config directory.",
+        title: "CODEX_HOME 路径",
+        description: "自定义 Codex 主目录和配置目录。",
         providerSettingsForm: {
           placeholder: "~/.codex",
           clearWhenEmpty: "omit",
@@ -739,9 +739,9 @@ export const CodexSettings = makeProviderSettingsSchema(
     shadowHomePath: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "Shadow home path",
+        title: "影子主目录路径",
         description:
-          "Account-specific Codex home. Keeps auth.json separate while sharing state from CODEX_HOME.",
+          "按账号划分的 Codex 主目录。auth.json 单独存放，同时共享 CODEX_HOME 中的状态。",
         providerSettingsForm: {
           placeholder: "~/.codex-t3/personal",
           clearWhenEmpty: "omit",
@@ -751,8 +751,8 @@ export const CodexSettings = makeProviderSettingsSchema(
     launchArgs: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "Launch arguments",
-        description: "Additional CLI arguments passed to codex app-server on session start.",
+        title: "启动参数",
+        description: "会话启动时传给 codex app-server 的额外命令行参数。",
       }),
     ),
     contextThresholdPercent: contextThresholdPercentSetting(),
@@ -770,9 +770,9 @@ export type CodexSettings = typeof CodexSettings.Type;
 const CLAUDE_AUTO_COMPACT_WINDOW_PATTERN = /^(?:|[1-9]\d{5}|1000000)$/;
 
 export const IDLE_COMPACTION_MODES = [
-  { value: "onReturn", label: "When you return" },
-  { value: "beforeCacheExpires", label: "Before the cache expires (beta)" },
-  { value: "off", label: "Never" },
+  { value: "onReturn", label: "你回来时" },
+  { value: "beforeCacheExpires", label: "提示缓存过期前（beta）" },
+  { value: "off", label: "从不" },
 ] as const;
 export const IdleCompactionMode = Schema.Literals(IDLE_COMPACTION_MODES.map((mode) => mode.value));
 export type IdleCompactionMode = typeof IdleCompactionMode.Type;
@@ -782,7 +782,7 @@ export type IdleCompactionMode = typeof IdleCompactionMode.Type;
 const LegacyCompactIdleThreads = Schema.Union([Schema.Boolean, IdleCompactionMode]);
 
 const INSTANCE_IDLE_COMPACTION_MODES = [
-  { value: "default", label: "Use default" },
+  { value: "default", label: "使用默认" },
   ...IDLE_COMPACTION_MODES,
 ] as const;
 const InstanceIdleCompaction = Schema.Literals(
@@ -806,9 +806,8 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     homePath: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "CLAUDE_CONFIG_DIR path",
-        description:
-          "Custom Claude home and config directory. Keeps .claude.json and .claude separate.",
+        title: "CLAUDE_CONFIG_DIR 路径",
+        description: "自定义 Claude 主目录和配置目录，.claude.json 与 .claude 分开保存。",
         providerSettingsForm: { placeholder: "~/.claude", clearWhenEmpty: "omit" },
       }),
     ),
@@ -819,10 +818,10 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     launchArgs: Schema.String.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "Launch arguments",
-        description: "Additional CLI arguments passed on session start.",
+        title: "启动参数",
+        description: "会话启动时传入的额外命令行参数。",
         providerSettingsForm: {
-          placeholder: "e.g. --chrome",
+          placeholder: "例如 --chrome",
           clearWhenEmpty: "omit",
         },
       }),
@@ -833,11 +832,10 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     ).pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "Auto-compact after",
-        description:
-          "Compact after 100,000 to 1,000,000 tokens. Leave empty to use Claude's default.",
+        title: "自动压缩阈值",
+        description: "超过 100,000 到 1,000,000 词元后压缩。留空使用 Claude 的默认值。",
         providerSettingsForm: {
-          placeholder: "e.g. 300000",
+          placeholder: "例如 300000",
           clearWhenEmpty: "omit",
         },
       }),
@@ -845,9 +843,9 @@ export const ClaudeSettings = makeProviderSettingsSchema(
     idleCompaction: InstanceIdleCompaction.pipe(
       Schema.withDecodingDefault(Effect.succeed("default" as const)),
       Schema.annotateKey({
-        title: "Compact idle threads",
+        title: "压缩空闲会话",
         description:
-          "When to compact an idle thread over 200,000 tokens: after you return, just before its prompt cache expires, or never. Overrides the default in Providers > Advanced.",
+          "空闲会话超过 200,000 词元后何时压缩：你回来后、提示缓存即将过期前，或从不压缩。覆盖“提供方 > 高级”中的默认值。",
         providerSettingsForm: {
           control: "select",
           options: INSTANCE_IDLE_COMPACTION_MODES,
@@ -870,10 +868,10 @@ export const ClaudeSettings = makeProviderSettingsSchema(
 export type ClaudeSettings = typeof ClaudeSettings.Type;
 
 export const ANTIGRAVITY_AUTH_METHODS = [
-  { value: "oauth-personal", label: "Google account" },
+  { value: "oauth-personal", label: "Google 账号" },
   { value: "oauth-business", label: "Gemini Enterprise" },
   { value: "gemini-api-key", label: "Gemini API key" },
-  { value: "agent-platform", label: "Agent Platform (Vertex AI)" },
+  { value: "agent-platform", label: "Agent Platform（Vertex AI）" },
 ] as const satisfies ReadonlyArray<ProviderSettingsFormOption>;
 export const AntigravityAuthMethod = Schema.Literals(
   ANTIGRAVITY_AUTH_METHODS.map((method) => method.value),
@@ -889,9 +887,8 @@ export const AntigravitySettings = makeProviderSettingsSchema(
     authMethod: AntigravityAuthMethod.pipe(
       Schema.withDecodingDefault(Effect.succeed("oauth-personal" as const)),
       Schema.annotateKey({
-        title: "Sign-in method",
-        description:
-          "Google accounts use your subscription; API keys and Agent Platform bill usage.",
+        title: "登录方式",
+        description: "Google 账号使用你的订阅；API key 和 Agent Platform 按用量计费。",
         providerSettingsForm: {
           control: "select",
           options: ANTIGRAVITY_AUTH_METHODS,
@@ -904,10 +901,10 @@ export const AntigravitySettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
         title: "API key",
-        description: "Gemini or Vertex AI express key. Stored separately on the host.",
+        description: "Gemini 或 Vertex AI express key，单独存放在主机上。",
         providerSettingsForm: {
           control: "password",
-          placeholder: "Optional",
+          placeholder: "可选",
           clearWhenEmpty: "omit",
         },
       }),
@@ -915,26 +912,25 @@ export const AntigravitySettings = makeProviderSettingsSchema(
     gcpProject: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "GCP project",
-        description:
-          "Required for Gemini Enterprise. Agent Platform uses it when no API key is set.",
+        title: "GCP 项目",
+        description: "Gemini Enterprise 必填。未设置 API key 时 Agent Platform 也会使用。",
         providerSettingsForm: { placeholder: "my-project-id", clearWhenEmpty: "omit" },
       }),
     ),
     gcpLocation: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "GCP location",
-        description: "Region for Gemini Enterprise or Agent Platform.",
+        title: "GCP 位置",
+        description: "Gemini Enterprise 或 Agent Platform 使用的区域。",
         providerSettingsForm: { placeholder: "us-central1", clearWhenEmpty: "omit" },
       }),
     ),
     binaryPath: TrimmedString.pipe(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
-        title: "Binary path",
-        description: "Custom ACP executable. Leave empty to select automatically.",
-        providerSettingsForm: { placeholder: "Automatic", clearWhenEmpty: "persist" },
+        title: "可执行文件路径",
+        description: "自定义 ACP 可执行文件。留空则自动选择。",
+        providerSettingsForm: { placeholder: "自动选择", clearWhenEmpty: "persist" },
       }),
     ),
     contextThresholdPercent: contextThresholdPercentSetting(),
@@ -1911,7 +1907,7 @@ export type ServerSettingsOperation = typeof ServerSettingsOperation.Type;
 
 /** Why a provider the administrator's policy leaves out cannot be used. */
 export const disallowedProviderMessage = (organization: string | undefined, label: string) =>
-  `${organization === undefined ? "Your organization" : `${organization}'s`} policy does not allow the ${label} provider.`;
+  `${organization === undefined ? "你的组织" : organization} 的策略不允许使用 ${label} 提供方。`;
 
 export class ServerSettingsError extends Schema.TaggedError<ServerSettingsError>()(
   "ServerSettingsError",

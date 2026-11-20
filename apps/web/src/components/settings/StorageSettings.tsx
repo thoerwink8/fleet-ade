@@ -292,7 +292,7 @@ function CleanupResults({
           entry.kind === "worktree"
             ? ((entry.threadId === null
                 ? entry.path
-                : entry.path?.split(/[\\/]/).findLast(Boolean)) ?? "Worktrees")
+                : entry.path?.split(/[\\/]/).findLast(Boolean)) ?? "工作树")
             : entry.kind === "logs"
               ? "轮转日志"
               : "浏览器产物";
@@ -460,7 +460,7 @@ function CleanupSection() {
     ).finally(() => setPending(false));
   };
   return (
-    <SettingsSection id="storage-cleanup" title="Cleanup" variant="plain">
+    <SettingsSection id="storage-cleanup" title="清理" variant="plain">
       <SettingsGroup>
         <SettingsRow
           {...searchableSetting("storage-delete-now")}
@@ -588,7 +588,7 @@ export function WorktreeCleanupSection() {
     )
   ) {
     return (
-      <SettingsSection id="storage-worktrees" title="Cleanup" variant="plain">
+      <SettingsSection id="storage-worktrees" title="清理" variant="plain">
         <SettingsScopeNotice inline target="all">
           请先更新所选机器，再配置项目工作树清理。
         </SettingsScopeNotice>
@@ -597,14 +597,14 @@ export function WorktreeCleanupSection() {
   }
   if (!supportsStorageCleanup(connectedEnvironments)) {
     return (
-      <SettingsSection id="storage-worktrees" title="Cleanup" variant="plain">
+      <SettingsSection id="storage-worktrees" title="清理" variant="plain">
         <StorageCleanupScopeNotice />
       </SettingsSection>
     );
   }
 
   return (
-    <SettingsSection id="storage-worktrees" title="Cleanup">
+    <SettingsSection id="storage-worktrees" title="清理">
       <>
         {isProjectScope && (
           <SettingsRow
@@ -637,13 +637,13 @@ export function WorktreeCleanupSection() {
                         ? "继承"
                         : mode === "off"
                           ? "关闭"
-                          : "Custom"}
+                          : "自定义"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   <SelectItem value="inherit">继承</SelectItem>
                   <SelectItem value="off">关闭</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="custom">自定义</SelectItem>
                 </SelectPopup>
               </Select>
             }

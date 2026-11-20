@@ -954,9 +954,9 @@ export function ProviderInstanceCard({
   const statusDiagnostic = hasCompatibilityWarning && needsAttention ? summary.detail : null;
   const inlineStatusDetail = hasCompatibilityWarning
     ? compatibility?.status === "broken"
-      ? "Incompatible"
+      ? "不兼容"
       : compatibility?.status === "unsupported"
-        ? "Unsupported"
+        ? "不受支持"
         : "有限支持"
     : summary.detail;
   const editorStatusNode =

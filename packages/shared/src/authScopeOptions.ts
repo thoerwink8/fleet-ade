@@ -25,83 +25,83 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
 }> = [
   {
     scope: AuthOrchestrationReadScope,
-    title: "View environment",
-    description: "Read threads, status, checkpoints, and configuration.",
+    title: "查看环境",
+    description: "读取会话、状态、检查点和配置。",
   },
   {
     scope: AuthOrchestrationOperateScope,
-    title: "Operate tasks",
-    description: "Start, update, and stop tasks.",
+    title: "操作任务",
+    description: "启动、更新和停止任务。",
   },
   {
     scope: AuthSettingsWriteScope,
-    title: "Change environment settings",
-    description: "Edit environment preferences and keybindings.",
+    title: "修改环境设置",
+    description: "编辑环境偏好和快捷键。",
   },
   {
     scope: AuthProvidersManageScope,
-    title: "Manage providers",
-    description: "Configure, install, sign in to, and update providers and usage sources.",
+    title: "管理提供方",
+    description: "配置、安装、登录和更新提供方与用量来源。",
   },
   {
     scope: AuthEnvironmentMaintainScope,
-    title: "Maintain environment",
-    description: "Update the server and control environment processes.",
+    title: "维护环境",
+    description: "更新服务器并控制环境进程。",
   },
   {
     scope: AuthPreviewOperateScope,
-    title: "Control previews",
-    description: "Open browser previews and host browser automation.",
+    title: "控制预览",
+    description: "打开浏览器预览并托管浏览器自动化。",
   },
   {
     scope: AuthDiagnosticsReadScope,
-    title: "View diagnostics and usage",
-    description: "Read process diagnostics, resource history, and usage totals.",
+    title: "查看诊断和用量",
+    description: "读取进程诊断、资源历史和用量汇总。",
   },
   {
     scope: AuthTerminalReadScope,
-    title: "View terminals",
-    description: "Read existing terminal output and status.",
+    title: "查看终端",
+    description: "读取已有终端的输出和状态。",
   },
   {
     scope: AuthTerminalOperateScope,
-    title: "Use terminals",
-    description: "Create terminals and send input to running shells.",
+    title: "使用终端",
+    description: "创建终端并向运行中的 shell 发送输入。",
   },
   {
     scope: AuthSourceControlWriteScope,
-    title: "Change source control",
-    description: "Commit, push, manage branches and repositories, and change pull requests.",
+    title: "修改源代码管理",
+    description: "提交、推送，管理分支和仓库，以及修改 pull request。",
   },
   {
     scope: AuthFilesystemReadScope,
-    title: "Read files",
-    description: "Browse host files, search workspaces, and inspect local changes.",
+    title: "读取文件",
+    description: "浏览主机文件、搜索工作区、查看本地改动。",
   },
   {
     scope: AuthFilesystemWriteScope,
-    title: "Write files",
-    description: "Edit workspace files and save plans to disk.",
+    title: "写入文件",
+    description: "编辑工作区文件并将计划保存到磁盘。",
   },
   {
     scope: AuthAccessReadScope,
-    title: "View access",
-    description: "Inspect pairing links and authorized clients.",
+    title: "查看访问",
+    description: "查看配对链接和已授权客户端。",
   },
   {
     scope: AuthAccessWriteScope,
-    title: "Manage access",
-    description: "Issue and revoke credentials for other clients.",
+    title: "管理访问",
+    description: "为其他客户端签发和吊销凭证。",
   },
   {
     scope: AuthRelayReadScope,
-    title: "View relay",
-    description: "Inspect managed relay connectivity.",
+    title: "查看中转",
+    description: "查看托管中转的连接状态。",
   },
   {
     scope: AuthRelayWriteScope,
-    title: "Manage relay",
-    description: "Change managed tunnel connectivity.",
+    title: "管理中转",
+    description: "修改托管隧道的连接。",
   },
 ];
 
@@ -113,10 +113,7 @@ export function sessionPermissionsUnavailableMessage(input: {
   /** The environment answered that this session is not signed in; retrying will not change that. */
   readonly rejected: boolean;
 }): string {
-  if (!input.connected) return "Connect to this environment to view this session’s permissions.";
-  if (input.rejected)
-    return "This environment did not accept your session. Reconnect to try again.";
-  return input.failed
-    ? "Could not verify your permissions. Retrying automatically."
-    : "Checking permissions…";
+  if (!input.connected) return "连接到此环境后，才能查看此会话的权限。";
+  if (input.rejected) return "此环境没有接受你的会话。请重新连接后重试。";
+  return input.failed ? "无法验证你的权限，正在自动重试。" : "正在检查权限…";
 }

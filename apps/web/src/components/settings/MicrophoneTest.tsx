@@ -177,7 +177,7 @@ export function MicrophoneTest({
         name === "NotAllowedError"
           ? MICROPHONE_PERMISSION_ERROR
           : name === "NotFoundError"
-            ? "No microphone found."
+            ? "找不到麦克风。"
             : cause instanceof Error
               ? cause.message
               : "无法访问麦克风。",
@@ -208,7 +208,7 @@ export function MicrophoneTest({
     ) : (
       <Button size="sm" variant="outline" onClick={() => void start()}>
         {phase === "ready" ? <RotateCcwIcon /> : <MicIcon />}
-        {phase === "ready" ? "重新录音" : "Record"}
+        {phase === "ready" ? "重新录音" : "录音"}
       </Button>
     );
   const panel = error ? (

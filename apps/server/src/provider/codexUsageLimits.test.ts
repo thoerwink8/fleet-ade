@@ -25,7 +25,7 @@ describe("codexRateLimitsToLimits", () => {
       {
         id: "individual",
         kind: "monthly",
-        label: "Monthly credit limit",
+        label: "每月额度限制",
         usedPercent: 1,
         resetsAt: "2026-07-19T22:26:40.000Z",
       },
@@ -99,7 +99,7 @@ describe("codexRateLimitsToLimits", () => {
         {
           id: "secondary",
           kind: "weekly",
-          label: "Weekly",
+          label: "每周",
           usedPercent: 47,
           windowDurationMins: 10080,
           resetsAt: "2026-07-19T22:26:40.000Z",
@@ -118,7 +118,7 @@ describe("codexRateLimitsToLimits", () => {
       {
         id: "primary",
         kind: "monthly",
-        label: "Monthly",
+        label: "每月",
         usedPercent: 80,
         windowDurationMins: 43_200,
       },
@@ -145,7 +145,7 @@ describe("codexRateLimitsToLimits", () => {
       {
         id: "secondary",
         kind: "weekly",
-        label: "Weekly",
+        label: "每周",
         usedPercent: 42,
         windowDurationMins: 10080,
       },
@@ -197,7 +197,7 @@ describe("codexRateLimitsToUpdate", () => {
         {
           id: "secondary",
           kind: "weekly",
-          label: "Weekly",
+          label: "每周",
           usedPercent: 51,
           windowDurationMins: 10080,
         },
@@ -224,7 +224,7 @@ describe("codexRateLimitsToUpdate", () => {
       {
         id: "secondary",
         kind: "weekly",
-        label: "Weekly",
+        label: "每周",
         usedPercent: 42,
         windowDurationMins: 10080,
       },
@@ -242,7 +242,7 @@ describe("codexRateLimitsFailureMessage", () => {
             "failed to fetch codex rate limits: GET https://chatgpt.com/backend-api/wham/usage failed: 401 Unauthorized",
         }),
       ),
-    ).toBe("Codex could not read usage (JSON-RPC -32603).");
+    ).toBe("Codex 无法读取用量（JSON-RPC -32603）。");
   });
 });
 
@@ -268,7 +268,7 @@ describe("mergeCodexRateLimits", () => {
         {
           id: "individual",
           kind: "monthly",
-          label: "Monthly credit limit",
+          label: "每月额度限制",
           usedPercent: 25,
           resetsAt: "2026-08-17T20:53:20.000Z",
         },

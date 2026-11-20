@@ -1334,7 +1334,7 @@ describe("/usage-limits", () => {
     });
     expect(report?.accounts[2]).toMatchObject({
       label: "Accounts · oss",
-      sourceLabel: "CLI Proxy",
+      sourceLabel: "CLI 代理",
       plan: "Codex OSS",
     });
     expect(report?.notices).toEqual([]);
@@ -1603,7 +1603,7 @@ describe("external usage settings", () => {
       [EnvironmentId.make("b"), host],
       [EnvironmentId.make("c"), host],
     ]);
-    expect(collectLimitNotices(presentations)).toEqual(["Host · codex: Could not read limits."]);
+    expect(collectLimitNotices(presentations)).toEqual(["Host · codex: 读取额度限制失败。"]);
   });
 });
 

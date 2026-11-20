@@ -456,7 +456,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
                     </Button>
                   }
                 />
-                <TooltipPopup side="top">Rotate</TooltipPopup>
+                <TooltipPopup side="top">旋转</TooltipPopup>
               </Tooltip>
             </div>
           ) : null}

@@ -767,8 +767,8 @@ function UsageOverview({
                   )}
                 >
                   {metric === "cost"
-                    ? `${formatPercent(share)} 的费用 · ${formatTokens(totals?.totalTokens ?? 0)} token`
-                    : `${formatPercent(share)} 的 token · ${formatUsd(totals?.costUsd ?? 0)}`}
+                    ? `${formatPercent(share)} 的费用 · ${formatTokens(totals?.totalTokens ?? 0)} 词元`
+                    : `${formatPercent(share)} 的词元 · ${formatUsd(totals?.costUsd ?? 0)}`}
                 </span>
               </div>
             );
@@ -777,7 +777,8 @@ function UsageOverview({
 
         <div className="flex min-w-0 flex-col gap-3">
           <h2 className="text-sm font-medium text-foreground">
-            {shownHourly ? "Hourly" : "每天"} {metric === "tokens" ? "processed tokens" : "cost"}
+            {shownHourly ? "每小时" : "每天"}
+            {metric === "tokens" ? "处理的词元" : "费用"}
           </h2>
           <UsageProviderChart
             providers={activeProviders}
@@ -885,7 +886,7 @@ function UsageOverview({
                 <th className="w-full py-2 text-left font-normal">模型</th>
                 <th className="py-2 pl-6 font-normal">费用</th>
                 <th className="hidden py-2 pl-6 font-normal sm:table-cell">占比</th>
-                <th className="py-2 pr-2 pl-6 font-normal">Tokens</th>
+                <th className="py-2 pr-2 pl-6 font-normal">词元</th>
               </tr>
             </thead>
             <tbody>
@@ -971,7 +972,7 @@ function UsageOverview({
                     </th>
                   ))}
                   <th className="py-2 pl-4 text-right font-normal">总计</th>
-                  <th className="py-2 pr-2 pl-4 text-right font-normal">Tokens</th>
+                  <th className="py-2 pr-2 pl-4 text-right font-normal">词元</th>
                 </tr>
               </thead>
               <tbody>
@@ -1183,7 +1184,7 @@ function UsageEnvironmentFilter({
           const progress = usageEnvironmentProgress(environment, refreshing);
           const status =
             environment.error !== null
-              ? "Unavailable"
+              ? "不可用"
               : environment.summary !== null &&
                   !isCompatibleUsageContractVersion(
                     environment.summary.contractVersion,
@@ -1198,7 +1199,7 @@ function UsageEnvironmentFilter({
                       ? "正在刷新…"
                       : progress.phase === "partway"
                         ? updatingProvidersLabel(progress.providers, providerLabel)
-                        : "Ready";
+                        : "就绪";
           return (
             <MenuCheckboxItem
               key={environment.environmentId}

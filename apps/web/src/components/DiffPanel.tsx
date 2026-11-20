@@ -1074,7 +1074,7 @@ export default function DiffPanel({
                   <span aria-hidden="true" />
                   <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem] items-center">
                     <span>分支</span>
-                    <span className="text-right">Remote</span>
+                    <span className="text-right">远端</span>
                   </div>
                 </div>
                 <ComboboxEmpty>没有匹配的引用。</ComboboxEmpty>

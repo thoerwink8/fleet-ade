@@ -65,7 +65,7 @@ describe("claudeResetCreditsToContract", () => {
       options: [
         expect.objectContaining({
           creditId: "grant_a",
-          label: "Full reset",
+          label: "全部重置",
           availableCount: 2,
           expiresAt: "2026-10-01T00:00:00.000Z",
         }),
@@ -100,9 +100,9 @@ describe("claudeResetCreditsToContract", () => {
         availableCount,
       ]),
     ).toEqual([
-      ["session_a", "5-hour reset", 1],
-      ["weekly_a", "Weekly reset", 1],
-      ["fable_a", "Fable reset", 2],
+      ["session_a", "5 小时重置", 1],
+      ["weekly_a", "每周重置", 1],
+      ["fable_a", "Fable 重置", 2],
     ]);
     expect(credits).toMatchObject({ availableCount: 4, nextCreditId: "weekly_a" });
   });
