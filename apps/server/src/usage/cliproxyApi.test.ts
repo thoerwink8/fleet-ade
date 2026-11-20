@@ -260,9 +260,9 @@ describe("CLIProxyAPI built-in management API", () => {
       const result = yield* api.readAccounts(config);
       expect(result.map((account) => [account.plan, account.usageLimits.windows[0]?.kind])).toEqual(
         [
-          ["ChatGPT Plus Subscription", "session"],
-          ["ChatGPT Go Subscription", "monthly"],
-          ["ChatGPT Free Subscription", "monthly"],
+          ["ChatGPT Plus 订阅", "session"],
+          ["ChatGPT Go 订阅", "monthly"],
+          ["ChatGPT Free 订阅", "monthly"],
         ],
       );
     }),

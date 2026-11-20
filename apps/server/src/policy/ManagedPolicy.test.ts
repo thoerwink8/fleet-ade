@@ -409,7 +409,7 @@ it.layer(NodeServices.layer)("ManagedPolicy.load", (it) => {
       });
       assert.equal(
         disallowedDriverReason(policy.summary, ProviderDriverKind.make("notAProvider")),
-        "Example Corp's policy does not allow the notAProvider provider.",
+        "Example Corp 的策略不允许使用 notAProvider 提供方。",
       );
       assert.isUndefined(disallowedDriverReason(policy.summary, ProviderDriverKind.make("codex")));
     }),

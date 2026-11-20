@@ -245,6 +245,10 @@ const WEEKDAY_LABELS: Record<string, string> = {
   sunday: "日",
 };
 
+// ICU-free: the same weekday names a `zh` locale would print, so tests and
+// machines without full ICU (CI) stay in Chinese.
+const WEEKDAY_SHORT = ["日", "一", "二", "三", "四", "五", "六"] as const;
+
 function snoozePresetDaysAhead(
   setting: Extract<SnoozePresetSetting, { kind: "at" }>,
   now: Date,
@@ -298,7 +302,7 @@ export function resolveSnoozePreset(
     whenLabel:
       labelNamesDay || wake.toDateString() === now.toDateString()
         ? time
-        : `${wake.toLocaleDateString(undefined, { weekday: "short" })} ${time}`,
+        : `周${WEEKDAY_SHORT[wake.getDay()]} ${time}`,
     snoozedUntil: wake.toISOString(),
   };
 }

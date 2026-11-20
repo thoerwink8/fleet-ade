@@ -185,7 +185,7 @@ describe("managed endpoint provisioning errors", () => {
       });
       const error = yield* decodeLinkUnavailableError(body);
       expect(relayProtectedErrorMessage(error)).toBe(
-        "Relay cannot provision the managed endpoint (managed_endpoint_provisioning_failed). Failed stage: ensure-tunnel.",
+        "中继无法开通托管端点（managed_endpoint_provisioning_failed）。 失败阶段：ensure-tunnel。",
       );
     }).pipe(Effect.scoped);
   });
