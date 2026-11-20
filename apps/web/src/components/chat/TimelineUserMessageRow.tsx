@@ -1117,7 +1117,7 @@ function RevertUserMessageButton({
         render={
           <Button
             type="button"
-            size="xs"
+            size="icon-sm"
             variant="ghost"
             disabled={activity.isRevertingCheckpoint || activity.isWorking}
             onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
@@ -1125,7 +1125,7 @@ function RevertUserMessageButton({
           />
         }
       >
-        <PencilIcon className="size-3" />
+        <PencilIcon className="size-3.5" />
       </TooltipTrigger>
       <TooltipPopup side="top">从这里编辑</TooltipPopup>
     </Tooltip>

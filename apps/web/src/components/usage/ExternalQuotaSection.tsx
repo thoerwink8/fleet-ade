@@ -52,6 +52,7 @@ export function ExternalQuotaSection({
       magpieUsage={query.data?.magpieUsage ?? null}
       localLines={localLines}
       pending={query.isPending}
+      error={query.error}
       onRefresh={() => query.refresh()}
     />
   );

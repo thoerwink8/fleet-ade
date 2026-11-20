@@ -14,7 +14,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
   label = "复制消息",
   icon: Icon = CopyIcon,
   extraFlavors,
-  size = "xs",
+  size = "icon-sm",
   variant = "outline",
   className,
 }: {
@@ -22,7 +22,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
   label?: string;
   icon?: LucideIcon;
   extraFlavors?: Readonly<Record<string, string>>;
-  size?: "xs" | "icon-xs";
+  size?: "xs" | "icon-xs" | "icon-sm";
   variant?: "outline" | "ghost";
   className?: string;
 }) {
@@ -50,7 +50,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
           />
         }
       >
-        {isCopied ? <CheckIcon className="size-3 text-primary" /> : <Icon className="size-3" />}
+        {isCopied ? <CheckIcon className="size-3.5 text-primary" /> : <Icon className="size-3.5" />}
       </TooltipTrigger>
       <TooltipPopup>
         <p>{label}</p>

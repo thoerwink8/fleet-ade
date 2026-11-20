@@ -252,7 +252,7 @@ it.effect("两台互连环境通过真实 MCP 上报各自摘要行，改动只�
               title: "A 的随手活",
               pendingRuntimeRequest: {
                 id: "request-1" as never,
-                kind: "user_input",
+                kind: "command",
                 createdAt: at,
               },
             }),
@@ -1600,6 +1600,112 @@ it.effect("heartbeat transport or proof errors do not mark a lease lost", () =>
         type: "upsert-task",
         title: "after",
       });
+    }),
+  ),
+);
+
+it.effect("pending request reports needsYou only for blocking approvals", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const summaryContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
+      const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
+      const cases = [
+        { kind: "command", needsYou: true },
+        { kind: "file-read", needsYou: true },
+        { kind: "file-change", needsYou: true },
+        { kind: "permission", needsYou: true },
+        { kind: "mcp-elicitation", needsYou: true },
+        { kind: "dynamic_tool_call", needsYou: false },
+        { kind: "user_input", needsYou: false },
+        { kind: "auth_refresh", needsYou: false },
+      ] as const;
+      const shells = yield* Ref.make(
+        new Map(
+          cases.map(({ kind }) => {
+            const threadId = ThreadId.make(`pending-${kind}`);
+            return [
+              threadId,
+              shell(threadId, "waiting", {
+                pendingRuntimeRequest: {
+                  id: `request-${kind}` as never,
+                  kind,
+                  createdAt: at,
+                },
+              }),
+            ] as const;
+          }),
+        ),
+      );
+      const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+            localReporterDependencies,
+            Scheduler.layer,
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: (threadId: ThreadId) =>
+                Effect.map(Ref.get(shells), (map) => map.get(threadId) ?? null),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: Effect.fn(function* (
+                request: Parameters<PeerMcpClient.PeerMcpClient["Service"]["call"]>[0],
+              ) {
+                const input = yield* decodeSummaryReport(request.arguments);
+                const result = yield* summary.report("executor", input);
+                return yield* decodePeerResult(request.success, result);
+              }, Effect.orDie),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const reporter = Context.get(reporterContext, FleetSummaryReporter.FleetSummaryReporter);
+      const updates = yield* summary.subscribe({ cursor: 0 });
+      const received = yield* Effect.forkChild(
+        Stream.runCollect(
+          updates.pipe(
+            Stream.filter((event) => event.type === "upsert"),
+            Stream.take(cases.length + 1),
+          ),
+        ),
+      );
+      const nonBlocking = ThreadId.make("pending-nonblocking");
+      yield* Ref.update(shells, (map) =>
+        new Map(map).set(
+          nonBlocking,
+          shell(nonBlocking, "waiting", {
+            pendingRuntimeRequest: {
+              id: "request-nonblocking" as never,
+              kind: "command",
+              createdAt: at,
+              blocking: false,
+            },
+          }),
+        ),
+      );
+      for (const { kind } of cases) {
+        const threadId = ThreadId.make(`pending-${kind}`);
+        yield* reporter.trackAdhoc(threadId, EnvironmentId.make("coordinator"));
+        yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+      }
+      yield* reporter.trackAdhoc(nonBlocking, EnvironmentId.make("coordinator"));
+      yield* reporter.handle(fakeEvent(nonBlocking, "run.updated"));
+
+      const upserts = [...(yield* Fiber.join(received))];
+      for (const { kind, needsYou } of cases) {
+        const row = upserts.find(
+          (event) => event.type === "upsert" && event.row.threadId === `pending-${kind}`,
+        );
+        expect(row?.type === "upsert" ? row.row.needsYou : undefined, kind).toBe(needsYou);
+        expect(row?.type === "upsert" ? row.row.phase : undefined, kind).toBe("stuck");
+        expect(row?.type === "upsert" ? row.row.reason : undefined, kind).toBe(`waiting:${kind}`);
+      }
+      const nonBlockingRow = upserts.find(
+        (event) => event.type === "upsert" && event.row.threadId === "pending-nonblocking",
+      );
+      expect(nonBlockingRow?.type === "upsert" ? nonBlockingRow.row.needsYou : undefined).toBe(
+        false,
+      );
     }),
   ),
 );

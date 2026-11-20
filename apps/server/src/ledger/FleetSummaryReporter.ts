@@ -17,6 +17,7 @@ import {
   FleetSummaryWriteResult,
   FleetSummarySessionRun,
   phaseFromSessionRun,
+  isBlockingApproval,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ThreadShell,
   type ThreadId,
@@ -162,7 +163,9 @@ const make = Effect.gen(function* () {
       ? `waiting:${shell.pendingRuntimeRequest.kind}`
       : (shell.lastError ?? "")
     ).slice(0, 200),
-    needsYou: shell.pendingRuntimeRequest !== null,
+    needsYou:
+      shell.pendingRuntimeRequest !== null &&
+      isBlockingApproval(shell.pendingRuntimeRequest.kind, shell.pendingRuntimeRequest.blocking),
     lastProgress: (shell.latestVisibleMessage?.text ?? "").slice(0, FLEET_SUMMARY_PROGRESS_LIMIT),
   });
 

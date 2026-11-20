@@ -14,6 +14,8 @@ const buttonVariants = cva(
     },
     variants: {
       size: {
+        action:
+          "h-8 gap-1 px-[calc(--spacing(2.5)-1px)] text-sm sm:h-7 [&_svg:not([class*='size-'])]:size-4",
         compact:
           "h-7 gap-1 rounded-md px-[calc(--spacing(2)-1px)] text-meta before:rounded-[calc(var(--radius-md)-1px)] [&_svg:not([class*='size-'])]:size-4",
         default: "h-9 px-[calc(--spacing(3)-1px)] sm:h-8",

@@ -5,7 +5,6 @@ import {
   toolGroupAction,
 } from "@t3tools/client-runtime/work-log/presentation";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
-import { formatTokens } from "@t3tools/shared/usageFormat";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import { type TimelineWorkEntry, type TimelineRow } from "./timelineRowContext";
 import { type WorkEntryIconName } from "./TimelineToolActivityIcon";
@@ -194,16 +193,6 @@ export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconNa
   }
 
   return workToneIcon(workEntry.tone).iconName;
-}
-
-export function estimateReasoningTokenLabel(detail: string | undefined): string | null {
-  const trimmed = detail?.trim();
-  if (!trimmed) return null;
-  const cjkMatches = trimmed.match(/[\u3400-\u9fff\uf900-\ufaff]/g);
-  const cjkCount = cjkMatches ? cjkMatches.length : 0;
-  const nonCjkCount = Math.max(0, trimmed.length - cjkCount);
-  const estimated = Math.max(1, Math.round(cjkCount * 0.7 + nonCjkCount / 4));
-  return `~${formatTokens(estimated)}`;
 }
 
 // Look past the visible label so long destinations and inline delimiters can close.
