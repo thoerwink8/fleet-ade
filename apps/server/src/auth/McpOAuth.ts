@@ -14,6 +14,7 @@ import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   MCP_PEER_LINK_SOFTWARE_ID,
+  EnvironmentId,
   mcpClientScopes,
   parseMcpApprovalCode,
   type RuntimeMode,
@@ -24,6 +25,7 @@ import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
+import * as Base64Url from "effect/encoding/Base64Url";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
@@ -36,6 +38,7 @@ import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import type * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
+import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import * as PayloadSigner from "./PayloadSigner.ts";
 import * as EnvironmentAuth from "./EnvironmentAuth.ts";
 import * as ServerSecretStore from "./ServerSecretStore.ts";
@@ -57,6 +60,8 @@ const MAX_REDIRECT_URIS = 5;
 const MAX_REDIRECT_URI_LENGTH = 512;
 const DEFAULT_CLIENT_NAME = "MCP client";
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const isEnvironmentId = Schema.is(EnvironmentId);
+const decodeEnvironmentIdOption = Schema.decodeUnknownOption(EnvironmentId);
 const CODE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const CODE_VERIFIER_PATTERN = /^[A-Za-z0-9\-._~]{43,128}$/;
 
@@ -178,6 +183,7 @@ export interface AuthorizationRequest {
   readonly state: Redacted.Redacted<string> | undefined;
   readonly resource: string;
   readonly issuer: string;
+  readonly peerEnvironmentId?: string;
 }
 
 interface PendingCode {
@@ -188,6 +194,7 @@ interface PendingCode {
   readonly codeChallenge: string;
   readonly resource: string;
   readonly access: AuthMcpClientAccess;
+  readonly peerIdentity?: string;
   readonly expiresAtMs: number;
 }
 
@@ -257,6 +264,8 @@ const make = Effect.gen(function* () {
   const random = yield* SecureRandom.SecureRandom;
   const digester = yield* Digest.Digest;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
+  const peerClient = yield* PeerMcpClient.PeerMcpClient;
+  const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
   const signer = yield* PayloadSigner.fromSecret(
     yield* secretStore.getOrCreateRandom(SIGNING_SECRET_NAME, 32).pipe(Effect.orDie),
   );
@@ -314,6 +323,7 @@ const make = Effect.gen(function* () {
         authorization.client.clientId,
         authorization.redirectUri,
         authorization.codeChallenge,
+        authorization.peerEnvironmentId ?? null,
       ]),
     );
 
@@ -396,6 +406,11 @@ const make = Effect.gen(function* () {
       state,
       resource: urls.resource,
       issuer: urls.issuer,
+      ...(client.peerLink &&
+      request.peer_environment_id !== undefined &&
+      isEnvironmentId(request.peer_environment_id)
+        ? { peerEnvironmentId: request.peer_environment_id }
+        : {}),
     } satisfies AuthorizationRequest;
   });
 
@@ -420,6 +435,7 @@ const make = Effect.gen(function* () {
   const mintCode = Effect.fn("McpOAuth.mintCode")(function* (
     authorization: AuthorizationRequest,
     access: AuthMcpClientAccess,
+    peerIdentity: string | undefined,
   ) {
     const now = yield* Clock.currentTimeMillis;
     const code = Buffer.from(yield* random.randomBytes(32)).toString("base64url");
@@ -433,6 +449,7 @@ const make = Effect.gen(function* () {
         codeChallenge: authorization.codeChallenge,
         resource: authorization.resource,
         access,
+        ...(peerIdentity === undefined ? {} : { peerIdentity }),
         expiresAtMs: now + AUTHORIZATION_CODE_TTL_MS,
       });
       return next;
@@ -478,7 +495,26 @@ const make = Effect.gen(function* () {
         });
       }
     }
-    const code = yield* mintCode(input.authorization, access);
+    let peerIdentity: string | undefined;
+    const hint = input.authorization.peerEnvironmentId;
+    // The hint only selects an already paired outbound link. A proof is valid
+    // only for this PKCE challenge and our environment ID; exchangeCode still
+    // requires its verifier before placing the proven identity in a session.
+    if (hint !== undefined) {
+      const target = yield* serverEnvironment.getEnvironmentId;
+      const proof = yield* peerClient
+        .call({
+          environmentId: EnvironmentId.make(hint),
+          tool: "fleet_peer_proof",
+          arguments: { challenge: input.authorization.codeChallenge, target },
+          proof: true,
+          limits: { runtimeMode: "approval-required", interactionMode: "default" },
+          success: Schema.Struct({ environmentId: Schema.String }),
+        })
+        .pipe(Effect.timeout("10 seconds"), Effect.option);
+      if (Option.isSome(proof) && proof.value.environmentId === hint) peerIdentity = hint;
+    }
+    const code = yield* mintCode(input.authorization, access, peerIdentity);
     yield* Effect.logInfo("Approved an MCP client sign-in.", {
       client: input.authorization.client.name,
       access,
@@ -542,6 +578,7 @@ const make = Effect.gen(function* () {
           label: pending.clientName,
           access: pending.access,
           peerLink: pending.peerLink,
+          ...(pending.peerIdentity === undefined ? {} : { peerIdentity: pending.peerIdentity }),
           client: deriveAuthClientMetadata({ request }),
         })
         .pipe(
@@ -586,14 +623,77 @@ export const layerMcpClientAuthenticator = Layer.effect(
     const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
     const environment = yield* ServerEnvironment.ServerEnvironment;
     const environmentId = yield* environment.getEnvironmentId;
+    const peerClient = yield* PeerMcpClient.PeerMcpClient;
+    const digester = yield* Digest.Digest;
     const hostedAppUrl = yield* hostedAppUrlConfig.pipe(Effect.option);
+    const identities = yield* Ref.make(new Map<string, EnvironmentId>());
     return McpHttpServer.McpClientAuthenticator.of({
       authenticate: Effect.fn("McpHttpServer.McpClientAuthenticator.authenticate")(
         function (request) {
           return environmentAuth.authenticateMcpClient(request).pipe(
             Effect.flatMap((client) =>
-              Clock.currentTimeMillis.pipe(
-                Effect.map((issuedAt): McpInvocationContext.McpInvocationScope => ({
+              Effect.gen(function* () {
+                let provenId =
+                  client.environmentId ?? (yield* Ref.get(identities)).get(client.sessionId);
+                const hint = request.headers[PeerMcpClient.PEER_IDENTITY_HEADER];
+                const challenge = request.headers[PeerMcpClient.PEER_CHALLENGE_HEADER];
+                const token = EnvironmentAuth.parseBearerToken(request);
+                const parsedHint = decodeEnvironmentIdOption(hint);
+                const isProof = request.headers[PeerMcpClient.PEER_PROOF_HEADER] === "1";
+                if (client.peerLink && isProof && (hint !== undefined || challenge !== undefined)) {
+                  return "identity_unavailable" as const;
+                }
+                if (
+                  client.peerLink &&
+                  !isProof &&
+                  provenId !== undefined &&
+                  Option.isSome(parsedHint) &&
+                  provenId !== parsedHint.value
+                )
+                  return "identity_conflict" as const;
+                if (
+                  client.peerLink &&
+                  !isProof &&
+                  (hint !== undefined || challenge !== undefined)
+                ) {
+                  if (
+                    Option.isNone(parsedHint) ||
+                    token === null ||
+                    typeof challenge !== "string" ||
+                    !CODE_CHALLENGE_PATTERN.test(challenge)
+                  )
+                    return "identity_unavailable" as const;
+                  const peerId = parsedHint.value;
+                  if (provenId === undefined) {
+                    const bearerDigest = Base64Url.encode(
+                      yield* digester
+                        .digest(Digest.sha256, new TextEncoder().encode(token))
+                        .pipe(Effect.orDie),
+                    );
+                    const proof = yield* peerClient
+                      .call({
+                        environmentId: peerId,
+                        tool: "fleet_peer_proof",
+                        arguments: { challenge, target: environmentId, bearerDigest },
+                        limits: { runtimeMode: "approval-required", interactionMode: "default" },
+                        proof: true,
+                        success: Schema.Struct({ environmentId: EnvironmentId }),
+                      })
+                      .pipe(Effect.timeout("10 seconds"), Effect.option);
+                    if (Option.isNone(proof) || proof.value.environmentId !== peerId) {
+                      return "identity_unavailable" as const;
+                    }
+                    const accepted = yield* Ref.modify(identities, (current) => {
+                      const existing = current.get(client.sessionId);
+                      if (existing !== undefined) return [existing === peerId, current] as const;
+                      return [true, new Map(current).set(client.sessionId, peerId)] as const;
+                    });
+                    if (!accepted) return "identity_conflict" as const;
+                    provenId = peerId;
+                  }
+                }
+                const issuedAt = yield* Clock.currentTimeMillis;
+                return {
                   environmentId,
                   requestNamespace: `client:${client.sessionId}`,
                   thread: undefined,
@@ -602,9 +702,7 @@ export const layerMcpClientAuthenticator = Layer.effect(
                     label: client.label,
                     access: client.access,
                     linked: client.peerLink,
-                    ...(client.environmentId === undefined
-                      ? {}
-                      : { environmentId: client.environmentId }),
+                    ...(provenId === undefined ? {} : { environmentId: provenId }),
                     ...(Option.isSome(hostedAppUrl) && !client.peerLink
                       ? { hostedAppUrl: hostedAppUrl.value }
                       : {}),
@@ -615,8 +713,8 @@ export const layerMcpClientAuthenticator = Layer.effect(
                     "pull-requests",
                   ]),
                   issuedAt,
-                })),
-              ),
+                } satisfies McpInvocationContext.McpInvocationScope;
+              }),
             ),
             Effect.catch((error) =>
               (EnvironmentAuth.isServerAuthCredentialError(error)

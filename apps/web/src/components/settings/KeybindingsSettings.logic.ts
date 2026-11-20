@@ -212,7 +212,15 @@ const KEYBINDING_GROUPS = [
   {
     id: "navigation",
     title: "导航",
-    prefixes: ["sidebar", "rightPanel", "commandPalette", "filePicker", "projectSearch", "editor"],
+    prefixes: [
+      "sidebar",
+      "rightPanel",
+      "commandPalette",
+      "shortcutCheatsheet",
+      "filePicker",
+      "projectSearch",
+      "editor",
+    ],
   },
   { id: "threads", title: "会话", prefixes: ["thread", "chat", "pullRequest"] },
   { id: "composer", title: "输入框", prefixes: ["composer", "modelPicker"] },
@@ -378,11 +386,13 @@ export function commandLabel(command: KeybindingCommand): string {
   if (command === "thread.steerQueuedMessage") return "队列：发送第一条排队消息";
   if (command === "thread.editQueuedMessage") return "队列：编辑最后一条排队消息";
   if (command === "thread.copyReference") return "PR：复制链接或会话";
+  if (command === "thread.commander") return "标成或取消指挥";
   const usageMetric = METRIC_OPTIONS.find((option) => option.command === command);
   if (usageMetric) return `Usage: ${usageMetric.label}`;
   const usagePeriod = WINDOW_OPTIONS.find((option) => option.command === command);
   if (usagePeriod) return `Usage: Period: ${usagePeriod.label}`;
   if (command === "view.reopenClosed") return "重新打开已关闭的标签页";
+  if (command === "shortcutCheatsheet.toggle") return "快捷键速查";
   if (command === "preview.focusUrl") return "预览：聚焦 URL";
   if (command === "preview.find") return "预览：在页面上查找";
   const raw = String(command);

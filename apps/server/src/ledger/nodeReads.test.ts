@@ -422,6 +422,66 @@ it.effect("有效但没有 orchestration:read 的凭证读三个口是 403", () 
   ),
 );
 
+it.effect("摘要迁移不因 UUID 格式或缺少链接而删除真实环境行", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* NodeReads.migrate;
+    const environmentId = "a191e6d5-bb17-4eb1-b6cf-dc1e1d692981";
+    const rowId = `adhoc\n${environmentId}\nthread-1`;
+    yield* sql`INSERT INTO fleet_summary_rows (
+      row_id, environment_id, kind, thread_id, title, phase, reason, needs_you,
+      last_progress, updated_at, revision
+    ) VALUES (${rowId}, ${environmentId}, 'adhoc', 'thread-1', 'Disconnected environment',
+      'working', 'working', 0, 'progress', '2026-11-19T00:00:00.000Z', 1)`;
+    yield* sql`UPDATE fleet_summary_meta SET revision = 1 WHERE id = 1`;
+    yield* NodeReads.migrate;
+    yield* NodeReads.migrate;
+    expect(yield* sql`SELECT row_id, environment_id FROM fleet_summary_rows`).toEqual([
+      { row_id: rowId, environment_id: environmentId },
+    ]);
+    expect(yield* sql`SELECT revision FROM fleet_summary_meta WHERE id = 1`).toEqual([
+      { revision: 1 },
+    ]);
+    expect(yield* sql`SELECT revision FROM fleet_summary_changes`).toEqual([]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("旧摘要登记迁移后保留数据并允许多个协调者", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE fleet_summary_registrations (
+      thread_id TEXT PRIMARY KEY, kind TEXT NOT NULL, coordinator TEXT NOT NULL,
+      repo TEXT, issue INTEGER, task_id TEXT, sent TEXT, deleting INTEGER NOT NULL DEFAULT 0
+    )`;
+    yield* sql`INSERT INTO fleet_summary_registrations (thread_id, kind, coordinator)
+      VALUES ('thread-1', 'adhoc', 'coordinator-a')`;
+    yield* NodeReads.migrate;
+    yield* NodeReads.migrate;
+    yield* sql`INSERT INTO fleet_summary_registrations (thread_id, kind, coordinator)
+      VALUES ('thread-1', 'adhoc', 'coordinator-b')`;
+    expect(
+      yield* sql`SELECT thread_id, coordinator FROM fleet_summary_registrations ORDER BY coordinator`,
+    ).toEqual([
+      { thread_id: "thread-1", coordinator: "coordinator-a" },
+      { thread_id: "thread-1", coordinator: "coordinator-b" },
+    ]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
+it.effect("migration rolls back all changes when a later schema change fails", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE node_claims (repo TEXT, issue INTEGER, task_id TEXT)`;
+    yield* sql`CREATE TABLE node_claims_before_fleet (repo TEXT)`;
+    const result = yield* Effect.exit(NodeReads.migrate);
+    expect(result._tag).toBe("Failure");
+    const tables = yield* sql<{
+      name: string;
+    }>`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('fleet_summary_meta', 'node_claims') ORDER BY name`;
+    expect(tables.map((table) => table.name)).toEqual(["node_claims"]);
+  }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+);
+
 it.effect("迁移旧 node_claims 去重并保留一条 repo issue task 租约", () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;

@@ -149,6 +149,18 @@ export class ThreadPinningUnsupportedError extends Schema.TaggedError<ThreadPinn
   }
 }
 
+export class ThreadCommanderUnsupportedError extends Schema.TaggedError<ThreadCommanderUnsupportedError>()(
+  "ThreadCommanderUnsupportedError",
+  {
+    environmentId: EnvironmentId,
+    threadId: ThreadId,
+  },
+) {
+  override get message(): string {
+    return "此环境的服务器尚不支持指挥会话标记。请更新服务器后再使用“标成指挥”。";
+  }
+}
+
 export class ThreadPinReorderUnsupportedError extends Schema.TaggedError<ThreadPinReorderUnsupportedError>()(
   "ThreadPinReorderUnsupportedError",
   {
@@ -299,6 +311,12 @@ export function useThreadActions() {
     reportFailure: false,
   });
   const unpinThreadMutation = useOrchestrationCommand(threadEnvironment.unpin, {
+    reportFailure: false,
+  });
+  const markCommanderMutation = useOrchestrationCommand(threadEnvironment.markCommander, {
+    reportFailure: false,
+  });
+  const unmarkCommanderMutation = useOrchestrationCommand(threadEnvironment.unmarkCommander, {
     reportFailure: false,
   });
   const setThreadAutoSettleMutation = useOrchestrationCommand(threadEnvironment.setAutoSettle, {
@@ -1079,6 +1097,44 @@ export function useThreadActions() {
     return result;
   };
 
+  const markCommanderThread = async (target: ScopedThreadRef) => {
+    if (!readEnvironmentServerConfigLoaded(target.environmentId)) {
+      return AsyncResult.failure(
+        Cause.fail(
+          new ThreadCommanderUnsupportedError({
+            environmentId: target.environmentId,
+            threadId: target.threadId,
+          }),
+        ),
+      );
+    }
+    const result = await markCommanderMutation({
+      environmentId: target.environmentId,
+      input: { threadId: target.threadId },
+    });
+    if (result._tag === "Success") announce("已标成指挥");
+    return result;
+  };
+
+  const unmarkCommanderThread = async (target: ScopedThreadRef) => {
+    if (!readEnvironmentServerConfigLoaded(target.environmentId)) {
+      return AsyncResult.failure(
+        Cause.fail(
+          new ThreadCommanderUnsupportedError({
+            environmentId: target.environmentId,
+            threadId: target.threadId,
+          }),
+        ),
+      );
+    }
+    const result = await unmarkCommanderMutation({
+      environmentId: target.environmentId,
+      input: { threadId: target.threadId },
+    });
+    if (result._tag === "Success") announce("已取消指挥");
+    return result;
+  };
+
   const settleThread = async (target: ScopedThreadRef) => {
     if (!readEnvironmentServerConfigLoaded(target.environmentId)) {
       return AsyncResult.failure(
@@ -1293,6 +1349,8 @@ export function useThreadActions() {
     pinThread,
     unpinThread,
     confirmAndUnpinThread,
+    markCommanderThread,
+    unmarkCommanderThread,
     reorderPinnedThread,
     reorderActiveThread,
     markThreadUnread,

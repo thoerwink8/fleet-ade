@@ -7,6 +7,7 @@ import {
   planPinnedReorder,
   resolveSettledThreadTimestamp,
   sortActiveThreadsByOrderKey,
+  sortCommanderThreads,
   sortSettledThreads,
   sortThreads,
   type SettledThreadTimestampInput,
@@ -320,5 +321,56 @@ describe("sortActiveThreadsByOrderKey", () => {
     const keys = new Map(assignments.map((assignment) => [assignment.id, assignment.orderKey]));
     const updated = threads.map((thread) => ({ ...thread, activeOrderKey: keys.get(thread.id) }));
     expect(sortActiveThreadsByOrderKey(updated).map((thread) => thread.id)).toEqual(orderedIds);
+  });
+});
+
+describe("sortCommanderThreads", () => {
+  it("orders commander threads by most recent activity descending with deterministic tie-break", () => {
+    const sorted = sortCommanderThreads([
+      {
+        ...makeThread({
+          id: "cmd-older",
+          createdAt: "2026-03-09T08:00:00.000Z",
+          updatedAt: "2026-03-09T09:00:00.000Z",
+        }),
+        latestRun: null,
+      },
+      {
+        ...makeThread({
+          id: "cmd-run",
+          createdAt: "2026-03-09T07:00:00.000Z",
+          updatedAt: "2026-03-09T08:00:00.000Z",
+        }),
+        latestRun: {
+          requestedAt: "2026-03-09T11:30:00.000Z",
+          startedAt: "2026-03-09T11:31:00.000Z",
+          completedAt: "2026-03-09T12:00:00.000Z",
+        },
+      },
+      {
+        ...makeThread({
+          id: "cmd-msg",
+          createdAt: "2026-03-09T06:00:00.000Z",
+          updatedAt: "2026-03-09T07:00:00.000Z",
+          latestUserMessageAt: "2026-03-09T11:45:00.000Z",
+        }),
+        latestRun: null,
+      },
+      {
+        ...makeThread({
+          id: "cmd-tie-b",
+          createdAt: "2026-03-09T08:00:00.000Z",
+          updatedAt: "2026-03-09T09:00:00.000Z",
+        }),
+        latestRun: null,
+      },
+    ]);
+
+    expect(sorted.map((thread) => thread.id)).toEqual([
+      "cmd-run",
+      "cmd-msg",
+      "cmd-older",
+      "cmd-tie-b",
+    ]);
   });
 });

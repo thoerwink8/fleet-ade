@@ -36,6 +36,22 @@ import {
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import type * as RpcSession from "../rpc/session.ts";
 
+export function provideEnvironmentStreamPermissions<R, ER, A, E, Services>(
+  runtime: Atom.AtomRuntime<EnvironmentRegistry.EnvironmentRegistry | R, ER>,
+  stream: Stream.Stream<A, E, Services>,
+) {
+  return Stream.unwrap(
+    Effect.gen(function* () {
+      const registry = yield* AtomRegistry.AtomRegistry;
+      return stream.pipe(
+        Stream.provideService(RpcPermissionGuard, {
+          authorize: (id, method, payload) =>
+            createCommandPermissions(runtime, method).authorize(registry, id, payload),
+        }),
+      );
+    }),
+  );
+}
 const isEnvironmentRpcUnavailable = Schema.is(EnvironmentRpcUnavailableError);
 
 /**

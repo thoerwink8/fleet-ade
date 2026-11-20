@@ -26,6 +26,7 @@ import {
   resolveSidebarDropTarget,
   planSidebarThreadDrop,
   resolveSidebarReorderableThreadKeys,
+  resolveSidebarThreadSection,
   sortPinnedThreadsForSidebar,
   sortScopedProjectsForSidebar,
   sortSidebarV2ProjectGroups,
@@ -1570,5 +1571,57 @@ describe("shouldCreateNewThreadInCurrentProject", () => {
     expect(shouldCreateNewThreadInCurrentProject(false, 1, 3)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(false, 0, 0)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(true, 2, 2)).toBe(true);
+  });
+});
+
+describe("commander sidebar pinning", () => {
+  it("pins commander above pinned, settled, and snoozed, and restores previous section when unmarked", () => {
+    expect(
+      resolveSidebarThreadSection({
+        commander: true,
+        pinned: true,
+        settled: true,
+        snoozed: true,
+      }),
+    ).toBe("commander");
+
+    expect(
+      resolveSidebarThreadSection({
+        commander: false,
+        pinned: true,
+        settled: false,
+        snoozed: false,
+      }),
+    ).toBe("pinned");
+  });
+
+  it("excludes commander threads from drag reordering and drop targets", () => {
+    const commander = makeThreadFixture({
+      id: ThreadId.make("cmd-1"),
+      commander: true,
+      pinnedAt: "2026-03-09T09:00:00.000Z",
+    });
+    const normal = makeThreadFixture({ id: ThreadId.make("act-1") });
+    const keys = resolveSidebarReorderableThreadKeys({
+      threads: [commander, normal],
+      serverConfigs: new Map([[commander.environmentId, { environment: {} } as never]]),
+      connectedEnvironmentIds: [commander.environmentId],
+    });
+    expect(keys.draggableThreadKeys.has("environment-test:cmd-1")).toBe(false);
+    expect(keys.draggableThreadKeys.has("environment-test:act-1")).toBe(true);
+
+    const list: readonly SidebarListItem[] = [
+      { kind: "thread", key: "cmd-1", section: "commander" },
+      { kind: "marker", marker: "pinned-header" },
+      { kind: "thread", key: "p1", section: "pinned" },
+      { kind: "marker", marker: "pinned-divider" },
+      { kind: "thread", key: "a1", section: "active" },
+    ];
+    expect(resolveSidebarDropTarget(list, "a1", "cmd-1")).toBeNull();
+    expect(resolveSidebarDropTarget(list, "a1", "sidebar-marker-pinned-header")).toEqual({
+      section: "pinned",
+      pinnedOrder: ["a1", "p1"],
+      activeOrder: [],
+    });
   });
 });

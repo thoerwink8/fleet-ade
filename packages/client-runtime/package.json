@@ -355,6 +355,10 @@
       "types": "./src/state/threadInbox.ts",
       "default": "./src/state/threadInbox.ts"
     },
+    "./state/fleet-summary": {
+      "types": "./src/state/fleetSummary.ts",
+      "default": "./src/state/fleetSummary.ts"
+    },
     "./state/thread-relationships": {
       "types": "./src/state/threadRelationships.ts",
       "default": "./src/state/threadRelationships.ts"

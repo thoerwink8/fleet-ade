@@ -74,4 +74,32 @@ describe("buildThreadActionMenuItems", () => {
     expect(items.find((item) => item.id === "archive")?.disabled).toBe(true);
     expect(items.find((item) => item.id === "turn-into-project")?.disabled).toBe(true);
   });
+
+  it("toggles mark-commander and unmark-commander independently of pin state", () => {
+    const pinnedNotCommander = buildThreadActionMenuItems({
+      ...baseState,
+      isPinned: true,
+      isCommander: false,
+      supports: { ...baseState.supports, commander: true },
+    });
+    expect(pinnedNotCommander.some((item) => item.id === "unpin")).toBe(true);
+    expect(pinnedNotCommander.some((item) => item.id === "mark-commander")).toBe(true);
+
+    const commanderNotPinned = buildThreadActionMenuItems({
+      ...baseState,
+      isPinned: false,
+      isCommander: true,
+      supports: { ...baseState.supports, commander: true },
+    });
+    expect(commanderNotPinned.some((item) => item.id === "pin")).toBe(true);
+    expect(commanderNotPinned.some((item) => item.id === "unmark-commander")).toBe(true);
+
+    const readOnly = buildThreadActionMenuItems({
+      ...baseState,
+      canOperate: false,
+      isCommander: false,
+      supports: { ...baseState.supports, commander: true },
+    });
+    expect(readOnly.find((item) => item.id === "mark-commander")?.disabled).toBe(true);
+  });
 });

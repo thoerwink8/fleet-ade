@@ -984,3 +984,31 @@ describe("Usage shortcuts", () => {
     );
   });
 });
+
+describe("thread commander shortcut", () => {
+  it("resolves mod+alt+p to thread.commander outside terminals", () => {
+    assert.strictEqual(
+      resolveShortcutCommand(
+        event({ key: "p", code: "KeyP", ctrlKey: true, altKey: true }),
+        DEFAULT_RESOLVED_KEYBINDINGS,
+        { platform: "Win32" },
+      ),
+      "thread.commander",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(
+        event({ key: "π", code: "KeyP", metaKey: true, altKey: true }),
+        DEFAULT_RESOLVED_KEYBINDINGS,
+        { platform: "MacIntel" },
+      ),
+      "thread.commander",
+    );
+    assert.isNull(
+      resolveShortcutCommand(
+        event({ key: "p", code: "KeyP", ctrlKey: true, altKey: true }),
+        DEFAULT_RESOLVED_KEYBINDINGS,
+        { platform: "Win32", context: { terminalFocus: true } },
+      ),
+    );
+  });
+});

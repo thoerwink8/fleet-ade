@@ -8,21 +8,14 @@ import {
   type FleetClaimHeartbeatInput,
   type FleetClaimLeaseInput,
 } from "@t3tools/contracts";
-import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as TestClock from "effect/testing/TestClock";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
-import * as PeerLinks from "../peer/PeerLinks.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
-import {
-  descriptorOf,
-  layerLinkingEnvironment,
-  linkTo,
-  servePeer,
-} from "../peer/PeerLinks.testkit.ts";
+import { descriptorOf, linkTo, servePeer } from "../peer/PeerLinks.testkit.ts";
 import * as FleetClaims from "./FleetClaims.ts";
 
 const coordinator = descriptorOf("coordinator", "Coordinator");
@@ -74,6 +67,16 @@ const claimInput = (repo: string, taskId: string, idempotencyKey: string) => ({
   idempotencyKey,
 });
 
+const serveApart = (descriptor: typeof coordinator) =>
+  Layer.build(Layer.fresh(NodeHttpServer.layerTest)).pipe(
+    Effect.flatMap((server) =>
+      servePeer(
+        descriptor,
+        McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
+      ).pipe(Effect.provideContext(server)),
+    ),
+  );
+
 it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签名会话身份", () =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -81,25 +84,73 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签�
         coordinator,
         McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
       );
-      const aContext = yield* layerLinkingEnvironment(nodeA).pipe(Layer.build);
-      const bContext = yield* layerLinkingEnvironment(nodeB).pipe(Layer.build);
-      const aLinks = Context.get(aContext, PeerLinks.PeerLinks);
-      const bLinks = Context.get(bContext, PeerLinks.PeerLinks);
-      const aClient = Context.get(aContext, PeerMcpClient.PeerMcpClient);
-      const bClient = Context.get(bContext, PeerMcpClient.PeerMcpClient);
-      yield* linkTo(aLinks, peer);
-      yield* linkTo(bLinks, peer);
+      const a = yield* serveApart(nodeA);
+      const b = yield* serveApart(nodeB);
+      const aClient = a.client;
+      const bClient = b.client;
+      // The executor first authenticates to the coordinator. The reciprocal
+      // link can then prove the coordinator's identity over that existing link.
+      yield* linkTo(a.links, peer);
+      const initialClaim = yield* claim(
+        aClient,
+        claimInput("example/one", "initial", "initial-unidentified"),
+      ).pipe(Effect.flip);
+      expect(initialClaim.code).toBe("orchestration_error");
+      yield* linkTo(peer.links, a);
+      const reciprocalClaim = yield* peer.client.call({
+        environmentId: nodeA.environmentId,
+        tool: "fleet_claim",
+        arguments: claimInput("example/one", "reciprocal", "coordinator-claim"),
+        limits,
+        success: FleetClaimClaimResult,
+      });
+      expect(reciprocalClaim.claim?.holderEnvironment).toBe(coordinator.environmentId);
+      // An unrelated hinted link has no authenticated return path and is not identified.
+      yield* linkTo(b.links, a);
+      const unrelatedClaim = yield* bClient
+        .call({
+          environmentId: nodeA.environmentId,
+          tool: "fleet_claim",
+          arguments: claimInput("example/one", "unrelated", "unidentified-claim"),
+          limits,
+          success: FleetClaimClaimResult,
+        })
+        .pipe(Effect.flip);
+      expect(unrelatedClaim.code).toBe("orchestration_error");
+      yield* linkTo(b.links, peer);
+      yield* linkTo(peer.links, b);
 
       const held = yield* claim(aClient, claimInput("example/one", "root", "a-root"));
       expect(held.outcome).toBe("claimed");
       expect(held.claim?.holder).not.toBe("node-a");
-      expect(held.claim?.holderEnvironment).toBe(held.claim?.holder);
+      expect(held.claim?.holderEnvironment).toBe("node-a");
+      // Re-pairing replaces the inbound session, but not the environment owning the lease.
+      const originalSession = held.claim!.holder;
+      yield* linkTo(a.links, peer);
+      const relinked = (yield* peer.linkedSessions).find(
+        (session) => session.sessionId !== originalSession,
+      );
+      expect(relinked).toBeDefined();
+      const afterRelink = yield* heartbeat(aClient, {
+        sequence: 1,
+        leases: [
+          {
+            repo: "example/one",
+            issue: 7,
+            taskId: "root",
+            attempt: held.claim!.attempt,
+            fencing: held.claim!.fencing,
+          },
+        ],
+      });
+      expect(afterRelink.results[0]?.outcome).toBe("renewed");
+      expect(afterRelink.results[0]?.claim?.holderEnvironment).toBe("node-a");
       expect((yield* claim(bClient, claimInput("example/one", "root", "b-root"))).outcome).toBe(
         "already-held",
       );
       const child = yield* claim(bClient, claimInput("example/one", "child-1", "b-child"));
       expect(child.outcome).toBe("claimed");
-      expect(child.claim?.holder).not.toBe("node-b");
+      expect(child.claim?.holderEnvironment).toBe("node-b");
       expect(child.claim?.holder).not.toBe(held.claim?.holder);
       expect((yield* claim(bClient, claimInput("other/repo", "root", "b-other"))).outcome).toBe(
         "claimed",
@@ -149,10 +200,10 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签�
         ],
       });
       expect(own.results[0]?.outcome).toBe("renewed");
-      expect(own.results[0]?.claim?.holderEnvironment).toBe(own.results[0]?.claim?.holder);
+      expect(own.results[0]?.claim?.holderEnvironment).toBe("node-b");
 
       const peerSession = (yield* peer.linkedSessions).find(
-        (session) => session.client.label === "T3 Code · Node B",
+        (session) => session.sessionId === child.claim?.holder,
       );
       expect(peerSession).toBeDefined();
       yield* peer.auth.revokeSession(peerSession!.sessionId);
@@ -172,10 +223,10 @@ it.effect("协调者按服务端时钟判定过期租约的心跳", () =>
         coordinator,
         McpHttpServer.layerFleetClaimsToolkit.pipe(Layer.provide(claimsLayer)),
       );
-      const aContext = yield* layerLinkingEnvironment(nodeA).pipe(Layer.build);
-      const aLinks = Context.get(aContext, PeerLinks.PeerLinks);
-      const aClient = Context.get(aContext, PeerMcpClient.PeerMcpClient);
-      yield* linkTo(aLinks, peer);
+      const a = yield* serveApart(nodeA);
+      yield* linkTo(a.links, peer);
+      yield* linkTo(peer.links, a);
+      const aClient = a.client;
 
       const held = yield* claim(aClient, claimInput("example/one", "root", "a-root"));
       expect(held.outcome).toBe("claimed");

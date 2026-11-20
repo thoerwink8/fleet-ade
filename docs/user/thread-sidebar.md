@@ -60,6 +60,7 @@ and worktree while you stay in the new thread composer. This requires a Git proj
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.
+Mark or unmark a commander from the thread menu, the command palette, or with `Ctrl+Alt+P` (`Cmd+Alt+P` on macOS).
 
 On web and desktop, unpinning, settling, snoozing, and archiving a thread each show
 a notification with **Undo** for five seconds. Undo restores the thread's previous

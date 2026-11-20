@@ -3,6 +3,7 @@ import {
   sessionGrantsScope,
   authScopeRequiredResponse,
   EnvironmentAuthorizationError,
+  WS_METHODS,
   type EnvironmentId,
   type AuthSessionState,
   type AuthEnvironmentScope,
@@ -55,6 +56,9 @@ function makeCommandPermissions<R, E>(
             Effect.timeoutOption(6_000),
             Effect.orElseSucceed(() => Option.none<AuthSessionState>()),
           );
+          if (Option.isNone(session) && method === WS_METHODS.fleetSummarySubscribe) {
+            return yield* Effect.die(new Error("Fleet session permissions unavailable"));
+          }
           const missing = scopes.find(
             (scope) => Option.isNone(session) || !sessionGrantsScope(session.value, scope),
           );

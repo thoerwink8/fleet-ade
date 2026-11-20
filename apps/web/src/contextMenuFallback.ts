@@ -103,6 +103,25 @@ const ICON_PATHS: Record<string, ReadonlyArray<{ tag: string; attrs: Record<stri
       },
     },
   ],
+  flag: [
+    {
+      tag: "path",
+      attrs: {
+        d: "M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528",
+      },
+    },
+  ],
+  "flag-off": [
+    { tag: "path", attrs: { d: "M16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" } },
+    { tag: "path", attrs: { d: "m2 2 20 20" } },
+    { tag: "path", attrs: { d: "M4 22V4" } },
+    {
+      tag: "path",
+      attrs: {
+        d: "M7.656 2H8c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10.347",
+      },
+    },
+  ],
   "refresh-cw": [
     { tag: "path", attrs: { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" } },
     { tag: "path", attrs: { d: "M21 3v5h-5" } },

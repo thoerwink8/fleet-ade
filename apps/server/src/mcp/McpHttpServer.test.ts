@@ -46,6 +46,8 @@ import * as DeviceService from "../device/DeviceService.ts";
 import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReviewGuideService.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as ServerConfig from "../config.ts";
+import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
+import { descriptorOf } from "../peer/PeerLinks.testkit.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
 import * as McpHttpServer from "./McpHttpServer.ts";
@@ -60,6 +62,7 @@ import { PreviewToolkit } from "./toolkits/preview/tools.ts";
 import { ProjectToolkit } from "./toolkits/project/tools.ts";
 
 const environmentId = EnvironmentId.make("environment-mcp-test");
+const coordinator = descriptorOf("environment-mcp-test", "Coordinator Test Node");
 const threadId = ThreadId.make("thread-mcp-test");
 const alternateTabId = PreviewTabId.make("tab-mcp-alternate");
 const decodeJsonText = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
@@ -1185,6 +1188,12 @@ it.effect("admits provider and OAuth client credentials and points only clients 
       ).pipe(
         Layer.provide(ServerSettings.layerTest()),
         Layer.provide(
+          Layer.succeed(ServerEnvironment.ServerEnvironment, {
+            getEnvironmentId: Effect.succeed(environmentId),
+            getDescriptor: Effect.succeed(coordinator),
+          }),
+        ),
+        Layer.provide(
           Layer.mock(McpSessionRegistry.McpSessionRegistry)({
             resolve: (token) =>
               Effect.succeed(
@@ -1198,7 +1207,13 @@ it.effect("admits provider and OAuth client credentials and points only clients 
           Layer.succeed(McpHttpServer.McpClientAuthenticator, {
             authenticate: (request) =>
               Effect.succeed(
-                request.headers.authorization === `Bearer ${clientToken}` ? clientScope : undefined,
+                request.headers.authorization === `Bearer ${clientToken}`
+                  ? clientScope
+                  : request.headers.authorization === "Bearer proof-unavailable"
+                    ? ("identity_unavailable" as const)
+                    : request.headers.authorization === "Bearer proof-conflict"
+                      ? ("identity_conflict" as const)
+                      : undefined,
               ),
           }),
         ),
@@ -1257,6 +1272,25 @@ it.effect("admits provider and OAuth client credentials and points only clients 
         "provider-session",
         "client:session-1",
       ]);
+      const unavailable = yield* call("proof-unavailable");
+      expect(unavailable.status).toBe(503);
+      expect(unavailable.headers["www-authenticate"]).toBeUndefined();
+      // The verifying environment needs a link back to the requester.
+      const unavailableText = yield* unavailable.text;
+      expect(unavailableText).toContain('"peer_identity_unavailable"');
+      expect(unavailableText).toContain("Coordinator Test Node");
+      expect(unavailableText).toContain(environmentId);
+      expect(unavailableText).toContain(
+        "this environment needs a link back to the requesting environment",
+      );
+      const conflict = yield* call("proof-conflict");
+      expect(conflict.status).toBe(503);
+      const conflictText = yield* conflict.text;
+      expect(conflictText).toContain('"peer_identity_conflict"');
+      expect(conflictText).toContain("Coordinator Test Node");
+      expect(conflictText).toContain(
+        "this environment needs a link back to the requesting environment",
+      );
 
       const missing = yield* call(undefined);
       expect(missing.status).toBe(401);
@@ -1321,7 +1355,11 @@ it.effect("accepts case-insensitive MCP bearer schemes and diagnoses rejected cr
       });
       yield* HttpRouter.serve(
         McpHttpServer.layerMcpTransport(Layer.empty).pipe(
-          Layer.provide(McpOAuth.layerMcpClientAuthenticator),
+          Layer.provide(
+            McpOAuth.layerMcpClientAuthenticator.pipe(
+              Layer.provide(Layer.mock(PeerMcpClient.PeerMcpClient)({})),
+            ),
+          ),
           Layer.provide(ServerSettings.layerTest()),
         ),
         { disableListenLog: true, disableLogger: true },

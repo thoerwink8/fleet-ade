@@ -26,15 +26,17 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
-// @effect-diagnostics nodeBuiltinImport:off -- joins the ledger file under the state directory.
-import * as NodePath from "node:path";
 
-import * as ServerConfig from "../config.ts";
 import * as NodeClaims from "./nodeClaims.ts";
 import * as NodeReads from "./nodeReads.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as LedgerDb from "./LedgerDb.ts";
 
+const isFleetSummaryError = Schema.is(FleetSummaryError);
 /** A stalled consumer retains at most the latest change per row. */
 const FLEET_SUMMARY_SUBSCRIBER_QUEUE_LIMIT = 200;
+const FLEET_SUMMARY_DONE_RETENTION_MS = 24 * 60 * 60 * 1000;
+const FLEET_ENVIRONMENT_HEARTBEAT_TTL_MS = 90_000;
 
 interface RowRecord {
   readonly environment_id: string;
@@ -86,16 +88,17 @@ export class FleetSummary extends Context.Service<
     >;
     /** Task rows without their exact live lease become stale; recovery clears it. */
     readonly sweepStale: Effect.Effect<void, FleetSummaryError>;
+    readonly cleanupDone: Effect.Effect<void, FleetSummaryError>;
   }
 >()("t3/ledger/FleetSummary") {}
 
 const rowIdOf = (
   environmentId: string,
   input: Pick<FleetSummaryReportInput, "type"> & {
-    readonly repo?: string;
-    readonly issue?: number;
-    readonly taskId?: string;
-    readonly threadId?: string;
+    readonly repo?: string | undefined;
+    readonly issue?: number | undefined;
+    readonly taskId?: string | undefined;
+    readonly threadId?: string | undefined;
   },
 ) => {
   switch (input.type) {
@@ -152,17 +155,19 @@ const sameReported = (current: FleetSummaryRow, next: FleetSummaryRow) =>
   current.stale === next.stale &&
   current.staleReason === next.staleReason;
 
-const make = Effect.fn("FleetSummary.make")(function* () {
+type KeepEnvironments = Effect.Effect<ReadonlySet<string>, FleetSummaryError>;
+
+const storageError = (cause: unknown) =>
+  new FleetSummaryError({
+    reason: "storage",
+    message: "Fleet summary storage is unavailable.",
+    cause,
+  });
+
+const make = Effect.fn("FleetSummary.make")(function* (keepEnvironments: KeepEnvironments) {
   const sql = yield* SqlClient.SqlClient;
   yield* NodeReads.migrate;
   yield* sql`PRAGMA journal_mode = WAL`;
-
-  const storageError = (cause: unknown) =>
-    new FleetSummaryError({
-      reason: "storage",
-      message: "Fleet summary storage is unavailable.",
-      cause,
-    });
 
   const meta = sql<MetaRecord>`SELECT id, revision FROM fleet_summary_meta WHERE id = 1`.pipe(
     Effect.flatMap((rows) =>
@@ -389,6 +394,39 @@ const make = Effect.fn("FleetSummary.make")(function* () {
     );
   };
 
+  // The previous session-lookup migration missed deleted sessions. Run this
+  // independently even if it completed; rows for deleted connections are derived
+  // data and may be discarded, including completed rows. Keep linked environments.
+  yield* sql
+    .withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS fleet_summary_migrations (name TEXT PRIMARY KEY)`;
+        const marker = "remove-unlinked-summary-rows-v2";
+        const applied =
+          yield* sql`SELECT name FROM fleet_summary_migrations WHERE name = ${marker}`;
+        if (applied.length > 0) return;
+        const keep = yield* keepEnvironments;
+        const candidates = yield* sql<{ readonly environment_id: string }>`
+        SELECT DISTINCT environment_id FROM fleet_summary_rows ORDER BY environment_id
+      `;
+        for (const { environment_id } of candidates) {
+          if (keep.has(environment_id)) continue;
+          const rows = yield* sql<
+            RowRecord & { readonly row_id: string }
+          >`SELECT * FROM fleet_summary_rows
+          WHERE environment_id = ${environment_id} ORDER BY row_id`;
+          for (const record of rows) {
+            const row = toRow(record);
+            const revision = yield* nextRevision;
+            yield* sql`DELETE FROM fleet_summary_rows WHERE row_id = ${record.row_id}`;
+            yield* recordChange(revision, { type: "tombstone", revision, key: keyOfRow(row) });
+          }
+        }
+        yield* sql`INSERT INTO fleet_summary_migrations (name) VALUES (${marker})`;
+      }),
+    )
+    .pipe(Effect.mapError((error) => (isFleetSummaryError(error) ? error : storageError(error))));
+
   const report = Effect.fn("FleetSummary.report")(function* (
     callerEnvironmentId: string,
     input: FleetSummaryReportInput,
@@ -398,29 +436,49 @@ const make = Effect.fn("FleetSummary.make")(function* () {
       input.type === "upsert-task" || input.type === "delete-task"
         ? { ...input, repo: yield* canonicalRepo(input.repo) }
         : input;
-    if (canonical.type === "upsert-task") {
-      const lease = yield* sql`
-        SELECT 1 AS held FROM node_claims
-        WHERE repo = ${canonical.repo} AND issue = ${canonical.issue} AND task_id = ${canonical.taskId}
-          AND holder_environment = ${callerEnvironmentId} AND state = 'running' AND lease_until > ${now}
-        LIMIT 1
-      `.pipe(Effect.mapError(storageError));
-      if (lease[0] === undefined) {
-        return yield* new FleetSummaryError({
-          reason: "lease-required",
-          message: "The caller does not hold this task lease.",
-        });
-      }
-    }
     const rowId = rowIdOf(callerEnvironmentId, canonical);
     return yield* publishLock.withPermits(1)(
       Effect.gen(function* () {
         const result = yield* sql
           .withTransaction(
             Effect.gen(function* () {
+              if (canonical.type === "upsert-task") {
+                const lease = yield* sql`
+        SELECT 1 AS held FROM node_claims AS claim
+        WHERE claim.repo = ${canonical.repo} AND claim.issue = ${canonical.issue} AND claim.task_id = ${canonical.taskId}
+          AND claim.holder_environment = ${callerEnvironmentId}
+          AND (${canonical.attempt ?? null} IS NULL OR claim.attempt = ${canonical.attempt ?? null})
+          AND (${canonical.fencing ?? null} IS NULL OR claim.fencing = ${canonical.fencing ?? null})
+          AND ((claim.state = 'running' AND claim.lease_until > ${now}) OR (
+            ${phaseFromSessionRun(canonical.sessionRun) === "done" ? 1 : 0} = 1 AND (
+              (claim.state = 'released' AND ${canonical.attempt ?? null} IS NOT NULL
+                AND ${canonical.fencing ?? null} IS NOT NULL)
+              OR EXISTS (
+                SELECT 1 FROM fleet_summary_rows AS row WHERE row.environment_id = ${callerEnvironmentId}
+                  AND row.repo = claim.repo AND row.issue = claim.issue AND row.task_id = claim.task_id
+                  AND row.thread_id = ${canonical.threadId}
+              )
+            )
+          )) LIMIT 1
+      `.pipe(Effect.mapError(storageError));
+                if (lease[0] === undefined) {
+                  return yield* new FleetSummaryError({
+                    reason: "lease-required",
+                    message: "The caller does not hold this task lease.",
+                  });
+                }
+              }
               const existing = yield* rowById(rowId);
               if (canonical.type === "delete-task" || canonical.type === "delete-adhoc") {
                 if (existing === undefined) {
+                  const current = yield* meta;
+                  return { revision: current.revision, changed: false, events: [] };
+                }
+                if (
+                  canonical.type === "delete-task" &&
+                  canonical.threadId !== undefined &&
+                  existing.threadId !== canonical.threadId
+                ) {
                   const current = yield* meta;
                   return { revision: current.revision, changed: false, events: [] };
                 }
@@ -435,6 +493,10 @@ const make = Effect.fn("FleetSummary.make")(function* () {
                 return { revision, changed: true, events: [event] };
               }
 
+              const preserveStale =
+                existing?.staleReason !== undefined &&
+                existing.staleReason !== "lease lost" &&
+                existing.staleReason !== "environment offline";
               const nextRow: FleetSummaryRow = {
                 environmentId: callerEnvironmentId,
                 ...(canonical.type === "upsert-task"
@@ -447,10 +509,18 @@ const make = Effect.fn("FleetSummary.make")(function* () {
                 needsYou: canonical.needsYou,
                 lastProgress: progress(canonical.lastProgress),
                 updatedAt: now,
-                stale: canonical.type === "upsert-task" ? false : (existing?.stale ?? false),
-                ...(canonical.type === "upsert-task" || existing?.staleReason === undefined
-                  ? {}
-                  : { staleReason: existing.staleReason }),
+                stale: preserveStale
+                  ? existing.stale
+                  : phaseFromSessionRun(canonical.sessionRun) === "done" ||
+                      canonical.type === "upsert-task"
+                    ? false
+                    : (existing?.stale ?? false),
+                ...(existing?.staleReason !== undefined &&
+                (preserveStale ||
+                  (phaseFromSessionRun(canonical.sessionRun) !== "done" &&
+                    canonical.type !== "upsert-task"))
+                  ? { staleReason: existing.staleReason }
+                  : {}),
                 revision: 0,
               };
               if (existing !== undefined && sameReported(existing, nextRow)) {
@@ -477,7 +547,9 @@ const make = Effect.fn("FleetSummary.make")(function* () {
               return { revision, changed: true, events: [event] };
             }),
           )
-          .pipe(Effect.mapError(storageError));
+          .pipe(
+            Effect.mapError((error) => (isFleetSummaryError(error) ? error : storageError(error))),
+          );
         yield* publish(result.events);
         return { revision: result.revision, changed: result.changed };
       }),
@@ -487,26 +559,47 @@ const make = Effect.fn("FleetSummary.make")(function* () {
   /** Lease freshness is task-specific and never changes session phase or adhoc rows. */
   const sweepStale = publishLock.withPermits(1)(
     Effect.gen(function* () {
-      const now = DateTime.formatIso(yield* DateTime.now);
+      const nowDate = yield* DateTime.now;
+      const now = DateTime.formatIso(nowDate);
+      const heartbeatCutoff = DateTime.formatIso(
+        DateTime.makeUnsafe(DateTime.toEpochMillis(nowDate) - FLEET_ENVIRONMENT_HEARTBEAT_TTL_MS),
+      );
       const events = yield* sql
         .withTransaction(
           Effect.gen(function* () {
-            const rows = yield* sql<RowRecord & { readonly has_lease: number }>`
-            SELECT summary.*, EXISTS (
-              SELECT 1 FROM node_claims AS claim
-              WHERE claim.repo = summary.repo AND claim.issue = summary.issue
-                AND claim.task_id = summary.task_id
-                AND claim.holder_environment = summary.environment_id
-                AND claim.state = 'running' AND claim.lease_until > ${now}
-            ) AS has_lease
-            FROM fleet_summary_rows AS summary WHERE summary.kind = 'task'
-            ORDER BY summary.row_id
-          `;
+            const rows = yield* sql<
+              RowRecord & { readonly has_lease: number; readonly offline: number }
+            >`
+              SELECT summary.*, EXISTS (
+                SELECT 1 FROM node_claims AS claim
+                WHERE claim.repo = summary.repo AND claim.issue = summary.issue
+                  AND claim.task_id = summary.task_id
+                  AND claim.holder_environment = summary.environment_id
+                  AND claim.state = 'running' AND claim.lease_until > ${now}
+              ) AS has_lease, COALESCE((
+                SELECT heartbeat.last_seen <= ${heartbeatCutoff}
+                FROM fleet_environment_heartbeats AS heartbeat
+                WHERE heartbeat.environment_id = summary.environment_id
+              ), summary.updated_at <= ${heartbeatCutoff}) AS offline
+              FROM fleet_summary_rows AS summary ORDER BY summary.row_id
+            `;
             const changes: Array<FleetSummaryChangeEvent> = [];
             for (const record of rows) {
               const row = toRow(record);
-              const stale = record.has_lease === 0;
-              const staleReason = stale ? "lease lost" : undefined;
+              if (row.phase === "done") continue;
+              if (
+                row.staleReason !== undefined &&
+                row.staleReason !== "lease lost" &&
+                row.staleReason !== "environment offline"
+              )
+                continue;
+              const staleReason =
+                record.offline === 1
+                  ? "environment offline"
+                  : record.kind === "task" && record.has_lease === 0
+                    ? "lease lost"
+                    : undefined;
+              const stale = staleReason !== undefined;
               if (row.stale === stale && row.staleReason === staleReason) continue;
               const revision = yield* nextRevision;
               const next = { ...row, stale, staleReason, revision };
@@ -525,7 +618,39 @@ const make = Effect.fn("FleetSummary.make")(function* () {
     }),
   );
 
-  return FleetSummary.of({ report, subscribe, sweepStale });
+  const cleanupDone = publishLock.withPermits(1)(
+    Effect.gen(function* () {
+      const now = DateTime.toEpochMillis(yield* DateTime.now);
+      const cutoff = DateTime.formatIso(DateTime.makeUnsafe(now - FLEET_SUMMARY_DONE_RETENTION_MS));
+      const events = yield* sql
+        .withTransaction(
+          Effect.gen(function* () {
+            const rows = yield* sql<RowRecord>`
+            SELECT * FROM fleet_summary_rows
+            WHERE phase = 'done' AND updated_at <= ${cutoff} ORDER BY row_id
+          `;
+            const changes: Array<FleetSummaryChangeEvent> = [];
+            for (const record of rows) {
+              const row = toRow(record);
+              const revision = yield* nextRevision;
+              yield* sql`DELETE FROM fleet_summary_rows WHERE row_id = ${rowIdOfRow(row)}`;
+              const event: FleetSummaryChangeEvent = {
+                type: "tombstone",
+                revision,
+                key: keyOfRow(row),
+              };
+              yield* recordChange(revision, event);
+              changes.push(event);
+            }
+            return changes;
+          }),
+        )
+        .pipe(Effect.mapError(storageError));
+      yield* publish(events);
+    }),
+  );
+
+  return FleetSummary.of({ report, subscribe, sweepStale, cleanupDone });
 });
 
 const rowIdOfRow = (row: FleetSummaryRow) =>
@@ -541,13 +666,33 @@ const rowIdOfKey = (key: FleetSummaryTombstoneKey) =>
 const sameRow = (event: FleetSummaryChangeEvent, rowId: string) =>
   (event.type === "upsert" ? rowIdOfRow(event.row) : rowIdOfKey(event.key)) === rowId;
 
+/** Read identities from the main database, not the separate ledger connection. */
+export const keepEnvironments = Effect.gen(function* () {
+  const mainSql = yield* SqlClient.SqlClient;
+  const identity = yield* ServerEnvironment.ServerEnvironmentIdentity;
+  const localId = yield* identity.getEnvironmentId;
+  const links = yield* mainSql<{ readonly environment_id: string }>`
+    SELECT environment_id FROM peer_environment_links
+  `;
+  return new Set<string>([localId, ...links.map((link) => link.environment_id)]);
+}).pipe(Effect.mapError(storageError));
+
 export const layer = Layer.unwrap(
-  Effect.map(ServerConfig.ServerConfig, ({ stateDir }) =>
-    Layer.effect(FleetSummary, make()).pipe(
-      Layer.provide(NodeSqliteClient.layer({ filename: NodePath.join(stateDir, "ledger.sqlite") })),
-    ),
-  ),
+  Effect.gen(function* () {
+    const mainContext = yield* Effect.context<
+      SqlClient.SqlClient | ServerEnvironment.ServerEnvironmentIdentity
+    >();
+    return Layer.effect(
+      FleetSummary,
+      make(keepEnvironments.pipe(Effect.provide(mainContext))),
+    ).pipe(Layer.provide(LedgerDb.layer));
+  }),
 );
 
-export const layerForTest = (filename = ":memory:") =>
-  Layer.effect(FleetSummary, make()).pipe(Layer.provideMerge(NodeSqliteClient.layer({ filename })));
+export const layerForTest = (
+  filename = ":memory:",
+  keepEnvironments: KeepEnvironments = Effect.succeed(new Set()),
+) =>
+  Layer.effect(FleetSummary, make(keepEnvironments)).pipe(
+    Layer.provideMerge(NodeSqliteClient.layer({ filename })),
+  );
