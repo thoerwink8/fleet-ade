@@ -747,7 +747,7 @@ const WORKSPACE_PREPARATION_INPUT_LEGACY = "Preparing workspace";
 const isWorkspacePreparationInput = (input: string | null | undefined): boolean =>
   input === WORKSPACE_PREPARATION_INPUT || input === WORKSPACE_PREPARATION_INPUT_LEGACY;
 const RUNTIME_REQUEST_DELIVERY_FAILED_MESSAGE =
-  "T3 Code could not confirm that your answer reached the agent. If the run stays stuck, stop it and try again.";
+  "T3 Code 无法确认你的回复已送达智能体。若任务一直卡住，停止它并重试。";
 
 function withoutPreparationResult(
   item: Extract<OrchestrationV2TurnItem, { readonly type: "command_execution" }>,
@@ -2179,7 +2179,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 parentItemId: null,
                 ordinal: yield* nextTurnItemOrdinal(projection),
                 status: "failed" as const,
-                title: "Queued provider could not start",
+                title: "排队的提供方未能启动",
                 startedAt: now,
                 completedAt: now,
                 updatedAt: now,
@@ -2903,7 +2903,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               parentItemId: null,
               ordinal: ordinal * 100 - 1,
               status: "completed",
-              title: handoff === null ? "Imported context" : "Provider handoff",
+              title: handoff === null ? "已导入上下文" : "提供方交接",
               startedAt: now,
               completedAt: now,
               updatedAt: now,
@@ -2969,9 +2969,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               },
             ]
           : [];
-      const detachReason = freshContext
-        ? FRESH_CONTEXT_DETACH_REASON
-        : "Provider or model selection changed.";
+      const detachReason = freshContext ? FRESH_CONTEXT_DETACH_REASON : "提供方或模型选择已更改。";
       yield* writeSystemEvents(
         [
           ...(selectionChanged
@@ -5169,14 +5167,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 detachedAt: now,
                 reason:
                   command.type === "thread.archive"
-                    ? "Thread archived."
+                    ? "会话已归档。"
                     : command.type === "thread.settle"
-                      ? "Thread settled."
+                      ? "会话已结束。"
                       : command.type === "thread.metadata.update"
-                        ? "Workspace changed."
+                        ? "工作区已更改。"
                         : command.type === "thread.runtime-mode.set"
-                          ? "Runtime mode changed."
-                          : "Provider or model selection changed.",
+                          ? "运行模式已更改。"
+                          : "提供方或模型选择已更改。",
               },
             });
             const pendingEffect = {
@@ -5188,14 +5186,14 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 providerSessionId: session.id,
                 detail:
                   command.type === "thread.archive"
-                    ? "Thread archived."
+                    ? "会话已归档。"
                     : command.type === "thread.settle"
-                      ? "Thread settled."
+                      ? "会话已结束。"
                       : command.type === "thread.metadata.update"
-                        ? "Workspace changed."
+                        ? "工作区已更改。"
                         : command.type === "thread.runtime-mode.set"
-                          ? "Runtime mode changed."
-                          : "Provider or model selection changed.",
+                          ? "运行模式已更改。"
+                          : "提供方或模型选择已更改。",
                 // Terminal detaches revoke MCP credentials; reattachments need other detach reasons to preserve them.
                 ...(command.type === "thread.archive" ? { revokeMcpCredential: true } : {}),
               },
@@ -8688,10 +8686,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             status: "completed",
             title:
               portableForkHandoff !== null
-                ? "Fork context"
+                ? "分叉上下文"
                 : providerSwitchHandoff !== null
-                  ? "Provider handoff"
-                  : "Merge-back context",
+                  ? "提供方交接"
+                  : "合并回上下文",
             startedAt: now,
             completedAt: now,
             updatedAt: now,
@@ -10826,7 +10824,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         parentItemId: null,
         ordinal: yield* nextTurnItemOrdinal({ thread }),
         status: "failed",
-        title: "Answer delivery not confirmed",
+        title: "答案送达未确认",
         startedAt: now,
         completedAt: now,
         updatedAt: now,
@@ -11497,7 +11495,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         return yield* new OrchestratorDispatchError({
           commandId: command.commandId,
           commandType: command.type,
-        cause: `Run ${command.runId} 不在工作区准备中。`,
+          cause: `Run ${command.runId} 不在工作区准备中。`,
         });
       }
       const now = yield* DateTime.now;
@@ -12218,7 +12216,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         parentItemId: null,
         ordinal: yield* nextTurnItemOrdinal({ thread, turnItems: pendingItems }),
         status: "completed",
-        title: "Interrupt requested",
+        title: "已请求中断",
         startedAt: now,
         completedAt: now,
         updatedAt: now,
@@ -12801,7 +12799,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       parentItemId: null,
       ordinal: yield* nextTurnItemOrdinal(projection),
       status: "completed",
-      title: "Interrupt requested",
+      title: "已请求中断",
       startedAt: now,
       completedAt: now,
       updatedAt: now,
@@ -12886,7 +12884,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         parentItemId: interruptRequestItem.id,
         ordinal: interruptRequestItem.ordinal + 1,
         status: "interrupted",
-        title: "Interrupted",
+        title: "已中断",
         startedAt: now,
         completedAt: now,
         updatedAt: now,
@@ -15062,7 +15060,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* new OrchestratorCommandPreviouslyRejectedError({
         commandId: command.commandId,
         commandType: command.type,
-        detail: receipt.error ?? "Previously rejected.",
+        detail: receipt.error ?? "先前已拒绝。",
       });
     }
     const dispatchThreadId = commandThreadId(command);
@@ -15313,7 +15311,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return yield* new OrchestratorCommandPreviouslyRejectedError({
         commandId: command.commandId,
         commandType: command.type,
-        detail: committed.receipt.error ?? "Previously rejected.",
+        detail: committed.receipt.error ?? "先前已拒绝。",
       });
     }
     // A concurrent command with this id for another thread can commit first,

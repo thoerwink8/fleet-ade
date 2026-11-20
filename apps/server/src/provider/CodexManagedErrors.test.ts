@@ -9,15 +9,14 @@ it("maps streamed failures to safe actionable messages and reconnect decisions",
       },
     }),
     {
-      message:
-        "ChatGPT could not validate this connection. Check the selected account and sharing permissions.",
+      message: "ChatGPT 无法验证这条连接。请检查所选账户和共享权限。",
       code: "subscription_sharing_v2_invalid_user",
       usageLimit: false,
     },
   );
   assert.include(
     classifyCodexManagedError("subscription_sharing_usage_limit_exceeded")!.message,
-    "Usage settings",
+    "用量设置",
   );
   assert.equal(
     classifyCodexManagedError("subscription_sharing_usage_limit_exceeded")!.code,
@@ -25,7 +24,7 @@ it("maps streamed failures to safe actionable messages and reconnect decisions",
   );
   assert.include(
     classifyCodexManagedError("subscription_sharing_unsupported_capability")!.message,
-    "feature",
+    "功能",
   );
   assert.isUndefined(classifyCodexManagedError(undefined));
   assert.isUndefined(classifyCodexManagedError({ error: "unknown" }));
@@ -34,8 +33,8 @@ it("maps streamed failures to safe actionable messages and reconnect decisions",
 it("distinguishes unsupported tools from input items without exposing the raw response", () => {
   const code = "subscription_sharing_unsupported_capability";
   for (const [detail, expected] of [
-    ["tool 'namespace' is not supported", "tool namespace"],
-    ["input item 'additional_tools' is not supported", "input item"],
+    ["tool 'namespace' is not supported", "工具命名空间"],
+    ["input item 'additional_tools' is not supported", "输入项"],
   ]) {
     const response = { error: { code, message: `${detail}; dummy-sensitive` } };
     for (const value of [response, JSON.stringify(response)]) {

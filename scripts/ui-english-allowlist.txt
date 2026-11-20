@@ -94,8 +94,6 @@ Gemini
 Gemini Argon
 # 配额桶名，来自 Antigravity 的分组，不是我们写的句子
 Gemini Carbon
-# 配额桶名，来自 Antigravity 的分组，不是我们写的句子
-Claude & GPT (shared)
 # 产品名
 ChatGPT
 # 产品名

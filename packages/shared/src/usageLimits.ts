@@ -149,7 +149,7 @@ export function collectExternalUsageLinks(presentations: LimitPresentations) {
     for (const provider of providersWithLimits(presentation.serverConfig?.providers ?? [])) {
       const external = provider.usageLimits?.externalUsage;
       if (external && provider.auth.status === "authenticated") {
-        const account = `${provider.displayName ?? provider.instanceId} on ${presentation.entry.target.label}`;
+        const account = `${provider.displayName ?? provider.instanceId} · ${presentation.entry.target.label}`;
         links.set(external.url, {
           ...external,
           message: provider.usageLimits?.unavailable?.message,
