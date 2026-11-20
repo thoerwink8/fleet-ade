@@ -156,27 +156,77 @@ it.effect("新持有者即使 fencing 相同也不删；不带 token 的 finish 
   }).pipe(withLedger),
 );
 
-it.effect("已释放或过期记录拒绝 HTTP 操作且保留记录", () =>
+it.effect("旧 HTTP 租约到期或释放后可重新认领，活跃租约仍冲突", () =>
+  Effect.gen(function* () {
+    const sql = yield* seed;
+    for (const [state, now, expected] of [
+      ["running", Date.parse(leaseUntil) - 1, 409],
+      ["running", Date.parse(leaseUntil), 200],
+      ["released", Date.parse(leaseUntil) - 1, 200],
+    ] as const) {
+      yield* sql`DELETE FROM node_claims`;
+      yield* sql`INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing, attempt)
+        VALUES ('legacy', ${repo}, 7, 'root', 'node-a', ${leaseUntil}, 'local', ${state}, 'old', 1)`;
+      const outcome = yield* NodeClaims.apply(
+        sql,
+        {
+          action: "claim",
+          repo,
+          issue: 7,
+          title: "test",
+          claimedBy: "node-b",
+          leaseUntil,
+          token: "new",
+        },
+        now,
+      );
+      assert.strictEqual(outcome.status, expected);
+      assert.deepEqual(yield* sql`SELECT claimed_by, fencing FROM node_claims`, [
+        expected === 200
+          ? { claimed_by: "node-b", fencing: "new" }
+          : { claimed_by: "node-a", fencing: "old" },
+      ]);
+    }
+  }).pipe(withLedger),
+);
+
+it.effect("HTTP finish 可清理自己的过期或释放租约，renew 不能续过期租约", () =>
   Effect.gen(function* () {
     const sql = yield* seed;
     for (const state of ["released", "running"]) {
-      yield* sql`DELETE FROM node_claims`;
       yield* sql`INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, attempt)
         VALUES ('legacy', ${repo}, 7, 'root', 'node-a', ${leaseUntil}, 'local', ${state}, 1)`;
-      const before = yield* sql`SELECT * FROM node_claims`;
-      for (const action of ["claim", "renew", "finish"] as const) {
-        const request =
-          action === "claim"
-            ? { action, repo, issue: 7, title: "test", claimedBy: "node-a", leaseUntil }
-            : action === "renew"
-              ? { action, repo, issue: 7, claimedBy: "node-a", leaseUntil }
-              : { action, repo, issue: 7, claimedBy: "node-a", outcome: "done" as const };
-        assert.strictEqual(
-          (yield* NodeClaims.apply(sql, request, Date.parse(leaseUntil) + 1)).status,
-          409,
-        );
-        assert.deepEqual(yield* sql`SELECT * FROM node_claims`, before);
-      }
+      const renew = yield* NodeClaims.apply(
+        sql,
+        { action: "renew", repo, issue: 7, claimedBy: "node-a", leaseUntil },
+        Date.parse(leaseUntil),
+      );
+      assert.strictEqual(renew.status, 409);
+      const finish = yield* NodeClaims.apply(
+        sql,
+        { action: "finish", repo, issue: 7, claimedBy: "node-a", outcome: "done" },
+        Date.parse(leaseUntil),
+      );
+      assert.strictEqual(finish.status, 200);
+      assert.deepEqual(yield* sql`SELECT issue FROM node_claims`, []);
+    }
+  }).pipe(withLedger),
+);
+
+it.effect("非 legacy 租约不会被 HTTP 认领覆盖", () =>
+  Effect.gen(function* () {
+    const sql = yield* seed;
+    for (const state of ["running", "released"]) {
+      yield* sql`DELETE FROM node_claims`;
+      yield* sql`INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, lease_until, state)
+        VALUES ('fleet-a', ${repo}, 7, 'root', 'node-a', ${leaseUntil}, ${state})`;
+      const outcome = yield* NodeClaims.apply(
+        sql,
+        { action: "claim", repo, issue: 7, title: "test", claimedBy: "node-b", leaseUntil },
+        Date.parse(leaseUntil),
+      );
+      assert.strictEqual(outcome.status, 409);
+      assert.deepEqual(yield* sql`SELECT fleet_id FROM node_claims`, [{ fleet_id: "fleet-a" }]);
     }
   }).pipe(withLedger),
 );

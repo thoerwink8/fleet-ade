@@ -95,7 +95,7 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签�
         aClient,
         claimInput("example/one", "initial", "initial-unidentified"),
       ).pipe(Effect.flip);
-      expect(initialClaim.code).toBe("invalid_request");
+      expect(initialClaim.code).toBe("orchestration_error");
       yield* linkTo(peer.links, a);
       const reciprocalClaim = yield* peer.client.call({
         environmentId: nodeA.environmentId,
@@ -116,7 +116,7 @@ it.effect("两台互连环境通过真实 RPC 共享协调者租约并使用签�
           success: FleetClaimClaimResult,
         })
         .pipe(Effect.flip);
-      expect(unrelatedClaim.code).toBe("invalid_request");
+      expect(unrelatedClaim.code).toBe("orchestration_error");
       yield* linkTo(b.links, peer);
       yield* linkTo(peer.links, b);
 

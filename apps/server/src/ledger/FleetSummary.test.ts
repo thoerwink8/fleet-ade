@@ -504,6 +504,58 @@ it.effect("按心跳识别掉线并恢复，不覆盖已完成和其他原因", 
   ),
 );
 
+it.effect("首次终态在释放后须匹配环境、attempt 和 fencing", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`UPDATE node_claims SET state = 'released' WHERE task_id = 'root'`;
+      for (const [environment, credentials] of [
+        ["environment-a", {}],
+        ["environment-a", { attempt: 1 }],
+        ["environment-a", { fencing: "1" }],
+        ["environment-a", { attempt: 2, fencing: "1" }],
+        ["environment-a", { attempt: 1, fencing: "wrong" }],
+        ["environment-b", { attempt: 1, fencing: "1" }],
+      ] as const) {
+        const error = yield* summary
+          .report(environment, task("root", { sessionRun: "completed", ...credentials }))
+          .pipe(Effect.flip);
+        expect(error.reason).toBe("lease-required");
+      }
+      const nonterminal = yield* summary
+        .report("environment-a", task("root", { attempt: 1, fencing: "1" }))
+        .pipe(Effect.flip);
+      expect(nonterminal.reason).toBe("lease-required");
+      const result = yield* summary.report(
+        "environment-a",
+        task("root", { sessionRun: "completed", attempt: 1, fencing: "1" }),
+      );
+      expect(result.changed).toBe(true);
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      if (snapshot?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(snapshot.rows).toMatchObject([{ taskId: "root", phase: "done" }]);
+    }),
+  ),
+);
+
+it.effect("首次终态不能凭已过期但未释放的租约上报", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql`UPDATE node_claims SET lease_until = '1970-01-01T00:00:00.000Z' WHERE task_id = 'root'`;
+      const error = yield* summary
+        .report(
+          "environment-a",
+          task("root", { sessionRun: "completed", attempt: 1, fencing: "1" }),
+        )
+        .pipe(Effect.flip);
+      expect(error.reason).toBe("lease-required");
+    }),
+  ),
+);
+
 it.effect("释放或过期后同线程终态仍可上报，失败不被吞", () =>
   serviceTest(
     Effect.gen(function* () {

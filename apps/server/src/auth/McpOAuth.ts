@@ -626,43 +626,63 @@ export const layerMcpClientAuthenticator = Layer.effect(
     const peerClient = yield* PeerMcpClient.PeerMcpClient;
     const digester = yield* Digest.Digest;
     const hostedAppUrl = yield* hostedAppUrlConfig.pipe(Effect.option);
+    const identities = yield* Ref.make(new Map<string, EnvironmentId>());
     return McpHttpServer.McpClientAuthenticator.of({
       authenticate: Effect.fn("McpHttpServer.McpClientAuthenticator.authenticate")(
         function (request) {
           return environmentAuth.authenticateMcpClient(request).pipe(
             Effect.flatMap((client) =>
               Effect.gen(function* () {
-                let provenId = client.environmentId;
+                let provenId =
+                  client.environmentId ?? (yield* Ref.get(identities)).get(client.sessionId);
                 const hint = request.headers[PeerMcpClient.PEER_IDENTITY_HEADER];
                 const challenge = request.headers[PeerMcpClient.PEER_CHALLENGE_HEADER];
                 const token = EnvironmentAuth.parseBearerToken(request);
                 const parsedHint = decodeEnvironmentIdOption(hint);
+                const isProof = request.headers[PeerMcpClient.PEER_PROOF_HEADER] === "1";
+                if (client.peerLink && isProof && (hint !== undefined || challenge !== undefined)) {
+                  return "identity_unavailable" as const;
+                }
                 if (
                   client.peerLink &&
-                  provenId === undefined &&
-                  request.headers[PeerMcpClient.PEER_PROOF_HEADER] !== "1" &&
-                  Option.isSome(parsedHint) &&
-                  token !== null &&
-                  typeof challenge === "string" &&
-                  CODE_CHALLENGE_PATTERN.test(challenge)
+                  !isProof &&
+                  (hint !== undefined || challenge !== undefined)
                 ) {
-                  const bearerDigest = Base64Url.encode(
-                    yield* digester
-                      .digest(Digest.sha256, new TextEncoder().encode(token))
-                      .pipe(Effect.orDie),
-                  );
-                  const proof = yield* peerClient
-                    .call({
-                      environmentId: parsedHint.value,
-                      tool: "fleet_peer_proof",
-                      arguments: { challenge, target: environmentId, bearerDigest },
-                      limits: { runtimeMode: "approval-required", interactionMode: "default" },
-                      proof: true,
-                      success: Schema.Struct({ environmentId: EnvironmentId }),
-                    })
-                    .pipe(Effect.timeout("10 seconds"), Effect.option);
-                  if (Option.isSome(proof) && proof.value.environmentId === parsedHint.value) {
-                    provenId = parsedHint.value;
+                  if (
+                    Option.isNone(parsedHint) ||
+                    token === null ||
+                    typeof challenge !== "string" ||
+                    !CODE_CHALLENGE_PATTERN.test(challenge) ||
+                    (provenId !== undefined && provenId !== parsedHint.value)
+                  )
+                    return "identity_unavailable" as const;
+                  const peerId = parsedHint.value;
+                  if (provenId === undefined) {
+                    const bearerDigest = Base64Url.encode(
+                      yield* digester
+                        .digest(Digest.sha256, new TextEncoder().encode(token))
+                        .pipe(Effect.orDie),
+                    );
+                    const proof = yield* peerClient
+                      .call({
+                        environmentId: peerId,
+                        tool: "fleet_peer_proof",
+                        arguments: { challenge, target: environmentId, bearerDigest },
+                        limits: { runtimeMode: "approval-required", interactionMode: "default" },
+                        proof: true,
+                        success: Schema.Struct({ environmentId: EnvironmentId }),
+                      })
+                      .pipe(Effect.timeout("10 seconds"), Effect.option);
+                    if (Option.isNone(proof) || proof.value.environmentId !== peerId) {
+                      return "identity_unavailable" as const;
+                    }
+                    const accepted = yield* Ref.modify(identities, (current) => {
+                      const existing = current.get(client.sessionId);
+                      if (existing !== undefined) return [existing === peerId, current] as const;
+                      return [true, new Map(current).set(client.sessionId, peerId)] as const;
+                    });
+                    if (!accepted) return "identity_unavailable" as const;
+                    provenId = peerId;
                   }
                 }
                 const issuedAt = yield* Clock.currentTimeMillis;

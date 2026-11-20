@@ -73,12 +73,12 @@ const FleetHeartbeatTool = Tool.make("fleet_heartbeat", {
   .annotate(Tool.Idempotent, true)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
 
-export const FleetPeerProofInput = Schema.Struct({
+const FleetPeerProofInput = Schema.Struct({
   challenge: Schema.String,
   target: EnvironmentId,
   bearerDigest: Schema.optional(Schema.String),
 });
-export const FleetPeerProofResult = Schema.Struct({ environmentId: EnvironmentId });
+const FleetPeerProofResult = Schema.Struct({ environmentId: EnvironmentId });
 
 const FleetPeerProofTool = Tool.make("fleet_peer_proof", {
   description: "Prove a pending peer link challenge to its coordinator.",
@@ -92,8 +92,8 @@ const FleetPeerProofTool = Tool.make("fleet_peer_proof", {
   ],
 })
   .annotate(Tool.Title, "Prove peer link")
-  .annotate(Tool.Readonly, false)
-  .annotate(Tool.Destructive, true)
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, false)
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.visibleToLinkedClients);
 

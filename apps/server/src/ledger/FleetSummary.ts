@@ -414,10 +414,14 @@ const make = Effect.fn("FleetSummary.make")(function* () {
           AND (${canonical.attempt ?? null} IS NULL OR claim.attempt = ${canonical.attempt ?? null})
           AND (${canonical.fencing ?? null} IS NULL OR claim.fencing = ${canonical.fencing ?? null})
           AND ((claim.state = 'running' AND claim.lease_until > ${now}) OR (
-            ${phaseFromSessionRun(canonical.sessionRun) === "done" ? 1 : 0} = 1 AND EXISTS (
-              SELECT 1 FROM fleet_summary_rows AS row WHERE row.environment_id = ${callerEnvironmentId}
-                AND row.repo = claim.repo AND row.issue = claim.issue AND row.task_id = claim.task_id
-                AND row.thread_id = ${canonical.threadId}
+            ${phaseFromSessionRun(canonical.sessionRun) === "done" ? 1 : 0} = 1 AND (
+              (claim.state = 'released' AND ${canonical.attempt ?? null} IS NOT NULL
+                AND ${canonical.fencing ?? null} IS NOT NULL)
+              OR EXISTS (
+                SELECT 1 FROM fleet_summary_rows AS row WHERE row.environment_id = ${callerEnvironmentId}
+                  AND row.repo = claim.repo AND row.issue = claim.issue AND row.task_id = claim.task_id
+                  AND row.thread_id = ${canonical.threadId}
+              )
             )
           )) LIMIT 1
       `.pipe(Effect.mapError(storageError));

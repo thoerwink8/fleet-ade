@@ -2,9 +2,10 @@ import {
   CommandId,
   EnvironmentId,
   MessageId,
-  ThreadId,
   OrchestratorMcpFailure,
   ProjectId,
+  FleetClaimHeartbeatItem,
+  ThreadId,
 } from "@t3tools/contracts";
 import * as Digest from "effect/crypto/Digest";
 import * as Effect from "effect/Effect";
@@ -104,6 +105,8 @@ const launchCommandId = Effect.fn("mcp.launchCommandId")(function* (
   return CommandId.make(`mcp:launch:${Hex.encode(digest)}`);
 });
 
+const decodeFleetTask = Schema.decodeUnknownEffect(Schema.fromJsonString(FleetClaimHeartbeatItem));
+
 const access = Effect.gen(function* () {
   yield* readCaller();
   return yield* Project.ProjectService;
@@ -116,13 +119,27 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
         const scope = yield* McpInvocationContext.McpInvocationContext;
         const context = yield* readCaller();
         const { caller } = context;
+        const fleetTask =
+          input.fleetTask === undefined
+            ? undefined
+            : yield* decodeFleetTask(input.fleetTask).pipe(
+                Effect.mapError(
+                  () =>
+                    new OrchestratorMcpFailure({
+                      code: "invalid_request",
+                      message: "fleetTask is not a readable fleet lease token.",
+                    }),
+                ),
+              );
         if (
-          input.fleetTask !== undefined &&
-          (scope.client?.linked !== true || input.fleetTask.fleetId !== scope.client.environmentId)
+          fleetTask !== undefined &&
+          (linkOrigin === undefined ||
+            scope.client?.linked !== true ||
+            scope.client.environmentId === undefined)
         )
           return yield* new OrchestratorMcpFailure({
             code: "invalid_request",
-            message: "fleetTask fleetId must match the linked coordinator environment.",
+            message: "fleetTask requires a linked coordinator environment and link origin.",
           });
         // A retry with the same key replays the first launch: the ids derive
         // from the caller and the key, and the launch service replays a
@@ -320,13 +337,21 @@ export const layer = McpToolAccess.toLayer(ProjectToolkit, {
           scope.client.environmentId !== undefined
         ) {
           const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
-          if (input.fleetTask !== undefined) {
-            yield* reporter.trackTask(thread.id, input.fleetTask).pipe(
-              Effect.catchCause((cause) =>
-                Effect.logWarning("fleet task registration failed", { threadId: thread.id, cause }),
-              ),
-              Effect.forkDetach,
-            );
+          if (fleetTask !== undefined) {
+            yield* reporter
+              .trackTask(thread.id, {
+                ...fleetTask,
+                fleetId: scope.client.environmentId,
+              })
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logWarning("fleet task registration failed", {
+                    threadId: thread.id,
+                    cause,
+                  }),
+                ),
+                Effect.forkDetach,
+              );
           } else {
             yield* reporter
               .trackAdhoc(thread.id, EnvironmentId.make(scope.client.environmentId))

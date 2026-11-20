@@ -3,7 +3,7 @@ import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
 import { FleetClaim } from "./fleetClaims.ts";
-import { FleetSummaryReportInput } from "./fleetSummary.ts";
+import { FleetSummaryReportInput, phaseFromSessionRun } from "./fleetSummary.ts";
 import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
 import { WS_METHODS, WsRpcGroup } from "./rpc.ts";
 
@@ -74,5 +74,20 @@ describe("WebSocket RPC contracts", () => {
 
     expect(Exit.isSuccess(decode({ ...request, path: null }))).toBe(true);
     expect(Exit.isFailure(decode({ ...request, path: "/repo/.git/hooks" }))).toBe(true);
+  });
+
+  it("maps idle and terminal session runs to done", () => {
+    for (const run of [
+      "idle",
+      "completed",
+      "interrupted",
+      "failed",
+      "cancelled",
+      "rolled_back",
+    ] as const) {
+      expect(phaseFromSessionRun(run)).toBe("done");
+    }
+    expect(phaseFromSessionRun("waiting")).toBe("stuck");
+    expect(phaseFromSessionRun("running")).toBe("working");
   });
 });

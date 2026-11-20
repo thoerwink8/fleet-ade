@@ -448,26 +448,57 @@ it.live("does not treat a linked session ID as an authenticated environment iden
           [PeerMcpClient.PEER_IDENTITY_HEADER]: "peer-env",
           [PeerMcpClient.PEER_CHALLENGE_HEADER]: challenge,
         };
+        const legacy = yield* authenticator.authenticate(request({}));
+        expect(legacy).toMatchObject({ client: { sessionId: client.sessionId } });
+        expect(legacy).not.toHaveProperty("client.environmentId");
+        expect(yield* Ref.get(calls)).toHaveLength(0);
+        expect(
+          yield* authenticator.authenticate(
+            request({
+              [PeerMcpClient.PEER_IDENTITY_HEADER]: "peer-env",
+              [PeerMcpClient.PEER_PROOF_HEADER]: "1",
+            }),
+          ),
+        ).toBe("identity_unavailable");
+        yield* Ref.set(answer, "different-env");
+        expect(yield* authenticator.authenticate(request(identity))).toBe("identity_unavailable");
+        expect(
+          yield* authenticator.authenticate(
+            request({
+              [PeerMcpClient.PEER_IDENTITY_HEADER]: "peer-env",
+            }),
+          ),
+        ).toBe("identity_unavailable");
+        yield* Ref.set(answer, "peer-env");
         const proven = yield* authenticator.authenticate(request(identity));
-        expect(proven?.client?.environmentId).toBe("peer-env");
+        expect(proven).toMatchObject({ client: { environmentId: "peer-env" } });
         const proofCalls = yield* Ref.get(calls);
-        expect(proofCalls).toHaveLength(1);
-        expect(proofCalls[0]).toMatchObject({ challenge, target: "self-env" });
+        expect(proofCalls).toHaveLength(2);
+        expect(proofCalls[1]).toMatchObject({ challenge, target: "self-env" });
         const digester = yield* Digest.Digest;
         const expectedDigest = Base64Url.encode(
           yield* digester.digest(Digest.sha256, new TextEncoder().encode(token)),
         );
-        expect(proofCalls[0]?.bearerDigest).toBe(expectedDigest);
+        expect(proofCalls[1]?.bearerDigest).toBe(expectedDigest);
         const plain = yield* authenticator.authenticate(request({}));
-        expect(plain?.client?.environmentId).toBeUndefined();
+        expect(plain).toMatchObject({ client: { environmentId: "peer-env" } });
         const suppressed = yield* authenticator.authenticate(
-          request({ ...identity, [PeerMcpClient.PEER_PROOF_HEADER]: "1" }),
+          request({ [PeerMcpClient.PEER_PROOF_HEADER]: "1" }),
         );
-        expect(suppressed?.client?.environmentId).toBeUndefined();
-        expect(yield* Ref.get(calls)).toHaveLength(1);
+        expect(suppressed).toMatchObject({ client: { environmentId: "peer-env" } });
         yield* Ref.set(answer, "different-env");
-        const spoofed = yield* authenticator.authenticate(request(identity));
-        expect(spoofed?.client?.environmentId).toBeUndefined();
+        expect(yield* authenticator.authenticate(request(identity))).toMatchObject({
+          client: { environmentId: "peer-env" },
+        });
+        expect(yield* Ref.get(calls)).toHaveLength(2);
+        expect(
+          yield* authenticator.authenticate(
+            request({
+              ...identity,
+              [PeerMcpClient.PEER_IDENTITY_HEADER]: "different-env",
+            }),
+          ),
+        ).toBe("identity_unavailable");
       }).pipe(Effect.provide(Layer.mergeAll(authenticatorLayer, NodeCrypto.layer)));
     }),
   ),

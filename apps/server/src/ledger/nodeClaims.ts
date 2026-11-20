@@ -124,20 +124,9 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
       }[];
       if (input.action === "finish") {
         const token = input.token;
-        if (
-          token === undefined &&
-          !held.some(
-            (row) =>
-              row.fleetId === "legacy" &&
-              row.state === "running" &&
-              row.claimedBy === input.claimedBy &&
-              leaseHeld(row.leaseUntil, nowMs),
-          )
-        )
-          return { status: 409, code: "not_claimed" } as const;
         const removed = yield* sql`
           DELETE FROM node_claims
-          WHERE fleet_id = 'legacy' AND state = 'running' AND task_id = 'root'
+          WHERE fleet_id = 'legacy' AND task_id = 'root'
             AND lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
             AND claimed_by = ${input.claimedBy}
             ${token !== undefined ? sql`AND fencing = ${token}` : sql``}
@@ -178,9 +167,19 @@ export const apply = Effect.fn("nodeClaims.apply")(function* (
         `;
         return { status: 200, code: "ok", leaseUntil: input.leaseUntil } as const;
       }
-      if (held.length > 0) {
+      if (
+        held.some(
+          (row) =>
+            row.fleetId !== "legacy" ||
+            (row.state === "running" && leaseHeld(row.leaseUntil, nowMs)),
+        )
+      ) {
         return { status: 409, code: "engine_has_it" } as const;
       }
+      yield* sql`
+        DELETE FROM node_claims WHERE fleet_id = 'legacy' AND task_id = 'root'
+          AND lower(repo) = lower(${input.repo}) AND issue = ${input.issue}
+      `;
       yield* sql`
         INSERT INTO node_claims (
           fleet_id, repo, issue, task_id, claimed_by, lease_until, executor, state, fencing, attempt,

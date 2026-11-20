@@ -21,7 +21,8 @@ const linkedClient = McpInvocationContext.McpInvocationContext.pipe(
 const missingLinkedEnvironment = () =>
   new OrchestratorMcpFailure({
     code: "invalid_request",
-    message: "旧链接，请重新链接",
+    message:
+      "Update the linked environment to claim fleet tasks. Existing leases can still be renewed or released.",
   });
 const fromFleetClaimsError = (error: FleetClaimsError) =>
   new OrchestratorMcpFailure({

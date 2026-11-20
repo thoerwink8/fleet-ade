@@ -36,6 +36,7 @@ const runWithPeerLinks = Effect.fn("environment.runWithPeerLinks")(function* <A,
     Effect.flatMap(run),
     Effect.provide(
       PeerLinks.layer.pipe(
+        // CLI linking does not serve proof callbacks; its challenge registry is separate from the server's.
         Layer.provide(PeerChallengeRegistry.layer),
         Layer.provide(
           Layer.mergeAll(

@@ -1199,7 +1199,11 @@ it.effect("admits provider and OAuth client credentials and points only clients 
           Layer.succeed(McpHttpServer.McpClientAuthenticator, {
             authenticate: (request) =>
               Effect.succeed(
-                request.headers.authorization === `Bearer ${clientToken}` ? clientScope : undefined,
+                request.headers.authorization === `Bearer ${clientToken}`
+                  ? clientScope
+                  : request.headers.authorization === "Bearer proof-unavailable"
+                    ? ("identity_unavailable" as const)
+                    : undefined,
               ),
           }),
         ),
@@ -1258,6 +1262,9 @@ it.effect("admits provider and OAuth client credentials and points only clients 
         "provider-session",
         "client:session-1",
       ]);
+      const unavailable = yield* call("proof-unavailable");
+      expect(unavailable.status).toBe(503);
+      expect(unavailable.headers["www-authenticate"]).toBeUndefined();
 
       const missing = yield* call(undefined);
       expect(missing.status).toBe(401);

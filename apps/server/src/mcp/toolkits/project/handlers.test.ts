@@ -1022,6 +1022,36 @@ it.effect("a linked launch returns while its initial summary report waits on the
   ),
 );
 
+it.effect("a fleet task without a link origin is rejected before launching", () =>
+  Effect.gen(function* () {
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched });
+    const dependencyContext = yield* Layer.build(harness.dependencies);
+    const toolkit = yield* ProjectToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+          Layer.provide(harness.dependencies),
+        ),
+      ),
+    );
+    const response = yield* toolkit
+      .handle("t3_thread_launch", {
+        title: "Unlinked fleet task",
+        projectId: harness.projectId,
+        fleetTask: JSON.stringify({
+          repo: "example/one",
+          issue: 7,
+          taskId: "task-x",
+          attempt: 1,
+          fencing: "1",
+        }),
+      })
+      .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+    expect(response.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+    expect(launched).toHaveLength(0);
+  }),
+);
+
 it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc row", () =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -1096,20 +1126,17 @@ it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc
         ),
       );
       const claim = {
-        fleetId: "coordinator",
         repo: "example/one",
         issue: 7,
         taskId: "task-x",
-        holder: "session-a",
         attempt: 1,
         fencing: "1",
-        leaseUntil: "2999-01-01T00:00:00.000Z",
       };
       const refused = yield* toolkit
         .handle("t3_thread_launch", {
-          title: "Wrong coordinator",
+          title: "Malformed token",
           projectId: harness.projectId,
-          fleetTask: { ...claim, fleetId: "other-coordinator" },
+          fleetTask: JSON.stringify({ ...claim, fencing: "" }),
         })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
       expect(refused.at(-1)?.result).toMatchObject({ code: "invalid_request" });
@@ -1118,7 +1145,7 @@ it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc
         .handle("t3_thread_launch", {
           title: "Leased work",
           projectId: harness.projectId,
-          fleetTask: claim,
+          fleetTask: JSON.stringify(claim),
         })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
       expect(response.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
@@ -1129,7 +1156,7 @@ it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc
         .handle("t3_thread_launch", {
           title: "Another leased thread",
           projectId: harness.projectId,
-          fleetTask: { ...claim, issue: 8, taskId: "task-y" },
+          fleetTask: JSON.stringify({ ...claim, issue: 8, taskId: "task-y" }),
         })
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
       expect(second.at(-1)?.result).toMatchObject({ threadId: launched[1]?.threadId });
@@ -1159,11 +1186,13 @@ it.effect("a failed fleet registration does not fail a launch and a replay regis
       const failed = yield* Deferred.make<void>();
       const registered = yield* Deferred.make<ThreadId>();
       let attempts = 0;
+      let registeredClaim: unknown;
       const dependencies = Layer.merge(
         harness.dependencies,
         Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
-          trackTask: (threadId) =>
+          trackTask: (threadId, claim) =>
             Effect.gen(function* () {
+              registeredClaim = claim;
               attempts += 1;
               if (attempts === 1) {
                 yield* Deferred.succeed(failed, undefined);
@@ -1185,16 +1214,13 @@ it.effect("a failed fleet registration does not fail a launch and a replay regis
         title: "Leased work",
         projectId: harness.projectId,
         clientRequestId: "retry-registration",
-        fleetTask: {
-          fleetId: "coordinator",
+        fleetTask: JSON.stringify({
           repo: "example/one",
           issue: 7,
           taskId: "task-x",
-          holder: "session-a",
           attempt: 1,
           fencing: "1",
-          leaseUntil: "2999-01-01T00:00:00.000Z",
-        },
+        }),
       };
       const first = yield* toolkit
         .handle("t3_thread_launch", input)
@@ -1206,6 +1232,14 @@ it.effect("a failed fleet registration does not fail a launch and a replay regis
         .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
       expect(replay.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
       expect(yield* Deferred.await(registered)).toBe(launched[0]?.threadId);
+      expect(registeredClaim).toEqual({
+        fleetId: "coordinator",
+        repo: "example/one",
+        issue: 7,
+        taskId: "task-x",
+        attempt: 1,
+        fencing: "1",
+      });
       expect(attempts).toBe(2);
     }),
   ),

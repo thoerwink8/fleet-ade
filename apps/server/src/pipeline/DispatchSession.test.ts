@@ -27,7 +27,7 @@ import * as ClaimLease from "./claimLease.ts";
 import { PipelineRuns, PipelineUsage, layer as runsLayer } from "./PipelineRuns.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
 import { SessionEndInbox, layer as inboxLayer, type SessionEndStatus } from "./SessionEndInbox.ts";
-import { EnvironmentId, type FleetClaim } from "@t3tools/contracts";
+import { EnvironmentId } from "@t3tools/contracts";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as FleetClaims from "../ledger/FleetClaims.ts";
 import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
@@ -216,7 +216,12 @@ const recordEnd = (
 
 describe("fleet lease binding", () => {
   it.effect("领取机群租约的运行派发后向自身摘要登记为任务行", () => {
-    const tracked = { value: [] as Array<{ threadId: string; claim: FleetClaim }> };
+    const tracked = {
+      value: [] as Array<{
+        threadId: string;
+        claim: Parameters<FleetSummaryReporter.FleetSummaryReporter["Service"]["trackTask"]>[1];
+      }>,
+    };
     const claimsLayer = ClaimLease.fleetPortLayer.pipe(
       Layer.provideMerge(FleetClaims.layerShared),
       Layer.provide(
@@ -226,8 +231,10 @@ describe("fleet lease binding", () => {
       ),
     );
     const reporterLayer = Layer.succeed(FleetSummaryReporter.FleetSummaryReporter, {
-      trackTask: (threadId: ThreadId, claim: FleetClaim) =>
-        Effect.sync(() => tracked.value.push({ threadId, claim })),
+      trackTask: (
+        threadId: ThreadId,
+        claim: Parameters<FleetSummaryReporter.FleetSummaryReporter["Service"]["trackTask"]>[1],
+      ) => Effect.sync(() => tracked.value.push({ threadId, claim })),
       trackAdhoc: () => Effect.void,
       untrack: () => Effect.void,
       handle: () => Effect.void,

@@ -1,5 +1,6 @@
 import type { FleetSummaryWriteResult } from "@t3tools/contracts";
 import { FleetSummaryError } from "@t3tools/contracts";
+import * as NodeSqlite from "node:sqlite";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { expect, it } from "@effect/vitest";
 import {
@@ -10,7 +11,6 @@ import {
   ProviderInstanceId,
   ThreadId,
   EnvironmentId,
-  phaseFromSessionRun,
   FleetSummaryReportInput,
   OrchestratorMcpFailure,
   FleetClaimHeartbeatResult,
@@ -59,6 +59,8 @@ const decodePeerResult = <A>(schema: Schema.Decoder<A>, result: FleetSummaryWrit
   Schema.decodeEffect(schema)(result);
 const decodeHeartbeatResult = <A>(schema: Schema.Decoder<A>, sequence: unknown) =>
   Schema.decodeEffect(schema)({ sequence, results: [] });
+const decodeLeaseResult = <A>(schema: Schema.Decoder<A>, outcome: unknown) =>
+  Schema.decodeEffect(schema)({ outcome, claim: null });
 const decodeHeartbeat = Schema.decodeUnknownEffect(FleetClaimHeartbeatResult);
 
 const claimsLayer = Layer.effectDiscard(
@@ -260,7 +262,7 @@ it.effect("两台互连环境通过真实 MCP 上报各自摘要行，改动只�
       yield* Ref.set(
         bShells,
         new Map([
-          [taskThreadB, shell(taskThreadB, "completed", { title: "B 的任务" })],
+          [taskThreadB, shell(taskThreadB, "running", { title: "B 的任务" })],
           [adhocThreadB, shell(adhocThreadB, "running", { title: "B 的随手活" })],
         ]),
       );
@@ -276,6 +278,10 @@ it.effect("两台互连环境通过真实 MCP 上报各自摘要行，改动只�
         yield* reporter.handle(fakeEvent(threadId, "run.updated"));
       }
       yield* Fiber.join(received);
+      yield* Ref.update(bShells, (map) =>
+        new Map(map).set(taskThreadB, shell(taskThreadB, "completed", { title: "B 的任务" })),
+      );
+      yield* b.reporter.handle(fakeEvent(taskThreadB, "run.updated"));
 
       const snapshots = yield* Stream.runCollect(
         (yield* coordinatorSummary.subscribe({})).pipe(Stream.take(1)),
@@ -536,10 +542,8 @@ it.effect(
           repo: "example/one",
           issue: 7,
           taskId: "t-1",
-          holder: "session-a",
           attempt: 2,
           fencing: "2",
-          leaseUntil: "2999-01-01T00:00:00.000Z",
         });
         yield* TestClock.adjust("30 seconds");
         const lastBeat = (yield* Ref.get(heartbeats)).at(-1);
@@ -807,10 +811,8 @@ it.effect("converting an ad hoc registration deletes it before publishing the ta
         repo: "example/one",
         issue: 7,
         taskId: "task",
-        holder: "holder",
         attempt: 1,
         fencing: "1",
-        leaseUntil: "2999-01-01T00:00:00.000Z",
       });
       yield* Deferred.await(taskSent);
       yield* reporter.handle(fakeEvent(threadId, "run.updated"));
@@ -879,10 +881,8 @@ it.effect("a delayed ad hoc acknowledgement cannot overwrite a task registration
           repo: "example/one",
           issue: 7,
           taskId: "task",
-          holder: "holder",
           attempt: 1,
           fencing: "1",
-          leaseUntil: "2999-01-01T00:00:00.000Z",
         }),
       );
       yield* Fiber.join(task);
@@ -1011,10 +1011,8 @@ it.effect("negative heartbeat outcomes stop only the matching leased registratio
           repo: "example/one",
           issue: 7,
           taskId: threadId,
-          holder: "holder",
           attempt: 1,
           fencing: "1",
-          leaseUntil: "2999-01-01T00:00:00.000Z",
         });
         yield* reporter.handle(fakeEvent(threadId, "run.updated"));
       }
@@ -1043,7 +1041,9 @@ it.effect("a local lease-required response stops subsequent task reports", () =>
             Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
               getEnvironmentId: Effect.succeed(self),
             }),
-            Layer.mock(FleetClaims.FleetClaims)({}),
+            Layer.mock(FleetClaims.FleetClaims)({
+              release: () => Effect.succeed({ outcome: "released", claim: null }),
+            }),
             Layer.mock(FleetSummary.FleetSummary)({
               report: () =>
                 Ref.update(writes, (count) => count + 1).pipe(
@@ -1088,6 +1088,488 @@ it.effect("a local lease-required response stops subsequent task reports", () =>
   ),
 );
 
-it("maps an idle executor session to done", () => {
-  expect(phaseFromSessionRun("idle")).toBe("done");
-});
+it.effect("a pending remote task suppresses local ad hoc registration", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const self = EnvironmentId.make("self");
+      const blocker = ThreadId.make("lane-blocker");
+      const threadId = ThreadId.make("pending-remote-task");
+      const entered = yield* Deferred.make<void>();
+      const unblock = yield* Deferred.make<void>();
+      const taskSent = yield* Deferred.make<void>();
+      const localReports = yield* Ref.make<Array<FleetSummaryReportInput>>([]);
+      const context = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Scheduler.layer,
+            Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+              getEnvironmentId: Effect.succeed(self),
+            }),
+            Layer.mock(FleetClaims.FleetClaims)({}),
+            Layer.mock(FleetSummary.FleetSummary)({
+              report: (_id, input) =>
+                Effect.gen(function* () {
+                  yield* Ref.update(localReports, (items) => [...items, input]);
+                  if (input.type === "upsert-adhoc" && input.threadId === blocker) {
+                    yield* Deferred.succeed(entered, undefined);
+                    yield* Deferred.await(unblock);
+                  }
+                  return { revision: 1, changed: true };
+                }),
+            }),
+            Layer.mock(Orchestrator.OrchestratorV2)({}),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: (id) => Effect.succeed(shell(id, "running")),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: (request) =>
+                Effect.gen(function* () {
+                  yield* Deferred.succeed(taskSent, undefined);
+                  return yield* decodePeerResult(request.success, {
+                    revision: 1,
+                    changed: true,
+                  }).pipe(Effect.orDie);
+                }),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
+      yield* reporter.trackAdhoc(blocker, self);
+      yield* Deferred.await(entered);
+      yield* reporter.trackTask(threadId, {
+        fleetId: "remote",
+        repo: "example/one",
+        issue: 7,
+        taskId: "task",
+        attempt: 1,
+        fencing: "1",
+      });
+      yield* reporter.trackAdhoc(threadId, self);
+      yield* Deferred.succeed(unblock, undefined);
+      yield* Deferred.await(taskSent);
+      yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+      expect(
+        (yield* Ref.get(localReports)).filter(
+          (item) => "threadId" in item && item.threadId === threadId,
+        ),
+      ).toEqual([]);
+    }),
+  ),
+);
+
+it.effect("a failed release remains nonrenewable after reporter reconstruction", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "fleet-finish-restart-" });
+      const filename = path.join(directory, "ledger.sqlite");
+      const threadId = ThreadId.make("finish-restart");
+      const status = yield* Ref.make<OrchestrationV2ThreadShell["status"]>("running");
+      const sent = yield* Deferred.make<void>();
+      const beats = yield* Ref.make<Array<ReadonlyArray<unknown>>>([]);
+      const deps = Layer.mergeAll(
+        localReporterDependencies,
+        Scheduler.layer,
+        Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+        Layer.mock(ProjectionStore.ProjectionStoreV2)({
+          getThreadShell: () => Effect.map(Ref.get(status), (value) => shell(threadId, value)),
+          listActiveShellIndex: () => Effect.succeed([]),
+        }),
+        Layer.mock(PeerMcpClient.PeerMcpClient)({
+          call: (request) =>
+            Effect.gen(function* () {
+              if (request.tool === "fleet_release")
+                return yield* new OrchestratorMcpFailure({
+                  code: "orchestration_error",
+                  message: "offline",
+                });
+              if (request.tool === "fleet_heartbeat") {
+                yield* Ref.update(beats, (items) => [
+                  ...items,
+                  request.arguments.leases as ReadonlyArray<unknown>,
+                ]);
+                return yield* decodeHeartbeatResult(
+                  request.success,
+                  request.arguments.sequence,
+                ).pipe(Effect.orDie);
+              }
+              yield* Deferred.succeed(sent, undefined);
+              return yield* decodePeerResult(request.success, { revision: 1, changed: true }).pipe(
+                Effect.orDie,
+              );
+            }),
+        }),
+      );
+      const build = () =>
+        FleetSummaryReporter.layerForTest(filename).pipe(
+          Layer.provide(deps),
+          Layer.fresh,
+          Layer.build,
+        );
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const reporter = Context.get(yield* build(), FleetSummaryReporter.FleetSummaryReporter);
+          yield* reporter.trackTask(threadId, {
+            fleetId: "remote",
+            repo: "example/one",
+            issue: 7,
+            taskId: "task",
+            attempt: 1,
+            fencing: "1",
+          });
+          yield* Deferred.await(sent);
+          yield* Ref.set(status, "completed");
+          yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+        }),
+      );
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const reporter = Context.get(yield* build(), FleetSummaryReporter.FleetSummaryReporter);
+          yield* reporter.start();
+          yield* TestClock.adjust("30 seconds");
+          expect((yield* Ref.get(beats)).every((leases) => leases.length === 0)).toBe(true);
+        }),
+      );
+    }).pipe(Effect.provide(NodeServices.layer)),
+  ),
+);
+
+it.effect("a remote task removes the local ad hoc row and prevents its recreation", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const self = EnvironmentId.make("self");
+      const threadId = ThreadId.make("remote-task-local-sweep");
+      const localReports = yield* Ref.make<Array<FleetSummaryReportInput>>([]);
+      const remoteReports = yield* Ref.make<Array<FleetSummaryReportInput>>([]);
+      const localSent = yield* Deferred.make<void>();
+      const remoteSent = yield* Deferred.make<void>();
+      const context = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Scheduler.layer,
+            Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+              getEnvironmentId: Effect.succeed(self),
+            }),
+            Layer.mock(FleetClaims.FleetClaims)({
+              heartbeat: (_id, input) => Effect.succeed({ sequence: input.sequence, results: [] }),
+            }),
+            Layer.mock(FleetSummary.FleetSummary)({
+              report: (_id, input) =>
+                Ref.update(localReports, (items) => [...items, input]).pipe(
+                  Effect.tap(() =>
+                    input.type === "upsert-adhoc"
+                      ? Deferred.succeed(localSent, undefined)
+                      : Effect.void,
+                  ),
+                  Effect.as({ revision: 1, changed: true }),
+                ),
+            }),
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: () => Effect.succeed(shell(threadId, "running")),
+              listActiveShellIndex: () =>
+                Effect.succeed([
+                  { id: threadId, mayBeLive: true } as ProjectionStore.ActiveShellIndexEntry,
+                ]),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: (request) =>
+                Effect.gen(function* () {
+                  if (request.tool === "fleet_heartbeat")
+                    return yield* decodeHeartbeatResult(
+                      request.success,
+                      request.arguments.sequence,
+                    ).pipe(Effect.orDie);
+                  const input = yield* decodeSummaryReport(request.arguments).pipe(Effect.orDie);
+                  yield* Ref.update(remoteReports, (items) => [...items, input]);
+                  yield* Deferred.succeed(remoteSent, undefined);
+                  return yield* decodePeerResult(request.success, {
+                    revision: 1,
+                    changed: true,
+                  }).pipe(Effect.orDie);
+                }),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
+      yield* reporter.trackAdhoc(threadId, self);
+      yield* Deferred.await(localSent);
+      yield* reporter.trackTask(threadId, {
+        fleetId: "remote",
+        repo: "example/one",
+        issue: 7,
+        taskId: "task",
+        attempt: 1,
+        fencing: "1",
+      });
+      yield* Deferred.await(remoteSent);
+      yield* reporter.start();
+      yield* TestClock.adjust("10 seconds");
+      expect((yield* Ref.get(localReports)).map((item) => item.type)).toEqual([
+        "upsert-adhoc",
+        "delete-adhoc",
+      ]);
+      expect((yield* Ref.get(remoteReports)).map((item) => item.type)).toEqual(["upsert-task"]);
+    }),
+  ),
+);
+
+it.effect(
+  "done releases the fenced lease before reporting and never renews after a release failure",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const threadId = ThreadId.make("finish-task");
+        const status = yield* Ref.make<OrchestrationV2ThreadShell["status"]>("running");
+        const calls = yield* Ref.make<Array<{ tool: string; arguments: Record<string, unknown> }>>(
+          [],
+        );
+        const firstReport = yield* Deferred.make<void>();
+        const failRelease = yield* Ref.make(true);
+        const context = yield* FleetSummaryReporter.layerForTest().pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              localReporterDependencies,
+              Scheduler.layer,
+              Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+              Layer.mock(ProjectionStore.ProjectionStoreV2)({
+                getThreadShell: () =>
+                  Effect.map(Ref.get(status), (value) => shell(threadId, value)),
+                listActiveShellIndex: () => Effect.succeed([]),
+              }),
+              Layer.mock(PeerMcpClient.PeerMcpClient)({
+                call: (request) =>
+                  Effect.gen(function* () {
+                    yield* Ref.update(calls, (items) => [
+                      ...items,
+                      { tool: request.tool, arguments: request.arguments },
+                    ]);
+                    if (request.tool === "fleet_heartbeat")
+                      return yield* decodeHeartbeatResult(
+                        request.success,
+                        request.arguments.sequence,
+                      ).pipe(Effect.orDie);
+                    if (request.tool === "fleet_release") {
+                      if (yield* Ref.get(failRelease))
+                        return yield* new OrchestratorMcpFailure({
+                          code: "orchestration_error",
+                          message: "offline",
+                        });
+                      return yield* decodeLeaseResult(request.success, "released").pipe(
+                        Effect.orDie,
+                      );
+                    }
+                    yield* Deferred.succeed(firstReport, undefined);
+                    return yield* decodePeerResult(request.success, {
+                      revision: 1,
+                      changed: true,
+                    }).pipe(Effect.orDie);
+                  }),
+              }),
+            ),
+          ),
+          Layer.build,
+        );
+        const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
+        yield* reporter.trackTask(threadId, {
+          fleetId: "remote",
+          repo: "example/one",
+          issue: 7,
+          taskId: "task",
+          attempt: 2,
+          fencing: "fence-2",
+        });
+        yield* Deferred.await(firstReport);
+        yield* Ref.set(status, "completed");
+        yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+        yield* reporter.start();
+        yield* TestClock.adjust("30 seconds");
+        const failedCalls = yield* Ref.get(calls);
+        expect(failedCalls.filter((call) => call.tool === "fleet_release").length).toBeGreaterThan(
+          0,
+        );
+        expect(
+          failedCalls
+            .filter((call) => call.tool === "fleet_heartbeat")
+            .every((call) => (call.arguments.leases as ReadonlyArray<unknown>).length === 0),
+        ).toBe(true);
+        yield* Ref.set(failRelease, false);
+        yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+        const allCalls = yield* Ref.get(calls);
+        const releaseIndex = allCalls.findLastIndex((call) => call.tool === "fleet_release");
+        expect(allCalls[releaseIndex]?.arguments).toMatchObject({
+          repo: "example/one",
+          issue: 7,
+          taskId: "task",
+          attempt: 2,
+          fencing: "fence-2",
+          idempotencyKey: expect.any(String),
+        });
+        expect(allCalls[releaseIndex + 1]).toMatchObject({
+          tool: "fleet_summary_report",
+          arguments: { sessionRun: "completed" },
+        });
+        yield* TestClock.adjust("30 seconds");
+        expect(
+          (yield* Ref.get(calls))
+            .filter((call) => call.tool === "fleet_heartbeat")
+            .every((call) => (call.arguments.leases as ReadonlyArray<unknown>).length === 0),
+        ).toBe(true);
+      }),
+    ),
+);
+
+it.effect("a live-index false positive with an idle shell is not registered", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("idle-index");
+      const writes = yield* Ref.make(0);
+      const context = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Scheduler.layer,
+            Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+              getEnvironmentId: Effect.succeed(EnvironmentId.make("self")),
+            }),
+            Layer.mock(FleetClaims.FleetClaims)({
+              heartbeat: (_id, input) => Effect.succeed({ sequence: input.sequence, results: [] }),
+            }),
+            Layer.mock(FleetSummary.FleetSummary)({
+              report: () =>
+                Ref.update(writes, (n) => n + 1).pipe(Effect.as({ revision: 1, changed: true })),
+            }),
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: () => Effect.succeed(shell(threadId, "idle")),
+              listActiveShellIndex: () =>
+                Effect.succeed([
+                  { id: threadId, mayBeLive: true } as ProjectionStore.ActiveShellIndexEntry,
+                ]),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({}),
+          ),
+        ),
+        Layer.build,
+      );
+      const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
+      yield* reporter.start();
+      yield* TestClock.adjust("15 seconds");
+      expect(yield* Ref.get(writes)).toBe(0);
+    }),
+  ),
+);
+
+it.effect("repeated identical registrations do not write their database row", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "fleet-registration-writes-" });
+      const filename = path.join(directory, "ledger.sqlite");
+      const threadId = ThreadId.make("unchanged-registration");
+      const sent = yield* Deferred.make<void>();
+      const context = yield* FleetSummaryReporter.layerForTest(filename).pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            localReporterDependencies,
+            Scheduler.layer,
+            Layer.mock(Orchestrator.OrchestratorV2)({}),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: () => Effect.succeed(shell(threadId, "running")),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: (request) =>
+                Effect.gen(function* () {
+                  yield* Deferred.succeed(sent, undefined);
+                  return yield* decodePeerResult(request.success, {
+                    revision: 1,
+                    changed: true,
+                  }).pipe(Effect.orDie);
+                }),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
+      yield* reporter.trackAdhoc(threadId, EnvironmentId.make("remote"));
+      yield* Deferred.await(sent);
+      yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+      const observer = new NodeSqlite.DatabaseSync(filename);
+      observer.exec("CREATE TABLE reporter_writes (n INTEGER NOT NULL)");
+      observer.exec(
+        "CREATE TRIGGER count_registration_update AFTER UPDATE ON fleet_summary_registrations BEGIN INSERT INTO reporter_writes VALUES (1); END",
+      );
+      yield* reporter.trackAdhoc(threadId, EnvironmentId.make("remote"));
+      yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+      expect(observer.prepare("SELECT * FROM reporter_writes").all()).toEqual([]);
+      observer.close();
+    }).pipe(Effect.provide(NodeServices.layer)),
+  ),
+);
+
+it.effect("heartbeat transport or proof errors do not mark a lease lost", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const threadId = ThreadId.make("unconfirmed-proof");
+      const title = yield* Ref.make("before");
+      const reports = yield* Ref.make<Array<FleetSummaryReportInput>>([]);
+      const sent = yield* Deferred.make<void>();
+      const context = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            localReporterDependencies,
+            Scheduler.layer,
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: () =>
+                Effect.map(Ref.get(title), (value) => shell(threadId, "running", { title: value })),
+              listActiveShellIndex: () => Effect.succeed([]),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: (request) =>
+                Effect.gen(function* () {
+                  if (request.tool === "fleet_heartbeat")
+                    return yield* new OrchestratorMcpFailure({
+                      code: "invalid_request",
+                      message: "proof failed",
+                    });
+                  const input = yield* decodeSummaryReport(request.arguments).pipe(Effect.orDie);
+                  yield* Ref.update(reports, (items) => [...items, input]);
+                  yield* Deferred.succeed(sent, undefined);
+                  return yield* decodePeerResult(request.success, {
+                    revision: 1,
+                    changed: true,
+                  }).pipe(Effect.orDie);
+                }),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const reporter = Context.get(context, FleetSummaryReporter.FleetSummaryReporter);
+      yield* reporter.trackTask(threadId, {
+        fleetId: "remote",
+        repo: "example/one",
+        issue: 7,
+        taskId: "task",
+        attempt: 1,
+        fencing: "1",
+      });
+      yield* Deferred.await(sent);
+      yield* reporter.start();
+      yield* TestClock.adjust("30 seconds");
+      yield* Ref.set(title, "after");
+      yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+      expect((yield* Ref.get(reports)).at(-1)).toMatchObject({
+        type: "upsert-task",
+        title: "after",
+      });
+    }),
+  ),
+);

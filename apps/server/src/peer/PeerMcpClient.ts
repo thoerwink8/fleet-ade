@@ -267,6 +267,16 @@ const make = Effect.gen(function* () {
         });
       }
       if (response.status === 403) return yield* linkedEnvironmentsOffThere;
+      if (response.status === 503) {
+        const text = yield* response.text;
+        if (text.includes('"peer_identity_unavailable"')) {
+          return yield* new OrchestratorMcpFailure({
+            code: "orchestration_error",
+            message:
+              "The linked environment could not verify this environment's identity. Check that both environments can reach each other, then retry.",
+          });
+        }
+      }
       if (response.status !== 200) {
         return yield* new OrchestratorMcpFailure({
           code: "orchestration_error",

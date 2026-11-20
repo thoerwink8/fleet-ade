@@ -68,14 +68,14 @@ const call = (
 
 const key = { repo: "example/one", issue: 7, taskId: "root" };
 
-it.effect("旧链接没有环境身份，调用真实 handler 要求重新链接", () =>
+it.effect("旧客户端没有环境身份时，提示升级而不是重新链接", () =>
   Effect.gen(function* () {
     const result = yield* call("fleet_claim", linkedClient("old-session"), {
       ...key,
       idempotencyKey: "claim-a",
     });
     expect(result.code).toBe("invalid_request");
-    expect(result.message).toContain("旧链接，请重新链接");
+    expect(result.message).toContain("Update the linked environment");
   }).pipe(Effect.provide(serverLayer)),
 );
 

@@ -8,6 +8,7 @@ import {
   EnvironmentId,
   FLEET_SUMMARY_PROGRESS_LIMIT,
   FleetClaimHeartbeatResult,
+  FleetClaimLeaseResult,
   type FleetClaimsError,
   type FleetSummaryError,
   type OrchestratorMcpFailure,
@@ -77,6 +78,8 @@ interface TrackedTask {
   readonly deleting?: boolean;
   readonly lost?: boolean;
   readonly deleteAdhocFirst?: boolean;
+  readonly finishing?: boolean;
+  readonly released?: boolean;
 }
 
 const keyFor = (threadId: string, coordinator: string) => `${threadId}\n${coordinator}`;
@@ -86,7 +89,10 @@ export class FleetSummaryReporter extends Context.Service<
   FleetSummaryReporter,
   {
     /** Explicitly bind a local executor thread to a winning claim and report its shell. */
-    readonly trackTask: (threadId: ThreadId, claim: FleetClaim) => Effect.Effect<void>;
+    readonly trackTask: (
+      threadId: ThreadId,
+      claim: Pick<FleetClaim, "fleetId" | "repo" | "issue" | "taskId" | "attempt" | "fencing">,
+    ) => Effect.Effect<void>;
     /** Register unleased work for one coordinator and report its current shell. */
     readonly trackAdhoc: (threadId: ThreadId, coordinator: EnvironmentId) => Effect.Effect<void>;
     /** Send tombstones to every coordinator; forget a registration once acknowledged. */
@@ -128,6 +134,9 @@ const make = Effect.gen(function* () {
           deleting: row.deleting === 1,
           lost: row.deleting === 2,
           deleteAdhocFirst: row.deleting === 3,
+          // 4/5 persist the nonrenewable completion transition and its release acknowledgement.
+          finishing: row.deleting === 4 || row.deleting === 5,
+          released: row.deleting === 5,
         },
       ]),
     ),
@@ -137,7 +146,7 @@ const make = Effect.gen(function* () {
     INSERT INTO fleet_summary_registrations (thread_id, kind, coordinator, repo, issue, task_id, sent, deleting, attempt, fencing)
     VALUES (${entry.threadId}, ${entry.kind}, ${entry.coordinator}, ${entry.repo ?? null},
       ${entry.issue ?? null}, ${entry.taskId ?? null}, ${entry.sent === undefined ? null : encodeSent(entry.sent)},
-      ${entry.lost ? 2 : entry.deleting ? 1 : entry.deleteAdhocFirst ? 3 : 0}, ${entry.attempt ?? null}, ${entry.fencing ?? null})
+      ${entry.lost ? 2 : entry.deleting ? 1 : entry.deleteAdhocFirst ? 3 : entry.released ? 5 : entry.finishing ? 4 : 0}, ${entry.attempt ?? null}, ${entry.fencing ?? null})
     ON CONFLICT(thread_id, coordinator) DO UPDATE SET kind = excluded.kind, coordinator = excluded.coordinator,
       repo = excluded.repo, issue = excluded.issue, task_id = excluded.task_id,
       sent = excluded.sent, deleting = excluded.deleting,
@@ -246,7 +255,7 @@ const make = Effect.gen(function* () {
       ),
     );
     if (shell === null) return;
-    if (entry.lost && phaseFromSessionRun(shell.status) !== "done") return;
+    if ((entry.lost || entry.finishing) && phaseFromSessionRun(shell.status) !== "done") return;
     if (entry.kind === "adhoc" && phaseFromSessionRun(shell.status) === "done") {
       const pending = { ...entry, deleting: true };
       yield* persist(pending);
@@ -263,6 +272,57 @@ const make = Effect.gen(function* () {
           return next;
         });
       }
+      return;
+    }
+    if (entry.kind === "task" && phaseFromSessionRun(shell.status) === "done" && !entry.released) {
+      const finishing = entry.finishing ? entry : { ...entry, finishing: true, lost: false };
+      if (finishing !== entry) {
+        yield* persist(finishing);
+        yield* Ref.update(tracked, (current) => new Map(current).set(key, finishing));
+      }
+      if (
+        finishing.repo === undefined ||
+        finishing.issue === undefined ||
+        finishing.taskId === undefined ||
+        finishing.attempt === undefined ||
+        finishing.fencing === undefined
+      )
+        return;
+      const input = {
+        repo: finishing.repo,
+        issue: finishing.issue,
+        taskId: finishing.taskId,
+        attempt: finishing.attempt,
+        fencing: finishing.fencing,
+        idempotencyKey: `summary-release:${finishing.threadId}:${finishing.attempt}:${finishing.fencing}`,
+      };
+      const release: Effect.Effect<
+        FleetClaimLeaseResult,
+        FleetClaimsError | OrchestratorMcpFailure
+      > =
+        finishing.coordinator === selfId
+          ? fleetClaims.release({ sessionId: selfId, environmentId: selfId }, input)
+          : peers.call({
+              environmentId: finishing.coordinator,
+              tool: "fleet_release",
+              arguments: input,
+              limits: { runtimeMode: "auto", interactionMode: "default" },
+              success: FleetClaimLeaseResult,
+            });
+      const result = yield* release.pipe(
+        Effect.as(true),
+        Effect.catch((error) =>
+          Effect.logWarning("fleet task release failed", {
+            threadId: finishing.threadId,
+            error,
+          }).pipe(Effect.as(false)),
+        ),
+      );
+      if (!result) return;
+      const released = { ...finishing, released: true };
+      yield* persist(released);
+      yield* Ref.update(tracked, (current) => new Map(current).set(key, released));
+      yield* report(key);
       return;
     }
     const fields = reportFields(shell);
@@ -292,10 +352,11 @@ const make = Effect.gen(function* () {
           AND kind = ${entry.kind} AND repo IS ${entry.repo ?? null}
           AND issue IS ${entry.issue ?? null} AND task_id IS ${entry.taskId ?? null}
           AND attempt IS ${entry.attempt ?? null} AND fencing IS ${entry.fencing ?? null}
-          AND deleting IN (0, 2)`.pipe(Effect.orDie);
+          AND deleting IN (0, 2, 5)`.pipe(Effect.orDie);
+      const sentEntry = entry;
       yield* Ref.update(tracked, (current) => {
         const latest = current.get(key);
-        if (latest !== entry) return current;
+        if (latest === undefined || latest !== sentEntry) return current;
         return new Map(current).set(key, { ...latest, sent: fields });
       });
     }
@@ -348,7 +409,14 @@ const make = Effect.gen(function* () {
     Effect.suspend(() => {
       const trackKey = keyFor(threadId, entry.coordinator);
       const version = Symbol();
-      if (entry.kind === "adhoc" && pendingTracks.get(trackKey)?.kind === "task")
+      if (
+        entry.kind === "adhoc" &&
+        (pendingTracks.get(trackKey)?.kind === "task" ||
+          (entry.coordinator === selfId &&
+            [...pendingTracks.entries()].some(
+              ([key, pending]) => key.startsWith(`${threadId}\n`) && pending.kind === "task",
+            )))
+      )
         return Effect.void;
       pendingTracks.set(trackKey, { version, kind: entry.kind });
       return sendLane
@@ -356,10 +424,27 @@ const make = Effect.gen(function* () {
           Effect.gen(function* () {
             if (pendingTracks.get(trackKey)?.version !== version) return;
             pendingTracks.delete(trackKey);
+            if (
+              entry.kind === "adhoc" &&
+              entry.coordinator === selfId &&
+              [...pendingTracks.entries()].some(
+                ([pendingKey, pending]) =>
+                  pendingKey.startsWith(`${threadId}\n`) && pending.kind === "task",
+              )
+            )
+              return;
             const key = keyFor(threadId, entry.coordinator);
             const current = yield* Ref.get(tracked);
             const previous = current.get(key);
-            if (entry.kind === "adhoc" && previous?.kind === "task") return;
+            if (
+              entry.kind === "adhoc" &&
+              (previous?.kind === "task" ||
+                (entry.coordinator === selfId &&
+                  [...current.values()].some(
+                    (item) => item.threadId === threadId && item.kind === "task" && !item.deleting,
+                  )))
+            )
+              return;
             const next: TrackedTask =
               previous?.kind === entry.kind &&
               previous.repo === entry.repo &&
@@ -370,8 +455,22 @@ const make = Effect.gen(function* () {
               !previous.deleting
                 ? previous
                 : { ...entry, threadId, deleteAdhocFirst: previous?.kind === "adhoc" };
-            yield* persist(next);
-            yield* Ref.update(tracked, (items) => new Map(items).set(key, next));
+            if (next !== previous) {
+              yield* persist(next);
+              yield* Ref.update(tracked, (items) => new Map(items).set(key, next));
+            }
+            if (entry.kind === "task" && entry.coordinator !== selfId) {
+              const localKey = keyFor(threadId, selfId);
+              const local = (yield* Ref.get(tracked)).get(localKey);
+              if (local?.kind === "adhoc") {
+                const deleting = { ...local, deleting: true };
+                if (!local.deleting) {
+                  yield* persist(deleting);
+                  yield* Ref.update(tracked, (items) => new Map(items).set(localKey, deleting));
+                }
+                yield* report(localKey);
+              }
+            }
             yield* sendLane.withPermits(1)(report(key)).pipe(Effect.forkDetach);
           }),
         )
@@ -395,7 +494,6 @@ const make = Effect.gen(function* () {
   // Local threads register with their own environment. Remote registrations
   // are explicit, so unrelated links do not receive thread metadata.
   const registerLocalSessions = Effect.gen(function* () {
-    const coordinators = new Set<EnvironmentId>([selfId]);
     const active = yield* projections
       .listActiveShellIndex()
       .pipe(
@@ -404,27 +502,50 @@ const make = Effect.gen(function* () {
         ),
       );
     if (active === null) return;
-    const current = yield* Ref.get(tracked);
+
     const live = new Set(active.filter((thread) => thread.mayBeLive).map((thread) => thread.id));
     yield* sendLane.withPermits(1)(
       Effect.gen(function* () {
         for (const [key, entry] of yield* Ref.get(tracked)) {
-          if (entry.kind !== "adhoc" || entry.coordinator !== selfId || live.has(entry.threadId))
-            continue;
-          const pending = { ...entry, deleting: true };
-          yield* persist(pending);
-          yield* Ref.update(tracked, (items) => new Map(items).set(key, pending));
+          if (entry.kind !== "adhoc" || entry.coordinator !== selfId) continue;
+          const taskExists = [...(yield* Ref.get(tracked)).values()].some(
+            (item) => item.threadId === entry.threadId && item.kind === "task" && !item.deleting,
+          );
+          if (!taskExists && live.has(entry.threadId)) continue;
+          if (!entry.deleting) {
+            const pending = { ...entry, deleting: true };
+            yield* persist(pending);
+            yield* Ref.update(tracked, (items) => new Map(items).set(key, pending));
+          }
           yield* report(key);
         }
       }),
     );
     for (const thread of active) {
       if (!thread.mayBeLive) continue;
-      for (const coordinator of coordinators) {
-        const previous = current.get(keyFor(thread.id, coordinator));
-        if (previous !== undefined) continue;
-        yield* trackAdhoc(thread.id, coordinator);
-      }
+      if (
+        [...(yield* Ref.get(tracked)).values()].some(
+          (entry) =>
+            entry.threadId === thread.id && (entry.kind === "task" || entry.coordinator === selfId),
+        )
+      )
+        continue;
+      if (
+        [...pendingTracks.entries()].some(
+          ([key, pending]) => key.startsWith(`${thread.id}\n`) && pending.kind === "task",
+        )
+      )
+        continue;
+      const shell = yield* projections.getThreadShell(thread.id).pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("fleet summary shell read failed", {
+            threadId: thread.id,
+            error,
+          }).pipe(Effect.as(null)),
+        ),
+      );
+      if (shell === null || phaseFromSessionRun(shell.status) === "done") continue;
+      yield* trackAdhoc(thread.id, selfId);
     }
   });
 
@@ -443,106 +564,110 @@ const make = Effect.gen(function* () {
       );
       let sequence = 0;
       yield* forkParked(
-        Effect.gen(function* () {
-          const entries = [...(yield* Ref.get(tracked)).values()];
-          const coordinators = new Map<EnvironmentId, Array<TrackedTask>>();
-          for (const entry of entries) {
-            if (entry.deleting === true || entry.lost === true) continue;
-            const list = coordinators.get(entry.coordinator) ?? [];
-            list.push(entry);
-            coordinators.set(entry.coordinator, list);
-          }
-          sequence += 1;
-          yield* Effect.forEach(
-            coordinators,
-            ([environmentId, tasks]) => {
-              const leases = tasks.flatMap((entry) =>
-                entry.repo !== undefined &&
-                entry.issue !== undefined &&
-                entry.taskId !== undefined &&
-                entry.attempt !== undefined &&
-                entry.fencing !== undefined
-                  ? [
-                      {
-                        repo: entry.repo,
-                        issue: entry.issue,
-                        taskId: entry.taskId,
-                        attempt: entry.attempt,
-                        fencing: entry.fencing,
-                      },
-                    ]
-                  : [],
+        sendLane
+          .withPermits(1)(
+            Effect.gen(function* () {
+              const entries = [...(yield* Ref.get(tracked)).values()];
+              const coordinators = new Map<EnvironmentId, Array<TrackedTask>>();
+              for (const entry of entries) {
+                if (entry.deleting === true || entry.lost === true || entry.finishing === true)
+                  continue;
+                const list = coordinators.get(entry.coordinator) ?? [];
+                list.push(entry);
+                coordinators.set(entry.coordinator, list);
+              }
+              sequence += 1;
+              yield* Effect.forEach(
+                coordinators,
+                ([environmentId, tasks]) => {
+                  const leases = tasks.flatMap((entry) =>
+                    entry.repo !== undefined &&
+                    entry.issue !== undefined &&
+                    entry.taskId !== undefined &&
+                    entry.attempt !== undefined &&
+                    entry.fencing !== undefined
+                      ? [
+                          {
+                            repo: entry.repo,
+                            issue: entry.issue,
+                            taskId: entry.taskId,
+                            attempt: entry.attempt,
+                            fencing: entry.fencing,
+                          },
+                        ]
+                      : [],
+                  );
+                  const send: Effect.Effect<
+                    FleetClaimHeartbeatResult,
+                    FleetClaimsError | OrchestratorMcpFailure
+                  > =
+                    environmentId === selfId
+                      ? fleetClaims.heartbeat(selfId, { sequence, leases })
+                      : peers.call({
+                          environmentId,
+                          tool: "fleet_heartbeat",
+                          arguments: { sequence, leases },
+                          limits: { runtimeMode: "auto", interactionMode: "default" },
+                          success: FleetClaimHeartbeatResult,
+                        });
+                  return send.pipe(
+                    Effect.timeout("20 seconds"),
+                    Effect.tap((result) =>
+                      Effect.forEach(
+                        result.results,
+                        (item) => {
+                          if (item.outcome === "renewed") return Effect.void;
+                          const entry = tasks.find(
+                            (task) =>
+                              task.repo === item.repo &&
+                              task.issue === item.issue &&
+                              task.taskId === item.taskId &&
+                              task.attempt === item.attempt,
+                          );
+                          if (entry === undefined) return Effect.void;
+                          return Effect.gen(function* () {
+                            const key = keyFor(entry.threadId, entry.coordinator);
+                            if (pendingTracks.has(key)) return;
+                            const current = (yield* Ref.get(tracked)).get(key);
+                            if (
+                              current === undefined ||
+                              current.deleting ||
+                              current.lost ||
+                              current.finishing ||
+                              current.kind !== entry.kind ||
+                              current.repo !== entry.repo ||
+                              current.issue !== entry.issue ||
+                              current.taskId !== entry.taskId ||
+                              current.attempt !== entry.attempt ||
+                              current.fencing !== entry.fencing
+                            )
+                              return;
+                            const lost = { ...current, lost: true };
+                            yield* persist(lost);
+                            yield* Ref.update(tracked, (items) => new Map(items).set(key, lost));
+                          });
+                        },
+                        { discard: true },
+                      ),
+                    ),
+                    Effect.catch((error) =>
+                      Effect.logWarning("fleet heartbeat failed", {
+                        environmentId,
+                        code:
+                          error._tag === "FleetClaimsError"
+                            ? error.reason
+                            : error._tag === "OrchestratorMcpFailure"
+                              ? error.code
+                              : "timeout",
+                      }),
+                    ),
+                  );
+                },
+                { discard: true, concurrency: "unbounded" },
               );
-              const send: Effect.Effect<
-                FleetClaimHeartbeatResult,
-                FleetClaimsError | OrchestratorMcpFailure
-              > =
-                environmentId === selfId
-                  ? fleetClaims.heartbeat(selfId, { sequence, leases })
-                  : peers.call({
-                      environmentId,
-                      tool: "fleet_heartbeat",
-                      arguments: { sequence, leases },
-                      limits: { runtimeMode: "auto", interactionMode: "default" },
-                      success: FleetClaimHeartbeatResult,
-                    });
-              return send.pipe(
-                Effect.timeout("20 seconds"),
-                Effect.tap((result) =>
-                  Effect.forEach(
-                    result.results,
-                    (item) => {
-                      if (item.outcome === "renewed") return Effect.void;
-                      const entry = tasks.find(
-                        (task) =>
-                          task.repo === item.repo &&
-                          task.issue === item.issue &&
-                          task.taskId === item.taskId &&
-                          task.attempt === item.attempt,
-                      );
-                      if (entry === undefined) return Effect.void;
-                      return sendLane.withPermits(1)(
-                        Effect.gen(function* () {
-                          const key = keyFor(entry.threadId, entry.coordinator);
-                          if (pendingTracks.has(key)) return;
-                          const current = (yield* Ref.get(tracked)).get(key);
-                          if (
-                            current === undefined ||
-                            current.deleting ||
-                            current.lost ||
-                            current.kind !== entry.kind ||
-                            current.repo !== entry.repo ||
-                            current.issue !== entry.issue ||
-                            current.taskId !== entry.taskId ||
-                            current.attempt !== entry.attempt ||
-                            current.fencing !== entry.fencing
-                          )
-                            return;
-                          const lost = { ...current, lost: true };
-                          yield* persist(lost);
-                          yield* Ref.update(tracked, (items) => new Map(items).set(key, lost));
-                        }),
-                      );
-                    },
-                    { discard: true },
-                  ),
-                ),
-                Effect.catch((error) =>
-                  Effect.logWarning("fleet heartbeat failed", {
-                    environmentId,
-                    code:
-                      error._tag === "FleetClaimsError"
-                        ? error.reason
-                        : error._tag === "OrchestratorMcpFailure"
-                          ? error.code
-                          : "timeout",
-                  }),
-                ),
-              );
-            },
-            { discard: true, concurrency: "unbounded" },
-          );
-        }).pipe(Effect.andThen(Effect.sleep("30 seconds")), Effect.forever),
+            }),
+          )
+          .pipe(Effect.andThen(Effect.sleep("30 seconds")), Effect.forever),
       );
       yield* forkParked(
         Stream.runForEach(engine.streamDomainEvents, handle).pipe(

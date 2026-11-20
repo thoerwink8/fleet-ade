@@ -123,7 +123,9 @@ export class McpClientAuthenticator extends Context.Service<
   {
     readonly authenticate: (
       request: HttpServerRequest.HttpServerRequest,
-    ) => Effect.Effect<McpInvocationContext.McpInvocationScope | undefined>;
+    ) => Effect.Effect<
+      McpInvocationContext.McpInvocationScope | "identity_unavailable" | undefined
+    >;
   }
 >()("t3/mcp/McpHttpServer/McpClientAuthenticator") {}
 
@@ -228,6 +230,15 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
       (Option.isSome(clients) && token.length > 0
         ? yield* clients.value.authenticate(request)
         : undefined);
+    if (invocation === "identity_unavailable") {
+      return HttpServerResponse.jsonUnsafe(
+        {
+          error: "peer_identity_unavailable",
+          message: "Peer identity could not be verified; retry the request.",
+        },
+        { status: 503 },
+      );
+    }
     if (!invocation) {
       yield* Effect.logWarning("rejected MCP request with an unusable credential", {
         reason:
