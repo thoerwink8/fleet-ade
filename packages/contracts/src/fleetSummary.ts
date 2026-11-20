@@ -14,6 +14,14 @@ export const FLEET_SUMMARY_PROGRESS_LIMIT = 120;
 export const FleetSummaryPhase = Schema.Literals(["working", "stuck", "done"]);
 export type FleetSummaryPhase = typeof FleetSummaryPhase.Type;
 
+export const isBlockingApproval = (kind: string, blocking?: boolean): boolean =>
+  blocking !== false &&
+  (kind === "command" ||
+    kind === "file-change" ||
+    kind === "file-read" ||
+    kind === "permission" ||
+    kind === "mcp-elicitation");
+
 /**
  * The executor's own session run. Phase is this mapping, never a lease timeout.
  * `waiting` is stuck; terminal runs are done; everything else is still working.
