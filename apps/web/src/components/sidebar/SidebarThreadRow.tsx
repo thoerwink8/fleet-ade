@@ -79,8 +79,9 @@ import {
   resolveSidebarThreadStatus,
   type SidebarThreadStatus,
   resolveThreadLastVisitedAt,
+  isThreadAttentionRowDisabled,
   shouldRecedeSidebarThread,
-  threadAttentionActionText,
+  threadAttentionSubtitleText,
   type ThreadAttention,
   resolveWorkingStartedAt,
   useRetainedValue,
@@ -558,7 +559,7 @@ type SidebarThreadRowProps = {
   onAcknowledgeWoke: (threadRef: ScopedThreadRef, visitedAt: string) => void;
   /** Set on rows inside the "等你处理" section. */
   attention?: (ThreadAttention & { readonly demoted?: boolean | undefined }) | undefined;
-  /** Blocking requests on a disconnected environment cannot be answered. */
+  /** Attention rows on a disconnected environment cannot be acted on until reconnected. */
   attentionOffline?: boolean | undefined;
   onFileDropThreads?: ((threadRef: ScopedThreadRef, files: File[]) => void) | undefined;
 };
@@ -807,9 +808,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       terminalProcessCount={terminalProcessCount}
     />
   );
-
+  const attentionDisabled = isThreadAttentionRowDisabled({
+    attention: props.attention,
+    attentionOffline: props.attentionOffline,
+  });
   const handleClick = (event: ReactMouseEvent) => {
-    if (props.attentionOffline && props.attention?.blocking) return;
+    if (attentionDisabled) return;
     onThreadClick(event, threadRef);
   };
   const handleAcknowledgeWokeClick = (event: ReactMouseEvent) => {
@@ -834,8 +838,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       return;
     }
     if (event.key !== "Enter" && event.key !== " ") return;
-    if (props.attentionOffline && props.attention?.blocking) return;
     event.preventDefault();
+    if (attentionDisabled) return;
+    onThreadActivate(threadRef);
   };
   const handleDoubleClick = (event: ReactMouseEvent) => {
     if (
@@ -936,9 +941,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     "group/sidebar-row relative w-full cursor-pointer overflow-hidden text-left outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
     // The card keeps the 1px transparent border of the sample page, so rows are 58px tall.
     variant === "card" ? "rounded-lg border border-transparent" : "rounded-md",
-    props.attentionOffline === true && props.attention?.blocking === true
-      ? "cursor-default opacity-60"
-      : null,
+    attentionDisabled ? "cursor-default opacity-60" : null,
     variant !== "card" &&
       variantAction === "unsettle" &&
       !props.isActive &&
@@ -1344,6 +1347,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               data-sidebar-parent={props.navigationParent}
               aria-label={accessibility.label}
               aria-current={accessibility.current}
+              aria-disabled={attentionDisabled || undefined}
               data-testid="sidebar-row-card"
               aria-busy={isRegeneratingTitle || undefined}
               className={rowSurfaceClassName}
@@ -1515,7 +1519,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               <div
                 className={cn(
                   "flex h-4 min-w-0 items-center gap-2 text-meta",
-                  props.attention.demoted || props.attentionOffline === true
+                  props.attention.demoted || attentionDisabled
                     ? "text-muted-foreground"
                     : props.attention.category === "completed"
                       ? "text-success-foreground"
@@ -1532,9 +1536,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                   )}
                 />
                 <span className="min-w-0 truncate">
-                  {props.attentionOffline === true && props.attention.blocking
-                    ? "环境已断线，连上后处理"
-                    : threadAttentionActionText(props.attention.category)}
+                  {threadAttentionSubtitleText({
+                    attention: props.attention,
+                    attentionOffline: props.attentionOffline,
+                  })}
                 </span>
               </div>
             ) : null}

@@ -993,7 +993,26 @@ export function resolveThreadAttention(
   return null;
 }
 
-export function threadAttentionActionText(category: ThreadAttentionCategory): string {
+export function isThreadAttentionRowDisabled(input: {
+  readonly attention: ThreadAttention | undefined;
+  readonly attentionOffline: boolean | undefined;
+}): boolean {
+  return input.attention !== undefined && input.attentionOffline === true;
+}
+
+export function isThreadAttentionDismissible(input: {
+  readonly attention: (ThreadAttention & { readonly demoted?: boolean }) | undefined;
+  readonly attentionOffline: boolean;
+}): boolean {
+  return (
+    input.attention !== undefined &&
+    !input.attention.blocking &&
+    !input.attention.demoted &&
+    !input.attentionOffline
+  );
+}
+
+function threadAttentionActionText(category: ThreadAttentionCategory): string {
   switch (category) {
     case "approval":
       return "等待批准，点开处理";
@@ -1006,6 +1025,14 @@ export function threadAttentionActionText(category: ThreadAttentionCategory): st
     case "completed":
       return "有新结果，点开查看";
   }
+}
+
+export function threadAttentionSubtitleText(input: {
+  readonly attention: ThreadAttention;
+  readonly attentionOffline: boolean | undefined;
+}): string {
+  if (isThreadAttentionRowDisabled(input)) return "环境已断线，连上后处理";
+  return threadAttentionActionText(input.attention.category);
 }
 
 // Suppress trailing double-click navigation; keyboard and synthetic clicks use detail 0.

@@ -177,6 +177,7 @@ import {
   resolveAdjacentThreadId,
   resolveSidebarSweepKeys,
   resolveSidebarDropTarget,
+  isThreadAttentionDismissible,
   resolveSidebarDropVerb,
   resolveSidebarThreadSection,
   resolveThreadAttention,
@@ -2736,10 +2737,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               isSnoozed,
               canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
               isRegeneratingTitle,
-              attentionDismissible: (() => {
-                const entry = attentionByKey.get(threadKey);
-                return entry !== undefined && !entry.blocking && !entry.demoted;
-              })(),
+              attentionDismissible: isThreadAttentionDismissible({
+                attention: attentionByKey.get(threadKey),
+                attentionOffline: !connectedEnvironmentIds.includes(thread.environmentId),
+              }),
               isRunning: !threadRuntimeCanArchive(thread.runtime),
               canTurnIntoProject: canTurnThreadIntoProject(threadRef),
               supports: {

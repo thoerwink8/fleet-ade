@@ -34,8 +34,11 @@ import {
   type SidebarListItem,
   type SidebarListMarker,
   type SidebarSection,
+  isThreadAttentionDismissible,
+  isThreadAttentionRowDisabled,
   resolveSidebarDropVerb,
   resolveThreadAttention,
+  threadAttentionSubtitleText,
 } from "./Sidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
@@ -1782,5 +1785,41 @@ describe("resolveThreadAttention", () => {
       }),
     ).toEqual({ category: "completed", blocking: false, unseen: false });
     expect(resolveThreadAttention(base)).toBeNull();
+  });
+
+  it("disables offline attention rows and hides dismiss regardless of blocking", () => {
+    const blocking = { category: "approval" as const, blocking: true, unseen: true };
+    const failed = { category: "failed" as const, blocking: false, unseen: true };
+    const completed = { category: "completed" as const, blocking: false, unseen: true };
+
+    expect(isThreadAttentionRowDisabled({ attention: blocking, attentionOffline: true })).toBe(
+      true,
+    );
+    expect(isThreadAttentionRowDisabled({ attention: failed, attentionOffline: true })).toBe(true);
+    expect(isThreadAttentionRowDisabled({ attention: completed, attentionOffline: true })).toBe(
+      true,
+    );
+    expect(isThreadAttentionRowDisabled({ attention: failed, attentionOffline: false })).toBe(
+      false,
+    );
+    expect(isThreadAttentionRowDisabled({ attention: undefined, attentionOffline: true })).toBe(
+      false,
+    );
+
+    expect(threadAttentionSubtitleText({ attention: blocking, attentionOffline: true })).toBe(
+      "环境已断线，连上后处理",
+    );
+    expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: true })).toBe(
+      "环境已断线，连上后处理",
+    );
+    expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: false })).toBe(
+      "上一轮出错了，点开处理",
+    );
+
+    expect(isThreadAttentionDismissible({ attention: failed, attentionOffline: true })).toBe(false);
+    expect(isThreadAttentionDismissible({ attention: failed, attentionOffline: false })).toBe(true);
+    expect(isThreadAttentionDismissible({ attention: blocking, attentionOffline: false })).toBe(
+      false,
+    );
   });
 });
