@@ -689,6 +689,9 @@ export const ServerConfig = Schema.Struct({
   directEndpoints: Schema.optionalKey(ForwardCompatibleArray(ServerDirectEndpoint)),
   observability: ServerObservability,
   settings: ServerSettings,
+  startupMaxConcurrentSessions: Schema.optionalKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  ),
   /** Present when an administrator's policy file manages this environment. */
   managedPolicy: Schema.optionalKey(ManagedPolicySummary),
   shellResumeCompletionMarker: Schema.optionalKey(Schema.Boolean),

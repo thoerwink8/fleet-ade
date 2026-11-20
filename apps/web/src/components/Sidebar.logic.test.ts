@@ -251,6 +251,12 @@ describe("resolveSidebarThreadStatus", () => {
 
   const idle = { hasPendingApprovals: false, hasPendingUserInput: false, runtime: null };
 
+  it("shows queued sessions as queued", () => {
+    expect(resolveSidebarThreadStatus({ ...idle, runtime: { ...runtime, status: "queued" } })).toBe(
+      "queued",
+    );
+  });
+
   it("prioritizes awaiting input over a running runtime, below approval", () => {
     expect(
       resolveSidebarThreadStatus({

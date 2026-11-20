@@ -638,3 +638,34 @@ it.effect.each(["confirmed", "unconfirmed", "failed"] as const)(
       );
     }),
 );
+
+it.effect("reads the updated concurrent session limit on every claim", () =>
+  Effect.gen(function* () {
+    const limits = yield* Ref.make<ReadonlyArray<number | undefined>>([]);
+    const outbox = Layer.mock(EffectOutbox.EffectOutboxV2)({
+      claimNext: (input) =>
+        Ref.update(limits, (current) => [...current, input.maxConcurrentSessions]).pipe(
+          Effect.as(Option.none()),
+        ),
+    });
+    const executor = Layer.succeed(
+      EffectWorker.OrchestrationEffectExecutorV2,
+      EffectWorker.OrchestrationEffectExecutorV2.of({ execute: () => Effect.void }),
+    );
+    const settings = ServerSettings.layerTest({ maxConcurrentSessions: 3 });
+    const worker = EffectWorker.layerWithOptions({ maxConcurrentSessions: 2 }).pipe(
+      Layer.provide(Layer.mergeAll(outbox, executor)),
+      Layer.provideMerge(settings),
+    );
+    yield* Effect.gen(function* () {
+      const service = yield* ServerSettings.ServerSettingsService;
+      const runner = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      yield* runner.runOnce();
+      yield* service.updateSettings({ maxConcurrentSessions: 1 });
+      yield* runner.runOnce();
+      yield* service.updateSettings({ maxConcurrentSessions: null });
+      yield* runner.runOnce();
+      assert.deepEqual(yield* Ref.get(limits), [2, 1, 2]);
+    }).pipe(Effect.provide(worker));
+  }),
+);
