@@ -872,6 +872,7 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
 
   const args = [...(built ? BUILT_DEV_ARGS : MODE_ARGS[input.mode]), ...input.runArgs];
   const spawnCommand = yield* resolveSpawnCommand("vp", args, { env });
+  const isWindows = yield* HostProcess.isWindows;
   const processContext = {
     mode: input.mode,
     executable: "vp" as const,
@@ -886,8 +887,10 @@ export const runDevRunnerWithInput = Effect.fn("dev-runner.runDevRunnerWithInput
     extendEnv: false,
     shell: spawnCommand.shell,
     // Its own process group: teardown signals the whole group, because vp
-    // does not pass SIGTERM on to Vite and the server.
-    detached: true,
+    // does not pass SIGTERM on to Vite and the server. On Windows detached
+    // allocates a new console window, and stop uses `taskkill /T` on the
+    // whole tree instead.
+    detached: !isWindows,
     forceKillAfter: "1500 millis",
   }).pipe(
     Effect.mapError(

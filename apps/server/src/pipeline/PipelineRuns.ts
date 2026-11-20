@@ -178,6 +178,8 @@ interface PipelineRunsShape {
     patch: PipelineRunNote,
     repository?: string,
   ) => Effect.Effect<void, PipelineRunsError>;
+  /** Internal: the durable claim-to-thread binding token; never leaves the server. */
+  readonly claimTokenForRun: (id: number) => Effect.Effect<string | null, PipelineRunsError>;
 }
 
 export class PipelineRuns extends Context.Service<PipelineRuns, PipelineRunsShape>()(
@@ -968,7 +970,16 @@ const make = Effect.gen(function* () {
     }
   });
 
-  return PipelineRuns.of({ tick, list, note, startSupervised });
+  const claimTokenForRun: PipelineRunsShape["claimTokenForRun"] = Effect.fn(
+    "PipelineRuns.claimTokenForRun",
+  )(function* (id) {
+    const rows = yield* sql<{ readonly claimToken: string | null }>`
+      SELECT claim_token AS claimToken FROM pipeline_runs WHERE id = ${id}
+    `.pipe(Effect.mapError(sqlFailure));
+    return rows[0]?.claimToken ?? null;
+  });
+
+  return PipelineRuns.of({ tick, list, note, startSupervised, claimTokenForRun });
 });
 
 export const layer = Layer.effect(PipelineRuns, make);

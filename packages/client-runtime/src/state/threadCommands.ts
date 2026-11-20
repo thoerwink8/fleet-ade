@@ -33,6 +33,7 @@ import {
   interruptThreadTurn,
   forkSideChat,
   forkThreadFromRun,
+  markThreadCommander,
   markThreadUnread,
   mergeThreadBack,
   promoteQueuedRun,
@@ -55,6 +56,7 @@ import {
   stopThreadSession,
   unarchiveThread,
   unlinkThreadPullRequest,
+  unmarkThreadCommander,
   unpinThread,
   unsettleThread,
   unsnoozeThread,
@@ -226,6 +228,18 @@ export function createThreadEnvironmentAtoms<R, E>(
     unpin: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:unpin",
       execute: unpinThread,
+      scheduler,
+      concurrency,
+    }),
+    markCommander: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:commander-mark",
+      execute: markThreadCommander,
+      scheduler,
+      concurrency,
+    }),
+    unmarkCommander: createEnvironmentCommand(runtime, {
+      label: "environment-data:commands:thread:commander-unmark",
+      execute: unmarkThreadCommander,
       scheduler,
       concurrency,
     }),
@@ -430,6 +444,8 @@ export function createThreadEnvironmentAtoms<R, E>(
     unsnooze: rowAction(sent.unsnooze),
     pin: rowAction(sent.pin),
     unpin: rowAction(sent.unpin),
+    markCommander: rowAction(sent.markCommander),
+    unmarkCommander: rowAction(sent.unmarkCommander),
   };
   const optimistic = createOptimisticThreadLifecycle(snapshotAtom);
   const disconnectedAtom = Atom.family((environmentId: EnvironmentId) =>
@@ -532,6 +548,14 @@ export function createThreadEnvironmentAtoms<R, E>(
       ...thread,
       pinnedAt: null,
       pinOrderKey: null,
+    })),
+    markCommander: optimistic.wrap(commands.markCommander, (thread) => ({
+      ...thread,
+      commander: true,
+    })),
+    unmarkCommander: optimistic.wrap(commands.unmarkCommander, (thread) => ({
+      ...thread,
+      commander: false,
     })),
     reorderPin: optimistic.wrap(commands.reorderPin, (thread, input) => ({
       ...thread,

@@ -75,7 +75,8 @@ export type EnvironmentSubscriptionRpcTag =
   | typeof WS_METHODS.subscribeWorktreeSetup
   | typeof WS_METHODS.subscribeProjectClones
   | typeof WS_METHODS.terminalAttach
-  | typeof WS_METHODS.terminalObserve;
+  | typeof WS_METHODS.terminalObserve
+  | typeof WS_METHODS.fleetSummarySubscribe;
 
 export type EnvironmentStreamCommandRpcTag =
   | typeof WS_METHODS.chatGptHandoffSubscribe
@@ -261,6 +262,17 @@ export function runStreamInSession<TTag extends EnvironmentStreamCommandRpcTag>(
     Stream.withSpan("EnvironmentRpc.runStream", {
       attributes: { "rpc.method": tag },
     }),
+  );
+}
+
+export function subscribeFleetSummaryInSession(
+  session: RpcSession,
+  input: EnvironmentRpcInput<typeof WS_METHODS.fleetSummarySubscribe>,
+) {
+  return Stream.unwrap(
+    authorizeRequest(WS_METHODS.fleetSummarySubscribe, input).pipe(
+      Effect.map(() => session.client[WS_METHODS.fleetSummarySubscribe](input)),
+    ),
   );
 }
 

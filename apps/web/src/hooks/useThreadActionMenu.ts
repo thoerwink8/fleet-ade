@@ -81,6 +81,8 @@ export function useThreadActionMenu(input: {
     unsnoozeThread,
     pinThread,
     confirmAndUnpinThread,
+    markCommanderThread,
+    unmarkCommanderThread,
     setThreadAutoSettle,
     archiveThread,
     deleteThread,
@@ -131,6 +133,7 @@ export function useThreadActionMenu(input: {
         autoSettleOptOut: readEnvironmentSupportsAutoSettleOptOut(threadRef.environmentId),
         snooze: configLoaded,
         pinning: configLoaded,
+        commander: configLoaded,
         titleRegeneration: configLoaded,
       };
       const isRegeneratingTitle = thread.titleRegeneration != null;
@@ -141,6 +144,7 @@ export function useThreadActionMenu(input: {
         branch: thread.branch ?? null,
         projectFilter: null,
         isPinned: thread.pinnedAt != null,
+        isCommander: thread.commander === true,
         isSettled: supports.settlement && thread.settledOverride === "settled",
         autoSettleEnabled: thread.autoSettleDisabledAt == null,
         isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
@@ -236,6 +240,12 @@ export function useThreadActionMenu(input: {
           await reportFailure("取消置顶会话失败", () => confirmAndUnpinThread(threadRef));
           return;
         }
+        case "mark-commander":
+          await reportFailure("标成指挥失败", () => markCommanderThread(threadRef));
+          return;
+        case "unmark-commander":
+          await reportFailure("取消指挥失败", () => unmarkCommanderThread(threadRef));
+          return;
         case "auto-settle:enabled":
         case "auto-settle:disabled":
           await reportFailure("更新自动收尾设置失败", () =>

@@ -15,14 +15,16 @@ const handlers = {
           message: "Linked environment required.",
         });
       const service = yield* FleetSummary.FleetSummary;
-      return yield* service
-        .report(scope.client.environmentId, input)
-        .pipe(
-          Effect.mapError(
-            (error: FleetSummaryError) =>
-              new OrchestratorMcpFailure({ code: "orchestration_error", message: error.message }),
-          ),
-        );
+      return yield* service.report(scope.client.environmentId, input).pipe(
+        Effect.mapError((error: FleetSummaryError) =>
+          error.reason === "lease-required"
+            ? new OrchestratorMcpFailure({
+                code: "invalid_request",
+                message: "fleet-summary:lease-required",
+              })
+            : new OrchestratorMcpFailure({ code: "orchestration_error", message: error.message }),
+        ),
+      );
     }),
   ),
 } satisfies McpToolAccess.Handlers<typeof FleetSummaryToolkit.tools>;

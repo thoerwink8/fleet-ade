@@ -635,9 +635,14 @@ export function filterCommandPaletteGroups(input: {
   }
 
   const now = input.now ?? Date.now();
+  // Settings are navigation results; matching executable actions stay ahead of them.
   const ranked = rankSearchGroups(
     searchableGroups.map((group) => ({ group, items: group.items })),
     (item, options) => rankPaletteItem(item, normalizedQuery, now, options),
+  ).toSorted(
+    (left, right) =>
+      Number(left.group.value === "settings-search") -
+      Number(right.group.value === "settings-search"),
   );
   const threadsMatch = ranked.some(({ group }) => group.value === "threads-search");
   const groups = ranked.map(({ group, ranked }): CommandPaletteGroup => {

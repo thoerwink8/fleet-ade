@@ -186,6 +186,7 @@ import {
   sidebarListItemId,
   sidebarThreadKeyAtY,
   sortInboxThreadsByReturn,
+  sortCommanderThreadsForSidebar,
   sortPinnedThreadsForSidebar,
   sortThreadsForSidebar,
   sortWorkingThreadsBySend,
@@ -461,8 +462,14 @@ function useSidebarThreads(input: {
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
-  const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
-    partition;
+  const {
+    commanderThreads,
+    pinnedThreads,
+    activeThreads,
+    workingThreads,
+    snoozedThreads,
+    settledThreads,
+  } = partition;
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
@@ -496,6 +503,7 @@ function useSidebarThreads(input: {
     ? workingThreads
     : routeThreadOnly(workingThreads, routeRowThreadKey);
   const orderedThreads = [
+    ...commanderThreads,
     ...pinnedThreads,
     ...activeThreads,
     ...visibleWorkingThreads,
@@ -504,6 +512,7 @@ function useSidebarThreads(input: {
   ];
   const sectionByThreadKey = new Map<string, SidebarSection>();
   for (const [list, section] of [
+    [commanderThreads, "commander"],
     [pinnedThreads, "pinned"],
     [activeThreads, "active"],
     [workingThreads, "working"],
@@ -517,6 +526,7 @@ function useSidebarThreads(input: {
     threads,
     workingShelfEnabled,
     searchableThreads: [
+      ...commanderThreads,
       ...pinnedThreads,
       ...activeThreads,
       ...workingThreads,
@@ -570,6 +580,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const preciseNow = new Date().toISOString();
   const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
+  const commander: EnvironmentThreadShell[] = [];
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
   const working: EnvironmentThreadShell[] = [];
@@ -607,21 +618,25 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       );
     } else {
       const section = resolveSidebarThreadSection({
+        commander: thread.commander === true,
         snoozed: configLoaded && effectiveSnoozed(thread, { now: preciseNow }),
         settled: configLoaded && thread.settledOverride === "settled",
         pinned: thread.pinnedAt != null,
       });
-      (section === "snoozed"
-        ? snoozed
-        : section === "settled"
-          ? settled
-          : section === "pinned"
-            ? pinned
-            : inbox(thread)
+      (section === "commander"
+        ? commander
+        : section === "snoozed"
+          ? snoozed
+          : section === "settled"
+            ? settled
+            : section === "pinned"
+              ? pinned
+              : inbox(thread)
       ).push(thread);
     }
   }
   // Availability gates dragging only; sorting must stay consistent across clients.
+  const sortedCommander = sortCommanderThreadsForSidebar(commander);
   const sortedPinned = sortPinnedThreadsForSidebar(pinned);
   const sortedActive = sortActiveBySend
     ? sortWorkingThreadsBySend(active)
@@ -629,6 +644,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       ? sortInboxThreadsByReturn(active, inboxObservation.returnedAt)
       : sortThreadsForSidebar(active);
   return {
+    commanderThreads: sortedCommander,
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
         ? sortedPinned
@@ -694,13 +710,16 @@ function isOptimisticDropReleased(input: {
   if (thread === undefined || thread.archivedAt !== null) {
     return true;
   }
-  const canonicalSection = effectiveSnoozed(thread, { now })
-    ? "snoozed"
-    : thread.settledOverride === "settled"
-      ? "settled"
-      : thread.pinnedAt != null
-        ? "pinned"
-        : "active";
+  const canonicalSection =
+    thread.commander === true
+      ? "commander"
+      : effectiveSnoozed(thread, { now })
+        ? "snoozed"
+        : thread.settledOverride === "settled"
+          ? "settled"
+          : thread.pinnedAt != null
+            ? "pinned"
+            : "active";
   if (
     canonicalSection !== optimisticDrop.sourceSection &&
     canonicalSection !== optimisticDrop.section
@@ -871,6 +890,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     pinThread,
     unpinThread,
     confirmAndUnpinThread,
+    markCommanderThread,
+    unmarkCommanderThread,
     setThreadAutoSettle,
     turnThreadIntoProject,
     reorderPinnedThread,
@@ -1216,6 +1237,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
 
   const {
     workingShelfEnabled,
+    commanderThreads,
     pinnedThreads,
     draggableThreadKeys,
     activeReorderableThreadKeys,
@@ -1806,6 +1828,36 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       }
     })();
   };
+  const attemptMarkCommander = (threadRef: ScopedThreadRef) => {
+    void (async () => {
+      const result = await markCommanderThread(threadRef);
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "标成指挥失败",
+            description: error instanceof Error ? error.message : "发生错误。",
+          }),
+        );
+      }
+    })();
+  };
+  const attemptUnmarkCommander = (threadRef: ScopedThreadRef) => {
+    void (async () => {
+      const result = await unmarkCommanderThread(threadRef);
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "取消指挥失败",
+            description: error instanceof Error ? error.message : "发生错误。",
+          }),
+        );
+      }
+    })();
+  };
 
   const handleThreadDragStart = (event: DragStartEvent) => {
     const activeKey = String(event.active.id);
@@ -1845,7 +1897,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         return { kind: "thread", key, section };
       });
     if (
-      pinnedThreads.length +
+      commanderThreads.length +
+        pinnedThreads.length +
         activeThreads.length +
         workingThreads.length +
         snoozedThreads.length +
@@ -1854,7 +1907,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     ) {
       return [];
     }
-    const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
+    const items: SidebarListItem[] = [
+      ...rowsOf(commanderThreads, "commander"),
+      { kind: "marker", marker: "pinned-header" },
+    ];
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
@@ -2572,6 +2628,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     }
                   : null,
               isPinned,
+              isCommander: thread.commander === true,
               isSettled,
               autoSettleEnabled: thread.autoSettleDisabledAt == null,
               isSnoozed,
@@ -2584,6 +2641,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 autoSettleOptOut: supportsAutoSettleOptOut,
                 snooze: configLoaded,
                 pinning: configLoaded,
+                commander: configLoaded,
                 titleRegeneration: configLoaded,
               },
               snoozePresets,
@@ -2658,6 +2716,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             return;
           case "unpin":
             attemptUnpin(threadRef);
+            return;
+          case "mark-commander":
+            attemptMarkCommander(threadRef);
+            return;
+          case "unmark-commander":
+            attemptUnmarkCommander(threadRef);
             return;
           case "turn-into-project": {
             const result = await turnThreadIntoProject(threadRef);
@@ -3185,7 +3249,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           {/* A scope can hide every active thread; say so even when its project still has settled ones. */}
           {!isSearchingThreads &&
           visibleDraftSessionCount === 0 &&
-          pinnedThreads.length +
+          commanderThreads.length +
+            pinnedThreads.length +
             activeThreads.length +
             workingThreads.length +
             snoozedThreads.length ===
@@ -3267,6 +3332,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           scopeThreadRef(thread.environmentId, thread.id),
                         );
                         const isCard =
+                          section === "commander" ||
                           section === "active" ||
                           section === "pinned" ||
                           section === "working" ||
@@ -3278,6 +3344,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             sortableId={threadKey}
                             contextDrag={isContextDrag}
                             sortableDisabled={
+                              section === "commander" ||
                               renamingThreadKey === threadKey ||
                               !draggableThreadKeys.has(threadKey) ||
                               optimisticDrop !== null

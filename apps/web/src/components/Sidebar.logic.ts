@@ -77,9 +77,17 @@ export function resolveSidebarRowAccessibility(input: {
   readonly statusLabel: string | null;
   readonly projectDisplayName: string | null;
   readonly isActive: boolean;
+  readonly isCommander?: boolean;
 }): { readonly label: string; readonly current: "page" | undefined } {
   return {
-    label: [input.title, input.statusLabel, input.projectDisplayName].filter(Boolean).join(", "),
+    label: [
+      input.title,
+      input.isCommander ? "指挥" : null,
+      input.statusLabel,
+      input.projectDisplayName,
+    ]
+      .filter(Boolean)
+      .join(", "),
     current: input.isActive ? "page" : undefined,
   };
 }
@@ -189,13 +197,15 @@ export const animateSidebarLayoutChanges: AnimateLayoutChanges = (args) =>
 
 // Snoozed rows cannot accept drops without a wake time. Working rows only drag out as chat context.
 
-export type SidebarSection = "pinned" | "active" | "working" | "snoozed" | "settled";
+export type SidebarSection = "commander" | "pinned" | "active" | "working" | "snoozed" | "settled";
 
 export function resolveSidebarThreadSection(input: {
+  readonly commander?: boolean;
   readonly snoozed: boolean;
   readonly settled: boolean;
   readonly pinned: boolean;
 }): SidebarSection {
+  if (input.commander) return "commander";
   if (input.snoozed) return "snoozed";
   if (input.settled) return "settled";
   if (input.pinned) return "pinned";
@@ -230,7 +240,8 @@ function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number):
   for (let i = 0; i < index && i < items.length; i += 1) {
     const item = items[i]!;
     if (item.kind !== "marker") continue;
-    if (item.marker === "pinned-divider") section = "active";
+    if (item.marker === "pinned-header") section = "pinned";
+    else if (item.marker === "pinned-divider") section = "active";
     else if (item.marker === "working-header") section = "working";
     else if (item.marker === "snoozed-header") section = "snoozed";
     else if (item.marker === "settled-header") section = "settled";
@@ -252,23 +263,31 @@ export function resolveSidebarDropTarget(
   const activeIndex = items.findIndex((item) => sidebarListItemId(item) === activeKey);
   const overIndex = items.findIndex((item) => sidebarListItemId(item) === overId);
   if (activeIndex === -1 || overIndex === -1 || items[activeIndex]?.kind !== "thread") return null;
+  if (items[activeIndex].section === "commander") return null;
+  const pinnedHeaderIndex = items.findIndex(
+    (item) => item.kind === "marker" && item.marker === "pinned-header",
+  );
+  if (pinnedHeaderIndex !== -1 && overIndex < pinnedHeaderIndex) return null;
+  if (items[overIndex]?.kind === "thread" && items[overIndex].section === "commander") return null;
   const moved = items.filter((_, index) => index !== activeIndex);
   moved.splice(overIndex, 0, items[activeIndex]!);
   const section = sectionAtSidebarSlot(moved, overIndex);
-  if (section === "working" || section === "snoozed") return null;
+  if (section === "commander" || section === "working" || section === "snoozed") return null;
   const pinnedOrder: string[] = [];
   const activeOrder: string[] = [];
   let currentSection: SidebarSection = "pinned";
   for (const item of moved) {
     if (item.kind === "marker") {
-      if (item.marker === "pinned-divider") currentSection = "active";
+      if (item.marker === "pinned-header") currentSection = "pinned";
+      else if (item.marker === "pinned-divider") currentSection = "active";
       else if (
         item.marker === "working-header" ||
         item.marker === "snoozed-header" ||
         item.marker === "settled-header"
       )
         break;
-    } else if (currentSection === "pinned") pinnedOrder.push(item.key);
+    } else if (item.section === "commander") continue;
+    else if (currentSection === "pinned") pinnedOrder.push(item.key);
     else activeOrder.push(item.key);
   }
   return { section, pinnedOrder, activeOrder };
@@ -303,7 +322,8 @@ export function resolveSidebarDropVerb(
   from: SidebarSection,
   to: SidebarSection | null,
 ): SidebarDropVerb | null {
-  if (to === null || to === from || to === "working" || to === "snoozed") return null;
+  if (to === null || to === from || to === "commander" || to === "working" || to === "snoozed")
+    return null;
   if (to === "pinned") return "pin";
   if (to === "settled") return "settle";
   if (from === "pinned") return "unpin";
@@ -335,7 +355,7 @@ export function sidebarThreadKeyAtY(list: HTMLElement, y: number): string | null
 }
 
 export function resolveSidebarReorderableThreadKeys(input: {
-  readonly threads: ReadonlyArray<Pick<SidebarThreadSummary, "environmentId" | "id">>;
+  readonly threads: ReadonlyArray<Pick<SidebarThreadSummary, "environmentId" | "id" | "commander">>;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, Pick<EnvironmentServerConfig, "environment">>;
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
 }) {
@@ -344,6 +364,7 @@ export function resolveSidebarReorderableThreadKeys(input: {
   const activeReorderableThreadKeys = new Set<string>();
 
   for (const thread of input.threads) {
+    if (thread.commander === true) continue;
     // Config is cached for offline rendering, so its presence does not make a row writable.
     if (
       !connectedEnvironmentIds.has(thread.environmentId) ||
@@ -388,7 +409,7 @@ export function planSidebarThreadDrop(input: {
     activeKeysById,
     activeReorderableKeys,
   } = input;
-  if (activeSection === "working") return { kind: "none" };
+  if (activeSection === "working" || activeSection === "commander") return { kind: "none" };
   if (input.supportsSettlement === false && (target.section === "settled" || activeSettled)) {
     return { kind: "none" };
   }
@@ -1100,6 +1121,7 @@ export {
 } from "@t3tools/client-runtime/state/thread-inbox";
 
 export { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
+export { sortCommanderThreads as sortCommanderThreadsForSidebar } from "@t3tools/client-runtime/state/thread-sort";
 export { sortPinnedThreadsByOrderKey as sortPinnedThreadsForSidebar } from "@t3tools/client-runtime/state/thread-sort";
 
 const EMPTY_CONTENT_MATCH_KEYS: ReadonlySet<string> = new Set<string>();

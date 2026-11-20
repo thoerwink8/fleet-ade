@@ -88,6 +88,26 @@ it.effect("fleet_summary_report denies linked callers without an environment ide
   }).pipe(Effect.provide(serverLayer)),
 );
 
+it.effect("fleet_summary_report identifies lease rejection for remote reporters", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`INSERT INTO repos (owner, name) VALUES ('example', 'one')`;
+    const result = yield* call(clientScope(true, "environment-a"), {
+      ...report,
+      type: "upsert-task",
+      repo: "example/one",
+      issue: 7,
+      taskId: "root",
+      fencing: "old-fencing",
+    });
+    expect(result).toMatchObject({
+      code: "invalid_request",
+      message: "fleet-summary:lease-required",
+    });
+    expect(yield* sql`SELECT environment_id FROM fleet_summary_rows`).toEqual([]);
+  }).pipe(Effect.provide(serverLayer)),
+);
+
 it.effect(
   "fleet_summary_report uses server-scoped identity for writes and cannot spoof another environment",
   () =>

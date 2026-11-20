@@ -28,6 +28,7 @@ import { parseBearerToken } from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as DeviceService from "../device/DeviceService.ts";
+import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as HtmlRender from "../htmlRender/HtmlRender.ts";
 import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
@@ -123,7 +124,12 @@ export class McpClientAuthenticator extends Context.Service<
   {
     readonly authenticate: (
       request: HttpServerRequest.HttpServerRequest,
-    ) => Effect.Effect<McpInvocationContext.McpInvocationScope | undefined>;
+    ) => Effect.Effect<
+      | McpInvocationContext.McpInvocationScope
+      | "identity_unavailable"
+      | "identity_conflict"
+      | undefined
+    >;
   }
 >()("t3/mcp/McpHttpServer/McpClientAuthenticator") {}
 
@@ -218,6 +224,7 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
   const clients = yield* Effect.serviceOption(McpClientAuthenticator);
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const runtimeModeCeiling = serverSettings.managedPolicy?.limits?.maxRuntimeMode;
+  const coordinator = yield* Effect.serviceOption(ServerEnvironment.ServerEnvironment);
   const authenticateRequest = Effect.fn("McpHttpServer.authenticateRequest")(function* (
     request: HttpServerRequest.HttpServerRequest,
   ) {
@@ -228,6 +235,24 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
       (Option.isSome(clients) && token.length > 0
         ? yield* clients.value.authenticate(request)
         : undefined);
+    if (invocation === "identity_unavailable" || invocation === "identity_conflict") {
+      // Name the verifying environment and tell the caller where the return link belongs.
+      const descriptor = Option.isSome(coordinator)
+        ? Option.some(yield* coordinator.value.getDescriptor)
+        : Option.none();
+      return HttpServerResponse.jsonUnsafe(
+        {
+          error:
+            invocation === "identity_conflict"
+              ? "peer_identity_conflict"
+              : "peer_identity_unavailable",
+          message: Option.isSome(descriptor)
+            ? `Peer identity could not be verified by ${descriptor.value.label} (${descriptor.value.environmentId}); this environment needs a link back to the requesting environment before retrying the request.`
+            : "Peer identity could not be verified; the verifying environment needs a link back to the requesting environment before retrying the request.",
+        },
+        { status: 503 },
+      );
+    }
     if (!invocation) {
       yield* Effect.logWarning("rejected MCP request with an unusable credential", {
         reason:

@@ -33,6 +33,7 @@ import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as Sqlite from "../persistence/Sqlite.ts";
 import * as PeerLinks from "./PeerLinks.ts";
+import * as PeerChallengeRegistry from "./PeerChallengeRegistry.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as PeerMcpClient from "./PeerMcpClient.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
@@ -79,6 +80,10 @@ export const servePeer = <E, R>(
       getEnvironmentId: Ref.get(descriptor).pipe(Effect.map((current) => current.environmentId)),
       getDescriptor: Ref.get(descriptor),
     });
+    const linkingContext = yield* layerLinkingEnvironment(initial).pipe(Layer.build);
+    const links = Context.get(linkingContext, PeerLinks.PeerLinks);
+    const peerClient = Context.get(linkingContext, PeerMcpClient.PeerMcpClient);
+    const challenges = Context.get(linkingContext, PeerChallengeRegistry.PeerChallengeRegistry);
     const authContext = yield* EnvironmentAuth.layer.pipe(
       Layer.provide(ManagedPolicy.layerTest()),
       Layer.provideMerge(ServerSettings.layerTest()),
@@ -142,6 +147,12 @@ export const servePeer = <E, R>(
       ),
     ).pipe(
       Layer.provide(layerRecordBearers),
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(PeerMcpClient.PeerMcpClient, peerClient),
+          Layer.succeed(PeerChallengeRegistry.PeerChallengeRegistry, challenges),
+        ),
+      ),
       Layer.provide(layerEnvironment),
       Layer.provide(Layer.succeedContext(authContext)),
     );
@@ -160,6 +171,8 @@ export const servePeer = <E, R>(
     return {
       url,
       auth,
+      links,
+      client: peerClient,
       /** Its settings, as for turning its Linked environments beta off. */
       settings: Context.get(authContext, ServerSettings.ServerSettingsService),
       descriptor,
@@ -197,6 +210,7 @@ export const layerLinkingEnvironment = <E = never>(
 ) =>
   PeerMcpClient.layer.pipe(
     Layer.provideMerge(PeerLinks.layer),
+    Layer.provideMerge(PeerChallengeRegistry.layer),
     Layer.provideMerge(ServerSettings.layerTest()),
     Layer.provideMerge(database),
     Layer.provide(Layer.mergeAll(secrets, FetchHttpClient.layer)),

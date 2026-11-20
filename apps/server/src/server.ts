@@ -88,6 +88,7 @@ import * as PeerForwarding from "./peer/PeerForwarding.ts";
 import * as RemoteDelegation from "./peer/RemoteDelegation.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
+import * as PeerChallengeRegistry from "./peer/PeerChallengeRegistry.ts";
 import * as PeerMcpClient from "./peer/PeerMcpClient.ts";
 import * as McpSessionRegistry from "./mcp/McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
@@ -672,10 +673,19 @@ const layerPipelineBudget = PipelineBudget.layerWorker.pipe(
   Layer.provide(GitHubRest.layerWithDependencies),
   Layer.provide(layerPipelineRuns),
 );
+export const layerFleetSummaryReporter = FleetSummaryReporter.layer.pipe(
+  Layer.provide(Scheduler.layer),
+  Layer.provide(ProjectionStoreV2.layer),
+  Layer.provideMerge(PeerMcpClient.layer),
+  Layer.provide(FleetSummary.layer),
+  Layer.provide(FleetClaims.layer),
+  Layer.provide(layerServerEnvironment),
+);
 const layerDispatchSession = DispatchSession.layerWorker.pipe(
   Layer.provideMerge(DispatchSession.layerLive),
   Layer.provide(layerPipelineRuns),
   Layer.provide(layerPipelineBudget),
+  Layer.provide(layerFleetSummaryReporter),
 );
 const layerOpenPullRequest = OpenPullRequest.layerWorker.pipe(
   Layer.provideMerge(OpenPullRequest.layerLive),
@@ -746,17 +756,14 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
     }),
   ).pipe(
     // Export this instance to the MCP handlers; its tracking map must be shared.
-    Layer.provideMerge(FleetSummaryReporter.layer),
-    Layer.provide(Scheduler.layer),
-    Layer.provide(ProjectionStoreV2.layer),
-    Layer.provideMerge(PeerMcpClient.layer),
-    Layer.provideMerge(PeerLinks.layer),
+    Layer.provideMerge(layerFleetSummaryReporter),
   ),
   Layer.effectDiscard(
     Effect.gen(function* () {
       const scheduler = yield* Scheduler.Scheduler;
       const summary = yield* FleetSummary.FleetSummary;
       yield* scheduler.register("fleet-summary-stale", summary.sweepStale);
+      yield* scheduler.register("fleet-summary-cleanup", summary.cleanupDone);
     }),
   ).pipe(Layer.provide(Scheduler.layer), Layer.provide(FleetSummary.layer)),
   ProviderUsageLimitsIngestion.layer,
@@ -779,6 +786,8 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   layerParkTriage,
   Layer.effectDiscard(ProjectSettingsOverrideSweep.sweep),
 ).pipe(
+  Layer.provideMerge(PeerLinks.layer),
+  Layer.provideMerge(PeerChallengeRegistry.layer),
   Layer.provideMerge(layerOrchestrationApplication),
   Layer.provideMerge(RuntimeLayer.layerEventInfrastructure),
   Layer.provideMerge(Layer.merge(ProjectStore.layer, ThreadSearch.layer)),
@@ -917,15 +926,11 @@ const layerMakeRoutes = Layer.mergeAll(
   ),
   Layer.provide(PreviewBrowser.layer),
   // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
-  Layer.provide(
-    PeerForwarding.layer.pipe(
-      Layer.provideMerge(PeerMcpClient.layer),
-      Layer.provideMerge(PeerLinks.layer),
-    ),
-  ),
+  Layer.provide(PeerForwarding.layer),
+  Layer.provide(PeerMcpClient.layer),
+  Layer.provide(PeerLinks.layer),
   Layer.provide(FleetClaims.layer),
-  // Same layer reference as the startup consumer: one memoized tracking map.
-  Layer.provide(FleetSummaryReporter.layer.pipe(Layer.provide(Scheduler.layer))),
+  Layer.provide(layerFleetSummaryReporter),
   Layer.provide(
     SpeechService.layer.pipe(
       Layer.provide(layerServerSettings),

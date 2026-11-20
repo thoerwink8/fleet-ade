@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { NonNegativeInt, PositiveInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import type { OrchestrationV2RuntimeRequest } from "./orchestrationV2.ts";
 
 /** Snapshot pages stay at or under this many rows. */
 export const FLEET_SUMMARY_PAGE_SIZE = 200;
@@ -14,9 +15,20 @@ export const FLEET_SUMMARY_PROGRESS_LIMIT = 120;
 export const FleetSummaryPhase = Schema.Literals(["working", "stuck", "done"]);
 export type FleetSummaryPhase = typeof FleetSummaryPhase.Type;
 
+export const isBlockingApproval = (
+  kind: OrchestrationV2RuntimeRequest["kind"],
+  blocking?: boolean,
+): boolean =>
+  blocking !== false &&
+  (kind === "command" ||
+    kind === "file-change" ||
+    kind === "file-read" ||
+    kind === "permission" ||
+    kind === "mcp-elicitation");
+
 /**
  * The executor's own session run. Phase is this mapping, never a lease timeout.
- * `waiting` is stuck; terminal runs are done; everything else is still working.
+ * `waiting` is stuck; idle and terminal runs are done; everything else is working.
  */
 export const FleetSummarySessionRun = Schema.Literals([
   "idle",
@@ -35,6 +47,7 @@ export type FleetSummarySessionRun = typeof FleetSummarySessionRun.Type;
 
 export const phaseFromSessionRun = (run: FleetSummarySessionRun): FleetSummaryPhase => {
   switch (run) {
+    case "idle":
     case "completed":
     case "interrupted":
     case "failed":
@@ -89,6 +102,8 @@ export const FleetSummaryUpsertTask = Schema.Struct({
   issue: PositiveInt,
   taskId: TrimmedNonEmptyString,
   threadId: TrimmedNonEmptyString,
+  attempt: Schema.optional(PositiveInt),
+  fencing: Schema.optional(TrimmedNonEmptyString),
   ...reportFields,
 });
 export type FleetSummaryUpsertTask = typeof FleetSummaryUpsertTask.Type;
@@ -105,6 +120,7 @@ export const FleetSummaryDeleteTask = Schema.Struct({
   repo: TrimmedNonEmptyString,
   issue: PositiveInt,
   taskId: TrimmedNonEmptyString,
+  threadId: Schema.optional(TrimmedNonEmptyString),
 });
 export type FleetSummaryDeleteTask = typeof FleetSummaryDeleteTask.Type;
 

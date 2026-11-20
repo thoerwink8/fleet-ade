@@ -115,6 +115,7 @@ export function createSidebarSortingStrategy(input: {
     const target = resolveSidebarDropTarget(items, active.key, sidebarListItemId(over));
     if (!target) return [];
     const groups: Record<SidebarSection, ThreadItem[]> = {
+      commander: [],
       pinned: [],
       active: [],
       working: [],
@@ -132,7 +133,12 @@ export function createSidebarSortingStrategy(input: {
         }
         continue;
       }
-      if (item.section === "pinned" || item.section === "active" || item.section === "working")
+      if (
+        item.section === "commander" ||
+        item.section === "pinned" ||
+        item.section === "active" ||
+        item.section === "working"
+      )
         cardHeight ??= rects[index]?.height;
       else slimHeight ??= rects[index]?.height;
       if (item.key !== active.key) groups[item.section].push(item);
@@ -172,6 +178,7 @@ export function createSidebarSortingStrategy(input: {
       if (groups[name].length > 0) projected.push(...groups[name]);
       else marker(`${name}-placeholder`);
     };
+    projected.push(...groups.commander);
     marker("pinned-header");
     projected.push(...groups.pinned);
     marker("pinned-divider");
@@ -195,7 +202,10 @@ export function createSidebarSortingStrategy(input: {
       const rect = index === undefined ? undefined : rects[index];
       const fallback =
         item.kind === "thread" &&
-        (item.section === "pinned" || item.section === "active" || item.section === "working")
+        (item.section === "commander" ||
+          item.section === "pinned" ||
+          item.section === "active" ||
+          item.section === "working")
           ? cardHeight
           : slimHeight;
       const moved = item.kind === "thread" && item.key === active.key;

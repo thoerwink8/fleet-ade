@@ -359,6 +359,41 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("SessionStore.lay
       expect((yield* sessions.verify(uncapped.token)).runtimeModeCeiling).toBeUndefined();
     }).pipe(Effect.provide(layerSessionStore())),
   );
+  it.effect("carries a verified peer identity only on linked sessions", () =>
+    Effect.gen(function* () {
+      const sessions = yield* SessionStore.SessionStore;
+      const linked = yield* sessions.issue({
+        subject: "mcp-client",
+        method: "bearer-access-token",
+        peerLink: true,
+        peerIdentity: "coordinator",
+      });
+      const ordinary = yield* sessions.issue({
+        subject: "mcp-client",
+        method: "bearer-access-token",
+        peerIdentity: "coordinator",
+      });
+      const legacyLinked = yield* sessions.issue({
+        subject: "mcp-client",
+        method: "bearer-access-token",
+        peerLink: true,
+      });
+
+      const verifiedLinked = yield* sessions.verify(linked.token);
+      const verifiedOrdinary = yield* sessions.verify(ordinary.token);
+      const verifiedLegacy = yield* sessions.verify(legacyLinked.token);
+
+      expect(verifiedLinked.peerLink).toBe(true);
+      expect(verifiedLinked.peerIdentity).toBe("coordinator");
+      expect(verifiedOrdinary.peerLink).toBeUndefined();
+      expect(verifiedOrdinary.peerIdentity).toBeUndefined();
+      const [ordinaryPayload] = ordinary.token.split(".");
+      expect(base64UrlDecodeUtf8(ordinaryPayload!)).not.toContain('"pei"');
+      expect(verifiedLegacy.peerLink).toBe(true);
+      expect(verifiedLegacy.peerIdentity).toBeUndefined();
+    }).pipe(Effect.provide(layerSessionStore())),
+  );
+
   it.effect("takes scopes from the session record", () =>
     Effect.gen(function* () {
       const sessions = yield* SessionStore.SessionStore;

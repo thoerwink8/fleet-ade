@@ -31,10 +31,13 @@ import * as DateTime from "effect/DateTime";
 import { FleetSummaryReportInput } from "@t3tools/contracts";
 import * as FleetSummary from "../../../ledger/FleetSummary.ts";
 import * as FleetSummaryReporter from "../../../ledger/FleetSummaryReporter.ts";
+import * as FleetClaims from "../../../ledger/FleetClaims.ts";
 import * as Orchestrator from "../../../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../../../orchestration-v2/ProjectionStore.ts";
 import * as PeerMcpClient from "../../../peer/PeerMcpClient.ts";
 import * as Scheduler from "../../../scheduling/Scheduler.ts";
+import * as ServerEnvironment from "../../../environment/ServerEnvironment.ts";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/process";
 import * as TestClock from "effect/testing/TestClock";
@@ -75,6 +78,8 @@ const clientLaunchHarness = (input: {
   /** The orchestrator refuses the new thread's mode, as under a managed ceiling. */
   readonly refusedByCeiling?: true;
   readonly linked?: boolean;
+  /** A linked session whose coordinator identity was never proven. */
+  readonly unprovenLink?: boolean;
 }) => {
   const projectId = ProjectId.make("project:client-target");
   const modelSelection = {
@@ -113,7 +118,8 @@ const clientLaunchHarness = (input: {
         label: "Claude Code",
         access: input.runtimeModeCeiling,
         hostedAppUrl: input.hostedAppUrl,
-        ...(input.linked ? { linked: true, environmentId: "coordinator" } : {}),
+        ...(input.linked ? { linked: true } : {}),
+        ...(input.linked && !input.unprovenLink ? { environmentId: "coordinator" } : {}),
       },
       issuedAt: 0,
       capabilities: new Set(["orchestration" as const]),
@@ -937,6 +943,11 @@ it.effect("a linked launch returns while its initial summary report waits on the
         Layer.provide(
           Layer.mergeAll(
             Scheduler.layer,
+            Layer.succeed(FleetSummary.FleetSummary, summary),
+            Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+              getEnvironmentId: Effect.succeed(EnvironmentId.make("executor")),
+            }),
+            Layer.mock(FleetClaims.FleetClaims)({}),
             Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.empty }),
             Layer.mock(ProjectionStore.ProjectionStoreV2)({
               getThreadShell: (threadId) => {
@@ -947,7 +958,7 @@ it.effect("a linked launch returns while its initial summary report waits on the
                     : ({
                         id: threadId,
                         title: launch.title,
-                        status: "idle",
+                        status: "running",
                         pendingRuntimeRequest: null,
                         lastError: null,
                         latestVisibleMessage: null,
@@ -1010,6 +1021,315 @@ it.effect("a linked launch returns while its initial summary report waits on the
           phase: "working",
         });
       }
+    }),
+  ),
+);
+
+it.effect("a fleet task without a link origin is rejected before launching", () =>
+  Effect.gen(function* () {
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched });
+    const dependencyContext = yield* Layer.build(harness.dependencies);
+    const toolkit = yield* ProjectToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+          Layer.provide(harness.dependencies),
+        ),
+      ),
+    );
+    const response = yield* toolkit
+      .handle("t3_thread_launch", {
+        title: "Unlinked fleet task",
+        projectId: harness.projectId,
+        fleetTask: JSON.stringify({
+          repo: "example/one",
+          issue: 7,
+          taskId: "task-x",
+          attempt: 1,
+          fencing: "1",
+        }),
+      })
+      .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+    expect(response.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+    expect(launched).toHaveLength(0);
+  }),
+);
+
+it.effect("a fleet task without a message or attachments is rejected before launching", () =>
+  Effect.gen(function* () {
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+    const registered: Array<unknown> = [];
+    const dependencies = Layer.merge(
+      harness.dependencies,
+      Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+        trackTask: (_threadId, claim) => Effect.sync(() => registered.push(claim)),
+        trackAdhoc: (threadId) => Effect.sync(() => registered.push(threadId)),
+      }),
+    );
+    const dependencyContext = yield* Layer.build(dependencies);
+    const toolkit = yield* ProjectToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(Layer.provide(dependencies)),
+      ),
+    );
+    for (const message of [undefined, "", "   "]) {
+      const response = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Empty fleet task",
+          projectId: harness.projectId,
+          ...(message === undefined ? {} : { message }),
+          fleetTask: JSON.stringify({
+            repo: "example/one",
+            issue: 7,
+            taskId: "task-x",
+            attempt: 1,
+            fencing: "1",
+          }),
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(response.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+    }
+    expect(launched).toHaveLength(0);
+    expect(registered).toHaveLength(0);
+  }),
+);
+
+it.effect("a linked launch without proven coordinator identity rejects fleetTask", () =>
+  Effect.gen(function* () {
+    const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+    const harness = clientLaunchHarness({
+      runtimeModeCeiling: "auto",
+      launched,
+      linked: true,
+      unprovenLink: true,
+    });
+    const registered: Array<unknown> = [];
+    const dependencies = Layer.merge(
+      harness.dependencies,
+      Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+        trackTask: (_threadId, claim) => Effect.sync(() => registered.push(claim)),
+        trackAdhoc: (threadId) => Effect.sync(() => registered.push(threadId)),
+      }),
+    );
+    const dependencyContext = yield* Layer.build(dependencies);
+    const toolkit = yield* ProjectToolkit.pipe(
+      Effect.provide(
+        McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(Layer.provide(dependencies)),
+      ),
+    );
+    const response = yield* toolkit
+      .handle("t3_thread_launch", {
+        title: "Unproven fleet task",
+        projectId: harness.projectId,
+        message: "Work the claim.",
+        fleetTask: JSON.stringify({
+          repo: "example/one",
+          issue: 7,
+          taskId: "task-x",
+          attempt: 1,
+          fencing: "1",
+        }),
+      })
+      .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+    expect(response.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+    expect(launched).toHaveLength(0);
+    expect(registered).toHaveLength(0);
+  }),
+);
+
+it.effect("a linked launch carrying fleetTask registers the claim, not an ad hoc row", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+      const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+      const summaryContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
+      const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
+      const reporting = yield* Deferred.make<void>();
+      const allowReport = yield* Deferred.make<void>();
+      const reported = yield* Deferred.make<void>();
+      const coordinatorSql = Context.get(summaryContext, SqlClient.SqlClient);
+      yield* coordinatorSql`INSERT INTO repos (owner, name) VALUES ('example', 'one')`;
+      yield* coordinatorSql`
+        INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, holder_environment,
+          lease_until, executor, state, fencing, attempt, claim_idempotency_key)
+        VALUES ('coordinator', 'example/one', 7, 'task-x', 'session-a', 'executor',
+          '2999-01-01T00:00:00.000Z', 'fleet', 'running', '1', 1, 'key-x')`;
+      yield* coordinatorSql`
+        INSERT INTO node_claims (fleet_id, repo, issue, task_id, claimed_by, holder_environment,
+          lease_until, executor, state, fencing, attempt, claim_idempotency_key)
+        VALUES ('coordinator', 'example/one', 8, 'task-y', 'session-a', 'executor',
+          '2999-01-01T00:00:00.000Z', 'fleet', 'running', '1', 1, 'key-y')`;
+      const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Scheduler.layer,
+            Layer.succeed(FleetSummary.FleetSummary, summary),
+            Layer.succeed(ServerEnvironment.ServerEnvironmentIdentity, {
+              getEnvironmentId: Effect.succeed(EnvironmentId.make("executor")),
+            }),
+            Layer.mock(FleetClaims.FleetClaims)({}),
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.empty }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: (threadId) =>
+                Effect.succeed(
+                  launched.some((entry) => entry.threadId === threadId)
+                    ? ({
+                        id: threadId,
+                        title: "Leased work",
+                        status: "running",
+                        pendingRuntimeRequest: null,
+                        lastError: null,
+                        latestVisibleMessage: null,
+                        createdAt: DateTime.makeUnsafe(0),
+                      } as OrchestrationV2ThreadShell)
+                    : null,
+                ),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: (request) =>
+                Effect.gen(function* () {
+                  yield* Deferred.succeed(reporting, undefined);
+                  yield* Deferred.await(allowReport);
+                  const input = yield* decodeSummaryReport(request.arguments);
+                  const result = yield* summary.report("executor", input);
+                  const decoded = yield* decodePeerResult(request.success, result);
+                  yield* Deferred.succeed(reported, undefined);
+                  return decoded;
+                }).pipe(Effect.orDie),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const dependencies = Layer.merge(harness.dependencies, Layer.succeedContext(reporterContext));
+      const dependencyContext = yield* Layer.build(dependencies);
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+      const claim = {
+        repo: "example/one",
+        issue: 7,
+        taskId: "task-x",
+        attempt: 1,
+        fencing: "1",
+      };
+      const refused = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Malformed token",
+          projectId: harness.projectId,
+          fleetTask: JSON.stringify({ ...claim, fencing: "" }),
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(refused.at(-1)?.result).toMatchObject({ code: "invalid_request" });
+      expect(launched).toHaveLength(0);
+      const response = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Leased work",
+          projectId: harness.projectId,
+          message: "Work the claim.",
+          fleetTask: JSON.stringify(claim),
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(response.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+      yield* Deferred.await(reporting);
+      // The first report holds the reporter's send lane while the peer is blocked.
+      // Another registration must not hold up its already-created thread.
+      const second = yield* toolkit
+        .handle("t3_thread_launch", {
+          title: "Another leased thread",
+          projectId: harness.projectId,
+          message: "Work the claim.",
+          fleetTask: JSON.stringify({ ...claim, issue: 8, taskId: "task-y" }),
+        })
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(second.at(-1)?.result).toMatchObject({ threadId: launched[1]?.threadId });
+      expect(launched).toHaveLength(2);
+      yield* Deferred.succeed(allowReport, undefined);
+      yield* Deferred.await(reported);
+      const events = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
+      if (events[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+      expect(events[0].rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            taskId: "task-x",
+            threadId: launched[0]?.threadId,
+            phase: "working",
+          }),
+        ]),
+      );
+    }),
+  ),
+);
+
+it.effect("a failed fleet registration does not fail a launch and a replay registers again", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
+      const harness = clientLaunchHarness({ runtimeModeCeiling: "auto", launched, linked: true });
+      const failed = yield* Deferred.make<void>();
+      const registered = yield* Deferred.make<ThreadId>();
+      let attempts = 0;
+      let registeredClaim: unknown;
+      const dependencies = Layer.merge(
+        harness.dependencies,
+        Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+          trackTask: (threadId, claim) =>
+            Effect.gen(function* () {
+              registeredClaim = claim;
+              attempts += 1;
+              if (attempts === 1) {
+                yield* Deferred.succeed(failed, undefined);
+                return yield* Effect.die(new Error("registration persistence failed"));
+              }
+              yield* Deferred.succeed(registered, threadId);
+            }),
+        }),
+      );
+      const dependencyContext = yield* Layer.build(dependencies);
+      const toolkit = yield* ProjectToolkit.pipe(
+        Effect.provide(
+          McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(
+            Layer.provide(dependencies),
+          ),
+        ),
+      );
+      const input = {
+        title: "Leased work",
+        projectId: harness.projectId,
+        clientRequestId: "retry-registration",
+        message: "Work the claim.",
+        fleetTask: JSON.stringify({
+          repo: "example/one",
+          issue: 7,
+          taskId: "task-x",
+          attempt: 1,
+          fencing: "1",
+        }),
+      };
+      const first = yield* toolkit
+        .handle("t3_thread_launch", input)
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      yield* Deferred.await(failed);
+      expect(first.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+      const replay = yield* toolkit
+        .handle("t3_thread_launch", input)
+        .pipe(Stream.unwrap, Stream.runCollect, Effect.provideContext(dependencyContext));
+      expect(replay.at(-1)?.result).toMatchObject({ threadId: launched[0]?.threadId });
+      expect(yield* Deferred.await(registered)).toBe(launched[0]?.threadId);
+      expect(registeredClaim).toEqual({
+        fleetId: "coordinator",
+        repo: "example/one",
+        issue: 7,
+        taskId: "task-x",
+        attempt: 1,
+        fencing: "1",
+      });
+      expect(attempts).toBe(2);
     }),
   ),
 );
