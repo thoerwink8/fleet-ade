@@ -291,7 +291,9 @@ const make = Effect.gen(function* () {
         } else if (identityUnavailable || decodeIdentityConflict(text)._tag === "Some") {
           return yield* new OrchestratorMcpFailure({
             code: "orchestration_error",
-            message: `The linked environment ${resolved.link.label} (${input.environmentId}) could not verify this environment's identity. Check that both environments can reach each other, then retry.`,
+            message: identityUnavailable
+              ? `The linked environment ${resolved.link.label} (${input.environmentId}) could not verify this environment's identity. On ${resolved.link.label}, link back to this environment and ensure it is reachable, then retry.`
+              : `The linked environment ${resolved.link.label} (${input.environmentId}) found a conflicting link for this environment. On ${resolved.link.label}, forget the incorrect link and pair this environment again, then retry.`,
           });
         }
       }

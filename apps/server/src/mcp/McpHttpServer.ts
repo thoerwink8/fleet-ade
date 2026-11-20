@@ -236,8 +236,7 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
         ? yield* clients.value.authenticate(request)
         : undefined);
     if (invocation === "identity_unavailable" || invocation === "identity_conflict") {
-      // Name this coordinator so a linked environment knows where to retry;
-      // its link back here is what proves the caller's identity.
+      // Name the verifying environment and tell the caller where the return link belongs.
       const descriptor = Option.isSome(coordinator)
         ? Option.some(yield* coordinator.value.getDescriptor)
         : Option.none();
@@ -248,8 +247,8 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
               ? "peer_identity_conflict"
               : "peer_identity_unavailable",
           message: Option.isSome(descriptor)
-            ? `Peer identity could not be verified by ${descriptor.value.label} (${descriptor.value.environmentId}); it must link back to this environment before retrying the request.`
-            : "Peer identity could not be verified; the coordinator must link back to this environment before retrying the request.",
+            ? `Peer identity could not be verified by ${descriptor.value.label} (${descriptor.value.environmentId}); this environment needs a link back to the requesting environment before retrying the request.`
+            : "Peer identity could not be verified; the verifying environment needs a link back to the requesting environment before retrying the request.",
         },
         { status: 503 },
       );

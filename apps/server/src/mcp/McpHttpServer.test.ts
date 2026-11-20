@@ -1275,18 +1275,22 @@ it.effect("admits provider and OAuth client credentials and points only clients 
       const unavailable = yield* call("proof-unavailable");
       expect(unavailable.status).toBe(503);
       expect(unavailable.headers["www-authenticate"]).toBeUndefined();
-      // An unprovable peer is told which coordinator refused it and that the
-      // coordinator must also be linked back to this machine.
+      // The verifying environment needs a link back to the requester.
       const unavailableText = yield* unavailable.text;
       expect(unavailableText).toContain('"peer_identity_unavailable"');
       expect(unavailableText).toContain("Coordinator Test Node");
       expect(unavailableText).toContain(environmentId);
-      expect(unavailableText).toContain("must link back to this environment");
+      expect(unavailableText).toContain(
+        "this environment needs a link back to the requesting environment",
+      );
       const conflict = yield* call("proof-conflict");
       expect(conflict.status).toBe(503);
       const conflictText = yield* conflict.text;
       expect(conflictText).toContain('"peer_identity_conflict"');
       expect(conflictText).toContain("Coordinator Test Node");
+      expect(conflictText).toContain(
+        "this environment needs a link back to the requesting environment",
+      );
 
       const missing = yield* call(undefined);
       expect(missing.status).toBe(401);

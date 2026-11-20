@@ -51,7 +51,11 @@ const toolkit = Toolkit.make(
 );
 
 /** One `probe` call to a linked peer at a remote address, answered by `http`. */
-const probeThrough = Effect.fn(function* (http: HttpClient.HttpClient, tool = "probe") {
+const probeThrough = Effect.fn(function* (
+  http: HttpClient.HttpClient,
+  tool = "probe",
+  args: Record<string, unknown> = {},
+) {
   const box = descriptorOf("environment-box", "Box");
   const context = yield* Layer.build(
     PeerMcpClient.layer.pipe(
@@ -88,7 +92,7 @@ const probeThrough = Effect.fn(function* (http: HttpClient.HttpClient, tool = "p
   return Context.get(context, PeerMcpClient.PeerMcpClient).call({
     environmentId: box.environmentId,
     tool,
-    arguments: {},
+    arguments: args,
     limits: { runtimeMode: "approval-required", interactionMode: "plan" },
     success: Result,
   });
@@ -432,8 +436,55 @@ it.effect("does not retry identity-sensitive calls anonymously", () =>
     );
     const heartbeat = yield* probeThrough(http, "fleet_heartbeat");
     const error = yield* heartbeat.pipe(Effect.flip);
-    expect(error.message).toContain("identity");
-    expect(error.message).toContain("Box");
+    expect(error.message).toBe(
+      "The linked environment Box (environment-box) could not verify this environment's identity. On Box, link back to this environment and ensure it is reachable, then retry.",
+    );
+    expect(requests).toBe(3);
+  }),
+);
+
+it.effect("does not retry a fleet task launch anonymously when identity is unavailable", () =>
+  Effect.gen(function* () {
+    let requests = 0;
+    const http = HttpClient.make((request) =>
+      Effect.sync(() => {
+        const index = requests++;
+        return HttpClientResponse.fromWeb(
+          request,
+          new Response(index === 2 ? '{"error":"peer_identity_unavailable"}' : "", {
+            status: index === 1 ? 202 : index === 2 ? 503 : 200,
+            headers: { "mcp-session-id": "session" },
+          }),
+        );
+      }),
+    );
+    const launch = yield* probeThrough(http, "t3_thread_launch", { fleetTask: "claim" });
+    const error = yield* launch.pipe(Effect.flip);
+    expect(error.message).toContain("On Box, link back to this environment");
+    expect(requests).toBe(3);
+  }),
+);
+
+it.effect("explains how to resolve a conflicting peer identity", () =>
+  Effect.gen(function* () {
+    let requests = 0;
+    const http = HttpClient.make((request) =>
+      Effect.sync(() => {
+        const index = requests++;
+        return HttpClientResponse.fromWeb(
+          request,
+          new Response(index === 2 ? '{"error":"peer_identity_conflict"}' : "", {
+            status: index === 1 ? 202 : index === 2 ? 503 : 200,
+            headers: { "mcp-session-id": "session" },
+          }),
+        );
+      }),
+    );
+    const call = yield* probeThrough(http, "fleet_heartbeat");
+    const error = yield* call.pipe(Effect.flip);
+    expect(error.message).toBe(
+      "The linked environment Box (environment-box) found a conflicting link for this environment. On Box, forget the incorrect link and pair this environment again, then retry.",
+    );
     expect(requests).toBe(3);
   }),
 );

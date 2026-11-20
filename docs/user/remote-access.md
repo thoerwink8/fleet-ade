@@ -355,8 +355,11 @@ an address you trust: the code is sent there.
 When one linked environment starts an ordinary thread on another, it attempts to
 prove its identity over the link back. If that proof is temporarily unavailable,
 the thread can still start without a verified machine identity. Fleet task claims
-and threads started with a fleet task require a verified identity instead: ensure
-the coordinator can reach the calling environment over a working link, then retry.
+and threads started with a fleet task require a verified identity instead. On the
+remote coordinator, open **Settings → Environments → Linked environments** and
+link back to the calling environment using its reachable address and pairing code;
+then retry. If the identity conflicts, **Forget** the incorrect link on the remote
+coordinator and pair the calling environment again before retrying.
 Older clients can still renew or release their existing leases, but must update
 before claiming new tasks; pairing again alone does not update the client.
 

@@ -1073,7 +1073,7 @@ it.effect("a fleet task without a message or attachments is rejected before laun
         McpToolAccess.HandlersLayer.layer(ProjectHandlers.layer).pipe(Layer.provide(dependencies)),
       ),
     );
-    for (const message of [undefined, ""]) {
+    for (const message of [undefined, "", "   "]) {
       const response = yield* toolkit
         .handle("t3_thread_launch", {
           title: "Empty fleet task",
