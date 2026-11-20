@@ -21,6 +21,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { PullRequestAdditions, layer as budgetLayer } from "./budget.ts";
 import * as ClaimLease from "./claimLease.ts";
+import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
 import * as DispatchSession from "./DispatchSession.ts";
 import { ELIGIBLE_LABEL, layer as issuesLayer, PipelineGitHubIssues } from "./GitHubIssues.ts";
 import { layerPortsDefault } from "./intakeGates.ts";
@@ -152,6 +153,8 @@ const usageLayer = Layer.succeed(
   }),
 );
 
+const reporterLayer = Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({});
+
 const pipelineLayer = (input: {
   readonly issues: Layer.Layer<PipelineGitHubIssues>;
   readonly pipelineRepos?: ReadonlyArray<string>;
@@ -279,6 +282,7 @@ describe("repo allowlist", () => {
     });
     const session = DispatchSession.layer.pipe(
       Layer.provide(budgetLayer),
+      Layer.provide(reporterLayer),
       Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
       Layer.provide(opener),
       Layer.provide(git),
@@ -309,6 +313,7 @@ describe("repo allowlist", () => {
         Effect.provide(
           Layer.fresh(DispatchSession.layer).pipe(
             Layer.provide(budgetLayer),
+            Layer.provide(reporterLayer),
             Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
             Layer.provide(opener),
             Layer.provide(git),
@@ -420,6 +425,7 @@ describe("repo allowlist", () => {
     });
     const session = DispatchSession.layer.pipe(
       Layer.provide(budgetLayer),
+      Layer.provide(reporterLayer),
       Layer.provide(Layer.succeed(PullRequestAdditions, { read: () => Effect.succeed(0) })),
       Layer.provide(opener),
       Layer.provide(git),

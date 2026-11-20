@@ -38,6 +38,7 @@ import { isLocalLoopbackHost, isTailnetHost } from "@t3tools/shared/hostClassifi
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as PeerChallengeRegistry from "./PeerChallengeRegistry.ts";
 
 const PeerHttpApi = HttpApi.make(EnvironmentHttpApi.identifier)
   .add(EnvironmentHttpApi.groups.metadata)
@@ -221,6 +222,7 @@ const make = Effect.gen(function* () {
   const httpClient = yield* HttpClient.HttpClient;
   const environment = yield* ServerEnvironment.ServerEnvironment;
   const isOwnLoopback = yield* LoopbackHost;
+  const challenges = yield* PeerChallengeRegistry.PeerChallengeRegistry;
 
   /** A fresh name for one link's token; the row records it. */
   const newSecretName = random.randomBytes(16).pipe(
@@ -295,7 +297,13 @@ const make = Effect.gen(function* () {
 
   /** Signs in to the peer's `/mcp` with a pairing code: register, decide, exchange. */
   const signIn = Effect.fn("PeerLinks.signIn")(
-    function* (origin: string, input: PeerLinkCreateInput, clientName: string) {
+    function* (
+      origin: string,
+      input: PeerLinkCreateInput,
+      clientName: string,
+      target: EnvironmentId,
+      selfId: EnvironmentId,
+    ) {
       const client = yield* clientFor(origin);
       // Only the peer's own refusals are rejections. A dropped connection or
       // an answer this version cannot read is classified below.
@@ -324,67 +332,71 @@ const make = Effect.gen(function* () {
       );
       const state = Base64Url.encode(yield* random.randomBytes(16));
       const resource = `${origin}/mcp`;
-      const decided = yield* client.mcpOAuth
-        .decision({
-          headers: {},
-          payload: {
-            authorization: {
-              response_type: "code",
-              client_id: registered.client_id,
+      yield* challenges.register(challenge, target);
+      return yield* Effect.gen(function* () {
+        const decided = yield* client.mcpOAuth
+          .decision({
+            headers: {},
+            payload: {
+              authorization: {
+                response_type: "code",
+                client_id: registered.client_id,
+                redirect_uri: LINK_REDIRECT_URI,
+                code_challenge: challenge,
+                code_challenge_method: "S256",
+                state: Redacted.make(state),
+                resource,
+                peer_environment_id: selfId,
+              },
+              decision: { _tag: "pairing-code", access: input.access, code: input.pairingCode },
+            },
+          })
+          .pipe(
+            Effect.catchTags({
+              AuthMcpApprovalError: (error) =>
+                Effect.fail(
+                  new PeerLinkError({ reason: "pairing_rejected", message: error.message }),
+                ),
+            }),
+          );
+        const redirect = URL.parse(decided.redirectTo);
+        if (redirect === null) {
+          return yield* new PeerLinkError({
+            reason: "incompatible",
+            message: `${origin} answered the sign-in with an address this version cannot read. Update both environments.`,
+          });
+        }
+        const code = redirect.searchParams.get("code");
+        if (code === null || redirect.searchParams.get("state") !== state) {
+          return yield* new PeerLinkError({
+            reason: "pairing_rejected",
+            message:
+              redirect.searchParams.get("error_description") ??
+              "The peer did not approve the link. Check the pairing code and try again.",
+          });
+        }
+        return yield* client.mcpOAuth
+          .token({
+            payload: {
+              grant_type: "authorization_code",
+              code: Redacted.make(code),
               redirect_uri: LINK_REDIRECT_URI,
-              code_challenge: challenge,
-              code_challenge_method: "S256",
-              state: Redacted.make(state),
+              client_id: registered.client_id,
+              code_verifier: Redacted.make(verifier),
               resource,
             },
-            decision: { _tag: "pairing-code", access: input.access, code: input.pairingCode },
-          },
-        })
-        .pipe(
-          Effect.catchTags({
-            AuthMcpApprovalError: (error) =>
+          })
+          .pipe(
+            Effect.catchIf(Schema.is(AuthMcpTokenError), (error) =>
               Effect.fail(
-                new PeerLinkError({ reason: "pairing_rejected", message: error.message }),
+                new PeerLinkError({
+                  reason: "pairing_rejected",
+                  message: `The peer refused the sign-in: ${error.message}`,
+                }),
               ),
-          }),
-        );
-      const redirect = URL.parse(decided.redirectTo);
-      if (redirect === null) {
-        return yield* new PeerLinkError({
-          reason: "incompatible",
-          message: `${origin} answered the sign-in with an address this version cannot read. Update both environments.`,
-        });
-      }
-      const code = redirect.searchParams.get("code");
-      if (code === null || redirect.searchParams.get("state") !== state) {
-        return yield* new PeerLinkError({
-          reason: "pairing_rejected",
-          message:
-            redirect.searchParams.get("error_description") ??
-            "The peer did not approve the link. Check the pairing code and try again.",
-        });
-      }
-      return yield* client.mcpOAuth
-        .token({
-          payload: {
-            grant_type: "authorization_code",
-            code: Redacted.make(code),
-            redirect_uri: LINK_REDIRECT_URI,
-            client_id: registered.client_id,
-            code_verifier: Redacted.make(verifier),
-            resource,
-          },
-        })
-        .pipe(
-          Effect.catchIf(Schema.is(AuthMcpTokenError), (error) =>
-            Effect.fail(
-              new PeerLinkError({
-                reason: "pairing_rejected",
-                message: `The peer refused the sign-in: ${error.message}`,
-              }),
             ),
-          ),
-        );
+          );
+      }).pipe(Effect.ensuring(challenges.remove(challenge)));
     },
     (effect, origin) =>
       effect.pipe(
@@ -511,7 +523,13 @@ const make = Effect.gen(function* () {
         message: `${peer.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
       });
     }
-    const issued = yield* signIn(primary, input, `T3 Code · ${self.label}`);
+    const issued = yield* signIn(
+      primary,
+      input,
+      `T3 Code · ${self.label}`,
+      peer.environmentId,
+      self.environmentId,
+    );
     const now = yield* DateTime.now;
     const linked: PeerLink = {
       environmentId: peer.environmentId,

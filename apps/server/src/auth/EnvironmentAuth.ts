@@ -555,6 +555,7 @@ export class EnvironmentAuth extends Context.Service<
       readonly label: string;
       readonly access: AuthMcpClientAccess;
       readonly peerLink: boolean;
+      readonly peerIdentity?: string;
       readonly client: AuthClientMetadata;
     }) => Effect.Effect<
       {
@@ -1323,21 +1324,17 @@ export const make = Effect.gen(function* () {
       mapSessionVerificationErrors,
       Effect.flatMap((session) =>
         session.subject === MCP_CLIENT_SUBJECT && session.method === "bearer-access-token"
-          ? session.peerLink === true && session.peerIdentity === undefined
-            ? Effect.fail(
-                new ServerAuthInvalidCredentialError({ diagnostic: "旧链接，请重新链接" }),
-              )
-            : Effect.succeed({
-                sessionId: session.sessionId,
-                label: session.client.label ?? "MCP client",
-                access: session.scopes.includes(AuthOrchestrationOperateScope)
-                  ? (session.runtimeModeCeiling ?? "approval-required")
-                  : "read-only",
-                peerLink: session.peerLink === true,
-                ...(session.peerIdentity === undefined
-                  ? {}
-                  : { environmentId: session.peerIdentity }),
-              } satisfies McpClientSession)
+          ? Effect.succeed({
+              sessionId: session.sessionId,
+              label: session.client.label ?? "MCP client",
+              access: session.scopes.includes(AuthOrchestrationOperateScope)
+                ? (session.runtimeModeCeiling ?? "approval-required")
+                : "read-only",
+              peerLink: session.peerLink === true,
+              ...(session.peerIdentity === undefined
+                ? {}
+                : { environmentId: session.peerIdentity }),
+            } satisfies McpClientSession)
           : Effect.fail(
               new ServerAuthInvalidCredentialError({
                 diagnostic: "Only MCP client sessions are accepted here.",
@@ -1356,6 +1353,7 @@ export const make = Effect.gen(function* () {
         scopes: mcpClientScopes(input.access),
         ttl: MCP_CLIENT_SESSION_TTL,
         ...(input.access === "read-only" ? {} : { runtimeModeCeiling: input.access }),
+        ...(input.peerIdentity === undefined ? {} : { peerIdentity: input.peerIdentity }),
         peerLink: input.peerLink,
         client: { ...input.client, label: input.label, deviceType: "bot" },
       })

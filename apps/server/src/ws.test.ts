@@ -190,6 +190,7 @@ const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
           startSupervised: () =>
             Effect.succeed({ status: "rejected" as const, code: "ineligible" as const }),
           note: () => Effect.void,
+          claimTokenForRun: () => Effect.succeed(null),
         }),
       ),
     ),

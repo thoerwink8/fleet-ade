@@ -15,6 +15,7 @@ import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
+import * as PeerChallengeRegistry from "../peer/PeerChallengeRegistry.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -35,6 +36,8 @@ const runWithPeerLinks = Effect.fn("environment.runWithPeerLinks")(function* <A,
     Effect.flatMap(run),
     Effect.provide(
       PeerLinks.layer.pipe(
+        // CLI linking does not serve proof callbacks; its challenge registry is separate from the server's.
+        Layer.provide(PeerChallengeRegistry.layer),
         Layer.provide(
           Layer.mergeAll(
             ServerSecretStore.layer,

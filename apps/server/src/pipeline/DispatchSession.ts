@@ -31,6 +31,8 @@ import { PipelineBudget } from "./budget.ts";
 import { PipelineRuns, type PipelineRunNote } from "./PipelineRuns.ts";
 import { shouldAdvancePipelineRun } from "./pipelineAdvance.ts";
 import { SessionEndInbox, type SessionEndEntry } from "./SessionEndInbox.ts";
+import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
+import * as ClaimLease from "./claimLease.ts";
 import { orderedCandidates, pickRouteCandidate } from "./routeCandidates.ts";
 
 const STUCK_SESSION_FAILED = "会话失败";
@@ -135,6 +137,7 @@ const make = Effect.gen(function* () {
   const projects = yield* ProjectService.ProjectService;
   const git = yield* GitWorkflowService.GitWorkflowService;
   const opener = yield* SessionOpener;
+  const reporter = yield* FleetSummaryReporter.FleetSummaryReporter;
 
   const openRuns = Effect.fn("DispatchSession.openRuns")(function* () {
     const listed = yield* runs.list;
@@ -143,6 +146,34 @@ const make = Effect.gen(function* () {
     );
   });
 
+  // The run's claim token is the durable binding; re-track every tick so a crash
+  // between open and the first registration reconciles on the next pass.
+  const bindLease = Effect.fn("DispatchSession.bindLease")(function* (run: OpenRun) {
+    if (run.threadId === null) return;
+    const claimToken = yield* runs
+      .claimTokenForRun(run.id)
+      .pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("pipeline.dispatch.lease-token-read-failed", { error }).pipe(
+            Effect.as(null),
+          ),
+        ),
+      );
+    if (claimToken === null) return;
+    const claim = yield* Effect.try({
+      try: () => ClaimLease.decodeLeaseToken(claimToken),
+      catch: () => undefined,
+    }).pipe(Effect.option);
+    if (Option.isNone(claim)) return;
+    yield* reporter.trackTask(ThreadId.make(run.threadId), claim.value).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("pipeline.dispatch.lease-bind-failed", {
+          issueNumber: run.issueNumber,
+          cause: Cause.pretty(cause),
+        }),
+      ),
+    );
+  });
   const projectForRepository = Effect.fn("DispatchSession.projectForRepository")(function* (
     owner: string,
     name: string,
@@ -279,6 +310,7 @@ const make = Effect.gen(function* () {
       { status: "session", threadId, sessionStartedAt: now },
       run.repository,
     );
+    yield* bindLease({ ...run, threadId });
   });
 
   const tick = Effect.gen(function* () {
@@ -295,6 +327,7 @@ const make = Effect.gen(function* () {
       if (!shouldAdvancePipelineRun(current.pipelineEnabled, run)) continue;
       if (run.status === "session") {
         if (run.sessionEndedAt !== null) continue;
+        yield* bindLease(run);
         const entry =
           run.threadId === null ? undefined : endByThread.get(ThreadId.make(run.threadId));
         if (entry !== undefined) {

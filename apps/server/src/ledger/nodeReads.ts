@@ -45,30 +45,38 @@ const payloadOf = (raw: string) =>
 
 /** Overwrite rows for snapshots and sessions. Claims are only read; this file never inserts one. */
 export const migrate = Effect.gen(function* () {
-  yield* Notes.migrate;
   const sql = yield* SqlClient.SqlClient;
-  yield* sql`
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      yield* Notes.migrate;
+      yield* sql`
     CREATE TABLE IF NOT EXISTS node_reports (
       node_id TEXT PRIMARY KEY,
       payload TEXT NOT NULL,
       received_at TEXT NOT NULL
     )
   `;
-  yield* sql`
+      yield* sql`
     CREATE TABLE IF NOT EXISTS node_sessions (
       node_id TEXT PRIMARY KEY,
       payload TEXT NOT NULL,
       received_at TEXT NOT NULL
     )
   `;
-  yield* sql`
+      yield* sql`
+    CREATE TABLE IF NOT EXISTS fleet_environment_heartbeats (
+      environment_id TEXT PRIMARY KEY,
+      last_seen TEXT NOT NULL
+    )
+  `;
+      yield* sql`
     CREATE TABLE IF NOT EXISTS fleet_summary_meta (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       revision INTEGER NOT NULL
     )
   `;
-  yield* sql`INSERT OR IGNORE INTO fleet_summary_meta (id, revision) VALUES (1, 0)`;
-  yield* sql`
+      yield* sql`INSERT OR IGNORE INTO fleet_summary_meta (id, revision) VALUES (1, 0)`;
+      yield* sql`
     CREATE TABLE IF NOT EXISTS fleet_summary_rows (
       row_id TEXT PRIMARY KEY,
       environment_id TEXT NOT NULL,
@@ -88,7 +96,7 @@ export const migrate = Effect.gen(function* () {
       revision INTEGER NOT NULL
     )
   `;
-  yield* sql`
+      yield* sql`
     CREATE TABLE IF NOT EXISTS fleet_summary_changes (
       revision INTEGER PRIMARY KEY,
       event_type TEXT NOT NULL,
@@ -96,54 +104,89 @@ export const migrate = Effect.gen(function* () {
       payload TEXT NOT NULL
     )
   `;
-  yield* sql`
+      yield* sql`
     CREATE INDEX IF NOT EXISTS idx_fleet_summary_rows_environment
     ON fleet_summary_rows (environment_id)
   `;
-  yield* sql`
+      {
+        const registrationColumns =
+          (yield* sql`PRAGMA table_info(fleet_summary_registrations)`) as readonly {
+            readonly name: string;
+            readonly pk: number;
+          }[];
+        const registrationPk = registrationColumns
+          .filter((column) => column.pk > 0)
+          .toSorted((left, right) => left.pk - right.pk)
+          .map((column) => column.name);
+        if (registrationColumns.length > 0 && registrationPk.join(",") !== "thread_id,coordinator")
+          yield* sql`ALTER TABLE fleet_summary_registrations RENAME TO fleet_summary_registrations_before_fleet`;
+        yield* sql`
     CREATE TABLE IF NOT EXISTS fleet_summary_registrations (
-      thread_id TEXT PRIMARY KEY,
+      thread_id TEXT NOT NULL,
       kind TEXT NOT NULL,
       coordinator TEXT NOT NULL,
       repo TEXT,
       issue INTEGER,
       task_id TEXT,
       sent TEXT,
-      deleting INTEGER NOT NULL DEFAULT 0
+      deleting INTEGER NOT NULL DEFAULT 0,
+      attempt INTEGER,
+      fencing TEXT,
+      PRIMARY KEY (thread_id, coordinator)
     )
   `;
-  yield* sql.withTransaction(
-    Effect.gen(function* () {
-      const claimColumns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
-        readonly name: string;
-        readonly pk: number;
-      }[];
-      const backupColumns = (yield* sql`PRAGMA table_info(node_claims_before_fleet)`) as readonly {
-        readonly name: string;
-      }[];
-      const primaryKey = claimColumns
-        .filter((column) => column.pk > 0)
-        .toSorted((left, right) => left.pk - right.pk)
-        .map((column) => column.name);
-      const currentNames = new Set(claimColumns.map((column) => column.name));
-      const currentSchema =
-        primaryKey.join(",") === "repo,issue,task_id" &&
-        [
-          "fleet_id",
-          "attempt",
-          "claim_idempotency_key",
-          "renew_idempotency_key",
-          "renew_lease_until",
-          "release_idempotency_key",
-        ].every((column) => currentNames.has(column));
+        const registrationBackup =
+          (yield* sql`PRAGMA table_info(fleet_summary_registrations_before_fleet)`) as readonly {
+            readonly name: string;
+          }[];
+        if (registrationBackup.length > 0) {
+          const backupNames = new Set(registrationBackup.map((column) => column.name));
+          yield* sql`
+      INSERT INTO fleet_summary_registrations (
+        thread_id, kind, coordinator, repo, issue, task_id, sent, deleting, attempt, fencing
+      )
+      SELECT thread_id, kind, coordinator, repo, issue, task_id, sent, deleting,
+        ${backupNames.has("attempt") ? sql`attempt` : sql`NULL`},
+        ${backupNames.has("fencing") ? sql`fencing` : sql`NULL`}
+      FROM fleet_summary_registrations_before_fleet
+      WHERE true
+      ON CONFLICT(thread_id, coordinator) DO NOTHING
+    `;
+          yield* sql`DROP TABLE fleet_summary_registrations_before_fleet`;
+        }
+      }
+      {
+        const claimColumns = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
+          readonly name: string;
+          readonly pk: number;
+        }[];
+        const backupColumns =
+          (yield* sql`PRAGMA table_info(node_claims_before_fleet)`) as readonly {
+            readonly name: string;
+          }[];
+        const primaryKey = claimColumns
+          .filter((column) => column.pk > 0)
+          .toSorted((left, right) => left.pk - right.pk)
+          .map((column) => column.name);
+        const currentNames = new Set(claimColumns.map((column) => column.name));
+        const currentSchema =
+          primaryKey.join(",") === "repo,issue,task_id" &&
+          [
+            "fleet_id",
+            "attempt",
+            "claim_idempotency_key",
+            "renew_idempotency_key",
+            "renew_lease_until",
+            "release_idempotency_key",
+          ].every((column) => currentNames.has(column));
 
-      if (!currentSchema && claimColumns.length > 0 && backupColumns.length === 0) {
-        yield* sql`ALTER TABLE node_claims RENAME TO node_claims_before_fleet`;
-      }
-      if (!currentSchema && claimColumns.length > 0 && backupColumns.length > 0) {
-        yield* sql`DROP TABLE node_claims`;
-      }
-      yield* sql`
+        if (!currentSchema && claimColumns.length > 0 && backupColumns.length === 0) {
+          yield* sql`ALTER TABLE node_claims RENAME TO node_claims_before_fleet`;
+        }
+        if (!currentSchema && claimColumns.length > 0 && backupColumns.length > 0) {
+          yield* sql`DROP TABLE node_claims`;
+        }
+        yield* sql`
         CREATE TABLE IF NOT EXISTS node_claims (
           fleet_id TEXT NOT NULL DEFAULT 'legacy',
           repo TEXT NOT NULL,
@@ -164,29 +207,30 @@ export const migrate = Effect.gen(function* () {
         )
       `;
 
-      const sourceColumns = (yield* sql`PRAGMA table_info(node_claims_before_fleet)`) as readonly {
-        readonly name: string;
-      }[];
-      if (sourceColumns.length > 0) {
-        const sourceNames = new Set(sourceColumns.map((column) => column.name));
-        const fleetId = sourceNames.has("fleet_id") ? sql`fleet_id` : sql`'legacy'`;
-        const taskId = sourceNames.has("task_id") ? sql`task_id` : sql`'root'`;
-        const attempt = sourceNames.has("attempt") ? sql`attempt` : sql`1`;
-        const claimKey = sourceNames.has("idempotency_key")
-          ? sql`idempotency_key`
-          : sourceNames.has("claim_idempotency_key")
-            ? sql`claim_idempotency_key`
+        const sourceColumns =
+          (yield* sql`PRAGMA table_info(node_claims_before_fleet)`) as readonly {
+            readonly name: string;
+          }[];
+        if (sourceColumns.length > 0) {
+          const sourceNames = new Set(sourceColumns.map((column) => column.name));
+          const fleetId = sourceNames.has("fleet_id") ? sql`fleet_id` : sql`'legacy'`;
+          const taskId = sourceNames.has("task_id") ? sql`task_id` : sql`'root'`;
+          const attempt = sourceNames.has("attempt") ? sql`attempt` : sql`1`;
+          const claimKey = sourceNames.has("idempotency_key")
+            ? sql`idempotency_key`
+            : sourceNames.has("claim_idempotency_key")
+              ? sql`claim_idempotency_key`
+              : sql`NULL`;
+          const renewKey = sourceNames.has("renew_idempotency_key")
+            ? sql`renew_idempotency_key`
             : sql`NULL`;
-        const renewKey = sourceNames.has("renew_idempotency_key")
-          ? sql`renew_idempotency_key`
-          : sql`NULL`;
-        const renewUntil = sourceNames.has("renew_lease_until")
-          ? sql`renew_lease_until`
-          : sql`NULL`;
-        const releaseKey = sourceNames.has("release_idempotency_key")
-          ? sql`release_idempotency_key`
-          : sql`NULL`;
-        yield* sql`
+          const renewUntil = sourceNames.has("renew_lease_until")
+            ? sql`renew_lease_until`
+            : sql`NULL`;
+          const releaseKey = sourceNames.has("release_idempotency_key")
+            ? sql`release_idempotency_key`
+            : sql`NULL`;
+          yield* sql`
           INSERT INTO node_claims (
             fleet_id, repo, issue, task_id, claimed_by, holder_environment, lease_until, executor,
             state, fencing, attempt, claim_idempotency_key, renew_idempotency_key,
@@ -211,17 +255,18 @@ export const migrate = Effect.gen(function* () {
           WHERE rank = 1
           ON CONFLICT(repo, issue, task_id) DO NOTHING
         `;
-        yield* sql`DROP TABLE node_claims_before_fleet`;
-      }
-      yield* sql`
+          yield* sql`DROP TABLE node_claims_before_fleet`;
+        }
+        yield* sql`
         CREATE INDEX IF NOT EXISTS idx_node_claims_holder
         ON node_claims (claimed_by, state)
       `;
-      const migrated = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
-        readonly name: string;
-      }[];
-      if (!migrated.some((column) => column.name === "holder_environment")) {
-        yield* sql`ALTER TABLE node_claims ADD COLUMN holder_environment TEXT`;
+        const migrated = (yield* sql`PRAGMA table_info(node_claims)`) as readonly {
+          readonly name: string;
+        }[];
+        if (!migrated.some((column) => column.name === "holder_environment")) {
+          yield* sql`ALTER TABLE node_claims ADD COLUMN holder_environment TEXT`;
+        }
       }
     }),
   );
