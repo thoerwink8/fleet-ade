@@ -69,14 +69,14 @@ describe("importFailureReason", () => {
 
 describe("importPolicyRefusal", () => {
   it("recovers a managed policy's refusal from the IPC-wrapped message", () => {
-    const denied = managedPolicyDeniedMessage("Example Corp", "importing browser cookies");
+    const denied = managedPolicyDeniedMessage("Example Corp", "导入浏览器 Cookie");
     expect(
       importPolicyRefusal({
         message: `Error invoking remote method 'desktop:preview-import-cookies': BrowserImportPolicyError: ${denied}`,
       }),
     ).toBe(denied);
     const unreadable =
-      "The managed policy at C:\\Program Files\\T3Code\\policy.json could not be read, so importing browser cookies is not allowed.";
+      "无法读取 C:\\Program Files\\T3Code\\policy.json 处的托管策略，因此不允许导入浏览器 Cookie。";
     expect(importPolicyRefusal({ message: `Error: ${unreadable}` })).toBe(unreadable);
   });
 

@@ -68,12 +68,12 @@ function UsageRows({
           <>
             {rows.agents.map((row) => (
               <p key={`agent-${row.name}`} className="text-sm">
-                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} token，花费 ${row.costUsd.toFixed(2)} 美元`}
+                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} 词元，花费 ${row.costUsd.toFixed(2)} 美元`}
               </p>
             ))}
             {rows.models.map((row) => (
               <p key={`model-${row.name}`} className="text-sm">
-                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} token，花费 ${row.costUsd.toFixed(2)} 美元`}
+                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} 词元，花费 ${row.costUsd.toFixed(2)} 美元`}
               </p>
             ))}
           </>

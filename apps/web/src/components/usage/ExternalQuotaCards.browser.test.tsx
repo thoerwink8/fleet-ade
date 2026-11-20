@@ -9,7 +9,7 @@ describe("ExternalQuotaCards", () => {
       <ExternalQuotaCards
         pending={false}
         onRefresh={() => undefined}
-        localLines={["Claude：12万 token"]}
+        localLines={["Claude：12万 词元"]}
         agy={{
           ok: true,
           groups: [
@@ -34,8 +34,8 @@ describe("ExternalQuotaCards", () => {
     await expect.element(screen.getByText(/周额度 剩余 42%/)).toBeVisible();
     await expect.element(screen.getByText(/5 小时额度 剩余 80%/)).toBeVisible();
     await expect.element(screen.getByText("magpie 未运行")).toBeVisible();
-    await expect.element(screen.getByText("omp：调用 2，3万 token，花费 0.50 美元")).toBeVisible();
-    await expect.element(screen.getByText("Claude：12万 token")).toBeVisible();
+    await expect.element(screen.getByText("omp：调用 2，3万 词元，花费 0.50 美元")).toBeVisible();
+    await expect.element(screen.getByText("Claude：12万 词元")).toBeVisible();
   });
   it("turns a stalled read into a failure with retry", async () => {
     const onRefresh = vi.fn();

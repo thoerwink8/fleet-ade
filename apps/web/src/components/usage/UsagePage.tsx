@@ -684,7 +684,7 @@ function UsageOverview({
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <span>
                 <span className={figureClass(loadingPartial)}>
-                  {formatCount(merged.sessions)} sessions
+                  {formatCount(merged.sessions)} 次会话
                 </span>
                 {metric === "cost" && " · API 估算"}
               </span>
@@ -716,9 +716,7 @@ function UsageOverview({
             const totals = merged.providers.find((entry) => entry.provider === provider);
             const share = metric === "cost" ? (totals?.costShare ?? 0) : (totals?.tokenShare ?? 0);
             const providerSessions = totals?.sessions ?? 0;
-            const sessionLabel = `${formatCount(providerSessions)} ${
-              providerSessions === 1 ? "session" : "sessions"
-            }`;
+            const sessionLabel = `${formatCount(providerSessions)} 次会话`;
             const providerLoading = loadingProviders.has(provider);
             const awaitingData = providerLoading && !providersWithData.has(provider);
             return (
@@ -801,7 +799,7 @@ function UsageOverview({
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-1 md:grid-cols-5">
           <Metric
             loading={loadingPartial}
-            label="处理的 token"
+            label="处理的词元"
             value={formatTokens(merged.totalTokens)}
           />
           <Metric
@@ -829,7 +827,7 @@ function UsageOverview({
         >
           {metric === "tokens" ? (
             <UsageShareBar
-              label="按类型统计的 token"
+              label="按类型统计的词元"
               segments={tokenTypeSegments(merged)}
               format={formatTokens}
             />
@@ -1348,7 +1346,7 @@ function UsageSkeleton() {
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-foreground">总计</h2>
         <MetricSkeletons
-          labels={["处理的 token", "缓存的输入", "未缓存的输入", "Output", "缓存节省"]}
+          labels={["处理的词元", "缓存的输入", "未缓存的输入", "输出", "缓存节省"]}
         />
       </section>
 

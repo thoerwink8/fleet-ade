@@ -146,7 +146,7 @@ describe("BrowserImport.checkBrowserImportPolicy", () => {
         "Example Corp 的策略不允许导入浏览器 Cookie。",
       );
       for (const unreadable of ["{ not json", policy({ notALimit: false })]) {
-        assert.include(yield* outcome(unreadable), "could not be read");
+        assert.include(yield* outcome(unreadable), "无法读取");
       }
     }).pipe(Effect.provide(NodeServices.layer)),
   );

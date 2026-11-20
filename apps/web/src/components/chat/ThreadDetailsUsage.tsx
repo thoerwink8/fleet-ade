@@ -114,16 +114,16 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
                 : `${usedTokens} / ${formatContextWindowTokens(maxTokens)}`
               : usedTokens
           }
-          ariaValue={used !== null ? `${used}% used` : `${usedTokens} tokens used`}
+          ariaValue={used !== null ? `已用 ${used}%` : `已用 ${usedTokens} 词元`}
           tooltip={
             <>
               <span className="text-foreground">
-                {used !== null ? `上下文：已用 ${used}%` : `上下文：已用 ${usedTokens} token`}
+                {used !== null ? `上下文：已用 ${used}%` : `上下文：已用 ${usedTokens} 词元`}
               </span>
               {maxTokens !== null ? (
                 <span className="text-muted-foreground">
-                  {usage.usedTokens.toLocaleString("en-US")} of {maxTokens.toLocaleString("en-US")}{" "}
-                  tokens
+                  共 {maxTokens.toLocaleString("en-US")} 词元，已用{" "}
+                  {usage.usedTokens.toLocaleString("en-US")}
                 </span>
               ) : null}
               {threshold !== null && threshold > 0 ? (
