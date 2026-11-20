@@ -37,6 +37,13 @@ const EMPTY_DEVICE_STATE: DeviceServiceState = {
   revision: 0,
 };
 
+export function isDeviceSupportOffered(
+  loaded: boolean,
+  state: Pick<DeviceServiceState, "hostStatus" | "agentAccessEnabled">,
+): boolean {
+  // The local host summary remains in state even while support is off; it must not make Device visible.
+  return !loaded || state.hostStatus !== "disabled" || state.agentAccessEnabled;
+}
 export function useDeviceState(environmentId: EnvironmentId | null): {
   readonly state: DeviceServiceState;
   readonly loaded: boolean;
