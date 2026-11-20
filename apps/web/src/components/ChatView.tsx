@@ -122,7 +122,15 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { orchestrationV2WorktreePending } from "@t3tools/shared/orchestrationV2ThreadError";
 import { resolveThreadReferenceCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomValue, useAtomSet } from "@effect/atom-react";
+import { isDeviceSupportOffered, useDeviceState } from "~/state/device";
+import {
+  dismissedFleetEngineFailureAtom,
+  reconcileFleetEngineFailureDismissal,
+  resolveFleetEngineFailure,
+  shouldShowFleetEngineFailure,
+  useFleetEngineStatus,
+} from "~/state/fleetEngine";
 import { type SetStateAction, use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BackgroundThreadContext } from "./chat/backgroundThread";
 import { WorkspaceMutationIdContext } from "./chat/ChatMarkdownMedia";
@@ -187,7 +195,6 @@ import {
 } from "../previewMiniPlayerStore";
 import { threadPullRequestPanelTarget } from "./pullRequest/pullRequestDetail.logic";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
-import { useDeviceState } from "~/state/device";
 import { BranchToolbar, type BranchToolbarHandle } from "./BranchToolbar";
 import { ComposerContextPermissions } from "./ComposerContextPermissions";
 import { makeWorkspaceFileDropHandlers } from "./chat/workspaceFileDrop";
@@ -1996,6 +2003,26 @@ export default function ChatView(props: ChatViewProps) {
   const { state: deviceState, loaded: deviceStateLoaded } = useDeviceState(
     activeThreadRef?.environmentId ?? null,
   );
+  const fleetEngineHealth = useFleetEngineStatus(environmentId);
+  const fleetEngineFailure = resolveFleetEngineFailure(fleetEngineHealth);
+  const dismissedFleetEngineFailureKind = useAtomValue(
+    dismissedFleetEngineFailureAtom(environmentId),
+  );
+  const dismissFleetEngineFailure = useAtomSet(dismissedFleetEngineFailureAtom(environmentId));
+  const shownFleetEngineFailure = shouldShowFleetEngineFailure(
+    fleetEngineFailure,
+    dismissedFleetEngineFailureKind,
+  )
+    ? fleetEngineFailure
+    : null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a successful poll ends the failure period that its dismissal covers
+  useEffect(() => {
+    const dismissed = reconcileFleetEngineFailureDismissal(
+      fleetEngineHealth,
+      dismissedFleetEngineFailureKind,
+    );
+    if (dismissed !== dismissedFleetEngineFailureKind) dismissFleetEngineFailure(dismissed);
+  }, [dismissedFleetEngineFailureKind, dismissFleetEngineFailure, fleetEngineHealth]);
   // The thread's own change request, placed against the project it belongs to. Without a
   // project there is nothing to resolve it against, so the caller falls back to the browser.
   const activeProjectRepository = sourceControlClients.repositorySelector(
@@ -3373,6 +3400,10 @@ export default function ChatView(props: ChatViewProps) {
             <ThreadFind onClose={focusComposerStable} />
             {isWorkspaceFileDragActive ? <WorkspaceFileDropOverlay /> : null}
             <ChatBannerLane
+              fleetEngineFailure={shownFleetEngineFailure}
+              onDismissFleetEngineFailure={() => {
+                if (fleetEngineFailure !== null) dismissFleetEngineFailure(fleetEngineFailure.kind);
+              }}
               environmentId={activeThread.environmentId}
               providerStatus={visibleProviderStatus}
               providerStatusDismissalKey={providerStatusDismissalKey}
@@ -4016,6 +4047,7 @@ export default function ChatView(props: ChatViewProps) {
           pullRequestAvailable={pullRequestSurfaceAvailable}
           pullRequestsAvailable={pullRequestsSurfaceAvailable}
           deviceAvailable={activeThreadRef !== null}
+          deviceOffered={isDeviceSupportOffered(deviceStateLoaded, deviceState)}
           sideChatAvailable={sideChat.available}
           sideChatDisabledReason={sideChatDisabledReason}
         >

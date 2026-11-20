@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-import { EngineStatusPage } from "../components/engine/EngineStatusPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_chat/engine")({
-  component: EngineStatusPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/", replace: true });
+  },
 });

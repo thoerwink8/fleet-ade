@@ -3,16 +3,9 @@ import { useNavigate, type AnyRouter } from "@tanstack/react-router";
 import { withoutAssistantCitationHash } from "../../lib/assistantCitationNavigation";
 import { resolveThreadRouteTarget, type ThreadRouteTarget } from "../../threadRoutes";
 
-/** Settings, Usage, engine status, pipeline, and channels open as modals over the last main-app view. */
+/** Settings and Usage open as modals over the last main-app view. */
 export function isAppModalPage(pathname: string) {
-  return (
-    pathname === "/settings" ||
-    pathname.startsWith("/settings/") ||
-    pathname === "/usage" ||
-    pathname === "/engine" ||
-    pathname === "/pipeline" ||
-    pathname === "/channels"
-  );
+  return pathname === "/settings" || pathname.startsWith("/settings/") || pathname === "/usage";
 }
 
 export function isSidebarUtilityPage(pathname: string) {

@@ -16,7 +16,7 @@ import {
   PIPELINE_STATUS_BADGE,
   PIPELINE_STATUS_LABEL,
   pipelineRunElementId,
-} from "./PipelinePage.logic";
+} from "./PipelineRunsSection.logic";
 
 function run(patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">): PipelineRun {
   return {
@@ -55,7 +55,7 @@ function run(patch: Partial<PipelineRun> & Pick<PipelineRun, "id" | "status">): 
 const ids = (runs: ReadonlyArray<PipelineRun>) => runs.map((item) => item.id);
 
 describe("groupPipelineRuns", () => {
-  it("keeps a running run with a pull request in both groups, and keeps stuck out of running", () => {
+  it("keeps pre-PR and active runs visible, and keeps stuck out of running", () => {
     const groups = groupPipelineRuns([
       run({ id: 1, status: "session" }),
       run({ id: 2, status: "checks", prNumber: 20 }),
@@ -64,9 +64,7 @@ describe("groupPipelineRuns", () => {
     ]);
 
     expect(ids(groups.running)).toEqual([1, 2]);
-    expect(ids(groups.stuck)).toEqual([3]);
     expect(groups.stuck[0]?.notifyNote).toBe("没送出");
-    expect(ids(groups.recentPullRequests)).toEqual([2, 3, 4]);
   });
 
   it("treats every non-terminal status as running and ignores a missing pull request number", () => {
@@ -126,11 +124,8 @@ describe("pipeline metric labels", () => {
 
   it("shows full details once per run and links duplicates in lower sections", () => {
     expect(pipelineRunElementId(7)).toBe("pipeline-run-7");
-    expect(isPipelineRunLink("needsAction", { status: "stuck" })).toBe(false);
-    expect(isPipelineRunLink("stuck", { status: "stuck" })).toBe(true);
-    expect(isPipelineRunLink("running", { status: "checks" })).toBe(false);
-    expect(isPipelineRunLink("recentPullRequests", { status: "checks" })).toBe(true);
-    expect(isPipelineRunLink("recentPullRequests", { status: "stuck" })).toBe(true);
-    expect(isPipelineRunLink("recentPullRequests", { status: "merged" })).toBe(false);
+    expect(isPipelineRunLink("needsAction")).toBe(false);
+    expect(isPipelineRunLink("stuck")).toBe(true);
+    expect(isPipelineRunLink("running")).toBe(false);
   });
 });

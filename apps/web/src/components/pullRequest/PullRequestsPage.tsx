@@ -73,6 +73,7 @@ import {
   usePullRequestScope,
   type PullRequestsSearch,
 } from "./usePullRequestListView";
+import { PipelineRunsSection } from "./PipelineRunsSection";
 import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
 import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
 import { PullRequestListGhost } from "./PullRequestGhosts";
@@ -1182,6 +1183,7 @@ export function PullRequestsPage() {
     (!querySettled || (showingCarried && listQuery.isPending));
   const listBody = (
     <>
+      <PipelineRunsSection />
       {!capabilityKnown ? (
         <PullRequestListGhost rows={7} caption="正在加载 PR…" />
       ) : !pullRequestsSupported ? (
@@ -1547,6 +1549,7 @@ export function PullRequestsPage() {
             pullRequestAvailable={false}
             pullRequestsAvailable={false}
             deviceAvailable={false}
+            deviceOffered={false}
             pullRequestStatusSeeds={listedPullRequestTabStatuses}
           >
             <PullRequestDetailPanel

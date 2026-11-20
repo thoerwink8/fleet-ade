@@ -201,10 +201,17 @@ export interface CommandPaletteItem {
   readonly matchHint?: SearchMatchHint;
   readonly icon: ReactNode;
   readonly disabled?: boolean;
+  readonly disabledReason?: string;
   readonly titleLeadingContent?: ReactNode;
   readonly titleTrailingContent?: ReactNode;
   readonly shortcutCommand?: KeybindingCommand;
   readonly secondary?: boolean;
+}
+
+export function commandPaletteDisabledReason(
+  item: Pick<CommandPaletteItem, "disabled" | "disabledReason">,
+): string | null {
+  return item.disabled ? (item.disabledReason ?? null) : null;
 }
 
 export interface CommandPaletteActionItem extends CommandPaletteItem {

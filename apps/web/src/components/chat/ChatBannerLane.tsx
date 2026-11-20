@@ -6,6 +6,10 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import type { Dispatch, SetStateAction } from "react";
+import { CircleAlertIcon, XIcon } from "lucide-react";
+import type { FleetEngineFailure } from "../../state/fleetEngine";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
+import { Button } from "../ui/button";
 import {
   dismissProviderStatusBannerForSession,
   ProviderStatusBanner,
@@ -18,6 +22,8 @@ import { dismissThreadErrorBannerForSession, ThreadErrorBanner } from "./ThreadE
  */
 export function ChatBannerLane(props: {
   environmentId: EnvironmentId;
+  fleetEngineFailure: FleetEngineFailure | null;
+  onDismissFleetEngineFailure: () => void;
   providerStatus: ServerProvider | null;
   providerStatusDismissalKey: string | null;
   onOpenProviderSetup: (instanceId: ProviderInstanceId) => void;
@@ -30,6 +36,8 @@ export function ChatBannerLane(props: {
   setThreadErrorBannerDismissTick: Dispatch<SetStateAction<number>>;
 }) {
   const {
+    fleetEngineFailure,
+    onDismissFleetEngineFailure,
     providerStatus,
     providerStatusDismissalKey,
     onOpenProviderSetup,
@@ -43,6 +51,25 @@ export function ChatBannerLane(props: {
   } = props;
   return (
     <div className="chat-banner-lane pointer-events-none absolute top-0 z-30 flex flex-col">
+      {fleetEngineFailure !== null ? (
+        <div className="pointer-events-auto mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
+          <Alert variant="error" role="alert" surface="glass" controlAlignment="first-line">
+            <CircleAlertIcon />
+            <AlertTitle>{fleetEngineFailure.title}</AlertTitle>
+            <AlertDescription>{fleetEngineFailure.description}</AlertDescription>
+            <AlertAction>
+              <Button
+                aria-label="关闭引擎故障提示"
+                onClick={onDismissFleetEngineFailure}
+                size="icon-xs"
+                variant="ghost-muted"
+              >
+                <XIcon />
+              </Button>
+            </AlertAction>
+          </Alert>
+        </div>
+      ) : null}
       <ProviderStatusBanner
         environmentId={props.environmentId}
         status={providerStatus}

@@ -114,6 +114,7 @@ describe("RightPanelTabs", () => {
           pullRequestAvailable={false}
           pullRequestsAvailable={false}
           deviceAvailable={false}
+          deviceOffered
         >
           {null}
         </RightPanelTabs>
@@ -187,6 +188,7 @@ function panel(activeSurface: RightPanelSurface) {
     pullRequestAvailable: true,
     pullRequestsAvailable: true,
     deviceAvailable: true,
+    deviceOffered: true,
     children: (
       <div data-testid="surface-content">
         {/* Stands in for ServerBrowserSurface, whose page canvas handles thumb buttons itself. */}
@@ -286,5 +288,31 @@ describe("device tab rename", () => {
     await userEvent.fill(input, "日本語");
     await userEvent.keyboard("{Enter}");
     expect(onRenameDevice).toHaveBeenCalledExactlyOnceWith(DEVICE_SURFACE.id, "日本語");
+  });
+});
+
+describe("unavailable surface launcher", () => {
+  it("shows why Diff is unavailable when clicked", async () => {
+    const onAddDiff = vi.fn();
+    const props = panel(DIFF_SURFACE).props as RightPanelTabsProps;
+    await using screen = await render(
+      <RightPanelTabs
+        {...props}
+        surfaces={[]}
+        activeSurfaceId={null}
+        diffAvailable={false}
+        onAddDiff={onAddDiff}
+      >
+        {null}
+      </RightPanelTabs>,
+    );
+
+    screen
+      .getByText("差异", { exact: true })
+      .element()
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    await expect.element(screen.getByText("还没有文件改动。")).toBeVisible();
+    expect(onAddDiff).not.toHaveBeenCalled();
   });
 });
