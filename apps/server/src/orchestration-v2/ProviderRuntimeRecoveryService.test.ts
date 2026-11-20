@@ -658,7 +658,9 @@ it.effect.each([
     } else {
       assert.equal(runEvent?.type === "run.updated" ? runEvent.payload.queuePosition : null, 1);
       assert.equal(runEvent?.type === "run.updated" ? runEvent.payload.queueHeld : false, true);
-      assert.isFalse(runEvent?.type === "run.updated" && runEvent.payload.awaitingSlot === true);
+      if (status === "starting") {
+        assert.isUndefined(runEvent?.type === "run.updated" ? runEvent.payload.awaitingSlot : null);
+      }
       assert.isUndefined(attemptEvent);
       assert.isUndefined(nodeEvent);
     }

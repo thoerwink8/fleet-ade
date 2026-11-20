@@ -299,6 +299,7 @@ export function layerWithRegistry<Error>(
   | EffectWorker.OrchestrationEffectWorkerV2
   | EventSink.EventSinkV2
   | ProviderSessionManager.ProviderSessionManagerV2
+  | ProviderRuntimeRecoveryService.ProviderRuntimeRecoveryService
   | CommandOutputRecorder.CommandOutputRecorder
   | ThreadCommandExecutor.ThreadCommandExecutor,
   Error | MigrationError | PlatformError.PlatformError | SqlError
@@ -570,6 +571,11 @@ export function layerWithRegistry<Error>(
     layerProviderSessionManagerProvided,
     layerEffectWorkerProvided,
     layerEventSinkProvided,
+    ProviderRuntimeRecoveryService.layer.pipe(
+      Layer.provide(
+        Layer.mergeAll(layerStores, layerEventSinkProvided, IdAllocator.layer, layerServerSettings),
+      ),
+    ),
     layerContinuationWorkerProvided,
     layerCommandOutputHubProvided,
     ThreadCommandExecutor.layer,

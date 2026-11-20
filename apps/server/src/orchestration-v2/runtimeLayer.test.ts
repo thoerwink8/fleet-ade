@@ -9008,10 +9008,10 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
             {
               status: "queued",
               queueHeld: true,
-              awaitingSlot: false,
               queuePosition: 1,
             },
           );
+          assert.isUndefined(held.runs.find((run) => run.id === source.id)?.awaitingSlot);
         }
         if (!started) {
           const prompt = held.turnItems.find(
@@ -9068,7 +9068,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const resumed = yield* orchestrator.getThreadProjection(threadId);
         assert.equal(resumed.runs.find((run) => run.id === second.id)?.status, "starting");
         if (!started)
-          assert.isFalse(resumed.runs.find((run) => run.id === source.id)?.awaitingSlot);
+          assert.isUndefined(resumed.runs.find((run) => run.id === source.id)?.awaitingSlot);
         assert.equal(resumed.runs.find((run) => run.id === first.id)?.status, "queued");
         assert.isFalse(resumed.runs.some((run) => run.status === "queued" && run.queueHeld));
         assert.equal(

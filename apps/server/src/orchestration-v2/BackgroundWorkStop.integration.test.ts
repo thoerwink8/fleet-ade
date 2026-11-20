@@ -28,6 +28,7 @@ import * as EffectWorker from "./EffectWorker.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
+import * as ProviderRuntimeRecoveryService from "./ProviderRuntimeRecoveryService.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 import { checkpointWorkspace } from "@t3tools/provider-testing/replayWorkspace";
@@ -1125,8 +1126,39 @@ it.effect("starts a concurrency-blocked run after the first session releases its
       const blocked = (yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!;
       assert.equal(blocked.status, "starting");
       assert.isTrue(blocked.awaitingSlot);
-      if (Option.isSome(first))
-        yield* outbox.succeed({ effectId: first.value.id, workerId: "slot-test" });
+      const recovery = yield* ProviderRuntimeRecoveryService.ProviderRuntimeRecoveryService;
+      yield* recovery.reconcile("startup");
+      const held = (yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!;
+      assert.equal(held.status, "queued");
+      assert.isTrue(held.queueHeld);
+      assert.isUndefined(held.awaitingSlot);
+      if (Option.isSome(first)) {
+        assert.equal(
+          (yield* outbox.get(first.value.id)).pipe(Option.getOrThrow).status,
+          "cancelled",
+        );
+      }
+      yield* outbox.enqueue([
+        {
+          id: "slot-recovered-occupant",
+          commandId: CommandId.make("slot-recovered-occupant"),
+          threadId: threads[0]!,
+          request: { type: "provider-turn.start", runId: blocked.id },
+        },
+      ]);
+      const occupant = yield* outbox.claimNext({ workerId: "slot-test", maxConcurrentSessions: 1 });
+      assert.isTrue(Option.isSome(occupant));
+      yield* orchestrator.dispatch({
+        type: "queue.resume",
+        commandId: CommandId.make("slot-b-resume"),
+        threadId: threads[1]!,
+      });
+      yield* worker.runOnce({ maxConcurrentSessions: 1 });
+      const remarked = (yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!;
+      assert.equal(remarked.status, "starting");
+      assert.isTrue(remarked.awaitingSlot);
+      if (Option.isSome(occupant))
+        yield* outbox.succeed({ effectId: occupant.value.id, workerId: "slot-test" });
       yield* worker.drain();
       const turn = yield* Queue.take(started);
       assert.equal(turn.providerThread.appThreadId, threads[1]);
