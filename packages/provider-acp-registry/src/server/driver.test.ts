@@ -492,7 +492,7 @@ describe("acpRegistrySnapshotReadiness", () => {
         status: "ready",
         version: "1.0.0",
         auth: { status: "unknown" },
-        message: "Checking ACP authentication, models, and commands in the background...",
+        message: "正在后台检查 ACP 认证、模型和命令…",
       });
     }),
   );
