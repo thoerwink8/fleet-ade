@@ -18,14 +18,10 @@ export function useCommitOnBlur(
       valueOnFocus.current = value;
       setDraft(value);
     },
-    onBlur: (event: React.FocusEvent<HTMLInputElement>) => {
+    onBlur: () => {
       const next = draft ?? value;
       setDraft(null);
-      if (
-        !event.currentTarget.validity.badInput &&
-        next !== valueOnFocus.current &&
-        next !== value
-      ) {
+      if (next !== valueOnFocus.current && next !== value) {
         onCommit(next);
       }
     },

@@ -86,6 +86,7 @@ import {
   getChangedTypographySettingLabels,
   hasChangedBackgroundActivitySettings,
   isProjectGroupingEnabled,
+  parseSessionLimitDraft,
   projectGroupingModeFromToggle,
   readLastEnabledProjectGroupingMode,
   rememberEnabledProjectGroupingMode,
@@ -1742,21 +1743,15 @@ export function ThreadsSettingsPanel() {
           control={
             <DraftInput
               size="sm"
-              type="number"
-              min={1}
-              step={1}
+              type="text"
+              inputMode="numeric"
               className="w-full sm:w-24"
               value={mixedMaxConcurrentSessions ? "" : String(settings.maxConcurrentSessions ?? "")}
               placeholder={mixedMaxConcurrentSessions ? "各不相同" : "不限制"}
               aria-label="同时运行的会话上限"
               onCommit={(value) => {
-                if (value.trim() === "") updateSettings({ maxConcurrentSessions: null });
-                else {
-                  const parsed = Number(value);
-                  if (Number.isSafeInteger(parsed) && parsed >= 1) {
-                    updateSettings({ maxConcurrentSessions: parsed });
-                  }
-                }
+                const parsed = parseSessionLimitDraft(value);
+                if (parsed !== undefined) updateSettings({ maxConcurrentSessions: parsed });
               }}
             />
           }

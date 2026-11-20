@@ -4,6 +4,7 @@ import { userEvent } from "vite-plus/test/browser";
 import { resolvePastedPath } from "@t3tools/shared/path";
 
 import { render } from "../../test/render";
+import { parseSessionLimitDraft } from "../components/settings/SettingsPanels.logic";
 import { DraftInput } from "../components/ui/draft-input";
 
 describe("settings draft commits", () => {
@@ -60,24 +61,72 @@ describe("settings draft commits", () => {
     expect(saved).toBe("/tmp/a\\ b");
   });
 
-  it("does not clear a saved number when the browser reports bad input", async () => {
-    let saved = "2";
+  it.each(["abc", "e", "0", "-2", "1.5"])(
+    "keeps a saved session limit when %s is typed",
+    async (invalidDraft) => {
+      let saved: number | null = 2;
+      await using screen = await render(
+        <DraftInput
+          type="text"
+          inputMode="numeric"
+          value={String(saved)}
+          onCommit={(next) => {
+            const parsed = parseSessionLimitDraft(next);
+            if (parsed !== undefined) saved = parsed;
+          }}
+        />,
+      );
+      const input = screen.getByRole("textbox");
+      await userEvent.clear(input);
+      await userEvent.type(input, invalidDraft);
+      await userEvent.tab();
+
+      expect(saved).toBe(2);
+      await expect.element(input).toHaveValue("2");
+    },
+  );
+
+  it("keeps a saved session limit when abc replaces the selected value", async () => {
+    let saved: number | null = 2;
     await using screen = await render(
       <DraftInput
-        type="number"
-        value={saved}
+        type="text"
+        inputMode="numeric"
+        value={String(saved)}
         onCommit={(next) => {
-          saved = next;
+          const parsed = parseSessionLimitDraft(next);
+          if (parsed !== undefined) saved = parsed;
         }}
       />,
     );
-    const input = screen.getByRole("spinbutton");
+    const input = screen.getByRole("textbox");
     await input.click();
-    await userEvent.clear(input);
-    await userEvent.type(input, "e");
-    expect((input.element() as HTMLInputElement).validity.badInput).toBe(true);
+    await userEvent.keyboard("{Control>}a{/Control}");
+    await userEvent.type(input, "abc");
     await userEvent.tab();
-    expect(saved).toBe("2");
-    await expect.element(input).toHaveValue(2);
+    expect(saved).toBe(2);
+    await expect.element(input).toHaveValue("2");
+  });
+
+  it.each([
+    ["", null],
+    ["3", 3],
+  ] as const)("commits session limit %s as %s", async (draft, expected) => {
+    let saved: number | null = 2;
+    await using screen = await render(
+      <DraftInput
+        type="text"
+        inputMode="numeric"
+        value={String(saved)}
+        onCommit={(next) => {
+          const parsed = parseSessionLimitDraft(next);
+          if (parsed !== undefined) saved = parsed;
+        }}
+      />,
+    );
+    const input = screen.getByRole("textbox");
+    await input.fill(draft);
+    await userEvent.tab();
+    expect(saved).toBe(expected);
   });
 });
