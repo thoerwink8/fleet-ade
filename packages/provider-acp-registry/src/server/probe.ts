@@ -29,6 +29,7 @@ import * as AcpRegistrySupport from "./AcpRegistrySupport.ts";
 import {
   findModelConfigOption,
   parseSessionModeState,
+  sessionModelStateFromInitialize,
 } from "@t3tools/provider-acp/server/runtimeModel";
 import {
   acpProviderOptionDescriptors,
@@ -256,14 +257,17 @@ export function normalizeAcpRegistryCommands(
 
 export function acpRegistryProbeResult(
   instanceId: ProviderInstanceId,
-  started: AcpSessionRuntime.AcpSessionRuntimeStartResult,
+  started: {
+    readonly initializeResult: EffectAcpSchema.InitializeResponse;
+    readonly sessionSetupResult?: AcpSessionRuntime.AcpSessionRuntimeStartResult["sessionSetupResult"];
+  },
   icon: string | null = null,
   spawn?: AcpRegistryAuthSpawnContext,
 ): AcpRegistryProbeResult {
   const liveConfiguration = normalizeAcpRegistryLiveConfiguration(
-    started.sessionSetupResult.configOptions ?? [],
-    parseSessionModeState(started.sessionSetupResult),
-    started.sessionSetupResult.models,
+    started.sessionSetupResult?.configOptions ?? [],
+    started.sessionSetupResult ? parseSessionModeState(started.sessionSetupResult) : undefined,
+    started.sessionSetupResult?.models ?? sessionModelStateFromInitialize(started.initializeResult),
   );
   return AcpRegistryProbeResult.make({
     instanceId,
@@ -286,6 +290,7 @@ export function acpRegistryProbeFailure(
   error: EffectAcpErrors.AcpError,
   authMethods: ReadonlyArray<AcpRegistryProbeAuthMethod> = [],
   authAction?: AcpRegistryUrlAuthAction,
+  stage: "initialize" | "session" = "initialize",
 ): AcpRegistryOperationError {
   const detail = error._tag === "AcpTransportError" && error.detail ? error.detail : error.message;
   const authenticationFailed =
@@ -295,7 +300,9 @@ export function acpRegistryProbeFailure(
     reason: authenticationFailed ? "authentication_failed" : "probe_failed",
     message: authenticationFailed
       ? "The ACP agent could not complete authentication."
-      : "The ACP agent could not create a test session.",
+      : stage === "session"
+        ? "The ACP agent could not create a test session."
+        : "The ACP agent could not initialize.",
     cause: error,
     ...(authMethods.length > 0 ? { authMethods } : {}),
     ...(authAction === undefined ? {} : { authAction }),
@@ -384,6 +391,25 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
       const runtime = yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(
         Effect.provide(runtimeContext),
       );
+      const initializeResult = yield* Effect.result(runtime.initialize());
+      if (Result.isFailure(initializeResult)) {
+        return yield* acpRegistryProbeFailure(
+          initializeResult.failure,
+          yield* Ref.get(authMethodsRef),
+        );
+      }
+      const initialized = initializeResult.success;
+      // Agents that persist sessions (omp, OpenCode) would keep one empty session per probe,
+      // so the disposable session/new probe only runs when the agent advertises session/delete
+      // and the finalizer below can remove it again.
+      if (initialized.agentCapabilities?.sessionCapabilities?.delete == null) {
+        return {
+          resolved,
+          initializeResult: initialized,
+          started: undefined,
+          commands: emptyAcpRegistryAvailableCommands(),
+        };
+      }
       const commandsRef = yield* Ref.make<AcpRegistryAvailableCommands>(
         emptyAcpRegistryAvailableCommands(),
       );
@@ -432,11 +458,12 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
           startResult.failure,
           yield* Ref.get(authMethodsRef),
           yield* Ref.get(authActionRef),
+          "session",
         );
       }
       const started = startResult.success;
-      // Agents that persist sessions (OpenCode) would otherwise keep one empty session per probe.
-      // The runtime only sends session/delete when the agent advertises it.
+      // The runtime only sends session/delete when the agent advertises it, which is the
+      // precondition checked above.
       yield* Effect.addFinalizer(() =>
         runtime
           .deleteSession(started.sessionId)
@@ -445,7 +472,12 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
       yield* Deferred.await(commandsAdvertised).pipe(
         Effect.timeoutOption(COMMAND_ADVERTISEMENT_GRACE),
       );
-      return { resolved, started, commands: yield* Ref.get(commandsRef) };
+      return {
+        resolved,
+        initializeResult: initialized,
+        started,
+        commands: yield* Ref.get(commandsRef),
+      };
     }).pipe(
       Effect.scoped,
       Effect.timeoutOrElse({
@@ -454,7 +486,7 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "probe_failed",
-              message: `The ACP agent did not resolve and create a test session within ${probeTimeoutMs / 1_000} seconds. Package installation or agent startup may be slow; this check retries on the next provider refresh.`,
+              message: `The ACP agent did not resolve and finish its probe within ${probeTimeoutMs / 1_000} seconds. Package installation or agent startup may be slow; this check retries on the next provider refresh.`,
             }),
           ),
       }),
@@ -465,7 +497,7 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
     return {
       probe: acpRegistryProbeResult(
         input.instanceId,
-        result.started,
+        result.started ?? { initializeResult: result.initializeResult },
         result.resolved.agent?.icon ?? null,
         {
           command: result.resolved.spawn.command,

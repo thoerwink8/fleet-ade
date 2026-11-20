@@ -13,7 +13,6 @@ import * as FileSystem from "effect/FileSystem";
 import * as Schema from "effect/Schema";
 import * as EffectAcpErrors from "effect-acp/errors";
 
-import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
 import {
   acpRegistryProbeFailure,
   acpRegistryProbeResult,
@@ -33,7 +32,6 @@ const decodeSettings = Schema.decodeSync(AcpRegistrySettings);
 describe("ACP Registry probe", () => {
   it("returns advertised auth methods and de-duplicated models", () => {
     const result = acpRegistryProbeResult(instanceId, {
-      sessionId: "probe-session",
       initializeResult: {
         protocolVersion: 1,
         agentCapabilities: {
@@ -84,8 +82,7 @@ describe("ACP Registry probe", () => {
           },
         ],
       },
-      modelConfigId: "model",
-    } satisfies AcpSessionRuntime.AcpSessionRuntimeStartResult);
+    });
 
     expect(result).toEqual({
       instanceId,
@@ -176,7 +173,6 @@ describe("ACP Registry probe", () => {
 
   it("omits overlong opaque model ids instead of publishing mutated ids", () => {
     const result = acpRegistryProbeResult(instanceId, {
-      sessionId: "probe-session",
       initializeResult: { protocolVersion: 1 },
       sessionSetupResult: {
         sessionId: "probe-session",
@@ -194,8 +190,7 @@ describe("ACP Registry probe", () => {
           },
         ],
       },
-      modelConfigId: "model",
-    } satisfies AcpSessionRuntime.AcpSessionRuntimeStartResult);
+    });
 
     expect(result.models).toEqual([{ id: "valid", name: "Valid", description: null }]);
     expect(result.currentModelId).toBeNull();
@@ -205,7 +200,6 @@ describe("ACP Registry probe", () => {
     const codexModel = '["codex","gpt-6.1-sol"]';
     const goModel = '["opencode-go","deepseek-v4.1-flash"]';
     const result = acpRegistryProbeResult(instanceId, {
-      sessionId: "probe-session",
       initializeResult: { protocolVersion: 1 },
       sessionSetupResult: {
         sessionId: "probe-session",
@@ -248,8 +242,7 @@ describe("ACP Registry probe", () => {
           },
         ],
       },
-      modelConfigId: "model",
-    } satisfies AcpSessionRuntime.AcpSessionRuntimeStartResult);
+    });
 
     expect(result.models).toEqual([
       { id: codexModel, name: "GPT-6.1 Sol", description: null },
@@ -279,7 +272,6 @@ describe("ACP Registry probe", () => {
         name: `Model ${index}`,
       }));
       const result = acpRegistryProbeResult(instanceId, {
-        sessionId: "probe-session",
         initializeResult: { protocolVersion: 1 },
         sessionSetupResult: {
           sessionId: "probe-session",
@@ -298,8 +290,7 @@ describe("ACP Registry probe", () => {
               }
             : { models: { currentModelId: "model-256", availableModels: models } }),
         },
-        modelConfigId: source === "config option" ? "model" : undefined,
-      } satisfies AcpSessionRuntime.AcpSessionRuntimeStartResult);
+      });
 
       expect(result.models).toHaveLength(256);
       expect(result.models[0]?.id).toBe("model-0");
@@ -413,8 +404,79 @@ describe("ACP Registry probe", () => {
     );
   });
 
+  it.live.each([true, false])(
+    "does not create persistent sessions without delete support (initialize models: %s)",
+    (hasInitializeModels) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "acp-probe-initialize-" });
+        const requestLogPath = NodePath.join(directory, "requests.ndjson");
+        const catalog = AcpRegistrySupport.AcpRegistryCatalog.of({
+          search: () => Effect.die("unused search"),
+          prepare: () => Effect.die("unused prepare"),
+          inspect: () => Effect.die("unused inspect"),
+          uninstallManagedBinary: () => Effect.die("unused uninstall"),
+          resolve: () =>
+            Effect.succeed({
+              agent: {
+                id: "mock-agent",
+                name: "Mock Agent",
+                version: "1.0.0",
+                description: "ACP initialize probe test agent",
+                distribution: { npx: { package: "mock-agent@1.0.0" } },
+              },
+              distribution: "npx" as const,
+              spawn: {
+                command: "node",
+                args: [mockAgentPath],
+                env: {
+                  ...process.env,
+                  T3_ACP_AUTH_METHOD_ID: "mock-login",
+                  T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+                  ...(hasInitializeModels ? {} : { T3_ACP_OMIT_INITIALIZE_MODEL_STATE: "1" }),
+                },
+              },
+            }),
+        });
+        const input = {
+          instanceId,
+          settings: decodeSettings({ agentId: "mock-agent" }),
+          cwd: process.cwd(),
+          environment: process.env,
+        };
+        const results = [];
+        for (let i = 0; i < 2; i++) {
+          results.push(
+            yield* probeAcpRegistryConfiguration(input).pipe(
+              Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog),
+            ),
+          );
+        }
+        const requests = (yield* fs.readFileString(requestLogPath))
+          .split("\n")
+          .filter((line) => line.length > 0)
+          .map((line) => JSON.parse(line));
+        expect(requests.filter((request) => request.method === "session/new")).toEqual([]);
+        expect(requests.filter((request) => request.method === "initialize")).toHaveLength(2);
+        expect(requests.filter((request) => request.method === "session/delete")).toEqual([]);
+        for (const result of results) {
+          expect(result.probe.ready).toBe(true);
+          expect(result.probe.sessionManagement.canDelete).toBe(false);
+          expect(result.probe.authMethods).toEqual(
+            expect.arrayContaining([expect.objectContaining({ id: "mock-login" })]),
+          );
+          if (hasInitializeModels) {
+            expect(result.probe.currentModelId).toBe("grok-4.6");
+            expect(result.probe.models).toEqual(
+              expect.arrayContaining([expect.objectContaining({ id: "grok-4.6" })]),
+            );
+          }
+        }
+      }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  );
+
   it.live.each(["succeeds", "fails"] as const)(
-    "deletes its health-probe session when deletion is advertised and %s",
+    "probes session/new, models, and commands when deletion is advertised (delete %s)",
     (deleteOutcome) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -441,6 +503,8 @@ describe("ACP Registry probe", () => {
                 env: {
                   ...process.env,
                   T3_ACP_V2_MANAGEMENT: "1",
+                  T3_ACP_OMIT_INITIALIZE_MODEL_STATE: "1",
+                  T3_ACP_AVAILABLE_COMMANDS: "compact,$workspace-skill",
                   T3_ACP_REQUEST_LOG_PATH: requestLogPath,
                   ...(deleteOutcome === "fails" ? { T3_ACP_FAIL_DELETE_SESSION: "1" } : {}),
                 },
@@ -457,10 +521,23 @@ describe("ACP Registry probe", () => {
         expect(result.probe.ready).toBe(true);
         expect(result.probe.sessionManagement.canDelete).toBe(true);
 
+        // Models and commands are read from the disposable probe session.
+        expect(result.probe.currentModelId).toBe("default");
+        expect(result.probe.models).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: "composer-2" }),
+            expect.objectContaining({ id: "gpt-5.3-codex[reasoning=medium,fast=false]" }),
+          ]),
+        );
+        expect(result.slashCommands).toEqual([expect.objectContaining({ name: "compact" })]);
+        expect(result.skills).toEqual([expect.objectContaining({ name: "workspace-skill" })]);
+
         const requests = (yield* fs.readFileString(requestLogPath))
           .split("\n")
           .filter((line) => line.length > 0)
           .map((line) => JSON.parse(line));
+        expect(requests.filter((request) => request.method === "initialize")).toHaveLength(1);
+        expect(requests.filter((request) => request.method === "session/new")).toHaveLength(1);
         expect(requests.filter((request) => request.method === "session/delete")).toEqual([
           expect.objectContaining({ params: { sessionId: "mock-session-1" } }),
         ]);
@@ -501,7 +578,7 @@ describe("ACP Registry probe", () => {
     });
     const genericFailure = acpRegistryProbeFailure(genericCause);
     expect(genericFailure.reason).toBe("probe_failed");
-    expect(genericFailure.message).toBe("The ACP agent could not create a test session.");
+    expect(genericFailure.message).toBe("The ACP agent could not initialize.");
     expect(genericFailure.cause).toBe(genericCause);
     expect(
       acpRegistryProbeFailure(
