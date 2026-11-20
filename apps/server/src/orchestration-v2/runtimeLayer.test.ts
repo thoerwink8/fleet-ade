@@ -34,6 +34,7 @@ import {
   ProviderSessionId,
   ProviderThreadId,
   ProviderTurnId,
+  RunAttemptId,
   RunId,
   ScheduledTaskId,
   ThreadId,
@@ -1134,6 +1135,28 @@ it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
         awaiting: true,
       });
       assert.isFalse((yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!.awaitingSlot);
+      yield* outbox.enqueue([
+        {
+          id: "slot-second-restart",
+          commandId: CommandId.make("slot-second-restart"),
+          threadId: threads[1]!,
+          request: {
+            type: "provider-turn.restart",
+            runId: blocked.id,
+            providerSessionId: ProviderSessionId.make("slot-session"),
+            providerThreadId: ProviderThreadId.make("slot-provider-thread"),
+            providerTurnId: ProviderTurnId.make("slot-provider-turn"),
+            interruptedAttemptId: RunAttemptId.make("slot-attempt"),
+          },
+        },
+      ]);
+      yield* worker.runOnce({ maxConcurrentSessions: 1 });
+      assert.isTrue((yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!.awaitingSlot);
+      yield* outbox.cancelUnsettled({
+        threadId: threads[1]!,
+        effectTypes: ["provider-turn.restart"],
+        reason: "test cleanup",
+      });
       if (Option.isSome(claimed)) {
         yield* outbox.succeed({ effectId: claimed.value.id, workerId: "slot-test" });
       }

@@ -18,10 +18,12 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
+import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EffectWorker from "./EffectWorker.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
@@ -1025,6 +1027,121 @@ const stopEarlierBackgroundWork = ({
       ),
     );
   });
+
+it.effect("starts a concurrency-blocked run after the first session releases its slot", () =>
+  Effect.gen(function* () {
+    const cwd = yield* checkpointWorkspace("concurrent-slot");
+    const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
+    const started = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2TurnInput>();
+    const adapter: ProviderAdapter.ProviderAdapterV2["Service"] = {
+      instanceId,
+      driver,
+      getCapabilities: () => Effect.succeed(CodexProviderCapabilitiesV2),
+      planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" }),
+      openSession: (input) =>
+        Effect.gen(function* () {
+          const now = yield* DateTime.now;
+          return {
+            instanceId,
+            driver,
+            providerSessionId: input.providerSessionId,
+            providerSession: {
+              id: input.providerSessionId,
+              driver,
+              providerInstanceId: instanceId,
+              status: "ready",
+              cwd,
+              model: modelSelection.model,
+              capabilities: CodexProviderCapabilitiesV2,
+              createdAt: now,
+              updatedAt: now,
+              lastError: null,
+            },
+            events: Stream.fromQueue(events),
+            ensureThread: ({ threadId }) =>
+              Effect.succeed({
+                id: ProviderThreadId.make(`provider-thread:codex:${threadId}`),
+                driver,
+                providerInstanceId: instanceId,
+                providerSessionId: input.providerSessionId,
+                appThreadId: threadId,
+                ownerNodeId: null,
+                nativeThreadRef: { driver, nativeId: `native:${threadId}`, strength: "strong" },
+                nativeConversationHeadRef: null,
+                status: "idle",
+                firstRunOrdinal: null,
+                lastRunOrdinal: null,
+                handoffIds: [],
+                forkedFrom: null,
+                createdAt: now,
+                updatedAt: now,
+              }),
+            resumeThread: ({ providerThread }) => Effect.succeed(providerThread),
+            startTurn: (turn) => Queue.offer(started, turn).pipe(Effect.asVoid),
+            steerTurn: () => Effect.die("unused"),
+            interruptTurn: () => Effect.die("unused"),
+            respondToRuntimeRequest: () => Effect.die("unused"),
+            readThreadSnapshot: () => Effect.die("unused"),
+            rollbackThread: () => Effect.die("unused"),
+            forkThread: () => Effect.die("unused"),
+          };
+        }),
+    };
+    yield* Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const threads = [ThreadId.make("slot-a"), ThreadId.make("slot-b")];
+      for (const threadId of threads) {
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          commandId: CommandId.make(`${threadId}-create`),
+          threadId,
+          projectId: ProjectId.make("project:concurrent-slot"),
+          title: "Slot",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: cwd,
+          createdBy: "user",
+          creationSource: "web",
+        });
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make(`${threadId}-message`),
+          threadId,
+          messageId: MessageId.make(`${threadId}-message`),
+          text: "Start",
+          attachments: [],
+          dispatchMode: { type: "start_immediately" },
+          createdBy: "user",
+          creationSource: "web",
+        });
+      }
+      const first = yield* outbox.claimNext({ workerId: "slot-test", maxConcurrentSessions: 1 });
+      assert.isTrue(Option.isSome(first));
+      yield* worker.runOnce({ maxConcurrentSessions: 1 });
+      const blocked = (yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!;
+      assert.equal(blocked.status, "starting");
+      assert.isTrue(blocked.awaitingSlot);
+      if (Option.isSome(first))
+        yield* outbox.succeed({ effectId: first.value.id, workerId: "slot-test" });
+      yield* worker.drain();
+      const turn = yield* Queue.take(started);
+      assert.equal(turn.providerThread.appThreadId, threads[1]);
+      assert.isFalse((yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!.awaitingSlot);
+    }).pipe(
+      Effect.provide(
+        ProviderReplayHarness.layerWithRegistry(
+          { name: "concurrent-slot" },
+          ProviderAdapterRegistry.layerSingle(adapter),
+          { runEffectWorker: false, settingsOverrides: { maxConcurrentSessions: 1 } },
+        ),
+      ),
+    );
+  }),
+);
 
 it.effect("Stop reaches background work an earlier provider thread still runs", () =>
   stopEarlierBackgroundWork({}),
