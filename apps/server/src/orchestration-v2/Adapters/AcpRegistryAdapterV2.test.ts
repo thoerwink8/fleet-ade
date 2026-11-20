@@ -1084,7 +1084,6 @@ describe("AcpRegistryAdapterV2", () => {
       Effect.gen(function* () {
         const setup = { sessionId: "agent-session", configOptions: modelOptions };
         const catalog = acpRegistryProbeResult(ProviderInstanceId.make("acp-registry-mode-pick"), {
-          sessionId: setup.sessionId,
           initializeResult: { protocolVersion: 1 },
           sessionSetupResult: {
             ...setup,
@@ -1098,7 +1097,6 @@ describe("AcpRegistryAdapterV2", () => {
                 : option,
             ),
           },
-          modelConfigId: "provider",
         });
         assert.deepEqual(catalog.models, [
           { id: "gateway", name: "Gateway", description: null },

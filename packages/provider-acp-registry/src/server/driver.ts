@@ -383,7 +383,7 @@ export function buildCheckedAcpRegistrySnapshot(
     status: probeFailed ? "warning" : readiness.status,
     auth: input.probe
       ? {
-          // Discovery sessions and an empty auth-method list do not prove sign-in.
+          // Initialize advertises authentication methods but does not prove sign-in.
           status: "unknown",
           canLogout: input.probe.probe.sessionManagement.canLogout,
         }
@@ -489,7 +489,7 @@ export const checkAcpRegistryProviderReadiness = Effect.fn(
   return inspected._tag === "Success" && inspected.success.status === "ready"
     ? {
         ...snapshot,
-        message: "正在后台检查 ACP 认证、模型和命令…",
+        message: "正在后台初始化 ACP 智能体…",
       }
     : snapshot;
 });

@@ -107,7 +107,7 @@ describe("acpRegistrySnapshotReadiness", () => {
     });
   });
 
-  it("keeps authentication unknown when an agent permits a discovery session before sign-in", () => {
+  it("keeps authentication unknown when initialize advertises auth methods", () => {
     const snapshot = buildCheckedAcpRegistrySnapshot({
       ...identity,
       settings: decodeSettings({ agentId: "test-agent" }),
@@ -417,7 +417,7 @@ describe("acpRegistrySnapshotReadiness", () => {
     },
   );
 
-  it.effect("runs the disposable probe only after local inspection is ready", () =>
+  it.effect("runs the initialize probe only after local inspection is ready", () =>
     Effect.gen(function* () {
       const settings = decodeSettings({ agentId: "test-agent" });
       const environment = { PATH: "/provider/bin" };
@@ -492,7 +492,7 @@ describe("acpRegistrySnapshotReadiness", () => {
         status: "ready",
         version: "1.0.0",
         auth: { status: "unknown" },
-        message: "正在后台检查 ACP 认证、模型和命令…",
+        message: "正在后台初始化 ACP 智能体…",
       });
     }),
   );
@@ -587,11 +587,15 @@ it.layer(driverLayer, { excludeTestServices: true })("AcpRegistryDriver", (it) =
           Stream.runHead,
         );
 
-      const probed = yield* waitForModels(["old-model"]).pipe(
+      // A probe only initializes, so without a live session the snapshot keeps
+      // the placeholder model.
+      yield* instance.snapshot.refresh;
+      expect((yield* instance.snapshot.getSnapshot).models.map((model) => model.slug)).toEqual([
+        "default",
+      ]);
+      const reported = yield* waitForModels(["old-model"]).pipe(
         Effect.forkScoped({ startImmediately: true }),
       );
-      yield* instance.snapshot.refresh;
-      yield* Fiber.join(probed);
       yield* coordinator.publishLiveConfiguration(
         identity.instanceId,
         normalizeAcpRegistryLiveConfiguration([], undefined, {
@@ -599,14 +603,15 @@ it.layer(driverLayer, { excludeTestServices: true })("AcpRegistryDriver", (it) =
           availableModels: [{ modelId: "old-model", name: "old-model" }],
         }),
       );
-      yield* fileSystem.writeFileString(modelsPath, JSON.stringify(["old-model", "new-model"]));
+      yield* Fiber.join(reported);
 
-      const refreshed = yield* waitForModels(["old-model", "new-model"]).pipe(
-        Effect.forkScoped({ startImmediately: true }),
-      );
+      // Clearing drops the cached live models without publishing, so the next
+      // refresh rebuilds the snapshot from the model-less probe.
       yield* instance.invalidateCaches ?? Effect.void;
       yield* instance.snapshot.refresh;
-      expect(Option.isSome(yield* Fiber.join(refreshed))).toBe(true);
+      expect((yield* instance.snapshot.getSnapshot).models.map((model) => model.slug)).toEqual([
+        "default",
+      ]);
     }),
   );
 
@@ -679,9 +684,9 @@ it.layer(driverLayer, { excludeTestServices: true })("AcpRegistryDriver", (it) =
           },
         );
 
-      const probed = yield* waitFor("model-a:,model-b:").pipe(
-        Effect.forkScoped({ startImmediately: true }),
-      );
+      // A probe only initializes, so models arrive with the live session and
+      // stay across a refresh.
+      const probed = yield* waitFor("default:").pipe(Effect.forkScoped({ startImmediately: true }));
       yield* instance.snapshot.refresh;
       yield* Fiber.join(probed);
       const learned = yield* waitFor("model-a:effort,model-b:effort").pipe(

@@ -8,6 +8,7 @@ import * as Deferred from "effect/Deferred";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
@@ -150,7 +151,13 @@ const make = Effect.gen(function* () {
           Stream.runHead,
           Effect.as(Option.none()),
         );
-        return yield* Effect.raceFirst(effect.pipe(Effect.asSome), foregroundStarted);
+        // The probe's child runtime keeps fibers alive until its scope closes, and
+        // closing that scope waits for the child to exit. The probe only needs the
+        // initialize result, so return it and let the scope close in the background.
+        return yield* Effect.raceFirst(effect.pipe(Effect.asSome), foregroundStarted).pipe(
+          Effect.forkDetach,
+          Effect.flatMap(Fiber.join),
+        );
       }),
     );
 

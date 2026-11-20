@@ -13,7 +13,6 @@ import {
 } from "@t3tools/contracts";
 import { AcpRegistrySettings } from "../settings.ts";
 import * as SecureRandom from "effect/crypto/SecureRandom";
-import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -29,6 +28,7 @@ import * as AcpRegistrySupport from "./AcpRegistrySupport.ts";
 import {
   findModelConfigOption,
   parseSessionModeState,
+  sessionModelStateFromInitialize,
 } from "@t3tools/provider-acp/server/runtimeModel";
 import {
   acpProviderOptionDescriptors,
@@ -44,8 +44,6 @@ const MAX_NAME_LENGTH = 160;
 const MAX_DESCRIPTION_LENGTH = 1_024;
 const MAX_COMMAND_LINE_LENGTH = 2_048;
 const PROBE_TIMEOUT_MS = 60_000;
-const COMMAND_ADVERTISEMENT_GRACE = "500 millis";
-const PROBE_SESSION_DELETE_TIMEOUT = "5 seconds";
 
 const boundedText = (value: string, maximumLength: number): string =>
   value.trim().slice(0, maximumLength);
@@ -214,11 +212,6 @@ export function normalizeAcpRegistryLiveConfiguration(
   };
 }
 
-const emptyAcpRegistryAvailableCommands = (): AcpRegistryAvailableCommands => ({
-  slashCommands: [],
-  skills: [],
-});
-
 export function normalizeAcpRegistryCommands(
   commands: ReadonlyArray<EffectAcpSchema.AvailableCommand>,
 ): AcpRegistryAvailableCommands {
@@ -256,14 +249,17 @@ export function normalizeAcpRegistryCommands(
 
 export function acpRegistryProbeResult(
   instanceId: ProviderInstanceId,
-  started: AcpSessionRuntime.AcpSessionRuntimeStartResult,
+  started: {
+    readonly initializeResult: EffectAcpSchema.InitializeResponse;
+    readonly sessionSetupResult?: AcpSessionRuntime.AcpSessionRuntimeStartResult["sessionSetupResult"];
+  },
   icon: string | null = null,
   spawn?: AcpRegistryAuthSpawnContext,
 ): AcpRegistryProbeResult {
   const liveConfiguration = normalizeAcpRegistryLiveConfiguration(
-    started.sessionSetupResult.configOptions ?? [],
-    parseSessionModeState(started.sessionSetupResult),
-    started.sessionSetupResult.models,
+    started.sessionSetupResult?.configOptions ?? [],
+    started.sessionSetupResult ? parseSessionModeState(started.sessionSetupResult) : undefined,
+    started.sessionSetupResult?.models ?? sessionModelStateFromInitialize(started.initializeResult),
   );
   return AcpRegistryProbeResult.make({
     instanceId,
@@ -295,7 +291,7 @@ export function acpRegistryProbeFailure(
     reason: authenticationFailed ? "authentication_failed" : "probe_failed",
     message: authenticationFailed
       ? "The ACP agent could not complete authentication."
-      : "The ACP agent could not create a test session.",
+      : "The ACP agent could not initialize.",
     cause: error,
     ...(authMethods.length > 0 ? { authMethods } : {}),
     ...(authAction === undefined ? {} : { authAction }),
@@ -347,10 +343,6 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
         .resolve(input.settings, input.cwd, input.environment)
         .pipe(Effect.mapError(AcpRegistrySupport.toAcpRegistryOperationError));
       const authMethodsRef = yield* Ref.make<ReadonlyArray<AcpRegistryProbeAuthMethod>>([]);
-      const authActionRef = yield* Ref.make<AcpRegistryUrlAuthAction | undefined>(undefined);
-      const runtimeCoordinator = yield* Effect.serviceOption(
-        AcpRegistryRuntimeCoordinator.AcpRegistryRuntimeCoordinator,
-      );
       const runtimeContext = yield* Layer.build(
         AcpSessionRuntime.layer({
           spawn: resolved.spawn,
@@ -384,68 +376,14 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
       const runtime = yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(
         Effect.provide(runtimeContext),
       );
-      const commandsRef = yield* Ref.make<AcpRegistryAvailableCommands>(
-        emptyAcpRegistryAvailableCommands(),
-      );
-      const commandsAdvertised = yield* Deferred.make<void>();
-      yield* runtime.handleElicitation((request) =>
-        Effect.gen(function* () {
-          if (
-            request.mode !== "url" ||
-            !("url" in request) ||
-            !("elicitationId" in request) ||
-            typeof request.url !== "string" ||
-            typeof request.elicitationId !== "string"
-          ) {
-            return { action: "decline" } as const;
-          }
-          const url = normalizeAcpRegistryWebUrl(request.url);
-          const elicitationId = boundedOpaqueValue(request.elicitationId, MAX_ID_LENGTH);
-          if (url === undefined || elicitationId === undefined) {
-            return { action: "decline" } as const;
-          }
-          const action: AcpRegistryUrlAuthAction = {
-            elicitationId,
-            url,
-            message: boundedText(request.message, MAX_DESCRIPTION_LENGTH),
-          };
-          yield* Ref.set(authActionRef, action);
-          const accepted = yield* Option.match(runtimeCoordinator, {
-            onNone: () => Effect.succeed(false),
-            onSome: (coordinator) => coordinator.requestUrlAuthentication(input.instanceId, action),
-          });
-          return accepted ? ({ action: "accept" } as const) : ({ action: "decline" } as const);
-        }),
-      );
-      yield* runtime.handleSessionUpdate((notification) => {
-        const update = notification.update;
-        return update.sessionUpdate === "available_commands_update"
-          ? Ref.set(commandsRef, normalizeAcpRegistryCommands(update.availableCommands)).pipe(
-              Effect.andThen(Deferred.succeed(commandsAdvertised, undefined)),
-              Effect.asVoid,
-            )
-          : Effect.void;
-      });
-      const startResult = yield* Effect.result(runtime.start());
-      if (Result.isFailure(startResult)) {
+      const initializeResult = yield* Effect.result(runtime.initialize());
+      if (Result.isFailure(initializeResult)) {
         return yield* acpRegistryProbeFailure(
-          startResult.failure,
+          initializeResult.failure,
           yield* Ref.get(authMethodsRef),
-          yield* Ref.get(authActionRef),
         );
       }
-      const started = startResult.success;
-      // Agents that persist sessions (OpenCode) would otherwise keep one empty session per probe.
-      // The runtime only sends session/delete when the agent advertises it.
-      yield* Effect.addFinalizer(() =>
-        runtime
-          .deleteSession(started.sessionId)
-          .pipe(Effect.timeoutOption(PROBE_SESSION_DELETE_TIMEOUT), Effect.ignore),
-      );
-      yield* Deferred.await(commandsAdvertised).pipe(
-        Effect.timeoutOption(COMMAND_ADVERTISEMENT_GRACE),
-      );
-      return { resolved, started, commands: yield* Ref.get(commandsRef) };
+      return { resolved, initializeResult: initializeResult.success };
     }).pipe(
       Effect.scoped,
       Effect.timeoutOrElse({
@@ -454,7 +392,7 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
           Effect.fail(
             new AcpRegistryOperationError({
               reason: "probe_failed",
-              message: `The ACP agent did not resolve and create a test session within ${probeTimeoutMs / 1_000} seconds. Package installation or agent startup may be slow; this check retries on the next provider refresh.`,
+              message: `The ACP agent did not resolve and initialize within ${probeTimeoutMs / 1_000} seconds. Package installation or agent startup may be slow; this check retries on the next provider refresh.`,
             }),
           ),
       }),
@@ -465,15 +403,15 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
     return {
       probe: acpRegistryProbeResult(
         input.instanceId,
-        result.started,
+        { initializeResult: result.initializeResult },
         result.resolved.agent?.icon ?? null,
         {
           command: result.resolved.spawn.command,
           args: result.resolved.spawn.args,
         },
       ),
-      slashCommands: result.commands.slashCommands,
-      skills: result.commands.skills,
+      slashCommands: [],
+      skills: [],
     };
   },
 );
