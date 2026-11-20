@@ -1,4 +1,10 @@
-import { ArrowLeftIcon, ArrowRightIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  ChartNoAxesColumnIcon,
+  NetworkIcon,
+  SettingsIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -253,6 +259,13 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     void navigate({ to: "/usage" });
   };
 
+  const handleFleetClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+    void navigate({ to: "/fleet" });
+  };
+
   const handleBackClick = () => {
     closeMobileSidebar();
     void navigateToMainApp();
@@ -282,6 +295,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label="用量"
             onClick={handleUsageClick}
           />
+          <SidebarUtilityItem icon={<NetworkIcon />} label="机群" onClick={handleFleetClick} />
         </>
       )}
       <SidebarThreadUndoNotice />
