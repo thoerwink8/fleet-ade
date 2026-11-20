@@ -14,20 +14,65 @@ import { CommandPalette } from "./CommandPalette";
 const entities = vi.hoisted(() => ({
   projects: [] as ReadonlyArray<Project>,
   threads: [] as ReadonlyArray<Thread>,
+  serverConfigs: new Map<EnvironmentId, { environment: Record<string, unknown> }>(),
+  activeThread: undefined as Thread | undefined,
+  markCommanderThread: vi.fn(async () => ({ _tag: "Success" as const })),
+  unmarkCommanderThread: vi.fn(async () => ({ _tag: "Success" as const })),
 }));
 vi.mock("../state/entities", async (original) => ({
   ...(await original<typeof import("../state/entities")>()),
   useProjects: () => entities.projects,
   useVisibleThreadShells: () => entities.threads,
+  useServerConfigs: () => entities.serverConfigs,
+  readThreadShell: (ref: { environmentId: EnvironmentId; threadId: ThreadId }) =>
+    entities.threads.find(
+      (candidate) => candidate.environmentId === ref.environmentId && candidate.id === ref.threadId,
+    ) ?? null,
 }));
+vi.mock("../state/session", async (original) => ({
+  ...(await original<typeof import("../state/session")>()),
+  readEnvironmentScope: () => true,
+}));
+vi.mock("../hooks/useHandleNewThread", async (original) => {
+  const actual = await original<typeof import("../hooks/useHandleNewThread")>();
+  return {
+    ...actual,
+    useHandleNewThread: () => {
+      const value = actual.useHandleNewThread();
+      return entities.activeThread ? { ...value, activeThread: entities.activeThread } : value;
+    },
+  };
+});
+vi.mock("../hooks/useThreadActions", async (original) => {
+  const actual = await original<typeof import("../hooks/useThreadActions")>();
+  return {
+    ...actual,
+    useThreadActions: () => ({
+      ...actual.useThreadActions(),
+      markCommanderThread: entities.markCommanderThread,
+      unmarkCommanderThread: entities.unmarkCommanderThread,
+    }),
+  };
+});
 
-function setup(state: { projects?: ReadonlyArray<Project>; threads?: ReadonlyArray<Thread> } = {}) {
+function setup(
+  state: {
+    projects?: ReadonlyArray<Project>;
+    threads?: ReadonlyArray<Thread>;
+    serverConfigs?: Map<EnvironmentId, { environment: Record<string, unknown> }>;
+    activeThread?: Thread | undefined;
+  } = {},
+) {
   // Earlier browser test files share this origin's localStorage; a remembered project
   // that is not listed here hides the default "New thread in <project>" row.
   removeLocalStorageItem(LAST_USED_PROJECT_STORAGE_KEY);
   useCommandPaletteStore.setState(useCommandPaletteStore.getInitialState(), true);
   entities.projects = state.projects ?? [];
   entities.threads = state.threads ?? [];
+  entities.serverConfigs = state.serverConfigs ?? new Map();
+  entities.activeThread = state.activeThread;
+  entities.markCommanderThread.mockClear();
+  entities.unmarkCommanderThread.mockClear();
 }
 
 describe("CommandPalette open intents", () => {
@@ -176,5 +221,38 @@ describe("CommandPalette open intents", () => {
     await page.getByRole("option", { name: /Acme/ }).first().click();
 
     await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/local/parent"));
+  });
+
+  it("shows mark and unmark commander actions for the active thread", async () => {
+    const environmentId = EnvironmentId.make("local");
+    const threadId = ThreadId.make("active-thread");
+    const serverConfigs = new Map([[environmentId, { environment: {} }]]);
+
+    const unmarked = makeThreadFixture({
+      environmentId,
+      id: threadId,
+      title: "Commander Candidate",
+      commander: false,
+    });
+    setup({ threads: [unmarked], serverConfigs, activeThread: unmarked });
+    await using screen = await render(<CommandPalette>{null}</CommandPalette>);
+
+    openCommandPalette({ query: "标成指挥" });
+    await page
+      .getByRole("option", { name: /标成指挥/ })
+      .first()
+      .click();
+    expect(entities.markCommanderThread).toHaveBeenCalledWith({ environmentId, threadId });
+
+    const marked = { ...unmarked, commander: true };
+    setup({ threads: [marked], serverConfigs, activeThread: marked });
+    await screen.rerender(<CommandPalette>{null}</CommandPalette>);
+
+    openCommandPalette({ query: "取消指挥" });
+    await page
+      .getByRole("option", { name: /取消指挥/ })
+      .first()
+      .click();
+    expect(entities.unmarkCommanderThread).toHaveBeenCalledWith({ environmentId, threadId });
   });
 });

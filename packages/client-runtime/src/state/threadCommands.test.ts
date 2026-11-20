@@ -664,4 +664,49 @@ describe("remote thread lifecycle commands", () => {
       expect((yield* Effect.promise(() => result))._tag).toBe("Success");
     }),
   );
+
+  it.effect(
+    "optimistically marks and unmarks commander without altering pinnedAt or updatedAt",
+    () =>
+      Effect.gen(function* () {
+        const h = yield* makeHarness();
+        const pinnedAt = DateTime.makeUnsafe("2026-09-10T08:00:00.000Z");
+        h.registry.set(h.snapshotAtom(ENVIRONMENT_ID), {
+          ...SNAPSHOT,
+          threads: [{ ...SNAPSHOT.threads[0]!, pinnedAt, commander: false }],
+        });
+
+        const markResult = h.commands.markCommander.run(h.registry, {
+          environmentId: ENVIRONMENT_ID,
+          input: { threadId: THREAD_ID },
+        });
+        expect(h.registry.get(h.visibleAtom)?.threads[0]?.commander).toBe(true);
+        expect(h.registry.get(h.visibleAtom)?.threads[0]?.pinnedAt).toEqual(pinnedAt);
+        expect(h.registry.get(h.visibleAtom)?.threads[0]?.updatedAt).toEqual(NOW);
+
+        const markReq = yield* Queue.take(h.requests);
+        expect(markReq.command.type).toBe("thread.commander.mark");
+        yield* Deferred.succeed(markReq.reply, { sequence: 2 });
+        expect((yield* Effect.promise(() => markResult))._tag).toBe("Success");
+
+        h.registry.set(h.snapshotAtom(ENVIRONMENT_ID), {
+          ...SNAPSHOT,
+          snapshotSequence: 2,
+          threads: [{ ...SNAPSHOT.threads[0]!, pinnedAt, commander: true }],
+        });
+
+        const unmarkResult = h.commands.unmarkCommander.run(h.registry, {
+          environmentId: ENVIRONMENT_ID,
+          input: { threadId: THREAD_ID },
+        });
+        expect(h.registry.get(h.visibleAtom)?.threads[0]?.commander).toBe(false);
+        expect(h.registry.get(h.visibleAtom)?.threads[0]?.pinnedAt).toEqual(pinnedAt);
+        expect(h.registry.get(h.visibleAtom)?.threads[0]?.updatedAt).toEqual(NOW);
+
+        const unmarkReq = yield* Queue.take(h.requests);
+        expect(unmarkReq.command.type).toBe("thread.commander.unmark");
+        yield* Deferred.succeed(unmarkReq.reply, { sequence: 3 });
+        expect((yield* Effect.promise(() => unmarkResult))._tag).toBe("Success");
+      }),
+  );
 });

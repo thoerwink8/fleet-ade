@@ -26,6 +26,10 @@ import {
   resolveSidebarDropTarget,
   planSidebarThreadDrop,
   resolveSidebarReorderableThreadKeys,
+  resolveSidebarRowAccessibility,
+  resolveSidebarThreadSection,
+  filterSidebarV2VisibleThreads,
+  sortCommanderThreadsForSidebar,
   sortPinnedThreadsForSidebar,
   sortScopedProjectsForSidebar,
   sortSidebarV2ProjectGroups,
@@ -1570,5 +1574,103 @@ describe("shouldCreateNewThreadInCurrentProject", () => {
     expect(shouldCreateNewThreadInCurrentProject(false, 1, 3)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(false, 0, 0)).toBe(true);
     expect(shouldCreateNewThreadInCurrentProject(true, 2, 2)).toBe(true);
+  });
+});
+
+describe("commander sidebar pinning", () => {
+  it("pins commander above pinned, settled, and snoozed, and restores previous section when unmarked", () => {
+    expect(
+      resolveSidebarThreadSection({
+        commander: true,
+        pinned: true,
+        settled: true,
+        snoozed: true,
+      }),
+    ).toBe("commander");
+
+    expect(
+      resolveSidebarThreadSection({
+        commander: false,
+        pinned: true,
+        settled: false,
+        snoozed: false,
+      }),
+    ).toBe("pinned");
+  });
+
+  it("excludes commander threads from drag reordering and drop targets", () => {
+    const commander = makeThreadFixture({
+      id: ThreadId.make("cmd-1"),
+      commander: true,
+      pinnedAt: "2026-03-09T09:00:00.000Z",
+    });
+    const normal = makeThreadFixture({ id: ThreadId.make("act-1") });
+    const keys = resolveSidebarReorderableThreadKeys({
+      threads: [commander, normal],
+      serverConfigs: new Map([[commander.environmentId, { environment: {} } as never]]),
+      connectedEnvironmentIds: [commander.environmentId],
+    });
+    expect(keys.draggableThreadKeys.has("environment-test:cmd-1")).toBe(false);
+    expect(keys.draggableThreadKeys.has("environment-test:act-1")).toBe(true);
+
+    const list: readonly SidebarListItem[] = [
+      { kind: "thread", key: "cmd-1", section: "commander" },
+      { kind: "marker", marker: "pinned-header" },
+      { kind: "thread", key: "p1", section: "pinned" },
+      { kind: "marker", marker: "pinned-divider" },
+      { kind: "thread", key: "a1", section: "active" },
+    ];
+    expect(resolveSidebarDropTarget(list, "a1", "cmd-1")).toBeNull();
+    expect(resolveSidebarDropTarget(list, "a1", "sidebar-marker-pinned-header")).toEqual({
+      section: "pinned",
+      pinnedOrder: ["a1", "p1"],
+      activeOrder: [],
+    });
+  });
+
+  it("keeps child threads hidden under commander threads and includes commander in accessibility label", () => {
+    const parent = makeThreadFixture({
+      id: ThreadId.make("cmd-parent"),
+      title: "Commander Thread",
+      commander: true,
+    });
+    const child = makeThreadFixture({
+      id: ThreadId.make("cmd-child"),
+      title: "Child Worker",
+      lineage: {
+        rootThreadId: parent.id,
+        parentThreadId: parent.id,
+        relationshipToParent: "subagent",
+      },
+    });
+    const visible = filterSidebarV2VisibleThreads([parent, child], null, new Set());
+    expect(visible.map((thread) => thread.id)).toEqual([parent.id]);
+
+    const sorted = sortCommanderThreadsForSidebar([
+      makeThreadFixture({
+        id: ThreadId.make("cmd-old"),
+        updatedAt: "2026-03-09T08:00:00.000Z",
+        latestUserMessageAt: "2026-03-09T08:00:00.000Z",
+      }),
+      makeThreadFixture({
+        id: ThreadId.make("cmd-new"),
+        updatedAt: "2026-03-09T09:00:00.000Z",
+        latestUserMessageAt: "2026-03-09T11:00:00.000Z",
+      }),
+    ]);
+    expect(sorted.map((thread) => thread.id)).toEqual([
+      ThreadId.make("cmd-new"),
+      ThreadId.make("cmd-old"),
+    ]);
+
+    expect(
+      resolveSidebarRowAccessibility({
+        title: "Commander Thread",
+        statusLabel: null,
+        projectDisplayName: "fleet-ade",
+        isActive: true,
+        isCommander: true,
+      }).label,
+    ).toBe("Commander Thread, 指挥, fleet-ade");
   });
 });

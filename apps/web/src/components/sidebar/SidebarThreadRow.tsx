@@ -981,11 +981,19 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       </span>
     ) : null;
 
+  const isCommander = thread.commander === true;
+  const commanderBadge = isCommander ? (
+    <Badge variant="accent-chip" size="sm">
+      指挥
+    </Badge>
+  ) : null;
+
   const accessibility = resolveSidebarRowAccessibility({
     title: thread.title,
     statusLabel: topStatus?.label ?? null,
     projectDisplayName: props.projectDisplayName,
     isActive: props.isActive,
+    isCommander,
   });
 
   const title = isRenaming ? (
@@ -996,30 +1004,32 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       onCancel={onCancelRename}
     />
   ) : (
-    <span
-      aria-hidden
-      className={cn(
-        "min-w-0 flex-1 text-start text-row transition-opacity motion-reduce:transition-none",
-        (variant === "card" ? props.isActive || isUnread : !shouldRecede)
-          ? "font-semibold"
-          : "font-normal",
-        variant === "card"
-          ? "truncate text-sidebar-foreground"
-          : cn(
-              "truncate group-focus-within/sidebar-row:text-foreground group-hover/sidebar-row:text-foreground",
-              shouldRecede
-                ? "text-secondary-label"
-                : props.isActive || isWoke || status === "input"
-                  ? "text-foreground"
-                  : isUnread
-                    ? "text-muted-foreground"
-                    : "text-secondary-label/70",
-            ),
-        isRegeneratingTitle && "opacity-55",
-      )}
-      dir={textDirection(thread.title)}
-    >
-      {thread.title}
+    <span aria-hidden className="flex min-w-0 flex-1 items-center gap-1.5">
+      <span
+        className={cn(
+          "min-w-0 truncate text-start text-row transition-opacity motion-reduce:transition-none",
+          (variant === "card" ? props.isActive || isUnread : !shouldRecede)
+            ? "font-semibold"
+            : "font-normal",
+          variant === "card"
+            ? "text-sidebar-foreground"
+            : cn(
+                "group-focus-within/sidebar-row:text-foreground group-hover/sidebar-row:text-foreground",
+                shouldRecede
+                  ? "text-secondary-label"
+                  : props.isActive || isWoke || status === "input"
+                    ? "text-foreground"
+                    : isUnread
+                      ? "text-muted-foreground"
+                      : "text-secondary-label/70",
+              ),
+          isRegeneratingTitle && "opacity-55",
+        )}
+        dir={textDirection(thread.title)}
+      >
+        {thread.title}
+      </span>
+      {commanderBadge}
     </span>
   );
   const accessibleTitle = isRenaming ? null : <span className="sr-only">{thread.title}</span>;
@@ -1640,17 +1650,24 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
           ) : null}
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex min-w-0 items-center gap-2.5">
-              <span
-                className={cn(
-                  "min-w-0 flex-1 truncate",
-                  props.isSettled
-                    ? "font-normal text-secondary-label/70 group-hover/sidebar-row:text-foreground"
-                    : "font-medium text-foreground",
-                  (props.isHighlighted || props.isRouteActive) && "text-foreground",
-                  thread.titleRegeneration != null && "opacity-55",
-                )}
-              >
-                {thread.title}
+              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span
+                  className={cn(
+                    "min-w-0 truncate",
+                    props.isSettled
+                      ? "font-normal text-secondary-label/70 group-hover/sidebar-row:text-foreground"
+                      : "font-medium text-foreground",
+                    (props.isHighlighted || props.isRouteActive) && "text-foreground",
+                    thread.titleRegeneration != null && "opacity-55",
+                  )}
+                >
+                  {thread.title}
+                </span>
+                {thread.commander === true ? (
+                  <Badge variant="accent-chip" size="sm">
+                    指挥
+                  </Badge>
+                ) : null}
               </span>
               <span id={`${props.resultId}-pr`} className="contents">
                 <ThreadSearchPullRequestNumber

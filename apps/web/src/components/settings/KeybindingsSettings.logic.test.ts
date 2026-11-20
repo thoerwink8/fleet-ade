@@ -10,6 +10,8 @@ import { resolveShortcutCommand } from "../../keybindings";
 import {
   buildKeybindingRows,
   buildWhenVariableOptions,
+  commandLabel,
+  groupKeybindingRows,
   keybindingConflictLabels,
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
@@ -305,5 +307,18 @@ describe("KeybindingsSettings.logic", () => {
     );
 
     expect(rows.map((row) => row.conflicts)).toEqual([[], []]);
+  });
+
+  it("exposes a Chinese label and groups thread.commander under threads", () => {
+    const groups = groupKeybindingRows(
+      buildKeybindingRows(
+        compileResolvedKeybindingsConfig([{ command: "thread.commander", key: "mod+alt+p" }]),
+        "Win32",
+      ),
+    );
+    expect(commandLabel("thread.commander")).toBe("标成或取消指挥");
+    expect(groups.find((group) => group.id === "threads")?.rows[0]?.command).toBe(
+      "thread.commander",
+    );
   });
 });

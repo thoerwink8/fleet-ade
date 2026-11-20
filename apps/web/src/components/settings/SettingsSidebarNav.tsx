@@ -116,6 +116,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
 const SETTINGS_DETAIL_PAGE_PARENTS: Readonly<Record<string, SettingsPath>> = {
   "/settings/diagnostics": "/settings/maintenance",
   "/settings/open-source-licenses": "/settings/about",
+  "/settings/commander": "/settings/threads",
 };
 
 // Attached only to the highlighted result, so it runs whenever the highlight lands on a row.

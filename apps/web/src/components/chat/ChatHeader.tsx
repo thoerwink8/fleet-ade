@@ -11,7 +11,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, FlagOffIcon, SettingsIcon } from "lucide-react";
 import {
   memo,
   useEffect,
@@ -23,6 +23,7 @@ import {
 } from "react";
 import { isTrailingDoubleClick } from "../Sidebar.logic";
 import { Badge } from "../ui/badge";
+import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import { useThreadActionMenu } from "~/hooks/useThreadActionMenu";
@@ -49,6 +50,7 @@ interface ChatHeaderProps {
   activeThreadId: ThreadId;
   activeThreadTitle: string;
   activeThreadLinkOrigin?: string | null | undefined;
+  isCommander?: boolean | undefined;
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
   parentThreadLink: { threadId: ThreadId; title: string } | null;
@@ -56,6 +58,8 @@ interface ChatHeaderProps {
   rightPanelOpen: boolean;
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
+  onOpenCommanderSettings?: (() => void) | undefined;
+  onUnmarkCommander?: (() => void) | undefined;
   onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
   /** The thread's branch, as a tag after the title. */
   branch?: string | null | undefined;
@@ -79,6 +83,7 @@ export const ChatHeader = memo(function ChatHeader({
   activeThreadId,
   activeThreadTitle,
   activeThreadLinkOrigin,
+  isCommander = false,
   isServerThread,
   activeProject,
   parentThreadLink,
@@ -86,6 +91,8 @@ export const ChatHeader = memo(function ChatHeader({
   rightPanelOpen,
   onNewThreadInProject,
   onOpenProjectSettings,
+  onOpenCommanderSettings,
+  onUnmarkCommander,
   onFindInThread,
   branch = null,
   pullRequest = null,
@@ -96,6 +103,7 @@ export const ChatHeader = memo(function ChatHeader({
   const interfaceFont = useClientSettings((settings) => settings.fontFamilySans);
   const breadcrumbContainerRef = useRef<HTMLDivElement>(null);
   const [collapseParentTitle, setCollapseParentTitle] = useState(false);
+  const [commanderMenuOpen, setCommanderMenuOpen] = useState(false);
   const activeThreadRef = scopeThreadRef(activeThreadEnvironmentId, activeThreadId);
   const canOperateThread = useEnvironmentScope(
     activeThreadEnvironmentId,
@@ -395,6 +403,50 @@ export const ChatHeader = memo(function ChatHeader({
                 由关联环境上的智能体在 {activeThreadLinkOrigin} 发起。
               </TooltipPopup>
             </Tooltip>
+          ) : null}
+          {renamingTitle === null && isCommander ? (
+            <Popover open={commanderMenuOpen} onOpenChange={setCommanderMenuOpen}>
+              <PopoverTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label="指挥会话操作"
+                    className="inline-flex shrink-0 cursor-pointer items-center rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  />
+                }
+              >
+                <Badge variant="accent-chip" size="sm">
+                  指挥
+                </Badge>
+              </PopoverTrigger>
+              <PopoverPopup side="bottom" align="start" sideOffset={6}>
+                <div className="flex w-48 flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommanderMenuOpen(false);
+                      onOpenCommanderSettings?.();
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-row text-foreground transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    <SettingsIcon className="size-4 shrink-0 text-muted-foreground" />
+                    <span>打开「指挥」设置</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canOperateThread || !isServerThread || !onUnmarkCommander}
+                    onClick={() => {
+                      setCommanderMenuOpen(false);
+                      onUnmarkCommander?.();
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-row text-foreground transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    <FlagOffIcon className="size-4 shrink-0 text-muted-foreground" />
+                    <span>取消指挥</span>
+                  </button>
+                </div>
+              </PopoverPopup>
+            </Popover>
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
