@@ -74,6 +74,7 @@ import {
   MessageSquareIcon,
   PaletteIcon,
   RotateCcwIcon,
+  KeyboardIcon,
   SettingsIcon,
   MonitorIcon,
   PinIcon,
@@ -261,6 +262,7 @@ import { Checkbox } from "./ui/checkbox";
 import { ProjectFilePicker } from "./files/ProjectFilePicker";
 import { openLinkPullRequestDialog } from "./pullRequest/LinkPullRequestDialog";
 import { openUseInAnotherApp } from "./mcp/UseInAnotherAppDialog";
+import { openShortcutCheatsheet } from "./ShortcutCheatsheet";
 import { ProjectContentSearchDialog } from "./search/ProjectContentSearchDialog";
 import { settingsForThisPlatform, SETTINGS_SECTION_LABELS } from "./settings/settingsSearch";
 import { primaryServerKeybindingsAtom } from "../state/server";
@@ -1716,6 +1718,17 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
+  actionItems.push({
+    kind: "action",
+    value: "action:shortcut-cheatsheet",
+    searchTerms: ["快捷键", "键盘", "速查", "帮助"],
+    title: "快捷键速查",
+    icon: <KeyboardIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "shortcutCheatsheet.toggle",
+    run: async () => {
+      openShortcutCheatsheet();
+    },
+  });
   actionItems.push({
     kind: "action",
     value: "action:settings",
