@@ -39,7 +39,6 @@ const identityTools: Record<string, true> = {
   fleet_renew: true,
   fleet_release: true,
   fleet_heartbeat: true,
-  t3_thread_launch: true,
   fleet_summary_report: true,
 };
 
@@ -214,7 +213,13 @@ const make = Effect.gen(function* () {
         const isProof = input.proof === true || input.tool === "fleet_peer_proof";
         let challenge: string | undefined;
         let identityHeaders: Record<string, string> = {};
-        if (!isProof && Object.hasOwn(identityTools, input.tool)) {
+        if (
+          !isProof &&
+          (Object.hasOwn(identityTools, input.tool) ||
+            // A launch proves identity only with fleet work: without a lease
+            // ref the callee never reads this environment's identity.
+            (input.tool === "t3_thread_launch" && input.arguments.fleetTask !== undefined))
+        ) {
           challenge = Base64Url.encode(yield* random.randomBytes(32).pipe(Effect.orDie));
           const bearerDigest = Base64Url.encode(
             yield* digester

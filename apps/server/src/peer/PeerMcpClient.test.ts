@@ -334,7 +334,11 @@ it.effect("renews a missing peer session once and reuses its replacement", () =>
         yield* client.call({
           environmentId: box.environmentId,
           tool,
-          arguments: {},
+          arguments:
+            tool === "t3_thread_launch"
+              ? // Only a launch carrying fleet work proves this environment.
+                { fleetTask: { repo: "o/r", issue: 1, taskId: "t", attempt: 1, fencing: "1" } }
+              : {},
           limits: { runtimeMode: "approval-required", interactionMode: "plan" },
           success: Result,
         }),
