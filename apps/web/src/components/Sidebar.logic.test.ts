@@ -34,7 +34,11 @@ import {
   type SidebarListItem,
   type SidebarListMarker,
   type SidebarSection,
+  isThreadAttentionDismissible,
+  isThreadAttentionRowDisabled,
   resolveSidebarDropVerb,
+  resolveThreadAttention,
+  threadAttentionSubtitleText,
 } from "./Sidebar.logic";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
@@ -1641,5 +1645,199 @@ describe("commander sidebar pinning", () => {
       pinnedOrder: ["a1", "p1"],
       activeOrder: [],
     });
+  });
+});
+
+describe("resolveThreadAttention", () => {
+  const visitedAt = "2026-03-09T10:00:00.000Z";
+  const beforeVisit = "2026-03-09T09:00:00.000Z";
+  const afterVisit = "2026-03-09T11:00:00.000Z";
+  const base = {
+    hasActionableProposedPlan: false,
+    hasPendingApprovals: false,
+    hasPendingUserInput: false,
+    pendingSubagentRequest: null,
+    interactionMode: "default" as const,
+    runtime: null,
+    latestRun: null,
+    lastVisitedAt: null,
+  };
+  const run = (status: "completed" | "failed", completedAt: string | null) => ({
+    runId: RunId.make("run-1"),
+    status,
+    requestedAt: null,
+    startedAt: null,
+    completedAt,
+    assistantMessageId: null,
+  });
+
+  it("keeps blocking requests visible regardless of visits", () => {
+    for (const [flag, category] of [
+      ["hasPendingApprovals", "approval"],
+      ["hasPendingUserInput", "input"],
+    ] as const) {
+      for (const lastVisitedAt of [null, beforeVisit, afterVisit]) {
+        expect(resolveThreadAttention({ ...base, [flag]: true, lastVisitedAt })).toEqual({
+          category,
+          blocking: true,
+          unseen: true,
+        });
+      }
+    }
+  });
+
+  it("reads blocking from the raw request, excluding auth refresh and async questions", () => {
+    expect(
+      resolveThreadAttention({
+        ...base,
+        pendingRuntimeRequest: { kind: "user_input" },
+      })?.category,
+    ).toBe("input");
+    expect(
+      resolveThreadAttention({
+        ...base,
+        pendingRuntimeRequest: { kind: "user_input", blocking: false },
+      }),
+    ).toBeNull();
+    expect(
+      resolveThreadAttention({
+        ...base,
+        pendingRuntimeRequest: { kind: "auth_refresh" },
+      }),
+    ).toBeNull();
+    expect(
+      resolveThreadAttention({
+        ...base,
+        pendingRuntimeRequest: { kind: "permission" },
+      })?.category,
+    ).toBe("approval");
+    expect(
+      resolveThreadAttention({
+        ...base,
+        pendingRuntimeRequest: { kind: "permission", blocking: false },
+      }),
+    ).toBeNull();
+  });
+
+  it("marks failed runs unseen only past the visit watermark", () => {
+    expect(
+      resolveThreadAttention({
+        ...base,
+        latestRun: run("failed", afterVisit),
+        lastVisitedAt: visitedAt,
+      }),
+    ).toEqual({ category: "failed", blocking: false, unseen: true });
+    expect(
+      resolveThreadAttention({
+        ...base,
+        latestRun: run("failed", beforeVisit),
+        lastVisitedAt: visitedAt,
+      }),
+    ).toEqual({ category: "failed", blocking: false, unseen: false });
+    expect(resolveThreadAttention({ ...base, latestRun: run("failed", beforeVisit) })).toEqual({
+      category: "failed",
+      blocking: false,
+      unseen: true,
+    });
+  });
+
+  it("keeps usage-limit failures in the limited category", () => {
+    const runtime = {
+      status: "failed" as const,
+      activeRunId: null,
+      providerInstanceId: ProviderInstanceId.make("codex"),
+      providerName: "Codex",
+      lastError: "Plan limit reached",
+      lastErrorClass: "usage_limit" as const,
+      updatedAt: afterVisit,
+    };
+    expect(
+      resolveThreadAttention({
+        ...base,
+        runtime,
+        latestRun: run("failed", afterVisit),
+        lastVisitedAt: visitedAt,
+      }),
+    ).toEqual({ category: "limited", blocking: false, unseen: true });
+    expect(resolveThreadAttention({ ...base, runtime, lastVisitedAt: visitedAt })?.unseen).toBe(
+      true,
+    );
+    expect(
+      resolveThreadAttention({
+        ...base,
+        runtime: { ...runtime, updatedAt: beforeVisit },
+        lastVisitedAt: visitedAt,
+      })?.unseen,
+    ).toBe(false);
+  });
+
+  it("treats completions as seen when never opened, unlike failures", () => {
+    expect(
+      resolveThreadAttention({
+        ...base,
+        latestRun: run("completed", afterVisit),
+        lastVisitedAt: visitedAt,
+      }),
+    ).toEqual({ category: "completed", blocking: false, unseen: true });
+    expect(
+      resolveThreadAttention({
+        ...base,
+        latestRun: run("completed", beforeVisit),
+        lastVisitedAt: visitedAt,
+      }),
+    ).toEqual({ category: "completed", blocking: false, unseen: false });
+    expect(resolveThreadAttention({ ...base, latestRun: run("completed", beforeVisit) })).toEqual({
+      category: "completed",
+      blocking: false,
+      unseen: false,
+    });
+  });
+
+  it("ignores ready plans and idle threads", () => {
+    expect(
+      resolveThreadAttention({
+        ...base,
+        hasActionableProposedPlan: true,
+        latestRun: run("completed", beforeVisit),
+        lastVisitedAt: visitedAt,
+      }),
+    ).toEqual({ category: "completed", blocking: false, unseen: false });
+    expect(resolveThreadAttention(base)).toBeNull();
+  });
+
+  it("disables offline attention rows and hides dismiss regardless of blocking", () => {
+    const blocking = { category: "approval" as const, blocking: true, unseen: true };
+    const failed = { category: "failed" as const, blocking: false, unseen: true };
+    const completed = { category: "completed" as const, blocking: false, unseen: true };
+
+    expect(isThreadAttentionRowDisabled({ attention: blocking, attentionOffline: true })).toBe(
+      true,
+    );
+    expect(isThreadAttentionRowDisabled({ attention: failed, attentionOffline: true })).toBe(true);
+    expect(isThreadAttentionRowDisabled({ attention: completed, attentionOffline: true })).toBe(
+      true,
+    );
+    expect(isThreadAttentionRowDisabled({ attention: failed, attentionOffline: false })).toBe(
+      false,
+    );
+    expect(isThreadAttentionRowDisabled({ attention: undefined, attentionOffline: true })).toBe(
+      false,
+    );
+
+    expect(threadAttentionSubtitleText({ attention: blocking, attentionOffline: true })).toBe(
+      "环境已断线，连上后处理",
+    );
+    expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: true })).toBe(
+      "环境已断线，连上后处理",
+    );
+    expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: false })).toBe(
+      "上一轮出错了，点开处理",
+    );
+
+    expect(isThreadAttentionDismissible({ attention: failed, attentionOffline: true })).toBe(false);
+    expect(isThreadAttentionDismissible({ attention: failed, attentionOffline: false })).toBe(true);
+    expect(isThreadAttentionDismissible({ attention: blocking, attentionOffline: false })).toBe(
+      false,
+    );
   });
 });

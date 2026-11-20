@@ -26,6 +26,11 @@ export const isBlockingApproval = (
     kind === "permission" ||
     kind === "mcp-elicitation");
 
+export const isUserInputRequest = (
+  kind: OrchestrationV2RuntimeRequest["kind"],
+  blocking?: boolean,
+): boolean => blocking !== false && kind === "user_input";
+
 /**
  * The executor's own session run. Phase is this mapping, never a lease timeout.
  * `waiting` is stuck; idle and terminal runs are done; everything else is working.

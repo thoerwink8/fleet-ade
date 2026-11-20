@@ -32,7 +32,11 @@ import {
   unlockNotificationAudio,
 } from "../threadNotifications";
 import { resolveBackgroundThreadRequest } from "./backgroundThreadAnnouncement";
-import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "./Sidebar.logic";
+import {
+  resolveSidebarThreadStatus,
+  resolveThreadAttention,
+  type SidebarThreadStatus,
+} from "./Sidebar.logic";
 import {
   createThreadNotificationGate,
   type ThreadNotificationKind,
@@ -261,10 +265,18 @@ export function startThreadNotifications(
         continue;
       }
       const thread = presentThreadShell(environmentId, rawThread, subagentRequest);
-      let status = resolveSidebarThreadStatus(thread);
-      if (status === "ready" && thread.latestRun?.status === "failed") status = "failed";
+      const statusInput = {
+        ...thread,
+        pendingRuntimeRequest: rawThread.pendingRuntimeRequest,
+      };
+      let status = resolveSidebarThreadStatus(statusInput);
+      const attentionCategory = resolveThreadAttention(statusInput)?.category ?? null;
+      if (status === "ready" && attentionCategory === "failed") status = "failed";
       const needsAttention =
-        status === "input" || status === "approval" || status === "failed" || status === "limited";
+        attentionCategory === "input" ||
+        attentionCategory === "approval" ||
+        attentionCategory === "failed" ||
+        attentionCategory === "limited";
       const requestId = needsAttention ? resolveBackgroundThreadRequest(thread).requestId : null;
       // Queued messages become the latest run while a request stays pending, so a request
       // with an id is keyed by that id alone and announces once.

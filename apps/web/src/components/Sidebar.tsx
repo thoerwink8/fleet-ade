@@ -177,8 +177,12 @@ import {
   resolveAdjacentThreadId,
   resolveSidebarSweepKeys,
   resolveSidebarDropTarget,
+  isThreadAttentionDismissible,
   resolveSidebarDropVerb,
   resolveSidebarThreadSection,
+  resolveThreadAttention,
+  resolveThreadLastVisitedAt,
+  type ThreadAttention,
   resolveSidebarReorderableThreadKeys,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
@@ -312,6 +316,7 @@ const EMPTY_THREADS: readonly EnvironmentThreadShell[] = [];
 
 const SETTLED_TAIL_INITIAL_COUNT = 15;
 const SETTLED_TAIL_PAGE_COUNT = 25;
+const ATTENTION_PAGE_COUNT = 20;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:recent-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
@@ -344,6 +349,13 @@ interface SidebarThreadPartitionInput {
   // on the clock, so the minute tick, the precise snooze-wake tick and the inbox
   // tracker's expiry version are inputs: a new key repartitions.
   readonly clockKey: string;
+  readonly routeRowThreadKey: string | null;
+  readonly lastVisitedAtById: Readonly<Record<string, string | undefined>>;
+}
+
+interface SidebarAttentionEntry extends ThreadAttention {
+  /** The open thread keeps its row until the route leaves, without counting. */
+  readonly demoted: boolean;
 }
 
 function scrollSidebarToTop(content: HTMLElement | null) {
@@ -417,6 +429,7 @@ function useSidebarThreads(input: {
     routeRowThreadKey,
   } = input;
   const workingShelfEnabled = useClientSettings((s) => s.sidebarWorkingShelfEnabled);
+  const lastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
   const inboxReturnsVersion = useSyncExternalStore(
     inboxReturns.subscribe,
     inboxReturns.getSnapshot,
@@ -440,6 +453,16 @@ function useSidebarThreads(input: {
     Schema.Boolean,
   );
 
+  const [attentionTail, setAttentionTail] = useState({
+    scopeKey: projectScopeKey,
+    count: ATTENTION_PAGE_COUNT,
+  });
+  if (attentionTail.scopeKey !== projectScopeKey) {
+    setAttentionTail({ scopeKey: projectScopeKey, count: ATTENTION_PAGE_COUNT });
+  }
+  const attentionVisibleCount =
+    attentionTail.scopeKey === projectScopeKey ? attentionTail.count : ATTENTION_PAGE_COUNT;
+
   const [settledTail, setSettledTail] = useState({
     scopeKey: projectScopeKey,
     count: SETTLED_TAIL_INITIAL_COUNT,
@@ -460,6 +483,8 @@ function useSidebarThreads(input: {
     workingShelfEnabled,
     sortActiveBySend: false,
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
+    routeRowThreadKey,
+    lastVisitedAtById,
   });
 
   const {
@@ -469,7 +494,28 @@ function useSidebarThreads(input: {
     workingThreads,
     snoozedThreads,
     settledThreads,
+    attentionThreads,
+    attentionByKey,
   } = partition;
+  const visibleAttentionThreads = (() => {
+    const visible = attentionThreads.slice(0, attentionVisibleCount);
+    if (
+      routeRowThreadKey !== null &&
+      !visible.some((thread) => threadShellKey(thread) === routeRowThreadKey)
+    ) {
+      const routeThread = attentionThreads.find(
+        (thread) => threadShellKey(thread) === routeRowThreadKey,
+      );
+      if (routeThread !== undefined) visible.push(routeThread);
+    }
+    return visible.length === attentionThreads.length ? attentionThreads : visible;
+  })();
+  const attentionCount =
+    attentionThreads.length === 1
+      ? 1
+      : attentionThreads.filter(
+          (thread) => attentionByKey.get(threadShellKey(thread))?.demoted !== true,
+        ).length;
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
@@ -504,6 +550,7 @@ function useSidebarThreads(input: {
     : routeThreadOnly(workingThreads, routeRowThreadKey);
   const orderedThreads = [
     ...commanderThreads,
+    ...visibleAttentionThreads,
     ...pinnedThreads,
     ...activeThreads,
     ...visibleWorkingThreads,
@@ -513,6 +560,7 @@ function useSidebarThreads(input: {
   const sectionByThreadKey = new Map<string, SidebarSection>();
   for (const [list, section] of [
     [commanderThreads, "commander"],
+    [attentionThreads, "attention"],
     [pinnedThreads, "pinned"],
     [activeThreads, "active"],
     [workingThreads, "working"],
@@ -527,6 +575,7 @@ function useSidebarThreads(input: {
     workingShelfEnabled,
     searchableThreads: [
       ...commanderThreads,
+      ...attentionThreads,
       ...pinnedThreads,
       ...activeThreads,
       ...workingThreads,
@@ -537,6 +586,14 @@ function useSidebarThreads(input: {
     settledCount,
     olderSettledShelf,
     hiddenSettledCount: Math.max(0, settledCount - visibleSettledThreads.length),
+    attentionCount,
+    hiddenAttentionCount: Math.max(0, attentionThreads.length - visibleAttentionThreads.length),
+    showMoreAttention: () =>
+      setAttentionTail((current) => ({
+        scopeKey: current.scopeKey,
+        count: current.count + ATTENTION_PAGE_COUNT,
+      })),
+    visibleAttentionThreads,
     showMoreSettled: () =>
       setSettledTail((current) => ({
         scopeKey: current.scopeKey,
@@ -576,6 +633,8 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     optimisticDrop,
     workingShelfEnabled,
     sortActiveBySend,
+    routeRowThreadKey,
+    lastVisitedAtById,
   } = input;
   const preciseNow = new Date().toISOString();
   const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
@@ -591,6 +650,8 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       : active;
   const snoozed: EnvironmentThreadShell[] = [];
   const settled: EnvironmentThreadShell[] = [];
+  const attention: EnvironmentThreadShell[] = [];
+  const attentionByKey = new Map<string, SidebarAttentionEntry>();
   const { draggableThreadKeys, activeReorderableThreadKeys } = resolveSidebarReorderableThreadKeys({
     threads: visible,
     serverConfigs,
@@ -617,10 +678,29 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
           : { ...projected, snoozedAt: thread.snoozedAt, snoozedUntil: thread.snoozedUntil },
       );
     } else {
+      const snoozedNow = configLoaded && effectiveSnoozed(thread, { now: preciseNow });
+      const settledNow = configLoaded && thread.settledOverride === "settled";
+      if (thread.commander !== true) {
+        const entry = resolveThreadAttention(
+          { ...thread, pendingRuntimeRequest: thread.source.pendingRuntimeRequest },
+          resolveThreadLastVisitedAt(thread.lastVisitedAt, lastVisitedAtById[threadKey]),
+        );
+        const isRoute = routeRowThreadKey === threadKey;
+        if (
+          entry !== null &&
+          (entry.blocking || (!snoozedNow && !settledNow && (entry.unseen || isRoute)))
+        ) {
+          attention.push(thread);
+          attentionByKey.set(threadKey, { ...entry, demoted: isRoute });
+          draggableThreadKeys.delete(threadKey);
+          activeReorderableThreadKeys.delete(threadKey);
+          continue;
+        }
+      }
       const section = resolveSidebarThreadSection({
         commander: thread.commander === true,
-        snoozed: configLoaded && effectiveSnoozed(thread, { now: preciseNow }),
-        settled: configLoaded && thread.settledOverride === "settled",
+        snoozed: snoozedNow,
+        settled: settledNow,
         pinned: thread.pinnedAt != null,
       });
       (section === "commander"
@@ -663,6 +743,19 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
             preferredIds: optimisticDrop.order,
             getId: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
           }),
+    attentionThreads: attention.toSorted((left, right) => {
+      const leftEntry = attentionByKey.get(threadShellKey(left))!;
+      const rightEntry = attentionByKey.get(threadShellKey(right))!;
+      const rankDelta =
+        (leftEntry.demoted ? 2 : leftEntry.blocking ? 0 : 1) -
+        (rightEntry.demoted ? 2 : rightEntry.blocking ? 0 : 1);
+      if (rankDelta !== 0) return rankDelta;
+      return (
+        firstValidTimestampMs(right.latestRun?.completedAt ?? null, right.updatedAt) -
+        firstValidTimestampMs(left.latestRun?.completedAt ?? null, left.updatedAt)
+      );
+    }),
+    attentionByKey,
     workingThreads: sortWorkingThreadsBySend(working),
     snoozedThreads: snoozed.toSorted(
       (left, right) =>
@@ -1246,6 +1339,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     snoozedThreads,
     settledThreads,
     snoozeNow,
+    attentionThreads,
+    attentionByKey,
+    attentionCount,
+    hiddenAttentionCount,
+    showMoreAttention,
+    visibleAttentionThreads,
     searchableThreads,
     settledVisibleCount,
     settledCount,
@@ -1898,6 +1997,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       });
     if (
       commanderThreads.length +
+        attentionThreads.length +
         pinnedThreads.length +
         activeThreads.length +
         workingThreads.length +
@@ -1907,10 +2007,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     ) {
       return [];
     }
-    const items: SidebarListItem[] = [
-      ...rowsOf(commanderThreads, "commander"),
-      { kind: "marker", marker: "pinned-header" },
-    ];
+    const items: SidebarListItem[] = rowsOf(commanderThreads, "commander");
+    if (attentionThreads.length > 0) {
+      items.push({ kind: "marker", marker: "attention-header" });
+      items.push(...rowsOf(visibleAttentionThreads, "attention"));
+      if (hiddenAttentionCount > 0) items.push({ kind: "marker", marker: "attention-more" });
+    }
+    items.push({ kind: "marker", marker: "pinned-header" });
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
@@ -2634,6 +2737,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               isSnoozed,
               canSnoozeNow: canSnooze(thread, { now: new Date().toISOString() }),
               isRegeneratingTitle,
+              attentionDismissible: isThreadAttentionDismissible({
+                attention: attentionByKey.get(threadKey),
+                attentionOffline: !connectedEnvironmentIds.includes(thread.environmentId),
+              }),
               isRunning: !threadRuntimeCanArchive(thread.runtime),
               canTurnIntoProject: canTurnThreadIntoProject(threadRef),
               supports: {
@@ -2773,6 +2880,30 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               }),
             ]);
             if (toast) toastManager.add(toast);
+            return;
+          }
+          case "dismiss-attention": {
+            acknowledgeWoke(threadRef, new Date().toISOString());
+            const canUndo =
+              serverConfigs.get(threadRef.environmentId)?.environment.capabilities
+                .threadVisitedTracking === true;
+            toastManager.add(
+              stackedThreadToast({
+                type: "success",
+                title: "已移出等你处理",
+                description: canUndo
+                  ? "已把这条会话标记为看过，所有设备同步。撤销会把它标为未读，同样影响所有设备。"
+                  : "已把这条会话标记为看过，所有设备同步。",
+                ...(canUndo
+                  ? {
+                      actionProps: {
+                        children: "撤销",
+                        onClick: () => markThreadUnread(threadRef),
+                      },
+                    }
+                  : {}),
+              }),
+            );
             return;
           }
           case "mark-unread":
@@ -3333,6 +3464,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         );
                         const isCard =
                           section === "commander" ||
+                          section === "attention" ||
                           section === "active" ||
                           section === "pinned" ||
                           section === "working" ||
@@ -3351,6 +3483,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             }
                             thread={thread}
                             variant={rowVariant}
+                            attention={
+                              section === "attention"
+                                ? (attentionByKey.get(threadKey) ?? undefined)
+                                : undefined
+                            }
+                            attentionOffline={
+                              section === "attention" &&
+                              !connectedEnvironmentIds.includes(thread.environmentId)
+                            }
                             navigationParent={
                               section === "working" ||
                               section === "snoozed" ||
@@ -3457,6 +3598,31 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           continue;
                         }
                         switch (item.marker) {
+                          case "attention-header":
+                            items.push(
+                              <SidebarSectionHeader
+                                key="attention-header"
+                                marker="attention-header"
+                                label="等你处理"
+                                count={attentionCount}
+                              />,
+                            );
+                            break;
+                          case "attention-more":
+                            items.push(
+                              <li className="list-none" key="attention-more">
+                                <button
+                                  type="button"
+                                  data-sidebar-row="attention:more"
+                                  onClick={showMoreAttention}
+                                  className="flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+                                >
+                                  <ChevronDownIcon aria-hidden className="size-4 shrink-0" />
+                                  {`再显示 ${Math.min(hiddenAttentionCount, ATTENTION_PAGE_COUNT)} 个`}
+                                </button>
+                              </li>,
+                            );
+                            break;
                           case "pinned-header":
                             items.push(
                               <SidebarDragBoundary

@@ -3,7 +3,13 @@ import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection
 import * as shelfHooks from "../state/olderSettledShelf";
 import { createWorkspaceFocusController, workspaceAreaProps } from "../lib/workspaceFocus";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { EnvironmentId, ProjectId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  ProjectId,
+  RunId,
+  ThreadId,
+  type ScopedThreadRef,
+} from "@t3tools/contracts";
 import { isMacPlatform } from "@t3tools/shared/keybindings";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
@@ -339,5 +345,63 @@ describe("sidebar settled pagination", () => {
     const loadedRows = screen.container.querySelectorAll("[data-thread-item]").length;
     await act(() => moreButton.click());
     expect(screen.container.querySelectorAll("[data-thread-item]")).toHaveLength(loadedRows);
+  });
+});
+
+describe("sidebar attention offline rows", () => {
+  it("dims and blocks click and Enter on non-blocking failed attention rows when offline", async () => {
+    const activeProject = project("active");
+    const failedThread = makeThreadFixture({
+      environmentId: activeProject.environmentId,
+      projectId: activeProject.id,
+      id: ThreadId.make("failed-offline"),
+      title: "Offline failed thread",
+      latestRun: {
+        runId: RunId.make("run-failed"),
+        status: "failed",
+        requestedAt: null,
+        startedAt: null,
+        completedAt: "2026-03-09T10:00:00.000Z",
+        assistantMessageId: null,
+      },
+    });
+    const otherThread = threadShell(activeProject.id, 1);
+    vi.mocked(useProjects).mockReturnValue([activeProject]);
+    vi.mocked(useQuietThreadShells).mockReturnValue([failedThread, otherThread]);
+    vi.mocked(useThreadRouteTarget).mockReturnValue({
+      kind: "server",
+      threadRef: { environmentId: activeProject.environmentId, threadId: otherThread.id },
+    });
+    vi.mocked(useHandleNewThread).mockReturnValue({
+      activeDraftThread: null,
+      activeThread: null,
+      defaultProjectRef: {
+        environmentId: activeProject.environmentId,
+        projectId: activeProject.id,
+      },
+      defaultProjectFallbackReady: true,
+      handleNewThread: vi.fn().mockResolvedValue(null),
+      routeDraftId: null,
+      routeThreadRef: { environmentId: activeProject.environmentId, threadId: otherThread.id },
+    });
+    await using screen = await render(
+      <SidebarProvider>
+        <Sidebar routeReveal={{ observedKey: null, pendingKey: null }} />
+      </SidebarProvider>,
+      { router: "/local/thread-1" },
+    );
+
+    const failedRow = screen.container.querySelector<HTMLElement>(
+      `[data-sidebar-row="${activeProject.environmentId}:${failedThread.id}"]`,
+    )!;
+    expect(failedRow.className).toContain("opacity-60");
+    expect(failedRow.className).toContain("cursor-default");
+    expect(failedRow.getAttribute("aria-disabled")).toBe("true");
+    expect(failedRow.textContent).toContain("环境已断线，连上后处理");
+    await userEvent.click(failedRow, { force: true });
+    expect(screen.router?.state.location.pathname).toBe("/local/thread-1");
+    failedRow.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.router?.state.location.pathname).toBe("/local/thread-1");
   });
 });

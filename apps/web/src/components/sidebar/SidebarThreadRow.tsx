@@ -79,7 +79,10 @@ import {
   resolveSidebarThreadStatus,
   type SidebarThreadStatus,
   resolveThreadLastVisitedAt,
+  isThreadAttentionRowDisabled,
   shouldRecedeSidebarThread,
+  threadAttentionSubtitleText,
+  type ThreadAttention,
   resolveWorkingStartedAt,
   useRetainedValue,
   withoutRemovedCheckout,
@@ -556,6 +559,10 @@ type SidebarThreadRowProps = {
   onUnsnooze: (threadRef: ScopedThreadRef) => void;
   onUnpin: (threadRef: ScopedThreadRef) => void;
   onAcknowledgeWoke: (threadRef: ScopedThreadRef, visitedAt: string) => void;
+  /** Set on rows inside the "等你处理" section. */
+  attention?: (ThreadAttention & { readonly demoted?: boolean | undefined }) | undefined;
+  /** Attention rows on a disconnected environment cannot be acted on until reconnected. */
+  attentionOffline?: boolean | undefined;
   onFileDropThreads?: ((threadRef: ScopedThreadRef, files: File[]) => void) | undefined;
 };
 
@@ -689,7 +696,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     : null;
 
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
-  const status = resolveSidebarThreadStatus(thread);
+  const status = resolveSidebarThreadStatus({
+    ...thread,
+    pendingRuntimeRequest: thread.source.pendingRuntimeRequest,
+  });
   const lastVisitedDate = lastVisitedAt === undefined ? null : parseTimestampDate(lastVisitedAt);
   const wokeAtDate = props.wokeAt === null ? null : parseTimestampDate(props.wokeAt);
   const isWoke =
@@ -802,8 +812,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       terminalProcessCount={terminalProcessCount}
     />
   );
-
+  const attentionDisabled = isThreadAttentionRowDisabled({
+    attention: props.attention,
+    attentionOffline: props.attentionOffline,
+  });
   const handleClick = (event: ReactMouseEvent) => {
+    if (attentionDisabled) return;
     onThreadClick(event, threadRef);
   };
   const handleAcknowledgeWokeClick = (event: ReactMouseEvent) => {
@@ -829,6 +843,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     }
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
+    if (attentionDisabled) return;
     onThreadActivate(threadRef);
   };
   const handleDoubleClick = (event: ReactMouseEvent) => {
@@ -930,6 +945,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     "group/sidebar-row relative w-full cursor-pointer overflow-hidden text-left outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
     // The card keeps the 1px transparent border of the sample page, so rows are 58px tall.
     variant === "card" ? "rounded-lg border border-transparent" : "rounded-md",
+    attentionDisabled ? "cursor-default opacity-60" : null,
     variant !== "card" &&
       variantAction === "unsettle" &&
       !props.isActive &&
@@ -1335,6 +1351,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               data-sidebar-parent={props.navigationParent}
               aria-label={accessibility.label}
               aria-current={accessibility.current}
+              aria-disabled={attentionDisabled || undefined}
               data-testid="sidebar-row-card"
               aria-busy={isRegeneratingTitle || undefined}
               className={rowSurfaceClassName}
@@ -1502,6 +1519,34 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 {prBadge}
               </span>
             </div>
+            {props.attention !== undefined ? (
+              <div
+                className={cn(
+                  "flex h-4 min-w-0 items-center gap-2 text-meta",
+                  props.attention.demoted || attentionDisabled
+                    ? "text-muted-foreground"
+                    : props.attention.category === "completed"
+                      ? "text-success-foreground"
+                      : props.attention.category === "limited"
+                        ? "text-warning-foreground"
+                        : "text-error-foreground",
+                )}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    props.attention.blocking ? "bg-warning" : "bg-current",
+                  )}
+                />
+                <span className="min-w-0 truncate">
+                  {threadAttentionSubtitleText({
+                    attention: props.attention,
+                    attentionOffline: props.attentionOffline,
+                  })}
+                </span>
+              </div>
+            ) : null}
           </div>
         </TooltipTrigger>
         {detailsTooltip}
