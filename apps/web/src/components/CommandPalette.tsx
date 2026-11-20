@@ -66,6 +66,8 @@ import {
   ChevronRightIcon,
   CornerLeftUpIcon,
   FileSearchIcon,
+  FlagIcon,
+  FlagOffIcon,
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
@@ -418,7 +420,8 @@ function OpenCommandPaletteDialog(props: {
   const { openChildSearch, setOpen } = props;
   const selectedThreadCount = useThreadSelectionStore((state) => state.selectedThreadKeys.size);
   const batchThreads = useOrchestrationCommand(threadEnvironment.batch, { reportFailure: false });
-  const { deleteThreads, markThreadsUnread } = useThreadActions();
+  const { deleteThreads, markThreadsUnread, markCommanderThread, unmarkCommanderThread } =
+    useThreadActions();
   // Keyed by palette session: the intent and restored search only seed this
   // mount, and closing must not change what the closing palette shows.
   const [initialSearch] = useState(
@@ -1468,6 +1471,41 @@ function OpenCommandPaletteDialog(props: {
       icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
       run: async () => {
         useRightPanelStore.getState().open(threadRef, "pull-requests");
+      },
+    });
+  }
+
+  if (
+    activeThread !== null &&
+    activeThreadServerConfig !== undefined &&
+    readEnvironmentScope(activeThread.environmentId, AuthOrchestrationOperateScope)
+  ) {
+    const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
+    const activeThreadShell =
+      threads.find(
+        (candidate) =>
+          candidate.environmentId === activeThread.environmentId &&
+          candidate.id === activeThread.id,
+      ) ?? readThreadShell(threadRef);
+    const isCommander = activeThreadShell?.commander === true;
+    actionItems.push({
+      kind: "action",
+      value: "action:thread-commander",
+      searchTerms: ["指挥", "commander", isCommander ? "取消指挥" : "标成指挥"],
+      title: isCommander ? "取消指挥" : "标成指挥",
+      icon: isCommander ? (
+        <FlagOffIcon className={ITEM_ICON_CLASS} />
+      ) : (
+        <FlagIcon className={ITEM_ICON_CLASS} />
+      ),
+      shortcutCommand: "thread.commander",
+      run: async () => {
+        const result = await (isCommander
+          ? unmarkCommanderThread(threadRef)
+          : markCommanderThread(threadRef));
+        if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+          throw squashAtomCommandFailure(result);
+        }
       },
     });
   }

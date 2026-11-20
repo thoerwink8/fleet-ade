@@ -115,6 +115,8 @@ export interface PinThreadInput extends ThreadCommandInput {
   readonly orderKey?: string;
 }
 export type UnpinThreadInput = ThreadCommandInput;
+export type MarkThreadCommanderInput = ThreadCommandInput;
+export type UnmarkThreadCommanderInput = ThreadCommandInput;
 
 export interface ReorderPinnedThreadInput extends ThreadCommandInput {
   readonly orderKey: string;
@@ -488,7 +490,14 @@ export const createThread = Effect.fn("EnvironmentCommands.createThread")(functi
 });
 
 function simpleThreadCommand(
-  type: "thread.archive" | "thread.unarchive" | "thread.settle" | "thread.pin" | "thread.unpin",
+  type:
+    | "thread.archive"
+    | "thread.unarchive"
+    | "thread.settle"
+    | "thread.pin"
+    | "thread.unpin"
+    | "thread.commander.mark"
+    | "thread.commander.unmark",
   input: ThreadCommandInput,
 ) {
   return allocateCommandId(input).pipe(
@@ -668,6 +677,18 @@ export const unpinThread = Effect.fn("EnvironmentCommands.unpinThread")(function
 ) {
   return yield* simpleThreadCommand("thread.unpin", input);
 });
+
+export const markThreadCommander = Effect.fn("EnvironmentCommands.markThreadCommander")(function* (
+  input: MarkThreadCommanderInput,
+) {
+  return yield* simpleThreadCommand("thread.commander.mark", input);
+});
+
+export const unmarkThreadCommander = Effect.fn("EnvironmentCommands.unmarkThreadCommander")(
+  function* (input: UnmarkThreadCommanderInput) {
+    return yield* simpleThreadCommand("thread.commander.unmark", input);
+  },
+);
 
 export const unsettleThread = Effect.fn("EnvironmentCommands.unsettleThread")(function* (
   input: UnsettleThreadInput,

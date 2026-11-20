@@ -114,6 +114,7 @@ type TrackedInboxThread = WorkingThreadInput &
       EnvironmentThreadShell,
       | "archivedAt"
       | "deletedAt"
+      | "commander"
       | "pinnedAt"
       | "settledOverride"
       | "settledAt"
@@ -216,6 +217,7 @@ export function createInboxReturnTracker() {
             ? JSON.stringify([
                 thread.archivedAt,
                 thread.deletedAt,
+                thread.commander === true,
                 thread.pinnedAt,
                 thread.settledOverride,
                 thread.settledAt,
@@ -235,6 +237,7 @@ export function createInboxReturnTracker() {
         const excluded =
           thread.archivedAt != null ||
           thread.deletedAt != null ||
+          thread.commander === true ||
           thread.pinnedAt != null ||
           thread.settledOverride === "settled" ||
           effectiveSnoozed(thread, { now: observedAt });
