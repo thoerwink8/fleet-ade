@@ -2,6 +2,9 @@ import { describe, expect, it } from "@effect/vitest";
 import type { FleetSummaryRow } from "@t3tools/contracts";
 import {
   EnvironmentId,
+  AuthOrchestrationReadScope,
+  EnvironmentAuthorizationError,
+  authScopeRequiredResponse,
   FleetSummaryError,
   WS_METHODS,
   type FleetSummaryEvent,
@@ -15,6 +18,7 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
+import * as TestClock from "effect/testing/TestClock";
 import * as EnvironmentRegistry from "../connection/registry.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import type { RpcSession } from "../rpc/session.ts";
@@ -113,6 +117,7 @@ it.effect("resubscribes with the committed cursor and clears it on resync", () =
     const visible = yield* Deferred.make<void>();
     const waitForVisible = yield* Ref.make(false);
     const failed = yield* Queue.unbounded<void>();
+    const latestStatus = yield* Ref.make("");
     const partial = yield* Queue.unbounded<void>();
     const session = {
       client: {
@@ -155,19 +160,23 @@ it.effect("resubscribes with the committed cursor and clears it on resync", () =
       }),
     ).pipe(
       Stream.runForEach((state) =>
-        state.error === "storage"
-          ? Queue.offer(failed, undefined)
-          : state.pending !== null
-            ? Queue.offer(partial, undefined)
-            : state.cursor === null
-              ? Queue.offer(
-                  initialStates,
-                  [...state.rows.values()].map((entry) => entry.threadId),
-                )
-              : Queue.offer(states, {
-                  cursor: state.cursor,
-                  ids: [...state.rows.values()].map((entry) => entry.threadId),
-                }),
+        Ref.set(latestStatus, state.status).pipe(
+          Effect.andThen(
+            state.error === "storage"
+              ? Queue.offer(failed, undefined)
+              : state.pending !== null
+                ? Queue.offer(partial, undefined)
+                : state.cursor === null
+                  ? Queue.offer(
+                      initialStates,
+                      [...state.rows.values()].map((entry) => entry.threadId),
+                    )
+                  : Queue.offer(states, {
+                      cursor: state.cursor,
+                      ids: [...state.rows.values()].map((entry) => entry.threadId),
+                    }),
+          ),
+        ),
       ),
       Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
       Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
@@ -207,6 +216,8 @@ it.effect("resubscribes with the committed cursor and clears it on resync", () =
     yield* SubscriptionRef.set(sessions, Option.some(session));
     expect(yield* Queue.take(inputs)).toEqual({ cursor: 10 });
     expect(yield* Queue.take(states)).toEqual({ cursor: 10, ids: ["1", "2"] });
+    yield* TestClock.adjust("2 seconds");
+    expect(yield* Ref.get(latestStatus)).toBe("live");
     yield* SubscriptionRef.set(sessions, Option.none());
     yield* SubscriptionRef.set(sessions, Option.some(session));
     expect(yield* Queue.take(inputs)).toEqual({ cursor: 10 });
@@ -220,5 +231,75 @@ it.effect("resubscribes with the committed cursor and clears it on resync", () =
     expect(yield* Queue.take(inputs)).toEqual({ cursor: 10 });
     yield* Queue.offer(events, { type: "resync", reason: "gap" });
     expect(yield* Queue.take(inputs)).toEqual({});
+  }),
+);
+
+it.effect.each([false, true])("handles permission denial=%s", (denyImmediately) =>
+  Effect.gen(function* () {
+    const source = EnvironmentId.make("source");
+    const inputs = yield* Queue.unbounded<unknown>();
+    const states = yield* Queue.unbounded<string>();
+    const attempts = yield* Queue.unbounded<void>();
+    const session = {
+      client: {
+        [WS_METHODS.fleetSummarySubscribe]: (input: unknown) =>
+          Stream.fromEffect(Queue.offer(inputs, input)).pipe(
+            Stream.drain,
+            Stream.concat(Stream.never),
+          ),
+      },
+    } as unknown as RpcSession;
+    const sessions = yield* SubscriptionRef.make<Option.Option<RpcSession>>(Option.some(session));
+    const supervisor = {
+      target: { environmentId: source },
+      session: sessions,
+    } as unknown as typeof EnvironmentSupervisor.EnvironmentSupervisor.Service;
+    const registry = {
+      followStream: (
+        _id: EnvironmentId,
+        stream: Stream.Stream<unknown, unknown, EnvironmentSupervisor.EnvironmentSupervisor>,
+      ) => Stream.provideService(stream, EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+    } as unknown as typeof EnvironmentRegistry.EnvironmentRegistry.Service;
+    const denied = yield* Ref.make(denyImmediately);
+    const follow = fleetSummaryChanges(source, { snapshot: null }).pipe(
+      Stream.runForEach((state) => Queue.offer(states, `${state.status}:${state.error}`)),
+      Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+      Effect.provideService(RpcPermissionGuard, {
+        authorize: () =>
+          Effect.gen(function* () {
+            yield* Queue.offer(attempts, undefined);
+            if (yield* Ref.get(denied))
+              return yield* new EnvironmentAuthorizationError({
+                ...authScopeRequiredResponse(AuthOrchestrationReadScope),
+                message: "denied",
+              });
+            return yield* Effect.die(new Error("session unavailable"));
+          }),
+      }),
+    );
+    yield* Effect.forkScoped(follow);
+    yield* Queue.take(attempts);
+    if (!denyImmediately) {
+      yield* Stream.fromQueue(states).pipe(
+        Stream.filter((state) => state === "updating:null"),
+        Stream.take(1),
+        Stream.runDrain,
+      );
+      yield* TestClock.adjust("124 millis");
+      expect(yield* Queue.size(attempts)).toBe(0);
+      expect(yield* Queue.size(inputs)).toBe(0);
+      yield* Ref.set(denied, true);
+      yield* TestClock.adjust("126 millis");
+      yield* Queue.take(attempts);
+    }
+    yield* Stream.fromQueue(states).pipe(
+      Stream.filter((state) => state === "error:forbidden"),
+      Stream.take(1),
+      Stream.runDrain,
+    );
+    expect(yield* Queue.size(inputs)).toBe(0);
+    yield* TestClock.adjust("30 seconds");
+    expect(yield* Queue.size(attempts)).toBe(0);
+    expect(yield* Queue.size(inputs)).toBe(0);
   }),
 );

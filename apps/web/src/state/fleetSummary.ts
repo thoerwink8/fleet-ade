@@ -3,19 +3,27 @@ import {
   createFleetSummaryAtoms,
   initialFleetSummaryState,
 } from "@t3tools/client-runtime/state/fleet-summary";
-import { AuthOrchestrationReadScope, type EnvironmentId } from "@t3tools/contracts";
+import {
+  AuthOrchestrationReadScope,
+  sessionGrantsScope,
+  type AuthSessionState,
+  type EnvironmentId,
+} from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { connectionAtomRuntime } from "../connection/runtime";
-import { useEnvironmentScope } from "./session";
+import { environmentSession } from "./session";
 
-const waitUntilVisible = Effect.callback<void>((resume) => {
+export const waitUntilVisible = Effect.callback<void>((resume) => {
   if (typeof document === "undefined" || document.visibilityState === "visible") {
     resume(Effect.void);
     return;
   }
   const onVisibilityChange = () => {
-    if (document.visibilityState === "visible") resume(Effect.void);
+    if (document.visibilityState === "visible") {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      resume(Effect.void);
+    }
   };
   document.addEventListener("visibilitychange", onVisibilityChange);
   return Effect.sync(() => document.removeEventListener("visibilitychange", onVisibilityChange));
@@ -23,9 +31,21 @@ const waitUntilVisible = Effect.callback<void>((resume) => {
 const fleetSummary = createFleetSummaryAtoms(connectionAtomRuntime, waitUntilVisible);
 const empty = initialFleetSummaryState("");
 const emptyAtom = Atom.make(AsyncResult.success(empty));
+const emptySessionAtom = Atom.make(AsyncResult.initial<AuthSessionState>());
+
+export function fleetSessionForbidden(
+  result: AsyncResult.AsyncResult<AuthSessionState, unknown>,
+): boolean {
+  return result._tag === "Success" && !sessionGrantsScope(result.value, AuthOrchestrationReadScope);
+}
 
 export function useFleetSummary(sourceEnvironmentId: EnvironmentId | null) {
-  const allowed = useEnvironmentScope(sourceEnvironmentId, AuthOrchestrationReadScope);
+  const session = useAtomValue(
+    sourceEnvironmentId === null
+      ? emptySessionAtom
+      : environmentSession.sessionStateAtom(sourceEnvironmentId),
+  );
+  const allowed = !fleetSessionForbidden(session);
   const result = useAtomValue(
     sourceEnvironmentId !== null && allowed
       ? fleetSummary.stateAtom(sourceEnvironmentId)

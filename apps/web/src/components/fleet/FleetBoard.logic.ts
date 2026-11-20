@@ -7,21 +7,6 @@ export type FleetBoardFilter = {
   readonly search?: string;
 };
 
-export function fleetMachineName(
-  id: string,
-  linked: ReadonlyMap<string, string>,
-  directory: ReadonlyMap<string, string>,
-): string {
-  return linked.get(id) || directory.get(id) || "未命名机器";
-}
-
-export function defaultFleetSource(
-  primary: string | null,
-  readable: readonly string[],
-): string | null {
-  return primary ?? readable[0] ?? null;
-}
-
 export function fleetReason(reason: string): string {
   switch (reason) {
     case "waiting:command":
@@ -39,9 +24,11 @@ export function fleetReason(reason: string): string {
   }
 }
 
-export function fleetStaleReason(reason: string | undefined): string | null {
-  if (reason === "environment offline") return null;
-  if (reason === "lease lost") return "卡住 · 这台机器已不在做这单";
+export function fleetStaleReason(
+  row: Pick<FleetSummaryRow, "stale" | "staleReason">,
+): string | null {
+  if (!row.stale || row.staleReason === "environment offline") return null;
+  if (row.staleReason === "lease lost") return "卡住 · 这台机器已不在做这单";
   return "卡住 · 信息可能过时";
 }
 
@@ -62,7 +49,7 @@ export function filterFleetRows(
       (filter.repo === undefined || row.repo === filter.repo) &&
       (query === "" ||
         row.title.toLocaleLowerCase().includes(query) ||
-        String(row.issue ?? "").includes(query)),
+        (/^\d+$/.test(query) && String(row.issue ?? "") === query)),
   );
 }
 

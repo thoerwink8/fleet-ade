@@ -29,6 +29,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as TestClock from "effect/testing/TestClock";
 import { Atom, AtomRegistry, AsyncResult } from "effect/reactivity";
 import { EnvironmentRegistry } from "../connection/registry.ts";
 import { createCommandPermissions } from "./commandPermissions.ts";
@@ -69,6 +70,20 @@ const setup = Effect.gen(function* () {
 });
 
 describe("command permissions", () => {
+  it.effect("treats unavailable fleet session as retryable, not forbidden", () =>
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      const fleet = createCommandPermissions(runtime, WS_METHODS.fleetSummarySubscribe);
+      const pending = yield* Effect.forkChild(Effect.exit(fleet.authorize(registry, env)));
+      yield* TestClock.adjust("6 seconds");
+      const result = yield* Fiber.join(pending);
+      expect(result._tag).toBe("Failure");
+      if (result._tag === "Failure")
+        expect(Cause.squash(result.cause)).not.toMatchObject({
+          _tag: "EnvironmentAuthorizationError",
+        });
+    }),
+  );
   it.effect("requires the destination read grant to refresh providers", () =>
     Effect.gen(function* () {
       const registry = yield* setup;

@@ -6,6 +6,7 @@ import type {
 } from "@t3tools/contracts";
 import { type EnvironmentId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
@@ -16,7 +17,11 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 import { Atom } from "effect/reactivity";
 import * as EnvironmentRegistry from "../connection/registry.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
-import { isAuthorizationFailure, subscribeFleetSummaryInSession } from "../rpc/client.ts";
+import {
+  isAuthorizationFailure,
+  subscribeFleetSummaryInSession,
+  subscriptionRetryDelay,
+} from "../rpc/client.ts";
 import { followStreamInEnvironment, provideEnvironmentStreamPermissions } from "./runtime.ts";
 
 export type FleetSummaryState = {
@@ -133,7 +138,6 @@ export function fleetSummaryChanges(
   sourceId: EnvironmentId,
   cache: ResumeCache,
   waitUntilVisible: Effect.Effect<void> = Effect.void,
-  waitForRetry: (delay: number) => Effect.Effect<void> = (delay) => Effect.sleep(delay),
 ) {
   return followStreamInEnvironment(
     sourceId,
@@ -171,6 +175,19 @@ export function fleetSummaryChanges(
                     );
                     const started = yield* SubscriptionRef.get(state);
                     let quiet: Fiber.Fiber<void> | undefined;
+                    const quietTimer = Effect.sleep("2 seconds").pipe(
+                      Effect.andThen(
+                        SubscriptionRef.update(state, (value): FleetSummaryState =>
+                          value.epoch === started.epoch &&
+                          value.cursor !== null &&
+                          value.pending === null &&
+                          value.error === null
+                            ? { ...value, status: "live" }
+                            : value,
+                        ),
+                      ),
+                    );
+                    quiet = yield* Effect.forkChild(quietTimer);
                     const stream = subscribeFleetSummaryInSession(
                       session.value,
                       started.cursor === null ? {} : { cursor: started.cursor },
@@ -195,20 +212,7 @@ export function fleetSummaryChanges(
                               cursor: current.cursor,
                             };
                           retries = 0;
-                          quiet = yield* Effect.forkChild(
-                            Effect.sleep("2 seconds").pipe(
-                              Effect.andThen(
-                                SubscriptionRef.update(state, (value): FleetSummaryState =>
-                                  value.epoch === started.epoch &&
-                                  value.cursor !== null &&
-                                  value.pending === null &&
-                                  value.error === null
-                                    ? { ...value, status: "live" }
-                                    : value,
-                                ),
-                              ),
-                            ),
-                          );
+                          quiet = yield* Effect.forkChild(quietTimer);
                         }),
                       ).pipe(Effect.raceFirst(Queue.take(wake))),
                     );
@@ -239,10 +243,10 @@ export function fleetSummaryChanges(
                       eventBuffer: [],
                     }));
                     const jitter = yield* Random.next;
-                    yield* waitForRetry(
+                    yield* Effect.sleep(
                       storage
                         ? 60_000
-                        : Math.min(30_000, 250 * 2 ** Math.min(retries++, 8)) *
+                        : Duration.toMillis(subscriptionRetryDelay(250, retries++)) *
                             (0.5 + jitter * 0.5),
                     );
                   }
@@ -263,7 +267,6 @@ export function fleetSummaryChanges(
 export function createFleetSummaryAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry.EnvironmentRegistry | R, E>,
   waitUntilVisible: Effect.Effect<void> = Effect.void,
-  waitForRetry: (delay: number) => Effect.Effect<void> = (delay) => Effect.sleep(delay),
 ) {
   const resumeFamily = Atom.family((sourceId: EnvironmentId) =>
     Atom.make((): ResumeCache => ({ snapshot: null })).pipe(
@@ -279,7 +282,7 @@ export function createFleetSummaryAtoms<R, E>(
           get.mount(resume);
           return provideEnvironmentStreamPermissions(
             runtime,
-            fleetSummaryChanges(sourceId, get.once(resume), waitUntilVisible, waitForRetry),
+            fleetSummaryChanges(sourceId, get.once(resume), waitUntilVisible),
           );
         },
         { initialValue: initialFleetSummaryState(sourceId) },
