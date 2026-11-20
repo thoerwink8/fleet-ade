@@ -275,7 +275,7 @@ function ExtendedOfficeViewer(props: {
             <DocumentPages
               html={documentPage.html}
               name={`${props.name}: ${documentPage.title}`}
-              details={`${documentDetails}${fileSize !== undefined ? ` · ${fileSize === 0 ? "0 bytes" : formatAttachmentSize(fileSize)}` : ""}`}
+            details={`${documentDetails}${fileSize !== undefined ? ` · ${fileSize === 0 ? "0 字节" : formatAttachmentSize(fileSize)}` : ""}`}
             />
           </Suspense>
         </>

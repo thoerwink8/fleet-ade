@@ -1295,11 +1295,11 @@ it("copies every indexed line rather than the mounted preview rows", async () =>
 });
 
 it.each([
-  ["one.csv", "text/csv", "name\nAda\n", "1 row · 1 column ·"],
-  ["two.csv", "text/csv", "name,count\nAda,1\nGrace,2\n", "2 rows · 2 columns ·"],
-  ["one.tsv", "text/tab-separated-values", "name\nAda\n", "1 row · 1 column ·"],
-  ["one.txt", "text/plain", "a".repeat(1024 * 1024) + "\n", "1 line ·"],
-  ["two.txt", "text/plain", ("a".repeat(512 * 1024) + "\n").repeat(2), "2 lines ·"],
+  ["one.csv", "text/csv", "name\nAda\n", "1 行 · 1 列 ·"],
+  ["two.csv", "text/csv", "name,count\nAda,1\nGrace,2\n", "2 行 · 2 列 ·"],
+  ["one.tsv", "text/tab-separated-values", "name\nAda\n", "1 行 · 1 列 ·"],
+  ["one.txt", "text/plain", "a".repeat(1024 * 1024) + "\n", "1 行 ·"],
+  ["two.txt", "text/plain", ("a".repeat(512 * 1024) + "\n").repeat(2), "2 行 ·"],
 ] as const)("labels the counts of %s in the status line", async (name, mimeType, text, label) => {
   const file = new Blob([text], { type: mimeType });
   await using screen = await render(
@@ -1817,7 +1817,7 @@ it.each(["rtf", "epub", "ods"] as const)(
           expect(screen.container.textContent).toContain("North");
           expect(screen.container.textContent).toContain("150");
           expect(screen.container.textContent).not.toContain("private note");
-          expect(screen.container.textContent).toContain("1 row · 2 columns");
+          expect(screen.container.textContent).toContain("1 行 · 2 列");
           expect(screen.container.textContent).not.toContain("Limited to 500");
         } else {
           const frame = screen.container.querySelector("iframe");

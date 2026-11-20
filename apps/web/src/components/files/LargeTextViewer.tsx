@@ -9,7 +9,7 @@ import VirtualTablePreview from "./VirtualTablePreview";
 const FIRST_SCREEN_BYTES = 16 * 1024;
 
 function countLabel(count: number, noun: string) {
-  return `${count.toLocaleString("zh-CN")} ${noun}${count === 1 ? "" : "s"}`;
+  return `${count.toLocaleString("zh-CN")} ${noun}`;
 }
 
 function firstScreen(text: string, delimiter: "," | "\t" | null, complete: boolean) {
@@ -221,8 +221,8 @@ export default function LargeTextViewer(props: {
         role="status"
       >
         {props.delimiter
-          ? `${countLabel(Math.max(0, meta.count - 1), "row")} · ${countLabel(meta.count ? meta.columns : 0, "column")}`
-          : countLabel(meta.count, "line")}
+          ? `${countLabel(Math.max(0, meta.count - 1), "行")} · ${countLabel(meta.count ? meta.columns : 0, "列")}`
+          : countLabel(meta.count, "行")}
         {meta.complete && meta.sizeBytes !== undefined
           ? ` · ${meta.sizeBytes === 0 ? "0 bytes" : formatAttachmentSize(meta.sizeBytes)}`
           : " · 正在索引…"}
