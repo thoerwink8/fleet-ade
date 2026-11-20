@@ -537,7 +537,7 @@ describe("large text preview recovery", () => {
       await vi.waitFor(() => expect(screen.container.textContent).toContain("original"));
       // A cold worker can take longer than waitFor allows to load and index on CI.
       await indexed[0];
-      await vi.waitFor(() => expect(screen.container.textContent).toContain("1,000 lines"));
+      await vi.waitFor(() => expect(screen.container.textContent).toContain("1,000 行"));
       const viewport = screen.container.querySelector<HTMLElement>('[tabindex="0"]')!;
       await act(() =>
         viewport.dispatchEvent(
