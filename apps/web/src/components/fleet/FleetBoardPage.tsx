@@ -12,6 +12,7 @@ import {
 import { useRef, useState, type ReactNode } from "react";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
 import { useNowMinute } from "~/hooks/useNowMinute";
+import { useStableCallback } from "~/hooks/useStableCallback";
 import { cn } from "~/lib/utils";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import {
@@ -247,8 +248,13 @@ export function FleetBoardPage() {
     search.source ?? primaryEnvironmentId,
     fleetSourceCandidates,
   );
-  const sourceConnected =
-    sourceEnvironmentId !== null && connectedIds.has(sourceEnvironmentId as EnvironmentId);
+  const sourceEnvironment =
+    sourceEnvironmentId === null
+      ? null
+      : (environments.find((environment) => environment.environmentId === sourceEnvironmentId) ??
+        null);
+  const sourcePhase = sourceEnvironment?.connection.phase ?? null;
+  const sourceConnected = sourcePhase === "connected";
   const fallbackSourceId =
     sourceEnvironmentId ??
     (search.source !== undefined &&
@@ -260,20 +266,41 @@ export function FleetBoardPage() {
       ? null
       : (environments.find((environment) => environment.environmentId === fallbackSourceId) ??
         null);
+  const fallbackPhase = fallbackEnvironment?.connection.phase ?? null;
   const fallbackSession = useEnvironmentSessionState(fallbackSourceId);
   const missingReadScopeError =
-    fallbackEnvironment?.connection.phase === "error" &&
-    (fallbackEnvironment.connection.error?.includes(AuthOrchestrationReadScope) ?? false);
+    fallbackPhase === "error" &&
+    (fallbackEnvironment?.connection.error?.includes(AuthOrchestrationReadScope) ?? false);
+  const fallbackActivePhase =
+    fallbackPhase === "connecting" ||
+    fallbackPhase === "reconnecting" ||
+    fallbackPhase === "connected";
   const scopeLoading =
     environments.length > 0 &&
     fleetSourceCandidates.length === 0 &&
+    fallbackActivePhase &&
     fallbackSession.data === null &&
     !fallbackSession.hasError &&
     !missingReadScopeError;
   const summary = useFleetSummary(sourceEnvironmentId);
+  const sessionReadError =
+    environments.length > 0 && fleetSourceCandidates.length === 0 && fallbackSession.hasError;
+  const sourceDisconnected =
+    environments.length > 0 &&
+    !scopeLoading &&
+    !missingReadScopeError &&
+    !sessionReadError &&
+    (sourceEnvironmentId === null
+      ? !fallbackActivePhase
+      : !sourceConnected && sourcePhase !== "connecting" && sourcePhase !== "reconnecting");
   const summaryForbidden =
     summary.error === "forbidden" ||
-    (environments.length > 0 && !scopeLoading && fleetSourceCandidates.length === 0);
+    missingReadScopeError ||
+    (environments.length > 0 &&
+      !scopeLoading &&
+      !sessionReadError &&
+      !sourceDisconnected &&
+      fleetSourceCandidates.length === 0);
   const retry = useFleetSummaryRetry(sourceEnvironmentId);
   const [retryPending, setRetryPending] = useState(false);
   const [doneOpenIds, setDoneOpenIds] = useState<ReadonlySet<string>>(new Set());
@@ -286,10 +313,11 @@ export function FleetBoardPage() {
   const directory = new Map(identities.map((identity) => [identity.environmentId, identity.label]));
   const machineName = (environmentId: string) =>
     fleetMachineName(environmentId, linkedNames, directory);
+  const displaySourceId = sourceEnvironmentId ?? fallbackSourceId;
   const sourceName =
-    sourceEnvironmentId === null
+    displaySourceId === null
       ? "这台机器"
-      : (directory.get(sourceEnvironmentId as EnvironmentId) ?? "这台机器");
+      : (directory.get(displaySourceId as EnvironmentId) ?? "这台机器");
 
   const allRows = [...summary.rows.values()];
   const machineIds = [...new Set(allRows.map((row) => row.environmentId))];
@@ -382,15 +410,10 @@ export function FleetBoardPage() {
   );
 
   const openedRowInSessionRef = useRef(false);
-  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
-  const registerRowRef = (key: string) => (node: HTMLButtonElement | null) => {
-    if (node) rowRefs.current.set(key, node);
-    else rowRefs.current.delete(key);
-  };
-  const handleOpenRow = (selectedKey: string) => {
+  const handleOpenRow = useStableCallback((selectedKey: string) => {
     openedRowInSessionRef.current = true;
     void patchSearch({ row: selectedKey });
-  };
+  });
   const handleCloseDetail = () => {
     const key = search.row;
     if (openedRowInSessionRef.current) {
@@ -400,7 +423,15 @@ export function FleetBoardPage() {
       void patchSearch({ row: undefined }, true);
     }
     if (key !== undefined) {
-      queueMicrotask(() => rowRefs.current.get(key)?.focus());
+      queueMicrotask(() => {
+        const buttons = document.querySelectorAll<HTMLButtonElement>("button[data-fleet-row]");
+        for (const button of buttons) {
+          if (button.dataset.fleetRow === key) {
+            button.focus();
+            break;
+          }
+        }
+      });
     }
   };
 
@@ -430,9 +461,11 @@ export function FleetBoardPage() {
             </span>
             {summary.status === "live" && sourceConnected ? (
               <Badge variant="success">已连接</Badge>
-            ) : summary.status === "error" || summaryForbidden ? (
+            ) : summary.status === "error" || summaryForbidden || sessionReadError ? (
               <Badge variant="error">读不到</Badge>
-            ) : summary.status === "loading" ? (
+            ) : sourceDisconnected ? (
+              <Badge variant="warning">连不上</Badge>
+            ) : summary.status === "loading" || scopeLoading ? (
               <Badge variant="secondary">正在读取</Badge>
             ) : (
               <Badge variant="warning">旧数据 · 正在更新</Badge>
@@ -468,17 +501,27 @@ export function FleetBoardPage() {
                 筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
               </Button>
             ) : null
-          ) : (
+          ) : allRows.length > 0 ||
+            (environments.length > 0 &&
+              !summaryForbidden &&
+              !sessionReadError &&
+              !sourceDisconnected &&
+              summary.status !== "error") ? (
             <>
               {statusChips}
               {machineFilter}
               {repoFilter}
             </>
-          )}
+          ) : null}
         </div>
 
         {isMobile &&
-        (allRows.length > 0 || (summary.status !== "error" && sourceEnvironmentId !== null)) ? (
+        (allRows.length > 0 ||
+          (!summaryForbidden &&
+            !sessionReadError &&
+            !sourceDisconnected &&
+            summary.status !== "error" &&
+            sourceEnvironmentId !== null)) ? (
           <div className="flex shrink-0 border-b px-5 py-2">{statusChips}</div>
         ) : null}
 
@@ -501,8 +544,7 @@ export function FleetBoardPage() {
                 title="正在读取"
                 description="第一次读取要等这台机器把它记下的活送过来。"
               />
-            ) : allRows.length === 0 &&
-              (fleetSourceCandidates.length === 0 || summary.error === "forbidden") ? (
+            ) : allRows.length === 0 && summaryForbidden ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="这个连接没有读取会话的权限，看不到机群汇总"
@@ -512,18 +554,18 @@ export function FleetBoardPage() {
                   </Button>
                 }
               />
-            ) : allRows.length === 0 && connectedIds.size === 0 ? (
+            ) : allRows.length === 0 && sourceDisconnected ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
-                title="还没有连上的环境"
-                description="连上一台 T3 Code 服务器后，这里会汇总它记下的各台机器的活。"
+                title={`汇总机 ${sourceName} 连不上`}
+                description="连上这台机器后，这里会显示它记下的各台机器的活。"
                 action={
                   <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
                     去连接
                   </Button>
                 }
               />
-            ) : allRows.length === 0 && summary.status === "error" ? (
+            ) : allRows.length === 0 && (summary.status === "error" || sessionReadError) ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="读不到机群汇总"
@@ -602,7 +644,6 @@ export function FleetBoardPage() {
                               )}
                               now={now}
                               selected={search.row === key}
-                              rowRef={registerRowRef(key)}
                               onSelect={handleOpenRow}
                             />
                           );
@@ -642,7 +683,6 @@ export function FleetBoardPage() {
                                     )}
                                     now={now}
                                     selected={search.row === key}
-                                    rowRef={registerRowRef(key)}
                                     onSelect={handleOpenRow}
                                   />
                                 );
@@ -680,7 +720,7 @@ export function FleetBoardPage() {
       />
 
       <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <SheetPopup side="bottom" aria-label="筛选机群">
+        <SheetPopup side="bottom" layer="nested" aria-label="筛选机群">
           <SheetHeader>
             <SheetTitle>筛选</SheetTitle>
           </SheetHeader>

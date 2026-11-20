@@ -1,10 +1,11 @@
+import "~/index.css";
 import { page, userEvent } from "vite-plus/test/browser";
 import { expect, it, vi } from "vite-plus/test";
-
 import { render } from "../../../test/render";
 import { FleetBoardPage } from "./FleetBoardPage";
 
 const mocks = vi.hoisted(() => ({
+  identities: [{ environmentId: "env-a", label: "这台机器" }],
   environments: [
     {
       environmentId: "env-a",
@@ -42,6 +43,50 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+function setup(overrides?: {
+  label?: string;
+  phase?: string;
+  error?: string | null;
+  readableIds?: string[];
+  sessionState?: { data: Record<string, unknown> | null; hasError: boolean; isPending: boolean };
+  rows?: Map<string, unknown>;
+  summaryStatus?: string;
+}) {
+  mocks.identities = [{ environmentId: "env-a", label: overrides?.label ?? "这台机器" }];
+  mocks.environments = [
+    {
+      environmentId: "env-a",
+      connection: {
+        phase: overrides?.phase ?? "connected",
+        error: overrides?.error ?? null,
+      },
+      serverConfig: null,
+    },
+  ];
+  mocks.readableIds = overrides?.readableIds ?? ["env-a"];
+  mocks.sessionState = overrides?.sessionState ?? { data: {}, hasError: false, isPending: false };
+  mocks.summary.status = overrides?.summaryStatus ?? "live";
+  mocks.summary.rows =
+    (overrides?.rows as typeof mocks.summary.rows | undefined) ??
+    new Map([
+      [
+        "adhoc\nenv-a\nthread-1",
+        {
+          environmentId: "env-a",
+          threadId: "thread-1",
+          title: "修机群看板",
+          phase: "working",
+          reason: "",
+          needsYou: false,
+          lastProgress: "正在写页面",
+          updatedAt: "2026-11-20T10:00:00.000Z",
+          stale: false,
+          revision: 1,
+        },
+      ],
+    ]);
+}
+
 vi.mock("~/state/fleetSummary", () => ({
   useFleetSummary: () => mocks.summary as never,
   useFleetSummaryRetry: () => async () => {},
@@ -49,7 +94,7 @@ vi.mock("~/state/fleetSummary", () => ({
 
 vi.mock("~/state/environments", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/state/environments")>()),
-  useEnvironmentIdentities: () => [{ environmentId: "env-a", label: "这台机器" }],
+  useEnvironmentIdentities: () => mocks.identities,
   useEnvironments: () => ({
     environments: mocks.environments,
   }),
@@ -78,7 +123,9 @@ vi.mock("~/hooks/useSettings", async (importOriginal) => ({
   useClientSettings: (selector: (settings: unknown) => unknown) => selector({}),
 }));
 
-it("syncs the row drawer with ?row and restores focus on back and Esc", async () => {
+it("syncs the row drawer with ?row and restores focus on back, Esc, and close button", async () => {
+  await page.viewport(1280, 800);
+  setup();
   await using screen = await render(<FleetBoardPage />, { router: "/fleet" });
   const router = screen.router;
   if (router === undefined) throw new Error("the test router is missing");
@@ -103,39 +150,58 @@ it("syncs the row drawer with ?row and restores focus on back and Esc", async ()
   await expect.element(page.getByRole("dialog", { name: "修机群看板" })).not.toBeInTheDocument();
   expect(router.latestLocation.search.row).toBeUndefined();
   await expect.element(rowButton).toHaveFocus();
+
+  await rowButton.click();
+  const dialog = page.getByRole("dialog", { name: "修机群看板" });
+  await expect.element(dialog).toBeVisible();
+
+  await dialog.getByRole("button", { name: "关闭" }).click();
+
+  await expect.element(dialog).not.toBeInTheDocument();
+  expect(router.latestLocation.search.row).toBeUndefined();
+  await expect.element(rowButton).toHaveFocus();
 });
 
 it("shows the missing-permission empty state when connection fails for orchestration:read", async () => {
-  const prevEnvironments = mocks.environments;
-  const prevReadableIds = mocks.readableIds;
-  const prevSessionState = mocks.sessionState;
-  const prevRows = mocks.summary.rows;
-  const prevStatus = mocks.summary.status;
-  try {
-    mocks.environments = [
-      {
-        environmentId: "env-a",
-        connection: {
-          phase: "error",
-          error: "The authenticated token is missing required scope: orchestration:read.",
-        },
-        serverConfig: null,
-      },
-    ];
-    mocks.readableIds = [];
-    mocks.sessionState = { data: null, hasError: false, isPending: false };
-    mocks.summary.rows = new Map();
-    mocks.summary.status = "loading";
+  setup({
+    phase: "error",
+    error: "The authenticated token is missing required scope: orchestration:read.",
+    readableIds: [],
+    sessionState: { data: null, hasError: false, isPending: false },
+    rows: new Map(),
+    summaryStatus: "loading",
+  });
 
-    await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
-    await expect
-      .element(page.getByText("这个连接没有读取会话的权限，看不到机群汇总"))
-      .toBeVisible();
-  } finally {
-    mocks.environments = prevEnvironments;
-    mocks.readableIds = prevReadableIds;
-    mocks.sessionState = prevSessionState;
-    mocks.summary.rows = prevRows;
-    mocks.summary.status = prevStatus;
-  }
+  await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
+  await expect.element(page.getByText("这个连接没有读取会话的权限，看不到机群汇总")).toBeVisible();
+});
+
+it("shows the disconnected source state instead of loading when offline and no rows", async () => {
+  setup({
+    label: "远端机",
+    phase: "offline",
+    readableIds: [],
+    sessionState: { data: null, hasError: false, isPending: false },
+    rows: new Map(),
+    summaryStatus: "loading",
+  });
+
+  await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
+  await expect.element(page.getByText("汇总机 远端机 连不上")).toBeVisible();
+  await expect.element(page.getByText("连不上", { exact: true })).toBeVisible();
+  await expect.element(page.getByRole("link", { name: "去连接" })).toBeVisible();
+});
+
+it("shows the read error retry state instead of missing-permission when session fetch fails", async () => {
+  setup({
+    phase: "connected",
+    readableIds: [],
+    sessionState: { data: null, hasError: true, isPending: false },
+    rows: new Map(),
+    summaryStatus: "loading",
+  });
+
+  await using _screen = await render(<FleetBoardPage />, { router: "/fleet" });
+  await expect.element(page.getByText("读不到机群汇总")).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "重试" })).toBeVisible();
 });

@@ -2,7 +2,7 @@ import { fleetSummaryRowKey } from "@t3tools/client-runtime/state/fleet-summary"
 import type { EnvironmentId, FleetSummaryRow, ThreadId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
-import { memo, type Ref } from "react";
+import { memo } from "react";
 
 import { cn } from "~/lib/utils";
 import { Badge } from "../ui/badge";
@@ -30,7 +30,6 @@ export const FleetBoardRow = memo(function FleetBoardRow({
   machineConnected,
   now,
   selected,
-  rowRef,
   onSelect,
 }: {
   row: FleetSummaryRow;
@@ -39,7 +38,6 @@ export const FleetBoardRow = memo(function FleetBoardRow({
   /** Shared minute-granular epoch ms, so a page of rows never re-renders alone. */
   now: number;
   selected: boolean;
-  rowRef?: Ref<HTMLButtonElement>;
   onSelect: (key: string) => void;
 }) {
   const key = fleetSummaryRowKey(row);
@@ -67,13 +65,13 @@ export const FleetBoardRow = memo(function FleetBoardRow({
   return (
     <div
       className={cn(
-        "flex w-full min-w-0 items-center gap-2 rounded-md transition-colors",
+        "flex w-full min-w-0 items-center gap-2 rounded-md transition-colors [content-visibility:auto] [contain-intrinsic-block-size:76px]",
         selected ? "bg-accent" : "hover:bg-accent/60",
       )}
     >
       <button
-        ref={rowRef}
         type="button"
+        data-fleet-row={key}
         aria-current={selected ? "true" : undefined}
         onClick={() => onSelect(key)}
         className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1 rounded-md px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
