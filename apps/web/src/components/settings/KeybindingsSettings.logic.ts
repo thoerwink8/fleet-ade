@@ -448,6 +448,7 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "filePicker.toggle": "文件选择器：开关",
   "projectSearch.toggle": "项目搜索：开关",
   "usage.open": "用量：打开",
+  "fleet.open": "机群：打开",
   "theme.select": "主题：选择",
   "appearance.cycle": "外观：循环切换",
   "themeEditor.toggle": "主题编辑器：开关",

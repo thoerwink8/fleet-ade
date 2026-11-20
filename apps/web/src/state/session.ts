@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { createEnvironmentSessionAtoms } from "@t3tools/client-runtime/state/session";
 import {
   type AuthEnvironmentScope,
@@ -103,4 +103,12 @@ export function useEnvironmentSessionState(environmentId: EnvironmentId | null) 
     hasError: result._tag === "Failure",
     isPending: result.waiting,
   };
+}
+
+export function useEnvironmentSessionRetry(environmentId: EnvironmentId | null) {
+  return useAtomRefresh(
+    environmentId === null
+      ? EMPTY_SESSION_STATE_ATOM
+      : environmentSession.sessionStateAtom(environmentId),
+  );
 }

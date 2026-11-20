@@ -102,8 +102,7 @@
     "apps/web": {
       // Worktree setup (scripts/setup-worktree.ts) runs this directly, and evidence
       // fixtures run under node.
-      // Fleet summary state is the entry point for the separately delivered board page.
-      "entry": ["scripts/warm-dep-cache.ts", "test/fixtures/**/*.mjs", "src/state/fleetSummary.ts"],
+      "entry": ["scripts/warm-dep-cache.ts", "test/fixtures/**/*.mjs"],
       // UI component modules are copied and adapted as cohesive sets. Keep their
       // named subcomponents even before they have callers; the file audit still
       // reports an entire component module when nothing imports it.

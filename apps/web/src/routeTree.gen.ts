@@ -22,6 +22,7 @@ import { Route as ChatSettingsRouteImport } from './routes/_chat.settings'
 import { Route as ChatPullRequestsRouteImport } from './routes/_chat.pull-requests'
 import { Route as ChatPipelineRouteImport } from './routes/_chat.pipeline'
 import { Route as ChatNewRouteImport } from './routes/_chat.new'
+import { Route as ChatFleetRouteImport } from './routes/_chat.fleet'
 import { Route as ChatEngineRouteImport } from './routes/_chat.engine'
 import { Route as ChatChannelsRouteImport } from './routes/_chat.channels'
 import { Route as ThreadsEnvironmentIdThreadIdRouteImport } from './routes/threads.$environmentId.$threadId'
@@ -118,6 +119,11 @@ const ChatPipelineRoute = ChatPipelineRouteImport.update({
 const ChatNewRoute = ChatNewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => ChatRoute,
+} as any)
+const ChatFleetRoute = ChatFleetRouteImport.update({
+  id: '/fleet',
+  path: '/fleet',
   getParentRoute: () => ChatRoute,
 } as any)
 const ChatEngineRoute = ChatEngineRouteImport.update({
@@ -301,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof WelcomeRoute
   '/channels': typeof ChatChannelsRoute
   '/engine': typeof ChatEngineRoute
+  '/fleet': typeof ChatFleetRoute
   '/new': typeof ChatNewRoute
   '/pipeline': typeof ChatPipelineRoute
   '/pull-requests': typeof ChatPullRequestsRoute
@@ -347,6 +354,7 @@ export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
   '/channels': typeof ChatChannelsRoute
   '/engine': typeof ChatEngineRoute
+  '/fleet': typeof ChatFleetRoute
   '/new': typeof ChatNewRoute
   '/pipeline': typeof ChatPipelineRoute
   '/pull-requests': typeof ChatPullRequestsRoute
@@ -396,6 +404,7 @@ export interface FileRoutesById {
   '/welcome': typeof WelcomeRoute
   '/_chat/channels': typeof ChatChannelsRoute
   '/_chat/engine': typeof ChatEngineRoute
+  '/_chat/fleet': typeof ChatFleetRoute
   '/_chat/new': typeof ChatNewRoute
   '/_chat/pipeline': typeof ChatPipelineRoute
   '/_chat/pull-requests': typeof ChatPullRequestsRoute
@@ -446,6 +455,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/channels'
     | '/engine'
+    | '/fleet'
     | '/new'
     | '/pipeline'
     | '/pull-requests'
@@ -492,6 +502,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/channels'
     | '/engine'
+    | '/fleet'
     | '/new'
     | '/pipeline'
     | '/pull-requests'
@@ -540,6 +551,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/_chat/channels'
     | '/_chat/engine'
+    | '/_chat/fleet'
     | '/_chat/new'
     | '/_chat/pipeline'
     | '/_chat/pull-requests'
@@ -682,6 +694,13 @@ declare module '@tanstack/react-router' {
       path: '/new'
       fullPath: '/new'
       preLoaderRoute: typeof ChatNewRouteImport
+      parentRoute: typeof ChatRoute
+    }
+    '/_chat/fleet': {
+      id: '/_chat/fleet'
+      path: '/fleet'
+      fullPath: '/fleet'
+      preLoaderRoute: typeof ChatFleetRouteImport
       parentRoute: typeof ChatRoute
     }
     '/_chat/engine': {
@@ -987,6 +1006,7 @@ const ChatSettingsRouteWithChildren = ChatSettingsRoute._addFileChildren(
 interface ChatRouteChildren {
   ChatChannelsRoute: typeof ChatChannelsRoute
   ChatEngineRoute: typeof ChatEngineRoute
+  ChatFleetRoute: typeof ChatFleetRoute
   ChatNewRoute: typeof ChatNewRoute
   ChatPipelineRoute: typeof ChatPipelineRoute
   ChatPullRequestsRoute: typeof ChatPullRequestsRoute
@@ -1000,6 +1020,7 @@ interface ChatRouteChildren {
 const ChatRouteChildren: ChatRouteChildren = {
   ChatChannelsRoute: ChatChannelsRoute,
   ChatEngineRoute: ChatEngineRoute,
+  ChatFleetRoute: ChatFleetRoute,
   ChatNewRoute: ChatNewRoute,
   ChatPipelineRoute: ChatPipelineRoute,
   ChatPullRequestsRoute: ChatPullRequestsRoute,

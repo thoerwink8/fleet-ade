@@ -9,7 +9,9 @@ import { DraftId } from "../composerDraftStore";
 // treat text-2xs, text-ui or bg-composer-seam-below as colors.
 const twMerge = extendTailwindMerge({
   extend: {
-    theme: { text: ["2xs", "3xs", "4xs", "5xs", "row", "ui", "meta", "title", "dialog-title"] },
+    theme: {
+      text: ["2xs", "3xs", "4xs", "5xs", "prose", "row", "ui", "meta", "title", "dialog-title"],
+    },
     classGroups: { "bg-image": [{ bg: ["composer-seam-below", "composer-seam-above"] }] },
   },
 });

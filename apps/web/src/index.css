@@ -113,8 +113,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --command-content-inset: 1rem;
   --floating-content-inset: 0.75rem;
   /* App layer order: the bottom terminal drawer (45, above the timeline minimap),
-     docked sheets, then the floating preview player (47–49, see
-     previewMiniPlayerLayout.ts), then dialogs and popovers (50 and up). */
+     docked sheets (46), then the floating preview player (47–49, see
+     previewMiniPlayerLayout.ts), then dialogs and popovers (50 and up), then nested sheets (60). */
   --z-sheet: 46;
   --glass-blur: 12px;
   --glass-opacity: 80%;
@@ -210,7 +210,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --text-4xs--line-height: 1;
   --text-5xs: 0.4375rem;
   --text-5xs--line-height: 1;
-  /* The type scale from :root, as text-row, text-ui, text-meta and title utilities. */
+  /* The type scale from :root, as text-prose, text-row, text-ui, text-meta and title utilities. */
+  --text-prose: var(--font-size-prose);
+  --text-prose--line-height: var(--line-height-prose);
   --text-row: var(--font-size-row);
   --text-row--line-height: var(--line-height-row);
   --text-ui: var(--font-size-ui);

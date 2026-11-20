@@ -370,6 +370,16 @@ ends, as for any delegated task. It keeps following the task across restarts.
 If the other machine revokes the link, or the link is removed here, the task
 fails with that reason.
 
+## See what every machine is doing
+
+Open **机群** from the sidebar or the command palette to read, in one place, the
+work every linked machine has reported to this one: what each is working on,
+what is waiting for you, and what it last finished. The board reads only what
+this machine has recorded, so a machine that has not reported in shows its last
+known state rather than a live one. Finished threads stay on the board for 24
+hours, then drop off. Nothing on the board changes a machine; to act on a
+thread, open it from its row.
+
 ## Manage or revoke access
 
 On the host, **Settings → Sharing & access** lets authorized administrators create

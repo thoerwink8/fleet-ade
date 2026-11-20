@@ -61,6 +61,7 @@ import {
   BugIcon,
   ListTreeIcon,
   ChartNoAxesColumnIcon,
+  NetworkIcon,
   CheckIcon,
   ChevronRightIcon,
   CornerLeftUpIcon,
@@ -1722,6 +1723,18 @@ function OpenCommandPaletteDialog(props: {
     shortcutCommand: "usage.open",
     run: async () => {
       await navigate({ to: "/usage" });
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:fleet",
+    searchTerms: ["fleet", "machines", "机群", "看板"],
+    title: "打开机群",
+    icon: <NetworkIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "fleet.open",
+    run: async () => {
+      await navigate({ to: "/fleet" });
     },
   });
 
