@@ -33,7 +33,7 @@ it.effect("refuses to listen on a non-loopback host when remote clients are not 
     }).pipe(Effect.flip);
     assert.equal(
       error.message,
-      "Example Corp's policy does not allow remote clients, so the server cannot listen on 0.0.0.0.",
+      "Example Corp 的策略不允许远程客户端访问，因此服务器不能在 0.0.0.0 上监听。",
     );
   }),
 );
@@ -52,7 +52,7 @@ it.effect("binds only the loopback address it approved when remote clients are n
     // Node listens on every interface for an empty host, and a name resolves through DNS.
     for (const host of ["", "127.office.example", "127.0.0.1e0", "0.0.0.0"]) {
       const error = yield* bind(host).pipe(Effect.flip);
-      assert.include(error.message, "does not allow remote clients", host);
+      assert.include(error.message, "不允许远程客户端访问", host);
     }
     for (const [host, address] of [
       [undefined, "127.0.0.1"],
@@ -68,7 +68,7 @@ it.effect("binds only the loopback address it approved when remote clients are n
       tailscaleServeEnabled: false,
       privateNetworkOnly: true,
     }).pipe(Effect.flip);
-    assert.include(service.message, "set T3CODE_HOST=127.0.0.1 in its service.env");
+    assert.include(service.message, "设置 T3CODE_HOST=127.0.0.1");
     assert.equal(yield* bind("localhost", { document: undefined }), "localhost");
     assert.equal(yield* bind(undefined, { document: undefined }), "127.0.0.1");
   }),
@@ -92,7 +92,7 @@ it.effect("refuses an auth policy the clients list leaves out", () =>
       host: undefined,
       tailscaleServeEnabled: false,
     }).pipe(Effect.flip);
-    assert.equal(error.message, "Example Corp's policy does not allow browsers on this machine.");
+    assert.equal(error.message, "Example Corp 的策略不允许本机浏览器访问。");
   }),
 );
 
@@ -103,7 +103,7 @@ it.effect("refuses unsafe-no-auth under any policy file, even one without limits
       host: undefined,
       tailscaleServeEnabled: false,
     }).pipe(Effect.flip);
-    assert.include(error.message, "without authentication");
+    assert.include(error.message, "无认证运行");
     assert.isTrue(ManagedLimits.allowsAuthPolicy({ document: undefined }, "unsafe-no-auth"));
   }),
 );
@@ -294,7 +294,7 @@ it.effect(
       assert.deepEqual(renamed["new.tailnet.ts.net:443"], { "/": "http://127.0.0.1:9000" });
       assert.include(
         former.message,
-        'under old.tailnet.ts.net, a former name of this machine, which "tailscale serve ... off" cannot reach; run "tailscale serve reset"',
+        '位于 old.tailnet.ts.net（此机器的旧名称）',
       );
       const current: Web = {
         "old.tailnet.ts.net:443": { "/": "http://127.0.0.1:9000" },
@@ -312,13 +312,13 @@ it.effect(
         localhostOffCalls,
       ).pipe(Effect.flip);
       assert.deepEqual(localhostOffCalls, []);
-      assert.include(localhost.message, "its target localhost might be another service");
+      assert.include(localhost.message, "其目标 localhost 可能是此端口上的其他服务");
       // Only a fresh read confirms the route is gone, whatever `off` exits with.
       for (const answers of [{ offIgnored: true }, { offIgnored: true, offExitCode: 1 }]) {
         const stuck = yield* close(answers).pipe(Effect.flip);
         assert.include(
           stuck.message,
-          'Tailscale Serve forwards port 443 at / here; turn it off with "tailscale serve --https=443 --set-path=/ off"',
+          'Tailscale Serve 仍转发',
         );
       }
       // Routes the server must not remove itself: a Service's, and a foreground command's.
@@ -340,7 +340,7 @@ it.effect(
       const ownedOffCalls: Array<ReadonlyArray<string>> = [];
       const owned = yield* close({ status: owners }, ownedOffCalls).pipe(Effect.flip);
       assert.deepEqual(ownedOffCalls, []);
-      assert.include(owned.message, 'stop the "tailscale serve" command that runs it');
+      assert.include(owned.message, '请停止运行它的 "tailscale serve" 命令');
       assert.include(
         owned.message,
         '"tailscale serve --service=svc:t3 --https=443 --set-path=/t3 off"',
@@ -355,12 +355,12 @@ it.effect(
         { stdout: "", exitCode: 1, stderr: dialFailure("permission denied") },
       ]) {
         const unread = yield* close({ status }).pipe(Effect.flip);
-        assert.include(unread.message, "does not start until Tailscale Serve can be checked");
+        assert.include(unread.message, "因此服务器不会启动：需先确认 Tailscale Serve 状态");
       }
       // A Tailscale that never answers is not read as nothing to close, and the refusal says why.
       const hung = yield* close({ statusHangs: true }).pipe(Effect.flip, Effect.forkChild);
       yield* TestClock.adjust("10 seconds");
-      assert.include((yield* Fiber.join(hung)).message, "Tailscale did not answer");
+      assert.include((yield* Fiber.join(hung)).message, "Tailscale 没有应答");
       // Tailscale down, logged out, or not installed forwards nothing now.
       for (const stderr of [
         dialFailure("connection refused"),
@@ -405,7 +405,7 @@ it.effect(
         Effect.flip,
       );
       assert.deepEqual(heldOffCalls, []);
-      assert.include(held.message, "while it cannot bind 127.0.0.1:3773");
+      assert.include(held.message, "无法绑定 127.0.0.1:3773");
     }).pipe(Effect.provideService(NetService.NetService, portFree));
   },
 );

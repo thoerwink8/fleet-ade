@@ -7553,7 +7553,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const terminal = yield* Queue.take(harness.terminalReceipts);
       assert.equal(terminal.status, "failed");
       if (terminal.status !== "failed") return;
-      assert.include(terminal.failure.message, "run `claude auth login`");
+      assert.include(terminal.failure.message, "运行 `claude auth login`");
       assert.include(terminal.failure.message, configDir);
       assert.include(terminal.failure.message, JSON.stringify(cwd));
       assert.notInclude(terminal.failure.message, "repeated API errors");

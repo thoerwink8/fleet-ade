@@ -393,7 +393,7 @@ describe("t3 pair", () => {
 
         assert.include(
           String(error),
-          "Example Corp's policy does not allow remote clients, so Tailscale Serve cannot be turned on.",
+          "Example Corp 的策略不允许远程客户端访问，因此不能开启 Tailscale Serve。",
         );
       }),
     ).pipe(Effect.provide(NodeServices.layer)),

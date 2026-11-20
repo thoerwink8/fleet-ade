@@ -324,7 +324,7 @@ export class OrchestratorRuntimeModeAboveCeilingError extends Schema.TaggedError
 ) {
   override get message(): string {
     const limit = managedRuntimeModeCeilingMessage(this.organization, this.maxRuntimeMode);
-    return this.refused === "turn" ? `${limit} Switch this thread's mode to continue.` : limit;
+    return this.refused === "turn" ? `${limit}请切换此会话的模式后继续。` : limit;
   }
 }
 

@@ -478,7 +478,7 @@ export const layer = Layer.effect(
     const webhookPolicyBlock =
       webhookPolicyOrganization === undefined
         ? undefined
-        : managedPolicyDeniedMessage(webhookPolicyOrganization, "webhook tasks");
+        : managedPolicyDeniedMessage(webhookPolicyOrganization, "webhook 任务");
     const withPolicy = (task: ScheduledTask): ScheduledTask =>
       webhookPolicyBlock !== undefined && task.schedule.type === "webhook"
         ? { ...task, blockedByPolicy: webhookPolicyBlock }

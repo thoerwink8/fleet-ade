@@ -215,7 +215,7 @@ it.layer(layerWithCeiling)("runtime mode ceiling", (it) => {
       const refusedCreate = yield* orchestrator.dispatch(create).pipe(Effect.flip);
       assert.ok(refusedCreate._tag === "OrchestratorRuntimeModeAboveCeilingError");
       assert.equal(refusedCreate.refused, "mode");
-      assert.equal(refusedCreate.message, "Example Corp limits threads to Auto-accept edits.");
+      assert.equal(refusedCreate.message, "Example Corp 限制会话最高到自动接受编辑。");
       assert.isNull(yield* projections.getThreadShell(threadId));
 
       yield* createThread(threadId);
@@ -284,7 +284,7 @@ it.layer(layerWithCeiling)("runtime mode ceiling", (it) => {
       assert.equal(refused.refused, "turn");
       assert.equal(
         refused.message,
-        "Example Corp limits threads to Auto-accept edits. Switch this thread's mode to continue.",
+        "Example Corp 限制会话最高到自动接受编辑。请切换此会话的模式后继续。",
       );
       assert.lengthOf((yield* orchestrator.getThreadRecords(threadId, ["runs"])).runs, 0);
 

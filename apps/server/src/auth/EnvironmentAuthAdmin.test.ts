@@ -64,7 +64,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
 
         assert.equal(
           error.message,
-          "Example Corp's policy does not allow remote clients, so this server cannot create pairing links.",
+          "Example Corp 的策略不允许远程客户端访问，因此此服务器不能创建配对链接。",
         );
         assert.isAbove(startup.credential.length, 0);
       }).pipe(Effect.provide(layerEnvironmentAuth(undefined, desktopAndLocalOnly))),

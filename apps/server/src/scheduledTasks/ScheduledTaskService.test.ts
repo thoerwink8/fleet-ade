@@ -817,7 +817,7 @@ it.effect("refuses saving an enabled task above the policy ceiling", () =>
           interactionMode: "default",
         });
       const refused = yield* save(true).pipe(Effect.flip);
-      assert.equal(refused.message, "Example Corp limits threads to Auto-accept edits.");
+      assert.equal(refused.message, "Example Corp 限制会话最高到自动接受编辑。");
       assert.lengthOf((yield* service.list()).tasks, 0);
       // A disabled task does not run, so it can still be saved.
       yield* save(false);
@@ -826,7 +826,7 @@ it.effect("refuses saving an enabled task above the policy ceiling", () =>
       const reenabled = yield* service
         .setEnabled({ id: ScheduledTaskId.make("task:above-ceiling"), enabled: true })
         .pipe(Effect.flip);
-      assert.equal(reenabled.message, "Example Corp limits threads to Auto-accept edits.");
+      assert.equal(reenabled.message, "Example Corp 限制会话最高到自动接受编辑。");
       // A task bound to a thread runs in that thread's mode, so its own is not checked.
       const bound = {
         id: ScheduledTaskId.make("task:bound"),

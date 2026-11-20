@@ -381,7 +381,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
   it.effect("lists a blocked driver's instances as unavailable without running them", () =>
     Effect.gen(function* () {
       const instanceId = ProviderInstanceId.make("codex");
-      const reason = "Example Corp's policy does not allow the Codex provider.";
+      const reason = "Example Corp 的策略不允许使用 Codex 提供方。";
       const { registry } = yield* makeProviderInstanceRegistry({
         drivers: [CodexDriver],
         configMap: { [instanceId]: { driver: ProviderDriverKind.make("codex") } },

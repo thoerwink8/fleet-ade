@@ -180,7 +180,7 @@ it.layer(
       assert.equal(refused._tag, "RuntimePolicyAboveCeilingError");
       assert.equal(
         refused.message,
-        "Example Corp limits threads to Auto-accept edits. Switch this thread's mode to continue.",
+        "Example Corp 限制会话最高到自动接受编辑。请切换此会话的模式后继续。",
       );
       const allowed = yield* resolve("auto-accept-edits");
       assert.equal(allowed.runtimeMode, "auto-accept-edits");
