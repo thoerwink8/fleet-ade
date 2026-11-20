@@ -34,6 +34,7 @@ import {
   ProviderSessionId,
   ProviderThreadId,
   ProviderTurnId,
+  RunAttemptId,
   RunId,
   ScheduledTaskId,
   ThreadId,
@@ -353,7 +354,7 @@ const layerTest = Layer.mergeAll(
   Layer.provide(SqlitePersistence.layerMemory),
   Layer.provide(layerCheckpointStoreTest),
   Layer.provide(layerServerConfig),
-  Layer.provide(ServerSettings.layerTest()),
+  Layer.provideMerge(ServerSettings.layerTest()),
   Layer.provide(layerTestProviderInstanceRegistry),
   Layer.provide(layerGitWorkflowTest),
   Layer.provide(layerProjectServiceTest),
@@ -1003,6 +1004,7 @@ const layerSharedApplicationDataPlaneTest = Layer.mergeAll(
   RuntimeLayer.layerProjectService,
   RuntimeLayer.layerEventSink,
   RuntimeLayer.layerEventInfrastructure,
+  EffectOutbox.layer,
 ).pipe(
   Layer.provide(
     Layer.mock(WorkspacePaths.WorkspacePaths)({
@@ -1042,6 +1044,128 @@ const layerSharedApplicationDataPlaneTest = Layer.mergeAll(
 );
 
 it.layer(layerTest)("OrchestrationV2LayerLive", (it) => {
+  it.effect("marks a concurrency-blocked run until its slot is released", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const sink = yield* EventSink.EventSinkV2;
+      const settings = yield* ServerSettings.ServerSettingsService;
+      const previousLimit = (yield* settings.getSettings).maxConcurrentSessions;
+      yield* Effect.acquireRelease(Effect.void, () =>
+        settings.updateSettings({ maxConcurrentSessions: previousLimit }).pipe(Effect.orDie),
+      );
+      yield* settings.updateSettings({ maxConcurrentSessions: 1 });
+      const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+      const threads = ["slot-first", "slot-second"].map((name) => ThreadId.make(name));
+      for (const threadId of threads) {
+        yield* seedProject({
+          projectId: ProjectId.make(`${threadId}-project`),
+          title: "Slot test",
+          workspaceRoot: `/work/${threadId}`,
+          defaultModelSelection: modelSelection,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        });
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          createdBy: "user",
+          creationSource: "web",
+          commandId: CommandId.make(`${threadId}-create`),
+          threadId,
+          projectId: ProjectId.make(`${threadId}-project`),
+          title: "Slot test",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+        });
+        yield* orchestrator.dispatch({
+          type: "message.dispatch",
+          createdBy: "user",
+          creationSource: "web",
+          commandId: CommandId.make(`${threadId}-message`),
+          threadId,
+          messageId: MessageId.make(`${threadId}-message`),
+          text: "Start",
+          attachments: [],
+          dispatchMode: { type: "start_immediately" },
+        });
+      }
+      const first = yield* outbox.claimNext({ workerId: "slot-test", maxConcurrentSessions: 1 });
+      assert.isTrue(Option.isSome(first));
+      yield* worker.runOnce();
+      const blocked = (yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!;
+      assert.equal(blocked.status, "starting");
+      assert.isTrue(blocked.awaitingSlot);
+      const markedSequence = yield* sink.latestSequence({ threadId: threads[1]! });
+      yield* worker.runOnce();
+      assert.equal(yield* sink.latestSequence({ threadId: threads[1]! }), markedSequence);
+      yield* orchestrator.dispatch({
+        type: "message.dispatch",
+        createdBy: "user",
+        creationSource: "web",
+        commandId: CommandId.make("slot-second-followup"),
+        threadId: threads[1]!,
+        messageId: MessageId.make("slot-second-followup"),
+        text: "Next",
+        attachments: [],
+        dispatchMode: { type: "queue_after_active" },
+      });
+      const withFollowup = yield* orchestrator.getThreadProjection(threads[1]!);
+      assert.equal(withFollowup.runs[0]?.status, "starting");
+      assert.isTrue(withFollowup.runs[0]?.awaitingSlot);
+      assert.equal(withFollowup.runs[1]?.status, "queued");
+      assert.isNotTrue(withFollowup.runs[1]?.awaitingSlot);
+      yield* settings.updateSettings({ maxConcurrentSessions: null });
+      const pending = (yield* outbox.listByCommandId(CommandId.make(`${threads[1]}-message`))).find(
+        (effect) => effect.request.type === "provider-turn.start",
+      )!;
+      const claimed = yield* outbox.claimNext({ workerId: "slot-test" });
+      assert.equal(
+        Option.isSome(claimed) &&
+          claimed.value.request.type === "provider-turn.start" &&
+          claimed.value.request.runId === blocked.id,
+        true,
+      );
+      yield* sink.setAwaitingSlot({ threadId: threads[1]!, runId: blocked.id, awaiting: false });
+      yield* sink.setAwaitingSlot({
+        threadId: threads[1]!,
+        runId: blocked.id,
+        effectId: pending.id,
+        awaiting: true,
+      });
+      assert.isFalse((yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!.awaitingSlot);
+      yield* outbox.enqueue([
+        {
+          id: "slot-second-restart",
+          commandId: CommandId.make("slot-second-restart"),
+          threadId: threads[1]!,
+          request: {
+            type: "provider-turn.restart",
+            runId: blocked.id,
+            providerSessionId: ProviderSessionId.make("slot-session"),
+            providerThreadId: ProviderThreadId.make("slot-provider-thread"),
+            providerTurnId: ProviderTurnId.make("slot-provider-turn"),
+            interruptedAttemptId: RunAttemptId.make("slot-attempt"),
+          },
+        },
+      ]);
+      yield* worker.runOnce({ maxConcurrentSessions: 1 });
+      assert.isTrue((yield* orchestrator.getThreadProjection(threads[1]!)).runs[0]!.awaitingSlot);
+      yield* outbox.cancelUnsettled({
+        threadId: threads[1]!,
+        effectTypes: ["provider-turn.restart"],
+        reason: "test cleanup",
+      });
+      if (Option.isSome(claimed)) {
+        yield* outbox.succeed({ effectId: claimed.value.id, workerId: "slot-test" });
+      }
+      if (Option.isSome(first)) {
+        yield* outbox.succeed({ effectId: first.value.id, workerId: "slot-test" });
+      }
+    }),
+  );
+
   const seedFailingRollbackThread = (name: string) =>
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
@@ -8853,6 +8977,18 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
               },
             ],
           });
+        } else {
+          yield* (yield* EventSink.EventSinkV2).write({
+            events: [
+              {
+                id: EventId.make(`${threadId}:awaiting-slot`),
+                type: "run.updated",
+                threadId,
+                occurredAt: yield* DateTime.now,
+                payload: { ...source, awaitingSlot: true },
+              },
+            ],
+          });
         }
         const queued = before.runs.filter((run) => run.status === "queued");
         assert.equal(queued.length, 2);
@@ -8875,6 +9011,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
               queuePosition: 1,
             },
           );
+          assert.isUndefined(held.runs.find((run) => run.id === source.id)?.awaitingSlot);
         }
         if (!started) {
           const prompt = held.turnItems.find(
@@ -8930,6 +9067,8 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         yield* orchestrator.dispatch(resume);
         const resumed = yield* orchestrator.getThreadProjection(threadId);
         assert.equal(resumed.runs.find((run) => run.id === second.id)?.status, "starting");
+        if (!started)
+          assert.isUndefined(resumed.runs.find((run) => run.id === source.id)?.awaitingSlot);
         assert.equal(resumed.runs.find((run) => run.id === first.id)?.status, "queued");
         assert.isFalse(resumed.runs.some((run) => run.status === "queued" && run.queueHeld));
         assert.equal(
@@ -9249,6 +9388,18 @@ it.layer(layerSharedApplicationDataPlaneTest)("pending provider interruption", (
       const run = starting.runs[0];
       assert.isDefined(run);
       assert.equal(run.status, "starting");
+      const sink = yield* EventSink.EventSinkV2;
+      const outbox = yield* EffectOutbox.EffectOutboxV2;
+      const pending = (yield* outbox.listByCommandId(
+        CommandId.make("runtime-layer-pending-interrupt-message"),
+      )).find((item) => item.request.type === "provider-turn.start")!;
+      yield* sink.setAwaitingSlot({
+        threadId,
+        runId: run.id,
+        effectId: pending.id,
+        awaiting: true,
+      });
+      assert.isTrue((yield* orchestrator.getThreadProjection(threadId)).runs[0]?.awaitingSlot);
 
       const interrupt = yield* threadManagement.interruptThread({
         projectId,
@@ -9261,6 +9412,8 @@ it.layer(layerSharedApplicationDataPlaneTest)("pending provider interruption", (
 
       const interrupted = yield* orchestrator.getThreadProjection(threadId);
       assert.equal(interrupted.runs[0]?.status, "interrupted");
+      assert.isFalse(interrupted.runs[0]?.awaitingSlot);
+      assert.equal((yield* outbox.get(pending.id)).pipe(Option.getOrThrow).status, "cancelled");
       assert.equal(interrupted.attempts[0]?.status, "interrupted");
       assert.equal(
         interrupted.nodes.find((node) => node.kind === "root_turn")?.status,

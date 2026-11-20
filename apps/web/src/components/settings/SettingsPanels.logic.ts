@@ -18,6 +18,13 @@ import {
 import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
 
+export function parseSessionLimitDraft(value: string): number | null | undefined {
+  if (value === "") return null;
+  if (!/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : undefined;
+}
+
 export function isProjectGroupingEnabled(mode: SidebarProjectGroupingMode): boolean {
   return mode !== "separate";
 }

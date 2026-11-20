@@ -299,6 +299,7 @@ export function layerWithRegistry<Error>(
   | EffectWorker.OrchestrationEffectWorkerV2
   | EventSink.EventSinkV2
   | ProviderSessionManager.ProviderSessionManagerV2
+  | ProviderRuntimeRecoveryService.ProviderRuntimeRecoveryService
   | CommandOutputRecorder.CommandOutputRecorder
   | ThreadCommandExecutor.ThreadCommandExecutor,
   Error | MigrationError | PlatformError.PlatformError | SqlError
@@ -548,6 +549,7 @@ export function layerWithRegistry<Error>(
   const layerEffectExecutorProvided = EffectWorker.layerExecutor.pipe(
     Layer.provide(
       Layer.mergeAll(
+        layerEventSinkProvided,
         layerRunFinalizationServiceProvided,
         layerCheckpointRollbackServiceProvided,
         layerProviderSessionManagerProvided,
@@ -561,7 +563,7 @@ export function layerWithRegistry<Error>(
     ),
   );
   const layerEffectWorkerProvided = EffectWorker.layer.pipe(
-    Layer.provide(Layer.merge(layerStores, layerEffectExecutorProvided)),
+    Layer.provide(Layer.mergeAll(layerStores, layerEffectExecutorProvided, layerEventSinkProvided)),
   );
   const layerReplayRuntime = Layer.mergeAll(
     layerEffectOutboxProvided,
@@ -569,6 +571,11 @@ export function layerWithRegistry<Error>(
     layerProviderSessionManagerProvided,
     layerEffectWorkerProvided,
     layerEventSinkProvided,
+    ProviderRuntimeRecoveryService.layer.pipe(
+      Layer.provide(
+        Layer.mergeAll(layerStores, layerEventSinkProvided, IdAllocator.layer, layerServerSettings),
+      ),
+    ),
     layerContinuationWorkerProvided,
     layerCommandOutputHubProvided,
     ThreadCommandExecutor.layer,

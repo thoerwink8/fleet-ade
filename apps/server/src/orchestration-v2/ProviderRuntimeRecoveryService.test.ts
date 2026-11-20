@@ -541,6 +541,7 @@ it.effect.each([
       {
         id: runId,
         status,
+        awaitingSlot: status === "starting",
         startedAt: null,
         activeAttemptId: attemptId,
         userMessageId: MessageId.make("message_queued_restart"),
@@ -657,6 +658,9 @@ it.effect.each([
     } else {
       assert.equal(runEvent?.type === "run.updated" ? runEvent.payload.queuePosition : null, 1);
       assert.equal(runEvent?.type === "run.updated" ? runEvent.payload.queueHeld : false, true);
+      if (status === "starting") {
+        assert.isUndefined(runEvent?.type === "run.updated" ? runEvent.payload.awaitingSlot : null);
+      }
       assert.isUndefined(attemptEvent);
       assert.isUndefined(nodeEvent);
     }

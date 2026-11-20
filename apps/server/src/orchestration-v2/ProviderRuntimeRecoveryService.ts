@@ -427,6 +427,7 @@ export const make = Effect.gen(function* () {
           continue;
         }
         if (run.queueHeld === true && retryableRuns.length === 0) continue;
+        const { awaitingSlot: _awaitingSlot, ...recoveredRun } = run;
         events.push({
           id: yield* allocateEventId(),
           type: "run.updated",
@@ -435,7 +436,7 @@ export const make = Effect.gen(function* () {
           providerInstanceId: run.providerInstanceId,
           occurredAt: now,
           payload: {
-            ...run,
+            ...(run.status === "starting" ? recoveredRun : run),
             status: "queued",
             queueHeld: true,
             ...(retryableRuns.length === 0 ? {} : { queuePosition: index + 1 }),

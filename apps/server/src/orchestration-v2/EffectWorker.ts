@@ -20,6 +20,7 @@ import {
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
+import * as EventSink from "./EventSink.ts";
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderTurnControlService from "./ProviderTurnControlService.ts";
@@ -83,6 +84,7 @@ export const layerExecutor: Layer.Layer<
   | RuntimeRequestService.RuntimeRequestServiceV2
   | ThreadTitleRegenerationService.ThreadTitleRegenerationService
   | ThreadManagementService.ThreadManagementService
+  | EventSink.EventSinkV2
   | ServerSettings.ServerSettingsService
 > = Layer.effect(
   OrchestrationEffectExecutorV2,
@@ -97,6 +99,7 @@ export const layerExecutor: Layer.Layer<
     const threadTitleRegeneration =
       yield* ThreadTitleRegenerationService.ThreadTitleRegenerationService;
     const threads = yield* ThreadManagementService.ThreadManagementService;
+    const eventSink = yield* EventSink.EventSinkV2;
     const settings = yield* ServerSettings.ServerSettingsService;
     return OrchestrationEffectExecutorV2.of({
       execute: Effect.fn("OrchestrationEffectExecutorV2.execute")(function (effect, options) {
@@ -379,21 +382,28 @@ export const layerExecutor: Layer.Layer<
                 ),
               );
           case "provider-turn.restart":
-            return providerTurnControl
-              .interruptAndAwaitTerminal({
+            return eventSink
+              .setAwaitingSlot({
                 threadId: effect.threadId,
-                providerSessionId: effect.request.providerSessionId,
-                providerThreadId: effect.request.providerThreadId,
-                providerTurnId: effect.request.providerTurnId,
-                interruptedAttemptId: effect.request.interruptedAttemptId,
-                ...(effect.request.sessionTransition?.type === "replace"
-                  ? {
-                      replacementProviderSessionId:
-                        effect.request.sessionTransition.replacementProviderSessionId,
-                    }
-                  : {}),
+                runId: effect.request.runId,
+                awaiting: false,
               })
               .pipe(
+                Effect.andThen(
+                  providerTurnControl.interruptAndAwaitTerminal({
+                    threadId: effect.threadId,
+                    providerSessionId: effect.request.providerSessionId,
+                    providerThreadId: effect.request.providerThreadId,
+                    providerTurnId: effect.request.providerTurnId,
+                    interruptedAttemptId: effect.request.interruptedAttemptId,
+                    ...(effect.request.sessionTransition?.type === "replace"
+                      ? {
+                          replacementProviderSessionId:
+                            effect.request.sessionTransition.replacementProviderSessionId,
+                        }
+                      : {}),
+                  }),
+                ),
                 Effect.andThen(
                   effect.request.sessionTransition?.type === "replace"
                     ? providerSessions.detach({
@@ -700,13 +710,14 @@ export const layerWithOptions = (
 ): Layer.Layer<
   OrchestrationEffectWorkerV2,
   never,
-  EffectOutbox.EffectOutboxV2 | OrchestrationEffectExecutorV2
+  EffectOutbox.EffectOutboxV2 | OrchestrationEffectExecutorV2 | EventSink.EventSinkV2
 > =>
   Layer.effect(
     OrchestrationEffectWorkerV2,
     Effect.gen(function* () {
       const outbox = yield* EffectOutbox.EffectOutboxV2;
       const executor = yield* OrchestrationEffectExecutorV2;
+      const eventSink = yield* EventSink.EventSinkV2;
       const serverConfig = yield* Effect.serviceOption(ServerConfig.ServerConfig);
       const serverSettings = yield* Effect.serviceOption(ServerSettings.ServerSettingsService);
       const workerId = options.workerId ?? `orchestration-v2:${process.pid}`;
@@ -824,6 +835,22 @@ export const layerWithOptions = (
           const maxConcurrentSessions = yield* resolveMaxConcurrentSessions(
             filter.maxConcurrentSessions,
           );
+          if (maxConcurrentSessions !== undefined) {
+            const blocked = yield* outbox.blockedBySessionLimit(maxConcurrentSessions);
+            for (const item of blocked) {
+              if (
+                item.request.type === "provider-turn.start" ||
+                item.request.type === "provider-turn.restart"
+              ) {
+                yield* eventSink.setAwaitingSlot({
+                  threadId: item.threadId,
+                  runId: item.request.runId,
+                  effectId: item.id,
+                  awaiting: true,
+                });
+              }
+            }
+          }
           const claimExit = yield* Effect.exit(
             outbox.claimNext({
               workerId,

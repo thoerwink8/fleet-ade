@@ -1764,6 +1764,9 @@ export const layerWsRpc = (
             otlpLogsEnabled: config.otlpLogsUrl !== undefined,
           },
           settings,
+          ...(config.maxConcurrentSessions === undefined
+            ? {}
+            : { startupMaxConcurrentSessions: config.maxConcurrentSessions }),
           ...(serverSettings.managedPolicy === undefined
             ? {}
             : { managedPolicy: serverSettings.managedPolicy }),

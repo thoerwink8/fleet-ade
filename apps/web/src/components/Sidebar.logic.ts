@@ -753,7 +753,16 @@ export function buildBulkUnpinContextMenuItem(input: {
 }
 
 export interface ThreadStatusPill {
-  label: "运行中" | "正在连接" | "已完成" | "失败" | "待批准" | "待输入" | "等待中" | "计划已就绪";
+  label:
+    | "失败"
+    | "已完成"
+    | "待批准"
+    | "待输入"
+    | "正在连接"
+    | "排队"
+    | "等待中"
+    | "计划已就绪"
+    | "运行中";
   colorClass: string;
   dotClass: string;
   pulse: boolean;
@@ -1013,6 +1022,7 @@ export type SidebarThreadStatus =
   | "approval"
   | "input"
   | "preparing"
+  | "queued"
   | "working"
   | "waiting"
   | "failed"
@@ -1061,8 +1071,14 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
     return "preparing";
   }
   if (
+    thread.runtime?.status === "queued" ||
+    (thread.runtime?.status === "starting" && thread.runtime.awaitingSlot === true)
+  ) {
+    return "queued";
+  }
+  if (
     thread.runtime !== null &&
-    ["queued", "starting", "running", "waiting"].includes(thread.runtime.status)
+    ["starting", "running", "waiting"].includes(thread.runtime.status)
   ) {
     return "working";
   }
@@ -1082,6 +1098,8 @@ export function resolveWindowTitleThreadStatus(thread: SidebarThreadStatusInput)
       return THREAD_STATUS_TEXT.approval;
     case "input":
       return THREAD_STATUS_TEXT.input;
+    case "queued":
+      return "排队";
     case "preparing":
     case "working":
       return THREAD_STATUS_TEXT.working;
@@ -1250,10 +1268,18 @@ export function resolveThreadStatusPill(input: {
   }
 
   if (
-    thread.runtime?.status === "preparing" ||
-    thread.runtime?.status === "starting" ||
-    thread.runtime?.status === "queued"
+    thread.runtime?.status === "queued" ||
+    (thread.runtime?.status === "starting" && thread.runtime.awaitingSlot === true)
   ) {
+    return {
+      label: "排队",
+      colorClass: "text-sidebar-muted-foreground",
+      dotClass: "bg-sidebar-muted-foreground",
+      pulse: false,
+    };
+  }
+
+  if (thread.runtime?.status === "preparing" || thread.runtime?.status === "starting") {
     return {
       label: "正在连接",
       colorClass: "text-sky-600 dark:text-sky-300/80",
