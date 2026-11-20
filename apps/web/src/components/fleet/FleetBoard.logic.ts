@@ -4,8 +4,7 @@ export const FLEET_BOARD_STATUSES = ["needsYou", "stuck", "working", "done"] as 
 export type FleetBoardStatus = (typeof FLEET_BOARD_STATUSES)[number];
 
 export type FleetBoardFilter = {
-  readonly status?: "needsYou" | "stuck" | "working" | "done" | undefined;
-  readonly statuses?: readonly FleetBoardStatus[] | undefined;
+  readonly status?: FleetBoardStatus | undefined;
   readonly machine?: string | undefined;
   readonly repo?: string | undefined;
   readonly search?: string | undefined;
@@ -24,12 +23,13 @@ export function fleetMachineName(
   return linked.get(id) || directory.get(id) || "未命名机器";
 }
 
-/** The machine to aggregate from: this one when it answers, else the first readable one. */
+/** The machine to aggregate from: the requested/primary one if in candidates, else the first candidate. */
 export function defaultFleetSource<Id extends string>(
-  primary: Id | null,
-  readable: readonly Id[],
+  preferred: Id | null,
+  candidates: readonly Id[],
 ): Id | null {
-  return primary ?? readable[0] ?? null;
+  if (preferred !== null && candidates.includes(preferred)) return preferred;
+  return candidates[0] ?? null;
 }
 
 export function fleetReason(reason: string): string {
@@ -92,14 +92,13 @@ export function filterFleetRows(
   rows: readonly FleetSummaryRow[],
   filter: FleetBoardFilter,
 ): FleetSummaryRow[] {
-  const statuses = filter.statuses ?? (filter.status === undefined ? undefined : [filter.status]);
   const raw = filter.search?.trim().toLocaleLowerCase() ?? "";
   // A leading # turns the query into an issue-number lookup; the title is not searched.
   const issueQuery = raw.startsWith("#") ? raw.slice(1) : undefined;
   const query = issueQuery === undefined ? raw : "";
   return rows.filter(
     (row) =>
-      (statuses === undefined || statuses.some((status) => matchesStatus(row, status))) &&
+      (filter.status === undefined || matchesStatus(row, filter.status)) &&
       (filter.machine === undefined || row.environmentId === filter.machine) &&
       (filter.repo === undefined || row.repo === filter.repo) &&
       (issueQuery !== undefined

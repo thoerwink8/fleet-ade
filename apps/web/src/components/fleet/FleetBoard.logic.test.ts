@@ -41,10 +41,11 @@ it("names machines from peer-link names, then local labels, then a fallback", ()
   expect(fleetMachineName("", linked, directory)).toBe("未命名机器");
 });
 
-it("defaults the summary source to the primary machine, else the first readable one", () => {
-  expect(defaultFleetSource("primary", ["other", "third"])).toBe("primary");
+it("defaults the summary source to the requested or primary machine when eligible, else the first candidate", () => {
+  expect(defaultFleetSource("primary", ["other", "primary", "third"])).toBe("primary");
+  expect(defaultFleetSource("missing", ["other", "third"])).toBe("other");
   expect(defaultFleetSource(null, ["other", "third"])).toBe("other");
-  expect(defaultFleetSource(null, [])).toBeNull();
+  expect(defaultFleetSource("primary", [])).toBeNull();
 });
 
 it("groups and filters a thousand rows without confusing issue searches", () => {
@@ -77,7 +78,6 @@ it("searches title text and issue numbers loosely, but # only matches issue numb
     row({ threadId: "t2", title: "整理周报", issue: 4089 }),
     row({ threadId: "t3", title: "机群 PR-2", issue: 12 }),
   ];
-  // A bare query matches title text, issue numbers, and PR-2 style numbers.
   // A bare query matches title text loosely, but issue numbers exactly.
   expect(filterFleetRows(rows, { search: "4089" }).map((r) => r.threadId)).toEqual(["t1", "t2"]);
   expect(filterFleetRows(rows, { search: "89" }).map((r) => r.threadId)).toEqual(["t1"]);
@@ -88,20 +88,23 @@ it("searches title text and issue numbers loosely, but # only matches issue numb
   expect(filterFleetRows(rows, { search: "#" }).map((r) => r.threadId)).toEqual(["t1", "t2", "t3"]);
 });
 
-it("filters by several statuses at once", () => {
+it("filters by one status at a time and keeps needs-you out of stuck", () => {
   const rows = [
     row({ threadId: "need", needsYou: true, phase: "stuck" }),
     row({ threadId: "work", phase: "working" }),
     row({ threadId: "done", phase: "done" }),
     row({ threadId: "idle", phase: "stuck" }),
   ];
-  expect(filterFleetRows(rows, { statuses: ["needsYou", "done"] }).map((r) => r.threadId)).toEqual([
+  expect(filterFleetRows(rows, { status: "needsYou" }).map((r) => r.threadId)).toEqual(["need"]);
+  expect(filterFleetRows(rows, { status: "done" }).map((r) => r.threadId)).toEqual(["done"]);
+  expect(filterFleetRows(rows, {}).map((r) => r.threadId)).toEqual([
     "need",
+    "work",
     "done",
+    "idle",
   ]);
-  expect(filterFleetRows(rows, { statuses: [] }).map((r) => r.threadId)).toEqual([]);
   // A needs-you row is matched by needsYou, not by its stuck phase.
-  expect(filterFleetRows(rows, { statuses: ["stuck"] }).map((r) => r.threadId)).toEqual(["idle"]);
+  expect(filterFleetRows(rows, { status: "stuck" }).map((r) => r.threadId)).toEqual(["idle"]);
 });
 it("counts statuses once, keeps needs-you out of phase, and marks offline rows", () => {
   const rows = [
@@ -136,9 +139,11 @@ it("formats reasons, ages and machine names", () => {
   expect(fleetReason("waiting:command")).toBe("等你批准命令");
   expect(fleetReason("waiting:file-change")).toBe("等你批准改文件");
   expect(fleetReason("waiting:user_input")).toBe("在等你回答");
+  expect(fleetReason("waiting:auth_refresh")).toBe("要重新登录");
   expect(fleetReason("x".repeat(81) + "\nsecret")).toBe("x".repeat(80));
   expect(fleetFullReason("waiting:command")).toBe("等你批准命令");
   expect(fleetFullReason("line1\nline2")).toBe("line1\nline2");
+  expect(fleetStaleReason({ stale: true, staleReason: "environment offline" })).toBeNull();
   expect(fleetStaleReason({ stale: true, staleReason: "lease lost" })).toBe(
     "卡住 · 这台机器已不在做这单",
   );

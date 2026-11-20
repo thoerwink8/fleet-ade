@@ -37,11 +37,10 @@ describe("fleet route search", () => {
     expect(matchedSearch("/fleet?q=fix")?.q).toBe("fix");
   });
 
-  it("keeps only known statuses", () => {
-    expect(matchedSearch("/fleet?statuses=needsYou&statuses=bogus")?.statuses).toEqual([
-      "needsYou",
-    ]);
-    expect(matchedSearch("/fleet?statuses=needsYou")?.statuses).toEqual(["needsYou"]);
+  it("keeps only a single known status", () => {
+    expect(matchedSearch("/fleet?status=needsYou")?.status).toBe("needsYou");
+    expect(matchedSearch("/fleet?status=bogus")?.status).toBeUndefined();
+    expect(matchedSearch("/fleet?status=needsYou&status=done")?.status).toBeUndefined();
   });
 
   it("drops non-string machine, source, and row values", () => {

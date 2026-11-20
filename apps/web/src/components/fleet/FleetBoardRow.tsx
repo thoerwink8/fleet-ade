@@ -27,6 +27,7 @@ function rowStatusBadge(row: FleetSummaryRow): {
 export const FleetBoardRow = memo(function FleetBoardRow({
   row,
   machineName,
+  machineConnected,
   now,
   selected,
   rowRef,
@@ -34,6 +35,7 @@ export const FleetBoardRow = memo(function FleetBoardRow({
 }: {
   row: FleetSummaryRow;
   machineName: string;
+  machineConnected: boolean;
   /** Shared minute-granular epoch ms, so a page of rows never re-renders alone. */
   now: number;
   selected: boolean;
@@ -94,7 +96,7 @@ export const FleetBoardRow = memo(function FleetBoardRow({
           <div className="min-w-0 truncate text-xs text-muted-foreground/80">{metaTail}</div>
         ) : null}
       </button>
-      {row.needsYou && row.threadId !== undefined ? (
+      {row.needsYou && machineConnected && row.threadId !== undefined ? (
         <Button
           variant="warning-outline"
           size="xs"

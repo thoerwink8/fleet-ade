@@ -376,8 +376,9 @@ Open **机群** from the sidebar or the command palette to read, in one place, t
 work every linked machine has reported to this one: what each is working on,
 what is waiting for you, and what it last finished. The board reads only what
 this machine has recorded, so a machine that has not reported in shows its last
-known state rather than a live one. Nothing on the board changes a machine; to
-act on a thread, open it from its row.
+known state rather than a live one. Finished threads stay on the board for 24
+hours, then drop off. Nothing on the board changes a machine; to act on a
+thread, open it from its row.
 
 ## Manage or revoke access
 

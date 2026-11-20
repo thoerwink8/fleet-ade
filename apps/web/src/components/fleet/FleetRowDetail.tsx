@@ -66,6 +66,7 @@ export function FleetRowDetail({
     >
       <SheetPopup
         side="right"
+        layer="nested"
         showCloseButton={!isMobile}
         className={isMobile ? "w-full max-w-none" : "sm:max-w-[24rem]"}
         aria-label={row?.title ?? "任务详情"}

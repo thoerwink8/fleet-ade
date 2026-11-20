@@ -14,12 +14,9 @@ export const Route = createFileRoute("/_chat/fleet")({
     machine:
       typeof raw.machine === "string" && raw.machine ? (raw.machine as EnvironmentId) : undefined,
     repo: typeof raw.repo === "string" && raw.repo ? raw.repo.slice(0, 200) : undefined,
-    statuses:
-      typeof raw.statuses === "string" || Array.isArray(raw.statuses)
-        ? (typeof raw.statuses === "string" ? [raw.statuses] : raw.statuses).filter(
-            (status): status is FleetBoardStatus =>
-              typeof status === "string" && VALID_STATUSES.has(status),
-          )
+    status:
+      typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
+        ? (raw.status as FleetBoardStatus)
         : undefined,
     source:
       typeof raw.source === "string" && raw.source ? (raw.source as EnvironmentId) : undefined,

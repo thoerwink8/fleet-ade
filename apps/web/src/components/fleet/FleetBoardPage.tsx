@@ -1,7 +1,7 @@
 import { fleetSummaryRowKey } from "@t3tools/client-runtime/state/fleet-summary";
 import type { EnvironmentId, FleetSummaryRow } from "@t3tools/contracts";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
-import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
 import {
   ChevronDownIcon,
   MonitorIcon,
@@ -21,7 +21,7 @@ import {
 } from "~/state/environments";
 import { useServerConfigs } from "~/state/entities";
 import { useLinkedEnvironments } from "~/state/peerLinks";
-import { useEnvironmentsWithScope } from "~/state/session";
+import { useEnvironmentsWithScope, useEnvironmentSessionState } from "~/state/session";
 import { useFleetSummary, useFleetSummaryRetry } from "~/state/fleetSummary";
 import { AuthOrchestrationReadScope } from "@t3tools/contracts";
 
@@ -58,7 +58,7 @@ export interface FleetSearch {
   readonly q?: string | undefined;
   readonly machine?: EnvironmentId | undefined;
   readonly repo?: string | undefined;
-  readonly statuses?: readonly FleetBoardStatus[] | undefined;
+  readonly status?: FleetBoardStatus | undefined;
   readonly source?: EnvironmentId | undefined;
   readonly row?: string | undefined;
 }
@@ -75,28 +75,27 @@ function useFleetSearch(): FleetSearch {
 }
 
 function FleetStatusChips({
-  statuses,
+  status: selectedStatus,
   counts,
   sourceUpdating,
   offlineCount,
   onChange,
   className,
 }: {
-  statuses: readonly FleetBoardStatus[];
+  status: FleetBoardStatus | undefined;
   counts: Readonly<Record<FleetBoardStatus, number>>;
   sourceUpdating: boolean;
   offlineCount: number;
-  onChange: (statuses: readonly FleetBoardStatus[]) => void;
+  onChange: (status: FleetBoardStatus | undefined) => void;
   className?: string;
 }) {
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <ToggleGroup
         aria-label="按状态筛选"
-        multiple
         variant="default"
-        value={[...statuses]}
-        onValueChange={(value) => onChange(value as FleetBoardStatus[])}
+        value={selectedStatus === undefined ? [] : [selectedStatus]}
+        onValueChange={(value) => onChange(value[0] as FleetBoardStatus | undefined)}
         className="max-sm:grid max-sm:w-full max-sm:grid-cols-2"
       >
         {FLEET_BOARD_STATUSES.map((status) => (
@@ -182,7 +181,7 @@ function FleetSourcePicker({
         <ChevronDownIcon aria-hidden className="size-3 shrink-0 opacity-60" />
       </MenuTrigger>
       <MenuPopup align="start">
-        <MenuItem onClick={() => onSelect(undefined)}>默认（本机）</MenuItem>
+        <MenuItem onClick={() => onSelect(undefined)}>默认</MenuItem>
         <MenuSeparator />
         {candidates.map((environmentId) => (
           <MenuItem key={environmentId} onClick={() => onSelect(environmentId)}>
@@ -224,13 +223,8 @@ function FleetBoardEmpty({
 
 export function FleetBoardPage() {
   const search = useFleetSearch();
-  // Unvalidated search (tests, hand-typed URLs) can hand a single string; the route's
-  // validateSearch always produces an array. Empty arrays mean "all statuses".
-  const filterStatuses = (() => {
-    const raw = search.statuses;
-    const list = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
-    return list.length > 0 ? list : undefined;
-  })();
+  const filterStatus = search.status;
+  const router = useRouter();
   const navigate = useNavigate();
   const isMobile = useMediaQuery("max-sm");
   const nowMinute = useNowMinute();
@@ -247,10 +241,7 @@ export function FleetBoardPage() {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const readableIds = useEnvironmentsWithScope(environments, AuthOrchestrationReadScope);
   const fleetSourceCandidates = environments
-    .filter(
-      (environment) =>
-        connectedIds.has(environment.environmentId) && readableIds.has(environment.environmentId),
-    )
+    .filter((environment) => readableIds.has(environment.environmentId))
     .map((environment) => environment.environmentId);
   const sourceEnvironmentId = defaultFleetSource(
     search.source ?? primaryEnvironmentId,
@@ -258,8 +249,31 @@ export function FleetBoardPage() {
   );
   const sourceConnected =
     sourceEnvironmentId !== null && connectedIds.has(sourceEnvironmentId as EnvironmentId);
-
+  const fallbackSourceId =
+    sourceEnvironmentId ??
+    (search.source !== undefined &&
+    environments.some((environment) => environment.environmentId === search.source)
+      ? search.source
+      : (primaryEnvironmentId ?? environments[0]?.environmentId ?? null));
+  const fallbackEnvironment =
+    fallbackSourceId === null
+      ? null
+      : (environments.find((environment) => environment.environmentId === fallbackSourceId) ??
+        null);
+  const fallbackSession = useEnvironmentSessionState(fallbackSourceId);
+  const missingReadScopeError =
+    fallbackEnvironment?.connection.phase === "error" &&
+    (fallbackEnvironment.connection.error?.includes(AuthOrchestrationReadScope) ?? false);
+  const scopeLoading =
+    environments.length > 0 &&
+    fleetSourceCandidates.length === 0 &&
+    fallbackSession.data === null &&
+    !fallbackSession.hasError &&
+    !missingReadScopeError;
   const summary = useFleetSummary(sourceEnvironmentId);
+  const summaryForbidden =
+    summary.error === "forbidden" ||
+    (environments.length > 0 && !scopeLoading && fleetSourceCandidates.length === 0);
   const retry = useFleetSummaryRetry(sourceEnvironmentId);
   const [retryPending, setRetryPending] = useState(false);
   const [doneOpenIds, setDoneOpenIds] = useState<ReadonlySet<string>>(new Set());
@@ -291,9 +305,7 @@ export function FleetBoardPage() {
   const statusCounts = fleetStatusCounts(scopedRows);
   const offlineCount = statusCounts.offline;
   const visibleRows =
-    filterStatuses === undefined
-      ? scopedRows
-      : filterFleetRows(scopedRows, { statuses: filterStatuses });
+    filterStatus === undefined ? scopedRows : filterFleetRows(scopedRows, { status: filterStatus });
   const groups = groupFleetRows(visibleRows, machineName);
   const activeRows = new Map<string, { done: FleetSummaryRow[]; active: FleetSummaryRow[] }>();
   for (const group of groups) {
@@ -312,22 +324,13 @@ export function FleetBoardPage() {
 
   const machineLabel = search.machine === undefined ? "所有机器" : machineName(search.machine);
   const activeFilterCount =
-    (filterStatuses !== undefined && filterStatuses.length !== FLEET_BOARD_STATUSES.length
-      ? 1
-      : 0) +
+    (filterStatus !== undefined ? 1 : 0) +
     (search.machine !== undefined ? 1 : 0) +
     (search.repo !== undefined ? 1 : 0);
-
   const selectedRow = search.row === undefined ? null : (summary.rows.get(search.row) ?? null);
   const selectedMachineName = selectedRow === null ? "" : machineName(selectedRow.environmentId);
   const selectedMachineConnected =
     selectedRow !== null && connectedIds.has(selectedRow.environmentId as EnvironmentId);
-
-  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
-  const registerRowRef = (key: string) => (node: HTMLButtonElement | null) => {
-    if (node) rowRefs.current.set(key, node);
-    else rowRefs.current.delete(key);
-  };
 
   const machineFilterVisible = machineIds.length >= 2 || search.machine !== undefined;
   const repoFilterVisible = repoNames.length >= 2 || search.repo !== undefined;
@@ -354,20 +357,15 @@ export function FleetBoardPage() {
   ) : null;
   const statusChips = (
     <FleetStatusChips
-      statuses={filterStatuses ?? FLEET_BOARD_STATUSES}
+      status={filterStatus}
       counts={statusCounts}
       sourceUpdating={
-        (!sourceConnected || summary.status === "updating") && summary.status !== "error"
+        sourceEnvironmentId !== null &&
+        (!sourceConnected || summary.status === "updating") &&
+        summary.status !== "error"
       }
       offlineCount={offlineCount}
-      onChange={(statuses) =>
-        patchSearch({
-          statuses:
-            statuses.length === FLEET_BOARD_STATUSES.length || statuses.length === 0
-              ? undefined
-              : statuses,
-        })
-      }
+      onChange={(status) => patchSearch({ status })}
     />
   );
   const clearFilters = (
@@ -375,7 +373,7 @@ export function FleetBoardPage() {
       variant="ghost-muted"
       size="sm"
       onClick={() => {
-        patchSearch({ statuses: undefined, machine: undefined, repo: undefined });
+        patchSearch({ status: undefined, machine: undefined, repo: undefined });
         setFiltersOpen(false);
       }}
     >
@@ -383,9 +381,24 @@ export function FleetBoardPage() {
     </Button>
   );
 
+  const openedRowInSessionRef = useRef(false);
+  const rowRefs = useRef(new Map<string, HTMLButtonElement>());
+  const registerRowRef = (key: string) => (node: HTMLButtonElement | null) => {
+    if (node) rowRefs.current.set(key, node);
+    else rowRefs.current.delete(key);
+  };
+  const handleOpenRow = (selectedKey: string) => {
+    openedRowInSessionRef.current = true;
+    void patchSearch({ row: selectedKey });
+  };
   const handleCloseDetail = () => {
     const key = search.row;
-    patchSearch({ row: undefined }, true);
+    if (openedRowInSessionRef.current) {
+      openedRowInSessionRef.current = false;
+      router.history.back();
+    } else {
+      void patchSearch({ row: undefined }, true);
+    }
     if (key !== undefined) {
       queueMicrotask(() => rowRefs.current.get(key)?.focus());
     }
@@ -417,26 +430,21 @@ export function FleetBoardPage() {
             </span>
             {summary.status === "live" && sourceConnected ? (
               <Badge variant="success">已连接</Badge>
+            ) : summary.status === "error" || summaryForbidden ? (
+              <Badge variant="error">读不到</Badge>
             ) : summary.status === "loading" ? (
               <Badge variant="secondary">正在读取</Badge>
-            ) : summary.status === "error" ? (
-              <Badge variant="error">读不到</Badge>
             ) : (
               <Badge variant="warning">旧数据 · 正在更新</Badge>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <span className="min-w-0">（只含这台机器记下的活）</span>
-            {statusCounts.needsYou > 0 ? (
-              <span className="shrink-0 text-warning-foreground">
-                要你看 {statusCounts.needsYou}
-              </span>
-            ) : null}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 border-b px-5 py-2">
-          <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8 sm:max-w-72">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-5 py-2">
+          <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8 sm:min-w-44 sm:max-w-72">
             <InputGroupAddon>
               <SearchIcon aria-hidden />
             </InputGroupAddon>
@@ -469,13 +477,14 @@ export function FleetBoardPage() {
           )}
         </div>
 
-        {isMobile && (summary.status !== "error" || sourceEnvironmentId !== null) ? (
+        {isMobile &&
+        (allRows.length > 0 || (summary.status !== "error" && sourceEnvironmentId !== null)) ? (
           <div className="flex shrink-0 border-b px-5 py-2">{statusChips}</div>
         ) : null}
 
         <ScrollArea className="min-h-0 flex-1">
           <WorkspacePageContainer width="wide">
-            {connectedIds.size === 0 ? (
+            {allRows.length === 0 && environments.length === 0 ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="还没有连上的环境"
@@ -486,7 +495,14 @@ export function FleetBoardPage() {
                   </Button>
                 }
               />
-            ) : fleetSourceCandidates.length === 0 || summary.error === "forbidden" ? (
+            ) : allRows.length === 0 && scopeLoading ? (
+              <FleetBoardEmpty
+                icon={<MonitorIcon />}
+                title="正在读取"
+                description="第一次读取要等这台机器把它记下的活送过来。"
+              />
+            ) : allRows.length === 0 &&
+              (fleetSourceCandidates.length === 0 || summary.error === "forbidden") ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="这个连接没有读取会话的权限，看不到机群汇总"
@@ -496,7 +512,18 @@ export function FleetBoardPage() {
                   </Button>
                 }
               />
-            ) : summary.status === "error" ? (
+            ) : allRows.length === 0 && connectedIds.size === 0 ? (
+              <FleetBoardEmpty
+                icon={<MonitorIcon />}
+                title="还没有连上的环境"
+                description="连上一台 T3 Code 服务器后，这里会汇总它记下的各台机器的活。"
+                action={
+                  <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
+                    去连接
+                  </Button>
+                }
+              />
+            ) : allRows.length === 0 && summary.status === "error" ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="读不到机群汇总"
@@ -549,7 +576,7 @@ export function FleetBoardPage() {
                         <span className="h-px min-w-2 flex-1 bg-sidebar-border/50" aria-hidden />
                         <span className="flex shrink-0 items-center gap-2 font-normal text-muted-foreground tabular-nums">
                           {FLEET_BOARD_STATUSES.map((status) =>
-                            group.counts[status] > 0 ? (
+                            status !== "done" && group.counts[status] > 0 ? (
                               <span key={status}>
                                 {STATUS_LABELS[status]} {group.counts[status]}
                               </span>
@@ -570,10 +597,13 @@ export function FleetBoardPage() {
                               key={key}
                               row={row}
                               machineName={machineName(row.environmentId)}
+                              machineConnected={connectedIds.has(
+                                row.environmentId as EnvironmentId,
+                              )}
                               now={now}
                               selected={search.row === key}
                               rowRef={registerRowRef(key)}
-                              onSelect={(selectedKey) => patchSearch({ row: selectedKey })}
+                              onSelect={handleOpenRow}
                             />
                           );
                         })}
@@ -607,10 +637,13 @@ export function FleetBoardPage() {
                                     key={key}
                                     row={row}
                                     machineName={machineName(row.environmentId)}
+                                    machineConnected={connectedIds.has(
+                                      row.environmentId as EnvironmentId,
+                                    )}
                                     now={now}
                                     selected={search.row === key}
                                     rowRef={registerRowRef(key)}
-                                    onSelect={(selectedKey) => patchSearch({ row: selectedKey })}
+                                    onSelect={handleOpenRow}
                                   />
                                 );
                               })}
