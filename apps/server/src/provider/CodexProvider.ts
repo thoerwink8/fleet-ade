@@ -1068,7 +1068,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
       {
         name: "goal",
         description: "设置一个目标，Codex 会持续工作直到完成",
-        input: { hint: "目标，或 pause、resume、clear 控制" },
+        input: { hint: "目标，或 pause、resume、clear" },
       },
       {
         name: "feedback",
