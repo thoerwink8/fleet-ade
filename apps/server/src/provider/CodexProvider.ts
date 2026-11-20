@@ -166,11 +166,11 @@ const REASONING_EFFORT_LABELS: Readonly<Record<string, string>> = {
 const DEFAULT_SERVICE_TIER_ID = "default";
 
 const SERVICE_TIER_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  ultrafast: "Even faster, more expensive",
+  ultrafast: "更快，价格更高",
 };
 
 const CYBER_ACCESS_PROGRAM_LABELS: Readonly<Record<string, string>> = {
-  standard: "Standard",
+  standard: "标准",
   daybreakBlue: "Daybreak Blue",
   daybreakRed: "Daybreak Red",
 };
@@ -282,7 +282,7 @@ export function mapCodexModelCapabilities(
   if (serviceTiers.length > 0) {
     optionDescriptors.push({
       id: "serviceTier",
-      label: "Service Tier",
+      label: "服务档位",
       type: "select",
       options: [
         {
@@ -309,7 +309,7 @@ export function mapCodexModelCapabilities(
     const defaultProgram = hasStandard ? "standard" : cyberAccessPrograms[0];
     optionDescriptors.push({
       id: "cyberAccessProgram",
-      label: "Cyber Access",
+      label: "网络访问",
       type: "select",
       // Standard stays selectable as an opt-out; Codex rejects it visibly when the login cannot use it.
       options: (hasStandard ? cyberAccessPrograms : ["standard", ...cyberAccessPrograms]).map(

@@ -168,7 +168,7 @@ export function describeMcpElicitation(
         ? [
             {
               decision: "acceptAlways" as const,
-              label: persistenceOptions.get("acceptAlways") || "Always allow",
+              label: persistenceOptions.get("acceptAlways") || "始终允许",
             },
           ]
         : []),

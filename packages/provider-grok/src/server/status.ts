@@ -209,7 +209,7 @@ export function buildGrokModelCapabilities(model: EffectAcpSchema.ModelInfo): Mo
         optionDescriptors: [
           {
             id: "reasoningEffort",
-            label: "Reasoning",
+            label: "推理",
             type: "select",
             options: reasoning.options.map((option) => ({
               id: option.value,

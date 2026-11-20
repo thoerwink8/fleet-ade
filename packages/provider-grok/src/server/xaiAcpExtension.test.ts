@@ -1073,7 +1073,7 @@ describe("XAiAcpExtension", () => {
     expect(questions).toEqual([
       {
         id: "scope",
-        header: "Question",
+        header: "问题",
         question: "Which scope should Grok use?",
         multiSelect: false,
         options: [
@@ -1106,7 +1106,7 @@ describe("XAiAcpExtension", () => {
     expect(questions).toEqual([
       {
         id: "Which changes should be included?",
-        header: "Question",
+        header: "问题",
         question: "Which changes should be included?",
         multiSelect: true,
         options: [
@@ -1138,7 +1138,7 @@ describe("XAiAcpExtension", () => {
     expect(questions).toEqual([
       {
         id: "Which label should Grok use?",
-        header: "Question",
+        header: "问题",
         question: "Which label should Grok use?",
         multiSelect: false,
         options: [

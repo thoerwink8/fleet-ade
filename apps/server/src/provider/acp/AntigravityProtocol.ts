@@ -83,14 +83,14 @@ export function antigravityApprovalOptions(
     request.options.find((entry) => entry.kind === kind && entry.optionId.trim());
   const once = optionWithKind("allow_once");
   if (once) {
-    options.push({ decision: "accept", label: "Allow once" });
+    options.push({ decision: "accept", label: "允许一次" });
   }
   const always = optionWithKind("allow_always");
   if (always) {
     const warning = antigravitySecurityWarning(always);
     options.push({
       decision: "acceptForSession",
-      label: "Allow for this thread",
+      label: "本会话内允许",
       ...(warning ? { warning } : {}),
     });
   }
@@ -125,10 +125,10 @@ export function extractAntigravityUserInputQuestion(
     }
     ids.add(option.optionId);
   }
-  const question = request.toolCall.title?.trim() || "Choose an option.";
+  const question = request.toolCall.title?.trim() || "请选择一个选项。";
   return {
     id: request.toolCall.toolCallId,
-    header: "Question",
+    header: "问题",
     question:
       question.length > TOOL_TEXT_LIMIT
         ? copyBoundedText(`${question.slice(0, TOOL_TEXT_LIMIT - 3)}...`)

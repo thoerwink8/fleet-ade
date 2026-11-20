@@ -581,7 +581,7 @@ describe("Grok native questions", () => {
       });
       assert.deepEqual(yield* Deferred.await(question), {
         id: "changes",
-        header: "Question",
+        header: "问题",
         question: questionText,
         multiSelect: true,
         options: [

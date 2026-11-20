@@ -1149,7 +1149,7 @@ export function extractXAiAskUserQuestions(
 ): ReadonlyArray<UserInputQuestion> {
   return unwrapAskUserQuestionParams(params).questions.map((question) => ({
     id: question.id ?? question.question,
-    header: "Question",
+    header: "问题",
     question: question.question,
     multiSelect: question.multiSelect === true,
     options:
@@ -1158,7 +1158,7 @@ export function extractXAiAskUserQuestions(
             label: option.label,
             description: option.description ?? option.label,
           }))
-        : [{ label: "OK", description: "Continue" }],
+        : [{ label: "OK", description: "继续" }],
   }));
 }
 
