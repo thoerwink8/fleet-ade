@@ -120,4 +120,17 @@ describe("project scratch identity", () => {
       registry.dispose();
     }
   });
+
+  it("shows the pre-translation scratch title in Chinese", () => {
+    const { registry, projects, snapshotAtom } = makeHarness();
+    try {
+      registry.set(snapshotAtom(environmentId), {
+        ...v2ShellSnapshot,
+        projects: [{ ...v2Project, title: "No project" }],
+      });
+      expect(registry.get(projects.projectsAtom)[0]?.title).toBe("无项目");
+    } finally {
+      registry.dispose();
+    }
+  });
 });

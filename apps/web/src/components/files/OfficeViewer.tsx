@@ -259,11 +259,10 @@ function ExtendedOfficeViewer(props: {
           className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-1 border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
           role="status"
         >
-          工作表 {page + 1} of {count} · {sheet.rowCount.toLocaleString("zh-CN")} row
-          {sheet.rowCount === 1 ? "" : "s"} · {sheet.columns.toLocaleString("zh-CN")} column
-          {sheet.columns === 1 ? "" : "s"}
+          工作表 {page + 1} / {count} · {sheet.rowCount.toLocaleString("zh-CN")} 行 ·{" "}
+          {sheet.columns.toLocaleString("zh-CN")} 列
           {fileSize !== undefined
-            ? ` · ${fileSize === 0 ? "0 bytes" : formatAttachmentSize(fileSize)}`
+            ? ` · ${fileSize === 0 ? "0 字节" : formatAttachmentSize(fileSize)}`
             : ""}
         </div>
       ) : null}

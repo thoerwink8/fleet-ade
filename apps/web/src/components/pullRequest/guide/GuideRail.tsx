@@ -42,7 +42,7 @@ export function GuideRail({
   return (
     <nav aria-label="审查导览" className="flex min-h-0 flex-col gap-4">
       <p className="text-xs text-muted-foreground tabular-nums @max-[56rem]/guide:hidden">
-        {reviewed} of {stops.length} read
+        已读 {reviewed} / {stops.length} 处
       </p>
       <div className="flex flex-col gap-4">
         <ol className="flex flex-col gap-0.5">{stops.map(renderStop)}</ol>

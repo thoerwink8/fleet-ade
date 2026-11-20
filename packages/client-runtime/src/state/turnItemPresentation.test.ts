@@ -72,6 +72,9 @@ function run(
 
 describe("turnItemIsWorkspacePreparation", () => {
   it("hides a preparation failure only once a retry cancelled it", () => {
+    expect(turnItemIsWorkspacePreparation(command("正在准备工作区"))).toBe(true);
+    expect(turnItemIsWorkspacePreparation(command("Preparing workspace"))).toBe(true);
+    expect(turnItemIsWorkspacePreparation(command("npm test"))).toBe(false);
     expect(turnItemIsWorkspacePreparation(preparationFailure("failed"))).toBe(false);
     expect(turnItemIsWorkspacePreparation(preparationFailure("cancelled"))).toBe(true);
     expect(turnItemIsWorkspacePreparation(preparationFailure("cancelled", null))).toBe(false);

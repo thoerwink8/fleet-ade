@@ -277,6 +277,58 @@ function projectedWorkEntryStatus(
   }
 }
 
+/** Labels written before the UI copy was translated, still stored on old turns. */
+export function translateLegacyEnglishLabel(value: string): string {
+  const trimmed = value.trim();
+  switch (trimmed) {
+    case "Ran command":
+      return "已运行命令";
+    case "Changed files":
+      return "已修改文件";
+    case "Searched files":
+      return "已搜索文件";
+    case "Tool":
+      return "工具";
+    case "Preparing workspace":
+      return "正在准备工作区";
+    case "Workspace ready":
+      return "工作区已就绪";
+    case "Workspace preparation completed.":
+      return "工作区准备已完成。";
+    case "Workspace preparation cancelled":
+      return "工作区准备已取消";
+    case "Workspace preparation failed":
+      return "工作区准备失败";
+    case "Workspace preparation interrupted":
+      return "工作区准备被打断";
+    case "Interrupted before provider start":
+      return "在智能体启动前被打断";
+    case "Run interrupted before provider start":
+      return "任务在智能体启动前被打断";
+  }
+  const tasksMatch = /^Tasks (\d+\/\d+.*)$/.exec(trimmed);
+  if (tasksMatch) return `任务 ${tasksMatch[1]}`;
+  const readMatch = /^Read (.+?)(?: \+(\d+) more)?$/.exec(trimmed);
+  if (readMatch) {
+    return `读取 ${readMatch[1]}${readMatch[2] ? ` 等另外 ${readMatch[2]} 个` : ""}`;
+  }
+  const searchFilesInMatch = /^Searched files (.+) in (.+)$/.exec(trimmed);
+  if (searchFilesInMatch) {
+    return `在 ${searchFilesInMatch[2]} 中搜索文件 ${searchFilesInMatch[1]}`;
+  }
+  const searchInMatch = /^Searched (.+) in (.+)$/.exec(trimmed);
+  if (searchInMatch) {
+    return `在 ${searchInMatch[2]} 中搜索 ${searchInMatch[1]}`;
+  }
+  const searchFilesMatch = /^Searched files (.+)$/.exec(trimmed);
+  if (searchFilesMatch) return `搜索文件 ${searchFilesMatch[1]}`;
+  const searchOnlyInMatch = /^Searched in (.+)$/.exec(trimmed);
+  if (searchOnlyInMatch) return `在 ${searchOnlyInMatch[1]} 中搜索`;
+  const searchMatch = /^Searched (.+)$/.exec(trimmed);
+  if (searchMatch) return `搜索 ${searchMatch[1]}`;
+  return value;
+}
+
 function projectedWorkEntryTone(item: OrchestrationV2TurnItem): WorkLogEntry["tone"] {
   if (item.type === "error") return "info";
   if (item.type === "reasoning") return "thinking";
@@ -304,7 +356,9 @@ export function providerErrorPresentation(
       label:
         item.failure.class === "usage_limit"
           ? "已达到用量上限"
-          : item.title?.trim() || "提供方错误",
+          : item.title === null || item.title === undefined || item.title.trim() === ""
+            ? "提供方错误"
+            : translateLegacyEnglishLabel(item.title),
       detail: item.failure.message,
     };
   }
@@ -318,13 +372,13 @@ export function providerErrorPresentation(
       : item.status === "completed"
         ? `提供方已恢复（重试 ${progress} 次）`
         : item.status === "failed"
-          ? `${item.failure.class === "usage_limit" ? "已达到用量上限" : "提供方错误"} after ${progress} retries`
+          ? `${item.failure.class === "usage_limit" ? "已达到用量上限" : "提供方错误"}（重试 ${progress} 次仍失败）`
           : `已停止重试提供方（${progress}）`;
   const retryDelay =
     item.status === "running" && item.retry.retryDelayMs !== null && item.retry.retryDelayMs > 0
       ? item.retry.retryDelayMs < 1_000
-        ? ` Retrying in ${item.retry.retryDelayMs}ms.`
-        : ` Retrying in ${(item.retry.retryDelayMs / 1_000).toFixed(1).replace(/\.0$/u, "")}s.`
+        ? ` ${item.retry.retryDelayMs} 毫秒后重试。`
+        : ` ${(item.retry.retryDelayMs / 1_000).toFixed(1).replace(/\.0$/u, "")} 秒后重试。`
       : "";
   return {
     label,

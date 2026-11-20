@@ -40,7 +40,7 @@ export function ThreadDetailsItemsRow() {
               />
             }
           >
-            {enabled} of {THREAD_DETAILS_ITEMS.length} 星期
+            已启用 {enabled} / {THREAD_DETAILS_ITEMS.length} 项
             <ChevronDownIcon aria-hidden />
           </MenuTrigger>
           <MenuPopup align="end">

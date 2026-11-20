@@ -1824,7 +1824,7 @@ export default function GitActionsControl({
                     <span className="text-muted-foreground">文件</span>
                     {!allSelected && !isEditingFiles && (
                       <span className="text-muted-foreground">
-                        ({selectedFiles.length} of {allFiles.length})
+                        （已选 {selectedFiles.length} / {allFiles.length}）
                       </span>
                     )}
                   </div>

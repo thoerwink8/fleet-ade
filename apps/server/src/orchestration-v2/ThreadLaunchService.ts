@@ -238,9 +238,9 @@ function failureDetail(error: unknown): string {
   if (isThreadLaunchError(error)) {
     const cause = error.cause;
     const detail = cause instanceof Error ? cause.message : String(cause);
-    return `Workspace preparation failed during ${error.operation.replaceAll("-", " ")}: ${detail}`;
+    return `工作区准备在 ${error.operation.replaceAll("-", " ")} 时失败：${detail}`;
   }
-  return `Workspace preparation failed: ${error instanceof Error ? error.message : String(error)}`;
+  return `工作区准备失败：${error instanceof Error ? error.message : String(error)}`;
 }
 
 const make = Effect.gen(function* () {

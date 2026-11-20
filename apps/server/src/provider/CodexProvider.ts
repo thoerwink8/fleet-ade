@@ -577,7 +577,7 @@ const requestCodexChatGptModels = Effect.fn("requestCodexChatGptModels")(functio
   );
   if (refreshed === undefined) {
     yield* Effect.logWarning(
-      "Codex did not refresh its model catalog in time; using the cached catalog.",
+      "Codex 模型目录刷新超时，继续使用缓存目录。",
     );
     return models;
   }
@@ -1068,7 +1068,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
       {
         name: "goal",
         description: "设置一个目标，Codex 会持续工作直到完成",
-        input: { hint: "目标，或 pause、resume、clear" },
+        input: { hint: "目标，或 pause、resume、clear 控制" },
       },
       {
         name: "feedback",
