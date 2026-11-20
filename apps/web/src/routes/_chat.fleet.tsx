@@ -10,7 +10,12 @@ export const Route = createFileRoute("/_chat/fleet")({
   validateSearch: (raw: Record<string, unknown>): FleetSearch => ({
     // Invalid values must be undefined, not omitted: the route merges raw search
     // with this output, so an omitted key would leak the raw one through.
-    q: typeof raw.q === "string" && raw.q ? raw.q.slice(0, 200) : undefined,
+    q:
+      typeof raw.q === "string" && raw.q
+        ? raw.q.slice(0, 200)
+        : typeof raw.q === "number" && Number.isFinite(raw.q)
+          ? String(raw.q).slice(0, 200)
+          : undefined,
     machine:
       typeof raw.machine === "string" && raw.machine ? (raw.machine as EnvironmentId) : undefined,
     repo: typeof raw.repo === "string" && raw.repo ? raw.repo.slice(0, 200) : undefined,

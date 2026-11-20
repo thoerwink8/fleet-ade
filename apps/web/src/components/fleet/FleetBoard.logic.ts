@@ -23,6 +23,23 @@ export function fleetMachineName(
   return linked.get(id) || directory.get(id) || "未命名机器";
 }
 
+/** Appends a short environment id suffix when two machines share the same display name. */
+export function disambiguateMachineNames(
+  ids: readonly string[],
+  baseName: (id: string) => string,
+): ReadonlyMap<string, string> {
+  const names = ids.map((id) => [id, baseName(id)] as const);
+  const counts = new Map<string, number>();
+  for (const [, name] of names) {
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  const result = new Map<string, string>();
+  for (const [id, name] of names) {
+    result.set(id, (counts.get(name) ?? 0) > 1 && id ? `${name} (${id.slice(0, 6)})` : name);
+  }
+  return result;
+}
+
 /** The machine to aggregate from: the requested/primary one if in candidates, else the first candidate. */
 export function defaultFleetSource<Id extends string>(
   preferred: Id | null,

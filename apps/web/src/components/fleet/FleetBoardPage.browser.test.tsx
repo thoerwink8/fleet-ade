@@ -213,3 +213,59 @@ it("shows the read error retry state instead of missing-permission when session 
   expect(mocks.retrySession).toHaveBeenCalledTimes(1);
   expect(mocks.retrySummary).not.toHaveBeenCalled();
 });
+
+it("clears q alongside filters when clicking 清除筛选", async () => {
+  await page.viewport(1280, 800);
+  setup();
+  await using screen = await render(<FleetBoardPage />, { router: "/fleet?q=不存在的词xyz999" });
+  const router = screen.router;
+  if (router === undefined) throw new Error("the test router is missing");
+
+  await expect.element(page.getByText("没有符合筛选的")).toBeVisible();
+  await page.getByRole("button", { name: "清除筛选" }).click();
+
+  expect(router.latestLocation.search.q).toBeUndefined();
+  await expect.element(page.getByRole("button", { name: /修机群看板/ })).toBeVisible();
+});
+
+it("hides the loading badge and search box on zero-environment, forbidden, and read-error empty states", async () => {
+  setup({ readableIds: [], rows: new Map(), summaryStatus: "loading" });
+  mocks.environments = [];
+  await using screenZero = await render(<FleetBoardPage />, { router: "/fleet" });
+  await expect.element(page.getByText("还没有连上的环境")).toBeVisible();
+  await expect.element(page.getByText("正在读取")).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("searchbox", { name: "搜索机群任务" }))
+    .not.toBeInTheDocument();
+  await screenZero[Symbol.asyncDispose]();
+
+  setup({
+    phase: "error",
+    error: "The authenticated token is missing required scope: orchestration:read.",
+    readableIds: [],
+    sessionState: { data: null, hasError: false, isPending: false },
+    rows: new Map(),
+    summaryStatus: "loading",
+  });
+  await using screenForbidden = await render(<FleetBoardPage />, { router: "/fleet" });
+  await expect.element(page.getByText("这个连接没有读取会话的权限，看不到机群汇总")).toBeVisible();
+  await expect.element(page.getByText("正在读取")).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("searchbox", { name: "搜索机群任务" }))
+    .not.toBeInTheDocument();
+  await screenForbidden[Symbol.asyncDispose]();
+
+  setup({
+    phase: "connected",
+    readableIds: [],
+    sessionState: { data: null, hasError: true, isPending: false },
+    rows: new Map(),
+    summaryStatus: "loading",
+  });
+  await using _screenError = await render(<FleetBoardPage />, { router: "/fleet" });
+  await expect.element(page.getByText("读不到机群汇总")).toBeVisible();
+  await expect.element(page.getByText("正在读取")).not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("searchbox", { name: "搜索机群任务" }))
+    .not.toBeInTheDocument();
+});

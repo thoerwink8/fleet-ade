@@ -79,7 +79,7 @@ export const FleetBoardRow = memo(function FleetBoardRow({
         <div className="flex min-w-0 items-center gap-2">
           {offline ? <Badge variant="secondary">最后已知</Badge> : null}
           <Badge variant={status.variant}>{status.label}</Badge>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.title}</span>
+          <span className="min-w-0 flex-1 truncate text-prose font-medium">{row.title}</span>
           {age ? (
             <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:inline">
               {age}

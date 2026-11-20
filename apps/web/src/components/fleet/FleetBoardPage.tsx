@@ -50,6 +50,7 @@ import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import {
   FLEET_BOARD_STATUSES,
   defaultFleetSource,
+  disambiguateMachineNames,
   filterFleetRows,
   fleetMachineName,
   fleetStatusCounts,
@@ -215,7 +216,7 @@ function FleetBoardEmpty({
   action?: ReactNode;
 }) {
   return (
-    <Empty size="compact">
+    <Empty size="compact-prose">
       <EmptyHeader>
         <EmptyMedia variant="icon">{icon}</EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
@@ -316,16 +317,23 @@ export function FleetBoardPage() {
   const identities = useEnvironmentIdentities();
   const serverConfigs = useServerConfigs();
   const directory = new Map(identities.map((identity) => [identity.environmentId, identity.label]));
+  const allRows = [...summary.rows.values()];
+  const machineIds = [...new Set(allRows.map((row) => row.environmentId))];
+  const knownMachineIds = [
+    ...new Set([
+      ...environments.map((environment) => environment.environmentId as string),
+      ...machineIds,
+    ]),
+  ];
+  const disambiguatedNames = disambiguateMachineNames(knownMachineIds, (environmentId) =>
+    fleetMachineName(environmentId, linkedNames, directory),
+  );
   const machineName = (environmentId: string) =>
+    disambiguatedNames.get(environmentId) ??
     fleetMachineName(environmentId, linkedNames, directory);
   const displaySourceId = sourceEnvironmentId ?? fallbackSourceId;
   const sourceName =
-    displaySourceId === null
-      ? "这台机器"
-      : (directory.get(displaySourceId as EnvironmentId) ?? "这台机器");
-
-  const allRows = [...summary.rows.values()];
-  const machineIds = [...new Set(allRows.map((row) => row.environmentId))];
+    displaySourceId === null ? "这台机器" : (directory.get(displaySourceId) ?? "这台机器");
   const repoNames = [
     ...new Set(allRows.flatMap((row) => (row.repo === undefined ? [] : [row.repo]))),
   ].sort((a, b) => a.localeCompare(b));
@@ -406,7 +414,7 @@ export function FleetBoardPage() {
       variant="ghost-muted"
       size="sm"
       onClick={() => {
-        patchSearch({ status: undefined, machine: undefined, repo: undefined });
+        patchSearch({ q: undefined, status: undefined, machine: undefined, repo: undefined });
         setFiltersOpen(false);
       }}
     >
@@ -448,89 +456,85 @@ export function FleetBoardPage() {
       <div ref={containerRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex min-h-12 shrink-0 items-center gap-2 border-b ps-5 pe-2">
           <WorkspaceBreadcrumb ariaLabel="机群导航" className="min-w-0 flex-1">
-            <WorkspaceBreadcrumbItem>
+            <WorkspaceBreadcrumbItem current>
               <h1>机群</h1>
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
           <AppRouteModalClose />
         </header>
 
-        <div className="flex shrink-0 flex-col gap-1 border-b px-5 py-2 text-xs text-muted-foreground">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="flex min-w-0 items-center gap-1">
-              汇总来自：
-              <FleetSourcePicker
-                sourceName={sourceName}
-                candidates={fleetSourceCandidates}
-                machineName={machineName}
-                selected={sourceEnvironmentId}
-                onSelect={(environmentId) => patchSearch({ source: environmentId })}
-              />
-            </span>
-            {summary.status === "live" && sourceConnected ? (
-              <Badge variant="success">已连接</Badge>
-            ) : summary.status === "error" || summaryForbidden || sessionReadError ? (
-              <Badge variant="error">读不到</Badge>
-            ) : sourceDisconnected ? (
-              <Badge variant="warning">连不上</Badge>
-            ) : summary.status === "loading" || scopeLoading ? (
-              <Badge variant="secondary">正在读取</Badge>
-            ) : (
-              <Badge variant="warning">旧数据 · 正在更新</Badge>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="min-w-0">（只含这台机器记下的活）</span>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-5 py-2">
-          <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8 sm:min-w-44 sm:max-w-72">
-            <InputGroupAddon>
-              <SearchIcon aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              type="search"
-              value={search.q ?? ""}
-              onChange={(event) => patchSearch({ q: event.currentTarget.value || undefined }, true)}
-              placeholder="搜索标题或 # 单号"
-              aria-label="搜索机群任务"
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-5 py-2 text-xs text-muted-foreground">
+          <span className="flex min-w-0 items-center gap-1">
+            汇总来自：
+            <FleetSourcePicker
+              sourceName={sourceName}
+              candidates={fleetSourceCandidates}
+              machineName={machineName}
+              selected={sourceEnvironmentId}
+              onSelect={(environmentId) => patchSearch({ source: environmentId })}
             />
-          </InputGroup>
-          {isMobile ? (
-            machineFilterVisible || repoFilterVisible || activeFilterCount > 0 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFiltersOpen(true)}
-                aria-label="筛选"
-              >
-                <SlidersHorizontalIcon aria-hidden />
-                筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
-              </Button>
-            ) : null
-          ) : allRows.length > 0 ||
-            (environments.length > 0 &&
-              !summaryForbidden &&
-              !sessionReadError &&
-              !sourceDisconnected &&
-              summary.status !== "error") ? (
-            <>
-              {statusChips}
-              {machineFilter}
-              {repoFilter}
-            </>
-          ) : null}
+          </span>
+          <span className="min-w-0">（只含这台机器记下的活）</span>
+          {environments.length === 0 ? null : summary.status === "live" && sourceConnected ? (
+            <Badge variant="success">已连接</Badge>
+          ) : summary.status === "error" || summaryForbidden || sessionReadError ? (
+            <Badge variant="error">读不到</Badge>
+          ) : sourceDisconnected ? (
+            <Badge variant="warning">连不上</Badge>
+          ) : summary.status === "loading" || scopeLoading ? (
+            <Badge variant="secondary">正在读取</Badge>
+          ) : (
+            <Badge variant="warning">旧数据 · 正在更新</Badge>
+          )}
         </div>
 
-        {isMobile &&
-        (allRows.length > 0 ||
-          (!summaryForbidden &&
-            !sessionReadError &&
-            !sourceDisconnected &&
-            summary.status !== "error" &&
-            sourceEnvironmentId !== null)) ? (
-          <div className="flex shrink-0 border-b px-5 py-2">{statusChips}</div>
+        {allRows.length > 0 ||
+        (environments.length > 0 &&
+          !summaryForbidden &&
+          !sessionReadError &&
+          !sourceDisconnected &&
+          summary.status !== "error") ? (
+          <>
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-5 py-2">
+              <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8 sm:min-w-44 sm:max-w-72">
+                <InputGroupAddon>
+                  <SearchIcon aria-hidden />
+                </InputGroupAddon>
+                <InputGroupInput
+                  type="search"
+                  value={search.q ?? ""}
+                  onChange={(event) =>
+                    patchSearch({ q: event.currentTarget.value || undefined }, true)
+                  }
+                  placeholder="搜索标题或 # 单号"
+                  aria-label="搜索机群任务"
+                />
+              </InputGroup>
+              {isMobile ? (
+                machineFilterVisible || repoFilterVisible || activeFilterCount > 0 ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFiltersOpen(true)}
+                    aria-label="筛选"
+                  >
+                    <SlidersHorizontalIcon aria-hidden />
+                    筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+                  </Button>
+                ) : null
+              ) : (
+                <>
+                  {statusChips}
+                  {machineFilter}
+                  {repoFilter}
+                </>
+              )}
+            </div>
+
+            {isMobile ? (
+              <div className="flex shrink-0 border-b px-5 py-2">{statusChips}</div>
+            ) : null}
+          </>
         ) : null}
 
         <ScrollArea className="min-h-0 flex-1">

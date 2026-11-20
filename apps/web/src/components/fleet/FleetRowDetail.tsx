@@ -21,7 +21,7 @@ import {
 
 function DetailItem({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-3 py-1 text-sm">
+    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-3 py-1 text-prose">
       <span className="text-muted-foreground">{label}</span>
       <span className="min-w-0 break-words">{children}</span>
     </div>
@@ -83,7 +83,7 @@ export function FleetRowDetail({
                 </div>
               ) : null}
               <SheetTitle>{row.title}</SheetTitle>
-              <SheetDescription>
+              <SheetDescription size="prose">
                 {machineName}
                 {row.repo !== undefined ? ` · ${row.repo}` : ""}
                 {row.issue !== undefined ? ` · #${row.issue}` : ""}
@@ -103,7 +103,7 @@ export function FleetRowDetail({
               </div>
               {row.needsYou || row.phase === "stuck" ? (
                 <div className="flex flex-col gap-1">
-                  {shortReason ? <p className="text-sm">{shortReason}</p> : null}
+                  {shortReason ? <p className="text-prose">{shortReason}</p> : null}
                   {fullReason && fullReason !== shortReason ? (
                     <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 text-xs text-muted-foreground">
                       {fullReason}
@@ -111,10 +111,10 @@ export function FleetRowDetail({
                   ) : null}
                 </div>
               ) : null}
-              {staleText !== null ? <p className="text-sm text-warning">{staleText}</p> : null}
+              {staleText !== null ? <p className="text-prose text-warning">{staleText}</p> : null}
               <section aria-label="最新进展" className="rounded-lg border bg-card p-3">
                 <p className="text-xs text-muted-foreground">最新进展</p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm">
+                <p className="mt-1 whitespace-pre-wrap break-words text-prose">
                   {row.lastProgress || "暂无进展"}
                 </p>
               </section>
@@ -132,7 +132,7 @@ export function FleetRowDetail({
               </section>
               {!machineConnected ? (
                 <div className="mt-auto flex flex-col gap-3 rounded-lg border bg-card p-3">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-prose text-muted-foreground">
                     这台机器没在本客户端连上，看不到详情
                   </p>
                   <div className="flex">

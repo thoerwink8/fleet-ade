@@ -164,10 +164,18 @@ function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
   );
 }
 
-function SheetDescription({ className, ...props }: SheetPrimitive.Description.Props) {
+function SheetDescription({
+  className,
+  size = "default",
+  ...props
+}: SheetPrimitive.Description.Props & { size?: "default" | "prose" }) {
   return (
     <SheetPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn(
+        "text-muted-foreground",
+        size === "prose" ? "text-prose" : "text-sm",
+        className,
+      )}
       data-slot="sheet-description"
       {...props}
     />

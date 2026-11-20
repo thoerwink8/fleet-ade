@@ -2,6 +2,7 @@ import { expect, it } from "vite-plus/test";
 import type { FleetSummaryRow } from "@t3tools/contracts";
 import {
   defaultFleetSource,
+  disambiguateMachineNames,
   filterFleetRows,
   fleetFullReason,
   fleetMachineName,
@@ -39,6 +40,16 @@ it("names machines from peer-link names, then local labels, then a fallback", ()
   expect(fleetMachineName("b", linked, directory)).toBe("机器乙");
   expect(fleetMachineName("gone", linked, directory)).toBe("未命名机器");
   expect(fleetMachineName("", linked, directory)).toBe("未命名机器");
+});
+
+it("disambiguates duplicate machine names with a short environment id suffix", () => {
+  const names = disambiguateMachineNames(
+    ["env-alpha-1111", "env-beta-2222", "env-gamma-3333"],
+    (id) => (id === "env-gamma-3333" ? "工作机" : "未命名机器"),
+  );
+  expect(names.get("env-alpha-1111")).toBe("未命名机器 (env-al)");
+  expect(names.get("env-beta-2222")).toBe("未命名机器 (env-be)");
+  expect(names.get("env-gamma-3333")).toBe("工作机");
 });
 
 it("defaults the summary source to the requested or primary machine when eligible, else the first candidate", () => {

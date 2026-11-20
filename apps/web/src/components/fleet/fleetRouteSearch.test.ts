@@ -27,8 +27,9 @@ function matchedSearch(url: string) {
 }
 
 describe("fleet route search", () => {
-  it("drops a q the URL parser turned into a number", () => {
-    expect(matchedSearch("/fleet?q=4089")?.q).toBeUndefined();
+  it("keeps numeric q as a string for direct issue-number links", () => {
+    expect(matchedSearch("/fleet?q=103")?.q).toBe("103");
+    expect(matchedSearch("/fleet?q=0")?.q).toBe("0");
     expect(matchedSearch("/fleet?q=true")?.q).toBeUndefined();
   });
 
