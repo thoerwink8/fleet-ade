@@ -292,10 +292,7 @@ it.effect(
       ).pipe(Effect.flip);
       assert.deepEqual(renamedOffCalls, []);
       assert.deepEqual(renamed["new.tailnet.ts.net:443"], { "/": "http://127.0.0.1:9000" });
-      assert.include(
-        former.message,
-        '位于 old.tailnet.ts.net（此机器的旧名称）',
-      );
+      assert.include(former.message, "位于 old.tailnet.ts.net（此机器的旧名称）");
       const current: Web = {
         "old.tailnet.ts.net:443": { "/": "http://127.0.0.1:9000" },
         "new.tailnet.ts.net:443": { "/": "http://127.0.0.1:3773" },
@@ -316,10 +313,7 @@ it.effect(
       // Only a fresh read confirms the route is gone, whatever `off` exits with.
       for (const answers of [{ offIgnored: true }, { offIgnored: true, offExitCode: 1 }]) {
         const stuck = yield* close(answers).pipe(Effect.flip);
-        assert.include(
-          stuck.message,
-          'Tailscale Serve 仍转发',
-        );
+        assert.include(stuck.message, "Tailscale Serve 仍转发");
       }
       // Routes the server must not remove itself: a Service's, and a foreground command's.
       const owners = {
