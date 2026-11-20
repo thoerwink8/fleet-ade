@@ -1,4 +1,4 @@
-import { FolderIcon } from "lucide-react";
+import { FolderIcon, InboxIcon } from "lucide-react";
 import { CollapsibleSectionHeader } from "../ui/collapsible-section-header";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -112,39 +112,57 @@ export function SidebarDragBoundary(props: {
 }
 
 export function SidebarSectionHeader(props: {
-  marker: "working-header" | "snoozed-header" | "settled-header";
+  marker: "attention-header" | "working-header" | "snoozed-header" | "settled-header";
   label: string;
   /** A muted trailing count. */
   count: number;
   className?: string;
   dragging?: boolean;
   isDropTarget?: boolean;
-  toggle: { expanded: boolean; onToggle: () => void };
+  toggle?: { expanded: boolean; onToggle: () => void } | undefined;
 }) {
   const shelf =
     props.marker === "working-header"
       ? "working"
       : props.marker === "snoozed-header"
         ? "snoozed"
-        : "settled";
+        : props.marker === "attention-header"
+          ? "attention"
+          : "settled";
+  const tone = props.isDropTarget ? "accent" : props.dragging ? "emphasized" : "section";
+  const count = <span className="font-normal tabular-nums">{props.count}</span>;
   return (
     <SortableSidebarMarker
       marker={props.marker}
       data-testid={`sidebar-${props.marker}`}
       className={cn("relative mx-0.5 h-6", props.className)}
     >
-      <CollapsibleSectionHeader
-        data-sidebar-row={`shelf:${shelf}`}
-        onClick={props.toggle.onToggle}
-        expanded={props.toggle.expanded}
-        tone={props.isDropTarget ? "accent" : props.dragging ? "emphasized" : "section"}
-        compact
-        icon={<FolderIcon className="size-3.5 text-muted-foreground" />}
-        data-testid={`sidebar-${shelf}-shelf-toggle`}
-        accessory={<span className="font-normal tabular-nums">{props.count}</span>}
-      >
-        {props.label}
-      </CollapsibleSectionHeader>
+      {props.toggle ? (
+        <CollapsibleSectionHeader
+          data-sidebar-row={`shelf:${shelf}`}
+          onClick={props.toggle.onToggle}
+          expanded={props.toggle.expanded}
+          tone={tone}
+          compact
+          icon={<FolderIcon className="size-3.5 text-muted-foreground" />}
+          data-testid={`sidebar-${shelf}-shelf-toggle`}
+          accessory={count}
+        >
+          {props.label}
+        </CollapsibleSectionHeader>
+      ) : (
+        <div
+          data-sidebar-row={`shelf:${shelf}`}
+          className="flex h-6 w-full items-center gap-2 rounded-md px-2 text-left text-meta font-semibold text-secondary-label"
+        >
+          <span aria-hidden className="flex shrink-0">
+            <InboxIcon className="size-3.5 text-muted-foreground" />
+          </span>
+          <span className="min-w-0 truncate">{props.label}</span>
+          <span aria-hidden className="invisible h-px min-w-2 flex-1" />
+          {count}
+        </div>
+      )}
     </SortableSidebarMarker>
   );
 }

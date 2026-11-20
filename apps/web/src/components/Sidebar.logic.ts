@@ -18,9 +18,12 @@ import {
 } from "@t3tools/client-runtime/state/thread-search";
 import { foldSearchQuery, rankSearchItems, scoreThreadSearch } from "@t3tools/shared/paletteSearch";
 import {
+  isBlockingApproval,
   isListedThreadLineage,
+  isUserInputRequest,
   type ContextMenuItem,
   type EnvironmentId,
+  type OrchestrationV2PendingRuntimeRequestSummary,
   type ResolvedKeybindingsConfig,
   type ScopedThreadRef,
   type ThreadId,
@@ -197,7 +200,14 @@ export const animateSidebarLayoutChanges: AnimateLayoutChanges = (args) =>
 
 // Snoozed rows cannot accept drops without a wake time. Working rows only drag out as chat context.
 
-export type SidebarSection = "commander" | "pinned" | "active" | "working" | "snoozed" | "settled";
+export type SidebarSection =
+  | "commander"
+  | "attention"
+  | "pinned"
+  | "active"
+  | "working"
+  | "snoozed"
+  | "settled";
 
 export function resolveSidebarThreadSection(input: {
   readonly commander?: boolean;
@@ -219,6 +229,8 @@ export type SidebarListMarker =
   | "active-placeholder"
   | "settled-placeholder"
   | "pinned-divider"
+  | "attention-header"
+  | "attention-more"
   | "working-header"
   | "snoozed-header"
   | "settled-header";
@@ -243,6 +255,7 @@ function sectionAtSidebarSlot(items: readonly SidebarListItem[], index: number):
     if (item.marker === "pinned-header") section = "pinned";
     else if (item.marker === "pinned-divider") section = "active";
     else if (item.marker === "working-header") section = "working";
+    else if (item.marker === "attention-header") section = "attention";
     else if (item.marker === "snoozed-header") section = "snoozed";
     else if (item.marker === "settled-header") section = "settled";
   }
@@ -272,7 +285,13 @@ export function resolveSidebarDropTarget(
   const moved = items.filter((_, index) => index !== activeIndex);
   moved.splice(overIndex, 0, items[activeIndex]!);
   const section = sectionAtSidebarSlot(moved, overIndex);
-  if (section === "commander" || section === "working" || section === "snoozed") return null;
+  if (
+    section === "commander" ||
+    section === "working" ||
+    section === "snoozed" ||
+    section === "attention"
+  )
+    return null;
   const pinnedOrder: string[] = [];
   const activeOrder: string[] = [];
   let currentSection: SidebarSection = "pinned";
@@ -912,6 +931,83 @@ function hasUnseenFailure(thread: ThreadStatusInput): boolean {
   return completedAt > lastVisitedAt;
 }
 
+export type ThreadAttentionCategory = "approval" | "input" | "failed" | "limited" | "completed";
+
+export interface ThreadAttention {
+  readonly category: ThreadAttentionCategory;
+  /** Blocking requests park the agent until answered; visiting does not clear them. */
+  readonly blocking: boolean;
+  readonly unseen: boolean;
+}
+
+export type ThreadAttentionInput = ThreadStatusInput & {
+  /** Raw request carries `blocking`; without it the derived flags decide. */
+  readonly pendingRuntimeRequest?: Pick<
+    OrchestrationV2PendingRuntimeRequestSummary,
+    "kind" | "blocking"
+  > | null;
+};
+
+export function resolveThreadAttention(
+  thread: ThreadAttentionInput,
+  lastVisitedAt: string | null | undefined = thread.lastVisitedAt,
+): ThreadAttention | null {
+  const request = thread.pendingRuntimeRequest;
+  const statusThread = { ...thread, lastVisitedAt };
+  if (
+    (request !== null && request !== undefined
+      ? isBlockingApproval(request.kind, request.blocking)
+      : thread.hasPendingApprovals) ||
+    thread.pendingSubagentRequest === "approval"
+  ) {
+    return { category: "approval", blocking: true, unseen: true };
+  }
+  if (
+    (request !== null && request !== undefined
+      ? isUserInputRequest(request.kind, request.blocking)
+      : thread.hasPendingUserInput) ||
+    thread.pendingSubagentRequest === "user_input"
+  ) {
+    return { category: "input", blocking: true, unseen: true };
+  }
+  const status = resolveSidebarThreadStatus({
+    ...thread,
+    blockedOnThreadWait: thread.blockedOnThreadWait ?? false,
+  });
+  if (status === "failed" || status === "limited" || thread.latestRun?.status === "failed") {
+    const category = status === "limited" ? "limited" : "failed";
+    if (thread.latestRun?.status === "failed") {
+      return { category, blocking: false, unseen: hasUnseenFailure(statusThread) };
+    }
+    const failedAt = Date.parse(thread.runtime?.updatedAt ?? "");
+    const visitedAt = Date.parse(lastVisitedAt ?? "");
+    const unseen =
+      lastVisitedAt == null || Number.isNaN(failedAt) || Number.isNaN(visitedAt)
+        ? true
+        : failedAt > visitedAt;
+    return { category, blocking: false, unseen };
+  }
+  if (thread.latestRun?.status === "completed" && thread.latestRun.completedAt) {
+    return { category: "completed", blocking: false, unseen: hasUnseenCompletion(statusThread) };
+  }
+  return null;
+}
+
+export function threadAttentionActionText(category: ThreadAttentionCategory): string {
+  switch (category) {
+    case "approval":
+      return "等待批准，点开处理";
+    case "input":
+      return "等待你的回答，点开处理";
+    case "failed":
+      return "上一轮出错了，点开处理";
+    case "limited":
+      return "额度受限，点开处理";
+    case "completed":
+      return "有新结果，点开查看";
+  }
+}
+
 // Suppress trailing double-click navigation; keyboard and synthetic clicks use detail 0.
 export function isTrailingDoubleClick(detail: number): boolean {
   return detail > 1;
@@ -1045,13 +1141,27 @@ type SidebarThreadStatusInput = Pick<
   | "pendingSubagentRequest"
   | "runtime"
   | "blockedOnThreadWait"
->;
+> & {
+  readonly pendingRuntimeRequest?: Pick<
+    OrchestrationV2PendingRuntimeRequestSummary,
+    "kind" | "blocking"
+  > | null;
+};
 
 export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): SidebarThreadStatus {
-  if (thread.hasPendingApprovals || thread.pendingSubagentRequest === "approval") {
+  const request = thread.pendingRuntimeRequest;
+  const hasApprovals =
+    request !== null && request !== undefined
+      ? isBlockingApproval(request.kind, request.blocking)
+      : thread.hasPendingApprovals;
+  const hasUserInput =
+    request !== null && request !== undefined
+      ? isUserInputRequest(request.kind, request.blocking)
+      : thread.hasPendingUserInput;
+  if (hasApprovals || thread.pendingSubagentRequest === "approval") {
     return "approval";
   }
-  if (thread.hasPendingUserInput || thread.pendingSubagentRequest === "user_input") {
+  if (hasUserInput || thread.pendingSubagentRequest === "user_input") {
     return "input";
   }
   if (thread.runtime?.status === "running" && thread.blockedOnThreadWait === true) {

@@ -116,6 +116,7 @@ export function createSidebarSortingStrategy(input: {
     if (!target) return [];
     const groups: Record<SidebarSection, ThreadItem[]> = {
       commander: [],
+      attention: [],
       pinned: [],
       active: [],
       working: [],

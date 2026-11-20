@@ -22,6 +22,7 @@ export type ThreadActionMenuId =
   | "rename"
   | "regenerate-title"
   | "mark-unread"
+  | "dismiss-attention"
   | "copy"
   | "copy-path"
   | "copy-branch"
@@ -96,6 +97,8 @@ export interface ThreadActionMenuState {
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
+  /** In "等你处理" with a non-blocking reason; blocking entries leave only when resolved. */
+  readonly attentionDismissible?: boolean;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
@@ -105,6 +108,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "new-thread-on-branch",
     "project-settings",
     "mark-unread",
+    "dismiss-attention",
     "copy",
     "copy-path",
     "copy-branch",
@@ -184,6 +188,9 @@ export function buildThreadActionMenuItems(
         ]
       : []),
     { id: "mark-unread", label: "标为未读", icon: "mail-open" },
+    ...(state.attentionDismissible
+      ? [{ id: "dismiss-attention" as const, label: "移出等你处理", icon: "bell-off" }]
+      : []),
     ...(state.projectFilter
       ? [
           {

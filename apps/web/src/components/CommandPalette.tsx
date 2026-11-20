@@ -68,6 +68,7 @@ import {
   FileSearchIcon,
   FlagIcon,
   FlagOffIcon,
+  InboxIcon,
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
@@ -232,7 +233,14 @@ import {
   type SearchOverlayMode,
 } from "./CommandPalette.logic";
 import { resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
-import { isSidebarHiddenThread, applyThreadBatch, batchDeleteConfirmText } from "./Sidebar.logic";
+import {
+  isSidebarHiddenThread,
+  applyThreadBatch,
+  batchDeleteConfirmText,
+  firstValidTimestampMs,
+  resolveThreadAttention,
+} from "./Sidebar.logic";
+import { useUiStateStore } from "../uiStateStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { CommandPaletteContent, type PendingInputSelection } from "./CommandPaletteContent";
 import {
@@ -699,6 +707,27 @@ function OpenCommandPaletteDialog(props: {
   const activeThreadPreviewOpen = useRightPanelStore(
     (state) => selectActiveRightPanel(state.byThreadKey, previewPanelThreadRef) === "preview",
   );
+  const lastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
+  const nextAttentionThread = (() => {
+    const candidates = threads.flatMap((thread) => {
+      const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+      const entry = resolveThreadAttention(
+        { ...thread, pendingRuntimeRequest: thread.source.pendingRuntimeRequest },
+        thread.lastVisitedAt ?? lastVisitedAtById[key],
+      );
+      if (entry === null || (!entry.blocking && !entry.unseen) || key === activeThreadKey) {
+        return [];
+      }
+      return [{ thread, blocking: entry.blocking }];
+    });
+    candidates.sort(
+      (left, right) =>
+        Number(right.blocking) - Number(left.blocking) ||
+        firstValidTimestampMs(right.thread.latestRun?.completedAt ?? null, right.thread.updatedAt) -
+          firstValidTimestampMs(left.thread.latestRun?.completedAt ?? null, left.thread.updatedAt),
+    );
+    return candidates[0]?.thread ?? null;
+  })();
   const supportsThreadFind =
     environments.find((environment) => environment.environmentId === activeThread?.environmentId)
       ?.serverConfig?.threadFind === true;
@@ -1380,6 +1409,24 @@ function OpenCommandPaletteDialog(props: {
       shortcutCommand: "preview.find",
       run: async () => {
         dispatchPreviewAction("find");
+      },
+    });
+  }
+
+  if (nextAttentionThread !== null) {
+    const target = nextAttentionThread;
+    actionItems.push({
+      kind: "action",
+      value: "action:next-attention-thread",
+      title: "跳到下一个等你处理的会话",
+      searchTitle: `跳到下一个等你处理的会话（${target.title}）`,
+      searchTerms: ["attention", "waiting", "next", "approval", "blocked"],
+      icon: <InboxIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        await navigate({
+          to: "/$environmentId/$threadId",
+          params: buildThreadRouteParams(scopeThreadRef(target.environmentId, target.id)),
+        });
       },
     });
   }

@@ -80,6 +80,8 @@ import {
   type SidebarThreadStatus,
   resolveThreadLastVisitedAt,
   shouldRecedeSidebarThread,
+  threadAttentionActionText,
+  type ThreadAttention,
   resolveWorkingStartedAt,
   useRetainedValue,
   withoutRemovedCheckout,
@@ -554,6 +556,10 @@ type SidebarThreadRowProps = {
   onUnsnooze: (threadRef: ScopedThreadRef) => void;
   onUnpin: (threadRef: ScopedThreadRef) => void;
   onAcknowledgeWoke: (threadRef: ScopedThreadRef, visitedAt: string) => void;
+  /** Set on rows inside the "等你处理" section. */
+  attention?: (ThreadAttention & { readonly demoted?: boolean | undefined }) | undefined;
+  /** Blocking requests on a disconnected environment cannot be answered. */
+  attentionOffline?: boolean | undefined;
   onFileDropThreads?: ((threadRef: ScopedThreadRef, files: File[]) => void) | undefined;
 };
 
@@ -687,7 +693,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     : null;
 
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
-  const status = resolveSidebarThreadStatus(thread);
+  const status = resolveSidebarThreadStatus({
+    ...thread,
+    pendingRuntimeRequest: thread.source.pendingRuntimeRequest,
+  });
   const lastVisitedDate = lastVisitedAt === undefined ? null : parseTimestampDate(lastVisitedAt);
   const wokeAtDate = props.wokeAt === null ? null : parseTimestampDate(props.wokeAt);
   const isWoke =
@@ -800,6 +809,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   );
 
   const handleClick = (event: ReactMouseEvent) => {
+    if (props.attentionOffline && props.attention?.blocking) return;
     onThreadClick(event, threadRef);
   };
   const handleAcknowledgeWokeClick = (event: ReactMouseEvent) => {
@@ -824,8 +834,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       return;
     }
     if (event.key !== "Enter" && event.key !== " ") return;
+    if (props.attentionOffline && props.attention?.blocking) return;
     event.preventDefault();
-    onThreadActivate(threadRef);
   };
   const handleDoubleClick = (event: ReactMouseEvent) => {
     if (
@@ -926,6 +936,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     "group/sidebar-row relative w-full cursor-pointer overflow-hidden text-left outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
     // The card keeps the 1px transparent border of the sample page, so rows are 58px tall.
     variant === "card" ? "rounded-lg border border-transparent" : "rounded-md",
+    props.attentionOffline === true && props.attention?.blocking === true
+      ? "cursor-default opacity-60"
+      : null,
     variant !== "card" &&
       variantAction === "unsettle" &&
       !props.isActive &&
@@ -1498,6 +1511,33 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 {prBadge}
               </span>
             </div>
+            {props.attention !== undefined ? (
+              <div
+                className={cn(
+                  "flex h-4 min-w-0 items-center gap-2 text-meta",
+                  props.attention.demoted || props.attentionOffline === true
+                    ? "text-muted-foreground"
+                    : props.attention.category === "completed"
+                      ? "text-success-foreground"
+                      : props.attention.category === "limited"
+                        ? "text-warning-foreground"
+                        : "text-error-foreground",
+                )}
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    props.attention.blocking ? "bg-warning" : "bg-current",
+                  )}
+                />
+                <span className="min-w-0 truncate">
+                  {props.attentionOffline === true && props.attention.blocking
+                    ? "环境已断线，连上后处理"
+                    : threadAttentionActionText(props.attention.category)}
+                </span>
+              </div>
+            ) : null}
           </div>
         </TooltipTrigger>
         {detailsTooltip}
