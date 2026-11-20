@@ -1736,8 +1736,8 @@ export function ThreadsSettingsPanel() {
           {...searchableSetting("max-concurrent-sessions")}
           description={
             startupLimit === undefined
-              ? "按机器内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。超过上限的会话会排队，此设置立即生效。"
-              : `按机器内存估计上限；留空表示设置不限制。此环境的启动上限是 ${startupLimit}，同时设置时取较小值。超过上限的会话会排队，此设置立即生效。`
+              ? "按机器内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。"
+              : `按机器内存估计上限；留空表示设置不限制。此环境的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。`
           }
           control={
             <DraftInput

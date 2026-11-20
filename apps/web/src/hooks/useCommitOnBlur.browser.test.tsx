@@ -59,4 +59,25 @@ describe("settings draft commits", () => {
     await userEvent.tab();
     expect(saved).toBe("/tmp/a\\ b");
   });
+
+  it("does not clear a saved number when the browser reports bad input", async () => {
+    let saved = "2";
+    await using screen = await render(
+      <DraftInput
+        type="number"
+        value={saved}
+        onCommit={(next) => {
+          saved = next;
+        }}
+      />,
+    );
+    const input = screen.getByRole("spinbutton");
+    await input.click();
+    await userEvent.clear(input);
+    await userEvent.type(input, "e");
+    expect((input.element() as HTMLInputElement).validity.badInput).toBe(true);
+    await userEvent.tab();
+    expect(saved).toBe("2");
+    await expect.element(input).toHaveValue(2);
+  });
 });
