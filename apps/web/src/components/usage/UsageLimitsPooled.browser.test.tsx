@@ -29,8 +29,8 @@ function managedChatGpt(instanceId: string, displayName: string): ServerProvider
     usageLimits: {
       checkedAt,
       windows: [],
-      unavailable: { reason: "unsupported", message: "Track usage in ChatGPT." },
-      externalUsage: { label: "ChatGPT usage", url: CHATGPT_USAGE_URL },
+      unavailable: { reason: "unsupported", message: "在 ChatGPT 中查看用量。" },
+      externalUsage: { label: "ChatGPT 用量", url: CHATGPT_USAGE_URL },
     },
   };
 }
@@ -56,8 +56,9 @@ describe("UsageLimitsPooled ChatGPT usage card", () => {
     );
 
     await expect
-      .element(screen.getByText("ChatGPT Work on Desk, ChatGPT Personal on Desk"))
+      .element(screen.getByText("ChatGPT Work · Desk, ChatGPT Personal · Desk"))
       .toBeVisible();
+    await expect.element(screen.getByText("ChatGPT 用量")).toBeVisible();
     await expect.element(screen.getByText("用已连接的账户在 ChatGPT 中查看用量。")).toBeVisible();
   });
 });

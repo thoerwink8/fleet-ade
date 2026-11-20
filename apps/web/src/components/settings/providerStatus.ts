@@ -172,9 +172,7 @@ export function getProviderVersionAdvisoryPresentation(
     title: label,
     detail:
       advisory.message ??
-      (versionLabel
-        ? `${label}: install ${versionLabel}.`
-        : `${label}: install the latest provider version.`),
+      (versionLabel ? `${label}：安装 ${versionLabel}。` : `${label}：安装最新的提供方版本。`),
     updateCommand: advisory.updateCommand,
     emphasis: "normal" as const,
     targetVersion: null,

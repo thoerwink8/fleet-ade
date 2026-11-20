@@ -6681,7 +6681,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       usedBefore: 100,
       expectedClass: "usage_limit",
       expectedCode: "subscription_sharing_workplace_individual_usage_limit_exceeded",
-      expectedMessage: "Usage settings",
+      expectedMessage: "用量设置",
     },
     // regression: #25333 ChatGPT sharing limit prose classifies as a usage limit
     {
@@ -6694,7 +6694,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       usedBefore: 100,
       expectedClass: "usage_limit",
       expectedCode: "subscription_sharing_usage_limit_exceeded",
-      expectedMessage: "Usage settings",
+      expectedMessage: "用量设置",
     },
     {
       name: "chatgpt-sharing-prose",
@@ -6705,7 +6705,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       resetAfter: true,
       expectedClass: "usage_limit",
       expectedCode: "subscription_sharing_usage_limit_exceeded",
-      expectedMessage: "Usage settings",
+      expectedMessage: "用量设置",
     },
     {
       name: "sharing-code-mention-retry",

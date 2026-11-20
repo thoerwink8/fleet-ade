@@ -1559,8 +1559,8 @@ describe("external usage settings", () => {
       usageLimits: {
         checkedAt: "2026-09-03T11:00:00.000Z",
         windows: [],
-        unavailable: { reason: "unsupported", message: "Track usage in ChatGPT." },
-        externalUsage: { label: "ChatGPT usage", url: "https://chatgpt.com/#settings/Usage" },
+        unavailable: { reason: "unsupported", message: "在 ChatGPT 中查看用量。" },
+        externalUsage: { label: "ChatGPT 用量", url: "https://chatgpt.com/#settings/Usage" },
       },
     });
     const presentations = new Map([
@@ -1581,8 +1581,8 @@ describe("external usage settings", () => {
     expect(collectExternalUsageLinks(presentations)).toEqual([
       {
         ...managed.usageLimits!.externalUsage,
-        message: "Track usage in ChatGPT.",
-        accounts: [`${managed.instanceId} on A`, "personal on A", `${managed.instanceId} on B`],
+        message: "在 ChatGPT 中查看用量。",
+        accounts: [`${managed.instanceId} · A`, "personal · A", `${managed.instanceId} · B`],
       },
     ]);
     expect(collectLimitAccounts(presentations)).toEqual([]);

@@ -39,7 +39,13 @@ const ROOTS = [
   "apps/server/src/provider/AntigravityProvider.ts",
   "apps/server/src/provider/antigravityAuthSupport.ts",
   "apps/server/src/provider/antigravityUsageLimits.ts",
+  "apps/server/src/provider/providerCompatibility.ts",
+  "apps/server/src/project/ManagedProjectFolders.ts",
+  "apps/server/src/orchestration-v2/Orchestrator.ts",
+  "packages/shared/src/usageLimits.ts",
+  "apps/server/src/provider/CodexManagedErrors.ts",
 ];
+
 const UI_NAMES = new Set([
   "title",
   "label",
@@ -149,6 +155,7 @@ function isUserCopy(text: string, allowlist: ReadonlyArray<AllowEntry>): boolean
   if (/(?:^and |, and\b)|\b\d+ other\b|\b(?:is|are|was|were|has|have) [a-z]{3,}\b/.test(plain)) {
     return true;
   }
+
   if (/^[a-z0-9_.:/\- ]+$/.test(plain)) return false;
   if (!/[A-Z\u4e00-\u9fff]/.test(plain)) return false;
   return (
@@ -335,6 +342,7 @@ for (const file of files.filter(included)) {
     rel.endsWith("/AntigravityProvider.ts") ||
     rel.endsWith("/antigravityAuthSupport.ts") ||
     rel.endsWith("/antigravityUsageLimits.ts") ||
+    rel.endsWith("/CodexManagedErrors.ts") ||
     /\/provider\/[^/]*Auth\.ts$/.test(rel);
   const templateCopy =
     rel.endsWith("/AntigravityProvider.ts") ||
@@ -393,6 +401,7 @@ for (const file of files.filter(included)) {
         texts.push(...expressionCandidateTexts(node.initializer));
       }
     }
+
     // `value={"No project"}` is a literal inside JSX, not a named UI attribute,
     // and a ternary keeps each branch as its own literal.
     if (
