@@ -397,6 +397,7 @@ function shellSubscriberThreadIds(
       : !options.omitOlderSettled ||
           beforeMs === undefined ||
           !isOlderSettledThreadShell(entry, beforeMs) ||
+          entry.commander === true ||
           entry.pinnedAt != null ||
           entry.snoozedUntil != null ||
           entry.mayBeLive ||

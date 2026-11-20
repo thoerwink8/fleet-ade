@@ -45,8 +45,6 @@ const badgeVariants = cva(
         chip: "h-6 min-w-0 tabular-nums gap-1 rounded-md border-border bg-card px-2 text-meta font-normal text-secondary-label sm:h-6 sm:min-w-0 sm:text-meta [&_svg:not([class*='size-'])]:size-3.5",
         label:
           "bg-[color-mix(in_srgb,var(--label)_8%,transparent)] text-[color-mix(in_srgb,var(--label)_30%,var(--color-foreground))] dark:bg-[color-mix(in_srgb,var(--label)_12%,transparent)] dark:text-[color-mix(in_srgb,var(--label)_45%,var(--color-foreground))]",
-        "accent-chip":
-          "border-info/30 bg-info/10 text-info-foreground dark:border-info/35 dark:bg-info/18 font-medium",
       },
     },
   },

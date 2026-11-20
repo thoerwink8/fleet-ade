@@ -983,7 +983,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
 
   const isCommander = thread.commander === true;
   const commanderBadge = isCommander ? (
-    <Badge variant="accent-chip" size="sm">
+    <Badge variant="info" size="sm">
       指挥
     </Badge>
   ) : null;
@@ -1664,7 +1664,7 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
                   {thread.title}
                 </span>
                 {thread.commander === true ? (
-                  <Badge variant="accent-chip" size="sm">
+                  <Badge variant="info" size="sm">
                     指挥
                   </Badge>
                 ) : null}

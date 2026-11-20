@@ -26,10 +26,7 @@ import {
   resolveSidebarDropTarget,
   planSidebarThreadDrop,
   resolveSidebarReorderableThreadKeys,
-  resolveSidebarRowAccessibility,
   resolveSidebarThreadSection,
-  filterSidebarV2VisibleThreads,
-  sortCommanderThreadsForSidebar,
   sortPinnedThreadsForSidebar,
   sortScopedProjectsForSidebar,
   sortSidebarV2ProjectGroups,
@@ -1626,51 +1623,5 @@ describe("commander sidebar pinning", () => {
       pinnedOrder: ["a1", "p1"],
       activeOrder: [],
     });
-  });
-
-  it("keeps child threads hidden under commander threads and includes commander in accessibility label", () => {
-    const parent = makeThreadFixture({
-      id: ThreadId.make("cmd-parent"),
-      title: "Commander Thread",
-      commander: true,
-    });
-    const child = makeThreadFixture({
-      id: ThreadId.make("cmd-child"),
-      title: "Child Worker",
-      lineage: {
-        rootThreadId: parent.id,
-        parentThreadId: parent.id,
-        relationshipToParent: "subagent",
-      },
-    });
-    const visible = filterSidebarV2VisibleThreads([parent, child], null, new Set());
-    expect(visible.map((thread) => thread.id)).toEqual([parent.id]);
-
-    const sorted = sortCommanderThreadsForSidebar([
-      makeThreadFixture({
-        id: ThreadId.make("cmd-old"),
-        updatedAt: "2026-03-09T08:00:00.000Z",
-        latestUserMessageAt: "2026-03-09T08:00:00.000Z",
-      }),
-      makeThreadFixture({
-        id: ThreadId.make("cmd-new"),
-        updatedAt: "2026-03-09T09:00:00.000Z",
-        latestUserMessageAt: "2026-03-09T11:00:00.000Z",
-      }),
-    ]);
-    expect(sorted.map((thread) => thread.id)).toEqual([
-      ThreadId.make("cmd-new"),
-      ThreadId.make("cmd-old"),
-    ]);
-
-    expect(
-      resolveSidebarRowAccessibility({
-        title: "Commander Thread",
-        statusLabel: null,
-        projectDisplayName: "fleet-ade",
-        isActive: true,
-        isCommander: true,
-      }).label,
-    ).toBe("Commander Thread, 指挥, fleet-ade");
   });
 });

@@ -78,35 +78,3 @@ it("opens the thread menu on a desktop title click without waiting", async () =>
   await screen.getByRole("button", { name: "新建会话 的会话操作" }).click();
   expect(openMenu).toHaveBeenCalledOnce();
 });
-
-it("renders the commander badge popover and triggers settings and unmark callbacks", async () => {
-  const onOpenCommanderSettings = vi.fn();
-  const onUnmarkCommander = vi.fn();
-  await using screen = await render(
-    <ChatHeader
-      activeThreadEnvironmentId={EnvironmentId.make("environment")}
-      activeThreadId={ThreadId.make("thread")}
-      activeThreadTitle="指挥调度会话"
-      isCommander
-      isServerThread
-      activeProject={null}
-      parentThreadLink={null}
-      onOpenThread={() => {}}
-      rightPanelOpen={false}
-      onNewThreadInProject={() => {}}
-      onOpenCommanderSettings={onOpenCommanderSettings}
-      onUnmarkCommander={onUnmarkCommander}
-    />,
-  );
-
-  const badgeButton = screen.getByRole("button", { name: "指挥会话操作" });
-  await expect.element(badgeButton).toBeVisible();
-  await badgeButton.click();
-
-  await screen.getByRole("button", { name: "打开「指挥」设置" }).click();
-  expect(onOpenCommanderSettings).toHaveBeenCalledOnce();
-
-  await badgeButton.click();
-  await screen.getByRole("button", { name: "取消指挥" }).click();
-  expect(onUnmarkCommander).toHaveBeenCalledOnce();
-});

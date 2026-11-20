@@ -23,7 +23,7 @@ import {
 } from "react";
 import { isTrailingDoubleClick } from "../Sidebar.logic";
 import { Badge } from "../ui/badge";
-import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
 import { useThreadActionMenu } from "~/hooks/useThreadActionMenu";
@@ -103,7 +103,6 @@ export const ChatHeader = memo(function ChatHeader({
   const interfaceFont = useClientSettings((settings) => settings.fontFamilySans);
   const breadcrumbContainerRef = useRef<HTMLDivElement>(null);
   const [collapseParentTitle, setCollapseParentTitle] = useState(false);
-  const [commanderMenuOpen, setCommanderMenuOpen] = useState(false);
   const activeThreadRef = scopeThreadRef(activeThreadEnvironmentId, activeThreadId);
   const canOperateThread = useEnvironmentScope(
     activeThreadEnvironmentId,
@@ -405,48 +404,27 @@ export const ChatHeader = memo(function ChatHeader({
             </Tooltip>
           ) : null}
           {renamingTitle === null && isCommander ? (
-            <Popover open={commanderMenuOpen} onOpenChange={setCommanderMenuOpen}>
-              <PopoverTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label="指挥会话操作"
-                    className="inline-flex shrink-0 cursor-pointer items-center rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                  />
-                }
+            <Menu>
+              <MenuTrigger
+                render={<Badge render={<button type="button" />} variant="info" size="sm" />}
+                aria-label="指挥会话操作"
               >
-                <Badge variant="accent-chip" size="sm">
-                  指挥
-                </Badge>
-              </PopoverTrigger>
-              <PopoverPopup side="bottom" align="start" sideOffset={6}>
-                <div className="flex w-48 flex-col gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCommanderMenuOpen(false);
-                      onOpenCommanderSettings?.();
-                    }}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-row text-foreground transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                  >
-                    <SettingsIcon className="size-4 shrink-0 text-muted-foreground" />
-                    <span>打开「指挥」设置</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canOperateThread || !isServerThread || !onUnmarkCommander}
-                    onClick={() => {
-                      setCommanderMenuOpen(false);
-                      onUnmarkCommander?.();
-                    }}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-row text-foreground transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    <FlagOffIcon className="size-4 shrink-0 text-muted-foreground" />
-                    <span>取消指挥</span>
-                  </button>
-                </div>
-              </PopoverPopup>
-            </Popover>
+                指挥
+              </MenuTrigger>
+              <MenuPopup side="bottom" align="start" sideOffset={6}>
+                <MenuItem onClick={onOpenCommanderSettings}>
+                  <SettingsIcon />
+                  打开「指挥」设置
+                </MenuItem>
+                <MenuItem
+                  disabled={!canOperateThread || !isServerThread || !onUnmarkCommander}
+                  onClick={onUnmarkCommander}
+                >
+                  <FlagOffIcon />
+                  取消指挥
+                </MenuItem>
+              </MenuPopup>
+            </Menu>
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>

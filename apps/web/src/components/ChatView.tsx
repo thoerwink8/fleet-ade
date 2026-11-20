@@ -2482,6 +2482,7 @@ export default function ChatView(props: ChatViewProps) {
     scrollToEnd,
     persistThreadSettingsForNextTurn,
   });
+  const unmarkActiveCommanderStable = useStableCallback(unmarkActiveCommander);
   const activeThreadHasCompactableConversation = serverVisibleTurnItems.some(
     ({ item }) =>
       item.type === "user_message" &&
@@ -3335,7 +3336,7 @@ export default function ChatView(props: ChatViewProps) {
               rightPanelOpen={inlineRightPanelOwnsTitleBar}
               onNewThreadInProject={handleNewThreadInActiveProjectStable}
               onOpenCommanderSettings={handleOpenCommanderSettingsStable}
-              onUnmarkCommander={unmarkActiveCommander}
+              onUnmarkCommander={unmarkActiveCommanderStable}
               {...(activeDraftLogicalProjectKey
                 ? { onOpenProjectSettings: handleOpenDraftProjectSettingsStable }
                 : {})}

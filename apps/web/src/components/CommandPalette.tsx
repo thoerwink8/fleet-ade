@@ -1491,7 +1491,7 @@ function OpenCommandPaletteDialog(props: {
     actionItems.push({
       kind: "action",
       value: "action:thread-commander",
-      searchTerms: ["指挥", "commander", "pin", "置顶", isCommander ? "取消指挥" : "标成指挥"],
+      searchTerms: ["指挥", "commander", isCommander ? "取消指挥" : "标成指挥"],
       title: isCommander ? "取消指挥" : "标成指挥",
       icon: isCommander ? (
         <FlagOffIcon className={ITEM_ICON_CLASS} />

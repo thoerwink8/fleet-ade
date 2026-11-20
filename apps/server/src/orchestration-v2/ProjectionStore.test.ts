@@ -48,6 +48,7 @@ import { projectThreadAwarenessV2 } from "@t3tools/shared/agentAwareness";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import { loadSubscriberShellSnapshot } from "./ShellStream.ts";
 import {
   buildBoundedThreadProjection,
   decodeThreadHistoryCursor,
@@ -148,7 +149,14 @@ const assertShellIndexCoversShells = Effect.fnUntraced(function* () {
   const trimmed = (
     row: Pick<
       ProjectionStore.ActiveShellIndexEntry,
-      "id" | "projectId" | "lineage" | "settledOverride" | "settledAt" | "pinnedAt" | "snoozedUntil"
+      | "id"
+      | "projectId"
+      | "lineage"
+      | "settledOverride"
+      | "settledAt"
+      | "pinnedAt"
+      | "snoozedUntil"
+      | "commander"
     >,
   ) => ({
     id: row.id,
@@ -157,6 +165,7 @@ const assertShellIndexCoversShells = Effect.fnUntraced(function* () {
     settledOverride: row.settledOverride,
     settledAt: iso(row.settledAt),
     pinnedAt: iso(row.pinnedAt),
+    commander: row.commander === true,
     snoozedUntil: iso(row.snoozedUntil),
   });
   assert.deepEqual(index.map(trimmed), shells.map(trimmed));
@@ -2837,6 +2846,7 @@ it.effect("SQL list older settled threads below a cursor", () =>
       readonly subagent?: boolean;
       readonly archived?: boolean;
       readonly snoozedUntilDay?: number;
+      readonly commander?: boolean;
     }) =>
       store.apply({
         id: EventId.make(`event:older:${input.name}`),
@@ -2866,6 +2876,7 @@ it.effect("SQL list older settled threads below a cursor", () =>
           updatedAt: now,
           archivedAt: input.archived === true ? now : null,
           settledOverride: input.settledDay === null ? null : "settled",
+          commander: input.commander === true,
           settledAt: input.settledDay === null ? null : at(input.settledDay),
           snoozedUntil: input.snoozedUntilDay === undefined ? null : at(input.snoozedUntilDay),
           lastVisitedAt: null,
@@ -2909,7 +2920,28 @@ it.effect("SQL list older settled threads below a cursor", () =>
     const next = yield* list({ settledAt: DateTime.formatIso(at(4)), threadId: id("b") }, 10);
     assert.deepEqual(next.threadIds, [id("c"), id("d"), id("snoozed")]);
     assert.deepEqual(yield* list(before, 25, []), { threadIds: [], counts: [] });
+    yield* createThread({ name: "commander", settledDay: 1, commander: true });
+    for (let n = 0; n < 25; n++) {
+      yield* createThread({ name: `new-${n}`, settledDay: 20 });
+    }
     yield* assertShellIndexCoversShells();
+    const sql = yield* SqlClient.SqlClient;
+    const subscriber = yield* loadSubscriberShellSnapshot({
+      sql,
+      listShellIndex: store.listActiveShellIndex(),
+      readThreads: (threadIds) =>
+        store.readShellSnapshot({
+          location: "active",
+          ...(threadIds === undefined ? {} : { threadIds }),
+        }),
+      listProjects: Effect.succeed([]),
+      latestSequence: Effect.succeed(0),
+      options: { omitIdleSubagents: true, omitOlderSettled: true },
+    });
+    assert.include(
+      subscriber.snapshot.threads.map((thread) => thread.id),
+      id("commander"),
+    );
     const scoped = yield* list(before, 0, [ProjectId.make("project:b")]);
     assert.deepEqual(scoped, {
       threadIds: [],
