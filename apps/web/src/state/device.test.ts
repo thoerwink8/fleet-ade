@@ -13,6 +13,12 @@ describe("device support availability", () => {
   });
 
   it("keeps Device available when either support is enabled or state is loading", () => {
+    expect(isDeviceSupportOffered(true, { hostStatus: "idle", agentAccessEnabled: false })).toBe(
+      true,
+    );
+    expect(isDeviceSupportOffered(true, { hostStatus: "disabled", agentAccessEnabled: true })).toBe(
+      true,
+    );
     expect(
       isDeviceSupportOffered(false, { hostStatus: "disabled", agentAccessEnabled: false }),
     ).toBe(true);
