@@ -21,6 +21,7 @@ import { cn } from "../../lib/utils";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { formatContextWindowCompactionMessage } from "./compaction.logic";
+import { buildContextDetailRows } from "./threadDetailsContext.logic";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
 
 const PACE_LABEL: Record<LimitPace, string> = {
@@ -34,6 +35,7 @@ export interface ThreadDetailsUsageInput {
   readonly providers: readonly ServerProvider[];
   readonly sources: UsageLimitSourceSnapshots;
   readonly contextWindow: ContextWindowSnapshot | null;
+  readonly promptCacheExpiresAt?: string | null;
 }
 
 type UsageTone = "error" | "warning" | null;
@@ -82,7 +84,15 @@ export function ThreadDetailsUsage({
 }
 
 /** The thread's context window. The bar fills as context is used; the tick marks auto-compaction. */
-export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowSnapshot }) {
+export function ThreadDetailsContext({
+  usage,
+  promptCacheExpiresAt = null,
+}: {
+  readonly usage: ContextWindowSnapshot;
+  readonly promptCacheExpiresAt?: string | null;
+}) {
+  const nowMinute = useNowMinute();
+  const nowMs = Date.parse(`${nowMinute}:00Z`);
   const maxTokens = usage.maxTokens != null && usage.maxTokens > 0 ? usage.maxTokens : null;
   const used =
     maxTokens !== null && usage.usedPercentage !== null
@@ -94,6 +104,16 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
       ? (threshold / maxTokens) * 100
       : null;
   const usedTokens = formatContextWindowTokens(usage.usedTokens);
+  const detailRows = buildContextDetailRows(
+    {
+      inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
+      outputTokens: usage.outputTokens,
+      reasoningOutputTokens: usage.reasoningOutputTokens,
+      promptCacheExpiresAt,
+    },
+    nowMs,
+  );
   return (
     <ThreadDetailsSection
       headingId="thread-details-context-heading"
@@ -134,6 +154,24 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
             </>
           }
         />
+        {detailRows.map((row) => (
+          <UsageRow
+            key={row.key}
+            label={row.label}
+            fill={row.fill}
+            tone={null}
+            muted
+            value={row.value}
+            tooltip={row.tooltipLines.map((line, index) => (
+              <span
+                key={line}
+                className={index === 0 ? "text-foreground" : "text-muted-foreground"}
+              >
+                {line}
+              </span>
+            ))}
+          />
+        ))}
       </div>
     </ThreadDetailsSection>
   );
