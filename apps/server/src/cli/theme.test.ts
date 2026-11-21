@@ -4,10 +4,13 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as PlatformError from "effect/PlatformError";
+import * as FileSystem from "effect/FileSystem";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NetService from "@t3tools/shared/Net";
 import { assert, describe, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as TestConsole from "effect/testing/TestConsole";
@@ -17,12 +20,26 @@ import { cli } from "../binCli.ts";
 import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
-const runCli = (args: ReadonlyArray<string>) =>
-  Command.runWith(cli, { version: "0.0.0" })(args).pipe(
-    Effect.provide(
-      Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer, TestConsole.layer),
-    ),
-  );
+const cliRuntime = Layer.mergeAll(
+  NodeServices.layer,
+  NodeCrypto.layer,
+  NetService.layer,
+  TestConsole.layer,
+);
+
+const runCli = (
+  args: ReadonlyArray<string>,
+  fileSystem?: Context.Service.Shape<typeof FileSystem.FileSystem>,
+) =>
+  Effect.gen(function* () {
+    const command = Command.runWith(cli, { version: "0.0.0" })(args);
+    if (fileSystem === undefined) return yield* command;
+    const current = yield* Effect.context<never>();
+    return yield* Effect.provideContext(
+      command,
+      Context.add(current, FileSystem.FileSystem, fileSystem),
+    );
+  }).pipe(Effect.provide(cliRuntime));
 
 const makeBaseDir = () => NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3code-theme-cli-"));
 
@@ -164,13 +181,21 @@ describe("t3 theme", () => {
     }),
   );
 
-  // quarantine: #214 关一基线：抛出 Unknown error: undefined
-  it.effect.skip("restores the previous theme when a re-publish fails to set", () =>
+  const failingFileSystem = (
+    fileSystem: (
+      fs: Context.Service.Shape<typeof FileSystem.FileSystem>,
+    ) => Context.Service.Shape<typeof FileSystem.FileSystem>,
+  ) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      return FileSystem.FileSystem.of(fileSystem(fs));
+    }).pipe(Effect.provide(cliRuntime));
+
+  it.effect("restores the previous theme when a re-publish fails to set", () =>
     Effect.gen(function* () {
       const baseDir = makeBaseDir();
       writeSettings(baseDir, {});
-      const userdataDir = NodePath.dirname(settingsPathFor(baseDir));
-      const themesDir = NodePath.join(userdataDir, "themes");
+      const themesDir = NodePath.join(NodePath.dirname(settingsPathFor(baseDir)), "themes");
       NodeFS.mkdirSync(themesDir, { recursive: true });
       const publishedPath = NodePath.join(themesDir, "nightfall.json");
       const previous =
@@ -179,28 +204,53 @@ describe("t3 theme", () => {
       const themeFile = NodePath.join(baseDir, "nightfall.json");
       NodeFS.writeFileSync(themeFile, NIGHTFALL_THEME_JSON);
 
-      NodeFS.chmodSync(userdataDir, 0o555);
-      try {
-        yield* runCli(["theme", "set", themeFile, "--base-dir", baseDir]).pipe(Effect.flip);
-        assert.equal(NodeFS.readFileSync(publishedPath, "utf8"), previous);
-      } finally {
-        NodeFS.chmodSync(userdataDir, 0o755);
-      }
+      // The settings write is what fails; a mode-bit denial does not hold for the owner on Linux.
+      const settingsPath = settingsPathFor(baseDir);
+      const denied = PlatformError.systemError({
+        _tag: "PermissionDenied",
+        module: "FileSystem",
+        method: "rename",
+        pathOrDescriptor: settingsPath,
+      });
+      const fileSystem = yield* failingFileSystem((fs) => ({
+        ...fs,
+        rename: (oldPath, newPath) =>
+          newPath === settingsPath ? Effect.fail(denied) : fs.rename(oldPath, newPath),
+      }));
+
+      const failure = yield* runCli(
+        ["theme", "set", themeFile, "--base-dir", baseDir],
+        fileSystem,
+      ).pipe(Effect.flip);
+
+      assert.include(String(failure), "Could not write");
+      assert.equal(NodeFS.readFileSync(publishedPath, "utf8"), previous);
+      assert.equal(Object.hasOwn(readSettings(baseDir), "defaultTheme"), false);
     }),
   );
 
-  // quarantine: #214 关一基线：抛出 Unknown error: undefined
-  it.effect.skip("refuses to write when the settings file cannot be read", () =>
+  it.effect("refuses to write when the settings file cannot be read", () =>
     Effect.gen(function* () {
       const baseDir = makeBaseDir();
       writeSettings(baseDir, { enableProviderUpdateChecks: false });
-      NodeFS.chmodSync(settingsPathFor(baseDir), 0o000);
+      const settingsPath = settingsPathFor(baseDir);
+      const denied = PlatformError.systemError({
+        _tag: "PermissionDenied",
+        module: "FileSystem",
+        method: "readFileString",
+        pathOrDescriptor: settingsPath,
+      });
+      const fileSystem = yield* failingFileSystem((fs) => ({
+        ...fs,
+        readFileString: (path, encoding) =>
+          path === settingsPath ? Effect.fail(denied) : fs.readFileString(path, encoding),
+      }));
 
-      const failure = yield* runCli(["theme", "set", "ocean", "--base-dir", baseDir]).pipe(
-        Effect.flip,
-      );
+      const failure = yield* runCli(
+        ["theme", "set", "ocean", "--base-dir", baseDir],
+        fileSystem,
+      ).pipe(Effect.flip);
 
-      NodeFS.chmodSync(settingsPathFor(baseDir), 0o644);
       assert.include(String(failure), "Could not read");
       assert.equal(readSettings(baseDir).enableProviderUpdateChecks, false);
       assert.equal(Object.hasOwn(readSettings(baseDir), "defaultTheme"), false);

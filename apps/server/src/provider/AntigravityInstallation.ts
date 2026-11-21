@@ -58,6 +58,28 @@ const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000;
 const FREE_SPACE_MARGIN = 256 * 1024 * 1024;
 const RECORD_MAX_BYTES = 8 * 1024;
 const RELEASE_RECORD = ".install-complete.json";
+// `Effect.timeout` races the deadline and interrupts the loser, so a runtime
+// that fails as the deadline wins reports only that interrupt. A real
+// cancellation still interrupts this fiber, and then the validation with it.
+const validationTimeout = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.fn("AntigravityInstallation.validationTimeout")(function* () {
+    const fiber = yield* Effect.forkChild(effect);
+    const exit = yield* Fiber.await(fiber).pipe(
+      Effect.raceFirst(Effect.sleep(VALIDATION_TIMEOUT).pipe(Effect.as(undefined))),
+    );
+    if (exit?._tag === "Failure") {
+      yield* Fiber.interrupt(fiber);
+      return yield* Effect.failCause(exit.cause);
+    }
+    if (exit === undefined) {
+      yield* Fiber.interrupt(fiber);
+      return yield* installationError(
+        "verify",
+        "The downloaded Antigravity runtime did not finish starting.",
+      );
+    }
+    return exit.value;
+  })();
 const LARGE_PAGE_KERNEL_MESSAGE =
   "Google's linux-arm64 Antigravity runtime needs a kernel with 4 KiB memory pages, and this kernel uses larger pages (as on Asahi Linux or Raspberry Pi 5). Use a remote environment or a custom Antigravity executable.";
 
@@ -604,10 +626,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
           );
         }
         yield* report("verifying", "正在检查已安装的运行环境。");
-        yield* validate(existing, asset.version).pipe(
-          Effect.scoped,
-          Effect.timeout(VALIDATION_TIMEOUT),
-        );
+        yield* validationTimeout(validate(existing, asset.version).pipe(Effect.scoped));
         yield* activate();
         return;
       }
@@ -864,7 +883,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
           managedVersionDirectory: pairDirectory,
         },
         asset.version,
-      ).pipe(Effect.scoped, Effect.timeout(VALIDATION_TIMEOUT));
+      ).pipe(Effect.scoped, validationTimeout);
       const record: InstalledRelease = {
         releaseId,
         version: asset.version,
@@ -887,10 +906,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
           completedRelease(releaseId).pipe(
             Effect.flatMap((existing) =>
               existing.version === asset.version
-                ? validate(existing, asset.version).pipe(
-                    Effect.scoped,
-                    Effect.timeout(VALIDATION_TIMEOUT),
-                  )
+                ? validationTimeout(validate(existing, asset.version).pipe(Effect.scoped))
                 : Effect.fail(
                     installationError(
                       "activate",
@@ -1015,9 +1031,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
         const work = (
           reuse === undefined
             ? install(asset!)
-            : validate(reuse, reuse.version!).pipe(
-                Effect.scoped,
-                Effect.timeout(VALIDATION_TIMEOUT),
+            : validationTimeout(validate(reuse, reuse.version!).pipe(Effect.scoped)).pipe(
                 Effect.andThen(ensureEligible(reuse.version!)),
                 Effect.andThen(
                   SubscriptionRef.update(state, (value) => ({
