@@ -2631,4 +2631,58 @@ describe("UsageService", () => {
         assert.strictEqual(emptyUsage.records, 0);
       }),
   );
+
+  it.effect(
+    "readSessionUsage widens past sinceTime when a transcript's mtime is older than the thread record",
+    () =>
+      Effect.gen(function* () {
+        const { home, settings, transcript } = yield* setup;
+        const transcriptTimestamp = "2026-07-27T10:00:00Z";
+        const transcriptSeconds =
+          DateTime.toEpochMillis(DateTime.makeUnsafe(transcriptTimestamp)) / 1000;
+        yield* TestClock.setTime(
+          DateTime.toEpochMillis(DateTime.makeUnsafe("2026-08-01T12:00:00Z")),
+        );
+
+        const importedLine = JSON.stringify({
+          type: "assistant",
+          timestamp: transcriptTimestamp,
+          requestId: "req_imported",
+          sessionId: "session-imported",
+          message: { id: "msg_imported", model: "claude-fable-5", usage: COMPLETE_USAGE },
+        });
+        yield* Effect.promise(async () => {
+          await NodeFSP.writeFile(transcript, `${importedLine}\n`);
+          await NodeFSP.utimes(transcript, transcriptSeconds, transcriptSeconds);
+        });
+
+        const service = yield* UsageService.make.pipe(
+          Effect.provide(
+            layerService({
+              prefix: "usage-service-session-imported-test",
+              home,
+              settings,
+              ratesDocument: COPY_RATES,
+            }),
+          ),
+        );
+
+        const sessionUsage = yield* service.readSessionUsage({
+          sessions: [{ provider: "claude", sessionId: "session-imported" }],
+          sinceTime: "2026-08-01T11:00:00Z",
+        });
+        const summary = yield* service.readSummary({
+          timeZone: "UTC",
+          sinceDay: UsageDay.make("2026-07-27"),
+          untilDay: UsageDay.make("2026-08-01"),
+        });
+        const summaryCost = summary.buckets.reduce((sum, bucket) => sum + bucket.costUsd, 0);
+
+        assert.strictEqual(sessionUsage.records, 1);
+        assert.strictEqual(sessionUsage.unpricedRecords, 0);
+        assert.isNotNull(sessionUsage.costUsd);
+        assert.closeTo(sessionUsage.costUsd!, COMPLETE_COST_USD, 1e-6);
+        assert.closeTo(sessionUsage.costUsd!, summaryCost, 1e-6);
+      }),
+  );
 });

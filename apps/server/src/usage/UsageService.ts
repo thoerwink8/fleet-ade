@@ -1163,41 +1163,55 @@ export const make = Effect.gen(function* () {
     const matchesTarget = (record: UsageRecord) =>
       targetKeys.has(`${record.provider}\0${record.sessionId}`);
 
-    const [scannedDirs] = yield* Effect.all(
+    const [resolved] = yield* Effect.all(
       [
         resolveTranscriptDirs(settings, retentionCutoffMs, false, neededProviders).pipe(
           Effect.provideContext(readerContext),
-          Effect.flatMap((resolved) =>
-            collectDirs(
-              resolved,
-              windowStartMs,
-              settings,
-              retentionCutoffMs,
-              false,
-              false,
-              neededProviders,
-            ),
-          ),
         ),
         ensureRates(false),
       ],
       { concurrency: 2 },
     );
 
-    const retainedSinceMs = Math.max(windowStartMs, retentionCutoffMs);
-    const filesByDir = retainCachedFiles(scannedDirs, retainedSinceMs);
-    reorderWalkedCacheEntries(scannedDirs, false);
-    yield* resolvePendingServiceTiers(scannedDirs, filesByDir, false, matchesTarget);
+    // Untraced: internal helper inside UsageService.scanSessionUsage; collectDirs owns the scan span.
+    const collectMatched = Effect.fnUntraced(function* (scanWindowStartMs: number) {
+      const scannedDirs = yield* collectDirs(
+        resolved,
+        scanWindowStartMs,
+        settings,
+        retentionCutoffMs,
+        false,
+        false,
+        neededProviders,
+      );
 
-    const crossFileSessions = sharedSessions(filesByDir.flat());
-    const matchedRecords: UsageRecord[] = [];
-    for (const files of filesByDir) {
-      for (const file of files) {
-        if (file.records.length === 0) continue;
-        forEachDedupedFileRecord(file.records, crossFileSessions, (usageRecord, rawRecord) => {
-          if (matchesTarget(rawRecord)) matchedRecords.push(usageRecord);
-        });
+      const retainedSinceMs = Math.max(scanWindowStartMs, retentionCutoffMs);
+      const filesByDir = retainCachedFiles(scannedDirs, retainedSinceMs);
+      reorderWalkedCacheEntries(scannedDirs, false);
+      yield* resolvePendingServiceTiers(scannedDirs, filesByDir, false, matchesTarget);
+
+      const crossFileSessions = sharedSessions(filesByDir.flat());
+      const records: UsageRecord[] = [];
+      for (const files of filesByDir) {
+        for (const file of files) {
+          if (file.records.length === 0) continue;
+          forEachDedupedFileRecord(file.records, crossFileSessions, (usageRecord, rawRecord) => {
+            if (matchesTarget(rawRecord)) records.push(usageRecord);
+          });
+        }
       }
+      return records;
+    });
+
+    let matchedRecords = yield* collectMatched(windowStartMs);
+    // An imported or forked thread's sinceTime can be newer than its transcript's mtime;
+    // widen to the retention window before treating the session as empty.
+    if (
+      input.sinceTime !== undefined &&
+      matchedRecords.length === 0 &&
+      windowStartMs > retentionCutoffMs
+    ) {
+      matchedRecords = yield* collectMatched(retentionCutoffMs);
     }
 
     pruneAndRecordCoverage(retentionCutoffMs);
