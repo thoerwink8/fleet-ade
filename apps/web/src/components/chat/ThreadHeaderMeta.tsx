@@ -73,36 +73,59 @@ export function ThreadHeaderChips({
 }
 
 /**
- * The one place the page shows how full the context window is. It opens the thread details,
- * which break the window down.
+ * The one place the page shows how full the context window is and what the thread has cost.
+ * It opens the thread details, which break both down.
  */
 export function ThreadHeaderContext({
   percent,
+  cost = null,
   open,
   presentation,
   popoverHandle,
   shortcutLabel,
   onToggle,
 }: {
-  readonly percent: string;
+  readonly percent: string | null;
+  readonly cost?: string | null | undefined;
   readonly open: boolean;
   readonly presentation: ThreadPanelPresentation;
   readonly popoverHandle: ReturnType<typeof PopoverCreateHandle> | undefined;
   readonly shortcutLabel: string | null;
   readonly onToggle: () => void;
 }): ReactNode {
+  if (percent === null && !cost) return null;
+  const ariaLabel =
+    percent !== null && cost
+      ? `上下文已用 ${percent}，本会话花费 ${cost}，打开会话详情`
+      : percent !== null
+        ? `上下文已用 ${percent}，打开会话详情`
+        : `本会话花费 ${cost}，打开会话详情`;
+  const tooltipText =
+    percent !== null && cost
+      ? `上下文窗口 ${percent} · 本会话花费 ${cost}，点开看组成`
+      : percent !== null
+        ? `上下文窗口 ${percent}，点开看组成`
+        : `本会话花费 ${cost}，点开看详情`;
   const button = (
     <Button
       type="button"
       variant="ghost-muted"
       size="xs"
       data-thread-header-context
-      aria-label={`上下文已用 ${percent}，打开会话详情`}
+      aria-label={ariaLabel}
       aria-pressed={open}
       className="[-webkit-app-region:no-drag]"
       onClick={presentation === "popover" ? undefined : onToggle}
     >
-      <span className="tabular-nums">{percent}</span>
+      {percent !== null ? <span className="tabular-nums">{percent}</span> : null}
+      {cost ? (
+        <span
+          data-thread-header-cost
+          className={cn("tabular-nums", percent !== null && "max-sm:hidden")}
+        >
+          {percent !== null ? ` · ${cost}` : cost}
+        </span>
+      ) : null}
     </Button>
   );
   return (
@@ -115,7 +138,7 @@ export function ThreadHeaderContext({
         )}
       </TooltipTrigger>
       <TooltipPopup side="bottom">
-        上下文窗口 {percent}，点开看组成
+        {tooltipText}
         {shortcutLabel ? ` (${shortcutLabel})` : ""}
       </TooltipPopup>
     </Tooltip>

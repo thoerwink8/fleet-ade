@@ -158,6 +158,28 @@ export const UsageSummary = Schema.Struct({
 });
 export type UsageSummary = typeof UsageSummary.Type;
 
+export const SessionUsageTarget = Schema.Struct({
+  provider: UsageProviderKind,
+  sessionId: TrimmedNonEmptyString,
+});
+export type SessionUsageTarget = typeof SessionUsageTarget.Type;
+
+export const SessionUsageInput = Schema.Struct({
+  sessions: Schema.Array(SessionUsageTarget),
+  /** Earliest timestamp (ISO) to consider when scanning transcript files. */
+  sinceTime: Schema.optional(TrimmedNonEmptyString),
+});
+export type SessionUsageInput = typeof SessionUsageInput.Type;
+
+export const SessionUsage = Schema.Struct({
+  /** Priced USD cost matching the Usage page, or null when no priced usage exists. */
+  costUsd: Schema.NullOr(Schema.Number),
+  totals: UsageTokenTotals,
+  records: NonNegativeInt,
+  unpricedRecords: NonNegativeInt,
+});
+export type SessionUsage = typeof SessionUsage.Type;
+
 export class UsageReadError extends Schema.TaggedError<UsageReadError>()("UsageReadError", {
   reason: Schema.Literals(["scanFailed", "invalidWindow"]),
   detail: TrimmedNonEmptyString,

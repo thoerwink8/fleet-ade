@@ -22,6 +22,7 @@ import {
   type UsageSummaryInput,
 } from "@t3tools/contracts";
 import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -2492,5 +2493,142 @@ describe("UsageService", () => {
         `interruption left the next matching request pending at scheduler check ${orphanedAt}`,
       );
     }),
+  );
+
+  it.effect(
+    "readSessionUsage matches readSummary cost for target sessions, honors overrides/aliases, and returns null cost for empty or unpriced sessions",
+    () =>
+      Effect.gen(function* () {
+        const { home, settings, transcript } = yield* setup;
+        const secondTranscript = NodePath.join(NodePath.dirname(transcript), "session-two.jsonl");
+        const unpricedTranscript = NodePath.join(
+          NodePath.dirname(transcript),
+          "session-unpriced.jsonl",
+        );
+        const day = "2026-08-01";
+        const baseMs = DateTime.toEpochMillis(DateTime.makeUnsafe("2026-08-01T10:00:00Z"));
+        yield* TestClock.setTime(
+          DateTime.toEpochMillis(DateTime.makeUnsafe("2026-08-01T12:00:00Z")),
+        );
+        const iso = (minutesOffset: number) =>
+          DateTime.formatIso(DateTime.makeUnsafe(baseMs + minutesOffset * 60_000));
+
+        const targetCopy = JSON.stringify({
+          type: "assistant",
+          timestamp: iso(-1),
+          requestId: "req_shared",
+          sessionId: "session-target-a",
+          message: { id: "msg_shared", model: "claude-fable-5", usage: PARTIAL_USAGE },
+        });
+        const targetComplete = JSON.stringify({
+          type: "assistant",
+          timestamp: iso(-1),
+          requestId: "req_shared",
+          sessionId: "session-target-a",
+          message: { id: "msg_shared", model: "claude-fable-5", usage: COMPLETE_USAGE },
+        });
+        const targetAlias = JSON.stringify({
+          type: "assistant",
+          timestamp: iso(0),
+          requestId: "req_alias",
+          sessionId: "session-target-b",
+          message: {
+            id: "msg_alias",
+            model: "alias-fable",
+            usage: { input_tokens: 1_000, output_tokens: 100 },
+          },
+        });
+        const unrelated = JSON.stringify({
+          type: "assistant",
+          timestamp: iso(0),
+          requestId: "req_other",
+          sessionId: "session-unrelated",
+          message: {
+            id: "msg_other",
+            model: "claude-fable-5",
+            usage: { input_tokens: 50_000, output_tokens: 10_000 },
+          },
+        });
+        const unpriced = JSON.stringify({
+          type: "assistant",
+          timestamp: iso(0),
+          requestId: "req_unpriced",
+          sessionId: "session-unpriced",
+          message: {
+            id: "msg_unpriced",
+            model: "unpriced-model",
+            usage: { input_tokens: 100, output_tokens: 50 },
+          },
+        });
+
+        yield* Effect.promise(() =>
+          Promise.all([
+            NodeFSP.writeFile(transcript, `${targetCopy}\n${targetComplete}\n${unrelated}\n`),
+            NodeFSP.writeFile(secondTranscript, `${targetAlias}\n`),
+            NodeFSP.writeFile(unpricedTranscript, `${unpriced}\n`),
+          ]),
+        );
+
+        const service = yield* UsageService.make.pipe(
+          Effect.provide(
+            layerService({
+              prefix: "usage-service-session-usage-test",
+              home,
+              ratesDocument: COPY_RATES,
+              settings: {
+                ...settings,
+                usageModelAliases: { "alias-fable": "claude-fable-5" },
+                usagePriceOverrides: {
+                  "claude-fable-5": {
+                    inputCostPerMillionTokens: 10,
+                    outputCostPerMillionTokens: 50,
+                    cacheReadCostPerMillionTokens: 1,
+                    cacheWriteCostPerMillionTokens: 12.5,
+                  },
+                },
+              },
+            }),
+          ),
+        );
+
+        const summary = yield* service.readSummary({
+          timeZone: "UTC",
+          sinceDay: UsageDay.make(day),
+          untilDay: UsageDay.make(day),
+        });
+        const unrelatedSummaryCost = 50_000 * 1e-5 + 10_000 * 5e-5;
+        const summaryTotalCost = summary.buckets.reduce((sum, bucket) => sum + bucket.costUsd, 0);
+
+        const sessionUsage = yield* service.readSessionUsage({
+          sessions: [
+            { provider: "claude", sessionId: "session-target-a" },
+            { provider: "claude", sessionId: "session-target-b" },
+          ],
+          sinceTime: iso(-2),
+        });
+        const expectedTargetCost = COMPLETE_COST_USD + 1_000 * 1e-5 + 100 * 5e-5;
+        assert.isNotNull(sessionUsage.costUsd);
+        assert.closeTo(sessionUsage.costUsd!, expectedTargetCost, 1e-6);
+        assert.closeTo(sessionUsage.costUsd!, summaryTotalCost - unrelatedSummaryCost, 1e-6);
+        assert.strictEqual(sessionUsage.records, 2);
+        assert.strictEqual(sessionUsage.unpricedRecords, 0);
+
+        const unpricedUsage = yield* service.readSessionUsage({
+          sessions: [{ provider: "claude", sessionId: "session-unpriced" }],
+        });
+        assert.isNull(unpricedUsage.costUsd);
+        assert.strictEqual(unpricedUsage.records, 1);
+        assert.strictEqual(unpricedUsage.unpricedRecords, 1);
+
+        const missingUsage = yield* service.readSessionUsage({
+          sessions: [{ provider: "claude", sessionId: "session-missing" }],
+        });
+        assert.isNull(missingUsage.costUsd);
+        assert.strictEqual(missingUsage.records, 0);
+
+        const emptyUsage = yield* service.readSessionUsage({ sessions: [] });
+        assert.isNull(emptyUsage.costUsd);
+        assert.strictEqual(emptyUsage.records, 0);
+      }),
   );
 });

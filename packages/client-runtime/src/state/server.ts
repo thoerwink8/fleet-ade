@@ -1538,6 +1538,12 @@ export function createServerEnvironmentAtoms<R, E>(
         );
       },
     }),
+    sessionUsage: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:session-usage",
+      tag: WS_METHODS.serverGetSessionUsage,
+      staleTimeMs: 15_000,
+      refreshTrigger: ({ environmentId }) => usageScanSettingsAtom(environmentId),
+    }),
     resourceTelemetry: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:server:resource-telemetry",
       tag: WS_METHODS.subscribeResourceTelemetry,

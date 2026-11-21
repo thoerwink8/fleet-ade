@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { resolveModelAliases, UsageAggregator } from "./usageAggregation.ts";
+import { aggregateSessionUsage, resolveModelAliases, UsageAggregator } from "./usageAggregation.ts";
 import type { RateTable } from "./usagePricing.ts";
 import type { UsageRecord } from "@t3tools/provider-core/server/usage";
 
@@ -281,5 +281,89 @@ describe("resolveModelAliases", () => {
         ["preview", "example-model"],
       ]),
     );
+  });
+});
+
+describe("aggregateSessionUsage", () => {
+  it("merges deduped copies, applies aliases and overrides, and matches UsageAggregator cost", () => {
+    const partial = record({
+      dedupeKey: "msg_1:",
+      totals: {
+        uncachedInputTokens: 10,
+        cachedInputTokens: 0,
+        cacheCreationTokens: 0,
+        outputTokens: 5,
+        reasoningTokens: 0,
+      },
+    });
+    const complete = record({
+      dedupeKey: "msg_1:",
+      model: "alias-model",
+      rateModel: "ignored-rate-model",
+    });
+    const extra = record({
+      model: "override-model",
+      totals: {
+        uncachedInputTokens: 1_000,
+        cachedInputTokens: 0,
+        cacheCreationTokens: 0,
+        outputTokens: 0,
+        reasoningTokens: 0,
+      },
+    });
+
+    const priceOverrides: RateTable = new Map([
+      [
+        "override-model",
+        {
+          inputCostPerToken: 2e-4,
+          outputCostPerToken: 0,
+          cacheReadCostPerToken: 0,
+          cacheCreationCostPerToken: 0,
+          cacheCreation1hCostPerToken: 0,
+          fast: null,
+          ultrafast: null,
+          contextTiers: [],
+        },
+      ],
+    ]);
+    const modelAliases = resolveModelAliases({ "alias-model": "claude-fable-5" });
+
+    const aggregator = new UsageAggregator({
+      timeZone: "UTC",
+      sinceDay: "2026-08-01",
+      untilDay: "2026-08-31",
+      rates,
+      priceOverrides,
+      modelAliases,
+    });
+    for (const item of [partial, complete, extra]) aggregator.add(item);
+    const expectedCost = aggregator
+      .finish()
+      .buckets.reduce((total, bucket) => total + bucket.costUsd, 0);
+
+    const session = aggregateSessionUsage([partial, complete, extra], {
+      rates,
+      priceOverrides,
+      modelAliases,
+    });
+    expect(session.records).toBe(2);
+    expect(session.unpricedRecords).toBe(0);
+    expect(session.costUsd).toBeCloseTo(expectedCost, 6);
+    expect(session.totals).toEqual({
+      uncachedInputTokens: 1_100,
+      cachedInputTokens: 1_000,
+      cacheCreationTokens: 10,
+      outputTokens: 50,
+      reasoningTokens: 0,
+    });
+  });
+
+  it("returns null costUsd for empty, unpriced, or zero-cost records", () => {
+    expect(aggregateSessionUsage([], { rates }).costUsd).toBeNull();
+    expect(
+      aggregateSessionUsage([record({ model: "unknown-model" })], { rates }).costUsd,
+    ).toBeNull();
+    expect(aggregateSessionUsage([record({ reportedCostUsd: 0 })], { rates }).costUsd).toBeNull();
   });
 });

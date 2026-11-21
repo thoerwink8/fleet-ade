@@ -1,4 +1,5 @@
 import { formatContextWindowTokens } from "../../lib/contextWindow";
+import { formatHeaderCostUsd } from "./threadHeaderMeta.logic";
 
 export interface ContextDetailUsage {
   readonly inputTokens?: number | null | undefined;
@@ -6,10 +7,11 @@ export interface ContextDetailUsage {
   readonly outputTokens?: number | null | undefined;
   readonly reasoningOutputTokens?: number | null | undefined;
   readonly promptCacheExpiresAt?: string | null | undefined;
+  readonly sessionCostUsd?: number | null | undefined;
 }
 
 export interface ContextDetailRow {
-  readonly key: "cache-hit" | "turn-output" | "prompt-cache";
+  readonly key: "cache-hit" | "turn-output" | "prompt-cache" | "session-cost";
   readonly label: string;
   readonly fill: number | null;
   readonly value: string;
@@ -82,6 +84,17 @@ export function buildContextDetailRows(
         });
       }
     }
+  }
+
+  const sessionCost = formatHeaderCostUsd(usage.sessionCostUsd);
+  if (sessionCost !== null) {
+    rows.push({
+      key: "session-cost",
+      label: "本会话花费",
+      fill: null,
+      value: sessionCost,
+      tooltipLines: [`本会话花费：${sessionCost}`, "按用量页口径计费"],
+    });
   }
 
   return rows;

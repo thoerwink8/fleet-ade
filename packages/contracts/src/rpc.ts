@@ -352,7 +352,14 @@ import {
   ProviderConsumeResetCreditResult,
 } from "./providerUsageLimits.ts";
 import { ExternalQuotas } from "./externalQuotas.ts";
-import { UsagePricing, UsageReadError, UsageSummary, UsageSummaryInput } from "./usage.ts";
+import {
+  SessionUsage,
+  SessionUsageInput,
+  UsagePricing,
+  UsageReadError,
+  UsageSummary,
+  UsageSummaryInput,
+} from "./usage.ts";
 import {
   StorageCleanupReport,
   DatabaseReclaimError,
@@ -551,6 +558,7 @@ export const WS_METHODS = {
   serverSignalProcess: "server.signalProcess",
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
+  serverGetSessionUsage: "server.getSessionUsage",
   serverGetExternalQuotas: "server.getExternalQuotas",
   serverRefreshUsageRates: "server.refreshUsageRates",
 
@@ -1026,6 +1034,12 @@ const WsServerPrepareTriageRpc = Rpc.make(WS_METHODS.serverPrepareTriage, {
 const WsServerGetUsageSummaryRpc = Rpc.make(WS_METHODS.serverGetUsageSummary, {
   payload: UsageSummaryInput,
   success: UsageSummary,
+  error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
+});
+
+const WsServerGetSessionUsageRpc = Rpc.make(WS_METHODS.serverGetSessionUsage, {
+  payload: SessionUsageInput,
+  success: SessionUsage,
   error: Schema.Union([EnvironmentAuthorizationError, UsageReadError]),
 });
 
@@ -2206,6 +2220,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerListTextGeneratorModelsRpc,
   WsServerPrepareTriageRpc,
   WsServerGetUsageSummaryRpc,
+  WsServerGetSessionUsageRpc,
   WsServerGetExternalQuotasRpc,
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,
