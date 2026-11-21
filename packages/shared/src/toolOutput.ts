@@ -15,7 +15,7 @@ import {
   readMcpAppReference,
   type McpAppReference,
 } from "./mcpApp.ts";
-import { resolveT3McpToolId } from "./t3McpToolPresentation.ts";
+import { resolveStoredT3McpToolName, resolveT3McpToolId } from "./t3McpToolPresentation.ts";
 
 const MAX_PARSED_BYTES = 16_384;
 const MAX_METADATA_BYTES = 8_192;
@@ -204,12 +204,12 @@ export function htmlRenderFromToolItem(item: {
   return output?.isError ? undefined : output?.htmlRender;
 }
 
-/** The thread-owned file `preview_recording_stop` stored for the agent. */
+/** The thread-owned recording a `preview_recording_stop` call stored. The tool is gone; old threads still own the files. */
 export function previewRecordingIdFromToolItem(item: {
   readonly toolName: string | null | undefined;
   readonly output?: unknown;
 }): string | undefined {
-  if (resolveT3McpToolId(item.toolName) !== "preview_recording_stop") return undefined;
+  if (resolveStoredT3McpToolName(item.toolName) !== "preview_recording_stop") return undefined;
   const budget: ResultReadBudget = {
     remainingBytes: MAX_PARSED_BYTES,
     remainingNodes: MAX_ENVELOPE_NODES,

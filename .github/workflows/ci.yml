@@ -98,12 +98,6 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Install Chromium and system dependencies
-        run: pnpm --dir apps/web exec playwright install --with-deps --only-shell chromium
-
-      - name: Install native secret service build dependencies
-        run: sudo apt-get install --yes --no-install-recommends libsecret-1-dev
-
       - name: Check packages
         run: pnpm check ensure-electron packages
 
@@ -174,9 +168,6 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
-
-      - name: Install Chromium and system dependencies
-        run: pnpm --dir apps/web exec playwright install --with-deps --only-shell chromium
 
       - name: Check server shard
         run: pnpm check "server ${{ matrix.shard }}/2"

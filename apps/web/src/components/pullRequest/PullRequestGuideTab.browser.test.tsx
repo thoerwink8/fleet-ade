@@ -114,8 +114,6 @@ function ChatBeside({
     getShortcutContext: () => ({
       terminalFocus: false,
       terminalOpen: false,
-      previewFocus: false,
-      previewOpen: false,
       isWeb: true,
       isDesktop: false,
       modelPickerOpen: false,

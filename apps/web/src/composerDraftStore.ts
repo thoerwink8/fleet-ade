@@ -57,7 +57,6 @@ import type {
 } from "@t3tools/client-runtime/state/shell";
 import { waitForDraftHeroTransition } from "./components/chat/draftHeroTransition";
 import { getLocalStorageItem } from "./hooks/useLocalStorage";
-import { readThreadPreviewState } from "./previewStateStore";
 import {
   readInstanceCustomModels,
   resolveAppModelSelection,
@@ -1588,12 +1587,6 @@ function getComposerDraftState(
   return state.draftsByThreadKey[threadKey] ?? null;
 }
 
-function draftThreadHasOpenPreview(draftThread: DraftThreadState | undefined): boolean {
-  if (draftThread === undefined) return false;
-  const ref = scopeThreadRef(draftThread.environmentId, draftThread.threadId);
-  return Object.keys(readThreadPreviewState(ref).sessions).length > 0;
-}
-
 function isComposerThreadKeyInUse(mappings: Record<string, string>, threadKey: string): boolean {
   return Object.values(mappings).includes(threadKey);
 }
@@ -2273,8 +2266,7 @@ export function partializeComposerDraftStoreState(
         ([threadKey, draftThread]) =>
           mappedDraftKeys.has(threadKey) ||
           isDraftThreadPromoting(draftThread) ||
-          composerDraftHasUserContent(state.draftsByThreadKey[threadKey]) ||
-          draftThreadHasOpenPreview(draftThread),
+          composerDraftHasUserContent(state.draftsByThreadKey[threadKey]),
       )
       .map(([threadKey]) => threadKey),
   );
@@ -2869,8 +2861,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               !isDraftThreadPromoting(previousDraftThread) &&
               !composerDraftHasUserContent(
                 state.draftsByThreadKey[previousThreadKeyForLogicalProject],
-              ) &&
-              !draftThreadHasOpenPreview(previousDraftThread)
+              )
             ) {
               delete nextDraftThreadsByThreadKey[previousThreadKeyForLogicalProject];
               if (state.draftsByThreadKey[previousThreadKeyForLogicalProject] !== undefined) {

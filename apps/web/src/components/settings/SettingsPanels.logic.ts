@@ -2,7 +2,6 @@ import type {
   BackgroundActivityProfile,
   BackgroundActivitySettings,
   ProviderInstanceConfig,
-  PreviewViewportSetting,
   ProviderInstanceId,
   ServerSettings,
   SidebarProjectGroupingMode,
@@ -108,69 +107,6 @@ export function getChangedTypographySettingLabels(settings: TypographySettings):
     ...(settings.fontFamilyTerminal !== DEFAULT_UNIFIED_SETTINGS.fontFamilyTerminal ||
     settings.fontSizeTerminal !== DEFAULT_UNIFIED_SETTINGS.fontSizeTerminal
       ? ["终端字体"]
-      : []),
-  ];
-}
-
-export type BrowserDefaultSettings = Pick<
-  UnifiedSettings,
-  | "browserDefaultViewport"
-  | "browserDefaultZoomFactor"
-  | "browserDefaultAppearance"
-  | "browserRecordingFrameRate"
-  | "browserRecordingShowKeyPresses"
-  | "browserRecordingShowMousePresses"
-  | "browserLinkTarget"
-  | "browserSearchEngine"
-  | "browserCustomSearchUrl"
-  | "browserAutoShowFloatingPreview"
-  | "pullRequestLinksOpenInApp"
->;
-
-function isSamePreviewViewport(
-  left: PreviewViewportSetting,
-  right: PreviewViewportSetting,
-): boolean {
-  if (left._tag !== right._tag) return false;
-  if (left._tag === "fill" || right._tag === "fill") return true;
-  if (left.width !== right.width || left.height !== right.height) return false;
-  return left._tag === "preset" && right._tag === "preset"
-    ? left.presetId === right.presetId
-    : true;
-}
-
-export function getChangedBrowserSettingLabels(settings: BrowserDefaultSettings): string[] {
-  return [
-    ...(isSamePreviewViewport(
-      settings.browserDefaultViewport,
-      DEFAULT_UNIFIED_SETTINGS.browserDefaultViewport,
-    )
-      ? []
-      : ["浏览器视口"]),
-    ...(settings.browserDefaultZoomFactor !== DEFAULT_UNIFIED_SETTINGS.browserDefaultZoomFactor
-      ? ["浏览器缩放"]
-      : []),
-    ...(settings.browserDefaultAppearance !== DEFAULT_UNIFIED_SETTINGS.browserDefaultAppearance
-      ? ["浏览器外观"]
-      : []),
-    ...(settings.browserRecordingFrameRate !== DEFAULT_UNIFIED_SETTINGS.browserRecordingFrameRate
-      ? ["录屏帧率"]
-      : []),
-    ...(settings.browserRecordingShowKeyPresses ? ["录制按键"] : []),
-    ...(settings.browserRecordingShowMousePresses ? ["录制鼠标点击"] : []),
-    ...(settings.browserLinkTarget !== DEFAULT_UNIFIED_SETTINGS.browserLinkTarget
-      ? ["链接打开方式"]
-      : []),
-    ...(settings.browserSearchEngine !== DEFAULT_UNIFIED_SETTINGS.browserSearchEngine ||
-    settings.browserCustomSearchUrl !== DEFAULT_UNIFIED_SETTINGS.browserCustomSearchUrl
-      ? ["搜索引擎"]
-      : []),
-    ...(settings.browserAutoShowFloatingPreview !==
-    DEFAULT_UNIFIED_SETTINGS.browserAutoShowFloatingPreview
-      ? ["浮动预览"]
-      : []),
-    ...(settings.pullRequestLinksOpenInApp !== DEFAULT_UNIFIED_SETTINGS.pullRequestLinksOpenInApp
-      ? ["在 T3 Code 中打开 PR"]
       : []),
   ];
 }

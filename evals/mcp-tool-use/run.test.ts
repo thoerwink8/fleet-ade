@@ -149,48 +149,11 @@ const write = (file_path: string, content: string, failed = false) => ({
   failed,
 });
 const LAUNCH = "import { chromium } from 'playwright';\nconst b = await chromium.launch();\n";
-const LOOK = "br-look-on-web-missing-cli";
-const UNASKED = "br-guard-unasked-edit-cli-world";
-const CHOSE = "br-guard-user-chose-cli";
 it.each([
-  [LOOK, [bash(`node -e "require('playwright').chromium.launch().then((b) => b.close())"`)], true],
-  [LOOK, [bash(`cat > /tmp/shot.mjs <<'EOF'\n${LAUNCH}EOF\nnode /tmp/shot.mjs`)], true],
-  [
-    LOOK,
-    [
-      bash(
-        "python3 - <<'EOF'\nfrom playwright.sync_api import sync_playwright\nwith sync_playwright() as p:\n    p.chromium.connect_over_cdp('http://localhost:9222')\nEOF",
-      ),
-    ],
-    true,
-  ],
-  [LOOK, [bash(`node -e "c.launchPersistentContext('/tmp/p', { headless: false })"`)], true],
-  [LOOK, [bash(`node -e "(await import('playwright')).webkit.launch()"`)], true],
-  [LOOK, [bash(`node -e "require('puppeteer').launch()"`)], true],
-  [LOOK, [bash("npx playwright screenshot http://localhost:3000 /tmp/s.png")], true],
-  [LOOK, [bash("pnpm exec playwright open http://localhost:3000")], true],
-  [LOOK, [bash("python -m playwright screenshot http://localhost:3000 /tmp/s.png")], true],
-  [LOOK, [bash("google-chrome-stable --headless=new --screenshot=/tmp/s.png http://x")], true],
-  [LOOK, [bash(`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless`)], true],
-  [
-    LOOK,
-    [bash("~/.cache/ms-playwright/chromium_headless_shell-1187/headless_shell --screenshot")],
-    true,
-  ],
-  [LOOK, [bash("shot http://localhost:3000/settings/subscription --out /tmp/s.png")], true],
-  [LOOK, [bash("uvx shot-scraper http://localhost:3000 -o /tmp/s.png")], true],
-  // World W has no suite, so a spec run is ad hoc there; the unasked-edit guard leaves it alone.
-  [LOOK, [bash("pnpm exec playwright test /tmp/qa/checkout.spec.ts")], true],
-  [UNASKED, [bash("npx playwright test")], false],
+  [[bash(`node -e "require('playwright').chromium.launch().then((b) => b.close())"`)], true],
   // A script the agent wrote is read where a command runs it.
-  [LOOK, [write("/tmp/shot.mjs", LAUNCH), bash("node /tmp/shot.mjs")], true],
+  [[write("/tmp/shot.mjs", LAUNCH), bash("node /tmp/shot.mjs")], true],
   [
-    LOOK,
-    [write("/tmp/x.py", "with sync_playwright() as p:\n  pass\n"), bash("python3 /tmp/x.py")],
-    true,
-  ],
-  [
-    LOOK,
     [
       {
         tool: "Edit",
@@ -202,40 +165,17 @@ it.each([
     ],
     true,
   ],
-  [LOOK, [write("/tmp/shot.mjs", LAUNCH)], false],
-  [LOOK, [write("/tmp/shot.mjs", LAUNCH, true), bash("node /tmp/shot.mjs")], false],
-  [LOOK, [bash("pnpm test:e2e")], false],
-  [LOOK, [bash("npx playwright install chromium && npx playwright --version")], false],
-  [LOOK, [bash(`grep -rn "chromium.launch" apps/web`), bash("rg 'chromium\\.launch\\(' .")], false],
-  [LOOK, [bash(`cat package.json | grep -E "playwright|puppeteer"`)], false],
-  [LOOK, [bash("ls node_modules/.bin | grep playwright; which chromium google-chrome")], false],
-  [
-    LOOK,
-    [bash(`node -e "console.log(require.resolve('puppeteer'), require.resolve('playwright'))"`)],
-    false,
-  ],
-  [
-    LOOK,
-    [bash("command -v agent-browser"), bash("agent-browser open http://localhost:3000")],
-    false,
-  ],
-  [LOOK, [bash("curl -s http://localhost:3000/settings/subscription")], false],
-  [LOOK, [bash(`git commit -m "fix: screenshot spacing"`)], false],
-  [LOOK, [bash("pnpm dev:local > /tmp/acme-web-dev.log 2>&1 &")], false],
-  [UNASKED, [bash("command -v agent-browser")], false],
-  [UNASKED, [bash("agent-browser open http://localhost:3000")], true],
-  [UNASKED, [bash("agent-browser --session qa open http://localhost:3000")], true],
-  // The user's chosen CLI counts with global flags before its subcommand; help doesn't.
-  [CHOSE, [bash("cd /tmp && agent-browser --session bal open http://localhost:3000")], false],
-  [CHOSE, [bash("agent-browser --help | grep open")], true],
-] as const)("%s browser shell check: %j fails=%s", (id, calls, fails) => {
+  [[write("/tmp/shot.mjs", LAUNCH)], false],
+  [[write("/tmp/shot.mjs", LAUNCH, true), bash("node /tmp/shot.mjs")], false],
+  [[bash(`grep -rn "chromium.launch" apps/web`), bash("rg 'chromium\\.launch\\(' .")], false],
+] as const)("shellMustNot reads scripts where a command runs them: %j fails=%s", (calls, fails) => {
   const run = {
     calls: calls.map((call) => ({ step: 0, ...call })),
     text: "",
     stopReason: "end_turn",
   };
-  const { shellMustNot, shellMust } = browserCase(id).expect;
-  assert.equal(failed({ shellMustNot, shellMust }, run).length > 0, fails);
+  const shellMustNot = ["\\bchromium\\s*\\.\\s*launch\\s*\\("];
+  assert.equal(failed({ shellMustNot }, run).length > 0, fails);
 });
 
 it("accepts any tool listed as an alternative", () => {
@@ -251,23 +191,19 @@ it("accepts any tool listed as an alternative", () => {
   ]);
   // A bound on alternatives counts their calls together.
   const both: SampleRun = {
-    calls: ["preview_status", "preview_open"].map((tool) => ({ step: 0, tool, input: {} })),
+    calls: ["link_pull_request", "watch_pull_request"].map((tool) => ({
+      step: 0,
+      tool,
+      input: {},
+    })),
     text: "",
     stopReason: "end_turn",
   };
-  assert.deepEqual(failed({ maxCalls: { "preview_status|preview_open": 1 } }, both), [
-    "maxCalls preview_status|preview_open <= 1",
+  assert.deepEqual(failed({ maxCalls: { "link_pull_request|watch_pull_request": 1 } }, both), [
+    "maxCalls link_pull_request|watch_pull_request <= 1",
   ]);
-  assert.deepEqual(failed({ maxCalls: { "preview_status|preview_open": 2 } }, both), []);
-  // With browser access off, any second preview-capability call counts, closing a tab included.
-  const offTwice: SampleRun = {
-    calls: ["preview_open", "t3_preview_close"].map((tool) => ({ step: 0, tool, input: {} })),
-    text: "",
-    stopReason: "end_turn",
-  };
-  assert.lengthOf(failed(browserCase("br-guard-browser-access-off").expect, offTwice), 1);
+  assert.deepEqual(failed({ maxCalls: { "link_pull_request|watch_pull_request": 2 } }, both), []);
 });
-
 it("counts the new threads an agent asks for, one brief per thread, over both creation tools", () => {
   const expect = { newThreads: ["~reconnect", "~csv", "~admin"] };
   const run = (...calls: Array<{ tool: string; input: unknown; failed?: boolean }>): SampleRun => ({
@@ -610,14 +546,7 @@ const childCase: McpToolUseCase = {
   prompt: "Push the fix, open a PR against main, and report the PR URL.",
   expect: { calls: [{ tool: "link_pull_request" }], notCalls: ["watch_pull_request"] },
 };
-
 const decodeCase = Schema.decodeSync(Schema.fromJsonString(McpToolUseCase));
-const browserCase = (id: string) =>
-  NodeFS.readFileSync(new URL("./cases/browser-routing.ndjson", import.meta.url), "utf8")
-    .trim()
-    .split("\n")
-    .map((line) => decodeCase(line))
-    .find((c) => c.id === id)!;
 
 it("rebuilds the template from this checkout and sends a child T3's task prompt", () => {
   const base = buildBase(template, { model: "claude-sonnet-5-5", keepUserInstructions: false });
@@ -806,20 +735,6 @@ it("answers simple mocked commands itself and gives the simulator the sample's h
   assert.equal(mockOutput(sample, "gh pr create --fill"), "https://github.com/acme/app/pull/124");
   assert.isUndefined(mockOutput(sample, "git push && gh pr create --fill"));
   assert.isUndefined(mockOutput(sample, "git status"));
-  // Probes and installs come before the bare missing-CLI mock, which would shadow them.
-  const missing = makeSample(browserCase("br-look-on-web-missing-cli"), sample.base);
-  assert.equal(mockOutput(missing, "command -v agent-browser"), "Exit code 1");
-  assert.equal(mockOutput(missing, "which agent-browser"), "Exit code 1\nagent-browser not found");
-  for (const install of [
-    "npx -y agent-browser open http://localhost:3000",
-    "npm i -g agent-browser",
-  ])
-    assert.match(mockOutput(missing, install) ?? "", /^Exit code 1\nnpm error code ENOTFOUND/);
-  assert.equal(
-    mockOutput(missing, "agent-browser open http://localhost:3000"),
-    "Exit code 127\nzsh: command not found: agent-browser",
-  );
-  assert.isUndefined(mockOutput(missing, "command -v agent-browser || echo missing"));
 
   const call = { tool: "Bash", input: { command: "git push && gh pr create --fill" } };
   const [machine, history] =

@@ -20,20 +20,12 @@ Ordinary coding tasks need no T3 tools.
 - T3 tools may load late. Try the name once before you call it absent.`,
   `### Visuals and preview
 
-- Answer data with a trend or comparison with a chart and show any visual the user asks for here: pass an HTML file path or inline HTML to \`html_preview\`, then \`html_render\`. A screenshot on disk or a text description doesn't show it. Never start a server for it. Page tools write only on user request. Never use them to show results. Asked for an image to post, send or use elsewhere: a \`.png\` file and its path, never \`html_render\`.
-- Never use \`preview_*\` unasked to verify or show your own edit. Use them when the current request asks for browser work, including recording edits, or names a page or tab. Don't repeat preview calls from an earlier turn. Public pages: web fetch or search unless browser work was asked; then preview tools only, no web fetch. Close a tab you opened before you reply, unless the user asked for it or uses it.`,
+- Answer data with a trend or comparison with a chart and show any visual the user asks for here: pass an HTML file path or inline HTML to \`html_preview\`, then \`html_render\`. A screenshot on disk or a text description doesn't show it. Never start a server for it. Asked for an image to post, send or use elsewhere: a \`.png\` file and its path, never \`html_render\`.`,
 ];
 
 export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
 
 ${T3_CODE_ORCHESTRATION_SECTIONS.join("\n\n")}
-`;
-
-export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `
-
-## T3 Code browser
-
-When browser work was asked, \`preview_*\` is the browser you share with the user: \`preview_status\` first, then \`preview_open\` if no tab can be automated. Prefer snapshot locators over coordinates. Switch browsers only if the tools are absent or \`preview_open\` says unsupported, the user asks, or two preview calls fail on one step. Then quote the error and switch.
 `;
 
 // ACP only: some ACP agents accept the injected MCP server but never expose
@@ -72,11 +64,7 @@ export function t3AcpPromptWithInstructions(input: {
       ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
       : T3_CODE_ACP_DEFAULT_MODE_INSTRUCTIONS,
     ...(input.state.hasT3Mcp
-      ? [
-          T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
-          T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
-          T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS,
-        ]
+      ? [T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(), T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS]
       : []),
   ];
   return `<t3_code_instructions>\n${instructions.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;

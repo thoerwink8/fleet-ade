@@ -4,11 +4,10 @@ import type {
   PullRequestCheck,
   PullRequestChecksState,
   PullRequestRef,
-  ScopedThreadRef,
 } from "@t3tools/contracts";
 import { useState } from "react";
 
-import { useOpenLink } from "~/browser/useOpenLink";
+import { useOpenLink } from "~/lib/useOpenLink";
 import { cn } from "~/lib/utils";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
@@ -30,11 +29,9 @@ import {
 function LazyChecksBody({
   environmentId,
   reference,
-  threadRef,
 }: {
   environmentId: EnvironmentId;
   reference: PullRequestRef;
-  threadRef: ScopedThreadRef | null;
 }) {
   const detailQuery = useEnvironmentQuery(
     pullRequestEnvironment.detail({ environmentId, input: reference }),
@@ -49,17 +46,11 @@ function LazyChecksBody({
       </p>
     );
   }
-  return <ChecksBody checks={detailQuery.data.checks} threadRef={threadRef} />;
+  return <ChecksBody checks={detailQuery.data.checks} />;
 }
 
-function ChecksBody({
-  checks,
-  threadRef,
-}: {
-  checks: ReadonlyArray<PullRequestCheck>;
-  threadRef: ScopedThreadRef | null;
-}) {
-  const openLink = useOpenLink(threadRef);
+function ChecksBody({ checks }: { checks: ReadonlyArray<PullRequestCheck> }) {
+  const openLink = useOpenLink();
   const [showAll, setShowAll] = useState(false);
   const { attention, running, completed } = groupPullRequestChecks(checks);
   const canCollapse = attention.length + running.length > 0 && completed.length > 0;
@@ -133,7 +124,6 @@ export function PullRequestChecksPopover({
   stale = false,
   environmentId,
   reference,
-  threadRef = null,
   variant = "icon",
   className,
   render,
@@ -143,7 +133,6 @@ export function PullRequestChecksPopover({
   stale?: boolean;
   environmentId?: EnvironmentId;
   reference?: PullRequestRef;
-  threadRef?: ScopedThreadRef | null;
   variant?: "icon" | "count";
   className?: string;
   render?: React.ReactElement;
@@ -203,13 +192,9 @@ export function PullRequestChecksPopover({
             检查详情已过期。刷新 pull request 以更新。
           </p>
         ) : checks !== undefined ? (
-          <ChecksBody checks={checks} threadRef={threadRef} />
+          <ChecksBody checks={checks} />
         ) : environmentId !== undefined && reference !== undefined ? (
-          <LazyChecksBody
-            environmentId={environmentId}
-            reference={reference}
-            threadRef={threadRef}
-          />
+          <LazyChecksBody environmentId={environmentId} reference={reference} />
         ) : null}
       </PopoverPopup>
     </Popover>

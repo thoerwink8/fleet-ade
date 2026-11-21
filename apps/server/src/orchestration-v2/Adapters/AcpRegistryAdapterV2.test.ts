@@ -1278,7 +1278,6 @@ describe("AcpRegistryAdapterV2", () => {
           providerSessionId: "mcp-session-acp-registry-mcp-transport",
           providerInstanceId: instanceId,
           endpoint,
-          browserToolsAvailable: false,
         };
         yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer opened-token" });
         const adapter = yield* makeAcpRegistryAdapterV2({
@@ -1419,7 +1418,6 @@ describe("AcpRegistryAdapterV2", () => {
           providerSessionId: `mcp-session-acp-omp-stdio-${sessionOrdinal}`,
           providerInstanceId: instanceId,
           endpoint,
-          browserToolsAvailable: false,
         };
         yield* mcpSessions.set({ ...mcpSession, authorizationHeader: "Bearer opened-token" });
         const adapter = yield* makeAcpRegistryAdapterV2({
@@ -1563,7 +1561,6 @@ describe("AcpRegistryAdapterV2", () => {
         providerInstanceId: instanceId,
         endpoint,
         authorizationHeader: "Bearer thread-env-token",
-        browserToolsAvailable: false,
       });
       // Several agents can run from one directory at once; the spawn env is how
       // a process the agent starts (an MCP server, a shell tool) finds its own

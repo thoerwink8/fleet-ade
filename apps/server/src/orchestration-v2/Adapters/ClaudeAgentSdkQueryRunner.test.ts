@@ -26,7 +26,6 @@ import { AgentScope } from "@t3tools/shared/AgentScope";
 import { ProviderEventLoggers } from "@t3tools/provider-core/server/ProviderEventLoggers";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import { signalProcessGroup } from "@t3tools/provider-core/server/processGroup";
-import * as PortScanner from "../../preview/PortScanner.ts";
 import {
   ClaudeAgentSdkQueryRunner,
   type ClaudeAgentSdkQueryOpenInput,
@@ -71,7 +70,6 @@ const writeClaudeSession = Effect.fnUntraced(function* (
 });
 
 const forkRunnerLayer = layerQueryRunner.pipe(
-  Layer.provide(PortScanner.layerTest),
   Layer.provide(Layer.succeed(ProviderEventLoggers, { native: undefined, canonical: undefined })),
 );
 
@@ -203,7 +201,6 @@ it.effect("forked Claude sessions keep their compaction chain", () =>
 );
 
 const realQueryRunner = layerQueryRunner.pipe(
-  Layer.provide(PortScanner.layerTest),
   Layer.provide(
     Layer.succeed(ProviderEventLoggers, {
       native: undefined,
@@ -789,32 +786,12 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")("Claude CLI pro
     }),
   );
 
-  it.effect("marks the CLI's jobs with its thread and counts it as an agent until it exits", () => {
-    let runningAgents = 0;
-    let releaseAgent!: () => void;
-    const agentReleased = new Promise<void>((resolve) => (releaseAgent = resolve));
-    const runner = layerQueryRunner.pipe(
-      Layer.provide(
-        Layer.mock(PortScanner.PortDiscovery)({
-          trackAgent: () => {
-            runningAgents += 1;
-            return () => {
-              runningAgents -= 1;
-              releaseAgent();
-            };
-          },
-        }),
-      ),
-      Layer.provide(
-        Layer.succeed(ProviderEventLoggers, { native: undefined, canonical: undefined }),
-      ),
-      Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
-    );
-    return Effect.gen(function* () {
+  it.effect("marks the CLI's jobs with its thread", () =>
+    Effect.gen(function* () {
       const cli = fakeClaudeCli(
         [
           'dir=$(dirname "$0")',
-          `printf '%s' "$${PortScanner.AGENT_THREAD_ENV}" > "$dir/thread"`,
+          `printf '%s' "$T3CODE_THREAD_ID" > "$dir/thread"`,
           "cat > /dev/null",
         ].join("\n"),
       );
@@ -832,10 +809,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")("Claude CLI pro
 
       const session = yield* openFakeCli(cli);
       assert.equal(yield* Effect.promise(() => threadRead), "thread-fake-cli");
-      assert.equal(runningAgents, 1);
       yield* session.close;
-      yield* Effect.promise(() => agentReleased);
-      assert.equal(runningAgents, 0);
-    }).pipe(Effect.provide(runner));
-  });
+    }).pipe(Effect.provide(realQueryRunner)),
+  );
 });

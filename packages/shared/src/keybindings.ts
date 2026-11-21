@@ -75,14 +75,6 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+w", command: "rightPanel.close", when: "!terminalFocus" },
   { key: "mod+shift+t", command: "view.reopenClosed" },
   { key: "mod+d", command: "diff.toggle", when: "!terminalFocus" },
-  { key: "mod+shift+j", command: "preview.toggle" },
-  { key: "mod+r", command: "preview.refresh", when: "previewFocus" },
-  { key: "mod+l", command: "preview.focusUrl", when: "previewFocus" },
-  { key: "mod+=", command: "preview.zoomIn", when: "previewFocus" },
-  { key: "mod++", command: "preview.zoomIn", when: "previewFocus" },
-  { key: "mod+-", command: "preview.zoomOut", when: "previewFocus" },
-  { key: "mod+0", command: "preview.resetZoom", when: "previewFocus" },
-  { key: "mod+f", command: "preview.find", when: "previewFocus" },
   { key: "mod+k", command: "commandPalette.toggle", when: "!terminalFocus" },
   // No when: the terminal encodes Ctrl+/ into the shell, so the handler runs in
   // the capture phase and decides for itself whether the terminal keeps the key.
@@ -116,7 +108,7 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+shift+o", command: "chat.new", when: "!terminalFocus" },
   { key: "mod+shift+n", command: "chat.newLocal", when: "!terminalFocus" },
   { key: "mod+alt+n", command: "chat.newWithoutProject", when: "!terminalFocus" },
-  { key: "mod+f", command: "chat.find", when: "!terminalFocus && !previewFocus" },
+  { key: "mod+f", command: "chat.find", when: "!terminalFocus && !rightPanelFocus" },
   { key: "mod+shift+m", command: "modelPicker.toggle", when: "!terminalFocus" },
   { key: "mod+shift+h", command: "composer.host", when: "!terminalFocus" },
   { key: "mod+shift+e", command: "composer.effort", when: "!terminalFocus" },

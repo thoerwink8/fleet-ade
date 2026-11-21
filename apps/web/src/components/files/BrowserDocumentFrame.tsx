@@ -35,7 +35,7 @@ import { isElectron } from "~/env";
 import { FileSurfaceLoading } from "./fileSurfaceChrome";
 import type { PdfViewState } from "./PdfViewer";
 
-import { useOpenLink } from "~/browser/useOpenLink";
+import { useOpenLink } from "~/lib/useOpenLink";
 import { ExpandedImageDialog } from "~/components/chat/ExpandedImageDialog";
 import type { ExpandedImagePreview } from "~/components/chat/ExpandedImagePreview";
 import { useHtmlRenderTheme } from "~/hooks/useHtmlRenderTheme";
@@ -60,7 +60,6 @@ const HTML_RENDER_SHORTCUT_COMMANDS: ReadonlySet<KeybindingCommand> = new Set([
   "rightPanel.toggleMaximized",
   "threadPanel.toggle",
   "terminal.toggle",
-  "preview.toggle",
   "navigation.back",
   "navigation.forward",
   "thread.previous",
@@ -246,7 +245,7 @@ export function HtmlRenderDocument(props: {
     },
   );
   const openChangeRequestLink = useOpenChangeRequestLink(props.threadRef);
-  const openLink = useOpenLink(props.threadRef);
+  const openLink = useOpenLink();
   const open = useEffectEvent((url: string, modifiers: { metaKey: boolean; ctrlKey: boolean }) => {
     if (modifiers.metaKey || modifiers.ctrlKey) {
       void readLocalApi()
@@ -265,7 +264,7 @@ export function HtmlRenderDocument(props: {
     ) {
       return;
     }
-    void openLink(url, { event: modifiers }).catch((cause: unknown) => console.error(cause));
+    void openLink(url).catch((cause: unknown) => console.error(cause));
   });
   const { onFullscreenChange } = props;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports fullscreen to the parent while the image viewer is open, and clears it on unmount

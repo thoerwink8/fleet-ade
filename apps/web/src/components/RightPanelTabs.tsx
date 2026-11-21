@@ -17,7 +17,6 @@ import {
 import type {
   ContextMenuItem,
   EnvironmentId,
-  PreviewSessionSnapshot,
   ProjectId,
   PullRequestState,
   ResolvedKeybindingsConfig,
@@ -36,17 +35,13 @@ import { restrictToFirstScrollableAncestor, restrictToHorizontalAxis } from "@dn
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   FileDiff,
   Files,
-  Globe2,
   MessagesSquare,
   Plus,
   TerminalSquare,
-  Volume2Icon,
-  VolumeOffIcon,
 } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -60,7 +55,6 @@ import {
 } from "react";
 
 import { isElectron } from "~/env";
-import type { DesktopPreviewOverlay } from "~/previewStateStore";
 import type { RightPanelSurface } from "~/rightPanelStore";
 import { cn } from "~/lib/utils";
 import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings";
@@ -69,22 +63,11 @@ import { useStableCallback } from "~/hooks/useStableCallback";
 import { Button } from "~/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ui/kbd";
-import {
-  Menu,
-  MenuItem,
-  MenuPopup,
-  MenuShortcut,
-  MenuSub,
-  MenuSubPopup,
-  MenuSubTrigger,
-  MenuTrigger,
-} from "~/components/ui/menu";
-import { useBrowserDefaults } from "~/browser/browserDefaults";
+import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "~/components/ui/menu";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
-import { faviconUrlForOrigin } from "@t3tools/shared/favicon";
+import { type PreviewPanelInlineSize } from "~/hooks/usePreviewPanelInlineSize";
 import { useTheme } from "~/hooks/useTheme";
-import type { PreviewPanelInlineSize } from "~/hooks/usePreviewPanelInlineSize";
 import {
   newestPullRequestSummary,
   pullRequestEnvironment,
@@ -94,11 +77,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { toastManager } from "~/components/ui/toast";
 
-import { PreviewPanelShell, type PreviewPanelMode } from "./preview/PreviewPanelShell";
-import { FaviconImage } from "./preview/PreviewFaviconIcon";
-import { previewBridge } from "./preview/previewBridge";
-import { dispatchPreviewAction } from "./preview/previewActionBus";
-import { preventThumbButtonFocus, takeThumbButtonNavigation } from "./preview/thumbButtons";
+import { RightPanelShell, type RightPanelMode } from "./RightPanelShell";
 import { PierreEntryIcon } from "./chat/PierreEntryIcon";
 import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
@@ -106,7 +85,7 @@ import { observeResize } from "~/lib/observeResize";
 import { surfaceShortcutKey } from "~/lib/surfaceShortcutKey";
 
 export interface RightPanelTabsProps {
-  mode: PreviewPanelMode;
+  mode: RightPanelMode;
   maximized?: boolean;
   open?: boolean;
   keybindings: ResolvedKeybindingsConfig;
@@ -119,10 +98,6 @@ export interface RightPanelTabsProps {
   environmentId: EnvironmentId | null;
   activeSurfaceId: string | null;
   pendingSurfaceIds: ReadonlySet<string>;
-  previewSessions: Readonly<Record<string, PreviewSessionSnapshot>>;
-  desktopByTabId: Readonly<Record<string, DesktopPreviewOverlay>>;
-  /** Maps server-local session ids to desktop runtime ids; session ids cannot address desktop operations. */
-  previewRuntimeTabId?: ((tabId: string) => string) | undefined;
   terminalLabelsById: ReadonlyMap<string, string>;
   onActivate: (surface: RightPanelSurface) => void;
   onCloseSurface: (surface: RightPanelSurface) => void;
@@ -131,9 +106,6 @@ export interface RightPanelTabsProps {
   onCloseAllSurfaces: () => void;
   onMoveSurface?: (surfaceId: string, toIndex: number) => void;
   onCopyFilePath: (relativePath: string) => void;
-  onAddBrowser: () => void;
-  /** Keep separate from the DOM click handler so a MouseEvent cannot become a profile id. */
-  onAddBrowserInProfile: (profileId: string) => void;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -141,7 +113,6 @@ export interface RightPanelTabsProps {
   onAddPullRequests: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
-  browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
@@ -164,12 +135,7 @@ export interface PullRequestTabStatus {
 
 export type PullRequestTabStatusSeed = Pick<PullRequestTabStatus, "state" | "isDraft">;
 
-function shouldOpenDefaultBrowserProfileFromMenuClick(pointerType: string | undefined): boolean {
-  return pointerType !== "touch";
-}
-
 const SURFACE_DISABLED_REASONS = {
-  browser: "浏览器预览仅在 T3 Code 桌面应用中可用。",
   terminal: "终端面板仅在项目会话中可用。",
   files: "打开项目后才能使用文件面板。",
   diff: "还没有文件改动。",
@@ -193,7 +159,6 @@ const LAUNCHER_SHORTCUT_BLOCKING_LAYERS = [
   .join(",");
 
 const SURFACE_UNAVAILABLE_HINTS = {
-  browser: "仅桌面应用可用。",
   terminal: "打开项目后可用。",
   files: "打开项目后可用。",
   diff: "还没有文件改动。",
@@ -202,50 +167,13 @@ const SURFACE_UNAVAILABLE_HINTS = {
   sideChat: "发送第一条消息后可用。",
 } as const;
 
-type TabContextMenuAction =
-  | "copy-path"
-  | "toggle-mute"
-  | "close"
-  | "close-others"
-  | "close-to-right"
-  | "close-all";
+type TabContextMenuAction = "copy-path" | "close" | "close-others" | "close-to-right" | "close-all";
 
 const TAB_SCROLL_EDGE_TOLERANCE = 1;
 const TAB_DRAG_MODIFIERS = [restrictToHorizontalAxis, restrictToFirstScrollableAncestor];
 
 function tabScrollViewport(root: HTMLDivElement | null): HTMLDivElement | null {
   return root?.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]') ?? null;
-}
-
-function previewTabIdOf(
-  surface: RightPanelSurface,
-  sessions: Readonly<Record<string, PreviewSessionSnapshot>>,
-): string | null {
-  if (surface.kind !== "preview" || !surface.resourceId) return null;
-  return sessions[surface.resourceId]?.tabId ?? null;
-}
-
-/**
- * Stays disabled until desktop overlay state arrives: a server session id can
- * resolve while the preview manager's createTab is still in flight, and muting
- * then fails with a PreviewTabNotFoundError nothing surfaces to the user.
- */
-function tabMuteMenuItem(input: {
-  overlay: DesktopPreviewOverlay | null;
-  canResolveRuntimeTabId: boolean;
-}): { label: string; disabled: boolean } {
-  const muted = input.overlay?.audioMuted ?? false;
-  return {
-    label: muted ? "取消标签静音" : "将标签静音",
-    disabled: input.overlay === null || !input.canResolveRuntimeTabId,
-  };
-}
-
-type TabAudioState = "none" | "audible" | "muted";
-
-function tabAudioState(overlay: DesktopPreviewOverlay | null): TabAudioState {
-  if (!overlay?.audible) return "none";
-  return overlay.audioMuted ? "muted" : "audible";
 }
 
 type SurfaceShortcutEvent = Pick<
@@ -316,9 +244,6 @@ function SurfaceMenuItem(props: {
 }
 
 function RightPanelEmptyState(props: {
-  onAddBrowser: () => void;
-  onAddBrowserInProfile: (profileId: string) => void;
-  browserProfiles: ReadonlyArray<{ readonly id: string; readonly name: string }>;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -326,7 +251,6 @@ function RightPanelEmptyState(props: {
   onAddPullRequests: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
-  browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
@@ -338,14 +262,6 @@ function RightPanelEmptyState(props: {
   const [highlight, setHighlight] = useState(-1);
 
   const actions = [
-    {
-      label: "浏览器",
-      icon: Globe2,
-      shortcut: "B",
-      available: props.browserAvailable,
-      disabledReason: SURFACE_UNAVAILABLE_HINTS.browser,
-      onClick: props.onAddBrowser,
-    },
     {
       label: "终端",
       icon: TerminalSquare,
@@ -498,42 +414,9 @@ function RightPanelEmptyState(props: {
                   )}
                 >
                   {actionIcon(action, "size-4")}
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate",
-                      action.label === "Browser" && props.browserProfiles.length > 1 && "pr-7",
-                    )}
-                  >
-                    {action.label}
-                  </span>
+                  <span className={cn("min-w-0 flex-1 truncate")}>{action.label}</span>
                   <Kbd>{action.shortcut}</Kbd>
                 </button>
-                {action.label === "Browser" && props.browserProfiles.length > 1 ? (
-                  <Menu>
-                    <MenuTrigger
-                      render={
-                        <Button
-                          aria-label="在指定配置中打开浏览器"
-                          className="absolute top-1/2 right-8 -translate-y-1/2"
-                          size="icon-xs"
-                          variant="ghost-muted"
-                        />
-                      }
-                    >
-                      <ChevronDown className="size-3.5" />
-                    </MenuTrigger>
-                    <MenuPopup align="end" side="bottom" sideOffset={6} className="max-w-56">
-                      {props.browserProfiles.map((profile) => (
-                        <MenuItem
-                          key={profile.id}
-                          onClick={() => props.onAddBrowserInProfile(profile.id)}
-                        >
-                          <span className="min-w-0 truncate">{profile.name}</span>
-                        </MenuItem>
-                      ))}
-                    </MenuPopup>
-                  </Menu>
-                ) : null}
               </div>
             ) : (
               <DisabledReasonTooltip
@@ -573,7 +456,6 @@ function RightPanelEmptyState(props: {
 
 function surfaceTitle(
   surface: RightPanelSurface,
-  sessions: Readonly<Record<string, PreviewSessionSnapshot>>,
   terminalLabelsById: ReadonlyMap<string, string>,
 ): string {
   switch (surface.kind) {
@@ -596,69 +478,20 @@ function surfaceTitle(
       return "PR";
     case "side-chat":
       return "侧聊";
-    case "preview": {
-      const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
-      if (!snapshot || snapshot.navStatus._tag === "Idle") return "浏览器";
-      if (snapshot.navStatus.title.trim().length > 0) return snapshot.navStatus.title;
-      try {
-        return new URL(snapshot.navStatus.url).host || "浏览器";
-      } catch {
-        return "浏览器";
-      }
-    }
   }
 }
-
-function PreviewFavicon({ capturedUrl, url }: { capturedUrl: string | null; url: string | null }) {
-  const publicProviderUrl = faviconUrlForOrigin(url, 32);
-  return (
-    <FaviconImage
-      sources={[capturedUrl, publicProviderUrl]}
-      fallback={<Globe2 className="size-3 shrink-0" />}
-      className="size-3 shrink-0 rounded-sm object-contain"
-    />
-  );
-}
-
-function sameOrigin(left: string, right: string): boolean {
-  try {
-    return new URL(left).origin === new URL(right).origin;
-  } catch {
-    return false;
-  }
-}
-
-function previewFaviconOf(
-  surface: RightPanelSurface,
-  sessions: Readonly<Record<string, PreviewSessionSnapshot>>,
-  desktopByTabId: Readonly<Record<string, DesktopPreviewOverlay>>,
-): { url: string | null; capturedUrl: string | null } {
-  const snapshot =
-    surface.kind === "preview" && surface.resourceId ? sessions[surface.resourceId] : null;
-  const url = !snapshot || snapshot.navStatus._tag === "Idle" ? null : snapshot.navStatus.url;
-  const favicon = snapshot ? (desktopByTabId[snapshot.tabId]?.favicon ?? null) : null;
-  const capturedUrl = favicon && url && sameOrigin(favicon.pageUrl, url) ? favicon.dataUrl : null;
-  return { url, capturedUrl };
-}
-
 function SurfaceIcon({
   surface,
-  previewUrl,
-  previewCapturedUrl,
   theme,
   environmentId,
   pullRequestStatusSeed,
 }: {
   surface: RightPanelSurface;
-  previewUrl: string | null;
-  previewCapturedUrl: string | null;
   theme: "light" | "dark";
   environmentId: EnvironmentId | null;
   pullRequestStatusSeed: PullRequestTabStatusSeed | undefined;
 }) {
   switch (surface.kind) {
-    case "preview":
-      return <PreviewFavicon capturedUrl={previewCapturedUrl} url={previewUrl} />;
     case "diff":
       return <FileDiff className="size-3 shrink-0" />;
     case "files":
@@ -857,6 +690,11 @@ function preventTabMiddleButtonDefault(event: ReactMouseEvent) {
   event.preventDefault();
 }
 
+// Thumb buttons move app history and focus unless the mouseup and mousedown are cancelled.
+function preventThumbButtonAppHistory(event: ReactMouseEvent) {
+  if (event.button === 3 || event.button === 4) event.preventDefault();
+}
+
 // Stable handlers and per-tab values let the compiler reuse tabs across parent renders.
 function RightPanelTab(
   props: RightPanelTabHandlers & {
@@ -865,18 +703,13 @@ function RightPanelTab(
     active: boolean;
     pending: boolean;
     title: string;
-    audio: TabAudioState;
-    audioRuntimeTabId: string | null;
-    previewUrl: string | null;
-    previewCapturedUrl: string | null;
     theme: "light" | "dark";
     environmentId: EnvironmentId | null;
     pullRequestStatusSeed: PullRequestTabStatusSeed | undefined;
     ownsDesktopTitleBar: boolean;
   },
 ) {
-  const { surface, audio, audioRuntimeTabId, onActivate, onClose, onAuxClick, onContextMenu } =
-    props;
+  const { surface, onActivate, onClose, onAuxClick, onContextMenu } = props;
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: surface.id,
     disabled: props.dragDisabled,
@@ -893,8 +726,6 @@ function RightPanelTab(
       <PanelTabCloseButton label={`关闭 ${title}`} onClick={() => onClose(surface)}>
         <SurfaceIcon
           surface={surface}
-          previewUrl={props.previewUrl}
-          previewCapturedUrl={props.previewCapturedUrl}
           theme={props.theme}
           environmentId={props.environmentId}
           pullRequestStatusSeed={props.pullRequestStatusSeed}
@@ -906,32 +737,6 @@ function RightPanelTab(
           />
         ) : null}
       </PanelTabCloseButton>
-      {audio === "none" || !audioRuntimeTabId ? null : (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                className="cursor-pointer flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
-                aria-label={audio === "muted" ? `取消 ${title} 的静音` : `将 ${title} 静音`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void previewBridge
-                    ?.setAudioMuted(audioRuntimeTabId, audio !== "muted")
-                    .catch(() => undefined);
-                }}
-              >
-                {audio === "muted" ? (
-                  <VolumeOffIcon className="size-3" />
-                ) : (
-                  <Volume2Icon className="size-3" />
-                )}
-              </button>
-            }
-          />
-          <TooltipPopup>{audio === "muted" ? "取消标签静音" : "将标签静音"}</TooltipPopup>
-        </Tooltip>
-      )}
       <Tooltip>
         <TooltipTrigger
           render={
@@ -976,7 +781,6 @@ function RightPanelTab(
 export function RightPanelTabs(props: RightPanelTabsProps) {
   const focusedSurface = props.surfaces.find((surface) => surface.id === props.activeSurfaceId);
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
-  const browserProfiles = useBrowserDefaults().profiles;
   const { resolvedTheme } = useTheme();
   const tabListRef = useRef<HTMLDivElement>(null);
   const addSurfaceTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1041,14 +845,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   };
 
   const addSurfaceActions = [
-    {
-      label: "浏览器",
-      icon: Globe2,
-      shortcut: "B",
-      available: props.browserAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.browser,
-      onClick: props.onAddBrowser,
-    },
     {
       label: "终端",
       icon: TerminalSquare,
@@ -1126,18 +922,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     if (surface.kind === "file" && surface.attachment === undefined) {
       items.push({ id: "copy-path", label: "复制路径" });
     }
-    const menuPreviewTabId = previewTabIdOf(surface, props.previewSessions);
-    const menuOverlay = menuPreviewTabId ? (props.desktopByTabId[menuPreviewTabId] ?? null) : null;
-    const menuMuted = menuOverlay?.audioMuted ?? false;
-    if (surface.kind === "preview") {
-      items.push({
-        id: "toggle-mute",
-        ...tabMuteMenuItem({
-          overlay: menuOverlay,
-          canResolveRuntimeTabId: props.previewRuntimeTabId !== undefined,
-        }),
-      });
-    }
     items.push(
       { id: "close", label: "关闭" },
       {
@@ -1164,16 +948,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           props.onCopyFilePath(surface.relativePath);
         }
         break;
-      case "toggle-mute": {
-        const runtimeTabId =
-          menuPreviewTabId && menuOverlay
-            ? (props.previewRuntimeTabId?.(menuPreviewTabId) ?? null)
-            : null;
-        if (runtimeTabId) {
-          void previewBridge?.setAudioMuted(runtimeTabId, !menuMuted).catch(() => undefined);
-        }
-        break;
-      }
       case "close":
         props.onCloseSurface(surface);
         break;
@@ -1249,12 +1023,12 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   };
 
   return (
-    <PreviewPanelShell
+    <RightPanelShell
       workspaceArea
       workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
       workspaceLabel={
         focusedSurface
-          ? `工作区面板：${surfaceTitle(focusedSurface, props.previewSessions, props.terminalLabelsById)}`
+          ? `工作区面板：${surfaceTitle(focusedSurface, props.terminalLabelsById)}`
           : "工作区面板"
       }
       mode={props.mode}
@@ -1263,13 +1037,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
       {...(props.defaultWidth !== undefined ? { defaultWidth: props.defaultWidth } : {})}
       {...(props.inlineSize ? { inlineSize: props.inlineSize } : {})}
-      onMouseDown={preventThumbButtonFocus}
-      onMouseUp={(event) =>
-        takeThumbButtonNavigation(
-          event,
-          focusedSurface?.kind === "preview" ? dispatchPreviewAction : undefined,
-        )
-      }
+      onMouseDown={preventThumbButtonAppHistory}
+      onMouseUp={preventThumbButtonAppHistory}
     >
       <div
         className={cn(
@@ -1292,12 +1061,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           <div className="flex h-full w-max min-w-full items-center gap-1">
             <SortableTabList surfaces={props.surfaces} onMove={props.onMoveSurface}>
               {props.surfaces.map((surface) => {
-                const previewTabId = previewTabIdOf(surface, props.previewSessions);
-                const favicon = previewFaviconOf(
-                  surface,
-                  props.previewSessions,
-                  props.desktopByTabId,
-                );
                 return (
                   <RightPanelTab
                     key={surface.id}
@@ -1305,15 +1068,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     dragDisabled={!props.onMoveSurface}
                     active={surface.id === props.activeSurfaceId}
                     pending={props.pendingSurfaceIds.has(surface.id)}
-                    title={surfaceTitle(surface, props.previewSessions, props.terminalLabelsById)}
-                    audio={tabAudioState(
-                      previewTabId ? (props.desktopByTabId[previewTabId] ?? null) : null,
-                    )}
-                    audioRuntimeTabId={
-                      previewTabId ? (props.previewRuntimeTabId?.(previewTabId) ?? null) : null
-                    }
-                    previewUrl={favicon.url}
-                    previewCapturedUrl={favicon.capturedUrl}
+                    title={surfaceTitle(surface, props.terminalLabelsById)}
                     theme={resolvedTheme}
                     environmentId={props.environmentId}
                     pullRequestStatusSeed={props.pullRequestStatusSeeds?.[surface.id]}
@@ -1349,41 +1104,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                 >
                   {addSurfaceActions.map((action) => {
                     const Icon = action.icon;
-                    if (action.label === "Browser" && action.available) {
-                      return (
-                        <MenuSub key={action.label}>
-                          <MenuSubTrigger
-                            className="[&>svg:last-child]:ms-0"
-                            aria-keyshortcuts={action.shortcut}
-                            onClick={(event) => {
-                              const pointerType =
-                                "pointerType" in event.nativeEvent &&
-                                typeof event.nativeEvent.pointerType === "string"
-                                  ? event.nativeEvent.pointerType
-                                  : undefined;
-                              if (!shouldOpenDefaultBrowserProfileFromMenuClick(pointerType))
-                                return;
-                              setAddSurfaceMenuOpen(false);
-                              action.onClick();
-                            }}
-                          >
-                            <Icon />
-                            {action.label}
-                            <MenuShortcut>{action.shortcut}</MenuShortcut>
-                          </MenuSubTrigger>
-                          <MenuSubPopup className="max-w-56">
-                            {browserProfiles.map((profile) => (
-                              <MenuItem
-                                key={profile.id}
-                                onClick={() => props.onAddBrowserInProfile(profile.id)}
-                              >
-                                <span className="min-w-0 truncate">{profile.name}</span>
-                              </MenuItem>
-                            ))}
-                          </MenuSubPopup>
-                        </MenuSub>
-                      );
-                    }
                     return (
                       <SurfaceMenuItem
                         key={action.label}
@@ -1460,16 +1180,12 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       <div className="flex min-h-0 flex-1 flex-col" data-right-panel-surface-content>
         {props.activeSurfaceId === null ? (
           <RightPanelEmptyState
-            onAddBrowser={props.onAddBrowser}
-            onAddBrowserInProfile={props.onAddBrowserInProfile}
-            browserProfiles={browserProfiles}
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
             onAddSideChat={props.onAddSideChat}
-            browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}
             diffAvailable={props.diffAvailable}
             filesAvailable={props.filesAvailable}
@@ -1482,6 +1198,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           props.children
         )}
       </div>
-    </PreviewPanelShell>
+    </RightPanelShell>
   );
 }

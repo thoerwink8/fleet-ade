@@ -259,13 +259,8 @@ describe("persistClientSettingsUpdate", () => {
         durableSettings = settings;
       });
     __setClientSettingsForTests(DEFAULT_CLIENT_SETTINGS);
-    const importedProfile = { id: "profile-import", name: "Imported", kind: "persistent" as const };
-
     const pending = persistClientSettingsUpdate(
-      (current) => ({
-        ...current,
-        browserProfiles: [...current.browserProfiles, importedProfile],
-      }),
+      (current) => ({ ...current, timestampFormat: "24-hour" }),
       persist,
     );
     await Promise.resolve();
@@ -276,12 +271,12 @@ describe("persistClientSettingsUpdate", () => {
     expect(persist).toHaveBeenCalledTimes(3);
     expect(persist.mock.calls[1]?.[0]).toMatchObject({
       wordWrap: false,
+      timestampFormat: "24-hour",
     });
-    expect(persist.mock.calls[1]?.[0].browserProfiles).toContainEqual(importedProfile);
     expect(durableSettings.wordWrap).toBe(false);
-    expect(durableSettings.browserProfiles).toContainEqual(importedProfile);
+    expect(durableSettings.timestampFormat).toBe("24-hour");
     expect(getClientSettings().wordWrap).toBe(false);
-    expect(getClientSettings().browserProfiles).toContainEqual(importedProfile);
+    expect(getClientSettings().timestampFormat).toBe("24-hour");
   });
 });
 

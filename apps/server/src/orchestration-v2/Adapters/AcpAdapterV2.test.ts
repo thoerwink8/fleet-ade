@@ -747,7 +747,6 @@ const makeInstructionCompactionHarness = Effect.fnUntraced(function* (
     providerInstanceId: instanceId,
     endpoint: "http://127.0.0.1:43123/mcp",
     authorizationHeader: "Bearer instruction-compaction-token",
-    browserToolsAvailable: true,
   });
   type Runtime = AcpSessionRuntime.AcpSessionRuntime["Service"];
   let sessionUpdate: Parameters<Runtime["handleSessionUpdate"]>[0] | undefined;
@@ -885,7 +884,6 @@ function assertReinjectedInstructions(
 ) {
   const text = blocks[0]?.text ?? "";
   assert.include(text, "T3 Code interaction mode: Default");
-  assert.include(text, "## T3 Code browser");
   assert.include(text, "T3 Code orchestration");
   assert.include(text, `<user_request>\n${request}\n</user_request>`);
   assert.include(blocks[1]?.text ?? "", "<runtime_info>");
@@ -2277,7 +2275,6 @@ describe("AcpAdapterV2", () => {
           providerInstanceId: instanceId,
           endpoint: "http://127.0.0.1:43123/mcp",
           authorizationHeader: "Bearer instruction-transition-token",
-          browserToolsAvailable: false,
         });
         const adapter = yield* makeAcpAdapterV2({
           instanceId,
@@ -2372,7 +2369,6 @@ describe("AcpAdapterV2", () => {
         const firstDefault = yield* runTurn(2, defaultPolicy, "First default request.");
         assert.equal(firstDefault.textBlockCount, 2);
         assert.include(firstDefault.prompt, "T3 Code interaction mode: Default");
-        assert.include(firstDefault.prompt, "## T3 Code browser");
         assert.include(firstDefault.prompt, "T3 Code orchestration");
         assert.include(firstDefault.prompt, "<runtime_info>");
         assert.notInclude(
@@ -4978,7 +4974,6 @@ describe("AcpAdapterV2", () => {
         providerInstanceId: instanceId,
         endpoint: "http://127.0.0.1:43123/mcp",
         authorizationHeader: "Bearer source-thread-token",
-        browserToolsAvailable: true,
       });
       yield* (yield* McpProviderSessions.McpProviderSessions).set({
         environmentId: EnvironmentId.make("environment-acp-native-fork"),
@@ -4987,7 +4982,6 @@ describe("AcpAdapterV2", () => {
         providerInstanceId: instanceId,
         endpoint: "http://127.0.0.1:43123/mcp",
         authorizationHeader: "Bearer target-thread-token",
-        browserToolsAvailable: true,
       });
       const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
         runtimeMode: "full-access",
@@ -5658,7 +5652,6 @@ describe("AcpAdapterV2", () => {
         providerInstanceId: instanceId,
         endpoint: "http://127.0.0.1:43124/mcp",
         authorizationHeader: "Bearer rollback-target-token",
-        browserToolsAvailable: false,
       });
       const runtimeInputs: Array<AcpAdapterV2RuntimeInput> = [];
       const protocolEvents = yield* Queue.unbounded<EffectAcpProtocol.AcpProtocolLogEvent>();

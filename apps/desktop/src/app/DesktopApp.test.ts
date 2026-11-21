@@ -41,7 +41,6 @@ import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 import * as ElectronSafeStorage from "../electron/ElectronSafeStorage.ts";
-import * as PreviewPasskeys from "../preview/Passkeys.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
 import * as DesktopSnapShot from "../snapShot/DesktopSnapShot.ts";
@@ -51,7 +50,6 @@ import * as DesktopApplicationMenu from "../window/DesktopApplicationMenu.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
 import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
 
-import * as BrowserImport from "../preview/BrowserImport/BrowserImport.ts";
 import * as DesktopBackendConfiguration from "../backend/DesktopBackendConfiguration.ts";
 import * as DesktopCliCommand from "./DesktopCliCommand.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
@@ -70,7 +68,6 @@ import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronTheme from "../electron/ElectronTheme.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as MacPermissions from "../permissions/MacPermissions.ts";
-import * as PreviewManager from "../preview/Manager.ts";
 
 it.effect.each([false, true])(
   "stops backends together before flushing history and cancels Linux registration, stop defect=%s",
@@ -140,9 +137,6 @@ it.effect.each([false, true])(
           Effect.provideService(ElectronSafeStorage.ElectronSafeStorage, {
             selectedStorageBackend: Effect.succeedNone,
           } as unknown as ElectronSafeStorage.ElectronSafeStorage["Service"]),
-          Effect.provideService(PreviewPasskeys.PreviewPasskeys, {
-            configure: Effect.void,
-          } as PreviewPasskeys.PreviewPasskeys["Service"]),
           Effect.provideService(DesktopApplicationMenu.DesktopApplicationMenu, {
             configure: Effect.void,
           }),
@@ -215,7 +209,6 @@ it.effect.each([false, true])(
       const app = yield* runApp.pipe(
         Effect.provide(
           Layer.mergeAll(
-            Layer.mock(BrowserImport.BrowserImport, {}),
             Layer.mock(ChildProcessSpawner.ChildProcessSpawner, {}),
             Layer.mock(DesktopBackendConfiguration.DesktopBackendConfiguration, {}),
             Layer.mock(DesktopCliCommand.DesktopCliCommand, {}),
@@ -235,11 +228,6 @@ it.effect.each([false, true])(
             Layer.mock(ElectronTheme.ElectronTheme, {}),
             Layer.mock(ElectronWindow.ElectronWindow, {}),
             Layer.mock(MacPermissions.MacPermissions, {}),
-            Layer.mock(PreviewManager.PreviewManager, {
-              isBrowserPartition: () => {
-                throw new Error("unexpected browser partition lookup");
-              },
-            }),
             FileSystem.layerNoop({}),
             Layer.mock(NetService.NetService, {}),
             Path.layer,

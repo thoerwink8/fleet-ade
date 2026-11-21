@@ -232,7 +232,7 @@ describe("readManagedPolicy", () => {
               // Registry names ignore case.
               text("maxRuntimeMode", "auto-accept-edits"),
               dword("Telemetry", 0),
-              text("Settings", '{"enableAgentBrowserAccess": {"value": false, "locked": true}}'),
+              text("Settings", '{"defaultAutoPull": {"value": true, "locked": true}}'),
               text("UpdatesMode", "off"),
               dword("AllowNightly", 1),
               dword("Updates", 1),
@@ -249,7 +249,7 @@ describe("readManagedPolicy", () => {
         {
           schemaVersion: 1,
           organization: "Société 日本 ✓",
-          settings: { enableAgentBrowserAccess: { value: false, locked: true } },
+          settings: { defaultAutoPull: { value: true, locked: true } },
           limits: {
             maxRuntimeMode: "auto-accept-edits",
             telemetry: false,

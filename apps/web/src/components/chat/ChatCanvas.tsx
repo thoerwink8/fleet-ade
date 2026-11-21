@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties } from "react";
 import { useStore } from "zustand";
 import { ChatCanvasContext } from "./ChatCanvasContext";
-import type { ChatCanvasPreview } from "./chatCanvasLayout";
 import { resolveChatCanvasModel, type ChatCanvasStore } from "./canvasStore";
 import { selectThreadPanelOpen, useRightPanelStore } from "../../rightPanelStore";
 import { observeResize } from "../../lib/observeResize";
@@ -10,7 +9,6 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 export function ChatCanvas({
   store,
   threadRef,
-  preview,
   composerOverlayElement,
   detailsCardTopInset = 0,
   children,
@@ -19,8 +17,6 @@ export function ChatCanvas({
   store: ChatCanvasStore;
   /** The thread whose details card sits on the canvas; other threads' measurements are stale. */
   threadRef: ScopedThreadRef | null;
-  /** The thread's mini player while it renders on this canvas. */
-  preview: ChatCanvasPreview | null;
   composerOverlayElement: HTMLElement | null;
   detailsCardTopInset?: number;
 }) {
@@ -76,14 +72,12 @@ export function ChatCanvas({
     measurements,
     detailsCardMeasurement,
     threadRef,
-    preview,
     detailsCardInlineOpen,
   });
   const context = {
     container: model.container,
     lane: model.lane,
     layout: model.layout,
-    previewKey: preview?.key ?? null,
     registerTimeline,
     measureDetailsCard: store.getState().measureDetailsCard,
     detailsCardTopInset: model.detailsCardTopInset,
@@ -97,7 +91,6 @@ export function ChatCanvas({
         {...props}
         ref={elementRef}
         data-chat-canvas
-        data-preview-overlaps-chat={layout.overlapsChat || undefined}
         className="relative flex min-h-0 min-w-0 flex-1 flex-col"
         style={
           {

@@ -12,7 +12,6 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { useDiffPanelStore } from "../diffPanelStore";
-import { browserMiniPlayerSource, usePreviewMiniPlayerStore } from "../previewMiniPlayerStore";
 import { useRightPanelStore } from "../rightPanelStore";
 
 function deferred<T>() {
@@ -199,7 +198,6 @@ import { useThreadActions } from "./useThreadActions";
 function seedThreadPanelState(ref: ScopedThreadRef) {
   useRightPanelStore.getState().show(ref);
   useDiffPanelStore.getState().selectGitScope(ref, "branch");
-  usePreviewMiniPlayerStore.getState().open(ref, browserMiniPlayerSource("tab"));
 }
 
 function threadPanelStatePresence(ref: ScopedThreadRef) {
@@ -207,11 +205,10 @@ function threadPanelStatePresence(ref: ScopedThreadRef) {
   return {
     rightPanel: key in useRightPanelStore.getState().byThreadKey,
     diffPanel: key in useDiffPanelStore.getState().byThreadKey,
-    miniPlayer: key in usePreviewMiniPlayerStore.getState().byThreadKey,
   };
 }
-const panelStateKept = { rightPanel: true, diffPanel: true, miniPlayer: true };
-const panelStateCleared = { rightPanel: false, diffPanel: false, miniPlayer: false };
+const panelStateKept = { rightPanel: true, diffPanel: true };
+const panelStateCleared = { rightPanel: false, diffPanel: false };
 
 const primary = EnvironmentId.make("primary");
 const secondary = EnvironmentId.make("secondary");
@@ -282,7 +279,6 @@ beforeEach(() => {
   state.sessionLookupFails = false;
   useRightPanelStore.setState(useRightPanelStore.getInitialState(), true);
   useDiffPanelStore.setState(useDiffPanelStore.getInitialState(), true);
-  usePreviewMiniPlayerStore.setState(usePreviewMiniPlayerStore.getInitialState(), true);
 });
 
 describe("thread action permissions", () => {

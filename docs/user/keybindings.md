@@ -123,9 +123,9 @@ Join modifiers and a key with `+`, such as `mod+shift+d` or `ctrl+l`.
 
 ## When conditions
 
-Available context keys are `terminalFocus`, `terminalOpen`, `previewFocus`,
-`previewOpen`, `rightPanelOpen`, `modelPickerOpen`, `usagePageOpen`, `composerFocus`,
-`draftThreadRoute`, `turnRunning`, `editableFocus`, `isWeb`, and `isDesktop`.
+Available context keys are `terminalFocus`, `terminalOpen`, `rightPanelOpen`,
+`modelPickerOpen`, `usagePageOpen`, `composerFocus`, `draftThreadRoute`, `turnRunning`,
+`editableFocus`, `isWeb`, and `isDesktop`.
 `rightPanelOpen` applies only to `rightPanel.new` and is true while the right panel is
 open; the default `mod+t` uses it to open the panel's new-tab menu.
 `draftThreadRoute` is true on a draft thread, including a restored draft, until it is first sent.
@@ -150,15 +150,8 @@ Combine keys with `!` for not, `&&` for and, `||` for or, and parentheses:
 `chat.find` searches conversation messages and proposed plans in the active thread. Entering a
 query searches the entire thread, including older messages. Thread search requires server support;
 update an older server to enable it. Select **Retry** if a search fails. It defaults to
-`mod+f` outside terminals and previews. Press **Enter** or **Shift+Enter** to move between matches,
+`mod+f` outside terminals. Press **Enter** or **Shift+Enter** to move between matches,
 and **Escape** to close find.
-
-## Find on a browser page
-
-`preview.find` (`mod+f` while a browser has focus) searches the open page in the desktop app. It
-is also in the browser's **⋮** menu and the command palette. A page that handles `mod+f` itself,
-such as a code editor, keeps its own find. Use the **⋮** menu to reach the browser's find there.
-Streamed browser tabs and T3 Code in a web browser do not support it.
 
 ## Precedence
 
@@ -198,11 +191,9 @@ closes the browser tab; rebind `rightPanel.close` and `terminal.close` to an ava
 shortcut such as `alt+w`.
 
 `mod+shift+t` reopens the last closed tab across the app, including files,
-diffs, pull requests, browsers, and devices, in the order you closed them.
-A browser opens in a fresh session without its old page history. Incognito tabs
-can reopen until you reload or quit the app. This shortcut does not undo deleted work.
-Browsers also use it to reopen browser tabs; choose another binding in Settings
-if the browser takes it first.
+diffs, and pull requests, in the order you closed them. This shortcut does not
+undo deleted work. Browsers also use it to reopen their own tabs; choose another
+binding in Settings if the browser takes it first.
 
 Many defaults include `!terminalFocus` so they do not intercept terminal input.
 Keep that condition when remapping them if you want the same behavior.

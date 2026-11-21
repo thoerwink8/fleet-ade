@@ -400,8 +400,6 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
   const desktopTelemetryFd = bootstrap?.desktopTelemetryFd;
   const desktopTelemetryControlFd = bootstrap?.desktopTelemetryControlFd;
   const desktopAppUpdate = bootstrap?.desktopAppUpdate;
-  const desktopBrowserFd = bootstrap?.desktopBrowserFd;
-  const desktopBrowserControlFd = bootstrap?.desktopBrowserControlFd;
   const resourceMonitorPath = bootstrap?.resourceMonitorPath;
   const autoBootstrapProjectFromCwd = Option.getOrElse(
     resolveOptionPrecedence(
@@ -540,8 +538,6 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     desktopTelemetryFd,
     desktopTelemetryControlFd,
     ...(desktopAppUpdate === undefined ? {} : { desktopAppUpdate }),
-    desktopBrowserFd,
-    desktopBrowserControlFd,
     resourceMonitorPath,
     autoBootstrapProjectFromCwd,
     logWebSocketEvents,

@@ -200,7 +200,6 @@ describe("HtmlRender", () => {
         providerInstanceId: ProviderInstanceId.make("claude"),
         endpoint: "http://localhost:8311/mcp",
         authorizationHeader: "Bearer first-token",
-        browserToolsAvailable: false,
       };
       yield* mcpSessions.set(session);
 
@@ -240,7 +239,7 @@ describe("HtmlRender", () => {
       expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toEqual(reference);
       expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toBe(undefined);
       const reused = yield* htmlRender.publish({ threadId, ...page });
-      yield* mcpSessions.set({ ...session, browserToolsAvailable: true });
+      yield* mcpSessions.set({ ...session, authorizationHeader: "Bearer reissued-token" });
       expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toEqual(reused);
 
       yield* htmlRender.publish({ threadId, ...page });

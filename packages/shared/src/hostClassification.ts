@@ -79,6 +79,28 @@ export const isLocalLoopbackHost = (host: string): boolean => {
   return parseIpv4Address(normalized)?.[0] === 127;
 };
 
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
+
+export const LSOF_LOCAL_HOST_TOKENS: ReadonlySet<string> = new Set([
+  ...LOOPBACK_HOSTS,
+  "*",
+  "[::]",
+  "[::1]",
+]);
+
+/** Loopback or unspecified-address hosts safe to treat as this machine for local-web auth. */
+export const isLoopbackHost = (host: string): boolean => {
+  const normalized = normalizeHostname(host);
+  return (
+    normalized === "[::1]" ||
+    normalized === "::1" ||
+    normalized === "localhost" ||
+    normalized === "0.0.0.0" ||
+    normalized === "::" ||
+    parseIpv4Address(normalized)?.[0] === 127
+  );
+};
+
 /** MagicDNS or fd7a:115c:a1e0::/48 identifies Tailscale; shared 100.64.0.0/10 addresses alone do not. */
 export const isTailnetHost = (host: string): boolean => {
   const normalized = normalizeHostname(host);

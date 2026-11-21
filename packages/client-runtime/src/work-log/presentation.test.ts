@@ -130,17 +130,17 @@ describe("resolveWorkEntryToolPresentation", () => {
     expect(workEntryDisplayIndicatesToolFailure(childFailure)).toBe(false);
   });
   it.each([
-    "mcp__t3-code__preview_click",
-    "mcp__t3_code__preview_click",
-    "mcp__t3code__preview_click",
-    "T3-code.preview_click",
-    "t3-code · preview_click completed",
-    "t3_code/preview_click",
-    "preview_click",
-  ])("recognizes browser tool names across providers: %s", (label) => {
+    "mcp__t3-code__html_preview",
+    "mcp__t3_code__html_preview",
+    "mcp__t3code__html_preview",
+    "T3-code.html_preview",
+    "t3-code · html_preview completed",
+    "t3_code/html_preview",
+    "html_preview",
+  ])("recognizes HTML preview tool names across providers: %s", (label) => {
     expect(resolveWorkEntryToolPresentation({ label })).toEqual({
-      displayName: "正在点击预览浏览器元素",
-      icon: "browser",
+      displayName: "正在预览 HTML 页面",
+      icon: "t3-code",
     });
   });
 
@@ -149,27 +149,27 @@ describe("resolveWorkEntryToolPresentation", () => {
       resolveWorkEntryToolPresentation({
         label: "Tool call complete",
         toolTitle: "Inspect the current page",
-        toolData: { server: "t3-code", tool: "preview_snapshot", result: { title: "Example" } },
+        toolData: { server: "t3-code", tool: "html_render", result: { title: "Example" } },
       }),
-    ).toEqual({ displayName: "正在截取预览页面快照", icon: "browser" });
+    ).toEqual({ displayName: "正在渲染 HTML 页面", icon: "t3-code" });
   });
 
   it("uses the summary's state only when the provider omitted a lifecycle status", () => {
-    const entry = { label: "T3-code.preview_click" };
+    const entry = { label: "T3-code.html_preview" };
     expect(resolveWorkEntryToolPresentation(entry, "inProgress")?.displayName).toBe(
-      "正在点击预览浏览器元素",
+      "正在预览 HTML 页面",
     );
     expect(resolveWorkEntryToolPresentation(entry, "completed")?.displayName).toBe(
-      "已点击预览浏览器元素",
+      "已预览 HTML 页面",
     );
     expect(
       resolveWorkEntryToolPresentation({ ...entry, toolLifecycleStatus: "completed" }, "inProgress")
         ?.displayName,
-    ).toBe("已点击预览浏览器元素");
+    ).toBe("已预览 HTML 页面");
     expect(
       resolveWorkEntryToolPresentation({ ...entry, toolLifecycleStatus: "failed" }, "completed")
         ?.displayName,
-    ).toBe("未能点击预览浏览器元素");
+    ).toBe("未能预览 HTML 页面");
   });
 
   it.each([
@@ -187,7 +187,7 @@ describe("resolveWorkEntryToolPresentation", () => {
 
   it("does not brand unknown tools or another server's matching tool name", () => {
     for (const label of [
-      "mcp__github__preview_click",
+      "mcp__github__html_preview",
       "t3-code.unknown_tool",
       "t3-code.toString",
       "搜索文件",
@@ -196,8 +196,8 @@ describe("resolveWorkEntryToolPresentation", () => {
     }
     expect(
       resolveWorkEntryToolPresentation({
-        label: "preview_click",
-        toolData: { server: "another-server", tool: "preview_click" },
+        label: "html_preview",
+        toolData: { server: "another-server", tool: "html_preview" },
       }),
     ).toBeNull();
   });

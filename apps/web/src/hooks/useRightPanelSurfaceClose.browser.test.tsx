@@ -15,15 +15,6 @@ const fixture = vi.hoisted(() => ({
 vi.mock("../lib/terminalCloseConfirm", () => ({
   confirmTerminalClose: (labels: readonly string[]) => fixture.confirm(labels),
 }));
-vi.mock("../components/ChatView.logic", () => ({
-  agentControlledBrowserCloseConfirmation: () => null,
-}));
-vi.mock("../previewStateStore", () => ({
-  useThreadPreviewState: () => ({ sessions: {}, desktopByTabId: {} }),
-  setActivePreviewTab: () => {},
-  beginPreviewSessionClose: () => {},
-  cancelPreviewSessionClose: () => {},
-}));
 vi.mock("../state/session", () => ({
   useEnvironmentScope: (id: string) => fixture.allowed.has(id),
   readEnvironmentScope: (id: string) => fixture.allowed.has(id),
@@ -56,7 +47,6 @@ vi.mock("../state/use-atom-command", () => ({
 }));
 // The commands are replaced above; importing their runtime would connect a client.
 vi.mock("../state/terminal", () => ({ terminalEnvironment: { open: {}, close: {}, write: {} } }));
-vi.mock("../state/preview", () => ({ previewEnvironment: { close: {} } }));
 vi.mock("../state/threads", () => ({ threadEnvironment: { delete: {} } }));
 vi.mock("../state/shell", () => ({ environmentShell: { stateValueAtom: () => null } }));
 vi.mock("@t3tools/client-runtime/state/runtime", () => ({

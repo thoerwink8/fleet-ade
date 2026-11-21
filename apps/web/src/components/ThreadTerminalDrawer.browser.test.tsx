@@ -74,7 +74,6 @@ vi.mock("../state/server", async () => {
   return { serverEnvironment: { configValueAtom: () => config } };
 });
 vi.mock("../state/terminal", () => ({ terminalEnvironment: { write: {}, resize: {} } }));
-vi.mock("../state/preview", () => ({ previewEnvironment: { open: {} } }));
 vi.mock("../state/projects", async () => {
   const { Atom, AsyncResult } = await import("effect/reactivity");
   return {
@@ -100,7 +99,6 @@ vi.mock("../state/projects", async () => {
   };
 });
 vi.mock("../editorPreferences", () => ({ useOpenInPreferredEditor: () => () => {} }));
-vi.mock("./preview/openTerminalLinkInPreview", () => ({ openTerminalLinkInPreview: () => {} }));
 vi.mock("~/localApi", () => ({ readLocalApi: () => null }));
 vi.mock("../hooks/useSettings", async () => {
   const { DEFAULT_CLIENT_SETTINGS } = await import("@t3tools/contracts/settings");
@@ -181,14 +179,14 @@ it("closes an exited terminal on its own thread after navigating to one reusing 
 it("hands thread navigation shortcuts from a focused terminal back to the app", async () => {
   const { other: threadRef } = setup();
   using _platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
-  useRightPanelStore.getState().openBrowser(threadRef, null);
+  useRightPanelStore.getState().open(threadRef, "files");
   await using _screen = await render(
     <Drawer
       threadRef={threadRef}
       onCloseTerminal={() => {}}
       keybindings={compileResolvedKeybindingsConfig([
         ...DEFAULT_KEYBINDINGS,
-        { key: "ctrl+r", command: "thread.next", when: "!previewOpen" },
+        { key: "ctrl+r", command: "thread.next", when: "terminalOpen" },
         { key: "ctrl+g", command: "thread.previous", when: "terminalOpen" },
       ])}
     />,
@@ -206,7 +204,7 @@ it("hands thread navigation shortcuts from a focused terminal back to the app", 
     false,
   ]);
   expect(terminalHandles("C", "KeyC")).toBe(true);
-  // Sidebar sees the open preview and the closed drawer and rejects these, so the shell keeps them.
+  // Sidebar sees the closed drawer and rejects terminalOpen, so the shell keeps these.
   expect([terminalHandles("r", "KeyR", false), terminalHandles("g", "KeyG", false)]).toEqual([
     true,
     true,

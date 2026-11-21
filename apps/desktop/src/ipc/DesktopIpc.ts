@@ -96,7 +96,7 @@ export class DesktopIpc extends Context.Service<
 >()("@t3tools/desktop/ipc/DesktopIpc") {}
 
 // ipcMain is shared by every webContents, including preview guests that load arbitrary pages.
-export const make = (
+const make = (
   ipcMain: DesktopIpcMain,
   isTrustedSender: DesktopIpcSenderGuard,
 ): DesktopIpc["Service"] =>

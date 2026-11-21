@@ -228,7 +228,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         config.settingsPath,
         `{
           "responseStreamingMode": "token",
-          "enableAgentBrowserAccess": false,
           "projectSettingsOverrides": {
             "legacy": { "responseStreamingMode": "token", "defaultAutoPull": true },
             "buffered": { "responseStreamingMode": "turn" },
@@ -239,7 +238,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
 
       const settings = yield* service.getSettings;
       assert.equal(settings.responseStreamingMode, "paragraph");
-      assert.isFalse(settings.enableAgentBrowserAccess);
       assert.deepEqual(settings.projectSettingsOverrides, {
         [ProjectId.make("legacy")]: { responseStreamingMode: "paragraph", defaultAutoPull: true },
         [ProjectId.make("buffered")]: { responseStreamingMode: "turn" },
@@ -252,6 +250,41 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       );
       assert.equal(persisted.responseStreamingMode, "turn");
       assert.deepEqual(persisted.projectSettingsOverrides, settings.projectSettingsOverrides);
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+  it.effect("loads settings that still name the removed browser", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      yield* fs.writeFileString(
+        config.settingsPath,
+        `{
+          "enableAgentBrowserAccess": false,
+          "browserDefaultViewport": { "width": 1280, "height": 800 },
+          "browserDefaultZoomFactor": 1,
+          "browserDefaultAppearance": "system",
+          "browserRecordingFrameRate": 30,
+          "browserRecordingShowKeyPresses": true,
+          "browserRecordingShowMousePresses": true,
+          "browserLinkTarget": "browser",
+          "browserSearchEngine": "duckduckgo",
+          "browserCustomSearchUrl": "https://example.test/?q=%s",
+          "browserAutoShowFloatingPreview": true,
+          "browserProfiles": [],
+          "browserDefaultProfileId": "default",
+          "continueThreadsAfterServerUpdate": false
+        }`,
+      );
+
+      const settings = yield* service.getSettings;
+      assert.equal(settings.continueThreadsAfterServerUpdate, false);
+      assert.equal("enableAgentBrowserAccess" in settings, false);
+
+      yield* service.updateSettings({ continueThreadsAfterServerUpdate: true });
+      const persisted = yield* fs.readFileString(config.settingsPath);
+      assert.equal(persisted.includes("enableAgentBrowserAccess"), false);
+      assert.equal(persisted.includes("browserProfiles"), false);
     }).pipe(Effect.provide(layerServerSettings())),
   );
 
@@ -2302,7 +2335,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         settings.projectSettingsOverrides,
         {
           [legacyProject]: {
-            enableAgentBrowserAccess: false,
             defaultModelSelection: model,
             defaultThreadEnvMode: "worktree",
             defaultAutoPull: true,

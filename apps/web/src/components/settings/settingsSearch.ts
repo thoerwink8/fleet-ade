@@ -28,7 +28,6 @@ export type SettingsPath =
   | "/settings/snap-shot"
   | "/settings/providers"
   | "/settings/threads"
-  | "/settings/browser"
   | "/settings/scheduled-tasks"
   | "/settings/source-control"
   | "/settings/worktrees"
@@ -100,7 +99,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/snap-shot": "快照",
   "/settings/providers": "智能体提供方",
   "/settings/threads": "会话",
-  "/settings/browser": "浏览器",
   "/settings/scheduled-tasks": "定时任务",
   "/settings/source-control": "版本控制",
   "/settings/worktrees": "工作树",
@@ -135,12 +133,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   },
   {
     heading: "智能体",
-    paths: [
-      "/settings/providers",
-      "/settings/threads",
-      "/settings/browser",
-      "/settings/scheduled-tasks",
-    ],
+    paths: ["/settings/providers", "/settings/threads", "/settings/scheduled-tasks"],
   },
   {
     heading: "代码",
@@ -944,84 +937,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/scheduled-tasks",
   },
   {
-    id: "agent-browser-access",
-    title: "智能体浏览器访问",
-    to: "/settings/browser",
-    scope: "project-defaults",
-    searchTerms: ["allow disable enable open drive preview tools sessions project override"],
-  },
-  {
-    id: "browser-profiles",
-    title: "浏览器配置",
-    to: "/settings/browser",
-    targetId: "browser",
-  },
-  {
-    id: "browser-default-profile",
-    title: "默认浏览器配置",
-    to: "/settings/browser",
-    targetId: "browser-profiles",
-  },
-  {
-    id: "browser-default-viewport",
-    title: "默认浏览器视口",
-    to: "/settings/browser",
-    searchTerms: ["preview size width height device desktop mobile rotate"],
-  },
-  {
-    id: "browser-default-zoom",
-    title: "默认浏览器缩放",
-    to: "/settings/browser",
-    searchTerms: ["preview page scale tabs percent"],
-  },
-  {
-    id: "browser-default-appearance",
-    title: "默认浏览器外观",
-    to: "/settings/browser",
-    searchTerms: ["preview color scheme light dark system os"],
-  },
-  {
-    id: "browser-recording-frame-rate",
-    title: "浏览器录屏帧率",
-    to: "/settings/browser",
-  },
-  {
-    id: "browser-recording-key-presses",
-    title: "在录屏中显示按键",
-    to: "/settings/browser",
-    searchTerms: ["browser preview keyboard shortcuts keystrokes overlay capture"],
-  },
-  {
-    id: "browser-recording-mouse-presses",
-    title: "在录屏中显示鼠标点击",
-    to: "/settings/browser",
-    searchTerms: ["browser preview clicks buttons drag overlay capture"],
-  },
-  {
-    id: "browser-link-target",
-    title: "链接打开方式",
-    to: "/settings/browser",
-    searchTerms: ["links default browser in-app browser external open"],
-  },
-  {
-    id: "browser-search-engine",
-    title: "搜索引擎",
-    to: "/settings/browser",
-    searchTerms: ["address bar duckduckgo google bing brave kagi ecosia custom url"],
-  },
-  {
     id: "pull-request-links-open-in-app",
     title: "在 T3 Code 中打开 PR",
     to: "/settings/diffs",
     searchTerms: [
       `pr commit links ${SOURCE_CONTROL_HOST_LABELS} browser external click default pull request view panel`,
     ],
-  },
-  {
-    id: "browser-auto-show-floating-preview",
-    title: "自动显示浮动预览",
-    to: "/settings/browser",
-    searchTerms: ["agent opens browser pop into view hide"],
   },
   {
     id: "automatic-pull",
@@ -1283,7 +1204,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/keybindings": null,
   "/settings/providers": null,
   "/settings/threads": null,
-  "/settings/browser": null,
   "/settings/source-control": "environment-defaults",
   "/settings/worktrees": "project-defaults",
   "/settings/connections": "connections",
@@ -1296,7 +1216,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
 };
 
 const RENAMED_SETTINGS_PATHS: Readonly<Record<string, SettingsPath>> = {
-  "/settings/integrations": "/settings/browser",
+  "/settings/integrations": "/settings/providers",
   "/settings/storage": "/settings/maintenance",
   "/settings/beta": "/settings/maintenance",
   "/settings/labs": "/settings/maintenance",

@@ -2,7 +2,6 @@ import { DownloadIcon, CopyIcon, CheckIcon, Code2Icon, EyeIcon, Table2Icon } fro
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { Spinner } from "~/components/ui/spinner";
 import {
-  AuthPreviewOperateScope,
   type EditorId,
   type EnvironmentId,
   type ProjectId,
@@ -40,12 +39,8 @@ import type { WorkerPoolManager } from "@pierre/diffs/worker";
 import { EditProvider, File, Virtualizer, useWorkerPool } from "@pierre/diffs/react";
 import { DiffWorkerPoolProvider } from "../DiffWorkerPoolProvider";
 import { useFilesystemReadAccess } from "~/state/filesystem";
-import {
-  isAtomCommandInterrupted,
-  squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
-import { FolderTree, Globe2, WrapTextIcon } from "lucide-react";
+import { FolderTree, WrapTextIcon } from "lucide-react";
 import * as Schema from "effect/Schema";
 import {
   lazy,
@@ -56,7 +51,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 
-import { isBrowserPreviewFile, openFileInPreview } from "~/browser/openFileInPreview";
 import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
 import { OpenInPicker } from "~/components/chat/OpenInPicker";
 import { MediaVideoPlayer } from "~/components/media/MediaVideoPlayer";
@@ -71,21 +65,16 @@ import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 import { cn, isMacPlatform } from "~/lib/utils";
 import { requestWorkspaceFocus } from "~/lib/workspaceFocus";
 import type { ChatFileAttachment } from "~/types";
+import { toastManager } from "~/components/ui/toast";
 import { isHostPath } from "@t3tools/shared/path";
 import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { type DraftId, useComposerDraftStore } from "~/composerDraftStore";
 import { buildFileReviewComment } from "~/reviewCommentContext";
-import { assetEnvironment } from "~/state/assets";
-import { usePreviewAvailable } from "~/browser/previewRuntime";
-import { useEnvironmentHttpBaseUrl, usePrimaryEnvironmentId } from "~/state/environments";
+import { usePrimaryEnvironmentId } from "~/state/environments";
 import { hostEnvironmentIdAtom } from "~/state/primaryEnvironment";
-import { previewEnvironment } from "~/state/preview";
 import { serverEnvironment } from "~/state/server";
 import { useEnvironmentScope } from "~/state/session";
-import { useAtomCommand } from "~/state/use-atom-command";
-import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 
 import { AttachmentFilePreview } from "./AttachmentFilePreview";
 import { AudioPreview } from "./AudioPreview";
@@ -1116,19 +1105,10 @@ export default function FilePreviewPanel({
   const defaultWordWrap = useClientSettings((settings) => settings.wordWrap);
   const [wordWrapOverride, setWordWrapOverride] = useState<boolean | null>(null);
   const wordWrap = wordWrapOverride ?? defaultWordWrap;
-  const canOperatePreview = useEnvironmentScope(environmentId, AuthPreviewOperateScope);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const hostEnvironmentId = useAtomValue(hostEnvironmentIdAtom);
   const remoteOpenState = useRemoteOpenState(environmentId);
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
-  const environmentHttpBaseUrl = useEnvironmentHttpBaseUrl(environmentId);
-  const previewAvailable = usePreviewAvailable(environmentId);
-  const createAssetUrl = useAtomQueryRunner(assetEnvironment.createUrl, {
-    reportFailure: false,
-  });
-  const openPreview = useAtomCommand(previewEnvironment.open, {
-    reportFailure: false,
-  });
   const isVideo = relativePath !== null && isWorkspaceVideoPreviewPath(relativePath);
   const isAudio = relativePath !== null && !isVideo && isWorkspaceAudioPreviewPath(relativePath);
   const isImage = relativePath !== null && !isVideo && isWorkspaceImagePreviewPath(relativePath);
@@ -1139,7 +1119,7 @@ export default function FilePreviewPanel({
     (binaryPreviewKind({ name: relativePath }) !== null ||
       officePreviewKind({ name: relativePath }) !== null ||
       isWorkspaceFontPreviewPath(relativePath));
-  const isHtml = relativePath !== null && !isPdf && isBrowserPreviewFile(relativePath);
+  const isHtml = relativePath !== null && !isPdf && /\.html?$/i.test(relativePath);
   const isHostFile =
     attachment !== undefined || (relativePath !== null && isHostPath(relativePath));
   const fileAccess = useFilesystemReadAccess(environmentId);
@@ -1297,13 +1277,6 @@ export default function FilePreviewPanel({
       : tableDelimiter
         ? setRenderTablePreferred
         : setRenderBrowserFilePreferred;
-  const canOpenInBrowser =
-    canOperatePreview &&
-    previewPath !== null &&
-    attachment === undefined &&
-    !isVideo &&
-    previewAvailable &&
-    isBrowserPreviewFile(previewPath);
   // Navigating up preserves the file tab; retain the trail's path spelling to find its folder tab.
   const navigateToFolder = (crumbPath: string) => {
     const path =
@@ -1355,31 +1328,6 @@ export default function FilePreviewPanel({
       }
       return next;
     });
-  };
-
-  const handleOpenInBrowser = () => {
-    if (!canReadFiles || !canOperatePreview || !absolutePath || !environmentHttpBaseUrl) return;
-    void (async () => {
-      const result = await openFileInPreview({
-        threadRef,
-        filePath: absolutePath,
-        workspaceRoot: cwd,
-        httpBaseUrl: environmentHttpBaseUrl,
-        createAssetUrl,
-        openPreview,
-      });
-      if (result._tag === "Success" || isAtomCommandInterrupted(result)) {
-        return;
-      }
-      const error = squashAtomCommandFailure(result);
-      toastManager.add(
-        stackedThreadToast({
-          type: "error",
-          title: "无法在浏览器中打开文件",
-          description: error instanceof Error ? error.message : "发生错误。",
-        }),
-      );
-    })();
   };
 
   if (attachment === undefined && !canReadFiles) {
@@ -1468,11 +1416,6 @@ export default function FilePreviewPanel({
               onPress={() => setWordWrapOverride(!wordWrap)}
             >
               <WrapTextIcon className="size-3.5" />
-            </FileSurfaceAction>
-          ) : null}
-          {canOpenInBrowser ? (
-            <FileSurfaceAction label="在预览浏览器中打开文件" onPress={handleOpenInBrowser}>
-              <Globe2 className="size-3.5" />
             </FileSurfaceAction>
           ) : null}
           {!isHostFile && previewPath !== null ? (
@@ -1715,7 +1658,6 @@ export default function FilePreviewPanel({
                 }
                 selectedPathRevealId={revealRequestId}
                 onOpenFile={onOpenFile}
-                answersPanelFind={!previewPath}
                 workspaceMutationId={workspaceMutationId}
                 {...(previewPath && !isMedia && !isPdf
                   ? {

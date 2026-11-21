@@ -12,9 +12,9 @@ import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { useClosedViewStore } from "../closedViewStore";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { environmentCatalog } from "../connection/catalog";
-import { effectiveShortcutsForCommand, resolveShortcutCommand } from "../keybindings";
+import { resolveShortcutCommand } from "../keybindings";
 import { isEditableFocused } from "../lib/editableFocus";
-import { isPreviewFocused } from "../lib/previewFocus";
+import { isRightPanelFocused } from "../lib/rightPanelFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
 import {
@@ -24,17 +24,14 @@ import {
 } from "../reopenClosedView";
 import {
   PULL_REQUESTS_PANEL_REF,
-  selectActiveRightPanel,
   selectSelectedRightPanelSurface,
   selectThreadRightPanelState,
   useRightPanelStore,
 } from "../rightPanelStore";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { readProject, readThreadShell } from "../state/entities";
-import { previewEnvironment } from "../state/preview";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { environmentShell } from "../state/shell";
-import { useAtomCommand } from "../state/use-atom-command";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import {
   buildDraftThreadRouteParams,
@@ -42,19 +39,6 @@ import {
   resolveThreadRouteTarget,
 } from "../threadRoutes";
 import { toastManager } from "./ui/toast";
-
-const PREVIEW_FORWARDED_COMMANDS = [
-  "workspace.focusNext",
-  "workspace.focusPrevious",
-  "sidebar.toggle",
-  "rightPanel.toggle",
-  "rightPanel.toggleMaximized",
-  "preview.focusUrl",
-  "preview.zoomIn",
-  "preview.zoomOut",
-  "preview.resetZoom",
-  "preview.find",
-] as const;
 
 const isGlobalPullRequests = (ref: ScopedThreadRef) =>
   scopedThreadKey(ref) === scopedThreadKey(PULL_REQUESTS_PANEL_REF);
@@ -76,12 +60,7 @@ export function ReopenClosedViewShortcut() {
     (state) =>
       selectThreadTerminalUiState(state.terminalUiStateByThreadKey, threadRef).terminalOpen,
   );
-  const previewOpen = useRightPanelStore(
-    (state) => selectActiveRightPanel(state.byThreadKey, threadRef) === "preview",
-  );
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const hasHistory = useClosedViewStore((state) => state.entries.length > 0);
-  const openPreview = useAtomCommand(previewEnvironment.open);
   const pending = useRef(Promise.resolve());
 
   const reopenNext = useEffectEvent(async () => {
@@ -122,7 +101,7 @@ export function ReopenClosedViewShortcut() {
     const thread = globalPullRequests ? null : readThreadShell(ref);
     const owner = thread ?? drafts.getDraftThreadByRef(ref);
     const project = owner ? readProject(scopeProjectRef(ref.environmentId, owner.projectId)) : null;
-    if (!(await reopenClosedView(restore, { openPreview, workspaceAvailable: project !== null }))) {
+    if (!(await reopenClosedView(restore, { workspaceAvailable: project !== null }))) {
       useClosedViewStore.getState().defer(restore.id);
       return;
     }
@@ -170,8 +149,7 @@ export function ReopenClosedViewShortcut() {
         context: {
           terminalFocus: isTerminalFocused(),
           terminalOpen,
-          previewFocus: isPreviewFocused(),
-          previewOpen,
+          rightPanelFocus: isRightPanelFocused(),
           editableFocus: isEditableFocused(event.target),
           modelPickerOpen: isModelPickerOpen(),
         },
@@ -189,43 +167,7 @@ export function ReopenClosedViewShortcut() {
       window.removeEventListener("keydown", onKeyDown, true);
       unsubscribe?.();
     };
-  }, [keybindings, previewOpen, terminalOpen]);
-
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- registers forwarded shortcut chords with the desktop preview bridge and clears them on cleanup
-  useEffect(() => {
-    const preview = window.desktopBridge?.preview;
-    if (!preview) return;
-    const options = {
-      context: {
-        previewFocus: true,
-        previewOpen: true,
-        terminalFocus: false,
-        terminalOpen,
-        editableFocus: false,
-        modelPickerOpen: false,
-        isDesktop: true,
-        isWeb: false,
-      },
-    };
-    // Guest browser processes miss app keydown listeners; desktop forwards the chords as menu actions.
-    const commands = [
-      ...(hasHistory ? (["view.reopenClosed"] as const) : []),
-      ...PREVIEW_FORWARDED_COMMANDS,
-    ];
-    void preview
-      .setForwardedShortcuts(
-        commands.flatMap((command) =>
-          effectiveShortcutsForCommand(keybindings, command, options).map((shortcut) => ({
-            command,
-            shortcut,
-          })),
-        ),
-      )
-      .catch(() => undefined);
-    return () => {
-      void preview.setForwardedShortcuts([]).catch(() => undefined);
-    };
-  }, [hasHistory, keybindings, terminalOpen]);
+  }, [keybindings, terminalOpen]);
 
   return null;
 }

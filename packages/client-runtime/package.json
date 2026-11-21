@@ -39,10 +39,6 @@
       "types": "./src/handoff.ts",
       "default": "./src/handoff.ts"
     },
-    "./preview/server-browser-stream": {
-      "types": "./src/preview/serverBrowserStream.ts",
-      "default": "./src/preview/serverBrowserStream.ts"
-    },
     "./worktree-setup": {
       "types": "./src/worktreeSetup.ts",
       "default": "./src/worktreeSetup.ts"
@@ -222,10 +218,6 @@
     "./state/presentation": {
       "types": "./src/state/presentation.ts",
       "default": "./src/state/presentation.ts"
-    },
-    "./state/deviceHubAccess": {
-      "types": "./src/state/deviceHubAccess.ts",
-      "default": "./src/state/deviceHubAccess.ts"
     },
     "./state/peerLinks": {
       "types": "./src/state/peerLinks.ts",

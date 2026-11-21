@@ -105,7 +105,6 @@ import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { resolveAttachmentPath, resolveAttachmentPathById } from "../../attachmentStore.ts";
-import * as PortScanner from "../../preview/PortScanner.ts";
 import { getCodexServiceTierOptionValue } from "../../codexModelOptions.ts";
 import { ServerConfig } from "../../config.ts";
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
@@ -781,7 +780,6 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
     readonly modelSelection: ModelSelection;
     readonly hasT3Mcp?: boolean;
-    readonly browserToolsAvailable?: boolean;
     /** ChatGPT token sharing does not accept service tiers. */
     readonly omitServiceTier?: boolean;
     readonly appContext?: ProviderAdapter.ProviderAdapterV2TurnInput["appContext"];
@@ -825,10 +823,10 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     );
     const t3Context =
       input.hasT3Mcp === true
-        ? buildCodexAdditionalContext(
-            { model: input.modelSelection.model, reasoningEffort: effort ?? undefined },
-            input.browserToolsAvailable ?? true,
-          )
+        ? buildCodexAdditionalContext({
+            model: input.modelSelection.model,
+            reasoningEffort: effort ?? undefined,
+          })
         : undefined;
     const additionalContext =
       t3Context === undefined && Object.keys(appContext).length === 0
@@ -1469,9 +1467,7 @@ function codexThreadRuntimeParams(input: {
         ? {}
         : { model_auto_compact_token_limit: input.autoCompactTokenLimit }),
       // One app-server serves many threads, so the id goes in per-thread shell config, not its env.
-      ...(input.threadId === null
-        ? {}
-        : { [`shell_environment_policy.set.${PortScanner.AGENT_THREAD_ENV}`]: input.threadId }),
+      ...(input.threadId === null ? {} : { [CODEX_THREAD_ENV_CONFIG_KEY]: input.threadId }),
       ...(t3Server === undefined
         ? {}
         : {
@@ -1554,7 +1550,8 @@ function readCodexProtocolPath(value: unknown, ...path: ReadonlyArray<string>): 
   return current;
 }
 
-const CODEX_THREAD_ENV_CONFIG_KEY = `shell_environment_policy.set.${PortScanner.AGENT_THREAD_ENV}`;
+/** The agent's shells carry their T3 thread, and the protocol log routes thread starts by it. */
+const CODEX_THREAD_ENV_CONFIG_KEY = "shell_environment_policy.set.T3CODE_THREAD_ID";
 
 /**
  * One app-server serves every Codex thread on an instance, so each frame is routed to the
@@ -1695,16 +1692,13 @@ function isSensitiveCodexProtocolKey(key: string): boolean {
 export const layerAppServerClientFactory: Layer.Layer<
   CodexAppServerClientFactory,
   never,
-  | ChildProcessSpawner.ChildProcessSpawner
-  | PortScanner.PortDiscovery
-  | ProviderEventLoggers.ProviderEventLoggers
+  ChildProcessSpawner.ChildProcessSpawner | ProviderEventLoggers.ProviderEventLoggers
 > = Layer.effect(
   CodexAppServerClientFactory,
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const { native: nativeEventLogger } = yield* ProviderEventLoggers.ProviderEventLoggers;
     const agentScope = yield* AgentScope;
-    const portDiscovery = yield* PortScanner.PortDiscovery;
 
     return CodexAppServerClientFactory.of({
       open: Effect.fn("CodexAdapterV2.open")(function* (input) {
@@ -1731,10 +1725,6 @@ export const layerAppServerClientFactory: Layer.Layer<
                 cause,
               }),
           ),
-        );
-        // Its shells carry each thread's T3CODE_THREAD_ID, so port discovery reads listeners' threads.
-        yield* Effect.acquireRelease(Effect.sync(portDiscovery.trackAgent), (release) =>
-          Effect.sync(release),
         );
         const protocolLogger = makeCodexAppServerProtocolLogger({
           nativeEventLogger,
@@ -7356,7 +7346,6 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               runtimePolicy: turnInput.runtimePolicy,
               modelSelection: turnInput.modelSelection,
               hasT3Mcp: mcpSession !== undefined,
-              browserToolsAvailable: mcpSession?.browserToolsAvailable ?? true,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,
               ...(turnInput.appContext === undefined ? {} : { appContext: turnInput.appContext }),
               ...(configuredReasoningSummary === undefined ? {} : { configuredReasoningSummary }),

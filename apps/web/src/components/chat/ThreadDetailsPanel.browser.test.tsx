@@ -137,8 +137,7 @@ function Panel({ fixture }: { fixture: ReturnType<typeof setup> }) {
       value={{
         container,
         lane: { padding: 48, minChatWidth: 640 },
-        layout: resolveChatCanvasLayout({ container, preview: null }),
-        previewKey: null,
+        layout: resolveChatCanvasLayout({ container }),
         registerTimeline: noop,
         measureDetailsCard: noop,
         detailsCardTopInset: 0,

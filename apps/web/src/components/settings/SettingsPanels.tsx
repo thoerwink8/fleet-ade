@@ -50,6 +50,7 @@ import {
   readThemePreference,
   useTheme,
 } from "../../hooks/useTheme";
+import { useClientSettings, useUpdatePrimarySettings } from "../../hooks/useSettings";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -82,7 +83,6 @@ import { ScopedSwitch } from "./ScopedSwitch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
-  getChangedBrowserSettingLabels,
   getChangedTypographySettingLabels,
   hasChangedBackgroundActivitySettings,
   isProjectGroupingEnabled,
@@ -101,7 +101,6 @@ import {
 import { searchableSetting } from "./settingsSearch";
 import { BackgroundActivitySettingsRow } from "./BackgroundActivitySettings";
 import { AdvancedSettings } from "./AdvancedSettings";
-import { PullRequestLinksOpenInAppSetting } from "./IntegrationsSettings";
 import { StorageCleanupSections } from "./StorageSettings";
 import { UpdateTrackSwitchDialog } from "./UpdateTrackSwitchDialog";
 import { environmentIdsKey } from "~/state/environmentAtomList";
@@ -566,9 +565,8 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.threadTitleInstructions !== DEFAULT_UNIFIED_SETTINGS.threadTitleInstructions
       ? ["会话标题生成说明"]
       : []),
-    ...getChangedBrowserSettingLabels(settings),
-    ...(settings.enableAgentBrowserAccess !== DEFAULT_UNIFIED_SETTINGS.enableAgentBrowserAccess
-      ? ["智能体浏览器访问"]
+    ...(settings.pullRequestLinksOpenInApp !== DEFAULT_UNIFIED_SETTINGS.pullRequestLinksOpenInApp
+      ? ["在 T3 Code 中打开 PR"]
       : []),
   ];
 
@@ -682,18 +680,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       fontSizePrompt: DEFAULT_UNIFIED_SETTINGS.fontSizePrompt,
       fontSizeCode: DEFAULT_UNIFIED_SETTINGS.fontSizeCode,
       fontSizeTerminal: DEFAULT_UNIFIED_SETTINGS.fontSizeTerminal,
-      browserDefaultViewport: DEFAULT_UNIFIED_SETTINGS.browserDefaultViewport,
-      browserDefaultZoomFactor: DEFAULT_UNIFIED_SETTINGS.browserDefaultZoomFactor,
-      browserDefaultAppearance: DEFAULT_UNIFIED_SETTINGS.browserDefaultAppearance,
-      browserRecordingFrameRate: DEFAULT_UNIFIED_SETTINGS.browserRecordingFrameRate,
-      browserRecordingShowKeyPresses: DEFAULT_UNIFIED_SETTINGS.browserRecordingShowKeyPresses,
-      browserRecordingShowMousePresses: DEFAULT_UNIFIED_SETTINGS.browserRecordingShowMousePresses,
-      browserLinkTarget: DEFAULT_UNIFIED_SETTINGS.browserLinkTarget,
-      browserSearchEngine: DEFAULT_UNIFIED_SETTINGS.browserSearchEngine,
-      browserCustomSearchUrl: DEFAULT_UNIFIED_SETTINGS.browserCustomSearchUrl,
-      browserAutoShowFloatingPreview: DEFAULT_UNIFIED_SETTINGS.browserAutoShowFloatingPreview,
       pullRequestLinksOpenInApp: DEFAULT_UNIFIED_SETTINGS.pullRequestLinksOpenInApp,
-      enableAgentBrowserAccess: DEFAULT_UNIFIED_SETTINGS.enableAgentBrowserAccess,
     });
     onRestored?.();
   };
@@ -1389,6 +1376,35 @@ function DiffColorsSettingsRow() {
             </SelectPopup>
           </Select>
         </div>
+      }
+    />
+  );
+}
+
+function PullRequestLinksOpenInAppSetting() {
+  const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
+  const updateSettings = useUpdatePrimarySettings();
+
+  return (
+    <SettingsRow
+      {...searchableSetting("pull-request-links-open-in-app")}
+      description="点击 pull request 链接时在 T3 Code 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
+      resetAction={
+        openInApp ? null : (
+          <SettingResetButton
+            label="在 T3 Code 中打开 PR"
+            onClick={() => updateSettings({ pullRequestLinksOpenInApp: true })}
+          />
+        )
+      }
+      control={
+        <Switch
+          checked={openInApp}
+          onCheckedChange={(checked) =>
+            updateSettings({ pullRequestLinksOpenInApp: Boolean(checked) })
+          }
+          aria-label="在 T3 Code 中打开 PR"
+        />
       }
     />
   );

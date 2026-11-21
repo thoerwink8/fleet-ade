@@ -5,7 +5,7 @@ the project and environment a change applies to. Pages that only hold device pre
 Appearance, don't show it. They start at **All projects** and **All environments**
 and stay selected as you move between categories or search for a setting.
 
-Preferences saved on this device, such as appearance, confirmations and browser profiles, always
+Preferences saved on this device, such as appearance and confirmations, always
 show and ignore the selection. Everything else is stored on a server. Choose one environment to
 edit its settings, or leave **All environments** to edit every connected environment at once.
 Offline environments keep their current values; this is a bulk edit, not a synced global default.
@@ -172,9 +172,8 @@ than** on the task.
 
 ## Defaults and inheritance
 
-Threads contains the model and workspace for new threads. Browser controls agent browser
-access. Source control contains automatic pull, the default pull request merge method and text
-generation. The same rows edit environment defaults or project overrides depending on the
+Threads contains the model and workspace for new threads. Source control contains automatic pull,
+the default pull request merge method, and text generation. The same rows edit environment defaults or project overrides depending on the
 project crumb.
 
 The Projects category, under Code, holds the project's name, icon, actions,
@@ -186,7 +185,6 @@ choose one in the scope line at the top to see or change only that checkout's se
 Settings a repository can also declare in `t3.json`, such as the workspace for new threads,
 resolve in one order: a project override, then the environment setting, then `t3.json`, then the
 built-in default. Leave a setting on **Inherit** to let the next tier decide.
-Browser access changes apply when an agent session next starts.
 
 New worktrees initialize git submodules recursively. If that step is slow because the repository
 declares many nested submodules, set **Submodules** in **Settings → Worktrees** under Advanced (with the project
@@ -210,8 +208,8 @@ hourly. Offline machines keep their existing policies.
 
 Select a project to set **Automatic worktree cleanup** to **Inherit**, **Off**, or **Custom**.
 Inherit follows each machine's rules; Off keeps that project's worktrees until you remove them
-manually. Custom applies separate worktree rules to the selected project or checkout. Browser
-captures and log retention remain machine-wide.
+manually. Custom applies separate worktree rules to the selected project or checkout. Log
+retention remains machine-wide.
 
 Worktrees can be removed after a chosen number of inactive days, after a thread settles, after
 merging, or when they have no commits beyond the default branch and their thread is settled or
@@ -237,8 +235,8 @@ Choose **Delete now** to run the enabled rules immediately. The latest results s
 worktrees were removed or kept and why, plus any failures.
 Results also list folders in the worktree folder that no thread uses, with their sizes; cleanup never removes them, so remove them manually if you want.
 
-Browser captures and rotated logs have separate retention periods. Expired capture links stop
-working. Current logs, message attachments, and browser profiles are kept.
+Rotated logs have their own retention period.
+Current logs and message attachments are kept.
 
 ## Project icons
 

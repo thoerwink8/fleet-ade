@@ -21,6 +21,11 @@ describe("authorization grants", () => {
 
     expect(() => decodeAuthGrantScopes(["review:write"])).toThrow();
     expect(AuthStandardClientScopes).not.toContain("review:write");
+
+    // The preview scope left with the built-in browser; stored sessions and older clients still name it.
+    expect(decodeAuthEnvironmentScopes(["preview:operate"])).toEqual(["preview:operate"]);
+    expect(decodeAuthGrantScopes(["preview:operate"])).toEqual(["preview:operate"]);
+    expect(AuthStandardClientScopes).not.toContain("preview:operate");
   });
 
   // Keep the pre-granular vocabulary frozen to expose compatibility regressions.

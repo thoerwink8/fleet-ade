@@ -456,9 +456,6 @@ export function summarizeT3ToolCalls(
     case "read-pr-guide":
       label = phrase("已读取", "读取", quantity(selected.length, "份", "评审指南"));
       break;
-    case "browser":
-      label = phrase("已使用", "使用", `浏览器 ${times}`);
-      break;
     case "html-preview":
       label = phrase("已预览", "预览", quantity(selected.length, "个 ", "HTML 页面"));
       break;

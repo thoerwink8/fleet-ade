@@ -50,12 +50,12 @@ import { deadlineAfter, deadlineStore, type ClockStore } from "@t3tools/client-r
 import { useDeadlinePassed } from "../hooks/useDeadline";
 import { isElectron } from "../env";
 import { shouldShowThreadJumpHintsForModifiers } from "../keybindings";
+import { isRightPanelFocused } from "../lib/rightPanelFocus";
 import { isTerminalFocused, subscribeToTerminalFocusChanges } from "../lib/terminalFocus";
-import { isPreviewFocused } from "../lib/previewFocus";
 import { isModelPickerOpen, subscribeToModelPickerVisibility } from "../modelPickerVisibility";
 import { shortcutModifierStore } from "../shortcutModifierState";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
-import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
+import { useRightPanelStore } from "../rightPanelStore";
 
 export function shouldNavigateAfterThreadPark(input: {
   readonly threadKey: string;
@@ -806,16 +806,13 @@ type ThreadStatusInput = Pick<
 export function threadShortcutContext(routeThreadRef: ScopedThreadRef | null) {
   return {
     terminalFocus: isTerminalFocused(),
+    rightPanelFocus: isRightPanelFocused(),
     terminalOpen:
       routeThreadRef !== null &&
       selectThreadTerminalUiState(
         useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
         routeThreadRef,
       ).terminalOpen,
-    previewFocus: isPreviewFocused(),
-    previewOpen:
-      selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, routeThreadRef) ===
-      "preview",
     modelPickerOpen: isModelPickerOpen(),
     isWeb: !isElectron,
     isDesktop: isElectron,
