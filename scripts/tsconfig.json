@@ -5,5 +5,10 @@
     "types": ["node"],
     "lib": ["ESNext", "esnext.disposable"]
   },
-  "include": ["**/*.ts"]
+  "include": [
+    "**/*.ts",
+    "../apps/server/src/provider/ModelManifest.ts",
+    "../apps/server/src/provider/ClaudeModelManifest.ts",
+    "../apps/server/src/provider/providerCompatibility.ts"
+  ]
 }

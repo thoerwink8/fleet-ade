@@ -23,3 +23,9 @@ released after the installed build. Snapshots report those models in
 Model data is schema-validated configuration. Tests should cover resolver
 and adapter semantics with synthetic model names, so adding a model never requires
 tests that repeat the configuration.
+
+## Updating the bundled manifest
+
+Run `pnpm models:sync --source <URL or local JSON path>` when a provider publishes a new manifest. The command validates the source, prints added, removed, and changed models, and only writes the bundled file when `--write` is supplied. Use a local copy first when reviewing a change; the command never writes an invalid or empty manifest.
+
+After writing, run `pnpm exec vp test run scripts/sync-models.test.ts apps/server/src/theirServices.static.test.ts` and inspect the selector with the relevant provider and model name. Review `git diff` to confirm only the intended manifest content changed.
