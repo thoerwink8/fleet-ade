@@ -191,16 +191,20 @@ function sameApartFromStreaming(
   }
   const before = previous.source;
   const after = next.source;
+  const { latestMessagePreview: _ignoredPreview, ...beforeWithoutPreview } = before;
   return (
     before.itemCount > 0 === after.itemCount > 0 &&
     before.visibleItemCount > 0 === after.visibleItemCount > 0 &&
     sameWireThreadShell(
       {
-        ...before,
+        ...beforeWithoutPreview,
         updatedAt: after.updatedAt,
         itemCount: after.itemCount,
         visibleItemCount: after.visibleItemCount,
         latestVisibleMessage: after.latestVisibleMessage,
+        ...(after.latestMessagePreview === undefined
+          ? {}
+          : { latestMessagePreview: after.latestMessagePreview }),
       },
       after,
     )

@@ -175,6 +175,8 @@ export interface EnvironmentThreadShell {
   readonly goal: OrchestrationV2ProviderGoal | null;
   readonly itemCount: number;
   readonly visibleItemCount: number;
+  readonly latestMessagePreview?: OrchestrationV2ThreadShell["latestMessagePreview"];
+  readonly turnCount?: number;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly archivedAt: string | null;
@@ -331,6 +333,8 @@ export function presentThreadShell(
     goal: thread.goal ?? null,
     itemCount: thread.itemCount,
     visibleItemCount: thread.visibleItemCount,
+    latestMessagePreview: thread.latestMessagePreview ?? null,
+    turnCount: thread.turnCount ?? 0,
     createdAt: iso(thread.createdAt),
     updatedAt,
     archivedAt: nullableIso(thread.archivedAt),

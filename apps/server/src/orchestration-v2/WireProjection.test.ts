@@ -11,6 +11,7 @@ import {
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
+  RunId,
   ThreadId,
   TurnItemId,
   type OrchestrationV2DomainEvent,
@@ -156,7 +157,99 @@ describe("orchestration V2 wire projection", () => {
     const shell = threadShellFromProjection(projection);
 
     expect(shell.latestVisibleMessage).toBeNull();
+    expect(shell.latestMessagePreview).toEqual({
+      role: "assistant",
+      text: `${"x".repeat(120)}…`,
+    });
+    expect(shell.turnCount).toBe(0);
     expect(JSON.stringify(shell).length).toBeLessThan(2_000);
+  });
+
+  it("excludes non-human wake messages and rolled-back runs from shell preview and turnCount", () => {
+    const t1 = DateTime.makeUnsafe("2026-08-13T00:00:01.000Z");
+    const t2 = DateTime.makeUnsafe("2026-08-13T00:00:02.000Z");
+    const t3 = DateTime.makeUnsafe("2026-08-13T00:00:03.000Z");
+    const threadId = ThreadId.make("thread-shell-preview-filter");
+    const activeRunId = RunId.make("run-active-1");
+    const rolledBackRunId = RunId.make("run-rolled-back-1");
+    const cancelledRunId = RunId.make("run-cancelled-1");
+    const projection = {
+      thread: {
+        createdBy: "user",
+        creationSource: "web",
+        id: threadId,
+        projectId: ProjectId.make("project-shell-preview"),
+        title: "Preview filter",
+        providerInstanceId: ProviderInstanceId.make("codex"),
+        modelSelection: null,
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        branch: null,
+        worktreePath: null,
+        lineage: {
+          parentThreadId: null,
+          relationshipToParent: null,
+          rootThreadId: threadId,
+        },
+        forkedFrom: null,
+        activeProviderThreadId: null,
+        createdAt: t1,
+        updatedAt: t3,
+        archivedAt: null,
+        settledOverride: null,
+        settledAt: null,
+        deletedAt: null,
+      },
+      runs: [
+        { id: activeRunId, ordinal: 1, status: "completed" },
+        { id: rolledBackRunId, ordinal: 2, status: "rolled_back" },
+        { id: cancelledRunId, ordinal: 3, status: "cancelled" },
+      ],
+      attempts: [],
+      runtimeRequests: [],
+      messages: [
+        {
+          id: MessageId.make("msg-human-1"),
+          threadId,
+          runId: activeRunId,
+          createdBy: "user",
+          role: "user",
+          text: "First real user message",
+          updatedAt: t1,
+        },
+        {
+          id: MessageId.make("msg-rolled-back"),
+          threadId,
+          runId: rolledBackRunId,
+          createdBy: "user",
+          role: "assistant",
+          text: "Rolled back reply should not show",
+          updatedAt: t2,
+        },
+        {
+          id: MessageId.make("msg-bg-wake"),
+          threadId,
+          runId: activeRunId,
+          createdBy: "agent",
+          role: "user",
+          text: 'Background command "test" completed',
+          updatedAt: t3,
+        },
+      ],
+      providerSessions: [],
+      providerThreads: [],
+      turnItems: [],
+      visibleTurnItems: [],
+      plans: [],
+      updatedAt: t3,
+    } as unknown as OrchestrationV2ThreadProjection;
+
+    const shell = threadShellFromProjection(projection);
+    expect(shell.latestMessagePreview).toEqual({
+      role: "user",
+      text: "First real user message",
+    });
+    expect(shell.turnCount).toBe(1);
   });
 
   it("omits even small dynamic tool results while retaining input", () => {

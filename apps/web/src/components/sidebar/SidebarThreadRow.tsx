@@ -116,6 +116,7 @@ import { Menu, MenuItem, MenuItemDetail, MenuPopup, MenuSeparator, MenuTrigger }
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { MiddleTruncate } from "../ui/middle-truncate";
 import { useThreadHasUnsentDraft } from "../../composerDraftStore";
+import { formatSidebarRowCounts, resolveSidebarRowPreviewText } from "./SidebarThreadRow.logic";
 
 // The fields thread rows show. Provider status pushes refresh `checkedAt`,
 // status and auth on every provider; leaving those out keeps each
@@ -1318,6 +1319,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     status,
     thread.latestRun != null || (thread.visibleItemCount ?? 0) > 0,
   );
+  const previewText = props.attention === undefined ? resolveSidebarRowPreviewText(thread) : null;
+  const rowCountsText = formatSidebarRowCounts({
+    turnCount: thread.turnCount,
+    pendingTaskCount: thread.pendingBackgroundTasks.length,
+  });
+  const hasThirdLine = props.attention !== undefined || previewText !== null;
   const rowStatusDuration =
     status === "preparing" || status === "working" ? (
       <span aria-hidden>
@@ -1334,9 +1341,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       data-thread-item={threadKey}
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
-      // Row 58px (1 + 8 + 20 + 4 + 16 + 8 + 1) plus the 4px gap the li padding leaves.
+      // 2-line card is 58px + 4px li padding (62px); 3-line card adds 4px gap + 16px meta line (82px).
       className={cn(
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_62px]",
+        "list-none py-0.5 [content-visibility:auto]",
+        hasThirdLine ? "[contain-intrinsic-size:auto_82px]" : "[contain-intrinsic-size:auto_62px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1502,6 +1510,15 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               )}
               {props.sweepAction !== null ? dragDestination : null}
             </div>
+            {previewText !== null ? (
+              <div
+                data-testid="sidebar-row-preview"
+                className="h-4 min-w-0 truncate text-meta text-muted-foreground"
+                dir={textDirection(previewText)}
+              >
+                {previewText}
+              </div>
+            ) : null}
             <div className="flex h-4 min-w-0 items-center gap-2 text-meta text-secondary-label">
               <Badge variant={rowStatus.variant}>
                 {/* Not a live region: a collapsed sidebar is inert, so
@@ -1514,6 +1531,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 {reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel}
               </span>
               <span className="ml-auto inline-flex shrink-0 items-center gap-2 tabular-nums text-muted-foreground">
+                {rowCountsText !== null ? (
+                  <span data-testid="sidebar-row-counts" className="shrink-0 tabular-nums">
+                    {rowCountsText}
+                  </span>
+                ) : null}
                 {remoteMachineIcon}
                 {terminalStatusIcon}
                 {prBadge}
