@@ -1,10 +1,13 @@
+import * as Schema from "effect/Schema";
 import {
   EnvironmentId,
+  MIN_SCHEDULED_TASK_INTERVAL_MS,
   ProjectId,
   DEFAULT_SERVER_SETTINGS,
   type ServerConfig,
   ProviderInstanceId,
   ScheduledTaskId,
+  ScheduledTaskUpsertSchedule,
   type ScheduledTask,
   ThreadId,
 } from "@t3tools/contracts";
@@ -18,6 +21,8 @@ import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope"
 
 import { deriveProviderInstanceEntries } from "../../providerInstances";
 import {
+  SCHEDULED_TASK_TEMPLATES,
+  applyScheduledTaskTemplate,
   scheduledTaskDefaultModel,
   defaultScheduledTaskProjectId,
   matchesScheduledTaskScope,
@@ -416,4 +421,46 @@ it("appends the server zone only to fixed-time schedule labels", () => {
   expect(scheduleLabel({ type: "fixed_time", timeOfDay: "09:00" })).toBe("Daily at 09:00");
   expect(scheduleLabel({ type: "interval", everyMs: 60_000 }, "Etc/UTC")).toBe("每 1 分钟");
   expect(scheduleLabel({ type: "webhook", signature: null }, "Etc/UTC")).toBe("收到 webhook 时");
+});
+
+describe("scheduled task templates", () => {
+  it("decodes every template schedule with contracts schema and respects minimum interval", () => {
+    const decodeSchedule = Schema.decodeUnknownSync(ScheduledTaskUpsertSchedule);
+    expect(SCHEDULED_TASK_TEMPLATES.length).toBe(4);
+    for (const template of SCHEDULED_TASK_TEMPLATES) {
+      const decoded = decodeSchedule(template.schedule);
+      expect(decoded).toEqual(template.schedule);
+      if (decoded.type === "interval") {
+        expect(decoded.everyMs).toBeGreaterThanOrEqual(MIN_SCHEDULED_TASK_INTERVAL_MS);
+      }
+    }
+  });
+
+  it("applies a template without overwriting project or model selection", () => {
+    const baseDraft = taskToDraft(legacyTask);
+    const ciTemplate = SCHEDULED_TASK_TEMPLATES.find((template) => template.id === "ci-patrol")!;
+    const appliedCi = applyScheduledTaskTemplate(baseDraft, ciTemplate);
+    expect(appliedCi.title).toBe(ciTemplate.name);
+    expect(appliedCi.prompt).toBe(ciTemplate.prompt);
+    expect(appliedCi.scheduleMode).toBe("interval");
+    expect(appliedCi.intervalMinutes).toBe("30");
+    expect(appliedCi.projectId).toBe(baseDraft.projectId);
+    expect(appliedCi.modelKey).toBe(baseDraft.modelKey);
+    expect(appliedCi.baseModelSelection).toBe(baseDraft.baseModelSelection);
+    expect(scheduleFromDraft(appliedCi)).toEqual(ciTemplate.schedule);
+
+    const weeklyTemplate = SCHEDULED_TASK_TEMPLATES.find(
+      (template) => template.id === "weekly-pr-triage",
+    )!;
+    const appliedWeekly = applyScheduledTaskTemplate(baseDraft, weeklyTemplate);
+    expect(appliedWeekly.title).toBe(weeklyTemplate.name);
+    expect(appliedWeekly.prompt).toBe(weeklyTemplate.prompt);
+    expect(appliedWeekly.scheduleMode).toBe("fixed");
+    expect(appliedWeekly.timeOfDay).toBe("10:00");
+    expect([...appliedWeekly.weekdays]).toEqual([1]);
+    expect(appliedWeekly.projectId).toBe(baseDraft.projectId);
+    expect(appliedWeekly.modelKey).toBe(baseDraft.modelKey);
+    expect(appliedWeekly.baseModelSelection).toBe(baseDraft.baseModelSelection);
+    expect(scheduleFromDraft(appliedWeekly)).toEqual(weeklyTemplate.schedule);
+  });
 });
