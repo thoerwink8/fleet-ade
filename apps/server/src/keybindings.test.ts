@@ -280,6 +280,7 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
         command: "chat.find",
         when: "!terminalFocus && !previewFocus",
       });
+      assert.deepInclude(persisted, { key: "mod+shift+y", command: "terminal.toggle" });
     }).pipe(Effect.provide(layerKeybindings())),
   );
 

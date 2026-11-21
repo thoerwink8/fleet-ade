@@ -268,6 +268,11 @@ export function resolveT3McpToolId(toolName: string | null | undefined): string 
   return name !== null && Object.hasOwn(T3_MCP_TOOLS, name) ? name : null;
 }
 
+/** The T3 tool a stored call names, even one this app no longer offers. */
+export function resolveStoredT3McpToolName(toolName: string | null | undefined): string | null {
+  return toolName == null ? null : resolveT3McpToolName(toolName);
+}
+
 type SummaryInput = Readonly<Record<string, unknown>>;
 
 const asSummaryInput = (input: unknown): SummaryInput | undefined =>

@@ -1183,7 +1183,7 @@ it.effect("lists optional tools to a deferring client only after tool_search loa
         });
       const OptionalToolkit = Toolkit.make(
         tool("delegate_task", "Delegates a task."),
-        tool("preview_open", "Opens a browser preview."),
+        tool("sample_tool", "A sample optional tool."),
         tool("schedule_task", "Schedules a task."),
       );
       const reads = McpToolAccess.reads(() => Effect.succeed({}));
@@ -1193,7 +1193,7 @@ it.effect("lists optional tools to a deferring client only after tool_search loa
             OptionalToolkit,
             McpToolAccess.toLayer(OptionalToolkit, {
               delegate_task: reads,
-              preview_open: reads,
+              sample_tool: reads,
               schedule_task: reads,
             }),
           ),
@@ -1268,15 +1268,15 @@ it.effect("lists optional tools to a deferring client only after tool_search loa
       const deferring = yield* session("deferringToken", true);
       const other = yield* session("otherToken", false);
       expect(yield* deferring.listed).toEqual(["delegate_task", "tool_search"]);
-      expect(yield* other.listed).toEqual(["delegate_task", "preview_open", "schedule_task"]);
+      expect(yield* other.listed).toEqual(["delegate_task", "sample_tool", "schedule_task"]);
       // Unlisted tools stay callable.
       expect((yield* deferring.call("schedule_task", {})).structuredContent).toEqual({});
 
-      expect(
-        (yield* deferring.call("tool_search", { query: "browser" })).structuredContent,
-      ).toEqual({ tools: [{ name: "preview_open", description: "Opens a browser preview." }] });
-      expect(yield* deferring.listed).toEqual(["delegate_task", "preview_open", "tool_search"]);
-      expect(yield* other.listed).toEqual(["delegate_task", "preview_open", "schedule_task"]);
+      expect((yield* deferring.call("tool_search", { query: "sample" })).structuredContent).toEqual(
+        { tools: [{ name: "sample_tool", description: "A sample optional tool." }] },
+      );
+      expect(yield* deferring.listed).toEqual(["delegate_task", "sample_tool", "tool_search"]);
+      expect(yield* other.listed).toEqual(["delegate_task", "sample_tool", "schedule_task"]);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
