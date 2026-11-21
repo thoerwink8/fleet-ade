@@ -113,7 +113,7 @@ After changing Associated Domains, bump the build version before rebuilding. mac
 reuse stale Shared Web Credentials metadata for the same app/version pair.
 
 The ordinary `dev:desktop` launcher is unsigned and cannot exercise macOS passkeys. For renderer
-HMR, install a signed build, start `vp run dev:web`, and launch the installed executable with the
+HMR, install a signed build, start `pnpm dev`, and launch the installed executable with the
 actual web and server ports. For example, with the default ports:
 
 ```sh

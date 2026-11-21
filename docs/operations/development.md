@@ -25,8 +25,6 @@ vp run dev
 Open the pairing URL printed by the dev runner. The bare origin does not authenticate
 a new browser.
 
-Prefer a container? See [Dev container](../internals/devcontainer.md) for VS Code and Codespaces setup.
-
 ## Forge mirror (optional)
 
 GitHub is the source of truth. [source.tanstack.com/@pingdotgg/t3code](https://source.tanstack.com/@pingdotgg/t3code)
@@ -45,10 +43,10 @@ the two forges; in text that reaches GitHub, use the GitHub number.
 
 ## Choosing a dev process
 
-Use `vp run dev` for server and web, or `vp run dev:desktop` for the Electron client.
-`dev:server` and `dev:web` start those processes separately.
+Use `pnpm dev` for server and web. It runs in the foreground; stop it with Ctrl+C or `pnpm stop`.
+For the Electron client, run `node scripts/dev-runner.ts dev:desktop`, which `pnpm stop` does not track.
 
-Flags go directly after the task name, for example `vp run dev --home-dir /tmp/t3code-dev`.
+Flags go directly after the task name, for example `pnpm dev --home-dir /tmp/t3code-dev`.
 Add `--browser` to open a browser automatically.
 
 To stop a worktree's dev stack when its thread settles, import the **Dev** action from
@@ -229,9 +227,8 @@ extension starts the same checker through `.vscode/tsdk/tsgo` (`js/ts.tsdk.path`
 script, so on Windows open the workspace through WSL.
 
 CI owns the full suite; see
-[ci.yml](../../.github/workflows/ci.yml) for its current jobs.
-The [manual Windows lane](../../.github/workflows/windows-tests.yml) is available for focused
-Windows investigation while that suite is not a required gate.
+[ci.yml](../../.github/workflows/ci.yml) for its current jobs. Its static job runs the format
+check, lint, the interface English scan, typecheck, and `knip:check`.
 
 ### Unused code
 
@@ -349,11 +346,9 @@ rustup target add aarch64-pc-windows-msvc
 ```
 
 NSIS is downloaded by electron-builder. WSL support additionally needs the Linux CLI archive
-passed as `--wsl-runtime`; see the
-[release runbook](./release.md#windows-payload-topology-and-update-validation).
+passed as `--wsl-runtime`.
 
 ### Signing and passkeys
 
-Add `--signed` after configuring the platform credentials in the
-[release runbook](./release.md). macOS passkeys need a signed, provisioned app; follow the
+Add `--signed` after configuring the platform credentials. macOS passkeys need a signed, provisioned app; follow the
 [Connect setup](./connect-setup.md#desktop-passkeys) for local signing and renderer HMR.

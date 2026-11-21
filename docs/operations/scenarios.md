@@ -154,7 +154,7 @@ that predates it.
 
 ## iOS
 
-An iOS scenario imports from [`t3-mobile.ts`](../../scripts/scenarios/t3-mobile.ts) and passes
+An iOS scenario imports from `t3-mobile.ts` and passes
 `IOS` where a web one passes `WEB`:
 
 ```ts
