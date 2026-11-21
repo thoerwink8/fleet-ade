@@ -1019,7 +1019,6 @@ describe("CodexAdapterV2 process exit", () => {
       ),
     ),
   );
-
 });
 
 describe("CodexAdapterV2 session initialize", () => {
@@ -1773,7 +1772,6 @@ describe("CodexAdapterV2 post-settle continuation", () => {
             "tools.update_plan.enabled": true,
             mcp_optional_startup_grace_ms: 10_000,
             "features.concurrent_reasoning_summaries": true,
-            "shell_environment_policy.set.T3CODE_THREAD_ID": `thread-${scenario}`,
             "mcp_servers.t3-code": {
               url: "http://127.0.0.1:43123/mcp",
               tool_timeout_sec: 3_900,
@@ -3355,7 +3353,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       assert.equal(resumed.nativeThreadRef?.nativeId, nativeThreadId);
       assert.equal(resumed.status, "idle");
       assert.equal(DateTime.toEpochMillis(resumed.updatedAt), 1782622450000);
-      assert.deepEqual(resumeThreadEnvs, [harness.threadId, undefined, explicitThreadId]);
+      assert.deepEqual(resumeThreadEnvs, [undefined, undefined, undefined]);
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
@@ -9348,7 +9346,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         assert.notEqual(forkedProviderThread.id, harness.providerThread.id);
         assert.equal(forkedProviderThread.forkedFrom?.providerTurnId, firstTurn.id);
         assert.deepEqual(outbound.slice(-2), ["thread/turns/list", "thread/revert"]);
-        assert.deepEqual(forkThreadEnvs, ["thread-fork-paginated-fallback-target"]);
+        assert.deepEqual(forkThreadEnvs, [undefined]);
       }).pipe(
         Effect.scoped,
         Effect.provide(

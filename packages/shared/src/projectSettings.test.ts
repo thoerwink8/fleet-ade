@@ -359,28 +359,25 @@ describe("projectSettingsOverrides patches", () => {
   it("derives the legacy per-key maps from the generic record", () => {
     const settings = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       projectSettingsOverrides: {
-        [projectId]: { defaultAutoPull: true, enableAgentDeviceAccess: false },
+        [projectId]: { defaultAutoPull: true },
         [otherProjectId]: { defaultProjectScripts: [] },
       },
     });
     expect(settings.projectAutoPullOverrides).toEqual({ [projectId]: true });
-    expect(settings.projectAgentBrowserAccessOverrides).toEqual({ [projectId]: false });
     expect(settings.projectScriptOverrides).toEqual({ [otherProjectId]: [] });
   });
 
   it("translates legacy per-key patches into the generic record", () => {
     const written = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       projectAutoPullOverrides: { [projectId]: true },
-      projectAgentBrowserAccessOverrides: { [projectId]: false, [otherProjectId]: true },
     });
     expect(written.projectSettingsOverrides).toEqual({
-      [projectId]: { defaultAutoPull: true, enableAgentDeviceAccess: false },
-      [otherProjectId]: { enableAgentDeviceAccess: true },
+      [projectId]: { defaultAutoPull: true },
     });
     const cleared = applyServerSettingsPatch(written, {
-      projectAgentBrowserAccessOverrides: { [projectId]: null, [otherProjectId]: null },
+      projectAutoPullOverrides: { [projectId]: null },
     });
-    expect(cleared.projectSettingsOverrides).toEqual({ [projectId]: { defaultAutoPull: true } });
+    expect(cleared.projectSettingsOverrides).toEqual({});
   });
 
   it("lets a canonical entry win over a legacy map for the same project", () => {

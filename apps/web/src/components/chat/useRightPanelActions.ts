@@ -4,11 +4,6 @@ import { formatFilePathForClipboard } from "@t3tools/client-runtime/media-action
 import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { type ScopedThreadRef, type RunId } from "@t3tools/contracts";
-import { useEffect } from "react";
-import {
-  isAtomCommandInterrupted,
-  squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
 import { useDiffPanelStore } from "../../diffPanelStore";
 import { type ThreadPanelPresentation } from "../../rightPanelLayout";
 import {
@@ -20,7 +15,6 @@ import { requestWorkspaceContentFocus, requestWorkspaceFocus } from "../../lib/w
 import { focusActivePanelTerminal, focusTerminal } from "../../lib/terminalFocus";
 import type { threadPullRequestPanelTarget } from "../pullRequest/pullRequestDetail.logic";
 import { stackedThreadToast, toastManager } from "../ui/toast";
-import { useAtomCommand } from "../../state/use-atom-command";
 import type { ChatShortcutCommands } from "./useChatShortcuts";
 interface RightPanelActionsInput {
   readonly activeThreadRef: ScopedThreadRef | null;
@@ -29,14 +23,13 @@ interface RightPanelActionsInput {
   readonly pullRequestPanelTarget: ReturnType<typeof threadPullRequestPanelTarget> | null;
   readonly threadPanelPresentation: ThreadPanelPresentation;
   readonly isServerThread: boolean;
-  readonly embedded: boolean;
+  readonly pullRequestsSurfaceAvailable: boolean;
   readonly isGitRepo: boolean;
   readonly diffOpen: boolean;
   readonly rightPanelOpen: boolean;
   readonly canMaximizeRightPanel: boolean;
   readonly rightPanelMaximized: boolean;
   readonly supportsPullRequests: boolean;
-  readonly pullRequestsSurfaceAvailable: boolean;
   readonly gitCwd: string | null;
   readonly activeProjectCwd: string | null;
   readonly onDiffPanelOpen: (() => void) | undefined;
@@ -56,7 +49,6 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     pullRequestPanelTarget,
     threadPanelPresentation,
     isServerThread,
-    embedded,
     isGitRepo,
     diffOpen,
     rightPanelOpen,

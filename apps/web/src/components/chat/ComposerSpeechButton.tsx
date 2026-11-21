@@ -14,7 +14,7 @@ type DownloadProgress = { downloaded: number; total: number } | null;
 const keepFocus = (event: PointerEvent) => event.preventDefault();
 
 /** One short status line per phase; also mirrored into the preview annotation editor. */
-export function resolveSpeechPresentation(
+function resolveSpeechPresentation(
   state: VoiceInputState,
   progress: DownloadProgress,
 ): { status: string | null; active: boolean } {

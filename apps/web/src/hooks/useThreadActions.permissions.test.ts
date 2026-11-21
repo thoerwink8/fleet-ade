@@ -207,8 +207,8 @@ function threadPanelStatePresence(ref: ScopedThreadRef) {
     diffPanel: key in useDiffPanelStore.getState().byThreadKey,
   };
 }
-const panelStateKept = { rightPanel: true, diffPanel: true, miniPlayer: true };
-const panelStateCleared = { rightPanel: false, diffPanel: false, miniPlayer: false };
+const panelStateKept = { rightPanel: true, diffPanel: true };
+const panelStateCleared = { rightPanel: false, diffPanel: false };
 
 const primary = EnvironmentId.make("primary");
 const secondary = EnvironmentId.make("secondary");

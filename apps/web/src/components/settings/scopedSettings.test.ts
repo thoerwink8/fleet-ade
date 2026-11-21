@@ -456,15 +456,14 @@ describe("scoped settings writes", () => {
   // regression: #35093 client settings saved in project scope overwrote the global default
   it("refuses client-only keys at project scope", () => {
     for (const scope of [project, checkout]) {
-      expect(
-        planScopedSettingsPatch(scope, environments, {
-        }),
-      ).toMatchObject({
-        clientPatch: {},
-        hasClientWrite: false,
-        serverWrites: [],
-        unavailableReason: "此设置是环境级设置，无法由项目覆盖。",
-      });
+      expect(planScopedSettingsPatch(scope, environments, { fontSizeInterface: 15 })).toMatchObject(
+        {
+          clientPatch: {},
+          hasClientWrite: false,
+          serverWrites: [],
+          unavailableReason: "此设置是环境级设置，无法由项目覆盖。",
+        },
+      );
       expect(
         planScopedSettingsPatch(
           scope,
@@ -475,7 +474,6 @@ describe("scoped settings writes", () => {
       ).toMatchObject({ clientPatch: { fontSizeInterface: 15 }, unavailableReason: null });
     }
   });
-
   it("clears overrides per member and removes an emptied entry", () => {
     const withOverrides = environment("Server", {
       settings: {

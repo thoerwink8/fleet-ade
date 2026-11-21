@@ -102,7 +102,6 @@ describe("rightPanelStore", () => {
     expect(useClosedViewStore.getState().entries).toEqual([]);
   });
 
-
   it("records only closed tabs when a panel is hidden or a terminal tab closes", () => {
     const store = useRightPanelStore.getState();
     store.open(refA, "diff");
@@ -128,7 +127,6 @@ describe("rightPanelStore", () => {
     repository: "pingdotgg/t3code",
     number: 42,
   });
-
 
   it.each([
     { choice: "file", choose: () => useRightPanelStore.getState().openFile(refA, "src/app.ts") },
@@ -948,7 +946,9 @@ describe("rightPanelStore", () => {
       expect(active?.id).toBe(pullRequestSurfaceId(reference));
       expect(active?.kind === "pull-request" && (active.detailTab ?? "summary")).toBe(tab);
       store.closeSurface(ref, active!.id);
-      await reopenClosedView(useClosedViewStore.getState().entries[0]!, { workspaceAvailable: true });
+      await reopenClosedView(useClosedViewStore.getState().entries[0]!, {
+        workspaceAvailable: true,
+      });
       const reopened = selectActiveRightPanelSurface(
         useRightPanelStore.getState().byThreadKey,
         ref,
@@ -1065,7 +1065,7 @@ describe("rightPanelStore", () => {
           kind: "file",
           relativePath: "src/app.ts",
           revealLine: null,
-          revealRequestId: 0,
+          revealRequestId: 1,
         },
       ],
     });
