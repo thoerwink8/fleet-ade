@@ -98,7 +98,6 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-
       - name: Check packages
         run: pnpm check ensure-electron packages
 
@@ -169,7 +168,6 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
-
 
       - name: Check server shard
         run: pnpm check "server ${{ matrix.shard }}/2"

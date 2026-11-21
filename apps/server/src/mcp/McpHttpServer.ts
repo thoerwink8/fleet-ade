@@ -266,7 +266,6 @@ const layerMcpAuthMiddleware = HttpRouter.middleware<{
   provides: McpInvocationContext.McpInvocationContext;
 }>()(makeMcpAuthMiddleware).layer;
 
-
 const MAX_NAMED_ARGUMENTS = 5;
 const MAX_ARGUMENT_NAME_CHARS = 64;
 const cutText = (text: string, max: number) => {
@@ -275,7 +274,6 @@ const cutText = (text: string, max: number) => {
   const last = text.charCodeAt(max - 1);
   return `${text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max)}…`;
 };
-
 
 /**
  * Rejects top-level arguments the advertised schema does not list, naming them. Nested objects stay lenient:
@@ -312,7 +310,6 @@ const decodeAsAdvertised = <Tools extends Record<string, Tool.Any>>(
       ),
     ),
   ) as unknown as Toolkit.Toolkit<Tools>;
-
 
 interface ImageToolResult {
   readonly screenshot: {
@@ -582,7 +579,6 @@ export const layerHtmlToolkit = Layer.mergeAll(
   imageToolRegistration(registerHtmlPreview(), HtmlHandlers.layerPreview),
 ).pipe(Layer.provide(HtmlRender.layer));
 
-
 export const layerOrchestratorToolkit = toolkitRegistration(
   OrchestratorToolkit,
   OrchestratorHandlers.layer,
@@ -603,7 +599,6 @@ const layerWorktreeToolkitRegistration = toolkitRegistration(
   WorktreeToolkit,
   WorktreeHandlers.layer,
 ).pipe(Layer.provide(WorktreeMcpService.layer));
-
 
 const layerEnvironmentToolkit = toolkitRegistration(
   EnvironmentToolkit,

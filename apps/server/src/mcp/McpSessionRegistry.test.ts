@@ -50,9 +50,7 @@ it.effect("stores only a token hash, resolves the bearer token, and revokes by t
     expect(token.length).toBeGreaterThan(20);
 
     const resolved = yield* registry.resolve(token);
-    expect(resolved?.capabilities).toEqual(
-      new Set(["orchestration", "worktree", "pull-requests"]),
-    );
+    expect(resolved?.capabilities).toEqual(new Set(["orchestration", "worktree", "pull-requests"]));
 
     yield* registry.revokeThread(threadId);
     expect(yield* registry.resolve(token)).toBeUndefined();
@@ -60,7 +58,6 @@ it.effect("stores only a token hash, resolves the bearer token, and revokes by t
     timestamp += 2_000;
   }),
 );
-
 
 // regression: #3114 use bound host for MCP endpoint
 it.effect("builds MCP endpoints from the bound server host", () =>

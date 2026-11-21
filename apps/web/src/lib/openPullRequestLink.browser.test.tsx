@@ -114,23 +114,22 @@ it("offers the original unavailable commit URL when web popups are blocked", asy
     ...DEFAULT_CLIENT_SETTINGS,
     pullRequestLinksOpenInApp: true,
   });
-    using _desktop = stubGlobal("desktopBridge", undefined);
-    await using screen = await render(
-      <AppAtomRegistryProvider>
-        <ToastProvider>
-          <CommitLink />
-        </ToastProvider>
-      </AppAtomRegistryProvider>,
-    );
-    using open = vi.spyOn(window, "open").mockReturnValue(null);
-    await screen.getByRole("link", { name: "提交" }).click();
-    await expect.element(page.getByRole("button", { name: "打开链接", exact: true })).toBeVisible();
-    expect(open).not.toHaveBeenCalled();
-    await page.getByRole("button", { name: "打开链接", exact: true }).click();
-    expect(open).toHaveBeenCalledExactlyOnceWith(commitUrl, "_blank", "noopener,noreferrer");
-    expect(state.openLink).not.toHaveBeenCalled();
-  },
-);
+  using _desktop = stubGlobal("desktopBridge", undefined);
+  await using screen = await render(
+    <AppAtomRegistryProvider>
+      <ToastProvider>
+        <CommitLink />
+      </ToastProvider>
+    </AppAtomRegistryProvider>,
+  );
+  using open = vi.spyOn(window, "open").mockReturnValue(null);
+  await screen.getByRole("link", { name: "提交" }).click();
+  await expect.element(page.getByRole("button", { name: "打开链接", exact: true })).toBeVisible();
+  expect(open).not.toHaveBeenCalled();
+  await page.getByRole("button", { name: "打开链接", exact: true }).click();
+  expect(open).toHaveBeenCalledExactlyOnceWith(commitUrl, "_blank", "noopener,noreferrer");
+  expect(state.openLink).not.toHaveBeenCalled();
+});
 
 it("opens an available commit in the closed Diff pane without the pane resetting it", async () => {
   setup();

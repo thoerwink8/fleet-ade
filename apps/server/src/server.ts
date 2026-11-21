@@ -503,14 +503,9 @@ const layerVcs = Layer.empty.pipe(
 
 const layerCheckpointStore = CheckpointStore.layer.pipe(Layer.provide(layerVcsDriverRegistry));
 
-
 const layerTerminal = TerminalManager.layer(
   ProviderInstanceRegistryHydration.deriveProviderInstanceConfigMap,
-).pipe(
-  Layer.provide(layerPtyAdapter),
-  Layer.provide(layerNativeTelemetry),
-);
-
+).pipe(Layer.provide(layerPtyAdapter), Layer.provide(layerNativeTelemetry));
 
 const layerWorkspaceEntries = WorkspaceEntries.layer.pipe(Layer.provide(WorkspacePaths.layer));
 

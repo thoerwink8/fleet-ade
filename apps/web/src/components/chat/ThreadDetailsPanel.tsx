@@ -264,7 +264,6 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                 </ThreadDetailsSection>
               ) : null}
 
-
               {density === "full" && !props.draftId && visible.automations ? (
                 <ThreadAutomationsPanel
                   environmentId={props.environmentId}

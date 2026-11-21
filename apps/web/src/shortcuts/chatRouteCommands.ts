@@ -94,7 +94,6 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
     });
   };
 
-
   return registerCommands(
     {
       "chat.newLocal": startNewLocal,

@@ -456,7 +456,13 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
               const surfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
                     const kind = (surface as { kind?: string }).kind;
-                    if (kind === "device" || kind === "plan" || kind === "agents" || kind === "preview") return [];
+                    if (
+                      kind === "device" ||
+                      kind === "plan" ||
+                      kind === "agents" ||
+                      kind === "preview"
+                    )
+                      return [];
                     if (
                       (surface.kind === "file" || surface.kind === "files") &&
                       "folderTrail" in surface &&

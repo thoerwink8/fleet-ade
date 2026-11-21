@@ -785,5 +785,4 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")("Claude CLI pro
       yield* Deferred.await(forgotten);
     }),
   );
-
 });

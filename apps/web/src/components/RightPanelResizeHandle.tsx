@@ -18,10 +18,7 @@ export function RightPanelResizeHandle({
       role="separator"
       aria-orientation="vertical"
       aria-label={label}
-      className={cn(
-        "absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize select-none",
-        className,
-      )}
+      className={cn("absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize select-none", className)}
       {...handlers}
       {...props}
     />

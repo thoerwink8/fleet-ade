@@ -1964,7 +1964,6 @@ it.effect.each([null, "run:nested-sdk"] as const)(
     }),
 );
 
-
 it.effect("keeps ingesting a failed root's background item when its work continues", () =>
   Effect.gen(function* () {
     const observed = yield* runBackgroundItemScenario("bg-failed-continues", (ids) => [
@@ -3181,7 +3180,6 @@ it.effect("interrupts a provider turn that starts after Stop settled its attempt
   }),
 );
 
-
 it.effect("fails the run when its event stream ends without a root terminal", () =>
   Effect.gen(function* () {
     const { observed, finalEvents } = yield* captureRootRunTermination({
@@ -3276,9 +3274,7 @@ function captureRootRunTermination(input: {
   readonly beforeTerminalWrite?: (
     request: Parameters<EventSink.EventSinkV2["Service"]["writeIfRunCurrent"]>[0],
   ) => Effect.Effect<boolean, EventSink.EventSinkV2Error>;
-  readonly afterStart?: (
-    closed: Deferred.Deferred<void>,
-  ) => Effect.Effect<void>;
+  readonly afterStart?: (closed: Deferred.Deferred<void>) => Effect.Effect<void>;
 }) {
   return Effect.gen(function* () {
     const ids = backgroundScenarioIds(input.key);
@@ -3928,9 +3924,7 @@ function runBackgroundItemScenario(
             const source = makeEvents(ids);
             const events = (Stream.isStream(source) ? source : Stream.fromIterable(source)).pipe(
               Stream.concat(
-                Stream.fromEffect(
-                  options?.onEventsConsumed ?? Effect.void,
-                ).pipe(Stream.drain),
+                Stream.fromEffect(options?.onEventsConsumed ?? Effect.void).pipe(Stream.drain),
               ),
             );
             return {

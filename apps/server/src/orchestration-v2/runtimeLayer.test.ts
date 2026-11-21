@@ -398,9 +398,7 @@ const layerScheduledTasksTest = ScheduledTaskService.layer.pipe(
 const layerResourceCleanupTest = ResourceCleanupService.layer.pipe(
   Layer.provideMerge(layerScheduledTasksTest),
   Layer.provide(
-    Layer.mergeAll(
-      Layer.mock(TerminalManager.TerminalManager)({ close: () => Effect.void }),
-    ),
+    Layer.mergeAll(Layer.mock(TerminalManager.TerminalManager)({ close: () => Effect.void })),
   ),
 );
 

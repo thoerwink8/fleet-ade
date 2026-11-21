@@ -212,7 +212,6 @@ describe("right panel thumb buttons", () => {
     expect(releaseThumbButton(content, 3)).toEqual(STAYS_PUT);
     expect(releaseThumbButton(content, 4)).toEqual(STAYS_PUT);
   });
-
 });
 
 describe("unavailable surface launcher", () => {

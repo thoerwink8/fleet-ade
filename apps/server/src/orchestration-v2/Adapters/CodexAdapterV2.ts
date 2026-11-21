@@ -1549,7 +1549,6 @@ function readCodexProtocolPath(value: unknown, ...path: ReadonlyArray<string>): 
   return current;
 }
 
-
 /**
  * One app-server serves every Codex thread on an instance, so each frame is routed to the
  * T3 thread it belongs to. Frames tied to no thread, such as `initialize`, go to the global log.
@@ -1577,7 +1576,11 @@ function makeCodexProtocolThreadRouter() {
     }
 
     const params = readCodexProtocolPath(frame, "params");
-    const configuredThreadId = readCodexProtocolPath(params, "config", "shell_environment_policy.set.T3CODE_THREAD_ID");
+    const configuredThreadId = readCodexProtocolPath(
+      params,
+      "config",
+      "shell_environment_policy.set.T3CODE_THREAD_ID",
+    );
     const nativeThreadId =
       readCodexProtocolPath(params, "threadId") ?? readCodexProtocolPath(params, "thread", "id");
     let threadId =
@@ -1689,8 +1692,7 @@ function isSensitiveCodexProtocolKey(key: string): boolean {
 export const layerAppServerClientFactory: Layer.Layer<
   CodexAppServerClientFactory,
   never,
-  | ChildProcessSpawner.ChildProcessSpawner
-  | ProviderEventLoggers.ProviderEventLoggers
+  ChildProcessSpawner.ChildProcessSpawner | ProviderEventLoggers.ProviderEventLoggers
 > = Layer.effect(
   CodexAppServerClientFactory,
   Effect.gen(function* () {

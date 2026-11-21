@@ -1163,11 +1163,7 @@ it.effect.each([
       }
       yield* server.write(0, { _tag: "Interrupt", requestId, interruptors: [] });
       if (direct) yield* Deferred.await(directStopped);
-    }).pipe(
-      Effect.provide(
-        Layer.fresh(layerConfigSources),
-      ),
-    ),
+    }).pipe(Effect.provide(Layer.fresh(layerConfigSources))),
 );
 
 it.effect("access changes made while the snapshot loads reach the client after it", () =>
@@ -1267,11 +1263,7 @@ it.effect("access changes made while the snapshot loads reach the client after i
       payload: { sessionId: revokedElsewhere },
     });
     yield* server.write(0, { _tag: "Interrupt", requestId, interruptors: [] });
-  }).pipe(
-    Effect.provide(
-        Layer.fresh(layerConfigSources),
-    ),
-  ),
+  }).pipe(Effect.provide(Layer.fresh(layerConfigSources))),
 );
 
 it.effect("on-demand clients get provider config without workspace snapshots", () =>
@@ -1614,11 +1606,7 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
     });
     assert.lengthOf(loaded.providers[0]?.workspaceSnapshots ?? [], 1);
     yield* server.write(0, { _tag: "Interrupt", requestId: lightRequest, interruptors: [] });
-  }).pipe(
-    Effect.provide(
-        Layer.fresh(layerConfigSources),
-    ),
-  ),
+  }).pipe(Effect.provide(Layer.fresh(layerConfigSources))),
 );
 
 it.effect("a missing thread worktree gets its project's skills in the cwd snapshot", () =>
@@ -1778,9 +1766,7 @@ it.effect("a missing thread worktree gets its project's skills in the cwd snapsh
       ["finalize"],
       "the thread's removed worktree should list the project's skills",
     );
-  }).pipe(
-    Effect.provide(Layer.fresh(layerConfigSources)),
-  ),
+  }).pipe(Effect.provide(Layer.fresh(layerConfigSources))),
 );
 
 it.effect("a git action that fails partway still refreshes the repository status", () =>
@@ -1842,9 +1828,7 @@ it.effect("a git action that fails partway still refreshes the repository status
     const exit = yield* Queue.take(exits);
     assert.deepEqual(Exit.isFailure(exit) ? Cause.squash(exit.cause) : exit, failure);
     assert.equal(yield* Deferred.await(refreshed), "/repo");
-  }).pipe(
-    Effect.provide(Layer.fresh(layerConfigSources)),
-  ),
+  }).pipe(Effect.provide(Layer.fresh(layerConfigSources))),
 );
 
 it.effect("a publish whose push fails still refreshes the new remote", () =>
@@ -1920,9 +1904,7 @@ it.effect("a publish whose push fails still refreshes the new remote", () =>
       [yield* Queue.take(refreshes), yield* Queue.take(refreshes)],
       ["identity /repo refresh=true", "status /repo"],
     );
-  }).pipe(
-    Effect.provide(Layer.fresh(layerConfigSources)),
-  ),
+  }).pipe(Effect.provide(Layer.fresh(layerConfigSources))),
 );
 
 // Pruned history cannot be replayed: a cursor below the boundary must resync from a snapshot,
@@ -2414,7 +2396,5 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
     });
     assert.deepEqual(imported, { threadId: pending, imported: true });
     assert.deepEqual(repaired, [pending]);
-  }).pipe(
-    Effect.provide(EventSink.layer.pipe(Layer.provideMerge(acpStores))),
-  ),
+  }).pipe(Effect.provide(EventSink.layer.pipe(Layer.provideMerge(acpStores)))),
 );

@@ -175,7 +175,6 @@ export const visibleToLinkedClients = (): boolean => {
   return scope?.client?.linked === true;
 };
 
-
 const missingCapability = (invocation: McpInvocationScope, capability: McpCapability) =>
   new McpCapabilityUnavailableError({
     capability,
@@ -199,7 +198,6 @@ export const requireMcpCapability = <const C extends McpCapability>(
     ),
     Effect.withSpan("mcp.requireCapability"),
   );
-
 
 const threadCallerRequired = (operation: string) =>
   new OrchestratorMcpFailure({

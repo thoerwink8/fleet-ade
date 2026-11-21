@@ -166,7 +166,6 @@ export const KeybindingShortcut = Schema.Struct({
 });
 export type KeybindingShortcut = typeof KeybindingShortcut.Type;
 
-
 const KeybindingWhenNodeRef = Schema.suspend(
   (): Schema.Codec<KeybindingWhenNode> => KeybindingWhenNode,
 );

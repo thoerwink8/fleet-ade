@@ -8,7 +8,6 @@ description: Test T3 Code's web and desktop UI through its built-in Browser pane
 Use an external browser via ego-browser or playwright-cli for verification. Native mobile verification is not covered by this skill.
 Do not install or switch to another automation system.
 
-
 ## Start the app
 
 Reuse this task's healthy dev server. Otherwise run `vp run dev` from the

@@ -2,7 +2,6 @@ import * as NodeChildProcess from "node:child_process";
 
 import { desktopDir, resolveElectronLaunchCommand } from "./electron-launcher.mjs";
 
-
 const childEnv = { ...process.env };
 delete childEnv.ELECTRON_RUN_AS_NODE;
 

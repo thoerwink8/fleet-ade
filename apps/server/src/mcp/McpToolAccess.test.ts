@@ -241,7 +241,10 @@ const fullAccessLinkedClient: McpInvocationContext.McpInvocationScope = {
   ...fullAccessClient,
   client: { ...fullAccessClient.client!, linked: true },
 };
-const noOrchestration = { ...fullAccess, capabilities: new Set<McpInvocationContext.McpCapability>() };
+const noOrchestration = {
+  ...fullAccess,
+  capabilities: new Set<McpInvocationContext.McpCapability>(),
+};
 
 it.effect.each([
   ["reads", ended, {}, "ran"],

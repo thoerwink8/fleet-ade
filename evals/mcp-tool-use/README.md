@@ -146,7 +146,6 @@ Passes per case, main's text → the request_secret guidance change stacked on t
 | ctrl-oauth (guard)           | 3/3 → 3/3                   | 6/6 → 6/6           | 6/6 → 6/6                             |
 | other guards and controls    | all pass → all pass         | all pass → all pass | all pass → all pass (prod-config 5/6) |
 
-
 ## File links cases
 
 `cases/file-links.ndjson` checks the file references in an agent's final answer. Chat turns every file-shaped Markdown link and inline code span into a pill, resolves it against the thread's cwd, and opens that path. `expect.fileLinks` replays the final answer through the same shared resolver (`file-link-grading.ts`) and fails on any pill that lands on no `world.files` entry, except a bare basename that the client's on-click lookup finds exactly once. `minWorking` sets how many working pills the answer needs, so an answer that cites no files cannot pass. Paths outside the thread cwd, `/home` and `/Users` are ignored.

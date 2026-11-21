@@ -1,8 +1,5 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import {
-  type EnvironmentId,
-  ThreadId,
-} from "@t3tools/contracts";
+import { type EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { type ClosedViewEntry, useClosedViewStore } from "./closedViewStore";
@@ -65,11 +62,7 @@ describe("closedViewStore", () => {
     const { storage, name } = useClosedViewStore.persist.getOptions();
     await storage!.setItem(name!, {
       state: {
-        entries: [
-          null,
-          {},
-          ...useClosedViewStore.getState().entries,
-        ] as ClosedViewEntry[],
+        entries: [null, {}, ...useClosedViewStore.getState().entries] as ClosedViewEntry[],
       },
       version: 0,
     });

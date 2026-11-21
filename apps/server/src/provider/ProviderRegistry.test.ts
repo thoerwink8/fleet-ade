@@ -3041,10 +3041,7 @@ it.layer(
           Layer.provideMerge(
             ProviderInstanceRegistryHydration.layer.pipe(
               Layer.provide(
-                Layer.mergeAll(
-                  ProviderInstallationGate.layer,
-                  SqlitePersistence.layerMemory,
-                ),
+                Layer.mergeAll(ProviderInstallationGate.layer, SqlitePersistence.layerMemory),
               ),
             ),
           ),
@@ -3175,10 +3172,7 @@ it.layer(
           Layer.provideMerge(
             ProviderInstanceRegistryHydration.layer.pipe(
               Layer.provide(
-                Layer.mergeAll(
-                  ProviderInstallationGate.layer,
-                  SqlitePersistence.layerMemory,
-                ),
+                Layer.mergeAll(ProviderInstallationGate.layer, SqlitePersistence.layerMemory),
               ),
             ),
           ),

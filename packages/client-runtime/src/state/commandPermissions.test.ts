@@ -115,7 +115,6 @@ describe("command permissions", () => {
     }),
   );
 
-
   it.effect("requires the destination provider grant to remove an incomplete connection", () =>
     Effect.gen(function* () {
       const registry = yield* setup;

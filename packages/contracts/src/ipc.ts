@@ -563,7 +563,6 @@ export const DesktopWslStateSchema = Schema.Struct({
   preflightError: Schema.NullOr(Schema.String),
 });
 
-
 export interface PickedElementStackFrame {
   functionName: string | null;
   fileName: string | null;
@@ -751,7 +750,6 @@ export const DesktopMediaReadSchema = Schema.Struct({
   data: Schema.Uint8Array,
 });
 export type DesktopMediaRead = typeof DesktopMediaReadSchema.Type;
-
 
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;

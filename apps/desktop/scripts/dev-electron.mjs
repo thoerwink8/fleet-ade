@@ -55,7 +55,6 @@ const hostPlatform = NodeOS.platform();
 const parentPid = process.ppid;
 const parentWatchIntervalMs = 1_000;
 
-
 await waitForResources({
   baseDir: desktopDir,
   files: requiredFiles,

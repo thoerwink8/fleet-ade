@@ -455,7 +455,6 @@ export const WS_METHODS = {
   terminalClear: "terminal.clear",
   terminalClose: "terminal.close",
 
-
   serverProbe: "server.probe",
   serverNetwork: "server.network",
   serverGetConfig: "server.getConfig",
@@ -1622,7 +1621,6 @@ const WsTerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
   payload: TerminalCloseInput,
   error: Schema.Union([TerminalError, EnvironmentAuthorizationError]),
 });
-
 
 const WsOrchestrationV2DispatchCommandRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, {
   payload: OrchestrationV2RpcSchemas.dispatchCommand.input,

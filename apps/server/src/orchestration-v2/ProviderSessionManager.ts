@@ -512,7 +512,11 @@ export const layerWithOptions = (
               threadId,
               Effect.gen(function* () {
                 // Live providers build MCP clients once; reuse credentials across workspace handoffs.
-                const capabilities = new Set<McpCapability>(["orchestration", "worktree", "pull-requests"]);
+                const capabilities = new Set<McpCapability>([
+                  "orchestration",
+                  "worktree",
+                  "pull-requests",
+                ]);
                 const subagent = yield* projectionStore.getThread(threadId).pipe(
                   Effect.map((thread) => thread.lineage.relationshipToParent === "subagent"),
                   Effect.orElseSucceed(() => false),

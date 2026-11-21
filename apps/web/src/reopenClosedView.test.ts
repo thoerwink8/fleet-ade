@@ -1,7 +1,4 @@
-import {
-  DEFAULT_CLIENT_SETTINGS,
-  type ScopedThreadRef,
-} from "@t3tools/contracts";
+import { DEFAULT_CLIENT_SETTINGS, type ScopedThreadRef } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { type ClosedViewEntry, useClosedViewStore } from "./closedViewStore";
@@ -123,7 +120,7 @@ describe("reopenClosedView", () => {
         expect(after.surfaces).toEqual([
           { kind: "files", id: "files", ...(folderTrail === undefined ? {} : { folderTrail }) },
         ]);
-        } finally {
+      } finally {
         unhost?.();
       }
     },
@@ -157,7 +154,6 @@ describe("reopenClosedView", () => {
       selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, threadRef).surfaces,
     ).toEqual([]);
   });
-
 });
 
 describe("planNextReopen", () => {

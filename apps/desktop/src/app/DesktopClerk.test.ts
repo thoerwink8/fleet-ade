@@ -386,7 +386,7 @@ it.effect.each(["startup", "open-url", "early-second-instance"] as const)(
             delivered.resolve(response.headers.get("location")!);
             return true;
           }),
-            copyText: () => Effect.void,
+        copyText: () => Effect.void,
       });
       const listeners = new Map<string, (...args: unknown[]) => void>();
       const electronApp = {

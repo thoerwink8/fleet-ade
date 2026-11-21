@@ -227,9 +227,7 @@ describe("pull request toolkit handlers", () => {
   it.effect("refuses a credential without the pull-requests capability", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness();
-      const error = yield* harness
-        .call("list_thread_pull_requests", {}, [])
-        .pipe(Effect.flip);
+      const error = yield* harness.call("list_thread_pull_requests", {}, []).pipe(Effect.flip);
       expect(error).toMatchObject({
         _tag: "McpCapabilityUnavailableError",
         capability: "pull-requests",

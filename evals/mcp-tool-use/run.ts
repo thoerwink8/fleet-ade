@@ -2386,7 +2386,9 @@ const main = Effect.gen(function* () {
     templatePath.endsWith(".gz") ? NodeZlib.gunzipSync(templateBytes) : templateBytes,
   );
   const keepUserInstructions = flags["user-instructions"] === "keep";
-  const buildFor = (role: McpToolUseCase["setup"]["role"]): Effect.Effect<Base, Schema.SchemaError> =>
+  const buildFor = (
+    role: McpToolUseCase["setup"]["role"],
+  ): Effect.Effect<Base, Schema.SchemaError> =>
     codex
       ? decodeCodexCapture(template).pipe(
           Effect.map((capture) =>

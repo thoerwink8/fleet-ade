@@ -1,8 +1,5 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import {
-  ChatFileAttachment,
-  ScopedThreadRef,
-} from "@t3tools/contracts";
+import { ChatFileAttachment, ScopedThreadRef } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";

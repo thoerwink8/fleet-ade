@@ -161,10 +161,7 @@ const layerDesktopServerExposure = DesktopServerExposure.layer.pipe(
   Layer.provideMerge(layerDesktopFoundation),
 );
 
-
-const layerDesktopWindow = DesktopWindow.layer.pipe(
-  Layer.provideMerge(layerDesktopServerExposure),
-);
+const layerDesktopWindow = DesktopWindow.layer.pipe(Layer.provideMerge(layerDesktopServerExposure));
 
 const layerDesktopSnapShot = DesktopSnapShot.layer.pipe(
   Layer.provideMerge(layerDesktopWindow),

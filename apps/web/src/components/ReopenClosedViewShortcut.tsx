@@ -39,7 +39,6 @@ import {
 } from "../threadRoutes";
 import { toastManager } from "./ui/toast";
 
-
 const isGlobalPullRequests = (ref: ScopedThreadRef) =>
   scopedThreadKey(ref) === scopedThreadKey(PULL_REQUESTS_PANEL_REF);
 
@@ -167,7 +166,6 @@ export function ReopenClosedViewShortcut() {
       unsubscribe?.();
     };
   }, [keybindings, terminalOpen]);
-
 
   return null;
 }

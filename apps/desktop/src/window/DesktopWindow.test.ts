@@ -412,7 +412,7 @@ const makeSplashScenario = (createOutcomes: readonly (Electron.BrowserWindow | n
           layerElectronMenu,
           Layer.succeed(ElectronShell.ElectronShell, {
             openExternal: () => Effect.succeed(true),
-              copyText: () => Effect.void,
+            copyText: () => Effect.void,
           } satisfies ElectronShell.ElectronShell["Service"]),
           layerElectronTheme,
           Layer.succeed(ElectronWindow.ElectronWindow, electronWindowShape),
@@ -712,7 +712,6 @@ describe("DesktopWindow", () => {
     }),
   );
 
-
   it.effect("zooms the app from Ctrl+wheel like the menu does", () =>
     Effect.gen(function* () {
       const fakeWindow = makeFakeBrowserWindow();
@@ -728,7 +727,10 @@ describe("DesktopWindow", () => {
         zoomChanged({}, "in");
         zoomChanged({}, "out");
         zoomChanged({}, "out");
-        assert.deepEqual(fakeWindow.setZoomLevel.mock.calls.map(([level]) => level), [0.5, 0, -0.5]);
+        assert.deepEqual(
+          fakeWindow.setZoomLevel.mock.calls.map(([level]) => level),
+          [0.5, 0, -0.5],
+        );
       }).pipe(Effect.provide(layer));
     }),
   );
@@ -835,7 +837,6 @@ describe("DesktopWindow", () => {
         }).pipe(Effect.provide(layer));
       }),
   );
-
 
   it.effect("persists normal bounds and state for a maximized window", () =>
     Effect.gen(function* () {
@@ -1172,7 +1173,6 @@ describe("DesktopWindow", () => {
       }).pipe(Effect.provide(layer));
     }),
   );
-
 
   it.effect("opens safe off-origin renderer navigations in the system browser", () =>
     Effect.gen(function* () {

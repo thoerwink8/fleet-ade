@@ -594,7 +594,6 @@ export const make = Effect.gen(function* () {
     );
     flushMainWindowBounds = flushBoundsPersist;
 
-
     const contextMenuContents = new WeakSet<Electron.WebContents>();
     const installContextMenu = (
       ownerWindow: Electron.BrowserWindow,

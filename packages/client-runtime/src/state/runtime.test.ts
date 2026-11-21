@@ -253,7 +253,6 @@ it.effect("keeps complete review metadata visible while a refresh is held", () =
   }),
 );
 
-
 describe("finite environment subscription lifecycle", () => {
   it.effect(
     "exposes early values and settles on the terminal value without waiting for a reconnect",

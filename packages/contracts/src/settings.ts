@@ -290,7 +290,6 @@ export const DefaultThemePreference = Schema.String.check(Schema.isMaxLength(64)
 // Excluded from RPC patches so t3 theme set can validate syntax and resolvability.
 export type DefaultThemePreference = typeof DefaultThemePreference.Type;
 
-
 export const LoadBalancingWeights = Schema.Record(
   TrimmedNonEmptyString,
   Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
