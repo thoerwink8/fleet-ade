@@ -66,10 +66,10 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
           path: yield* pathWithT3,
           args,
         }),
-      ).toBe(`sudo env "PATH=$PATH" t3 browser setup --base-dir '/srv/t3 home'`);
+      ).toBe(`sudo env "PATH=$PATH" t3 doctor --base-dir '/srv/t3 home'`);
       expect(
         yield* rootCommand({ node: "/opt/t3/t3", entry: "/opt/t3/t3", executable: true, args }),
-      ).toBe("sudo /opt/t3/t3 browser setup --base-dir '/srv/t3 home'");
+      ).toBe("sudo /opt/t3/t3 doctor --base-dir '/srv/t3 home'");
     }),
   );
 
@@ -98,7 +98,7 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
       const linked = yield* fs.makeTempDirectoryScoped();
       yield* fs.symlink(shim, path.join(linked, "t3"));
       expect(yield* rootCommand({ ...desktop, path: linked })).toBe(
-        'sudo env "PATH=$PATH" t3 doctor',
+        `sudo '${shim}' doctor`,
       );
 
       expect(
@@ -138,7 +138,7 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
           path: path.join(prefix, "bin"),
           env: { T3CODE_NPM_LAUNCHER_PATH: npmLauncher },
         }),
-      ).toBe('sudo env "PATH=$PATH" t3 doctor');
+      ).toBe("sudo /home/theo/.t3/runtime/versions/1.0.0/t3 doctor");
 
       expect(
         yield* rootCommand({ ...desktop, env: { T3CODE_CLI_PATH: path.join(home, "gone") } }),
