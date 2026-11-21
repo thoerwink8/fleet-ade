@@ -405,3 +405,100 @@ describe("sidebar attention offline rows", () => {
     expect(screen.router?.state.location.pathname).toBe("/local/thread-1");
   });
 });
+
+describe("sidebar card summary preview and counts", () => {
+  it("renders summary preview, turn/task counts, and scrolls smoothly with 120 threads", async () => {
+    using stack = new DisposableStack();
+    const style = document.createElement("style");
+    style.textContent = appCss;
+    document.head.append(style);
+    stack.defer(() => style.remove());
+    const activeProject = project("active");
+    const threads = Array.from({ length: 120 }, (_, index) =>
+      makeThreadFixture({
+        environmentId: activeProject.environmentId,
+        projectId: activeProject.id,
+        id: ThreadId.make(`thread-dense-${index}`),
+        title: `会话 ${index + 1}`,
+        updatedAt: new Date(Date.UTC(2026, 2, 10, 0, 120 - index, 0)).toISOString(),
+        latestMessagePreview:
+          index === 1
+            ? { role: "user", text: "会话 2" }
+            : {
+                role: index % 2 === 0 ? "assistant" : "user",
+                text: `这是第 ${index + 1} 条会话的最新进展摘要`,
+              },
+        turnCount: index + 1,
+        pendingBackgroundTasks:
+          index === 0
+            ? [
+                {
+                  taskId: "task-1",
+                  kind: "subagent",
+                  description: "子代理任务",
+                },
+              ]
+            : [],
+      }),
+    );
+    vi.mocked(useProjects).mockReturnValue([activeProject]);
+    vi.mocked(useQuietThreadShells).mockReturnValue(threads);
+    vi.mocked(useThreadRouteTarget).mockReturnValue({
+      kind: "server",
+      threadRef: { environmentId: activeProject.environmentId, threadId: threads[0]!.id },
+    });
+    vi.mocked(useHandleNewThread).mockReturnValue({
+      activeDraftThread: null,
+      activeThread: null,
+      defaultProjectRef: {
+        environmentId: activeProject.environmentId,
+        projectId: activeProject.id,
+      },
+      defaultProjectFallbackReady: true,
+      handleNewThread: vi.fn().mockResolvedValue(null),
+      routeDraftId: null,
+      routeThreadRef: { environmentId: activeProject.environmentId, threadId: threads[0]!.id },
+    });
+    await using screen = await render(
+      <SidebarProvider style={{ height: 400, minHeight: 400 }}>
+        <Sidebar routeReveal={{ observedKey: null, pendingKey: null }} />
+      </SidebarProvider>,
+      { router: "/local/thread-dense-0" },
+    );
+
+    const firstRow = screen.container.querySelector<HTMLElement>(
+      `[data-sidebar-row="${activeProject.environmentId}:thread-dense-0"]`,
+    )!;
+    expect(firstRow.querySelector('[data-testid="sidebar-row-preview"]')?.textContent).toBe(
+      "这是第 1 条会话的最新进展摘要",
+    );
+    expect(firstRow.querySelector('[data-testid="sidebar-row-counts"]')?.textContent).toBe(
+      "1 轮 · 1 任务",
+    );
+
+    // Duplicate title preview is suppressed.
+    const secondRow = screen.container.querySelector<HTMLElement>(
+      `[data-sidebar-row="${activeProject.environmentId}:thread-dense-1"]`,
+    )!;
+    expect(secondRow.querySelector('[data-testid="sidebar-row-preview"]')).toBeNull();
+    expect(secondRow.querySelector('[data-testid="sidebar-row-counts"]')?.textContent).toBe("2 轮");
+
+    // User-authored preview carries the "你：" prefix.
+    const thirdRow = screen.container.querySelector<HTMLElement>(
+      `[data-sidebar-row="${activeProject.environmentId}:thread-dense-3"]`,
+    )!;
+    expect(thirdRow.querySelector('[data-testid="sidebar-row-preview"]')?.textContent).toBe(
+      "你：这是第 4 条会话的最新进展摘要",
+    );
+
+    expect(screen.container.querySelectorAll('[data-testid="sidebar-row-card"]')).toHaveLength(120);
+    const viewport = screen.container.querySelector<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]',
+    )!;
+    viewport.style.height = "300px";
+    viewport.style.maxHeight = "300px";
+    expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+    viewport.scrollTop = 3000;
+    expect(viewport.scrollTop).toBeGreaterThan(0);
+  });
+});

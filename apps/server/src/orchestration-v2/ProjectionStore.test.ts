@@ -9638,6 +9638,8 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
       const rolledBackShellThread = shell.threads.find((entry) => entry.id === threadId);
       assert.isDefined(rolledBackShellThread);
       assert.isNull(rolledBackShellThread.latestVisibleMessage);
+      assert.isNull(rolledBackShellThread.latestMessagePreview);
+      assert.strictEqual(rolledBackShellThread.turnCount, 0);
       assert.deepEqual(rolledBackShellThread?.pendingBackgroundTasks ?? [], []);
     }),
   );

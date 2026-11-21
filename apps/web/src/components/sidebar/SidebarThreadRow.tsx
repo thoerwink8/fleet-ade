@@ -116,6 +116,7 @@ import { Menu, MenuItem, MenuItemDetail, MenuPopup, MenuSeparator, MenuTrigger }
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { MiddleTruncate } from "../ui/middle-truncate";
 import { useThreadHasUnsentDraft } from "../../composerDraftStore";
+import { formatSidebarRowCounts, resolveSidebarRowPreviewText } from "./SidebarThreadRow.logic";
 
 // The fields thread rows show. Provider status pushes refresh `checkedAt`,
 // status and auth on every provider; leaving those out keeps each
@@ -227,6 +228,7 @@ function SidebarThreadTooltip({
   showInstanceBadge,
   modelInstanceId,
   modelLabel,
+  reasoningEffort,
   branchMismatch,
   terminalStatus,
   terminalProcessCount,
@@ -241,6 +243,7 @@ function SidebarThreadTooltip({
   showInstanceBadge: boolean;
   modelInstanceId: string;
   modelLabel: string;
+  reasoningEffort: string | null;
   branchMismatch: {
     threadBranch: string;
     currentBranch: string;
@@ -249,6 +252,7 @@ function SidebarThreadTooltip({
   terminalProcessCount: number;
 }) {
   const driverKind = providerEntry?.driverKind ?? null;
+  const modelWithEffort = reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel;
   const previousProviderNames = thread.providerInstanceHistory
     .filter((instanceId) => instanceId !== modelInstanceId)
     .map((instanceId) => providerEntryByInstanceId.get(instanceId)?.displayName ?? instanceId);
@@ -309,8 +313,8 @@ function SidebarThreadTooltip({
             />
             <div className="min-w-0 truncate text-foreground/75">
               {showInstanceBadge && providerEntry
-                ? `${modelLabel} · ${providerEntry.displayName}`
-                : modelLabel}
+                ? `${modelWithEffort} · ${providerEntry.displayName}`
+                : modelWithEffort}
             </div>
           </div>
         ) : null}
@@ -791,6 +795,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const modelLabel = selectedModel
     ? getTriggerDisplayModelName(selectedModel, providerEntry?.driverKind)
     : thread.modelSelection.model;
+  const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
 
   const isRemote = thread.environmentId !== props.currentEnvironmentId;
   const showsScratchMachine = !checkoutThread.branch && props.scratchMachineLabel !== null;
@@ -807,6 +812,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       showInstanceBadge={showInstanceBadge}
       modelInstanceId={modelInstanceId}
       modelLabel={modelLabel}
+      reasoningEffort={reasoningEffort}
       branchMismatch={branchMismatch}
       terminalStatus={terminalStatus}
       terminalProcessCount={terminalProcessCount}
@@ -1313,11 +1319,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     );
   }
 
-  const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
   const rowStatus = resolveRowStatusDot(
     status,
     thread.latestRun != null || (thread.visibleItemCount ?? 0) > 0,
   );
+  const previewText = props.attention === undefined ? resolveSidebarRowPreviewText(thread) : null;
+  const rowCountsText = formatSidebarRowCounts({
+    turnCount: thread.turnCount,
+    pendingTaskCount: thread.pendingBackgroundTasks.length,
+  });
+  const hasThirdLine = props.attention !== undefined || previewText !== null;
   const rowStatusDuration =
     status === "preparing" || status === "working" ? (
       <span aria-hidden>
@@ -1334,9 +1345,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       data-thread-item={threadKey}
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
-      // Row 58px (1 + 8 + 20 + 4 + 16 + 8 + 1) plus the 4px gap the li padding leaves.
+      // 2-line card is 58px + 4px li padding (62px); 3-line card adds 4px gap + 16px meta line (82px).
       className={cn(
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_62px]",
+        "list-none py-0.5 [content-visibility:auto]",
+        hasThirdLine ? "[contain-intrinsic-size:auto_82px]" : "[contain-intrinsic-size:auto_62px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1502,7 +1514,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               )}
               {props.sweepAction !== null ? dragDestination : null}
             </div>
-            <div className="flex h-4 min-w-0 items-center gap-2 text-meta text-secondary-label">
+            {previewText !== null ? (
+              <div
+                data-testid="sidebar-row-preview"
+                className="h-4 min-w-0 truncate text-meta text-muted-foreground"
+                dir={textDirection(previewText)}
+              >
+                {previewText}
+              </div>
+            ) : null}
+            <div className="flex h-4 min-w-0 items-center gap-1.5 text-meta text-secondary-label">
               <Badge variant={rowStatus.variant}>
                 {/* Not a live region: a collapsed sidebar is inert, so
                     BackgroundThreadAnnouncer and the open thread's
@@ -1510,10 +1531,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 {rowStatus.label}
                 {rowStatusDuration}
               </Badge>
-              <span className="min-w-0 truncate text-muted-foreground">
-                {reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel}
-              </span>
-              <span className="ml-auto inline-flex shrink-0 items-center gap-2 tabular-nums text-muted-foreground">
+              <span className="min-w-0 truncate text-muted-foreground">{modelLabel}</span>
+              <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 tabular-nums text-muted-foreground">
+                {rowCountsText !== null ? (
+                  <span data-testid="sidebar-row-counts" className="shrink-0 tabular-nums">
+                    {rowCountsText}
+                  </span>
+                ) : null}
                 {remoteMachineIcon}
                 {terminalStatusIcon}
                 {prBadge}
@@ -1637,6 +1661,7 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
   const modelLabel = selectedModel
     ? getTriggerDisplayModelName(selectedModel, providerEntry?.driverKind)
     : thread.modelSelection.model;
+  const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
   const runningTerminalIds = useThreadRunningTerminalIds({
     environmentId: thread.environmentId,
     threadId: thread.id,
@@ -1752,6 +1777,7 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
           showInstanceBadge={showInstanceBadge}
           modelInstanceId={modelInstanceId}
           modelLabel={modelLabel}
+          reasoningEffort={reasoningEffort}
           branchMismatch={branchMismatch}
           terminalStatus={terminalStatus}
           terminalProcessCount={runningTerminalIds.length}

@@ -2155,6 +2155,12 @@ export const OrchestrationV2LatestVisibleMessageSummary = Schema.Struct({
 export type OrchestrationV2LatestVisibleMessageSummary =
   typeof OrchestrationV2LatestVisibleMessageSummary.Type;
 
+export const OrchestrationV2ThreadMessagePreview = Schema.Struct({
+  role: Schema.Literals(["user", "assistant"]),
+  text: Schema.String,
+});
+export type OrchestrationV2ThreadMessagePreview = typeof OrchestrationV2ThreadMessagePreview.Type;
+
 export const OrchestrationV2ThreadShell = Schema.Struct({
   ...OrchestrationV2CreationFields,
   id: ThreadId,
@@ -2198,6 +2204,10 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   /** Retired with guest links; no longer populated. Kept so older servers decode. */
   pendingGuestMessageCount: Schema.optional(NonNegativeInt),
   latestVisibleMessage: Schema.NullOr(OrchestrationV2LatestVisibleMessageSummary),
+  /** Bounded single-line summary of the latest non-empty user/assistant message. Absent from older servers. */
+  latestMessagePreview: Schema.optional(Schema.NullOr(OrchestrationV2ThreadMessagePreview)),
+  /** Number of non-silent, non-rolled-back, non-cancelled runs in this thread. Absent from older servers. */
+  turnCount: Schema.optional(NonNegativeInt),
   latestUserMessageAt: Schema.NullOr(Schema.DateTimeUtc),
   /** Excludes wakes and agent messages that advance latestUserMessageAt through the user role. */
   latestUserAuthoredMessageAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
