@@ -1,11 +1,9 @@
 import {
   CLOUD_SPEECH_LABELS,
   CloudSpeechProvider,
-  EasDeviceHostConfig,
   isSecretReference,
   secretReferencesInSettings,
   type ServerSettings,
-  SimlockDeviceHostConfig,
   TextGeneratorConfig,
   UsageLimitSourceConfig,
 } from "@t3tools/contracts";
@@ -20,8 +18,6 @@ type SecretUseSettings = Pick<
   | "sourceControlHosts"
   | "usageLimitSources"
   | "textGenerators"
-  | "easDeviceHosts"
-  | "simlockDeviceHosts"
   | "cloudSpeechCredentials"
 >;
 
@@ -100,12 +96,6 @@ export function secretProviderUses(
         generator.label ?? generator.baseUrl,
         generator,
       ),
-    ),
-    ...settings.easDeviceHosts.flatMap((host) =>
-      uses({ settingsSchema: EasDeviceHostConfig }, `eas:${host.id}`, host.label, host),
-    ),
-    ...settings.simlockDeviceHosts.flatMap((host) =>
-      uses({ settingsSchema: SimlockDeviceHostConfig }, `simlock:${host.id}`, host.label, host),
     ),
     ...CloudSpeechProvider.literals.flatMap((provider) => {
       const credential = settings.cloudSpeechCredentials[provider];

@@ -10,7 +10,6 @@ import { McpServer } from "effect/ai";
 import { AssetSigner } from "../assets/AssetSigner.ts";
 import { ServerSecretStore } from "../auth/ServerSecretStore.ts";
 import { ServerConfig } from "../config.ts";
-import { DeviceService } from "../device/DeviceService.ts";
 import { ServerEnvironment } from "../environment/ServerEnvironment.ts";
 import { FleetSummaryReporter } from "../ledger/FleetSummaryReporter.ts";
 import { GitWorkflowService } from "../git/GitWorkflowService.ts";
@@ -54,7 +53,6 @@ import budget from "./agentContextBudget.json" with { type: "json" };
 const toolHandlerServices = Layer.mergeAll(
   Layer.mock(AssetSigner)({}),
   Layer.mock(FleetSummaryReporter)({ trackAdhoc: () => Effect.void }),
-  Layer.mock(DeviceService)({}),
   Layer.mock(DocumentText)({}),
   Layer.mock(GitVcsDriver)({}),
   Layer.mock(GitWorkflowService)({}),
@@ -107,10 +105,11 @@ const claudeSystemAppend = () => {
 
 const codexAdditionalContext = () =>
   Object.values(
-    buildCodexAdditionalContext(
-      { model: "gpt-6.1-sol", modelName: "GPT-6.1 Sol", reasoningEffort: "high" },
-      { browser: true, device: true },
-    ),
+    buildCodexAdditionalContext({
+      model: "gpt-6.1-sol",
+      modelName: "GPT-6.1 Sol",
+      reasoningEffort: "high",
+    }),
   )
     .map((entry) => entry.value)
     .join("");

@@ -66,14 +66,13 @@ export type T3McpToolSummaryAction =
   | "write-pr-guides"
   | "read-pr-guide"
   | "browser"
-  | "device"
   | "html-preview"
   | "html-render";
 
 export interface T3McpToolDefinition {
   readonly displayName: string;
   readonly labels: readonly [action: string, running: string, completed: string, detail: string];
-  readonly icon: "t3-code" | "browser" | "device" | "pull-request";
+  readonly icon: "t3-code" | "browser" | "pull-request";
   readonly summaryAction: T3McpToolSummaryAction;
 }
 
@@ -194,10 +193,6 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     "browser",
     "browser",
   ),
-  device_list: tool(["列出", "正在列出", "已列出", "模拟器与设备"], "device", "device"),
-  device_open: tool(["打开", "正在打开", "已打开", "设备面板中的设备"], "device", "device"),
-  device_screenshot: tool(["截取", "正在截取", "已截取", "设备截图"], "device", "device"),
-  device_close: tool(["关闭", "正在关闭", "已关闭", "设备"], "device", "device"),
   run_scheduled_task_now: tool(["运行", "正在运行", "已请求运行", "定时任务"], "schedule-run"),
   t3_queue: tool(["管理", "正在管理", "已管理", "排队消息"], "queue-edit"),
   t3_pending_request: tool(["处理", "正在处理", "已处理", "待处理问题"], "question-respond"),

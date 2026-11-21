@@ -70,8 +70,8 @@ const screenshotItem = {
   ordinal: 1,
   status: "completed" as const,
   title: null,
-  toolName: "mcp__t3-code__device_screenshot",
-  input: { deviceId: "phone" },
+  toolName: "mcp__t3-code__preview_snapshot",
+  input: { url: "http://localhost:5733" },
   output: {
     content: [
       {

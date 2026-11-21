@@ -311,8 +311,8 @@ describe("orchestration V2 wire projection", () => {
     const item = {
       ...base,
       type: "dynamic_tool" as const,
-      toolName: "mcp__t3-code__device_screenshot",
-      input: { deviceId: "phone" },
+      toolName: "mcp__t3-code__preview_snapshot",
+      input: { url: "http://localhost:5733" },
       output: {
         content: [{ type: "image", source: { type: "base64", media_type: "image/png", data } }],
       },

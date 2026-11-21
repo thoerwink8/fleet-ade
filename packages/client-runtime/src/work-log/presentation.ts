@@ -110,7 +110,6 @@ export type ToolGroupAction =
   | "command"
   | "thread-create"
   | "browser"
-  | "device"
   | "code-search"
   | "search"
   | "other"
@@ -358,7 +357,6 @@ function computeToolGroupAction(entry: WorkLogPresentationEntry): ToolGroupActio
   const presentation = resolveWorkEntryToolPresentation(entry);
   if (presentation?.action !== undefined) return presentation.action;
   if (presentation?.icon === "browser") return "browser";
-  if (presentation?.icon === "device") return "device";
   if (entry.requestKind === "file-read" || entry.viewedImagePath !== undefined) return "read";
   if (entry.itemType === "approval_request" || entry.itemType === "user_input_request") {
     return workLogEntryIsToolLike(entry) ? "other" : "update";
@@ -532,8 +530,6 @@ function toolGroupActionLabel(action: ToolGroupAction, count: number): string {
       return `运行了 ${count} 条命令`;
     case "thread-create":
       return `创建了 ${count} 个会话`;
-    case "device":
-      return `操作了设备 ${count} 次`;
     case "browser":
       return `使用了浏览器 ${count} 次`;
     case "search":

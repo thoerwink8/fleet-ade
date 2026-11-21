@@ -136,7 +136,7 @@ const CHAT_HERE =
 // the card"), only the secret's source ("from the dashboard"), or the ask itself says "here" or "in
 // chat".
 const PRIVATE_ROUTE =
-  "(?<!(?i:\\b(?:not|no|without)\\s+(?:\\w+\\s+){0,2}))(?<!(?i:\\bfrom\\s+(?:(?:the|your|its|that|this|my)\\s+)?(?:\\w+\\s+)?))(?:\\b|(?=\\.env\\b))(?i:card(?![\\s-]*(?:numbers?|details|brand))|(?:private|secure) (?:\\w+ )?(?:input|prompt|field|form|card)|(?:request|collect)\\w*\\b[^.;!?\\n]{0,40}\\b(?:securely|privately)|(?:securely|privately) (?:request|collect)|request_secret|secret prompt|Device panel|\\.env\\b|your (?:own )?terminal|dashboard|1Password|keychain|GitHub secrets?|Settings|password manager|when (?:it|the (?:CLI|prompt|tool)|\\w+) (?:asks|prompts))";
+  "(?<!(?i:\\b(?:not|no|without)\\s+(?:\\w+\\s+){0,2}))(?<!(?i:\\bfrom\\s+(?:(?:the|your|its|that|this|my)\\s+)?(?:\\w+\\s+)?))(?:\\b|(?=\\.env\\b))(?i:card(?![\\s-]*(?:numbers?|details|brand))|(?:private|secure) (?:\\w+ )?(?:input|prompt|field|form|card)|(?:request|collect)\\w*\\b[^.;!?\\n]{0,40}\\b(?:securely|privately)|(?:securely|privately) (?:request|collect)|request_secret|secret prompt|\\.env\\b|your (?:own )?terminal|dashboard|1Password|keychain|GitHub secrets?|Settings|password manager|when (?:it|the (?:CLI|prompt|tool)|\\w+) (?:asks|prompts))";
 const CODE_NOUN =
   "(?i:passwords?|passcodes?|pairing codes?|(?:6|six)-digit codes?|verification codes?|authorization codes?|one-time codes?|PINs?|tokens?|API keys?|credentials|logins?)";
 // An API key named earlier in the message, which makes a bare "key" one: "API key",
@@ -201,7 +201,7 @@ const ASKS: ReadonlyArray<readonly [pattern: string, excusable: boolean]> = [
   // "There's a 6-digit code on the phone. Send it over", "I need the 6-digit code … Send me the code":
   // an ask for "it" or "the code" after the secret is named.
   [
-    `\\b${CODE_NOUN}\\b[\\s\\S]{0,300}?${NEG}\\b${VERB}${WHO}(?:\\s+(?i:it|them)|${DET}(?:\\s+(?i:new|same))?\\s+(?i:code|digits|number|PIN))\\b(?!\\s+(?i:in|into|through|via|to) (?:the |that |this |a )?(?:card|private|secure|Device panel|\\.env|terminal|dashboard))`,
+    `\\b${CODE_NOUN}\\b[\\s\\S]{0,300}?${NEG}\\b${VERB}${WHO}(?:\\s+(?i:it|them)|${DET}(?:\\s+(?i:new|same))?\\s+(?i:code|digits|number|PIN))\\b(?!\\s+(?i:in|into|through|via|to) (?:the |that |this |a )?(?:card|private|secure|\\.env|terminal|dashboard))`,
     true,
   ],
 ];
