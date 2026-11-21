@@ -62,6 +62,15 @@ export function formatCount(value: number): string {
   return INTEGER.format(Math.round(value));
 }
 
+export function formatCountWan(value: number): string {
+  if (value >= 10_000) {
+    const wan = value / 10_000;
+    const text = wan >= 10 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, "");
+    return `${text}万`;
+  }
+  return String(Math.round(value));
+}
+
 const TOKEN_SUFFIXES = ["K", "M", "B", "T"] as const;
 
 export function formatTokens(value: number): string {

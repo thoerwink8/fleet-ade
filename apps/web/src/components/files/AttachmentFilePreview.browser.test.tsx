@@ -1391,7 +1391,7 @@ it("loads a font attachment through the lazy preview", async () => {
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 });
 
-// quarantine: #19 关一基线：点 显示渲染后的图表 超时
+// quarantine: #214 关一基线：点 显示渲染后的图表 超时
 it.skip("toggles a Mermaid attachment between diagram and source through the lazy preview", async () => {
   const text = "flowchart LR\nA --> B";
   const file = new Blob([text], { type: "text/vnd.mermaid" });
