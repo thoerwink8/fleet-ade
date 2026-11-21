@@ -107,6 +107,40 @@ describe("compareModelManifests", () => {
     assert.equal((await decideModelManifestWrite(current, next, "{}")).write, true);
   });
 
+  it("reports a compatibility-only change", () => {
+    const compatibility = [{ driver: "codex", t3CodeRange: ">=1.0.0", ranges: [] }];
+    const current = manifest([{ slug: "same", name: "Same" }], { compatibility });
+    const next = manifest([{ slug: "same", name: "Same" }], {
+      compatibility: [
+        {
+          driver: "codex",
+          t3CodeRange: ">=1.0.0",
+          ranges: [{ range: ">=1.0.0", status: "supported" }],
+        },
+      ],
+    });
+    assert.deepStrictEqual(
+      compareModelManifests(current, next).changes.map(({ path }) => path),
+      ["compatibility"],
+    );
+  });
+
+  it("reports a profile-only change", () => {
+    const withProfile = (mode: string) =>
+      manifest([{ slug: "same", name: "Same" }], {
+        providers: {
+          synthetic: {
+            profiles: { basic: { adapter: { mode } } },
+            models: [{ slug: "same", name: "Same", status: "current" }],
+          },
+        },
+      });
+    assert.deepStrictEqual(
+      compareModelManifests(withProfile("old"), withProfile("new")).changes.map(({ path }) => path),
+      ["providers.synthetic.profiles"],
+    );
+  });
+
   it("ignores object key order when deciding whether to write", async () => {
     const current = manifest([{ slug: "same", name: "Same" }], {
       updatedAt: "2026-01-01T00:00:00Z",
