@@ -10,7 +10,7 @@ export interface PreviewPanelInlineSize {
   readonly observeRow: (host: HTMLElement) => () => void;
 }
 
-const PANEL_WIDTH_STORAGE_KEY = "t3code:right-panel-width";
+const PREVIEW_PANEL_WIDTH_STORAGE_KEY = "t3code:preview-panel-width";
 const PREVIEW_PANEL_MIN_WIDTH = 360;
 const PREVIEW_PANEL_MAX_WIDTH_FRACTION = 0.7;
 /** Below this, the sibling chat column's composer overflows. */
@@ -31,7 +31,7 @@ export function usePreviewPanelInlineSize(
     getPreviewPanelMaxWidth(typeof window === "undefined" ? 1280 : window.innerWidth),
   );
   const { width, handlers } = useResizableWidth({
-    storageKey: options.widthStorageKey ?? PANEL_WIDTH_STORAGE_KEY,
+    storageKey: options.widthStorageKey ?? PREVIEW_PANEL_WIDTH_STORAGE_KEY,
     defaultWidth: options.defaultWidth ?? PREVIEW_PANEL_DEFAULT_WIDTH,
     minWidth: PREVIEW_PANEL_MIN_WIDTH,
     maxWidth,

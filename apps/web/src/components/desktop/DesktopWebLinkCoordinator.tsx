@@ -1,61 +1,23 @@
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { promptLinkAppPath } from "@t3tools/shared/promptLinks";
 import { readPairingAppLink, resolveRemotePairingTarget } from "@t3tools/shared/remote";
 import { useRouter } from "@tanstack/react-router";
-import * as Effect from "effect/Effect";
-import { AtomRegistry } from "effect/reactivity";
-import * as Stream from "effect/Stream";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { readLocalApi } from "../../localApi";
 import { requestConfirmDialog } from "../../confirmDialog";
 import { connectPairing } from "../../connection/onboarding";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
-import { useClientSettings } from "../../hooks/useSettings";
-import { useOpenChangeRequestLink } from "../../lib/openPullRequestLink";
-import { appAtomRegistry } from "../../rpc/atomRegistry";
-import { resolveThreadRouteTarget } from "../../threadRoutes";
-import { readProject, readThreadShell } from "../../state/entities";
-import { useEnvironmentHttpBaseUrl, usePrimaryEnvironment } from "../../state/environments";
-import { allReachableShellsLiveAtom } from "../../state/shell";
+import { usePrimaryEnvironment } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { stackedThreadToast, toastManager } from "../ui/toast";
-
-/** A link handed over by the OS is a plain click: nothing about it asks for the browser. */
-const externalClick = {
-  preventDefault() {},
-  stopPropagation() {},
-  metaKey: false,
-  ctrlKey: false,
-};
-
-/** Resolves once every reachable environment has reported its projects or settled offline. */
-const projectsSettled = (): Promise<void> =>
-  Effect.runPromise(
-    AtomRegistry.toStream(appAtomRegistry, allReachableShellsLiveAtom).pipe(
-      Stream.filter((settled) => settled),
-      Stream.runHead,
-      Effect.asVoid,
-    ),
-  );
-
-/**
- * HTML files are served by this machine's environment, so only its threads can
- * take them.
- */
 
 export function DesktopWebLinkCoordinator() {
   const router = useRouter();
   const primaryEnvironment = usePrimaryEnvironment();
-  const openPullRequestsInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
-  const openChangeRequest = useOpenChangeRequestLink();
   const connectPairingEnvironment = useAtomCommand(connectPairing, { reportFailure: false });
-  const httpBaseUrl = useEnvironmentHttpBaseUrl(primaryEnvironment?.environmentId ?? null);
   const queueRef = useRef(Promise.resolve());
   const pairedUrlsRef = useRef(new Set<string>());
   const webLinks = window.desktopBridge?.webLinks;
@@ -68,9 +30,6 @@ export function DesktopWebLinkCoordinator() {
     (localEnvironmentDisabled ||
       (primaryEnvironment?.connection.phase === "connected" &&
         primaryEnvironment.serverConfig !== null));
-
-  const reportFailure = (url: string, description = url) =>
-    toastManager.add(stackedThreadToast({ type: "error", title: "无法打开链接", description }));
 
   const reportPairingFailure = (error: unknown) =>
     toastManager.add(
@@ -108,17 +67,6 @@ export function DesktopWebLinkCoordinator() {
     });
   };
 
-  const openInBrowser = useEffectEvent(async (url: string) => {
-    const isFile = url.startsWith("file:");
-    // Only this machine's environment serves files, so fail before starting a thread.
-    if (isFile && httpBaseUrl === null) {
-      reportFailure(url);
-      return;
-    }
-    void readLocalApi()?.shell.openExternal(url);
-    return;
-  });
-
   const openLink = useEffectEvent(async (url: string) => {
     const pairingUrl = readPairingAppLink(url);
     if (pairingUrl !== null) {
@@ -126,45 +74,11 @@ export function DesktopWebLinkCoordinator() {
       return;
     }
     const appPath = promptLinkAppPath(url);
-    if (appPath !== null) {
-      await router.navigate({ href: appPath });
-      return;
-    }
-    const routeParams = router.state.matches.at(-1)?.params ?? {};
-    const routeTarget = resolveThreadRouteTarget(routeParams);
-    const activeThreadRef = routeTarget?.kind === "server" ? routeTarget.threadRef : undefined;
-    const activeThread = activeThreadRef ? readThreadShell(activeThreadRef) : null;
-    const activeProject =
-      activeThread && activeThreadRef
-        ? readProject(scopeProjectRef(activeThreadRef.environmentId, activeThread.projectId))
-        : null;
-    const commitThreadRef =
-      activeThread &&
-      sourceControlClients.parseCommitUrl(url, activeProject?.repositoryIdentity?.provider) !== null
-        ? activeThreadRef
-        : undefined;
-    // A commit the thread's workspace lacks continues here, after its lookup.
-    const openUnavailableCommit = () => {
-      queueRef.current = queueRef.current.then(() => openInBrowser(url)).catch(() => undefined);
-    };
-    if (openChangeRequest(externalClick, url, commitThreadRef, undefined, openUnavailableCommit))
-      return;
-    await openInBrowser(url);
+    if (appPath !== null) await router.navigate({ href: appPath });
   });
 
   const receiveLink = useEffectEvent((url: string) => {
-    // A connected server publishes its config before its project snapshot, so a source control
-    // link delivered at launch would miss its project and fall through to the browser. Hold
-    // those links until discovery settles; an ordinary link never waits for it.
-    const hold =
-      openPullRequestsInApp &&
-      (sourceControlClients.parseChangeRequestUrl(url) !== null ||
-        sourceControlClients.parseCommitUrl(url) !== null)
-        ? projectsSettled()
-        : Promise.resolve();
-    void hold.then(() => {
-      queueRef.current = queueRef.current.then(() => openLink(url)).catch(() => undefined);
-    });
+    queueRef.current = queueRef.current.then(() => openLink(url)).catch(() => undefined);
   });
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to desktop web link opens over the bridge and marks the renderer ready

@@ -280,8 +280,6 @@ function ProjectScriptEditorForm({
   const [runOnSettle, setRunOnSettle] = useState(request.initial.runOnSettle);
   const [stopOnSettle, setStopOnSettle] = useState(request.initial.stopOnSettle ?? false);
   const [keybinding, setKeybinding] = useState(request.initial.keybinding ?? "");
-  const [previewUrl, setPreviewUrl] = useState(request.initial.previewUrl ?? "");
-  const [autoOpenPreview, setAutoOpenPreview] = useState(request.initial.autoOpenPreview);
   const [isSaving, setIsSaving] = useState(false);
   const pendingSubmissionRef = useRef<object | null>(null);
   // A save that settles after this form is replaced must not close or error
@@ -355,7 +353,6 @@ function ProjectScriptEditorForm({
         keybinding,
         command: commandForProjectScript(scriptIdForValidation),
       });
-      const trimmedPreviewUrl = previewUrl.trim();
       payload = {
         name: trimmedName,
         command: trimmedCommand,
@@ -367,8 +364,9 @@ function ProjectScriptEditorForm({
         ...((request.scriptId === null && canChangeKeybinding) || changesKeybinding
           ? { keybinding: keybindingRule?.key ?? null }
           : {}),
-        previewUrl: trimmedPreviewUrl.length > 0 ? trimmedPreviewUrl : null,
-        autoOpenPreview: trimmedPreviewUrl.length > 0 ? autoOpenPreview : false,
+        // The in-app preview is gone; a saved script keeps these so its project file is not rewritten.
+        previewUrl: request.initial.previewUrl,
+        autoOpenPreview: request.initial.autoOpenPreview,
       } satisfies NewProjectScriptInput;
     } catch (error) {
       setValidationError(error instanceof Error ? error.message : "无法保存操作。");
@@ -485,18 +483,6 @@ function ProjectScriptEditorForm({
                 onChange={(event) => setCommand(event.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="script-preview-url">预览 URL（可选）</Label>
-              <Input
-                id="script-preview-url"
-                placeholder="http://localhost:5173"
-                value={previewUrl}
-                onChange={(event) => setPreviewUrl(event.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                运行此操作时，在应用内预览中打开此 URL。
-              </p>
-            </div>
             <label className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035]">
               <span>创建工作树时自动运行</span>
               <Switch
@@ -528,18 +514,6 @@ function ProjectScriptEditorForm({
               <Switch
                 checked={stopOnSettle}
                 onCheckedChange={(checked) => setStopOnSettle(Boolean(checked))}
-              />
-            </label>
-            <label
-              className={`flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm dark:border-transparent dark:bg-white/[0.035] ${
-                previewUrl.trim().length === 0 ? "opacity-60" : ""
-              }`}
-            >
-              <span>运行此操作时自动打开预览</span>
-              <Switch
-                checked={autoOpenPreview}
-                disabled={previewUrl.trim().length === 0}
-                onCheckedChange={(checked) => setAutoOpenPreview(Boolean(checked))}
               />
             </label>
             {validationError && <p className="text-sm text-destructive">{validationError}</p>}

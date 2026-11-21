@@ -16,7 +16,7 @@ import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 export interface McpCredentialRequest {
   readonly threadId: ThreadId;
   readonly providerInstanceId: ProviderInstanceId;
-  /** Capabilities granted to the credential; omits the named ones when absent. Defaults to full access. */
+  /** Granted on top of the capabilities every thread credential carries. */
   readonly capabilities?: ReadonlySet<McpInvocationContext.McpCapability>;
   readonly subagent?: boolean;
 }

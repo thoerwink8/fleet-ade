@@ -156,7 +156,11 @@ import { serverEnvironment } from "../state/server";
 import { shellEnvironment } from "../state/shell";
 import { assetEnvironment } from "../state/assets";
 import { projectEnvironment } from "../state/projects";
-import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
+import {
+  readEnvironmentScope,
+  readPreparedConnection,
+  useEnvironmentScope,
+} from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
 import { filesystemEnvironment } from "../state/filesystem";
 import {
@@ -659,7 +663,7 @@ function useChatMarkdownState({
     );
   };
   const openChangeRequestLink = useOpenChangeRequestLink(threadRef, pullRequestPanelRef);
-  const openDeferredMarkdownLink = useOpenLink(threadRef);
+  const openDeferredMarkdownLink = useOpenLink();
   const mathEnabled = useClientSettings((settings) => settings.mathRenderingEnabled);
   // Keyed by the file links found, not the text, so streamed text that adds none keeps the
   // renderer context, and every block reading it, unchanged.

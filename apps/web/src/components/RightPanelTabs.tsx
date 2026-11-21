@@ -77,6 +77,7 @@ import { useEnvironmentQuery } from "~/state/query";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { toastManager } from "~/components/ui/toast";
 
+import { RightPanelShell, type RightPanelMode } from "./RightPanelShell";
 import { PierreEntryIcon } from "./chat/PierreEntryIcon";
 import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
@@ -84,7 +85,7 @@ import { observeResize } from "~/lib/observeResize";
 import { surfaceShortcutKey } from "~/lib/surfaceShortcutKey";
 
 export interface RightPanelTabsProps {
-  mode: "inline" | "embedded" | "sheet";
+  mode: RightPanelMode;
   maximized?: boolean;
   open?: boolean;
   keybindings: ResolvedKeybindingsConfig;
@@ -1022,17 +1023,22 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   };
 
   return (
-    <div
-      className="flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col"
-      onMouseDown={preventThumbButtonAppHistory}
-      onMouseUp={preventThumbButtonAppHistory}
-      data-workspace-area
-      data-workspace-focus-key={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
-      aria-label={
+    <RightPanelShell
+      workspaceArea
+      workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
+      workspaceLabel={
         focusedSurface
           ? `工作区面板：${surfaceTitle(focusedSurface, props.terminalLabelsById)}`
           : "工作区面板"
       }
+      mode={props.mode}
+      {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
+      {...(props.open !== undefined ? { open: props.open } : {})}
+      {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
+      {...(props.defaultWidth !== undefined ? { defaultWidth: props.defaultWidth } : {})}
+      {...(props.inlineSize ? { inlineSize: props.inlineSize } : {})}
+      onMouseDown={preventThumbButtonAppHistory}
+      onMouseUp={preventThumbButtonAppHistory}
     >
       <div
         className={cn(
@@ -1192,6 +1198,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           props.children
         )}
       </div>
-    </div>
+    </RightPanelShell>
   );
 }

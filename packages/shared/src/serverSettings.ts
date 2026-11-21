@@ -292,10 +292,12 @@ export function deriveLegacyProjectOverrides(
   const projectAutoPullOverrides: Record<string, boolean> = {};
   const projectScriptOverrides: Record<string, ServerSettings["defaultProjectScripts"] | null> = {};
   for (const [projectId, entry] of Object.entries(settings.projectSettingsOverrides)) {
-    if (entry.defaultAutoPull !== undefined)
+    if (entry.defaultAutoPull !== undefined) {
       projectAutoPullOverrides[projectId] = entry.defaultAutoPull;
-    if (entry.defaultProjectScripts !== undefined)
+    }
+    if (entry.defaultProjectScripts !== undefined) {
       projectScriptOverrides[projectId] = entry.defaultProjectScripts;
+    }
   }
   return { projectAutoPullOverrides, projectScriptOverrides };
 }
@@ -305,12 +307,15 @@ function translateLegacyProjectOverridePatch(
   patch: ServerSettingsPatch,
 ): ServerSettingsPatch {
   const { projectAutoPullOverrides, projectScriptOverrides, ...rest } = patch;
-  if (projectAutoPullOverrides === undefined && projectScriptOverrides === undefined) return patch;
+  if (projectAutoPullOverrides === undefined && projectScriptOverrides === undefined) {
+    return patch;
+  }
   const currentEntries: Readonly<Record<string, ProjectSettingsOverrides>> =
     current.projectSettingsOverrides;
   const entries = new Map<string, ProjectSettingsOverrides | null>(
     Object.entries(rest.projectSettingsOverrides ?? {}),
   );
+  // Canonical entries outrank legacy maps, including deliberately omitted keys.
   const canonicalProjectIds = new Set(Object.keys(rest.projectSettingsOverrides ?? {}));
   const applyKey = <K extends ProjectScopedServerSettingKey>(
     map: Readonly<Record<string, ProjectSettingsOverrides[K] | null>> | undefined,
@@ -322,14 +327,20 @@ function translateLegacyProjectOverridePatch(
       const entry: ProjectSettingsOverrides = {
         ...(entries.get(projectId) ?? currentEntries[projectId]),
       };
-      if (value === null || value === undefined) delete entry[key];
-      else entry[key] = value;
+      if (value === null || value === undefined) {
+        delete entry[key];
+      } else {
+        entry[key] = value;
+      }
       entries.set(projectId, Object.keys(entry).length === 0 ? null : entry);
     }
   };
   applyKey(projectAutoPullOverrides, "defaultAutoPull");
   applyKey(projectScriptOverrides, "defaultProjectScripts");
-  return { ...rest, projectSettingsOverrides: Object.fromEntries(entries) } as ServerSettingsPatch;
+  return {
+    ...rest,
+    projectSettingsOverrides: Object.fromEntries(entries),
+  } as ServerSettingsPatch;
 }
 
 /**
@@ -374,7 +385,6 @@ export function applyServerSettingsPatch(
     usageModelAliases: usageModelAliasesPatch,
     // Entry replacement: deepMerge would keep keys the client meant to clear.
     projectSettingsOverrides: projectSettingsOverridesPatch,
-    projectAgentBrowserAccessOverrides: _legacyBrowserAccess,
     projectAutoPullOverrides: _legacyAutoPull,
     projectScriptOverrides: _legacyScripts,
     network: networkPatch,

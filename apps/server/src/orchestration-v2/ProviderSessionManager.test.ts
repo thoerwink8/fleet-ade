@@ -13,7 +13,6 @@ import {
   type OrchestrationV2ProviderSession,
   type OrchestrationV2ProviderThread,
   type OrchestrationV2TurnItem,
-  type Project,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -39,7 +38,6 @@ import { HttpServer } from "effect/http";
 
 import { ProviderWorkspaceMissingError } from "../provider/Errors.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
-import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
@@ -649,7 +647,6 @@ function layerTest(input: {
   readonly spawnBeforeOpen?: boolean;
   readonly scopeCloseReached?: Deferred.Deferred<void>;
   readonly serverSettingsLayer?: ReturnType<typeof ServerSettings.layerTest>;
-  readonly projectServiceLayer?: Layer.Layer<ProjectService.ProjectService>;
   readonly installationGateLayer?: Layer.Layer<ProviderInstallationGate.ProviderInstallationGate>;
 }) {
   const layerConfiguredEventSink =
@@ -743,7 +740,6 @@ function layerTest(input: {
           layerTestStores,
           input.installationGateLayer ?? ProviderInstallationGate.layer,
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
-          ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
         ),
       ),
     ),
@@ -790,24 +786,6 @@ const layerPausingMcpRegistry = (pause: {
       });
     }),
   ).pipe(Layer.provide(layerTestMcpRegistry));
-
-function makeBrowserAccessProject(projectId: ProjectId): Project {
-  return {
-    id: projectId,
-    title: "Browser access project",
-    workspaceRoot: process.cwd(),
-    repositoryIdentity: null,
-    faviconPath: null,
-    projectIcon: null,
-    defaultModelSelection: null,
-    defaultThreadEnvMode: null,
-    autoPull: false,
-    scripts: [],
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    deletedAt: null,
-  };
-}
 
 function makePendingRuntimeRequestEvents(input: {
   readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
@@ -1304,19 +1282,8 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
-      const projectId = ProjectId.make("project-provider-session-manager-shared-stopped-start");
-      const holdProjectRead = yield* Ref.make(false);
-      const projectReadHeld = yield* Deferred.make<void>();
-      const projectServiceLayer = Layer.mock(ProjectService.ProjectService)({
-        getById: (requestedProjectId) =>
-          Ref.get(holdProjectRead).pipe(
-            Effect.flatMap((hold) =>
-              hold
-                ? Deferred.succeed(projectReadHeld, undefined).pipe(Effect.andThen(Effect.never))
-                : Effect.succeedSome(makeBrowserAccessProject(requestedProjectId)),
-            ),
-          ),
-      });
+      const armed = yield* Ref.make(false);
+      const paused = yield* Deferred.make<void>();
       yield* Effect.gen(function* () {
         const eventSink = yield* EventSink.EventSinkV2;
         const idAllocator = yield* IdAllocator.IdAllocatorV2;
@@ -1330,8 +1297,8 @@ it.effect(
         });
         yield* eventSink.write({
           events: [
-            yield* makeThreadCreatedEvent({ idAllocator, threadId: threadA, now, projectId }),
-            yield* makeThreadCreatedEvent({ idAllocator, threadId: threadB, now, projectId }),
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: threadA, now }),
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: threadB, now }),
           ],
         });
         const runtime = yield* manager.open({
@@ -1373,9 +1340,10 @@ it.effect(
         yield* startTurn(threadB);
 
         yield* manager.detach({ providerSessionId, threadId: threadA });
-        yield* Ref.set(holdProjectRead, true);
+        // Stops the start while it revalidates the detached thread's MCP credential.
+        yield* Ref.set(armed, true);
         const startingA = yield* startTurn(threadA).pipe(Effect.forkChild);
-        yield* Deferred.await(projectReadHeld);
+        yield* Deferred.await(paused);
         yield* Fiber.interrupt(startingA);
 
         yield* TestClock.adjust("2 seconds");
@@ -1383,16 +1351,7 @@ it.effect(
         assert.isTrue(Option.isSome(yield* manager.get(providerSessionId)));
         assert.equal((yield* Ref.get(state)).closeCount, 0);
       }).pipe(
-        Effect.provide(
-          layerTest({
-            state,
-            idleTimeoutMs: 1000,
-            projectServiceLayer,
-            serverSettingsLayer: ServerSettings.layerTest({
-              projectSettingsOverrides: { [projectId]: { defaultAutoPull: true } },
-            }),
-          }),
-        ),
+        Effect.provide(layerTest({ state, idleTimeoutMs: 1000, pauseResolve: { armed, paused } })),
       );
     }),
 );

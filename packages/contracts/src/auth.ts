@@ -33,7 +33,6 @@ export const AuthOrchestrationOperateScope = "orchestration:operate" as const;
 export const AuthSettingsWriteScope = "settings:write" as const;
 export const AuthProvidersManageScope = "providers:manage" as const;
 export const AuthEnvironmentMaintainScope = "environment:maintain" as const;
-export const AuthPreviewOperateScope = "preview:operate" as const;
 export const AuthDiagnosticsReadScope = "diagnostics:read" as const;
 export const AuthTerminalReadScope = "terminal:read" as const;
 export const AuthTerminalOperateScope = "terminal:operate" as const;
@@ -42,6 +41,8 @@ export const AuthFilesystemReadScope = "filesystem:read" as const;
 export const AuthFilesystemWriteScope = "filesystem:write" as const;
 /** Retained for decoding existing credentials; grants no current RPC access. */
 const AuthReviewWriteScope = "review:write" as const;
+/** Retained for existing credentials and older clients' grant requests; grants no current RPC access. */
+const AuthPreviewOperateScope = "preview:operate" as const;
 export const AuthAccessReadScope = "access:read" as const;
 export const AuthAccessWriteScope = "access:write" as const;
 export const AuthRelayReadScope = "relay:read" as const;
@@ -153,7 +154,6 @@ export const AuthStandardClientScopes = [
   AuthSettingsWriteScope,
   AuthProvidersManageScope,
   AuthEnvironmentMaintainScope,
-  AuthPreviewOperateScope,
   AuthDiagnosticsReadScope,
   AuthTerminalReadScope,
   AuthTerminalOperateScope,

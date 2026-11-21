@@ -8,7 +8,6 @@ import {
   type AuthGrantScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
-  AuthPreviewOperateScope,
   AuthProvidersManageScope,
   AuthRelayReadScope,
   AuthRelayWriteScope,
@@ -47,11 +46,6 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
     scope: AuthEnvironmentMaintainScope,
     title: "维护环境",
     description: "更新服务器并控制环境进程。",
-  },
-  {
-    scope: AuthPreviewOperateScope,
-    title: "控制预览",
-    description: "打开浏览器预览并托管浏览器自动化。",
   },
   {
     scope: AuthDiagnosticsReadScope,

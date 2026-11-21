@@ -8,7 +8,6 @@ export const THREAD_DETAILS_ITEMS = [
   { id: "branch", label: "分支与 PR", defaultVisible: true },
   { id: "gitActions", label: "Git 操作", defaultVisible: true },
   { id: "changes", label: "改动", defaultVisible: true },
-  { id: "servers", label: "服务器", defaultVisible: true },
   { id: "automations", label: "自动化", defaultVisible: true },
   { id: "lineage", label: "会话关系", defaultVisible: true },
   { id: "sideChats", label: "侧聊", defaultVisible: true },

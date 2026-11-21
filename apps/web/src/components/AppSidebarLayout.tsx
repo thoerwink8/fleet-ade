@@ -24,6 +24,7 @@ import {
   shortcutLabelForCommand,
 } from "../keybindings";
 import { isEditableFocused } from "../lib/editableFocus";
+import { isRightPanelFocused } from "../lib/rightPanelFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
@@ -252,6 +253,7 @@ function registerThreadUndoCommands(
           {
             context: {
               terminalFocus: isTerminalFocused(),
+              rightPanelFocus: isRightPanelFocused(),
               ...readRoutePanelsOpen(router),
               // A collapsed sidebar hides the notice, so text fields keep their own undo.
               editableFocus:

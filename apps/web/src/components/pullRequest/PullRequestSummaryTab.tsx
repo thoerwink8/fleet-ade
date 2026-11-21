@@ -550,7 +550,7 @@ export function PullRequestSummaryTab({
       })),
   ];
 
-  const openLink = useOpenLink(threadRef);
+  const openLink = useOpenLink();
   const openCheck = (url: string) => {
     void openLink(url).catch((error: unknown) => {
       console.error(error);

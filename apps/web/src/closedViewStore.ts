@@ -36,8 +36,6 @@ const sameTarget = (entry: ClosedViewEntry, view: ClosedView): boolean => {
   }
 };
 
-const isPersistentView = (_entry: ClosedViewEntry) => true;
-
 const isThreadRef = Schema.is(ScopedThreadRef);
 const isAttachment = Schema.is(ChatFileAttachment);
 
@@ -110,12 +108,10 @@ export const useClosedViewStore = create<ClosedViewStoreState>()(
         const entries = (persisted as Partial<Pick<ClosedViewStoreState, "entries">> | null)
           ?.entries;
         return {
-          entries: Array.isArray(entries)
-            ? entries.filter(isClosedViewEntry).filter(isPersistentView)
-            : [],
+          entries: Array.isArray(entries) ? entries.filter(isClosedViewEntry) : [],
         };
       },
-      partialize: ({ entries }) => ({ entries: entries.filter(isPersistentView) }),
+      partialize: ({ entries }) => ({ entries }),
     },
   ),
 );

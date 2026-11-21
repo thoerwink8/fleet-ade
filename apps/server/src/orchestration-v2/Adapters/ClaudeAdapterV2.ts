@@ -1282,6 +1282,7 @@ export const layerQueryRunner: Layer.Layer<
     const agentScope = yield* AgentScope;
     const providerProcesses = yield* ProviderProcesses.ProviderProcesses;
     const platform = yield* HostProcess.Platform;
+    const hostEnvironment = yield* HostProcess.Environment;
     const runFork = Effect.runForkWith(yield* Effect.context<never>());
     const processRunner = yield* ProcessRunner.make();
     const readProcessTable = processRunner
@@ -1339,7 +1340,12 @@ export const layerQueryRunner: Layer.Layer<
             Stream.toAsyncIterable,
           );
           // Send MCP credentials over stdin to keep them out of SDK argv and inherited command environments.
-          const { mcpServers, ...queryOptions } = input.options;
+          const { mcpServers, ...sdkOptions } = input.options;
+          // Jobs the agent starts inherit the thread, as ACP and Codex sessions' jobs do.
+          const queryOptions = {
+            ...sdkOptions,
+            env: { ...(sdkOptions.env ?? hostEnvironment), T3CODE_THREAD_ID: input.threadId },
+          };
           // The SDK can prepend a scope wrapper to native binaries; script entries run through node.
           const binaryPath = queryOptions.pathToClaudeCodeExecutable;
           const launch =

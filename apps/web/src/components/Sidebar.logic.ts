@@ -50,6 +50,7 @@ import { deadlineAfter, deadlineStore, type ClockStore } from "@t3tools/client-r
 import { useDeadlinePassed } from "../hooks/useDeadline";
 import { isElectron } from "../env";
 import { shouldShowThreadJumpHintsForModifiers } from "../keybindings";
+import { isRightPanelFocused } from "../lib/rightPanelFocus";
 import { isTerminalFocused, subscribeToTerminalFocusChanges } from "../lib/terminalFocus";
 import { isModelPickerOpen, subscribeToModelPickerVisibility } from "../modelPickerVisibility";
 import { shortcutModifierStore } from "../shortcutModifierState";
@@ -805,6 +806,7 @@ type ThreadStatusInput = Pick<
 export function threadShortcutContext(routeThreadRef: ScopedThreadRef | null) {
   return {
     terminalFocus: isTerminalFocused(),
+    rightPanelFocus: isRightPanelFocused(),
     terminalOpen:
       routeThreadRef !== null &&
       selectThreadTerminalUiState(

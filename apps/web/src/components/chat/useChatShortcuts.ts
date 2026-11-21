@@ -104,7 +104,7 @@ export function useChatShortcuts(input: ChatShortcutsInput) {
     )
       return;
     const context = input.getShortcutContext(event.target);
-    if (context.terminalFocus || context.modelPickerOpen) return;
+    if (context.terminalFocus || context.rightPanelFocus || context.modelPickerOpen) return;
     event.preventDefault();
     input.closeThreadFind();
   });

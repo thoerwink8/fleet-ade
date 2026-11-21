@@ -785,4 +785,31 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")("Claude CLI pro
       yield* Deferred.await(forgotten);
     }),
   );
+
+  it.effect("marks the CLI's jobs with its thread", () =>
+    Effect.gen(function* () {
+      const cli = fakeClaudeCli(
+        [
+          'dir=$(dirname "$0")',
+          `printf '%s' "$T3CODE_THREAD_ID" > "$dir/thread"`,
+          "cat > /dev/null",
+        ].join("\n"),
+      );
+      const dir = NodePath.dirname(cli);
+      NodeChildProcess.execFileSync("mkfifo", [NodePath.join(dir, "thread")]);
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => NodeFS.rmSync(dir, { recursive: true, force: true })),
+      );
+      const threadRead = new Promise<string>((resolve) => {
+        let thread = "";
+        NodeFS.createReadStream(NodePath.join(dir, "thread"), "utf8")
+          .on("data", (chunk) => (thread += chunk))
+          .once("end", () => resolve(thread));
+      });
+
+      const session = yield* openFakeCli(cli);
+      assert.equal(yield* Effect.promise(() => threadRead), "thread-fake-cli");
+      yield* session.close;
+    }).pipe(Effect.provide(realQueryRunner)),
+  );
 });

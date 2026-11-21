@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 
 import * as McpInvocationContext from "./McpInvocationContext.ts";
 
-it.effect("reports other missing capabilities with the neutral error", () => {
+it.effect("reports a missing capability with the neutral error", () => {
   const invocation: McpInvocationContext.McpInvocationScope = {
     environmentId: EnvironmentId.make("environment-1"),
     requestNamespace: "provider-session-1",

@@ -245,7 +245,7 @@ export function HtmlRenderDocument(props: {
     },
   );
   const openChangeRequestLink = useOpenChangeRequestLink(props.threadRef);
-  const openLink = useOpenLink(props.threadRef);
+  const openLink = useOpenLink();
   const open = useEffectEvent((url: string, modifiers: { metaKey: boolean; ctrlKey: boolean }) => {
     if (modifiers.metaKey || modifiers.ctrlKey) {
       void readLocalApi()

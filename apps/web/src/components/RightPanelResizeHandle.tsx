@@ -1,26 +1,33 @@
-import type { ComponentPropsWithoutRef } from "react";
+import type { ComponentProps } from "react";
 import type { ResizableWidthHandlers } from "~/hooks/useResizableWidth";
 import { cn } from "~/lib/utils";
 
-interface RightPanelResizeHandleProps extends Omit<ComponentPropsWithoutRef<"div">, "children"> {
+interface Props extends Pick<
+  ComponentProps<"div">,
+  "tabIndex" | "onKeyDown" | "aria-valuenow" | "aria-valuemin" | "aria-valuemax"
+> {
   handlers: ResizableWidthHandlers;
-  label: string;
+  className?: string;
+  label?: string;
 }
 
-export function RightPanelResizeHandle({
-  handlers,
-  label,
-  className,
-  ...props
-}: RightPanelResizeHandleProps) {
+export function RightPanelResizeHandle({ handlers, className, label, ...separatorProps }: Props) {
   return (
     <div
       role="separator"
-      aria-orientation="vertical"
       aria-label={label}
-      className={cn("absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize select-none", className)}
+      aria-orientation="vertical"
+      {...separatorProps}
+      className={cn(
+        "group absolute inset-y-0 left-0 z-40 w-1 cursor-col-resize touch-none select-none any-pointer-coarse:-left-2 any-pointer-coarse:w-4",
+        className,
+      )}
       {...handlers}
-      {...props}
-    />
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 w-px -translate-x-1/2 bg-transparent transition-colors duration-150 group-hover:bg-border group-focus-visible:bg-primary/60 group-active:bg-primary/60 any-pointer-coarse:left-2"
+      />
+    </div>
   );
 }

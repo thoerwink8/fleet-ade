@@ -187,10 +187,10 @@ const missingCapability = (invocation: McpInvocationScope, capability: McpCapabi
           providerInstanceId: invocation.thread.providerInstanceId,
         }),
   });
-export type McpCapabilityError<_C extends McpCapability> = McpCapabilityUnavailableError;
-export const requireMcpCapability = <const C extends McpCapability>(
-  capability: C,
-): Effect.Effect<McpInvocationScope, McpCapabilityError<C>, McpInvocationContext> =>
+
+export const requireMcpCapability = (
+  capability: McpCapability,
+): Effect.Effect<McpInvocationScope, McpCapabilityUnavailableError, McpInvocationContext> =>
   McpInvocationContext.pipe(
     Effect.filterOrFail(
       (invocation) => invocation.capabilities.has(capability),

@@ -251,6 +251,38 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
       }).pipe(Effect.provide(layerKeybindings())),
   );
 
+  it.effect("drops shortcuts of removed commands unreported and still syncs defaults", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const { keybindingsConfigPath } = yield* ServerConfig.ServerConfig;
+      yield* fs.writeFileString(
+        keybindingsConfigPath,
+        JSON.stringify([
+          { key: "mod+shift+j", command: "preview.toggle" },
+          { key: "mod+r", command: "preview.refresh", when: "previewFocus" },
+          { key: "mod+f", command: "chat.find", when: "!terminalFocus && !previewFocus" },
+          { key: "mod+shift+y", command: "terminal.toggle" },
+        ]),
+      );
+
+      const keybindings = yield* Keybindings.Keybindings;
+      yield* keybindings.syncDefaultKeybindingsOnStartup;
+
+      assert.deepEqual((yield* keybindings.loadConfigState).issues, []);
+      const persisted = yield* readKeybindingsConfig(keybindingsConfigPath);
+      const commands = new Set<string>(persisted.map((entry) => entry.command));
+      assert.isFalse([...commands].some((command) => command.startsWith("preview.")));
+      for (const defaultRule of SharedKeybindings.DEFAULT_KEYBINDINGS) {
+        assert.isTrue(commands.has(defaultRule.command), `expected ${defaultRule.command}`);
+      }
+      assert.deepInclude(persisted, {
+        key: "mod+f",
+        command: "chat.find",
+        when: "!terminalFocus && !previewFocus",
+      });
+    }).pipe(Effect.provide(layerKeybindings())),
+  );
+
   it.effect("adds a late default to an existing command once", () =>
     Effect.gen(function* () {
       const { keybindingsConfigPath } = yield* ServerConfig.ServerConfig;

@@ -19,9 +19,16 @@ import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
-import { Tool, Toolkit } from "effect/ai";
+import { McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 
+import * as ProjectService from "../project/ProjectService.ts";
+import * as FleetSummaryReporter from "../ledger/FleetSummaryReporter.ts";
+import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
+import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
+import * as DocumentText from "../provider/DocumentText.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as McpOAuth from "../auth/McpOAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
@@ -35,13 +42,60 @@ import * as ServerConfig from "../config.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
 import { descriptorOf } from "../peer/PeerLinks.testkit.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import { advertisedJsonSchema } from "./advertisedJsonSchema.ts";
 import * as McpHttpServer from "./McpHttpServer.ts";
 import * as McpToolAccess from "./McpToolAccess.ts";
 import * as McpToolAccessTestkit from "./McpToolAccess.testkit.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
 import * as McpSessionRegistry from "./McpSessionRegistry.ts";
+import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
+import { OrchestratorToolkit } from "./toolkits/orchestrator/tools.ts";
+import { ProjectToolkit } from "./toolkits/project/tools.ts";
+
 const environmentId = EnvironmentId.make("environment-mcp-test");
 const coordinator = descriptorOf("environment-mcp-test", "Coordinator Test Node");
+const threadId = ThreadId.make("thread-mcp-test");
+const invocation = {
+  environmentId,
+  requestNamespace: "provider-session-mcp-test",
+  thread: {
+    threadId,
+    providerSessionId: "provider-session-mcp-test",
+    providerInstanceId: ProviderInstanceId.make("codex"),
+  },
+  client: undefined,
+  capabilities: new Set<McpInvocationContext.McpCapability>(),
+  issuedAt: 1,
+};
+const client = McpSchema.McpServerClient.of({
+  clientId: 1,
+  clientCapabilities: {},
+  clientInfo: { name: "mcp-test", version: "1.0.0" },
+  protocolVersion: "2025-06-18",
+  initializePayload: {
+    protocolVersion: "2025-06-18",
+    capabilities: {},
+    clientInfo: { name: "mcp-test", version: "1.0.0" },
+  },
+  getClient: Effect.die("unused"),
+});
+const layerPullRequestsTest = McpHttpServer.layerPullRequestsToolkit.pipe(
+  Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
+  Layer.provideMerge(McpToolAccessTestkit.liveThreadsLayer),
+  Layer.provide(
+    Layer.mergeAll(
+      Layer.mock(ProjectService.ProjectService)({}),
+      Layer.mock(PullRequestReviewGuideService.PullRequestReviewGuideService)({}),
+      Layer.mock(PullRequestService.PullRequestService)({}),
+      Layer.mock(Orchestrator.OrchestratorV2)({}),
+      Layer.mock(ProjectionStore.ProjectionStoreV2)({}),
+      NodeServices.layer,
+      NodeCrypto.layer,
+    ),
+  ),
+);
+
+/** Records every span and the order spans start and end in, by span ID. */
 const recordSpans = () => {
   const spans: Array<Tracer.NativeSpan> = [];
   const order: Array<string> = [];
@@ -60,6 +114,216 @@ const recordSpans = () => {
   });
   return { tracer, spans, order };
 };
+
+const callTool = (name: string, args: Record<string, unknown>) =>
+  Effect.gen(function* () {
+    const server = yield* McpServer.McpServer;
+    return yield* server
+      .callTool({ name, arguments: args })
+      .pipe(
+        Effect.provideService(McpInvocationContext.McpInvocationContext, invocation),
+        Effect.provideService(McpSchema.McpServerClient, client),
+      );
+  });
+
+const RecordingToolkit = Toolkit.make(
+  OrchestratorToolkit.tools.delegate_task,
+  OrchestratorToolkit.tools.t3_thread_read,
+  OrchestratorToolkit.tools.t3_thread_wait,
+  ProjectToolkit.tools.t3_project_update,
+  ProjectToolkit.tools.t3_thread_launch,
+);
+const layerRecordingTools = (calls: Array<unknown>) => {
+  const record = McpToolAccess.reads((params: unknown) =>
+    Effect.sync(() => calls.push(params)).pipe(
+      Effect.andThen(
+        Effect.fail(new OrchestratorMcpFailure({ code: "thread_not_found", message: "Recorded." })),
+      ),
+    ),
+  );
+  return McpHttpServer.toolkitRegistration(
+    RecordingToolkit,
+    McpToolAccess.toLayer(RecordingToolkit, {
+      delegate_task: record,
+      t3_thread_read: record,
+      t3_thread_wait: record,
+      t3_project_update: record,
+      t3_thread_launch: record,
+    }),
+  ).pipe(
+    Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
+    Layer.provide(
+      Layer.mergeAll(
+        McpToolAccessTestkit.liveThreadsLayer,
+        Layer.mock(OrchestratorMcpService.OrchestratorMcpService)({}),
+        Layer.mock(ProjectService.ProjectService)({}),
+        Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
+        Layer.mock(FleetSummaryReporter.FleetSummaryReporter)({
+          trackAdhoc: () => Effect.void,
+        }),
+        Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+          namedProjectsRoot: process.cwd(),
+        }),
+        Layer.mock(GitVcsDriver.GitVcsDriver)({}),
+        Layer.mock(ServerSettings.ServerSettingsService)({}),
+        Layer.mock(DocumentText.DocumentText)({}),
+        Layer.mock(ProviderRegistry.ProviderRegistry)({}),
+        ServerConfig.layerTest(process.cwd(), { prefix: "t3-mcp-http-server-test-" }),
+        NodeCrypto.layer,
+      ),
+    ),
+    Layer.provideMerge(NodeServices.layer),
+  );
+};
+
+it.effect("advertises the compact input schema for every registered tool", () =>
+  Effect.gen(function* () {
+    const server = yield* McpServer.McpServer;
+    const tools: Record<string, Tool.Any> = RecordingToolkit.tools;
+
+    expect(server.tools.length).toBe(Object.keys(tools).length);
+    for (const { tool } of server.tools) {
+      expect(tool.inputSchema, tool.name).toEqual(advertisedJsonSchema(tools[tool.name]!));
+    }
+  }).pipe(Effect.provide(layerRecordingTools([]))),
+);
+
+it.effect("decodes null optional arguments the way it decodes omitted ones", () => {
+  const calls: Array<unknown> = [];
+  return Effect.gen(function* () {
+    const thread = { threadId: "thread-null-arguments" };
+    yield* callTool("t3_thread_read", thread);
+    yield* callTool("t3_thread_read", { ...thread, afterPosition: null, view: null });
+    yield* callTool("delegate_task", { task: "Inspect", target: {} });
+    yield* callTool("delegate_task", { task: "Inspect", title: null, target: { model: null } });
+    yield* callTool("t3_project_update", { projectId: "project-1", projectIcon: null });
+
+    expect(calls).toHaveLength(5);
+    expect(calls[1]).toEqual(calls[0]);
+    expect(calls[3]).toEqual(calls[2]);
+    expect(calls[4]).toStrictEqual({ projectId: "project-1", projectIcon: null });
+  }).pipe(Effect.provide(layerRecordingTools(calls)));
+});
+
+it.effect("rejects arguments a tool does not declare instead of dropping them", () => {
+  const calls: Array<unknown> = [];
+  return Effect.gen(function* () {
+    const launch = yield* Effect.flip(
+      callTool("t3_thread_launch", { title: "Repro", scratch: true, prompt: "say hi" }),
+    );
+    const wait = yield* Effect.flip(
+      callTool("t3_thread_wait", { threadId: "thread-excess-arguments", timeout: 5_000 }),
+    );
+
+    expect(calls).toEqual([]);
+    expect(launch.message).toContain('Unknown argument "prompt"');
+    expect(wait.message).toContain('Unknown argument "timeout"');
+  }).pipe(Effect.provide(layerRecordingTools(calls)));
+});
+
+it.effect("accepts a nested key the merged advertised schema shows", () => {
+  const calls: Array<unknown> = [];
+  return Effect.gen(function* () {
+    yield* Effect.exit(
+      callTool("t3_thread_launch", {
+        title: "Root",
+        projectId: "project-1",
+        message: "say hi",
+        workspaceStrategy: { type: "root", baseRef: "main" },
+      }),
+    );
+
+    expect(calls).toHaveLength(1);
+  }).pipe(Effect.provide(layerRecordingTools(calls)));
+});
+
+it.effect(
+  "clamps t3_thread_read page sizes above their maximum instead of rejecting the call",
+  () => {
+    const calls: Array<unknown> = [];
+    return Effect.gen(function* () {
+      const thread = { threadId: "thread-clamped-arguments" };
+      // Codex never shows the model these bounds, so an over-large page must still read.
+      yield* callTool("t3_thread_read", {
+        ...thread,
+        limit: 150,
+        runLimit: 80,
+        maxCharsPerItem: 60_000,
+      });
+      yield* callTool("t3_thread_read", {
+        ...thread,
+        limit: 100,
+        runLimit: 50,
+        maxCharsPerItem: 20_000,
+      });
+      yield* callTool("t3_thread_read", { ...thread, limit: 7, runLimit: 1, maxCharsPerItem: 1 });
+
+      expect(calls).toEqual([
+        { ...thread, limit: 100, runLimit: 50, maxCharsPerItem: 20_000 },
+        { ...thread, limit: 100, runLimit: 50, maxCharsPerItem: 20_000 },
+        { ...thread, limit: 7, runLimit: 1, maxCharsPerItem: 1 },
+      ]);
+    }).pipe(Effect.provide(layerRecordingTools(calls)));
+  },
+);
+
+it.effect.each(["limit", "runLimit", "maxCharsPerItem"])(
+  "still rejects a t3_thread_read %s below its minimum",
+  (field) => {
+    const calls: Array<unknown> = [];
+    return Effect.gen(function* () {
+      // Zero is a different request than one item, so it fails rather than answering another question.
+      const rejected = yield* callTool("t3_thread_read", {
+        threadId: "thread-below-minimum",
+        [field]: 0,
+      }).pipe(Effect.flip);
+
+      expect(String(rejected)).toContain("greater than or equal to 1");
+      expect(calls).toEqual([]);
+    }).pipe(Effect.provide(layerRecordingTools(calls)));
+  },
+);
+
+it("keeps cross-tool routing out of the delegate_task description", () => {
+  const description = OrchestratorToolkit.tools.delegate_task.description ?? "";
+  expect(description).toContain("Start one child agent with only `task`");
+  // Review rounds, follow-ups, and polling are routed in the system text.
+  expect(description).not.toContain("t3_thread_send");
+  expect(description).not.toContain("Do not poll");
+  expect(description).not.toContain("Prefer native");
+});
+
+it.effect(
+  "registers the pull request toolkit and surfaces a missing capability as a tool error",
+  () =>
+    Effect.gen(function* () {
+      const server = yield* McpServer.McpServer;
+      const names = server.tools.map(({ tool }) => tool.name);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          "link_pull_request",
+          "unlink_pull_request",
+          "list_thread_pull_requests",
+        ]),
+      );
+      const linkTool = server.tools.find(({ tool }) => tool.name === "link_pull_request");
+      expect(linkTool?.tool.annotations?.idempotentHint).toBe(true);
+      expect(linkTool?.tool.annotations?.openWorldHint).toBe(false);
+      expect(linkTool?.tool.description).toContain("Link a PR to this thread");
+      expect(linkTool?.tool.description).toContain("settles the thread on merge");
+
+      const denied = yield* server
+        .callTool({ name: "list_thread_pull_requests", arguments: {} })
+        .pipe(
+          Effect.provideService(McpInvocationContext.McpInvocationContext, invocation),
+          Effect.provideService(McpSchema.McpServerClient, client),
+        );
+      expect(denied.isError).toBe(true);
+      expect(denied.content).toEqual([
+        { type: "text", text: "MCP credential does not grant the pull-requests capability." },
+      ]);
+    }).pipe(Effect.provide(layerPullRequestsTest)),
+);
 
 it.effect("terminates HTTP MCP sessions with DELETE", () =>
   Effect.scoped(

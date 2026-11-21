@@ -1466,7 +1466,8 @@ function codexThreadRuntimeParams(input: {
       ...(input.autoCompactTokenLimit === undefined
         ? {}
         : { model_auto_compact_token_limit: input.autoCompactTokenLimit }),
-      // One app-server serves many threads; protocol routing uses native thread ids.
+      // One app-server serves many threads, so the id goes in per-thread shell config, not its env.
+      ...(input.threadId === null ? {} : { [CODEX_THREAD_ENV_CONFIG_KEY]: input.threadId }),
       ...(t3Server === undefined
         ? {}
         : {
@@ -1549,6 +1550,9 @@ function readCodexProtocolPath(value: unknown, ...path: ReadonlyArray<string>): 
   return current;
 }
 
+/** The agent's shells carry their T3 thread, and the protocol log routes thread starts by it. */
+const CODEX_THREAD_ENV_CONFIG_KEY = "shell_environment_policy.set.T3CODE_THREAD_ID";
+
 /**
  * One app-server serves every Codex thread on an instance, so each frame is routed to the
  * T3 thread it belongs to. Frames tied to no thread, such as `initialize`, go to the global log.
@@ -1576,11 +1580,7 @@ function makeCodexProtocolThreadRouter() {
     }
 
     const params = readCodexProtocolPath(frame, "params");
-    const configuredThreadId = readCodexProtocolPath(
-      params,
-      "config",
-      "shell_environment_policy.set.T3CODE_THREAD_ID",
-    );
+    const configuredThreadId = readCodexProtocolPath(params, "config", CODEX_THREAD_ENV_CONFIG_KEY);
     const nativeThreadId =
       readCodexProtocolPath(params, "threadId") ?? readCodexProtocolPath(params, "thread", "id");
     let threadId =

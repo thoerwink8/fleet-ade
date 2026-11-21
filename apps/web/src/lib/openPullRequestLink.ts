@@ -68,7 +68,7 @@ export function useOpenChangeRequestLink(
     reportFailure: false,
     refresh: true,
   });
-  const openLink = useOpenLink(threadRef);
+  const openLink = useOpenLink();
   return (event, targetUrl, targetThreadRef, targetEnvironmentId, onCommitUnavailable) => {
     if (!openInApp || shouldOpenPullRequestExternally(event)) return false;
     const resolvedThreadRef = targetThreadRef ?? threadRef;
@@ -234,7 +234,7 @@ export function useOpenChangeRequestLink(
 
 export function useOpenPrLink(threadRef?: ScopedThreadRef) {
   const openChangeRequest = useOpenChangeRequestLink(threadRef);
-  const openLink = useOpenLink(threadRef);
+  const openLink = useOpenLink();
   return (event: MouseEvent<HTMLElement>, prUrl: string, targetThreadRef?: ScopedThreadRef) => {
     if (event.button > 1) return false;
     event.stopPropagation();

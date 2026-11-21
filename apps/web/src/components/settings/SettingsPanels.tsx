@@ -50,6 +50,7 @@ import {
   readThemePreference,
   useTheme,
 } from "../../hooks/useTheme";
+import { useClientSettings, useUpdatePrimarySettings } from "../../hooks/useSettings";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -563,6 +564,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(isTextGenerationModelDirty ? ["文本生成模型"] : []),
     ...(settings.threadTitleInstructions !== DEFAULT_UNIFIED_SETTINGS.threadTitleInstructions
       ? ["会话标题生成说明"]
+      : []),
+    ...(settings.pullRequestLinksOpenInApp !== DEFAULT_UNIFIED_SETTINGS.pullRequestLinksOpenInApp
+      ? ["在 T3 Code 中打开 PR"]
       : []),
   ];
 
@@ -1377,6 +1381,35 @@ function DiffColorsSettingsRow() {
   );
 }
 
+function PullRequestLinksOpenInAppSetting() {
+  const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
+  const updateSettings = useUpdatePrimarySettings();
+
+  return (
+    <SettingsRow
+      {...searchableSetting("pull-request-links-open-in-app")}
+      description="点击 pull request 链接时在 T3 Code 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
+      resetAction={
+        openInApp ? null : (
+          <SettingResetButton
+            label="在 T3 Code 中打开 PR"
+            onClick={() => updateSettings({ pullRequestLinksOpenInApp: true })}
+          />
+        )
+      }
+      control={
+        <Switch
+          checked={openInApp}
+          onCheckedChange={(checked) =>
+            updateSettings({ pullRequestLinksOpenInApp: Boolean(checked) })
+          }
+          aria-label="在 T3 Code 中打开 PR"
+        />
+      }
+    />
+  );
+}
+
 export function DiffsSettingsPanel() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -1510,6 +1543,7 @@ export function DiffsSettingsPanel() {
             />
           }
         />
+        <PullRequestLinksOpenInAppSetting />
       </SettingsSection>
     </SettingsPageContainer>
   );

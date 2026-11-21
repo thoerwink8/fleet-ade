@@ -127,7 +127,6 @@ describe("FileBrowserPanel", () => {
         selectedPathRevealId={0}
         onOpenFile={() => {}}
         workspaceMutationId={null}
-        answersPanelFind
       />,
     );
     await vi.waitFor(() => expect(findTreeRow("README.md")).not.toBeNull());

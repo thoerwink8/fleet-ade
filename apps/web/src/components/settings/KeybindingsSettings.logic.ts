@@ -119,6 +119,7 @@ const WHEN_IDENTIFIER_LABELS: Readonly<Record<string, string>> = {
   terminalFocus: "焦点在终端",
   terminalOpen: "终端已打开",
   rightPanelOpen: "右侧面板已打开",
+  rightPanelFocus: "焦点在右侧面板",
   composerFocus: "焦点在输入框",
   editableFocus: "焦点在可编辑区域",
   modelPickerOpen: "模型选择器已打开",

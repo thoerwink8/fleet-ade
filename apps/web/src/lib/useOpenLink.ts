@@ -1,12 +1,11 @@
-import { readLocalApi } from "~/localApi";
 import { useStableCallback } from "~/hooks/useStableCallback";
-export function useOpenLink(_threadRef?: unknown) {
-  return useStableCallback(async (url: string): Promise<void> => {
-    const localApi = readLocalApi();
-    if (localApi) {
-      await localApi.shell.openExternal(url);
-      return;
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
+import { readLocalApi } from "~/localApi";
+
+/** Rejects if the system-browser handoff fails. */
+export function useOpenLink(): (url: string) => Promise<void> {
+  return useStableCallback(async (url: string) => {
+    const api = readLocalApi();
+    if (!api) throw new Error("无法打开链接。");
+    await api.shell.openExternal(url);
   });
 }
