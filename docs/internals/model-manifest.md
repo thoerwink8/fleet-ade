@@ -1,8 +1,9 @@
 # Model manifest
 
 The [bundled manifest](../../apps/server/src/provider/model-manifest.json) is the only
-source of model metadata; the server never fetches it. Model data changes with a
-release; `updatedAt` records the last edit.
+source of model metadata; the server never fetches it. This repo does not follow
+the upstream project, so a fetch would hand model classification and compatibility
+gates to someone else's repository. Model data changes with a release.
 
 Generic catalog data describes presentation and capabilities. Each provider owns
 its adapter schema and dispatch mappings. Providers never read the manifest
@@ -18,12 +19,6 @@ ships. Claude entries set `adapter.claudeCode.minVersion`; Codex entries set
 `adapter.codex.minVersion`, since Codex's own `model/list` cannot name models
 released after the installed build. Snapshots report those models in
 `updateRequiredModels`, and the picker tells the user which update unlocks them.
-
-`currentModels.claudeAgent` is the current-model classification overlay for
-releases that predate catalog discovery; it does not add models to their catalogs.
-Catalog-aware releases use `providers.claudeAgent.models[].status` instead.
-Codex uses `currentModels.codex` as a legacy-classification overlay for discovered
-models.
 
 Model data is schema-validated configuration. Tests should cover resolver
 and adapter semantics with synthetic model names, so adding a model never requires

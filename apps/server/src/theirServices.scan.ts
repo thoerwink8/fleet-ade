@@ -58,7 +58,11 @@ const TEXT_EXTENSIONS = new Set([
   ".example",
 ]);
 
-export const scanTheirHosts = Effect.fn("theirServices.scanTheirHosts")(function* (root: string) {
+const scanTextFiles = Effect.fn("theirServices.scanTextFiles")(function* (
+  root: string,
+  pattern: RegExp,
+  skipTests: boolean,
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const hits: string[] = [];
@@ -80,13 +84,22 @@ export const scanTheirHosts = Effect.fn("theirServices.scanTheirHosts")(function
       }
       const base = path.basename(full);
       if (base.startsWith("LICENSE")) continue;
+      if (skipTests && /.test.[cm]?[jt]sx?$/.test(base)) continue;
       const extension = path.extname(full);
       if (extension === ".md") continue;
       if (!TEXT_EXTENSIONS.has(extension) && base !== ".env.example") continue;
       const text = yield* fs.readFileString(full).pipe(Effect.orElseSucceed(() => ""));
-      const found = text.match(new RegExp(bannedHostPattern().source, "gi"));
+      const found = text.match(new RegExp(pattern.source, "gi"));
       if (found) hits.push(`${path.relative(root, full)} ${found.length}`);
     }
   }
   return hits;
 });
+
+export const scanTheirHosts = (root: string) => scanTextFiles(root, bannedHostPattern(), false);
+
+/** Server code must not fetch their model manifest; matches the upstream raw path, not other files they host. */
+const UPSTREAM_MANIFEST_PATH = ["pingdotgg", "t3code", "main", "apps", "server"].join("/");
+
+export const scanUpstreamManifestFetches = (root: string) =>
+  scanTextFiles(root, new RegExp(UPSTREAM_MANIFEST_PATH), true);

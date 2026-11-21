@@ -120,7 +120,7 @@ A provider lives in its own `packages/provider-<name>` package, with
   [`builtInDrivers.ts`](../../apps/server/src/provider/builtInDrivers.ts). The driver carries its
   adapter driver. Also its position in the [status order](../../apps/server/src/provider/providerStatusCache.ts), a
   compatibility policy in [`model-manifest.json`](../../apps/server/src/provider/model-manifest.json)
-  (bump `updatedAt`; see [model manifest](./model-manifest.md)), and its default model in contracts.
+  (see [model manifest](./model-manifest.md)), and its default model in contracts.
 - **Client registration:** the client definition in the web and mobile provider registries, and
   settings search terms. Clients draw the package icon; do not add a per-driver icon branch.
 - **Docs:** a `docs/user/providers-<name>.md` guide in the product's voice, a row in the

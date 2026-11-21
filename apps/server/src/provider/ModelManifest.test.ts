@@ -4,8 +4,6 @@ import * as ModelCatalog from "@t3tools/provider-core/server/ModelCatalog";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as TestClock from "effect/testing/TestClock";
-import { HttpClient, HttpClientResponse } from "effect/http";
-import { vi } from "vite-plus/test";
 
 import * as ModelManifest from "./ModelManifest.ts";
 
@@ -130,35 +128,5 @@ describe("resolveProviderCatalog", () => {
         ModelManifest.resolveProviderCatalog(invalid, ProviderDriverKind.make("synthetic")),
       );
     }
-  });
-});
-
-describe("ModelManifest service", () => {
-  it.effect("serves the bundled manifest and never opens a network request", () => {
-    const requests: Array<string> = [];
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    return Effect.gen(function* () {
-      const service = yield* ModelManifest.ModelManifest;
-      assert.deepStrictEqual(yield* service.current, ModelManifest.BUNDLED_MODEL_MANIFEST);
-      yield* TestClock.adjust("2 hours");
-      assert.deepStrictEqual(yield* service.current, ModelManifest.BUNDLED_MODEL_MANIFEST);
-      assert.deepStrictEqual(requests, []);
-      assert.strictEqual(fetchSpy.mock.calls.length, 0);
-    }).pipe(
-      Effect.provide(
-        ModelManifest.layer.pipe(
-          Layer.provideMerge(
-            Layer.succeed(
-              HttpClient.HttpClient,
-              HttpClient.make((request) => {
-                requests.push(request.url);
-                return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json({})));
-              }),
-            ),
-          ),
-        ),
-      ),
-      Effect.ensuring(Effect.sync(() => fetchSpy.mockRestore())),
-    );
   });
 });

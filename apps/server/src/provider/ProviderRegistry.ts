@@ -353,7 +353,6 @@ export const layer = Layer.effect(
     const instanceRegistry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
     const instanceRegistryMutator =
       yield* ProviderInstanceRegistryMutator.ProviderInstanceRegistryMutator;
-    const manifestService = yield* ModelManifest.ModelManifest;
     const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;
     const serviceScope = yield* Effect.scope;
     const config = yield* ServerConfig.ServerConfig;
@@ -432,18 +431,14 @@ export const layer = Layer.effect(
         ),
       ),
     );
-    const initialManifest = yield* manifestService.current;
-    const classifyCompatibility = (
-      provider: ServerProvider,
-      manifest: ModelManifest.ModelManifestData,
-    ) =>
+    const classifyCompatibility = (provider: ServerProvider) =>
       applyProviderCompatibility(
         provider,
-        manifest.compatibility,
         ModelManifest.BUNDLED_MODEL_MANIFEST.compatibility,
+        undefined,
       );
     const providersRef = yield* Ref.make<ReadonlyArray<ServerProvider>>(
-      bootProviders.map((provider) => classifyCompatibility(provider, initialManifest)),
+      bootProviders.map((provider) => classifyCompatibility(provider)),
     );
     const workspaceRefreshesRef = yield* Ref.make<
       ReadonlyMap<ProviderInstance, ReadonlyMap<string, Deferred.Deferred<void>>>
@@ -500,7 +495,6 @@ export const layer = Layer.effect(
         readonly replace?: boolean;
       },
     ) {
-      const manifest = yield* manifestService.current;
       const nextProvidersWithUpdateState = yield* Effect.forEach(
         nextProviders,
         applyProviderUpdateState,
@@ -528,9 +522,7 @@ export const layer = Layer.effect(
           }
 
           const providers = orderProviderSnapshots(
-            [...mergedProviders.values()].map((provider) =>
-              classifyCompatibility(provider, manifest),
-            ),
+            [...mergedProviders.values()].map(classifyCompatibility),
           );
           const providersToPersist = providers.filter((provider) =>
             updatedKeys.has(snapshotInstanceKey(provider)),
