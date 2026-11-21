@@ -8089,7 +8089,6 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         FROM orchestration_v2_projection_runs r
         WHERE r.thread_id IN (SELECT value FROM json_each(${encodeIdList(threadIds)}))
           AND r.status NOT IN ('rolled_back', 'cancelled')
-          AND NOT ${isSilentShellRun("r")}
         GROUP BY r.thread_id
       `;
 
