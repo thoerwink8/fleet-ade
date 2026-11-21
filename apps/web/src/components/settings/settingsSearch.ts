@@ -29,7 +29,6 @@ export type SettingsPath =
   | "/settings/providers"
   | "/settings/threads"
   | "/settings/browser"
-  | "/settings/devices"
   | "/settings/scheduled-tasks"
   | "/settings/source-control"
   | "/settings/worktrees"
@@ -102,7 +101,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/providers": "智能体提供方",
   "/settings/threads": "会话",
   "/settings/browser": "浏览器",
-  "/settings/devices": "设备",
   "/settings/scheduled-tasks": "定时任务",
   "/settings/source-control": "版本控制",
   "/settings/worktrees": "工作树",
@@ -141,7 +139,6 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
       "/settings/providers",
       "/settings/threads",
       "/settings/browser",
-      "/settings/devices",
       "/settings/scheduled-tasks",
     ],
   },
@@ -954,35 +951,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["allow disable enable open drive preview tools sessions project override"],
   },
   {
-    id: "device-sources",
-    title: "设备来源",
-    to: "/settings/devices",
-    searchTerms: [
-      "device hosts ssh remote mac mini identity key connection eas expo cloud local simulators",
-    ],
-  },
-  {
-    id: "agent-device-access",
-    title: "允许智能体使用设备",
-    to: "/settings/devices",
-    targetId: "devices",
-    searchTerms: ["allow simulator emulator ios android drive tools sessions"],
-  },
-  {
-    id: "device-hub",
-    title: "使用设备",
-    to: "/settings/devices",
-    targetId: "devices",
-    searchTerms: ["device hub simulator emulator ios android install start version"],
-  },
-  {
-    id: "device-platform-support",
-    title: "本地模拟器",
-    to: "/settings/devices",
-    targetId: "device-sources",
-    searchTerms: ["simulator support xcode android studio sdk avd runtime"],
-  },
-  {
     id: "browser-profiles",
     title: "浏览器配置",
     to: "/settings/browser",
@@ -1053,7 +1021,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "browser-auto-show-floating-preview",
     title: "自动显示浮动预览",
     to: "/settings/browser",
-    searchTerms: ["agent opens browser device simulator pop into view hide"],
+    searchTerms: ["agent opens browser pop into view hide"],
   },
   {
     id: "automatic-pull",
@@ -1316,7 +1284,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/providers": null,
   "/settings/threads": null,
   "/settings/browser": null,
-  "/settings/devices": null,
   "/settings/source-control": "environment-defaults",
   "/settings/worktrees": "project-defaults",
   "/settings/connections": "connections",

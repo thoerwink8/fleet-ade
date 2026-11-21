@@ -36,7 +36,6 @@ import { restrictToFirstScrollableAncestor, restrictToHorizontalAxis } from "@dn
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Smartphone,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -68,7 +67,6 @@ import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings
 import { readLocalApi } from "~/localApi";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { Button } from "~/components/ui/button";
-import { AndroidIcon, AppleIcon } from "~/components/Icons";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ui/kbd";
 import {
@@ -86,7 +84,6 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
 import { faviconUrlForOrigin } from "@t3tools/shared/favicon";
 import { useTheme } from "~/hooks/useTheme";
-import { useDeviceState } from "~/state/device";
 import type { PreviewPanelInlineSize } from "~/hooks/usePreviewPanelInlineSize";
 import {
   newestPullRequestSummary,
@@ -128,7 +125,6 @@ export interface RightPanelTabsProps {
   previewRuntimeTabId?: ((tabId: string) => string) | undefined;
   terminalLabelsById: ReadonlyMap<string, string>;
   onActivate: (surface: RightPanelSurface) => void;
-  onRenameDevice?: (surfaceId: string, title: string) => void;
   onCloseSurface: (surface: RightPanelSurface) => void;
   onCloseOtherSurfaces: (surface: RightPanelSurface) => void;
   onCloseSurfacesToRight: (surface: RightPanelSurface) => void;
@@ -143,7 +139,6 @@ export interface RightPanelTabsProps {
   onAddFiles: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
-  onAddDevice: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
   browserAvailable: boolean;
@@ -152,8 +147,6 @@ export interface RightPanelTabsProps {
   filesAvailable: boolean;
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
-  deviceAvailable: boolean;
-  deviceOffered: boolean;
   sideChatAvailable?: boolean;
   /** Overrides the default reason while side chats are available but cannot start. */
   sideChatDisabledReason?: string | null;
@@ -182,7 +175,6 @@ const SURFACE_DISABLED_REASONS = {
   diff: "还没有文件改动。",
   pullRequest: "此会话的分支尚无 pull request。",
   pullRequests: "此会话没有可用的已关联 pull request。",
-  device: "设备仅在会话中可用。",
   sideChat: "发送第一条消息后才能开始侧聊。",
 } as const;
 
@@ -207,12 +199,10 @@ const SURFACE_UNAVAILABLE_HINTS = {
   diff: "还没有文件改动。",
   pullRequest: "此分支尚无 pull request。",
   pullRequests: "没有可用的已关联 pull request。",
-  device: "在会话中可用。",
   sideChat: "发送第一条消息后可用。",
 } as const;
 
 type TabContextMenuAction =
-  | "rename"
   | "copy-path"
   | "toggle-mute"
   | "close"
@@ -334,7 +324,6 @@ function RightPanelEmptyState(props: {
   onAddFiles: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
-  onAddDevice: () => void;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
   browserAvailable: boolean;
@@ -343,8 +332,6 @@ function RightPanelEmptyState(props: {
   filesAvailable: boolean;
   pullRequestAvailable: boolean;
   pullRequestsAvailable: boolean;
-  deviceAvailable: boolean;
-  deviceOffered: boolean;
   sideChatAvailable: boolean;
   sideChatDisabledReason: string | null;
 }) {
@@ -399,19 +386,6 @@ function RightPanelEmptyState(props: {
       disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequests,
       onClick: props.onAddPullRequests,
     },
-    ...(props.deviceOffered
-      ? [
-          {
-            label: "设备",
-            description: "查看 iOS 模拟器或 Android 模拟器。",
-            icon: Smartphone,
-            shortcut: "M",
-            available: props.deviceAvailable,
-            disabledReason: SURFACE_UNAVAILABLE_HINTS.device,
-            onClick: props.onAddDevice,
-          },
-        ]
-      : []),
     ...(props.onAddSideChat
       ? [
           {
@@ -620,8 +594,6 @@ function surfaceTitle(
       return `#${surface.number}`;
     case "pull-requests":
       return "PR";
-    case "device":
-      return surface.title ?? surface.target?.name ?? "设备";
     case "side-chat":
       return "侧聊";
     case "preview": {
@@ -714,14 +686,6 @@ function SurfaceIcon({
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
     case "side-chat":
       return <SideChatTabIcon environmentId={environmentId} threadId={surface.threadId} />;
-    case "device":
-      return surface.target?.platform === "ios" ? (
-        <AppleIcon className="size-3 shrink-0" />
-      ) : surface.target?.platform === "android" ? (
-        <AndroidIcon className="size-3 shrink-0" />
-      ) : (
-        <Smartphone className="size-3 shrink-0" />
-      );
   }
 }
 
@@ -885,8 +849,6 @@ interface RightPanelTabHandlers {
   onClose: (surface: RightPanelSurface) => void;
   onAuxClick: (event: ReactMouseEvent, surface: RightPanelSurface) => void;
   onContextMenu: (event: ReactMouseEvent, surface: RightPanelSurface) => void;
-  onStartRename: (surfaceId: string) => void;
-  onFinishRename: (surfaceId: string, title: string) => void;
 }
 
 // Chromium on Linux only suppresses primary-selection paste when mouseup is cancelled.
@@ -910,22 +872,11 @@ function RightPanelTab(
     theme: "light" | "dark";
     environmentId: EnvironmentId | null;
     pullRequestStatusSeed: PullRequestTabStatusSeed | undefined;
-    renaming: boolean;
-    canRename: boolean;
     ownsDesktopTitleBar: boolean;
   },
 ) {
-  const {
-    surface,
-    audio,
-    audioRuntimeTabId,
-    onActivate,
-    onClose,
-    onAuxClick,
-    onContextMenu,
-    onStartRename,
-    onFinishRename,
-  } = props;
+  const { surface, audio, audioRuntimeTabId, onActivate, onClose, onAuxClick, onContextMenu } =
+    props;
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: surface.id,
     disabled: props.dragDisabled,
@@ -981,56 +932,21 @@ function RightPanelTab(
           <TooltipPopup>{audio === "muted" ? "取消标签静音" : "将标签静音"}</TooltipPopup>
         </Tooltip>
       )}
-      {props.renaming ? (
-        <input
-          aria-label="设备标签名"
-          className="w-24 min-w-0 rounded-sm bg-background px-1 outline-none ring-1 ring-inset ring-ring"
-          defaultValue={title}
-          ref={(element) => {
-            element?.focus();
-            element?.select();
-          }}
-          onBlur={(event) => onFinishRename(surface.id, event.currentTarget.value)}
-          onKeyDown={(event) => {
-            event.stopPropagation();
-            if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-            if (event.key === "Enter") event.currentTarget.blur();
-            if (event.key === "Escape") {
-              event.currentTarget.value = title;
-              event.currentTarget.blur();
-            }
-          }}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className="cursor-pointer flex min-w-0 items-center"
+              aria-label={sideChatState === null ? undefined : `${title}, ${sideChatState}`}
+              onClick={() => onActivate(surface)}
+            >
+              <span className="truncate">{title}</span>
+            </button>
+          }
         />
-      ) : (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <button
-                type="button"
-                onDoubleClick={() => {
-                  if (surface.kind === "device" && props.canRename) onStartRename(surface.id);
-                }}
-                className="cursor-pointer flex min-w-0 items-center"
-                aria-label={sideChatState === null ? undefined : `${title}, ${sideChatState}`}
-                onClick={() => onActivate(surface)}
-              >
-                <span className="truncate">{title}</span>
-              </button>
-            }
-          />
-          <TooltipPopup>
-            {surface.kind === "device" ? (
-              <DeviceTabTooltip
-                surface={surface}
-                environmentId={props.environmentId}
-                title={title}
-              />
-            ) : (
-              title
-            )}
-          </TooltipPopup>
-        </Tooltip>
-      )}
+        <TooltipPopup>{title}</TooltipPopup>
+      </Tooltip>
     </>
   );
   return (
@@ -1064,7 +980,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   const { resolvedTheme } = useTheme();
   const tabListRef = useRef<HTMLDivElement>(null);
   const addSurfaceTriggerRef = useRef<HTMLButtonElement>(null);
-  const [renamingDevice, setRenamingDevice] = useState<string | null>(null);
   const [addSurfaceMenuOpen, setAddSurfaceMenuOpen] = useState(false);
   const [tabScrollState, setTabScrollState] = useState({
     hasOverflow: false,
@@ -1174,18 +1089,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       disabledReason: SURFACE_DISABLED_REASONS.pullRequests,
       onClick: props.onAddPullRequests,
     },
-    ...(props.deviceOffered
-      ? [
-          {
-            label: "设备",
-            icon: Smartphone,
-            shortcut: "M",
-            available: props.deviceAvailable,
-            disabledReason: SURFACE_DISABLED_REASONS.device,
-            onClick: props.onAddDevice,
-          },
-        ]
-      : []),
     ...(props.onAddSideChat
       ? [
           {
@@ -1220,8 +1123,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     if (surfaceIndex < 0) return;
 
     const items: ContextMenuItem<TabContextMenuAction>[] = [];
-    if (surface.kind === "device" && props.onRenameDevice)
-      items.push({ id: "rename", label: "重命名" });
     if (surface.kind === "file" && surface.attachment === undefined) {
       items.push({ id: "copy-path", label: "复制路径" });
     }
@@ -1258,9 +1159,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
     const action = await api.contextMenu.show(items, { x: event.clientX, y: event.clientY });
     switch (action) {
-      case "rename":
-        setRenamingDevice(surface.id);
-        break;
       case "copy-path":
         if (surface.kind === "file" && surface.attachment === undefined) {
           props.onCopyFilePath(surface.relativePath);
@@ -1306,11 +1204,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       void handleTabContextMenu(event, surface);
     },
   );
-  const onStartRenameTab = useStableCallback((surfaceId: string) => setRenamingDevice(surfaceId));
-  const onFinishRenameTab = useStableCallback((surfaceId: string, title: string) => {
-    props.onRenameDevice?.(surfaceId, title);
-    setRenamingDevice(null);
-  });
 
   // A newly active tab, or tabs that start overflowing, can sit outside the scrolled strip.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- scrolls the active tab DOM node into view after it changes or the tab strip starts overflowing
@@ -1409,7 +1302,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   <RightPanelTab
                     key={surface.id}
                     surface={surface}
-                    dragDisabled={!props.onMoveSurface || renamingDevice === surface.id}
+                    dragDisabled={!props.onMoveSurface}
                     active={surface.id === props.activeSurfaceId}
                     pending={props.pendingSurfaceIds.has(surface.id)}
                     title={surfaceTitle(surface, props.previewSessions, props.terminalLabelsById)}
@@ -1424,15 +1317,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     theme={resolvedTheme}
                     environmentId={props.environmentId}
                     pullRequestStatusSeed={props.pullRequestStatusSeeds?.[surface.id]}
-                    renaming={renamingDevice === surface.id}
-                    canRename={props.onRenameDevice !== undefined}
                     ownsDesktopTitleBar={ownsDesktopTitleBar}
                     onActivate={onActivateTab}
                     onClose={onCloseTab}
                     onAuxClick={onTabAuxClick}
                     onContextMenu={onTabContextMenu}
-                    onStartRename={onStartRenameTab}
-                    onFinishRename={onFinishRenameTab}
                   />
                 );
               })}
@@ -1579,7 +1468,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddFiles={props.onAddFiles}
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
-            onAddDevice={props.onAddDevice}
             onAddSideChat={props.onAddSideChat}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}
@@ -1587,8 +1475,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             filesAvailable={props.filesAvailable}
             pullRequestAvailable={props.pullRequestAvailable}
             pullRequestsAvailable={props.pullRequestsAvailable}
-            deviceAvailable={props.deviceAvailable}
-            deviceOffered={props.deviceOffered}
             sideChatAvailable={props.sideChatAvailable === true}
             sideChatDisabledReason={props.sideChatDisabledReason ?? null}
           />
@@ -1597,29 +1483,5 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
         )}
       </div>
     </PreviewPanelShell>
-  );
-}
-
-function DeviceTabTooltip(props: {
-  surface: Extract<RightPanelSurface, { kind: "device" }>;
-  environmentId: EnvironmentId | null;
-  title: string;
-}) {
-  const target = props.surface.target;
-  const { state } = useDeviceState(target ? props.environmentId : null);
-  const device = target
-    ? state.devices.find((entry) => entry.hostId === target.hostId && entry.id === target.deviceId)
-    : undefined;
-  const host = target ? state.hosts.find((entry) => entry.id === target.hostId) : undefined;
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span>{props.title}</span>
-      {target ? (
-        <span className="text-muted-foreground">
-          {host?.label ?? "设备主机"} ·{" "}
-          {device?.version ?? (target.platform === "ios" ? "iOS" : "Android")}
-        </span>
-      ) : null}
-    </div>
   );
 }

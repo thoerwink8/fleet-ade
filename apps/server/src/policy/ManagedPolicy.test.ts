@@ -71,8 +71,8 @@ it.layer(NodeServices.layer)("ManagedPolicy.load", (it) => {
         }),
       );
       assert.equal(
-        policy.settings.applyLocks(DEFAULT_SERVER_SETTINGS).enableDeviceSupport,
-        DEFAULT_SERVER_SETTINGS.enableDeviceSupport,
+        policy.settings.applyLocks(DEFAULT_SERVER_SETTINGS).defaultRuntimeMode,
+        DEFAULT_SERVER_SETTINGS.defaultRuntimeMode,
       );
     }),
   );

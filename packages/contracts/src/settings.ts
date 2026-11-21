@@ -1,4 +1,3 @@
-import { EasDeviceHostConfigs, SimlockDeviceHostConfigs, SshDeviceHostConfigs } from "./device.ts";
 import {
   AuthOrchestrationOperateScope,
   AuthSettingsWriteScope,
@@ -1541,13 +1540,13 @@ export const ServerSettings = Schema.Struct({
   /** Fold once so restarts cannot undo later UI resets. */
   projectSettingsFolded: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
 
+  // Retired device-panel settings remain decode-compatible but are never read.
   enableAgentDeviceAccess: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  /** Enabling the Device panel must not grant providers device control. */
   enableDeviceSupport: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   deviceOnboardingCompleted: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  deviceHosts: SshDeviceHostConfigs.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
-  easDeviceHosts: EasDeviceHostConfigs.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
-  simlockDeviceHosts: SimlockDeviceHostConfigs.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  deviceHosts: Schema.Unknown.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  easDeviceHosts: Schema.Unknown.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  simlockDeviceHosts: Schema.Unknown.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
   sidebarAutoSettleAfterDays: Schema.NullOr(SidebarAutoSettleAfterDays).pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_SIDEBAR_AUTO_SETTLE_AFTER_DAYS)),
   ),
@@ -1578,6 +1577,7 @@ export const ServerSettings = Schema.Struct({
   linkedEnvironmentsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Retired Labs switches; kept for deployed policy files and stored settings, but ignored. */
   fastWorktreeCheckout: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  // Retired device host toggle remains only for old settings decoding.
   simlockDeviceHostsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Legacy client sidebar settings; retained here only for policy-file compatibility. */
   boringSidebarEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
@@ -2052,12 +2052,13 @@ export const ServerSettingsPatch = Schema.Struct({
       ),
     ),
   ),
+  // Retired device-panel policy fields are decoded and ignored.
   enableAgentDeviceAccess: Schema.optionalKey(Schema.Boolean),
   enableDeviceSupport: Schema.optionalKey(Schema.Boolean),
   deviceOnboardingCompleted: Schema.optionalKey(Schema.Boolean),
-  deviceHosts: Schema.optionalKey(SshDeviceHostConfigs),
-  easDeviceHosts: Schema.optionalKey(EasDeviceHostConfigs),
-  simlockDeviceHosts: Schema.optionalKey(SimlockDeviceHostConfigs),
+  deviceHosts: Schema.optionalKey(Schema.Unknown),
+  easDeviceHosts: Schema.optionalKey(Schema.Unknown),
+  simlockDeviceHosts: Schema.optionalKey(Schema.Unknown),
   sidebarAutoSettleAfterDays: Schema.optionalKey(Schema.NullOr(SidebarAutoSettleAfterDays)),
   compactIdleThreads: Schema.optionalKey(LegacyCompactIdleThreads),
   idleCompaction: Schema.optionalKey(IdleCompactionMode),

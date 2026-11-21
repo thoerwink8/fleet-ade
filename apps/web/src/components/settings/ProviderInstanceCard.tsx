@@ -591,14 +591,14 @@ export function ProviderEnvironmentSection(props: {
 
 function ProjectOverrideInheritance({
   projectEnabled,
-  deviceEnabled,
+  environmentEnabled,
 }: {
   readonly projectEnabled: boolean;
-  readonly deviceEnabled: boolean;
+  readonly environmentEnabled: boolean;
 }) {
   const layers = [
     { key: "project", label: "项目", enabled: projectEnabled, effective: true },
-    { key: "device", label: "设备", enabled: deviceEnabled, effective: false },
+    { key: "environment", label: "环境", enabled: environmentEnabled, effective: false },
   ];
   return (
     <Popover>
@@ -1152,11 +1152,11 @@ export function ProviderInstanceCard({
             <span className="flex items-center">
               <ProjectOverrideInheritance
                 projectEnabled={projectOverride.value}
-                deviceEnabled={resolveProviderInstanceEnabled(instance)}
+                environmentEnabled={resolveProviderInstanceEnabled(instance)}
               />
               <SettingResetButton
                 label={`${displayName} 启用状态`}
-                tooltip="恢复设备设置"
+                tooltip="恢复环境设置"
                 disabled={readOnly || !canWriteSettings}
                 onClick={projectOverride.onReset}
               />

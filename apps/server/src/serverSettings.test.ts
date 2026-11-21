@@ -1518,17 +1518,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
               enabled: true,
             },
           },
-          easDeviceHosts: [
-            {
-              kind: "eas",
-              id: "eas",
-              label: "EAS 模拟器",
-              accessToken: "expo-secret",
-              maxSessionMinutes: 30,
-              idleMinutes: 10,
-              maxConcurrentSessions: 2,
-            },
-          ],
         });
         const values = [
           "config-secret",
@@ -1537,7 +1526,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           "bitbucket-secret",
           "gitcafe-secret",
           "quota-secret",
-          "expo-secret",
         ];
         const client = ServerSettingsModule.redactServerSettingsForClient(saved, {
           secretReferences: true,
@@ -1554,7 +1542,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           providerInstances: client.providerInstances,
           sourceControlHosts: client.sourceControlHosts,
           usageLimitSources: client.usageLimitSources,
-          easDeviceHosts: client.easDeviceHosts,
         });
         for (const value of values) assert.include(JSON.stringify(echoed), value);
         const renamed = yield* service.updateProviderInstance({
@@ -1785,14 +1772,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           provider: SecretProviderId.make("personal"),
           reference: "op://Private/Hub/key",
         };
-        const easReference = {
-          provider: SecretProviderId.make("personal"),
-          reference: "op://Private/Expo/token",
-        };
-        const simlockReference = {
-          provider: SecretProviderId.make("personal"),
-          reference: "op://Private/Simlock/token",
-        };
         const antigravityReference = {
           provider: SecretProviderId.make("personal"),
           reference: "op://Private/Gemini/key",
@@ -1818,28 +1797,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
               enabled: true,
             },
           },
-          easDeviceHosts: [
-            {
-              kind: "eas",
-              id: "eas",
-              label: "EAS 模拟器",
-              accessToken: easReference,
-              maxSessionMinutes: 30,
-              idleMinutes: 10,
-              maxConcurrentSessions: 2,
-            },
-          ],
-          simlockDeviceHosts: [
-            {
-              kind: "simlock",
-              id: "pool",
-              label: "Device pool",
-              gatewayUrl: "https://simlock.test:4700",
-              agentToken: simlockReference,
-              maxLeases: 2,
-              maxLeaseMinutes: 60,
-            },
-          ],
           providerInstances: {
             [antigravity]: {
               driver: ProviderDriverKind.make("antigravity"),
@@ -1859,8 +1816,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         assert.equal(legacy.sourceControlHosts.bitbucket?.accessToken, SECRET_REDACTED);
         assert.equal(legacy.usageLimitSources[hub]?.managementKey, SECRET_REDACTED);
         assert.equal(legacy.textGenerators[router]?.apiKey, SECRET_REDACTED);
-        assert.equal(legacy.easDeviceHosts[0]?.accessToken, SECRET_REDACTED);
-        assert.equal(legacy.simlockDeviceHosts[0]?.agentToken, SECRET_REDACTED);
         const configOf = (settings: ServerSettings, id: ProviderInstanceId) =>
           settings.providerInstances[id]?.config as Record<string, unknown> | undefined;
         assert.equal(configOf(legacy, antigravity)?.apiKey, SECRET_REDACTED);
@@ -1869,8 +1824,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           sourceControlHosts: legacy.sourceControlHosts,
           usageLimitSources: legacy.usageLimitSources,
           textGenerators: legacy.textGenerators,
-          easDeviceHosts: legacy.easDeviceHosts,
-          simlockDeviceHosts: legacy.simlockDeviceHosts,
           providerInstances: legacy.providerInstances,
         });
         assert.deepEqual(echoed.sourceControlHosts.bitbucket?.accessToken, reference);
@@ -1885,8 +1838,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           xai: "literal-fixture",
           openrouter: "",
         });
-        assert.deepEqual(echoed.easDeviceHosts[0]?.accessToken, easReference);
-        assert.deepEqual(echoed.simlockDeviceHosts[0]?.agentToken, simlockReference);
         assert.deepEqual(configOf(echoed, antigravity)?.apiKey, antigravityReference);
         assert.isTrue(Option.isSome(yield* stored("github", "tokens", "ghe.acme.test")));
       }).pipe(Effect.provide(layerServerSettingsWithSecrets())),
@@ -1932,17 +1883,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
             enabled: true,
           },
         },
-        easDeviceHosts: [
-          {
-            kind: "eas",
-            id: "eas",
-            label: "EAS 模拟器",
-            accessToken: personal("Expo/token"),
-            maxSessionMinutes: 30,
-            idleMinutes: 10,
-            maxConcurrentSessions: 2,
-          },
-        ],
       });
 
       // An older client's save echoes a reference it cannot decode as the redacted marker.
@@ -1969,7 +1909,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       });
       assert.equal(removed.usageLimitSources[hub]?.managementKey, "");
       assert.deepEqual(removed.cloudSpeechCredentials, { openai: "", xai: work, openrouter: "" });
-      assert.equal(removed.easDeviceHosts[0]?.accessToken, "");
       assert.deepEqual(Object.keys(removed.secretProviders), ["work"]);
     }).pipe(Effect.provide(layerServerSettingsWithSecrets())),
   );
@@ -1981,8 +1920,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         "cloudSpeechCredentials.openai",
         "cloudSpeechCredentials.xai",
         "cloudSpeechCredentials.openrouter",
-        "easDeviceHosts.[].accessToken",
-        "simlockDeviceHosts.[].agentToken",
         "usageLimitSources.*.managementKey",
         "textGenerators.*.apiKey",
       ]);
@@ -2430,11 +2367,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
       schemaVersion: 1,
       organization: "Example Corp",
       settings: {
+        defaultAutoPull: { value: true, locked: true },
         defaultRuntimeMode: { value: "approval-required", locked: false },
-        enableAgentDeviceAccess: { value: false, locked: true },
       },
     };
-
     it.effect("uses policy defaults until the user picks something else", () =>
       Effect.gen(function* () {
         const service = yield* ServerSettingsModule.ServerSettingsService;
@@ -2552,7 +2488,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
           ),
         ),
     );
-
     it.effect("lays locks over the user's own and per-project values without persisting them", () =>
       Effect.gen(function* () {
         const service = yield* ServerSettingsModule.ServerSettingsService;
@@ -2562,46 +2497,47 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
         yield* fs.writeFileString(
           config.settingsPath,
           JSON.stringify({
-            enableAgentDeviceAccess: true,
-            projectSettingsOverrides: { [projectId]: { enableAgentDeviceAccess: true } },
+            defaultAutoPull: false,
+            projectSettingsOverrides: { [projectId]: { defaultAutoPull: false } },
           }),
         );
 
         const settings = yield* service.getSettings;
-        assert.isFalse(settings.enableAgentDeviceAccess);
-        assert.isFalse(settings.projectSettingsOverrides[projectId]?.enableAgentDeviceAccess);
+        assert.isTrue(settings.defaultAutoPull);
+        assert.isTrue(settings.projectSettingsOverrides[projectId]?.defaultAutoPull);
         assert.deepEqual(service.managedPolicy, {
           organization: "Example Corp",
-          lockedSettings: ["enableAgentDeviceAccess"],
+          lockedSettings: ["defaultAutoPull"],
         });
 
         const rejected = yield* service
-          .updateSettings({ enableAgentDeviceAccess: true, defaultAutoPull: true })
+          .updateSettings({ defaultAutoPull: false, defaultRuntimeMode: "full-access" })
           .pipe(Effect.flip);
         assert.equal(rejected.operation, "write-managed-setting");
-        assert.equal(rejected.managedSetting, "enableAgentDeviceAccess");
+        assert.equal(rejected.managedSetting, "defaultAutoPull");
         assert.equal(
           rejected.message,
-          "enableAgentDeviceAccess is managed by Example Corp and cannot be changed.",
+          "defaultAutoPull is managed by Example Corp and cannot be changed.",
         );
-        assert.isFalse((yield* service.getSettings).defaultAutoPull);
+        assert.equal((yield* service.getSettings).defaultRuntimeMode, "approval-required");
 
         const projectRejected = yield* service
           .updateSettings({
-            projectSettingsOverrides: { [projectId]: { enableAgentDeviceAccess: true } },
+            projectSettingsOverrides: { [projectId]: { defaultAutoPull: false } },
           })
           .pipe(Effect.flip);
-        assert.equal(projectRejected.managedSetting, "enableAgentDeviceAccess");
+        assert.equal(projectRejected.managedSetting, "defaultAutoPull");
 
         // Unrelated writes, and writes that keep the locked value, go through.
-        yield* service.updateSettings({ enableAgentDeviceAccess: false, defaultAutoPull: true });
-        assert.isTrue((yield* service.getSettings).defaultAutoPull);
+        yield* service.updateSettings({ defaultAutoPull: true, defaultRuntimeMode: "full-access" });
+        assert.equal((yield* service.getSettings).defaultRuntimeMode, "full-access");
 
         // The user's own value stays on disk, ready for when the policy is removed.
         const stored = JSON.parse(yield* fs.readFileString(config.settingsPath));
-        assert.isTrue(stored.enableAgentDeviceAccess);
+        assert.isFalse(stored.defaultAutoPull);
       }).pipe(Effect.provide(layerServerSettings(policy))),
     );
+
     it.effect("accepts a project override that brings the locked value inside a new setting", () =>
       Effect.gen(function* () {
         const service = yield* ServerSettingsModule.ServerSettingsService;

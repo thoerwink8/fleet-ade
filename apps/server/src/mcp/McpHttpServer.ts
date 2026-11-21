@@ -15,7 +15,6 @@ import type * as Types from "effect/Types";
 import { AiError, McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import {
-  DeviceToolError,
   OrchestratorMcpFailure,
   PreviewAutomationError,
   ProviderInteractionMode,
@@ -27,7 +26,6 @@ import packageJson from "../../package.json" with { type: "json" };
 import { parseBearerToken } from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import * as DeviceService from "../device/DeviceService.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as HtmlRender from "../htmlRender/HtmlRender.ts";
 import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
@@ -71,12 +69,6 @@ import * as PullRequestsHandlers from "./toolkits/pullRequests/handlers.ts";
 import * as ToolSearchHandlers from "./toolkits/toolSearch/handlers.ts";
 import { ToolSearchToolkit } from "./toolkits/toolSearch/tools.ts";
 import { PullRequestsToolkit } from "./toolkits/pullRequests/tools.ts";
-import * as DeviceHandlers from "./toolkits/device/handlers.ts";
-import {
-  DeviceScreenshotTool,
-  DeviceScreenshotToolkit,
-  DeviceStandardToolkit,
-} from "./toolkits/device/tools.ts";
 import * as HtmlHandlers from "./toolkits/html/handlers.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
 import { requestUrl } from "../requestUrl.ts";
@@ -853,37 +845,7 @@ const registerImageTool = Effect.fn("McpHttpServer.registerImageTool")(function*
   });
 });
 
-const registerDeviceScreenshot = Effect.fn("McpHttpServer.registerDeviceScreenshot")(function* () {
-  const devices = yield* DeviceService.DeviceService;
-  const threads = yield* ThreadManagementService.ThreadManagementService;
-  const built = yield* decodeAsAdvertised(DeviceScreenshotToolkit);
-  yield* registerImageTool(
-    DeviceScreenshotTool,
-    (payload) =>
-      built
-        .handle("device_screenshot", payload)
-        .pipe(Stream.unwrap, Stream.run(Sink.last()), Effect.flatMap(Effect.fromOption)),
-    (effect) =>
-      effect.pipe(
-        Effect.provideService(DeviceService.DeviceService, devices),
-        Effect.provideService(ThreadManagementService.ThreadManagementService, threads),
-      ),
-    "screenshot",
-    (error) => {
-      if (!isDeviceToolError(error)) {
-        return isOrchestratorMcpFailure(error)
-          ? error.message
-          : (parameterValidationMessage(error) ?? "Device screenshot failed.");
-      }
-      return error._tag === "DeviceOperationError" && error.reason === "hub_rejected"
-        ? `${error.message} Call device_list to check the device state, and device_open if it needs to be reopened.`
-        : error.message;
-    },
-  );
-});
-
 const isOrchestratorMcpFailure = Schema.is(OrchestratorMcpFailure);
-const isDeviceToolError = Schema.is(DeviceToolError);
 
 const registerHtmlPreview = Effect.fn("McpHttpServer.registerHtmlPreview")(function* () {
   const htmlRender = yield* HtmlRender.HtmlRender;
@@ -1074,21 +1036,6 @@ export const layerPullRequestsToolkit = toolkitRegistration(
   PullRequestsHandlers.layer,
 ).pipe(Layer.provide(PullRequestWatchService.layer));
 
-const layerDeviceStandardToolkitRegistration = toolkitRegistration(
-  DeviceStandardToolkit,
-  DeviceHandlers.layerStandard,
-);
-
-const layerDeviceScreenshotRegistration = imageToolRegistration(
-  registerDeviceScreenshot(),
-  DeviceHandlers.layerScreenshot,
-);
-
-export const layerDeviceToolkit = Layer.mergeAll(
-  layerDeviceStandardToolkitRegistration,
-  layerDeviceScreenshotRegistration,
-);
-
 /**
  * `McpServer` for in-process calls, which provide `McpInvocationContext`
  * around `callTool` as the auth middleware does for each /mcp request.
@@ -1130,7 +1077,6 @@ export const layerTools = Layer.mergeAll(
   layerPreviewControlsRegistration,
   layerWorktreeToolkitRegistration,
   layerPullRequestsToolkit,
-  layerDeviceToolkit,
   layerHtmlToolkit,
 );
 

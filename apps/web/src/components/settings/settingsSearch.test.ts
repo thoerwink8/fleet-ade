@@ -364,7 +364,6 @@ describe("movedSettingsPath", () => {
     expect(movedSettingsPath("/settings/connections", "network-access")).toBe("/settings/access");
     expect(movedSettingsPath("/settings/storage", "storage-worktrees")).toBe("/settings/worktrees");
     expect(movedSettingsPath("/settings/storage", "")).toBe("/settings/maintenance");
-    expect(movedSettingsPath("/settings/integrations", "devices")).toBe("/settings/devices");
     expect(movedSettingsPath("/settings/beta", "")).toBe("/settings/maintenance");
     expect(movedSettingsPath("/settings/labs", "")).toBe("/settings/maintenance");
   });

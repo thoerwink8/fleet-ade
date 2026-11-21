@@ -8,6 +8,5 @@ notices:
 - On mobile, open **Settings → About T3 Code → Open source licenses**.
 
 The page lists the version when available, license identifier, and the parts of T3 Code that include
-or use the item. This also covers optional device tools that T3 Code installs on demand instead of
-bundling. Select a row to read the complete notice text. Use the search field to find a package,
+or use the item. Select a row to read the complete notice text. Use the search field to find a package,
 version, license, or app component.

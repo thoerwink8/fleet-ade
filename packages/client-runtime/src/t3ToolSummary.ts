@@ -459,9 +459,6 @@ export function summarizeT3ToolCalls(
     case "browser":
       label = phrase("已使用", "使用", `浏览器 ${times}`);
       break;
-    case "device":
-      label = phrase("已操作", "操作", `设备 ${times}`);
-      break;
     case "html-preview":
       label = phrase("已预览", "预览", quantity(selected.length, "个 ", "HTML 页面"));
       break;
