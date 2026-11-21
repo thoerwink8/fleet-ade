@@ -6,7 +6,7 @@ import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { referenceRepos } from "./lib/reference-repos.ts";
+import { referenceRepos, type ReferenceRepo } from "./lib/reference-repos.ts";
 import {
   applyReferenceRepoSync,
   planReferenceRepoSync,
@@ -14,7 +14,15 @@ import {
 } from "./sync-reference-repos.ts";
 
 const effectRepo = referenceRepos[0]!;
-const alchemyEffect = referenceRepos[1]!;
+const fixtureRepo: ReferenceRepo = {
+  id: "fixture",
+  prefix: ".repos/fixture",
+  repository: "https://example.invalid/fixture.git",
+  latestRef: "main",
+  versionSourcePath: "pnpm-workspace.yaml",
+  packageVersionPath: ["catalog", "fixture"],
+  versionTagPrefix: "v",
+};
 
 const execGit = Effect.fnUntraced(function* (cwd: string, args: ReadonlyArray<string>) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -40,14 +48,14 @@ it.layer(NodeServices.layer)("sync-reference-repos", (it) => {
       });
       yield* fs.writeFileString(
         path.join(rootDir, "pnpm-workspace.yaml"),
-        "catalog:\n  alchemy: 2.0.0-beta.84\n  effect: 4.0.0-beta.73\n",
+        "catalog:\n  fixture: 2.0.0-beta.84\n  effect: 4.0.0-beta.73\n",
       );
 
       assert.equal(
         yield* resolveReferenceRepoRef(effectRepo, rootDir, false),
         "effect@4.0.0-beta.73",
       );
-      assert.equal(yield* resolveReferenceRepoRef(alchemyEffect, rootDir, false), "v2.0.0-beta.84");
+      assert.equal(yield* resolveReferenceRepoRef(fixtureRepo, rootDir, false), "v2.0.0-beta.84");
     }),
   );
 
@@ -98,7 +106,7 @@ it.layer(NodeServices.layer)("sync-reference-repos", (it) => {
         );
       }
 
-      yield* fs.writeFileString(path.join(upstreamDir, "README.md"), "alchemy reference\n");
+      yield* fs.writeFileString(path.join(upstreamDir, "README.md"), "fixture reference\n");
       // Keep an empty submodule mountpoint in the upstream tree via a gitlink entry.
       assert.equal(
         (yield* execGit(upstreamDir, [
@@ -113,7 +121,7 @@ it.layer(NodeServices.layer)("sync-reference-repos", (it) => {
       assert.equal((yield* execGit(upstreamDir, ["commit", "--quiet", "-m", "init"])).exitCode, 0);
 
       // Seed rootDir with an inherited orphan 160000 gitlink and no root .gitmodules.
-      yield* fs.makeDirectory(path.join(rootDir, ".repos/alchemy-effect/submodules/distilled"), {
+      yield* fs.makeDirectory(path.join(rootDir, ".repos/fixture/submodules/distilled"), {
         recursive: true,
       });
       assert.equal(
@@ -121,7 +129,7 @@ it.layer(NodeServices.layer)("sync-reference-repos", (it) => {
           "update-index",
           "--add",
           "--cacheinfo",
-          "160000,e02e9d405b8848909f4f746b61b12a663f631c7c,.repos/alchemy-effect/submodules/distilled",
+          "160000,e02e9d405b8848909f4f746b61b12a663f631c7c,.repos/fixture/submodules/distilled",
         ])).exitCode,
         0,
       );
@@ -132,7 +140,7 @@ it.layer(NodeServices.layer)("sync-reference-repos", (it) => {
       assert.equal((yield* execGit(rootDir, ["submodule", "status"])).exitCode, 128);
 
       yield* applyReferenceRepoSync(rootDir, {
-        repo: alchemyEffect,
+        repo: fixtureRepo,
         ref: "v2.0.0-beta.84",
         cloneArgs: ["clone", "--quiet", upstreamDir],
       });
@@ -141,9 +149,9 @@ it.layer(NodeServices.layer)("sync-reference-repos", (it) => {
       assert.equal(submoduleStatus.exitCode, 0, submoduleStatus.stderr);
       assert.equal(submoduleStatus.stdout, "");
 
-      const staged = yield* execGit(rootDir, ["ls-files", "--stage", "--", alchemyEffect.prefix]);
+      const staged = yield* execGit(rootDir, ["ls-files", "--stage", "--", fixtureRepo.prefix]);
       assert.equal(staged.exitCode, 0);
-      assert.include(staged.stdout, ".repos/alchemy-effect/README.md");
+      assert.include(staged.stdout, ".repos/fixture/README.md");
       assert.notInclude(staged.stdout, "160000 ");
     }),
   );

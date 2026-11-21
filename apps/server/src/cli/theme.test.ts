@@ -164,7 +164,7 @@ describe("t3 theme", () => {
     }),
   );
 
-  // quarantine: #27 关一基线：抛出 Unknown error: undefined
+  // quarantine: #214 关一基线：抛出 Unknown error: undefined
   it.effect.skip("restores the previous theme when a re-publish fails to set", () =>
     Effect.gen(function* () {
       const baseDir = makeBaseDir();
@@ -189,7 +189,7 @@ describe("t3 theme", () => {
     }),
   );
 
-  // quarantine: #28 关一基线：抛出 Unknown error: undefined
+  // quarantine: #214 关一基线：抛出 Unknown error: undefined
   it.effect.skip("refuses to write when the settings file cannot be read", () =>
     Effect.gen(function* () {
       const baseDir = makeBaseDir();

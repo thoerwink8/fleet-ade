@@ -660,8 +660,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       }),
   );
 
+  // quarantine: #214 关一基线：安装状态是 cancelled，期望是 failed
   // The runtime's own abort is a real process; Windows has no POSIX sh.
-  // quarantine: #26 关一基线：安装状态是 cancelled，期望是 failed
   it.effect.skip(
     "explains that the linux-arm64 runtime needs 4 KiB pages when it aborts on a 16 KiB kernel",
     () =>

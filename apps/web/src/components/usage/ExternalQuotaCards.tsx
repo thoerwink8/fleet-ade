@@ -1,16 +1,8 @@
 import type { ExternalQuotaGroups, ExternalUsageReport } from "@t3tools/contracts";
+import { formatCountWan } from "@t3tools/shared/usageFormat";
 
 import { Button } from "../ui/button";
 import { QUOTA_STALL_TIMEOUT_MS, usePendingStall } from "./usePendingStall";
-
-function formatCount(value: number): string {
-  if (value >= 10_000) {
-    const wan = value / 10_000;
-    const text = wan >= 10 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, "");
-    return `${text}万`;
-  }
-  return String(Math.round(value));
-}
 
 function formatReset(resetsAt: string | undefined): string | null {
   if (!resetsAt) return null;
@@ -68,12 +60,12 @@ function UsageRows({
           <>
             {rows.agents.map((row) => (
               <p key={`agent-${row.name}`} className="text-sm">
-                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} 词元，花费 ${row.costUsd.toFixed(2)} 美元`}
+                {`${row.name}：调用 ${row.calls}，${formatCountWan(row.tokens)} 词元，花费 ${row.costUsd.toFixed(2)} 美元`}
               </p>
             ))}
             {rows.models.map((row) => (
               <p key={`model-${row.name}`} className="text-sm">
-                {`${row.name}：调用 ${row.calls}，${formatCount(row.tokens)} 词元，花费 ${row.costUsd.toFixed(2)} 美元`}
+                {`${row.name}：调用 ${row.calls}，${formatCountWan(row.tokens)} 词元，花费 ${row.costUsd.toFixed(2)} 美元`}
               </p>
             ))}
           </>
