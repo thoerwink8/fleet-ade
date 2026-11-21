@@ -296,7 +296,12 @@ import { getTriggerDisplayModelName } from "./chat/providerIconUtils";
 import { resolveScrollToEndClearance } from "./composerFooterLayout";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ThreadHeaderContext } from "./chat/ThreadHeaderMeta";
-import { formatHeaderContextPercent } from "./chat/threadHeaderMeta.logic";
+import {
+  collectThreadUsageSessions,
+  formatHeaderContextPercent,
+  formatHeaderCostUsd,
+} from "./chat/threadHeaderMeta.logic";
+import { useThreadSessionUsage } from "../state/usage";
 import { useSideChat } from "./chat/useSideChat";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { shouldShowOpenInPicker } from "./chat/OpenInPicker.logic";
@@ -1498,6 +1503,17 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadLiveTokenUsage,
     activeProviderThread,
   );
+  const threadUsageQuery = collectThreadUsageSessions(serverProjection?.providerThreads);
+  const sessionUsageRefreshKey =
+    isServerThread && activeThread
+      ? `${activeContextWindow?.updatedAt ?? ""}:${serverProjection?.providerTurns.length ?? 0}:${activeRuntime?.status ?? ""}`
+      : null;
+  const activeSessionUsage = useThreadSessionUsage(
+    isServerThread && activeThread ? activeThread.environmentId : null,
+    threadUsageQuery,
+    sessionUsageRefreshKey,
+  );
+  const headerCost = formatHeaderCostUsd(activeSessionUsage?.costUsd);
   const pendingBackgroundTasks = deriveThreadPendingBackgroundTasks(serverProjection);
   const activeWorkStartedAt =
     deriveActiveWorkStartedAt(activeActivityRun, activeRuntime, localDispatchStartedAt) ??
@@ -3363,9 +3379,10 @@ export default function ChatView(props: ChatViewProps) {
               branch={activeThread.branch ?? null}
               pullRequest={linkedThreadPullRequest ?? null}
               trailing={
-                headerContextPercent !== null ? (
+                headerContextPercent !== null || headerCost !== null ? (
                   <ThreadHeaderContext
                     percent={headerContextPercent}
+                    cost={headerCost}
                     open={threadPanelOpen}
                     presentation={threadPanelPresentation}
                     popoverHandle={threadPanelPopoverHandle}
@@ -3960,6 +3977,7 @@ export default function ChatView(props: ChatViewProps) {
                     sources: serverConfig?.usageLimitSources ?? EMPTY_USAGE_LIMIT_SOURCES,
                     contextWindow: activeContextWindow,
                     promptCacheExpiresAt: activeThreadLiveTokenUsage?.promptCacheExpiresAt ?? null,
+                    sessionCostUsd: activeSessionUsage?.costUsd ?? null,
                   }}
                 />
 

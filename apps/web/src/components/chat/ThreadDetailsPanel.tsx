@@ -33,6 +33,7 @@ import {
 } from "./ThreadDetailsUsage";
 import { ThreadDetailsItemsMenuItems } from "./ThreadDetailsItemsMenu";
 import { resolveThreadDetailsVisibility, THREAD_DETAILS_ITEMS } from "./threadDetailsItems";
+import { formatHeaderCostUsd } from "./threadHeaderMeta.logic";
 import { useClientSettings } from "../../hooks/useSettings";
 import { useProject, useServerConfigs } from "../../state/entities";
 import { ThreadDetailsThreadPrRows } from "./ThreadDetailsPrRows";
@@ -286,10 +287,13 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
 
               {visible.usage ? <ThreadDetailsUsage {...props.usage} /> : null}
 
-              {visible.context && props.usage.contextWindow ? (
+              {visible.context &&
+              (props.usage.contextWindow != null ||
+                formatHeaderCostUsd(props.usage.sessionCostUsd) !== null) ? (
                 <ThreadDetailsContext
-                  usage={props.usage.contextWindow}
+                  usage={props.usage.contextWindow ?? null}
                   promptCacheExpiresAt={props.usage.promptCacheExpiresAt ?? null}
+                  sessionCostUsd={props.usage.sessionCostUsd ?? null}
                 />
               ) : null}
 

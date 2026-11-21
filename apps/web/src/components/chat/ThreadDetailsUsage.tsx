@@ -36,6 +36,7 @@ export interface ThreadDetailsUsageInput {
   readonly sources: UsageLimitSourceSnapshots;
   readonly contextWindow: ContextWindowSnapshot | null;
   readonly promptCacheExpiresAt?: string | null;
+  readonly sessionCostUsd?: number | null;
 }
 
 type UsageTone = "error" | "warning" | null;
@@ -87,33 +88,38 @@ export function ThreadDetailsUsage({
 export function ThreadDetailsContext({
   usage,
   promptCacheExpiresAt = null,
+  sessionCostUsd = null,
 }: {
-  readonly usage: ContextWindowSnapshot;
+  readonly usage: ContextWindowSnapshot | null;
   readonly promptCacheExpiresAt?: string | null;
+  readonly sessionCostUsd?: number | null;
 }) {
   const nowMinute = useNowMinute();
   const nowMs = Date.parse(`${nowMinute}:00Z`);
-  const maxTokens = usage.maxTokens != null && usage.maxTokens > 0 ? usage.maxTokens : null;
+  const maxTokens =
+    usage !== null && usage.maxTokens != null && usage.maxTokens > 0 ? usage.maxTokens : null;
   const used =
-    maxTokens !== null && usage.usedPercentage !== null
+    usage !== null && maxTokens !== null && usage.usedPercentage !== null
       ? Math.round(Math.max(0, Math.min(100, usage.usedPercentage)))
       : null;
-  const threshold = usage.autoCompactThreshold ?? null;
+  const threshold = usage?.autoCompactThreshold ?? null;
   const tick =
     maxTokens !== null && threshold !== null && threshold > 0 && threshold < maxTokens
       ? (threshold / maxTokens) * 100
       : null;
-  const usedTokens = formatContextWindowTokens(usage.usedTokens);
+  const usedTokens = usage !== null ? formatContextWindowTokens(usage.usedTokens) : null;
   const detailRows = buildContextDetailRows(
     {
-      inputTokens: usage.inputTokens,
-      cachedInputTokens: usage.cachedInputTokens,
-      outputTokens: usage.outputTokens,
-      reasoningOutputTokens: usage.reasoningOutputTokens,
+      inputTokens: usage?.inputTokens,
+      cachedInputTokens: usage?.cachedInputTokens,
+      outputTokens: usage?.outputTokens,
+      reasoningOutputTokens: usage?.reasoningOutputTokens,
       promptCacheExpiresAt,
+      sessionCostUsd,
     },
     nowMs,
   );
+  if (usage === null && detailRows.length === 0) return null;
   return (
     <ThreadDetailsSection
       headingId="thread-details-context-heading"
@@ -121,39 +127,41 @@ export function ThreadDetailsContext({
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
-        <UsageRow
-          label="上下文"
-          fill={used}
-          tone={used === null ? null : used >= 90 ? "error" : used >= 80 ? "warning" : null}
-          tick={tick}
-          muted
-          value={
-            maxTokens !== null
-              ? threshold !== null && threshold > 0
-                ? `${usedTokens} / 阈值 ${formatContextWindowTokens(threshold)}`
-                : `${usedTokens} / ${formatContextWindowTokens(maxTokens)}`
-              : usedTokens
-          }
-          ariaValue={used !== null ? `已用 ${used}%` : `已用 ${usedTokens} 词元`}
-          tooltip={
-            <>
-              <span className="text-foreground">
-                {used !== null ? `上下文：已用 ${used}%` : `上下文：已用 ${usedTokens} 词元`}
-              </span>
-              {maxTokens !== null ? (
-                <span className="text-muted-foreground">
-                  共 {maxTokens.toLocaleString("en-US")} 词元，已用{" "}
-                  {usage.usedTokens.toLocaleString("en-US")}
+        {usage !== null && usedTokens !== null ? (
+          <UsageRow
+            label="上下文"
+            fill={used}
+            tone={used === null ? null : used >= 90 ? "error" : used >= 80 ? "warning" : null}
+            tick={tick}
+            muted
+            value={
+              maxTokens !== null
+                ? threshold !== null && threshold > 0
+                  ? `${usedTokens} / 阈值 ${formatContextWindowTokens(threshold)}`
+                  : `${usedTokens} / ${formatContextWindowTokens(maxTokens)}`
+                : usedTokens
+            }
+            ariaValue={used !== null ? `已用 ${used}%` : `已用 ${usedTokens} 词元`}
+            tooltip={
+              <>
+                <span className="text-foreground">
+                  {used !== null ? `上下文：已用 ${used}%` : `上下文：已用 ${usedTokens} 词元`}
                 </span>
-              ) : null}
-              {threshold !== null && threshold > 0 ? (
-                <span className="text-muted-foreground">
-                  {formatContextWindowCompactionMessage(threshold)}
-                </span>
-              ) : null}
-            </>
-          }
-        />
+                {maxTokens !== null ? (
+                  <span className="text-muted-foreground">
+                    共 {maxTokens.toLocaleString("en-US")} 词元，已用{" "}
+                    {usage.usedTokens.toLocaleString("en-US")}
+                  </span>
+                ) : null}
+                {threshold !== null && threshold > 0 ? (
+                  <span className="text-muted-foreground">
+                    {formatContextWindowCompactionMessage(threshold)}
+                  </span>
+                ) : null}
+              </>
+            }
+          />
+        ) : null}
         {detailRows.map((row) => (
           <UsageRow
             key={row.key}

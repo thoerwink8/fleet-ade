@@ -135,6 +135,40 @@ describe("buildContextDetailRows", () => {
         },
       ],
     },
+    {
+      name: "includes session cost row when positive and hides zero/null cost",
+      usage: {
+        inputTokens: null,
+        cachedInputTokens: null,
+        outputTokens: null,
+        reasoningOutputTokens: null,
+        promptCacheExpiresAt: null,
+        sessionCostUsd: 0.38,
+      },
+      nowMs: NOW_MS,
+      expected: [
+        {
+          key: "session-cost",
+          label: "本会话花费",
+          fill: null,
+          value: "$0.38",
+          tooltipLines: ["本会话花费：$0.38", "按用量页口径计费"],
+        },
+      ],
+    },
+    {
+      name: "omits session cost row when cost is zero",
+      usage: {
+        inputTokens: null,
+        cachedInputTokens: null,
+        outputTokens: null,
+        reasoningOutputTokens: null,
+        promptCacheExpiresAt: null,
+        sessionCostUsd: 0,
+      },
+      nowMs: NOW_MS,
+      expected: [],
+    },
   ])("$name", ({ usage, nowMs, expected }) => {
     expect(buildContextDetailRows(usage, nowMs)).toEqual(expected);
   });

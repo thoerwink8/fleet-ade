@@ -1,5 +1,6 @@
 // @effect-diagnostics globalDate:off
 import type {
+  SessionUsage,
   UsageBucket,
   UsageCategoryCost,
   UsageDay,
@@ -303,10 +304,7 @@ export class UsageAggregator {
 
   // Aliases use the target's rate, replacing provider-specific rateModel.
   #mapModel(record: UsageRecord): UsageRecord {
-    const model = this.#options.modelAliases?.get(record.model);
-    if (model === undefined) return record;
-    const { rateModel: _rateModel, ...rest } = record;
-    return { ...rest, model };
+    return mapUsageRecordModel(record, this.#options.modelAliases);
   }
 
   // Time-ordered records usually reuse the previous bucket; avoid rebuilding its key.
@@ -410,6 +408,83 @@ export class UsageAggregator {
       outOfWindow: this.#outOfWindow,
     };
   }
+}
+
+function mapUsageRecordModel(
+  record: UsageRecord,
+  modelAliases: ReadonlyMap<string, string> | undefined,
+): UsageRecord {
+  const model = modelAliases?.get(record.model);
+  if (model === undefined) return record;
+  const { rateModel: _rateModel, ...rest } = record;
+  return { ...rest, model };
+}
+
+export interface SessionUsageOptions {
+  readonly rates: RateTable;
+  readonly priceOverrides?: RateTable;
+  readonly modelAliases?: ReadonlyMap<string, string>;
+}
+
+export const EMPTY_SESSION_USAGE: SessionUsage = {
+  costUsd: null,
+  totals: { ...EMPTY_TOTALS },
+  records: 0,
+  unpricedRecords: 0,
+};
+
+/**
+ * Aggregates usage records for a single session using the same alias mapping,
+ * dedupe-copy merging, and pricing rules as `UsageAggregator`.
+ */
+export function aggregateSessionUsage(
+  records: Iterable<UsageRecord>,
+  options: SessionUsageOptions,
+): SessionUsage {
+  const seen = new Map<string, UsageRecord>();
+  const totals: { -readonly [K in keyof UsageTokenTotals]: number } = { ...EMPTY_TOTALS };
+  let costUsd = 0;
+  let recordCount = 0;
+  let unpricedRecords = 0;
+
+  const accumulate = (record: UsageRecord) => {
+    const priced = priceUsage(options.rates, record, options.priceOverrides);
+    totals.uncachedInputTokens += record.totals.uncachedInputTokens;
+    totals.cachedInputTokens += record.totals.cachedInputTokens;
+    totals.cacheCreationTokens += record.totals.cacheCreationTokens;
+    totals.outputTokens += record.totals.outputTokens;
+    totals.reasoningTokens += record.totals.reasoningTokens;
+    costUsd += priced.costUsd;
+    recordCount += 1;
+    if (priced.costSource === "unpriced") unpricedRecords += 1;
+  };
+
+  for (const input of records) {
+    const mapped = mapUsageRecordModel(input, options.modelAliases);
+    if (mapped.dedupeKey !== null) {
+      const held = seen.get(mapped.dedupeKey);
+      seen.set(mapped.dedupeKey, held === undefined ? mapped : mergeUsageCopies(held, mapped));
+      continue;
+    }
+    accumulate(mapped);
+  }
+
+  for (const record of seen.values()) {
+    accumulate(record);
+  }
+
+  return {
+    costUsd:
+      recordCount === 0 ||
+      unpricedRecords === recordCount ||
+      !Number.isFinite(costUsd) ||
+      costUsd <= 0
+        ? null
+        : roundUsd(costUsd),
+    totals,
+    records: recordCount,
+    unpricedRecords,
+  };
 }
 
 function roundUsd(value: number): number {

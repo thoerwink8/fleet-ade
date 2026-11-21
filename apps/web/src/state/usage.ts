@@ -3,6 +3,8 @@ import {
   AuthDiagnosticsReadScope,
   USAGE_CONTRACT_VERSION,
   type EnvironmentId,
+  type SessionUsage,
+  type SessionUsageInput,
   type UsageBucket,
   type UsageSummary,
   type UsageProviderKind,
@@ -11,7 +13,7 @@ import {
 import { refreshUsage, usageSummaryInput } from "@t3tools/client-runtime/state/usage";
 import { resolveUsageAccess } from "@t3tools/client-runtime/state/usage-access";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { mergeUsage, type EnvironmentUsage, type MergedUsage } from "@t3tools/shared/usageMerge";
 import { appAtomRegistry } from "../rpc/atomRegistry";
@@ -243,4 +245,82 @@ export function useUsage(
     isPartial: answeredCount > 0 && stillReporting > 0,
     refresh,
   };
+}
+
+const EMPTY_SESSION_USAGE_ATOM = Atom.make<SessionUsage | null>(null).pipe(
+  Atom.withLabel("web-usage:session:empty"),
+);
+
+const sessionUsageByKeyAtom = Atom.family((requestKey: string) =>
+  Atom.make((get): SessionUsage | null => {
+    const [environmentId, input] = JSON.parse(requestKey) as readonly [
+      EnvironmentId,
+      SessionUsageInput,
+    ];
+    if (input.sessions.length === 0) return null;
+    const presentation = get(environmentPresentations.presentationsAtom).get(environmentId);
+    if (!presentation) return null;
+    const sessionResult = get(environmentSession.sessionStateAtom(environmentId));
+    const access = resolveUsageAccess({
+      connectionPhase: presentation.connection.phase,
+      session: AsyncResult.getOrElse(sessionResult, () => null),
+      hasSessionError: sessionResult._tag === "Failure",
+    });
+    if (!access.canReadDiagnostics) return null;
+    const result = get(serverEnvironment.sessionUsage({ environmentId, input }));
+    return AsyncResult.getOrElse(result, () => null);
+  }).pipe(Atom.withLabel(`web-usage:session:${requestKey}`)),
+);
+
+/**
+ * Reads USD cost and token totals for the active thread's native provider sessions, keeping the
+ * last value for the same session key while refreshes are in flight and refreshing on `refreshKey`
+ * changes.
+ */
+export function useThreadSessionUsage(
+  environmentId: EnvironmentId | null,
+  input: SessionUsageInput,
+  refreshKey: string | null,
+): SessionUsage | null {
+  const sessionKey =
+    environmentId === null || input.sessions.length === 0
+      ? null
+      : JSON.stringify([environmentId, input]);
+  const liveUsage = useAtomValue(
+    sessionKey === null ? EMPTY_SESSION_USAGE_ATOM : sessionUsageByKeyAtom(sessionKey),
+  );
+  const [retained, setRetained] = useState<{
+    readonly key: string | null;
+    readonly usage: SessionUsage | null;
+  }>({ key: sessionKey, usage: liveUsage });
+  if (retained.key !== sessionKey) {
+    setRetained({ key: sessionKey, usage: liveUsage });
+  } else if (liveUsage !== null && liveUsage !== retained.usage) {
+    setRetained({ key: sessionKey, usage: liveUsage });
+  }
+  const usage = retained.key === sessionKey ? (liveUsage ?? retained.usage) : liveUsage;
+
+  const previousRefreshRef = useRef<{
+    readonly sessionKey: string | null;
+    readonly refreshKey: string | null;
+  }>({ sessionKey, refreshKey });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- refreshes the sessionUsage registry atom when this thread's turn/context state advances
+  useEffect(() => {
+    const previous = previousRefreshRef.current;
+    previousRefreshRef.current = { sessionKey, refreshKey };
+    if (
+      environmentId === null ||
+      sessionKey === null ||
+      previous.sessionKey !== sessionKey ||
+      previous.refreshKey === refreshKey ||
+      refreshKey === null ||
+      !readEnvironmentScope(environmentId, AuthDiagnosticsReadScope)
+    ) {
+      return;
+    }
+    const [, parsedInput] = JSON.parse(sessionKey) as readonly [EnvironmentId, SessionUsageInput];
+    appAtomRegistry.refresh(serverEnvironment.sessionUsage({ environmentId, input: parsedInput }));
+  }, [environmentId, sessionKey, refreshKey]);
+
+  return usage;
 }
