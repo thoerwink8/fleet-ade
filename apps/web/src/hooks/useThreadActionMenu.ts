@@ -23,6 +23,7 @@ import {
 import { titleRegenerationToast } from "../components/threadTitleRegenerationToast";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { copyThreadReference } from "../lib/copyThreadReference";
+import { exportThreadMarkdown } from "../lib/exportThreadMarkdown";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
@@ -141,6 +142,7 @@ export function useThreadActionMenu(input: {
       const items = buildThreadActionMenuItems({
         canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
         canFind: onFind !== undefined,
+        canExport: true,
         branch: thread.branch ?? null,
         projectFilter: null,
         isPinned: thread.pinnedAt != null,
@@ -280,6 +282,18 @@ export function useThreadActionMenu(input: {
           } else if (!isAtomCommandInterrupted(result)) {
             failureToast("无法将会话转换为项目", squashAtomCommandFailure(result));
           }
+          return;
+        }
+        case "export-markdown": {
+          const project = projects.find(
+            (candidate) =>
+              candidate.environmentId === thread.environmentId && candidate.id === thread.projectId,
+          );
+          await exportThreadMarkdown({
+            threadRef,
+            title: thread.title,
+            projectName: project?.title ?? null,
+          });
           return;
         }
         case "copy-path": {

@@ -102,4 +102,29 @@ describe("buildThreadActionMenuItems", () => {
     });
     expect(readOnly.find((item) => item.id === "mark-commander")?.disabled).toBe(true);
   });
+
+  it("keeps export-markdown enabled for read-only clients when canExport is true", () => {
+    const hidden = buildThreadActionMenuItems({
+      ...baseState,
+      canOperate: false,
+    });
+    expect(hidden.some((item) => item.id === "export-markdown")).toBe(false);
+
+    const visible = buildThreadActionMenuItems({
+      ...baseState,
+      canOperate: false,
+      canExport: true,
+    });
+    const exportIndex = visible.findIndex((item) => item.id === "export-markdown");
+    const copyIndex = visible.findIndex((item) => item.id === "copy");
+    expect(exportIndex).toBeGreaterThan(-1);
+    expect(exportIndex).toBe(copyIndex - 1);
+    expect(visible[exportIndex]).toMatchObject({
+      id: "export-markdown",
+      label: "导出为 Markdown",
+      icon: "download",
+      separatorBefore: true,
+    });
+    expect(visible[exportIndex]?.disabled).not.toBe(true);
+  });
 });
