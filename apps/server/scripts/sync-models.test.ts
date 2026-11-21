@@ -182,20 +182,48 @@ describe("model manifest validation and write decision", () => {
     });
   });
 
-  it("formats source layouts identically and preserves the bundled text", async () => {
+  it("preserves formatting when only updatedAt changes", async () => {
     const text = NodeFS.readFileSync(
       new URL("../src/provider/model-manifest.json", import.meta.url),
       "utf8",
     );
-    const value = validateModelManifest(JSON.parse(text));
-    assert.equal(await formatModelManifest(value, text), text);
-
-    const changed = { ...value, updatedAt: "2026-01-01T00:00:00Z" };
-    const compactSource = validateModelManifest(JSON.parse(JSON.stringify(changed)));
-    const indentedSource = validateModelManifest(JSON.parse(JSON.stringify(changed, null, 2)));
+    const expected = text.replace(
+      '  "updatedAt": "2026-11-12T18:25:36Z",',
+      '  "updatedAt": "2026-11-13T00:00:00Z",',
+    );
     assert.equal(
-      await formatModelManifest(compactSource, text),
-      await formatModelManifest(indentedSource, text),
+      await formatModelManifest(validateModelManifest(JSON.parse(expected)), text),
+      expected,
+    );
+  });
+
+  it("preserves unchanged siblings when adding a model", async () => {
+    const text = NodeFS.readFileSync(
+      new URL("../src/provider/model-manifest.json", import.meta.url),
+      "utf8",
+    );
+    const expected = text.replace(
+      '        { "slug": "gpt-5.3-codex-spark", "name": "GPT-5.3 Codex Spark", "status": "legacy" }\n      ]',
+      '        { "slug": "gpt-5.3-codex-spark", "name": "GPT-5.3 Codex Spark", "status": "legacy" },\n        { "slug": "sync-test-model", "name": "Sync Test Model", "status": "legacy" }\n      ]',
+    );
+    assert.equal(
+      await formatModelManifest(validateModelManifest(JSON.parse(expected)), text),
+      expected,
+    );
+  });
+
+  it("preserves unchanged siblings when deleting a model", async () => {
+    const text = NodeFS.readFileSync(
+      new URL("../src/provider/model-manifest.json", import.meta.url),
+      "utf8",
+    );
+    const expected = text.replace(
+      ',\n        { "slug": "gpt-5.3-codex-spark", "name": "GPT-5.3 Codex Spark", "status": "legacy" }',
+      "",
+    );
+    assert.equal(
+      await formatModelManifest(validateModelManifest(JSON.parse(expected)), text),
+      expected,
     );
   });
 });

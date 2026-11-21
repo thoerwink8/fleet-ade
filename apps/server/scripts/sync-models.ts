@@ -16,7 +16,7 @@ const MANIFEST_PATH = NodeURL.fileURLToPath(
   new URL("../src/provider/model-manifest.json", import.meta.url),
 );
 const SOURCE_TIMEOUT_MS = 15_000;
-const USAGE = "用法: pnpm models:sync --source <地址或本地 JSON 路径> [--write]";
+const USAGE = "用法：pnpm models:sync --source <地址或本地 JSON 路径> [--write]";
 
 type ModelEntry = NonNullable<
   NonNullable<ModelManifest.ModelManifestData["providers"]>[string]
@@ -146,8 +146,8 @@ function parseJsonRange(text: string): JsonRange {
   return parseValue();
 }
 
-function emitJson(value: unknown, indent: number): string {
-  return JSON.stringify(value, null, 2).replace(/\n/g, `\n${"  ".repeat(indent)}`);
+function emitJson(value: unknown): string {
+  return JSON.stringify(value);
 }
 
 function mergeRange(
@@ -159,6 +159,7 @@ function mergeRange(
 ): string {
   if (equalJson(current, next)) return text.slice(range.start, range.end);
   if (range.kind === "object" && isRecord(current) && isRecord(next)) {
+    if (!text.slice(range.start, range.end).includes("\n")) return emitJson(next);
     const emitted = new Set<string>();
     const parts: Array<string> = [];
     for (const [key, entry] of range.entries) {
@@ -171,25 +172,31 @@ function mergeRange(
       );
     }
     for (const key of Object.keys(next)) {
-      if (!emitted.has(key))
-        parts.push(`${JSON.stringify(key)}: ${emitJson(next[key], indent + 1)}`);
+      if (!emitted.has(key)) parts.push(`${JSON.stringify(key)}: ${emitJson(next[key])}`);
     }
     if (parts.length === 0) return "{}";
     const pad = "  ".repeat(indent);
     return `{\n${pad}${parts.join(`,\n${pad}`)}\n${"  ".repeat(indent - 1)}}`;
   }
   if (range.kind === "array" && Array.isArray(current) && Array.isArray(next)) {
-    const parts =
-      current.length === next.length
-        ? range.items.map((item, index) =>
-            mergeRange(text, item, current[index], next[index], indent + 1),
-          )
-        : next.map((item) => emitJson(item, indent + 1));
+    const currentItems = range.items;
+    const reused = new Set<number>();
+    const parts = next.map((item) => {
+      const sourceIndex = current.findIndex(
+        (candidate, index) => !reused.has(index) && equalJson(candidate, item),
+      );
+      if (sourceIndex >= 0) {
+        reused.add(sourceIndex);
+        const sourceRange = currentItems[sourceIndex];
+        if (sourceRange !== undefined) return text.slice(sourceRange.start, sourceRange.end);
+      }
+      return emitJson(item);
+    });
     if (parts.length === 0) return "[]";
     const pad = "  ".repeat(indent);
     return `[\n${pad}${parts.join(`,\n${pad}`)}\n${"  ".repeat(indent - 1)}]`;
   }
-  return emitJson(next, indent);
+  return emitJson(next);
 }
 
 function mergeManifestText(baselineText: string, next: ModelManifest.ModelManifestData): string {
@@ -277,22 +284,11 @@ export function compareModelManifests(
     addChange(
       changes,
       `providers.${provider}.models`,
-      modelSnapshot(currentModels, provider),
-      modelSnapshot(nextModels, provider),
+      currentProviders[provider]?.models,
+      nextProviders[provider]?.models,
     );
   }
   return { added, removed, changed, changes };
-}
-function modelSnapshot(
-  entries: Map<string, { readonly provider: string; readonly model: ModelEntry }>,
-  provider: string,
-): Record<string, ModelEntry> {
-  return Object.fromEntries(
-    [...entries]
-      .filter(([, entry]) => entry.provider === provider)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => [key, entry.model]),
-  );
 }
 
 function addChange(
@@ -386,28 +382,34 @@ function printDiff(diff: ModelManifestDiff): void {
     return;
   }
   for (const change of diff.changes) {
-    console.log(`清单改动 ${change.path}: ${printValue(change.from)} -> ${printValue(change.to)}`);
+    if (change.path.endsWith(".models")) continue;
+    console.log(`清单改动 ${change.path}：${printValue(change.from)} -> ${printValue(change.to)}`);
   }
   if (diff.added.length)
     console.log(
-      `新增模型: ${diff.added.map(({ provider, model }) => `${provider}/${model.slug}`).join(", ")}`,
+      `新增模型：${diff.added.map(({ provider, model }) => `${provider}/${model.slug}`).join("、")}`,
     );
   if (diff.removed.length)
     console.log(
-      `删除模型: ${diff.removed.map(({ provider, model }) => `${provider}/${model.slug}`).join(", ")}`,
+      `删除模型：${diff.removed.map(({ provider, model }) => `${provider}/${model.slug}`).join("、")}`,
     );
   for (const model of diff.changed) {
     for (const field of model.fields)
       console.log(
-        `模型改动 ${model.provider}/${model.slug}.${field.field}: ${printValue(field.from)} -> ${printValue(field.to)}`,
+        `模型改动 ${model.provider}/${model.slug}.${field.field}：${printValue(field.from)} -> ${printValue(field.to)}`,
       );
   }
 }
 
 async function writeManifest(text: string): Promise<void> {
   const temporaryPath = `${MANIFEST_PATH}.${process.pid}.tmp`;
-  await NodeFSP.writeFile(temporaryPath, text);
-  await NodeFSP.rename(temporaryPath, MANIFEST_PATH);
+  try {
+    await NodeFSP.writeFile(temporaryPath, text);
+    await NodeFSP.rename(temporaryPath, MANIFEST_PATH);
+  } catch (error) {
+    await NodeFSP.rm(temporaryPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 async function main(): Promise<void> {
