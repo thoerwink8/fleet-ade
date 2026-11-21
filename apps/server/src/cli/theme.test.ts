@@ -204,7 +204,7 @@ describe("t3 theme", () => {
       const themeFile = NodePath.join(baseDir, "nightfall.json");
       NodeFS.writeFileSync(themeFile, NIGHTFALL_THEME_JSON);
 
-      // The settings write is what fails; a mode-bit denial does not hold for the owner on Linux.
+      // The settings write is what fails; root bypasses mode-bit denial on Linux.
       const settingsPath = settingsPathFor(baseDir);
       const denied = PlatformError.systemError({
         _tag: "PermissionDenied",
