@@ -214,7 +214,7 @@ describe("orchestration V2 wire projection", () => {
           runId: activeRunId,
           createdBy: "user",
           role: "user",
-          text: "First real user message",
+          text: "**First** `real` [user message](https://example.com)",
           updatedAt: t1,
         },
         {

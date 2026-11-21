@@ -228,6 +228,7 @@ function SidebarThreadTooltip({
   showInstanceBadge,
   modelInstanceId,
   modelLabel,
+  reasoningEffort,
   branchMismatch,
   terminalStatus,
   terminalProcessCount,
@@ -242,6 +243,7 @@ function SidebarThreadTooltip({
   showInstanceBadge: boolean;
   modelInstanceId: string;
   modelLabel: string;
+  reasoningEffort: string | null;
   branchMismatch: {
     threadBranch: string;
     currentBranch: string;
@@ -250,6 +252,7 @@ function SidebarThreadTooltip({
   terminalProcessCount: number;
 }) {
   const driverKind = providerEntry?.driverKind ?? null;
+  const modelWithEffort = reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel;
   const previousProviderNames = thread.providerInstanceHistory
     .filter((instanceId) => instanceId !== modelInstanceId)
     .map((instanceId) => providerEntryByInstanceId.get(instanceId)?.displayName ?? instanceId);
@@ -310,8 +313,8 @@ function SidebarThreadTooltip({
             />
             <div className="min-w-0 truncate text-foreground/75">
               {showInstanceBadge && providerEntry
-                ? `${modelLabel} · ${providerEntry.displayName}`
-                : modelLabel}
+                ? `${modelWithEffort} · ${providerEntry.displayName}`
+                : modelWithEffort}
             </div>
           </div>
         ) : null}
@@ -792,6 +795,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const modelLabel = selectedModel
     ? getTriggerDisplayModelName(selectedModel, providerEntry?.driverKind)
     : thread.modelSelection.model;
+  const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
 
   const isRemote = thread.environmentId !== props.currentEnvironmentId;
   const showsScratchMachine = !checkoutThread.branch && props.scratchMachineLabel !== null;
@@ -808,6 +812,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       showInstanceBadge={showInstanceBadge}
       modelInstanceId={modelInstanceId}
       modelLabel={modelLabel}
+      reasoningEffort={reasoningEffort}
       branchMismatch={branchMismatch}
       terminalStatus={terminalStatus}
       terminalProcessCount={terminalProcessCount}
@@ -1314,7 +1319,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     );
   }
 
-  const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
   const rowStatus = resolveRowStatusDot(
     status,
     thread.latestRun != null || (thread.visibleItemCount ?? 0) > 0,
@@ -1519,7 +1523,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 {previewText}
               </div>
             ) : null}
-            <div className="flex h-4 min-w-0 items-center gap-2 text-meta text-secondary-label">
+            <div className="flex h-4 min-w-0 items-center gap-1.5 text-meta text-secondary-label">
               <Badge variant={rowStatus.variant}>
                 {/* Not a live region: a collapsed sidebar is inert, so
                     BackgroundThreadAnnouncer and the open thread's
@@ -1527,10 +1531,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                 {rowStatus.label}
                 {rowStatusDuration}
               </Badge>
-              <span className="min-w-0 truncate text-muted-foreground">
-                {reasoningEffort ? `${modelLabel} · ${reasoningEffort}` : modelLabel}
-              </span>
-              <span className="ml-auto inline-flex shrink-0 items-center gap-2 tabular-nums text-muted-foreground">
+              <span className="min-w-0 truncate text-muted-foreground">{modelLabel}</span>
+              <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 tabular-nums text-muted-foreground">
                 {rowCountsText !== null ? (
                   <span data-testid="sidebar-row-counts" className="shrink-0 tabular-nums">
                     {rowCountsText}
@@ -1659,6 +1661,7 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
   const modelLabel = selectedModel
     ? getTriggerDisplayModelName(selectedModel, providerEntry?.driverKind)
     : thread.modelSelection.model;
+  const reasoningEffort = extractReasoningEffortLabel(thread.modelSelection.options);
   const runningTerminalIds = useThreadRunningTerminalIds({
     environmentId: thread.environmentId,
     threadId: thread.id,
@@ -1774,6 +1777,7 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
           showInstanceBadge={showInstanceBadge}
           modelInstanceId={modelInstanceId}
           modelLabel={modelLabel}
+          reasoningEffort={reasoningEffort}
           branchMismatch={branchMismatch}
           terminalStatus={terminalStatus}
           terminalProcessCount={runningTerminalIds.length}

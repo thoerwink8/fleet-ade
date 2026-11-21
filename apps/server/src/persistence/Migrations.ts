@@ -110,6 +110,7 @@ import Migration0099 from "./Migrations/099_PipelineRunController.ts";
 import Migration0100 from "./Migrations/100_CommandReceiptResult.ts";
 import Migration0101 from "./Migrations/101_AuthPeerEnvironmentBinding.ts";
 import Migration0102 from "./Migrations/102_ChildSessionSummary.ts";
+import Migration0103 from "./Migrations/103_ProjectionThreadMessagePreview.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -215,6 +216,7 @@ const migrationEntries = [
   [100, "CommandReceiptResult", Migration0100],
   [101, "AuthPeerEnvironmentBinding", Migration0101],
   [102, "ChildSessionSummary", Migration0102],
+  [103, "ProjectionThreadMessagePreview", Migration0103],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
