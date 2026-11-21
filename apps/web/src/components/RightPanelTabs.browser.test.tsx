@@ -8,7 +8,6 @@ import type { RightPanelSurface } from "~/rightPanelStore";
 import { render, stubGlobal } from "../../test/render";
 import { HistorySwipeNavigation } from "./HistorySwipeNavigation";
 import { RightPanelTabs, type RightPanelTabsProps } from "./RightPanelTabs";
-import { subscribePreviewAction } from "./preview/previewActionBus";
 
 const navigateHistory = vi.hoisted(() => vi.fn());
 vi.mock("../navigationHistory", () => ({ canNavigateHistory: () => true, navigateHistory }));
@@ -229,7 +228,6 @@ describe("right panel thumb buttons", () => {
 
   it("go back and forward in the active browser tab instead of the app router", async () => {
     const actions: string[] = [];
-    using _subscription = { [Symbol.dispose]: subscribePreviewAction((a) => actions.push(a)) };
     await using screen = await render(panel(BROWSER_SURFACE));
     const tabStrip = screen.container.querySelector("[data-right-panel-tabbar]")!;
     const content = screen.getByTestId("surface-content").element();

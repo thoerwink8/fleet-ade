@@ -8,7 +8,7 @@ import type {
 } from "@t3tools/contracts";
 import { useState } from "react";
 
-import { useOpenLink } from "~/browser/useOpenLink";
+import { useOpenLink } from "~/lib/useOpenLink";
 import { cn } from "~/lib/utils";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";

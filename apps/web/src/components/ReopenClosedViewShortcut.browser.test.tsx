@@ -11,15 +11,10 @@ const state = vi.hoisted(() => ({
   params: {} as Record<string, string>,
   workspaceAvailable: true,
   navigate: vi.fn(),
-  openPreview: vi.fn(),
   setShortcuts: vi.fn(async () => undefined),
   toast: vi.fn(),
 }));
 
-vi.mock(import("./preview/openPreviewSession"), async (original) => ({
-  ...(await original()),
-  openPreviewSession: state.openPreview,
-}));
 vi.mock(import("@effect/atom-react"), async (original) => ({
   ...(await original()),
   useAtomValue: (() => state.keybindings) as never,
@@ -33,13 +28,6 @@ vi.mock(import("../state/use-atom-command"), async (original) => ({
   ...(await original()),
   useAtomCommand: ((command: unknown) => command) as never,
 }));
-vi.mock(import("../state/preview"), async (original) => {
-  const actual = await original();
-  return {
-    ...actual,
-    previewEnvironment: { ...actual.previewEnvironment, open: state.openPreview as never },
-  };
-});
 vi.mock(import("../connection/catalog"), async (original) => {
   const actual = await original();
   const { Atom } = await import("effect/reactivity");

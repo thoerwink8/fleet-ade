@@ -7,7 +7,6 @@ import { dismissContextMenu } from "~/contextMenuFallback";
 import { isMacPlatform } from "~/lib/utils";
 import { render } from "../../../test/render";
 import FileBrowserPanel from "./FileBrowserPanel";
-import { dispatchPreviewAction } from "../preview/previewActionBus";
 
 const entries: readonly ProjectEntry[] = [
   { path: "src", kind: "directory" },

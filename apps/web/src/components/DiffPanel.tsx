@@ -115,7 +115,7 @@ import { DiffFileLoadingBoundary } from "./diffs/DiffFileLoadingBoundary";
 import { DiffFileStatus } from "./diffs/DiffFileStatus";
 import { useThreadRouteRef } from "../hooks/useThreadRouteTarget";
 import { projectCommitUrl } from "@t3tools/client-runtime/change-request-links";
-import { useOpenLink } from "../browser/useOpenLink";
+import { useOpenLink } from "../lib/useOpenLink";
 
 type DiffThemeType = "light" | "dark";
 const AUTOMATIC_BASE_REF = "__automatic_base_ref__";

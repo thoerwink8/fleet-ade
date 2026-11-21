@@ -74,7 +74,6 @@ vi.mock("../state/server", async () => {
   return { serverEnvironment: { configValueAtom: () => config } };
 });
 vi.mock("../state/terminal", () => ({ terminalEnvironment: { write: {}, resize: {} } }));
-vi.mock("../state/preview", () => ({ previewEnvironment: { open: {} } }));
 vi.mock("../state/projects", async () => {
   const { Atom, AsyncResult } = await import("effect/reactivity");
   return {
@@ -100,7 +99,6 @@ vi.mock("../state/projects", async () => {
   };
 });
 vi.mock("../editorPreferences", () => ({ useOpenInPreferredEditor: () => () => {} }));
-vi.mock("./preview/openTerminalLinkInPreview", () => ({ openTerminalLinkInPreview: () => {} }));
 vi.mock("~/localApi", () => ({ readLocalApi: () => null }));
 vi.mock("../hooks/useSettings", async () => {
   const { DEFAULT_CLIENT_SETTINGS } = await import("@t3tools/contracts/settings");

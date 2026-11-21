@@ -91,15 +91,7 @@ import * as PeerLinks from "./peer/PeerLinks.ts";
 import * as PeerChallengeRegistry from "./peer/PeerChallengeRegistry.ts";
 import * as PeerMcpClient from "./peer/PeerMcpClient.ts";
 import * as McpSessionRegistry from "./mcp/McpSessionRegistry.ts";
-import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
-import * as PreviewManager from "./preview/Manager.ts";
-import * as PortScanner from "./preview/PortScanner.ts";
-import * as ServerBrowser from "./preview/ServerBrowser.ts";
-import * as PreviewAgentActivity from "./preview/PreviewAgentActivity.ts";
-import * as DesktopBrowserChannel from "./preview/DesktopBrowserChannel.ts";
-import * as ServerBrowserStream from "./preview/ServerBrowserStream.ts";
 import * as PreviewBrowser from "./preview/PreviewBrowser.ts";
-import * as ProcessRunner from "./processRunner.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -511,20 +503,14 @@ const layerVcs = Layer.empty.pipe(
 
 const layerCheckpointStore = CheckpointStore.layer.pipe(Layer.provide(layerVcsDriverRegistry));
 
-const layerPortScanner = PortScanner.layer.pipe(Layer.provide(ProcessRunner.layer));
 
 const layerTerminal = TerminalManager.layer(
   ProviderInstanceRegistryHydration.deriveProviderInstanceConfigMap,
 ).pipe(
   Layer.provide(layerPtyAdapter),
-  Layer.provide(layerPortScanner),
   Layer.provide(layerNativeTelemetry),
 );
 
-const layerPreview = Layer.empty.pipe(
-  Layer.provideMerge(PreviewManager.layer),
-  Layer.provideMerge(layerPortScanner),
-);
 
 const layerWorkspaceEntries = WorkspaceEntries.layer.pipe(Layer.provide(WorkspacePaths.layer));
 
@@ -789,7 +775,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   Layer.provideMerge(layerSourceControlProviderRegistry),
   Layer.provideMerge(layerGit),
   Layer.provideMerge(layerVcs),
-  Layer.provideMerge(Layer.mergeAll(layerTerminal, layerPreview)),
+  Layer.provideMerge(layerTerminal),
   Layer.provideMerge(layerPersistence),
   Layer.provideMerge(
     Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, UsageLimitSources.layer),
@@ -801,9 +787,6 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   // One gate for the server, below hydration so the Claude adapter sees it: layers memoize by
   // reference, so the runtime layer shares it.
   Layer.provideMerge(ProviderInstallationGate.layer),
-  // Provider hydration builds the Claude runner, which reports agents to the same scanner the
-  // terminal and preview layers share.
-  Layer.provideMerge(layerPortScanner),
   Layer.provideMerge(
     Layer.mergeAll(
       AntigravityInstallation.AntigravityInstallation.layer.pipe(
@@ -886,7 +869,6 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerHttp.layerAssetRoute,
     ServerHttp.layerAttachmentUploadRoute,
     LedgerNotes.routeLayer,
-    ServerBrowserStream.routeLayer,
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer,
     speechStreamRouteLayer,
@@ -909,13 +891,6 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(PeerLinkRequests.layer),
   // Share the service so HTTP/WS clients single-flight reads and invalidate each other's cached patches.
   Layer.provide(layerPullRequestService),
-  // The same activity instance RunExecutionService reports to, by layer memoization.
-  Layer.provide(
-    ServerBrowser.layer.pipe(
-      Layer.provide(Layer.merge(DesktopBrowserChannel.layer, PreviewAgentActivity.layer)),
-    ),
-  ),
-  Layer.provide(PreviewBrowser.layer),
   // Links to other environments, shared by Settings (WebSocket) and agents (/mcp).
   Layer.provide(PeerForwarding.layer),
   Layer.provide(PeerMcpClient.layer),
@@ -931,7 +906,6 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(CloudSpeech.layer.pipe(Layer.provide(SecretResolver.layer))),
   Layer.provide(layerServerSettings),
   Layer.provide(PipelineSupervision.layer),
-  Layer.provide(PreviewAutomationBroker.layer),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
   Layer.provide(layerCommandReadiness),
   Layer.provide(ServerHttp.layerBrowserApiCors),

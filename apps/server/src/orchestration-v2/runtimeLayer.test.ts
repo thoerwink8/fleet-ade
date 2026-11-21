@@ -92,7 +92,6 @@ import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
-import * as PreviewManager from "../preview/Manager.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
 import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import * as ThreadLaunchService from "./ThreadLaunchService.ts";
@@ -400,7 +399,6 @@ const layerResourceCleanupTest = ResourceCleanupService.layer.pipe(
   Layer.provideMerge(layerScheduledTasksTest),
   Layer.provide(
     Layer.mergeAll(
-      Layer.mock(PreviewManager.PreviewManager)({ close: () => Effect.void }),
       Layer.mock(TerminalManager.TerminalManager)({ close: () => Effect.void }),
     ),
   ),

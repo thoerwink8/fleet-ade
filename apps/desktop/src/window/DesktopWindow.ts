@@ -14,7 +14,6 @@ import { type DesktopSnapShotEvent, DEFAULT_CLIENT_SETTINGS } from "@t3tools/con
 
 import * as DesktopAssets from "../app/DesktopAssets.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
-import * as DesktopPrimaryPaste from "../app/DesktopPrimaryPaste.ts";
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
@@ -30,12 +29,6 @@ import {
   TRACKPAD_SCROLL_END_CHANNEL,
   WINDOW_FULLSCREEN_STATE_CHANNEL,
 } from "../ipc/channels.ts";
-import {
-  PASSKEY_BRIDGE_ARGUMENT,
-  PRIMARY_PASTE_DISABLED_ARGUMENT,
-} from "../preview/GuestProtocol.ts";
-import * as PreviewManager from "../preview/Manager.ts";
-import * as PreviewPasskeys from "../preview/Passkeys.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
@@ -109,12 +102,9 @@ type DesktopWindowRuntimeServices =
   | ElectronShell.ElectronShell
   | ElectronTheme.ElectronTheme
   | ElectronWindow.ElectronWindow
-  | DesktopRendererHistory.DesktopRendererHistory
-  | PreviewManager.PreviewManager;
+  | DesktopRendererHistory.DesktopRendererHistory;
 
-export type DesktopWindowError =
-  | ElectronWindow.ElectronWindowCreateError
-  | PreviewManager.PreviewManagerError;
+export type DesktopWindowError = ElectronWindow.ElectronWindowCreateError;
 
 export type MainWindowZoomDirection = "in" | "out" | "reset";
 export type MainWindowContentsCommand = "reload" | "forceReload" | "toggleDevTools";
@@ -139,7 +129,7 @@ export class DesktopWindow extends Context.Service<
     readonly dispatchSnapShotEvent: (
       event: DesktopSnapShotEvent,
     ) => Effect.Effect<void, DesktopWindowError>;
-    // Electron zoom roles target focused guests; zoomMain must always target the app.
+    // Zoom commands always target the app's main renderer.
     readonly zoomMain: (direction: MainWindowZoomDirection) => Effect.Effect<void>;
     readonly runMainContentsCommand: (command: MainWindowContentsCommand) => Effect.Effect<void>;
     readonly syncAppearance: Effect.Effect<void>;
@@ -385,9 +375,6 @@ export const make = Effect.gen(function* () {
   const electronShell = yield* ElectronShell.ElectronShell;
   const electronTheme = yield* ElectronTheme.ElectronTheme;
   const electronWindow = yield* ElectronWindow.ElectronWindow;
-  const previewManager = yield* PreviewManager.PreviewManager;
-  const previewPasskeys = yield* PreviewPasskeys.PreviewPasskeys;
-  const primaryPaste = yield* DesktopPrimaryPaste.DesktopPrimaryPaste;
   const desktopSettings = yield* DesktopAppSettings.DesktopAppSettings;
   const clientSettings = yield* DesktopClientSettings.DesktopClientSettings;
   const electronApp = yield* ElectronApp.ElectronApp;
@@ -435,8 +422,6 @@ export const make = Effect.gen(function* () {
       direction === "reset" ? 0 : webContents.getZoomLevel() + (direction === "in" ? 0.5 : -0.5),
     );
     if (environment.platform === "darwin") syncMacosWindowButtons(window);
-    // App zoom propagates to guests; restore each preview's own zoom.
-    yield* previewManager.reapplyZoom();
   });
 
   const createWindow = Effect.fn("desktop.window.createWindow")(function* (): Effect.fn.Return<
@@ -444,7 +429,6 @@ export const make = Effect.gen(function* () {
     DesktopWindowError
   > {
     if (yield* Ref.get(desktopState.quitting)) return Option.none();
-    yield* previewManager.getBrowserSession();
     const applicationUrl = getDesktopUrl(environment.isDevelopment);
     const iconPaths = yield* assets.iconPaths;
     const iconOption = getIconOption(iconPaths, environment.platform);
@@ -491,8 +475,6 @@ export const make = Effect.gen(function* () {
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
-        webviewTag: true,
-        // Guest fullscreen propagates to the embedder; both must opt out to keep it inside the webview.
         // The app's own fullscreen elements reach OS fullscreen through syncHtmlFullscreen.
         disableHtmlFullscreenWindowResize: true,
       },
@@ -612,37 +594,6 @@ export const make = Effect.gen(function* () {
     );
     flushMainWindowBounds = flushBoundsPersist;
 
-    yield* previewManager.setMainWindow(window);
-    if (yield* Ref.get(desktopState.quitting)) {
-      yield* electronWindow.destroyAll;
-      return Option.none();
-    }
-    window.webContents.on("will-attach-webview", (event, webPreferences, params) => {
-      if (
-        typeof params.partition !== "string" ||
-        !previewManager.isBrowserPartition(params.partition)
-      ) {
-        event.preventDefault();
-        return;
-      }
-      webPreferences.sandbox = true;
-      webPreferences.nodeIntegration = false;
-      webPreferences.nodeIntegrationInSubFrames = false;
-      webPreferences.contextIsolation = false;
-      webPreferences.disableHtmlFullscreenWindowResize = true;
-      if (previewPasskeys.bridgeEnabled) {
-        webPreferences.additionalArguments = [
-          ...(webPreferences.additionalArguments ?? []),
-          PASSKEY_BRIDGE_ARGUMENT,
-        ];
-      }
-      if (!primaryPaste.enabled) {
-        webPreferences.additionalArguments = [
-          ...(webPreferences.additionalArguments ?? []),
-          PRIMARY_PASTE_DISABLED_ARGUMENT,
-        ];
-      }
-    });
 
     const contextMenuContents = new WeakSet<Electron.WebContents>();
     const installContextMenu = (
@@ -654,7 +605,6 @@ export const make = Effect.gen(function* () {
       contents.on("context-menu", (event, params) => {
         event.preventDefault();
         if (contents.isDestroyed() || ownerWindow.isDestroyed()) return;
-        // Right-clicking a guest may leave native editing roles targeting the host renderer.
         contents.focus();
 
         const menuTemplate: Electron.MenuItemConstructorOptions[] = [];
@@ -734,10 +684,6 @@ export const make = Effect.gen(function* () {
       });
     };
     installContextMenu(window, window.webContents);
-    window.webContents.on("did-attach-webview", (_event, contents) => {
-      installContextMenu(window, contents);
-      void runPromise(previewManager.prepareWebview(contents));
-    });
 
     window.webContents.setWindowOpenHandler(({ url }) => {
       if (Option.isSome(ElectronShell.parseSafeExternalUrl(url))) {
@@ -809,7 +755,7 @@ export const make = Effect.gen(function* () {
         window.webContents.send(TRACKPAD_SCROLL_END_CHANNEL);
       }
     });
-    // Ctrl+wheel bypasses menus; guest contents emit their own zoom-changed event.
+    // Ctrl+wheel bypasses menus and emits a zoom-changed event.
     window.webContents.on("zoom-changed", (_event, direction) => {
       if (window.isDestroyed()) return;
       runFork(zoomWindow(window, direction));

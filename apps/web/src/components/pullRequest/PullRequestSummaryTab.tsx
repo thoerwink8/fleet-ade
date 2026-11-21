@@ -32,7 +32,7 @@ import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "rea
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { cn } from "~/lib/utils";
-import { useOpenLink } from "~/browser/useOpenLink";
+import { useOpenLink } from "~/lib/useOpenLink";
 import { RelativeTime } from "~/components/RelativeTime";
 import { useClientSettings } from "~/hooks/useSettings";
 import { formatFullTimestamp } from "~/timestampFormat";

@@ -24,7 +24,6 @@ import {
   shortcutLabelForCommand,
 } from "../keybindings";
 import { isEditableFocused } from "../lib/editableFocus";
-import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
@@ -142,9 +141,7 @@ function readRoutePanelsOpen(router: AnyRouter) {
       useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
       routeThreadRef,
     ).terminalOpen,
-    previewOpen:
-      selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, routeThreadRef) ===
-      "preview",
+    previewOpen: false,
   };
 }
 
@@ -257,7 +254,7 @@ function registerThreadUndoCommands(
           {
             context: {
               terminalFocus: isTerminalFocused(),
-              previewFocus: isPreviewFocused(),
+              previewFocus: false,
               ...readRoutePanelsOpen(router),
               // A collapsed sidebar hides the notice, so text fields keep their own undo.
               editableFocus:

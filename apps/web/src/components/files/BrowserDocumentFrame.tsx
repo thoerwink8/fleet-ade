@@ -35,7 +35,7 @@ import { isElectron } from "~/env";
 import { FileSurfaceLoading } from "./fileSurfaceChrome";
 import type { PdfViewState } from "./PdfViewer";
 
-import { useOpenLink } from "~/browser/useOpenLink";
+import { useOpenLink } from "~/lib/useOpenLink";
 import { ExpandedImageDialog } from "~/components/chat/ExpandedImageDialog";
 import type { ExpandedImagePreview } from "~/components/chat/ExpandedImagePreview";
 import { useHtmlRenderTheme } from "~/hooks/useHtmlRenderTheme";

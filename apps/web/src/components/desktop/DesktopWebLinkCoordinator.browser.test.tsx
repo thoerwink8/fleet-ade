@@ -78,7 +78,7 @@ vi.mock(import("../../hooks/useScratchProject"), async (original) => ({
 vi.mock("../../state/use-atom-query-runner", () => ({
   useAtomQueryRunner: () => state.preview,
 }));
-vi.mock("../../browser/useOpenLink", () => ({ useOpenLink: () => state.openLink }));
+vi.mock("../../lib/useOpenLink", () => ({ useOpenLink: () => state.openLink }));
 vi.mock(import("../../confirmDialog"), async (original) => ({
   ...(await original()),
   requestConfirmDialog: state.confirm,

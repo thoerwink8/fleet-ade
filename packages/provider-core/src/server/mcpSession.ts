@@ -14,9 +14,7 @@ export interface McpProviderSessionConfig {
   readonly providerInstanceId: ProviderInstanceId;
   readonly endpoint: string;
   readonly authorizationHeader: string;
-  /** Omit preview_* instructions when the user withholds agent browser access. */
-  readonly browserToolsAvailable: boolean;
+  /** Capabilities granted to the MCP credential. */
   readonly capabilities?: ReadonlySet<string>;
-  /** True while a delegated task this thread started will wake it with its result. */
   readonly hasPendingWake?: Effect.Effect<boolean>;
 }

@@ -1256,15 +1256,6 @@ export const t3Default = (
         htmlRender: { attachmentId: "att-1", title: input.title ?? "Visual", height: 560 },
         message: HTML_RENDERED,
       };
-    case "preview_status":
-      return {
-        available: false,
-        visible: false,
-        tabId: null,
-        url: null,
-        title: null,
-        loading: false,
-      };
     default:
       return { ok: true };
   }

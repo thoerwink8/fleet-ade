@@ -40,7 +40,6 @@ import { loadFileAncestors } from "./loadFileAncestors";
 import { useDirectoryEntries } from "./useDirectoryEntries";
 import { useProjectPathSearch } from "~/state/queries";
 import { isMacPlatform } from "~/lib/utils";
-import { type PreviewAction, subscribePreviewAction } from "../preview/previewActionBus";
 
 interface FileBrowserPanelProps {
   environmentId: EnvironmentId;
@@ -340,15 +339,6 @@ export default function FileBrowserPanel({
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
   };
-  const onPanelAction = useEffectEvent((action: PreviewAction) => {
-    // Hidden panel tabs stay mounted; only the visible Files tab answers.
-    if (action === "find" && searchInputRef.current?.getClientRects().length) focusSearch();
-  });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the panel find command, which fires while focus is anywhere in the right panel
-  useEffect(() => {
-    if (!answersPanelFind) return;
-    return subscribePreviewAction(onPanelAction);
-  }, [answersPanelFind]);
   const expandedPathsRef = useRef(new Set<string>());
   const expansionRoot = `${environmentId}:${cwd}`;
   // Folders expanded when the panel last unmounted; each reopens once lazy loading lists it.

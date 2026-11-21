@@ -44,7 +44,6 @@ import {
 } from "lucide-react";
 import {
   AssetWorkspaceAssetNotFoundError,
-  AuthPreviewOperateScope,
   type EditorId,
   type EnvironmentId,
   type ServerConfig,
@@ -116,7 +115,7 @@ import { resolveProtocolRelativeMediaUrl } from "./media/mediaContent";
 import {
   revealInFileExplorerLabelForKind,
   revealInFileExplorerLabelForOs,
-} from "./preview/fileExplorerLabel";
+} from "../lib/fileExplorerLabel";
 import {
   resolveExternalWebLinkHost,
   showExternalLinkContextMenu,
@@ -124,7 +123,6 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { Button } from "./ui/button";
 import { stackedThreadToast, toastManager } from "./ui/toast";
-import { recordVisitForThread } from "../browserHistoryStore";
 import {
   PreferredEditorEnvironmentRequiredError,
   useOpenInPreferredEditor,
@@ -165,7 +163,6 @@ import {
   readPreparedConnection,
   useEnvironmentScope,
 } from "../state/session";
-import { previewEnvironment } from "../state/preview";
 import { useAtomCommand } from "../state/use-atom-command";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
 import { projectEnvironment } from "../state/projects";
@@ -181,17 +178,8 @@ import {
 import { resolvePullRequestPreviewTarget } from "@t3tools/client-runtime/change-request-links";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { useOpenChangeRequestLink } from "~/lib/openPullRequestLink";
-import { useOpenLink } from "../browser/useOpenLink";
+import { useOpenLink } from "../lib/useOpenLink";
 import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
-import { isPreviewAvailableFor } from "../browser/previewRuntime";
-import {
-  isBrowserPreviewFile,
-  openFileInPreview,
-  openUrlInPreview,
-  BrowserPreviewUnavailableError,
-  isBrowserSettingsReadError,
-} from "../browser/openFileInPreview";
-import { resolveLinkTarget } from "../browser/browserLinkTarget";
 import { PullRequestLinkPreview } from "./pullRequest/PullRequestLinkPreview";
 import { MarkdownCodeBlock, SuspenseShikiCodeBlock } from "./chat/MarkdownCodeBlock";
 import { createMarkdownRenderer } from "./chat/markdownRenderer";
@@ -562,13 +550,9 @@ function useChatMarkdownState({
     reportFailure: false,
     refresh: true,
   });
-  const openPreview = useAtomCommand(previewEnvironment.open, {
-    reportFailure: false,
-  });
   const pullRequestLinking = usePullRequestLinking(threadRef?.environmentId);
   const environmentId = threadRef?.environmentId ?? explicitEnvironmentId ?? null;
   const canOperateHost = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
-  const canOperatePreview = useEnvironmentScope(environmentId, AuthPreviewOperateScope);
   const isClientHost = useAtomValue(clientHostEnvironmentAtom(environmentId));
   const remoteOpen = useRemoteOpenResolution(environmentId);
   const canUseShellActions =
@@ -684,8 +668,6 @@ function useChatMarkdownState({
   };
   const openChangeRequestLink = useOpenChangeRequestLink(threadRef, pullRequestPanelRef);
   const openDeferredMarkdownLink = useOpenLink(threadRef);
-  // Subscribe so hydrated settings apply before the anchor synchronously decides whether to intercept _blank.
-  const linkTargetPreference = useClientSettings((settings) => settings.browserLinkTarget);
   const mathEnabled = useClientSettings((settings) => settings.mathRenderingEnabled);
   // Keyed by the file links found, not the text, so streamed text that adds none keeps the
   // renderer context, and every block reading it, unchanged.
@@ -715,57 +697,6 @@ function useChatMarkdownState({
     if (threadRef === undefined || (!linked && linkedThreadPullRequestFor(href) === null)) return;
     if (!readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)) return;
     await pullRequestLinking.changeLink(threadRef, href, linked);
-  };
-  const openExternalLinkInPreview = (url: string) => {
-    if (!threadRef || !canOperatePreview) {
-      return Promise.resolve(
-        AsyncResult.failure<void, BrowserPreviewUnavailableError>(
-          Cause.fail(
-            new BrowserPreviewUnavailableError({
-              message: "此客户端无法使用预览。",
-            }),
-          ),
-        ),
-      );
-    }
-    return openUrlInPreview({ threadRef, url, openPreview }).then((result) => {
-      if (result._tag === "Success") recordVisitForThread(threadRef, url);
-      else if (!isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
-        if (isBrowserSettingsReadError(error)) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "无法在浏览器中打开链接",
-              description: error.message,
-            }),
-          );
-        }
-      }
-      return result;
-    });
-  };
-  const openMarkdownFileInPreview = (path: string) => {
-    const preparedConnection = threadRef ? readPreparedConnection(threadRef.environmentId) : null;
-    if (!threadRef || !canOperatePreview || preparedConnection === null) {
-      return Promise.resolve(
-        AsyncResult.failure<void, BrowserPreviewUnavailableError>(
-          Cause.fail(
-            new BrowserPreviewUnavailableError({
-              message: "环境未连接。",
-            }),
-          ),
-        ),
-      );
-    }
-    return openFileInPreview({
-      threadRef,
-      filePath: path,
-      workspaceRoot: cwd,
-      httpBaseUrl: preparedConnection.httpBaseUrl,
-      createAssetUrl,
-      openPreview,
-    });
   };
   const findWorkspaceFileMatch = async (fileLinkMeta: MarkdownFileLinkMeta) => {
     const workspaceRelativePath = fileLinkMeta.workspaceLookupPath;
@@ -930,21 +861,13 @@ function useChatMarkdownState({
             : undefined
         }
         revealLabel={revealInFileManagerLabel}
-        onOpenInBrowser={
-          threadRef &&
-          canOperatePreview &&
-          isPreviewAvailableFor(threadRef.environmentId) &&
-          isBrowserPreviewFile(fileLinkMeta.filePath)
-            ? () => openMarkdownFileInPreview(fileLinkMeta.filePath)
-            : undefined
-        }
+        onOpenInBrowser={undefined}
       />
     );
   };
 
   const componentState = {
     canOperateHost,
-    canOperatePreview,
     cwd,
     diffThemeName,
     environmentId,
@@ -960,14 +883,12 @@ function useChatMarkdownState({
     inline,
     mathEnabled,
     isStreaming,
-    linkTargetPreference,
     markdownFileLinkMetaByHref,
     onTaskListChange,
     onUseArtifactTemplate,
     onRunShellCommand,
     openChangeRequestLink,
     openDeferredMarkdownLink,
-    openExternalLinkInPreview,
     openMarkdownMedia,
     projects,
     linkedThreadPullRequestFor,
@@ -1128,7 +1049,6 @@ const CHAT_MARKDOWN_COMPONENTS = {
   a: function MarkdownAnchor({ node, href, children, title: _title, ...props }) {
     const {
       canOperateHost,
-      canOperatePreview,
       cwd,
       environmentId,
       imageBaseDir,
@@ -1137,8 +1057,6 @@ const CHAT_MARKDOWN_COMPONENTS = {
       openMarkdownMedia,
       openChangeRequestLink,
       openDeferredMarkdownLink,
-      linkTargetPreference,
-      openExternalLinkInPreview,
       projects,
       linkedThreadPullRequestFor,
       resolveThreadPullRequest,
@@ -1209,8 +1127,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
         : null;
       const isSameDocumentLink = href?.startsWith("#") ?? false;
       const onClick = props.onClick;
-      const canOpenInPreview =
-        canOperatePreview && Boolean(threadRef && isPreviewAvailableFor(threadRef.environmentId));
+      const canOpenInPreview = false;
       const linkChildren = <MarkdownLinkContext value>{children}</MarkdownLinkContext>;
       const link = (
         <a
@@ -1256,40 +1173,18 @@ const CHAT_MARKDOWN_COMPONENTS = {
               return;
             }
             if (event.defaultPrevented) return;
-            if (
-              resolveLinkTarget({
-                url: href,
-                event,
-                preference: linkTargetPreference,
-                canOpenInApp: canOpenInPreview,
-              }) !== "app"
-            ) {
-              // Open desktop Alt-clicks before Chromium downloads them so link routers can read the held key.
-              if (isElectron && event.altKey) {
-                event.preventDefault();
-                event.stopPropagation();
-                void readLocalApi()
-                  ?.shell.openExternal(href)
-                  .catch((cause) =>
-                    reportMarkdownActionFailure(
-                      { operation: "open-link-external", target: href },
-                      cause,
-                    ),
-                  );
-              }
-              return;
+            if (isElectron && event.altKey) {
+              event.preventDefault();
+              event.stopPropagation();
+              void readLocalApi()
+                ?.shell.openExternal(href)
+                .catch((cause) =>
+                  reportMarkdownActionFailure(
+                    { operation: "open-link-external", target: href },
+                    cause,
+                  ),
+                );
             }
-            event.preventDefault();
-            event.stopPropagation();
-            void openExternalLinkInPreview(href).then((result) => {
-              if (result._tag === "Success" || isAtomCommandInterrupted(result)) return;
-              reportMarkdownActionFailure(
-                { operation: "open-link-in-preview", target: href },
-                result.cause,
-              );
-              if (isBrowserSettingsReadError(squashAtomCommandFailure(result))) return;
-              void readLocalApi()?.shell.openExternal(href);
-            });
           }}
           onContextMenu={(event) => {
             if (!href || !faviconHost) return;
@@ -1311,13 +1206,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
               position: { x: event.clientX, y: event.clientY },
               showContextMenu: (items, position) => api.contextMenu.show(items, position),
               openInPreview: async (target) => {
-                const result = await openExternalLinkInPreview(target);
-                if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-                  reportMarkdownActionFailure(
-                    { operation: "open-link-in-preview", target },
-                    result.cause,
-                  );
-                }
+                await api.shell.openExternal(target);
               },
               openExternal: (target) => api.shell.openExternal(target),
               copyLink: (target) => writeTextToClipboard(target, "link"),

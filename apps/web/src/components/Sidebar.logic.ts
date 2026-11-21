@@ -51,7 +51,6 @@ import { useDeadlinePassed } from "../hooks/useDeadline";
 import { isElectron } from "../env";
 import { shouldShowThreadJumpHintsForModifiers } from "../keybindings";
 import { isTerminalFocused, subscribeToTerminalFocusChanges } from "../lib/terminalFocus";
-import { isPreviewFocused } from "../lib/previewFocus";
 import { isModelPickerOpen, subscribeToModelPickerVisibility } from "../modelPickerVisibility";
 import { shortcutModifierStore } from "../shortcutModifierState";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
@@ -812,10 +811,8 @@ export function threadShortcutContext(routeThreadRef: ScopedThreadRef | null) {
         useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
         routeThreadRef,
       ).terminalOpen,
-    previewFocus: isPreviewFocused(),
-    previewOpen:
-      selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, routeThreadRef) ===
-      "preview",
+    previewFocus: false,
+    previewOpen: false,
     modelPickerOpen: isModelPickerOpen(),
     isWeb: !isElectron,
     isDesktop: isElectron,

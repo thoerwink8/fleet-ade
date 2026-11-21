@@ -8,7 +8,7 @@ import { act, render, stubGlobal } from "../../test/render";
 
 const state = vi.hoisted(() => ({ preview: vi.fn(), openLink: vi.fn() }));
 vi.mock("../state/use-atom-query-runner", () => ({ useAtomQueryRunner: () => state.preview }));
-vi.mock("../browser/useOpenLink", () => ({ useOpenLink: () => state.openLink }));
+vi.mock("./useOpenLink", () => ({ useOpenLink: () => state.openLink }));
 vi.mock(import("../state/environments"), async (original) => ({
   ...(await original()),
   usePrimaryEnvironmentId: () => EnvironmentId.make("local"),

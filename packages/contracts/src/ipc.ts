@@ -1,20 +1,12 @@
 import * as Schema from "effect/Schema";
-import type { PreviewCaptureFailureEncoded } from "./previewCapture.ts";
 
 import { SnapShotSource } from "./chatAttachment.ts";
 import { EnvironmentId, TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { BrowserProfileId } from "./browserProfile.ts";
-import type {
-  BrowserImportResult,
-  BrowserImportSource,
-  BrowserImportSourceId,
-} from "./browserImport.ts";
 import { AuthAccessTokenResult, AuthSessionState } from "./auth.ts";
 import { AdvertisedEndpoint } from "./remoteAccess.ts";
 import { ExecutionEnvironmentDescriptor } from "./environment.ts";
 import { type ClientSettings, type QuitConfirmationMode, SnapShotShortcut } from "./settings.ts";
 import type { EditorId } from "./editor.ts";
-import { KeybindingShortcut, type PreviewForwardedShortcut } from "./keybindings.ts";
 
 import type {
   DesktopAppActivationRequest,

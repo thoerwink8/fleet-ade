@@ -13,8 +13,6 @@ import { AtomRegistry } from "effect/reactivity";
 import * as Stream from "effect/Stream";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { openFileInPreview, openUrlInPreview } from "../../browser/openFileInPreview";
-import { isPreviewAvailableFor } from "../../browser/previewRuntime";
 import { requestConfirmDialog } from "../../confirmDialog";
 import { connectPairing } from "../../connection/onboarding";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
@@ -29,7 +27,6 @@ import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { assetEnvironment } from "../../state/assets";
 import { readProject, readThreadShell } from "../../state/entities";
 import { useEnvironmentHttpBaseUrl, usePrimaryEnvironment } from "../../state/environments";
-import { previewEnvironment } from "../../state/preview";
 import { allReachableShellsLiveAtom } from "../../state/shell";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
@@ -57,26 +54,6 @@ const projectsSettled = (): Promise<void> =>
  * HTML files are served by this machine's environment, so only its threads can
  * take them.
  */
-function threadShowingBrowser(
-  routeParams: Record<string, string | undefined>,
-  fileEnvironmentId: EnvironmentId | null,
-): ScopedThreadRef | null {
-  const target = resolveThreadRouteTarget(routeParams);
-  if (target === null) return null;
-  let threadRef = target.kind === "server" ? target.threadRef : null;
-  if (target.kind === "draft") {
-    const session = useComposerDraftStore.getState().getDraftSession(target.draftId);
-    if (!session || session.promotedTo) return null;
-    threadRef = scopeThreadRef(session.environmentId, session.threadId);
-  }
-  if (threadRef === null || !isPreviewAvailableFor(threadRef.environmentId)) return null;
-  if (fileEnvironmentId !== null && threadRef.environmentId !== fileEnvironmentId) return null;
-  const surface = selectActiveRightPanelSurface(
-    useRightPanelStore.getState().byThreadKey,
-    threadRef,
-  );
-  return surface?.kind === "preview" ? threadRef : null;
-}
 
 export function DesktopWebLinkCoordinator() {
   const router = useRouter();
@@ -85,11 +62,6 @@ export function DesktopWebLinkCoordinator() {
   const openChangeRequest = useOpenChangeRequestLink();
   const { scratchEnvironmentId, openScratchProject } = useScratchProject();
   const openThread = useNewThreadHandler();
-  const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
-  const createAssetUrl = useAtomQueryRunner(assetEnvironment.createUrl, {
-    reportFailure: false,
-    refresh: true,
-  });
   const connectPairingEnvironment = useAtomCommand(connectPairing, { reportFailure: false });
   const httpBaseUrl = useEnvironmentHttpBaseUrl(primaryEnvironment?.environmentId ?? null);
   const queueRef = useRef(Promise.resolve());
@@ -170,32 +142,8 @@ export function DesktopWebLinkCoordinator() {
       reportFailure(url);
       return;
     }
-    const threadRef =
-      threadShowingBrowser(
-        routeParams,
-        isFile ? (primaryEnvironment?.environmentId ?? null) : null,
-      ) ?? (await startThread(url));
-    if (threadRef === null) return;
-    const result = isFile
-      ? httpBaseUrl === null
-        ? null
-        : await openFileInPreview({
-            threadRef,
-            filePath: decodeURIComponent(new URL(url).pathname),
-            workspaceRoot: undefined,
-            httpBaseUrl,
-            createAssetUrl,
-            openPreview,
-          })
-      : await openUrlInPreview({ threadRef, url, openPreview });
-    if (result === null) {
-      reportFailure(url);
-      return;
-    }
-    if (result._tag === "Failure") {
-      const error = squashAtomCommandFailure(result);
-      reportFailure(url, error instanceof Error ? error.message : url);
-    }
+    void readLocalApi()?.shell.openExternal(url);
+    return;
   });
 
   const openLink = useEffectEvent(async (url: string) => {

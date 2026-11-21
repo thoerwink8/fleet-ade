@@ -57,7 +57,6 @@ import type {
 } from "@t3tools/client-runtime/state/shell";
 import { waitForDraftHeroTransition } from "./components/chat/draftHeroTransition";
 import { getLocalStorageItem } from "./hooks/useLocalStorage";
-import { readThreadPreviewState } from "./previewStateStore";
 import {
   readInstanceCustomModels,
   resolveAppModelSelection,
@@ -1591,7 +1590,7 @@ function getComposerDraftState(
 function draftThreadHasOpenPreview(draftThread: DraftThreadState | undefined): boolean {
   if (draftThread === undefined) return false;
   const ref = scopeThreadRef(draftThread.environmentId, draftThread.threadId);
-  return Object.keys(readThreadPreviewState(ref).sessions).length > 0;
+  return false;
 }
 
 function isComposerThreadKeyInUse(mappings: Record<string, string>, threadKey: string): boolean {

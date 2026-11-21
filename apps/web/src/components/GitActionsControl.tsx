@@ -125,7 +125,7 @@ import {
 } from "@t3tools/client-runtime/operations/projects";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
-import { useOpenLink } from "~/browser/useOpenLink";
+import { useOpenLink } from "~/lib/useOpenLink";
 
 interface GitActionsControlProps {
   gitCwd: string | null;

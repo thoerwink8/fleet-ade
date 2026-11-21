@@ -2,7 +2,6 @@ import type { KeybindingCommand, ResolvedKeybindingsConfig } from "@t3tools/cont
 
 import { resolveShortcutCommand, type ShortcutMatchContext } from "../keybindings";
 import { isEditableFocused } from "../lib/editableFocus";
-import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
 import { appAtomRegistry } from "../rpc/atomRegistry";
@@ -47,7 +46,7 @@ const observerScopes: CommandScope[] = [];
 function readFocusContext(event: KeyboardEvent): Partial<ShortcutMatchContext> {
   return {
     terminalFocus: isTerminalFocused(),
-    previewFocus: isPreviewFocused(),
+    previewFocus: false,
     editableFocus: isEditableFocused(event.target),
     modelPickerOpen: isModelPickerOpen(),
   };

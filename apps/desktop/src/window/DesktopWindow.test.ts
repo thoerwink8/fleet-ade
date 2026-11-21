@@ -36,7 +36,6 @@ vi.mock("electron", async (importOriginal) => ({
 import * as DesktopAssets from "../app/DesktopAssets.ts";
 import * as DesktopConfig from "../app/DesktopConfig.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
-import * as DesktopPrimaryPaste from "../app/DesktopPrimaryPaste.ts";
 import * as DesktopState from "../app/DesktopState.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
@@ -49,12 +48,6 @@ import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import { SNAP_SHOT_EVENT_CHANNEL } from "../ipc/channels.ts";
 import * as DesktopServerExposure from "../backend/DesktopServerExposure.ts";
 import * as DesktopWindow from "./DesktopWindow.ts";
-import {
-  PASSKEY_BRIDGE_ARGUMENT,
-  PRIMARY_PASTE_DISABLED_ARGUMENT,
-} from "../preview/GuestProtocol.ts";
-import * as PreviewManager from "../preview/Manager.ts";
-import * as PreviewPasskeys from "../preview/Passkeys.ts";
 
 const environmentInput = {
   dirname: "/repo/apps/desktop/dist-electron",
@@ -234,17 +227,13 @@ function layerTest(input: {
   readonly beforeMainWindowBoundsUpdate?: (
     bounds: DesktopAppSettings.DesktopWindowBounds,
   ) => Effect.Effect<void>;
-  readonly setPreviewMainWindow?: (window: Electron.BrowserWindow) => Effect.Effect<void>;
   readonly destroyAll?: Effect.Effect<void>;
   readonly onWindowCreate?: Effect.Effect<void>;
   readonly openedExternalUrls?: unknown[];
   readonly onCopyText?: (text: string) => Effect.Effect<void>;
   readonly onPopupTemplate?: (input: ElectronMenu.ElectronMenuTemplateInput) => Effect.Effect<void>;
-  readonly previewZoomReapplies?: number[];
   readonly onReveal?: (window: Electron.BrowserWindow) => void;
   readonly focusedWindow?: Electron.BrowserWindow;
-  readonly primaryPasteEnabled?: boolean;
-  readonly previewPasskeyBridgeEnabled?: boolean;
 }) {
   let desktopSettings = input.desktopSettings ?? DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS;
   const layerDesktopAppSettings = Layer.succeed(DesktopAppSettings.DesktopAppSettings, {
@@ -336,25 +325,6 @@ function layerTest(input: {
         } satisfies ElectronShell.ElectronShell["Service"]),
         layerElectronTheme,
         layerElectronWindow,
-        Layer.succeed(DesktopPrimaryPaste.DesktopPrimaryPaste, {
-          enabled: input.primaryPasteEnabled ?? true,
-        }),
-        Layer.mock(PreviewPasskeys.PreviewPasskeys)({
-          bridgeEnabled: input.previewPasskeyBridgeEnabled ?? false,
-          installSessionHandlers: () => {},
-          attachGuest: () => () => {},
-        }),
-        Layer.mock(PreviewManager.PreviewManager)({
-          getBrowserSession: () => Effect.succeed({} as Electron.Session),
-          setMainWindow: input.setPreviewMainWindow ?? (() => Effect.void),
-          prepareWebview: () => Effect.void,
-          isBrowserPartition: (partition) => partition.startsWith("persist:t3code-preview-"),
-          getBrowserPartition: () => Effect.succeed("persist:t3code-preview-test"),
-          reapplyZoom: () =>
-            Effect.sync(() => {
-              input.previewZoomReapplies?.push(input.window.webContents.getZoomLevel());
-            }),
-        }),
       ),
     ),
     Layer.merge(DesktopState.layer),
@@ -449,18 +419,6 @@ const makeSplashScenario = (createOutcomes: readonly (Electron.BrowserWindow | n
           } satisfies ElectronShell.ElectronShell["Service"]),
           layerElectronTheme,
           Layer.succeed(ElectronWindow.ElectronWindow, electronWindowShape),
-          Layer.succeed(DesktopPrimaryPaste.DesktopPrimaryPaste, { enabled: true }),
-          Layer.mock(PreviewPasskeys.PreviewPasskeys)({
-            bridgeEnabled: false,
-            installSessionHandlers: () => {},
-            attachGuest: () => () => {},
-          }),
-          Layer.mock(PreviewManager.PreviewManager)({
-            getBrowserSession: () => Effect.succeed({} as Electron.Session),
-            setMainWindow: () => Effect.void,
-            isBrowserPartition: (partition) => partition.startsWith("persist:t3code-preview-"),
-            getBrowserPartition: () => Effect.succeed("persist:t3code-preview-test"),
-          }),
         ),
       ),
     );
@@ -757,71 +715,23 @@ describe("DesktopWindow", () => {
     }),
   );
 
-  // Chromium hands the main window's zoom level down to embedded preview
-  // guests, so every app zoom has to put the preview browser back at its own
-  // zoom or zooming the UI drags the previewed page with it.
-  it.effect("zooms main with a focused popup and reapplies preview zoom", () =>
-    Effect.gen(function* () {
-      const fakeWindow = makeFakeBrowserWindow();
-      const popup = makeFakeBrowserWindow();
-      const createCount = yield* Ref.make(0);
-      const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
-      const previewZoomReapplies: number[] = [];
-      const layer = layerTest({
-        window: fakeWindow.window,
-        createCount,
-        mainWindow,
-        previewZoomReapplies,
-        focusedWindow: popup.window,
-      });
-
-      yield* Effect.gen(function* () {
-        const desktopWindow = yield* DesktopWindow.DesktopWindow;
-        yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
-
-        yield* desktopWindow.zoomMain("out");
-        yield* desktopWindow.zoomMain("out");
-        yield* desktopWindow.zoomMain("in");
-        yield* desktopWindow.zoomMain("reset");
-
-        assert.deepEqual(
-          fakeWindow.setZoomLevel.mock.calls.map(([level]) => level),
-          [-0.5, -1, -0.5, 0],
-        );
-        assert.deepEqual(previewZoomReapplies, [-0.5, -1, -0.5, 0]);
-        assert.equal(popup.setZoomLevel.mock.calls.length, 0);
-      }).pipe(Effect.provide(layer));
-    }),
-  );
 
   it.effect("zooms the app from Ctrl+wheel like the menu does", () =>
     Effect.gen(function* () {
       const fakeWindow = makeFakeBrowserWindow();
       const createCount = yield* Ref.make(0);
       const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
-      const previewZoomReapplies: number[] = [];
-      const layer = layerTest({
-        window: fakeWindow.window,
-        createCount,
-        mainWindow,
-        previewZoomReapplies,
-      });
+      const layer = layerTest({ window: fakeWindow.window, createCount, mainWindow });
 
       yield* Effect.gen(function* () {
         const desktopWindow = yield* DesktopWindow.DesktopWindow;
         yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
-
         const zoomChanged = fakeWindow.webContentsListeners.get("zoom-changed");
         if (!zoomChanged) return yield* Effect.die("zoom-changed listener was not registered");
         zoomChanged({}, "in");
         zoomChanged({}, "out");
         zoomChanged({}, "out");
-
-        assert.deepEqual(
-          fakeWindow.setZoomLevel.mock.calls.map(([level]) => level),
-          [0.5, 0, -0.5],
-        );
-        assert.deepEqual(previewZoomReapplies, [0.5, 0, -0.5]);
+        assert.deepEqual(fakeWindow.setZoomLevel.mock.calls.map(([level]) => level), [0.5, 0, -0.5]);
       }).pipe(Effect.provide(layer));
     }),
   );
@@ -929,67 +839,6 @@ describe("DesktopWindow", () => {
       }),
   );
 
-  it.effect.each(["backend ready", "activation", "renderer event"] as const)(
-    "quietly cancels %s when quit races preview cleanup",
-    (entry) =>
-      Effect.gen(function* () {
-        const fake = makeFakeBrowserWindow();
-        const createCount = yield* Ref.make(0);
-        const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
-        const previewStarted = yield* Deferred.make<void>();
-        const releasePreview = yield* Deferred.make<void>();
-        const reveal = vi.fn();
-        const warnings: unknown[] = [];
-        const logger = Logger.make(({ logLevel, message }) => {
-          if (logLevel === "Warn" || logLevel === "Error") warnings.push(message);
-        });
-        const layer = layerTest({
-          window: fake.window,
-          createCount,
-          mainWindow,
-          desktopSettings: {
-            ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS,
-            localEnvironmentEnabled: false,
-          },
-          setPreviewMainWindow: () =>
-            Deferred.succeed(previewStarted, undefined).pipe(
-              Effect.andThen(Deferred.await(releasePreview)),
-            ),
-          destroyAll: Effect.sync(() => fake.isDestroyed.mockReturnValue(true)),
-          onReveal: reveal,
-        });
-
-        yield* Effect.gen(function* () {
-          const windows = yield* DesktopWindow.DesktopWindow;
-          const state = yield* DesktopState.DesktopState;
-          const creation =
-            entry === "backend ready"
-              ? windows.handleBackendReady(new URL("http://127.0.0.1:3773"))
-              : entry === "activation"
-                ? windows.activate
-                : windows.dispatchMenuAction("open-settings");
-          const fiber = yield* creation.pipe(Effect.forkChild({ startImmediately: true }));
-          yield* Deferred.await(previewStarted);
-          yield* Ref.set(state.quitting, true);
-          // Cover both an already-destroyed window and one shutdown has yet to destroy.
-          fake.isDestroyed.mockReturnValue(entry !== "backend ready");
-          yield* Deferred.succeed(releasePreview, undefined);
-
-          assert.isTrue(Exit.isSuccess(yield* Fiber.await(fiber)));
-          assert.isTrue(fake.window.isDestroyed());
-          assert.isTrue(Option.isNone(yield* Ref.get(mainWindow)));
-          assert.equal(fake.loadURL.mock.calls.length, 0);
-          assert.equal(fake.openDevTools.mock.calls.length, 0);
-          assert.equal(fake.send.mock.calls.length, 0);
-          assert.equal(reveal.mock.calls.length, 0);
-          assert.deepEqual(warnings, []);
-        }).pipe(
-          Effect.provide(
-            Layer.mergeAll(layer, Logger.layer([logger], { mergeWithExisting: false })),
-          ),
-        );
-      }),
-  );
 
   it.effect("persists normal bounds and state for a maximized window", () =>
     Effect.gen(function* () {
@@ -1327,42 +1176,6 @@ describe("DesktopWindow", () => {
     }),
   );
 
-  it.effect.each([
-    {
-      primaryPasteEnabled: false,
-      expected: [PASSKEY_BRIDGE_ARGUMENT, PRIMARY_PASTE_DISABLED_ARGUMENT],
-    },
-    { primaryPasteEnabled: true, expected: [PASSKEY_BRIDGE_ARGUMENT] },
-  ])(
-    "passes the primary-paste setting to preview guests (enabled: $primaryPasteEnabled)",
-    ({ primaryPasteEnabled, expected }) =>
-      Effect.gen(function* () {
-        const fakeWindow = makeFakeBrowserWindow();
-        const layer = layerTest({
-          window: fakeWindow.window,
-          createCount: yield* Ref.make(0),
-          mainWindow: yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none()),
-          primaryPasteEnabled,
-          previewPasskeyBridgeEnabled: true,
-        });
-
-        yield* Effect.gen(function* () {
-          const desktopWindow = yield* DesktopWindow.DesktopWindow;
-          yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
-
-          const willAttachWebview = fakeWindow.webContentsListeners.get("will-attach-webview");
-          if (!willAttachWebview) {
-            return yield* Effect.die("will-attach-webview listener was not registered");
-          }
-          const webPreferences: Electron.WebPreferences = {};
-          willAttachWebview({ preventDefault: () => {} }, webPreferences, {
-            partition: "persist:t3code-preview-test",
-          });
-
-          assert.deepEqual(webPreferences.additionalArguments, expected);
-        }).pipe(Effect.provide(layer));
-      }),
-  );
 
   it.effect("opens safe off-origin renderer navigations in the system browser", () =>
     Effect.gen(function* () {

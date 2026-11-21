@@ -25,9 +25,6 @@ import { PullRequestDetailGhost } from "../pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "../pullRequest/PullRequestsUnavailableState";
 import { ThreadPullRequestsPanel } from "../pullRequest/ThreadPullRequestsPanel";
 
-const PreviewPanel = lazy(() =>
-  import("../preview/PreviewPanel").then((module) => ({ default: module.PreviewPanel })),
-);
 const DiffPanel = lazy(() => import("../DiffPanel"));
 const FilePreviewPanel = lazy(() => import("../files/FilePreviewPanel"));
 
@@ -80,19 +77,6 @@ export function RightPanelSurfaceContent(props: {
   const { surface, threadRef, visible, onCloseSurface } = props;
   if (surface === null) return null;
   switch (surface.kind) {
-    case "preview":
-      return (
-        <Suspense fallback={null}>
-          <PreviewPanel
-            mode="embedded"
-            threadRef={threadRef}
-            tabId={surface.resourceId}
-            configuredUrls={props.configuredPreviewUrls}
-            visible={visible}
-            onSendAnnotation={props.onSendAnnotation}
-          />
-        </Suspense>
-      );
     case "terminal":
       return (
         <PersistentThreadTerminalPanel

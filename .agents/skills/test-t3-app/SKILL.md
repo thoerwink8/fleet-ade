@@ -5,9 +5,9 @@ description: Test T3 Code's web and desktop UI through its built-in Browser pane
 
 # Test T3 web and desktop
 
-Use T3's built-in Browser panel for verification. Follow the recovery steps
-below before declaring it unavailable. Do not install or switch to another
-automation system. Native mobile verification is not covered by this skill.
+Use an external browser via ego-browser or playwright-cli for verification. Native mobile verification is not covered by this skill.
+Do not install or switch to another automation system.
+
 
 ## Start the app
 
@@ -27,24 +27,17 @@ Do not spend a paid model to see a turn render. `vp run dev` registers the
 through the real adapter and orchestration. Its models are scenarios:
 `showcase` covers thinking, a plan, tool calls, an approval, and markdown.
 Press `Ctrl+Alt+Shift+R` for a picker (GNOME takes that key for screen
-recording), call `window.t3dev.replay("showcase")`
-with `preview_evaluate`, or run
+recording), or run
 `node apps/server/src/bin.ts thread start --base-dir .t3 --provider devReplay --model showcase <project> "go"`.
 When the test needs real provider behavior, use that provider's cheapest
 model, such as Haiku for Claude or Luna for Codex.
 
-## Use the Browser panel
+## Use an external browser
 
-Call `preview_status`. If no tab can be automated, call `preview_open`, including
-when status reports `available: false` or `tabId: null`. Status can report
-unavailable simply because no tab exists yet; opening a tab needs no user action.
-Stop verification and explain the blocker only if the tools are absent or
-`preview_open` reports unavailable or fails.
-
-Navigate to the complete startup pairing URL once with
-`preview_navigate`, then use `preview_snapshot` and T3's interaction tools.
-If the token was consumed or expired, run `node apps/server/src/bin.ts pair`
-for a fresh one. Keep using the same tab.
+Open the complete startup pairing URL in ego-browser or playwright-cli and
+use its navigation, snapshot, and interaction tools. If the token was consumed
+or expired, run `node apps/server/src/bin.ts pair` for a fresh one.
+Keep using the same browser context.
 
 ## Verify and retain
 

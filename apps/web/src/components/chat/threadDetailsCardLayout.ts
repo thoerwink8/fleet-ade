@@ -1,4 +1,9 @@
-import type { PreviewMiniPlayerFrame } from "../preview/previewMiniPlayerLayout";
+interface PreviewMiniPlayerFrameLike {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 import { DETAILS_CARD_CLEARANCE } from "./chatCanvasLayout";
 
 export const THREAD_DETAILS_CARD_GAP = 12;
@@ -23,7 +28,7 @@ export function resolveThreadDetailsCardLayout({
 }: {
   container: { width: number; height: number };
   lane: { padding: number; minChatWidth: number };
-  frame: PreviewMiniPlayerFrame | null;
+  frame: PreviewMiniPlayerFrameLike | null;
   overlapsDetailsCard?: boolean;
   topInset?: number;
 }) {

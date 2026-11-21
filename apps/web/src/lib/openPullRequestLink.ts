@@ -11,8 +11,7 @@ import {
 
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 
-import { canOpenLinksInApp } from "../browser/browserLinkTarget";
-import { useOpenLink } from "../browser/useOpenLink";
+import { useOpenLink } from "./useOpenLink";
 import { useClientSettings } from "../hooks/useSettings";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { useRightPanelStore } from "../rightPanelStore";
@@ -65,7 +64,6 @@ export function useOpenChangeRequestLink(
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
   const ignoreWhitespace = useClientSettings((settings) => settings.diffIgnoreWhitespace);
-  const browserLinkTarget = useClientSettings((settings) => settings.browserLinkTarget);
   const readDiffPreview = useAtomQueryRunner(reviewEnvironment.diffPreview, {
     reportFailure: false,
     refresh: true,
@@ -206,10 +204,7 @@ export function useOpenChangeRequestLink(
           if (openPullRequest()) return;
           if (onCommitUnavailable) return onCommitUnavailable();
           // A popup opened after the lookup has lost the click's activation, so browsers block it.
-          if (
-            window.desktopBridge === undefined &&
-            (browserLinkTarget !== "app" || !canOpenLinksInApp(resolvedThreadRef))
-          ) {
+          if (window.desktopBridge === undefined) {
             const toastId = toastManager.add(
               stackedThreadToast({
                 type: "info",

@@ -54,8 +54,6 @@ import {
 } from "../state/entities";
 import { useUiStateStore } from "../uiStateStore";
 import { useDiffPanelStore } from "../diffPanelStore";
-import { usePreviewMiniPlayerStore } from "../previewMiniPlayerStore";
-import { clearThreadPreviewState } from "../previewStateStore";
 import { useRightPanelStore } from "../rightPanelStore";
 import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../threadRoutes";
@@ -255,10 +253,8 @@ function expireThreadUndos(target: ScopedThreadRef, kinds: readonly string[]) {
 }
 
 function clearDeletedThreadPanelState(ref: ScopedThreadRef) {
-  clearThreadPreviewState(ref);
   useRightPanelStore.getState().removeThread(ref);
   useDiffPanelStore.getState().removeThread(ref);
-  usePreviewMiniPlayerStore.getState().removeThread(ref);
 }
 
 /** A No project thread that already has its own folder, on a server that can promote it. */

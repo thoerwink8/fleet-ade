@@ -1,8 +1,6 @@
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
   ChatFileAttachment,
-  INCOGNITO_BROWSER_PROFILE_ID,
-  PreviewSessionSnapshot,
   ScopedThreadRef,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -13,13 +11,11 @@ import { resolveStorage } from "./lib/storage";
 import { randomUUID } from "./lib/utils";
 import { type RightPanelSurface } from "./rightPanelStore";
 
-export type ClosedView =
-  | {
-      kind: "panel-tab";
-      threadRef: ScopedThreadRef;
-      surface: Exclude<RightPanelSurface, { kind: "terminal" }>;
-    }
-  | { kind: "browser"; threadRef: ScopedThreadRef; snapshot: PreviewSessionSnapshot };
+export type ClosedView = {
+  kind: "panel-tab";
+  threadRef: ScopedThreadRef;
+  surface: Exclude<RightPanelSurface, { kind: "terminal" }>;
+};
 
 export type ClosedViewEntry = ClosedView & { id: string };
 
@@ -40,22 +36,17 @@ const sameTarget = (entry: ClosedViewEntry, view: ClosedView): boolean => {
   switch (entry.kind) {
     case "panel-tab":
       return view.kind === "panel-tab" && entry.surface.id === view.surface.id;
-    case "browser":
-      return view.kind === "browser" && entry.snapshot.tabId === view.snapshot.tabId;
   }
 };
 
-const isPersistentView = (entry: ClosedViewEntry) =>
-  entry.kind !== "browser" || entry.snapshot.profileId !== INCOGNITO_BROWSER_PROFILE_ID;
+const isPersistentView = (_entry: ClosedViewEntry) => true;
 
 const isThreadRef = Schema.is(ScopedThreadRef);
-const isSnapshot = Schema.is(PreviewSessionSnapshot);
 const isAttachment = Schema.is(ChatFileAttachment);
 
 const isClosedViewEntry = (entry: unknown): entry is ClosedViewEntry => {
   const view = entry as ClosedViewEntry | null;
   if (!view || typeof view.id !== "string" || !isThreadRef(view.threadRef)) return false;
-  if (view.kind === "browser") return isSnapshot(view.snapshot);
   if (view.kind !== "panel-tab") return false;
   const surface = view.surface;
   if (!surface || typeof surface.id !== "string") return false;
@@ -64,8 +55,6 @@ const isClosedViewEntry = (entry: unknown): entry is ClosedViewEntry => {
     case "files":
     case "pull-requests":
       return surface.id === surface.kind;
-    case "preview":
-      return surface.resourceId === null || typeof surface.resourceId === "string";
     case "file":
       return (
         typeof surface.relativePath === "string" &&

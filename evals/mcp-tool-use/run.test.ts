@@ -249,25 +249,7 @@ it("accepts any tool listed as an alternative", () => {
   assert.deepEqual(failed(expect, run("list_thread_pull_requests")), [
     "calls link_pull_request|watch_pull_request",
   ]);
-  // A bound on alternatives counts their calls together.
-  const both: SampleRun = {
-    calls: ["preview_status", "preview_open"].map((tool) => ({ step: 0, tool, input: {} })),
-    text: "",
-    stopReason: "end_turn",
-  };
-  assert.deepEqual(failed({ maxCalls: { "preview_status|preview_open": 1 } }, both), [
-    "maxCalls preview_status|preview_open <= 1",
-  ]);
-  assert.deepEqual(failed({ maxCalls: { "preview_status|preview_open": 2 } }, both), []);
-  // With browser access off, any second preview-capability call counts, closing a tab included.
-  const offTwice: SampleRun = {
-    calls: ["preview_open", "t3_preview_close"].map((tool) => ({ step: 0, tool, input: {} })),
-    text: "",
-    stopReason: "end_turn",
-  };
-  assert.lengthOf(failed(browserCase("br-guard-browser-access-off").expect, offTwice), 1);
 });
-
 it("counts the new threads an agent asks for, one brief per thread, over both creation tools", () => {
   const expect = { newThreads: ["~reconnect", "~csv", "~admin"] };
   const run = (...calls: Array<{ tool: string; input: unknown; failed?: boolean }>): SampleRun => ({
@@ -611,13 +593,6 @@ const childCase: McpToolUseCase = {
   expect: { calls: [{ tool: "link_pull_request" }], notCalls: ["watch_pull_request"] },
 };
 
-const decodeCase = Schema.decodeSync(Schema.fromJsonString(McpToolUseCase));
-const browserCase = (id: string) =>
-  NodeFS.readFileSync(new URL("./cases/browser-routing.ndjson", import.meta.url), "utf8")
-    .trim()
-    .split("\n")
-    .map((line) => decodeCase(line))
-    .find((c) => c.id === id)!;
 
 it("rebuilds the template from this checkout and sends a child T3's task prompt", () => {
   const base = buildBase(template, { model: "claude-sonnet-5-5", keepUserInstructions: false });

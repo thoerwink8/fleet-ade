@@ -79,7 +79,6 @@ import {
   MenuSubTrigger,
   MenuTrigger,
 } from "~/components/ui/menu";
-import { useBrowserDefaults } from "~/browser/browserDefaults";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
 import { faviconUrlForOrigin } from "@t3tools/shared/favicon";
@@ -94,11 +93,6 @@ import { useEnvironmentQuery } from "~/state/query";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { toastManager } from "~/components/ui/toast";
 
-import { PreviewPanelShell, type PreviewPanelMode } from "./preview/PreviewPanelShell";
-import { FaviconImage } from "./preview/PreviewFaviconIcon";
-import { previewBridge } from "./preview/previewBridge";
-import { dispatchPreviewAction } from "./preview/previewActionBus";
-import { preventThumbButtonFocus, takeThumbButtonNavigation } from "./preview/thumbButtons";
 import { PierreEntryIcon } from "./chat/PierreEntryIcon";
 import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
@@ -106,7 +100,7 @@ import { observeResize } from "~/lib/observeResize";
 import { surfaceShortcutKey } from "~/lib/surfaceShortcutKey";
 
 export interface RightPanelTabsProps {
-  mode: PreviewPanelMode;
+  mode: "inline" | "embedded";
   maximized?: boolean;
   open?: boolean;
   keybindings: ResolvedKeybindingsConfig;
@@ -164,9 +158,6 @@ export interface PullRequestTabStatus {
 
 export type PullRequestTabStatusSeed = Pick<PullRequestTabStatus, "state" | "isDraft">;
 
-function shouldOpenDefaultBrowserProfileFromMenuClick(pointerType: string | undefined): boolean {
-  return pointerType !== "touch";
-}
 
 const SURFACE_DISABLED_REASONS = {
   browser: "浏览器预览仅在 T3 Code 桌面应用中可用。",
@@ -609,15 +600,9 @@ function surfaceTitle(
   }
 }
 
-function PreviewFavicon({ capturedUrl, url }: { capturedUrl: string | null; url: string | null }) {
-  const publicProviderUrl = faviconUrlForOrigin(url, 32);
-  return (
-    <FaviconImage
-      sources={[capturedUrl, publicProviderUrl]}
-      fallback={<Globe2 className="size-3 shrink-0" />}
-      className="size-3 shrink-0 rounded-sm object-contain"
-    />
-  );
+function PreviewFavicon({ url }: { capturedUrl: string | null; url: string | null }) {
+  void url;
+  return <Globe2 className="size-3 shrink-0" />;
 }
 
 function sameOrigin(left: string, right: string): boolean {
@@ -914,12 +899,6 @@ function RightPanelTab(
                 type="button"
                 className="cursor-pointer flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
                 aria-label={audio === "muted" ? `取消 ${title} 的静音` : `将 ${title} 静音`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void previewBridge
-                    ?.setAudioMuted(audioRuntimeTabId, audio !== "muted")
-                    .catch(() => undefined);
-                }}
               >
                 {audio === "muted" ? (
                   <VolumeOffIcon className="size-3" />
@@ -976,7 +955,6 @@ function RightPanelTab(
 export function RightPanelTabs(props: RightPanelTabsProps) {
   const focusedSurface = props.surfaces.find((surface) => surface.id === props.activeSurfaceId);
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
-  const browserProfiles = useBrowserDefaults().profiles;
   const { resolvedTheme } = useTheme();
   const tabListRef = useRef<HTMLDivElement>(null);
   const addSurfaceTriggerRef = useRef<HTMLButtonElement>(null);
@@ -1164,16 +1142,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           props.onCopyFilePath(surface.relativePath);
         }
         break;
-      case "toggle-mute": {
-        const runtimeTabId =
-          menuPreviewTabId && menuOverlay
-            ? (props.previewRuntimeTabId?.(menuPreviewTabId) ?? null)
-            : null;
-        if (runtimeTabId) {
-          void previewBridge?.setAudioMuted(runtimeTabId, !menuMuted).catch(() => undefined);
-        }
-        break;
-      }
       case "close":
         props.onCloseSurface(surface);
         break;
@@ -1249,26 +1217,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   };
 
   return (
-    <PreviewPanelShell
-      workspaceArea
-      workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
-      workspaceLabel={
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      data-workspace-area
+      data-workspace-focus-key={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
+      aria-label={
         focusedSurface
           ? `工作区面板：${surfaceTitle(focusedSurface, props.previewSessions, props.terminalLabelsById)}`
           : "工作区面板"
-      }
-      mode={props.mode}
-      {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
-      {...(props.open !== undefined ? { open: props.open } : {})}
-      {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
-      {...(props.defaultWidth !== undefined ? { defaultWidth: props.defaultWidth } : {})}
-      {...(props.inlineSize ? { inlineSize: props.inlineSize } : {})}
-      onMouseDown={preventThumbButtonFocus}
-      onMouseUp={(event) =>
-        takeThumbButtonNavigation(
-          event,
-          focusedSurface?.kind === "preview" ? dispatchPreviewAction : undefined,
-        )
       }
     >
       <div
@@ -1349,41 +1305,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                 >
                   {addSurfaceActions.map((action) => {
                     const Icon = action.icon;
-                    if (action.label === "Browser" && action.available) {
-                      return (
-                        <MenuSub key={action.label}>
-                          <MenuSubTrigger
-                            className="[&>svg:last-child]:ms-0"
-                            aria-keyshortcuts={action.shortcut}
-                            onClick={(event) => {
-                              const pointerType =
-                                "pointerType" in event.nativeEvent &&
-                                typeof event.nativeEvent.pointerType === "string"
-                                  ? event.nativeEvent.pointerType
-                                  : undefined;
-                              if (!shouldOpenDefaultBrowserProfileFromMenuClick(pointerType))
-                                return;
-                              setAddSurfaceMenuOpen(false);
-                              action.onClick();
-                            }}
-                          >
-                            <Icon />
-                            {action.label}
-                            <MenuShortcut>{action.shortcut}</MenuShortcut>
-                          </MenuSubTrigger>
-                          <MenuSubPopup className="max-w-56">
-                            {browserProfiles.map((profile) => (
-                              <MenuItem
-                                key={profile.id}
-                                onClick={() => props.onAddBrowserInProfile(profile.id)}
-                              >
-                                <span className="min-w-0 truncate">{profile.name}</span>
-                              </MenuItem>
-                            ))}
-                          </MenuSubPopup>
-                        </MenuSub>
-                      );
-                    }
                     return (
                       <SurfaceMenuItem
                         key={action.label}
@@ -1462,7 +1383,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           <RightPanelEmptyState
             onAddBrowser={props.onAddBrowser}
             onAddBrowserInProfile={props.onAddBrowserInProfile}
-            browserProfiles={browserProfiles}
+            browserProfiles={[]}
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
@@ -1482,6 +1403,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           props.children
         )}
       </div>
-    </PreviewPanelShell>
+    </div>
   );
 }

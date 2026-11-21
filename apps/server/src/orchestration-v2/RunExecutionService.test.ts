@@ -56,7 +56,6 @@ import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderCommitBatch from "./ProviderCommitBatch.ts";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
-import * as PreviewAgentActivity from "../preview/PreviewAgentActivity.ts";
 import * as RunExecutionService from "./RunExecutionService.ts";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
@@ -88,7 +87,6 @@ const layerRunExecutionTest = RunExecutionService.layer.pipe(
   Layer.provide(
     Layer.mergeAll(
       McpAppModelContext.layerEmpty,
-      PreviewAgentActivity.layer,
       Layer.mock(CheckpointService.CheckpointServiceV2)({ captureBaseline: () => Effect.void }),
       layerTurnItemPositionsTest,
       mockEventSink({}),
@@ -903,7 +901,6 @@ it.effect("passes the thread's MCP app context to the provider under a safe key"
       RunExecutionService.layer.pipe(
         Layer.provide(
           Layer.mergeAll(
-            PreviewAgentActivity.layer,
             Layer.mock(McpAppModelContext.McpAppModelContext)({
               forThread: () =>
                 Effect.succeed([
@@ -946,7 +943,6 @@ it.effect("fails the run when its ownership check cannot be read before calling 
       Layer.provide(
         Layer.mergeAll(
           McpAppModelContext.layerEmpty,
-          PreviewAgentActivity.layer,
           Layer.mock(CheckpointService.CheckpointServiceV2)({ captureBaseline: () => Effect.void }),
           layerTurnItemPositionsTest,
           mockEventSink({
@@ -1149,7 +1145,6 @@ it.effect("starts the provider when checkpoint baseline capture fails", () =>
       Layer.provide(
         Layer.mergeAll(
           McpAppModelContext.layerEmpty,
-          PreviewAgentActivity.layer,
           Layer.mock(CheckpointService.CheckpointServiceV2)({
             captureBaseline: () =>
               Effect.fail(
@@ -1270,7 +1265,6 @@ it.effect.each(["failure", "interruption", "stale-attempt", "start-guard"] as co
         Layer.provide(
           Layer.mergeAll(
             McpAppModelContext.layerEmpty,
-            PreviewAgentActivity.layer,
             Layer.mock(CheckpointService.CheckpointServiceV2)({
               captureBaseline: () =>
                 scenario === "start-guard" ? Effect.void : Effect.die("not reached"),
@@ -1442,7 +1436,6 @@ it.effect("ingests new member threads of an owned child after the root turn term
       Layer.provide(
         Layer.mergeAll(
           McpAppModelContext.layerEmpty,
-          PreviewAgentActivity.layer,
           Layer.mock(CheckpointService.CheckpointServiceV2)({ captureBaseline: () => Effect.void }),
           layerTurnItemPositionsTest,
           mockEventSink({
@@ -1675,7 +1668,6 @@ it.effect("ends a nested native subagent and its thread when the root run is int
       Layer.provide(
         Layer.mergeAll(
           McpAppModelContext.layerEmpty,
-          PreviewAgentActivity.layer,
           Layer.mock(CheckpointService.CheckpointServiceV2)({ captureBaseline: () => Effect.void }),
           layerTurnItemPositionsTest,
           mockEventSink({
@@ -2121,7 +2113,6 @@ it.effect(
         Layer.provide(
           Layer.mergeAll(
             McpAppModelContext.layerEmpty,
-            PreviewAgentActivity.layer,
             Layer.mock(CheckpointService.CheckpointServiceV2)({
               captureBaseline: () => Effect.void,
             }),
@@ -2558,7 +2549,6 @@ it.effect("settles native subagents when a workspace handoff completes the root 
       Layer.provide(
         Layer.mergeAll(
           McpAppModelContext.layerEmpty,
-          PreviewAgentActivity.layer,
           Layer.mock(CheckpointService.CheckpointServiceV2)({
             captureBaseline: () => Effect.void,
           }),
@@ -3503,7 +3493,6 @@ function captureRootRunTermination(input: {
           }),
         ),
       ),
-      Layer.provideMerge(PreviewAgentActivity.layer),
     );
 
     const previewActivityEnded = yield* Effect.gen(function* () {

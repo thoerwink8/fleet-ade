@@ -187,7 +187,6 @@ import {
   type CompiledClaudeModelSelection,
 } from "../../claudeModelOptions.ts";
 import * as ServerConfig from "../../config.ts";
-import * as PortScanner from "../../preview/PortScanner.ts";
 import * as ProcessRunner from "../../processRunner.ts";
 import * as ServerSettings from "../../serverSettings.ts";
 import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
@@ -1272,7 +1271,6 @@ export const layerQueryRunner: Layer.Layer<
   | ChildProcessSpawner.ChildProcessSpawner
   | SecureRandom.SecureRandom
   | Path.Path
-  | PortScanner.PortDiscovery
   | ProviderEventLoggers.ProviderEventLoggers
 > = Layer.effect(
   ClaudeAgentSdkQueryRunner,
@@ -1286,7 +1284,6 @@ export const layerQueryRunner: Layer.Layer<
     const platform = yield* HostProcess.Platform;
     const runFork = Effect.runForkWith(yield* Effect.context<never>());
     const hostEnvironment = yield* HostProcess.Environment;
-    const portDiscovery = yield* PortScanner.PortDiscovery;
     const processRunner = yield* ProcessRunner.make();
     const readProcessTable = processRunner
       .run({ command: "ps", args: ["-A", "-o", "pid=,ppid=,pgid=,lstart="], timeout: "5 seconds" })
@@ -1343,15 +1340,7 @@ export const layerQueryRunner: Layer.Layer<
             Stream.toAsyncIterable,
           );
           // Send MCP credentials over stdin to keep them out of SDK argv and inherited command environments.
-          const { mcpServers, ...sdkOptions } = input.options;
-          // Jobs the agent starts inherit the thread, so port discovery can attribute their servers.
-          const queryOptions = {
-            ...sdkOptions,
-            env: {
-              ...(sdkOptions.env ?? hostEnvironment),
-              [PortScanner.AGENT_THREAD_ENV]: input.threadId,
-            },
-          };
+          const { mcpServers, ...queryOptions } = input.options;
           // The SDK can prepend a scope wrapper to native binaries; script entries run through node.
           const binaryPath = queryOptions.pathToClaudeCodeExecutable;
           const launch =

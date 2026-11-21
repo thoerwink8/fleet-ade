@@ -87,8 +87,6 @@ import {
   TextSearchIcon,
 } from "lucide-react";
 import { openThreadFind } from "./chat/threadFindStore";
-import { dispatchPreviewAction } from "./preview/previewActionBus";
-import { previewBridge } from "./preview/previewBridge";
 import {
   useDeferredValue,
   useEffect,
@@ -699,14 +697,6 @@ function OpenCommandPaletteDialog(props: {
   const activeThreadKey = activeThread
     ? scopedThreadKey(scopeThreadRef(activeThread.environmentId, activeThread.id))
     : null;
-  const previewPanelThreadRef = activeThread
-    ? scopeThreadRef(activeThread.environmentId, activeThread.id)
-    : activeDraftThread
-      ? scopeThreadRef(activeDraftThread.environmentId, activeDraftThread.threadId)
-      : null;
-  const activeThreadPreviewOpen = useRightPanelStore(
-    (state) => selectActiveRightPanel(state.byThreadKey, previewPanelThreadRef) === "preview",
-  );
   const lastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
   const nextAttentionThread = (() => {
     const candidates = threads.flatMap((thread) => {
@@ -1387,19 +1377,6 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
-  if (activeThreadPreviewOpen && previewBridge) {
-    actionItems.push({
-      kind: "action",
-      value: "find-in-browser-page",
-      title: "在浏览器页面中查找",
-      searchTerms: ["find", "search", "browser", "preview", "page"],
-      icon: <TextSearchIcon className={ITEM_ICON_CLASS} />,
-      shortcutCommand: "preview.find",
-      run: async () => {
-        dispatchPreviewAction("find");
-      },
-    });
-  }
 
   if (nextAttentionThread !== null) {
     const target = nextAttentionThread;
