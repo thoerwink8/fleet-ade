@@ -98,6 +98,9 @@ vi.mock("../components/ui/toast", () => ({
   stackedThreadToast: (toast: unknown) => toast,
   toastManager: { add: () => state.completed.resolve() },
 }));
+vi.mock("../lib/exportThreadMarkdown", () => ({
+  exportThreadMarkdown: async () => recordEffect("export-markdown"),
+}));
 vi.mock("../components/Sidebar.snooze", () => ({
   resolveSnoozePresets: () => [
     { id: "hour", label: "In 1 hour", whenLabel: "3 PM", snoozedUntil: "2099-01-01T00:00:00Z" },
@@ -191,5 +194,16 @@ describe("thread menu permissions", () => {
     expect(items[0]?.disabled).not.toBe(true);
     expect(state.effects).toEqual(["find"]);
     expect(onFind).toHaveBeenCalledExactlyOnceWith(target);
+  });
+
+  it("allows export-markdown without operate permission", async () => {
+    state.show.mockResolvedValue("export-markdown");
+    createMenu().openMenu(position);
+    await state.completed.promise;
+    const items = state.show.mock.calls[0]![0];
+    const exportItem = items.find((item) => item.id === "export-markdown");
+    expect(exportItem).toMatchObject({ id: "export-markdown", label: "导出为 Markdown" });
+    expect(exportItem?.disabled).not.toBe(true);
+    expect(state.effects).toEqual(["export-markdown"]);
   });
 });

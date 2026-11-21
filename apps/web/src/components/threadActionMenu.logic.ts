@@ -23,6 +23,7 @@ export type ThreadActionMenuId =
   | "regenerate-title"
   | "mark-unread"
   | "dismiss-attention"
+  | "export-markdown"
   | "copy"
   | "copy-path"
   | "copy-branch"
@@ -72,6 +73,7 @@ export function buildDraftActionMenuItems(options: {
 export interface ThreadActionMenuState {
   readonly canOperate: boolean;
   readonly canFind?: boolean;
+  readonly canExport?: boolean;
   readonly branch: string | null;
   readonly projectFilter: {
     readonly label: string;
@@ -109,6 +111,7 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
     "project-settings",
     "mark-unread",
     "dismiss-attention",
+    "export-markdown",
     "copy",
     "copy-path",
     "copy-branch",
@@ -233,11 +236,21 @@ export function buildThreadActionMenuItems(
           },
         ]
       : []),
+    ...(state.canExport
+      ? [
+          {
+            id: "export-markdown" as const,
+            label: "导出为 Markdown",
+            icon: "download",
+            separatorBefore: true,
+          },
+        ]
+      : []),
     {
       id: "copy",
       label: "复制",
       icon: "copy",
-      separatorBefore: true,
+      separatorBefore: !state.canExport,
       children: [
         { id: "copy-path", label: "路径", icon: "folder" },
         ...(state.branch
