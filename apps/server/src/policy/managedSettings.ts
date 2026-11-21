@@ -459,10 +459,10 @@ export function makeManagedSettings(
     return kept;
   };
 
-  // The paths keepStored puts back: each default, cut at an atomic setting, and the legacy key a
-  // defaulted setting replaced, which an older file holds the user's choice in.
+  // The paths keepStored puts back: each default or lock, cut at an atomic setting, and the legacy
+  // key a defaulted setting replaced, which an older file holds the user's choice in.
   const restoredPaths = (isAtomic: (key: string) => boolean): ReadonlyArray<Segments> => [
-    ...defaults.map((entry) => {
+    ...[...defaults, ...locks].map((entry) => {
       const atomicAt = entry.segments.findIndex(isAtomic);
       return atomicAt === -1 ? entry.segments : entry.segments.slice(0, atomicAt + 1);
     }),

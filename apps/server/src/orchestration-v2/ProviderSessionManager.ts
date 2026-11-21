@@ -450,7 +450,7 @@ export const layerWithOptions = (
                 ? yield* projectService.value.getById(thread.projectId)
                 : Option.none();
               if (Option.isNone(project)) {
-                return { browser: settings.enableAgentBrowserAccess };
+                return { browser: false };
               }
             }
             const effective = resolveProjectSettings(settings, thread.projectId).settings;

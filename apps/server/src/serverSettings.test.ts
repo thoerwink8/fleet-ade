@@ -2367,10 +2367,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
       schemaVersion: 1,
       organization: "Example Corp",
       settings: {
+        defaultAutoPull: { value: true, locked: true },
         defaultRuntimeMode: { value: "approval-required", locked: false },
       },
     };
-
     it.effect("uses policy defaults until the user picks something else", () =>
       Effect.gen(function* () {
         const service = yield* ServerSettingsModule.ServerSettingsService;
