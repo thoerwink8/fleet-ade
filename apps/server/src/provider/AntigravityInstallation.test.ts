@@ -1,7 +1,7 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Layer from "effect/Layer";
-import { expect, it } from "@effect/vitest";
+import { expect, it, it as effectIt } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Digest from "effect/crypto/Digest";
 import * as Deferred from "effect/Deferred";
@@ -660,9 +660,8 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       }),
   );
 
-  // quarantine: #214 关一基线：安装状态是 cancelled，期望是 failed
-  // The runtime's own abort is a real process; Windows has no POSIX sh.
-  it.effect.skip(
+  // quarantine: #214 The runtime abort fixture uses POSIX sh, unavailable on Windows.
+  effectIt.live.skipIf(hostPlatform === "win32")(
     "explains that the linux-arm64 runtime needs 4 KiB pages when it aborts on a 16 KiB kernel",
     () =>
       Effect.gen(function* () {
@@ -692,7 +691,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
         const state = yield* terminalState(installation);
         expect(state.phase).toBe("failed");
         expect(state.message).toMatch(/page/i);
-      }),
+      }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
   it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
