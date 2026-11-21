@@ -2,7 +2,13 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import type { UsageSource } from "@t3tools/contracts";
 
-import { formatHourShort, formatTokens, makeWindow, usageSourceMessages } from "./usageFormat.ts";
+import {
+  formatCountWan,
+  formatHourShort,
+  formatTokens,
+  makeWindow,
+  usageSourceMessages,
+} from "./usageFormat.ts";
 
 function malformedSource(count: number, overrides: Partial<UsageSource> = {}): UsageSource {
   return {
@@ -182,5 +188,14 @@ describe("token formatting", () => {
     expect(formatTokens(999_999)).toBe("1M");
     expect(formatTokens(999_999_999)).toBe("1B");
     expect(formatTokens(-999_999)).toBe("-1M");
+  });
+});
+
+describe("formatCountWan", () => {
+  it("switches to 万 at ten thousand and drops a trailing .0", () => {
+    expect(formatCountWan(9_999)).toBe("9999");
+    expect(formatCountWan(10_000)).toBe("1万");
+    expect(formatCountWan(15_000)).toBe("1.5万");
+    expect(formatCountWan(123_456)).toBe("12万");
   });
 });

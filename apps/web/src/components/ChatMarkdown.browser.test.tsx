@@ -231,7 +231,7 @@ it("reuses the parse of a remounted message that has stable extra plugins", asyn
   expect(parsed).toHaveBeenCalledTimes(1);
 });
 
-// quarantine: #17 关一基线：高亮结果是 undefined，期望是源码字符串
+// quarantine: #214 关一基线：高亮结果是 undefined，期望是源码字符串
 it.skip("highlights a code block's own source when an earlier block of the same length was cached", async () => {
   setup();
   const highlightedText = (container: HTMLElement) =>

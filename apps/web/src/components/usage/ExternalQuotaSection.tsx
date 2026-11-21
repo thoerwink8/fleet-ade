@@ -3,6 +3,7 @@ import {
   type EnvironmentId,
   type UsageProviderKind,
 } from "@t3tools/contracts";
+import { formatCountWan } from "@t3tools/shared/usageFormat";
 
 import { serverEnvironment } from "../../state/server";
 import { useEnvironmentQuery } from "../../state/query";
@@ -16,15 +17,6 @@ const LOCAL_PROVIDER_LABEL = {
   grok: "Grok",
   antigravity: "Antigravity",
 } as const;
-
-function formatCount(value: number): string {
-  if (value >= 10_000) {
-    const wan = value / 10_000;
-    const text = wan >= 10 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, "");
-    return `${text}万`;
-  }
-  return String(Math.round(value));
-}
 
 export function ExternalQuotaSection({
   environmentId,
@@ -43,7 +35,7 @@ export function ExternalQuotaSection({
   const localLines = localProviders.flatMap((provider) => {
     if (RETIRED_USAGE_PROVIDERS.has(provider.provider)) return [];
     const label = LOCAL_PROVIDER_LABEL[provider.provider as keyof typeof LOCAL_PROVIDER_LABEL];
-    return [`${label}：${provider.records} 次，${formatCount(provider.totalTokens)} 词元`];
+    return [`${label}：${provider.records} 次，${formatCountWan(provider.totalTokens)} 词元`];
   });
   return (
     <ExternalQuotaCards
