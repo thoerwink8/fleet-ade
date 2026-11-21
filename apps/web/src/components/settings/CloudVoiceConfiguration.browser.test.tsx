@@ -84,7 +84,7 @@ async function withVoicePanel(
   );
 }
 
-// quarantine: #22 关一基线：点 Cancel 超时
+// quarantine: #214 关一基线：点 Cancel 超时
 it.skip("cancelling a provider's setup keeps the current destination and writes nothing", async () => {
   chooseAudioDestination({ kind: "environment", environmentId: id });
   const writes: unknown[] = [];
@@ -112,7 +112,7 @@ it.skip("cancelling a provider's setup keeps the current destination and writes 
   );
 });
 
-// quarantine: #23 关一基线：点 API key 输入框超时
+// quarantine: #214 关一基线：点 API key 输入框超时
 it.skip("enables the chosen provider only after a successful setup", async () => {
   chooseAudioDestination({ kind: "environment", environmentId: id });
   const writes: unknown[] = [];

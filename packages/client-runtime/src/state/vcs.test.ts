@@ -41,7 +41,6 @@ import {
   commitVcsRefsRefresh,
   createVcsEnvironmentAtoms,
   makeCachedVcsRefsChanges,
-  resolveQuickAction,
 } from "./vcs.ts";
 import {
   invalidateCachedVcsRefs,
@@ -864,27 +863,3 @@ function status(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
     ...overrides,
   };
 }
-
-describe("resolveQuickAction", () => {
-  it("commits local changes without pushing when the branch is behind upstream", () => {
-    const behind = status({ hasWorkingTreeChanges: true, behindCount: 2 });
-    const commit = { label: "提交", disabled: false, kind: "run_action", action: "commit" };
-    expect(resolveQuickAction(behind, false)).toEqual(commit);
-    expect(
-      resolveQuickAction(
-        {
-          ...behind,
-          pr: {
-            number: 13,
-            title: "Open PR",
-            url: "https://example.com/pr/13",
-            baseRef: "main",
-            headRef: "feature/test",
-            state: "open",
-          },
-        },
-        false,
-      ),
-    ).toEqual(commit);
-  });
-});

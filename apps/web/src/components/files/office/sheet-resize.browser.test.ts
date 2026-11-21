@@ -145,7 +145,7 @@ it.each([false, true])(
   },
 );
 
-// quarantine: #25 关一基线：页面停在 Loading file，找不到名为 Sample 的 grid
+// quarantine: #214 关一基线：页面停在 Loading file，找不到名为 Sample 的 grid
 it.skip("requests current dimensions after resizing and scrolling away and back before a frame arrives", async () => {
   const archive = new JSZip();
   archive.file(

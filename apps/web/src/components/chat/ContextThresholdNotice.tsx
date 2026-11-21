@@ -3,15 +3,7 @@ import {
   contextThresholdPrompts,
   sessionContextThreshold,
 } from "@t3tools/shared/contextThreshold";
-
-function formatCount(value: number): string {
-  if (value >= 10_000) {
-    const wan = value / 10_000;
-    const text = wan >= 10 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, "");
-    return `${text}万`;
-  }
-  return String(Math.round(value));
-}
+import { formatCountWan } from "@t3tools/shared/usageFormat";
 
 export function ContextThresholdNotice({
   usedTokens,
@@ -38,7 +30,7 @@ export function ContextThresholdNotice({
   const prompt = contextThresholdPrompts(driver);
   return (
     <p className="px-3 pb-1 text-meta text-muted-foreground">
-      {`上下文 已用 ${formatCount(usedTokens)} / 阈值 ${formatCount(view.thresholdTokens)}`}
+      {`上下文 已用 ${formatCountWan(usedTokens)} / 阈值 ${formatCountWan(view.thresholdTokens)}`}
       {prompt ? "。已超过阈值，建议压缩或新开一轮。" : null}
     </p>
   );

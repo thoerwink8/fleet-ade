@@ -152,46 +152,6 @@ left by a run that was killed is replaced). A
 commit that is your clean `HEAD` runs in place. So a new scenario can prove a fix against a base
 that predates it.
 
-## iOS
-
-An iOS scenario imports from `t3-mobile.ts` and passes
-`IOS` where a web one passes `WEB`:
-
-```ts
-import { expect } from "e2e";
-
-import { IOS, test } from "./t3-mobile.ts";
-
-test(
-  "The iOS app lists a seeded thread and opens its history",
-  IOS,
-  async ({ t3, app, screen }) => {
-    const project = await t3.project("demo");
-    await t3.thread({ project, title: "Earlier work", messages: ["first", "second"] });
-    await t3.open();
-
-    const thread = screen.getByText("Earlier work", { exact: false }).first();
-    await expect(thread).toBeVisible({ timeout: 120_000 });
-    await thread.tap();
-    await expect(screen.getByText("second fixture turn complete", { exact: false })).toBeVisible();
-  },
-);
-```
-
-`t3.project` and `t3.thread` are the same. `t3.open()` installs the dev client for the checkout's
-native fingerprint, loads it from Metro, and pairs it with the scenario's server. `device` is
-e2e's [device fixture](https://e2e.com/docs/mobile#the-device-fixture) for system actions.
-
-The run leases an iPhone 18 Pro from the Simlock pool, so it needs `SIMLOCK_AGENT_DEVICE_URL`
-and `AGENT_DEVICE_DAEMON_AUTH_TOKEN`, as `mobile:e2e` does, and a gateway on Simlock 0.7.0 or
-later. A web-only run leases nothing. The device reaches this machine over the tailnet on ports
-13990 (server) and 8190 (Metro); set `T3_SCENARIO_SERVER_PORT` and `T3_SCENARIO_METRO_PORT` when
-another run on the machine holds them. An iOS run takes two to three minutes, most of it the
-device and the first bundle. `e2e run --target web` or `--target ios` runs one side.
-
-`scenarios:prove` works the same for an iOS scenario. Each commit gets the dev client built for
-its own native code.
-
 ## Other tiers
 
 - **Android.** Add a target with `mobile({ platform: "android", device: simlock("Pixel 9") })`

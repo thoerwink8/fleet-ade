@@ -185,7 +185,7 @@ patchedDependencies:
   "@alchemy.run/test@2.0.0-beta.85": patches/@alchemy.run__test@2.0.0-beta.85.patch
   "@effect/vitest@4.1.2": patches/@effect__vitest@4.1.2.patch
   "@ff-labs/fff-node@0.11.0": patches/@ff-labs__fff-node@0.11.0.patch
-  # Exports the dependency-light subpaths mobile and the web diff parser import, and makes find
+  # Exports the dependency-light subpaths the web diff parser imports, and makes find
   # cover folded files and collapsed context (onRevealSearchMatch).
   "@pierre/diffs@1.7.0-beta.3": patches/@pierre__diffs@1.7.0-beta.3.patch
   dbus-next@0.10.2: patches/dbus-next@0.10.2.patch

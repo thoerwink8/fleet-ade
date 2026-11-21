@@ -113,7 +113,7 @@ async function keepsBlockedAction(primaryAction: "merge" | "enable-auto-merge") 
   expect(perform).toHaveBeenCalledExactlyOnceWith(primaryAction, "squash");
 }
 
-// quarantine: #21 关一基线：整例超过 15 秒
+// quarantine: #214 关一基线：整例超过 15 秒
 it.skip("keeps a blocked merge action reachable without arming or performing it", () =>
   keepsBlockedAction("merge"));
 
