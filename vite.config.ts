@@ -211,13 +211,6 @@ export default defineConfig({
       "**/*.graphql.ts",
       "packages/source-control-github/schema/**",
       "apps/server/schema/**",
-      "apps/mobile/android/**",
-      "apps/mobile/ios/**",
-      "apps/mobile/uniwind-types.d.ts",
-      // Vendored and generated C.
-      "apps/mobile/modules/t3-highlights/Vendor/**",
-      "apps/mobile/modules/t3-highlights/cpp/generated/**",
-      "apps/mobile/modules/t3-highlights/nitrogen/generated/**",
       "*.icon/**",
     ],
     sortPackageJson: {},
@@ -244,9 +237,6 @@ export default defineConfig({
       "**/*.graphql.ts",
       "packages/source-control-github/schema/**",
       "apps/server/schema/**",
-      "apps/mobile/android/**",
-      "apps/mobile/ios/**",
-      "apps/mobile/uniwind-types.d.ts",
     ],
     plugins: ["eslint", "oxc", "react", "unicorn", "typescript"],
     jsPlugins: ["./oxlint-plugin-t3code/index.ts", "@shadcn/lint"],
@@ -351,7 +341,7 @@ export default defineConfig({
         rules: { "t3code/prefer-effect-fn": "off" },
       },
       {
-        files: ["apps/web/src/**", "apps/mobile/src/**", "apps/desktop/src/**"],
+        files: ["apps/web/src/**", "apps/desktop/src/**"],
         // Users still pick their own project icon from the full Lucide set.
         excludeFiles: ["apps/web/src/projectIconOptions.ts"],
         rules: { "t3code/no-sparkles-icon": "error" },
@@ -369,7 +359,7 @@ export default defineConfig({
         rules: { "t3code/no-dom-test-environment": "error" },
       },
       {
-        files: ["packages/client-runtime/src/state/**", "apps/{web,mobile,desktop}/src/**"],
+        files: ["packages/client-runtime/src/state/**", "apps/{web,desktop}/src/**"],
         rules: { "t3code/no-rpc-permission-bypass": ["error", { allowRawClientAccess: false }] },
       },
       {
@@ -385,12 +375,7 @@ export default defineConfig({
         },
       },
       {
-        files: [
-          "apps/web/src/components/settings/AuthorizedClientsSettings.tsx",
-          "apps/mobile/src/features/updates/app-updates.ts",
-          "apps/web/src/components/device/DevicePhoneViewport.tsx",
-          "apps/web/src/components/device/DeviceDuoViewport.tsx",
-        ],
+        files: ["apps/web/src/components/settings/AuthorizedClientsSettings.tsx"],
         rules: { "t3code/no-rpc-permission-bypass": ["error", { allowRawClientAccess: true }] },
       },
       {
@@ -496,27 +481,6 @@ export default defineConfig({
             },
           ],
         },
-      },
-      {
-        files: ["apps/mobile/src/**"],
-        rules: {
-          "t3code/no-mobile-uniwind-theme-escape-hatches": "error",
-          "t3code/require-registered-list-scroll": "error",
-        },
-      },
-      {
-        files: ["apps/mobile/src/**"],
-        excludeFiles: [
-          "apps/mobile/src/components/ui/AppSymbol.tsx",
-          "apps/mobile/src/components/ui/AppSymbol.android.tsx",
-          "apps/mobile/src/features/pull-requests/pullRequestGlyphs.ts",
-        ],
-        rules: { "t3code/no-mobile-pull-request-glyph-literals": "error" },
-      },
-      {
-        files: ["apps/mobile/src/**"],
-        excludeFiles: ["**/*.test.{ts,tsx}"],
-        rules: { "t3code/no-ambiguous-detail-navigation": "error" },
       },
       {
         // Raw ResizeObserver state commits miss the paint; observeResize flushes derived layout together.
@@ -627,7 +591,6 @@ export default defineConfig({
       {
         // ESNext types allow APIs absent from Hermes; restrict shared client code, exempting Node tests.
         files: [
-          "apps/mobile/src/**",
           "packages/client-runtime/src/**",
           "packages/contracts/src/**",
           "packages/shared/src/**",
@@ -636,48 +599,14 @@ export default defineConfig({
         rules: { "t3code/no-hermes-unsupported-apis": "error" },
       },
       {
-        // Directives hide bailouts from mobile's compiler-coverage check; retain hooks until its allowlist is empty.
-        files: ["apps/mobile/src/**/*.{ts,tsx}"],
-        rules: { "t3code/no-manual-memo": ["error", { allowMemoHooks: true }] },
-      },
-      {
-        files: ["apps/web/src/**", "apps/mobile/src/**", "packages/*/src/**"],
+        files: ["apps/web/src/**", "packages/*/src/**"],
         rules: { "t3code/no-unreasoned-state-sync": "error" },
       },
       {
         // React Compiler caches use* functions only if they call a hook.
-        files: ["apps/web/src/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}"],
+        files: ["apps/web/src/**/*.{ts,tsx}"],
         excludeFiles: ["**/*.test.ts", "**/*.test.tsx"],
         rules: { "t3code/no-hookless-use-function": "error" },
-      },
-      {
-        files: [
-          "apps/mobile/src/features/archive/ArchivedThreadsScreen.tsx",
-          "apps/mobile/src/features/connection/ConnectionsNewRouteScreen.tsx",
-          "apps/mobile/src/features/files/FileMarkdownPreview.tsx",
-          "apps/mobile/src/features/files/SourceFileSurface.tsx",
-          "apps/mobile/src/features/files/AttachmentFileScreen.tsx",
-          "apps/mobile/src/features/files/ThreadFilesRouteScreen.tsx",
-          "apps/mobile/src/features/files/thread-file-navigator-pane.tsx",
-          "apps/mobile/src/features/layout/nested-stacks.tsx",
-          "apps/mobile/src/features/review/ReviewSheet.tsx",
-          "apps/mobile/src/features/review/useNativeReviewDiffBridge.ts",
-          "apps/mobile/src/features/settings/SettingsEnvironmentsRouteScreen.tsx",
-          "apps/mobile/src/features/threads/ThreadComposer.tsx",
-          "apps/mobile/src/features/threads/ThreadFeed.tsx",
-          "apps/mobile/src/features/threads/ThreadQueueControl.tsx",
-          "apps/mobile/src/features/review/ReviewCommentCard.tsx",
-          "apps/mobile/src/features/threads/thread-list-v2-items.tsx",
-          "apps/mobile/src/components/ui/SecretTextInput.android.tsx",
-          "apps/mobile/src/lib/useMobileNavigationTheme.ts",
-          "apps/mobile/src/native/T3ComposerEditor.ios.tsx",
-          "apps/mobile/src/native/T3ComposerEditor.native.tsx",
-          "apps/mobile/src/native/SelectableMarkdownText.tsx",
-          "apps/mobile/src/native/useEnrichedLinkVariants.ts",
-        ],
-        rules: {
-          "t3code/no-mobile-uniwind-theme-escape-hatches": ["error", { allowUniwindTheme: true }],
-        },
       },
     ],
     options: {
