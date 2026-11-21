@@ -2299,10 +2299,8 @@ export const layerWsRpc = (
         [WS_METHODS.serverRefreshProviders]:
           /* Request instrumentation already owns the span; keep this helper in that context. */
           Effect.fnUntraced(function* (input) {
-            if (input.modelCatalogOnly === true) {
-              yield* providerRegistry.refreshModelCatalog;
-              return { providers: [] };
-            }
+            // The model list ships with the server, so there is nothing to refresh.
+            if (input.modelCatalogOnly === true) return { providers: [] };
             if (input.refreshModels) {
               yield* providerRegistry.invalidateModelCaches({
                 instanceId: input.instanceId,

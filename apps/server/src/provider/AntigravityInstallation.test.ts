@@ -199,10 +199,6 @@ const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
     Effect.provideService(HostProcess.Environment, { PATH: options.path ?? "" }),
     Effect.provideService(ModelManifest.ModelManifest, {
       current: options.manifest ?? Effect.succeed(ModelManifest.BUNDLED_MODEL_MANIFEST),
-      refresh: Effect.succeed(ModelManifest.BUNDLED_MODEL_MANIFEST),
-      forceRefresh: Effect.succeed(ModelManifest.BUNDLED_MODEL_MANIFEST),
-      refreshOnDemand: Effect.succeed(ModelManifest.BUNDLED_MODEL_MANIFEST),
-      refreshInBackground: Effect.void,
     }),
     Effect.provideService(
       HttpClient.HttpClient,
