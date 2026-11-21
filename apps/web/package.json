@@ -8,10 +8,8 @@
     "dev": "vp dev",
     "dev:built": "vp build --watch",
     "build": "vp build",
-    "i18n:generate": "gt generate",
     "preview": "vp preview",
-    "test": "vp test run --passWithNoTests --project unit --project browser",
-    "i18n:translate": "gt translate"
+    "test": "vp test run --passWithNoTests --project unit --project browser"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -57,7 +55,6 @@
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
-    "canvas-confetti": "1.9.4",
     "class-variance-authority": "^0.7.1",
     "culori": "^4.0.2",
     "dompurify": "^3.4.17",
@@ -97,7 +94,6 @@
     "@effect/vitest": "catalog:",
     "@tailwindcss/vite": "^4.0.0",
     "@tanstack/router-plugin": "^1.161.0",
-    "@types/canvas-confetti": "1.9.0",
     "@types/compression": "^1.8.1",
     "@types/culori": "^4.0.1",
     "@types/hast": "^3.0.4",
@@ -109,7 +105,6 @@
     "@vitejs/plugin-react": "^6.1.2",
     "@vitest/browser-playwright": "5.0.5",
     "compression": "^1.8.2",
-    "gt": "2.27.0",
     "micromark-util-types": "catalog:",
     "oxc-transform-react": "~0.152.0",
     "playwright": "1.64.1",
