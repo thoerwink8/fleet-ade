@@ -365,7 +365,46 @@ const PersistedResponseStreamingMode = Schema.Union([
     }),
   ),
 );
+// The built-in browser is gone; old files still name its keys, and one unknown key would
+// reset every setting to defaults.
+const RETIRED_BROWSER_SETTING_KEYS = [
+  "enableAgentBrowserAccess",
+  "browserDefaultViewport",
+  "browserDefaultZoomFactor",
+  "browserDefaultAppearance",
+  "browserRecordingFrameRate",
+  "browserRecordingShowKeyPresses",
+  "browserRecordingShowMousePresses",
+  "browserLinkTarget",
+  "browserSearchEngine",
+  "browserCustomSearchUrl",
+  "browserAutoShowFloatingPreview",
+  "browserProfiles",
+  "browserDefaultProfileId",
+] as const;
+const retiredBrowserSetting = Schema.optionalKey(Schema.Unknown);
+const RetiredBrowserSettings = Schema.Struct({
+  enableAgentBrowserAccess: retiredBrowserSetting,
+  browserDefaultViewport: retiredBrowserSetting,
+  browserDefaultZoomFactor: retiredBrowserSetting,
+  browserDefaultAppearance: retiredBrowserSetting,
+  browserRecordingFrameRate: retiredBrowserSetting,
+  browserRecordingShowKeyPresses: retiredBrowserSetting,
+  browserRecordingShowMousePresses: retiredBrowserSetting,
+  browserLinkTarget: retiredBrowserSetting,
+  browserSearchEngine: retiredBrowserSetting,
+  browserCustomSearchUrl: retiredBrowserSetting,
+  browserAutoShowFloatingPreview: retiredBrowserSetting,
+  browserProfiles: retiredBrowserSetting,
+  browserDefaultProfileId: retiredBrowserSetting,
+});
+const stripRetiredBrowserSettings = (settings: ServerSettings): ServerSettings => {
+  const current: Record<string, unknown> = { ...settings };
+  for (const key of RETIRED_BROWSER_SETTING_KEYS) delete current[key];
+  return current as ServerSettings;
+};
 const PersistedServerSettings = Schema.Struct({
+  ...RetiredBrowserSettings.fields,
   ...ServerSettings.fields,
   responseStreamingMode: PersistedResponseStreamingMode.pipe(
     Schema.withDecodingDefault(Effect.succeed("paragraph" as const)),
@@ -817,7 +856,7 @@ const make = Effect.gen(function* () {
           });
         }
       } else {
-        settings = decoded.value;
+        settings = stripRetiredBrowserSettings(decoded.value);
       }
     }
     // Settings saved by a server that kept the mode in `compactIdleThreads` move

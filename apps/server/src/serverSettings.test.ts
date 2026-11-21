@@ -252,6 +252,41 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       assert.deepEqual(persisted.projectSettingsOverrides, settings.projectSettingsOverrides);
     }).pipe(Effect.provide(layerServerSettings())),
   );
+  it.effect("loads settings that still name the removed browser", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      yield* fs.writeFileString(
+        config.settingsPath,
+        `{
+          "enableAgentBrowserAccess": false,
+          "browserDefaultViewport": { "width": 1280, "height": 800 },
+          "browserDefaultZoomFactor": 1,
+          "browserDefaultAppearance": "system",
+          "browserRecordingFrameRate": 30,
+          "browserRecordingShowKeyPresses": true,
+          "browserRecordingShowMousePresses": true,
+          "browserLinkTarget": "browser",
+          "browserSearchEngine": "duckduckgo",
+          "browserCustomSearchUrl": "https://example.test/?q=%s",
+          "browserAutoShowFloatingPreview": true,
+          "browserProfiles": [],
+          "browserDefaultProfileId": "default",
+          "continueThreadsAfterServerUpdate": false
+        }`,
+      );
+
+      const settings = yield* service.getSettings;
+      assert.equal(settings.continueThreadsAfterServerUpdate, false);
+      assert.equal("enableAgentBrowserAccess" in settings, false);
+
+      yield* service.updateSettings({ continueThreadsAfterServerUpdate: true });
+      const persisted = yield* fs.readFileString(config.settingsPath);
+      assert.equal(persisted.includes("enableAgentBrowserAccess"), false);
+      assert.equal(persisted.includes("browserProfiles"), false);
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
 
   it.effect("keeps an override key a newer server saved when a project setting is edited", () =>
     Effect.gen(function* () {

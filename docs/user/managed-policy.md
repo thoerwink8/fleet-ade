@@ -26,7 +26,7 @@ The desktop app includes the `t3` command; see [The `t3` command](./install.md#t
   "supportUrl": "https://it.example.com/t3",
   "settings": {
     "defaultRuntimeMode": { "value": "approval-required", "locked": false },
-    "enableAgentBrowserAccess": { "value": false, "locked": true }
+    "continueThreadsAfterServerUpdate": { "value": false, "locked": true }
   },
   "limits": {
     "maxRuntimeMode": "auto-accept-edits",

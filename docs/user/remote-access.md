@@ -235,32 +235,14 @@ again on its next connect.
 For Antigravity's Google callback on a remote host, see
 [remote sign-in](./providers-antigravity.md#sign-in-from-a-remote-device).
 
-## Browser on a remote environment
+## Headless browser on a remote environment
 
-Browser tabs belong to the environment, so you and your agents see the same
-tabs from any device. The desktop app shows its own environment's tabs
-directly. Every other device, and the desktop app for other environments,
-streams them from the host. Agents keep using them while no device is
-connected, and `localhost` addresses reach servers on the host.
+HTML previews belong to the environment. Agents check a page with screenshots from a small
+headless browser that T3 Code keeps for itself, and a remote device sees the same result. It
+never uses a browser you installed, and `localhost` addresses reach servers on the host.
 
-The first tab downloads a headless Chrome, about 120 MB, into the T3 home. It
-is the same browser [HTML renders](html-renders.md) use, so a host downloads it
-only once. Some Linux hosts need [setup](#browser-host-setup) before it can
-start.
-
-Agent tabs have separate storage and share a Chromium process. Take control before
-typing into an agent's tab, then release control when you want the agent to
-continue. Read-only connections can watch without changing the page.
-
-While you have control, the tab works with your device: text the page copies or
-cuts goes to your clipboard, a file picker on the page opens your device's
-picker, and a finished download is offered for you to save. Popups such as
-sign-in windows open as their own tabs. Downloads stay on the host until the
-tab closes. Audio does not play on your device.
-
-On a phone, tap the floating preview's corner dot to show its controls, then
-**Pop into separate window** to keep watching in picture-in-picture over other
-apps.
+The first preview downloads that browser, about 120 MB, into the T3 home. Some Linux hosts need
+[setup](#browser-host-setup) before it can start.
 
 ### Local servers
 
@@ -280,7 +262,7 @@ the background service, and restart it. Script preview URLs still appear.
 macOS, Windows, and Linux desktops run the browser as is. Some Linux hosts need
 one-time setup: Ubuntu 23.10 and later block the sandbox the browser runs in,
 and minimal images and containers lack libraries it loads. When that happens,
-the server says so at startup, and browser tabs and HTML previews show the
+the server says so at startup, and HTML previews show the
 command to run on the host:
 
 ```sh

@@ -1587,9 +1587,7 @@ function getComposerDraftState(
   return state.draftsByThreadKey[threadKey] ?? null;
 }
 
-function draftThreadHasOpenPreview(draftThread: DraftThreadState | undefined): boolean {
-  if (draftThread === undefined) return false;
-  const ref = scopeThreadRef(draftThread.environmentId, draftThread.threadId);
+function draftThreadHasOpenPreview(_draftThread: DraftThreadState | undefined): boolean {
   return false;
 }
 

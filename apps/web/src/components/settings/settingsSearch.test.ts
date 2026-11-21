@@ -201,7 +201,6 @@ describe("searchSettings", () => {
       ["工作树位置", "storage-worktrees-location"],
       ["产物与日志", "storage-artifacts"],
       ["立即删除", "storage-delete-now"],
-      ["搜索引擎", "browser-search-engine"],
       ["智能体提供方", "providers"],
     ] as const) {
       expect(searchSettings(title)[0]?.id, title).toBe(id);

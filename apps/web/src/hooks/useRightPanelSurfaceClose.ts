@@ -9,7 +9,6 @@ import { useThreadTerminalActions } from "../components/terminal/useThreadTermin
 import { confirmTerminalClose } from "../lib/terminalCloseConfirm";
 import { focusPanelTerminalAfterClose } from "../lib/terminalFocus";
 import {
-  selectActiveRightPanelSurface,
   selectThreadRightPanelState,
   useRightPanelStore,
   type RightPanelSurface,

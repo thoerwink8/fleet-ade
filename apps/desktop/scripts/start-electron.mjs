@@ -1,5 +1,4 @@
 import * as NodeChildProcess from "node:child_process";
-import * as NodePath from "node:path";
 
 import { desktopDir, resolveElectronLaunchCommand } from "./electron-launcher.mjs";
 
