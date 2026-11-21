@@ -156,7 +156,7 @@ import { serverEnvironment } from "../state/server";
 import { shellEnvironment } from "../state/shell";
 import { assetEnvironment } from "../state/assets";
 import { projectEnvironment } from "../state/projects";
-import { useEnvironmentScope } from "../state/session";
+import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
 import { filesystemEnvironment } from "../state/filesystem";
 import {

@@ -130,6 +130,7 @@ export function DesktopWebLinkCoordinator() {
       await router.navigate({ href: appPath });
       return;
     }
+    const routeParams = router.state.matches.at(-1)?.params ?? {};
     const routeTarget = resolveThreadRouteTarget(routeParams);
     const activeThreadRef = routeTarget?.kind === "server" ? routeTarget.threadRef : undefined;
     const activeThread = activeThreadRef ? readThreadShell(activeThreadRef) : null;

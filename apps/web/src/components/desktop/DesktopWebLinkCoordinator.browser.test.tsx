@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   routeParams: {} as Record<string, string>,
   preview: vi.fn(),
   openLink: vi.fn(async () => undefined),
+  openExternal: vi.fn(async (_url: string) => undefined),
   navigate: vi.fn(async (): Promise<void> => undefined),
   openScratchProject: vi.fn(async () => null),
   confirm: vi.fn(async (_message: string) => true),
@@ -79,6 +80,19 @@ vi.mock("../../state/use-atom-query-runner", () => ({
   useAtomQueryRunner: () => state.preview,
 }));
 vi.mock("../../lib/useOpenLink", () => ({ useOpenLink: () => state.openLink }));
+vi.mock(import("../../localApi"), async (original) => {
+  const actual = await original();
+  return {
+    ...actual,
+    readLocalApi: () => {
+      const api = actual.readLocalApi();
+      return {
+        ...api,
+        shell: { ...api?.shell, openExternal: state.openExternal },
+      };
+    },
+  };
+});
 vi.mock(import("../../confirmDialog"), async (original) => ({
   ...(await original()),
   requestConfirmDialog: state.confirm,
@@ -262,7 +276,7 @@ it("opens a PR commit the workspace lacks in the thread's PR panel", async () =>
   expect(state.openLink).not.toHaveBeenCalled();
 });
 
-it("opens a plain commit the workspace lacks like any other delivered link", async () => {
+it("opens a plain commit the workspace lacks through the desktop shell", async () => {
   setup();
   state.routeParams = { environmentId: "local", threadId: "thread" };
   state.projects = [project];
@@ -270,8 +284,9 @@ it("opens a plain commit the workspace lacks like any other delivered link", asy
   appAtomRegistry.set(discoverySettled, true);
   const plainCommitUrl = `https://github.com/Effect-TS/effect/commit/${sha}`;
   await using _coordinator = await mount(plainCommitUrl);
-  await vi.waitFor(() => expect(state.openScratchProject).toHaveBeenCalledOnce());
-  // Handing it to the OS browser would loop when T3 Code is the default browser.
+  await vi.waitFor(() => expect(state.openExternal).toHaveBeenCalledOnce());
+  expect(state.openExternal).toHaveBeenCalledWith(plainCommitUrl);
+  expect(state.openScratchProject).not.toHaveBeenCalled();
   expect(state.openLink).not.toHaveBeenCalled();
   expect(useDiffPanelStore.getState().byThreadKey).toEqual({});
   expect(useRightPanelStore.getState().byThreadKey).toEqual({});

@@ -186,7 +186,7 @@ it("hands thread navigation shortcuts from a focused terminal back to the app", 
       onCloseTerminal={() => {}}
       keybindings={compileResolvedKeybindingsConfig([
         ...DEFAULT_KEYBINDINGS,
-        { key: "ctrl+r", command: "thread.next", when: "!previewOpen" },
+        { key: "ctrl+r", command: "thread.next", when: "terminalOpen" },
         { key: "ctrl+g", command: "thread.previous", when: "terminalOpen" },
       ])}
     />,
@@ -204,7 +204,7 @@ it("hands thread navigation shortcuts from a focused terminal back to the app", 
     false,
   ]);
   expect(terminalHandles("C", "KeyC")).toBe(true);
-  // Sidebar sees the open preview and the closed drawer and rejects these, so the shell keeps them.
+  // Sidebar sees the closed drawer and rejects terminalOpen, so the shell keeps these.
   expect([terminalHandles("r", "KeyR", false), terminalHandles("g", "KeyG", false)]).toEqual([
     true,
     true,

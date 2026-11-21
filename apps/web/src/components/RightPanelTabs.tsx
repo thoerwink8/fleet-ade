@@ -63,13 +63,7 @@ import { useStableCallback } from "~/hooks/useStableCallback";
 import { Button } from "~/components/ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ui/kbd";
-import {
-  Menu,
-  MenuItem,
-  MenuPopup,
-  MenuShortcut,
-  MenuTrigger,
-} from "~/components/ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "~/components/ui/menu";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
 import { type PreviewPanelInlineSize } from "~/hooks/usePreviewPanelInlineSize";
@@ -140,7 +134,6 @@ export interface PullRequestTabStatus {
 
 export type PullRequestTabStatusSeed = Pick<PullRequestTabStatus, "state" | "isDraft">;
 
-
 const SURFACE_DISABLED_REASONS = {
   terminal: "终端面板仅在项目会话中可用。",
   files: "打开项目后才能使用文件面板。",
@@ -173,12 +166,7 @@ const SURFACE_UNAVAILABLE_HINTS = {
   sideChat: "发送第一条消息后可用。",
 } as const;
 
-type TabContextMenuAction =
-  | "copy-path"
-  | "close"
-  | "close-others"
-  | "close-to-right"
-  | "close-all";
+type TabContextMenuAction = "copy-path" | "close" | "close-others" | "close-to-right" | "close-all";
 
 const TAB_SCROLL_EDGE_TOLERANCE = 1;
 const TAB_DRAG_MODIFIERS = [restrictToHorizontalAxis, restrictToFirstScrollableAncestor];
@@ -425,13 +413,7 @@ function RightPanelEmptyState(props: {
                   )}
                 >
                   {actionIcon(action, "size-4")}
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate",
-                    )}
-                  >
-                    {action.label}
-                  </span>
+                  <span className={cn("min-w-0 flex-1 truncate")}>{action.label}</span>
                   <Kbd>{action.shortcut}</Kbd>
                 </button>
               </div>
@@ -705,6 +687,11 @@ interface RightPanelTabHandlers {
 function preventTabMiddleButtonDefault(event: ReactMouseEvent) {
   if (event.button !== 1) return;
   event.preventDefault();
+}
+
+// Thumb buttons move app history and focus unless the mouseup and mousedown are cancelled.
+function preventThumbButtonAppHistory(event: ReactMouseEvent) {
+  if (event.button === 3 || event.button === 4) event.preventDefault();
 }
 
 // Stable handlers and per-tab values let the compiler reuse tabs across parent renders.
@@ -1036,7 +1023,9 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col"
+      className="flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col"
+      onMouseDown={preventThumbButtonAppHistory}
+      onMouseUp={preventThumbButtonAppHistory}
       data-workspace-area
       data-workspace-focus-key={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
       aria-label={

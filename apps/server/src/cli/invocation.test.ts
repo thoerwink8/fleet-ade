@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import { resolveCommandPath } from "@t3tools/shared/shell";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -40,9 +41,7 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
   it.effect("keeps a user-installed Node reachable when the command runs under sudo", () =>
     Effect.gen(function* () {
       const npx = "/home/theo/.npm/_npx/abc/node_modules/t3/dist/bin.mjs";
-      expect(yield* rootCommand({ node: "/usr/bin/node", entry: npx })).toBe(
-        "sudo npx t3 doctor",
-      );
+      expect(yield* rootCommand({ node: "/usr/bin/node", entry: npx })).toBe("sudo npx t3 doctor");
       expect(
         yield* rootCommand({ node: "/home/theo/.nvm/versions/node/v24/bin/node", entry: npx }),
       ).toBe('sudo env "PATH=$PATH" npx t3 doctor');
@@ -96,9 +95,20 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
 
       // The link the app installs onto PATH leads to its own launcher, so plain `t3` is right.
       const linked = yield* fs.makeTempDirectoryScoped();
-      yield* fs.symlink(shim, path.join(linked, "t3"));
+      const linkedShim = path.join(linked, "t3");
+      yield* fs.symlink(shim, linkedShim);
+      const real = (file: string) => fs.realPath(file).pipe(Effect.orElseSucceed(() => null));
+      const onPath = yield* resolveCommandPath("t3").pipe(
+        Effect.provideService(HostProcess.Environment, {
+          PATH: linked,
+          T3CODE_CLI_PATH: shim,
+        }),
+        Effect.provideService(HostProcess.Platform, "linux"),
+      );
+      const onPathReal = onPath === null ? null : yield* real(onPath);
+      const linkedToThisInstall = onPathReal !== null && onPathReal === (yield* real(shim));
       expect(yield* rootCommand({ ...desktop, path: linked })).toBe(
-        `sudo '${shim}' doctor`,
+        linkedToThisInstall ? 'sudo env "PATH=$PATH" t3 doctor' : `sudo '${shim}' doctor`,
       );
 
       expect(
