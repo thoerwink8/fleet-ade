@@ -36,8 +36,6 @@ interface PendingActionState {
 }
 
 interface ComposerPrimaryActionsProps {
-  /** Footer controls (dictation) that always sit right before the primary button. */
-  children?: ReactNode;
   compact: boolean;
   canOperateThread: boolean;
   pendingAction: PendingActionState | null;
@@ -47,8 +45,6 @@ interface ComposerPrimaryActionsProps {
   followUpBehavior?: "queue" | "steer";
   canSteer?: boolean;
   alternateShortcutLabel?: string | null;
-  /** Dictation is running; Send finishes it and submits once the transcript lands. */
-  voiceInputActive?: boolean;
   isSendBusy: boolean;
   sendDisabledReason: string | null;
   isEnvironmentUnavailable: boolean;
@@ -62,7 +58,6 @@ interface ComposerPrimaryActionsProps {
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   compactBeforeSendTokens?: number | null;
-  hideCompactToggle?: boolean;
   keepFullHistory?: boolean;
   onToggleKeepFullHistory?: () => void;
 }
@@ -217,7 +212,6 @@ export function CollapsedComposerStopAction({
 }
 
 export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
-  children,
   compact,
   canOperateThread,
   pendingAction,
@@ -227,7 +221,6 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   followUpBehavior = "steer",
   canSteer = true,
   alternateShortcutLabel = null,
-  voiceInputActive = false,
   isSendBusy,
   sendDisabledReason,
   isEnvironmentUnavailable,
@@ -241,7 +234,6 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   onPreviousPendingQuestion,
   onInterrupt,
   compactBeforeSendTokens = null,
-  hideCompactToggle = false,
   keepFullHistory = false,
   onToggleKeepFullHistory,
 }: ComposerPrimaryActionsProps) {
@@ -309,7 +301,6 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             </Button>
           )
         ) : null}
-        {children}
         <button
           type="submit"
           className={cn(messageActionPillClassName, "h-8 sm:h-7", compact ? "px-3" : "px-4")}
@@ -322,10 +313,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             isEnvironmentUnavailable ||
             isSendDisabled ||
             pendingAction.isResponding ||
-            (!voiceInputActive &&
-              (pendingAction.isLastQuestion
-                ? !pendingAction.isComplete
-                : !pendingAction.canAdvance))
+            (pendingAction.isLastQuestion ? !pendingAction.isComplete : !pendingAction.canAdvance)
           }
         >
           {formatPendingPrimaryActionLabel({
@@ -347,12 +335,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     !hasSendableContent &&
     !isEditingQueuedMessage
   ) {
-    return (
-      <>
-        {children}
-        {renderStopGenerationButton()}
-      </>
-    );
+    return renderStopGenerationButton();
   }
 
   const showResume = canResume && !hasSendableContent && !isEditingQueuedMessage;
@@ -453,14 +436,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
       <TooltipPopup>{submitTooltip}</TooltipPopup>
     </Tooltip>
   );
-  if (compactTokens === null || hideCompactToggle) {
-    return withStopButton(
-      <>
-        {children}
-        {submit}
-      </>,
-    );
-  }
+  if (compactTokens === null) return withStopButton(submit);
 
   return withStopButton(
     <div data-chat-composer-compact-send="true" className="flex items-center gap-2">
@@ -493,7 +469,6 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           <div>{keepFullHistory ? "点击以先压缩历史记录" : "点击以保留完整历史记录"}</div>
         </TooltipPopup>
       </Tooltip>
-      {children}
       {submit}
     </div>,
   );

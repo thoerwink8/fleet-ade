@@ -1,6 +1,4 @@
 import {
-  CLOUD_SPEECH_LABELS,
-  CloudSpeechProvider,
   isSecretReference,
   secretReferencesInSettings,
   type ServerSettings,
@@ -14,11 +12,7 @@ import { deriveProviderSettingsFields, type SettingsFormDefinition } from "./Pro
 
 type SecretUseSettings = Pick<
   ServerSettings,
-  | "providerInstances"
-  | "sourceControlHosts"
-  | "usageLimitSources"
-  | "textGenerators"
-  | "cloudSpeechCredentials"
+  "providerInstances" | "sourceControlHosts" | "usageLimitSources" | "textGenerators"
 >;
 
 interface SecretProviderUse {
@@ -97,11 +91,5 @@ export function secretProviderUses(
         generator,
       ),
     ),
-    ...CloudSpeechProvider.literals.flatMap((provider) => {
-      const credential = settings.cloudSpeechCredentials[provider];
-      return isSecretReference(credential) && credential.provider === providerId
-        ? [{ id: `voice:${provider}`, label: `语音 · ${CLOUD_SPEECH_LABELS[provider]}` }]
-        : [];
-    }),
   ];
 }

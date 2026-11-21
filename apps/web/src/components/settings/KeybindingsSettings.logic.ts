@@ -447,7 +447,6 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "composer.sendAlternate": "输入框：使用相反的排队或引导操作",
   "composer.sendBackground": "输入框：在后台启动",
   "composer.sendAndNewThread": "输入框：发送并新建会话",
-  "composer.dictation": "输入框：开始或结束听写",
   "composer.host": "输入框：切换主机",
   "composer.cycleHost": "输入框：循环切换主机",
   "composer.effort": "输入框：切换推理强度",

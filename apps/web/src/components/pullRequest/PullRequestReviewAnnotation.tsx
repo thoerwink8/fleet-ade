@@ -21,7 +21,6 @@ import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime
 
 import { RelativeTime } from "~/components/RelativeTime";
 import { cn } from "~/lib/utils";
-import { SpeechTextField, TextFieldSpeechControls } from "~/speech/useTextFieldSpeech";
 
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -44,25 +43,6 @@ import {
 
 const CARD_CLASS =
   "mx-3 my-2 rounded-xl border border-border/70 bg-background p-3 text-sm shadow-sm";
-
-function submitKeys(input: {
-  readonly value: string;
-  readonly pending: boolean;
-  readonly allowEmpty?: boolean;
-  readonly onSubmit: () => void;
-  readonly onCancel?: (() => void) | undefined;
-}) {
-  return (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Escape" && input.onCancel) {
-      event.preventDefault();
-      input.onCancel();
-    }
-    if (isCommentSubmitShortcut(event, input.value, input.pending, input.allowEmpty)) {
-      event.preventDefault();
-      input.onSubmit();
-    }
-  };
-}
 
 export function toViewerSide(side: PullRequestDiffSide) {
   return side === "left" ? ("deletions" as const) : ("additions" as const);
@@ -229,7 +209,6 @@ export function ReviewThreadCard({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const sendingRef = useRef(false);
-  const replyRef = useRef<HTMLTextAreaElement>(null);
   const [loadedPage, setLoadedPage] = useState<
     (PullRequestThreadCommentsResult & { readonly threadId: string }) | null
   >(null);
@@ -422,56 +401,39 @@ export function ReviewThreadCard({
 
           {canReply ? (
             replying ? (
-              <SpeechTextField
-                environmentId={environmentId}
-                projectId={reference.projectId}
-                ownerKey={JSON.stringify(["pr-reply", environmentId, reference, thread.id])}
-                text={reply}
-                textareaRef={replyRef}
-                onTextChange={setReply}
-                disabled={pending}
-              >
-                {(speech) => (
-                  <div className="mt-2">
-                    <PullRequestMarkdownTextarea
-                      ref={replyRef}
-                      readOnly={speech.freezesEditor}
-                      autoFocus
-                      size="sm"
-                      completionScope={completionScope}
-                      value={reply}
-                      placeholder="回复"
-                      aria-label="回复此对话"
-                      onValueChange={setReply}
-                      onKeyDown={submitKeys({
-                        value: reply,
-                        pending,
-                        allowEmpty: speech.blocksSubmission,
-                        onSubmit: () => speech.submitAfterDictation((text) => void send(text)),
-                        onCancel: () =>
-                          speech.state.phase === "idle" ? setReplying(false) : speech.cancel(),
-                      })}
-                    />
-                    <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                      <TextFieldSpeechControls speech={speech} disabled={pending} />
-                      <Button size="xs" variant="ghost" onClick={() => setReplying(false)}>
-                        取消
-                      </Button>
-                      <Button
-                        size="xs"
-                        disabled={
-                          speech.preparing ||
-                          pending ||
-                          (!speech.blocksSubmission && reply.trim().length === 0)
-                        }
-                        onClick={() => speech.submitAfterDictation((text) => void send(text))}
-                      >
-                        回复
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </SpeechTextField>
+              <div className="mt-2">
+                <PullRequestMarkdownTextarea
+                  autoFocus
+                  size="sm"
+                  completionScope={completionScope}
+                  value={reply}
+                  placeholder="回复"
+                  aria-label="回复此对话"
+                  onValueChange={setReply}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setReplying(false);
+                    }
+                    if (isCommentSubmitShortcut(event, reply, pending)) {
+                      event.preventDefault();
+                      void send(reply);
+                    }
+                  }}
+                />
+                <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                  <Button size="xs" variant="ghost" onClick={() => setReplying(false)}>
+                    取消
+                  </Button>
+                  <Button
+                    size="xs"
+                    disabled={pending || reply.trim().length === 0}
+                    onClick={() => void send(reply)}
+                  >
+                    回复
+                  </Button>
+                </div>
+              </div>
             ) : (
               <Button size="xs" variant="ghost" className="mt-2" onClick={() => setReplying(true)}>
                 回复

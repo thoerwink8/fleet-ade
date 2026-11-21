@@ -14,7 +14,6 @@ import {
   DEFAULT_SERVER_SETTINGS,
   globalIdleCompaction,
   idleCompactionPatch,
-  PROJECT_SCOPED_SERVER_SETTING_KEYS,
   requiredScopesForProjectMutation,
   resolveIdleCompaction,
   resolveProjectProviderInstanceEnabled,
@@ -501,28 +500,57 @@ describe("requiredScopesForProjectMutation", () => {
   });
 });
 
-describe("voice settings", () => {
-  it("does not import voice consent from ordinary device preferences", () => {
-    const imported = {
-      voiceTranscriptionEnvironmentId: "env-1",
+describe("retired voice input settings", () => {
+  it("ignores the voice keys that older builds saved", () => {
+    const client = {
+      voiceMicrophone: "mic-1",
+      voiceMicrophones: [{ kind: "default" }, { kind: "device", deviceId: "mic-1", label: "USB" }],
+      voiceShortcutMode: "hold",
       voiceTranscriptionDestination: { kind: "environment", environmentId: "env-1" },
-      speechPostProcessingEnabled: true,
-    };
-    expect(decodeClientSettings({}).speechSilenceFiltering).toBe(true);
-    expect(decodeClientSettingsPatch({ speechSilenceFiltering: false })).toEqual({
+      speechLanguage: "de",
+      speechTranslateToEnglish: true,
+      speechCustomWords: [{ term: "Effect", aliases: ["a fact"] }],
       speechSilenceFiltering: false,
+      speechRemoveFillerWords: false,
+      speechPostProcessingPrompt: { mode: "custom", customInstructions: "Tidy up." },
+      speechCorrectionWord: "scratch that",
+    };
+    const server = {
+      cloudSpeechCredentials: { openai: "sk-test", xai: "", openrouter: "" },
+      speechModelId: "handy-computer/parakeet-unified-en-0.6b-gguf",
+      speechAcceleration: "gpu",
+      speechModelUnloadTimeout: "min_15",
+      speechProjectCustomWords: [{ term: "Effect", aliases: [] }],
+      speechPostProcessingModelSelection: { instanceId: "codex", model: "gpt-6-luna" },
+    };
+    const projectId = ProjectId.make("project-1");
+    const decoded = decodeServerSettings({
+      ...server,
+      projectSettingsOverrides: {
+        [projectId]: {
+          speechProjectCustomWords: [{ term: "Vite", aliases: [] }],
+          continueThreadsAfterServerUpdate: false,
+        },
+      },
     });
-    for (const key of Object.keys(imported)) {
-      expect(decodeClientSettings(imported)).not.toHaveProperty(key);
-      expect(decodeClientSettingsPatch(imported)).not.toHaveProperty(key);
+    for (const key of Object.keys(client)) {
+      expect(decodeClientSettings({ ...client, timestampFormat: "24-hour" })).not.toHaveProperty(
+        key,
+      );
+      expect(decodeClientSettingsPatch(client)).not.toHaveProperty(key);
     }
-  });
-
-  it("keeps the correction cue personal and project vocabulary on the environment", () => {
-    expect(decodeClientSettings({}).speechCorrectionWord).toBe("");
-    expect(() => decodeClientSettingsPatch({ speechCorrectionWord: "x".repeat(51) })).toThrow();
-    expect(DEFAULT_SERVER_SETTINGS.speechProjectCustomWords).toEqual([]);
-    expect(PROJECT_SCOPED_SERVER_SETTING_KEYS).toContain("speechProjectCustomWords");
+    for (const key of Object.keys(server)) {
+      expect(decoded).not.toHaveProperty(key);
+      expect(decodeServerSettingsPatch(server)).not.toHaveProperty(key);
+    }
+    expect(decodeClientSettings({ ...client, timestampFormat: "24-hour" }).timestampFormat).toBe(
+      "24-hour",
+    );
+    // Project entries round-trip keys they do not know, so the stored words stay and are never read.
+    expect(decoded.projectSettingsOverrides[projectId]).toEqual({
+      speechProjectCustomWords: [{ term: "Vite", aliases: [] }],
+      continueThreadsAfterServerUpdate: false,
+    });
   });
 });
 

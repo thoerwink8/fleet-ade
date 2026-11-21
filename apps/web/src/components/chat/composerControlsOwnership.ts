@@ -1,7 +1,7 @@
 /**
- * Which control answers the composer.mode shortcut. The footer keeps four controls (attach,
- * model and effort, voice, send), so the permissions chip never shows: Permissions live in the
- * model picker's footer, which therefore always owns composer.mode.
+ * Which control answers the composer.mode shortcut. The footer keeps three controls (attach,
+ * model and effort, send), so the permissions chip never shows: Permissions live in the model
+ * picker's footer, which therefore always owns composer.mode.
  */
 export function resolveComposerControlsOwnership() {
   return {

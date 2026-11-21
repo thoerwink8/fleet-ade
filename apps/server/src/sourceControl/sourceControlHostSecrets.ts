@@ -126,10 +126,7 @@ const collectUsageLimitSecretReferences = (
 export const invalidateSettingsSecrets = Effect.fn("SettingsSecrets.invalidate")(function* <E>(
   resolver: SecretResolver.SecretResolver["Service"],
   settings: Effect.Effect<
-    Pick<
-      ServerSettings,
-      "sourceControlHosts" | "usageLimitSources" | "textGenerators" | "cloudSpeechCredentials"
-    >,
+    Pick<ServerSettings, "sourceControlHosts" | "usageLimitSources" | "textGenerators">,
     E
   >,
 ) {
@@ -140,7 +137,6 @@ export const invalidateSettingsSecrets = Effect.fn("SettingsSecrets.invalidate")
       ...Object.values(current.textGenerators).flatMap(({ apiKey }) =>
         isSecretReference(apiKey) ? [apiKey] : [],
       ),
-      ...Object.values(current.cloudSpeechCredentials).filter(isSecretReference),
     ]),
     Effect.orElseSucceed(() => undefined),
   );

@@ -28,7 +28,6 @@ const settings = Schema.decodeSync(ServerSettings)({
   usageLimitSources: {
     hub: { kind: "cliproxy", url: "https://hub.test", managementKey: personal("op://hub") },
   },
-  cloudSpeechCredentials: { openai: personal("op://voice"), xai: "" },
 });
 
 it.each([
@@ -39,7 +38,6 @@ it.each([
       "Codex · CODEX_TOKEN",
       "GitHub · github.com",
       "https://hub.test · Management Key",
-      "语音 · OpenAI",
     ],
   ],
   ["work", ["Antigravity Work · OTHER_TOKEN", "GitHub · ghe.acme.test"]],

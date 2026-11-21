@@ -42,7 +42,7 @@ it.effect("round-trips resolved Space shortcuts", () =>
     const codec = Schema.fromJsonString(ResolvedKeybindingsConfig);
     const rules = [
       {
-        command: "composer.dictation" as const,
+        command: "composer.stash" as const,
         shortcut: { ...shortcut, key: " ", metaKey: true, modKey: false },
       },
     ];

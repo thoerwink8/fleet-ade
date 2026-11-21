@@ -33,8 +33,6 @@ export type {
   ReviewGuideGenerationResult,
   ThreadTitleGenerationInput,
   ThreadTitleGenerationResult,
-  TranscriptionPostProcessingInput,
-  TranscriptionPostProcessingResult,
 } from "@t3tools/provider-core/server/textGeneration";
 
 export class TextGeneration extends Context.Service<TextGeneration, ProviderTextGeneration>()(
@@ -46,8 +44,7 @@ type TextGenerationOp =
   | "generatePrContent"
   | "generateBranchName"
   | "generateThreadTitle"
-  | "generateReviewGuide"
-  | "generateTranscriptionPostProcessing";
+  | "generateReviewGuide";
 
 const resolveInstance = (
   registry: ProviderInstanceRegistry.ProviderInstanceRegistry["Service"],
@@ -190,17 +187,6 @@ export const make = Effect.gen(function* () {
         input.modelSelection,
         input.projectId,
         (service, modelSelection) => service.generateReviewGuide({ ...input, modelSelection }),
-      );
-    }),
-    generateTranscriptionPostProcessing: Effect.fn(
-      "TextGeneration.generateTranscriptionPostProcessing",
-    )(function (input) {
-      return generate(
-        "generateTranscriptionPostProcessing",
-        input.modelSelection,
-        null,
-        (service, modelSelection) =>
-          service.generateTranscriptionPostProcessing({ ...input, modelSelection }),
       );
     }),
     generateThreadTitle: Effect.fn("TextGeneration.generateThreadTitle")(function (input) {

@@ -20,7 +20,6 @@ export type SettingsPath =
   | "/settings/general"
   | "/settings/network"
   | "/settings/diagnostics"
-  | "/settings/voice"
   | "/settings/appearance"
   | "/settings/chat"
   | "/settings/diffs"
@@ -107,7 +106,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/secrets": "凭据",
   "/settings/maintenance": "维护",
   "/settings/about": "关于",
-  "/settings/voice": "语音",
   "/settings/archived": "归档",
 };
 
@@ -127,7 +125,6 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
       "/settings/chat",
       "/settings/diffs",
       "/settings/keybindings",
-      "/settings/voice",
       "/settings/snap-shot",
     ],
   },
@@ -492,104 +489,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [
       "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar thread status order working approval",
     ],
-  },
-  {
-    id: "voice-transcription-destination",
-    title: "转写方式",
-    to: "/settings/voice",
-    searchTerms: [
-      "send microphone audio dictation destination speech voice stt transcription environment machine consent privacy cloud OpenAI Grok OpenRouter",
-    ],
-  },
-  {
-    id: "voice-microphone",
-    title: "麦克风",
-    to: "/settings/voice",
-    searchTerms: ["mic input audio device order priority preferred"],
-  },
-  {
-    id: "dictation-shortcut-mode",
-    title: "听写快捷键",
-    to: "/settings/voice",
-    searchTerms: ["speech voice keyboard hotkey hold toggle auto"],
-  },
-  {
-    id: "speech-language",
-    title: "转写语言",
-    to: "/settings/voice",
-    searchTerms: ["speech voice translate english auto detect"],
-  },
-  {
-    id: "speech-dictionary",
-    title: "词典",
-    to: "/settings/voice",
-    searchTerms: ["speech voice transcription vocabulary names glossary alias"],
-  },
-  {
-    id: "speech-project-dictionary",
-    title: "项目词典",
-    to: "/settings/voice",
-    scope: "project-defaults",
-    searchTerms: [
-      "speech voice transcription vocabulary shared dictionary team environment glossary",
-    ],
-  },
-  {
-    id: "speech-post-processing-model",
-    title: "文本整理模型",
-    to: "/settings/voice",
-    scope: "environment",
-    searchTerms: ["speech voice transcript cleanup provider model post-processing"],
-  },
-  {
-    id: "speech-correction-word",
-    title: "纠正提示词",
-    to: "/settings/voice",
-    searchTerms: ["speech voice cleanup sorry scratch that fix mistake"],
-  },
-  {
-    id: "speech-silence-filtering",
-    title: "静音过滤",
-    to: "/settings/voice",
-    searchTerms: ["voice speech vad silero pauses noise"],
-  },
-  {
-    id: "remove-filler-words",
-    title: "移除语气词",
-    to: "/settings/voice",
-    searchTerms: ["voice speech transcription hesitation um uh cleanup"],
-  },
-  {
-    id: "speech-post-processing",
-    title: "整理转写文本",
-    to: "/settings/voice",
-    searchTerms: ["speech transcription polish clean provider prompt post-processing"],
-  },
-  {
-    id: "speech-models",
-    title: "转写模型",
-    to: "/settings/voice",
-    searchTerms: [
-      "speech voice stt download whisper parakeet canary moonshine accuracy speed benchmark languages",
-    ],
-  },
-  {
-    id: "speech-hardware",
-    title: "转写硬件与模型内存释放",
-    to: "/settings/voice",
-    searchTerms: ["speech voice stt advanced gpu cpu acceleration memory unload idle"],
-  },
-  {
-    id: "microphone-test",
-    title: "测试麦克风",
-    to: "/settings/voice",
-    searchTerms: ["test mic audio playback loopback record input level"],
-  },
-  {
-    id: "transcription-test",
-    title: "测试模型",
-    to: "/settings/voice",
-    searchTerms: ["test voice speech model transcription recognition"],
   },
   {
     id: "auto-settle-inactive-threads",
@@ -1196,7 +1095,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/projects": "project",
   "/settings/general": null,
   "/settings/network": "environment",
-  "/settings/voice": null,
   "/settings/appearance": null,
   "/settings/chat": null,
   "/settings/diffs": null,
