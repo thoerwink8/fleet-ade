@@ -24,8 +24,8 @@ Model data is schema-validated configuration. Tests should cover resolver
 and adapter semantics with synthetic model names, so adding a model never requires
 tests that repeat the configuration.
 
-## Updating the bundled manifest
+## 更新内置模型清单
 
-Run `pnpm models:sync --source <URL or local JSON path>` when a provider publishes a new manifest. The command validates the source, prints added, removed, and changed models, and only writes the bundled file when `--write` is supplied. Use a local copy first when reviewing a change; the command never writes an invalid or empty manifest.
+当维护者提供了新的模型清单地址或文件时，运行 `pnpm models:sync --source <地址或本地 JSON 路径>`。来源相对路径按输入命令时的目录解析；通过 pnpm 运行时使用 `INIT_CWD`。命令会校验来源，打印完整清单差异；只有加上 `--write` 才会原子替换内置文件，且写入内容来自校验后的对象，不保留来源中的多余字段。
 
-After writing, run `pnpm exec vp test run scripts/sync-models.test.ts apps/server/src/theirServices.static.test.ts` and inspect the selector with the relevant provider and model name. Review `git diff` to confirm only the intended manifest content changed.
+跑完后运行会读取内置清单的服务端测试：`apps/server/src/provider/ModelManifest.test.ts`、`apps/server/src/provider/ProviderRegistry.test.ts`，再运行 `vp fmt --check`。用本地副本先审查；命令不会写入不合法或空清单。
