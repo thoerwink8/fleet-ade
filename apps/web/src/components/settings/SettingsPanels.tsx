@@ -2067,7 +2067,7 @@ export function MaintenanceSettingsPanel() {
           serverScoped
           settingKeys={["enableProviderUpdateChecks"]}
           {...searchableSetting("provider-update-checks")}
-          description="检查已安装的提供方 CLI 是否有新版本，并获取模型目录更新。关闭后，新模型可能不会出现。"
+          description="检查已安装的提供方 CLI 是否有新版本。"
           resetAction={
             settings.enableProviderUpdateChecks !==
             DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (

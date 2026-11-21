@@ -102,12 +102,6 @@ export class ProviderRegistry extends Context.Service<
       readonly fresh?: boolean | undefined;
     }) => Effect.Effect<void>;
 
-    /**
-     * For an opened model picker: refetch a model manifest older than a few
-     * minutes. When it changed, recheck latest CLI versions and probe providers.
-     */
-    readonly refreshModelCatalog: Effect.Effect<void>;
-
     readonly getProviderMaintenanceCapabilitiesForInstance: (
       instanceId: ProviderInstanceId,
       provider: ProviderDriverKind,
@@ -359,7 +353,6 @@ export const layer = Layer.effect(
     const instanceRegistry = yield* ProviderInstanceRegistry.ProviderInstanceRegistry;
     const instanceRegistryMutator =
       yield* ProviderInstanceRegistryMutator.ProviderInstanceRegistryMutator;
-    const manifestService = yield* ModelManifest.ModelManifest;
     const latestVersions = yield* ProviderLatestVersions.ProviderLatestVersions;
     const serviceScope = yield* Effect.scope;
     const config = yield* ServerConfig.ServerConfig;
@@ -438,18 +431,14 @@ export const layer = Layer.effect(
         ),
       ),
     );
-    const initialManifest = yield* manifestService.current;
-    const classifyCompatibility = (
-      provider: ServerProvider,
-      manifest: ModelManifest.ModelManifestData,
-    ) =>
+    const classifyCompatibility = (provider: ServerProvider) =>
       applyProviderCompatibility(
         provider,
-        manifest.compatibility,
         ModelManifest.BUNDLED_MODEL_MANIFEST.compatibility,
+        undefined,
       );
     const providersRef = yield* Ref.make<ReadonlyArray<ServerProvider>>(
-      bootProviders.map((provider) => classifyCompatibility(provider, initialManifest)),
+      bootProviders.map((provider) => classifyCompatibility(provider)),
     );
     const workspaceRefreshesRef = yield* Ref.make<
       ReadonlyMap<ProviderInstance, ReadonlyMap<string, Deferred.Deferred<void>>>
@@ -506,7 +495,6 @@ export const layer = Layer.effect(
         readonly replace?: boolean;
       },
     ) {
-      const manifest = yield* manifestService.current;
       const nextProvidersWithUpdateState = yield* Effect.forEach(
         nextProviders,
         applyProviderUpdateState,
@@ -534,9 +522,7 @@ export const layer = Layer.effect(
           }
 
           const providers = orderProviderSnapshots(
-            [...mergedProviders.values()].map((provider) =>
-              classifyCompatibility(provider, manifest),
-            ),
+            [...mergedProviders.values()].map(classifyCompatibility),
           );
           const providersToPersist = providers.filter((provider) =>
             updatedKeys.has(snapshotInstanceKey(provider)),
@@ -561,17 +547,6 @@ export const layer = Layer.effect(
       return providers;
     });
 
-    const compatibilityRefreshRunning = yield* Ref.make(false);
-    // Reclassify the current model after fetch; republishing the old probe could overwrite newer health results.
-    const refreshCompatibility = Effect.gen(function* () {
-      if (!(yield* Ref.getAndSet(compatibilityRefreshRunning, true))) {
-        yield* manifestService.refresh.pipe(
-          Effect.andThen(upsertProviders([], { persist: false })),
-          Effect.ensuring(Ref.set(compatibilityRefreshRunning, false)),
-          Effect.forkIn(serviceScope),
-        );
-      }
-    });
     const syncProvider = Effect.fn("syncProvider")(function* (
       provider: ServerProvider,
       options?: {
@@ -593,9 +568,7 @@ export const layer = Layer.effect(
           return next;
         });
       }
-      const providers = yield* upsertProviders([provider], options);
-      yield* refreshCompatibility;
-      return providers;
+      return yield* upsertProviders([provider], options);
     });
 
     const setProviderMaintenanceActionState = Effect.fn("setProviderMaintenanceActionState")(
@@ -657,9 +630,6 @@ export const layer = Layer.effect(
       Option.none(),
     );
 
-    // What the last full pass could see; a later manifest fetch does not reach providers by itself.
-    const probedManifestUpdatedAt = yield* Ref.make(initialManifest.updatedAt);
-
     const refreshAll = Effect.fn("refreshAll")(function* () {
       const claimed = yield* Ref.modify(
         refreshAllInFlightRef,
@@ -679,20 +649,15 @@ export const layer = Layer.effect(
       if (claimed.owner) {
         // Detach shared passes so the first caller's interruption cannot cancel other callers' work.
         // Syncing first keeps a refresh right after a rebuild from probing the replaced instance.
-        yield* manifestService.current.pipe(
-          Effect.flatMap(({ updatedAt }) =>
-            syncLiveSourcesAndContinue.pipe(
-              Effect.andThen(Ref.get(liveSubsRef)),
-              Effect.flatMap((instances) =>
-                Effect.forEach(instances.values(), (instance) => refreshOneSource(instance), {
-                  concurrency: "unbounded",
-                  discard: true,
-                }),
-              ),
-              Effect.andThen(Ref.get(providersRef)),
-              Effect.tap(() => Ref.set(probedManifestUpdatedAt, updatedAt)),
-            ),
+        yield* syncLiveSourcesAndContinue.pipe(
+          Effect.andThen(Ref.get(liveSubsRef)),
+          Effect.flatMap((instances) =>
+            Effect.forEach(instances.values(), (instance) => refreshOneSource(instance), {
+              concurrency: "unbounded",
+              discard: true,
+            }),
           ),
+          Effect.andThen(Ref.get(providersRef)),
           Effect.onExit((exit) =>
             Ref.set(refreshAllInFlightRef, Option.none()).pipe(
               Effect.andThen(Deferred.done(claimed.completion, exit)),
@@ -746,7 +711,6 @@ export const layer = Layer.effect(
       provider: ProviderDriverKind,
       selectedInstanceId: ProviderInstanceId,
     ) {
-      yield* manifestService.forceRefresh;
       const instances = (yield* instanceRegistry.listInstances).filter(
         (instance) =>
           instance.driverKind === provider &&
@@ -914,7 +878,7 @@ export const layer = Layer.effect(
                 awaitingBootInstances.has(instance) &&
                 (yield* instance.snapshot.isAwaitingFirstCheck ?? Effect.succeed(false))
               ) {
-                return yield* refreshCompatibility;
+                return;
               }
               yield* correlateSnapshotWithSource(source, provider).pipe(
                 Effect.flatMap(syncProvider),
@@ -1135,7 +1099,6 @@ export const layer = Layer.effect(
     const invalidateModelCaches = Effect.fn("ProviderRegistry.invalidateModelCaches")(function* (
       input: Parameters<ProviderRegistry["Service"]["invalidateModelCaches"]>[0],
     ) {
-      yield* manifestService.forceRefresh;
       const instances = yield* instanceRegistry.listInstances;
       yield* Effect.forEach(
         instances.filter(
@@ -1160,17 +1123,6 @@ export const layer = Layer.effect(
       );
     });
 
-    const refreshModelCatalog = Effect.fn("ProviderRegistry.refreshModelCatalog")(function* () {
-      const { updatedAt } = yield* manifestService.refreshOnDemand;
-      // The first pass can be one that started before the fetch, so allow one more.
-      for (let pass = 0; pass < 2; pass++) {
-        if ((yield* Ref.get(probedManifestUpdatedAt)) === updatedAt) return;
-        // A new model usually ships with the CLI release that supports it.
-        yield* latestVersions.invalidateAll;
-        yield* refreshAll();
-      }
-    });
-
     return {
       getProviders: Ref.get(providersRef),
       refresh: (provider?: ProviderDriverKind) =>
@@ -1185,10 +1137,6 @@ export const layer = Layer.effect(
         refreshWorkspaceSnapshot(input).pipe(Effect.catchCause(recoverRefreshFailure)),
       refreshAfterUpdate,
       invalidateModelCaches,
-      refreshModelCatalog: refreshModelCatalog().pipe(
-        Effect.catchCause(recoverRefreshFailure),
-        Effect.asVoid,
-      ),
       getProviderMaintenanceCapabilitiesForInstance,
       setProviderMaintenanceActionState,
       get streamChanges() {
