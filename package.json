@@ -14,6 +14,7 @@
     "icons:export": "node scripts/export-brand-icons.ts",
     "icons:check": "node scripts/export-brand-icons.ts --check",
     "licenses:sync": "node scripts/sync-third-party-license-notices.ts",
+    "models:sync": "node apps/server/scripts/sync-models.ts",
     "build": "vp run --filter './apps/*' build",
     "build:desktop": "vp run --filter @t3tools/desktop --filter t3 build",
     "build:desktop:bundle": "vp run --filter @t3tools/desktop build:bundle",

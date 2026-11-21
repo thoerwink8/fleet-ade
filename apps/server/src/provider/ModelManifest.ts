@@ -81,6 +81,7 @@ const ModelManifestSchema = ModelManifestEnvelopeSchema.pipe(
   ),
 );
 export type ModelManifestData = typeof ModelManifestSchema.Type;
+export const decodeModelManifest = Schema.decodeUnknownExit(ModelManifestSchema);
 
 export const BUNDLED_MODEL_MANIFEST: ModelManifestData =
   Schema.decodeUnknownSync(ModelManifestSchema)(bundledManifestJson);
