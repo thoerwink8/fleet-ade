@@ -21,7 +21,7 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
     readonly executable?: boolean;
     readonly args?: ReadonlyArray<string>;
   }) =>
-    resolveRootCliCommand("browser setup", input.args).pipe(
+    resolveRootCliCommand("doctor", input.args).pipe(
       Effect.provideService(HostProcess.ExecutablePath, input.node),
       Effect.provideService(HostProcess.Arguments, [input.node, input.entry]),
       Effect.provideService(HostProcess.IsExecutable, input.executable ?? false),
@@ -41,18 +41,18 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
     Effect.gen(function* () {
       const npx = "/home/theo/.npm/_npx/abc/node_modules/t3/dist/bin.mjs";
       expect(yield* rootCommand({ node: "/usr/bin/node", entry: npx })).toBe(
-        "sudo npx t3 browser setup",
+        "sudo npx t3 doctor",
       );
       expect(
         yield* rootCommand({ node: "/home/theo/.nvm/versions/node/v24/bin/node", entry: npx }),
-      ).toBe('sudo env "PATH=$PATH" npx t3 browser setup');
+      ).toBe('sudo env "PATH=$PATH" npx t3 doctor');
       expect(
         yield* rootCommand({
           node: "/home/theo/.local/node/bin/node",
           entry: "/home/theo/.local/lib/node_modules/t3/dist/bin.mjs",
           path: yield* pathWithT3,
         }),
-      ).toBe('sudo env "PATH=$PATH" t3 browser setup');
+      ).toBe('sudo env "PATH=$PATH" t3 doctor');
     }),
   );
 
@@ -87,18 +87,18 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
         env: { T3CODE_CLI_PATH: shim },
       };
 
-      expect(yield* rootCommand(desktop)).toBe(`sudo '${shim}' browser setup`);
+      expect(yield* rootCommand(desktop)).toBe(`sudo '${shim}' doctor`);
 
       // An unrelated `t3` on PATH, such as an older npm global, is another install's CLI.
       expect(yield* rootCommand({ ...desktop, path: yield* pathWithT3 })).toBe(
-        `sudo '${shim}' browser setup`,
+        `sudo '${shim}' doctor`,
       );
 
       // The link the app installs onto PATH leads to its own launcher, so plain `t3` is right.
       const linked = yield* fs.makeTempDirectoryScoped();
       yield* fs.symlink(shim, path.join(linked, "t3"));
       expect(yield* rootCommand({ ...desktop, path: linked })).toBe(
-        'sudo env "PATH=$PATH" t3 browser setup',
+        'sudo env "PATH=$PATH" t3 doctor',
       );
 
       expect(
@@ -107,7 +107,7 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
           entry: "/opt/t3/t3",
           executable: true,
         }),
-      ).toBe("sudo /opt/t3/t3 browser setup");
+      ).toBe("sudo /opt/t3/t3 doctor");
 
       // A standalone executable started directly (systemd, no launcher) is still this install.
       expect(
@@ -117,7 +117,7 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
           executable: true,
           path: yield* pathWithT3,
         }),
-      ).toBe("sudo /opt/t3/t3 browser setup");
+      ).toBe("sudo /opt/t3/t3 doctor");
 
       // A global npm launcher runs the downloaded executable; PATH's `t3` is that launcher.
       const prefix = path.join(home, "npm");
@@ -138,11 +138,11 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
           path: path.join(prefix, "bin"),
           env: { T3CODE_NPM_LAUNCHER_PATH: npmLauncher },
         }),
-      ).toBe('sudo env "PATH=$PATH" t3 browser setup');
+      ).toBe('sudo env "PATH=$PATH" t3 doctor');
 
       expect(
         yield* rootCommand({ ...desktop, env: { T3CODE_CLI_PATH: path.join(home, "gone") } }),
-      ).toBe('sudo env "PATH=$PATH" t3 browser setup');
+      ).toBe('sudo env "PATH=$PATH" t3 doctor');
     }),
   );
 });
