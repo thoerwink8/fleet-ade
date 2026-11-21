@@ -1685,6 +1685,9 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
       onTermination: (error) =>
         recordTermination(error).pipe(
           Effect.andThen(options.onTermination?.(error) ?? Effect.void),
+          Effect.ensuring(
+            Scope.close(runtimeScope, Exit.fail(error)).pipe(Effect.forkDetach, Effect.asVoid),
+          ),
         ),
       ...(options.onOutgoingResponseFailure
         ? { onOutgoingResponseFailure: options.onOutgoingResponseFailure }
