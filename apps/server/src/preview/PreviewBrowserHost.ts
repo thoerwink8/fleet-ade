@@ -1,6 +1,8 @@
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 export const SETUP_SUBCOMMAND = "browser setup";
 
@@ -42,6 +44,9 @@ export type PreviewBrowserHostError =
   | PreviewBrowserLibrariesError
   | PreviewBrowserRootError;
 
+const MISSING_LIBRARY = /^\s*(\S+) => not found$/gm;
+const LOADER_ERROR = /error while loading shared libraries: ([^:\s]+)/;
+
 export const diagnoseLaunchFailure = Effect.fn("PreviewBrowserHost.diagnoseLaunchFailure")(
   function* (input: {
     readonly executable: string;
@@ -62,3 +67,23 @@ export const diagnoseLaunchFailure = Effect.fn("PreviewBrowserHost.diagnoseLaunc
       : new PreviewBrowserLibrariesError({ setupCommand, libraries });
   },
 );
+
+/** Detect missing libraries with --version; ldd can report misses that NixOS nix-ld provides. */
+const missingLibraries = Effect.fn("PreviewBrowserHost.missingLibraries")(function* (
+  executable: string,
+) {
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const run = (command: string, args: ReadonlyArray<string>) =>
+    spawner
+      .string(ChildProcess.make(command, args, { stdin: "ignore" }), { includeStderr: true })
+      .pipe(
+        Effect.timeout("5 seconds"),
+        Effect.orElseSucceed(() => ""),
+      );
+  const loaderError = LOADER_ERROR.exec(yield* run(executable, ["--version"]))?.[1];
+  if (loaderError === undefined) return [];
+  const listed = [...(yield* run("ldd", [executable])).matchAll(MISSING_LIBRARY)].map(
+    (match) => match[1]!,
+  );
+  return listed.length > 0 ? listed : [loaderError];
+});

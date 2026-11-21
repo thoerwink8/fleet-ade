@@ -140,6 +140,15 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
         `{"name":"t3","version":"${packageJson.version}"}`,
       );
       yield* fs.symlink(npmLauncher, path.join(prefix, "bin/t3"));
+      const npmOnPath = yield* resolveCommandPath("t3").pipe(
+        Effect.provideService(HostProcess.Environment, {
+          PATH: path.join(prefix, "bin"),
+          T3CODE_NPM_LAUNCHER_PATH: npmLauncher,
+        }),
+        Effect.provideService(HostProcess.Platform, "linux"),
+      );
+      const npmOnPathIsLauncher =
+        npmOnPath !== null && (yield* real(npmOnPath)) === (yield* real(npmLauncher));
       expect(
         yield* rootCommand({
           node: "/home/theo/.t3/runtime/versions/1.0.0/t3",
@@ -148,7 +157,11 @@ it.layer(NodeServices.layer)("root CLI commands", (it) => {
           path: path.join(prefix, "bin"),
           env: { T3CODE_NPM_LAUNCHER_PATH: npmLauncher },
         }),
-      ).toBe("sudo /home/theo/.t3/runtime/versions/1.0.0/t3 doctor");
+      ).toBe(
+        npmOnPathIsLauncher
+          ? 'sudo env "PATH=$PATH" t3 doctor'
+          : "sudo /home/theo/.t3/runtime/versions/1.0.0/t3 doctor",
+      );
 
       expect(
         yield* rootCommand({ ...desktop, env: { T3CODE_CLI_PATH: path.join(home, "gone") } }),

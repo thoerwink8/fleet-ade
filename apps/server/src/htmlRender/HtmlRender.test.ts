@@ -239,7 +239,7 @@ describe("HtmlRender", () => {
       expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toEqual(reference);
       expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toBe(undefined);
       const reused = yield* htmlRender.publish({ threadId, ...page });
-      yield* mcpSessions.set({ ...session, providerSessionId: "reissued-credential" });
+      yield* mcpSessions.set({ ...session, authorizationHeader: "Bearer reissued-token" });
       expect(yield* mcpSessions.takeHtmlRender(threadId, page)).toEqual(reused);
 
       yield* htmlRender.publish({ threadId, ...page });
