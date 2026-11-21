@@ -1,9 +1,3 @@
-interface PreviewMiniPlayerFrameLike {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 import { DETAILS_CARD_CLEARANCE } from "./chatCanvasLayout";
 
 export const THREAD_DETAILS_CARD_GAP = 12;
@@ -22,14 +16,10 @@ export function resolveThreadDetailsCardDensity(
 export function resolveThreadDetailsCardLayout({
   container,
   lane,
-  frame,
-  overlapsDetailsCard = false,
   topInset = 0,
 }: {
   container: { width: number; height: number };
   lane: { padding: number; minChatWidth: number };
-  frame: PreviewMiniPlayerFrameLike | null;
-  overlapsDetailsCard?: boolean;
   topInset?: number;
 }) {
   const gap = THREAD_DETAILS_CARD_GAP;
@@ -37,10 +27,7 @@ export function resolveThreadDetailsCardLayout({
   const x = container.width - width - gap;
   if (x - DETAILS_CARD_CLEARANCE - lane.padding < lane.minChatWidth) return null;
   const y = gap + topInset;
-  const height =
-    overlapsDetailsCard && frame && frame.x + frame.width > x - gap && frame.x < x + width + gap
-      ? Math.min(container.height - y - gap, frame.y - y - gap)
-      : container.height - y - gap;
+  const height = container.height - y - gap;
   if (height < 160) return null;
   return {
     x,

@@ -179,7 +179,7 @@ it("closes an exited terminal on its own thread after navigating to one reusing 
 it("hands thread navigation shortcuts from a focused terminal back to the app", async () => {
   const { other: threadRef } = setup();
   using _platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux x86_64");
-  useRightPanelStore.getState().openBrowser(threadRef, null);
+  useRightPanelStore.getState().open(threadRef, "files");
   await using _screen = await render(
     <Drawer
       threadRef={threadRef}

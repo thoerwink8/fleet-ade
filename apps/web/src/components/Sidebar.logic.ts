@@ -54,7 +54,7 @@ import { isTerminalFocused, subscribeToTerminalFocusChanges } from "../lib/termi
 import { isModelPickerOpen, subscribeToModelPickerVisibility } from "../modelPickerVisibility";
 import { shortcutModifierStore } from "../shortcutModifierState";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
-import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
+import { useRightPanelStore } from "../rightPanelStore";
 
 export function shouldNavigateAfterThreadPark(input: {
   readonly threadKey: string;
@@ -811,8 +811,6 @@ export function threadShortcutContext(routeThreadRef: ScopedThreadRef | null) {
         useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
         routeThreadRef,
       ).terminalOpen,
-    previewFocus: false,
-    previewOpen: false,
     modelPickerOpen: isModelPickerOpen(),
     isWeb: !isElectron,
     isDesktop: isElectron,

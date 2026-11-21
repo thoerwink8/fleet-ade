@@ -1283,7 +1283,6 @@ export const layerQueryRunner: Layer.Layer<
     const providerProcesses = yield* ProviderProcesses.ProviderProcesses;
     const platform = yield* HostProcess.Platform;
     const runFork = Effect.runForkWith(yield* Effect.context<never>());
-    const hostEnvironment = yield* HostProcess.Environment;
     const processRunner = yield* ProcessRunner.make();
     const readProcessTable = processRunner
       .run({ command: "ps", args: ["-A", "-o", "pid=,ppid=,pgid=,lstart="], timeout: "5 seconds" })
@@ -1421,9 +1420,6 @@ export const layerQueryRunner: Layer.Layer<
             const child = spawnProcess(spawnOptions);
             spawnedProcess = child;
             // A spawn that fails emits only "error".
-            const releaseAgent = portDiscovery.trackAgent();
-            child.once("exit", releaseAgent);
-            child.on("error", releaseAgent);
             processExited = child.exitCode !== null || child.signalCode != null;
             processExit = new Promise<void>((resolve) => {
               if (processExited) resolve();
@@ -2222,7 +2218,6 @@ export const CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS: ReadonlyArray<string> = [
   "mcp__t3-code__t3_project_list",
   "mcp__t3-code__t3_project_read",
   "mcp__t3-code__t3_thread_search",
-  "mcp__t3-code__t3_preview_list",
   "mcp__t3-code__t3_environment_read",
   "mcp__t3-code__t3_pipeline_status",
   "mcp__t3-code__t3_environment_links",

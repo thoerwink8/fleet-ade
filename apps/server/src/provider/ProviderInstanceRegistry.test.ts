@@ -49,7 +49,6 @@ import { makeProviderInstanceRegistry } from "./ProviderInstanceRegistry.ts";
 import { ProviderDriverError } from "./Errors.ts";
 import * as ProviderInstallationGate from "./ProviderInstallationGate.ts";
 import * as ProviderOrchestrationAdapterInfrastructure from "./ProviderOrchestrationAdapterInfrastructure.ts";
-import * as PortScanner from "../preview/PortScanner.ts";
 import * as ProviderHostLive from "./ProviderHostLive.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
@@ -220,7 +219,7 @@ describe("ProviderInstanceRegistry — multi-instance codex slice", () => {
   );
   const layerBase = ProviderHostLive.layer.pipe(Layer.provideMerge(layerBaseDeps));
   const layerTest = ProviderOrchestrationAdapterInfrastructure.layer.pipe(
-    Layer.provide(Layer.merge(PortScanner.layerTest, SqlitePersistence.layerMemory)),
+    Layer.provide(SqlitePersistence.layerMemory),
     Layer.provideMerge(layerBase),
   );
 

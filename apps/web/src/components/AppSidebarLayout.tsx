@@ -26,7 +26,6 @@ import {
 import { isEditableFocused } from "../lib/editableFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
-import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
@@ -135,13 +134,12 @@ function isKeybindingCaptureTarget(event: KeyboardEvent) {
 
 function readRoutePanelsOpen(router: AnyRouter) {
   const routeThreadRef = resolveThreadRouteRef(router.state.matches.at(-1)?.params ?? {});
-  if (!routeThreadRef) return { terminalOpen: false, previewOpen: false };
+  if (!routeThreadRef) return { terminalOpen: false };
   return {
     terminalOpen: selectThreadTerminalUiState(
       useTerminalUiStateStore.getState().terminalUiStateByThreadKey,
       routeThreadRef,
     ).terminalOpen,
-    previewOpen: false,
   };
 }
 
@@ -254,7 +252,6 @@ function registerThreadUndoCommands(
           {
             context: {
               terminalFocus: isTerminalFocused(),
-              previewFocus: false,
               ...readRoutePanelsOpen(router),
               // A collapsed sidebar hides the notice, so text fields keep their own undo.
               editableFocus:

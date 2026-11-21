@@ -24,6 +24,8 @@ export class ResourceCleanupError extends Schema.TaggedError<ResourceCleanupErro
 export class ResourceCleanupService extends Context.Reference<{
   readonly cleanupScheduledTasks: (threadId: ThreadId) => Effect.Effect<void, ResourceCleanupError>;
   readonly cleanupTerminals: (threadId: string) => Effect.Effect<void, ResourceCleanupError>;
+  /** Old thread-deletion events still reference this; previews are gone, so it is a no-op. */
+  readonly cleanupPreviews: (threadId: string) => Effect.Effect<void, ResourceCleanupError>;
   readonly cleanupAttachments: (
     attachmentIds: ReadonlyArray<string>,
   ) => Effect.Effect<void, ResourceCleanupError>;
@@ -67,17 +69,7 @@ export const layer = Layer.effect(
             ),
           );
       }),
-      cleanupPreviews: Effect.fn("ResourceCleanupService.cleanupPreviews")(function (
-        threadId: string,
-      ) {
-        return previews
-          .close({ threadId: ThreadId.make(threadId) })
-          .pipe(
-            Effect.mapError(
-              (cause) => new ResourceCleanupError({ operation: "preview", threadId, cause }),
-            ),
-          );
-      }),
+      cleanupPreviews: Effect.fn("ResourceCleanupService.cleanupPreviews")(() => Effect.void),
       cleanupAttachments: Effect.fn("ResourceCleanupService.cleanupAttachments")(function (
         attachmentIds: ReadonlyArray<string>,
       ) {

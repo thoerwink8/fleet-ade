@@ -12,7 +12,7 @@ import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { useClosedViewStore } from "../closedViewStore";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { environmentCatalog } from "../connection/catalog";
-import { effectiveShortcutsForCommand, resolveShortcutCommand } from "../keybindings";
+import { resolveShortcutCommand } from "../keybindings";
 import { isEditableFocused } from "../lib/editableFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
@@ -23,7 +23,6 @@ import {
 } from "../reopenClosedView";
 import {
   PULL_REQUESTS_PANEL_REF,
-  selectActiveRightPanel,
   selectSelectedRightPanelSurface,
   selectThreadRightPanelState,
   useRightPanelStore,
@@ -32,7 +31,6 @@ import { appAtomRegistry } from "../rpc/atomRegistry";
 import { readProject, readThreadShell } from "../state/entities";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { environmentShell } from "../state/shell";
-import { useAtomCommand } from "../state/use-atom-command";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import {
   buildDraftThreadRouteParams,
@@ -63,7 +61,6 @@ export function ReopenClosedViewShortcut() {
       selectThreadTerminalUiState(state.terminalUiStateByThreadKey, threadRef).terminalOpen,
   );
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const hasHistory = useClosedViewStore((state) => state.entries.length > 0);
   const pending = useRef(Promise.resolve());
 
   const reopenNext = useEffectEvent(async () => {
@@ -152,8 +149,6 @@ export function ReopenClosedViewShortcut() {
         context: {
           terminalFocus: isTerminalFocused(),
           terminalOpen,
-          previewFocus: false,
-          previewOpen: false,
           editableFocus: isEditableFocused(event.target),
           modelPickerOpen: isModelPickerOpen(),
         },

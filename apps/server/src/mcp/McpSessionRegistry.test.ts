@@ -44,16 +44,14 @@ it.effect("stores only a token hash, resolves the bearer token, and revokes by t
     const issued = yield* registry.issue({
       threadId,
       providerInstanceId: ProviderInstanceId.make("codex"),
-      capabilities: new Set(["preview"]),
     });
     expect(issued.config.endpoint).toBe("http://127.0.0.1:43123/mcp");
     const token = issued.config.authorizationHeader.replace(/^Bearer\s+/, "");
     expect(token.length).toBeGreaterThan(20);
 
     const resolved = yield* registry.resolve(token);
-    expect(resolved?.thread.threadId).toBe(threadId);
     expect(resolved?.capabilities).toEqual(
-      new Set(["preview", "orchestration", "worktree", "pull-requests"]),
+      new Set(["orchestration", "worktree", "pull-requests"]),
     );
 
     yield* registry.revokeThread(threadId);
@@ -63,37 +61,6 @@ it.effect("stores only a token hash, resolves the bearer token, and revokes by t
   }),
 );
 
-it.effect("always grants pull-requests and gates browser access independently", () =>
-  Effect.gen(function* () {
-    const registry = yield* makeRegistry(() => 1_000);
-    const withPreview = yield* registry.issue({
-      threadId: ThreadId.make("thread-preview"),
-      providerInstanceId: ProviderInstanceId.make("codex"),
-      capabilities: new Set(["preview"]),
-    });
-    const withoutPreview = yield* registry.issue({
-      threadId: ThreadId.make("thread-no-preview"),
-      providerInstanceId: ProviderInstanceId.make("codex"),
-      capabilities: new Set(),
-    });
-    const capabilitiesOf = (issued: typeof withPreview) =>
-      registry
-        .resolve(issued.config.authorizationHeader.replace(/^Bearer\s+/, ""))
-        .pipe(Effect.map((scope) => [...(scope?.capabilities ?? [])].sort()));
-
-    expect(yield* capabilitiesOf(withPreview)).toEqual([
-      "orchestration",
-      "preview",
-      "pull-requests",
-      "worktree",
-    ]);
-    expect(yield* capabilitiesOf(withoutPreview)).toEqual([
-      "orchestration",
-      "pull-requests",
-      "worktree",
-    ]);
-  }),
-);
 
 // regression: #3114 use bound host for MCP endpoint
 it.effect("builds MCP endpoints from the bound server host", () =>
@@ -111,7 +78,6 @@ it.effect("builds MCP endpoints from the bound server host", () =>
       const issued = yield* registry.issue({
         threadId: ThreadId.make(`thread-${hostname}`),
         providerInstanceId: ProviderInstanceId.make("codex"),
-        capabilities: new Set(["preview"]),
       });
       expect(issued.config.endpoint).toBe(expectedEndpoint);
     }
@@ -125,7 +91,6 @@ it.effect("expires credentials once their session stops showing signs of life", 
     const issued = yield* registry.issue({
       threadId: ThreadId.make("thread-2"),
       providerInstanceId: ProviderInstanceId.make("claude"),
-      capabilities: new Set(["preview"]),
     });
     const token = issued.config.authorizationHeader.replace(/^Bearer\s+/, "");
     timestamp += 101;
@@ -146,7 +111,6 @@ it.effect("a backward wall clock step neither extends nor revives credentials", 
         .issue({
           threadId: ThreadId.make(threadId),
           providerInstanceId: ProviderInstanceId.make("codex"),
-          capabilities: new Set(["preview"]),
         })
         .pipe(Effect.map((issued) => issued.config.authorizationHeader.replace(/^Bearer\s+/, "")));
 
@@ -174,7 +138,6 @@ it.effect("does not keep credentials of other threads alive", () =>
     const issued = yield* registry.issue({
       threadId: ThreadId.make("thread-4"),
       providerInstanceId: ProviderInstanceId.make("codex"),
-      capabilities: new Set(["preview"]),
     });
     const token = issued.config.authorizationHeader.replace(/^Bearer\s+/, "");
 
@@ -194,7 +157,6 @@ it.effect("only a trusted touch restores an expired token with its original scop
     const issued = yield* registry.issue({
       threadId,
       providerInstanceId: ProviderInstanceId.make("claude"),
-      capabilities: new Set(["preview"]),
     });
     const token = issued.config.authorizationHeader.replace(/^Bearer\s+/, "");
     const scope = yield* registry.resolve(token);
@@ -232,7 +194,6 @@ it.effect.each(["provider-session", "thread", "all"] as const)(
       const issued = yield* registry.issue({
         threadId,
         providerInstanceId: ProviderInstanceId.make("codex"),
-        capabilities: new Set(["preview"]),
       });
       const token = issued.config.authorizationHeader.replace(/^Bearer\s+/, "");
 

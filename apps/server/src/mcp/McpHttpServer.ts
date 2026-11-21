@@ -1,9 +1,11 @@
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
+import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import type * as Types from "effect/Types";
 import { AiError, McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
@@ -52,6 +54,8 @@ import { ToolSearchToolkit } from "./toolkits/toolSearch/tools.ts";
 import { PullRequestsToolkit } from "./toolkits/pullRequests/tools.ts";
 import * as HtmlHandlers from "./toolkits/html/handlers.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
+import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
+import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import { requestUrl } from "../requestUrl.ts";
 
 const mcpResourceMetadataUrl = (request: HttpServerRequest.HttpServerRequest) =>
@@ -265,6 +269,13 @@ const layerMcpAuthMiddleware = HttpRouter.middleware<{
 
 const MAX_NAMED_ARGUMENTS = 5;
 const MAX_ARGUMENT_NAME_CHARS = 64;
+const cutText = (text: string, max: number) => {
+  if (text.length <= max) return text;
+  // Half an emoji serializes to a lone surrogate escape, which provider JSON parsers reject.
+  const last = text.charCodeAt(max - 1);
+  return `${text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max)}…`;
+};
+
 
 /**
  * Rejects top-level arguments the advertised schema does not list, naming them. Nested objects stay lenient:

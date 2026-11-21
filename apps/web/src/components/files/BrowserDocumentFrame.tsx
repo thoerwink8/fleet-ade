@@ -60,7 +60,6 @@ const HTML_RENDER_SHORTCUT_COMMANDS: ReadonlySet<KeybindingCommand> = new Set([
   "rightPanel.toggleMaximized",
   "threadPanel.toggle",
   "terminal.toggle",
-  "preview.toggle",
   "navigation.back",
   "navigation.forward",
   "thread.previous",
@@ -265,7 +264,7 @@ export function HtmlRenderDocument(props: {
     ) {
       return;
     }
-    void openLink(url, { event: modifiers }).catch((cause: unknown) => console.error(cause));
+    void openLink(url).catch((cause: unknown) => console.error(cause));
   });
   const { onFullscreenChange } = props;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports fullscreen to the parent while the image viewer is open, and clears it on unmount

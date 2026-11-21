@@ -33,8 +33,6 @@ type ShortcutInput = {
   disabled: boolean;
   terminalOpen: boolean;
   modelPickerOpen: boolean;
-  /** Resolve the chord as if the preview had focus; the keys arrive relayed from its guest. */
-  previewFocus?: boolean;
   /** When set, the chord targets this editor only while it has focus. */
   targetRef?: RefObject<HTMLElement | null>;
   /** An editor outside this document reports whether it holds the keyboard. */
@@ -139,15 +137,11 @@ export function useDictationShortcut(input: ShortcutInput) {
         return;
       }
       const { keybindings, terminalOpen, modelPickerOpen, disabled } = current.current;
-      const previewFocus = current.current.previewFocus ?? false;
       const command = resolveShortcutCommand(event, keybindings, {
         context: {
           terminalFocus: getTerminalFocusOwner() !== null,
           terminalOpen,
           modelPickerOpen,
-          previewFocus,
-          previewOpen: previewFocus,
-          ...(previewFocus ? { editableFocus: true } : {}),
         },
       });
       if (command !== "composer.dictation") return;

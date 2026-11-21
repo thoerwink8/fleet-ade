@@ -331,16 +331,16 @@ describe("projectSettingsOverrides patches", () => {
   it("replaces a project's entry, removes it with null, and drops empty entries", () => {
     const first = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       projectSettingsOverrides: {
-        [projectId]: { defaultAutoPull: true, enableAgentBrowserAccess: false },
+        [projectId]: { defaultAutoPull: true, enableAgentDeviceAccess: false },
         [otherProjectId]: { defaultAutoPull: false },
       },
     });
     expect(hasProjectSettingsOverrides(first)).toBe(true);
     const replaced = applyServerSettingsPatch(first, {
-      projectSettingsOverrides: { [projectId]: { enableAgentBrowserAccess: false } },
+      projectSettingsOverrides: { [projectId]: { enableAgentDeviceAccess: false } },
     });
     expect(replaced.projectSettingsOverrides[projectId]).toEqual({
-      enableAgentBrowserAccess: false,
+      enableAgentDeviceAccess: false,
     });
     expect(replaced.projectSettingsOverrides[otherProjectId]).toEqual({ defaultAutoPull: false });
     const emptied = applyServerSettingsPatch(replaced, {
@@ -359,7 +359,7 @@ describe("projectSettingsOverrides patches", () => {
   it("derives the legacy per-key maps from the generic record", () => {
     const settings = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       projectSettingsOverrides: {
-        [projectId]: { defaultAutoPull: true, enableAgentBrowserAccess: false },
+        [projectId]: { defaultAutoPull: true, enableAgentDeviceAccess: false },
         [otherProjectId]: { defaultProjectScripts: [] },
       },
     });
@@ -374,8 +374,8 @@ describe("projectSettingsOverrides patches", () => {
       projectAgentBrowserAccessOverrides: { [projectId]: false, [otherProjectId]: true },
     });
     expect(written.projectSettingsOverrides).toEqual({
-      [projectId]: { defaultAutoPull: true, enableAgentBrowserAccess: false },
-      [otherProjectId]: { enableAgentBrowserAccess: true },
+      [projectId]: { defaultAutoPull: true, enableAgentDeviceAccess: false },
+      [otherProjectId]: { enableAgentDeviceAccess: true },
     });
     const cleared = applyServerSettingsPatch(written, {
       projectAgentBrowserAccessOverrides: { [projectId]: null, [otherProjectId]: null },

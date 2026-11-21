@@ -220,10 +220,7 @@ export function useOpenChangeRequestLink(
             );
             return;
           }
-          return openLink(targetUrl, {
-            event: { metaKey: event.metaKey, ctrlKey: event.ctrlKey, button: event.button },
-            threadRef: resolvedThreadRef,
-          });
+          return openLink(targetUrl);
         })
         .catch((error: unknown) => console.error(error));
       return true;
@@ -250,7 +247,7 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
     event.preventDefault();
     if (!openInBrowser && openChangeRequest(event, prUrl, targetThreadRef)) return true;
 
-    void openLink(prUrl, { event, threadRef: targetThreadRef }).catch((error: unknown) => {
+    void openLink(prUrl).catch((error: unknown) => {
       console.error(error);
       toastManager.add(
         stackedThreadToast({

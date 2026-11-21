@@ -10,7 +10,6 @@ import {
   ThreadId,
   ProjectId,
   type ReviewDiffPreviewInput,
-  type PreviewEvent,
   type TerminalAttachInput,
   type TerminalAttachStreamEvent,
   type TerminalMetadataStreamEvent,

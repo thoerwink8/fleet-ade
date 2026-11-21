@@ -16,8 +16,6 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   ComposerContextRecord,
   OrchestratorMcpTaskRole,
-  PreviewAutomationError,
-  PreviewAutomationUnavailableError,
   ProviderInstanceId,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -54,8 +52,6 @@ import { AttachmentToolkit } from "../../apps/server/src/mcp/toolkits/attachment
 import { EnvironmentToolkit } from "../../apps/server/src/mcp/toolkits/environment/tools.ts";
 import { HtmlToolkit } from "../../apps/server/src/mcp/toolkits/html/tools.ts";
 import { OrchestratorToolkit } from "../../apps/server/src/mcp/toolkits/orchestrator/tools.ts";
-import { PreviewToolkit } from "../../apps/server/src/mcp/toolkits/preview/tools.ts";
-import { PreviewControlsToolkit } from "../../apps/server/src/mcp/toolkits/previewControls/tools.ts";
 import { ProjectToolkit } from "../../apps/server/src/mcp/toolkits/project/tools.ts";
 import {
   CHILD_PULL_REQUEST_REPORT_NEXT,
@@ -233,8 +229,6 @@ const McpToolUseWorld = Schema.StructWithRest(
         Schema.StructWithRest(Schema.Struct({ sha: Schema.String, subject: Schema.String }), Rest),
       ),
     ),
-    /** false: agent browser access is off. T3 denies every preview call and drops its browser text. */
-    browserAgentAccess: Schema.optional(Schema.Boolean),
     /**
      * Task IDs of the background commands and Monitors still running on the agent's Claude
      * session. With them, T3's own t3_background_wait handler answers from this world.
@@ -277,8 +271,7 @@ export const McpToolUseCase = Schema.Struct({
     ),
     world: Schema.optional(McpToolUseWorld),
     /**
-     * Canned tool results by bare name, T3 or native. `"default"` uses the runner's result. For a
-     * preview tool, a `PreviewAutomationError` fails it with that error's message. A
+     * Canned tool results by bare name, T3 or native. `"default"` uses the runner's result. A
      * `{"$sequence": [...]}` mock answers its nth call with the nth result, then repeats the last.
      */
     mocks: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
@@ -405,10 +398,8 @@ const t3SourceTools: ReadonlyArray<Tool.Any> = [
   AttachmentToolkit,
   ProjectToolkit,
   EnvironmentToolkit,
-  PreviewControlsToolkit,
   WorktreeToolkit,
   PullRequestsToolkit,
-  PreviewToolkit,
   HtmlToolkit,
 ].flatMap((toolkit): ReadonlyArray<Tool.Any> => Object.values(toolkit.tools));
 // McpHttpServer decodes arguments with each tool's JSON codec, which drops undeclared keys.
@@ -425,14 +416,6 @@ const t3Tools: ReadonlyArray<ApiTool> = t3SourceTools.map((tool) => ({
   description: Tool.getDescription(tool) ?? "",
   input_schema: advertisedJsonSchema(tool),
 }));
-// T3 gates these on the `preview` capability, which agent browser access decides.
-const PREVIEW_TOOLS = new Set(
-  [PreviewToolkit, PreviewControlsToolkit].flatMap((toolkit) =>
-    Object.values(toolkit.tools).map((tool: Tool.Any) => tool.name),
-  ),
-);
-const decodePreviewError = Schema.decodeUnknownOption(PreviewAutomationError);
-const previewFailure = (mock: unknown) => Option.getOrUndefined(decodePreviewError(mock));
 const enabledWhen = (predicate: () => boolean) =>
   new Set(
     t3SourceTools
@@ -466,27 +449,19 @@ const pastedSecret = (name: string, input: Readonly<Record<string, unknown>>) =>
 const visibleT3Tools = (options: { readonly subagent?: boolean }) =>
   t3Tools.filter((tool) => !(options.subagent === true && hiddenFromSubagents.has(tool.name)));
 
-/** T3's Claude Code options for an eval thread: its system prompt append and its hooks. `browser`
- * says whether the thread holds the `preview` capability, as agent browser access decides.
- */
-const claudeQueryOptions = (model: Model, browser = true) => {
-  // Refs whose text follows a capability read its flag; older ones ignore it.
-  const input: Parameters<typeof makeClaudeQueryOptions>[0] & {
-    readonly browserToolsAvailable?: boolean;
-  } = {
+/** T3's Claude Code options for an eval thread: its system prompt append and its hooks. */
+const claudeQueryOptions = (model: Model) =>
+  makeClaudeQueryOptions({
     modelSelection: { instanceId: ProviderInstanceId.make(CLAUDE_PROVIDER), model },
     nativeThreadId: "mcp-tool-use-eval",
     resume: false,
     cwd: null,
     mcpServers: { "t3-code": { type: "http", url: "http://127.0.0.1/mcp" } },
-    browserToolsAvailable: browser,
-  };
-  return makeClaudeQueryOptions(input);
-};
+  });
 
 /** Text T3 appends to Claude Code's system prompt. Delegated children get the same text. */
-export const t3SystemAppend = (model: Model, browser = true) => {
-  const { systemPrompt } = claudeQueryOptions(model, browser);
+export const t3SystemAppend = (model: Model) => {
+  const { systemPrompt } = claudeQueryOptions(model);
   if (isRecord(systemPrompt) && systemPrompt.type === "preset" && systemPrompt.append) {
     return systemPrompt.append;
   }
@@ -497,10 +472,8 @@ export const t3SystemAppend = (model: Model, browser = true) => {
  * The context T3's SubagentStart hooks give a native subagent, which gets none of the append.
  * Empty when T3 registers no such hook.
  */
-export const t3SubagentContext = async (model: Model, browser = true) => {
-  const hooks = (claudeQueryOptions(model, browser).hooks?.SubagentStart ?? []).flatMap(
-    (m) => m.hooks,
-  );
+export const t3SubagentContext = async (model: Model) => {
+  const hooks = (claudeQueryOptions(model).hooks?.SubagentStart ?? []).flatMap((m) => m.hooks);
   const input = {
     hook_event_name: "SubagentStart" as const,
     session_id: "mcp-tool-use-eval",
@@ -575,8 +548,6 @@ export const buildBase = (
     readonly subagent?: boolean;
     /** A native subagent starts from its task: T3 appends nothing to its system prompt. */
     readonly nativeSubagent?: boolean;
-    /** false: the thread has no agent browser access, so T3's text leaves the browser out. */
-    readonly browserAccess?: boolean;
   },
 ) => {
   const t3 = visibleT3Tools(options);
@@ -600,7 +571,7 @@ export const buildBase = (
     .toSorted()
     .join("\n");
   const { model } = options;
-  const append = options.nativeSubagent ? "" : t3SystemAppend(model, options.browserAccess);
+  const append = options.nativeSubagent ? "" : t3SystemAppend(model);
   const modelLine = `You are powered by the model named ${MODELS[model]}. The exact model ID is ${model}.`;
   const joined = systemTexts.join("\n");
   // The capture's home directory names its user. Cases use `/home/user` paths instead.
@@ -664,8 +635,6 @@ const buildCodexBase = (
     readonly keepUserInstructions: boolean;
     readonly effort?: string | undefined;
     readonly subagent?: boolean;
-    /** false: the thread has no agent browser access, so T3's text leaves the browser out. */
-    readonly browserAccess?: boolean;
   },
 ): Base => {
   const t3 = visibleT3Tools(options);
@@ -699,10 +668,7 @@ const buildCodexBase = (
     if (item.role === "assistant") return [];
     return [JSON.parse(clean(JSON.stringify(item))) as Block];
   });
-  const context = buildCodexAdditionalContext(
-    { model: options.model, reasoningEffort: effort },
-    options.browserAccess ?? true,
-  );
+  const context = buildCodexAdditionalContext({ model: options.model, reasoningEffort: effort });
   input.push(
     ...Object.entries(context).map(([key, entry]) => message(`<${key}>${entry.value}</${key}>`)),
   );
@@ -1555,17 +1521,6 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
     return failed(`${input.path} is not a readable HTML document. Pass an absolute path.`);
   }
   const mock = nextMock(sample, name, testCase.setup.mocks?.[name]);
-  if (isT3Name(call.name) && PREVIEW_TOOLS.has(name)) {
-    if (testCase.setup.world?.browserAgentAccess === false)
-      return failed(
-        new PreviewAutomationUnavailableError({
-          capability: "preview",
-          environmentId: EVAL_ENVIRONMENT_ID,
-        }).message,
-      );
-    const previewError = previewFailure(mock);
-    if (previewError !== undefined) return failed(previewError.message);
-  }
   const fromWorld = mock === undefined || mock === "default";
   if (sample.backgroundWait && isT3Name(call.name) && name === "t3_background_wait" && fromWorld) {
     const result = yield* sample.backgroundWait(input);
@@ -2431,10 +2386,7 @@ const main = Effect.gen(function* () {
     templatePath.endsWith(".gz") ? NodeZlib.gunzipSync(templateBytes) : templateBytes,
   );
   const keepUserInstructions = flags["user-instructions"] === "keep";
-  const buildFor = (
-    role: McpToolUseCase["setup"]["role"],
-    browserAccess: boolean,
-  ): Effect.Effect<Base, Schema.SchemaError> =>
+  const buildFor = (role: McpToolUseCase["setup"]["role"]): Effect.Effect<Base, Schema.SchemaError> =>
     codex
       ? decodeCodexCapture(template).pipe(
           Effect.map((capture) =>
@@ -2443,7 +2395,6 @@ const main = Effect.gen(function* () {
               keepUserInstructions,
               effort: flags.effort,
               subagent: role === "delegated-child",
-              browserAccess,
             }),
           ),
         )
@@ -2452,10 +2403,9 @@ const main = Effect.gen(function* () {
             const built = buildBase(capture.request.provider_native, {
               model: flags.model,
               keepUserInstructions,
-              browserAccess,
             });
             return role === "native-subagent"
-              ? Effect.promise(() => t3SubagentContext(flags.model, browserAccess)).pipe(
+              ? Effect.promise(() => t3SubagentContext(flags.model)).pipe(
                   Effect.map((subagentContext): Base => ({ ...built, subagentContext })),
                 )
               : Effect.succeed(built);
@@ -2463,14 +2413,14 @@ const main = Effect.gen(function* () {
         );
   // Codex has no native subagents; its cases with that role run as top-level threads.
   const baseKey = ({ setup }: McpToolUseCase) =>
-    `${codex && setup.role === "native-subagent" ? "top" : setup.role}:${setup.world?.browserAgentAccess !== false}`;
-  const base = yield* buildFor("top", true);
-  const bases = new Map<string, Base>([["top:true", base]]);
+    codex && setup.role === "native-subagent" ? "top" : setup.role;
+  const base = yield* buildFor("top");
+  const bases = new Map<string, Base>([["top", base]]);
   for (const testCase of selected) {
     const key = baseKey(testCase);
     if (bases.has(key)) continue;
-    const [role = "top", browser] = key.split(":") as [McpToolUseCase["setup"]["role"], string];
-    bases.set(key, yield* buildFor(role, browser === "true"));
+    const [role = "top"] = key.split(":") as [McpToolUseCase["setup"]["role"], string];
+    bases.set(key, yield* buildFor(role));
   }
   const baseFor = (testCase: McpToolUseCase) => bases.get(baseKey(testCase)) ?? base;
   const effort = flags.effort ?? base.codex?.reasoning.effort ?? "high";

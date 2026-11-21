@@ -1,10 +1,12 @@
+import type { ExecutionEnvironmentPlatformOs } from "@t3tools/contracts";
+
 export function revealInFileExplorerLabelForOs(
-  os: string | null | undefined,
+  os: ExecutionEnvironmentPlatformOs | null | undefined,
 ): string {
   switch (os) {
     case "darwin":
       return "在 Finder 中显示";
-    case "win32":
+    case "windows":
       return "在资源管理器中显示";
     default:
       return "在文件管理器中显示";
@@ -12,14 +14,14 @@ export function revealInFileExplorerLabelForOs(
 }
 
 export function revealInFileExplorerLabelForKind(
-  kind: "mac" | "windows" | "linux",
+  kind: "finder" | "file-explorer" | "files",
 ): string {
   switch (kind) {
-    case "mac":
+    case "finder":
       return "在 Finder 中显示";
-    case "windows":
+    case "file-explorer":
       return "在资源管理器中显示";
-    case "linux":
+    case "files":
       return "在文件管理器中显示";
   }
 }

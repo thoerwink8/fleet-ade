@@ -51,6 +51,7 @@ import { ProviderWorkspaceMissingError } from "../provider/Errors.ts";
 import * as ProviderInstallationGate from "../provider/ProviderInstallationGate.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ServerConfig from "../config.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as EventSink from "./EventSink.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
@@ -431,6 +432,7 @@ export const layerWithOptions = (
       const agentScope = yield* AgentScope;
       const installationGate = yield* ProviderInstallationGate.ProviderInstallationGate;
       const serverConfig = yield* Effect.serviceOption(ServerConfig.ServerConfig);
+      const serverSettings = yield* Effect.serviceOption(ServerSettings.ServerSettingsService);
       const readMaxConcurrentSessions = Effect.gen(function* () {
         const configuredLimit = Option.isNone(serverConfig)
           ? undefined

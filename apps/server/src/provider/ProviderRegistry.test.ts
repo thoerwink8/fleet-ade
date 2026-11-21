@@ -72,7 +72,6 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import * as ProviderInstallationGate from "./ProviderInstallationGate.ts";
 import * as ProviderInstanceRegistryHydration from "./ProviderInstanceRegistryHydration.ts";
-import * as PortScanner from "../preview/PortScanner.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettingsModule from "../serverSettings.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -3043,7 +3042,6 @@ it.layer(
             ProviderInstanceRegistryHydration.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(
-                  PortScanner.layerTest,
                   ProviderInstallationGate.layer,
                   SqlitePersistence.layerMemory,
                 ),
@@ -3178,7 +3176,6 @@ it.layer(
             ProviderInstanceRegistryHydration.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(
-                  PortScanner.layerTest,
                   ProviderInstallationGate.layer,
                   SqlitePersistence.layerMemory,
                 ),
@@ -3311,7 +3308,6 @@ it.layer(
         ProviderInstanceRegistryHydration.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
-              PortScanner.layerTest,
               ProviderInstallationGate.layer,
               SqlitePersistence.layerMemory,
               // Registry reconciliation must not probe agents installed on the test host.

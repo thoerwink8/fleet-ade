@@ -61,7 +61,6 @@ export function RightPanelSurfaceContent(props: {
   readonly visible: boolean;
   readonly composerDraftTarget: ScopedThreadRef | DraftId;
   readonly keybindings: ResolvedKeybindingsConfig;
-  readonly configuredPreviewUrls: ReadonlyArray<string>;
   readonly workspaceMutationId: string | null;
   readonly getShortcutContext: () => ShortcutMatchContext;
   readonly onSendAnnotation: (

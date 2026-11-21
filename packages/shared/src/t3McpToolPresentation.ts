@@ -65,14 +65,13 @@ export type T3McpToolSummaryAction =
   | "unwatch-pr"
   | "write-pr-guides"
   | "read-pr-guide"
-  | "browser"
   | "html-preview"
   | "html-render";
 
 export interface T3McpToolDefinition {
   readonly displayName: string;
   readonly labels: readonly [action: string, running: string, completed: string, detail: string];
-  readonly icon: "t3-code" | "browser" | "pull-request";
+  readonly icon: "t3-code" | "pull-request";
   readonly summaryAction: T3McpToolSummaryAction;
 }
 
@@ -156,43 +155,6 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_thread_interrupt: tool(["中断", "正在中断", "已请求中断", "会话"], "thread-interrupt"),
   t3_worktree_handoff: tool(["交接至", "正在交接至", "已交接至", "Git 工作树"], "worktree-handoff"),
   t3_worktree_status: tool(["查询", "正在查询", "已查询", "工作树状态"], "worktree-status"),
-  preview_status: tool(["查询", "正在查询", "已查询", "预览浏览器状态"], "browser", "browser"),
-  preview_open: tool(["打开", "正在打开", "已打开", "预览浏览器页面"], "browser", "browser"),
-  preview_navigate: tool(["跳转", "正在跳转", "已跳转", "预览浏览器地址"], "browser", "browser"),
-  preview_dialog: tool(["响应", "正在响应", "已响应", "预览浏览器弹窗"], "browser", "browser"),
-  preview_snapshot: tool(
-    ["截取", "正在截取", "已截取", "预览页面快照"],
-    "browser",
-    "browser",
-    "截取预览页面快照",
-  ),
-  preview_act: tool(["操作", "正在操作", "已操作", "预览浏览器"], "browser", "browser"),
-  preview_click: tool(["点击", "正在点击", "已点击", "预览浏览器元素"], "browser", "browser"),
-  preview_press: tool(["按键", "正在按键", "已按键", "预览浏览器按键"], "browser", "browser"),
-  preview_type: tool(["输入", "正在输入", "已输入", "预览浏览器文本"], "browser", "browser"),
-  preview_hover: tool(["悬停", "正在悬停", "已悬停", "预览浏览器元素"], "browser", "browser"),
-  preview_select: tool(["选择", "正在选择", "已选择", "预览浏览器选项"], "browser", "browser"),
-  preview_drag: tool(["拖拽", "正在拖拽", "已拖拽", "预览浏览器元素"], "browser", "browser"),
-  preview_upload: tool(["上传", "正在上传", "已上传", "预览浏览器文件"], "browser", "browser"),
-  preview_scroll: tool(["滚动", "正在滚动", "已滚动", "预览浏览器页面"], "browser", "browser"),
-  preview_resize: tool(["调整", "正在调整", "已调整", "预览浏览器尺寸"], "browser", "browser"),
-  preview_evaluate: tool(["执行", "正在执行", "已执行", "预览浏览器脚本"], "browser", "browser"),
-  preview_wait_for: tool(["等待", "正在等待", "已等待", "预览页面就绪"], "browser", "browser"),
-  preview_set_appearance: tool(
-    ["设置", "正在设置", "已设置", "预览浏览器外观"],
-    "browser",
-    "browser",
-  ),
-  preview_recording_start: tool(
-    ["开始录制", "正在开始录制", "已开始录制", "预览浏览器"],
-    "browser",
-    "browser",
-  ),
-  preview_recording_stop: tool(
-    ["停止录制", "正在停止录制", "已停止录制", "预览浏览器"],
-    "browser",
-    "browser",
-  ),
   run_scheduled_task_now: tool(["运行", "正在运行", "已请求运行", "定时任务"], "schedule-run"),
   t3_queue: tool(["管理", "正在管理", "已管理", "排队消息"], "queue-edit"),
   t3_pending_request: tool(["处理", "正在处理", "已处理", "待处理问题"], "question-respond"),
@@ -221,8 +183,6 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_thread_organize: tool(["整理", "正在整理", "已整理", "会话"], "thread-organize"),
   t3_thread_update: tool(["更新", "正在更新", "已更新", "会话信息"], "thread-update"),
   t3_worktree_list: tool(["列出", "正在列出", "已列出", "工作区分支"], "worktree-list"),
-  t3_preview_list: tool(["列出", "正在列出", "已列出", "预览标签页"], "browser", "browser"),
-  t3_preview_close: tool(["关闭", "正在关闭", "已关闭", "预览标签页"], "browser", "browser"),
   t3_environment_read: tool(["读取", "正在读取", "已读取", "环境偏好设置"], "environment-read"),
   t3_environment_links: tool(["列出", "正在列出", "已列出", "已关联环境"], "environment-links"),
   t3_environment_link: tool(["请求关联", "正在请求关联", "已请求关联", "环境"], "environment-link"),

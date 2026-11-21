@@ -1,9 +1,8 @@
-import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { promptLinkAppPath } from "@t3tools/shared/promptLinks";
 import { readPairingAppLink, resolveRemotePairingTarget } from "@t3tools/shared/remote";
@@ -13,23 +12,18 @@ import { AtomRegistry } from "effect/reactivity";
 import * as Stream from "effect/Stream";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { readLocalApi } from "../../localApi";
 import { requestConfirmDialog } from "../../confirmDialog";
 import { connectPairing } from "../../connection/onboarding";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
-import { useComposerDraftStore } from "../../composerDraftStore";
-import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
-import { useScratchProject } from "../../hooks/useScratchProject";
 import { useClientSettings } from "../../hooks/useSettings";
 import { useOpenChangeRequestLink } from "../../lib/openPullRequestLink";
-import { selectActiveRightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
-import { assetEnvironment } from "../../state/assets";
 import { readProject, readThreadShell } from "../../state/entities";
 import { useEnvironmentHttpBaseUrl, usePrimaryEnvironment } from "../../state/environments";
 import { allReachableShellsLiveAtom } from "../../state/shell";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { useAtomQueryRunner } from "../../state/use-atom-query-runner";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 
 /** A link handed over by the OS is a plain click: nothing about it asks for the browser. */
@@ -60,8 +54,6 @@ export function DesktopWebLinkCoordinator() {
   const primaryEnvironment = usePrimaryEnvironment();
   const openPullRequestsInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
   const openChangeRequest = useOpenChangeRequestLink();
-  const { scratchEnvironmentId, openScratchProject } = useScratchProject();
-  const openThread = useNewThreadHandler();
   const connectPairingEnvironment = useAtomCommand(connectPairing, { reportFailure: false });
   const httpBaseUrl = useEnvironmentHttpBaseUrl(primaryEnvironment?.environmentId ?? null);
   const queueRef = useRef(Promise.resolve());
@@ -116,26 +108,7 @@ export function DesktopWebLinkCoordinator() {
     });
   };
 
-  const startThread = async (url: string): Promise<ScopedThreadRef | null> => {
-    const environmentId = scratchEnvironmentId(primaryEnvironment?.environmentId ?? null);
-    if (environmentId === null) {
-      reportFailure(url);
-      return null;
-    }
-    const project = await openScratchProject(environmentId, "无法打开链接");
-    if (!project) return null;
-    const opened = await openThread(scopeProjectRef(project.environmentId, project.id));
-    if (!opened) {
-      reportFailure(url);
-      return null;
-    }
-    const threadRef = scopeThreadRef(project.environmentId, opened.threadId);
-    useRightPanelStore.getState().requestMaximize(threadRef);
-    return threadRef;
-  };
-
   const openInBrowser = useEffectEvent(async (url: string) => {
-    const routeParams = router.state.matches.at(-1)?.params ?? {};
     const isFile = url.startsWith("file:");
     // Only this machine's environment serves files, so fail before starting a thread.
     if (isFile && httpBaseUrl === null) {
@@ -157,7 +130,6 @@ export function DesktopWebLinkCoordinator() {
       await router.navigate({ href: appPath });
       return;
     }
-    const routeParams = router.state.matches.at(-1)?.params ?? {};
     const routeTarget = resolveThreadRouteTarget(routeParams);
     const activeThreadRef = routeTarget?.kind === "server" ? routeTarget.threadRef : undefined;
     const activeThread = activeThreadRef ? readThreadShell(activeThreadRef) : null;

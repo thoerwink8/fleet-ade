@@ -1948,7 +1948,6 @@ export default function ChatView(props: ChatViewProps) {
         measurements: state.measurements,
         detailsCardMeasurement: state.detailsCardMeasurement,
         threadRef: activeThreadRef,
-        preview: null,
         detailsCardInlineOpen: threadPanelInlineOpen,
       }).detailsCardMode,
   );
@@ -2687,8 +2686,6 @@ export default function ChatView(props: ChatViewProps) {
   const getShortcutContext = (eventTarget: EventTarget | null = document.activeElement) => ({
     terminalFocus: getTerminalFocusOwner() !== null,
     terminalOpen: Boolean(terminalUiState.terminalOpen),
-    previewFocus: false,
-    previewOpen: false,
     editableFocus: isEditableFocused(eventTarget),
     modelPickerOpen: composerRef.current?.isModelPickerOpen() ?? false,
     composerFocus:
@@ -3335,7 +3332,6 @@ export default function ChatView(props: ChatViewProps) {
             }}
             store={chatCanvasStore}
             threadRef={activeThreadRef}
-            preview={canvasPreview}
             detailsCardTopInset={isThreadFindActive ? THREAD_FIND_BAR_RESERVED_HEIGHT : 0}
             composerOverlayElement={isDraftHeroState ? null : composerOverlayElement}
             data-chat-workspace-drop-target="true"

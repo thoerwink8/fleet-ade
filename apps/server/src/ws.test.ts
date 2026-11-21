@@ -55,8 +55,6 @@ import * as Statement from "effect/sql/Statement";
 import { vi } from "vite-plus/test";
 
 import * as AssetSigner from "./assets/AssetSigner.ts";
-import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
-import * as ServerBrowser from "./preview/ServerBrowser.ts";
 import * as AcpRegistryRuntimeCoordinator from "@t3tools/provider-acp-registry/server/AcpRegistryRuntimeCoordinator";
 import * as AcpRegistrySupport from "@t3tools/provider-acp-registry/server/AcpRegistrySupport";
 import * as AgentSessionImporter from "./project/AgentSessionImporter.ts";
@@ -85,8 +83,6 @@ import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as RpcAuthorization from "./auth/RpcAuthorization.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
-import * as PortScanner from "./preview/PortScanner.ts";
-import * as PreviewManager from "./preview/Manager.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
 import * as ProjectCloneTracker from "./project/ProjectCloneTracker.ts";
@@ -864,8 +860,6 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(PairingGrantStore.PairingGrantStore)({}),
   Layer.mock(PeerLinks.PeerLinks)({}),
   Layer.mock(PeerLinkRequests.PeerLinkRequests)({}),
-  Layer.mock(PortScanner.PortDiscovery)({ trackAgent: () => () => undefined }),
-  Layer.mock(PreviewManager.PreviewManager)({}),
   Layer.mock(ProcessDiagnostics.ProcessDiagnostics)({}),
   Layer.mock(ProcessResourceMonitor.ProcessResourceMonitor)({}),
   Layer.mock(ProjectCloneTracker.ProjectCloneTracker)({}),
@@ -1063,8 +1057,6 @@ it.effect.each([
               method: "browser-session-cookie",
               scopes: [],
             },
-            yield* ServerBrowser.ServerBrowser,
-            () => Effect.void,
             { secretReferences: true },
           ).pipe(Layer.provide(configRpcServices)),
         ),
@@ -1173,11 +1165,7 @@ it.effect.each([
       if (direct) yield* Deferred.await(directStopped);
     }).pipe(
       Effect.provide(
-        Layer.mergeAll(
-          Layer.fresh(layerConfigSources),
-          Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-          Layer.mock(ServerBrowser.ServerBrowser)({}),
-        ),
+        Layer.fresh(layerConfigSources),
       ),
     ),
 );
@@ -1217,8 +1205,6 @@ it.effect("access changes made while the snapshot loads reach the client after i
             method: "browser-session-cookie",
             scopes: [],
           },
-          yield* ServerBrowser.ServerBrowser,
-          () => Effect.void,
           { secretReferences: true },
         ).pipe(
           Layer.merge(RpcAuthorization.layer([AuthAccessReadScope])),
@@ -1283,11 +1269,7 @@ it.effect("access changes made while the snapshot loads reach the client after i
     yield* server.write(0, { _tag: "Interrupt", requestId, interruptors: [] });
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(
         Layer.fresh(layerConfigSources),
-        Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-        Layer.mock(ServerBrowser.ServerBrowser)({}),
-      ),
     ),
   ),
 );
@@ -1419,8 +1401,6 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
             method: "browser-session-cookie",
             scopes: [],
           },
-          yield* ServerBrowser.ServerBrowser,
-          () => Effect.void,
           { secretReferences: true },
         ).pipe(Layer.provide(configRpcServices)),
       ),
@@ -1636,11 +1616,7 @@ it.effect("on-demand clients get provider config without workspace snapshots", (
     yield* server.write(0, { _tag: "Interrupt", requestId: lightRequest, interruptors: [] });
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(
         Layer.fresh(layerConfigSources),
-        Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-        Layer.mock(ServerBrowser.ServerBrowser)({}),
-      ),
     ),
   ),
 );
@@ -1779,8 +1755,6 @@ it.effect("a missing thread worktree gets its project's skills in the cwd snapsh
             method: "browser-session-cookie",
             scopes: [],
           },
-          yield* ServerBrowser.ServerBrowser,
-          () => Effect.void,
           { secretReferences: true },
         ).pipe(Layer.provide(services)),
       ),
@@ -1805,13 +1779,7 @@ it.effect("a missing thread worktree gets its project's skills in the cwd snapsh
       "the thread's removed worktree should list the project's skills",
     );
   }).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        Layer.fresh(layerConfigSources),
-        Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-        Layer.mock(ServerBrowser.ServerBrowser)({}),
-      ),
-    ),
+    Effect.provide(Layer.fresh(layerConfigSources)),
   ),
 );
 
@@ -1857,8 +1825,6 @@ it.effect("a git action that fails partway still refreshes the repository status
             method: "browser-session-cookie",
             scopes: [AuthSourceControlWriteScope],
           },
-          yield* ServerBrowser.ServerBrowser,
-          () => Effect.void,
           { secretReferences: true },
         ).pipe(
           Layer.provide(services),
@@ -1877,13 +1843,7 @@ it.effect("a git action that fails partway still refreshes the repository status
     assert.deepEqual(Exit.isFailure(exit) ? Cause.squash(exit.cause) : exit, failure);
     assert.equal(yield* Deferred.await(refreshed), "/repo");
   }).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        Layer.fresh(layerConfigSources),
-        Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-        Layer.mock(ServerBrowser.ServerBrowser)({}),
-      ),
-    ),
+    Effect.provide(Layer.fresh(layerConfigSources)),
   ),
 );
 
@@ -1936,8 +1896,6 @@ it.effect("a publish whose push fails still refreshes the new remote", () =>
             method: "browser-session-cookie",
             scopes: [AuthSourceControlWriteScope],
           },
-          yield* ServerBrowser.ServerBrowser,
-          () => Effect.void,
           { secretReferences: true },
         ).pipe(
           Layer.provide(services),
@@ -1963,13 +1921,7 @@ it.effect("a publish whose push fails still refreshes the new remote", () =>
       ["identity /repo refresh=true", "status /repo"],
     );
   }).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        Layer.fresh(layerConfigSources),
-        Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-        Layer.mock(ServerBrowser.ServerBrowser)({}),
-      ),
-    ),
+    Effect.provide(Layer.fresh(layerConfigSources)),
   ),
 );
 
@@ -2427,8 +2379,6 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
             method: "browser-session-cookie",
             scopes: [],
           },
-          yield* ServerBrowser.ServerBrowser,
-          () => Effect.void,
           { secretReferences: true },
         ).pipe(
           Layer.provide(services),
@@ -2465,12 +2415,6 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
     assert.deepEqual(imported, { threadId: pending, imported: true });
     assert.deepEqual(repaired, [pending]);
   }).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        EventSink.layer.pipe(Layer.provideMerge(acpStores)),
-        Layer.mock(PreviewAutomationBroker.PreviewAutomationBroker)({}),
-        Layer.mock(ServerBrowser.ServerBrowser)({}),
-      ),
-    ),
+    Effect.provide(EventSink.layer.pipe(Layer.provideMerge(acpStores))),
   ),
 );

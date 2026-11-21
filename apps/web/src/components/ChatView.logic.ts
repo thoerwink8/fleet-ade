@@ -93,8 +93,6 @@ import type { DraftThreadEnvMode } from "../composerDraftStore";
 import { type ComposerSubmissionIntent } from "../composer-logic";
 import type { ReviewCommentContext } from "../reviewCommentContext";
 import { derivePhase, type TimelineEntry } from "../session-logic";
-import type { PreviewMiniPlayerSource } from "../previewMiniPlayerStore";
-import type { DesktopPreviewOverlay } from "../previewStateStore";
 import type { RightPanelSurface } from "../rightPanelStore";
 import {
   NO_PROVIDER_MODEL_SELECTION,
@@ -109,40 +107,6 @@ export const LAST_INVOKED_SCRIPT_BY_PROJECT_KEY = "t3code:last-invoked-script-by
 export const MAX_HIDDEN_MOUNTED_TERMINAL_THREADS = 10;
 
 export const ENVIRONMENT_RECONNECT_WARNING_GRACE_MS = 2_000;
-
-export function agentControlledBrowserCloseConfirmation(
-  surfaces: readonly RightPanelSurface[],
-  desktopByTabId: Readonly<Record<string, Pick<DesktopPreviewOverlay, "controller"> | undefined>>,
-): string | null {
-  const activeBrowserCount = surfaces.filter(
-    (surface) =>
-      surface.kind === "preview" &&
-      surface.resourceId !== null &&
-      desktopByTabId[surface.resourceId]?.controller === "agent",
-  ).length;
-  if (activeBrowserCount === 0) return null;
-  if (activeBrowserCount === 1) {
-    return [
-      "关闭智能体正在使用的浏览器？",
-      "智能体正在操作这个浏览器，关闭它可能会中断当前操作。",
-    ].join("\n");
-  }
-  return [
-    `关闭智能体正在使用的 ${activeBrowserCount} 个浏览器？`,
-    "智能体正在操作这些浏览器，关闭它们可能会中断当前操作。",
-  ].join("\n");
-}
-
-export function shouldRenderPreviewMiniPlayer(
-  source: PreviewMiniPlayerSource | null,
-  renderedRightPanelSurface: RightPanelSurface | null,
-): boolean {
-  if (source === null) return false;
-  return !(
-    renderedRightPanelSurface?.kind === "preview" &&
-    renderedRightPanelSurface.resourceId === source.tabId
-  );
-}
 
 export function shouldOpenProactivePullRequest(
   previousTargetKey: string | null | undefined,

@@ -1,8 +1,9 @@
 import type { ComponentPropsWithoutRef } from "react";
+import type { ResizableWidthHandlers } from "~/hooks/useResizableWidth";
 import { cn } from "~/lib/utils";
 
 interface RightPanelResizeHandleProps extends Omit<ComponentPropsWithoutRef<"div">, "children"> {
-  handlers: Record<string, unknown>;
+  handlers: ResizableWidthHandlers;
   label: string;
 }
 

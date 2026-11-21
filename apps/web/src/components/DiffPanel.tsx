@@ -471,7 +471,7 @@ export default function DiffPanel({
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1)
       return;
     event.preventDefault();
-    void openLink(url, { event });
+    void openLink(url);
   };
   const refreshPreviewQuery = branchDiffPreview.refresh;
   const refreshDiffFromUserAction = refreshPreviewQuery;

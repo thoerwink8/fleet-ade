@@ -780,7 +780,6 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
     readonly modelSelection: ModelSelection;
     readonly hasT3Mcp?: boolean;
-    readonly browserToolsAvailable?: boolean;
     /** ChatGPT token sharing does not accept service tiers. */
     readonly omitServiceTier?: boolean;
     readonly appContext?: ProviderAdapter.ProviderAdapterV2TurnInput["appContext"];
@@ -824,10 +823,10 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     );
     const t3Context =
       input.hasT3Mcp === true
-        ? buildCodexAdditionalContext(
-            { model: input.modelSelection.model, reasoningEffort: effort ?? undefined },
-            input.browserToolsAvailable ?? true,
-          )
+        ? buildCodexAdditionalContext({
+            model: input.modelSelection.model,
+            reasoningEffort: effort ?? undefined,
+          })
         : undefined;
     const additionalContext =
       t3Context === undefined && Object.keys(appContext).length === 0
@@ -1578,6 +1577,7 @@ function makeCodexProtocolThreadRouter() {
     }
 
     const params = readCodexProtocolPath(frame, "params");
+    const configuredThreadId = readCodexProtocolPath(params, "config", "shell_environment_policy.set.T3CODE_THREAD_ID");
     const nativeThreadId =
       readCodexProtocolPath(params, "threadId") ?? readCodexProtocolPath(params, "thread", "id");
     let threadId =
@@ -7344,7 +7344,6 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               runtimePolicy: turnInput.runtimePolicy,
               modelSelection: turnInput.modelSelection,
               hasT3Mcp: mcpSession !== undefined,
-              browserToolsAvailable: mcpSession?.browserToolsAvailable ?? true,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,
               ...(turnInput.appContext === undefined ? {} : { appContext: turnInput.appContext }),
               ...(configuredReasoningSummary === undefined ? {} : { configuredReasoningSummary }),

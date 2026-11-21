@@ -71,7 +71,6 @@ function setup() {
   __setClientSettingsForTests({
     ...DEFAULT_CLIENT_SETTINGS,
     pullRequestLinksOpenInApp: true,
-    browserLinkTarget: "system",
   });
   useDiffPanelStore.setState({
     byThreadKey: {},
@@ -109,16 +108,12 @@ it.each([
   expect(useRightPanelStore.getState().byThreadKey).toEqual({});
 });
 
-it.each(["system", "app"] as const)(
-  "offers the original unavailable commit URL when web popups are blocked (%s)",
-  async (browserLinkTarget) => {
-    setup();
-    // Without preview access, the "app" preference opens a popup too.
-    __setClientSettingsForTests({
-      ...DEFAULT_CLIENT_SETTINGS,
-      pullRequestLinksOpenInApp: true,
-      browserLinkTarget,
-    });
+it("offers the original unavailable commit URL when web popups are blocked", async () => {
+  setup();
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    pullRequestLinksOpenInApp: true,
+  });
     using _desktop = stubGlobal("desktopBridge", undefined);
     await using screen = await render(
       <AppAtomRegistryProvider>

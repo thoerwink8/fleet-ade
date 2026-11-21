@@ -6,7 +6,6 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
-import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
@@ -320,7 +319,6 @@ function layerTest(input: {
               input.openedExternalUrls?.push(url);
               return true;
             }),
-          openSystemSettings: () => Effect.succeed(true),
           copyText: input.onCopyText ?? (() => Effect.void),
         } satisfies ElectronShell.ElectronShell["Service"]),
         layerElectronTheme,
@@ -414,8 +412,7 @@ const makeSplashScenario = (createOutcomes: readonly (Electron.BrowserWindow | n
           layerElectronMenu,
           Layer.succeed(ElectronShell.ElectronShell, {
             openExternal: () => Effect.succeed(true),
-            openSystemSettings: () => Effect.succeed(true),
-            copyText: () => Effect.void,
+              copyText: () => Effect.void,
           } satisfies ElectronShell.ElectronShell["Service"]),
           layerElectronTheme,
           Layer.succeed(ElectronWindow.ElectronWindow, electronWindowShape),

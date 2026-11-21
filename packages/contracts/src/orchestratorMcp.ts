@@ -968,3 +968,22 @@ export class OrchestratorMcpFailure extends Schema.TaggedError<OrchestratorMcpFa
     message: Schema.String,
   },
 ) {}
+
+const McpCapabilityErrorFields = {
+  environmentId: EnvironmentId,
+  threadId: Schema.optional(ThreadId),
+  providerSessionId: Schema.optional(TrimmedNonEmptyString),
+  providerInstanceId: Schema.optional(ProviderInstanceId),
+};
+
+export class McpCapabilityUnavailableError extends Schema.TaggedError<McpCapabilityUnavailableError>()(
+  "McpCapabilityUnavailableError",
+  {
+    capability: TrimmedNonEmptyString,
+    ...McpCapabilityErrorFields,
+  },
+) {
+  override get message(): string {
+    return `MCP credential does not grant the ${this.capability} capability.`;
+  }
+}

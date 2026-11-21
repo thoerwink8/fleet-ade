@@ -1620,9 +1620,7 @@ export const layer: Layer.Layer<
                 : Effect.gen(function* () {
                     yield* ingestEvent(yield* routeEvent(event));
                   }),
-            Effect.gen(function* () {
-              return yield* shouldStopProviderEventIngestion;
-            }),
+            shouldStopProviderEventIngestion,
             Ref.get(rootTerminalSeen).pipe(Effect.map((seen) => !seen)),
           )
           .pipe(

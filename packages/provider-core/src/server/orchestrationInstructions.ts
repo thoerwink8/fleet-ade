@@ -29,12 +29,6 @@ export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
 ${T3_CODE_ORCHESTRATION_SECTIONS.join("\n\n")}
 `;
 
-export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `
-
-## T3 Code browser
-
-When browser work was asked, \`preview_*\` is the browser you share with the user: \`preview_status\` first, then \`preview_open\` if no tab can be automated. Prefer snapshot locators over coordinates. Switch browsers only if the tools are absent or \`preview_open\` says unsupported, the user asks, or two preview calls fail on one step. Then quote the error and switch.
-`;
 
 // ACP only: some ACP agents accept the injected MCP server but never expose
 // its tools, so they need the terminal transport other harnesses never use.
@@ -72,11 +66,7 @@ export function t3AcpPromptWithInstructions(input: {
       ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
       : T3_CODE_ACP_DEFAULT_MODE_INSTRUCTIONS,
     ...(input.state.hasT3Mcp
-      ? [
-          T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
-          T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(),
-          T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS,
-        ]
+      ? [T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim(), T3_CODE_ACP_MCP_FALLBACK_INSTRUCTIONS]
       : []),
   ];
   return `<t3_code_instructions>\n${instructions.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;

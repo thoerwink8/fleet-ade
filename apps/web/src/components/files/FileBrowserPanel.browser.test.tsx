@@ -117,7 +117,7 @@ describe("FileBrowserPanel", () => {
     await vi.waitFor(() => expect(onOpenFile).toHaveBeenCalledTimes(1));
   });
 
-  it("mod+f from a tree row, or the panel find command, focuses the file search", async () => {
+  it("mod+f from a tree row focuses the file search", async () => {
     await using _screen = await render(
       <FileBrowserPanel
         environmentId={EnvironmentId.make("env-files")}
@@ -137,10 +137,6 @@ describe("FileBrowserPanel", () => {
     await userEvent.keyboard(`{${modifier}>}f{/${modifier}}`);
 
     const search = page.getByRole("searchbox", { name: "搜索 repo 的文件" });
-    await expect.element(search).toHaveFocus();
-
-    (search.element() as HTMLElement).blur();
-    dispatchPreviewAction("find");
     await expect.element(search).toHaveFocus();
   });
 

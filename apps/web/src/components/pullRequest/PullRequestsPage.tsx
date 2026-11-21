@@ -126,8 +126,6 @@ function getShortcutContext() {
   return {
     terminalFocus: isTerminalFocused(),
     terminalOpen: false,
-    previewFocus: false,
-    previewOpen: false,
     modelPickerOpen: false,
     isWeb: !isElectron,
     isDesktop: isElectron,
@@ -144,8 +142,6 @@ const MAX_PAGE_SIZE = 500;
 const EMPTY_VIEWERS: PullRequestListResult["viewers"] = {};
 const EMPTY_PARTITIONS: PullRequestPartitionsSnapshot = { authored: [], reviewing: [] };
 const NO_LIST_TARGETS: ReadonlyArray<EnvironmentQueryTarget<PullRequestListInput>> = [];
-const EMPTY_PREVIEW_SESSIONS = {};
-const EMPTY_PREVIEW_DESKTOP_STATE = {};
 const EMPTY_TERMINAL_LABELS = new Map<string, string>();
 const EMPTY_PENDING_SURFACES = new Set<string>();
 export function PullRequestsPage() {
@@ -1513,8 +1509,6 @@ export function PullRequestsPage() {
             environmentId={panelEnvironmentId}
             activeSurfaceId={renderedPullRequestSurface.id}
             pendingSurfaceIds={EMPTY_PENDING_SURFACES}
-            previewSessions={EMPTY_PREVIEW_SESSIONS}
-            desktopByTabId={EMPTY_PREVIEW_DESKTOP_STATE}
             terminalLabelsById={EMPTY_TERMINAL_LABELS}
             onActivate={(surface) => {
               if (surface.kind === "pull-request") activateSurface(surface);
@@ -1534,14 +1528,11 @@ export function PullRequestsPage() {
                 useRightPanelStore.getState().moveSurface(rightPanelRef, surfaceId, toIndex);
             }}
             onCopyFilePath={() => undefined}
-            onAddBrowser={() => undefined}
-            onAddBrowserInProfile={() => undefined}
             onAddTerminal={() => undefined}
             onAddDiff={() => undefined}
             onAddFiles={() => undefined}
             onAddPullRequest={() => undefined}
             onAddPullRequests={() => undefined}
-            browserAvailable={false}
             terminalAvailable={false}
             diffAvailable={false}
             filesAvailable={false}

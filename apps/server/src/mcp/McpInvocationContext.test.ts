@@ -18,6 +18,7 @@ it.effect("reports other missing capabilities with the neutral error", () => {
       providerSessionId: "provider-session-1",
       providerInstanceId: ProviderInstanceId.make("codex"),
     },
+    client: undefined,
     capabilities: new Set(["orchestration"]),
     issuedAt: 1,
   };
