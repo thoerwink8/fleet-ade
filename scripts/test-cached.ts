@@ -1,11 +1,12 @@
-// @effect-diagnostics nodeBuiltinImport:off globalConsole:off
+// @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalDate:off
 import * as NodeCrypto from "node:crypto";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
-import { matchesTestPath } from "./lib/cached-tests.ts";
+import { cachedTestTasks, matchesTestPath } from "./lib/cached-tests.ts";
+import { runEveryTask } from "./lib/run-every-task.ts";
 import { shardedTestFiles } from "./lib/sharded-tests.ts";
 
 const root = NodePath.resolve(import.meta.dirname, "..");
@@ -66,53 +67,81 @@ if (files.length === 0) {
 console.log(
   `Cached tests: ${files.length} files, ${groupSize} per task, concurrency ${concurrency}`,
 );
-const env = {
-  ...process.env,
-  T3_CACHED_TESTS: JSON.stringify({
-    files,
-    groupSize,
-    uncached: values.uncached.map((file) => NodePath.relative(root, NodePath.resolve(file))),
-  }),
+const request = {
+  files,
+  groupSize,
+  uncached: values.uncached.map((file) => NodePath.relative(root, NodePath.resolve(file))),
 };
+const tasks = cachedTestTasks(JSON.stringify(request), root);
+const cacheRoot =
+  process.env.VITE_CACHE_PATH || NodePath.join(root, "node_modules/.vite/task-cache");
+interface TaskSummary {
+  task_name: string;
+  result: {
+    CacheHit?: { source: string; saved_duration_ms: number };
+    Spawned?: { outcome: { Success?: unknown } };
+  };
+}
+const ran: Array<TaskSummary> = [];
+let env: NodeJS.ProcessEnv = process.env;
 const started = performance.now();
-const result = NodeChildProcess.spawnSync(
-  NodePath.join(root, "node_modules/.bin/vp"),
-  ["run", "--concurrency-limit", String(concurrency), "test-cache"],
-  {
-    cwd: root,
-    env,
-    stdio: "inherit",
+const { status, failed } = runEveryTask(
+  Object.keys(tasks).filter((task) => task !== "test-cache"),
+  (only, alone) => {
+    const runStarted = Date.now();
+    env = { ...process.env, T3_CACHED_TESTS: JSON.stringify({ ...request, only }) };
+    const result = NodeChildProcess.spawnSync(
+      NodePath.join(root, "node_modules/.bin/vp"),
+      ["run", "--concurrency-limit", String(alone ? 1 : concurrency), "test-cache"],
+      { cwd: root, env, stdio: "inherit" },
+    );
+    if (result.error) throw result.error;
+    // A run that dies before it writes a summary leaves the previous run's file in place.
+    const summaryFile = NodeFS.existsSync(cacheRoot)
+      ? NodeFS.readdirSync(cacheRoot, { withFileTypes: true })
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => NodePath.join(cacheRoot, entry.name, "last-summary.json"))
+          .filter((file) => NodeFS.existsSync(file) && NodeFS.statSync(file).mtimeMs >= runStarted)
+          .sort((a, b) => NodeFS.statSync(b).mtimeMs - NodeFS.statSync(a).mtimeMs)[0]
+      : undefined;
+    const summary: { tasks: Array<TaskSummary> } = summaryFile
+      ? JSON.parse(NodeFS.readFileSync(summaryFile, "utf8"))
+      : { tasks: [] };
+    if (!alone) ran.push(...summary.tasks);
+    return {
+      status: result.status ?? 1,
+      outcomes: new Map(
+        summary.tasks.map((task) => [
+          task.task_name,
+          task.result.CacheHit || task.result.Spawned?.outcome.Success ? "passed" : "failed",
+        ]),
+      ),
+    };
   },
 );
-if (result.error) throw result.error;
 const cacheRunMs = performance.now() - started;
-process.exitCode = result.status ?? 1;
+process.exitCode = status;
+if (failed.length > 0) {
+  console.error(`\nFailed test tasks (${failed.length}):`);
+  for (const task of failed) {
+    console.error(`  ${tasks[task]!.cwd ?? "."}: ${tasks[task]!.command}`);
+  }
+} else if (status !== 0) {
+  console.error("\nA test run failed, but every task it stopped passed when rerun alone.");
+}
 if (verifyHits > 0) {
-  const cacheRoot =
-    process.env.VITE_CACHE_PATH || NodePath.join(root, "node_modules/.vite/task-cache");
-  const summaryFiles = NodeFS.readdirSync(cacheRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => NodePath.join(cacheRoot, entry.name, "last-summary.json"))
-    .filter((file) => NodeFS.existsSync(file))
-    .sort((a, b) => NodeFS.statSync(b).mtimeMs - NodeFS.statSync(a).mtimeMs);
-  const summary: {
-    tasks: Array<{
-      task_name: string;
-      result: { CacheHit?: { source: string; saved_duration_ms: number } };
-    }>;
-  } = JSON.parse(NodeFS.readFileSync(summaryFiles[0]!, "utf8"));
   const rank = (task: string) =>
     NodeCrypto.createHash("sha256")
       .update(
         `${process.env.GITHUB_RUN_ID || "local"}:${process.env.GITHUB_RUN_ATTEMPT || "1"}:${task}`,
       )
       .digest("hex");
-  const hits = summary.tasks.filter((task) => task.result.CacheHit);
+  const hits = ran.filter((task) => task.result.CacheHit);
   const verify = hits
     .toSorted((a, b) => rank(a.task_name).localeCompare(rank(b.task_name)))
     .slice(0, verifyHits);
   const verification: Array<{ task: string; exitCode: number; durationMs: number }> = [];
-  if (result.status === 0) {
+  if (status === 0) {
     for (const task of verify) {
       console.log(`Verifying cached result without cache: ${task.task_name}`);
       const start = performance.now();
