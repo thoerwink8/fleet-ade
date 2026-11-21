@@ -3,26 +3,20 @@
   // Exported types are part of our contracts even before they have consumers.
   "rules": { "types": "off", "nsTypes": "off" },
   // These executables are supplied by the OS or installed separately from npm.
-  "ignoreBinaries": ["eas", "file", "mkfifo", "pkill", "pkg-config", "plutil", "sips"],
+  "ignoreBinaries": ["file", "mkfifo", "pkill", "pkg-config", "plutil", "sips"],
   "workspaces": {
     ".": {
       // Keep vendored reference repositories outside the root project.
       "project": ["*.{js,mjs,cjs,ts,mts,cts}", ".github/**/*.cjs"],
-      "entry": [
-        ".github/scripts/thread-transfer-report.cjs",
-        ".github/scripts/pr-limits.cjs",
-        ".github/scripts/duty.cjs",
-      ],
+      "entry": [".github/scripts/duty.cjs"],
       "vite": { "entry": [".github/**/*.test.cjs"] },
       "vitest": { "entry": [".github/**/*.test.cjs"] },
     },
     "scripts": {
       // Knip loads its preprocessor through a CLI option; native verification and
-      // worktree setup (from t3.json) run directly. release-desktop.yml bundles the
-      // Windows verify script with esbuild through a path knip does not trace,
-      // electron-builder loads the macOS signer by path.
-      // release-desktop.yml runs the desktop launch check through xvfb-run, which knip
-      // does not trace.
+      // worktree setup (from t3.json) run directly. The Windows verify script and the
+      // desktop launch check are run by hand, and electron-builder loads the macOS
+      // signer by path.
       "entry": [
         // These fixture scripts are injected into a browser page by path.
         "fixtures/*/*.js",

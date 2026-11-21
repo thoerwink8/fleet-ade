@@ -214,14 +214,6 @@ export default defineConfig({
       "*.icon/**",
     ],
     sortPackageJson: {},
-    overrides: [
-      {
-        files: [".devcontainer/devcontainer.json"],
-        options: {
-          trailingComma: "none",
-        },
-      },
-    ],
   },
   lint: {
     ignorePatterns: [

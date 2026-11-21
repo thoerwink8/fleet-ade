@@ -3,8 +3,6 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 
-import * as HostProcess from "@t3tools/shared/HostProcess";
-
 const root = NodePath.resolve(import.meta.dirname, "..");
 const vp = NodePath.join(root, "node_modules", "vite-plus", "bin", "vp");
 
@@ -153,11 +151,6 @@ function serverShardStep(shard: string): Step {
   ]);
 }
 
-const releaseChecks = [
-  ".github/scripts/check-nightly-release.test.cjs",
-  ".github/scripts/test-delta.test.cjs",
-];
-
 const steps: Step[] = [
   vpStep("fmt", ["fmt", "--check", "--no-error-on-unmatched-pattern"]),
   vpStep("lint", ["lint", "--report-unused-disable-directives"]),
@@ -170,16 +163,6 @@ const steps: Step[] = [
     "--only-shell",
     "chromium",
   ]),
-  ...(HostProcess.Platform.defaultValue() === "linux"
-    ? [
-        {
-          name: "preview-python",
-          command: "python3",
-          args: ["-B", ".github/scripts/stage-preview-bundle.test.py"],
-        } satisfies Step,
-      ]
-    : []),
-  nodeStep("release-checks", ["--test", ...releaseChecks]),
   vpStep("packages", [
     "run",
     "--parallel",

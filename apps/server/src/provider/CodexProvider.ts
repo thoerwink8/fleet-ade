@@ -576,9 +576,7 @@ const requestCodexChatGptModels = Effect.fn("requestCodexChatGptModels")(functio
     CODEX_CATALOG_REFRESH_TIMEOUT_MS,
   );
   if (refreshed === undefined) {
-    yield* Effect.logWarning(
-      "Codex 模型目录刷新超时，继续使用缓存目录。",
-    );
+    yield* Effect.logWarning("Codex 模型目录刷新超时，继续使用缓存目录。");
     return models;
   }
   return (

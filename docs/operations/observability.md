@@ -165,7 +165,7 @@ node --run dev
 ```
 
 ```bash
-node --run dev:desktop
+node scripts/dev-runner.ts dev:desktop
 ```
 
 ### Option 2: Run With A Local LGTM Stack
@@ -225,7 +225,7 @@ node --run dev
 Monorepo desktop dev:
 
 ```bash
-node --run dev:desktop
+node scripts/dev-runner.ts dev:desktop
 ```
 
 Packaged desktop app:

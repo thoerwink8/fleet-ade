@@ -97,7 +97,7 @@ For a production macOS app with bundle ID `com.t3tools.t3code`:
    This setting also configures Electron/macOS passkeys.
 4. Check `https://<frontend-api>/.well-known/apple-app-site-association`. Its
    `webcredentials.apps` must include `<TEAM_ID>.com.t3tools.t3code`.
-5. Configure signing as described in the [release runbook](./release.md#2-apple-signing--notarization-setup-macos).
+5. Configure signing for the build as described in `docs/operations/development.md` (Signing and passkeys).
 
 Local signed builds additionally use:
 
@@ -113,7 +113,7 @@ After changing Associated Domains, bump the build version before rebuilding. mac
 reuse stale Shared Web Credentials metadata for the same app/version pair.
 
 The ordinary `dev:desktop` launcher is unsigned and cannot exercise macOS passkeys. For renderer
-HMR, install a signed build, start `vp run dev:web`, and launch the installed executable with the
+HMR, install a signed build, start `node scripts/dev-runner.ts dev:web`, and launch the installed executable with the
 actual web and server ports. For example, with the default ports:
 
 ```sh
