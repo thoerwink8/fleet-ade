@@ -2,6 +2,7 @@ import { isListedThreadLineage, isWebhookDedupeTemplate } from "@t3tools/contrac
 import {
   EnvironmentId,
   MAX_WEBHOOK_DELIVERY_AGE_MINUTES,
+  MIN_SCHEDULED_TASK_INTERVAL_MS,
   type ProjectId,
   ScheduledTaskId,
   type ScheduledTask,
@@ -437,4 +438,82 @@ export function defaultScheduledTaskProjectId<
       (scopedToProject ? scopedProjects[0] : undefined)
     )?.id ?? ""
   );
+}
+
+export type ScheduledTaskTemplateSchedule = Extract<
+  ScheduledTaskUpsertSchedule,
+  { readonly type: "interval" | "fixed_time" }
+>;
+
+export interface ScheduledTaskTemplate {
+  readonly id: string;
+  readonly label: string;
+  readonly description: string;
+  readonly name: string;
+  readonly prompt: string;
+  readonly schedule: ScheduledTaskTemplateSchedule;
+}
+
+export const SCHEDULED_TASK_TEMPLATES: ReadonlyArray<ScheduledTaskTemplate> = [
+  {
+    id: "daily-morning-brief",
+    label: "每日晨报",
+    description: "每天 09:00 总结昨天以来的提交、未合 PR 和失败检查，并列出今天优先做的三件事",
+    name: "每日晨报",
+    prompt:
+      "总结昨天以来的代码提交、尚未合并的 PR 以及失败的检查项，按优先级列出今天最先需要处理的三件事。",
+    schedule: { type: "fixed_time", timeOfDay: "09:00" },
+  },
+  {
+    id: "ci-patrol",
+    label: "巡检 CI",
+    description: "每 30 分钟检查一次 CI 状态，失败时给出原因和修复建议，全绿只回「全绿」",
+    name: "巡检 CI",
+    prompt:
+      "检查当前项目的 CI 和自动检查状态。如果有失败项，简要说明失败原因和建议的修复方法；如果全部通过，只回复「全绿」。",
+    schedule: { type: "interval", everyMs: Math.max(30 * 60_000, MIN_SCHEDULED_TASK_INTERVAL_MS) },
+  },
+  {
+    id: "weekly-pr-triage",
+    label: "每周整理 PR",
+    description: "每周一 10:00 梳理打开超过 7 天的 PR 及其卡点",
+    name: "每周整理 PR",
+    prompt: "列出当前打开超过 7 天的 PR，说明每个 PR 的当前状态、主要卡点以及建议的下一步动作。",
+    schedule: { type: "fixed_time", timeOfDay: "10:00", weekdays: [1] },
+  },
+  {
+    id: "daily-wrap-up",
+    label: "收工小结",
+    description: "每天 18:00 总结今天完成的改动和尚未做完的事项",
+    name: "收工小结",
+    prompt: "总结今天完成的改动、已提交或待合并的进展，以及尚未做完、明天需要继续跟进的事项。",
+    schedule: { type: "fixed_time", timeOfDay: "18:00" },
+  },
+];
+
+export function applyScheduledTaskTemplate(
+  draft: DraftState,
+  template: ScheduledTaskTemplate,
+): DraftState {
+  if (template.schedule.type === "interval") {
+    return {
+      ...draft,
+      title: template.name,
+      prompt: template.prompt,
+      scheduleMode: "interval",
+      intervalMinutes: String(Math.max(1, Math.round(template.schedule.everyMs / 60_000))),
+    };
+  }
+  const weekdays =
+    template.schedule.weekdays && template.schedule.weekdays.length > 0
+      ? new Set(template.schedule.weekdays)
+      : new Set([0, 1, 2, 3, 4, 5, 6]);
+  return {
+    ...draft,
+    title: template.name,
+    prompt: template.prompt,
+    scheduleMode: "fixed",
+    timeOfDay: template.schedule.timeOfDay.padStart(5, "0"),
+    weekdays,
+  };
 }

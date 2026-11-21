@@ -94,7 +94,9 @@ import { EnvironmentRow, useEnvironmentTransportLabel } from "./EnvironmentRow";
 import { SettingsGroup } from "./SettingsGroup";
 import { settingsScopeEnvironmentLabel, settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
 import {
+  SCHEDULED_TASK_TEMPLATES,
   WEBHOOK_SIGNATURE_DEFAULTS,
+  applyScheduledTaskTemplate,
   changeDraftProject,
   moveDraftToThread,
   scheduleDraftErrors,
@@ -110,6 +112,7 @@ import {
   taskToDraft,
   unbindDraftFromThread,
   type DraftState,
+  type ScheduledTaskTemplate,
   type ScheduleMode,
   type WorkspaceMode,
 } from "./scheduledTasksSettings.logic";
@@ -368,6 +371,34 @@ function statusVariant(status: ScheduledTask["lastRunStatus"]) {
   return "outline";
 }
 
+function ScheduledTaskTemplates({
+  disabled,
+  onSelect,
+}: {
+  readonly disabled: boolean;
+  readonly onSelect: (template: ScheduledTaskTemplate) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {SCHEDULED_TASK_TEMPLATES.map((template) => (
+          <Button
+            key={template.id}
+            variant="outline"
+            size="sm"
+            title={template.description}
+            disabled={disabled}
+            onClick={() => onSelect(template)}
+          >
+            {template.label}
+          </Button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">先保存，再点立即运行试一次</p>
+    </div>
+  );
+}
+
 export function ScheduledTasksSettings(target: {
   readonly environmentId?: EnvironmentId;
   readonly taskId?: ScheduledTaskId | undefined;
@@ -376,6 +407,7 @@ export function ScheduledTasksSettings(target: {
   const [editor, setEditor] = useState<{
     environmentId: EnvironmentId;
     task: ScheduledTask | null;
+    template?: ScheduledTaskTemplate | undefined;
   } | null>(null);
   const openForEdit = (environmentId: EnvironmentId, task: ScheduledTask) => {
     setEditor({ environmentId, task });
@@ -432,6 +464,10 @@ export function ScheduledTasksSettings(target: {
     permittedEnvironments.find(
       (entry) => entry.environmentId === defaultEnvironment?.environmentId,
     ) ?? permittedEnvironments[0];
+  const openForTemplate = (template: ScheduledTaskTemplate) => {
+    if (!creationEnvironment) return;
+    setEditor({ environmentId: creationEnvironment.environmentId, task: null, template });
+  };
   return (
     <SettingsPageContainer>
       <SettingsSection
@@ -470,6 +506,8 @@ export function ScheduledTasksSettings(target: {
           <ScheduledTaskEnvironmentList
             environmentId={linkedEnvironmentId}
             taskId={target.taskId}
+            canCreate={Boolean(creationEnvironment)}
+            onCreateFromTemplate={openForTemplate}
             onEdit={openForEdit}
           />
         ) : (
@@ -479,6 +517,8 @@ export function ScheduledTasksSettings(target: {
                 key={entry.environmentId}
                 environment={entry}
                 taskId={linkedEnvironmentId === entry.environmentId ? target.taskId : undefined}
+                canCreate={Boolean(creationEnvironment)}
+                onCreateFromTemplate={openForTemplate}
                 onEdit={openForEdit}
               />
             ))}
@@ -487,9 +527,10 @@ export function ScheduledTasksSettings(target: {
       </SettingsSection>
       {editor ? (
         <ScheduledTaskEditorDialog
-          key={`${editor.environmentId}:${editor.task?.id ?? "new"}`}
+          key={`${editor.environmentId}:${editor.task?.id ?? editor.template?.id ?? "new"}`}
           initialEnvironmentId={editor.environmentId}
           task={editor.task}
+          initialTemplate={editor.template}
           onClose={closeEditor}
         />
       ) : null}
@@ -509,10 +550,14 @@ const scheduledTasksListAtom = environmentAtomList("web-scheduled-tasks-list", (
 function ScheduledTaskEnvironmentList({
   environmentId,
   taskId,
+  canCreate,
+  onCreateFromTemplate,
   onEdit,
 }: {
   readonly environmentId: EnvironmentId | undefined;
   readonly taskId: ScheduledTaskId | undefined;
+  readonly canCreate: boolean;
+  readonly onCreateFromTemplate: (template: ScheduledTaskTemplate) => void;
   readonly onEdit: (environmentId: EnvironmentId, task: ScheduledTask) => void;
 }) {
   const { scope, environments } = useSettingsScope();
@@ -601,7 +646,14 @@ function ScheduledTaskEnvironmentList({
         />
       ) : null}
       {populated.length === 0 && loaded.length > 0 ? (
-        <SettingsRow title="没有定时任务" description="没有符合所选环境和项目的任务。" />
+        <SettingsRow
+          title="没有定时任务"
+          description="没有符合所选环境和项目的任务。可以从下方模板快速开始："
+        >
+          <div className="pt-3 pb-2">
+            <ScheduledTaskTemplates disabled={!canCreate} onSelect={onCreateFromTemplate} />
+          </div>
+        </SettingsRow>
       ) : null}
       {Object.entries(summaries).map(([label, entries]) => {
         if (entries.length === 0) return null;
@@ -647,10 +699,14 @@ function ScheduledTaskEnvironmentSubtitle({
 function ScheduledTaskEnvironmentSection({
   environment,
   taskId,
+  canCreate,
+  onCreateFromTemplate,
   onEdit,
 }: {
   readonly environment: EnvironmentPresentation;
   readonly taskId?: ScheduledTaskId | undefined;
+  readonly canCreate: boolean;
+  readonly onCreateFromTemplate: (template: ScheduledTaskTemplate) => void;
   readonly onEdit: (environmentId: EnvironmentId, task: ScheduledTask) => void;
 }) {
   const { scope } = useSettingsScope();
@@ -698,7 +754,14 @@ function ScheduledTaskEnvironmentSection({
             />
           ) : null}
           {tasks.length === 0 ? (
-            <SettingsRow title="没有定时任务" description="没有符合所选环境和项目的任务。" />
+            <SettingsRow
+              title="没有定时任务"
+              description="没有符合所选环境和项目的任务。可以从下方模板快速开始："
+            >
+              <div className="pt-3 pb-2">
+                <ScheduledTaskTemplates disabled={!canCreate} onSelect={onCreateFromTemplate} />
+              </div>
+            </SettingsRow>
           ) : (
             tasks.map((task) => (
               <ScheduledTaskRow
@@ -1138,10 +1201,12 @@ function WebhookDeliveryMode({ environmentId }: { readonly environmentId: Enviro
 function ScheduledTaskEditorDialog({
   initialEnvironmentId,
   task,
+  initialTemplate,
   onClose,
 }: {
   readonly initialEnvironmentId: EnvironmentId;
   readonly task: ScheduledTask | null;
+  readonly initialTemplate?: ScheduledTaskTemplate | undefined;
   readonly onClose: () => void;
 }) {
   const [saving, setSaving] = useState(false);
@@ -1157,6 +1222,7 @@ function ScheduledTaskEditorDialog({
         <ScheduledTaskEditorForm
           initialEnvironmentId={initialEnvironmentId}
           task={task}
+          initialTemplate={initialTemplate}
           saving={saving}
           onSavingChange={setSaving}
           onClose={onClose}
@@ -1328,12 +1394,14 @@ function ScheduledTaskDestination({
 function ScheduledTaskEditorForm({
   initialEnvironmentId,
   task,
+  initialTemplate,
   saving,
   onSavingChange: setSaving,
   onClose,
 }: {
   readonly initialEnvironmentId: EnvironmentId;
   readonly task: ScheduledTask | null;
+  readonly initialTemplate?: ScheduledTaskTemplate | undefined;
   readonly saving: boolean;
   readonly onSavingChange: (saving: boolean) => void;
   readonly onClose: () => void;
@@ -1368,14 +1436,14 @@ function ScheduledTaskEditorForm({
     label: "scheduled task upsert",
   });
   const webhookDenial = managedCapabilityDenial(useManagedPolicy(environmentId), "webhookTasks");
-  const [draft, setDraft] = useState<DraftState>(() =>
-    task
-      ? taskToDraft(task)
-      : {
-          ...EMPTY_DRAFT,
-          projectId: defaultScheduledTaskProjectId(scopedProjects, scope),
-        },
-  );
+  const [draft, setDraft] = useState<DraftState>(() => {
+    if (task) return taskToDraft(task);
+    const base: DraftState = {
+      ...EMPTY_DRAFT,
+      projectId: defaultScheduledTaskProjectId(scopedProjects, scope),
+    };
+    return initialTemplate ? applyScheduledTaskTemplate(base, initialTemplate) : base;
+  });
   // Pinned first. The chosen project stays listed after it is archived.
   const projects = scopedProjects
     .filter(
@@ -1418,6 +1486,17 @@ function ScheduledTaskEditorForm({
     activeInstanceId,
     activeModel,
   );
+
+  const applyTemplate = async (template: ScheduledTaskTemplate) => {
+    if (saving || !canOperate) return;
+    if (draft.title.trim().length > 0 || draft.prompt.trim().length > 0) {
+      const confirmed =
+        (await requestConfirmDialog("覆盖当前填写的内容？")) ??
+        window.confirm("覆盖当前填写的内容？");
+      if (!confirmed) return;
+    }
+    setDraft((current) => applyScheduledTaskTemplate(current, template));
+  };
 
   const reportFailure = (title: string, error: unknown) => {
     toastManager.add(
@@ -1550,6 +1629,14 @@ function ScheduledTaskEditorForm({
         <fieldset disabled={saving} className="min-w-0 space-y-5">
           {!connected ? (
             <p className="text-sm text-destructive">请重新连接此环境后再保存。</p>
+          ) : null}
+          {task === null ? (
+            <Field label="从模板开始">
+              <ScheduledTaskTemplates
+                disabled={saving || !canOperate}
+                onSelect={(template) => void applyTemplate(template)}
+              />
+            </Field>
           ) : null}
           <Field label="运行环境" htmlFor="scheduled-task-environment">
             <Select
