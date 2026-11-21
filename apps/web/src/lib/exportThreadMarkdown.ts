@@ -1,16 +1,12 @@
 import { type AtomCommandSuccess, runAtomCommand } from "@t3tools/client-runtime/state/runtime";
-import type { ScopedThreadRef } from "@t3tools/contracts";
+import type { OrchestrationV2ProjectedTurnItem, ScopedThreadRef } from "@t3tools/contracts";
 import { Atom, type AtomRegistry } from "effect/reactivity";
 
 import { toastManager } from "../components/ui/toast";
 import { downloadPlanAsTextFile } from "../proposedPlan";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentThreadDetails, threadEnvironment } from "../state/threads";
-import {
-  buildThreadExportFilename,
-  buildThreadMarkdown,
-  type ThreadExportVisibleItem,
-} from "./threadExport";
+import { buildThreadExportFilename, buildThreadMarkdown } from "./threadExport";
 
 const MAX_EXPORT_HISTORY_PAGES = 50;
 
@@ -19,7 +15,7 @@ type HistoryPageResult = AtomCommandSuccess<
 >;
 
 export interface ExportThreadSnapshot {
-  readonly visibleTurnItems: ReadonlyArray<ThreadExportVisibleItem>;
+  readonly visibleTurnItems: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
   readonly hasMoreHistory: boolean;
   readonly loadFailed?: true;
 }
@@ -27,7 +23,7 @@ export interface ExportThreadSnapshot {
 export type LoadAllThreadHistoryOutcome =
   | {
       readonly _tag: "ready";
-      readonly items: ReadonlyArray<ThreadExportVisibleItem>;
+      readonly items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
       readonly truncated: boolean;
     }
   | { readonly _tag: "failed" };
@@ -61,7 +57,7 @@ type ThreadDetail<K extends keyof typeof environmentThreadDetails> = Atom.Type<
 >;
 
 function exportThreadSnapshot(input: {
-  readonly thread: ThreadDetail<"quietThreadAtom">;
+  readonly thread: ThreadDetail<"threadAtom">;
   readonly history: ThreadDetail<"historyAtom">;
   readonly status: ThreadDetail<"statusAtom">;
   readonly error: ThreadDetail<"errorAtom">;
@@ -114,7 +110,8 @@ export async function exportThreadMarkdown(input: {
   inFlightExports.add(key);
 
   const registry = input.registry ?? appAtomRegistry;
-  const threadAtom = environmentThreadDetails.quietThreadAtom(input.threadRef);
+  // Read full threadAtom instead of quietThreadAtom, which strips assistant message text.
+  const threadAtom = environmentThreadDetails.threadAtom(input.threadRef);
   const historyAtom = environmentThreadDetails.historyAtom(input.threadRef);
   const statusAtom = environmentThreadDetails.statusAtom(input.threadRef);
   const errorAtom = environmentThreadDetails.errorAtom(input.threadRef);
@@ -132,48 +129,50 @@ export async function exportThreadMarkdown(input: {
     title: "正在加载历史…",
   });
 
-  const outcome = await loadAllThreadHistory({
-    readThread: () => waitForSettledThread(registry, settledThreadAtom),
-    loadEarlier: async () => {
-      const result = await runAtomCommand(
-        registry,
-        threadEnvironment.loadEarlierHistory,
-        {
-          environmentId: input.threadRef.environmentId,
-          input: { threadId: input.threadRef.threadId },
-        },
-        { label: "export thread markdown history", reportFailure: false },
-      );
-      return result._tag === "Success"
-        ? result.value
-        : { _tag: "error", message: "无法加载历史记录。" };
-    },
-  });
-
-  toastManager.close(loadingToastId);
-  inFlightExports.delete(key);
-
-  if (outcome._tag === "failed") {
-    toastManager.add({
-      type: "error",
-      title: "无法加载历史记录，请稍后重试",
+  try {
+    const outcome = await loadAllThreadHistory({
+      readThread: () => waitForSettledThread(registry, settledThreadAtom),
+      loadEarlier: async () => {
+        const result = await runAtomCommand(
+          registry,
+          threadEnvironment.loadEarlierHistory,
+          {
+            environmentId: input.threadRef.environmentId,
+            input: { threadId: input.threadRef.threadId },
+          },
+          { label: "export thread markdown history", reportFailure: false },
+        );
+        return result._tag === "Success"
+          ? result.value
+          : { _tag: "error", message: "无法加载历史记录。" };
+      },
     });
-    return;
-  }
 
-  const exportedAt = new Date();
-  const markdown = buildThreadMarkdown({
-    title: input.title,
-    projectName: input.projectName,
-    exportedAt,
-    items: outcome.items,
-    truncated: outcome.truncated,
-  });
-  const filename = buildThreadExportFilename(input.title, exportedAt);
-  downloadPlanAsTextFile(filename, markdown);
-  toastManager.add({
-    type: "success",
-    title: "已导出",
-    description: "分享前请检查内容里有没有密钥或令牌",
-  });
+    if (outcome._tag === "failed") {
+      toastManager.add({
+        type: "error",
+        title: "无法加载历史记录，请稍后重试",
+      });
+      return;
+    }
+
+    const exportedAt = new Date();
+    const markdown = buildThreadMarkdown({
+      title: input.title,
+      projectName: input.projectName,
+      exportedAt,
+      items: outcome.items,
+      truncated: outcome.truncated,
+    });
+    const filename = buildThreadExportFilename(input.title, exportedAt);
+    downloadPlanAsTextFile(filename, markdown);
+    toastManager.add({
+      type: "success",
+      title: "已导出",
+      description: "分享前请检查内容里有没有密钥或令牌",
+    });
+  } finally {
+    toastManager.close(loadingToastId);
+    inFlightExports.delete(key);
+  }
 }

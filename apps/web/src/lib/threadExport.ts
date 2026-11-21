@@ -1,15 +1,10 @@
-export interface ThreadExportVisibleItem {
-  readonly item:
-    | { readonly type: "user_message"; readonly text: string }
-    | { readonly type: "assistant_message"; readonly text: string }
-    | { readonly type: string };
-}
+import type { OrchestrationV2ProjectedTurnItem } from "@t3tools/contracts";
 
 export interface BuildThreadMarkdownInput {
   readonly title: string;
   readonly projectName?: string | null | undefined;
   readonly exportedAt: Date;
-  readonly items: ReadonlyArray<ThreadExportVisibleItem>;
+  readonly items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
   readonly truncated?: boolean | undefined;
 }
 
@@ -64,9 +59,9 @@ export function buildThreadMarkdown(input: BuildThreadMarkdownInput): string {
   }
 
   for (const row of input.items) {
-    if (row.item.type === "user_message" && "text" in row.item) {
+    if (row.item.type === "user_message") {
       sections.push(`## 你\n\n${row.item.text.trimEnd()}`);
-    } else if (row.item.type === "assistant_message" && "text" in row.item) {
+    } else if (row.item.type === "assistant_message") {
       sections.push(`## 助手\n\n${row.item.text.trimEnd()}`);
     }
   }
