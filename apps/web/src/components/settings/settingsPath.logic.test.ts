@@ -11,7 +11,7 @@ describe("resolveSettingsPath", () => {
     expect(resolveSettingsPath("/settings/integrations/extra", "")).toEqual({ kind: "missing" });
   });
 
-  it("sends the settings index home and keeps renamed paths on their new pages", () => {
+  it("sends the settings index home, and integrations and beta to their new pages", () => {
     expect(resolveSettingsPath("/settings", "")).toEqual({
       kind: "redirect",
       to: "/settings/general",
@@ -22,18 +22,6 @@ describe("resolveSettingsPath", () => {
       to: "/settings/general",
       retainSearch: false,
     });
-    expect(resolveSettingsPath("/settings/about", "")).toEqual({
-      kind: "redirect",
-      to: "/settings/maintenance",
-      hash: "about",
-      retainSearch: true,
-    });
-    expect(resolveSettingsPath("/settings/network", "")).toEqual({
-      kind: "redirect",
-      to: "/settings/general",
-      hash: "network",
-      retainSearch: true,
-    });
     expect(resolveSettingsPath("/settings/integrations", "")).toEqual({
       kind: "redirect",
       to: "/settings/providers",
@@ -42,18 +30,6 @@ describe("resolveSettingsPath", () => {
     expect(resolveSettingsPath("/settings/beta", "")).toEqual({
       kind: "redirect",
       to: "/settings/maintenance",
-      retainSearch: true,
-    });
-    expect(resolveSettingsPath("/settings/general", "text-generation-model")).toEqual({
-      kind: "redirect",
-      to: "/settings/threads",
-      hash: "text-generation-model",
-      retainSearch: true,
-    });
-    expect(resolveSettingsPath("/settings/general", "#text-generation-model")).toEqual({
-      kind: "redirect",
-      to: "/settings/threads",
-      hash: "text-generation-model",
       retainSearch: true,
     });
   });

@@ -49,7 +49,7 @@ import { Route as ChatSettingsArchivedRouteImport } from './routes/_chat.setting
 import { Route as ChatSettingsAppearanceRouteImport } from './routes/_chat.settings.appearance'
 import { Route as ChatSettingsAccessRouteImport } from './routes/_chat.settings.access'
 import { Route as ChatSettingsAboutRouteImport } from './routes/_chat.settings.about'
-import { Route as ChatSettingsSectionRouteImport } from './routes/_chat.settings.$section'
+import { Route as ChatSettingsSplatRouteImport } from './routes/_chat.settings.$'
 import { Route as ChatDraftDraftIdRouteImport } from './routes/_chat.draft.$draftId'
 import { Route as ChatEnvironmentIdThreadIdRouteImport } from './routes/_chat.$environmentId.$threadId'
 
@@ -256,9 +256,9 @@ const ChatSettingsAboutRoute = ChatSettingsAboutRouteImport.update({
   path: '/about',
   getParentRoute: () => ChatSettingsRoute,
 } as any)
-const ChatSettingsSectionRoute = ChatSettingsSectionRouteImport.update({
-  id: '/$section',
-  path: '/$section',
+const ChatSettingsSplatRoute = ChatSettingsSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => ChatSettingsRoute,
 } as any)
 const ChatDraftDraftIdRoute = ChatDraftDraftIdRouteImport.update({
@@ -291,7 +291,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
-  '/settings/$section': typeof ChatSettingsSectionRoute
+  '/settings/$': typeof ChatSettingsSplatRoute
   '/settings/about': typeof ChatSettingsAboutRoute
   '/settings/access': typeof ChatSettingsAccessRoute
   '/settings/appearance': typeof ChatSettingsAppearanceRoute
@@ -335,7 +335,7 @@ export interface FileRoutesByTo {
   '/': typeof ChatIndexRoute
   '/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/draft/$draftId': typeof ChatDraftDraftIdRoute
-  '/settings/$section': typeof ChatSettingsSectionRoute
+  '/settings/$': typeof ChatSettingsSplatRoute
   '/settings/about': typeof ChatSettingsAboutRoute
   '/settings/access': typeof ChatSettingsAccessRoute
   '/settings/appearance': typeof ChatSettingsAppearanceRoute
@@ -381,7 +381,7 @@ export interface FileRoutesById {
   '/_chat/': typeof ChatIndexRoute
   '/_chat/$environmentId/$threadId': typeof ChatEnvironmentIdThreadIdRoute
   '/_chat/draft/$draftId': typeof ChatDraftDraftIdRoute
-  '/_chat/settings/$section': typeof ChatSettingsSectionRoute
+  '/_chat/settings/$': typeof ChatSettingsSplatRoute
   '/_chat/settings/about': typeof ChatSettingsAboutRoute
   '/_chat/settings/access': typeof ChatSettingsAccessRoute
   '/_chat/settings/appearance': typeof ChatSettingsAppearanceRoute
@@ -427,7 +427,7 @@ export interface FileRouteTypes {
     | '/projects/$projectKey'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
-    | '/settings/$section'
+    | '/settings/$'
     | '/settings/about'
     | '/settings/access'
     | '/settings/appearance'
@@ -471,7 +471,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$environmentId/$threadId'
     | '/draft/$draftId'
-    | '/settings/$section'
+    | '/settings/$'
     | '/settings/about'
     | '/settings/access'
     | '/settings/appearance'
@@ -516,7 +516,7 @@ export interface FileRouteTypes {
     | '/_chat/'
     | '/_chat/$environmentId/$threadId'
     | '/_chat/draft/$draftId'
-    | '/_chat/settings/$section'
+    | '/_chat/settings/$'
     | '/_chat/settings/about'
     | '/_chat/settings/access'
     | '/_chat/settings/appearance'
@@ -836,11 +836,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSettingsAboutRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
-    '/_chat/settings/$section': {
-      id: '/_chat/settings/$section'
-      path: '/$section'
-      fullPath: '/settings/$section'
-      preLoaderRoute: typeof ChatSettingsSectionRouteImport
+    '/_chat/settings/$': {
+      id: '/_chat/settings/$'
+      path: '/$'
+      fullPath: '/settings/$'
+      preLoaderRoute: typeof ChatSettingsSplatRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
     '/_chat/draft/$draftId': {
@@ -861,7 +861,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface ChatSettingsRouteChildren {
-  ChatSettingsSectionRoute: typeof ChatSettingsSectionRoute
+  ChatSettingsSplatRoute: typeof ChatSettingsSplatRoute
   ChatSettingsAboutRoute: typeof ChatSettingsAboutRoute
   ChatSettingsAccessRoute: typeof ChatSettingsAccessRoute
   ChatSettingsAppearanceRoute: typeof ChatSettingsAppearanceRoute
@@ -888,7 +888,7 @@ interface ChatSettingsRouteChildren {
 }
 
 const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
-  ChatSettingsSectionRoute: ChatSettingsSectionRoute,
+  ChatSettingsSplatRoute: ChatSettingsSplatRoute,
   ChatSettingsAboutRoute: ChatSettingsAboutRoute,
   ChatSettingsAccessRoute: ChatSettingsAccessRoute,
   ChatSettingsAppearanceRoute: ChatSettingsAppearanceRoute,

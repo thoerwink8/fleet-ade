@@ -17,16 +17,16 @@ describe("settings path routing", () => {
       "__root__",
       "/_chat",
       "/_chat/settings",
-      "/_chat/settings/$section",
+      "/_chat/settings/$",
     ]);
   });
 
-  it("keeps renamed paths that have no page file on the settings catch-all", () => {
+  it("keeps renamed paths that have no page file on the settings splat", () => {
     expect(matchedRouteIds("/settings/integrations")).toEqual([
       "__root__",
       "/_chat",
       "/_chat/settings",
-      "/_chat/settings/$section",
+      "/_chat/settings/$",
     ]);
   });
 
