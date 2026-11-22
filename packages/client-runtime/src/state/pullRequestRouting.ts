@@ -40,7 +40,6 @@ const reads = new Set<string>([
   WS_METHODS.pullRequestsActivity,
   WS_METHODS.pullRequestsThreadComments,
   WS_METHODS.pullRequestsDiffFileContents,
-  WS_METHODS.pullRequestsFilesViewed,
   WS_METHODS.pullRequestsChangeBreakdown,
 ]);
 const writes = new Set<string>([WS_METHODS.pullRequestsRunAction]);

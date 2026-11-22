@@ -115,18 +115,6 @@ mutation UpdateReviewComment($commentId: ID!, $body: String!) {
   }
 }
 
-# Clears one file, or puts it back. GitHub has no bulk form of either mutation, so
-# `GraphQLResolver.aliased` repeats this under an alias per file and a burst of ticks is one
-# request; `$viewed` picks which of the two each alias runs.
-mutation SetFileViewed($pullRequestId: ID!, $path: String!, $viewed: Boolean!) {
-  markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) @include(if: $viewed) {
-    clientMutationId
-  }
-  unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) @skip(if: $viewed) {
-    clientMutationId
-  }
-}
-
 mutation MergePullRequest($input: MergePullRequestInput!) {
   mergePullRequest(input: $input) {
     pullRequest {

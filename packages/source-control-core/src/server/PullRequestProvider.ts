@@ -14,7 +14,6 @@ import type {
   PullRequestCheck,
   PullRequestChecks,
   PullRequestComment,
-  PullRequestFileViewed,
   PullRequestCommit,
   PullRequestInvolvement,
   PullRequestLabel,
@@ -241,11 +240,6 @@ export interface ProviderDiffFilePaths {
   readonly nextCursor: string | null;
 }
 
-export interface ProviderFilesViewed {
-  readonly files: ReadonlyArray<PullRequestFileViewed>;
-  readonly truncated: boolean;
-}
-
 export interface ProviderFileStats {
   readonly files: ReadonlyArray<{
     readonly path: string;
@@ -460,10 +454,6 @@ export interface PullRequestProviderApi {
   readonly getFileStats?: (
     input: ProviderRepositoryRef & { readonly number: number },
   ) => Effect.Effect<ProviderFileStats, PullRequestProviderError>;
-
-  readonly getFilesViewed?: (
-    input: ProviderRepositoryRef & { readonly number: number },
-  ) => Effect.Effect<ProviderFilesViewed, PullRequestProviderError>;
 
   /**
    * A host with no bulk form is still owed one round trip for the batch rather than one per

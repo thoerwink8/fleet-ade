@@ -957,30 +957,33 @@ describe("rightPanelStore", () => {
     }
   });
 
-  it("normalizes a persisted non-code detail tab back to code on migrate", () => {
-    const pr = { projectId: "project-a", repository: "pingdotgg/t3code", number: 12 };
-    const surfaceId = pullRequestSurfaceId(pr);
-    const migrated = migratePersistedRightPanelState({
-      byThreadKey: {
-        "env-1:thread-A": {
-          isOpen: true,
-          activeSurfaceId: surfaceId,
-          surfaces: [
-            {
-              id: surfaceId,
-              kind: "pull-request",
-              projectId: pr.projectId,
-              repository: pr.repository,
-              number: pr.number,
-              detailTab: "guide",
-            },
-          ],
+  it.each(["guide", "timeline", "summary"])(
+    "normalizes persisted %s detail tab back to code on migrate",
+    (detailTab) => {
+      const pr = { projectId: "project-a", repository: "pingdotgg/t3code", number: 12 };
+      const surfaceId = pullRequestSurfaceId(pr);
+      const migrated = migratePersistedRightPanelState({
+        byThreadKey: {
+          "env-1:thread-A": {
+            isOpen: true,
+            activeSurfaceId: surfaceId,
+            surfaces: [
+              {
+                id: surfaceId,
+                kind: "pull-request",
+                projectId: pr.projectId,
+                repository: pr.repository,
+                number: pr.number,
+                detailTab: detailTab as "guide" | "timeline" | "summary",
+              },
+            ],
+          },
         },
-      },
-    });
-    const surface = selectThreadRightPanelState(migrated.byThreadKey, refA).surfaces[0];
-    expect(surface?.kind === "pull-request" ? (surface.detailTab ?? "code") : null).toBe("code");
-  });
+      });
+      const surface = selectThreadRightPanelState(migrated.byThreadKey, refA).surfaces[0];
+      expect(surface?.kind === "pull-request" ? (surface.detailTab ?? "code") : null).toBe("code");
+    },
+  );
 
   it("keeps matching repository and number on different hosts as separate tabs", () => {
     const first = { projectId: "project-a", repository: "acme/api", number: 7, host: "github.com" };

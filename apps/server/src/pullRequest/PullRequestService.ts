@@ -32,7 +32,6 @@ import {
   type PullRequestDiffStat,
   type PullRequestDiffInput,
   type PullRequestChangeBreakdown,
-  type PullRequestFilesViewedResult,
   type PullRequestDiffResult,
   type PullRequestInvalidateInput,
   type PullRequestReportStateInput,
@@ -67,7 +66,6 @@ import { sourceControlDefinitions } from "../sourceControl/sourceControlDefiniti
 
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerSettings from "../serverSettings.ts";
-import * as PullRequestFilesViewed from "../persistence/PullRequestFilesViewed.ts";
 import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import type { SourceControlProviderContext } from "@t3tools/source-control-core/server/SourceControlProvider";
@@ -85,7 +83,6 @@ import {
 } from "@t3tools/source-control-core/server/PullRequestProvider";
 import * as PullRequestReadCache from "./PullRequestReadCache.ts";
 import * as PullRequestProviderRegistry from "./PullRequestProviderRegistry.ts";
-import * as ViewedFiles from "./pullRequestViewedFiles.ts";
 import { toChangeBreakdown } from "./pullRequestChangeBreakdown.ts";
 
 export interface PullRequestMergeEvent extends PullRequestRef {
@@ -121,7 +118,6 @@ const REPORTED_STATE_DEDUPE_MS = 5 * 60 * 1_000;
 const DIFF_CACHE_TTL = Duration.seconds(60);
 const COMMIT_DIFF_CACHE_TTL = Duration.minutes(10);
 const LIST_STATS_CACHE_TTL = Duration.seconds(60);
-const FILES_VIEWED_CACHE_TTL = Duration.seconds(15);
 const DIFF_STALE_WINDOW = Duration.minutes(10);
 const DIFF_SWEEP_INTERVAL = Duration.minutes(1);
 const VIEWER_CACHE_TTL = Duration.minutes(10);
@@ -148,7 +144,6 @@ const diffCacheEvictions = (entries: Iterable<readonly [string, PullRequestDiffR
   }
   return evictions;
 };
-const FILES_VIEWED_CACHE_CAPACITY = 128;
 const VIEWER_CACHE_CAPACITY = 32;
 
 export type PullRequestError = PullRequestUnavailableError | PullRequestOperationError;
@@ -245,9 +240,6 @@ export class PullRequestService extends Context.Service<
     readonly diffFileContents: (
       input: PullRequestDiffFileContentsInput,
     ) => Effect.Effect<PullRequestDiffFileContentsResult, PullRequestError>;
-    readonly filesViewed: (
-      input: PullRequestRef,
-    ) => Effect.Effect<PullRequestFilesViewedResult, PullRequestError>;
     readonly changeBreakdown: (
       input: PullRequestRef,
     ) => Effect.Effect<PullRequestChangeBreakdown, PullRequestError>;
@@ -554,9 +546,6 @@ function withRateLimitBackoff(
     ...(api.getDiffFileContents === undefined
       ? {}
       : { getDiffFileContents: wrap("getDiffFileContents", api.getDiffFileContents) }),
-    ...(api.getFilesViewed === undefined
-      ? {}
-      : { getFilesViewed: wrap("getFilesViewed", api.getFilesViewed) }),
     ...(api.getFileStats === undefined
       ? {}
       : { getFileStats: wrap("getFileStats", api.getFileStats) }),
@@ -673,7 +662,6 @@ export const make = Effect.gen(function* () {
   const repositoryIdentities = yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
   const sourceControlProviders = yield* SourceControlProviderRegistry.SourceControlProviderRegistry;
   const rateLimits = yield* SourceControlRateLimit.SourceControlRateLimit;
-  const filesViewedStore = yield* PullRequestFilesViewed.PullRequestFilesViewedRepository;
   const readCache = yield* PullRequestReadCache.PullRequestReadCache;
   const clock = yield* Clock.Clock;
 
@@ -2469,20 +2457,6 @@ export const make = Effect.gen(function* () {
     epochs.set(scope, ++epochCounter);
   };
   const bumpRefEpoch = (ref: PullRequestRef) => bumpEpoch(refEpochs, ref);
-  const filesViewedEpochs = new Map<string, number>();
-  const filesViewedEpoch = (ref: PullRequestRef) => filesViewedEpochs.get(refScope(ref)) ?? 0;
-  const bumpFilesViewedEpoch = (ref: PullRequestRef) => bumpEpoch(filesViewedEpochs, ref);
-
-  let everyFileRevisionEpoch = 0;
-  const viewedFiles = ViewedFiles.make({
-    filesViewedStore,
-    requireProject,
-    requiredViewerOf: (project) => viewerOf(project),
-    toPullRequestError,
-    runFork,
-    refEpoch,
-    fileRevisionsEpoch: () => everyFileRevisionEpoch,
-  });
 
   const filtersOfKey = (
     slots: ReadonlyArray<
@@ -3020,24 +2994,6 @@ export const make = Effect.gen(function* () {
     return staleDiff.serve(key, read.pipe(Effect.map((read) => read.value)));
   };
 
-  const filesViewedCache = yield* Cache.makeWith(
-    (key: string) => {
-      const [referenceKey] = JSON.parse(key) as [string, number];
-      return viewedFiles.filesViewed(refOfCacheKey(referenceKey));
-    },
-    {
-      capacity: FILES_VIEWED_CACHE_CAPACITY,
-      timeToLive: (exit) => (Exit.isSuccess(exit) ? FILES_VIEWED_CACHE_TTL : Duration.zero),
-    },
-  );
-  // Key canonical refs to match epochs bumped with the remote's spelling.
-  const filesViewed: PullRequestService["Service"]["filesViewed"] = (input) =>
-    canonicalRef(input).pipe(
-      Effect.flatMap((ref) =>
-        Cache.get(filesViewedCache, JSON.stringify([refCacheKey(ref), filesViewedEpoch(ref)])),
-      ),
-    );
-
   const listStatsCache = yield* Cache.makeWith(
     (key: string) => {
       const [, refs] = JSON.parse(key) as [number, ReadonlyArray<[string, string, number, number]>];
@@ -3110,14 +3066,6 @@ export const make = Effect.gen(function* () {
     "PullRequestService.invalidate",
   )(function* (input, options) {
     const reference = input.reference;
-    if (input.filesViewedOnly === true) {
-      return yield* reference === undefined
-        ? Cache.invalidateAll(filesViewedCache)
-        : canonicalRef(reference).pipe(
-            Effect.flatMap((ref) => Effect.sync(() => bumpFilesViewedEpoch(ref))),
-            Effect.ignore,
-          );
-    }
     if (reference !== undefined) {
       yield* canonicalRef(reference).pipe(
         Effect.flatMap((ref) =>
@@ -3131,7 +3079,6 @@ export const make = Effect.gen(function* () {
     } else {
       yield* forgetProviderReads();
       listingsEpoch = ++epochCounter;
-      everyFileRevisionEpoch = ++epochCounter;
       viewersByHost.clear();
       yield* Cache.invalidateAll(viewerFlights);
     }
@@ -3327,7 +3274,6 @@ export const make = Effect.gen(function* () {
     threadComments,
     diff: credentialCached(diff),
     diffFileContents,
-    filesViewed: credentialCached(filesViewed),
     changeBreakdown: credentialCached((input) =>
       Cache.get(changeBreakdownCache, refCacheKey(input)),
     ),

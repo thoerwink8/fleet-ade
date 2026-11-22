@@ -693,7 +693,7 @@ it.effect(
           // A repository-scoped verify reads the switched token; pinned work keeps the old one.
           yield* Effect.ignore(cli.getRoutingIdentity(input));
           yield* Effect.ignore(
-            cli.getPullRequestFilesViewed({ ...input, repository: "owner/repo", number: 1 }),
+            cli.getPullRequestFileStats({ ...input, repository: "owner/repo", number: 1 }),
           );
           return identity;
         }),
@@ -3985,93 +3985,6 @@ layer("GitHubPullRequestApi.layer", (it) => {
       assert.strictEqual(error.retryAt, Date.parse("2099-08-13T14:00:00Z"));
       assert.strictEqual(mockedExecute.mock.calls.length, 1);
       yield* TestClock.setTime(Date.parse("2100-01-01T00:00:00Z"));
-    }),
-  );
-
-  it.effect("reads every page of viewed files, and says so when there are too many", () =>
-    Effect.gen(function* () {
-      const page = (index: number, hasNextPage: boolean) =>
-        Effect.succeed(
-          output(
-            encodeJson({
-              data: {
-                repository: {
-                  pullRequest: {
-                    files: {
-                      pageInfo: { hasNextPage, endCursor: `cursor-${index}` },
-                      nodes: [
-                        { path: `src/file${index}.ts`, viewerViewedState: "VIEWED" },
-                        { path: `src/other${index}.ts`, viewerViewedState: "UNVIEWED" },
-                      ],
-                    },
-                  },
-                },
-              },
-            }),
-          ),
-        );
-      mockedExecute
-        .mockReturnValueOnce(page(0, true))
-        .mockReturnValueOnce(page(1, true))
-        .mockReturnValueOnce(page(2, false));
-      const cli = yield* GitHubPullRequestApi.GitHubPullRequestApi;
-
-      const viewed = yield* cli.getPullRequestFilesViewed({
-        cwd: "/w",
-        repository: "acme/web",
-        host: "github.com",
-        number: 7,
-      });
-
-      assert.strictEqual(mockedExecute.mock.calls.length, 3);
-      expect([varsAt(0)["after"], varsAt(1)["after"], varsAt(2)["after"]]).toEqual([
-        undefined,
-        "cursor-0",
-        "cursor-1",
-      ]);
-      assert.isFalse(viewed.truncated);
-      expect(viewed.files.map((file) => [file.path, file.state])).toEqual([
-        ["src/file0.ts", "viewed"],
-        ["src/other0.ts", "unviewed"],
-        ["src/file1.ts", "viewed"],
-        ["src/other1.ts", "unviewed"],
-        ["src/file2.ts", "viewed"],
-        ["src/other2.ts", "unviewed"],
-      ]);
-    }),
-  );
-
-  it.effect("stops paging viewed files rather than following a change without end", () =>
-    Effect.gen(function* () {
-      mockedExecute.mockReturnValue(
-        Effect.succeed(
-          output(
-            encodeJson({
-              data: {
-                repository: {
-                  pullRequest: {
-                    files: {
-                      pageInfo: { hasNextPage: true, endCursor: "cursor" },
-                      nodes: [{ path: "src/file.ts", viewerViewedState: "VIEWED" }],
-                    },
-                  },
-                },
-              },
-            }),
-          ),
-        ),
-      );
-      const cli = yield* GitHubPullRequestApi.GitHubPullRequestApi;
-
-      const viewed = yield* cli.getPullRequestFilesViewed({
-        cwd: "/w",
-        repository: "acme/web",
-        host: "github.com",
-        number: 7,
-      });
-
-      assert.strictEqual(mockedExecute.mock.calls.length, 2);
-      assert.isTrue(viewed.truncated);
     }),
   );
 });

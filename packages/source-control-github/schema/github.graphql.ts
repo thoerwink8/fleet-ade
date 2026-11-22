@@ -77,16 +77,6 @@ export const DiffSide = Schema.Literals(["LEFT", "RIGHT"])
 export type DiffSide = typeof DiffSide.Type
 
 /**
- * The possible viewed states of a file .
- *
- * - `DISMISSED`: The file has new changes since last viewed.
- * - `UNVIEWED`: The file has not been marked as viewed.
- * - `VIEWED`: The file has been marked as viewed.
- */
-export const FileViewedState = Schema.Literals(["DISMISSED", "UNVIEWED", "VIEWED"])
-export type FileViewedState = typeof FileViewedState.Type
-
-/**
  * The possible states of an issue.
  *
  * - `CLOSED`: An issue that has been closed

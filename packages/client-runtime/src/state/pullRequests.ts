@@ -3,12 +3,10 @@ import {
   PullRequestActivity,
   PullRequestDetail as PullRequestDetailSchema,
   PullRequestPreview,
-  PullRequestReviewGuideResult,
   PullRequestListResult,
   PullRequestChecks,
   PullRequestDiffResult,
   PullRequestChangeBreakdown,
-  PullRequestFilesViewedResult,
   PullRequestLinkedThreadsResult,
   type EnvironmentId,
   type PullRequestActionInput,
@@ -114,17 +112,6 @@ function writableQueryFamily<A, E>(
     writableQuery(source),
   );
   return normalizePullRequestQuery((target) => writable(family(target)));
-}
-
-/** Restart pre-mutation reads before patching so they cannot restore stale values. */
-function updateCached<A, E>(
-  registry: AtomRegistry.AtomRegistry,
-  atom: Atom.Writable<AsyncResult.AsyncResult<A, E>>,
-  update: (value: A) => A,
-  refresh = false,
-) {
-  if (refresh || registry.get(atom).waiting) registry.refresh(atom);
-  registry.update(atom, AsyncResult.map(update));
 }
 
 interface ActionReplyPatch {
@@ -390,7 +377,6 @@ export interface PullRequestAnswerHandlers {
   readonly listStats?: QueryAnswerHandler<PullRequestListStatsInput, PullRequestListStatsResult>;
   readonly detail?: QueryAnswerHandler<PullRequestRef, PullRequestDetail>;
   readonly checks?: QueryAnswerHandler<PullRequestRef, PullRequestChecks | null>;
-  readonly reviewGuide?: QueryAnswerHandler<PullRequestRef, PullRequestReviewGuideResult>;
   /** Once per action reply, after the loaded readers show it; unscoped references only. */
   readonly actionReply?: QueryAnswerHandler<PullRequestRef, PullRequestSummary>;
 }
@@ -593,17 +579,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
   // Hover cards read their own atoms, so a pending or failed hover read never decides where a
   // click on the same link goes.
   const previewCard = previewQuery("environment-data:pull-requests:preview-card");
-  const reviewGuide = writableQueryFamily(
-    createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:pull-requests:review-guide",
-      persistence: persistQuery(PullRequestReviewGuideResult),
-      tag: WS_METHODS.pullRequestsReviewGuide,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsReviewGuide, input),
-      staleTimeMs: 60_000,
-      refreshTrigger: ({ environmentId }) => refreshes({ environmentId, input: {} }),
-      ...(onAnswer.reviewGuide === undefined ? {} : { onAnswer: onAnswer.reviewGuide }),
-    }),
-  );
   const loadDiff = Effect.fn("PullRequests.loadDiff")(function* (input: PullRequestDiffInput) {
     const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
     const loader = yield* PullRequestDiffLoader.PullRequestDiffLoader;
@@ -803,13 +778,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
           ]),
       },
     }),
-    filesViewed: createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:pull-requests:files-viewed",
-      persistence: persistQuery(PullRequestFilesViewedResult),
-      tag: WS_METHODS.pullRequestsFilesViewed,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsFilesViewed, input),
-      staleTimeMs: 15_000,
-    }),
     changeBreakdown: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:pull-requests:change-breakdown",
       persistence: persistQuery(PullRequestChangeBreakdown),
@@ -844,16 +812,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       },
       scheduler: commandScheduler,
       concurrency: serialPerEnvironment,
-    }),
-    reviewGuide,
-    generateReviewGuide: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:generate-review-guide",
-      tag: WS_METHODS.pullRequestsGenerateReviewGuide,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsGenerateReviewGuide, input),
-      onSuccess: (target, registry, result) =>
-        Effect.sync(() => {
-          updateCached(registry, reviewGuide(target), () => result, true);
-        }),
     }),
     /**
      * A separate request rather than a flag on a read, so only a person's refresh spends

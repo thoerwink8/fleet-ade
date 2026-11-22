@@ -27,7 +27,6 @@ import {
   type PullRequestReferenceCandidate,
   type PullRequestComment,
   type PullRequestCommit,
-  type PullRequestFileViewed,
   type PullRequestInvolvement,
   type PullRequestListFilters,
   type PullRequestListState,
@@ -79,7 +78,6 @@ import {
   toPullRequestCommitStats,
   toPullRequestCheckContextsPage,
   toPullRequestCore,
-  toPullRequestFilesViewedPage,
   toPullRequestFileStatsPage,
   toPullRequestHeads,
   toPullRequestNodeId,
@@ -383,7 +381,8 @@ interface GitHubPullRequestListPage {
 const PULL_REQUEST_FALLBACK_MAX_ROWS = 1_000;
 
 const DIFF_FILES_PAGE_SIZE = 100;
-const FILES_VIEWED_MAX_PAGES = 5;
+
+const FILE_STATS_MAX_PAGES = 5;
 
 const NODE_ID_CACHE_CAPACITY = 128;
 
@@ -421,11 +420,6 @@ export interface GitHubPullRequestDiffSlice {
   readonly truncated: boolean;
   readonly nextCursor: string | null;
   readonly omittedFileStats?: ReadonlyArray<PullRequestOmittedFileStat>;
-}
-
-export interface GitHubPullRequestFilesViewed {
-  readonly files: ReadonlyArray<PullRequestFileViewed>;
-  readonly truncated: boolean;
 }
 
 export interface GitHubPullRequestFileStats {
@@ -581,13 +575,6 @@ export class GitHubPullRequestApi extends Context.Service<
       { readonly oldContents: string; readonly newContents: string },
       GitHubPullRequestApiError
     >;
-
-    readonly getPullRequestFilesViewed: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-    }) => Effect.Effect<GitHubPullRequestFilesViewed, GitHubPullRequestApiError>;
 
     readonly getPullRequestFileStats: (input: {
       readonly cwd: string;
@@ -2555,36 +2542,6 @@ export const make = Effect.gen(function* () {
       });
     }),
 
-    getPullRequestFilesViewed: Effect.fn("GitHubPullRequestApi.getPullRequestFilesViewed")(
-      function (input) {
-        const { owner, name } = parseRepositorySelector(input.repository);
-        const target = { ...input, operation: "getPullRequestFilesViewed" };
-        return readPages(
-          GraphQLClient.pages(client.PullRequestFilesViewed, {
-            variables: { owner, name, number: input.number },
-            connection: (result) => {
-              const page = toPullRequestFilesViewedPage(result);
-              return {
-                ...page,
-                pageInfo: { hasNextPage: page.nextCursor !== null, endCursor: page.nextCursor },
-              };
-            },
-          }),
-          {
-            ...target,
-            maxPages: FILES_VIEWED_MAX_PAGES,
-            hasNextPage: (page) => page.nextCursor !== null,
-          },
-        ).pipe(
-          graphql(target),
-          Effect.map(({ pages, truncated }) => ({
-            files: pages.flatMap((page) => page.files),
-            truncated,
-          })),
-        );
-      },
-    ),
-
     getPullRequestFileStats: Effect.fn("GitHubPullRequestApi.getPullRequestFileStats")(
       function (input) {
         const { owner, name } = parseRepositorySelector(input.repository);
@@ -2602,7 +2559,7 @@ export const make = Effect.gen(function* () {
           }),
           {
             ...target,
-            maxPages: FILES_VIEWED_MAX_PAGES,
+            maxPages: FILE_STATS_MAX_PAGES,
             hasNextPage: (page) => page.nextCursor !== null,
           },
         ).pipe(

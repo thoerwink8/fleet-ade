@@ -41,6 +41,7 @@ import { PullRequestDetailGhost } from "./PullRequestGhosts";
 import { pullRequestRefKey, usePullRequestDetail } from "./usePullRequestDetail";
 import { PullRequestDetailCrumbs } from "./PullRequestDetailCrumbs";
 import { SourceControlAppAccessNotice } from "../SourceControlAppAccessNotice";
+import { PipelineRunsSection } from "./PipelineRunsSection";
 import { DiffPanelLoadingState } from "../DiffPanelShell";
 import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
 import { openOnHostLabel } from "./pullRequestLinkContextMenu";
@@ -275,6 +276,7 @@ export function PullRequestDetailPanel({
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col bg-background">
+      <PipelineRunsSection />
       <div
         className={cn(
           "@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2",

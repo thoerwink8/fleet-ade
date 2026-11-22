@@ -171,7 +171,6 @@ import {
   ProviderUploadFeedbackResult,
 } from "./provider.ts";
 import { ProviderInstanceId, ProviderInstanceMutation } from "./providerInstance.ts";
-import { PullRequestReviewGuideResult } from "./pullRequestReviewGuide.ts";
 import {
   PullRequestActionInput,
   PullRequestActivity,
@@ -179,7 +178,6 @@ import {
   PullRequestDetail,
   PullRequestPreview,
   PullRequestChecks,
-  PullRequestFilesViewedResult,
   PullRequestDiffFileContentsInput,
   PullRequestDiffFileContentsResult,
   PullRequestInvalidateInput,
@@ -512,12 +510,9 @@ export const WS_METHODS = {
   pullRequestsPreview: "pullRequests.preview",
   pullRequestsChecks: "pullRequests.checks",
   pullRequestsActivity: "pullRequests.activity",
-  pullRequestsReviewGuide: "pullRequests.reviewGuide",
-  pullRequestsGenerateReviewGuide: "pullRequests.generateReviewGuide",
   pullRequestsThreadComments: "pullRequests.threadComments",
   pullRequestsDiffFileContents: "pullRequests.diffFileContents",
   pullRequestsRunAction: "pullRequests.runAction",
-  pullRequestsFilesViewed: "pullRequests.filesViewed",
   pullRequestsChangeBreakdown: "pullRequests.changeBreakdown",
   pullRequestsInvalidate: "pullRequests.invalidate",
   pullRequestsReportState: "pullRequests.reportState",
@@ -1060,18 +1055,6 @@ const WsPullRequestsActivityRpc = Rpc.make(WS_METHODS.pullRequestsActivity, {
   error: PullRequestRpcError,
 });
 
-const WsPullRequestsReviewGuideRpc = Rpc.make(WS_METHODS.pullRequestsReviewGuide, {
-  payload: PullRequestRef,
-  success: PullRequestReviewGuideResult,
-  error: PullRequestRpcError,
-});
-
-const WsPullRequestsGenerateReviewGuideRpc = Rpc.make(WS_METHODS.pullRequestsGenerateReviewGuide, {
-  payload: PullRequestRef,
-  success: PullRequestReviewGuideResult,
-  error: PullRequestRpcError,
-});
-
 const WsPullRequestsThreadCommentsRpc = Rpc.make(WS_METHODS.pullRequestsThreadComments, {
   payload: PullRequestThreadCommentsInput,
   success: PullRequestThreadCommentsResult,
@@ -1081,12 +1064,6 @@ const WsPullRequestsThreadCommentsRpc = Rpc.make(WS_METHODS.pullRequestsThreadCo
 const WsPullRequestsDiffFileContentsRpc = Rpc.make(WS_METHODS.pullRequestsDiffFileContents, {
   payload: PullRequestDiffFileContentsInput,
   success: PullRequestDiffFileContentsResult,
-  error: PullRequestRpcError,
-});
-
-const WsPullRequestsFilesViewedRpc = Rpc.make(WS_METHODS.pullRequestsFilesViewed, {
-  payload: PullRequestRef,
-  success: PullRequestFilesViewedResult,
   error: PullRequestRpcError,
 });
 
@@ -1936,12 +1913,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsPullRequestsPreviewRpc,
   WsPullRequestsChecksRpc,
   WsPullRequestsActivityRpc,
-  WsPullRequestsReviewGuideRpc,
-  WsPullRequestsGenerateReviewGuideRpc,
   WsPullRequestsThreadCommentsRpc,
   WsPullRequestsDiffFileContentsRpc,
   WsPullRequestsChangeBreakdownRpc,
-  WsPullRequestsFilesViewedRpc,
   WsPullRequestsRunActionRpc,
   WsPullRequestsInvalidateRpc,
   WsPullRequestsReportStateRpc,

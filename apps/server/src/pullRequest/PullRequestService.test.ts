@@ -24,8 +24,6 @@ import * as ServerSettingsService from "../serverSettings.ts";
 import { PullRequestOperationError } from "@t3tools/contracts";
 
 import * as ProjectService from "../project/ProjectService.ts";
-import * as SqlitePersistence from "../persistence/Sqlite.ts";
-import * as PullRequestFilesViewed from "../persistence/PullRequestFilesViewed.ts";
 import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
 import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import type { SourceControlProvider } from "@t3tools/source-control-core/server/SourceControlProvider";
@@ -306,7 +304,6 @@ function makeService(input: {
           resolve: input.resolveRepositoryIdentity ?? (() => Effect.succeed(null)),
         }),
         SourceControlRateLimit.layer,
-        PullRequestFilesViewed.layer.pipe(Layer.provide(SqlitePersistence.layerMemory)),
         Layer.effect(PullRequestReadCache.PullRequestReadCache, PullRequestReadCache.make).pipe(
           Layer.provide(KeyValueStore.layerMemory),
           Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -3084,7 +3081,7 @@ it.effect("reads the fresh diff when detail or summary discovers a changed revis
 
 it.effect("keeps routed reads separate when the GitHub account changes", () =>
   Effect.gen(function* () {
-    for (const operation of ["summary", "detail", "checks", "diff", "filesViewed"] as const) {
+    for (const operation of ["summary", "detail", "checks", "diff"] as const) {
       let failing = false;
       let calls = 0;
       const read = () =>
@@ -3100,17 +3097,6 @@ it.effect("keeps routed reads separate when the GitHub account changes", () =>
         ],
         providers: [
           fakePullRequestProvider(SourceControlProviderKind.make("github"), {
-            capabilities: {
-              ...fakePullRequestProvider(SourceControlProviderKind.make("github")).capabilities,
-              viewedFiles: "host",
-            },
-            getFilesViewed: () =>
-              read().pipe(
-                Effect.as({
-                  files: [{ path: "private.ts", state: "viewed" as const }],
-                  truncated: false,
-                }),
-              ),
             getChangeRequestSummary: read,
             getChangeRequestChecks: read,
             getChangeRequest: read,
@@ -3143,14 +3129,7 @@ it.effect("keeps routed reads separate when the GitHub account changes", () =>
 
 it.effect("isolates routed caches for two credentials belonging to the same account", () =>
   Effect.gen(function* () {
-    for (const operation of [
-      "summary",
-      "detail",
-      "checks",
-      "diff",
-      "preview",
-      "filesViewed",
-    ] as const) {
+    for (const operation of ["summary", "detail", "checks", "diff", "preview"] as const) {
       let credential = "broad";
       let calls = 0;
       const read = () =>
@@ -3166,17 +3145,6 @@ it.effect("isolates routed caches for two credentials belonging to the same acco
         ],
         providers: [
           fakePullRequestProvider(SourceControlProviderKind.make("github"), {
-            capabilities: {
-              ...fakePullRequestProvider(SourceControlProviderKind.make("github")).capabilities,
-              viewedFiles: "host",
-            },
-            getFilesViewed: () =>
-              read().pipe(
-                Effect.as({
-                  files: [{ path: "private.ts", state: "viewed" as const }],
-                  truncated: false,
-                }),
-              ),
             withVerifiedCredential: (_, use) =>
               Effect.suspend(() =>
                 use({

@@ -272,9 +272,6 @@ export const PullRequestReviewerCapabilities = Schema.Struct({
 });
 export type PullRequestReviewerCapabilities = typeof PullRequestReviewerCapabilities.Type;
 
-export const PullRequestViewedFilesStore = Schema.Literals(["host", "environment"]);
-export type PullRequestViewedFilesStore = typeof PullRequestViewedFilesStore.Type;
-
 /** `#` references issues (and GitHub pull requests); `!` is retained only to decode old GitLab data. */
 export const PullRequestReferenceSigil = Schema.Literals(["#", "!"]);
 export type PullRequestReferenceSigil = typeof PullRequestReferenceSigil.Type;
@@ -292,7 +289,6 @@ export const PullRequestCapabilities = Schema.Struct({
   updateMethods: Schema.optional(ForwardCompatibleArray(PullRequestUpdateMethod)),
   search: Schema.Boolean,
   reactions: Schema.optional(Schema.Boolean),
-  viewedFiles: Schema.optional(PullRequestViewedFilesStore),
   review: PullRequestReviewCapabilities,
   reviewers: PullRequestReviewerCapabilities,
   edit: Schema.optional(PullRequestEditCapabilities),
@@ -598,7 +594,6 @@ export type PullRequestFilterOptions = typeof PullRequestFilterOptions.Type;
  */
 export const PullRequestInvalidateInput = Schema.Struct({
   reference: Schema.optional(PullRequestRef),
-  filesViewedOnly: Schema.optional(Schema.Boolean),
 });
 export type PullRequestInvalidateInput = typeof PullRequestInvalidateInput.Type;
 
@@ -730,26 +725,6 @@ export const PullRequestDiffFileContentsResult = Schema.Struct({
   newContents: Schema.String,
 });
 export type PullRequestDiffFileContentsResult = typeof PullRequestDiffFileContentsResult.Type;
-
-const MAX_FILE_PATH_LENGTH = 4096;
-// Preserve filename whitespace so viewed marks match host paths.
-const FilePath = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_FILE_PATH_LENGTH));
-
-export const PullRequestFileViewedState = Schema.Literals(["unviewed", "viewed", "dismissed"]);
-export type PullRequestFileViewedState = typeof PullRequestFileViewedState.Type;
-
-export const PullRequestFileViewed = Schema.Struct({
-  path: FilePath,
-  state: PullRequestFileViewedState,
-});
-export type PullRequestFileViewed = typeof PullRequestFileViewed.Type;
-
-export const PullRequestFilesViewedResult = Schema.Struct({
-  /** Only the files the host reported a state for. A file missing from this list is unviewed. */
-  files: Schema.Array(PullRequestFileViewed),
-  truncated: Schema.Boolean,
-});
-export type PullRequestFilesViewedResult = typeof PullRequestFilesViewedResult.Type;
 
 const PullRequestLineCount = Schema.Struct({
   additions: NonNegativeInt,

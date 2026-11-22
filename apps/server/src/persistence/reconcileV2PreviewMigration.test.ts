@@ -48,6 +48,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "DropPullRequestReviewState"],
       ]);
       const after = yield* sql`SELECT * FROM pipeline_runs`;
       assert.deepStrictEqual(
@@ -158,6 +159,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "DropPullRequestReviewState"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -172,12 +174,6 @@ describe("V2 preview upgrade", () => {
         yield* sql`SELECT created_at FROM effect_sql_migrations WHERE migration_id = 55`,
         [{ created_at: "2026-09-15 00:00:00" }],
       );
-      yield* sql`
-        INSERT INTO pull_request_files_viewed
-          (provider, host, repository, number, viewer, path, revision, viewed_at)
-        VALUES ('github', 'github.com', 'owner/repo', 1, 'viewer', 'file.ts', 'revision', '2026-09-17')
-      `;
-      assert.strictEqual((yield* sql`SELECT * FROM pull_request_files_viewed`).length, 1);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
   it.effect("upgrades an existing command receipt table with batch results", () =>
@@ -193,6 +189,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "DropPullRequestReviewState"],
       ]);
       const after = yield* sql<{
         readonly name: string;
@@ -304,6 +301,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "DropPullRequestReviewState"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

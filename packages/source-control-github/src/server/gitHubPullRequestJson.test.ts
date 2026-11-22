@@ -13,7 +13,6 @@ import {
   reviewThreadConversation,
   toPullRequestActivityPage,
   toPullRequestCore,
-  toPullRequestFilesViewedPage,
   toPullRequestRows,
   toReviewThreadCommentsPage,
   toCanWrite,
@@ -24,7 +23,6 @@ import { PullRequestWatchFingerprint } from "./pullRequestBatches.graphql.ts";
 import {
   PullRequestActivity,
   PullRequestCore,
-  PullRequestFilesViewed,
   ViewerPermissions,
 } from "./pullRequestReads.graphql.ts";
 import { ReviewThreadComments, ReviewThreads } from "./pullRequestReviews.graphql.ts";
@@ -204,10 +202,6 @@ const decodeReviewThreadsJson = (raw: string) =>
 const decodeReviewThreadCommentsJson = (raw: string) =>
   through(ReviewThreadComments.result, toReviewThreadCommentsPage)(withReviewDefaults(raw));
 const decodeViewerPermissionsJson = through(ViewerPermissions.result, toViewerPermissions);
-const decodePullRequestFilesViewedJson = through(
-  PullRequestFilesViewed.result,
-  toPullRequestFilesViewedPage,
-);
 
 function listJson(entries: ReadonlyArray<Record<string, unknown>>): string {
   return JSON.stringify({
@@ -1439,31 +1433,6 @@ describe("decodePullRequestFilesJson", () => {
     expect(result.patch).toContain("diff --git a/src/app.ts b/src/app.ts");
     expect(result.truncated).toBe(true);
     expect(result.rawCount).toBe(2);
-  });
-});
-
-describe("decodePullRequestFilesViewedJson", () => {
-  const page = (
-    nodes: ReadonlyArray<unknown>,
-    pageInfo: { hasNextPage: boolean; endCursor: string | null },
-  ) =>
-    JSON.stringify({
-      data: { repository: { pullRequest: { files: { pageInfo, nodes } } } },
-    });
-
-  it("treats a state it has never heard of as unread rather than failing the page", () => {
-    const decoded = decodePullRequestFilesViewedJson(
-      page([{ path: "src/a.ts", viewerViewedState: "SOMETHING_NEW" }], {
-        hasNextPage: false,
-        endCursor: null,
-      }),
-    );
-    expect(Result.isSuccess(decoded)).toBe(true);
-    if (!Result.isSuccess(decoded)) return;
-    expect(decoded.success).toEqual({
-      files: [{ path: "src/a.ts", state: "unviewed" }],
-      nextCursor: null,
-    });
   });
 });
 

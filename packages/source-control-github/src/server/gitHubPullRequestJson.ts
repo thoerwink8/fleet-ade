@@ -14,7 +14,6 @@ import type {
   PullRequestChecksState,
   PullRequestComment,
   PullRequestCommit,
-  PullRequestFileViewedState,
   PullRequestLabel,
   PullRequestMergeCapabilities,
   PullRequestMergeMethod,
@@ -50,7 +49,6 @@ import type {
   PullRequestCommitStats,
   PullRequestCheckContexts,
   PullRequestCore,
-  PullRequestFilesViewed,
   PullRequestFileStats,
   PullRequestHeads,
   PullRequestPreview as PullRequestPreviewQuery,
@@ -1633,39 +1631,6 @@ function toFilesPatch(entries: ReadonlyArray<unknown>): GitHubPullRequestFilesPa
     truncated,
     rawCount: entries.length,
     omittedFileStats,
-  };
-}
-
-export interface GitHubPullRequestFilesViewedPage {
-  readonly files: ReadonlyArray<{
-    readonly path: string;
-    readonly state: PullRequestFileViewedState;
-  }>;
-  readonly nextCursor: string | null;
-}
-
-function toFileViewedState(raw: string): PullRequestFileViewedState {
-  switch (raw.trim().toUpperCase()) {
-    case "VIEWED":
-      return "viewed";
-    case "DISMISSED":
-      return "dismissed";
-    default:
-      return "unviewed";
-  }
-}
-
-export function toPullRequestFilesViewedPage(
-  result: PullRequestFilesViewed.Result,
-): GitHubPullRequestFilesViewedPage {
-  const files = result.repository?.pullRequest?.files;
-  return {
-    files: nodesOf(files).flatMap((node) =>
-      node.path.length === 0
-        ? []
-        : [{ path: node.path, state: toFileViewedState(node.viewerViewedState) }],
-    ),
-    nextCursor: nextCursorOf(files?.pageInfo),
   };
 }
 

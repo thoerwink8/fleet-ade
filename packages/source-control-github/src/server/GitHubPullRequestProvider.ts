@@ -43,7 +43,6 @@ const CAPABILITIES: PullRequestCapabilities = {
   reactions: true,
   mentions: true,
   referenceSigils: ["#"],
-  viewedFiles: "host",
   review: {
     inlineComment: true,
     rangeComment: true,
@@ -669,9 +668,6 @@ export const make = Effect.gen(function* () {
 
     getDiffFileContents: (input) =>
       cli.getPullRequestDiffFileContents(input).pipe(Effect.mapError(fail("getDiffFileContents"))),
-
-    getFilesViewed: (input) =>
-      cli.getPullRequestFilesViewed(input).pipe(Effect.mapError(fail("getFilesViewed"))),
 
     getFileStats: (input) =>
       cli.getPullRequestFileStats(input).pipe(Effect.mapError(fail("getFileStats"))),
