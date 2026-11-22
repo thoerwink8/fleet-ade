@@ -43,10 +43,8 @@ vi.mock("@effect/atom-react", async (original) => ({
 }));
 vi.mock("../hooks/useTheme", () => ({
   useRenderedAppearance: () => "light",
-  useTheme: () => ({ theme: "t3-chat", resolvedTheme: "light", appearanceMode: "light" }),
+  useTheme: () => ({ theme: "grove", resolvedTheme: "light", appearanceMode: "light" }),
 }));
-vi.mock("../hooks/useCustomThemes", () => ({ useCustomThemes: () => [] }));
-vi.mock("../hooks/useEnvironmentTheme", () => ({ useEnvironmentThemeDefinitions: () => [] }));
 vi.mock("../hooks/useSettings", async (original) => ({
   ...(await original<typeof import("../hooks/useSettings")>()),
   useClientSettings: () => DEFAULT_CLIENT_SETTINGS,

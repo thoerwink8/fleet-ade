@@ -89,7 +89,7 @@ function Column() {
 
 it("names an agent's reasoning level and keeps its mode out of the levels", async () => {
   await using screen = await render(<Column />, { router: false }); // no routes involved
-  await expect.element(screen.getByRole("status")).toHaveTextContent("Medium");
+  await expect.element(screen.getByRole("status")).toHaveTextContent("·Medium");
 
   const levels = screen.getByRole("radiogroup", { name: "正在思考" });
   await expect.element(levels.getByRole("radio")).toHaveLength(3);
