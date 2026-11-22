@@ -109,4 +109,71 @@ describe("thread undo notice", () => {
     expect(add).toHaveBeenCalledOnce();
     expect(announce).not.toHaveBeenCalled();
   });
+
+  it("shows and updates a persistent settle toast and closes it only when undone or expired", async () => {
+    const add = vi.spyOn(toastManager, "add").mockReturnValue("settle-toast");
+    const update = vi.spyOn(toastManager, "update").mockImplementation(() => {});
+    const close = vi.spyOn(toastManager, "close").mockImplementation(() => {});
+    const undoFirst = vi.fn(async () => AsyncResult.success(undefined));
+    const undoSecond = vi.fn(async () => AsyncResult.success(undefined));
+
+    showThreadUndoNotice({
+      action: "Settled",
+      failureTitle: "无法撤销收尾",
+      undo: undoFirst,
+      claim: ThreadUndo.begin("settle", "env/first"),
+    });
+    expect(add).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "success",
+        title: "已收尾",
+        timeout: 0,
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
+
+    vi.advanceTimersByTime(4_000);
+    showThreadUndoNotice({
+      action: "Settled",
+      failureTitle: "无法撤销收尾",
+      undo: undoSecond,
+      claim: ThreadUndo.begin("settle", "env/second"),
+    });
+    expect(update).toHaveBeenCalledExactlyOnceWith(
+      "settle-toast",
+      expect.objectContaining({
+        title: "已收尾 2 个会话",
+        timeout: 0,
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
+
+    // Past the first 5s mark, the extended undo window is still alive and the toast stays open.
+    vi.advanceTimersByTime(2_000);
+    expect(close).not.toHaveBeenCalled();
+
+    const updatePayload = update.mock.calls[0]?.[1];
+    const actionOnClick =
+      typeof updatePayload === "object" && updatePayload !== null
+        ? (updatePayload.actionProps?.onClick as (() => void) | undefined)
+        : undefined;
+    actionOnClick?.();
+    await Promise.resolve();
+    expect(close).toHaveBeenCalledExactlyOnceWith("settle-toast");
+    expect(undoFirst).toHaveBeenCalledOnce();
+    expect(undoSecond).toHaveBeenCalledOnce();
+
+    // When not undone manually, expiry closes the settle toast.
+    close.mockClear();
+    showThreadUndoNotice({
+      action: "Settled",
+      failureTitle: "无法撤销收尾",
+      undo: undoFirst,
+      claim: ThreadUndo.begin("settle", "env/third"),
+    });
+    vi.advanceTimersByTime(4_999);
+    expect(close).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(close).toHaveBeenCalledExactlyOnceWith("settle-toast");
+  });
 });

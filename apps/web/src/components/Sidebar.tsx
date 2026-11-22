@@ -117,7 +117,7 @@ import { useOrderWhileOpen } from "../hooks/useOrderWhileOpen";
 import { useProjectPin } from "../hooks/useProjectGroupUpdate";
 import { useSidebarProjectGroups } from "../hooks/useSidebarProjectGroups";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
-import { registerSettleAndAdvance } from "../settleAndAdvance";
+import { registerSidebarSettle } from "../sidebarSettle";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { useClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
@@ -186,7 +186,7 @@ import {
   resolveSidebarReorderableThreadKeys,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
-  shouldNavigateAfterThreadPark,
+  shouldNavigateAfterThreadSnooze,
   sidebarListItemId,
   sidebarThreadKeyAtY,
   sortInboxThreadsByReturn,
@@ -256,6 +256,7 @@ import {
   type SidebarProviderEntry,
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
+import { resolveDuplicateEmptyThreadTitleSuffixes } from "./sidebar/SidebarThreadRow.logic";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarDragBoundary,
@@ -609,6 +610,8 @@ function useSidebarThreads(input: {
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
+    nowMinute,
+    orderedThreads,
     orderedThreadKeys: orderedThreads.map(threadShellKey),
     threadByKey: new Map(orderedThreads.map((thread) => [threadShellKey(thread), thread] as const)),
     settledThreadKeys: new Set(settledThreads.map(threadShellKey)),
@@ -1361,6 +1364,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
+    nowMinute,
+    orderedThreads,
     orderedThreadKeys,
     threadByKey,
     settledThreadKeys,
@@ -1436,6 +1441,39 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const threadSearchResultKeys = threadSearchResults.map((thread) =>
     scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
   );
+  const nowMinuteMs = Date.parse(`${nowMinute}:00.000Z`);
+  const duplicateEmptyTitleSuffixByKey = resolveDuplicateEmptyThreadTitleSuffixes({
+    threads: orderedThreads.map((thread) => ({
+      key: threadShellKey(thread),
+      title: thread.title,
+      createdAt: thread.createdAt,
+      latestRun: thread.latestRun,
+      runtime: thread.runtime,
+      latestUserMessageAt: thread.latestUserMessageAt,
+      visibleItemCount: thread.visibleItemCount,
+      turnCount: thread.turnCount,
+      latestMessagePreview: thread.latestMessagePreview,
+    })),
+    timestampFormat,
+    nowMs: nowMinuteMs,
+  });
+  const searchDuplicateEmptyTitleSuffixByKey = isSearchingThreads
+    ? resolveDuplicateEmptyThreadTitleSuffixes({
+        threads: threadSearchResults.map((thread) => ({
+          key: threadShellKey(thread),
+          title: thread.title,
+          createdAt: thread.createdAt,
+          latestRun: thread.latestRun,
+          runtime: thread.runtime,
+          latestUserMessageAt: thread.latestUserMessageAt,
+          visibleItemCount: thread.visibleItemCount,
+          turnCount: thread.turnCount,
+          latestMessagePreview: thread.latestMessagePreview,
+        })),
+        timestampFormat,
+        nowMs: nowMinuteMs,
+      })
+    : null;
 
   // The highlight follows its thread, so rows that arrive late do not move
   // it under Enter; a new query starts at the top.
@@ -1637,51 +1675,32 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         : () => void router.navigate({ to: "/" });
   };
 
-  const attemptSettle = (
-    threadRef: ScopedThreadRef,
-    opts: { coSettlingKeys?: ReadonlySet<string> } = {},
-  ) => {
+  const attemptSettle = (threadRef: ScopedThreadRef) => {
     void (async () => {
       const threadKey = scopedThreadKey(threadRef);
       if (settlingThreadKeysRef.current.has(threadKey)) return;
       settlingThreadKeysRef.current.add(threadKey);
-      const navigateAfterSettle = planForwardNavigation(threadKey, opts.coSettlingKeys);
       const result = await settleThread(threadRef);
       settlingThreadKeysRef.current.delete(threadKey);
-      if (result._tag === "Failure") {
-        if (!isAtomCommandInterrupted(result)) {
-          const error = squashAtomCommandFailure(result);
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "收尾会话失败",
-              description: error instanceof Error ? error.message : "发生错误。",
-            }),
-          );
-        }
-        return;
-      }
-      if (
-        shouldNavigateAfterThreadPark({
-          threadKey,
-          currentThreadKey: readRouteThreadKey(router),
-          action: "settle",
-          now: new Date().toISOString(),
-          thread: readThreadShell(threadRef),
-        })
-      ) {
-        navigateAfterSettle?.();
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "收尾会话失败",
+            description: error instanceof Error ? error.message : "发生错误。",
+          }),
+        );
       }
     })();
   };
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- registers this sidebar's settle handler in the module-level settleAndAdvance registry
-  useEffect(() => registerSettleAndAdvance(attemptSettle), [attemptSettle]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- registers this sidebar's settle handler in the module-level sidebarSettle registry
+  useEffect(() => registerSidebarSettle(attemptSettle), [attemptSettle]);
   const settleThreads = (threadKeys: readonly string[]) => {
-    const coSettlingKeys = new Set(threadKeys);
     for (const threadKey of threadKeys) {
       const thread = threadByKeyRef.current.get(threadKey);
       if (!thread || thread.settledOverride === "settled") continue;
-      attemptSettle(scopeThreadRef(thread.environmentId, thread.id), { coSettlingKeys });
+      attemptSettle(scopeThreadRef(thread.environmentId, thread.id));
     }
   };
   const attemptUnsettle = (threadRef: ScopedThreadRef) => {
@@ -2230,21 +2249,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       switch (plan.kind) {
         case "settle": {
           settlingThreadKeysRef.current.add(activeKey);
-          const navigateAfterSettle = planForwardNavigation(activeKey);
-          const settled = await run(settleThread(threadRef), "收尾会话失败").finally(() =>
+          await run(settleThread(threadRef), "收尾会话失败").finally(() =>
             settlingThreadKeysRef.current.delete(activeKey),
           );
-          if (
-            settled &&
-            shouldNavigateAfterThreadPark({
-              threadKey: activeKey,
-              currentThreadKey: readRouteThreadKey(router),
-              action: "settle",
-              now: new Date().toISOString(),
-              thread: readThreadShell(threadRef),
-            })
-          )
-            navigateAfterSettle?.();
           return;
         }
         case "move-active":
@@ -2300,10 +2307,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         : ({ status: "failure", error: squashAtomCommandFailure(result) } as const);
     }
     if (
-      shouldNavigateAfterThreadPark({
+      shouldNavigateAfterThreadSnooze({
         threadKey,
         currentThreadKey: readRouteThreadKey(router),
-        action: "snooze",
         now: new Date().toISOString(),
         thread: readThreadShell(threadRef),
       })
@@ -3337,6 +3343,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           isSettled={settledThreadKeys.has(threadKey)}
                           key={threadKey}
                           thread={thread}
+                          titleSuffix={searchDuplicateEmptyTitleSuffixByKey?.get(threadKey) ?? null}
                           project={
                             projectByKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null
                           }
@@ -3489,6 +3496,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               optimisticDrop !== null
                             }
                             thread={thread}
+                            titleSuffix={duplicateEmptyTitleSuffixByKey.get(threadKey) ?? null}
                             variant={rowVariant}
                             attention={
                               section === "attention"

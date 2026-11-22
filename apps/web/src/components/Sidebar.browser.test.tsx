@@ -1,5 +1,6 @@
 import appCss from "../index.css?inline";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
+import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import * as shelfHooks from "../state/olderSettledShelf";
 import { createWorkspaceFocusController, workspaceAreaProps } from "../lib/workspaceFocus";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -11,9 +12,18 @@ import {
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { isMacPlatform } from "@t3tools/shared/keybindings";
-import type { ReactNode } from "react";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from "@tanstack/react-router";
+import { AsyncResult } from "effect/reactivity";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { userEvent } from "vite-plus/test/browser";
+import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, fakeTimers, render } from "../../test/render";
 import { openCommandPalette } from "../commandPaletteBus";
@@ -21,8 +31,16 @@ import { makeThreadFixture } from "../test-fixtures";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { __setClientSettingsForTests, getClientSettings } from "../hooks/useSettings";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
-import { useProjects, useServerConfigs, useQuietThreadShells } from "../state/entities";
+import {
+  readEnvironmentServerConfigLoaded,
+  readThreadShell,
+  useProjects,
+  useServerConfigs,
+  useThreadShell,
+  useQuietThreadShells,
+} from "../state/entities";
 import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
+import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import type { Project } from "../types";
@@ -30,6 +48,7 @@ import Sidebar from "./Sidebar";
 import { THREAD_JUMP_HINT_SHOW_DELAY_MS } from "./Sidebar.logic";
 import { SortableThreadRow } from "./sidebar/SidebarThreadRow";
 import { SidebarProvider } from "./ui/sidebar";
+import { ToastProvider } from "./ui/toast";
 
 vi.mock(import("../state/olderSettledShelf"), async (original) => {
   const actual = await original();
@@ -500,5 +519,200 @@ describe("sidebar card summary preview and counts", () => {
     expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
     viewport.scrollTop = 3000;
     expect(viewport.scrollTop).toBeGreaterThan(0);
+  });
+});
+
+function createThreadListStore(initial: readonly EnvironmentThreadShell[]) {
+  let threads = [...initial];
+  const listeners = new Set<() => void>();
+  const emit = () => {
+    for (const listener of listeners) listener();
+  };
+  return {
+    getSnapshot: () => threads,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    find: (ref: ScopedThreadRef) =>
+      threads.find(
+        (thread) => thread.environmentId === ref.environmentId && thread.id === ref.threadId,
+      ) ?? null,
+    update: (
+      threadId: ThreadId,
+      updater: (thread: EnvironmentThreadShell) => EnvironmentThreadShell,
+    ) => {
+      threads = threads.map((thread) => (thread.id === threadId ? updater(thread) : thread));
+      emit();
+    },
+  };
+}
+
+function createSettleRouteApp(initialPath: string) {
+  function Shell() {
+    return (
+      <ToastProvider>
+        <SidebarProvider>
+          <Sidebar routeReveal={{ observedKey: null, pendingKey: null }} />
+          <Outlet />
+        </SidebarProvider>
+      </ToastProvider>
+    );
+  }
+  const rootRoute = createRootRoute({ component: Shell });
+  const threadRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "$environmentId/$threadId",
+  });
+  return createRouter({
+    routeTree: rootRoute.addChildren([threadRoute]),
+    history: createMemoryHistory({ initialEntries: [initialPath] }),
+  });
+}
+
+describe("sidebar thread settle", () => {
+  const setupSettleFixture = (stack: DisposableStack) => {
+    const activeProject = project("active");
+    const threadX = makeThreadFixture({
+      environmentId: activeProject.environmentId,
+      projectId: activeProject.id,
+      id: ThreadId.make("thread-x"),
+      title: "会话 X",
+    });
+    const threadY = makeThreadFixture({
+      environmentId: activeProject.environmentId,
+      projectId: activeProject.id,
+      id: ThreadId.make("thread-y"),
+      title: "会话 Y",
+    });
+    const threadXRef: ScopedThreadRef = {
+      environmentId: activeProject.environmentId,
+      threadId: threadX.id,
+    };
+    const store = createThreadListStore([threadX, threadY]);
+    stack.defer(() =>
+      ThreadUndo.invalidate("settle", `${activeProject.environmentId}:${threadX.id}`),
+    );
+
+    const settleCommand = vi.fn(async (input: { input: { threadId: ThreadId } }) => {
+      store.update(input.input.threadId, (thread) => ({
+        ...thread,
+        settledOverride: "settled",
+        settledAt: "2026-03-10T12:00:00.000Z",
+      }));
+      return AsyncResult.success(undefined);
+    });
+    const unsettleCommand = vi.fn(async (input: { input: { threadId: ThreadId } }) => {
+      store.update(input.input.threadId, (thread) => ({
+        ...thread,
+        settledOverride: "active",
+        settledAt: null,
+      }));
+      return AsyncResult.success(undefined);
+    });
+
+    const useStoreThreads = () =>
+      useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+    const useStoreThread = (ref: ScopedThreadRef | null) => {
+      useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+      return ref ? store.find(ref) : null;
+    };
+    vi.mocked(useProjects).mockReturnValue([activeProject]);
+    vi.mocked(useQuietThreadShells).mockImplementation(useStoreThreads);
+    vi.mocked(useThreadShell).mockImplementation(useStoreThread);
+    vi.mocked(readThreadShell).mockImplementation((ref) => store.find(ref));
+    vi.mocked(readEnvironmentServerConfigLoaded).mockReturnValue(true);
+    vi.mocked(readEnvironmentScope).mockReturnValue(true);
+    vi.mocked(useEnvironmentScope).mockReturnValue(true);
+    vi.mocked(useServerConfigs).mockReturnValue(
+      new Map([
+        [
+          activeProject.environmentId,
+          {
+            scratchWorkspaceRoot: null,
+            shellThreadFamilies: false,
+          } as unknown as EnvironmentServerConfig,
+        ],
+      ]),
+    );
+    vi.mocked(useThreadRouteTarget).mockReturnValue({
+      kind: "server",
+      threadRef: threadXRef,
+    });
+    vi.mocked(useHandleNewThread).mockReturnValue({
+      activeDraftThread: null,
+      activeThread: null,
+      defaultProjectRef: {
+        environmentId: activeProject.environmentId,
+        projectId: activeProject.id,
+      },
+      defaultProjectFallbackReady: true,
+      handleNewThread: vi.fn().mockResolvedValue(null),
+      routeDraftId: null,
+      routeThreadRef: threadXRef,
+    });
+    vi.mocked(useOrchestrationCommand).mockImplementation((command: unknown) => {
+      if (command === threadEnvironment.settle) return settleCommand as never;
+      if (command === threadEnvironment.unsettle) return unsettleCommand as never;
+      return vi.fn().mockResolvedValue(AsyncResult.success(undefined)) as never;
+    });
+
+    return { activeProject, threadX, threadXRef, store, settleCommand, unsettleCommand };
+  };
+
+  it("keeps the active route on settle, moves the row into 最近, and restores it via the undo toast", async () => {
+    using stack = new DisposableStack();
+    const { activeProject, threadX, settleCommand, unsettleCommand } = setupSettleFixture(stack);
+    const rowKey = `${activeProject.environmentId}:${threadX.id}`;
+    const router = createSettleRouteApp("/local/thread-x");
+    await router.load();
+
+    // Reads thread route params from a real $environmentId/$threadId route, which the default router lacks.
+    await using screen = await render(<RouterProvider router={router} />, { router: false });
+
+    const rowBefore = screen.container.querySelector<HTMLElement>(
+      `[data-sidebar-row="${rowKey}"]`,
+    )!;
+    expect(rowBefore.getAttribute("data-sidebar-parent")).toBeNull();
+
+    const settleButton = rowBefore.querySelector<HTMLButtonElement>(
+      'button[aria-label="收尾会话"]',
+    )!;
+    await userEvent.click(settleButton);
+
+    await vi.waitFor(() => {
+      expect(settleCommand).toHaveBeenCalledOnce();
+    });
+    expect(router.state.location.pathname).toBe("/local/thread-x");
+
+    const settledShelf = screen.container.querySelector<HTMLElement>(
+      '[data-sidebar-row="shelf:settled"]',
+    )!;
+    expect(settledShelf).not.toBeNull();
+    if (settledShelf.getAttribute("aria-expanded") === "false") {
+      await userEvent.click(settledShelf);
+    }
+
+    await vi.waitFor(() => {
+      const settledRow = screen.container.querySelector<HTMLElement>(
+        `[data-sidebar-row="${rowKey}"]`,
+      );
+      expect(settledRow?.getAttribute("data-sidebar-parent")).toBe("shelf:settled");
+    });
+    expect(router.state.location.pathname).toBe("/local/thread-x");
+
+    await expect.element(page.getByText("已收尾")).toBeVisible();
+    const undoButton = page.getByRole("button", { name: "撤销" });
+    await expect.element(undoButton).toBeVisible();
+    await userEvent.click(undoButton);
+
+    await vi.waitFor(() => {
+      expect(unsettleCommand).toHaveBeenCalledOnce();
+      const restoredRow = screen.container.querySelector<HTMLElement>(
+        `[data-sidebar-row="${rowKey}"]`,
+      );
+      expect(restoredRow?.getAttribute("data-sidebar-parent")).toBeNull();
+    });
+    expect(router.state.location.pathname).toBe("/local/thread-x");
   });
 });

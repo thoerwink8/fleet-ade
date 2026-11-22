@@ -34,7 +34,7 @@ import {
   isBackgroundWorkStopPending,
 } from "@t3tools/client-runtime/state/thread-execution";
 import { useAcknowledgeThreadWoke, useThreadActions } from "../../hooks/useThreadActions";
-import { settleAndAdvance } from "../../settleAndAdvance";
+import { settleSidebarThread } from "../../sidebarSettle";
 import type { ChatShortcutCommands } from "./useChatShortcuts";
 import { resolveThreadLastVisitedAt } from "../Sidebar.logic";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -678,7 +678,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         void handleUnsettleActiveThread();
         return;
       }
-      if (settleAndAdvance(activeThreadRef)) return;
+      if (settleSidebarThread(activeThreadRef)) return;
       void settleThread(activeThreadRef).then(toastThreadActionFailure("收尾会话失败"));
     },
     "thread.pin": ({ event }) => {

@@ -180,7 +180,10 @@ vi.mock("../components/ui/toast", () => ({
   toastManager: {
     add: (toast: { title?: string }) => {
       if (toast.title) state.toasts.push(toast.title);
+      return "toast";
     },
+    update: () => {},
+    close: () => {},
   },
 }));
 vi.mock("./useHandleNewThread", () => ({ useNewThreadHandler: () => async () => {} }));

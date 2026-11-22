@@ -318,9 +318,7 @@ function PullRequestBadge({
   return (
     <Tooltip key={opensList ? "list" : "link"}>
       <TooltipTrigger render={control}>
-        <span
-          className={cn("contents font-normal text-xs tabular-nums", presentation.toneClassName)}
-        >
+        <span className={cn("contents font-normal tabular-nums", presentation.toneClassName)}>
           <presentation.Icon aria-hidden className="size-3 shrink-0" />
           <span className="text-secondary-label">{presentation.text}</span>
         </span>
@@ -575,7 +573,7 @@ export function ThreadTerminalStatusButton({
             aria-label={label}
             data-testid={`sidebar-terminal-status-${threadRef.threadId}`}
             className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+              "relative inline-flex h-6 min-w-6 shrink-0 cursor-pointer items-center justify-center rounded-sm outline-none after:absolute after:inset-x-0 after:-inset-y-0.5 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
               status?.colorClass,
             )}
             onPointerDown={(event) => event.stopPropagation()}

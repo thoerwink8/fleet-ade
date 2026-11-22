@@ -16,11 +16,13 @@ import { SidebarMenuItem } from "../ui/sidebar";
 export function SidebarThreadUndoNotice() {
   const notice = useThreadUndoNotice((state) => state.notice);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  // Settled shows a toast with its own undo button, so omit the footer copy to avoid two Undo actions.
+  const footerNotice = notice?.action === "Settled" ? null : notice;
   // Short enough to fit beside the utility icons; screen readers hear the full summary.
-  const summary = notice
-    ? notice.count === 1
-      ? notice.action
-      : `${notice.action} ${notice.count}`
+  const summary = footerNotice
+    ? footerNotice.count === 1
+      ? footerNotice.action
+      : `${footerNotice.action} ${footerNotice.count}`
     : null;
 
   // Keeps the last text on screen while it fades out, then unmounts on transitionend.

@@ -104,8 +104,12 @@ export { Button, buttonVariants, type ButtonSize, type ButtonVariant };
 const inlineButtonVariants = cva(
   "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 [text-align:var(--inline-button-text-align,center)] [white-space:var(--inline-button-white-space,nowrap)] hover:underline focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-64",
   {
-    defaultVariants: { tone: "default" },
+    defaultVariants: { size: "default", tone: "default" },
     variants: {
+      size: {
+        default: "",
+        row: "relative min-h-6 text-row after:absolute after:inset-x-0 after:-inset-y-0.5",
+      },
       touchTarget: {
         padded: "pointer-coarse:min-h-11 pointer-coarse:px-1.5",
       },
@@ -122,13 +126,14 @@ const inlineButtonVariants = cva(
 
 export function InlineButton({
   className,
+  size,
   tone,
   touchTarget,
   render,
   ...props
 }: useRender.ComponentProps<"button"> & VariantProps<typeof inlineButtonVariants>) {
   const defaultProps = {
-    className: cn(inlineButtonVariants({ tone, touchTarget }), className),
+    className: cn(inlineButtonVariants({ size, tone, touchTarget }), className),
     "data-slot": "inline-button",
     type: render ? undefined : ("button" as const),
   };

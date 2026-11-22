@@ -158,10 +158,11 @@ export function formatDayAwareTimestamp(
   timestampFormat: TimestampFormat,
   nowMs: number = Date.now(),
   timeZone?: string,
+  includeSeconds = false,
 ): string {
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
-  const time = getTimestampFormatter(timestampFormat, false, timeZone).format(date);
+  const time = getTimestampFormatter(timestampFormat, includeSeconds, timeZone).format(date);
 
   const today = calendarDay(new Date(nowMs), timeZone);
   const messageDay = calendarDay(date, timeZone);

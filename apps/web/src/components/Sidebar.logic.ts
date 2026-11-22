@@ -57,19 +57,16 @@ import { shortcutModifierStore } from "../shortcutModifierState";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useRightPanelStore } from "../rightPanelStore";
 
-export function shouldNavigateAfterThreadPark(input: {
+export function shouldNavigateAfterThreadSnooze(input: {
   readonly threadKey: string;
   readonly currentThreadKey: string | null;
-  readonly action: "settle" | "snooze";
   readonly now: string;
-  readonly thread: (ThreadSnoozeShell & Pick<SidebarThreadSummary, "settledOverride">) | null;
+  readonly thread: ThreadSnoozeShell | null;
 }): boolean {
   return (
     input.threadKey === input.currentThreadKey &&
     input.thread !== null &&
-    (input.action === "settle"
-      ? input.thread.settledOverride === "settled"
-      : effectiveSnoozed(input.thread, { now: input.now }))
+    effectiveSnoozed(input.thread, { now: input.now })
   );
 }
 

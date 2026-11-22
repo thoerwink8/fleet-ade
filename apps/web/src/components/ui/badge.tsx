@@ -48,6 +48,13 @@ const badgeVariants = cva(
           "bg-[color-mix(in_srgb,var(--label)_8%,transparent)] text-[color-mix(in_srgb,var(--label)_30%,var(--color-foreground))] dark:bg-[color-mix(in_srgb,var(--label)_12%,transparent)] dark:text-[color-mix(in_srgb,var(--label)_45%,var(--color-foreground))]",
       },
     },
+    compoundVariants: [
+      {
+        variant: ["dot-attention", "dot-active", "dot-blocked", "dot-waiting", "dot-done"],
+        size: "row",
+        className: "h-5 min-w-0 text-row sm:h-5 sm:min-w-0 sm:text-row",
+      },
+    ],
   },
 );
 
