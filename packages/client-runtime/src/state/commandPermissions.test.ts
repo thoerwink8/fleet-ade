@@ -77,10 +77,13 @@ describe("command permissions", () => {
       yield* TestClock.adjust("6 seconds");
       const result = yield* Fiber.join(pending);
       expect(result._tag).toBe("Failure");
-      if (result._tag === "Failure")
-        expect(Cause.squash(result.cause)).not.toMatchObject({
-          _tag: "EnvironmentAuthorizationError",
+      if (result._tag === "Failure") {
+        expect(Cause.hasDies(result.cause)).toBe(false);
+        expect(Cause.squash(result.cause)).toMatchObject({
+          _tag: "FleetSessionPermissionsUnavailable",
+          message: "Fleet session permissions unavailable",
         });
+      }
     }),
   );
   it.effect("requires the destination read grant to refresh providers", () =>
@@ -276,9 +279,10 @@ it.effect(
       const registry = yield* setup;
       registry.set(sessions(env), AsyncResult.success(grant(true)));
       const git = createCommandPermissions(runtime, WS_METHODS.vcsInit);
-      expect((yield* git.authorize(registry, env).pipe(Effect.flip)).requiredPermission).toBe(
-        AuthSourceControlWriteScope,
-      );
+      expect(yield* git.authorize(registry, env).pipe(Effect.flip)).toMatchObject({
+        _tag: "EnvironmentAuthorizationError",
+        requiredPermission: AuthSourceControlWriteScope,
+      });
       registry.set(
         sessions(env),
         AsyncResult.success({
@@ -296,9 +300,10 @@ it.effect(
         threadId: ThreadId.make("thread"),
       };
       expect(registry.get(prepare.permissionAtom(env, input))).toBe(false);
-      expect((yield* prepare.authorize(registry, env, input).pipe(Effect.flip)).requiredScope).toBe(
-        AuthOrchestrationOperateScope,
-      );
+      expect(yield* prepare.authorize(registry, env, input).pipe(Effect.flip)).toMatchObject({
+        _tag: "EnvironmentAuthorizationError",
+        requiredScope: AuthOrchestrationOperateScope,
+      });
       yield* prepare.authorize(registry, env, { ...input, threadId: undefined });
       registry.set(
         sessions(env),
@@ -485,9 +490,10 @@ it.effect("requires access management to answer a link request", () =>
     registry.set(sessions(env), AsyncResult.success(grant(true)));
     const answer = createCommandPermissions(runtime, WS_METHODS.peerLinksAnswerRequest);
     expect(registry.get(answer.permissionAtom(env))).toBe(false);
-    expect((yield* answer.authorize(registry, env).pipe(Effect.flip)).requiredPermission).toBe(
-      AuthAccessWriteScope,
-    );
+    expect(yield* answer.authorize(registry, env).pipe(Effect.flip)).toMatchObject({
+      _tag: "EnvironmentAuthorizationError",
+      requiredPermission: AuthAccessWriteScope,
+    });
     registry.set(
       sessions(env),
       AsyncResult.success({

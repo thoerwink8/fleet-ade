@@ -166,13 +166,20 @@ export const getInitialServerConfig = Effect.fn("EnvironmentRpc.getInitialServer
   },
 );
 
+export class FleetSessionPermissionsUnavailable extends Schema.TaggedError<FleetSessionPermissionsUnavailable>()(
+  "FleetSessionPermissionsUnavailable",
+  {
+    message: Schema.String,
+  },
+) {}
+
 /** Installed by the shared command boundary. A missing boundary denies protected writes. */
 export class RpcPermissionGuard extends Context.Reference<{
   readonly authorize: (
     environmentId: EnvironmentId,
     method: string,
     input: unknown,
-  ) => Effect.Effect<void, EnvironmentAuthorizationError>;
+  ) => Effect.Effect<void, EnvironmentAuthorizationError | FleetSessionPermissionsUnavailable>;
 }>("@t3tools/client-runtime/rpc/RpcPermissionGuard", {
   defaultValue: () => ({
     authorize: (_environmentId, method, input) => {
@@ -189,14 +196,22 @@ export class RpcPermissionGuard extends Context.Reference<{
   }),
 }) {}
 
-const authorizeRequest = Effect.fn("EnvironmentRpc.authorize")(function* (
-  method: string,
-  input: unknown,
-) {
+// Untraced: EnvironmentRpc.authorize and EnvironmentRpc.subscribeFleetSummary already span this.
+const authorizeGuard = Effect.fnUntraced(function* (method: string, input: unknown) {
   if (clientRpcRequiredScopes(method, input).length === 0) return;
   const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
   const guard = yield* RpcPermissionGuard;
   yield* guard.authorize(supervisor.target.environmentId, method, input);
+});
+
+const authorizeRequest = Effect.fn("EnvironmentRpc.authorize")(function* (
+  method: string,
+  input: unknown,
+) {
+  // Fleet summary subscribe calls authorizeGuard and keeps the typed failure.
+  yield* authorizeGuard(method, input).pipe(
+    Effect.catchTag("FleetSessionPermissionsUnavailable", (error) => Effect.die(error)),
+  );
 });
 
 export const requestInSession = Effect.fn("EnvironmentRpc.request")(function* <
@@ -262,16 +277,15 @@ export function runStreamInSession<TTag extends EnvironmentStreamCommandRpcTag>(
   );
 }
 
-export function subscribeFleetSummaryInSession(
-  session: RpcSession,
-  input: EnvironmentRpcInput<typeof WS_METHODS.fleetSummarySubscribe>,
-) {
-  return Stream.unwrap(
-    authorizeRequest(WS_METHODS.fleetSummarySubscribe, input).pipe(
-      Effect.map(() => session.client[WS_METHODS.fleetSummarySubscribe](input)),
-    ),
-  );
-}
+export const subscribeFleetSummaryInSession = Effect.fn("EnvironmentRpc.subscribeFleetSummary")(
+  function* (
+    session: RpcSession,
+    input: EnvironmentRpcInput<typeof WS_METHODS.fleetSummarySubscribe>,
+  ) {
+    yield* authorizeGuard(WS_METHODS.fleetSummarySubscribe, input);
+    return session.client[WS_METHODS.fleetSummarySubscribe](input);
+  },
+);
 
 interface SubscriptionOptions<TTag extends EnvironmentSubscriptionRpcTag> {
   /** Reports defects; the subscription then waits for the next session or resubscribe. */

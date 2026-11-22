@@ -29,6 +29,8 @@ import {
   fleetSummaryRowKey,
   fleetSummaryChanges,
   initialFleetSummaryState,
+  type FleetSummaryState,
+  type ResumeCache,
 } from "./fleetSummary.ts";
 
 const isFleetSummaryError = Schema.is(FleetSummaryError);
@@ -230,6 +232,9 @@ it.effect("resubscribes with the committed cursor and clears it on resync", () =
     yield* Deferred.succeed(visible, undefined);
     expect(yield* Queue.take(inputs)).toEqual({ cursor: 10 });
     yield* Queue.offer(events, { type: "resync", reason: "gap" });
+    yield* TestClock.adjust("124 millis");
+    expect(yield* Queue.size(inputs)).toBe(0);
+    yield* TestClock.adjust("126 millis");
     expect(yield* Queue.take(inputs)).toEqual({});
   }),
 );
@@ -301,5 +306,92 @@ it.effect.each([false, true])("handles permission denial=%s", (denyImmediately) 
     yield* TestClock.adjust("30 seconds");
     expect(yield* Queue.size(attempts)).toBe(0);
     expect(yield* Queue.size(inputs)).toBe(0);
+  }),
+);
+
+const followControlledSummary = (options: {
+  readonly authorize: Effect.Effect<void>;
+  readonly cache: ResumeCache;
+  readonly onState: (state: FleetSummaryState) => Effect.Effect<void>;
+}) =>
+  Effect.gen(function* () {
+    const source = EnvironmentId.make("source");
+    const inputs = yield* Queue.unbounded<{ cursor?: number }>();
+    const events = yield* Queue.unbounded<FleetSummaryEvent>();
+    const session = {
+      client: {
+        [WS_METHODS.fleetSummarySubscribe]: (input: { cursor?: number }) =>
+          Stream.fromEffect(Queue.offer(inputs, input)).pipe(
+            Stream.drain,
+            Stream.concat(Stream.fromQueue(events)),
+          ),
+      },
+    } as unknown as RpcSession;
+    const sessions = yield* SubscriptionRef.make<Option.Option<RpcSession>>(Option.some(session));
+    const supervisor = {
+      target: { environmentId: source },
+      session: sessions,
+    } as unknown as typeof EnvironmentSupervisor.EnvironmentSupervisor.Service;
+    const registry = {
+      followStream: (
+        _id: EnvironmentId,
+        stream: Stream.Stream<unknown, unknown, EnvironmentSupervisor.EnvironmentSupervisor>,
+      ) => Stream.provideService(stream, EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
+    } as unknown as typeof EnvironmentRegistry.EnvironmentRegistry.Service;
+    yield* fleetSummaryChanges(source, options.cache).pipe(
+      Stream.runForEach(options.onState),
+      Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+      Effect.provideService(RpcPermissionGuard, { authorize: () => options.authorize }),
+      Effect.forkScoped,
+    );
+    return { inputs, events };
+  });
+
+it.effect("stays updating until a resumed subscription is authorized and open", () =>
+  Effect.gen(function* () {
+    const release = yield* Deferred.make<void>();
+    const attempts = yield* Queue.unbounded<void>();
+    const latest = yield* Ref.make("");
+    const { inputs } = yield* followControlledSummary({
+      authorize: Queue.offer(attempts, undefined).pipe(Effect.andThen(Deferred.await(release))),
+      cache: {
+        snapshot: {
+          sourceId: "source",
+          rows: new Map([[fleetSummaryRowKey(row(1, 4)), row(1, 4)]]),
+          cursor: 4,
+        },
+      },
+      onState: (state) => Ref.set(latest, state.status),
+    });
+    yield* Queue.take(attempts);
+    yield* TestClock.adjust("2 seconds");
+    expect(yield* Queue.size(inputs)).toBe(0);
+    expect(yield* Ref.get(latest)).toBe("updating");
+    yield* Deferred.succeed(release, undefined);
+    expect(yield* Queue.take(inputs)).toEqual({ cursor: 4 });
+    yield* TestClock.adjust("2 seconds");
+    expect(yield* Ref.get(latest)).toBe("live");
+  }),
+);
+
+it.effect("backs off before resubscribing when a snapshot page does not match", () =>
+  Effect.gen(function* () {
+    const { inputs, events } = yield* followControlledSummary({
+      authorize: Effect.void,
+      cache: { snapshot: null },
+      onState: () => Effect.void,
+    });
+    expect(yield* Queue.take(inputs)).toEqual({});
+    yield* Queue.offer(events, {
+      type: "snapshot",
+      revision: 3,
+      page: 2,
+      pageCount: 1,
+      rows: [row(1)],
+    });
+    yield* TestClock.adjust("124 millis");
+    expect(yield* Queue.size(inputs)).toBe(0);
+    yield* TestClock.adjust("126 millis");
+    expect(yield* Queue.take(inputs)).toEqual({});
   }),
 );
