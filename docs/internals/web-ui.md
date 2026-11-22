@@ -5,6 +5,12 @@
 Controls come from [`components/ui`](../../apps/web/src/components/ui).
 [AGENTS.md](../../AGENTS.md#taste) says how to use and extend them.
 
+`components/ui` is also the only place that imports `@fleet/design/react`; lint rejects the import
+anywhere else in `apps/web`. The design system's components take data where ours take composed
+parts, so each primitive adapts it once and call sites stay as they are. A generic look that
+fleet-design owns changes there; a look that belongs to one feature stays in that feature.
+Its tokens load in the `fleet-tokens` cascade layer, the lowest one, as `--fa-*` variables.
+
 Don't style a raw `<button>`, `<input>`, `<select>`, or `<textarea>` to look like a control a
 primitive provides. Raw elements are right when the element isn't that control: semantic rows, tabs,
 resize handles, swatches, editor surfaces, anything whose behavior or geometry differs by design.
