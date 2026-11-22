@@ -12,6 +12,7 @@ import {
   getSettingsSearchTargetScope,
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
+  movedSettingsRedirect,
   movedSettingsPath,
   searchSettings,
   SETTINGS_NAV_GROUPS,
@@ -374,6 +375,24 @@ describe("movedSettingsPath", () => {
     );
     expect(movedSettingsPath("/settings/secrets", "")).toBe("/settings/connections");
     expect(movedSettingsPath("/settings/about", "about")).toBe("/settings/maintenance");
+  });
+  it("carries default section anchors for bare moved paths", () => {
+    expect(movedSettingsRedirect("/settings/network", "")).toEqual({
+      to: "/settings/general",
+      hash: "network",
+    });
+    expect(movedSettingsRedirect("/settings/keybindings", "")).toEqual({
+      to: "/settings/general",
+      hash: "keybindings",
+    });
+    expect(movedSettingsRedirect("/settings/worktrees", "")).toEqual({
+      to: "/settings/projects",
+      hash: "worktree-creation",
+    });
+    expect(movedSettingsRedirect("/settings/about", "")).toEqual({
+      to: "/settings/maintenance",
+      hash: "about",
+    });
   });
 
   it("leaves current pages alone", () => {

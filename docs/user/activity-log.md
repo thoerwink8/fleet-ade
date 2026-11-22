@@ -33,7 +33,7 @@ setting applies to this browser or device only.
 ## Screen reader announcements
 
 On web and desktop, a screen reader hears the open thread's turn as it runs. **Screen reader
-announcements** in **Settings → Chat** sets how much. **Status only** says when a turn starts,
+announcements** in **Settings → Threads** sets how much. **Status only** says when a turn starts,
 needs your approval or input, and ends. **Status and messages** also reads each message the agent
 writes and then keeps working after, once that message is complete. A very long message is cut
 short. The reply that closes the turn is not read, so you can read it yourself when you hear

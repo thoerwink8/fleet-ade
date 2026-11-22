@@ -28,7 +28,7 @@ import {
 import { useAccessEnvironment } from "./useAccessEnvironment";
 import { searchableSetting } from "./settingsSearch";
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { SettingsRow, SettingsSection } from "./settingsLayout";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 
@@ -44,7 +44,7 @@ export function SecretsSettingsPanel() {
   const { candidates, environment } = useAccessEnvironment(selectedEnvironmentId);
   const connected = environment?.connection.phase === "connected";
   return (
-    <SettingsPageContainer>
+    <>
       {candidates.length > 1 && environment !== null ? (
         <div className="flex min-w-0 items-center gap-1.5 px-3 text-sm text-muted-foreground sm:px-4">
           <span className="shrink-0">凭据提供方所属环境</span>
@@ -107,7 +107,7 @@ export function SecretsSettingsPanel() {
           </p>
         </SettingsSection>
       )}
-    </SettingsPageContainer>
+    </>
   );
 }
 
