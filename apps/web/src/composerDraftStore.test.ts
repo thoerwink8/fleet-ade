@@ -2639,6 +2639,50 @@ describe("composerDraftStore attachment references", () => {
     );
   });
 
+  it("restores an image saved with captured-window data as a plain image", () => {
+    const image = {
+      id: "img-1",
+      name: "window.png",
+      mimeType: "image/png",
+      sizeBytes: 1,
+      dataUrl: "data:image/png;base64,YQ==",
+    };
+    const merged = useComposerDraftStore.persist.getOptions().merge!(
+      {
+        draftsByThreadKey: {
+          [threadKeyFor(threadId, TEST_ENVIRONMENT_ID)]: {
+            prompt: "",
+            attachments: [
+              {
+                ...image,
+                source: {
+                  kind: "snap-shot",
+                  capturedAt: "2026-08-24T11:00:00.000Z",
+                  appName: "Editor",
+                  windowTitle: "main.ts",
+                  accessibility: { format: "flat-text", text: "Saved text", truncated: false },
+                },
+              },
+            ],
+          },
+        },
+      },
+      useComposerDraftStore.getInitialState(),
+    );
+    const draft = merged.draftsByThreadKey[threadKeyFor(threadId, TEST_ENVIRONMENT_ID)];
+    expect(draft?.persistedAttachments).toEqual([image]);
+    expect(draft?.images.map(({ file: _file, ...rest }) => rest)).toEqual([
+      {
+        type: "image",
+        id: image.id,
+        name: image.name,
+        mimeType: image.mimeType,
+        sizeBytes: image.sizeBytes,
+        previewUrl: image.dataUrl,
+      },
+    ]);
+  });
+
   it("preserves canonical references when another producer ID matches their namespace", () => {
     const prompt =
       "![x.png](t3-context://v1/image/image_x) ![image_x.png](t3-context://v1/image/image_image_x)";
