@@ -466,7 +466,7 @@ export class ChildSessionSummary extends Context.Service<
             FROM orchestration_v2_projection_subagents
             WHERE child_thread_id = ${shell.id}
               AND origin = 'app_owned'
-              AND json_type(payload_json, '$.timedOutAt') = 'string'
+              AND json_type(payload_json, '$.timedOutAt') = 'text'
             LIMIT 1
           `;
         const pr =
@@ -677,15 +677,19 @@ export class ChildSessionSummary extends Context.Service<
             if (stored.event.type === "thread.deleted" || stored.event.type === "thread.archived") {
               return internal.recompute(stored.event.threadId, null).pipe(Effect.ignore);
             }
-            return projectionStore.getThreadShell(stored.event.threadId).pipe(
+            const threadId =
+              stored.event.type === "subagent.updated"
+                ? stored.event.payload.childThreadId
+                : stored.event.threadId;
+            if (threadId === null) return Effect.void;
+            return projectionStore.getThreadShell(threadId).pipe(
               Effect.matchEffect({
                 onFailure: (error) =>
                   Effect.logWarning("child-summary.event-shell-read-failed", {
-                    threadId: stored.event.threadId,
+                    threadId,
                     error,
                   }),
-                onSuccess: (shell) =>
-                  internal.recompute(stored.event.threadId, shell).pipe(Effect.ignore),
+                onSuccess: (shell) => internal.recompute(threadId, shell).pipe(Effect.ignore),
               }),
             );
           });

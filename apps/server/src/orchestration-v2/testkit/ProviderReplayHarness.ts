@@ -270,7 +270,8 @@ export interface ProviderReplayHarnessOptions {
   readonly recoverOnStartup?: boolean;
   readonly continueThreadsAfterServerUpdate?: boolean;
   readonly settingsOverrides?: DeepPartial<ContractServerSettings>;
-  /** Lets a test hold a projection read open to order concurrent dispatches. */
+  /** Exposes the harness settings service for tests that must inspect or update it. */
+  readonly exposeServerSettings?: boolean;
   readonly wrapProjectionStore?: (
     store: ProjectionStore.ProjectionStoreV2Shape,
   ) => ProjectionStore.ProjectionStoreV2Shape;
@@ -547,7 +548,7 @@ export function layerWithRegistry<Error>(
     Layer.provide(Layer.mergeAll(layerStores, layerEffectExecutorProvided, layerEventSinkProvided)),
   );
   const layerReplayRuntime = Layer.mergeAll(
-    layerServerSettings,
+    ...(options.exposeServerSettings === true ? [layerServerSettings] : []),
     layerEffectOutboxProvided,
     layerOrchestratorProvided,
     layerProviderSessionManagerProvided,
@@ -565,7 +566,6 @@ export function layerWithRegistry<Error>(
     Layer.provide(ProviderTurnStartServiceTestkit.layer),
     Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
   );
-
   if (options.runEffectWorker === false) {
     return layerReplayRuntime;
   }

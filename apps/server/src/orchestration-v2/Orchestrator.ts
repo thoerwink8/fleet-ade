@@ -28,9 +28,9 @@ import {
   MessageId,
   NonNegativeInt,
   PositiveInt,
+  type NodeId,
   ProjectId,
   type ModelSelection,
-  OrchestrationV2Command,
   type OrchestrationV2InternalCommand,
   type OrchestrationV2LimitRecoveryUpdate,
   type OrchestrationV2Notification,
@@ -2816,12 +2816,19 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           queueDelivery,
         ),
       };
+      const parentThreadId = projection.thread.lineage.parentThreadId;
       const delegatedTask =
-        queuedRun.delegatedTaskId === undefined || projection.thread.lineage.parentThreadId === null
+        queuedRun.delegatedTaskId === undefined || parentThreadId === null
           ? undefined
-          : (yield* projectionStore.getThreadProjection(
-              projection.thread.lineage.parentThreadId,
-            )).subagents.find((candidate) => candidate.id === queuedRun.delegatedTaskId);
+          : (yield* projectionStore
+              .getThreadRecords(parentThreadId, ["subagents"], {
+                subagentIds: [queuedRun.delegatedTaskId],
+              })
+              .pipe(
+                Effect.mapError(
+                  (cause) => new OrchestratorProjectionError({ threadId: parentThreadId, cause }),
+                ),
+              )).subagents[0];
       const delegatedTimeoutEffect =
         delegatedTask?.timeoutMs !== undefined && delegatedTask.timeoutMs !== null
           ? delegatedTaskTimeoutEffect({
@@ -9060,14 +9067,16 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
       effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
     ) {
-      const parent = yield* projectionStore
-        .getThreadRecords(command.parentThreadId, ["subagents"])
+      const { subagents } = yield* projectionStore
+        .getThreadRecords(command.parentThreadId, ["subagents"], {
+          subagentIds: [command.taskId],
+        })
         .pipe(
           Effect.mapError(
             (cause) => new OrchestratorProjectionError({ threadId: command.parentThreadId, cause }),
           ),
         );
-      const task = parent.subagents.find((candidate) => candidate.id === command.taskId);
+      const task = subagents[0];
       if (
         task?.origin !== "app_owned" ||
         task.timeoutMs == null ||
@@ -9355,10 +9364,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         threadId: childThreadId,
         senderThreadId: command.parentThreadId,
         messageId: childMessageId,
-        text:
-          task.instructions === undefined || task.instructions.length === 0
-            ? command.task
-            : `${task.instructions}\n\n${command.task}`,
+        text: command.task,
         attachments: [],
         modelSelection: command.modelSelection,
         dispatchMode:

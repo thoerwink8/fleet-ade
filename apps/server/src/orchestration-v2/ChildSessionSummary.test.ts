@@ -66,6 +66,26 @@ const storedEvent = (
   } as unknown as OrchestrationV2StoredEvent["event"],
 });
 
+const timedOutSubagentEvent = (
+  parentThreadId: ThreadId,
+  childThreadId: ThreadId,
+  sequence: number,
+): OrchestrationV2StoredEvent => ({
+  sequence,
+  commandId: null,
+  event: {
+    id: EventId.make(`event:${String(sequence)}`),
+    threadId: parentThreadId,
+    type: "subagent.updated",
+    occurredAt: DateTime.makeUnsafe(0),
+    payload: {
+      childThreadId,
+      origin: "app_owned",
+      timedOutAt: "2026-01-01T00:01:00.000Z",
+    },
+  } as unknown as OrchestrationV2StoredEvent["event"],
+});
+
 const seedProjectionThread = (threadId: ThreadId, parentThreadId: ThreadId) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
@@ -257,6 +277,64 @@ it.effect.each([
           events,
           getThreadShell,
           seedProjectionThread(child, parent).pipe(Effect.orDie),
+          ready,
+        ),
+      ),
+    );
+  }),
+);
+
+it.effect("recomputes the child row when its parent delegation times out", () =>
+  Effect.gen(function* () {
+    const events = yield* Queue.unbounded<OrchestrationV2StoredEvent>();
+    const ready = yield* Deferred.make<void>();
+    const processed = yield* Deferred.make<void>();
+    const parent = ThreadId.make("thread:timeout-parent");
+    const child = ThreadId.make("thread:timeout-child");
+    const marker = ThreadId.make("thread:timeout-marker");
+    const childShell = {
+      ...liveThreadShell(child),
+      lineage: {
+        parentThreadId: parent,
+        rootThreadId: parent,
+        relationshipToParent: "subagent" as const,
+      },
+    };
+    const parentShell = {
+      ...liveThreadShell(parent),
+      lineage: { parentThreadId: null, rootThreadId: parent, relationshipToParent: null },
+    };
+    const getThreadShell: ProjectionStore.ProjectionStoreV2Shape["getThreadShell"] = (id) =>
+      id === marker
+        ? Deferred.succeed(processed, undefined).pipe(Effect.as(null))
+        : Deferred.isDone(ready).pipe(Effect.map(() => (id === child ? childShell : parentShell)));
+    yield* Effect.gen(function* () {
+      yield* Deferred.await(ready);
+      const internal = yield* ChildSessionSummaryInternal;
+      const service = yield* ChildSessionSummary;
+      yield* internal.note(factsFor(child, parent, 0));
+      yield* Queue.offer(events, timedOutSubagentEvent(parent, child, 1));
+      yield* Queue.offer(events, storedEvent("thread.metadata-updated", marker, 2));
+      yield* Deferred.await(processed);
+      const detail = yield* service.detail({ threadId: child });
+      assert.ok(detail !== null);
+      assert.strictEqual(detail.phase, "卡住");
+      assert.strictEqual(detail.reason, "超时");
+      assert.strictEqual(detail.activity, "超时");
+    }).pipe(
+      Effect.provide(
+        workerLayer(
+          events,
+          getThreadShell,
+          Effect.gen(function* () {
+            const sql = yield* SqlClient.SqlClient;
+            yield* seedProjectionThread(child, parent);
+            yield* sql`
+              INSERT INTO orchestration_v2_projection_subagents
+                (subagent_id, thread_id, parent_node_id, provider, child_thread_id, origin, status, updated_at, payload_json)
+              VALUES ('timeout-task', ${parent}, 'timeout-node', 'codex', ${child}, 'app_owned', 'running', '2026-01-01T00:00:00.000Z', ${JSON.stringify({ childThreadId: child, timedOutAt: "2026-01-01T00:01:00.000Z" })})
+            `;
+          }).pipe(Effect.orDie),
           ready,
         ),
       ),

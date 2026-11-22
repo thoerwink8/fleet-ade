@@ -1,4 +1,3 @@
-import * as DateTime from "effect/DateTime";
 import { assert, it } from "@effect/vitest";
 import {
   CommandId,
@@ -19,11 +18,11 @@ import {
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
-import * as Effect from "effect/Effect";
+import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
+import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import * as Metric from "effect/Metric";
 import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
@@ -41,6 +40,7 @@ import * as DelegatedTaskQuestionReactor from "./DelegatedTaskQuestionReactor.ts
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
+import * as EffectWorker from "./EffectWorker.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
@@ -93,6 +93,7 @@ const layerCommanderDispatchTest = Layer.mergeAll(
     {
       databaseLayer: layerDatabase,
       runEffectWorker: false,
+      exposeServerSettings: true,
       settingsOverrides: {
         dispatchTimeoutMs: 60_000,
         dispatchStopOnTimeout: false,
@@ -1579,11 +1580,12 @@ it.effect("snapshots the commander timeout and leaves the child running when it 
   }).pipe(Effect.provide(layerCommanderDispatchTest)),
 );
 
-it.effect("stops only the timed-out delegation when stop-on-timeout was accepted", () =>
+it("stops only the timed-out delegation when stop-on-timeout was accepted", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
     const { parentThreadId, task } = yield* acceptCommanderDelegation({
       name: "stop-timeout",
       orchestrator,
@@ -1606,6 +1608,37 @@ it.effect("stops only the timed-out delegation when stop-on-timeout was accepted
       occurredAt: now,
       payload: { ...childRun, delegatedTaskId: task.id, status: "running", startedAt: now },
     });
+    const sibling = yield* orchestrator.dispatch({
+      type: "delegated_task.request",
+      commandId: CommandId.make("stop-timeout-sibling"),
+      parentThreadId,
+      parentRunId: task.runId!,
+      parentNodeId: task.parentNodeId,
+      task: "Review another change",
+      modelSelection,
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      createdBy: "agent",
+      creationSource: "mcp",
+    });
+    const siblingTask = (yield* projections.getThreadProjection(parentThreadId)).subagents.find(
+      (candidate) => candidate.id !== task.id,
+    )!;
+    const siblingRun = (yield* projections.getThreadRecords(siblingTask.childThreadId!, ["runs"]))
+      .runs[0]!;
+    yield* projections.apply({
+      id: EventId.make("event:stop-timeout-sibling-run"),
+      type: "run.updated",
+      threadId: siblingTask.childThreadId!,
+      runId: siblingRun.id,
+      occurredAt: now,
+      payload: {
+        ...siblingRun,
+        delegatedTaskId: siblingTask.id,
+        status: "running",
+        startedAt: now,
+      },
+    });
     yield* TestClock.adjust("1 minute");
     const timeoutCommandId = CommandId.make("stop-timeout-wake");
     yield* orchestrator.dispatch({
@@ -1614,22 +1647,30 @@ it.effect("stops only the timed-out delegation when stop-on-timeout was accepted
       parentThreadId,
       taskId: task.id,
     });
-    const stop = yield* outbox.get(`effect:${timeoutCommandId}:delegated-tasks.stop:${task.id}`);
-    if (Option.isNone(stop)) {
-      assert.fail("expected stop-on-timeout to use the existing stop");
-    }
-    const stopEffect = stop.value;
-    assert.equal(stopEffect.request.type, "delegated-tasks.stop");
-    assert.equal(stopEffect.request.taskId, task.id);
-    assert.equal(stopEffect.threadId, parentThreadId);
-  }).pipe(Effect.provide(layerCommanderDispatchTest)),
-);
+    yield* worker.drain();
+    assert.equal(
+      (yield* projections.getThreadRecords(task.childThreadId!, ["runs"])).runs[0]?.status,
+      "stopping",
+    );
+    assert.equal(
+      (yield* projections.getThreadRecords(siblingTask.childThreadId!, ["runs"])).runs[0]?.status,
+      "running",
+    );
+    assert.isDefined(sibling);
+    assert.equal(
+      (yield* outbox.listByCommandId(timeoutCommandId)).filter(
+        (effect) => effect.request.type === "delegated-tasks.stop",
+      ).length,
+      1,
+    );
+  }).pipe(Effect.provide(layerCommanderDispatchTest)));
 
-it.effect("keeps the accepted timeout and instructions after the settings change", () =>
+it("keeps the accepted timeout and instructions after the settings change", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     const settings = yield* ServerSettings.ServerSettingsService;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
     const { parentThreadId, task } = yield* acceptCommanderDelegation({
       name: "snapshot",
       orchestrator,
@@ -1640,12 +1681,24 @@ it.effect("keeps the accepted timeout and instructions after the settings change
       commanderInstructions: "改过的守则",
       dispatchStopOnTimeout: true,
     });
+    yield* TestClock.adjust("5 seconds");
+    yield* orchestrator.dispatch({
+      type: "delegated_task.timeout",
+      commandId: CommandId.make("snapshot-timeout"),
+      parentThreadId,
+      taskId: task.id,
+    });
     const retained = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
     assert.equal(retained.timeoutMs, task.timeoutMs);
     assert.equal(retained.instructions, "环境守则");
     assert.equal(retained.stopOnTimeout, false);
-  }).pipe(Effect.provide(layerCommanderDispatchTest)),
-);
+    assert.isUndefined(retained.timedOutAt);
+    assert.isFalse(
+      (yield* outbox.listByCommandId(CommandId.make("snapshot-timeout"))).some(
+        (effect) => effect.request.type === "delegated-tasks.stop",
+      ),
+    );
+  }).pipe(Effect.provide(layerCommanderDispatchTest)));
 
 it.effect("uses the host commander model and keeps the current model when that cell is empty", () =>
   Effect.gen(function* () {

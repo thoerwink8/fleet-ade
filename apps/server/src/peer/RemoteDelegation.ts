@@ -320,6 +320,13 @@ const make = Effect.gen(function* () {
           }
         }
       }
+      if (input.timeoutMs != null) {
+        return yield* new OrchestratorMcpFailure({
+          code: "invalid_request",
+          message:
+            "Timeouts are not supported for cross-environment delegation: this environment cannot observe the remote child run's startedAt.",
+        });
+      }
       // A worktree there would branch from a commit this checkout has and the
       // other may not, so a remote task runs in that project's checkout.
       if (input.isolation === "worktree") {

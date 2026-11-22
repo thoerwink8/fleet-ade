@@ -123,9 +123,10 @@ function existingThreadIdsForCommand(
       return command.sourceThreadId === command.targetThreadId
         ? [command.sourceThreadId]
         : [command.sourceThreadId, command.targetThreadId];
+    case "delegated_task.request":
+      return [command.parentThreadId];
     case "delegated_task.timeout":
       return [command.parentThreadId];
-    case "delegated_task.wake-policy":
     case "delegated_task.completion-delivery.acknowledge":
     case "delegated_task.completion-delivery.dispose":
     case "delegated_task.remote.request":
