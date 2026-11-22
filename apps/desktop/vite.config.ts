@@ -79,26 +79,6 @@ export default defineConfig({
       ...(shouldLaunchElectronAfterPack ? { onSuccess: devElectronCommand } : {}),
     },
     {
-      format: "cjs",
-      outDir: "dist-electron",
-      dts: false,
-      sourcemap: true,
-      outExtensions: () => ({ js: ".cjs" }),
-      define: publicConfigDefine,
-      entry: [
-        "src/electron/WindowsForegroundFocusWorker.ts",
-        "src/snapShot/GlobalShiftShortcutWorker.ts",
-        "src/snapShot/RegionSnapShotWorker.ts",
-        "src/snapShot/SnapShotAccessibilityWorker.ts",
-      ],
-      clean: false,
-      deps: {
-        alwaysBundle: (id) => !id.startsWith("node:") && !isMainProcessExternal(id),
-        neverBundle: isMainProcessExternal,
-        onlyBundle: false,
-      },
-    },
-    {
       // boot.cjs requires the other two at runtime, so all three stay separate files.
       format: "cjs",
       outDir: "dist-electron",
@@ -124,15 +104,6 @@ export default defineConfig({
         alwaysBundle: (id) => id === "@clerk/electron" || id.startsWith("@clerk/electron/"),
       },
     },
-    {
-      // Sandboxed preloads must be self-contained, without shared runtime chunks.
-      format: "cjs",
-      outDir: "dist-electron",
-      dts: false,
-      sourcemap: true,
-      outExtensions: () => ({ js: ".cjs" }),
-      entry: ["src/mac-permission-preload.ts"],
-    },
   ],
   test: {
     // The Windows lane runs workspace suites concurrently; filesystem-heavy
@@ -143,7 +114,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "unit",
-          include: [...defaultInclude, "../../native/kde-snap-shot/src/*.test.ts"],
+          include: defaultInclude,
           exclude: ["**/node_modules/**", ...domTests],
           setupFiles: [
             "../../packages/shared/src/testing/longTempDir.ts",

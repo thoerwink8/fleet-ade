@@ -565,3 +565,23 @@ describe("server model preferences", () => {
     expect(decodeServerSettingsPatch(input)).toEqual(input);
   });
 });
+
+describe("retired snapshot settings", () => {
+  it("ignores the snapshot keys that older builds saved", () => {
+    const client = {
+      snapShotEnabled: true,
+      snapShotIncludeAccessibility: false,
+      snapShotShortcut: { kind: "modifier-pair", modifier: "control" },
+      snapShotPlaySound: false,
+      snapShotSound: "camera-shutter",
+      snapShotFlash: false,
+      snapShotAnimations: false,
+    };
+    const decoded = decodeClientSettings({ ...client, timestampFormat: "24-hour" });
+    for (const key of Object.keys(client)) {
+      expect(decoded).not.toHaveProperty(key);
+      expect(decodeClientSettingsPatch(client)).not.toHaveProperty(key);
+    }
+    expect(decoded.timestampFormat).toBe("24-hour");
+  });
+});

@@ -23,7 +23,6 @@ export async function serializeComposerImages(
           mimeType: image.mimeType,
           sizeBytes: image.sizeBytes,
           dataUrl,
-          ...(image.source ? { source: image.source } : {}),
         });
       } catch {
         const existingPersisted = existingPersistedById.get(image.id);
