@@ -85,7 +85,15 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
       </SettingsScopeNotice>
     );
   }
-  if (SETTINGS_DEVICE_ONLY_PATHS.has(pathname) || pathname === "/settings/projects") {
+  if (
+    SETTINGS_DEVICE_ONLY_PATHS.has(pathname) ||
+    // General mixes device settings with the network section, which reports a missing scope itself.
+    pathname === "/settings/general" ||
+    pathname === "/settings/projects" ||
+    // Merged into 代码, which keeps its own unavailable notice.
+    pathname === "/settings/source-control" ||
+    pathname === "/settings/worktrees"
+  ) {
     return children;
   }
   if (scope.kind === "unavailable")

@@ -81,7 +81,7 @@ export async function handleDesktopAppActivationRequest(
       return failure(
         request.requestId,
         "project-create-failed",
-        errorMessage(error, "T3 Code 无法添加该项目。"),
+        errorMessage(error, "Fleet ADE 无法添加该项目。"),
       );
     }
   }
@@ -92,7 +92,7 @@ export async function handleDesktopAppActivationRequest(
       projectId,
     });
     if (opened === null) {
-      return failure(request.requestId, "thread-open-failed", "T3 Code 无法为该项目打开新会话。");
+      return failure(request.requestId, "thread-open-failed", "Fleet ADE 无法为该项目打开新会话。");
     }
     return {
       version: 1,
@@ -105,7 +105,7 @@ export async function handleDesktopAppActivationRequest(
     return failure(
       request.requestId,
       "thread-open-failed",
-      errorMessage(error, "T3 Code 无法为该项目打开新会话。"),
+      errorMessage(error, "Fleet ADE 无法为该项目打开新会话。"),
     );
   }
 }

@@ -373,7 +373,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
         );
       return executable;
     },
-    Effect.mapError(wrapFailure("resolve", "T3 Code 中未安装 Codex。请先安装。")),
+    Effect.mapError(wrapFailure("resolve", "Fleet ADE 中未安装 Codex。请先安装。")),
   );
   const acquire = Effect.fn("CodexInstallation.acquire")(function* () {
     return yield* Effect.acquireRelease(

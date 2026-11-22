@@ -1,7 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SourceControlSettingsPanel } from "../components/settings/SourceControlSettings";
-
-export const Route = createFileRoute("/_chat/settings/source-control")({
-  component: SourceControlSettingsPanel,
-});
+// Folded into /settings/projects; the settings route redirects old links, anchors included.
+export const Route = createFileRoute("/_chat/settings/source-control")({});

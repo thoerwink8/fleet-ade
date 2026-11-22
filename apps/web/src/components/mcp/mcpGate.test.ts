@@ -143,7 +143,7 @@ describe("resolveMcpGate", () => {
           cause: "no_connector",
           reason: "Cloudflare 没有来自本机的可用隧道连接。",
           hint: null,
-          fix: "Restart T3 Code.",
+          fix: "Restart Fleet ADE.",
         },
       },
       "offline",

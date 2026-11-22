@@ -978,7 +978,7 @@ function ConnectionsSettingsContent({
         {desktopWslState.enabled ? (
           <SettingsRow
             title="仅 WSL"
-            description="仅运行 WSL 后端。更改后 T3 Code 会重启。"
+            description="仅运行 WSL 后端。更改后 Fleet ADE 会重启。"
             className="bg-muted/20 pl-7 sm:pl-8"
             control={
               <Switch
@@ -1308,8 +1308,8 @@ function ConnectionsSettingsContent({
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   {pendingDesktopServerExposureMode === "network-accessible"
-                    ? "允许你的其他设备通过网络连接 T3 Code。设备配对后即可获得访问权限。T3 Code 将重启。"
-                    : "通过本地网络连接的设备将断开连接。T3 Connect、Tailscale HTTPS 等现有隧道仍可使用。T3 Code 将重启。"}
+                    ? "允许你的其他设备通过网络连接 Fleet ADE。设备配对后即可获得访问权限。Fleet ADE 将重启。"
+                    : "通过本地网络连接的设备将断开连接。T3 Connect、Tailscale HTTPS 等现有隧道仍可使用。Fleet ADE 将重启。"}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1365,15 +1365,15 @@ function ConnectionsSettingsContent({
                 <AlertDialogDescription>
                   {pendingWslChange?.kind === "disable"
                     ? pendingWslChange.wasWslOnly
-                      ? "T3 Code 将重启并使用 Windows 后端。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 后即可继续访问。"
-                      : "WSL 后端将停止。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 前无法在 T3 Code 中访问。"
+                      ? "Fleet ADE 将重启并使用 Windows 后端。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 后即可继续访问。"
+                      : "WSL 后端将停止。WSL 中的会话和项目会保留在发行版内，重新启用 WSL 前无法在 Fleet ADE 中访问。"
                     : pendingWslChange?.kind === "distro"
-                      ? "T3 Code 将在新发行版中重启 WSL 后端。当前发行版中仍在运行的会话会中断。"
+                      ? "Fleet ADE 将在新发行版中重启 WSL 后端。当前发行版中仍在运行的会话会中断。"
                       : pendingWslChange?.kind === "enable"
                         ? "要同时运行 WSL 和 Windows 后端，还是停止 Windows 后端、仅使用 WSL？之后可以在设置中更改。"
                         : pendingWslChange?.nextValue
-                          ? "T3 Code 将重启并仅启动 WSL 后端。关闭此选项前，你将无法访问 Windows 中的项目。"
-                          : "T3 Code 将重启，并在运行 WSL 的同时重新启动 Windows 后端。"}
+                          ? "Fleet ADE 将重启并仅启动 WSL 后端。关闭此选项前，你将无法访问 Windows 中的项目。"
+                          : "Fleet ADE 将重启，并在运行 WSL 的同时重新启动 Windows 后端。"}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1459,7 +1459,7 @@ function ConnectionsSettingsContent({
               <AlertDialogHeader>
                 <AlertDialogTitle>停用 Tailscale HTTPS？</AlertDialogTitle>
                 <AlertDialogDescription>
-                  T3 Code 将重启本地后端，并停用 Tailscale 转发。
+                  Fleet ADE 将重启本地后端，并停用 Tailscale 转发。
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -1497,7 +1497,7 @@ function ConnectionsSettingsContent({
               <DialogHeader>
                 <DialogTitle>设置 Tailscale HTTPS？</DialogTitle>
                 <DialogDescription>
-                  T3 Code 将重启本地后端并启用 Tailscale 转发，由 Tailscale 把 HTTPS
+                  Fleet ADE 将重启本地后端并启用 Tailscale 转发，由 Tailscale 把 HTTPS
                   流量代理到此后端。
                 </DialogDescription>
               </DialogHeader>

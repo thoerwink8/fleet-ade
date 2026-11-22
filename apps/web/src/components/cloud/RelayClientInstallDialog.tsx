@@ -68,8 +68,8 @@ export function RelayClientInstallDialog() {
           <DialogTitle>{isInstalling ? "正在安装中继客户端" : "要安装中继客户端吗？"}</DialogTitle>
           <DialogDescription>
             {isInstalling
-              ? "T3 Code 正在为此环境做准备，以便通过 T3 Connect 安全访问。"
-              : "T3 Code 需要中继客户端，才能通过 T3 Connect 访问此环境。"}
+              ? "Fleet ADE 正在为此环境做准备，以便通过 T3 Connect 安全访问。"
+              : "Fleet ADE 需要中继客户端，才能通过 T3 Connect 访问此环境。"}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>
@@ -90,14 +90,15 @@ export function RelayClientInstallDialog() {
                 value={activeStepIndex + 1}
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
-                安装中继客户端期间，请保持 T3 Code 打开。
+                安装中继客户端期间，请保持 Fleet ADE 打开。
               </p>
             </div>
           ) : (
             <div className="rounded-xl border border-border/70 bg-muted/35 p-3">
               <p className="text-sm font-medium text-foreground">托管中继客户端</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                T3 Code 会在本机下载并安装版本 {view.status === "confirming" ? view.version : ""}。
+                Fleet ADE 会在本机下载并安装版本 {view.status === "confirming" ? view.version : ""}
+                。
               </p>
             </div>
           )}

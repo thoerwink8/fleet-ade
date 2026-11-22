@@ -145,7 +145,7 @@ function ReclaimRow({
       toastManager.add({
         type: "success",
         title: `正在回收 ${amount} 上的 ${label}`,
-        description: `该设备上的 T3 Code 会重启，约 ${minutes} 分钟后恢复。`,
+        description: `该设备上的 Fleet ADE 会重启，约 ${minutes} 分钟后恢复。`,
       });
       return;
     }
@@ -163,7 +163,7 @@ function ReclaimRow({
       title={`${amount} 上的 ${label}`}
       description={
         status.reclaimFailure === undefined
-          ? `会重启该设备上的 T3 Code，大约离线 ${minutes} 分钟。`
+          ? `会重启该设备上的 Fleet ADE，大约离线 ${minutes} 分钟。`
           : `上次尝试失败：${status.reclaimFailure}`
       }
       control={
@@ -184,7 +184,7 @@ function ReclaimRow({
                   回收 {amount} 星期 {label}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  {label} 上的 T3 Code 会停止、重建数据库，然后重新启动。大约离线 {minutes}{" "}
+                  {label} 上的 Fleet ADE 会停止、重建数据库，然后重新启动。大约离线 {minutes}{" "}
                   分钟。正在运行的智能体会在重启时停止。
                 </AlertDialogDescription>
               </AlertDialogHeader>

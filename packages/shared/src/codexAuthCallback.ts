@@ -13,8 +13,8 @@ export class CodexAuthCallbackError extends Schema.TaggedError<CodexAuthCallback
 }
 
 const listeners = new Map<string, AbortController>();
-const CALLBACK_PAGE_TITLE = "返回 T3 Code";
-const CALLBACK_PAGE_BODY = "已收到登录响应。T3 Code 正在完成连接。可以关闭此标签页。";
+const CALLBACK_PAGE_TITLE = "返回 Fleet ADE";
+const CALLBACK_PAGE_BODY = "已收到登录响应。Fleet ADE 正在完成连接。可以关闭此标签页。";
 
 export function cancelCodexAuthCallback(authorizationUrl: string) {
   const { state } = codexAuthorizationRequest(authorizationUrl);
@@ -59,7 +59,7 @@ export async function receiveCodexAuthCallback(
         response
           .writeHead(200, { "content-type": "text/html; charset=utf-8" })
           .end(
-            `<!doctype html><html lang="zh-CN"><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>T3 Code</title><style>body{font-family:system-ui;display:grid;place-items:center;min-height:90vh;margin:0}main{max-width:360px;padding:32px}h1{font-size:24px}p{line-height:1.6;opacity:.7}</style></head><body><main><h1>${CALLBACK_PAGE_TITLE}</h1><p>${CALLBACK_PAGE_BODY}</p></main></body></html>`,
+            `<!doctype html><html lang="zh-CN"><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Fleet ADE</title><style>body{font-family:system-ui;display:grid;place-items:center;min-height:90vh;margin:0}main{max-width:360px;padding:32px}h1{font-size:24px}p{line-height:1.6;opacity:.7}</style></head><body><main><h1>${CALLBACK_PAGE_TITLE}</h1><p>${CALLBACK_PAGE_BODY}</p></main></body></html>`,
           );
       }
       callback.resolve(url);
@@ -77,7 +77,7 @@ export async function receiveCodexAuthCallback(
       server.once("error", () =>
         reject(
           new Error(
-            "这台电脑上的 ChatGPT 回调端口已被占用。请关闭另一个登录后再试，或在 T3 Code 中粘贴重定向 URL。",
+            "这台电脑上的 ChatGPT 回调端口已被占用。请关闭另一个登录后再试，或在 Fleet ADE 中粘贴重定向 URL。",
           ),
         ),
       );

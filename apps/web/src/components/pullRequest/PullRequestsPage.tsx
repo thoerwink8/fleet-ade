@@ -1021,7 +1021,7 @@ export function PullRequestsPage() {
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
           title="PR 不可用"
-          error="更新你的 T3 Code 服务器以浏览 pull request。"
+          error="更新你的 Fleet ADE 服务器以浏览 pull request。"
         />
       ) : firstLoad ? (
         <PullRequestListGhost rows={7} caption="正在加载 PR…" />

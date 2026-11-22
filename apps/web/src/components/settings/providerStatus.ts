@@ -54,7 +54,7 @@ export function getProviderSummary(provider: ServerProvider | undefined) {
   if (!provider.enabled || provider.status === "disabled") {
     return {
       headline: "Disabled",
-      detail: provider.message ?? "此提供方已安装，但已停用，无法用于 T3 Code 的新会话。",
+      detail: provider.message ?? "此提供方已安装，但已停用，无法用于 Fleet ADE 的新会话。",
     };
   }
   if (!provider.installed) {

@@ -381,7 +381,7 @@ export function startDesktopUpdateLaunchNotice(): () => void {
         stackedThreadToast({
           type: "error",
           title: "更新未生效",
-          description: `T3 Code 仍停留在 ${APP_VERSION}。请从更新按钮重新安装 ${notAppliedVersion}。`,
+          description: `Fleet ADE 仍停留在 ${APP_VERSION}。请从更新按钮重新安装 ${notAppliedVersion}。`,
         }),
       );
     },

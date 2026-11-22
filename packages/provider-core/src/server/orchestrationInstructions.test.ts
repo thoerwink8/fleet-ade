@@ -46,7 +46,7 @@ describe("T3 orchestration instructions", () => {
       previousState: state,
     });
     assert.include(withTools, T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim());
-    assert.notInclude(withTools, "## T3 Code devices");
+    assert.notInclude(withTools, "## Fleet ADE devices");
     assert.equal(
       t3AcpPromptWithInstructions({ prompt: "Again.", state, previousState: state }),
       "Again.",

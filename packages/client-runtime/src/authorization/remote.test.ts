@@ -94,7 +94,7 @@ describe("remote environment authorization", () => {
         credential: "one-time-credential",
         dpopProof: "token-proof",
         clientMetadata: {
-          label: "T3 Code Mobile",
+          label: "Fleet ADE Mobile",
           deviceType: "mobile",
           os: "iOS",
         },

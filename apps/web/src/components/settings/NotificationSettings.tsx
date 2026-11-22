@@ -14,7 +14,7 @@ import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings"
 
 export function NotificationSettings() {
   const mode = useScopedSettings((settings) => settings.notificationMode);
-  const updateSettings = useUpdateScopedSettings();
+  const updateSettings = useUpdateScopedSettings({ deviceOnly: true });
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
 
@@ -23,7 +23,7 @@ export function NotificationSettings() {
       {...searchableSetting("thread-notifications")}
       description={
         permissionMessage ??
-        "会话完成、失败或需要输入或批准时发送系统提醒。仅在此设备上打开 T3 Code 时生效。"
+        "会话完成、失败或需要输入或批准时发送系统提醒。仅在此设备上打开 Fleet ADE 时生效。"
       }
       control={
         <Select

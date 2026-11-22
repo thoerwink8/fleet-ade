@@ -41,7 +41,7 @@ export function HostedEmptyState() {
                 ? "重新启用此电脑，或连接另一台电脑。"
                 : cloudEnabled
                   ? "智能体在你的电脑上运行。"
-                  : "智能体在你的电脑上运行。请先在电脑上启动 T3 Code。"}
+                  : "智能体在你的电脑上运行。请先在电脑上启动 Fleet ADE。"}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

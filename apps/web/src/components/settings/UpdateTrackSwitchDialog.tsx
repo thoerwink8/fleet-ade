@@ -170,7 +170,7 @@ function SwitchPlan({
         ...(idle.note === null ? [] : [idle.note]),
         ...(crossesLocal && updatesOff ? ["此应用已停用更新，请手动重新安装以切换通道。"] : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
-          ? ["如果 T3 Code 重启后没有重新打开，请再次打开。"]
+          ? ["如果 Fleet ADE 重启后没有重新打开，请再次打开。"]
           : []),
       ]}
       restarts={everything.restarts}

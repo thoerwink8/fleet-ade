@@ -53,9 +53,9 @@ export function CliCommandSettingsRow() {
   if (!state?.supported) return null;
   const installed = state.installedPath !== null;
   const description = state.shadowedBy
-    ? `新终端会优先运行 ${state.shadowedBy} 中的另一个 t3。请先移除它，再使用 T3 Code 的版本。`
+    ? `新终端会优先运行 ${state.shadowedBy} 中的另一个 t3。请先移除它，再使用 Fleet ADE 的版本。`
     : !installed
-      ? "在任意终端通过 `t3` 运行 T3 Code 的 CLI。"
+      ? "在任意终端通过 `t3` 运行 Fleet ADE 的 CLI。"
       : state.onPath
         ? `已安装到 ${state.installedPath}。打开新终端即可使用。`
         : state.pathSetup?.added

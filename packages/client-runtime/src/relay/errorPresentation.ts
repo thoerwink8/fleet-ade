@@ -94,7 +94,7 @@ export function relayRequestFailureDetail(error: {
 }
 
 const RELAY_TUNNEL_RELEASED_MESSAGE =
-  "离线时间较长，其 T3 Connect 隧道已被移除。请在那台电脑上启动 T3 Code 并更新到最新版本，即可重新连接。";
+  "离线时间较长，其 T3 Connect 隧道已被移除。请在那台电脑上启动 Fleet ADE 并更新到最新版本，即可重新连接。";
 
 export function relayOfflineReasonMessage(
   status: Pick<RelayEnvironmentStatusResponse, "offlineReason">,

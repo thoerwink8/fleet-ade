@@ -482,7 +482,7 @@ export async function persistScopedSettingsPatch(
       return [
         {
           ...environment,
-          message: "此环境不支持该设置，请更新该环境上的 T3 Code。",
+          message: "此环境不支持该设置，请更新该环境上的 Fleet ADE。",
         },
       ];
     }

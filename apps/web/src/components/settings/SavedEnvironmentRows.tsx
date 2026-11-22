@@ -687,7 +687,7 @@ function ConfiguredCloudLinkRow({
       ) : isElectron ? (
         <SettingsRow
           title={searchableSetting("t3-connect").title}
-          description="请在主机上运行 `t3 connect link`，然后在那里重启 T3 Code。"
+          description="请在主机上运行 `t3 connect link`，然后在那里重启 Fleet ADE。"
         />
       ) : null}
       {signedOut && showSwitch ? null : (

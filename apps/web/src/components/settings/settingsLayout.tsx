@@ -46,6 +46,8 @@ interface SettingsSearchTargetContextValue {
   readonly onTargetHandled: () => void;
 }
 
+const SettingsPageContainerNestedContext = createContext(false);
+
 const noop = () => undefined;
 const SettingsSearchTargetContext = createContext<SettingsSearchTargetContextValue>({
   targetId: null,
@@ -558,6 +560,7 @@ export function SettingsPageContainer({
   width?: WorkspacePageWidth;
   searchTargetFallbacks?: Readonly<Record<string, string | undefined>>;
 }) {
+  const nested = useContext(SettingsPageContainerNestedContext);
   const navigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });
   const highlightTarget = useLocation({
@@ -580,15 +583,21 @@ export function SettingsPageContainer({
       highlightTarget={highlightTarget}
       onTargetHandled={clearTargetHash}
     >
-      <div
-        className="topbar-scroll-fade scrollbar-gutter-both flex-1 overflow-y-auto"
-        data-settings-page-scroll
-      >
-        <WorkspacePageContainer width={width} className={cn("gap-8", className)}>
-          <SettingsScopeSentence />
-          {children}
-        </WorkspacePageContainer>
-      </div>
+      {nested ? (
+        <div className={cn("flex flex-col gap-8", className)}>{children}</div>
+      ) : (
+        <div
+          className="topbar-scroll-fade scrollbar-gutter-both flex-1 overflow-y-auto"
+          data-settings-page-scroll
+        >
+          <WorkspacePageContainer width={width} className={cn("gap-8", className)}>
+            <SettingsScopeSentence />
+            <SettingsPageContainerNestedContext value={true}>
+              {children}
+            </SettingsPageContainerNestedContext>
+          </WorkspacePageContainer>
+        </div>
+      )}
     </SettingsSearchTargetProvider>
   );
 }

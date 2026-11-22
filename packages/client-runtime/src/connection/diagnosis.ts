@@ -102,7 +102,7 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
     case "session_pending":
       return "此设备仍在加载 T3 Connect 登录状态";
     case "outdated":
-      return `${host} 运行的 T3 Code 版本较旧`;
+      return `${host} 运行的 Fleet ADE 版本较旧`;
     case "clock_skew":
       return "此设备的时钟不准确";
     case "not_linked":
@@ -117,9 +117,9 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
     case "tunnel_down":
       return `${host} 的隧道离线`;
     case "origin_unreachable":
-      return `隧道正常，但 ${host} 上的 T3 Code 没有响应`;
+      return `隧道正常，但 ${host} 上的 Fleet ADE 没有响应`;
     case "invalid_response":
-      return `${host} 上的 T3 Code 返回了异常响应`;
+      return `${host} 上的 Fleet ADE 返回了异常响应`;
     case "dns":
       return `无法解析 ${host} 的隧道地址`;
     case "tls":
@@ -148,8 +148,8 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
         : `T3 Connect 无法访问 ${host} 的隧道`;
     case "server":
       return failure?.reason === "authentication" || failure?.reason === "permission"
-        ? `${host} 上的 T3 Code 未接受此设备`
-        : `${host} 上的 T3 Code 没有响应`;
+        ? `${host} 上的 Fleet ADE 未接受此设备`
+        : `${host} 上的 Fleet ADE 没有响应`;
   }
 }
 
@@ -157,14 +157,14 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
   const checkHost = `请在 ${host} 上查看“设置 > 共享与访问”，或运行 \`t3 connect status\`。`;
   switch (located.cause) {
     case "offline":
-      return ["请将此设备连接到互联网。T3 Code 会自动重新连接。"];
+      return ["请将此设备连接到互联网。Fleet ADE 会自动重新连接。"];
     case "session_pending":
       return [
-        "请稍等。T3 Code 会自动重试。",
-        "如果一直没有进展，请在此设备上重新加载或重启 T3 Code。",
+        "请稍等。Fleet ADE 会自动重试。",
+        "如果一直没有进展，请在此设备上重新加载或重启 Fleet ADE。",
       ];
     case "outdated":
-      return [`请更新 ${host} 上的 T3 Code。`];
+      return [`请更新 ${host} 上的 Fleet ADE。`];
     case "clock_skew":
       return [`请在此设备和 ${host} 上开启自动日期与时间，然后重试。`];
     case "not_linked":
@@ -173,21 +173,21 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
         `请在 ${host} 上打开“设置 > 共享与访问”，并开启 T3 Connect。`,
       ];
     case "tunnel_pending":
-      return ["请稍等片刻。T3 Code 会自动重试。", checkHost];
+      return ["请稍等片刻。Fleet ADE 会自动重试。", checkHost];
     case "relay_error":
-      return ["请等几分钟。T3 Code 会自动重试。", "如果仍然失败，请复制诊断信息并反馈。"];
+      return ["请等几分钟。Fleet ADE 会自动重试。", "如果仍然失败，请复制诊断信息并反馈。"];
     case "tunnel_not_enabled":
       return [`请在 ${host} 上打开“设置 > 共享与访问”，并开启 T3 Connect。`];
     case "released":
     case "tunnel_down":
       return [
-        `请确认 ${host} 未休眠，且 T3 Code 正在运行。`,
+        `请确认 ${host} 未休眠，且 Fleet ADE 正在运行。`,
         checkHost,
         `${host} 上的 VPN 或 Tailscale 出口节点可能会阻止隧道连接（端口 7844）。请关闭它们或允许隧道连接。`,
       ];
     case "origin_unreachable":
     case "invalid_response":
-      return [`请在 ${host} 上打开或重启 T3 Code。`, checkHost];
+      return [`请在 ${host} 上打开或重启 Fleet ADE。`, checkHost];
     // The relay saw these on its way to the host, so the fix is on the host.
     case "dns":
     case "tls":
@@ -200,7 +200,10 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
   }
   switch (located.hop) {
     case "device":
-      return ["请在此设备上重启 T3 Code。", `如果仍然失败，请从此设备移除 ${host}，然后重新添加。`];
+      return [
+        "请在此设备上重启 Fleet ADE。",
+        `如果仍然失败，请从此设备移除 ${host}，然后重新添加。`,
+      ];
     case "relay":
       return failure?.reason === "authentication"
         ? ["请退出 T3 Connect 后重新登录。"]
@@ -218,7 +221,7 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
           ]
         : [`请确认 ${host} 未休眠且已联网。`, checkHost];
     case "server":
-      return [`请确认 ${host} 上的 T3 Code 正在运行。`, "请重试。如果仍然失败，请复制诊断信息。"];
+      return [`请确认 ${host} 上的 Fleet ADE 正在运行。`, "请重试。如果仍然失败，请复制诊断信息。"];
   }
 }
 
@@ -289,7 +292,7 @@ function hopLabel(hop: ConnectionHop, host: string): string {
     case "tunnel":
       return `${host} 的隧道`;
     case "server":
-      return `${host} 上的 T3 Code`;
+      return `${host} 上的 Fleet ADE`;
   }
 }
 
@@ -360,7 +363,7 @@ const HOP_MARK = { ok: "ok", failed: "FAILED", unchecked: "not checked" } as con
 /** One plain-text block for bug reports. */
 export function connectionDiagnosisText(hostLabel: string, diagnosis: ConnectionDiagnosis): string {
   return [
-    `T3 Code connection to ${hostLabel}: ${diagnosis.headline}`,
+    `Fleet ADE connection to ${hostLabel}: ${diagnosis.headline}`,
     "",
     ...diagnosis.hops.map((hop) => `${hop.label}: ${HOP_MARK[hop.result]}`),
     "",

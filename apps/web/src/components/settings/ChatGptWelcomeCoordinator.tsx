@@ -66,7 +66,8 @@ export function ChatGptWelcomeCoordinator() {
           <OpenAI className="mb-2 size-8" aria-hidden="true" />
           <DialogTitle>已连接你的 ChatGPT 套餐</DialogTitle>
           <DialogDescription>
-            T3 Code 中符合条件的用量会计入你的 ChatGPT 套餐。请在 ChatGPT 中管理共享用量和额度设置。
+            Fleet ADE 中符合条件的用量会计入你的 ChatGPT 套餐。请在 ChatGPT
+            中管理共享用量和额度设置。
           </DialogDescription>
           <p className="text-xs text-muted-foreground">
             {next?.providerName} 星期 {next?.environmentLabel}

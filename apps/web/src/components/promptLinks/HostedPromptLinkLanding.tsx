@@ -46,7 +46,7 @@ function summarize(
         prompt.value === null
           ? {
               title: "打开此会话",
-              description: "如果你已连接到运行它的机器，它会在 T3 Code 中打开。",
+              description: "如果你已连接到运行它的机器，它会在 Fleet ADE 中打开。",
               prompt: null,
               details: [],
             }
@@ -148,7 +148,7 @@ function HostedPromptLinkLanding({
         <Alert className="mt-5" variant="error">
           <AlertTitle>此提示词含有隐藏字符，可能是恶意内容</AlertTitle>
           <AlertDescription>
-            T3 Code 已去掉 {prompt.hiddenCharacters} 个隐藏字符。发送前请先读一遍提示词。
+            Fleet ADE 已去掉 {prompt.hiddenCharacters} 个隐藏字符。发送前请先读一遍提示词。
           </AlertDescription>
         </Alert>
       ) : null}

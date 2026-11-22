@@ -77,11 +77,11 @@ export function resolveProviderCompatibility(
       : "unknown";
   const message =
     status === "broken"
-      ? "这个提供方版本与此 T3 Code 版本不兼容。"
+      ? "这个提供方版本与此 Fleet ADE 版本不兼容。"
       : status === "unsupported"
-        ? "这个提供方版本不在此 T3 Code 版本的支持范围内。"
+        ? "这个提供方版本不在此 Fleet ADE 版本的支持范围内。"
         : status === "graceful"
-          ? "这个提供方版本与此 T3 Code 版本仅部分兼容。"
+          ? "这个提供方版本与此 Fleet ADE 版本仅部分兼容。"
           : null;
   const recommendedVersion = policy.recommendedVersion ?? null;
   const recommendedRange = policy.recommendedRange ?? null;

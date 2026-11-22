@@ -20,6 +20,6 @@ export function hostFreezeNotice(
     description:
       loadAverage !== undefined && loadAverage > cpuCount
         ? `其 CPU 负载过高（${Math.round(loadAverage)} 个核心的负载为 ${cpuCount}）。`
-        : `${hostLabel} 上的 T3 Code 太忙，未能响应。`,
+        : `${hostLabel} 上的 Fleet ADE 太忙，未能响应。`,
   };
 }

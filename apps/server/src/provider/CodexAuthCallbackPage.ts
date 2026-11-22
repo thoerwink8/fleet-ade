@@ -18,12 +18,12 @@ export function codexAuthCallbackPage(
   const title = success ? "已登录" : "登录未能完成";
   const description = success
     ? destination
-      ? "正在返回 T3 Code。可以继续了。"
-      : "请返回 T3 Code 继续。可以关闭此标签页。"
-    : "请返回 T3 Code 并重新登录。";
+      ? "正在返回 Fleet ADE。可以继续了。"
+      : "请返回 Fleet ADE 继续。可以关闭此标签页。"
+    : "请返回 Fleet ADE 并重新登录。";
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark"><title>${escapeHtml(title)} · T3 Code</title>
+<meta name="color-scheme" content="light dark"><title>${escapeHtml(title)} · Fleet ADE</title>
 ${success && destination ? `<meta http-equiv="refresh" content="1;url=${escapeHtml(destination)}">` : ""}
 <style>
 :root{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#18181b;background:#fafafa;color-scheme:light dark}
@@ -37,6 +37,6 @@ a{display:inline-flex;align-items:center;justify-content:center;margin-top:28px;
 </style></head><body><main><div class="brand"><strong>T3</strong> Code</div>
 <div class="status" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${success ? '<path d="m5 12 4 4L19 6"/>' : '<path d="m6 6 12 12M6 18 18 6"/>'}</svg></div>
 <h1>${escapeHtml(title)}</h1><p>${description}</p>
-${destination ? `<a href="${escapeHtml(destination)}">返回 T3 Code</a>` : ""}
+${destination ? `<a href="${escapeHtml(destination)}">返回 Fleet ADE</a>` : ""}
 </main><script nonce="${escapeHtml(nonce)}">history.replaceState(null,"","/auth/callback");</script></body></html>`;
 }

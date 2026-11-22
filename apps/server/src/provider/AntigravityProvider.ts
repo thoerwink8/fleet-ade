@@ -199,7 +199,7 @@ export const makeAntigravityProvider = Effect.fn("makeAntigravityProvider")(func
         auth: { status: "unknown", ...(options.auth ? { type: options.auth.type } : {}) },
         message: settings.enabled
           ? "正在检查 Antigravity 是否可用。"
-          : "已在 T3 Code 设置里停用 Antigravity。",
+          : "已在 Fleet ADE 设置里停用 Antigravity。",
       },
     }),
     setup: { canAuthenticate: true, canInstall: true },

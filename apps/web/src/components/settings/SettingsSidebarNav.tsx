@@ -11,21 +11,13 @@ import {
   ArchiveIcon,
   BotIcon,
   CalendarClockIcon,
-  FileDiffIcon,
   FolderTreeIcon,
-  GitBranchIcon,
-  NetworkIcon,
-  InfoIcon,
-  MessageSquareTextIcon,
-  MessagesSquareIcon,
-  PanelsTopLeftIcon,
-  KeyboardIcon,
-  KeyRoundIcon,
   PaletteIcon,
   SearchIcon,
   ServerIcon,
+  MessagesSquareIcon,
+  PanelsTopLeftIcon,
   Settings2Icon,
-  ShieldCheckIcon,
   WrenchIcon,
   XIcon,
 } from "lucide-react";
@@ -71,30 +63,30 @@ const SETTINGS_SECTION_ICONS: Readonly<
   Record<SettingsPath, ComponentType<{ className?: string }>>
 > = {
   "/settings/general": Settings2Icon,
-  "/settings/network": NetworkIcon,
+  "/settings/network": Settings2Icon,
   "/settings/diagnostics": WrenchIcon,
   "/settings/appearance": PaletteIcon,
-  "/settings/chat": MessageSquareTextIcon,
-  "/settings/diffs": FileDiffIcon,
+  "/settings/chat": MessagesSquareIcon,
+  "/settings/diffs": PaletteIcon,
   "/settings/projects": PanelsTopLeftIcon,
-  "/settings/keybindings": KeyboardIcon,
+  "/settings/keybindings": Settings2Icon,
   "/settings/providers": BotIcon,
   "/settings/threads": MessagesSquareIcon,
   "/settings/scheduled-tasks": CalendarClockIcon,
-  "/settings/source-control": GitBranchIcon,
+  "/settings/source-control": PanelsTopLeftIcon,
   "/settings/worktrees": FolderTreeIcon,
   "/settings/connections": ServerIcon,
-  "/settings/access": ShieldCheckIcon,
-  "/settings/secrets": KeyRoundIcon,
+  "/settings/access": ServerIcon,
+  "/settings/secrets": ServerIcon,
   "/settings/maintenance": WrenchIcon,
-  "/settings/about": InfoIcon,
+  "/settings/about": WrenchIcon,
   "/settings/archived": ArchiveIcon,
 };
 
-// Detail pages without a nav entry highlight the page that links to them.
+// Detail pages without a nav entry highlight the section that links to them.
 const SETTINGS_DETAIL_PAGE_PARENTS: Readonly<Record<string, SettingsPath>> = {
   "/settings/diagnostics": "/settings/maintenance",
-  "/settings/open-source-licenses": "/settings/about",
+  "/settings/open-source-licenses": "/settings/maintenance",
 };
 
 // Attached only to the highlighted result, so it runs whenever the highlight lands on a row.

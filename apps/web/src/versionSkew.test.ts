@@ -16,7 +16,7 @@ import {
   resolveVersionMismatch,
 } from "./versionSkew";
 
-const MISMATCH_HINT = "版本不一致。请让客户端和服务器使用相同的 T3 Code 版本。";
+const MISMATCH_HINT = "版本不一致。请让客户端和服务器使用相同的 Fleet ADE 版本。";
 
 describe("versionSkew", () => {
   it("updates only the proven install and safely quotes its paths", () => {

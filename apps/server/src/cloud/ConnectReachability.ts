@@ -84,21 +84,21 @@ export function classifyReachability(
     fix: string,
     hint: string | null = null,
   ): Unreachable => ({ status: "unreachable", checkedAt, cause, reason, hint, fix });
-  const restart = "请重启 T3 Code。如果仍然如此，请重新运行 `t3 connect`。";
+  const restart = "请重启 Fleet ADE。如果仍然如此，请重新运行 `t3 connect`。";
 
   if (!facts.managedTunnelConfigured) {
     // A running server reads the link `t3 connect` stores only at startup.
     return fail(
       "not_linked",
       "服务器尚未设置 T3 Connect 隧道。",
-      "请运行 `t3 connect`，然后重启 T3 Code 以应用关联。",
+      "请运行 `t3 connect`，然后重启 Fleet ADE 以应用关联。",
     );
   }
   if (connector === null) {
     return fail(
       "connector_not_running",
       "隧道客户端（cloudflared）未运行。",
-      "请重启 T3 Code。如果仍无法运行，请检查服务器日志中的中继客户端错误。",
+      "请重启 Fleet ADE。如果仍无法运行，请检查服务器日志中的中继客户端错误。",
     );
   }
   const status = endpoint?.kind === "status" ? endpoint.status : null;
@@ -131,7 +131,7 @@ export function classifyReachability(
     return fail(
       "origin_unreachable",
       "隧道已运行，但无法访问本机上的 T3 服务器。",
-      "请重启 T3 Code，让隧道使用服务器监听的端口。",
+      "请重启 Fleet ADE，让隧道使用服务器监听的端口。",
     );
   }
   if (endpoint === null || connector.readyConnections === 0) {

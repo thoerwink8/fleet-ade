@@ -192,7 +192,7 @@ it.effect("links with a pairing code, and the peer holds its agents to the limit
       });
       // B lists the link under A's name, where it can be revoked.
       expect((yield* linkedSessions(b)).map((session) => session.client.label)).toEqual([
-        "T3 Code · Laptop",
+        "Fleet ADE · Laptop",
       ]);
       expect(
         (yield* a.links.list).map(({ environmentId, status }) => [environmentId, status]),
@@ -201,8 +201,8 @@ it.effect("links with a pairing code, and the peer holds its agents to the limit
       // The caller's limits narrow the link's access; they never widen it.
       expect(
         yield* probe(a, { runtimeMode: "approval-required", interactionMode: "plan" }),
-      ).toEqual({ caller: "T3 Code · Laptop", modes: "approval-required/plan" });
-      expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
+      ).toEqual({ caller: "Fleet ADE · Laptop", modes: "approval-required/plan" });
+      expect(yield* probe(a)).toEqual({ caller: "Fleet ADE · Laptop", modes: "auto/default" });
 
       // A refusal keeps the peer's reason.
       const notFound = yield* probe(a, undefined, "refuse").pipe(Effect.flip);
@@ -224,7 +224,7 @@ it.effect("a stale linkedEnvironmentsEnabled=false no longer gates links on eith
       yield* link;
 
       yield* b.settings.updateSettings({ linkedEnvironmentsEnabled: false });
-      expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
+      expect(yield* probe(a)).toEqual({ caller: "Fleet ADE · Laptop", modes: "auto/default" });
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
@@ -342,7 +342,7 @@ it.effect("a legacy peer's 403 keeps a linked call retryable", () =>
       const refused = yield* probe(legacy).pipe(Effect.flip);
       expect(refused.code).toBe("orchestration_error");
       expect(refused.message).toContain("turned off");
-      expect(yield* probe(a)).toEqual({ caller: "T3 Code · Laptop", modes: "auto/default" });
+      expect(yield* probe(a)).toEqual({ caller: "Fleet ADE · Laptop", modes: "auto/default" });
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
@@ -811,7 +811,7 @@ it.effect("linking a picked machine that answers nowhere names it and links noth
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
-it.live("linking an address with nothing listening says so, unlike one that is not T3 Code", () =>
+it.live("linking an address with nothing listening says so, unlike one that is not Fleet ADE", () =>
   Effect.scoped(
     Effect.gen(function* () {
       const closed = yield* Effect.scoped(
@@ -827,7 +827,7 @@ it.live("linking an address with nothing listening says so, unlike one that is n
         a.links.link({ url, pairingCode: "unused", access: "auto" }).pipe(Effect.flip);
       expect((yield* linking(closed)).message).toBe(`${closed} did not answer (ECONNREFUSED).`);
       expect((yield* linking(notT3)).message).toBe(
-        `${notT3} answered, but not as a T3 Code environment this version understands.`,
+        `${notT3} answered, but not as a Fleet ADE environment this version understands.`,
       );
       expect(yield* a.links.list).toEqual([]);
     }),

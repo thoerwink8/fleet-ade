@@ -101,7 +101,7 @@ function toSshPasswordPromptError(
       break;
     case "DesktopSshPromptWindowUnavailableError":
     case "DesktopSshPromptPresentationError":
-      message = "T3 Code 窗口不可用，无法进行 SSH 身份验证。";
+      message = "Fleet ADE 窗口不可用，无法进行 SSH 身份验证。";
       break;
     case "DesktopSshPromptTimedOutError":
       message = `${cause.destination} 的 SSH 身份验证超时。`;

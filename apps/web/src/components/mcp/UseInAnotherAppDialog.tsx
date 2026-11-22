@@ -73,7 +73,7 @@ export function UseInAnotherAppDialogHost() {
 
 function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentId | null }) {
   const { environment, label } = useAccessEnvironment(requested);
-  const title = `在其他应用中使用 T3 Code（MCP）· ${label ?? "T3 Code"}`;
+  const title = `在其他应用中使用 Fleet ADE（MCP）· ${label ?? "Fleet ADE"}`;
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : close())}>
       <WizardPopup>
@@ -395,7 +395,7 @@ function GateScreen({
         </GateMessage>
       );
     case "update":
-      return <GateMessage title={`请更新 ${name} 上的 T3 Code`} />;
+      return <GateMessage title={`请更新 ${name} 上的 Fleet ADE`} />;
     case "no-relay-read":
       return (
         <GateMessage
@@ -452,7 +452,7 @@ function GateScreen({
           ) : (
             <div className="space-y-2 text-sm">
               <CommandBlock command="t3 connect link" />
-              <p>请在 {name} 上重启 T3 Code。</p>
+              <p>请在 {name} 上重启 Fleet ADE。</p>
               {checkAgain}
             </div>
           )}

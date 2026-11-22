@@ -264,7 +264,7 @@ describe("scoped settings writes", () => {
     const unsupported = [
       {
         label: server.label,
-        message: "此环境不支持该设置，请更新该环境上的 T3 Code。",
+        message: "此环境不支持该设置，请更新该环境上的 Fleet ADE。",
       },
     ];
 
@@ -466,6 +466,26 @@ describe("scoped settings writes", () => {
         planScopedSettingsPatch(scope, environments, { fontScale: "large" }, { deviceOnly: true }),
       ).toMatchObject({ clientPatch: { fontScale: "large" }, unavailableReason: null });
     }
+  });
+  it("saves device settings locally when the page also edits a server", () => {
+    expect(
+      planScopedSettingsPatch(
+        named,
+        environments,
+        { fontScale: "large", enableProviderUpdateChecks: false },
+        { deviceOnly: true },
+      ),
+    ).toMatchObject({
+      clientPatch: { fontScale: "large" },
+      hasClientWrite: true,
+      serverWrites: [
+        {
+          environmentId: server.environmentId,
+          patch: { enableProviderUpdateChecks: false },
+        },
+      ],
+      unavailableReason: null,
+    });
   });
   it("clears overrides per member and removes an emptied entry", () => {
     const withOverrides = environment("Server", {

@@ -34,7 +34,7 @@ export function SecretsSettingsPanel() {
       environment.serverConfig.secretProviderSettings !== true ? (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            请先更新 {environment.label} 上的 T3 Code，才能管理它的凭据提供方。
+            请先更新 {environment.label} 上的 Fleet ADE，才能管理它的凭据提供方。
           </p>
         </SettingsSection>
       ) : connected ? (

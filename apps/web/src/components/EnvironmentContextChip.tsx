@@ -32,7 +32,9 @@ export function EnvironmentContextChip(props: {
           </ContextChip>
         }
       />
-      <TooltipPopup side="top">{environment ? "T3 Code 环境" : "此应用中没有的机器"}</TooltipPopup>
+      <TooltipPopup side="top">
+        {environment ? "Fleet ADE 环境" : "此应用中没有的机器"}
+      </TooltipPopup>
     </Tooltip>
   );
 }
