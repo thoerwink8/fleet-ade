@@ -62,7 +62,8 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # build-desktop-artifact.ts spawns `vp`. pnpm installs that shim in
+      # build-desktop-artifact.ts spawns `vp` for the JS bundle, the staged
+      # install, and electron-builder. pnpm installs that shim in
       # node_modules/.bin, which the runner does not put on PATH.
       - name: Put workspace binaries on PATH
         run: cygpath -w "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
