@@ -52,7 +52,6 @@ source alone does not explain. Most code changes do not need an internal documen
 - [Composer coordinates and serialization](./internals/composer-editors.md)
 - [Context handoffs](./internals/context-handoffs.md)
 - [Action names agree across presentations](./internals/consistency-action-names.md)
-- [Pull request file revisions](./internals/pull-request-file-revisions.md)
 - [Model classification](./internals/model-manifest.md)
 - [Remote environments](./internals/remote.md)
 - [Resource telemetry](./internals/resource-telemetry.md)

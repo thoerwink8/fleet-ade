@@ -687,13 +687,13 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             };
           }),
         ),
-      setPullRequestDetailTab: (ref, surfaceId, detailTab) =>
+      setPullRequestDetailTab: (ref, surfaceId, _detailTab) =>
         set((state) => {
           const threadKey = scopedThreadKey(ref);
           const existing = state.byThreadKey[threadKey]?.surfaces.find(
             (surface) => surface.id === surfaceId,
           );
-          const normalized: PullRequestDetailTab = detailTab === "code" ? "code" : "code";
+          const normalized = "code" as const;
           if (existing?.kind !== "pull-request" || (existing.detailTab ?? "code") === normalized)
             return state;
           return automaticUpdate(state, threadKey, (current) => ({
