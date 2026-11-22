@@ -13,7 +13,6 @@ import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
-import * as PlatformError from "effect/PlatformError";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -1364,19 +1363,6 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
           Effect.catch((error) =>
             enrichProcessExitWithStderr(error).pipe(Effect.flatMap(Effect.fail)),
           ),
-          // Closing the runtime scope interrupts this request after the process exit is recorded.
-          Effect.catchCause((cause) =>
-            Cause.hasInterruptsOnly(cause)
-              ? Ref.get(terminationErrorRef).pipe(
-                  Effect.flatMap((terminated) =>
-                    Option.isSome(terminated)
-                      ? Effect.fail(terminated.value)
-                      : Effect.failCause(cause),
-                  ),
-                  Effect.uninterruptible,
-                )
-              : Effect.failCause(cause),
-          ),
           Effect.tap((result) =>
             logRequest({
               method,
@@ -1682,46 +1668,6 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
     Effect.forkIn(runtimeScope),
   );
 
-  // A write to a runtime that has already exited fails with EPIPE. Keep the process exit.
-  const exitedProcessError = (reported: EffectAcpErrors.AcpError) =>
-    Effect.gen(function* () {
-      if (reported._tag === "AcpProcessExitedError") return reported;
-      if (
-        reported._tag !== "AcpTransportError" ||
-        reported.detail !== "Failed to write an outgoing ACP message"
-      ) {
-        return reported;
-      }
-      const running = yield* child.isRunning.pipe(Effect.orElseSucceed(() => true));
-      if (running) return reported;
-      const exit = yield* child.exitCode.pipe(Effect.exit);
-      if (Exit.isSuccess(exit)) {
-        const code = Number(exit.value);
-        if (code === 0) return reported;
-        return new EffectAcpErrors.AcpProcessExitedError({
-          code,
-          pid: Number(child.pid),
-          cause: reported,
-        });
-      }
-      const failure = Cause.squash(exit.cause);
-      const signal =
-        PlatformError.isPlatformError(failure) &&
-        failure.reason.module === "ChildProcess" &&
-        failure.reason.method === "exitCode" &&
-        failure.reason.cause instanceof Error
-          ? /^Process interrupted due to receipt of signal: '(SIG[A-Z0-9]+)'$/.exec(
-              failure.reason.cause.message,
-            )?.[1]
-          : undefined;
-      if (signal === undefined) return reported;
-      return new EffectAcpErrors.AcpProcessExitedError({
-        signal,
-        pid: Number(child.pid),
-        cause: reported,
-      });
-    });
-
   const acpContext = yield* Layer.build(
     EffectAcpClient.layerChildProcess(child, {
       ...(options.transformStdout ? { transformStdout: options.transformStdout } : {}),
@@ -1737,17 +1683,10 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
       ...(options.protocolLogging?.logger ? { logger: options.protocolLogging.logger } : {}),
       ...(options.onIncomingRequest ? { onIncomingRequest: options.onIncomingRequest } : {}),
       onTermination: (error) =>
-        exitedProcessError(error).pipe(
-          Effect.flatMap((resolved) =>
-            recordTermination(resolved).pipe(
-              Effect.andThen(options.onTermination?.(resolved) ?? Effect.void),
-              Effect.ensuring(
-                Scope.close(runtimeScope, Exit.fail(resolved)).pipe(
-                  Effect.forkDetach,
-                  Effect.asVoid,
-                ),
-              ),
-            ),
+        recordTermination(error).pipe(
+          Effect.andThen(options.onTermination?.(error) ?? Effect.void),
+          Effect.ensuring(
+            Scope.close(runtimeScope, Exit.fail(error)).pipe(Effect.forkDetach, Effect.asVoid),
           ),
         ),
       ...(options.onOutgoingResponseFailure
