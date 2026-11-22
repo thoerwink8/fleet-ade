@@ -49,7 +49,6 @@ import {
   revealWindow,
   pickFolder,
   pickProjectFavicon,
-  pickThemeFiles,
   setTheme,
   syncHtmlFullscreen,
   showContextMenu,
@@ -116,7 +115,6 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
 
   yield* ipc.handle(pickFolder);
   yield* ipc.handle(pickProjectFavicon);
-  yield* ipc.handle(pickThemeFiles);
   yield* ipc.handle(setTheme);
   yield* ipc.handle(showContextMenu);
   yield* ipc.handle(openExternal);

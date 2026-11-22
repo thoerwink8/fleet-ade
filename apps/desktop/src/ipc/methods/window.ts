@@ -6,19 +6,15 @@ import {
   DesktopThemeSchema,
   EDITORS,
   EditorId,
-  PickedThemeFileSchema,
   PickFolderOptionsSchema,
   PRIMARY_LOCAL_ENVIRONMENT_ID,
   REMOTE_CAPABLE_EDITOR_IDS,
   type DesktopEnvironmentBootstrap,
-  type PickedThemeFile,
 } from "@t3tools/contracts";
 import { PROJECT_FAVICON_EXTENSIONS } from "@t3tools/shared/projectFavicon";
 import { resolveEditorCommand } from "@t3tools/shared/editor";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { isRelayTracingEnabled } from "@t3tools/shared/otelEnvironment";
-import * as FileSystem from "effect/FileSystem";
-import * as Path from "effect/Path";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -477,44 +473,5 @@ export const syncHtmlFullscreen = DesktopIpc.makeIpcMethod({
       state.leaving = window.isFullScreen();
       window.setFullScreen(false);
     }
-  }),
-});
-
-const PICKED_THEME_FILE_MAX_BYTES = 256 * 1024;
-
-export const pickThemeFiles = DesktopIpc.makeIpcMethod({
-  channel: IpcChannels.PICK_THEME_FILES_CHANNEL,
-  payload: Schema.Undefined,
-  result: Schema.NullOr(Schema.Array(PickedThemeFileSchema)),
-  handler: Effect.fn("desktop.ipc.window.pickThemeFiles")(function* () {
-    const dialog = yield* ElectronDialog.ElectronDialog;
-    const electronWindow = yield* ElectronWindow.ElectronWindow;
-    const fileSystem = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const extensionsDir = path.join(yield* HostProcess.HomeDirectory, ".vscode", "extensions");
-    const defaultPath = yield* fileSystem
-      .exists(extensionsDir)
-      .pipe(Effect.orElseSucceed(() => false));
-    const paths = yield* dialog.pickFiles({
-      owner: yield* electronWindow.focusedMainOrFirst,
-      defaultPath: defaultPath ? Option.some(extensionsDir) : Option.none(),
-      filters: [{ name: "JSON", extensions: ["json"] }],
-      multiple: true,
-    });
-    if (paths.length === 0) {
-      return null;
-    }
-    return yield* Effect.forEach(paths, (filePath) => {
-      const name = path.basename(filePath);
-      return Effect.gen(function* () {
-        const info = yield* fileSystem.stat(filePath);
-        const size = Number(info.size);
-        if (size > PICKED_THEME_FILE_MAX_BYTES) {
-          return { name, size, text: "" } satisfies PickedThemeFile;
-        }
-        const text = yield* fileSystem.readFileString(filePath);
-        return { name, size, text } satisfies PickedThemeFile;
-      }).pipe(Effect.orElseSucceed((): PickedThemeFile => ({ name, size: 0, text: "" })));
-    });
   }),
 });
