@@ -13,14 +13,12 @@ export interface ServerConfigProjection {
 }
 
 /**
- * Published themes and usage-limit sources are current machine state, so a
- * cache could restore a set the machine no longer reports.
+ * Usage-limit sources are current machine state, so a cache could restore a
+ * set the machine no longer reports.
  */
-export function withoutEnvironmentThemes(config: ServerConfig): ServerConfig {
-  if (config.environmentThemes === undefined && config.usageLimitSources === undefined) {
-    return config;
-  }
-  const { environmentThemes: _themes, usageLimitSources: _sources, ...rest } = config;
+export function withoutUsageLimitSources(config: ServerConfig): ServerConfig {
+  if (config.usageLimitSources === undefined) return config;
+  const { usageLimitSources: _sources, ...rest } = config;
   return rest;
 }
 
@@ -99,11 +97,8 @@ export function applyServerConfigProjection(
 ): Option.Option<ServerConfigProjection> {
   switch (event.type) {
     case "snapshot": {
-      // Wire snapshots never contain published themes. Keep the previous set
-      // until the server sends its authoritative theme event.
-      const carriedThemes = Option.isSome(current)
-        ? current.value.config.environmentThemes
-        : undefined;
+      // Wire snapshots never contain usage-limit sources. Keep the previous set
+      // until the server sends its authoritative event.
       const carriedSources = Option.isSome(current)
         ? current.value.config.usageLimitSources
         : undefined;
@@ -113,7 +108,6 @@ export function applyServerConfigProjection(
           Option.getOrUndefined(current)?.config.providers,
           event.config.providers,
         ),
-        ...(carriedThemes === undefined ? {} : { environmentThemes: carriedThemes }),
         ...(carriedSources === undefined ? {} : { usageLimitSources: carriedSources }),
       };
       return Option.some({
@@ -162,15 +156,6 @@ export function applyServerConfigProjection(
           source: "live",
         };
       });
-    case "environmentThemesUpdated":
-      return Option.map(current, (projection) => ({
-        config: {
-          ...projection.config,
-          environmentThemes: event.payload.themes.length > 0 ? event.payload.themes : undefined,
-        },
-        latestEvent: event,
-        source: "live",
-      }));
     case "usageLimitSourcesUpdated":
       return Option.map(current, (projection) => ({
         config: {

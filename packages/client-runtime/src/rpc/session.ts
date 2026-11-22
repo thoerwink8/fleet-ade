@@ -43,7 +43,7 @@ import {
 import {
   applyServerConfigProjection,
   type ServerConfigProjection,
-  withoutEnvironmentThemes,
+  withoutUsageLimitSources,
 } from "../state/serverConfigProjection.ts";
 import { environmentMismatchError } from "../connection/errors.ts";
 
@@ -63,7 +63,6 @@ export interface RpcSession {
 }
 
 export interface RpcSessionOptions {
-  readonly environmentThemes?: boolean;
   readonly usageLimitSources?: boolean;
   readonly usageLimitsCommand?: boolean;
   readonly providerCatalogsOnDemand?: boolean;
@@ -94,10 +93,6 @@ type ServerConfigSubscription = Stream.Stream<
 type ServerConfigSubscriptionInput = Parameters<
   WsRpcProtocolClient[typeof WS_METHODS.subscribeServerConfig]
 >[0];
-type EnvironmentThemesUpdatedEvent = Extract<
-  ServerConfigStreamEvent,
-  { readonly type: "environmentThemesUpdated" }
->;
 type UsageLimitSourcesUpdatedEvent = Extract<
   ServerConfigStreamEvent,
   { readonly type: "usageLimitSourcesUpdated" }
@@ -106,7 +101,6 @@ type UsageLimitSourcesUpdatedEvent = Extract<
 interface ServerConfigReplayState {
   readonly projection: ServerConfigProjection;
   readonly revision: number;
-  readonly themesEvent: EnvironmentThemesUpdatedEvent | undefined;
   readonly sourcesEvent: UsageLimitSourcesUpdatedEvent | undefined;
 }
 
@@ -122,13 +116,9 @@ function serverConfigReplayEvents(
   const snapshot = {
     version: 1 as const,
     type: "snapshot" as const,
-    config: withoutEnvironmentThemes(state.projection.config),
+    config: withoutUsageLimitSources(state.projection.config),
   };
-  return [
-    snapshot,
-    ...(state.themesEvent === undefined ? [] : [state.themesEvent]),
-    ...(state.sourcesEvent === undefined ? [] : [state.sourcesEvent]),
-  ];
+  return [snapshot, ...(state.sourcesEvent === undefined ? [] : [state.sourcesEvent])];
 }
 
 const isSocketErrorReason = Schema.is(Socket.SocketErrorReason);
@@ -175,7 +165,6 @@ export const make = Effect.fn("RpcSessionFactory.make")(function* (
 ) {
   const webSocketConstructor = yield* Socket.WebSocketConstructor;
   const serverConfigInput: ServerConfigSubscriptionInput = {
-    ...(options.environmentThemes === true ? { environmentThemes: true } : {}),
     ...(options.usageLimitSources === true ? { usageLimitSources: true } : {}),
     ...(options.usageLimitsCommand === true ? { usageLimitsCommand: true } : {}),
     ...(options.providerCatalogsOnDemand === true ? { providerCatalogsOnDemand: true } : {}),
@@ -314,10 +303,6 @@ export const make = Effect.fn("RpcSessionFactory.make")(function* (
                 onNone: () => 1,
                 onSome: (state) => state.revision + 1,
               }),
-              themesEvent:
-                event.type === "environmentThemesUpdated"
-                  ? event
-                  : Option.getOrUndefined(current)?.themesEvent,
               sourcesEvent:
                 event.type === "usageLimitSourcesUpdated"
                   ? event

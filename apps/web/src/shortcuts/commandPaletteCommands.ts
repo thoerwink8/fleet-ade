@@ -7,7 +7,6 @@ import {
 } from "../commandPaletteStore";
 import { overlayModeForCommand } from "../components/CommandPalette.logic";
 import { APPEARANCE_OPTIONS, notifyThemeSaveFailure } from "../components/CommandPaletteThemeItems";
-import { toggleThemeEditorForTheme } from "../components/settings/themeEditorStore";
 import { toastManager } from "../components/ui/toast";
 import { getThemeSnapshot, setAppearanceMode } from "../hooks/useTheme";
 import { type CommandHandler, type CommandScopeOptions, registerCommands } from "./dispatcher";
@@ -100,11 +99,6 @@ export function installCommandPaletteCommands(
         consume(event);
         if (event.repeat) return;
         dispatchCommandPalette({ _tag: "OpenChangeTheme" });
-      },
-      "themeEditor.toggle": (event) => {
-        consume(event);
-        const { theme, themeHalves, resolvedTheme } = getThemeSnapshot();
-        toggleThemeEditorForTheme({ theme, themeHalves, initialAppearance: resolvedTheme });
       },
       "usage.open": (event) => {
         consume(event);

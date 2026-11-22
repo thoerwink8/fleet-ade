@@ -167,24 +167,14 @@ const encodeServerConfig = Schema.encodeSync(ServerConfig);
 const encodeServerConfigStreamEvent = Schema.encodeSync(ServerConfigStreamEvent);
 const encodeDefect = Schema.encodeSync(Schema.Defect());
 const ENCODED_SERVER_CONFIG = encodeServerConfig(SERVER_CONFIG);
-const THEME_SERVER_CONFIG: ServerConfigType = {
+const SOURCE_SERVER_CONFIG: ServerConfigType = {
   ...SERVER_CONFIG,
   environment: {
     ...SERVER_CONFIG.environment,
-    capabilities: {
-      ...SERVER_CONFIG.environment.capabilities,
-      environmentThemes: true,
-    },
+    capabilities: { ...SERVER_CONFIG.environment.capabilities, usageLimitSources: true },
   },
 };
-const ENCODED_THEME_SERVER_CONFIG = encodeServerConfig(THEME_SERVER_CONFIG);
-const SOURCE_SERVER_CONFIG: ServerConfigType = {
-  ...THEME_SERVER_CONFIG,
-  environment: {
-    ...THEME_SERVER_CONFIG.environment,
-    capabilities: { ...THEME_SERVER_CONFIG.environment.capabilities, usageLimitSources: true },
-  },
-};
+const ENCODED_SOURCE_SERVER_CONFIG = encodeServerConfig(SOURCE_SERVER_CONFIG);
 const PROVIDER = Schema.decodeSync(ServerProvider)({
   instanceId: "codex",
   driver: "codex",
@@ -506,11 +496,9 @@ describe("RpcSessionFactory", () => {
     }),
   );
 
-  it.effect.each([
-    { usageLimitSources: true },
-    { environmentThemes: true, usageLimitSources: true },
-  ])("replays usage sources and removal with %j", (options) =>
+  it.effect("replays usage sources and removal", () =>
     Effect.gen(function* () {
+      const options = { usageLimitSources: true };
       const { factory, sockets } = yield* makeFactory(options);
       const session = yield* factory.connect(PREPARED);
       const ready = yield* Effect.forkChild(session.ready);
@@ -524,13 +512,6 @@ describe("RpcSessionFactory", () => {
         Effect.forkChild,
       );
       expect((yield* Queue.take(observed)).type).toBe("snapshot");
-      const themes: ServerConfigStreamEventType[] = options.environmentThemes
-        ? [{ version: 1, type: "environmentThemesUpdated", payload: { themes: [] } }]
-        : [];
-      for (const event of themes) {
-        yield* publishConfigEvents(socket, [event]);
-        expect(yield* Queue.take(observed)).toEqual(event);
-      }
       const events: ServerConfigStreamEventType[] = [
         SOURCE_EVENT,
         { version: 1, type: "usageLimitSourcesUpdated", payload: { sources: [] } },
@@ -555,7 +536,7 @@ describe("RpcSessionFactory", () => {
         yield* publishConfigEvents(socket, [marker]);
         expect(yield* Queue.take(observed)).toEqual(marker);
         const replayed = Array.from(yield* Fiber.join(replay));
-        expect(replayed.slice(1)).toEqual([...themes, event, marker]);
+        expect(replayed.slice(1)).toEqual([event, marker]);
         let projection = applyServerConfigProjection(Option.none(), {
           version: 1,
           type: "snapshot",
@@ -575,104 +556,9 @@ describe("RpcSessionFactory", () => {
     }),
   );
 
-  it.effect("replays theme updates and deletion as authoritative events", () =>
+  it.effect("recovers a slow subscriber after it misses a usage-source deletion", () =>
     Effect.gen(function* () {
-      const { factory, sockets } = yield* makeFactory({ environmentThemes: true });
-      const session = yield* factory.connect(PREPARED);
-      const readyFiber = yield* Effect.forkChild(session.ready);
-      const socket = yield* awaitSocket(sockets);
-      socket.open();
-      yield* completeInitialConfig(socket, ENCODED_THEME_SERVER_CONFIG, {
-        environmentThemes: true,
-      });
-      yield* Fiber.join(readyFiber);
-
-      const firstThemes = [
-        {
-          id: "nightfall",
-          name: "Nightfall",
-          appearance: "dark" as const,
-          canvas: "#1a1b26",
-          accent: "#7aa2f7",
-        },
-      ];
-      const replacementThemes = [
-        {
-          id: "midnight",
-          name: "Midnight",
-          appearance: "dark" as const,
-          canvas: "#000000",
-          accent: "#ffffff",
-        },
-      ];
-      const subscriberStarted = yield* Deferred.make<void>();
-      const subscriber = yield* session.subscribeServerConfig({ environmentThemes: true }).pipe(
-        Stream.mapEffect((event) =>
-          Deferred.succeed(subscriberStarted, undefined).pipe(Effect.as(event)),
-        ),
-        Stream.take(4),
-        Stream.runCollect,
-        Effect.forkChild,
-      );
-      yield* Deferred.await(subscriberStarted);
-      yield* publishConfigEvents(socket, [
-        {
-          version: 1,
-          type: "environmentThemesUpdated",
-          payload: { themes: firstThemes },
-        },
-        {
-          version: 1,
-          type: "environmentThemesUpdated",
-          payload: { themes: replacementThemes },
-        },
-        {
-          version: 1,
-          type: "environmentThemesUpdated",
-          payload: { themes: [] },
-        },
-      ]);
-
-      const liveEvents = Array.from(yield* Fiber.join(subscriber));
-      expect(liveEvents.map((event) => event.type)).toEqual([
-        "snapshot",
-        "environmentThemesUpdated",
-        "environmentThemesUpdated",
-        "environmentThemesUpdated",
-      ]);
-      expect(liveEvents[2]).toMatchObject({ payload: { themes: replacementThemes } });
-
-      const replay = Array.from(
-        yield* session
-          .subscribeServerConfig({ environmentThemes: true })
-          .pipe(Stream.take(2), Stream.runCollect),
-      );
-      expect(replay.map((event) => event.type)).toEqual(["snapshot", "environmentThemesUpdated"]);
-      expect(replay[1]).toMatchObject({ payload: { themes: [] } });
-
-      let projection = applyServerConfigProjection(Option.none(), {
-        version: 1,
-        type: "snapshot",
-        config: THEME_SERVER_CONFIG,
-      });
-      projection = applyServerConfigProjection(projection, {
-        version: 1,
-        type: "environmentThemesUpdated",
-        payload: { themes: firstThemes },
-      });
-      for (const event of replay) {
-        projection = applyServerConfigProjection(projection, event);
-      }
-      expect(Option.getOrThrow(projection).config.environmentThemes).toBeUndefined();
-    }),
-  );
-
-  it.effect("recovers a slow subscriber after it misses theme and usage-source deletion", () =>
-    Effect.gen(function* () {
-      const { factory, sockets } = yield* makeFactory({
-        environmentThemes: true,
-        usageLimitSources: true,
-      });
+      const { factory, sockets } = yield* makeFactory({ usageLimitSources: true });
       const session = yield* factory.connect(PREPARED);
       const readyFiber = yield* Effect.forkChild(session.ready);
       const socket = yield* awaitSocket(sockets);
@@ -680,58 +566,28 @@ describe("RpcSessionFactory", () => {
       yield* completeInitialConfig(
         socket,
         encodeServerConfig({ ...SOURCE_SERVER_CONFIG, providers: [PROVIDER] }),
-        { environmentThemes: true, usageLimitSources: true },
+        { usageLimitSources: true },
       );
       yield* Fiber.join(readyFiber);
 
       const slowSubscriberStarted = yield* Deferred.make<void>();
       const releaseSlowSubscriber = yield* Deferred.make<void>();
       let firstEvent = true;
-      const slowSubscriber = yield* session
-        .subscribeServerConfig({ environmentThemes: true, usageLimitSources: true })
-        .pipe(
-          Stream.mapEffect((event) => {
-            if (!firstEvent) return Effect.succeed(event);
-            firstEvent = false;
-            return Deferred.succeed(slowSubscriberStarted, undefined).pipe(
-              Effect.andThen(Deferred.await(releaseSlowSubscriber)),
-              Effect.as(event),
-            );
-          }),
-          Stream.take(4),
-          Stream.runCollect,
-          Effect.forkChild,
-        );
+      const slowSubscriber = yield* session.subscribeServerConfig({ usageLimitSources: true }).pipe(
+        Stream.mapEffect((event) => {
+          if (!firstEvent) return Effect.succeed(event);
+          firstEvent = false;
+          return Deferred.succeed(slowSubscriberStarted, undefined).pipe(
+            Effect.andThen(Deferred.await(releaseSlowSubscriber)),
+            Effect.as(event),
+          );
+        }),
+        Stream.take(3),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
       yield* Deferred.await(slowSubscriberStarted);
 
-      const firstThemes = [
-        {
-          id: "nightfall",
-          name: "Nightfall",
-          appearance: "dark" as const,
-          canvas: "#1a1b26",
-          accent: "#7aa2f7",
-        },
-      ];
-      const themeEvents: ServerConfigStreamEventType[] = [
-        {
-          version: 1,
-          type: "environmentThemesUpdated",
-          payload: { themes: firstThemes },
-        },
-        {
-          version: 1,
-          type: "environmentThemesUpdated",
-          payload: {
-            themes: [{ ...firstThemes[0]!, name: "Nightfall 2" }],
-          },
-        },
-        {
-          version: 1,
-          type: "environmentThemesUpdated",
-          payload: { themes: [] },
-        },
-      ];
       const settingsEvents = Array.from({ length: 65 }, (): ServerConfigStreamEventType => ({
         version: 1,
         type: "settingsUpdated",
@@ -750,14 +606,12 @@ describe("RpcSessionFactory", () => {
           providers: [{ ...status, checkedAt: "2026-04-10T00:05:00.000Z", message: "Checked" }],
         },
       };
-      const allEvents = [providerEvent, ...themeEvents, ...sourceEvents, ...settingsEvents];
+      const allEvents = [providerEvent, ...sourceEvents, ...settingsEvents];
       const observedByFastSubscriber = yield* Queue.unbounded<ServerConfigStreamEventType>();
-      yield* session
-        .subscribeServerConfig({ environmentThemes: true, usageLimitSources: true })
-        .pipe(
-          Stream.runForEach((event) => Queue.offer(observedByFastSubscriber, event)),
-          Effect.forkChild,
-        );
+      yield* session.subscribeServerConfig({ usageLimitSources: true }).pipe(
+        Stream.runForEach((event) => Queue.offer(observedByFastSubscriber, event)),
+        Effect.forkChild,
+      );
       expect((yield* Queue.take(observedByFastSubscriber)).type).toBe("snapshot");
       for (const event of allEvents) {
         yield* publishConfigEvents(socket, [event]);
@@ -769,7 +623,6 @@ describe("RpcSessionFactory", () => {
       expect(recovered.map((event) => event.type)).toEqual([
         "snapshot",
         "snapshot",
-        "environmentThemesUpdated",
         "usageLimitSourcesUpdated",
       ]);
       expect(recovered[1]).toMatchObject({
@@ -777,20 +630,17 @@ describe("RpcSessionFactory", () => {
           providers: [{ ...PROVIDER, checkedAt: "2026-04-10T00:05:00.000Z", message: "Checked" }],
         },
       });
-      expect(recovered[2]).toMatchObject({ payload: { themes: [] } });
-      expect(recovered[3]).toMatchObject({ payload: { sources: [] } });
+      expect(recovered[2]).toMatchObject({ payload: { sources: [] } });
 
       let projection = applyServerConfigProjection(Option.none(), {
         version: 1,
         type: "snapshot",
         config: SOURCE_SERVER_CONFIG,
       });
-      projection = applyServerConfigProjection(projection, themeEvents[0]!);
       projection = applyServerConfigProjection(projection, SOURCE_EVENT);
       for (const event of recovered.slice(1)) {
         projection = applyServerConfigProjection(projection, event);
       }
-      expect(Option.getOrThrow(projection).config.environmentThemes).toBeUndefined();
       expect(Option.getOrThrow(projection).config.usageLimitSources).toBeUndefined();
     }),
   );
@@ -825,13 +675,13 @@ describe("RpcSessionFactory", () => {
     "keeps durable config state alive after an owned $failure failure",
     ({ failure }) =>
       Effect.gen(function* () {
-        const { factory, sockets } = yield* makeFactory({ environmentThemes: true });
+        const { factory, sockets } = yield* makeFactory({ usageLimitSources: true });
         const firstSession = yield* factory.connect(PREPARED);
         const firstReady = yield* Effect.forkChild(firstSession.ready);
         const firstSocket = yield* awaitSocket(sockets);
         firstSocket.open();
-        yield* completeInitialConfig(firstSocket, ENCODED_THEME_SERVER_CONFIG, {
-          environmentThemes: true,
+        yield* completeInitialConfig(firstSocket, ENCODED_SOURCE_SERVER_CONFIG, {
+          usageLimitSources: true,
         });
         yield* Fiber.join(firstReady);
 
@@ -860,7 +710,7 @@ describe("RpcSessionFactory", () => {
           clear: () => Effect.void,
         });
         const configState = yield* makeEnvironmentServerConfigState({
-          environmentThemes: true,
+          usageLimitSources: true,
         }).pipe(
           Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
           Effect.provideService(Persistence.EnvironmentCacheStore, cache),
@@ -874,26 +724,13 @@ describe("RpcSessionFactory", () => {
             Effect.map(Option.getOrThrow),
           );
 
-        const firstThemes = [
-          {
-            id: "first-theme",
-            name: "First theme",
-            appearance: "dark" as const,
-            canvas: "#111111",
-            accent: "#ffffff",
-          },
-        ];
-        const firstThemeState = yield* awaitConfig(
-          (config) => config.environmentThemes?.[0]?.id === "first-theme",
+        const firstSources =
+          SOURCE_EVENT.type === "usageLimitSourcesUpdated" ? SOURCE_EVENT.payload.sources : [];
+        const firstSourceState = yield* awaitConfig(
+          (config) => config.usageLimitSources?.[0]?.id === "proxy",
         ).pipe(Effect.forkChild);
-        yield* publishConfigEvents(firstSocket, [
-          {
-            version: 1,
-            type: "environmentThemesUpdated",
-            payload: { themes: firstThemes },
-          },
-        ]);
-        expect((yield* Fiber.join(firstThemeState)).environmentThemes).toEqual(firstThemes);
+        yield* publishConfigEvents(firstSocket, [SOURCE_EVENT]);
+        expect((yield* Fiber.join(firstSourceState)).usageLimitSources).toEqual(firstSources);
 
         const firstClosed = yield* firstSession.closed.pipe(Effect.exit, Effect.forkChild);
         const firstRequest = yield* awaitRequest(firstSocket);
@@ -930,9 +767,9 @@ describe("RpcSessionFactory", () => {
         yield* SubscriptionRef.set(activeSession, Option.none());
 
         const recoveredConfig = {
-          ...THEME_SERVER_CONFIG,
+          ...SOURCE_SERVER_CONFIG,
           environment: {
-            ...THEME_SERVER_CONFIG.environment,
+            ...SOURCE_SERVER_CONFIG.environment,
             label: "Recovered environment",
           },
         } satisfies ServerConfigType;
@@ -941,7 +778,7 @@ describe("RpcSessionFactory", () => {
         const secondSocket = yield* awaitSocket(sockets, 1);
         secondSocket.open();
         yield* completeInitialConfig(secondSocket, encodeServerConfig(recoveredConfig), {
-          environmentThemes: true,
+          usageLimitSources: true,
         });
         yield* Fiber.join(secondReady);
 
@@ -949,28 +786,23 @@ describe("RpcSessionFactory", () => {
           (config) => config.environment.label === "Recovered environment",
         ).pipe(Effect.forkChild);
         yield* SubscriptionRef.set(activeSession, Option.some(secondSession));
-        expect((yield* Fiber.join(recoveredState)).environmentThemes).toEqual(firstThemes);
+        expect((yield* Fiber.join(recoveredState)).usageLimitSources).toEqual(firstSources);
 
-        const recoveredThemes = [
-          {
-            id: "recovered-theme",
-            name: "Recovered theme",
-            appearance: "dark" as const,
-            canvas: "#000000",
-            accent: "#eeeeee",
-          },
-        ];
+        const recoveredSources = firstSources.map((source) => ({
+          ...source,
+          id: UsageLimitSourceId.make("recovered"),
+        }));
         const liveRecoveredState = yield* awaitConfig(
-          (config) => config.environmentThemes?.[0]?.id === "recovered-theme",
+          (config) => config.usageLimitSources?.[0]?.id === "recovered",
         ).pipe(Effect.forkChild);
         yield* publishConfigEvents(secondSocket, [
           {
             version: 1,
-            type: "environmentThemesUpdated",
-            payload: { themes: recoveredThemes },
+            type: "usageLimitSourcesUpdated",
+            payload: { sources: recoveredSources },
           },
         ]);
-        expect((yield* Fiber.join(liveRecoveredState)).environmentThemes).toEqual(recoveredThemes);
+        expect((yield* Fiber.join(liveRecoveredState)).usageLimitSources).toEqual(recoveredSources);
       }),
   );
 
@@ -983,7 +815,7 @@ describe("RpcSessionFactory", () => {
         .subscribeServerConfig({})
         .pipe(Stream.runHead, Effect.flip, Effect.forkChild);
       const customConfigFiber = yield* session
-        .subscribeServerConfig({ environmentThemes: true })
+        .subscribeServerConfig({ usageLimitSources: true })
         .pipe(Stream.runHead, Effect.flip, Effect.forkChild);
       const socket = yield* awaitSocket(sockets);
       socket.open();

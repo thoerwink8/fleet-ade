@@ -364,19 +364,6 @@ export const PickFolderOptionsSchema = Schema.Struct({
   targetEnvironmentId: Schema.optionalKey(Schema.String),
 });
 
-/** Oversized files have empty text so the main process never loads their contents. */
-export interface PickedThemeFile {
-  name: string;
-  size: number;
-  text: string;
-}
-
-export const PickedThemeFileSchema = Schema.Struct({
-  name: Schema.String,
-  size: Schema.Number,
-  text: Schema.String,
-});
-
 export interface DesktopWslDistro {
   name: string;
   isDefault: boolean;
@@ -662,7 +649,6 @@ export interface DesktopBridge {
   setWslOnly: (enabled: boolean) => Promise<DesktopWslState>;
   pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
   pickProjectFavicon: (initialPath?: string) => Promise<string | null>;
-  pickThemeFiles: () => Promise<readonly PickedThemeFile[] | null>;
   setTheme: (theme: DesktopTheme) => Promise<void>;
   showContextMenu: <T extends string>(
     items: readonly ContextMenuItem<T>[],

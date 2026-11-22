@@ -1,6 +1,6 @@
 import { HOSTED_APP_CHANNEL } from "~/branding";
 import { isElectron, isSecretsFeatureEnabled } from "~/env";
-import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
+import { isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
 import { STATIC_KEYBINDING_COMMANDS, type KeybindingCommand } from "@t3tools/contracts";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
@@ -9,9 +9,6 @@ import {
   type SourceControlDefinition,
 } from "@t3tools/client-runtime/source-control-clients";
 import { DEFAULT_KEYBINDINGS } from "@t3tools/shared/keybindings";
-import * as Schema from "effect/Schema";
-import { TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "../../appearanceFonts";
-import { writeLocalStorageValue } from "../../hooks/useLocalStorage";
 import { commandLabel } from "./KeybindingsSettings.logic";
 import type { ResolvedSettingsScope } from "./settingsScope";
 
@@ -52,7 +49,6 @@ export interface SettingsSearchItem {
   readonly searchTerms?: ReadonlyArray<string>;
   readonly scope?: SettingsSearchScope;
   readonly desktopOnly?: boolean;
-  readonly macOnly?: boolean;
   readonly windowsOnly?: boolean;
   readonly releaseChannelOnly?: boolean;
   readonly secretsFeatureOnly?: boolean;
@@ -297,22 +293,8 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "theme",
     title: "主题",
     to: "/settings/appearance",
-    searchTerms: ["appearance colors palette custom import"],
+    searchTerms: ["appearance colors palette"],
     targetId: "appearance",
-  },
-  {
-    // Prefixed because the slider control already owns the `appearance-contrast` id.
-    id: "setting-appearance-contrast",
-    title: "对比度",
-    to: "/settings/appearance",
-    searchTerms: ["colors borders interface"],
-  },
-  {
-    // Prefixed because the slider control already owns the `glass-opacity` id.
-    id: "setting-glass-opacity",
-    title: "毛玻璃不透明度",
-    to: "/settings/appearance",
-    searchTerms: ["transparent transparency solid menus dialogs composer"],
   },
   {
     id: "diff-color-scheme",
@@ -335,21 +317,10 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
-    id: "effort-display",
-    title: "推理强度显示",
-    to: "/settings/appearance",
-    searchTerms: ["reasoning effort thinking bars graph word label level composer"],
-  },
-  {
     id: "math-rendering",
     title: "渲染数学公式",
     to: "/settings/appearance",
     searchTerms: ["latex tex katex equations formulas markdown"],
-  },
-  {
-    id: "panel-animations",
-    title: "面板动画",
-    to: "/settings/appearance",
   },
   {
     id: "environment-identification",
@@ -359,41 +330,10 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "appearance-interface",
   },
   {
-    id: "interface-font",
-    title: "界面字体",
+    id: "font-size",
+    title: "字号",
     to: "/settings/appearance",
-    searchTerms: ["typography family size system sans"],
-  },
-  {
-    id: "prompt-font",
-    title: "提示词字体",
-    to: "/settings/appearance",
-    searchTerms: ["typography family size composer input"],
-  },
-  {
-    id: "code-font",
-    title: "代码字体",
-    to: "/settings/appearance",
-    searchTerms: ["typography family size monospace code blocks diffs file previews"],
-  },
-  {
-    id: "terminal-font",
-    title: "终端字体",
-    to: "/settings/appearance",
-    searchTerms: ["typography family size monospace output"],
-  },
-  {
-    id: "separate-fonts",
-    title: "分别设置字体",
-    to: "/settings/appearance",
-    searchTerms: ["typography advanced prompt code terminal font family size individually"],
-  },
-  {
-    id: "font-smoothing",
-    title: "字体平滑",
-    to: "/settings/appearance",
-    searchTerms: ["typography text grayscale anti aliasing macos thin"],
-    macOnly: true,
+    searchTerms: ["typography font size text larger smaller code terminal composer reading"],
   },
   {
     id: "word-wrap",
@@ -1194,7 +1134,6 @@ export function settingsForThisPlatform(
       (isElectron || item.desktopOnly !== true) &&
       (!item.releaseChannelOnly || isElectron || HOSTED_APP_CHANNEL !== null) &&
       (!item.secretsFeatureOnly || isSecretsFeatureEnabled) &&
-      (!item.macOnly || isMacPlatform(platform)) &&
       (!item.windowsOnly || isWindowsPlatform(platform)),
   );
 }
@@ -1243,25 +1182,4 @@ export function searchSettings(
         left.index - right.index,
     )
     .map(({ item }) => item);
-}
-
-// These rows only exist with separate fonts on, so a search jump to one turns them on.
-const ADVANCED_TYPOGRAPHY_TARGET_IDS: ReadonlySet<string> = new Set([
-  "prompt-font",
-  "terminal-font",
-]);
-
-export function isAdvancedTypographyTarget(targetId: string): boolean {
-  return ADVANCED_TYPOGRAPHY_TARGET_IDS.has(targetId);
-}
-
-/**
- * Opens the persisted section a search result lives in before jumping to it, so
- * its row is mounted to scroll to. The terminal reads the same flag, so it must
- * stay on after the jump.
- */
-export function revealSettingsSearchTarget(targetId: string): void {
-  if (isAdvancedTypographyTarget(targetId)) {
-    writeLocalStorageValue(TYPOGRAPHY_ADVANCED_STORAGE_KEY, true, false, Schema.Boolean);
-  }
 }

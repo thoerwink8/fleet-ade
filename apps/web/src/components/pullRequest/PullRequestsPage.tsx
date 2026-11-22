@@ -93,7 +93,7 @@ import { useStableCallback } from "~/hooks/useStableCallback";
 import { useOpenPanelPullRequestUrl } from "~/hooks/useOpenPanelPullRequestUrl";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { toastManager } from "../ui/toast";
-import { usePanelAnimationSettings, usePanelPresence } from "~/panelAnimations";
+import { PANEL_ANIMATION, usePanelPresence } from "~/panelAnimations";
 import {
   PULL_REQUESTS_PANEL_REF,
   selectActiveRightPanelSurface,
@@ -185,8 +185,7 @@ export function PullRequestsPage() {
   const selectedPullRequestSurface =
     selectedRightPanelSurface?.kind === "pull-request" ? selectedRightPanelSurface : null;
   const activePullRequestSurface = rightPanelState.isOpen ? selectedPullRequestSurface : null;
-  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
-    usePanelAnimationSettings();
+  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } = PANEL_ANIMATION;
   const rightPanelPresenceValue = {
     activeSurface: selectedPullRequestSurface,
     surfaces: rightPanelState.surfaces,

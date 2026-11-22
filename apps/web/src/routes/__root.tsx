@@ -31,7 +31,6 @@ import { ReopenClosedViewShortcut } from "../components/ReopenClosedViewShortcut
 import { ShortcutCheatsheetDialog } from "../components/ShortcutCheatsheet";
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
 import { ChatGptWelcomeCoordinator } from "../components/settings/ChatGptWelcomeCoordinator";
-import { ThemeEditorHost } from "../components/settings/ThemeEditorHost";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { Button } from "../components/ui/button";
 import { StandalonePage, StandalonePageHeader } from "../components/ui/standalone-page";
@@ -182,7 +181,6 @@ function RootRouteBranch() {
         {appShell}
       </FirstRunGate>
       {/* Above the shell and the router, so drafts survive navigation. */}
-      <ThemeEditorHost />
     </>
   );
 }

@@ -50,6 +50,15 @@ describe("retired client settings", () => {
     expect(decoded).not.toHaveProperty("boringSidebarMultilineRows");
     expect(decoded.notificationMode).toBe("off");
   });
+
+  it("decodes server settings that still carry the removed default theme", () => {
+    const decoded = decodeServerSettings({
+      defaultTheme: "nightfall",
+      defaultThemeSetAt: "2026-10-01T00:00:00.000Z",
+    });
+    expect(decoded).not.toHaveProperty("defaultTheme");
+    expect(decoded).not.toHaveProperty("defaultThemeSetAt");
+  });
 });
 
 describe("storage cleanup settings", () => {

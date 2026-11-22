@@ -83,7 +83,6 @@ export const STATIC_KEYBINDING_COMMANDS = [
   "fleet.open",
   "theme.select",
   "appearance.cycle",
-  "themeEditor.toggle",
   "composer.stash",
   "composer.sendAlternate",
   "composer.sendBackground",

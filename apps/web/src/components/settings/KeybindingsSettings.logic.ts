@@ -266,7 +266,7 @@ const KEYBINDING_GROUPS = [
   { id: "composer", title: "输入框", prefixes: ["composer", "modelPicker"] },
   { id: "terminal", title: "终端", prefixes: ["terminal"] },
   { id: "diff", title: "差异", prefixes: ["diff"] },
-  { id: "appearance", title: "外观", prefixes: ["theme", "appearance", "themeEditor"] },
+  { id: "appearance", title: "外观", prefixes: ["theme", "appearance"] },
   { id: "scripts", title: "项目脚本", prefixes: ["script"] },
 ] as const;
 const OTHER_KEYBINDING_GROUP = { id: "other", title: "其他" } as const;
@@ -442,7 +442,6 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "fleet.open": "机群：打开",
   "theme.select": "主题：选择",
   "appearance.cycle": "外观：循环切换",
-  "themeEditor.toggle": "主题编辑器：开关",
   "composer.stash": "输入框：暂存",
   "composer.sendAlternate": "输入框：使用相反的排队或引导操作",
   "composer.sendBackground": "输入框：在后台启动",

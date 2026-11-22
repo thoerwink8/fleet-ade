@@ -6,7 +6,6 @@ import {
   type ProviderInstallState,
   type ProviderSetupInput,
   ServerObservability,
-  EnvironmentThemeId,
   UsageLimitSourceId,
   type ServerConfig,
   type ServerConfigStreamEvent,
@@ -82,7 +81,7 @@ const CONFIG = {
   observability: null,
   providers: [],
   settings: {},
-  environment: { capabilities: { environmentThemes: true } },
+  environment: { capabilities: { usageLimitSources: true } },
 } as unknown as ServerConfig;
 
 const snapshotEvent = (config: ServerConfig): ServerConfigStreamEvent => ({
@@ -429,7 +428,7 @@ const makeConfigPersistenceHarness = Effect.fn("test.makeConfigPersistenceHarnes
     clear: () => Effect.void,
   });
   const state = yield* makeEnvironmentServerConfigState(
-    { environmentThemes: true, usageLimitSources: true },
+    { usageLimitSources: true },
     machineCatalogs,
   ).pipe(
     Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
@@ -544,7 +543,7 @@ describe("server state projection", () => {
       }),
   );
 
-  it.effect("saves once across transient themes, usage sources and stall updates", () =>
+  it.effect("saves once across transient usage sources and stall updates", () =>
     Effect.gen(function* () {
       const saved = yield* Ref.make<ReadonlyArray<ServerConfig>>([]);
       yield* Effect.scoped(
@@ -556,19 +555,6 @@ describe("server state projection", () => {
           yield* TestClock.adjust("500 millis");
           expect((yield* Ref.get(saved)).length).toBe(1);
           for (const event of [
-            {
-              version: 1,
-              type: "environmentThemesUpdated",
-              payload: {
-                themes: [
-                  {
-                    id: EnvironmentThemeId.make("theme-test"),
-                    name: "Test theme",
-                    appearance: "dark",
-                  },
-                ],
-              },
-            },
             {
               version: 1,
               type: "usageLimitSourcesUpdated",
@@ -596,8 +582,6 @@ describe("server state projection", () => {
           ] satisfies ReadonlyArray<ServerConfigStreamEvent>) {
             const projection = yield* h.send(event);
             expect(projection.latestEvent).toBe(event);
-            if (event.type === "environmentThemesUpdated")
-              expect(projection.config.environmentThemes).toEqual(event.payload.themes);
             if (event.type === "usageLimitSourcesUpdated")
               expect(projection.config.usageLimitSources).toEqual(event.payload.sources);
             yield* TestClock.adjust("10 seconds");
@@ -706,7 +690,7 @@ describe("server state projection", () => {
           yield* h.send(snapshotEvent(CONFIG));
           yield* TestClock.adjust("500 millis");
           yield* h.send(snapshotEvent(changed));
-          yield* h.send({ version: 1, type: "environmentThemesUpdated", payload: { themes: [] } });
+          yield* h.send({ version: 1, type: "usageLimitSourcesUpdated", payload: { sources: [] } });
         }),
       );
       expect(yield* Ref.get(saved)).toEqual([CONFIG, changed]);
@@ -925,29 +909,29 @@ describe("server state projection", () => {
     ).toBe(true);
   });
 
-  it("keeps published themes across a reconnect snapshot", () => {
-    const themes = [
+  it("keeps usage-limit sources across a reconnect snapshot", () => {
+    const sources = [
       {
-        id: "nightfall",
-        name: "Nightfall",
-        appearance: "dark",
-        canvas: "#1a1b26",
-        accent: "#7aa2f7",
+        id: UsageLimitSourceId.make("source-test"),
+        kind: "cliproxy",
+        label: "Test source",
+        checkedAt: "2026-10-20T07:50:37.633Z",
+        accounts: [],
       },
     ] as const;
 
-    const withThemes = applyServerConfigProjection(
+    const withSources = applyServerConfigProjection(
       applyServerConfigProjection(Option.none(), { version: 1, type: "snapshot", config: CONFIG }),
-      { version: 1, type: "environmentThemesUpdated", payload: { themes } },
+      { version: 1, type: "usageLimitSourcesUpdated", payload: { sources } },
     );
-    expect(Option.getOrThrow(withThemes).config.environmentThemes).toEqual(themes);
+    expect(Option.getOrThrow(withSources).config.usageLimitSources).toEqual(sources);
 
-    const afterReconnect = applyServerConfigProjection(withThemes, {
+    const afterReconnect = applyServerConfigProjection(withSources, {
       version: 1,
       type: "snapshot",
       config: CONFIG,
     });
-    expect(Option.getOrThrow(afterReconnect).config.environmentThemes).toEqual(themes);
+    expect(Option.getOrThrow(afterReconnect).config.usageLimitSources).toEqual(sources);
   });
 
   it("keeps a current welcome on ready and rejects a buffered welcome from the old session", () => {

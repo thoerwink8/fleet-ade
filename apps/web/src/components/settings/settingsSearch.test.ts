@@ -89,8 +89,7 @@ describe("searchSettings", () => {
 
   it("matches normalized title substrings", () => {
     expect(searchSettings("  自动换行  ", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
-    expect(searchSettings("毛玻璃").map((item) => item.id)).toEqual(["setting-glass-opacity"]);
-    expect(searchSettings("面板动画").map((item) => item.id)).toEqual(["panel-animations"]);
+    expect(searchSettings("字号").map((item) => item.id)).toEqual(["font-size"]);
     expect(searchSettings("主题")[0]?.id).toBe("theme");
     const localeLowerCase = vi.spyOn(String.prototype, "toLocaleLowerCase").mockReturnValue("gıt");
     try {

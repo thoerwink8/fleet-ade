@@ -32,13 +32,7 @@ import {
 } from "@t3tools/client-runtime/state/shared-settings";
 import { ensureLocalApi } from "~/localApi";
 import { subscribeBrowserClientSettingsWrites } from "~/clientPersistenceStorage";
-import {
-  getThemeDefinition,
-  getThemePreviewSidebarArtwork,
-  resolveThemeHalf,
-  subscribeToThemePreview,
-  themeAllowsSidebarArtwork,
-} from "~/themePalette";
+import { getThemeDefinition, themeAllowsSidebarArtwork } from "~/themePalette";
 import {
   modelPreferencesMigrationPatch,
   resolveModelPreferences,
@@ -424,19 +418,12 @@ function resolveEnvironmentIdentificationMode(input: {
 export function useEnvironmentIdentificationMode(): EnvironmentIdentificationMode {
   const settingsHydrated = useClientSettingsHydrated();
   const mode = useClientSettings((settings) => settings.environmentIdentificationMode);
-  const { resolvedTheme, theme, themeHalves } = useTheme();
-  const previewSidebarArtwork = useSyncExternalStore(
-    subscribeToThemePreview,
-    getThemePreviewSidebarArtwork,
-    () => null,
-  );
-  const activeTheme = resolveThemeHalf(theme, themeHalves, resolvedTheme);
-  const activeThemeDefinition = getThemeDefinition(activeTheme);
+  const { theme } = useTheme();
   return resolveEnvironmentIdentificationMode({
     mode,
     settingsHydrated,
-    paletteThemeActive: previewSidebarArtwork !== null || activeThemeDefinition !== null,
-    paletteThemeAllowsArtwork: previewSidebarArtwork ?? themeAllowsSidebarArtwork(activeTheme),
+    paletteThemeActive: getThemeDefinition(theme) !== null,
+    paletteThemeAllowsArtwork: themeAllowsSidebarArtwork(theme),
   });
 }
 

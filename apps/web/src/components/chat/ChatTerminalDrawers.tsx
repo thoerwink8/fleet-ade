@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useComposerDraftStore } from "../../composerDraftStore";
 import type { TerminalContextSelection } from "../../lib/terminalContext";
-import { usePanelAnimationSettings, usePanelPresence } from "../../panelAnimations";
+import { PANEL_ANIMATION, usePanelPresence } from "../../panelAnimations";
 import { useThreadRefs } from "../../state/entities";
 import { useTerminalUiStateStore } from "../../terminalUiStateStore";
 import {
@@ -54,8 +54,7 @@ export function ChatTerminalDrawers(props: ChatTerminalDrawersProps) {
   const draftThreadKeys = Object.values(draftThreadsByThreadKey).map((draftThread) =>
     scopedThreadKey(scopeThreadRef(draftThread.environmentId, draftThread.threadId)),
   );
-  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
-    usePanelAnimationSettings();
+  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } = PANEL_ANIMATION;
   const activeTerminalDrawerPresence = usePanelPresence(
     Boolean(activeThreadKey && props.activeTerminalOpen),
     true,

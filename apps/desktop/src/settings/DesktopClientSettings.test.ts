@@ -21,7 +21,6 @@ const clientSettings: ClientSettings = {
   ...DEFAULT_CLIENT_SETTINGS,
   notificationMode: "notifications-and-sound",
   inAppNotificationsEnabled: true,
-  appearanceContrast: 100,
   confirmQuit: "double-click",
   confirmThreadArchive: true,
   confirmThreadDelete: false,
@@ -31,18 +30,8 @@ const clientSettings: ClientSettings = {
   diffLayout: "stacked",
   environmentIdentificationMode: "artwork",
   favorites: [],
-  fontFamilyCode: "",
-  fontFamilyComposer: "",
-  fontFamilySans: "",
-  fontFamilyTerminal: "",
-  fontSizeCode: 13,
-  fontSizeInterface: 16,
-  fontSizePrompt: 14,
-  fontSizeTerminal: 12,
-  fontSmoothing: true,
-  glassOpacity: 80,
+  fontScale: "large",
   onboardingCompletedAt: null,
-  panelAnimationDurationMs: 0,
   proactivePanelsEnabled: true,
   showSkillsInSlashMenu: false,
   persistComposerContextStrip: true,
@@ -229,7 +218,7 @@ describe("DesktopClientSettings", () => {
     ),
   );
 
-  it.effect("loads legacy wrapped client settings documents", () =>
+  it.effect("loads legacy wrapped documents and ignores removed appearance settings", () =>
     withClientSettings(
       Effect.gen(function* () {
         const environment = yield* DesktopEnvironment.DesktopEnvironment;
@@ -240,7 +229,15 @@ describe("DesktopClientSettings", () => {
           environment.clientSettingsPath,
           `{
             "settings": {
-              "timestampFormat": "12-hour"
+              "timestampFormat": "12-hour",
+              "appearanceContrast": 140,
+              "glassOpacity": 40,
+              "panelAnimationDurationMs": 200,
+              "effortDisplay": "glyph",
+              "fontFamilySans": "Inter",
+              "fontSizeInterface": 18,
+              "fontSizeCode": 15,
+              "fontSmoothing": false
             }
           }\n`,
         );
@@ -249,6 +246,8 @@ describe("DesktopClientSettings", () => {
         assert.isTrue(Option.isSome(persisted));
         if (Option.isSome(persisted)) {
           assert.equal(persisted.value.timestampFormat, "12-hour");
+          assert.equal(persisted.value.fontScale, "standard");
+          assert.notProperty(persisted.value, "glassOpacity");
         }
       }),
     ),
@@ -256,7 +255,7 @@ describe("DesktopClientSettings", () => {
 
   it.effect.each([
     { label: "malformed JSON", contents: "{not-json" },
-    { label: "invalid legacy settings", contents: '{"settings":{"fontSizeCode":"large"}}' },
+    { label: "invalid legacy settings", contents: '{"settings":{"fontScale":"huge"}}' },
   ])("reports $label without treating the settings file as absent", (document) =>
     withClientSettings(
       Effect.gen(function* () {

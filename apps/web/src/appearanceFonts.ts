@@ -1,50 +1,47 @@
-import {
-  DEFAULT_CODE_FONT_SIZE,
-  DEFAULT_INTERFACE_FONT_SIZE,
-  DEFAULT_PROMPT_FONT_SIZE,
-  MAX_CODE_FONT_SIZE,
-  MAX_INTERFACE_FONT_SIZE,
-  MAX_PROMPT_FONT_SIZE,
-  MIN_CODE_FONT_SIZE,
-  MIN_INTERFACE_FONT_SIZE,
-  MIN_PROMPT_FONT_SIZE,
-} from "@t3tools/contracts";
-import * as Schema from "effect/Schema";
+import type { FontScale } from "@t3tools/contracts/settings";
 
-export const DEFAULT_SANS_FONT_STACK =
+const DEFAULT_SANS_FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Inter Variable", system-ui, sans-serif';
 
-// Some engines map `ui-monospace` to a proportional font, so prefer concrete names.
-export const DEFAULT_CODE_FONT_STACK =
-  '"Cascadia Mono", "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "PingFang SC", "Microsoft YaHei UI", monospace';
-
-export const TYPOGRAPHY_ADVANCED_STORAGE_KEY = "t3code:typography-advanced";
-export const CHAT_READING_SIZE_STORAGE_KEY = "t3code:chat-reading-size";
-export const ChatReadingSizeSchema = Schema.Literals(["standard", "comfortable", "large"]);
-export type ChatReadingSize = typeof ChatReadingSizeSchema.Type;
-export const DEFAULT_CHAT_READING_SIZE: ChatReadingSize = "comfortable";
-export const CHAT_READING_SIZE_REM: Readonly<Record<ChatReadingSize, string>> = {
-  standard: "0.875rem",
-  comfortable: "0.9375rem",
-  large: "1rem",
+/** Pixel sizes per step. The interface size sets the root; code, terminal and chat prose follow in pixels. */
+export const FONT_SCALES: Readonly<
+  Record<FontScale, { readonly interface: number; readonly code: number; readonly prose: number }>
+> = {
+  standard: { interface: 16, code: 13, prose: 15 },
+  comfortable: { interface: 17, code: 14, prose: 16 },
+  large: { interface: 18, code: 15, prose: 17 },
 };
 
-export function resolveTerminalFontPreference(input: {
-  readonly advanced: boolean;
-  readonly code: string;
-  readonly terminal: string;
-}): string {
-  if (input.advanced) return input.terminal;
-  return input.code;
+export function applyFontScale(root: HTMLElement, scale: FontScale): void {
+  const sizes = FONT_SCALES[scale];
+  root.style.fontSize = `${sizes.interface}px`;
+  root.style.setProperty("--font-size-prose", `${sizes.prose}px`);
+  root.style.setProperty("--font-size-prompt", "var(--text-sm)");
+  root.style.setProperty("--font-size-code", `${sizes.code}px`);
+  root.style.setProperty("--diffs-font-size", `${sizes.code}px`);
 }
 
-export function resolveTerminalFontSizePreference(input: {
-  readonly advanced: boolean;
-  readonly code: number;
-  readonly terminal: number;
-}): number {
-  if (input.advanced) return input.terminal;
-  return input.code;
+/** The widest single-digit `ol` marker in the interface face; CSS cannot measure it to size the list gutter. */
+export function applyListMarkerWidth(root: HTMLElement): void {
+  const markerWidth = probeWidth(DEFAULT_SANS_FONT_STACK, LIST_MARKER_PROBE_TEXT);
+  if (markerWidth === null) {
+    root.style.removeProperty("--list-marker-sans");
+  } else {
+    root.style.setProperty("--list-marker-sans", `${(markerWidth / PROBE_FONT_SIZE).toFixed(3)}em`);
+  }
+}
+
+const LIST_MARKER_PROBE_TEXT = "0. ";
+const PROBE_FONT_SIZE = 16;
+let fontProbeContext: CanvasRenderingContext2D | null | undefined;
+
+function probeWidth(fontList: string, text: string): number | null {
+  if (fontProbeContext === undefined) {
+    fontProbeContext = document.createElement("canvas").getContext("2d");
+  }
+  if (fontProbeContext === null) return null;
+  fontProbeContext.font = `${PROBE_FONT_SIZE}px ${fontList}`;
+  return fontProbeContext.measureText(text).width;
 }
 
 function quoteFontFamilyName(name: string): string {
@@ -61,122 +58,6 @@ function cssFontFamilies(input: string): string | null {
     .map(quoteFontFamilyName)
     .filter((name) => name.length > 0);
   return families.length > 0 ? families.join(", ") : null;
-}
-
-export function appearanceFontStack(custom: string, defaultStack: string): string {
-  const families = cssFontFamilies(custom);
-  return families === null ? defaultStack : `${families}, ${defaultStack}`;
-}
-
-export interface AppearanceFontPreferences {
-  readonly sans: string;
-  readonly code: string;
-  readonly composer: string;
-  readonly sizeInterface: number;
-  readonly sizePrompt: number;
-  readonly sizeCode: number;
-  readonly smoothing: boolean;
-  readonly separate: boolean;
-}
-
-/** Interface size sets the root; prompt and code use pixels to avoid double scaling. */
-export function applyAppearanceFontVariables(
-  root: HTMLElement,
-  preferences: AppearanceFontPreferences,
-): void {
-  const families: ReadonlyArray<readonly [variable: string, custom: string, fallback: string]> = [
-    ["--font-sans", preferences.sans, DEFAULT_SANS_FONT_STACK],
-    ["--font-mono", preferences.code, DEFAULT_CODE_FONT_STACK],
-    ["--font-composer", preferences.separate ? preferences.composer : "", "var(--font-sans)"],
-  ];
-  for (const [variable, custom, fallback] of families) {
-    const list = cssFontFamilies(custom);
-    if (list === null) {
-      root.style.removeProperty(variable);
-    } else {
-      root.style.setProperty(variable, `${list}, ${fallback}`);
-    }
-  }
-
-  const markerWidth = probeWidth(
-    appearanceFontStack(preferences.sans, DEFAULT_SANS_FONT_STACK),
-    LIST_MARKER_PROBE_TEXT,
-  );
-  if (markerWidth === null) {
-    root.style.removeProperty("--list-marker-sans");
-  } else {
-    root.style.setProperty("--list-marker-sans", `${(markerWidth / PROBE_FONT_SIZE).toFixed(3)}em`);
-  }
-
-  root.style.fontSize = `${clampInterfaceFontSize(preferences.sizeInterface)}px`;
-  root.style.setProperty(
-    "--font-size-prompt",
-    preferences.separate ? `${clampPromptFontSize(preferences.sizePrompt)}px` : "var(--text-sm)",
-  );
-  const code = clampCodeFontSize(preferences.sizeCode);
-  root.style.setProperty("--font-size-code", `${code}px`);
-  root.style.setProperty("--diffs-font-size", `${code}px`);
-
-  if (preferences.smoothing) {
-    root.style.setProperty("-webkit-font-smoothing", "antialiased");
-  } else {
-    root.style.removeProperty("-webkit-font-smoothing");
-  }
-}
-
-function clampFontSize(value: number, minimum: number, maximum: number, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.min(maximum, Math.max(minimum, Math.round(value)));
-}
-
-function clampInterfaceFontSize(value: number): number {
-  return clampFontSize(
-    value,
-    MIN_INTERFACE_FONT_SIZE,
-    MAX_INTERFACE_FONT_SIZE,
-    DEFAULT_INTERFACE_FONT_SIZE,
-  );
-}
-
-function clampPromptFontSize(value: number): number {
-  return clampFontSize(value, MIN_PROMPT_FONT_SIZE, MAX_PROMPT_FONT_SIZE, DEFAULT_PROMPT_FONT_SIZE);
-}
-
-function clampCodeFontSize(value: number): number {
-  return clampFontSize(value, MIN_CODE_FONT_SIZE, MAX_CODE_FONT_SIZE, DEFAULT_CODE_FONT_SIZE);
-}
-
-const FONT_PROBE_TEXT = "mmmmmmmmMMWli1O0@# fjord";
-// The widest single-digit `ol` marker; CSS can't measure it to size the list gutter.
-const LIST_MARKER_PROBE_TEXT = "0. ";
-const PROBE_FONT_SIZE = 16;
-let fontProbeContext: CanvasRenderingContext2D | null | undefined;
-
-function probeWidth(fontList: string, text = FONT_PROBE_TEXT): number | null {
-  if (fontProbeContext === undefined) {
-    fontProbeContext = document.createElement("canvas").getContext("2d");
-  }
-  if (fontProbeContext === null) return null;
-  fontProbeContext.font = `${PROBE_FONT_SIZE}px ${fontList}`;
-  return fontProbeContext.measureText(text).width;
-}
-
-/** Probes canvas metrics because document.fonts.check() accepts uninstalled families. */
-export function isFontFamilyAvailable(family: string): boolean {
-  const families = cssFontFamilies(family);
-  if (families === null) return false;
-  if (/^(system-ui|sans-serif|serif|monospace|ui-monospace)$/i.test(families)) return true;
-  try {
-    for (const generic of ["monospace", "serif", "sans-serif"]) {
-      const baseline = probeWidth(generic);
-      const candidate = probeWidth(`${families}, ${generic}`);
-      if (baseline === null || candidate === null) return false;
-      if (candidate !== baseline) return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
 }
 
 const MONOSPACE_PROBE_VARIANTS = ["normal 400", "normal 700", "italic 400", "italic 700"] as const;
@@ -212,138 +93,5 @@ export function isMonospaceFamily(family: string): boolean {
     return true;
   } catch {
     return true;
-  }
-}
-
-const SANS_GENERIC_CANDIDATES = [
-  "Segoe UI Variable Text",
-  "Segoe UI",
-  "Roboto",
-  "Noto Sans",
-  "Ubuntu",
-  "Cantarell",
-  "DejaVu Sans",
-  "Liberation Sans",
-  "Helvetica Neue",
-  "Arial",
-] as const;
-const MONO_GENERIC_CANDIDATES = [
-  "Menlo",
-  "Consolas",
-  "Cascadia Mono",
-  "DejaVu Sans Mono",
-  "Ubuntu Mono",
-  "Liberation Mono",
-  "Noto Sans Mono",
-  "Roboto Mono",
-  "Monaco",
-  "Courier New",
-] as const;
-
-const GENERIC_PROBE_TEXT = "RagIl10O@ fjord quiz";
-
-// Canvas generic-family mappings can differ from CSS, so measure the DOM.
-function measureDomProbeWidth(fontFamily: string): number | null {
-  try {
-    const body = document.body;
-    if (!body) return null;
-    const span = document.createElement("span");
-    span.style.cssText =
-      "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;font-size:100px;";
-    span.style.fontFamily = fontFamily;
-    span.textContent = GENERIC_PROBE_TEXT;
-    body.appendChild(span);
-    const width = span.getBoundingClientRect().width;
-    span.remove();
-    return width > 0 ? width : null;
-  } catch {
-    return null;
-  }
-}
-
-function widthsMatch(left: number, right: number): boolean {
-  return Math.abs(left - right) < 0.01;
-}
-
-function isApplePlatform(): boolean {
-  return (
-    typeof navigator !== "undefined" &&
-    /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent)
-  );
-}
-
-function resolveGenericFamilyLabel(generic: string): string | null {
-  const lower = generic.toLowerCase();
-  if (lower === "serif") return null;
-  const monoLike = lower === "ui-monospace" || lower === "monospace";
-  const genericWidth = measureDomProbeWidth(generic);
-  if (genericWidth === null) return null;
-  for (const candidate of monoLike ? MONO_GENERIC_CANDIDATES : SANS_GENERIC_CANDIDATES) {
-    if (!isFontFamilyAvailable(candidate)) continue;
-    const candidateWidth = measureDomProbeWidth(`"${candidate}"`);
-    if (candidateWidth !== null && widthsMatch(genericWidth, candidateWidth)) {
-      return candidate;
-    }
-  }
-  // Unnameable Apple faces need -apple-system metrics to distinguish the UI face from SF Mono.
-  if (isApplePlatform()) {
-    const systemWidth = measureDomProbeWidth("-apple-system");
-    if (systemWidth !== null && widthsMatch(genericWidth, systemWidth)) return "SF Pro";
-    return monoLike ? "SF Mono" : "SF Pro";
-  }
-  return null;
-}
-
-export function resolveDefaultFamilyLabel(stack: string): string | null {
-  const isApple = isApplePlatform();
-  for (const raw of stack.split(",")) {
-    const family = raw.trim().replace(/^(['"])(.*)\1$/, "$2");
-    if (family.length === 0) continue;
-    if (/^(-apple-system|BlinkMacSystemFont)$/i.test(family) && !isApple) continue;
-    if (
-      /^(system-ui|sans-serif|serif|monospace|ui-monospace|-apple-system|BlinkMacSystemFont)$/i.test(
-        family,
-      )
-    ) {
-      const resolved = resolveGenericFamilyLabel(family);
-      if (resolved !== null) return resolved;
-      continue;
-    }
-    if (isFontFamilyAvailable(family)) return family;
-  }
-  return null;
-}
-
-export interface InstalledFontFamiliesResult {
-  readonly families: readonly string[];
-  readonly status: "granted" | "denied" | "unsupported";
-}
-
-let installedFamiliesCache: InstalledFontFamiliesResult | null = null;
-
-/** Call from a user gesture; the first call prompts for local-fonts permission. */
-export async function queryInstalledFontFamilies(): Promise<InstalledFontFamiliesResult> {
-  if (installedFamiliesCache !== null) return installedFamiliesCache;
-  const query = (
-    window as Window & {
-      queryLocalFonts?: () => Promise<ReadonlyArray<{ readonly family: string }>>;
-    }
-  ).queryLocalFonts;
-  if (typeof query !== "function") {
-    installedFamiliesCache = { families: [], status: "unsupported" };
-    return installedFamiliesCache;
-  }
-  try {
-    const fonts = await query.call(window);
-    const families = [...new Set(fonts.map((font) => font.family))]
-      // Dot-prefixed macOS UI faces often refuse to render in web content.
-      .filter((family) => !family.startsWith("."))
-      .sort((left, right) => left.localeCompare(right));
-    // Denied access can return an empty list instead of throwing.
-    if (families.length === 0) return { families: [], status: "denied" };
-    installedFamiliesCache = { families, status: "granted" };
-    return installedFamiliesCache;
-  } catch {
-    return { families: [], status: "denied" };
   }
 }
