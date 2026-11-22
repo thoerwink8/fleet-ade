@@ -1428,7 +1428,7 @@ describe("MessagesTimeline agent messages", () => {
     expect(screen.buttons("打开会话")).toHaveLength(0);
   });
 
-  it("leaves messages sent by T3 Code as full bubbles", async () => {
+  it("leaves messages sent by Fleet ADE as full bubbles", async () => {
     setup();
     await using screen = await renderTimeline([
       message(AGENT_MESSAGE, { createdBy: "agent", creationSource: "server" }),

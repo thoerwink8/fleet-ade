@@ -18,7 +18,7 @@ The composer writes Markdown and shows it styled as you type. When your cursor
 is on styled text, its Markdown shows instead, such as `**bold**`, and the
 markers edit like any other text: delete them to remove the style, or change
 `**` to `*` for italic. The style updates when your cursor leaves. To write
-plain Markdown with no styling, turn off **Settings → Chat → Rich text
+plain Markdown with no styling, turn off **Settings → Threads → Rich text
 composer**. Lines starting with `- `, `1. `, `- [ ] `, `> `, `# ` or `---`
 become lists, task lists, quotes, headings and rules; ` ``` ` followed by Enter
 opens a code block. What you typed is what the agent receives, markers and
@@ -62,7 +62,7 @@ See [images and videos](#images-and-videos-in-messages) for previewing and savin
 
 ## Send while the agent is working
 
-On web and desktop, choose **Settings → Chat → Follow-up behavior** to queue
+On web and desktop, choose **Settings → Threads → Follow-up behavior** to queue
 new messages for a later turn or steer the running turn immediately. The setting
 applies to this client; already queued messages keep their place. Queued messages
 are saved on the server and can be edited or removed before they send.
@@ -77,7 +77,7 @@ Use `Cmd+Shift+Enter` on macOS or `Ctrl+Shift+Enter` on Windows and Linux to sen
 the oldest queued message as a steer. This leaves the current draft intact and
 requires an active turn that supports steering. If that shortcut sends the opposite
 action for your draft, move focus outside the composer to steer the queued message. Change
-`thread.steerQueuedMessage` in **Settings → Keybindings** to use another shortcut.
+`thread.steerQueuedMessage` in **Settings → General → Keybindings** to use another shortcut.
 
 Press `Option+Up` on macOS or `Alt+Up` on Windows and Linux with the cursor at the
 start of the composer to edit the most recently queued message. Change
@@ -228,7 +228,7 @@ Type `/` for commands or `$` to add a skill from the selected environment and
 provider. On mobile, both are also available before starting a thread on
 **New task**.
 
-The slash menu also includes skills unless you turn off **Settings → Chat →
+The slash menu also includes skills unless you turn off **Settings → Threads →
 Show skills in slash menu**, under Advanced. Only skills enabled for the provider are listed.
 
 After you add or change skills, plugins, or MCP servers, use **Restart agent

@@ -177,7 +177,7 @@ export function ServerUpdatesAction({
       if (desktopTargets.length > 0) {
         const confirmed =
           (await requestConfirmDialog(
-            `要更新 ${desktopTargets.map((target) => target.serverLabel).join(", ")} 上的 T3 Code 桌面应用吗？它们会在那些机器上关闭并重新启动。`,
+            `要更新 ${desktopTargets.map((target) => target.serverLabel).join(", ")} 上的 Fleet ADE 桌面应用吗？它们会在那些机器上关闭并重新启动。`,
             { initialFocus: "confirm" },
           )) ?? true;
         if (!confirmed) return;
@@ -283,7 +283,7 @@ export function ServerUpdateAction({
     if (isDesktopAppUpdate) {
       const confirmed =
         (await requestConfirmDialog(
-          `要更新运行 ${serverLabel} 的 T3 Code 桌面应用吗？它会在那台机器上关闭并重新启动。`,
+          `要更新运行 ${serverLabel} 的 Fleet ADE 桌面应用吗？它会在那台机器上关闭并重新启动。`,
           { initialFocus: "confirm" },
         )) ?? true;
       if (!confirmed) {

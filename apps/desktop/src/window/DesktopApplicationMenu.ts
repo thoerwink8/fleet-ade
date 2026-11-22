@@ -74,7 +74,7 @@ const checkForUpdatesFromMenu = Effect.gen(function* () {
     yield* electronDialog.showMessageBox({
       type: "info",
       title: "已是最新版本！",
-      message: `T3 Code ${updateState.currentVersion} 已是最新版本。`,
+      message: `Fleet ADE ${updateState.currentVersion} 已是最新版本。`,
       buttons: ["OK"],
     });
   } else if (updateState.status === "error") {

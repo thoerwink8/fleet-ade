@@ -1343,7 +1343,7 @@ describe("DesktopWindow", () => {
         createCount,
         mainWindow,
         onReveal: () => {
-          foreground = "T3 Code";
+          foreground = "Fleet ADE";
           operations.push("reveal");
         },
       });
@@ -1356,7 +1356,7 @@ describe("DesktopWindow", () => {
         operations.length = 0;
         foreground = "Discord";
         yield* desktopWindow.dispatchMenuAction("new-thread");
-        assert.equal(foreground, "T3 Code");
+        assert.equal(foreground, "Fleet ADE");
         foreground = "Explorer";
         yield* desktopWindow.dispatchMenuAction("paste-as-text", { reveal: false });
 

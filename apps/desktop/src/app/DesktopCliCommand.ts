@@ -299,7 +299,7 @@ export const make = Effect.gen(function* () {
       // PATH would split the folder at the `;`, leaving two wrong entries behind.
       if (binDirectory.includes(";")) {
         return yield* fail(
-          `${binDirectory} 含有“;”，T3 Code 无法将其加入 PATH。请直接运行 ${launcher}。`,
+          `${binDirectory} 含有“;”，Fleet ADE 无法将其加入 PATH。请直接运行 ${launcher}。`,
         );
       }
       const entries = pathEntries(yield* readUserPath, ";");
@@ -398,15 +398,15 @@ export const make = Effect.gen(function* () {
       return yield* fail("请先安装 t3 命令。");
     }
     const setup = startupLine(installed.value);
-    if (setup === undefined) return yield* fail("T3 Code 无法将 t3 添加到此 shell 的 PATH。");
+    if (setup === undefined) return yield* fail("Fleet ADE 无法将 t3 添加到此 shell 的 PATH。");
     const shadowedBy = yield* foreignFirstOnPath;
     if (Option.isSome(shadowedBy)) {
-      return yield* fail(`${shadowedBy.value} 处的另一个 t3 会优先运行；T3 Code 不会改动它。`);
+      return yield* fail(`${shadowedBy.value} 处的另一个 t3 会优先运行；Fleet ADE 不会改动它。`);
     }
     if (!(yield* folderOnPath(installed.value)) && !(yield* hasLine(setup))) {
       yield* fs.makeDirectory(path.dirname(setup.path), { recursive: true }).pipe(
         Effect.andThen(
-          fs.writeFileString(setup.path, `\n# Added by T3 Code\n${setup.line}\n`, { flag: "a" }),
+          fs.writeFileString(setup.path, `\n# Added by Fleet ADE\n${setup.line}\n`, { flag: "a" }),
         ),
         Effect.mapError(() => fail(`无法将 t3 添加到 ${setup.file}。`)),
       );
@@ -427,7 +427,7 @@ export const make = Effect.gen(function* () {
       if (existing !== undefined) {
         const target = yield* fs.readLink(existing).pipe(Effect.option);
         if (Option.getOrUndefined(target) !== launcher) {
-          return yield* logInfo("left another T3 Code app's t3 command in place", {
+          return yield* logInfo("left another Fleet ADE app's t3 command in place", {
             existing,
           });
         }

@@ -256,7 +256,7 @@ function UnknownWhenVariableWarning({
 
   return (
     <WarningTooltipIcon label={label} focusable={focusable} className="size-4.5">
-      T3 Code 尚不识别此条件。仍可保存，但只有运行时提供该条件时才可能匹配。
+      Fleet ADE 尚不识别此条件。仍可保存，但只有运行时提供该条件时才可能匹配。
     </WarningTooltipIcon>
   );
 }

@@ -157,7 +157,7 @@ Manually settling an idle thread dismisses unanswered async questions without
 sending an answer or restarting the agent. Settling also closes the thread's
 terminals that wait at an idle prompt, and keeps their output. A terminal that
 runs a command, such as a dev server, stays open unless its action has **Stop this action
-when the thread settles** enabled in Settings > Projects > Actions. You can also set
+when the thread settles** enabled in Settings > Code > Actions. You can also set
 `"stopOnSettle": true` on a `t3.json` action and import it there. Start the command through
 that action so T3 can stop its terminal and child processes. Commands started through an
 agent's own shell tools are managed by the provider.
@@ -222,7 +222,7 @@ On mobile, the thread list search also lists message matches and opens them at
 the matching message; on an iPad with a keyboard, `Cmd+K` opens the same
 palette.
 
-Use **Settings → Keybindings** to find or customize shortcuts for searching files
+Use **Settings → General → Keybindings** to find or customize shortcuts for searching files
 and copying a thread reference. A copied reference uses the thread's pull request
 link when available, otherwise a link to the thread, which opens it from anywhere
 you paste it and pastes into a composer as a thread chip (see

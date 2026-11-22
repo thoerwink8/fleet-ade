@@ -91,7 +91,7 @@ function EmptyMobileClients() {
       <EmptyHeader>
         <EmptyTitle>没有移动客户端</EmptyTitle>
         <EmptyDescription>
-          在手机上安装 T3 Code 并登录 T3 Connect，即可收到推送通知和实时活动。
+          在手机上安装 Fleet ADE 并登录 T3 Connect，即可收到推送通知和实时活动。
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

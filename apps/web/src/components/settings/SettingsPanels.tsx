@@ -521,7 +521,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["会话标题生成说明"]
       : []),
     ...(settings.pullRequestLinksOpenInApp !== DEFAULT_UNIFIED_SETTINGS.pullRequestLinksOpenInApp
-      ? ["在 T3 Code 中打开 PR"]
+      ? ["在 Fleet ADE 中打开 PR"]
       : []),
   ];
 
@@ -665,7 +665,7 @@ function AutoSettleDaysInput({
 export function GeneralSettingsPanel() {
   const setting = searchableSetting;
   const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
+  const updateSettings = useUpdateScopedSettings({ deviceOnly: true });
   const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
     readLastEnabledProjectGroupingMode(),
   );
@@ -962,7 +962,7 @@ export function ChatSettingsPanel() {
     { value: "mod-enter", label: `始终用 ${modifierLabel} + Enter 发送` },
   ] as const;
   const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
+  const updateSettings = useUpdateScopedSettings({ deviceOnly: true });
 
   return (
     <SettingsPageContainer>
@@ -1135,7 +1135,7 @@ const isToolCallVisibility = Schema.is(ToolCallVisibility);
 
 function ToolCallVisibilityRow() {
   const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
+  const updateSettings = useUpdateScopedSettings({ deviceOnly: true });
   return (
     <SettingsRow
       {...searchableSetting("tool-call-visibility")}
@@ -1183,7 +1183,7 @@ const isScreenReaderAnnouncements = Schema.is(ScreenReaderAnnouncements);
 
 function ScreenReaderAnnouncementsRow() {
   const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
+  const updateSettings = useUpdateScopedSettings({ deviceOnly: true });
   return (
     <SettingsRow
       {...searchableSetting("screen-reader-announcements")}
@@ -1230,7 +1230,7 @@ function ScreenReaderAnnouncementsRow() {
 
 function ScreenReaderWindowTitleRow() {
   const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
+  const updateSettings = useUpdateScopedSettings({ deviceOnly: true });
   return (
     <SettingsRow
       {...searchableSetting("screen-reader-window-title")}
@@ -1318,11 +1318,11 @@ function PullRequestLinksOpenInAppSetting() {
   return (
     <SettingsRow
       {...searchableSetting("pull-request-links-open-in-app")}
-      description="点击 pull request 链接时在 T3 Code 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
+      description="点击 pull request 链接时在 Fleet ADE 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
       resetAction={
         openInApp ? null : (
           <SettingResetButton
-            label="在 T3 Code 中打开 PR"
+            label="在 Fleet ADE 中打开 PR"
             onClick={() => updateSettings({ pullRequestLinksOpenInApp: true })}
           />
         )
@@ -1333,7 +1333,7 @@ function PullRequestLinksOpenInAppSetting() {
           onCheckedChange={(checked) =>
             updateSettings({ pullRequestLinksOpenInApp: Boolean(checked) })
           }
-          aria-label="在 T3 Code 中打开 PR"
+          aria-label="在 Fleet ADE 中打开 PR"
         />
       }
     />
@@ -2153,7 +2153,7 @@ export function AboutSettingsPanel() {
       <SettingsSection id="legal" title="法律信息">
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="T3 Code 使用的依赖项、素材和可选工具的声明。"
+          description="Fleet ADE 使用的依赖项、素材和可选工具的声明。"
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}

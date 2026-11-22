@@ -103,7 +103,8 @@ export function ShortcutCheatsheetDialog() {
         </DialogPanel>
         <div className="px-6 pb-4 text-sm leading-6">
           <Link
-            to="/settings/keybindings"
+            to="/settings/general"
+            hash="keybindings"
             className="text-muted-foreground underline-offset-2 hover:underline"
             onClick={() => setOpen(false)}
           >

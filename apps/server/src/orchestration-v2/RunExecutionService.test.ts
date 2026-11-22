@@ -2968,7 +2968,7 @@ it.effect.each(["failure", "defect", "interrupt-failure", "ownership-lost"] as c
         const error = written.find((item) => item.type === "error");
         assert.equal(
           error?.failure.message,
-          "T3 Code 服务器无法打开数据库文件（SQLITE_CANTOPEN）。请在运行服务器的机器上检查磁盘空间，并确认数据和临时目录存在且可写，然后重试。若仍然失败，请查看服务器日志。",
+          "Fleet ADE 服务器无法打开数据库文件（SQLITE_CANTOPEN）。请在运行服务器的机器上检查磁盘空间，并确认数据和临时目录存在且可写，然后重试。若仍然失败，请查看服务器日志。",
         );
         const repaired = finalEvents.find((event) => event.type === "provider-turn.updated");
         if (failureMode === "interrupt-failure") {

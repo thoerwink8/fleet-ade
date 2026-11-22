@@ -420,7 +420,7 @@ const NODE_PTY_BINARY_MISSING_EXIT_CODE = 4;
 
 const formatNodePtyProbeFailureReason = (exitCode: number): string | null =>
   exitCode === NODE_PTY_BINARY_MISSING_EXIT_CODE
-    ? "此 T3 Code 版本缺少 WSL 支持：未包含打包的 Linux node-pty 二进制文件。请安装支持 WSL 的版本。"
+    ? "此 Fleet ADE 版本缺少 WSL 支持：未包含打包的 Linux node-pty 二进制文件。请安装支持 WSL 的版本。"
     : null;
 
 // Capture login-shell PATH because the server launches provider CLIs by name.

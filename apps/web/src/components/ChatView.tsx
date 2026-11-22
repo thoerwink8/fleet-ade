@@ -2803,7 +2803,7 @@ export default function ChatView(props: ChatViewProps) {
         : serverConfig === null
           ? "侧聊尚未就绪，请稍后重试。"
           : serverConfig.environment.capabilities.sideChats !== true
-            ? "请更新此环境的 T3 Code 服务器后再使用侧聊。"
+            ? "请更新此环境的 Fleet ADE 服务器后再使用侧聊。"
             : sideChatsOffered && !isServerThread
               ? "发送第一条消息后才能开始侧聊。"
               : sideChat.available &&

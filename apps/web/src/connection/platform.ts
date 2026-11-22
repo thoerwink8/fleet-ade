@@ -247,7 +247,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
       }
       return new ConnectionBlockedError({
         reason: "configuration",
-        detail: `${descriptor.label} 运行的 T3 Code 是 ${descriptor.serverVersion}，而这台桌面是 ${APP_VERSION}，该服务器无法接受这次配对。请在 ${descriptor.label} 上重启 T3 服务器，使它运行 ${APP_VERSION}，然后重试。`,
+        detail: `${descriptor.label} 运行的 Fleet ADE 是 ${descriptor.serverVersion}，而这台桌面是 ${APP_VERSION}，该服务器无法接受这次配对。请在 ${descriptor.label} 上重启 Fleet ADE 服务器，使它运行 ${APP_VERSION}，然后重试。`,
       });
     },
   });

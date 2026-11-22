@@ -136,7 +136,7 @@ describe("project removal confirmation", () => {
     });
     expect(plan.projectThreads).toHaveLength(3);
     expect(plan.confirmationMessage).toBe(
-      'Remove checkout "仓库" and delete its 1 thread?\n路径：/work/repo\n环境：本地\n这些会话及所有已归档会话将从 T3 Code 中删除。提供方会话会保留。\n此项目组中的其他条目不受影响。\n此操作无法撤销。',
+      'Remove checkout "仓库" and delete its 1 thread?\n路径：/work/repo\n环境：本地\n这些会话及所有已归档会话将从 Fleet ADE 中删除。提供方会话会保留。\n此项目组中的其他条目不受影响。\n此操作无法撤销。',
     );
   });
 
@@ -152,7 +152,7 @@ describe("project removal confirmation", () => {
     expect(plan.confirmationMessage).toContain("环境：Remote");
     expect(plan.confirmationMessage).toContain("此项目组中的其他条目不受影响。");
     expect(plan.confirmationMessage).toContain(
-      "所有已归档会话将从 T3 Code 中删除。提供方会话会保留。",
+      "所有已归档会话将从 Fleet ADE 中删除。提供方会话会保留。",
     );
   });
 

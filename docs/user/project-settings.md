@@ -52,10 +52,10 @@ Pinned projects come first in the project pickers: the project picker on a new t
 new-thread list, the command palette, the sidebar project filter, and mobile. In the boring sidebar, pinned projects get the top
 folders, even with no active threads. Pin or unpin a project from its row in any of those lists,
 or press the thread pin shortcut (`mod+shift+p` by default) on the highlighted row. **Pin
-project** in the command palette and **Settings → Projects** work too. A list keeps its order
+project** in the command palette and **Settings → Code** work too. A list keeps its order
 while it is open, so a new pin moves up the next time you open it.
 
-Archive a project you are done with in **Settings → Projects**. It leaves the project pickers.
+Archive a project you are done with in **Settings → Code**. It leaves the project pickers.
 Its threads, settings, and files stay as they are, and archived projects still show in the
 Settings project list, marked **Archived**. Choose one there and select **Unarchive** to bring it
 back. On mobile, both are in **Settings → Projects → Organize**.
@@ -64,7 +64,7 @@ A project on several machines must have every machine connected to pin or archiv
 
 ## Worktree branch names
 
-In **Settings → Worktrees → Worktree branch naming**, choose a static prefix,
+In **Settings → Code → Worktree branch naming**, choose a static prefix,
 a model-selected semantic prefix such as `feat/` or `fix/`, or custom instructions
 for the complete name. The static prefix defaults to `t3/`; a trailing slash is
 optional, and an empty prefix adds nothing. Invalid characters in a static prefix
@@ -164,7 +164,7 @@ requests and the prompt each one produced.
 If the environment is offline, the sender gets an error and nothing runs;
 redeliver from the sender, such as GitHub's **Recent Deliveries**, once it is
 back. To have T3 Connect keep requests instead, turn on **Hold webhooks while
-offline** in **Settings → Sharing & access**. T3 Connect then stores requests to a
+offline** in **Settings → Connections**. T3 Connect then stores requests to a
 T3 Connect URL for up to 24 hours and delivers them when the environment
 returns. Leave it off if you don't want request bodies stored outside your
 machine. To skip requests that waited too long, set **Skip requests older
@@ -187,7 +187,7 @@ resolve in one order: a project override, then the environment setting, then `t3
 built-in default. Leave a setting on **Inherit** to let the next tier decide.
 
 New worktrees initialize git submodules recursively. If that step is slow because the repository
-declares many nested submodules, set **Submodules** in **Settings → Worktrees** under Advanced (with the project
+declares many nested submodules, set **Submodules** in **Settings → Code** under Advanced (with the project
 selected to override it there) to **Top level only** to stop at the ones the repository declares
 itself, or **Skip** to leave them for a setup script. It resolves in the same order as the
 workspace default: a `"worktreeSubmodules"` value in the `t3.json` of the branch being checked out
@@ -196,13 +196,13 @@ applies when the project and environment are both on **Inherit**.
 ## Worktree location
 
 New worktrees go in the `worktrees` folder of the T3 home directory. To put them somewhere else,
-such as another drive, set **Settings → Worktrees → Worktree location** to an absolute path like
+such as another drive, set **Settings → Code → Worktree location** to an absolute path like
 `D:\worktrees` or `~/worktrees`. The setting is per machine. Existing worktrees stay where they
 are, and cleanup covers both the default folder and the custom one.
 
 ## Storage cleanup
 
-Open **Settings → Worktrees → Cleanup** to enable automatic cleanup on one machine or all connected
+Open **Settings → Code → Cleanup** to enable automatic cleanup on one machine or all connected
 environments. Policies are off by default and run on the server at startup, when changed, and
 hourly. Offline machines keep their existing policies.
 

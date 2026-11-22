@@ -23,7 +23,7 @@ export function orchestrationProtocolCompatibilityError(
       })
     : new ConnectionBlockedError({
         reason: "unsupported",
-        detail: `此客户端需要更新的服务器。请更新 ${descriptor.label} 上的 T3 Code 后再连接。`,
+        detail: `此客户端需要更新的服务器。请更新 ${descriptor.label} 上的 Fleet ADE 后再连接。`,
         ...(canSelfUpdate(descriptor) ? { serverUpdateRequired: true } : {}),
       });
 }

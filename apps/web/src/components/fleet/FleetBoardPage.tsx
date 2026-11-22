@@ -543,7 +543,7 @@ export function FleetBoardPage() {
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
                 title="还没有连上的环境"
-                description="连上一台 T3 Code 服务器后，这里会汇总它记下的各台机器的活。"
+                description="连上一台 Fleet ADE 服务器后，这里会汇总它记下的各台机器的活。"
                 action={
                   <Button variant="outline" size="sm" render={<Link to="/settings/connections" />}>
                     去连接

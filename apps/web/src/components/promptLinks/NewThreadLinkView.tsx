@@ -141,7 +141,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
       replace: true,
     }).catch(() => null);
     if (opened === null) {
-      setState({ status: "failed", message: "T3 Code 无法打开新会话。" });
+      setState({ status: "failed", message: "Fleet ADE 无法打开新会话。" });
       return;
     }
     setState({ status: "opened" });
@@ -207,7 +207,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     if (environmentId === null || serverConfig === null || newProjectsRoot === null) {
       setState({
         status: "failed",
-        message: "这台机器无法从链接克隆。请更新其上的 T3 Code，或从命令面板克隆仓库。",
+        message: "这台机器无法从链接克隆。请更新其上的 Fleet ADE，或从命令面板克隆仓库。",
       });
       return;
     }

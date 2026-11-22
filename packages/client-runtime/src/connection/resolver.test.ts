@@ -184,7 +184,7 @@ describe("ConnectionResolver", () => {
 
       expect(error).toMatchObject({ reason: "unsupported" });
       expect(error.message).toBe(
-        "此客户端需要更新的服务器。请更新 Compatible environment 上的 T3 Code 后再连接。",
+        "此客户端需要更新的服务器。请更新 Compatible environment 上的 Fleet ADE 后再连接。",
       );
     }),
   );

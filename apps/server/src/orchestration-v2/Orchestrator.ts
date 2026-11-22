@@ -711,7 +711,7 @@ const WORKSPACE_PREPARATION_INPUT_LEGACY = "Preparing workspace";
 const isWorkspacePreparationInput = (input: string | null | undefined): boolean =>
   input === WORKSPACE_PREPARATION_INPUT || input === WORKSPACE_PREPARATION_INPUT_LEGACY;
 const RUNTIME_REQUEST_DELIVERY_FAILED_MESSAGE =
-  "T3 Code 无法确认你的回复已送达智能体。若任务一直卡住，停止它并重试。";
+  "Fleet ADE 无法确认你的回复已送达智能体。若任务一直卡住，停止它并重试。";
 
 function withoutPreparationResult(
   item: Extract<OrchestrationV2TurnItem, { readonly type: "command_execution" }>,

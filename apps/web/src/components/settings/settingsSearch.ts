@@ -79,66 +79,42 @@ export interface SettingsSearchAvailability {
 }
 
 export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
-  "/settings/diagnostics": "诊断",
-  "/settings/projects": "项目",
+  "/settings/diagnostics": "维护",
+  "/settings/projects": "代码",
   "/settings/general": "通用",
-  "/settings/network": "网络",
+  "/settings/network": "通用",
   "/settings/appearance": "外观",
-  "/settings/chat": "聊天",
-  "/settings/diffs": "差异与 PR",
-  "/settings/keybindings": "快捷键",
-  "/settings/providers": "智能体提供方",
+  "/settings/chat": "会话",
+  "/settings/diffs": "外观",
+  "/settings/keybindings": "通用",
+  "/settings/providers": "智能体",
   "/settings/threads": "会话",
-  "/settings/scheduled-tasks": "定时任务",
-  "/settings/source-control": "版本控制",
-  "/settings/worktrees": "工作树",
-  "/settings/connections": "环境",
-  "/settings/access": "共享与访问",
-  "/settings/secrets": "凭据",
+  "/settings/scheduled-tasks": "定时",
+  "/settings/source-control": "代码",
+  "/settings/worktrees": "代码",
+  "/settings/connections": "连接",
+  "/settings/access": "连接",
+  "/settings/secrets": "连接",
   "/settings/maintenance": "维护",
-  "/settings/about": "关于",
-  "/settings/archived": "归档",
+  "/settings/about": "维护",
+  "/settings/archived": "会话",
 };
 
-/** Sidebar order. A group with a hidden heading is set apart on screen by space alone. */
+/** Sidebar order. Eight sections, each a single entry; the pages that used to be
+ *  their own entries now live inside them and their old paths redirect here. */
 export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   readonly heading: string;
   readonly headingHidden?: true;
   readonly paths: ReadonlyArray<SettingsPath>;
 }> = [
-  {
-    heading: "偏好",
-    headingHidden: true,
-    paths: [
-      "/settings/general",
-      "/settings/network",
-      "/settings/appearance",
-      "/settings/chat",
-      "/settings/diffs",
-      "/settings/keybindings",
-    ],
-  },
-  {
-    heading: "智能体",
-    paths: ["/settings/providers", "/settings/threads", "/settings/scheduled-tasks"],
-  },
-  {
-    heading: "代码",
-    paths: ["/settings/projects", "/settings/source-control", "/settings/worktrees"],
-  },
-  {
-    heading: "连接",
-    paths: [
-      "/settings/connections",
-      "/settings/access",
-      ...(isSecretsFeatureEnabled ? (["/settings/secrets"] as const) : []),
-    ],
-  },
-  {
-    heading: "更多",
-    headingHidden: true,
-    paths: ["/settings/maintenance", "/settings/about", "/settings/archived"],
-  },
+  { heading: "通用", headingHidden: true, paths: ["/settings/general"] },
+  { heading: "外观", headingHidden: true, paths: ["/settings/appearance"] },
+  { heading: "智能体", headingHidden: true, paths: ["/settings/providers"] },
+  { heading: "会话", headingHidden: true, paths: ["/settings/threads"] },
+  { heading: "定时", headingHidden: true, paths: ["/settings/scheduled-tasks"] },
+  { heading: "代码", headingHidden: true, paths: ["/settings/projects"] },
+  { heading: "连接", headingHidden: true, paths: ["/settings/connections"] },
+  { heading: "维护", headingHidden: true, paths: ["/settings/maintenance"] },
 ];
 
 export function keybindingSearchAnchorId<Command extends KeybindingCommand>(command: Command) {
@@ -154,7 +130,7 @@ const KEYBINDING_SEARCH_ITEMS = STATIC_KEYBINDING_COMMANDS.toSorted((left, right
   return {
     id: keybindingSearchAnchorId(command),
     title: commandLabel(command),
-    to: "/settings/keybindings" as const,
+    to: "/settings/general" as const,
     searchTerms: [command, ...defaultKeys],
     secondary: true,
     ...(defaultKeys.length === 0 ? { targetId: "keybindings" } : {}),
@@ -181,7 +157,7 @@ export function sourceControlHostSearchItems(
         title: credentials
           ? `${definition.label} accounts and token`
           : `${definition.label} credentials`,
-        to: "/settings/source-control" as const,
+        to: "/settings/projects" as const,
         searchTerms: [
           credentials
             ? `${names} ${credentials.cliName} account login user host switch multiple accounts disable sign in token personal access token pat api key credential`
@@ -207,7 +183,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "storage-worktree-keep-when",
     targetId: "storage-worktrees",
     title: "保留有本地改动的工作树",
-    to: "/settings/worktrees",
+    to: "/settings/projects",
     scope: "project-defaults",
     searchTerms: [
       "any local files uncommitted changes edited tracked files ignored env build output cleanup",
@@ -223,7 +199,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktrees",
     title: "工作树清理",
-    to: "/settings/worktrees",
+    to: "/settings/projects",
     scope: "project-defaults",
     searchTerms: [
       "disk storage automatic delete deleted archived threads old inactive merged settled unchanged worktrees retention days project inherit off custom",
@@ -232,7 +208,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktrees-location",
     title: "工作树位置",
-    to: "/settings/worktrees",
+    to: "/settings/projects",
     scope: "environment-defaults",
     searchTerms: ["worktree location folder directory path drive external disk"],
   },
@@ -299,7 +275,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "diff-color-scheme",
     title: "差异颜色",
-    to: "/settings/diffs",
+    to: "/settings/appearance",
     searchTerms: ["red green blue orange additions deletions changes counts palette colorblind"],
   },
   {
@@ -361,7 +337,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "network",
     title: "网络",
-    to: "/settings/network",
+    to: "/settings/general",
     searchTerms: ["proxy", "代理", "http_proxy", "证书", "直连"],
     environmentOnly: true,
     scope: "environment",
@@ -403,7 +379,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "tool-call-visibility",
     title: "聊天中的工具调用",
-    to: "/settings/chat",
+    to: "/settings/threads",
     searchTerms: [
       "hide tool calls commands edits searches work log activity quiet chat zen final answers only",
     ],
@@ -411,7 +387,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "screen-reader-announcements",
     title: "屏幕阅读器播报",
-    to: "/settings/chat",
+    to: "/settings/threads",
     searchTerms: [
       "accessibility a11y screen reader nvda jaws voiceover orca narrator speech announce read aloud messages activity steps",
     ],
@@ -419,7 +395,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "screen-reader-window-title",
     title: "屏幕阅读器窗口标题",
-    to: "/settings/chat",
+    to: "/settings/threads",
     searchTerms: [
       "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar thread status order working approval",
     ],
@@ -493,49 +469,49 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "hide-whitespace-changes",
     title: "隐藏空白字符改动",
-    to: "/settings/diffs",
+    to: "/settings/appearance",
     searchTerms: ["diff ignore spaces edits default"],
   },
   {
     id: "default-diff-file-state",
     title: "差异文件默认状态",
-    to: "/settings/diffs",
+    to: "/settings/appearance",
     searchTerms: ["collapsed expanded collapse expand files pull request pr code tab"],
   },
   {
     id: "diff-layout",
     title: "差异布局",
-    to: "/settings/diffs",
+    to: "/settings/appearance",
     searchTerms: ["stacked split side by side unified inline view"],
   },
   {
     id: "proactive-panels",
     title: "自动打开 PR 与改动面板",
-    to: "/settings/diffs",
+    to: "/settings/appearance",
     searchTerms: ["proactive automatically open diff pull request pr right panel agent completion"],
   },
   {
     id: "skills-in-slash-menu",
     title: "在斜杠菜单中显示技能",
-    to: "/settings/chat",
+    to: "/settings/threads",
     searchTerms: ["command menu dollar $ slash /"],
   },
   {
     id: "composer-rich-text",
     title: "富文本输入框",
-    to: "/settings/chat",
+    to: "/settings/threads",
     searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
   },
   {
     id: "send-shortcut",
     title: "发送快捷键",
-    to: "/settings/chat",
+    to: "/settings/threads",
     searchTerms: ["enter return command ctrl multiline prompt new line composer"],
   },
   {
     id: "follow-up-behavior",
     title: "追加消息行为",
-    to: "/settings/chat",
+    to: "/settings/threads",
     searchTerms: ["queue steer running turn send default behavior composer"],
   },
   {
@@ -580,14 +556,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "worktree-submodules",
     title: "子模块",
-    to: "/settings/worktrees",
+    to: "/settings/projects",
     scope: "project-defaults",
     searchTerms: ["git submodule init recursive top-level none worktree t3.json"],
   },
   {
     id: "start-from-origin",
     title: "从远程分支开始",
-    to: "/settings/worktrees",
+    to: "/settings/projects",
     scope: "project-defaults",
     searchTerms: ["new worktrees start remote origin latest fetched branch local"],
   },
@@ -647,20 +623,20 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "app-version",
     title: "版本",
-    to: "/settings/about",
+    to: "/settings/maintenance",
     searchTerms: ["about check for updates download install upgrade release"],
   },
   {
     id: "update-track",
     title: "更新通道",
-    to: "/settings/about",
+    to: "/settings/maintenance",
     searchTerms: ["release channel stable latest nightly prerelease"],
     releaseChannelOnly: true,
   },
   {
     id: "cli-command",
     title: "t3 命令",
-    to: "/settings/about",
+    to: "/settings/maintenance",
     searchTerms: ["cli terminal shell path install command line"],
     desktopOnly: true,
   },
@@ -682,12 +658,12 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "open-source-licenses",
     title: "开源许可",
-    to: "/settings/about",
+    to: "/settings/maintenance",
   },
   {
     id: "keybindings",
     title: "快捷键",
-    to: "/settings/keybindings",
+    to: "/settings/general",
     searchTerms: ["keyboard shortcuts hotkeys commands bindings json"],
   },
   ...KEYBINDING_SEARCH_ITEMS,
@@ -731,8 +707,8 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "pull-request-links-open-in-app",
-    title: "在 T3 Code 中打开 PR",
-    to: "/settings/diffs",
+    title: "在 Fleet ADE 中打开 PR",
+    to: "/settings/appearance",
     searchTerms: [
       `pr commit links ${SOURCE_CONTROL_HOST_LABELS} browser external click default pull request view panel`,
     ],
@@ -740,14 +716,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "automatic-pull",
     title: "自动拉取",
-    to: "/settings/source-control",
+    to: "/settings/projects",
     scope: "project-defaults",
     searchTerms: ["auto pull default branch current checkout fast forward upstream"],
   },
   {
     id: "remove-agent-credits-on-merge",
     title: "合并时移除智能体署名",
-    to: "/settings/source-control",
+    to: "/settings/projects",
     scope: "project-defaults",
     searchTerms: [
       `pull request ${SOURCE_CONTROL_HOST_LABELS} squash co-authored-by attribution claude codex generated`,
@@ -756,14 +732,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "pull-request-merge-method",
     title: "默认合并方式",
-    to: "/settings/source-control",
+    to: "/settings/projects",
     scope: "project-defaults",
     searchTerms: ["pull request merge squash rebase last selected"],
   },
   {
     id: "source-control",
     title: "版本控制",
-    to: "/settings/source-control",
+    to: "/settings/projects",
     scope: "environment-defaults",
     searchTerms: [
       `version control git ${SOURCE_CONTROL_HOST_TERMS} hosting integrations credentials scan server environment`,
@@ -783,7 +759,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "worktree-branch-naming",
     title: "工作树分支命名",
-    to: "/settings/worktrees",
+    to: "/settings/projects",
     searchTerms: ["static semantic prefix custom prompt instructions feat fix refactor chore"],
     environmentOnly: true,
     scope: "project-defaults",
@@ -792,7 +768,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "source-control-writing-style",
     title: "提交与 PR 文案",
-    to: "/settings/source-control",
+    to: "/settings/projects",
     searchTerms: [
       "repository conventions conventional commits custom instructions commit messages change pr pull request merge request titles descriptions body style prompt write my own",
     ],
@@ -801,14 +777,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "follow-change-request-templates",
     title: "遵循 PR 模板",
-    to: "/settings/source-control",
+    to: "/settings/projects",
     searchTerms: ["repository pr pull request merge request change request description structure"],
     environmentOnly: true,
   },
   {
     id: "source-control-writer-model",
     title: "版本控制文案模型",
-    to: "/settings/source-control",
+    to: "/settings/projects",
     searchTerms: [
       "override generated commit change request pr titles descriptions branch bookmark",
     ],
@@ -824,7 +800,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "environment-icon",
     title: "环境图标",
-    to: "/settings/access",
+    to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["machine glyph sidebar mac mini studio laptop desktop server cloud vm"],
   },
@@ -838,7 +814,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "network-access",
     title: "网络访问",
-    to: "/settings/access",
+    to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["expose backend remote pairing local machine interfaces host restart"],
     localBackendManagementOnly: true,
@@ -846,7 +822,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "tailscale-https",
     title: "Tailscale HTTPS",
-    to: "/settings/access",
+    to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["serve magicdns endpoint remote secure network"],
     desktopOnly: true,
@@ -855,7 +831,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "wsl-backend",
     title: "WSL 后端",
-    to: "/settings/access",
+    to: "/settings/connections",
     searchTerms: [
       "windows subsystem linux distro second server projects stop windows backend restart wsl only",
     ],
@@ -868,7 +844,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "t3-connect",
     localEnvironmentOnly: true,
     title: "T3 Connect",
-    to: "/settings/access",
+    to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["managed tunnel cloud other devices remote tunnels limit t3 chat"],
     desktopOnly: true,
@@ -878,7 +854,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "hold-webhooks-while-offline",
     localEnvironmentOnly: true,
     title: "离线时保留 Webhook",
-    to: "/settings/access",
+    to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["webhook automations offline queue mailbox t3 connect"],
     cloudOnly: true,
@@ -888,7 +864,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "publish-agent-activity",
     localEnvironmentOnly: true,
     title: "发布智能体活动",
-    to: "/settings/access",
+    to: "/settings/connections",
     targetId: "connections-environment",
     searchTerms: ["mobile push notifications live activities cloud tunnel"],
     cloudOnly: true,
@@ -896,7 +872,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "connections-environment",
     title: "本机",
-    to: "/settings/access",
+    to: "/settings/connections",
     searchTerms: [
       "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint",
     ],
@@ -934,14 +910,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "secret-providers",
     title: "凭据提供方",
-    to: "/settings/secrets",
+    to: "/settings/connections",
     searchTerms: ["vault credentials api key"],
     secretsFeatureOnly: true,
   },
   {
     id: "archive",
     title: "已归档会话",
-    to: "/settings/archived",
+    to: "/settings/threads",
     searchTerms: ["restore reopen deleted history projects"],
   },
 ] as const satisfies ReadonlyArray<SettingsSearchItem>;
@@ -972,11 +948,27 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/archived": "project-defaults",
 };
 
-const RENAMED_SETTINGS_PATHS: Readonly<Record<string, SettingsPath>> = {
-  "/settings/integrations": "/settings/providers",
-  "/settings/storage": "/settings/maintenance",
-  "/settings/beta": "/settings/maintenance",
-  "/settings/labs": "/settings/maintenance",
+/** Pages folded into one of the eight sections. Their rows keep working through the anchor. */
+interface RenamedSettingsTarget {
+  readonly to: SettingsPath;
+  readonly defaultHash?: string;
+}
+
+const RENAMED_SETTINGS_PATHS: Readonly<Record<string, RenamedSettingsTarget>> = {
+  "/settings/integrations": { to: "/settings/providers" },
+  "/settings/storage": { to: "/settings/maintenance", defaultHash: "storage-artifacts" },
+  "/settings/beta": { to: "/settings/maintenance" },
+  "/settings/labs": { to: "/settings/maintenance" },
+  "/settings/network": { to: "/settings/general", defaultHash: "network" },
+  "/settings/keybindings": { to: "/settings/general", defaultHash: "keybindings" },
+  "/settings/chat": { to: "/settings/threads", defaultHash: "composer" },
+  "/settings/archived": { to: "/settings/threads", defaultHash: "archive" },
+  "/settings/diffs": { to: "/settings/appearance", defaultHash: "diffs" },
+  "/settings/source-control": { to: "/settings/projects", defaultHash: "source-control" },
+  "/settings/worktrees": { to: "/settings/projects", defaultHash: "worktree-creation" },
+  "/settings/access": { to: "/settings/connections", defaultHash: "connections-environment" },
+  "/settings/secrets": { to: "/settings/connections", defaultHash: "secret-providers" },
+  "/settings/about": { to: "/settings/maintenance", defaultHash: "about" },
 };
 const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
   "/settings/general",
@@ -987,21 +979,30 @@ const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
 ]);
 // Section anchors that moved but are not search results themselves.
 const MOVED_SECTION_ANCHORS: Readonly<Record<string, SettingsPath>> = {
-  "authorized-clients": "/settings/access",
+  "authorized-clients": "/settings/connections",
   "text-generation": "/settings/threads",
-  about: "/settings/about",
+  about: "/settings/maintenance",
 };
 
 /** Where an old settings link now lives. Its anchor finds the page its row moved to. */
-export function movedSettingsPath(pathname: string, hash: string): SettingsPath | null {
+export function movedSettingsRedirect(
+  pathname: string,
+  hash: string,
+): { readonly to: SettingsPath; readonly hash?: string } | null {
   if (!SPLIT_SETTINGS_PATHS.has(pathname)) return null;
   const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;
   const anchored = hash
     ? (items.find((item) => item.id === hash) ?? items.find((item) => item.targetId === hash))
     : undefined;
-  const to =
-    anchored?.to ?? MOVED_SECTION_ANCHORS[hash] ?? RENAMED_SETTINGS_PATHS[pathname] ?? null;
-  return to === pathname ? null : to;
+  const renamed = RENAMED_SETTINGS_PATHS[pathname];
+  const to = anchored?.to ?? MOVED_SECTION_ANCHORS[hash] ?? renamed?.to ?? null;
+  if (to === null || to === pathname) return null;
+  if (hash) return { to, hash };
+  return renamed?.defaultHash ? { to, hash: renamed.defaultHash } : { to };
+}
+
+export function movedSettingsPath(pathname: string, hash: string): SettingsPath | null {
+  return movedSettingsRedirect(pathname, hash)?.to ?? null;
 }
 
 export function getSettingsSearchTargetScope(targetId: string) {

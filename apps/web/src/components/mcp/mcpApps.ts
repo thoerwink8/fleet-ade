@@ -8,9 +8,9 @@ import museLogo from "./logos/muse.png";
 import openClawLogo from "./logos/openclaw.png";
 import pokeLogo from "./logos/poke.png";
 
-/** How the Connect step hands T3 Code's MCP URL to an app. Every `link` is https. */
+/** How the Connect step hands Fleet ADE's MCP URL to an app. Every `link` is https. */
 export type McpAppHandoff =
-  /** Opens the app's add form with T3 Code filled in. */
+  /** Opens the app's add form with Fleet ADE filled in. */
   | { readonly kind: "open"; readonly link: (mcpUrl: string) => string }
   /** Copies the URL, then opens the page it goes on. */
   | { readonly kind: "copy-url"; readonly link: string }
@@ -51,7 +51,7 @@ export const MCP_APPS: readonly McpApp[] = [
     logo: pokeLogo,
     handoff: {
       kind: "open",
-      link: (url) => `https://poke.com/integrations/new?name=T3%20Code&url=${encoded(url)}`,
+      link: (url) => `https://poke.com/integrations/new?name=Fleet%20ADE&url=${encoded(url)}`,
     },
     steps: ["打开 poke.com/integrations/new。", "粘贴 URL 并添加集成。"],
     docs: "https://poke.com/docs/mcp-servers",
@@ -63,7 +63,7 @@ export const MCP_APPS: readonly McpApp[] = [
     handoff: {
       kind: "open",
       link: (url) =>
-        `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=T3%20Code&connectorUrl=${encoded(url)}`,
+        `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=Fleet%20ADE&connectorUrl=${encoded(url)}`,
     },
     steps: [
       "在 Claude 中打开 Customize，然后打开 Connectors。",
@@ -109,7 +109,7 @@ export const MCP_APPS: readonly McpApp[] = [
       "选择 Custom apps，再点 Add，然后粘贴 URL。",
     ],
     docs: "https://support.google.com/gemini/answer/17209137",
-    // Gemini's sign-in and its tool schema checks do not work with T3 Code yet.
+    // Gemini's sign-in and its tool schema checks do not work with Fleet ADE yet.
     hidden: true,
   },
   {

@@ -42,7 +42,7 @@ export function LocalEnvironmentSetting() {
         {...searchableSetting("local-environment")}
         description={
           enabled
-            ? "在本机上运行智能体。关闭后，T3 Code 将仅使用远程环境。"
+            ? "在本机上运行智能体。关闭后，Fleet ADE 将仅使用远程环境。"
             : "已关闭。智能体仅在远程环境中运行。"
         }
         control={
@@ -67,8 +67,8 @@ export function LocalEnvironmentSetting() {
             <AlertDialogTitle>{enabled ? "关闭本地环境？" : "开启本地环境？"}</AlertDialogTitle>
             <AlertDialogDescription>
               {enabled
-                ? "T3 Code 将重启，不再在本机上运行服务器。本机上运行的智能体和终端将停止，其他设备也将无法连接本机。你的项目、历史记录和远程环境不受影响。"
-                : "T3 Code 将重启，并重新在本机上运行服务器。"}
+                ? "Fleet ADE 将重启，不再在本机上运行服务器。本机上运行的智能体和终端将停止，其他设备也将无法连接本机。你的项目、历史记录和远程环境不受影响。"
+                : "Fleet ADE 将重启，并重新在本机上运行服务器。"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}

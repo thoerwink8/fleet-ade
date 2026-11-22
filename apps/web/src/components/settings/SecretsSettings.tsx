@@ -1,7 +1,12 @@
-import type { EnvironmentId, SecretProviderConfig, SecretProviderId } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  resolveEnvironmentMachineKind,
+  type SecretProviderConfig,
+  type SecretProviderId,
+} from "@t3tools/contracts";
 import { builtInSecretProviderDefinitions } from "@t3tools/secret-provider-definitions/registry";
 import { useState } from "react";
-
+import { useSearch } from "@tanstack/react-router";
 import { useEnvironmentSettings, useUpdateEnvironmentSettings } from "../../hooks/useSettings";
 import type { EnvironmentPresentation } from "../../state/environments";
 import { useEnvironmentSessionState } from "../../state/session";
@@ -20,29 +25,81 @@ import {
   classifyProviderEnvironmentAccess,
   resolveRemoteOperateAccess,
 } from "./ProviderSettingsPanel.logic";
-import { useSettingsScope } from "./SettingsScopeContext";
+import { useAccessEnvironment } from "./useAccessEnvironment";
 import { searchableSetting } from "./settingsSearch";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
+import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
+import { SettingsRow, SettingsSection } from "./settingsLayout";
+import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 
 export function SecretsSettingsPanel() {
-  const { scope, environment } = useSettingsScope();
+  // Like AccessSettings: this device page hides the scope sentence, so the
+  // single-environment picker lives here and only reads the `machine` search param.
+  const linkedEnvironmentId = useSearch({
+    strict: false,
+    select: (search) =>
+      typeof search.machine === "string" ? EnvironmentId.make(search.machine) : null,
+  });
+  const [selectedEnvironmentId, setSelectedEnvironmentId] = useState(linkedEnvironmentId);
+  const { candidates, environment } = useAccessEnvironment(selectedEnvironmentId);
   const connected = environment?.connection.phase === "connected";
   return (
-    <SettingsPageContainer>
+    <>
+      {candidates.length > 1 && environment !== null ? (
+        <div className="flex min-w-0 items-center gap-1.5 px-3 text-sm text-muted-foreground sm:px-4">
+          <span className="shrink-0">凭据提供方所属环境</span>
+          <Select
+            value={environment.environmentId}
+            onValueChange={(next) => {
+              if (next !== null) setSelectedEnvironmentId(next);
+            }}
+          >
+            <SelectTrigger size="sm" className="w-auto max-w-72" aria-label="环境">
+              <SelectValue>
+                {(value: EnvironmentId) => {
+                  const selected = candidates.find(
+                    (candidate) => candidate.environmentId === value,
+                  );
+                  return selected ? settingsScopeEnvironmentLabel(selected, candidates) : null;
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup alignItemWithTrigger={false}>
+              {candidates.map((candidate) => (
+                <SelectItem
+                  hideIndicator
+                  key={candidate.environmentId}
+                  value={candidate.environmentId}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <EnvironmentMachineIcon
+                      aria-hidden
+                      kind={resolveEnvironmentMachineKind(candidate.serverConfig)}
+                      className="size-3.5 shrink-0"
+                    />
+                    <span className="min-w-0 truncate">
+                      {settingsScopeEnvironmentLabel(candidate, candidates)}
+                    </span>
+                    {candidate.connection.phase !== "connected" ? (
+                      <span className="shrink-0 text-xs text-muted-foreground">离线</span>
+                    ) : null}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </div>
+      ) : null}
       {connected &&
       environment.serverConfig !== null &&
       environment.serverConfig.secretProviderSettings !== true ? (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            请先更新 {environment.label} 上的 T3 Code，才能管理它的凭据提供方。
+            请先更新 {environment.label} 上的 Fleet ADE，才能管理它的凭据提供方。
           </p>
         </SettingsSection>
-      ) : connected ? (
-        <EnvironmentSecretProviders
-          key={environment.environmentId}
-          environment={environment}
-          projectScoped={scope.kind === "project" || scope.kind === "checkout"}
-        />
+      ) : connected && environment !== null ? (
+        <EnvironmentSecretProviders key={environment.environmentId} environment={environment} />
       ) : (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
@@ -50,16 +107,14 @@ export function SecretsSettingsPanel() {
           </p>
         </SettingsSection>
       )}
-    </SettingsPageContainer>
+    </>
   );
 }
 
 function EnvironmentSecretProviders({
   environment,
-  projectScoped,
 }: {
   readonly environment: EnvironmentPresentation;
-  readonly projectScoped: boolean;
 }) {
   const environmentId = environment.environmentId;
   const sessionState = useEnvironmentSessionState(environmentId);
@@ -73,17 +128,12 @@ function EnvironmentSecretProviders({
       hasError: sessionState.hasError,
     }),
   });
-  const readOnly = access.kind !== "editable" || projectScoped;
+  const readOnly = access.kind !== "editable";
   const providers = useEnvironmentSettings(environmentId, (settings) => settings.secretProviders);
   const updateSettings = useUpdateEnvironmentSettings(environmentId);
   const entries = Object.entries(providers) as Array<[SecretProviderId, SecretProviderConfig]>;
   return (
     <SettingsSection {...searchableSetting("secret-providers")}>
-      {projectScoped ? (
-        <p className="px-4 pt-3 text-xs text-muted-foreground">
-          这是环境级设置，请先选择一个环境再修改。
-        </p>
-      ) : null}
       {entries.length === 0 ? (
         <SettingsRow
           title="尚未配置凭据提供方。"

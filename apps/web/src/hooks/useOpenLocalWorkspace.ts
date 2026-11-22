@@ -70,7 +70,7 @@ export function useOpenLocalWorkspace() {
         });
         if (result._tag === "Failure") {
           const error = squashAtomCommandFailure(result);
-          throw error instanceof Error ? error : new Error("T3 Code 无法添加该项目。");
+          throw error instanceof Error ? error : new Error("Fleet ADE 无法添加该项目。");
         }
         return projectId;
       },

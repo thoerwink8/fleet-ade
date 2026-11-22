@@ -351,7 +351,7 @@ it.effect("requires an update before running an older activated managed installa
     );
     const restarted = yield* makeHarness({ baseDir: first.baseDir });
     expect((yield* Effect.flip(restarted.installation.resolve())).detail).toContain(
-      "不在此 T3 Code 版本的支持范围内",
+      "不在此 Fleet ADE 版本的支持范围内",
     );
     yield* restarted.installation.start;
     expect((yield* terminalState(restarted.installation)).phase).toBe("succeeded");

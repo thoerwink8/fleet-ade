@@ -163,8 +163,8 @@ function ActiveSshPasswordPrompt({
         <DialogHeader>
           <DialogTitle>需要 SSH 验证</DialogTitle>
           <DialogDescription>
-            请输入 <code>{target}</code> 要求的密码或验证码。T3 Code 会把你的回答交给本机 SSH
-            进程，并暂存在内存中以便此主机复用。T3 Code 不会把它写入磁盘。
+            请输入 <code>{target}</code> 要求的密码或验证码。Fleet ADE 会把你的回答交给本机 SSH
+            进程，并暂存在内存中以便此主机复用。Fleet ADE 不会把它写入磁盘。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>

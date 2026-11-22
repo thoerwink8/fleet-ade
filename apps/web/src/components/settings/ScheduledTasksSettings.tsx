@@ -1183,8 +1183,12 @@ function WebhookDeliveryMode({ environmentId }: { readonly environmentId: Enviro
       {cloudLink.data.holdWebhooksWhileOffline
         ? "此环境离线时，请求最多保留 24 小时。"
         : "实时转发。此环境离线时，请求会失败。"}
-      <Link to="/settings/access" className="underline underline-offset-2">
-        在“共享与访问”中更改
+      <Link
+        to="/settings/connections"
+        hash="connections-environment"
+        className="underline underline-offset-2"
+      >
+        在“连接”中更改
       </Link>
     </p>
   );
@@ -1549,7 +1553,7 @@ function ScheduledTaskEditorForm({
     if (schedule.type === "once" && !offersOnce) {
       reportFailure(
         "此环境不支持单次运行",
-        "此环境运行的是旧版 T3 Code。请更新后再创建单次定时任务，或选择其他定时规则。",
+        "此环境运行的是旧版 Fleet ADE。请更新后再创建单次定时任务，或选择其他定时规则。",
       );
       return;
     }

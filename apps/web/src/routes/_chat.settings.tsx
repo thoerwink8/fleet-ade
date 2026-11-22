@@ -24,7 +24,7 @@ import {
   getSettingsSearchTargetScope,
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
-  movedSettingsPath,
+  movedSettingsRedirect,
 } from "../components/settings/settingsSearch";
 
 function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void }) {
@@ -85,7 +85,15 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
       </SettingsScopeNotice>
     );
   }
-  if (SETTINGS_DEVICE_ONLY_PATHS.has(pathname) || pathname === "/settings/projects") {
+  if (
+    SETTINGS_DEVICE_ONLY_PATHS.has(pathname) ||
+    // Device panels share these pages with environment panels, which show their own
+    // connect notice through SettingsEnvironmentScopeGate.
+    pathname === "/settings/general" ||
+    pathname === "/settings/threads" ||
+    pathname === "/settings/projects" ||
+    pathname === "/settings/maintenance"
+  ) {
     return children;
   }
   if (scope.kind === "unavailable")
@@ -148,7 +156,7 @@ function SettingsRouteLayout() {
   return (
     <SettingsScopeProvider
       search={rawSearch}
-      singleEnvironment={pathname === "/settings/providers" || pathname === "/settings/secrets"}
+      singleEnvironment={pathname === "/settings/providers"}
       deviceOnly={SETTINGS_DEVICE_ONLY_PATHS.has(pathname)}
       onChange={(next) => {
         // Send every axis so retain middleware recognizes "all" as an explicit target.
@@ -176,8 +184,8 @@ export const Route = createFileRoute("/_chat/settings")({
     if (location.pathname === "/settings") {
       throw redirect({ to: "/settings/general", replace: true });
     }
-    const moved = movedSettingsPath(location.pathname, location.hash);
-    if (moved) throw redirect({ to: moved, search: true, hash: true, replace: true });
+    const moved = movedSettingsRedirect(location.pathname, location.hash);
+    if (moved) throw redirect({ ...moved, search: true, replace: true });
   },
   component: SettingsRouteLayout,
 });

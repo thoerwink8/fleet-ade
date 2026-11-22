@@ -639,7 +639,7 @@ type MessagesTimelineRowContent =
       label: string;
       tokenCounts: ReturnType<typeof contextCompactionTokenCounts>;
       active: boolean;
-      /** Replaces "上下文已压缩" when T3 Code compacted without being asked. */
+      /** Replaces "上下文已压缩" when Fleet ADE compacted without being asked. */
       title?: string;
       failed?: true;
       /** The provider's reason, when a failed compaction gave one. */

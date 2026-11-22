@@ -259,7 +259,7 @@ export function McpAppFrame(props: {
       flushSync(() => setDisplayMode("inline"));
       const approved = await requestConfirmDialog(message);
       if (approved === undefined) {
-        throw new McpAppHostRefusal({ message: "T3 无法在这里请求批准。" });
+        throw new McpAppHostRefusal({ message: "Fleet ADE 无法在这里请求批准。" });
       }
       return approved;
     };

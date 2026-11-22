@@ -9,14 +9,14 @@ const GENERIC_ERROR_PREFIXES = [
 ];
 
 const SQLITE_RECOVERY_MESSAGES: Readonly<Record<number, string>> = {
-  5: "T3 Code 服务器数据库正忙（SQLITE_BUSY）。请稍等再试。如果反复出现，请检查是否有另一个 T3 Code 进程正在使用服务器上的同一数据目录。",
-  6: "T3 Code 服务器数据库已锁定（SQLITE_LOCKED）。请稍等再试。如果反复出现，请查看服务器日志，找出占用数据库锁的进程。",
-  8: "T3 Code 服务器数据库是只读的（SQLITE_READONLY）。请在运行服务器的机器上确认数据目录可写、磁盘以读写方式挂载，然后重试。",
-  10: "T3 Code 服务器无法读写数据库（SQLITE_IOERR）。请在运行服务器的机器上检查磁盘剩余空间和磁盘健康，然后重试。若仍然失败，请查看服务器日志。",
-  11: "T3 Code 服务器数据库似乎已损坏（SQLITE_CORRUPT）。请保留服务器数据目录，并在从备份恢复前查看服务器日志。",
-  13: "T3 Code 服务器无法保存这次更改，因为数据库或磁盘已满（SQLITE_FULL）。请在运行服务器的机器上腾出空间，然后重试。如果空间足够，请查看服务器日志里的数据库大小限制。",
-  14: "T3 Code 服务器无法打开数据库文件（SQLITE_CANTOPEN）。请在运行服务器的机器上检查磁盘空间，并确认数据和临时目录存在且可写，然后重试。若仍然失败，请查看服务器日志。",
-  26: "T3 Code 服务器无法读取数据库文件（SQLITE_NOTADB）。请保留服务器数据目录，并在从备份恢复前检查配置的数据库路径和服务器日志。",
+  5: "Fleet ADE 服务器数据库正忙（SQLITE_BUSY）。请稍等再试。如果反复出现，请检查是否有另一个 Fleet ADE 进程正在使用服务器上的同一数据目录。",
+  6: "Fleet ADE 服务器数据库已锁定（SQLITE_LOCKED）。请稍等再试。如果反复出现，请查看服务器日志，找出占用数据库锁的进程。",
+  8: "Fleet ADE 服务器数据库是只读的（SQLITE_READONLY）。请在运行服务器的机器上确认数据目录可写、磁盘以读写方式挂载，然后重试。",
+  10: "Fleet ADE 服务器无法读写数据库（SQLITE_IOERR）。请在运行服务器的机器上检查磁盘剩余空间和磁盘健康，然后重试。若仍然失败，请查看服务器日志。",
+  11: "Fleet ADE 服务器数据库似乎已损坏（SQLITE_CORRUPT）。请保留服务器数据目录，并在从备份恢复前查看服务器日志。",
+  13: "Fleet ADE 服务器无法保存这次更改，因为数据库或磁盘已满（SQLITE_FULL）。请在运行服务器的机器上腾出空间，然后重试。如果空间足够，请查看服务器日志里的数据库大小限制。",
+  14: "Fleet ADE 服务器无法打开数据库文件（SQLITE_CANTOPEN）。请在运行服务器的机器上检查磁盘空间，并确认数据和临时目录存在且可写，然后重试。若仍然失败，请查看服务器日志。",
+  26: "Fleet ADE 服务器无法读取数据库文件（SQLITE_NOTADB）。请保留服务器数据目录，并在从备份恢复前检查配置的数据库路径和服务器日志。",
 };
 
 function databaseErrorMessage(value: unknown): string | undefined {
@@ -34,7 +34,7 @@ function databaseErrorMessage(value: unknown): string | undefined {
     cause = cause.cause;
   }
 
-  return "T3 Code 服务器无法完成这次数据库请求。请重试一次；若仍然失败，请查看服务器日志中的数据库错误。";
+  return "Fleet ADE 服务器无法完成这次数据库请求。请重试一次；若仍然失败，请查看服务器日志中的数据库错误。";
 }
 
 export function userFacingDatabaseErrorMessage(cause: unknown): string | undefined {

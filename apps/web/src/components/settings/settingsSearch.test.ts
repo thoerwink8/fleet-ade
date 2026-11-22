@@ -12,6 +12,7 @@ import {
   getSettingsSearchTargetScope,
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
+  movedSettingsRedirect,
   movedSettingsPath,
   searchSettings,
   SETTINGS_NAV_GROUPS,
@@ -36,7 +37,7 @@ const ITEMS: ReadonlyArray<SettingsSearchItem> = [
   {
     id: "network-access",
     title: "网络访问",
-    to: "/settings/access",
+    to: "/settings/connections",
     searchTerms: ["remote pairing backend"],
   },
   {
@@ -61,7 +62,7 @@ describe("searchSettings", () => {
   it("matches titles, sections, and remembered setting details", () => {
     expect(searchSettings("换行", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
     expect(searchSettings("网络", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
-    expect(searchSettings("共享", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
+    expect(searchSettings("连接", ITEMS).map((item) => item.id)).toEqual(["network-access"]);
     expect(searchSettings("claude", ITEMS).map((item) => item.id)).toEqual(["providers"]);
     expect(searchSettings("long lines", ITEMS).map((item) => item.id)).toEqual(["word-wrap"]);
     const spanish = (message: string) => (message === "自动换行" ? "Ajuste de línea" : message);
@@ -180,7 +181,7 @@ describe("searchSettings", () => {
     expect(searchSettings("mod+b")[0]?.id).toBe("keybinding-sidebar.toggle");
     expect(searchSettings("复制链接")[0]).toMatchObject({
       id: "keybinding-thread.copyReference",
-      to: "/settings/keybindings",
+      to: "/settings/general",
     });
   });
 
@@ -350,18 +351,48 @@ describe("movedSettingsPath", () => {
     expect(movedSettingsPath("/settings/general", "text-generation-model")).toBe(
       "/settings/threads",
     );
-    expect(movedSettingsPath("/settings/connections", "authorized-clients")).toBe(
-      "/settings/access",
+    expect(movedSettingsPath("/settings/general", "authorized-clients")).toBe(
+      "/settings/connections",
     );
+    expect(movedSettingsPath("/settings/connections", "local-environment")).toBeNull();
     expect(movedSettingsPath("/settings/source-control", "worktree-branch-naming")).toBe(
-      "/settings/worktrees",
+      "/settings/projects",
     );
-    expect(movedSettingsPath("/settings/appearance", "diff-color-scheme")).toBe("/settings/diffs");
-    expect(movedSettingsPath("/settings/connections", "network-access")).toBe("/settings/access");
-    expect(movedSettingsPath("/settings/storage", "storage-worktrees")).toBe("/settings/worktrees");
+    expect(movedSettingsPath("/settings/appearance", "chat-width")).toBeNull();
+    expect(movedSettingsPath("/settings/connections", "wsl-backend")).toBeNull();
+    expect(movedSettingsPath("/settings/storage", "storage-worktrees")).toBe("/settings/projects");
     expect(movedSettingsPath("/settings/storage", "")).toBe("/settings/maintenance");
     expect(movedSettingsPath("/settings/beta", "")).toBe("/settings/maintenance");
     expect(movedSettingsPath("/settings/labs", "")).toBe("/settings/maintenance");
+    expect(movedSettingsPath("/settings/network", "")).toBe("/settings/general");
+    expect(movedSettingsPath("/settings/keybindings", "keybindings")).toBe("/settings/general");
+    expect(movedSettingsPath("/settings/chat", "composer")).toBe("/settings/threads");
+    expect(movedSettingsPath("/settings/archived", "")).toBe("/settings/threads");
+    expect(movedSettingsPath("/settings/diffs", "")).toBe("/settings/appearance");
+    expect(movedSettingsPath("/settings/worktrees", "")).toBe("/settings/projects");
+    expect(movedSettingsPath("/settings/access", "authorized-clients")).toBe(
+      "/settings/connections",
+    );
+    expect(movedSettingsPath("/settings/secrets", "")).toBe("/settings/connections");
+    expect(movedSettingsPath("/settings/about", "about")).toBe("/settings/maintenance");
+  });
+  it("carries default section anchors for bare moved paths", () => {
+    expect(movedSettingsRedirect("/settings/network", "")).toEqual({
+      to: "/settings/general",
+      hash: "network",
+    });
+    expect(movedSettingsRedirect("/settings/keybindings", "")).toEqual({
+      to: "/settings/general",
+      hash: "keybindings",
+    });
+    expect(movedSettingsRedirect("/settings/worktrees", "")).toEqual({
+      to: "/settings/projects",
+      hash: "worktree-creation",
+    });
+    expect(movedSettingsRedirect("/settings/about", "")).toEqual({
+      to: "/settings/maintenance",
+      hash: "about",
+    });
   });
 
   it("leaves current pages alone", () => {

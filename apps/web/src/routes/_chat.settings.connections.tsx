@@ -1,8 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import { ConnectionsSettings } from "../components/settings/ConnectionsSettings";
+import { SecretsSettingsPanel } from "../components/settings/SecretsSettings";
+import { SettingsPageContainer } from "../components/settings/settingsLayout";
+import { isSecretsFeatureEnabled } from "../env";
 
 function SettingsConnectionsRoute() {
-  return <ConnectionsSettings view="environments" />;
+  return (
+    <SettingsPageContainer>
+      <ConnectionsSettings />
+      {isSecretsFeatureEnabled ? <SecretsSettingsPanel /> : null}
+    </SettingsPageContainer>
+  );
 }
 
 export const Route = createFileRoute("/_chat/settings/connections")({

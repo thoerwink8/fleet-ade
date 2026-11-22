@@ -215,7 +215,7 @@ it("shows who sent a queued message and folds automation and agent prompts", asy
   await page.getByRole("button", { name: "打开会话" }).nth(1).click({ force: true });
   expect(onOpenThread).toHaveBeenLastCalledWith("thread:linked-lead", "environment:linked");
 
-  await expect.element(page.getByText("由 T3 Code 发送 ·", { exact: true })).toBeVisible();
+  await expect.element(page.getByText("由 Fleet ADE 发送 ·", { exact: true })).toBeVisible();
   await expect.element(page.getByText("Continue where you left off.")).toBeVisible();
 });
 

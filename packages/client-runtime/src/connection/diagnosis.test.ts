@@ -53,9 +53,9 @@ const results = (state: SupervisorConnectionState, via?: "relay" | "direct") =>
   diagnose(state, via)?.hops.map((hop) => `${hop.hop}:${hop.result}`);
 
 describe("presentConnectionDiagnosis", () => {
-  it("tells a working tunnel apart from T3 Code not answering", () => {
+  it("tells a working tunnel apart from Fleet ADE not answering", () => {
     expect(diagnose(backoff(unavailable("origin_unreachable")))?.headline).toBe(
-      "隧道正常，但 Mac mini 上的 T3 Code 没有响应",
+      "隧道正常，但 Mac mini 上的 Fleet ADE 没有响应",
     );
     expect(results(backoff(unavailable("origin_unreachable")), "direct")).toEqual([
       "device:ok",

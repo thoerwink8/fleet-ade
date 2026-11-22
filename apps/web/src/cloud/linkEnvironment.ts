@@ -64,7 +64,7 @@ const ensureRelayClientAvailable = Effect.fn("linkEnvironment.ensureRelayClientA
     if (status.status === "available") return;
     if (status.status === "unsupported") {
       return yield* new CloudEnvironmentLinkError({
-        message: `T3 Code 无法在 ${status.platform}-${status.arch} 上自动安装中继客户端。`,
+        message: `Fleet ADE 无法在 ${status.platform}-${status.arch} 上自动安装中继客户端。`,
       });
     }
 
@@ -100,7 +100,7 @@ const ensureRelayClientAvailable = Effect.fn("linkEnvironment.ensureRelayClientA
       return yield* new CloudEnvironmentLinkError({
         message:
           installedStatus.status === "unsupported"
-            ? `T3 Code 无法在 ${installedStatus.platform}-${installedStatus.arch} 上自动安装中继客户端。`
+            ? `Fleet ADE 无法在 ${installedStatus.platform}-${installedStatus.arch} 上自动安装中继客户端。`
             : "安装后中继客户端仍不可用。",
       });
     }

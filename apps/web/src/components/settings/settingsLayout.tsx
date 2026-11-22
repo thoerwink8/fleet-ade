@@ -46,6 +46,8 @@ interface SettingsSearchTargetContextValue {
   readonly onTargetHandled: () => void;
 }
 
+const SettingsPageContainerNestedContext = createContext(false);
+
 const noop = () => undefined;
 const SettingsSearchTargetContext = createContext<SettingsSearchTargetContextValue>({
   targetId: null,
@@ -558,6 +560,7 @@ export function SettingsPageContainer({
   width?: WorkspacePageWidth;
   searchTargetFallbacks?: Readonly<Record<string, string | undefined>>;
 }) {
+  const nested = useContext(SettingsPageContainerNestedContext);
   const navigate = useNavigate();
   const hash = useLocation({ select: (location) => location.hash });
   const highlightTarget = useLocation({
@@ -580,17 +583,40 @@ export function SettingsPageContainer({
       highlightTarget={highlightTarget}
       onTargetHandled={clearTargetHash}
     >
-      <div
-        className="topbar-scroll-fade scrollbar-gutter-both flex-1 overflow-y-auto"
-        data-settings-page-scroll
-      >
-        <WorkspacePageContainer width={width} className={cn("gap-8", className)}>
-          <SettingsScopeSentence />
-          {children}
-        </WorkspacePageContainer>
-      </div>
+      {nested ? (
+        <div className={cn("flex flex-col gap-8", className)}>{children}</div>
+      ) : (
+        <div
+          className="topbar-scroll-fade scrollbar-gutter-both flex-1 overflow-y-auto"
+          data-settings-page-scroll
+        >
+          <WorkspacePageContainer width={width} className={cn("gap-8", className)}>
+            <SettingsScopeSentence />
+            <SettingsPageContainerNestedContext value={true}>
+              {children}
+            </SettingsPageContainerNestedContext>
+          </WorkspacePageContainer>
+        </div>
+      )}
     </SettingsSearchTargetProvider>
   );
+}
+
+/** Environment panels on a merged page show a connect notice; the rest of the page stays usable. */
+export function SettingsEnvironmentScopeGate({ children }: { readonly children: ReactNode }) {
+  const scope = useOptionalSettingsScope();
+  if (scope === null) return children;
+  if (scope.scope.kind === "unavailable") {
+    return <p className="text-sm text-muted-foreground">{scope.scope.message}</p>;
+  }
+  if (scope.scope.kind === "environment" && scope.connectedEnvironments.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        重新连接 {scope.scope.label}，才能改它的设置。
+      </p>
+    );
+  }
+  return children;
 }
 
 export function scrollToSettingsTarget(

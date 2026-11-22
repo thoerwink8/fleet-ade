@@ -69,7 +69,7 @@ export function fullAccessOverrideExplanation(
 ): string {
   return override === "ask_rule"
     ? "完全访问会跳过审批，但智能体自身设置里有一条“询问”规则匹配了这个操作，所以它仍会询问。删除或缩小这条规则即可不再提示。"
-    : "完全访问会跳过审批，但智能体仍会因少数自带的安全检查而暂停，任何设置都无法跳过，例如无法确认路径的删除操作。T3 Code 无法关闭这些检查，请核对请求，符合预期再批准。";
+    : "完全访问会跳过审批，但智能体仍会因少数自带的安全检查而暂停，任何设置都无法跳过，例如无法确认路径的删除操作。Fleet ADE 无法关闭这些检查，请核对请求，符合预期再批准。";
 }
 
 export interface ThreadUserInputQuestion extends Omit<

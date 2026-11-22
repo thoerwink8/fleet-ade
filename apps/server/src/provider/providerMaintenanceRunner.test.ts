@@ -592,7 +592,7 @@ describe("providerMaintenanceRunner", () => {
         // The registry reports no new version, so a command that exits 0 ends as "unchanged".
         assert.strictEqual(
           result.providers[0]?.updateState?.message,
-          "Update command completed, but T3 Code still detects an outdated provider version.",
+          "Update command completed, but Fleet ADE still detects an outdated provider version.",
         );
       }).pipe(
         Effect.provide(
@@ -1382,7 +1382,7 @@ it.effect.each([
         mode === "default-precurrent"
           ? "Already up to date."
           : mode === "unknown"
-            ? "Update command completed, but T3 Code could not verify the provider version."
+            ? "Update command completed, but Fleet ADE could not verify the provider version."
             : "Provider updated.",
       );
       assert.strictEqual(provider.version, version);

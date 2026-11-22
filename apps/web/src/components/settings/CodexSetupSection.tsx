@@ -607,8 +607,8 @@ function ManagedCodexSetup({
         : installation?.phase === "verifying"
           ? "正在检查 Codex。"
           : installed
-            ? `${installation?.source === "local" ? "Using your installed Codex" : "Managed by T3 Code"}${installation?.installedVersion ? ` · v${installation.installedVersion}` : ""}.`
-            : (installation?.message ?? "T3 Code 会为你下载和管理 Codex。");
+            ? `${installation?.source === "local" ? "Using your installed Codex" : "Managed by Fleet ADE"}${installation?.installedVersion ? ` · v${installation.installedVersion}` : ""}.`
+            : (installation?.message ?? "Fleet ADE 会为你下载和管理 Codex。");
   const accountDescription = finishingSignIn ? (
     "正在完成登录…"
   ) : installActive ? (
@@ -685,7 +685,7 @@ function ManagedCodexSetup({
   const callbackCompletion =
     !handoff && auth?.phase === "waiting" && url ? (
       <div className="flex w-full flex-col gap-3 text-xs leading-relaxed text-muted-foreground">
-        <p>如果登录后没有返回 T3 Code，请粘贴最后一个 localhost 页面的 URL。</p>
+        <p>如果登录后没有返回 Fleet ADE，请粘贴最后一个 localhost 页面的 URL。</p>
         <form
           className="flex flex-col gap-2 sm:flex-row sm:items-center"
           onSubmit={(event) => {
@@ -741,7 +741,7 @@ function ManagedCodexSetup({
           <details>
             <summary className="cursor-pointer">其他连接方式</summary>
             <Button className="mt-2" size="sm" variant="outline" render={<a href={handoffUrl} />}>
-              使用 T3 桌面版自动返回
+              使用 Fleet ADE 桌面版自动返回
             </Button>
           </details>
         ) : null}
@@ -1084,7 +1084,7 @@ export function CodexManagedRuntimeFields({
     <>
       <SettingsRow
         title="可执行文件路径"
-        description="由 T3 Code 选择。"
+        description="由 Fleet ADE 选择。"
         control={
           <div className="w-full sm:w-80">
             <Input

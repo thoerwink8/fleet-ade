@@ -27,7 +27,7 @@ export function formatAgentOutputSilence(silenceSinceIso: string, nowMs: number)
   const silentMs = nowMs - startedAtMs;
   if (silentMs < AGENT_OUTPUT_SILENCE_MS) return null;
   const seconds = Math.floor(silentMs / 1000);
-  return `智能体 ${seconds} 秒没有输出。可能连不上网，检查 设置→网络。`;
+  return `智能体 ${seconds} 秒没有输出。可能连不上网，检查 设置→通用→网络。`;
 }
 
 export function agentOutputSilenceSince(input: {

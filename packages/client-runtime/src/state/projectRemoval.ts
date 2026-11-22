@@ -41,8 +41,8 @@ export function planProjectRemoval<
         ]
       : [`将移除 ${members.length} 个已分组的项目条目。`]),
     ...(threadCount > 0
-      ? ["这些会话及所有已归档会话将从 T3 Code 中删除。提供方会话会保留。"]
-      : ["所有已归档会话将从 T3 Code 中删除。提供方会话会保留。"]),
+      ? ["这些会话及所有已归档会话将从 Fleet ADE 中删除。提供方会话会保留。"]
+      : ["所有已归档会话将从 Fleet ADE 中删除。提供方会话会保留。"]),
     isWholeGroup && !hasOtherMembers
       ? "仅移除项目条目，磁盘上的文件会保留。"
       : "此项目组中的其他条目不受影响。",

@@ -35,7 +35,7 @@ export function ProjectsSettings() {
     (scope.kind === "unavailable" &&
       (scope.reason === "project-missing" || scope.reason === "checkout-missing"));
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-col">
       {value.project && projectScope ? (
         <ProjectSettingsPanel
           projectKey={value.project}

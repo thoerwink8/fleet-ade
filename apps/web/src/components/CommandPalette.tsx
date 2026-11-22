@@ -1043,7 +1043,7 @@ function OpenCommandPaletteDialog(props: {
 
   const openSourceControlSettings = () => {
     setOpen(false);
-    void navigate({ to: "/settings/source-control" });
+    void navigate({ to: "/settings/projects", hash: "source-control" });
   };
 
   const buildAddProjectSourceGroups = (
@@ -1112,7 +1112,7 @@ function OpenCommandPaletteDialog(props: {
               }
             />
             <TooltipPopup align="end" side="left">
-              {disabledHint ?? "打开“设置 → 版本控制”以配置此提供方。"}
+              {disabledHint ?? "打开“设置 → 代码”以配置此提供方。"}
             </TooltipPopup>
           </Tooltip>
         </span>
@@ -1787,7 +1787,7 @@ function OpenCommandPaletteDialog(props: {
       "openclaw",
       "hermes",
     ],
-    title: "在其他应用中使用 T3 Code（MCP）",
+    title: "在其他应用中使用 Fleet ADE（MCP）",
     icon: <PlugIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       openUseInAnotherApp(
@@ -1937,7 +1937,7 @@ function OpenCommandPaletteDialog(props: {
     value: `setting:${item.id}`,
     searchTerms: [item.title, SETTINGS_SECTION_LABELS[item.to], ...(item.searchTerms ?? [])],
     title: item.title,
-    description: `Settings · ${SETTINGS_SECTION_LABELS[item.to]}`,
+    description: `设置 · ${SETTINGS_SECTION_LABELS[item.to]}`,
     ...(item.secondary ? { secondary: true } : {}),
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {

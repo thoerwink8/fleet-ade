@@ -74,7 +74,7 @@ export function LinkedEnvironmentsSettings({
       ) : links.data.links.length === 0 ? (
         <SettingsRow
           title="没有已关联的环境"
-          description="关联另一台运行 T3 Code 的机器（例如 VPS），让这里的智能体能够在那台机器上启动和操作会话。"
+          description="关联另一台运行 Fleet ADE 的机器（例如 VPS），让这里的智能体能够在那台机器上启动和操作会话。"
         />
       ) : (
         links.data.links.map((link) => (
@@ -103,7 +103,7 @@ function LinkedEnvironmentRow({
   const [busy, setBusy] = useState(false);
   const forget = async () => {
     const confirmed = await (requestConfirmDialog(
-      `Forget ${link.label}? Agents here stop working there. Revoke "T3 Code · …" in ${link.label}'s Sharing & access to end the session there too.`,
+      `Forget ${link.label}? Agents here stop working there. Revoke "Fleet ADE · …" in ${link.label}'s Connections settings to end the session there too.`,
       { variant: "destructive" },
     ) ?? Promise.resolve(false));
     if (!confirmed) return;
@@ -273,7 +273,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         <DialogHeader>
           <DialogTitle>关联环境</DialogTitle>
           <DialogDescription>
-            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在该环境的「共享与访问」里的已授权客户端中，可以在那里撤销。
+            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在该环境的「连接」里的已授权客户端中，可以在那里撤销。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -338,12 +338,12 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 />
                 {machine !== null ? (
                   <span className="block text-xs text-muted-foreground">
-                    在 {machine.label} 上创建链接：设置 → 共享与访问 → 已授权客户端 →
+                    在 {machine.label} 上创建链接：设置 → 连接 → 已授权客户端 →
                     创建链接，然后把配对码粘贴到这里。
                   </span>
                 ) : (
                   <span className="block text-xs text-muted-foreground">
-                    在那边打开共享与访问并创建链接，或在终端运行 <code>t3 pair</code>
+                    在那边打开连接并创建链接，或在终端运行 <code>t3 pair</code>
                     ，再把配对码粘贴到这里。
                   </span>
                 )}

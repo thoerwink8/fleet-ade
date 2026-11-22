@@ -50,7 +50,7 @@ export function relayProtectedErrorMessage(error: RelayProtectedError): string {
         return "此环境的 T3 Connect 隧道仍在设置中。";
       }
       if (error.reason === "endpoint_provider_not_managed") {
-        return "此环境仅关联了智能体活动发布，无法接受连接。请在那台电脑上打开「设置 → 共享与访问」，开启 T3 Connect。";
+        return "此环境仅关联了智能体活动发布，无法接受连接。请在那台电脑上打开「设置 → 连接」，开启 T3 Connect。";
       }
       return error.reason
         ? `中继拒绝了环境连接请求（${error.reason}）。`
@@ -94,7 +94,7 @@ export function relayRequestFailureDetail(error: {
 }
 
 const RELAY_TUNNEL_RELEASED_MESSAGE =
-  "离线时间较长，其 T3 Connect 隧道已被移除。请在那台电脑上启动 T3 Code 并更新到最新版本，即可重新连接。";
+  "离线时间较长，其 T3 Connect 隧道已被移除。请在那台电脑上启动 Fleet ADE 并更新到最新版本，即可重新连接。";
 
 export function relayOfflineReasonMessage(
   status: Pick<RelayEnvironmentStatusResponse, "offlineReason">,

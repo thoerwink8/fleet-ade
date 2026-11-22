@@ -77,12 +77,12 @@ export function getArm64IntelBuildWarningDescription(state: DesktopUpdateState):
 
   const action = resolveDesktopUpdateButtonAction(state);
   if (action === "download") {
-    return "这台 Mac 使用 Apple Silicon，但 T3 Code 仍以 Rosetta 运行 Intel 版本。下载可用更新即可切换到原生的 Apple Silicon 版本。";
+    return "这台 Mac 使用 Apple Silicon，但 Fleet ADE 仍以 Rosetta 运行 Intel 版本。下载可用更新即可切换到原生的 Apple Silicon 版本。";
   }
   if (action === "install") {
-    return "这台 Mac 使用 Apple Silicon，但 T3 Code 仍以 Rosetta 运行 Intel 版本。重启即可安装已下载的 Apple Silicon 版本。";
+    return "这台 Mac 使用 Apple Silicon，但 Fleet ADE 仍以 Rosetta 运行 Intel 版本。重启即可安装已下载的 Apple Silicon 版本。";
   }
-  return "这台 Mac 使用 Apple Silicon，但 T3 Code 仍以 Rosetta 运行 Intel 版本。下次应用更新会将其替换为原生的 Apple Silicon 版本。";
+  return "这台 Mac 使用 Apple Silicon，但 Fleet ADE 仍以 Rosetta 运行 Intel 版本。下次应用更新会将其替换为原生的 Apple Silicon 版本。";
 }
 
 export function getDesktopUpdateButtonTooltip(state: DesktopUpdateState): string {
@@ -123,7 +123,7 @@ export function getDesktopUpdateInstallConfirmationMessage(
   state: Pick<DesktopUpdateState, "availableVersion" | "downloadedVersion">,
 ): string {
   const version = state.downloadedVersion ?? state.availableVersion;
-  return `Install update${version ? ` ${version}` : ""} and restart T3 Code?\n\nAny running tasks will be interrupted. Make sure you're ready before continuing.`;
+  return `Install update${version ? ` ${version}` : ""} and restart Fleet ADE?\n\nAny running tasks will be interrupted. Make sure you're ready before continuing.`;
 }
 
 export function getDesktopUpdateActionError(result: DesktopUpdateActionResult): string | null {

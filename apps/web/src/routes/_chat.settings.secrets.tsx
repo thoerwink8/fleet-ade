@@ -1,11 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
-import { SecretsSettingsPanel } from "../components/settings/SecretsSettings";
-import { isSecretsFeatureEnabled } from "../env";
-
-export const Route = createFileRoute("/_chat/settings/secrets")({
-  beforeLoad: () => {
-    if (!isSecretsFeatureEnabled) throw redirect({ to: "/settings/general", replace: true });
-  },
-  component: SecretsSettingsPanel,
-});
+// Folded into /settings/connections; the settings route redirects old links, anchors included.
+export const Route = createFileRoute("/_chat/settings/secrets")({});

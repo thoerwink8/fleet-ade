@@ -92,7 +92,7 @@ export const buildInitialGrokProviderSnapshot = Effect.fn(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Grok 已在 T3 Code 设置中停用。",
+        message: "Grok 已在 Fleet ADE 设置中停用。",
       },
     });
   }
@@ -418,7 +418,7 @@ export const checkGrokProviderStatus = Effect.fn("checkGrokProviderStatus")(func
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Grok 已在 T3 Code 设置中停用。",
+        message: "Grok 已在 Fleet ADE 设置中停用。",
       },
     });
   }

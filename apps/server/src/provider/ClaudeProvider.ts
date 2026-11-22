@@ -652,7 +652,7 @@ export const checkClaudeProviderStatus = Effect.fn("checkClaudeProviderStatus")(
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Claude 已在 T3 Code 设置中停用。",
+        message: "Claude 已在 Fleet ADE 设置中停用。",
       },
     });
   }
@@ -898,7 +898,7 @@ export const makePendingClaudeProvider = Effect.fn("ClaudeProvider.makePendingCl
           version: null,
           status: "warning",
           auth: { status: "unknown" },
-          message: "Claude 已在 T3 Code 设置中停用。",
+          message: "Claude 已在 Fleet ADE 设置中停用。",
         },
       });
     }

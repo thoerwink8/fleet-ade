@@ -9,7 +9,7 @@ in once, and you choose what it may do.
 ## Add T3 Code to an assistant app
 
 Open the command palette (`Cmd/Ctrl+K`) and choose **Use T3 Code in another
-app (MCP)**, or use the button in **Settings → Sharing & access**. Pick the
+app (MCP)**, or use the button in **Settings → Connections**. Pick the
 app and follow the step for that app. Assistants like
 Poke and Claude run in the cloud, so the wizard first asks you to sign in to T3
 Connect and turn it on for the environment. To reach your other machines through
@@ -27,7 +27,7 @@ client ID cannot connect.
 
 ## Get the MCP URL
 
-In **Settings → Environments**, open a saved environment's menu and choose
+In **Settings → Connections**, open a saved environment's menu and choose
 **Copy MCP URL**. The URL is the environment's address followed by `/mcp`, for
 example:
 
@@ -64,7 +64,7 @@ Either page names the agent and where its access goes:
   Anyone who runs that service gets the access.
 
 Only approve a sign-in you just started. On the environment's own page, enter a
-code from **Use T3 Code in another app (MCP)**, **Settings → Sharing & access**,
+code from **Use T3 Code in another app (MCP)**, **Settings → Connections**,
 or `t3 auth pairing create` on the host. A browser already signed in to the
 environment with permission to manage access can approve without a code. On the
 web app, **Use a sign-in code instead** opens the environment's own page.
@@ -158,6 +158,6 @@ result that always includes the thread id.
 
 ## Remove an agent
 
-Approved agents appear under **Settings → Sharing & access** like other clients.
+Approved agents appear under **Settings → Connections** like other clients.
 Revoke one there to cut off its access immediately. A sign-in lasts 30 days;
 after that the agent asks you to approve it again.

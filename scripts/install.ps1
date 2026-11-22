@@ -246,7 +246,7 @@ if (-not ((Test-Path $launchers) -and ((Get-Content $launchers) -contains $shimP
   [System.IO.File]::AppendAllText($launchers, "$shimPath`r`n", (New-Object System.Text.UTF8Encoding $false))
 }
 if ($interactive) { [Console]::Error.Write("`r$esc[2K") }
-[Console]::Error.WriteLine("  ${green}Installed T3 Code $version$reset`n")
+[Console]::Error.WriteLine("  ${green}Installed Fleet ADE $version$reset`n")
 if ($binDir.Contains(";")) {
   # PATH would split the folder at the `;`, so name the command in full instead.
   Write-Host "  Run ${bold}& '$($shim.Replace("'", "''"))'$reset to get started.`n"
@@ -263,6 +263,6 @@ if ($binDir.Contains(";")) {
   } elseif ($added) {
     Write-Host "  Run ${bold}t3$reset to get started. For new windows, add $binDir to your PATH.`n"
   } else {
-    Write-Host "  Run ${bold}t3$reset to use T3 Code here, or ${bold}t3 up$reset to use it from your other devices.`n"
+    Write-Host "  Run ${bold}t3$reset to use Fleet ADE here, or ${bold}t3 up$reset to use it from your other devices.`n"
   }
 }

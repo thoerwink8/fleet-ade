@@ -848,7 +848,7 @@ const makePendingCodexProvider = Effect.fn("CodexProvider.makePendingCodexProvid
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex 已在 T3 Code 设置中停用。",
+        message: "Codex 已在 Fleet ADE 设置中停用。",
       },
     });
   }
@@ -949,7 +949,7 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
         version: null,
         status: "warning",
         auth: { status: "unknown" },
-        message: "Codex 已在 T3 Code 设置中停用。",
+        message: "Codex 已在 Fleet ADE 设置中停用。",
       },
     });
   }

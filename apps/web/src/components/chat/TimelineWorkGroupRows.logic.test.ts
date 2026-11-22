@@ -13,10 +13,10 @@ describe("agent output silence", () => {
   it("stays quiet until a running turn has produced nothing for the threshold", () => {
     expect(formatAgentOutputSilence(since, startMs + AGENT_OUTPUT_SILENCE_MS - 1)).toBeNull();
     expect(formatAgentOutputSilence(since, startMs + AGENT_OUTPUT_SILENCE_MS)).toBe(
-      "智能体 60 秒没有输出。可能连不上网，检查 设置→网络。",
+      "智能体 60 秒没有输出。可能连不上网，检查 设置→通用→网络。",
     );
     expect(formatAgentOutputSilence(since, startMs + 90_000)).toBe(
-      "智能体 90 秒没有输出。可能连不上网，检查 设置→网络。",
+      "智能体 90 秒没有输出。可能连不上网，检查 设置→通用→网络。",
     );
     expect(formatAgentOutputSilence("not-a-time", startMs)).toBeNull();
   });

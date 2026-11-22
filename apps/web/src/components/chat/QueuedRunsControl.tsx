@@ -437,7 +437,7 @@ function QueuedMessage(props: {
         attribution === "guest" && "border-guest/50",
       )}
     >
-      {attribution === "t3code" ? <span className="shrink-0">由 T3 Code 发送 ·</span> : null}
+      {attribution === "t3code" ? <span className="shrink-0">由 Fleet ADE 发送 ·</span> : null}
       {presentation?.guestName === undefined ? null : (
         <GuestMessageName name={presentation.guestName} />
       )}

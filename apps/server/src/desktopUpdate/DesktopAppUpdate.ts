@@ -130,7 +130,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
         return { targetVersion: report.state.currentVersion, method: "desktop-app" as const };
       }
       return yield* failWith(
-        `The T3 Code desktop app on this machine is already up to date on ${report.state.currentVersion}.`,
+        `The Fleet ADE desktop app on this machine is already up to date on ${report.state.currentVersion}.`,
       );
     }
     return yield* failWith(report.reason ?? report.state.message ?? "桌面应用更新失败。");
@@ -140,7 +140,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
     function* (reportProgress, trackSwitch) {
       if (!available) {
         return yield* failWith(
-          "This server was not started by the T3 Code desktop app, so it cannot drive a desktop update.",
+          "This server was not started by the Fleet ADE desktop app, so it cannot drive a desktop update.",
         );
       }
       if (yield* Ref.getAndSet(inFlight, true)) {
@@ -162,7 +162,7 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
             .requestDesktopUpdate(requestId, trackSwitch)
             .pipe(
               Effect.mapError((error) =>
-                failWith("Could not reach the T3 Code desktop app on this machine.", error),
+                failWith("Could not reach the Fleet ADE desktop app on this machine.", error),
               ),
             );
           return yield* consumeReports(
@@ -199,7 +199,9 @@ export const make = Effect.fn("desktopUpdate.desktopAppUpdate.make")(function* (
         });
         yield* Effect.uninterruptible(
           receiver.commitDesktopUpdate(requestId).pipe(
-            Effect.mapError((error) => failWith("Could not reach the T3 Code desktop app.", error)),
+            Effect.mapError((error) =>
+              failWith("Could not reach the Fleet ADE desktop app.", error),
+            ),
             Effect.tap(() => onHandoffAccepted()),
           ),
         );
