@@ -882,7 +882,7 @@ function DiagnosticsSettingsBody() {
         toastManager.add({
           type: "info",
           title: "进程已退出",
-          description: "此进程不是 T3 服务器的子进程，可能已经退出。",
+          description: "此进程不是 Fleet ADE 服务器的子进程，可能已经退出。",
         });
         return;
       }
@@ -1003,7 +1003,7 @@ function DiagnosticsSettingsBody() {
           <StatBlock
             label="CPU 时间"
             value={resourceData ? formatCpuTime(resourceData.totalCpuSecondsApprox) : "..."}
-            tooltip="所选时段内，T3 服务器根进程及其后代进程实际使用 CPU 的估算时长。仅在采样进程使用 CPU 时累加，旧样本会随时段移动而移出。"
+            tooltip="所选时段内，Fleet ADE 服务器根进程及其后代进程实际使用 CPU 的估算时长。仅在采样进程使用 CPU 时累加，旧样本会随时段移动而移出。"
           />
           <StatBlock
             label="样本数"

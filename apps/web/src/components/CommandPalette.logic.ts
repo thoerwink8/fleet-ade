@@ -875,7 +875,7 @@ export function buildPaletteRemoteSourceReadiness(
       ? entry
       : {
           ...entry,
-          hint: entry.hint.replace("打开版本控制设置", "打开“设置 → 版本控制”"),
+          hint: entry.hint.replace("打开版本控制设置", "打开“设置 → 代码”"),
         };
   };
 }

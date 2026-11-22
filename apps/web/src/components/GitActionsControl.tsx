@@ -209,7 +209,7 @@ function getPublishProviderReadiness(input: {
   if (!discovered) {
     return {
       ready: false,
-      hint: "无法获取提供方状态。请打开“设置 → 版本控制”并重新扫描。",
+      hint: "无法获取提供方状态。请打开“设置 → 代码”并重新扫描。",
     };
   }
   if (discovered.status !== "available") {
@@ -220,7 +220,7 @@ function getPublishProviderReadiness(input: {
       ready: false,
       hint:
         Option.getOrNull(discovered.auth.detail) ??
-        `${discovered.label} 尚未通过身份验证。请打开“设置 → 版本控制”查看设置指引。`,
+        `${discovered.label} 尚未通过身份验证。请打开“设置 → 代码”查看设置指引。`,
     };
   }
   return { ready: true, hint: null };
@@ -661,7 +661,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                           }
                         />
                         <TooltipPopup side="top" align="end">
-                          {readiness.hint ?? "打开“设置 → 版本控制”以配置此提供方。"}
+                          {readiness.hint ?? "打开“设置 → 代码”以配置此提供方。"}
                         </TooltipPopup>
                       </Tooltip>
                     </div>

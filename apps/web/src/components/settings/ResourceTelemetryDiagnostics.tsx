@@ -122,7 +122,7 @@ function categoryLabel(category: ResourceTelemetryProcessCategory): string {
     case "resource-monitor":
       return "监测器";
     case "unknown-t3":
-      return "T3 进程";
+      return "Fleet ADE 进程";
   }
 }
 
@@ -999,7 +999,7 @@ function ResourceTelemetryDiagnosticsBody({
           <div className="flex flex-col gap-3 border-b border-border/60 bg-linear-to-r from-muted/45 via-muted/20 to-transparent px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
               <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-                T3 系统资源占用
+                Fleet ADE 系统资源占用
               </div>
               <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
                 服务器、提供方、终端、桌面进程和监测器自身的实时原生统计。

@@ -273,7 +273,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         <DialogHeader>
           <DialogTitle>关联环境</DialogTitle>
           <DialogDescription>
-            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在该环境的「共享与访问」里的已授权客户端中，可以在那里撤销。
+            此处的智能体随后可以在那边启动会话、发消息并等待。它会出现在该环境的「连接」里的已授权客户端中，可以在那里撤销。
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -338,12 +338,12 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 />
                 {machine !== null ? (
                   <span className="block text-xs text-muted-foreground">
-                    在 {machine.label} 上创建链接：设置 → 共享与访问 → 已授权客户端 →
+                    在 {machine.label} 上创建链接：设置 → 连接 → 已授权客户端 →
                     创建链接，然后把配对码粘贴到这里。
                   </span>
                 ) : (
                   <span className="block text-xs text-muted-foreground">
-                    在那边打开共享与访问并创建链接，或在终端运行 <code>t3 pair</code>
+                    在那边打开连接并创建链接，或在终端运行 <code>t3 pair</code>
                     ，再把配对码粘贴到这里。
                   </span>
                 )}

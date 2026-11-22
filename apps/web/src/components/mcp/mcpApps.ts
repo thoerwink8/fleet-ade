@@ -51,7 +51,7 @@ export const MCP_APPS: readonly McpApp[] = [
     logo: pokeLogo,
     handoff: {
       kind: "open",
-      link: (url) => `https://poke.com/integrations/new?name=T3%20Code&url=${encoded(url)}`,
+      link: (url) => `https://poke.com/integrations/new?name=Fleet%20ADE&url=${encoded(url)}`,
     },
     steps: ["打开 poke.com/integrations/new。", "粘贴 URL 并添加集成。"],
     docs: "https://poke.com/docs/mcp-servers",
@@ -63,7 +63,7 @@ export const MCP_APPS: readonly McpApp[] = [
     handoff: {
       kind: "open",
       link: (url) =>
-        `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=T3%20Code&connectorUrl=${encoded(url)}`,
+        `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=Fleet%20ADE&connectorUrl=${encoded(url)}`,
     },
     steps: [
       "在 Claude 中打开 Customize，然后打开 Connectors。",

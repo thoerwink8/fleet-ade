@@ -47,7 +47,7 @@ function showPermissionNotice(
     timeout: 0,
     onClose: persistDismissal,
     actionProps: {
-      children: "打开共享与访问",
+      children: "打开连接设置",
       onClick: () => {
         dismiss();
         void router.navigate({ to: "/settings/access" });

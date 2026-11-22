@@ -741,7 +741,7 @@ function ManagedCodexSetup({
           <details>
             <summary className="cursor-pointer">其他连接方式</summary>
             <Button className="mt-2" size="sm" variant="outline" render={<a href={handoffUrl} />}>
-              使用 T3 桌面版自动返回
+              使用 Fleet ADE 桌面版自动返回
             </Button>
           </details>
         ) : null}

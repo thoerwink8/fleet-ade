@@ -395,7 +395,7 @@ function InstanceSessionManagement(
     <div className="grid gap-3">
       <SettingsRow
         title="原生运行实例"
-        description="将智能体的原生运行实例导入 T3 会话并继续。"
+        description="将智能体的原生运行实例导入 Fleet ADE 会话并继续。"
         status={
           canList && props.projects.length === 0 ? "请先添加项目，再导入运行实例。" : undefined
         }

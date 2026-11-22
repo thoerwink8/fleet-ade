@@ -376,7 +376,7 @@ function LinkRequestDialog(props: {
                           spellCheck={false}
                         />
                         <span className="block text-xs text-muted-foreground">
-                          请在 {targetName} 上创建关联：设置 → 共享与访问 → 已授权客户端 →
+                          请在 {targetName} 上创建关联：设置 → 连接 → 已授权客户端 →
                           创建关联，然后把配对码粘贴到这里。
                         </span>
                       </label>
@@ -389,7 +389,7 @@ function LinkRequestDialog(props: {
             {useExisting ? (
               <p className="text-xs text-muted-foreground">
                 此环境已关联到 {targetName}。智能体可以照原样使用该关联；可在设置 →
-                环境中更改其访问权限。
+                连接中更改其访问权限。
               </p>
             ) : null}
             {error !== null ? (
