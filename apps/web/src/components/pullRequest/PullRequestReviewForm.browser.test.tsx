@@ -1,17 +1,12 @@
 import { createRef } from "react";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
-import { act, render } from "../../../test/render";
+import { render } from "../../../test/render";
 import { PullRequestReviewForm } from "./PullRequestReviewForm";
 import { pullRequestReviewKey, usePullRequestReviewStore } from "./pullRequestReviewStore";
 
 const mocks = vi.hoisted(() => ({
   submit: vi.fn().mockResolvedValue({ _tag: "Success" }),
-  queue: vi.fn<(submit: (text: string) => void) => void>(),
-}));
-vi.mock("~/speech/useTextFieldSpeech", () => ({
-  TextFieldSpeechControls: () => null,
-  useTextFieldSpeech: () => ({ blocksSubmission: true, submitAfterDictation: mocks.queue }),
 }));
 vi.mock("~/state/use-atom-command", () => ({ useAtomCommand: () => mocks.submit }));
 vi.mock(import("~/state/pullRequests"), async (original) => ({
@@ -19,13 +14,13 @@ vi.mock(import("~/state/pullRequests"), async (original) => ({
   pullRequestEnvironment: { submitReview: {} } as never,
 }));
 
-it("submits only the line comments still in the draft when dictation finishes", async () => {
+it("submits the summary with only the line comments still in the draft", async () => {
   mocks.submit.mockClear();
-  mocks.queue.mockClear();
   const reference = { projectId: ProjectId.make("test"), repository: "test/repo", number: 1 };
   const key = pullRequestReviewKey(reference);
   const store = usePullRequestReviewStore.getState();
   store.clear(key);
+  store.setSummary(key, "Typed summary");
   store.addComment(key, {
     id: "removed",
     body: "Do not post",
@@ -34,7 +29,6 @@ it("submits only the line comments still in the draft when dictation finishes", 
   });
   await using screen = await render(
     <PullRequestReviewForm
-      active
       environmentId={EnvironmentId.make("test")}
       reference={reference}
       completionScope={null}
@@ -47,12 +41,12 @@ it("submits only the line comments still in the draft when dictation finishes", 
       onSubmitted={vi.fn()}
     />,
   );
+  // The form rendered with the comment; removing it before the click must keep it out of the review.
+  store.removeComments(key, ["removed"]);
   await screen.getByRole("button", { name: "提交审查" }).click();
-  await act(() => store.clear(key));
-  await act(() => mocks.queue.mock.calls[0]![0]("Dictated summary"));
   expect(mocks.submit).toHaveBeenCalledWith(
     expect.objectContaining({
-      input: expect.objectContaining({ body: "Dictated summary", comments: [] }),
+      input: expect.objectContaining({ body: "Typed summary", comments: [] }),
     }),
   );
 });

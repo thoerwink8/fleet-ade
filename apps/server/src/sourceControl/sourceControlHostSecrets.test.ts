@@ -1,5 +1,5 @@
 import { assert, it } from "@effect/vitest";
-import { SecretProviderId, UsageLimitSourceId } from "@t3tools/contracts";
+import { ProviderInstanceId, SecretProviderId, UsageLimitSourceId } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as Effect from "effect/Effect";
 
@@ -142,7 +142,7 @@ it.effect("reads a collected reference again once it is invalidated", () =>
       },
     } as const;
     cache.set("cliproxy#key", "stale");
-    cache.set("voice#key", "stale");
+    cache.set("generator#key", "stale");
     assert.deepEqual((yield* read()).bitbucket, {
       email: "me@example.test",
       accessToken: "stale",
@@ -152,13 +152,19 @@ it.effect("reads a collected reference again once it is invalidated", () =>
       resolver,
       Effect.succeed({
         sourceControlHosts: hosts,
-        cloudSpeechCredentials: { openai: source("voice#key"), xai: "", openrouter: "" },
         usageLimitSources,
-        textGenerators: {},
+        textGenerators: {
+          [ProviderInstanceId.make("router")]: {
+            kind: "openaiCompatible",
+            baseUrl: "https://router.test/v1",
+            apiKey: source("generator#key"),
+            enabled: true,
+          },
+        },
       }),
     );
     assert.isFalse(cache.has("cliproxy#key"));
-    assert.isFalse(cache.has("voice#key"));
+    assert.isFalse(cache.has("generator#key"));
     assert.deepEqual((yield* read()).bitbucket, {
       email: "me@example.test",
       accessToken: "rotated",

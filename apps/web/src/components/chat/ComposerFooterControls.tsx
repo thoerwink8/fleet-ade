@@ -186,7 +186,6 @@ export function ComposerPermissionsSection(props: {
 }
 
 export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(props: {
-  children?: React.ReactNode;
   compact: boolean;
   canOperateThread: boolean;
   isPreparingWorktree: boolean;
@@ -203,7 +202,6 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   followUpBehavior: "queue" | "steer";
   canSteer: boolean;
   alternateShortcutLabel: string | null;
-  voiceInputActive?: boolean;
   isSendBusy: boolean;
   sendDisabledReason: string | null;
   isEnvironmentUnavailable: boolean;
@@ -216,7 +214,6 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   compactBeforeSendTokens: number | null;
-  hideCompactToggle: boolean;
   keepFullHistory: boolean;
   onToggleKeepFullHistory: () => void;
 }) {
@@ -232,7 +229,6 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         followUpBehavior={props.followUpBehavior}
         canSteer={props.canSteer}
         alternateShortcutLabel={props.alternateShortcutLabel}
-        voiceInputActive={props.voiceInputActive ?? false}
         isSendBusy={props.isSendBusy}
         sendDisabledReason={props.sendDisabledReason}
         isEnvironmentUnavailable={props.isEnvironmentUnavailable}
@@ -246,12 +242,9 @@ export const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryA
         onPreviousPendingQuestion={props.onPreviousPendingQuestion}
         onInterrupt={props.onInterrupt}
         compactBeforeSendTokens={props.compactBeforeSendTokens}
-        hideCompactToggle={props.hideCompactToggle}
         keepFullHistory={props.keepFullHistory}
         onToggleKeepFullHistory={props.onToggleKeepFullHistory}
-      >
-        {props.children}
-      </ComposerPrimaryActions>
+      />
     </>
   );
 });

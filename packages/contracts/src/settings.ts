@@ -11,7 +11,6 @@ import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import * as SchemaGetter from "effect/SchemaGetter";
 import {
-  EnvironmentId,
   ForwardCompatibleNullable,
   ForwardCompatibleOptional,
   OmittedWhenNull,
@@ -43,15 +42,6 @@ import {
   ProviderDriverKind,
 } from "./providerInstance.ts";
 import { PullRequestMergeMethod } from "./pullRequest.ts";
-import {
-  CloudSpeechModelId,
-  SpeechAcceleration,
-  SpeechCorrectionCue,
-  SpeechCustomWords,
-  SpeechLanguage,
-  SpeechModelUnloadTimeout,
-  SpeechPostProcessingPromptSettings,
-} from "./speech.ts";
 
 export const TimestampFormat = Schema.Literals(["locale", "12-hour", "24-hour"]);
 export type TimestampFormat = typeof TimestampFormat.Type;
@@ -328,35 +318,6 @@ export type ModelPreferences = {
   readonly providerModelPreferences: typeof ProviderModelPreferences.Type;
 };
 
-export const VoiceShortcutMode = Schema.Literals(["auto", "hold", "toggle"]);
-export type VoiceShortcutMode = typeof VoiceShortcutMode.Type;
-
-export const VoiceMicrophoneEntry = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("default") }),
-  Schema.Struct({ kind: Schema.Literal("device"), deviceId: Schema.String, label: Schema.String }),
-]);
-export type VoiceMicrophoneEntry = typeof VoiceMicrophoneEntry.Type;
-
-/**
- * Where this device sends microphone audio. A cloud grant names the forwarding environment and
- * the provider; an OpenRouter grant also names the exact model, since OpenRouter has no default.
- */
-export const VoiceTranscriptionDestination = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal("environment"), environmentId: EnvironmentId }),
-  Schema.Struct({
-    kind: Schema.Literal("cloud"),
-    environmentId: EnvironmentId,
-    provider: Schema.Literals(["openai", "xai"]),
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("cloud"),
-    environmentId: EnvironmentId,
-    provider: Schema.Literal("openrouter"),
-    model: CloudSpeechModelId,
-  }),
-]);
-export type VoiceTranscriptionDestination = typeof VoiceTranscriptionDestination.Type;
-
 export const ClientSettingsSchema = Schema.Struct({
   notificationMode: NotificationMode.pipe(
     Schema.withDecodingDefault(Effect.succeed("off" as const)),
@@ -469,24 +430,6 @@ export const ClientSettingsSchema = Schema.Struct({
   timestampFormat: TimestampFormat.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_TIMESTAMP_FORMAT)),
   ),
-  // Superseded by voiceMicrophones; read only to seed an empty order.
-  voiceMicrophone: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
-  // Device-local microphone order. Recording uses the first connected entry.
-  voiceMicrophones: Schema.Array(VoiceMicrophoneEntry).pipe(
-    Schema.withDecodingDefault(Effect.succeed([])),
-  ),
-  voiceShortcutMode: VoiceShortcutMode.pipe(Schema.withDecodingDefault(Effect.succeed("auto"))),
-  speechLanguage: SpeechLanguage.pipe(Schema.withDecodingDefault(Effect.succeed("auto"))),
-  speechTranslateToEnglish: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  speechCustomWords: SpeechCustomWords.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
-  speechSilenceFiltering: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
-  speechRemoveFillerWords: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
-  speechPostProcessingPrompt: SpeechPostProcessingPromptSettings.pipe(
-    Schema.withDecodingDefault(
-      Effect.succeed({ mode: "default" as const, customInstructions: "" }),
-    ),
-  ),
-  speechCorrectionWord: SpeechCorrectionCue.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   // A locale code or "system". Open string so new locales and downgrades need no migration.
   language: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed("en"))),
   snapShotEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
@@ -1136,7 +1079,6 @@ export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "sidebarAutoSettleKeepPullRequests",
   "continueThreadsAfterServerUpdate",
   "responseStreamingMode",
-  "speechProjectCustomWords",
   "dispatchCodeModelSelection",
   "dispatchReviewModelSelection",
   "dispatchReadonlyModelSelection",
@@ -1178,7 +1120,6 @@ export const ProjectSettingsOverrides = Schema.Struct({
   sidebarAutoSettleKeepPullRequests: Schema.optionalKey(Schema.Boolean),
   continueThreadsAfterServerUpdate: Schema.optionalKey(Schema.Boolean),
   responseStreamingMode: Schema.optionalKey(ResponseStreamingMode),
-  speechProjectCustomWords: Schema.optionalKey(SpeechCustomWords),
   dispatchCodeModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   dispatchReviewModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   dispatchReadonlyModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
@@ -1302,15 +1243,6 @@ export const StorageCleanupSettings = Schema.Struct({
 });
 export type StorageCleanupSettings = typeof StorageCleanupSettings.Type;
 
-const CloudSpeechCredential = SettingsSecretValue.pipe(
-  Schema.withDecodingDefault(Effect.succeed("")),
-);
-export const CloudSpeechCredentials = Schema.Struct({
-  openai: CloudSpeechCredential,
-  xai: CloudSpeechCredential,
-  openrouter: CloudSpeechCredential,
-});
-
 export const MaxConcurrentSessions = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1));
 export type MaxConcurrentSessions = typeof MaxConcurrentSessions.Type;
 
@@ -1407,22 +1339,6 @@ export const ServerSettings = Schema.Struct({
   /** Holds an OS sleep inhibitor while any run is active; closing a laptop lid still sleeps it. */
   keepAwakeWhileAgentsWork: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
 
-  cloudSpeechCredentials: CloudSpeechCredentials.pipe(
-    Schema.withDecodingDefault(Effect.succeed({ openai: "", xai: "", openrouter: "" })),
-  ),
-  speechModelId: Schema.String.pipe(
-    Schema.withDecodingDefault(Effect.succeed("handy-computer/parakeet-unified-en-0.6b-gguf")),
-  ),
-  speechAcceleration: SpeechAcceleration.pipe(Schema.withDecodingDefault(Effect.succeed("auto"))),
-  speechModelUnloadTimeout: SpeechModelUnloadTimeout.pipe(
-    Schema.withDecodingDefault(Effect.succeed("min_15")),
-  ),
-  // Vocabulary shared by everyone who dictates in a project; it lives with the project's environment.
-  speechProjectCustomWords: SpeechCustomWords.pipe(Schema.withDecodingDefault(Effect.succeed([]))),
-  // Null follows textGenerationModelSelection; a selection pins transcript cleanup to its own model.
-  speechPostProcessingModelSelection: Schema.NullOr(ModelSelection).pipe(
-    Schema.withDecodingDefault(Effect.succeed(null)),
-  ),
   defaultAutoPull: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   defaultProjectScripts: Schema.Array(ProjectScript).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
@@ -1921,18 +1837,6 @@ export const ServerSettingsPatch = Schema.Struct({
   enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),
   continueThreadsAfterServerUpdate: Schema.optionalKey(Schema.Boolean),
   keepAwakeWhileAgentsWork: Schema.optionalKey(Schema.Boolean),
-  cloudSpeechCredentials: Schema.optionalKey(
-    Schema.Struct({
-      openai: Schema.optionalKey(SettingsSecretValue),
-      xai: Schema.optionalKey(SettingsSecretValue),
-      openrouter: Schema.optionalKey(SettingsSecretValue),
-    }),
-  ),
-  speechModelId: Schema.optionalKey(Schema.String),
-  speechAcceleration: Schema.optionalKey(SpeechAcceleration),
-  speechModelUnloadTimeout: Schema.optionalKey(SpeechModelUnloadTimeout),
-  speechProjectCustomWords: Schema.optionalKey(SpeechCustomWords),
-  speechPostProcessingModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   defaultAutoPull: Schema.optionalKey(Schema.Boolean),
   defaultProjectScripts: Schema.optionalKey(Schema.Array(ProjectScript)),
   projectScriptOverrides: Schema.optionalKey(
@@ -2159,16 +2063,6 @@ export const ClientSettingsPatch = Schema.Struct({
   sidebarProjectSortOrder: Schema.optionalKey(SidebarProjectSortOrder),
   sidebarThreadSortOrder: Schema.optionalKey(SidebarThreadSortOrder),
   timestampFormat: Schema.optionalKey(TimestampFormat),
-  voiceMicrophone: Schema.optionalKey(Schema.String),
-  voiceMicrophones: Schema.optionalKey(Schema.Array(VoiceMicrophoneEntry)),
-  voiceShortcutMode: Schema.optionalKey(VoiceShortcutMode),
-  speechLanguage: Schema.optionalKey(SpeechLanguage),
-  speechTranslateToEnglish: Schema.optionalKey(Schema.Boolean),
-  speechCustomWords: Schema.optionalKey(SpeechCustomWords),
-  speechSilenceFiltering: Schema.optionalKey(Schema.Boolean),
-  speechRemoveFillerWords: Schema.optionalKey(Schema.Boolean),
-  speechPostProcessingPrompt: Schema.optionalKey(SpeechPostProcessingPromptSettings),
-  speechCorrectionWord: Schema.optionalKey(SpeechCorrectionCue),
   language: Schema.optionalKey(Schema.String),
   snapShotEnabled: Schema.optionalKey(Schema.Boolean),
   snapShotIncludeAccessibility: Schema.optionalKey(Schema.Boolean),

@@ -162,7 +162,7 @@ it.each(["blocked", "refusedLater"] as const)(
   },
 );
 
-it("cancels a new citation while dictation makes the composer read-only", async () => {
+it("cancels a new citation while the composer is read-only", async () => {
   const editorRef = createRef<ComposerPromptEditorHandle>();
   await using screen = await render(<Composer question={false} editorRef={editorRef} disabled />);
 

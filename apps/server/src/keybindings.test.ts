@@ -260,6 +260,7 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
         JSON.stringify([
           { key: "mod+shift+j", command: "preview.toggle" },
           { key: "mod+r", command: "preview.refresh", when: "previewFocus" },
+          { key: "mod+shift+d", command: "composer.dictation", when: "!terminalFocus" },
           { key: "mod+f", command: "chat.find", when: "!terminalFocus && !previewFocus" },
           { key: "mod+shift+y", command: "terminal.toggle" },
         ]),
@@ -272,6 +273,7 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
       const persisted = yield* readKeybindingsConfig(keybindingsConfigPath);
       const commands = new Set<string>(persisted.map((entry) => entry.command));
       assert.isFalse([...commands].some((command) => command.startsWith("preview.")));
+      assert.isFalse(commands.has("composer.dictation"));
       for (const defaultRule of SharedKeybindings.DEFAULT_KEYBINDINGS) {
         assert.isTrue(commands.has(defaultRule.command), `expected ${defaultRule.command}`);
       }

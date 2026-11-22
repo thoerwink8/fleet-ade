@@ -150,7 +150,6 @@ export function PullRequestComposer({
         {verdicts.length > 0 ? (
           <div hidden={mode !== "review"}>
             <PullRequestReviewForm
-              active={open && mode === "review"}
               environmentId={environmentId}
               reference={reference}
               completionScope={pullRequestCompletionScope(detail, environmentId, reference)}
@@ -172,7 +171,6 @@ export function PullRequestComposer({
         {canComment ? (
           <div hidden={mode !== "comment"}>
             <PullRequestCommentForm
-              active={open && mode === "comment"}
               environmentId={environmentId}
               reference={reference}
               detail={detail}

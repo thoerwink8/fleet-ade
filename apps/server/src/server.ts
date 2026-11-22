@@ -50,11 +50,6 @@ import * as AgentScopeLive from "./process/agentScope.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as NodePtyAdapter from "./terminal/NodePtyAdapter.ts";
 import * as PullRequestHttp from "./pullRequest/http.ts";
-import * as SpeechModelStore from "./speech/SpeechModelStore.ts";
-import * as SpeechService from "./speech/SpeechService.ts";
-import * as CloudSpeech from "./speech/CloudSpeech.ts";
-import { speechHttpApiLayer } from "./speech/http.ts";
-import { speechStreamRouteLayer } from "./speech/stream.ts";
 import * as PullRequestProviderRegistry from "./pullRequest/PullRequestProviderRegistry.ts";
 import * as PullRequestService from "./pullRequest/PullRequestService.ts";
 import * as SqlitePersistence from "./persistence/Sqlite.ts";
@@ -855,7 +850,6 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(OrchestrationHttp.layer),
       Layer.provide(PullRequestHttp.layer),
       Layer.provide(ProjectHttp.layer),
-      Layer.provide(speechHttpApiLayer),
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
       Layer.provide(FleetEngineHttp.layer),
       Layer.provide(WebhookRoute.layer.pipe(Layer.provide(RelayDeliveryProof.layer))),
@@ -867,7 +861,6 @@ const layerMakeRoutes = Layer.mergeAll(
     LedgerNotes.routeLayer,
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer,
-    speechStreamRouteLayer,
   ),
   McpHttpServer.layer.pipe(
     Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
@@ -894,13 +887,6 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(PeerLinks.layer),
   Layer.provide(FleetClaims.layer),
   Layer.provide(layerFleetSummaryReporter),
-  Layer.provide(
-    SpeechService.layer.pipe(
-      Layer.provide(layerServerSettings),
-      Layer.provide(SpeechModelStore.layer),
-    ),
-  ),
-  Layer.provide(CloudSpeech.layer.pipe(Layer.provide(SecretResolver.layer))),
   Layer.provide(layerServerSettings),
   Layer.provide(PipelineSupervision.layer),
   Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),

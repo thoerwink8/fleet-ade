@@ -1,7 +1,6 @@
 import {
   AntigravitySettings,
   ClaudeSettings,
-  CloudSpeechCredentials,
   CodexSettings,
   type ProviderInstanceConfig,
   type ServerSettings,
@@ -33,7 +32,6 @@ const providerSecretFields = new Map([
 ]);
 const usageLimitSecretFields = secretSettingsFields(UsageLimitSourceConfig);
 const textGeneratorSecretFields = secretSettingsFields(TextGeneratorConfig);
-const voiceSecretFields = secretSettingsFields(CloudSpeechCredentials);
 const encode = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
 export interface SettingsSecret {
@@ -209,11 +207,6 @@ function mapSecretFieldGroups(
 
   return {
     ...settings,
-    cloudSpeechCredentials: mapFields(
-      settings.cloudSpeechCredentials,
-      voiceSecretFields,
-      (provider) => `voice-cloud-${provider}`,
-    ) as ServerSettings["cloudSpeechCredentials"],
     providerInstances,
     sourceControlHosts,
     usageLimitSources,

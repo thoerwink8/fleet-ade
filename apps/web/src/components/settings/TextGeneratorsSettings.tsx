@@ -237,7 +237,6 @@ const TASKS = [
     key: "sourceControlWriterModelSelection",
     label: "提交信息、pull request 和分支名称",
   },
-  { key: "speechPostProcessingModelSelection", label: "语音转写文本整理" },
 ] as const;
 
 /**
@@ -512,7 +511,7 @@ function TextGenerationTaskPicker({
   const settings = useEnvironmentSettings(environmentId);
   const updateSettings = useUpdateEnvironmentSettings(environmentId);
   const own = settings[settingKey];
-  // Source control and voice follow the text generation model until they get their own.
+  // Source control follows the text generation model until it gets its own.
   const selection = own ?? settings.textGenerationModelSelection;
   const targets = useTextGenerationTargets({
     environmentId,

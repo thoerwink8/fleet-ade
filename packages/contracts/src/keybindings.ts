@@ -88,7 +88,6 @@ export const STATIC_KEYBINDING_COMMANDS = [
   "composer.sendAlternate",
   "composer.sendBackground",
   "composer.sendAndNewThread",
-  "composer.dictation",
   "composer.host",
   "composer.cycleHost",
   "composer.effort",
@@ -132,6 +131,7 @@ export const RETIRED_KEYBINDING_COMMANDS: ReadonlySet<string> = new Set([
   "preview.zoomOut",
   "preview.resetZoom",
   "preview.find",
+  "composer.dictation",
 ]);
 
 export const KeybindingCommand = Schema.Union([

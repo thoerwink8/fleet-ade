@@ -25,7 +25,6 @@ import {
   parsePersistedServerObservabilitySettings,
   resolveReviewGuideModelSelection,
   resolveSourceControlWriterModelSelection,
-  resolveSpeechPostProcessingModelSelection,
 } from "./serverSettings.ts";
 
 const decodeServerSettings = Schema.decodeUnknownSync(ServerSettings);
@@ -343,16 +342,16 @@ describe("serverSettings helpers", () => {
 
   it("falls back from a removed instance whose id matches an inherited object key", () => {
     for (const id of ["constructor", "toString", "valueOf"]) {
-      const speechPostProcessingModelSelection = createModelSelection(
+      const sourceControlWriterModelSelection = createModelSelection(
         ProviderInstanceId.make(id),
         "gpt-5.4-mini",
       );
-      const settings = { ...DEFAULT_SERVER_SETTINGS, speechPostProcessingModelSelection };
+      const settings = { ...DEFAULT_SERVER_SETTINGS, sourceControlWriterModelSelection };
 
-      expect(isModelSelectionProviderEnabled(settings, speechPostProcessingModelSelection)).toBe(
+      expect(isModelSelectionProviderEnabled(settings, sourceControlWriterModelSelection)).toBe(
         false,
       );
-      expect(resolveSpeechPostProcessingModelSelection(settings)).toBe(
+      expect(resolveSourceControlWriterModelSelection(settings, undefined, null)).toBe(
         settings.textGenerationModelSelection,
       );
     }
@@ -408,12 +407,10 @@ describe("serverSettings helpers", () => {
       },
       sourceControlWriterModelSelection: selection,
       reviewGuideModelSelection: selection,
-      speechPostProcessingModelSelection: selection,
     });
     // A text generator has no provider snapshot; an empty list must not read as unusable.
     const on = settings(true);
     expect(resolveSourceControlWriterModelSelection(on, [], null)).toBe(selection);
-    expect(resolveSpeechPostProcessingModelSelection(on, [])).toBe(selection);
     expect(resolveReviewGuideModelSelection(on, [], null)).toBe(selection);
     expect(
       resolveReviewGuideModelSelection(
@@ -425,9 +422,6 @@ describe("serverSettings helpers", () => {
 
     const off = settings(false);
     expect(resolveSourceControlWriterModelSelection(off, [], null)).toBe(
-      off.textGenerationModelSelection,
-    );
-    expect(resolveSpeechPostProcessingModelSelection(off, [])).toBe(
       off.textGenerationModelSelection,
     );
   });
@@ -1021,42 +1015,8 @@ describe("synchronized model preferences", () => {
   });
 });
 
-describe("resolveSpeechPostProcessingModelSelection", () => {
-  it("follows the text generation model until a usable cleanup model is set", () => {
-    const textGeneration = createModelSelection(ProviderInstanceId.make("codex"), "gpt-6-luna");
-    const cleanup = createModelSelection(ProviderInstanceId.make("claudeAgent"), "claude-haiku", [
-      { id: "effort", value: "low" },
-    ]);
-    const base = { ...DEFAULT_SERVER_SETTINGS, textGenerationModelSelection: textGeneration };
-    expect(resolveSpeechPostProcessingModelSelection(base)).toBe(textGeneration);
-    const pinned = applyServerSettingsPatch(base, { speechPostProcessingModelSelection: cleanup });
-    expect(resolveSpeechPostProcessingModelSelection(pinned)).toEqual(cleanup);
-    expect(
-      resolveSpeechPostProcessingModelSelection({
-        ...pinned,
-        providerInstances: {
-          [ProviderInstanceId.make("claudeAgent")]: {
-            driver: ProviderDriverKind.make("claudeAgent"),
-            enabled: false,
-            config: {},
-          },
-        },
-      }),
-    ).toBe(textGeneration);
-    expect(
-      resolveSpeechPostProcessingModelSelection(pinned, [
-        {
-          instanceId: "claudeAgent",
-          enabled: true,
-          installed: true,
-          supportsTextGeneration: false,
-        },
-      ] as never),
-    ).toBe(textGeneration);
-    expect(
-      applyServerSettingsPatch(pinned, { speechPostProcessingModelSelection: null })
-        .speechPostProcessingModelSelection,
-    ).toBeNull();
+describe("maxConcurrentSessions patches", () => {
+  it("sets the cap and clears it with null", () => {
     const capped = applyServerSettingsPatch(
       DEFAULT_SERVER_SETTINGS,
       decodeServerSettingsPatch({ maxConcurrentSessions: 2 }),

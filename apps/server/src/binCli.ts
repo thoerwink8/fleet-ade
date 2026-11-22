@@ -35,7 +35,6 @@ import {
 } from "./cli/install.ts";
 import { uninstallCommand } from "./cli/uninstall.ts";
 import { runServiceLauncherCli } from "./cli/serviceLauncher.ts";
-import { speechWorkerCommand } from "./cli/speechWorker.ts";
 import { claudeHistoryCommand } from "./cli/claudeHistory.ts";
 import { sshHelperCommand } from "./cli/sshHelper.ts";
 import { serviceCommand } from "./cli/service.ts";
@@ -116,7 +115,6 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
         Command.withHandler(() => Effect.sync(() => void runServiceLauncherCli())),
       ),
       claudeHistoryCommand,
-      speechWorkerCommand,
       sshHelperCommand,
 
       servicePreflightCommand,
