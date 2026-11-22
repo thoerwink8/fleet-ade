@@ -13,10 +13,7 @@ import { cn } from "~/lib/utils";
 import { ModelPickerContent, resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { retainedModelWhileProviderLocked } from "./ProviderModelPicker.logic";
 import { ChatGptSharingControl } from "./ChatGptSharingControl";
-import {
-  ProviderInstanceIcon,
-  resolveProviderInstanceAcpRegistryIconUrl,
-} from "./ProviderInstanceIcon";
+import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 import { ModelEsque, getDisplayModelName, getTriggerDisplayModelName } from "./providerIconUtils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { ComposerControl, type ComposerControlSize } from "./ComposerControl";
@@ -150,17 +147,6 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
     : triggerTitle;
   const showInstanceBadge =
     activeEntry !== null && shouldShowInstanceBadge(activeEntry, props.instanceEntries);
-  const showInlineInstanceBadge =
-    showInstanceBadge && activeEntry !== null && activeEntry.driverKind !== "openaiCompatible";
-  const usesOmpTextTile =
-    activeEntry !== null &&
-    activeEntry.driverKind === "acpRegistry" &&
-    resolveProviderInstanceAcpRegistryIconUrl({
-      driverKind: activeEntry.driverKind,
-      agentId: activeEntry.acpRegistryAgentId,
-      iconUrl: activeEntry.acpRegistryIconUrl,
-    }) === null &&
-    activeEntry.displayName.trim().toLowerCase() === "omp";
 
   const setIsMenuOpen = (open: boolean) => {
     props.onOpenChange?.(open);
@@ -387,10 +373,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
             </span>
           ) : activeEntry && props.triggerLabel === undefined ? (
             // Narrow compacted composers hide the provider icon before truncating the name.
-            <span
-              data-chat-provider-model-picker-icon
-              className={cn("contents", showInlineInstanceBadge && "[&_span>svg]:mx-0")}
-            >
+            <span data-chat-provider-model-picker-icon className="contents">
               <ProviderInstanceIcon
                 driverKind={activeEntry.driverKind}
                 displayName={activeEntry.displayName}
@@ -398,30 +381,11 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                 acpRegistryAgentId={activeEntry.acpRegistryAgentId}
                 acpRegistryIconUrl={activeEntry.acpRegistryIconUrl}
                 showBadge={showInstanceBadge}
-                className={
-                  showInlineInstanceBadge
-                    ? "h-4 w-auto gap-1"
-                    : usesOmpTextTile
-                      ? "h-4 w-auto min-w-4"
-                      : "size-4"
-                }
-                iconClassName={cn(
-                  usesOmpTextTile ? "h-4 w-auto min-w-4 px-1" : "size-4",
-                  props.activeProviderIconClassName,
-                )}
-                indicatorBackground={
-                  showInlineInstanceBadge
-                    ? activeEntry.accentColor
-                      ? "transparent"
-                      : "var(--border)"
-                    : (props.instanceIndicatorBackground ?? "var(--contrast-input)")
-                }
-                badgeClassName={cn(
-                  showInlineInstanceBadge
-                    ? "static right-auto bottom-auto h-3.5 min-w-3.5 px-1 text-5xs"
-                    : "right-[-0.125rem] bottom-[-0.125rem] h-3 min-w-3 px-0.5 text-5xs",
-                  size === "xs" && "shadow-none",
-                )}
+                badgePlacement="inline"
+                className="h-4 min-w-4"
+                iconClassName={cn("size-4", props.activeProviderIconClassName)}
+                indicatorBackground={props.instanceIndicatorBackground ?? "var(--contrast-input)"}
+                {...(size === "xs" ? { badgeClassName: "shadow-none" } : {})}
               />
             </span>
           ) : null}
