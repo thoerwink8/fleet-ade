@@ -5,11 +5,12 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
-import { cachedTestTasks, matchesTestPath } from "./lib/cached-tests.ts";
+import { cachedTestTasks, matchesTestPath, toRepoPath } from "./lib/cached-tests.ts";
 import { runEveryTask } from "./lib/run-every-task.ts";
 import { shardedTestFiles } from "./lib/sharded-tests.ts";
 
 const root = NodePath.resolve(import.meta.dirname, "..");
+const vp = NodePath.join(root, "node_modules", "vite-plus", "bin", "vp");
 const { values, positionals } = NodeUtil.parseArgs({
   args: process.argv[2] === "--" ? process.argv.slice(3) : process.argv.slice(2),
   allowPositionals: true,
@@ -41,14 +42,16 @@ if (values.shard && positionals.length !== 1) {
 }
 const candidates = values.shard
   ? (await shardedTestFiles(NodePath.resolve(positionals[0]!), values.shard)).map((file) =>
-      NodePath.relative(root, file),
+      toRepoPath(NodePath.relative(root, file)),
     )
   : NodeChildProcess.execFileSync(
       "git",
       ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
       { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
     ).split("\0");
-const filters = positionals.map((path) => NodePath.relative(root, NodePath.resolve(path)));
+const filters = positionals.map((path) =>
+  toRepoPath(NodePath.relative(root, NodePath.resolve(path))),
+);
 const isSelectable = (file: string) =>
   /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
   !file.startsWith(".repos/") &&
@@ -70,7 +73,9 @@ console.log(
 const request = {
   files,
   groupSize,
-  uncached: values.uncached.map((file) => NodePath.relative(root, NodePath.resolve(file))),
+  uncached: values.uncached.map((file) =>
+    toRepoPath(NodePath.relative(root, NodePath.resolve(file))),
+  ),
 };
 const tasks = cachedTestTasks(JSON.stringify(request), root);
 const cacheRoot =
@@ -90,8 +95,8 @@ const { status, failed, cleared } = runEveryTask(
   (only, alone) => {
     const runStarted = Date.now();
     const result = NodeChildProcess.spawnSync(
-      NodePath.join(root, "node_modules/.bin/vp"),
-      ["run", "--concurrency-limit", String(alone ? 1 : concurrency), "test-cache"],
+      process.execPath,
+      [vp, "run", "--concurrency-limit", String(alone ? 1 : concurrency), "test-cache"],
       {
         cwd: root,
         env: { ...env, T3_CACHED_TESTS: JSON.stringify({ ...request, only }) },
@@ -153,8 +158,8 @@ if (verifyHits > 0) {
       console.log(`Verifying cached result without cache: ${task.task_name}`);
       const start = performance.now();
       const audit = NodeChildProcess.spawnSync(
-        NodePath.join(root, "node_modules/.bin/vp"),
-        ["run", "--no-cache", "--remote-cache", "off", task.task_name],
+        process.execPath,
+        [vp, "run", "--no-cache", "--remote-cache", "off", task.task_name],
         { cwd: root, env, stdio: "inherit" },
       );
       if (audit.error) throw audit.error;

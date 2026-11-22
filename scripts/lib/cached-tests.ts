@@ -15,6 +15,11 @@ interface CachedTestTask {
       };
 }
 
+/** Git and Vitest name files with forward slashes; `node:path` on Windows does not. */
+export function toRepoPath(path: string) {
+  return path.split(NodePath.sep).join("/");
+}
+
 export function matchesTestPath(file: string, filters: Array<string>) {
   return (
     filters.length === 0 ||
@@ -102,8 +107,8 @@ export function cachedTestTasks(
     for (const group of groups) {
       const key = NodeCrypto.createHash("sha256").update(group.join("\0")).digest("hex");
       tasks[`test-cache:${key}`] = {
-        command: `${command} ${group.map((file) => `'${NodePath.relative(directory, NodePath.join(root, file)).replaceAll("'", "'\"'\"'")}'`).join(" ")}`,
-        ...(directory === root ? {} : { cwd: NodePath.relative(root, directory) }),
+        command: `${command} ${group.map((file) => `'${toRepoPath(NodePath.relative(directory, NodePath.join(root, file))).replaceAll("'", "'\"'\"'")}'`).join(" ")}`,
+        ...(directory === root ? {} : { cwd: toRepoPath(NodePath.relative(root, directory)) }),
         cache: uncached.includes(group[0]!)
           ? false
           : {
