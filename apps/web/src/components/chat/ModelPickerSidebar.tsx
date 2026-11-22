@@ -13,7 +13,7 @@ import {
 
 function describeUnavailableInstance(entry: ProviderInstanceEntry): string {
   const label = entry.displayName;
-  // An unavailable instance (a driver this build lacks or the policy leaves out) says why instead.
+  // An unavailable instance (a driver this build lacks) says why instead.
   if ((!entry.enabled && entry.isAvailable) || entry.status === "disabled") {
     return `${label}：已在设置中停用。`;
   }

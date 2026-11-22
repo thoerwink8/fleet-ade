@@ -1,5 +1,4 @@
 import { doctorCommand } from "./cli/doctor.ts";
-import { policyCommand } from "./cli/policy.ts";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
@@ -41,7 +40,6 @@ import { serviceCommand } from "./cli/service.ts";
 import { servicePreflightCommand } from "./cli/servicePreflight.ts";
 import { themeCommand } from "./cli/theme.ts";
 import { traceCommand } from "./cli/trace.ts";
-import { triageCommand } from "./cli/triage.ts";
 import { connectCommand, statusCommand, upCommand } from "./cli/up.ts";
 
 const layerCliRuntime = Layer.mergeAll(
@@ -121,8 +119,6 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
       themeCommand,
       traceCommand,
       doctorCommand,
-      policyCommand,
-      triageCommand,
       cloudEnabled ? connectCommand : connectUnavailableCommand,
     ]),
   );

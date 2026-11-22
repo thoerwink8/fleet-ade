@@ -33,7 +33,6 @@ import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ScheduledTaskService from "./ScheduledTaskService.ts";
-import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 
 const isScheduledTaskError = Schema.is(ScheduledTaskError);
 
@@ -199,7 +198,6 @@ it.effect(
             Layer.provideMerge(
               ScheduledTaskService.layer,
               Layer.mergeAll(
-                ManagedPolicy.layerTest(),
                 Layer.mock(ThreadLaunchService.ThreadLaunchService)({
                   launch: () =>
                     Ref.updateAndGet(dispatched, (n) => n + 1).pipe(
@@ -293,7 +291,6 @@ it.effect(
             Layer.provideMerge(
               ScheduledTaskService.layer,
               Layer.mergeAll(
-                ManagedPolicy.layerTest(),
                 Layer.mock(ThreadLaunchService.ThreadLaunchService)({
                   launch: () =>
                     Ref.updateAndGet(dispatched, (n) => n + 1).pipe(
@@ -358,7 +355,6 @@ it.effect("thread cleanup notifies subscribers and a finishing run cannot recrea
     const layer = ScheduledTaskService.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ManagedPolicy.layerTest(),
           Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
           Layer.mock(ThreadManagementService.ThreadManagementService)({
             sendToThread: () =>
@@ -432,7 +428,6 @@ it.effect.each([
     const layer = ScheduledTaskService.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ManagedPolicy.layerTest(),
           Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
           Layer.mock(ThreadManagementService.ThreadManagementService)({
             sendToThread: (input) => Ref.set(sent, input.messageId).pipe(Effect.as({} as never)),
@@ -518,7 +513,6 @@ it.effect("a bound run follows its thread when promotion moves it mid-send", () 
     const layer = ScheduledTaskService.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ManagedPolicy.layerTest(),
           Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
           Layer.mock(ThreadManagementService.ThreadManagementService)({
             sendToThread: (input) =>
@@ -588,7 +582,6 @@ it.effect("a fresh-session task launches one thread, then starts each later run 
     const layer = ScheduledTaskService.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ManagedPolicy.layerTest(),
           Layer.mock(ThreadLaunchService.ThreadLaunchService)({
             launch: () =>
               Ref.update(launches, (n) => n + 1).pipe(
@@ -668,7 +661,6 @@ it.effect("a first run whose thread was deleted before it bound removes the task
     const layer = ScheduledTaskService.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ManagedPolicy.layerTest(),
           Layer.mock(ThreadLaunchService.ThreadLaunchService)({
             launch: () =>
               Effect.succeed({
@@ -721,7 +713,6 @@ it.effect.each(["recreated under the same id", "moved to another project"] as co
       const layer = ScheduledTaskService.layer.pipe(
         Layer.provide(
           Layer.mergeAll(
-            ManagedPolicy.layerTest(),
             Layer.mock(ThreadLaunchService.ThreadLaunchService)({
               launch: () =>
                 Deferred.succeed(launching, undefined).pipe(
@@ -777,76 +768,6 @@ it.effect.each(["recreated under the same id", "moved to another project"] as co
     }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
 
-it.effect("refuses saving an enabled task above the policy ceiling", () =>
-  Effect.gen(function* () {
-    const layer = ScheduledTaskService.layer.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          ManagedPolicy.layerTest({
-            schemaVersion: 1,
-            organization: "Example Corp",
-            limits: { maxRuntimeMode: "auto-accept-edits" },
-          }),
-          Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
-          Layer.mock(ThreadManagementService.ThreadManagementService)({
-            getThreadShell: () => Effect.succeed(threadShell(ProjectId.make("project:test"))),
-          }),
-          Layer.mock(SecretRequests.SecretRequests)({}),
-          Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
-            namedProjectsRoot: "/projects",
-            isScratchProject: () => Effect.succeed(false),
-          }),
-          NodeCrypto.layer,
-          Scheduler.layer,
-        ),
-      ),
-    );
-    yield* Effect.gen(function* () {
-      const service = yield* ScheduledTaskService.ScheduledTaskService;
-      const save = (enabled: boolean) =>
-        service.upsert({
-          id: ScheduledTaskId.make("task:above-ceiling"),
-          title: "Nightly 版",
-          prompt: "Check progress",
-          enabled,
-          schedule: { type: "interval", everyMs: 60_000 },
-          projectId: ProjectId.make("project:test"),
-          workspaceStrategy: { type: "root" },
-          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
-          runtimeMode: "full-access",
-          interactionMode: "default",
-        });
-      const refused = yield* save(true).pipe(Effect.flip);
-      assert.equal(refused.message, "Example Corp 限制会话最高到自动接受编辑。");
-      assert.lengthOf((yield* service.list()).tasks, 0);
-      // A disabled task does not run, so it can still be saved.
-      yield* save(false);
-      assert.lengthOf((yield* service.list()).tasks, 1);
-      // Nor can it be switched back on while its mode is above the ceiling.
-      const reenabled = yield* service
-        .setEnabled({ id: ScheduledTaskId.make("task:above-ceiling"), enabled: true })
-        .pipe(Effect.flip);
-      assert.equal(reenabled.message, "Example Corp 限制会话最高到自动接受编辑。");
-      // A task bound to a thread runs in that thread's mode, so its own is not checked.
-      const bound = {
-        id: ScheduledTaskId.make("task:bound"),
-        title: "Follow up",
-        prompt: "Check progress",
-        enabled: true,
-        schedule: { type: "interval", everyMs: 60_000 },
-        projectId: ProjectId.make("project:test"),
-        workspaceStrategy: { type: "root" },
-        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
-        runtimeMode: "full-access",
-        interactionMode: "default",
-      } as const;
-      yield* service.upsert({ ...bound, threadId: ThreadId.make("thread:bound") });
-      // Nor when an edit omits the thread it stays bound to.
-      yield* service.upsert(bound);
-    }).pipe(Effect.provide(layer));
-  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
-);
-
 it.effect("checks a task's destination thread only when the destination changes", () =>
   Effect.gen(function* () {
     const project = ProjectId.make("project:test");
@@ -865,7 +786,6 @@ it.effect("checks a task's destination thread only when the destination changes"
     const layer = ScheduledTaskService.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ManagedPolicy.layerTest(),
           Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
           Layer.mock(ThreadManagementService.ThreadManagementService)({
             getThreadShell: (threadId) =>
@@ -943,7 +863,6 @@ it.effect("a run interrupted right after it reserves the task does not block the
     const layer = ScheduledTaskService.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          ManagedPolicy.layerTest(),
           Layer.mock(ThreadLaunchService.ThreadLaunchService)({
             launch: () =>
               Ref.update(launches, (n) => n + 1).pipe(

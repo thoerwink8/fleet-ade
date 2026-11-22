@@ -80,14 +80,8 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { WorktreeBaseBranchPicker } from "../WorktreeBaseBranchPicker";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { ConnectionStatusDot, connectionPhaseDotClassName } from "../ConnectionStatusDot";
-import {
-  AuthOrchestrationOperateScope,
-  clampManagedRuntimeMode,
-  managedCapabilityDenial,
-} from "@t3tools/contracts";
+import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { resolvePastedPath } from "@t3tools/shared/path";
-import { useManagedPolicy } from "~/state/managedPolicy";
-import { ManagedNotice } from "../ManagedPolicy";
 import { readEnvironmentScope } from "~/state/session";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { EnvironmentRow, useEnvironmentTransportLabel } from "./EnvironmentRow";
@@ -833,9 +827,7 @@ function ScheduledTaskRow({
         <div className="flex flex-wrap items-center gap-2">
           <span>
             {scheduleLabel(task.schedule, timeZone, task.nextRunAt)} ·{" "}
-            {task.blockedByPolicy !== undefined ? (
-              task.blockedByPolicy
-            ) : !task.enabled ? (
+            {!task.enabled ? (
               "已暂停"
             ) : isWebhook ? (
               "正在监听"
@@ -1435,7 +1427,6 @@ function ScheduledTaskEditorForm({
   const upsertTask = useAtomCommand(serverEnvironment.upsertScheduledTask, {
     label: "scheduled task upsert",
   });
-  const webhookDenial = managedCapabilityDenial(useManagedPolicy(environmentId), "webhookTasks");
   const [draft, setDraft] = useState<DraftState>(() => {
     if (task) return taskToDraft(task);
     const base: DraftState = {
@@ -1593,10 +1584,7 @@ function ScheduledTaskEditorForm({
       ...(offersThreadModes ? { threadMode: draft.threadMode } : {}),
       workspaceStrategy,
       modelSelection,
-      // Tasks have no mode picker; a mode above the administrator's ceiling would fail every run.
-      runtimeMode:
-        clampManagedRuntimeMode(environment?.serverConfig?.managedPolicy, draft.runtimeMode) ??
-        draft.runtimeMode,
+      runtimeMode: draft.runtimeMode,
       interactionMode: draft.interactionMode,
       creationSource: "web",
     };
@@ -1911,26 +1899,11 @@ function ScheduledTaskEditorForm({
                   <Toggle value="once">单次</Toggle>
                 ) : null}
                 <Toggle value="interval">按间隔</Toggle>
-                <Toggle
-                  value="webhook"
-                  disabled={webhookDenial !== undefined && draft.scheduleMode !== "webhook"}
-                >
-                  收到 webhook 时
-                </Toggle>
+                <Toggle value="webhook">收到 webhook 时</Toggle>
               </ToggleGroup>
             </div>
 
-            {webhookDenial !== undefined ? (
-              <ManagedNotice>
-                {draft.scheduleMode === "webhook"
-                  ? `${webhookDenial}请将此任务改为固定时间、按间隔运行，或停用后再保存。`
-                  : webhookDenial}
-              </ManagedNotice>
-            ) : null}
-            {/* A disabled task still saves, so keep its fields reachable for fixing. */}
-            {draft.scheduleMode === "webhook" &&
-            webhookDenial !== undefined &&
-            draft.enabled ? null : draft.scheduleMode === "webhook" ? (
+            {draft.scheduleMode === "webhook" ? (
               <div className="space-y-4">
                 <WebhookEndpointField environmentId={environmentId} task={liveTask} />
                 <p className="text-xs text-muted-foreground">
@@ -2189,14 +2162,7 @@ function ScheduledTaskEditorForm({
         </DialogClose>
         <Button
           size="sm"
-          disabled={
-            !canOperate ||
-            saving ||
-            editingTaskMissing ||
-            !connected ||
-            !tasksQuery.data ||
-            (draft.enabled && draft.scheduleMode === "webhook" && webhookDenial !== undefined)
-          }
+          disabled={!canOperate || saving || editingTaskMissing || !connected || !tasksQuery.data}
           onClick={() => void submit()}
         >
           {draft.editingId ? "保存任务" : "创建任务"}

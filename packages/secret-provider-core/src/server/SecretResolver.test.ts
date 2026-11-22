@@ -185,6 +185,12 @@ describe("SecretResolver", () => {
         kind: SecretProviderKind.make("openbao"),
         label: "Vault",
       },
+      // Saved by a build that still shipped this kind.
+      [SecretProviderId.make("retired")]: {
+        kind: SecretProviderKind.make("one_password"),
+        label: "1Password",
+        config: { account: "my" },
+      },
       [SecretProviderId.make("broken")]: { kind: FAKE_KIND, label: "Broken", config: {} },
     };
     return Effect.gen(function* () {
@@ -193,11 +199,12 @@ describe("SecretResolver", () => {
       const values = yield* resolver.read([
         ref("fake://openai", SecretProviderId.make("missing")),
         ref("fake://openai", SecretProviderId.make("vault")),
+        ref("op://Private/OpenAI/credential", SecretProviderId.make("retired")),
         ref("fake://openai", SecretProviderId.make("broken")),
         ref("openai"),
       ]);
 
-      assert.deepStrictEqual(values, [undefined, undefined, undefined, undefined]);
+      assert.deepStrictEqual(values, [undefined, undefined, undefined, undefined, undefined]);
       assert.strictEqual(reads.length, 0);
     }).pipe(Effect.provide(resolverLayer(driver, () => providers)));
   });

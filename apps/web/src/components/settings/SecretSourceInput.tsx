@@ -14,7 +14,6 @@ import { useState, type ComponentProps, type ComponentType, type ReactNode } fro
 
 import { isSecretsFeatureEnabled } from "../../env";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
-import { OnePasswordIcon } from "../Icons";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../ui/button";
@@ -23,7 +22,6 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Spinner } from "../ui/spinner";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SecretInput } from "./SecretInput";
-import { classifySecretProvider } from "./SecretProviderDialog.logic";
 
 export interface SecretSource {
   readonly id: SecretProviderId;
@@ -35,6 +33,18 @@ const NO_SECRET_SOURCES: ReadonlyArray<SecretSource> = [];
 const STORED_VALUE = "__stored__";
 const decodeSecretReference = Schema.decodeUnknownOption(SecretReference);
 
+const isConfigByKind = new Map(
+  builtInSecretProviderDefinitions.definitions.map((definition) => [
+    definition.kind as string,
+    Schema.is(definition.configSchema),
+  ]),
+);
+
+/** Unknown kinds and configs that no longer decode cannot be picked; removal stays available. */
+function isSupportedSecretProvider(provider: SecretProviderConfig) {
+  return isConfigByKind.get(provider.kind)?.(provider.config) === true;
+}
+
 /** Secret providers a setting can point at; empty when the environment cannot read references. */
 export function useSecretSources(environmentId: EnvironmentId): ReadonlyArray<SecretSource> {
   const providers = useEnvironmentSettings(environmentId, (settings) => settings.secretProviders);
@@ -44,7 +54,7 @@ export function useSecretSources(environmentId: EnvironmentId): ReadonlyArray<Se
   );
   if (!isSecretsFeatureEnabled || !supported) return NO_SECRET_SOURCES;
   return (Object.entries(providers) as Array<[SecretProviderId, SecretProviderConfig]>)
-    .filter(([, config]) => classifySecretProvider(config).kind !== "unsupported")
+    .filter(([, config]) => isSupportedSecretProvider(config))
     .map(([id, config]) => ({ id, kind: config.kind, label: config.label }));
 }
 
@@ -93,7 +103,7 @@ export function SecretSourceSelect(props: {
         title={title}
       >
         <SelectValue>
-          <SourceIcon icon={value === null ? TypeIcon : known ? OnePasswordIcon : KeyRoundIcon} />
+          <SourceIcon icon={value === null ? TypeIcon : KeyRoundIcon} />
         </SelectValue>
       </SelectTrigger>
       <SelectPopup align="start" alignItemWithTrigger={false}>
@@ -102,7 +112,7 @@ export function SecretSourceSelect(props: {
         </SelectItem>
         {sources.map((source) => (
           <SelectItem key={source.id} value={source.id}>
-            <SourceLabel icon={OnePasswordIcon} label={source.label} />
+            <SourceLabel icon={KeyRoundIcon} label={source.label} />
           </SelectItem>
         ))}
         {known ? null : (

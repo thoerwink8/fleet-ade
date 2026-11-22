@@ -4,8 +4,6 @@ import {
   AuthMcpApprovalError,
   AuthMcpClientAccess,
   AuthMcpAuthorizationRequest,
-  isRuntimeModeAbove,
-  managedRuntimeModeCeilingMessage,
   parseMcpApprovalCode,
 } from "@t3tools/contracts";
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
@@ -152,11 +150,7 @@ export function McpConsent({
   const access =
     requireLevelChoice && requestedAccess === null
       ? null
-      : resolveMcpAccess(
-          requestedAccess,
-          loaded.status === "ready" ? loaded.details.runtimeModeCeiling : undefined,
-          pairingCode.trim().length > 0,
-        );
+      : resolveMcpAccess(requestedAccess, pairingCode.trim().length > 0);
   const [errorMessage, setErrorMessage] = useState("");
   const [pending, setPending] = useState<"approve" | "deny" | null>(null);
 
@@ -333,12 +327,7 @@ export function McpConsent({
               onValueChange={(value) => setAccess(value as AuthMcpClientAccess)}
             >
               {AuthMcpClientAccess.literals.map((option) => (
-                <AccessOption
-                  key={option}
-                  access={option}
-                  selected={option === access}
-                  disabledReason={ceilingReason(details, option)}
-                />
+                <AccessOption key={option} access={option} selected={option === access} />
               ))}
             </RadioGroup>
             <p className="text-xs text-muted-foreground">
@@ -386,16 +375,6 @@ function ConnectAgentHeading({
   return <StandalonePageHeader context="智能体登录" title={title} description={description} />;
 }
 
-/** Why a managed policy keeps `access` from being granted, or undefined when it may be. */
-function ceilingReason(details: AuthMcpApprovalDetails, access: AuthMcpClientAccess) {
-  const ceiling = details.runtimeModeCeiling;
-  return ceiling === undefined ||
-    access === "read-only" ||
-    !isRuntimeModeAbove(access, ceiling.maxRuntimeMode)
-    ? undefined
-    : managedRuntimeModeCeilingMessage(ceiling.organization, ceiling.maxRuntimeMode);
-}
-
 /** One access level in a radio group; `description` replaces the level's own, null hides it. */
 export function AccessOption({
   access,
@@ -405,7 +384,7 @@ export function AccessOption({
 }: {
   readonly access: AuthMcpClientAccess;
   readonly selected: boolean;
-  readonly disabledReason: string | undefined;
+  readonly disabledReason?: string | undefined;
   readonly description?: string | null;
 }) {
   const { label, icon: Icon } = accessConfig[access];

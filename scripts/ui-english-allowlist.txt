@@ -77,8 +77,6 @@ OpenRouter
 # 产品名
 Open VSX
 # 产品名
-1Password
-# 产品名
 Antigravity
 # 本机网关产品名
 magpie

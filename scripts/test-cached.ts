@@ -83,7 +83,7 @@ const cacheRoot =
 interface TaskSummary {
   task_name: string;
   result: {
-    CacheHit?: { source: string; saved_duration_ms: number };
+    CacheHit?: { saved_duration_ms: number };
     Spawned?: { outcome: { Success?: unknown } };
   };
 }
@@ -172,7 +172,6 @@ if (verifyHits > 0) {
     }
   }
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const remote = hits.filter((task) => task.result.CacheHit?.source === "Remote").length;
     const savedMs = hits.reduce(
       (total, task) => total + (task.result.CacheHit?.saved_duration_ms ?? 0),
       0,
@@ -180,7 +179,7 @@ if (verifyHits > 0) {
     NodeFS.appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
       `### Server test cache (${values.shard || "unsharded"})\n\n` +
-        `${files.length} files selected; ${hits.length} hits (${remote} remote); ${(savedMs / 1000).toFixed(1)}s task runtime avoided; ${(cacheRunMs / 1000).toFixed(1)}s elapsed.\n\n` +
+        `${files.length} files selected; ${hits.length} hits; ${(savedMs / 1000).toFixed(1)}s task runtime avoided; ${(cacheRunMs / 1000).toFixed(1)}s elapsed.\n\n` +
         `${verification.length} cached results re-executed without cache; ${verification.filter((audit) => audit.exitCode !== 0).length} verification failures.\n`,
     );
   }

@@ -322,6 +322,18 @@ describe("server ownership", () => {
       );
       const remaining = yield* ServerRuntimeState.readPersistedServerRuntimeState(statePath);
       assert.equal(Option.getOrThrow(remaining).ownerId, "other-owner");
+      // A record from a build that still wrote the retired managedPolicy key reads the same.
+      yield* fs.writeFileString(
+        statePath,
+        JSON.stringify({
+          ...Option.getOrThrow(remaining),
+          managedPolicy: { source: "/etc/t3code/policy.json", organization: "Example Corp" },
+        }),
+      );
+      assert.deepEqual(
+        yield* ServerRuntimeState.readPersistedServerRuntimeState(statePath),
+        remaining,
+      );
     }).pipe(Effect.provide(layerOwnership)),
   );
 

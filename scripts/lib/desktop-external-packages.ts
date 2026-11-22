@@ -3,8 +3,6 @@ const DESKTOP_RUNTIME_EXTERNAL_PREFIXES = [
   "@napi-rs/keyring",
   "@clerk/electron-passkeys",
   "electron-webauthn",
-  "ffi-rs",
-  "@yuuang/",
   // Playwright reads its runtime bundle/driver from disk; inlining cannot replace those files.
   "playwright-core",
 ] as const;

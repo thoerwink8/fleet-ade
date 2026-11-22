@@ -17,7 +17,6 @@ import {
   type EnvironmentId,
   type ProviderInstanceConfig,
   type ProviderInstanceEnvironmentVariable,
-  isManagedDriverAllowed,
 } from "@t3tools/contracts";
 import {
   OMP_ACP_BUILTIN,
@@ -32,7 +31,6 @@ import {
 
 import { cn } from "../../lib/utils";
 import { normalizeProviderAccentColor } from "../../providerInstances";
-import { managedInstanceLocks, useManagedPolicy } from "../../state/managedPolicy";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
 import { Button } from "../ui/button";
 import { ChatGptConnectionButton } from "./ChatGptConnectionButton";
@@ -68,7 +66,6 @@ import { ProviderEnvironmentSection } from "./ProviderInstanceCard";
 import { useSecretSources } from "./SecretSourceInput";
 
 const INSTANCE_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
-const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 const ACP_REGISTRY_DRIVER_KIND = ProviderDriverKind.make("acpRegistry");
 const DEFAULT_DRIVER_OPTION = providerClients.definitions[0]!;
 const DRIVER_OPTIONS = providerClients.definitions.filter(
@@ -165,19 +162,10 @@ export function AddProviderInstanceDialog({
 
   const [wizardStep, setWizardStep] = useState(0);
   const [addingChatGptAccount, setAddingChatGptAccount] = useState(false);
-  // Drivers the administrator's policy leaves out are not offered at all.
-  const managedPolicy = useManagedPolicy(environmentId);
-  const featuredDriverOptions = FEATURED_DRIVER_OPTIONS.filter((option) =>
-    isManagedDriverAllowed(managedPolicy, option.driverKind),
-  );
-  const moreDriverOptions = MORE_DRIVER_OPTIONS.filter((option) =>
-    isManagedDriverAllowed(managedPolicy, option.driverKind),
-  );
-  const acpRegistryAllowed = isManagedDriverAllowed(managedPolicy, ACP_REGISTRY_DRIVER_KIND);
   const [driver, setDriver] = useState<ProviderDriverKind>(
     () =>
-      (featuredDriverOptions[0] ?? moreDriverOptions[0])?.driverKind ??
-      (acpRegistryAllowed ? ACP_REGISTRY_DRIVER_KIND : DEFAULT_DRIVER_KIND),
+      (FEATURED_DRIVER_OPTIONS[0] ?? MORE_DRIVER_OPTIONS[0])?.driverKind ??
+      ACP_REGISTRY_DRIVER_KIND,
   );
   const [identityByDriver, setIdentityByDriver] = useState<Record<string, ProviderIdentityDraft>>(
     {},
@@ -389,9 +377,6 @@ export function AddProviderInstanceDialog({
     setHasAttemptedSubmit(false);
   };
 
-  // A policy that owns this driver's launch settings also rules out ChatGPT's own runtime.
-  const driverLocks = managedInstanceLocks(managedPolicy, driver);
-
   const handleSave = async () => {
     if (!readEnvironmentScope(environmentId, AuthProvidersManageScope)) return;
     if (isSaving || createdInstanceId) return;
@@ -499,7 +484,7 @@ export function AddProviderInstanceDialog({
                   提供方
                 </div>
                 <ProviderOptionGrid
-                  options={featuredDriverOptions}
+                  options={FEATURED_DRIVER_OPTIONS}
                   value={driver}
                   disabled={isPreparingRegistryAgent}
                   onValueChange={selectDriver}
@@ -508,7 +493,7 @@ export function AddProviderInstanceDialog({
                 <MultipleAccountsNote environmentId={environmentId} driver={driver} />
               </div>
 
-              {wizardStep === 0 && (moreDriverOptions.length > 0 || acpRegistryAllowed) ? (
+              {wizardStep === 0 ? (
                 <Collapsible open={showMoreProviders} onOpenChange={setShowMoreProviders}>
                   <div className="flex pt-2">
                     <CollapsibleTrigger render={<Button variant="ghost-muted" size="xs" />}>
@@ -523,20 +508,18 @@ export function AddProviderInstanceDialog({
                   <CollapsiblePanel animate={false}>
                     <div className="space-y-4 pt-4">
                       <ProviderOptionGrid
-                        options={moreDriverOptions}
+                        options={MORE_DRIVER_OPTIONS}
                         value={driver}
                         disabled={isPreparingRegistryAgent}
                         onValueChange={selectDriver}
                         aria-label="更多提供方"
                       />
-                      {!acpRegistryAllowed ? null : (
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <div aria-hidden className="flex-1 border-t border-border/70" />
-                          <span>或从 ACP Registry 中选择</span>
-                          <div aria-hidden className="flex-1 border-t border-border/70" />
-                        </div>
-                      )}
-                      {!acpRegistryAllowed ? null : isAcpRegistry && isManualAcpConfiguration ? (
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div aria-hidden className="flex-1 border-t border-border/70" />
+                        <span>或从 ACP Registry 中选择</span>
+                        <div aria-hidden className="flex-1 border-t border-border/70" />
+                      </div>
+                      {isAcpRegistry && isManualAcpConfiguration ? (
                         <div className="grid gap-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -718,9 +701,6 @@ export function AddProviderInstanceDialog({
                     idPrefix={`add-provider-${driver}`}
                     variant="settings"
                     onChange={setConfigDraft}
-                    managed={
-                      driverLocks && { keys: driverLocks.configKeys, reason: driverLocks.reason }
-                    }
                     environmentId={environmentId}
                   />
                 </SettingsGroup>
@@ -753,12 +733,10 @@ export function AddProviderInstanceDialog({
                   <Button variant="outline" size="sm" onClick={() => navigateToStep(1)}>
                     手动配置
                   </Button>
-                  {driverLocks?.configKeys.has("setupMode") ? null : (
-                    <ChatGptConnectionButton
-                      size="sm"
-                      onClick={() => setAddingChatGptAccount(true)}
-                    />
-                  )}
+                  <ChatGptConnectionButton
+                    size="sm"
+                    onClick={() => setAddingChatGptAccount(true)}
+                  />
                 </>
               ) : wizardStep < (isAcpRegistry ? 1 : 2) ? (
                 <Button

@@ -176,7 +176,6 @@
   "src/textGeneration/CodexTextGeneration.test.ts": 1,
   "src/textGeneration/GrokTextGeneration.test.ts": 0.5,
   "src/textGeneration/ThreadTitleLinks.test.ts": 0.5,
-  "src/triage/triageSession.test.ts": 0.5,
   "src/usage/UsageLimitSources.test.ts": 0.6,
   "src/usage/UsageService.test.ts": 2.2,
   "src/usage/cliproxyApi.test.ts": 0.5,

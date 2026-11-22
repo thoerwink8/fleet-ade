@@ -1327,11 +1327,11 @@ export const ServerSettings = Schema.Struct({
   guestSharingEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** Retired link toggle; retained so stored settings decode, but ignored. */
   linkedEnvironmentsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  /** Retired Labs switches; kept for deployed policy files and stored settings, but ignored. */
+  /** Retired Labs switches; kept so stored settings decode, but ignored. */
   fastWorktreeCheckout: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   // Retired device host toggle remains only for old settings decoding.
   simlockDeviceHostsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
-  /** Legacy client sidebar settings; retained here only for policy-file compatibility. */
+  /** Legacy client sidebar settings; retained here only so stored settings decode. */
   boringSidebarEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   boringSidebarMultilineRows: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
@@ -1371,7 +1371,7 @@ export const ServerSettings = Schema.Struct({
   maxConcurrentSessions: Schema.NullOr(MaxConcurrentSessions).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
-  /** Pinned on. Decoded for stored settings and policy compatibility; the stored value is ignored. */
+  /** Pinned on. Decoded for stored settings; the stored value is ignored. */
   promptSuggestionsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   sidebarAutoSettleKeepPullRequests: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
@@ -1652,14 +1652,8 @@ export const ServerSettingsOperation = Schema.Literals([
   "write-secret-provider",
   "write-file",
   "prepare-directory",
-  "write-managed-setting",
-  "use-disallowed-provider",
 ]);
 export type ServerSettingsOperation = typeof ServerSettingsOperation.Type;
-
-/** Why a provider the administrator's policy leaves out cannot be used. */
-export const disallowedProviderMessage = (organization: string | undefined, label: string) =>
-  `${organization === undefined ? "你的组织" : organization} 的策略不允许使用 ${label} 提供方。`;
 
 export class ServerSettingsError extends Schema.TaggedError<ServerSettingsError>()(
   "ServerSettingsError",
@@ -1668,24 +1662,10 @@ export class ServerSettingsError extends Schema.TaggedError<ServerSettingsError>
     operation: ServerSettingsOperation,
     providerInstanceId: Schema.optional(Schema.String),
     environmentVariable: Schema.optional(Schema.String),
-    /** For `write-managed-setting`: the locked dot path and who manages it. */
-    managedSetting: Schema.optional(Schema.String),
-    managedBy: Schema.optional(Schema.String),
-    /** For `use-disallowed-provider`: the provider's name as users know it. */
-    providerLabel: Schema.optional(Schema.String),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
   override get message(): string {
-    if (this.operation === "write-managed-setting") {
-      return `${this.managedSetting ?? "This setting"} is managed by ${this.managedBy ?? "your organization"} and cannot be changed.`;
-    }
-    if (this.operation === "use-disallowed-provider") {
-      return disallowedProviderMessage(
-        this.managedBy,
-        this.providerLabel ?? this.providerInstanceId ?? "this",
-      );
-    }
     const provider =
       this.providerInstanceId === undefined ? "" : ` for provider ${this.providerInstanceId}`;
     const variable =

@@ -84,48 +84,6 @@ describe("collectServerUpdateTargets", () => {
       ["manual", "需要手动更新"],
     ]);
   });
-
-  it("skips servers whose policy refuses the update, with the policy's message", () => {
-    const managed = (
-      id: string,
-      updates: { mode: "off" } | { mode: "auto"; allowNightly: false },
-      selfUpdate: "boot-service" | "desktop-managed" = "boot-service",
-    ) => {
-      const base = machine(id, "0.0.40", selfUpdate);
-      return {
-        ...base,
-        serverConfig: {
-          ...base.serverConfig!,
-          managedPolicy: { organization: "Example Corp", lockedSettings: [], limits: { updates } },
-        },
-      };
-    };
-    const machines = [
-      managed("off", { mode: "off" }),
-      managed("no-nightly", { mode: "auto", allowNightly: false }),
-      // A desktop app updates from its own feed, whatever track this app is on.
-      managed("desktop-no-nightly", { mode: "auto", allowNightly: false }, "desktop-managed"),
-    ];
-
-    expect(
-      collectServerUpdateTargets(machines, "0.0.50").skipped.map((entry) => [
-        entry.label,
-        entry.reason,
-      ]),
-    ).toEqual([["off", "Example Corp 管理 T3 Code 的更新。"]]);
-    expect(
-      collectServerUpdateTargets(
-        machines.map((entry) => ({
-          ...entry,
-          serverConfig: {
-            ...entry.serverConfig,
-            environment: { ...entry.serverConfig.environment, serverVersion: "0.0.49-nightly.1" },
-          },
-        })),
-        "0.0.50-nightly.20261028.1",
-      ).skipped.map((entry) => entry.label),
-    ).toEqual(["off", "no-nightly"]);
-  });
 });
 
 describe("collectChannelSwitchTargets", () => {
@@ -196,18 +154,6 @@ describe("collectChannelSwitchTargets", () => {
     ]);
   });
 
-  const managedHost = (base: UpdateEverythingMachine): UpdateEverythingMachine => ({
-    ...base,
-    serverConfig: {
-      ...base.serverConfig!,
-      managedPolicy: {
-        organization: "Example Corp",
-        lockedSettings: [],
-        limits: { updates: { mode: "auto", allowNightly: false } },
-      },
-    },
-  });
-
   it("moves stable hosts to nightly only when nightly knows their database", () => {
     const nightly = { channel: "nightly" as const, version: NIGHTLY, databaseMigration: 72 };
     const { targets, skipped } = collectChannelSwitchTargets(
@@ -225,8 +171,6 @@ describe("collectChannelSwitchTargets", () => {
           },
         }),
         machine("current", NIGHTLY, "boot-service"),
-        // The server refuses a track its policy rules out, so the dialog skips it up front.
-        managedHost(host(machine("no-nightly", "0.1.2", "boot-service"), 70)),
       ],
       nightly,
     );
@@ -240,7 +184,6 @@ describe("collectChannelSwitchTargets", () => {
         `数据库包含 ${NIGHTLY} 尚不支持的更改；请继续使用 Stable，直到 Nightly 通道支持这些更改`,
       ],
       ["old-desktop", "需要更高版本的桌面应用"],
-      ["no-nightly", "Example Corp 管理 T3 Code 的更新。只能安装稳定版。"],
     ]);
   });
 });

@@ -3,8 +3,6 @@ import {
   CLI_RELEASE_BASE_URL_ENV,
   CLI_RELEASE_CHANNELS,
   cliReleaseChannelOf,
-  releaseAssetUrl,
-  updateFeedFileName,
   type CliReleaseChannel,
 } from "@t3tools/shared/cliRelease";
 import * as Console from "effect/Console";
@@ -16,7 +14,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { Argument, Command, Flag, GlobalFlag, Prompt } from "effect/cli";
-import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
+import { FetchHttpClient, HttpClient } from "effect/http";
 
 import packageJson from "../../package.json" with { type: "json" };
 import * as BootService from "../cloud/bootService.ts";
@@ -34,8 +32,6 @@ import {
   windowsShimTarget,
 } from "../cloud/pinnedRuntime.ts";
 import { compareExactServiceVersions, isExactServiceVersion } from "../cloud/serviceProtocol.ts";
-import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
-import { managedUpdateMirror, managedUpdateRefusal } from "../policy/managedUpdates.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { isProcessAlive, readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
@@ -50,8 +46,6 @@ export class CliUpdateError extends Schema.TaggedError<CliUpdateError>()("CliUpd
   }
 }
 
-const RELEASE_INDEX_TIMEOUT = Duration.seconds(30);
-
 export const resolveNewestVersion = Effect.fn("cli.update.resolve_newest")(function* (
   _channel: CliReleaseChannel,
 ) {
@@ -59,47 +53,6 @@ export const resolveNewestVersion = Effect.fn("cli.update.resolve_newest")(funct
     reason:
       "This build does not look up a public release. Pass a version and set T3CODE_RELEASE_BASE_URL.",
   });
-});
-
-/** The version an update mirror's feed file for this platform offers on `channel`. */
-export const resolveMirrorVersion = Effect.fn("cli.update.resolve_mirror")(function* (
-  mirror: { readonly organization: string; readonly feedUrl: string },
-  channel: CliReleaseChannel,
-) {
-  if (channel === "preview") {
-    return yield* new CliUpdateError({
-      reason: `${mirror.organization}'s update mirror has no preview builds.`,
-    });
-  }
-  const httpClient = yield* HttpClient.HttpClient;
-  const fileName = updateFeedFileName(
-    channel === "nightly" ? "nightly" : "latest",
-    yield* HostProcess.Platform,
-    yield* HostProcess.Architecture,
-  );
-  const url = releaseAssetUrl(mirror.feedUrl, fileName);
-  // Not the URL, whose query can hold the mirror's access token.
-  const unreadable = new CliUpdateError({
-    reason: `Could not read ${fileName} from ${mirror.organization}'s update mirror.`,
-  });
-  const body = yield* httpClient.get(url).pipe(
-    Effect.flatMap(HttpClientResponse.filterStatusOk),
-    Effect.flatMap((response) => response.text),
-    Effect.mapError(() => unreadable),
-    Effect.timeoutOrElse({
-      duration: RELEASE_INDEX_TIMEOUT,
-      orElse: () => Effect.fail(unreadable),
-    }),
-  );
-  const version = /^version:\s*["']?([^"'\s]+)/m.exec(body)?.[1];
-  if (
-    version === undefined ||
-    !isExactServiceVersion(version) ||
-    cliReleaseChannelOf(version) !== channel
-  ) {
-    return yield* unreadable;
-  }
-  return version;
 });
 
 /**
@@ -233,12 +186,7 @@ export const updateCommand = Command.make("update", {
         assumeYes: flags.yes,
       }).pipe(
         Effect.provide(
-          Layer.mergeAll(
-            CliService.layer(config),
-            ProcessRunner.layer,
-            FetchHttpClient.layer,
-            ManagedPolicy.layer,
-          ),
+          Layer.mergeAll(CliService.layer(config), ProcessRunner.layer, FetchHttpClient.layer),
         ),
       );
     }),
@@ -305,18 +253,9 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   const environment = yield* HostProcess.Environment;
   const httpClient = yield* HttpClient.HttpClient;
   const service = yield* BootService.BootService;
-  const policy = yield* ManagedPolicy.ManagedPolicy;
-  const mirror = managedUpdateMirror(policy.document);
 
   const currentVersion = packageJson.version;
   const channel = input.channel ?? cliReleaseChannelOf(currentVersion);
-  const refusal = managedUpdateRefusal(
-    policy.document,
-    input.requestedVersion === undefined ? channel : cliReleaseChannelOf(input.requestedVersion),
-  );
-  if (refusal !== undefined) {
-    return yield* new CliUpdateError({ reason: refusal });
-  }
   if (input.requestedVersion !== undefined && !isExactServiceVersion(input.requestedVersion)) {
     return yield* new CliUpdateError({
       reason: `'${input.requestedVersion}' is not an exact t3 version.`,
@@ -327,9 +266,7 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
   const targetVersion = yield* (
     input.requestedVersion !== undefined
       ? Effect.succeed(input.requestedVersion)
-      : mirror === undefined
-        ? resolveNewestVersion(channel)
-        : resolveMirrorVersion(mirror, channel)
+      : resolveNewestVersion(channel)
   ).pipe(Effect.ensuring(Effect.sync(progress.finish)));
   const targetChannel = cliReleaseChannelOf(targetVersion);
 
@@ -444,8 +381,7 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     httpClient,
     platform,
     arch,
-    releaseBaseUrl: mirror?.feedUrl ?? (environment[CLI_RELEASE_BASE_URL_ENV]?.trim() || undefined),
-    requirePublishedRelease: mirror !== undefined,
+    releaseBaseUrl: environment[CLI_RELEASE_BASE_URL_ENV]?.trim() || undefined,
     validate: (paths) =>
       runner
         .run({
@@ -474,10 +410,7 @@ export const runUpdate = Effect.fn("cli.update.run")(function* (input: {
     Effect.catchIf(isUnpublishedRelease, () =>
       Effect.fail(
         new CliUpdateError({
-          reason:
-            mirror === undefined
-              ? `No release archive was published for t3@${targetVersion}.`
-              : `${mirror.organization}'s update mirror has no t3@${targetVersion} for this machine.`,
+          reason: `No release archive was published for t3@${targetVersion}.`,
         }),
       ),
     ),
