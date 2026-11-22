@@ -1,5 +1,5 @@
 import { workspaceAreaProps } from "../lib/workspaceFocus";
-import { Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
+import { Link, Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { RotateCcwIcon } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -20,11 +20,11 @@ import {
   retainSettingsScope,
   validateSettingsRouteSearch,
 } from "../components/settings/settingsScopeNavigation";
+import { resolveSettingsPath } from "../components/settings/settingsPath.logic";
 import {
   getSettingsSearchTargetScope,
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
-  movedSettingsRedirect,
 } from "../components/settings/settingsSearch";
 
 function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void }) {
@@ -46,6 +46,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
   const { scope, connectedEnvironments } = useSettingsScope();
   const { environments } = useEnvironments();
   const hash = useLocation({ select: (location) => location.hash });
+  if (resolveSettingsPath(pathname, hash).kind === "missing") return children;
   const searchTarget = getSettingsSearchTargetScope(hash);
   const autoSettlementAvailability = searchTarget?.requiresThreadAutoSettlement
     ? getThreadAutoSettlementSearchAvailability(environments, scope)
@@ -110,6 +111,20 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
     );
   }
   return children;
+}
+
+function SettingsPathMissingView() {
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center p-6">
+      <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+        <h1 className="text-lg font-medium text-foreground">页面不存在</h1>
+        <p className="text-sm text-muted-foreground">
+          这个地址不是设置里的页面。返回设置首页继续。
+        </p>
+        <Button render={<Link to="/settings/general" replace />}>返回设置首页</Button>
+      </div>
+    </div>
+  );
 }
 
 function SettingsContentLayout() {
@@ -180,12 +195,16 @@ function SettingsRouteLayout() {
 export const Route = createFileRoute("/_chat/settings")({
   validateSearch: validateSettingsRouteSearch,
   search: { middlewares: [retainSettingsScope] },
-  beforeLoad: async ({ location }) => {
-    if (location.pathname === "/settings") {
-      throw redirect({ to: "/settings/general", replace: true });
-    }
-    const moved = movedSettingsRedirect(location.pathname, location.hash);
-    if (moved) throw redirect({ ...moved, search: true, replace: true });
+  beforeLoad: ({ location }) => {
+    const decision = resolveSettingsPath(location.pathname, location.hash);
+    if (decision.kind !== "redirect") return;
+    throw redirect({
+      to: decision.to,
+      ...(decision.hash ? { hash: decision.hash } : {}),
+      ...(decision.retainSearch ? { search: true } : {}),
+      replace: true,
+    });
   },
+  notFoundComponent: SettingsPathMissingView,
   component: SettingsRouteLayout,
 });
