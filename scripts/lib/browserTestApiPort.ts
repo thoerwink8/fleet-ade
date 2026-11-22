@@ -11,11 +11,7 @@ export interface PortRange {
   readonly end: number;
 }
 
-// Hyper-V carves exclusions from the default dynamic range. Its 100-port
-// blocks move on each boot, so a missed netsh read cannot know them.
-export const COMMON_WINDOWS_EXCLUDED_PORT_RANGES: readonly PortRange[] = [
-  { start: 49_152, end: 65_535 },
-];
+export type IpVersion = "ipv4" | "ipv6";
 
 export interface NetshSpawn {
   (
@@ -29,7 +25,7 @@ export interface NetshSpawn {
   ): Uint8Array;
 }
 
-const NETSH_ARGS = ["int", "ipv4", "show", "excludedportrange", "protocol=tcp"] as const;
+const IP_VERSIONS = ["ipv4", "ipv6"] as const satisfies readonly IpVersion[];
 const SEPARATOR = /-{5,}/;
 const PORT_LINE = /^\s*(\d+)\s+(\d+)\b/;
 
@@ -63,24 +59,35 @@ export function parseNetshExcludedPortRanges(text: string): readonly PortRange[]
 }
 
 export function excludedPortRangesForPlatform(
+  runningTests: boolean,
   platform: NodeJS.Platform,
-  readNetsh: () => string | null,
+  readNetsh: (ipVersion: IpVersion) => string | null,
 ): readonly PortRange[] {
-  if (platform !== "win32") return [];
-  const text = readNetsh();
-  if (text === null) return COMMON_WINDOWS_EXCLUDED_PORT_RANGES;
-  return parseNetshExcludedPortRanges(text) ?? COMMON_WINDOWS_EXCLUDED_PORT_RANGES;
+  if (!runningTests || platform !== "win32") return [];
+  const ranges: PortRange[] = [];
+  for (const ipVersion of IP_VERSIONS) {
+    const text = readNetsh(ipVersion);
+    if (text === null) continue;
+    const parsed = parseNetshExcludedPortRanges(text);
+    if (parsed === null) continue;
+    ranges.push(...parsed);
+  }
+  // 20000-23999 sits below the dynamic port range, so a missed netsh listing has no known block to skip.
+  return mergeRanges(ranges);
 }
 
-export function readNetshExcludedPortText(exec: NetshSpawn = defaultNetshExec): string | null {
+export function readNetshExcludedPortText(
+  ipVersion: IpVersion,
+  exec: NetshSpawn = defaultNetshExec,
+): string | null {
   const root = process.env.SystemRoot || "C:\\Windows";
   try {
     return decodeNetshOutput(
-      exec(`${root}\\System32\\netsh.exe`, NETSH_ARGS, {
-        encoding: "buffer",
-        windowsHide: true,
-        timeout: 3_000,
-      }),
+      exec(
+        `${root}\\System32\\netsh.exe`,
+        ["int", ipVersion, "show", "excludedportrange", "protocol=tcp"],
+        { encoding: "buffer", windowsHide: true, timeout: 3_000 },
+      ),
     );
   } catch {
     return null;

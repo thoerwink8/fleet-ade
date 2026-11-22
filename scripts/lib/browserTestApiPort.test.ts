@@ -3,11 +3,11 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   BROWSER_TEST_API_PORT_BASE,
   BROWSER_TEST_API_PORT_SPAN,
-  COMMON_WINDOWS_EXCLUDED_PORT_RANGES,
   excludedPortRangesForPlatform,
   parseNetshExcludedPortRanges,
   pickBrowserTestApiPort,
   readNetshExcludedPortText,
+  type IpVersion,
   type NetshSpawn,
 } from "./browserTestApiPort.ts";
 
@@ -33,7 +33,6 @@ describe("pickBrowserTestApiPort", () => {
     for (const hash of [0, 1, 1_510, 3_999, 4_000, 61_510, -1]) {
       const hashed = BROWSER_TEST_API_PORT_BASE + ((hash >>> 0) % BROWSER_TEST_API_PORT_SPAN);
       expect(pickBrowserTestApiPort(hash, [])).toBe(hashed);
-      expect(pickBrowserTestApiPort(hash, COMMON_WINDOWS_EXCLUDED_PORT_RANGES)).toBe(hashed);
     }
   });
 
@@ -81,68 +80,116 @@ describe("parseNetshExcludedPortRanges", () => {
   });
 });
 
+const IPV4_TABLE = `
+Protocol tcp Port Exclusion Ranges
+
+Start Port    End Port
+----------    --------
+    21482       21581
+`;
+
+const IPV6_TABLE = `
+Protocol tcp Port Exclusion Ranges
+
+Start Port    End Port
+----------    --------
+    21570       21620
+    23000       23010
+`;
+
 describe("excludedPortRangesForPlatform", () => {
   it("leaves non-Windows ports on the hash alone", () => {
     let reads = 0;
+    const read = () => {
+      reads += 1;
+      return NETSH_TABLE;
+    };
+    expect(excludedPortRangesForPlatform(true, "linux", read)).toEqual([]);
+    expect(excludedPortRangesForPlatform(true, "darwin", read)).toEqual([]);
+    expect(reads).toBe(0);
+  });
+
+  it("does not read netsh outside a test run", () => {
+    let reads = 0;
     expect(
-      excludedPortRangesForPlatform("linux", () => {
+      excludedPortRangesForPlatform(false, "win32", () => {
         reads += 1;
-        return null;
-      }),
-    ).toEqual([]);
-    expect(
-      excludedPortRangesForPlatform("darwin", () => {
-        reads += 1;
-        return NETSH_TABLE;
+        return IPV6_TABLE;
       }),
     ).toEqual([]);
     expect(reads).toBe(0);
   });
 
-  it("uses the netsh table on Windows and the common range when that read fails", () => {
-    expect(excludedPortRangesForPlatform("win32", () => NETSH_TABLE)).toEqual([
-      { start: 5_357, end: 5_357 },
-      { start: 61_482, end: 61_581 },
-      { start: 50_000, end: 50_059 },
+  it("unions ipv4 and ipv6 tables, and skips nothing when a listing is missing", () => {
+    const read = (ipVersion: IpVersion) => (ipVersion === "ipv4" ? IPV4_TABLE : IPV6_TABLE);
+    expect(excludedPortRangesForPlatform(true, "win32", read)).toEqual([
+      { start: 21_482, end: 21_620 },
+      { start: 23_000, end: 23_010 },
     ]);
-    expect(excludedPortRangesForPlatform("win32", () => null)).toBe(
-      COMMON_WINDOWS_EXCLUDED_PORT_RANGES,
+    expect(pickBrowserTestApiPort(1_510, excludedPortRangesForPlatform(true, "win32", read))).toBe(
+      21_621,
     );
-    expect(excludedPortRangesForPlatform("win32", () => "not a netsh table")).toBe(
-      COMMON_WINDOWS_EXCLUDED_PORT_RANGES,
+    const ipv6Only = excludedPortRangesForPlatform(true, "win32", (ipVersion) =>
+      ipVersion === "ipv6" ? IPV6_TABLE : null,
     );
+    expect(ipv6Only).toEqual([
+      { start: 21_570, end: 21_620 },
+      { start: 23_000, end: 23_010 },
+    ]);
+    expect(pickBrowserTestApiPort(1_570, ipv6Only)).toBe(21_621);
+    expect(excludedPortRangesForPlatform(true, "win32", () => null)).toEqual([]);
+    expect(excludedPortRangesForPlatform(true, "win32", () => "not a netsh table")).toEqual([]);
   });
 });
 
 describe("readNetshExcludedPortText", () => {
-  it("runs netsh hidden and decodes a utf-16 listing", () => {
-    let seen:
-      | { file: string; args: readonly string[]; windowsHide: boolean; timeout: number }
-      | undefined;
+  it("reads ipv4 and ipv6 hidden and decodes a utf-16 listing", () => {
+    const seen: Array<{
+      file: string;
+      args: readonly string[];
+      windowsHide: boolean;
+      timeout: number;
+    }> = [];
     const exec: NetshSpawn = (file, args, options) => {
-      seen = { file, args, windowsHide: options.windowsHide, timeout: options.timeout };
-      return Buffer.from(NETSH_TABLE, "utf16le");
+      seen.push({ file, args, windowsHide: options.windowsHide, timeout: options.timeout });
+      const table = args[1] === "ipv6" ? IPV6_TABLE : IPV4_TABLE;
+      return Buffer.from(table, "utf16le");
     };
 
-    expect(readNetshExcludedPortText(exec)).toContain("61482");
+    expect(
+      excludedPortRangesForPlatform(true, "win32", (ipVersion) =>
+        readNetshExcludedPortText(ipVersion, exec),
+      ),
+    ).toEqual([
+      { start: 21_482, end: 21_620 },
+      { start: 23_000, end: 23_010 },
+    ]);
     const root = process.env.SystemRoot || "C:\\Windows";
-    expect(seen).toEqual({
-      file: `${root}\\System32\\netsh.exe`,
-      args: ["int", "ipv4", "show", "excludedportrange", "protocol=tcp"],
-      windowsHide: true,
-      timeout: 3_000,
-    });
+    expect(seen).toEqual([
+      {
+        file: `${root}\\System32\\netsh.exe`,
+        args: ["int", "ipv4", "show", "excludedportrange", "protocol=tcp"],
+        windowsHide: true,
+        timeout: 3_000,
+      },
+      {
+        file: `${root}\\System32\\netsh.exe`,
+        args: ["int", "ipv6", "show", "excludedportrange", "protocol=tcp"],
+        windowsHide: true,
+        timeout: 3_000,
+      },
+    ]);
   });
 
   it("returns null when netsh fails, and strips a utf-16 BOM", () => {
     const failing: NetshSpawn = () => {
       throw new Error("ENOENT");
     };
-    expect(readNetshExcludedPortText(failing)).toBeNull();
+    expect(readNetshExcludedPortText("ipv4", failing)).toBeNull();
 
     const bom = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(NETSH_TABLE, "utf16le")]);
     const exec: NetshSpawn = () => bom;
-    expect(parseNetshExcludedPortRanges(readNetshExcludedPortText(exec) ?? "")).toEqual([
+    expect(parseNetshExcludedPortRanges(readNetshExcludedPortText("ipv6", exec) ?? "")).toEqual([
       { start: 5_357, end: 5_357 },
       { start: 61_482, end: 61_581 },
       { start: 50_000, end: 50_059 },

@@ -104,11 +104,15 @@ const unitTestProject = {
   },
 } satisfies TestProjectInlineConfiguration;
 
-// Spread checkouts across 20000-23999. pick skips Windows exclusions; strictPort
-// still only moves when the port is already taken.
+// Spread checkouts across 20000-23999. netsh runs only while Vitest loads this file;
+// strictPort still only moves when the port is already taken.
 const browserTestApiPort = pickBrowserTestApiPort(
   Hash.string(import.meta.dirname),
-  excludedPortRangesForPlatform(HostProcess.Platform.defaultValue(), readNetshExcludedPortText),
+  excludedPortRangesForPlatform(
+    process.env.VITEST === "true",
+    HostProcess.Platform.defaultValue(),
+    readNetshExcludedPortText,
+  ),
 );
 
 const browserTestProject = {
