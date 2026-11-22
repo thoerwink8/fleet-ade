@@ -1,0 +1,109 @@
+name: Desktop Windows
+
+# Unsigned Windows x64 NSIS installer, uploaded as an Actions artifact.
+# No GitHub Release and no update repository, so an installed copy is not
+# offered updates from another project's releases.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Installer version. Empty uses apps/desktop/package.json.
+        required: false
+        default: ""
+        type: string
+  pull_request:
+    paths:
+      - .github/workflows/desktop-windows.yml
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: Windows x64 NSIS
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      # The desktop build compiles native/resource-monitor itself. This step
+      # only installs the host toolchain and the MSVC target that compile needs.
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # build-desktop-artifact.ts spawns `vp` for the JS bundle, the staged
+      # install, and electron-builder. pnpm installs that shim in
+      # node_modules/.bin, which the runner does not put on PATH.
+      - name: Put workspace binaries on PATH
+        run: cygpath -w "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$INPUT_VERSION" ]]; then
+            version="$INPUT_VERSION"
+          else
+            version="$(node -p "require('./apps/desktop/package.json').version")"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid installer version: $version" >&2
+            exit 1
+          fi
+          echo "Installer version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build unsigned NSIS installer
+        env:
+          BUILD_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node scripts/build-desktop-artifact.ts \
+            --platform win \
+            --target nsis \
+            --arch x64 \
+            --build-version "$BUILD_VERSION" \
+            --output-dir out
+
+      - name: List installer
+        run: ls -lh out
+
+      - name: Upload installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-windows-${{ steps.version.outputs.version }}
+          path: out/*.exe
+          if-no-files-found: error
+          retention-days: 30

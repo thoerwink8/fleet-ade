@@ -2727,6 +2727,9 @@ export const stageWindowsServerSidecar = Effect.fn("stageWindowsServerSidecar")(
     }),
     { label: "vp install --prod (server sidecar)", verbose: input.verbose },
   );
+  // Keyring is a server dependency. Windows installs it here, not in the app
+  // stage, and the loader checks beside index.js before the nested package.
+  yield* stageKeyringNativeBinaries(serverStageDir, "win", input.arch);
 
   yield* Effect.log("[desktop-artifact] Packing server.asar...");
   yield* fs.makeDirectory(path.dirname(input.asarPath), { recursive: true });
@@ -3475,7 +3478,10 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     { label: "vp install --prod", verbose: options.verbose },
   );
   yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
-  yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
+  // Keyring is a server package. Windows stages its binary in the sidecar.
+  if (options.platform !== "win") {
+    yield* stageKeyringNativeBinaries(stageAppDir, options.platform, options.arch);
+  }
 
   if (options.platform === "win" && windowsServerAsarPath) {
     yield* stageWindowsServerSidecar({
