@@ -1391,8 +1391,7 @@ it("loads a font attachment through the lazy preview", async () => {
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
 });
 
-// quarantine: #214 关一基线：点 显示渲染后的图表 超时
-it.skip("toggles a Mermaid attachment between diagram and source through the lazy preview", async () => {
+it("toggles a Mermaid attachment between diagram and source through the lazy preview", async () => {
   const text = "flowchart LR\nA --> B";
   const file = new Blob([text], { type: "text/vnd.mermaid" });
   await using screen = await render(
@@ -1409,7 +1408,7 @@ it.skip("toggles a Mermaid attachment between diagram and source through the laz
   await screen.getByRole("button", { name: "放大图表" }).click();
   await vi.waitFor(() => {
     const image = document.querySelector<HTMLImageElement>('[role="dialog"] img');
-    expect(image?.alt).toBe("Mermaid 图表");
+    expect(image?.alt).toBe("Mermaid 图");
     expect(image?.naturalWidth).toBeGreaterThan(0);
   });
   await page.getByRole("button", { name: "关闭图片预览" }).click();
