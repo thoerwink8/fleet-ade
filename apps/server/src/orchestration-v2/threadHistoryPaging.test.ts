@@ -805,49 +805,6 @@ describe("threadHistoryPaging", () => {
     ]);
   });
 
-  it("keeps user text the timeline hides and drops system injections outside the window", () => {
-    const projection = makeProjection([makeTurnStart(0, "user")]);
-    const message = (id: string, runId: string, createdBy: "user" | "agent", text: string) => ({
-      id: MessageId.make(id),
-      threadId: THREAD,
-      runId,
-      nodeId: null,
-      role: "user" as const,
-      text,
-      attachments: [],
-      streaming: false,
-      createdBy,
-      creationSource: createdBy === "user" ? ("web" as const) : ("server" as const),
-      createdAt: NOW,
-      updatedAt: NOW,
-    });
-    const full = {
-      ...projection,
-      runs: [
-        { id: "run-old", ordinal: 0, status: "completed", userMessageId: "old" },
-        { id: "run-rolled", ordinal: 1, status: "rolled_back", userMessageId: "rolled" },
-        { id: "run-cancelled", ordinal: 2, status: "cancelled", userMessageId: "cancelled" },
-        { id: "run-latest", ordinal: 3, status: "completed", userMessageId: "prompt-0" },
-      ],
-      messages: [
-        message("old", "run-old", "user", "更早的完成轮"),
-        message("rolled", "run-rolled", "user", "回退前那句"),
-        message("cancelled", "run-cancelled", "user", "取消的排队"),
-        message("injected", "run-rolled", "agent", "系统注入"),
-        message("orphan", "run-missing", "user", "窗口没带上的用户原文"),
-        message("orphan-agent", "run-missing", "agent", "窗口没带上的系统注入"),
-      ],
-    } as unknown as typeof projection;
-
-    const bounded = buildBoundedThreadProjection({ projection: full, snapshotSequence: 9 });
-
-    expect(bounded.projection.messages.map((retained) => retained.text).toSorted()).toEqual([
-      "取消的排队",
-      "回退前那句",
-      "窗口没带上的用户原文",
-    ]);
-  });
-
   it("omits historical control details that remain available from history items", () => {
     const projection = makeProjection(Array.from({ length: 200 }, (_, index) => makeRow(index)));
     const populated = {

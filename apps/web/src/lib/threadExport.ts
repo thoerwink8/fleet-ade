@@ -1,6 +1,7 @@
 import type {
   OrchestrationV2ConversationMessage,
   OrchestrationV2ProjectedTurnItem,
+  OrchestrationV2Run,
   OrchestrationV2TurnItem,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
@@ -10,8 +11,8 @@ export interface BuildThreadMarkdownInput {
   readonly projectName?: string | null | undefined;
   readonly exportedAt: Date;
   readonly items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
-  /** User text the timeline hid: a queued or cancelled insert, or a rolled-back run. */
   readonly messages?: ReadonlyArray<OrchestrationV2ConversationMessage> | undefined;
+  readonly runs?: ReadonlyArray<Pick<OrchestrationV2Run, "id" | "status">> | undefined;
   readonly truncated?: boolean | undefined;
 }
 
@@ -31,7 +32,6 @@ type UserMessageFields = {
     | undefined;
 };
 
-/** The user typed it, including a steer, a queued insert, or input from a turn that was interrupted. */
 function isExportedUserMessage(message: UserMessageFields): boolean {
   return (
     message.createdBy === "user" &&
@@ -67,10 +67,15 @@ function exportLines(input: BuildThreadMarkdownInput): ExportLine[] {
     }
   }
 
+  const queuedRunIds = new Set(
+    (input.runs ?? []).flatMap((run) => (run.status === "queued" ? [String(run.id)] : [])),
+  );
   const hidden = (input.messages ?? [])
     .filter(
       (message) =>
         message.role === "user" &&
+        message.runId !== null &&
+        queuedRunIds.has(String(message.runId)) &&
         isExportedUserMessage(message) &&
         !coveredMessageIds.has(message.id),
     )
@@ -124,6 +129,32 @@ export function buildThreadExportFilename(title: string, date: Date): string {
   return `${sanitizeThreadFilenameSegment(title)}-${formatDateCompact(date)}.md`;
 }
 
+const FENCE_LINE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
+
+// An interrupted reply can stop inside a fence, and the next heading would be read as code.
+function closeOpenCodeFence(section: string): string {
+  let open: { readonly marker: string; readonly length: number } | null = null;
+  for (const line of section.split("\n")) {
+    const match = FENCE_LINE.exec(line);
+    if (match === null) continue;
+    const token = match[2]!;
+    const marker = token[0]!;
+    if (
+      open !== null &&
+      marker === open.marker &&
+      token.length >= open.length &&
+      match[3]!.trim() === ""
+    ) {
+      open = null;
+      continue;
+    }
+    if (open === null) open = { marker, length: token.length };
+  }
+  if (open === null) return section;
+  const closer = open.marker.repeat(open.length);
+  return section.endsWith("\n") ? `${section}${closer}` : `${section}\n${closer}`;
+}
+
 export function buildThreadMarkdown(input: BuildThreadMarkdownInput): string {
   const displayTitle = input.title.trim() || "会话";
   const metaParts: string[] = [];
@@ -141,7 +172,7 @@ export function buildThreadMarkdown(input: BuildThreadMarkdownInput): string {
 
   for (const line of exportLines(input)) {
     const heading = line.role === "user" ? "你" : "助手";
-    sections.push(`## ${heading}\n\n${line.text.trimEnd()}`);
+    sections.push(closeOpenCodeFence(`## ${heading}\n\n${line.text.trimEnd()}`));
   }
 
   sections.push("> 工具调用和文件改动没有导出。");

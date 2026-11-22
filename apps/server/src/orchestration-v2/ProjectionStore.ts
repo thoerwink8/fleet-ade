@@ -4286,21 +4286,6 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                   WHERE run.thread_id = ${threadId}
                     AND run.status IN ('queued', 'preparing', 'starting', 'running', 'waiting')
                     AND message.thread_id = ${threadId}
-                  UNION
-                  -- The timeline hides these runs. Export still reads the user's own text.
-                  SELECT message.payload_json, message.created_at, message.message_id
-                  FROM orchestration_v2_projection_runs AS run
-                  INNER JOIN orchestration_v2_projection_messages AS message
-                    ON message.run_id = run.run_id
-                  WHERE run.thread_id = ${threadId}
-                    AND run.status IN ('rolled_back', 'cancelled')
-                    AND message.thread_id = ${threadId}
-                    AND message.role = 'user'
-                    AND json_extract(message.payload_json, '$.createdBy') = 'user'
-                    AND coalesce(json_extract(message.payload_json, '$.workflowScript'), 0) <> 1
-                    AND json_extract(message.payload_json, '$.idleCompaction') IS NULL
-                    AND json_extract(message.payload_json, '$.notification') IS NULL
-                    AND json_extract(message.payload_json, '$.delegatedCompletion') IS NULL
                 )
                 ORDER BY created_at ASC, message_id ASC
               `,

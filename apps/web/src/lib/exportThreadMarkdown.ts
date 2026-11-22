@@ -2,6 +2,7 @@ import { type AtomCommandSuccess, runAtomCommand } from "@t3tools/client-runtime
 import type {
   OrchestrationV2ConversationMessage,
   OrchestrationV2ProjectedTurnItem,
+  OrchestrationV2Run,
   ScopedThreadRef,
 } from "@t3tools/contracts";
 import { Atom, type AtomRegistry } from "effect/reactivity";
@@ -21,6 +22,7 @@ type HistoryPageResult = AtomCommandSuccess<
 export interface ExportThreadSnapshot {
   readonly visibleTurnItems: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
   readonly messages?: ReadonlyArray<OrchestrationV2ConversationMessage> | undefined;
+  readonly runs?: ReadonlyArray<Pick<OrchestrationV2Run, "id" | "status">> | undefined;
   readonly hasMoreHistory: boolean;
   readonly loadFailed?: true;
 }
@@ -30,6 +32,7 @@ export type LoadAllThreadHistoryOutcome =
       readonly _tag: "ready";
       readonly items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
       readonly messages: ReadonlyArray<OrchestrationV2ConversationMessage>;
+      readonly runs: ReadonlyArray<Pick<OrchestrationV2Run, "id" | "status">>;
       readonly truncated: boolean;
     }
   | { readonly _tag: "failed" };
@@ -48,6 +51,7 @@ export async function loadAllThreadHistory(input: {
         _tag: "ready",
         items: snapshot.visibleTurnItems,
         messages: snapshot.messages ?? [],
+        runs: snapshot.runs ?? [],
         truncated: false,
       };
     }
@@ -56,6 +60,7 @@ export async function loadAllThreadHistory(input: {
         _tag: "ready",
         items: snapshot.visibleTurnItems,
         messages: snapshot.messages ?? [],
+        runs: snapshot.runs ?? [],
         truncated: true,
       };
     }
@@ -67,6 +72,7 @@ export async function loadAllThreadHistory(input: {
         _tag: "ready",
         items: snapshot.visibleTurnItems,
         messages: snapshot.messages ?? [],
+        runs: snapshot.runs ?? [],
         truncated: false,
       };
     }
@@ -86,13 +92,20 @@ function exportThreadSnapshot(input: {
   if (input.history.loading) return null;
   if (input.thread === null) {
     if (input.status === "deleted" || input.error !== null) {
-      return { visibleTurnItems: [], messages: [], hasMoreHistory: false, loadFailed: true };
+      return {
+        visibleTurnItems: [],
+        messages: [],
+        runs: [],
+        hasMoreHistory: false,
+        loadFailed: true,
+      };
     }
     return null;
   }
   return {
     visibleTurnItems: input.thread.projection.visibleTurnItems,
     messages: input.thread.projection.messages,
+    runs: input.thread.projection.runs,
     hasMoreHistory: input.history.hasMoreHistory,
   };
 }
@@ -185,6 +198,7 @@ export async function exportThreadMarkdown(input: {
       exportedAt,
       items: outcome.items,
       messages: outcome.messages,
+      runs: outcome.runs,
       truncated: outcome.truncated,
     });
     const filename = buildThreadExportFilename(input.title, exportedAt);

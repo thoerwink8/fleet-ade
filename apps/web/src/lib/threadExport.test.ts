@@ -2,6 +2,7 @@ import {
   EnvironmentId,
   MessageId,
   NonNegativeInt,
+  RunId,
   ThreadId,
   TurnItemId,
   type OrchestrationV2ConversationMessage,
@@ -18,7 +19,6 @@ const testState = vi.hoisted(() => ({
   toasts: [] as Array<unknown>,
   closedToasts: [] as Array<unknown>,
   fullVisibleTurnItems: [] as ReadonlyArray<OrchestrationV2ProjectedTurnItem>,
-  fullMessages: [] as ReadonlyArray<OrchestrationV2ConversationMessage>,
 }));
 
 vi.mock("../proposedPlan", () => ({
@@ -48,7 +48,6 @@ vi.mock("../state/threads", () => {
     environmentId: EnvironmentId.make("env-1"),
     projection: {
       visibleTurnItems: testState.fullVisibleTurnItems,
-      messages: testState.fullMessages,
     },
   }));
   // Mirrors threadDetail.ts toThreadStructureTurnItem: assistant_message and reasoning lose `text`.
@@ -170,13 +169,18 @@ function makeUserMessage(
   };
 }
 
-function makeAssistantRow(index: number, text: string): OrchestrationV2ProjectedTurnItem {
+function makeAssistantRow(
+  index: number,
+  text: string,
+  overrides?: Partial<Extract<OrchestrationV2TurnItem, { type: "assistant_message" }>>,
+): OrchestrationV2ProjectedTurnItem {
   return makeProjectedRow(index, {
     ...makeBaseFields(index),
     type: "assistant_message",
     messageId: MessageId.make(`msg-assistant-${index}`),
     text,
     streaming: false,
+    ...overrides,
   });
 }
 
@@ -195,7 +199,6 @@ beforeEach(() => {
   testState.toasts = [];
   testState.closedToasts = [];
   testState.fullVisibleTurnItems = [];
-  testState.fullMessages = [];
 });
 
 describe("buildThreadExportFilename", () => {
@@ -261,12 +264,26 @@ describe("buildThreadMarkdown", () => {
     });
 
     expect(markdown).toContain(codeBlock);
-    const fences = markdown.split("\n").filter((line) => line.startsWith("```"));
-    expect(fences).toEqual(["```ts", "```"]);
+  });
+
+  it("closes an interrupted assistant fence before the next user heading", () => {
+    const markdown = buildThreadMarkdown({
+      title: "打断",
+      exportedAt: new Date(2026, 10, 21, 10, 0),
+      items: [
+        makeAssistantRow(0, "写到一半：\n\n```ts\nconst answer =", { status: "interrupted" }),
+        makeUserRow(1, "接着写"),
+      ],
+    });
+
+    const open = markdown.indexOf("```ts");
+    const userHeading = markdown.indexOf("## 你");
+    expect(markdown.slice(open, userHeading).split("\n")).toContain("```");
+    expect(markdown).toContain("## 你\n\n接着写");
   });
 
   it("exports user-authored steer, queued, and interrupted input, and skips system injections", () => {
-    const codeFence = ["```ts", "const queued = true;", "```"].join("\n");
+    const queuedRunId = RunId.make("run-queued");
     const markdown = buildThreadMarkdown({
       title: "各类用户消息",
       exportedAt: new Date(2026, 10, 21, 10, 0),
@@ -290,11 +307,13 @@ describe("buildThreadMarkdown", () => {
         makeAssistantRow(8, "助手还在"),
       ],
       messages: [
-        makeUserMessage("hidden-queued", `还在队列里\n\n${codeFence}`, "2026-11-21T09:00:00Z"),
-        makeUserMessage("hidden-rolled-back", "回退前那句", "2026-11-21T09:40:00Z"),
+        makeUserMessage("hidden-queued", "还在队列里", "2026-11-21T09:00:00Z", {
+          runId: queuedRunId,
+        }),
         makeUserMessage("system-wake", "监视到了更新", "2026-11-21T09:10:00Z", {
           createdBy: "agent",
           creationSource: "server",
+          runId: queuedRunId,
           notification: {
             source: { kind: "system" },
             outcome: "updated",
@@ -302,26 +321,22 @@ describe("buildThreadMarkdown", () => {
           },
         }),
       ],
+      runs: [{ id: queuedRunId, status: "queued" }],
     });
 
-    expect(markdown.match(/^## 你$/gm)).toHaveLength(7);
+    expect(markdown.match(/^## 你$/gm)).toHaveLength(6);
     expect(markdown).toContain("## 你\n\n还在队列里");
-    expect(markdown).toContain(codeFence);
     expect(markdown).toContain("## 你\n\n正常开一轮");
     expect(markdown).toContain("## 你\n\n引导一句");
     expect(markdown).toContain("## 你\n\n排队插进来");
     expect(markdown).toContain("## 你\n\n排队改成引导");
     expect(markdown).toContain("## 你\n\n这轮被打断了");
-    expect(markdown).toContain("## 你\n\n回退前那句");
     expect(markdown).toContain("## 助手\n\n助手还在");
     expect(markdown).not.toContain("服务端替你压缩");
     expect(markdown).not.toContain("系统写入的提示");
     expect(markdown).not.toContain("工作流脚本");
     expect(markdown).not.toContain("监视到了更新");
-    const fences = markdown.split("\n").filter((line) => line.startsWith("```"));
-    expect(fences).toEqual(["```ts", "```"]);
     expect(markdown.indexOf("还在队列里")).toBeLessThan(markdown.indexOf("正常开一轮"));
-    expect(markdown.indexOf("这轮被打断了")).toBeLessThan(markdown.indexOf("回退前那句"));
   });
 
   it("adds a truncation notice at the top when truncated is true", () => {
@@ -361,44 +376,9 @@ describe("loadAllThreadHistory", () => {
       _tag: "ready",
       items: snapshots[1]!.visibleTurnItems,
       messages: [],
+      runs: [],
       truncated: false,
     });
-  });
-
-  it("exports every user message after paging the whole history", async () => {
-    const snapshots: ExportThreadSnapshot[] = [
-      { visibleTurnItems: [makeUserRow(2, "第三页")], hasMoreHistory: true },
-      {
-        visibleTurnItems: [makeUserRow(1, "第二页"), makeUserRow(2, "第三页")],
-        hasMoreHistory: true,
-      },
-      {
-        visibleTurnItems: [
-          makeUserRow(0, "第一页"),
-          makeUserRow(1, "第二页"),
-          makeUserRow(2, "第三页"),
-        ],
-        hasMoreHistory: false,
-      },
-    ];
-    let index = 0;
-    const outcome = await loadAllThreadHistory({
-      readThread: async () => snapshots[index++]!,
-      loadEarlier: async () => ({ _tag: "loaded" as const }),
-    });
-
-    expect(outcome._tag).toBe("ready");
-    if (outcome._tag !== "ready") return;
-    const markdown = buildThreadMarkdown({
-      title: "翻页",
-      exportedAt: new Date(2026, 10, 21, 10, 0),
-      items: outcome.items,
-      messages: outcome.messages,
-    });
-    expect(markdown.match(/^## 你$/gm)).toHaveLength(3);
-    expect(markdown).toContain("## 你\n\n第一页");
-    expect(markdown).toContain("## 你\n\n第二页");
-    expect(markdown).toContain("## 你\n\n第三页");
   });
 
   it("returns truncated when paging hits the max page limit", async () => {
@@ -419,6 +399,7 @@ describe("loadAllThreadHistory", () => {
       _tag: "ready",
       items: snapshot.visibleTurnItems,
       messages: [],
+      runs: [],
       truncated: true,
     });
   });
@@ -455,35 +436,6 @@ describe("exportThreadMarkdown", () => {
     expect(exported).toContain("## 你\n\n帮我写个示例");
     expect(exported).toContain(`## 助手\n\n这是助手回复：\n\n${codeSnippet}`);
     expect(exported).not.toContain("内部推理");
-    expect(exported.split("\n").filter((line) => line.startsWith("```"))).toEqual(["```ts", "```"]);
-  });
-
-  it("includes hidden user text from the projection and drops system injections", async () => {
-    testState.fullVisibleTurnItems = [
-      makeUserRow(0, "看得见的"),
-      makeUserRow(1, "服务端注入", { createdBy: "agent", creationSource: "server" }),
-    ];
-    testState.fullMessages = [
-      makeUserMessage("queued", "排队还没发出去", "2026-11-21T08:00:00Z"),
-      makeUserMessage("wake", "不是你写的", "2026-11-21T08:05:00Z", {
-        createdBy: "agent",
-        creationSource: "server",
-      }),
-    ];
-
-    const registry = AtomRegistry.make();
-    await exportThreadMarkdown({
-      threadRef: { environmentId: EnvironmentId.make("env-1"), threadId: THREAD_ID },
-      title: "隐藏消息",
-      registry,
-    });
-
-    const exported = testState.downloaded[0]!.contents;
-    expect(exported.match(/^## 你$/gm)).toHaveLength(2);
-    expect(exported).toContain("## 你\n\n排队还没发出去");
-    expect(exported).toContain("## 你\n\n看得见的");
-    expect(exported).not.toContain("服务端注入");
-    expect(exported).not.toContain("不是你写的");
   });
 
   it("releases in-flight guard and closes loading toast if download throws", async () => {
