@@ -660,7 +660,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       }),
   );
 
-  // quarantine: #214 The runtime abort fixture uses POSIX sh, unavailable on Windows.
+  // The abort fixture depends on POSIX sh.
   effectIt.live.skipIf(hostPlatform === "win32")(
     "explains that the linux-arm64 runtime needs 4 KiB pages when it aborts on a 16 KiB kernel",
     () =>

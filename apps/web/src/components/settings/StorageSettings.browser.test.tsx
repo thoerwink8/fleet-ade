@@ -261,8 +261,7 @@ it("returns a newly enabled retention rule to off when its first save fails", as
   await expect.element(ruleSwitch(screen)).not.toBeChecked();
 });
 
-// quarantine: #214 关一基线：填写天数输入框超时
-it.skip("keeps a newer pending age open when an older first save fails", async () => {
+it("keeps a newer pending age open when an older first save fails", async () => {
   setup();
   await using screen = await render(panel());
   await userEvent.click(ruleSwitch(screen));
