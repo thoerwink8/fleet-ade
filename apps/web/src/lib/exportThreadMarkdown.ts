@@ -1,5 +1,9 @@
 import { type AtomCommandSuccess, runAtomCommand } from "@t3tools/client-runtime/state/runtime";
-import type { OrchestrationV2ProjectedTurnItem, ScopedThreadRef } from "@t3tools/contracts";
+import type {
+  OrchestrationV2ConversationMessage,
+  OrchestrationV2ProjectedTurnItem,
+  ScopedThreadRef,
+} from "@t3tools/contracts";
 import { Atom, type AtomRegistry } from "effect/reactivity";
 
 import { toastManager } from "../components/ui/toast";
@@ -16,6 +20,7 @@ type HistoryPageResult = AtomCommandSuccess<
 
 export interface ExportThreadSnapshot {
   readonly visibleTurnItems: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
+  readonly messages?: ReadonlyArray<OrchestrationV2ConversationMessage> | undefined;
   readonly hasMoreHistory: boolean;
   readonly loadFailed?: true;
 }
@@ -24,6 +29,7 @@ export type LoadAllThreadHistoryOutcome =
   | {
       readonly _tag: "ready";
       readonly items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>;
+      readonly messages: ReadonlyArray<OrchestrationV2ConversationMessage>;
       readonly truncated: boolean;
     }
   | { readonly _tag: "failed" };
@@ -38,16 +44,31 @@ export async function loadAllThreadHistory(input: {
     const snapshot = await input.readThread();
     if (snapshot.loadFailed) return { _tag: "failed" };
     if (!snapshot.hasMoreHistory) {
-      return { _tag: "ready", items: snapshot.visibleTurnItems, truncated: false };
+      return {
+        _tag: "ready",
+        items: snapshot.visibleTurnItems,
+        messages: snapshot.messages ?? [],
+        truncated: false,
+      };
     }
     if (pages >= maxPages) {
-      return { _tag: "ready", items: snapshot.visibleTurnItems, truncated: true };
+      return {
+        _tag: "ready",
+        items: snapshot.visibleTurnItems,
+        messages: snapshot.messages ?? [],
+        truncated: true,
+      };
     }
     const result = await input.loadEarlier();
     if (result._tag === "error") return { _tag: "failed" };
     // Noop means no older cursor exists; stop instead of re-reading the same snapshot.
     if (result._tag === "noop") {
-      return { _tag: "ready", items: snapshot.visibleTurnItems, truncated: false };
+      return {
+        _tag: "ready",
+        items: snapshot.visibleTurnItems,
+        messages: snapshot.messages ?? [],
+        truncated: false,
+      };
     }
   }
 }
@@ -65,12 +86,13 @@ function exportThreadSnapshot(input: {
   if (input.history.loading) return null;
   if (input.thread === null) {
     if (input.status === "deleted" || input.error !== null) {
-      return { visibleTurnItems: [], hasMoreHistory: false, loadFailed: true };
+      return { visibleTurnItems: [], messages: [], hasMoreHistory: false, loadFailed: true };
     }
     return null;
   }
   return {
     visibleTurnItems: input.thread.projection.visibleTurnItems,
+    messages: input.thread.projection.messages,
     hasMoreHistory: input.history.hasMoreHistory,
   };
 }
@@ -162,6 +184,7 @@ export async function exportThreadMarkdown(input: {
       projectName: input.projectName,
       exportedAt,
       items: outcome.items,
+      messages: outcome.messages,
       truncated: outcome.truncated,
     });
     const filename = buildThreadExportFilename(input.title, exportedAt);

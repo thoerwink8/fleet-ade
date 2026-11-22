@@ -621,13 +621,34 @@ function messagesForBoundedProjection(
     }
   }
 
+  const runById = new Map(projection.runs.map((run) => [String(run.id), run]));
+  // The timeline hides a queued or cancelled insert and every row of a rolled-back run.
+  // A windowed read can load that user text without the run, and export still needs it.
+  const isHiddenUserAuthoredMessage = (message: (typeof projection.messages)[number]) => {
+    if (
+      message.role !== "user" ||
+      message.createdBy !== "user" ||
+      message.workflowScript === true ||
+      message.idleCompaction !== undefined ||
+      message.notification !== undefined ||
+      message.delegatedCompletion !== undefined ||
+      message.runId === null
+    ) {
+      return false;
+    }
+    const run = runById.get(String(message.runId));
+    if (run === undefined) return true;
+    return run.status === "rolled_back" || run.status === "cancelled" || run.status === "queued";
+  };
+
   return projection.messages.filter(
     (message) =>
       retainedMessageIds.has(String(message.id)) ||
       (message.runId !== null && retainedRunIds.has(String(message.runId))) ||
       message.delegatedCompletion !== undefined ||
       // Keep the workflow script outside the history window; clients use it to open the coordinator thread.
-      message.workflowScript === true,
+      message.workflowScript === true ||
+      isHiddenUserAuthoredMessage(message),
   );
 }
 
