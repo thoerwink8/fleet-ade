@@ -26,8 +26,6 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
-import * as ManagedLimits from "../policy/managedLimits.ts";
-import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 
 export type CloudManagedEndpointRuntimeStatus =
   | {
@@ -140,7 +138,7 @@ const encodeHttp2Fallback = Schema.encodeSync(Http2Fallback);
 // than this, so a crash-looping connector or an offline host does not redownload
 // on every reconcile.
 const RELAY_CLIENT_INSTALL_RETRY_INTERVAL_MS = 10 * 60_000;
-export const RELAY_CLIENT_LOG_FILE = "relay-client.ndjson";
+const RELAY_CLIENT_LOG_FILE = "relay-client.ndjson";
 
 /** Preserve user-chosen PATH binaries and overrides; CLI downloads require consent. */
 function needsPinnedRelayClient(executable: RelayClient.RelayClientStatus): boolean {
@@ -212,8 +210,6 @@ export const make = Effect.gen(function* () {
   const relayClient = yield* RelayClient.RelayClient;
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   const httpClient = HttpClient.withScope(yield* HttpClient.HttpClient);
-  // Without T3 Connect no connector ever runs, whoever asks for one.
-  const connectAllowed = ManagedLimits.allowsConnect(yield* ManagedPolicy.ManagedPolicy);
   const activeRef = yield* Ref.make<ActiveConnector | null>(null);
   const desiredConfigRef = yield* Ref.make<RelayManagedEndpointRuntimeConfig | null>(null);
   const recoveryRequests = yield* Queue.sliding<RelayManagedEndpointRuntimeConfig>(1);
@@ -855,10 +851,9 @@ export const make = Effect.gen(function* () {
   });
 
   const applyConfig = Effect.fn("CloudManagedEndpointRuntime.applyConfig")(
-    (requested: RelayManagedEndpointRuntimeConfig | null) =>
+    (config: RelayManagedEndpointRuntimeConfig | null) =>
       reconcileSemaphore.withPermits(1)(
         Effect.gen(function* () {
-          const config = connectAllowed ? requested : null;
           // Keep backoff when recovery returns the same tunnel/token, or every recovery respawns a crash loop.
           const desired = yield* Ref.get(desiredConfigRef);
           const unchanged =

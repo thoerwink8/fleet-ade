@@ -31,7 +31,6 @@ import {
   type RuntimeRequestId,
   type ThreadTokenUsageSnapshot,
   type ThreadId,
-  isRuntimeModeAbove,
   type TurnTokenUsage,
 } from "@t3tools/contracts";
 import { AgentScope, AgentScopeThreadId } from "@t3tools/shared/AgentScope";
@@ -7515,26 +7514,6 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             });
           }
           const configOptions = yield* runtime.getConfigOptions;
-          // Under a policy ceiling, a mode the user picks applies only when the flavor can place
-          // it under the ceiling; an unknown mode could be the agent's own skip-approval mode.
-          const ceiling = runtimePolicy.maxRuntimeMode;
-          const isModeChoice = (id: string) =>
-            id === ACP_SESSION_MODE_OPTION_ID ||
-            configOptions.some(
-              (option) =>
-                option.id === id &&
-                (option.category === "mode" || option.category === "collaboration_mode"),
-            );
-          const withinCeiling = (selection: { readonly id: string; readonly value: unknown }) => {
-            if (ceiling === undefined || ceiling === "full-access" || !isModeChoice(selection.id)) {
-              return true;
-            }
-            const granted =
-              typeof selection.value === "string"
-                ? flavor.runtimeModeForSessionMode?.(selection.value)
-                : undefined;
-            return granted !== undefined && !isRuntimeModeAbove(granted, ceiling);
-          };
           const explicitSelections = modelSelection.options ?? [];
           const implicitSelections = unsetOptionDefaults.filter(
             (implicit) => !explicitSelections.some((selection) => selection.id === implicit.id),
@@ -7542,7 +7521,6 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const optionSelections = [...explicitSelections, ...implicitSelections].flatMap(
             (selection) => {
               if (flavor.ownedModelOptionIds?.includes(selection.id) === true) return [];
-              if (!withinCeiling(selection)) return [];
               return [
                 selection.value === ACP_EMPTY_OPTION_VALUE
                   ? { ...selection, value: "" }

@@ -1,11 +1,10 @@
 import type { EnvironmentId, SecretProviderConfig, SecretProviderId } from "@t3tools/contracts";
-import { PlusIcon } from "lucide-react";
+import { builtInSecretProviderDefinitions } from "@t3tools/secret-provider-definitions/registry";
 import { useState } from "react";
 
 import { useEnvironmentSettings, useUpdateEnvironmentSettings } from "../../hooks/useSettings";
 import type { EnvironmentPresentation } from "../../state/environments";
 import { useEnvironmentSessionState } from "../../state/session";
-import { OnePasswordIcon, type Icon } from "../Icons";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -16,23 +15,14 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-import { SecretProviderDialog } from "./SecretProviderDialog";
-import { classifySecretProvider } from "./SecretProviderDialog.logic";
 import { secretProviderUses } from "./SecretsSettings.logic";
 import {
   classifyProviderEnvironmentAccess,
   resolveRemoteOperateAccess,
 } from "./ProviderSettingsPanel.logic";
 import { useSettingsScope } from "./SettingsScopeContext";
-import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { searchableSetting } from "./settingsSearch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
-
-const SECRET_PROVIDER_KINDS: Readonly<
-  Record<string, { readonly name: string; readonly icon: Icon }>
-> = {
-  one_password: { name: "1Password", icon: OnePasswordIcon },
-};
 
 export function SecretsSettingsPanel() {
   const { scope, environment } = useSettingsScope();
@@ -86,108 +76,42 @@ function EnvironmentSecretProviders({
   const readOnly = access.kind !== "editable" || projectScoped;
   const providers = useEnvironmentSettings(environmentId, (settings) => settings.secretProviders);
   const updateSettings = useUpdateEnvironmentSettings(environmentId);
-  const [dialog, setDialog] = useState<
-    null | { readonly mode: "add" } | { readonly mode: "edit"; readonly id: SecretProviderId }
-  >(null);
   const entries = Object.entries(providers) as Array<[SecretProviderId, SecretProviderConfig]>;
-  const editingConfig = dialog?.mode === "edit" ? providers[dialog.id] : undefined;
-  const editing =
-    dialog?.mode === "edit" && editingConfig !== undefined
-      ? { id: dialog.id, config: editingConfig }
-      : undefined;
   return (
-    <>
-      <SettingsSection
-        {...searchableSetting("secret-providers")}
-        headerAction={
-          !readOnly ? (
-            <Button size="xs" variant="outline" onClick={() => setDialog({ mode: "add" })}>
-              <PlusIcon className="size-3" aria-hidden />
-              添加提供方
-            </Button>
-          ) : null
-        }
-      >
-        {projectScoped ? (
-          <p className="px-4 pt-3 text-xs text-muted-foreground">
-            这是环境级设置，请先选择一个环境再修改。
-          </p>
-        ) : null}
-        {entries.length === 0 ? (
-          <SettingsRow
-            title="尚未配置凭据提供方。"
-            description="添加一个 1Password 账户，然后将它选为提供方变量的来源。"
-          />
-        ) : (
-          entries.map(([id, config]) => {
-            const classified = classifySecretProvider(config);
-            const kind =
-              classified.kind === "unsupported"
-                ? undefined
-                : SECRET_PROVIDER_KINDS[classified.kind];
-            return (
-              <SettingsRow
-                key={id}
-                title={
-                  <span className="flex min-w-0 items-center gap-2">
-                    {kind ? (
-                      <kind.icon className="size-4.5 shrink-0 text-foreground/80" aria-hidden />
-                    ) : null}
-                    <span className="min-w-0 wrap-anywhere">{config.label}</span>
-                  </span>
-                }
-                description={
-                  classified.kind === "one_password" && kind ? (
-                    <span className="flex min-w-0 items-center gap-1">
-                      <span className="shrink-0">{kind.name} ·</span>
-                      <RedactedSensitiveText
-                        value={classified.account}
-                        ariaLabel="切换账户可见性"
-                        revealTooltip="点击显示账户"
-                        hideTooltip="点击隐藏账户"
-                        className="max-w-full truncate"
-                      />
-                    </span>
-                  ) : (
-                    `不支持的提供方（${config.kind}）`
-                  )
-                }
-                control={
-                  !readOnly ? (
-                    <div className="flex items-center gap-1">
-                      {kind ? (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => setDialog({ mode: "edit", id })}
-                        >
-                          编辑
-                        </Button>
-                      ) : null}
-                      <RemoveSecretProviderButton
-                        environmentId={environmentId}
-                        id={id}
-                        label={config.label}
-                        onConfirm={() => updateSettings({ secretProviders: { [id]: null } })}
-                      />
-                    </div>
-                  ) : null
-                }
-              />
-            );
-          })
-        )}
-      </SettingsSection>
-      {dialog !== null && !readOnly && (dialog.mode === "add" || editing !== undefined) ? (
-        <SecretProviderDialog
-          onClose={() => setDialog(null)}
-          environmentId={environmentId}
-          environmentLabel={environment.label}
-          existingIds={new Set(Object.keys(providers))}
-          {...(editing === undefined ? {} : { existing: editing })}
-        />
+    <SettingsSection {...searchableSetting("secret-providers")}>
+      {projectScoped ? (
+        <p className="px-4 pt-3 text-xs text-muted-foreground">
+          这是环境级设置，请先选择一个环境再修改。
+        </p>
       ) : null}
-    </>
+      {entries.length === 0 ? (
+        <SettingsRow
+          title="尚未配置凭据提供方。"
+          description="此版本没有可添加的凭据提供方类型。"
+        />
+      ) : (
+        entries.map(([id, config]) => (
+          <SettingsRow
+            key={id}
+            title={<span className="min-w-0 wrap-anywhere">{config.label}</span>}
+            description={
+              builtInSecretProviderDefinitions.find(config.kind)?.label ??
+              `不支持的提供方（${config.kind}）`
+            }
+            control={
+              !readOnly ? (
+                <RemoveSecretProviderButton
+                  environmentId={environmentId}
+                  id={id}
+                  label={config.label}
+                  onConfirm={() => updateSettings({ secretProviders: { [id]: null } })}
+                />
+              ) : null
+            }
+          />
+        ))
+      )}
+    </SettingsSection>
   );
 }
 

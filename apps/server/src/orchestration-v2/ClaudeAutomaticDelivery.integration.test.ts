@@ -26,7 +26,6 @@ import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
-import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
@@ -338,7 +337,6 @@ it.effect.each(deliveries)(
                   }),
                 ),
                 Layer.provide(Layer.mock(ThreadLaunchService.ThreadLaunchService)({})),
-                Layer.provide(ManagedPolicy.layerTest()),
                 Layer.provide(
                   Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
                     namedProjectsRoot: "/projects",

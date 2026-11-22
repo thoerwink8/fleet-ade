@@ -32,8 +32,6 @@ import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } fr
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
-import * as ManagedLimits from "../policy/managedLimits.ts";
-import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import { resolveBaseDir } from "../os-jank.ts";
 import {
   type PersistedServerRuntimeState,
@@ -545,11 +543,6 @@ export const pairCommand = Command.make("pair", {
       const notes: Array<string> = [];
       let pairingBaseUrl: string;
       if (flags.tailscale) {
-        // Serve stays on after this command exits, so refuse before turning it on.
-        const policy = yield* ManagedPolicy.ManagedPolicy.pipe(Effect.provide(ManagedPolicy.layer));
-        if (!ManagedLimits.allowsRemoteClients(policy)) {
-          return yield* ManagedLimits.refuseRemoteClients(policy, "因此不能开启 Tailscale Serve");
-        }
         const resolved = yield* resolveTailscalePairingBase({
           target,
           servePort: flags.tailscaleServePort,

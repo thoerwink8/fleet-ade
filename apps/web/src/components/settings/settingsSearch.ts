@@ -61,7 +61,6 @@ export interface SettingsSearchItem {
   readonly wslAvailableOnly?: boolean;
   readonly managedTunnelOnly?: boolean;
   readonly peerLinksOnly?: boolean;
-  readonly textGeneratorsOnly?: boolean;
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
 }
@@ -76,8 +75,6 @@ export interface SettingsSearchAvailability {
   readonly hasThreadAutoSettlement: boolean;
   readonly managedTunnelActive?: boolean;
   readonly hasPeerLinkHost?: boolean;
-  /** An environment without a provider allow-list, which hides text generators. */
-  readonly hasTextGeneratorsEnvironment?: boolean;
   readonly hasPrimaryEnvironment?: boolean;
 }
 
@@ -719,7 +716,6 @@ export const SETTINGS_SEARCH_ITEMS = [
       "model api api key openai openrouter anthropic ollama lm studio custom endpoint base url thread titles commit messages",
     ],
     providerSettingsOnly: true,
-    textGeneratorsOnly: true,
   },
   {
     id: "provider-health-check-interval",
@@ -965,15 +961,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "secret-providers",
     title: "凭据提供方",
     to: "/settings/secrets",
-    searchTerms: ["1password vault credentials api key"],
-    secretsFeatureOnly: true,
-  },
-  {
-    id: "secret-providers-add",
-    title: "添加凭据提供方",
-    to: "/settings/secrets",
-    targetId: "secret-providers",
-    searchTerms: ["new 1password vault op cli account"],
+    searchTerms: ["vault credentials api key"],
     secretsFeatureOnly: true,
   },
   {
@@ -1132,8 +1120,7 @@ export function filterAvailableSettingsSearchItems(
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
       (!item.managedTunnelOnly || availability.managedTunnelActive === true) &&
-      (!item.peerLinksOnly || availability.hasPeerLinkHost === true) &&
-      (!item.textGeneratorsOnly || availability.hasTextGeneratorsEnvironment === true),
+      (!item.peerLinksOnly || availability.hasPeerLinkHost === true),
   );
 }
 

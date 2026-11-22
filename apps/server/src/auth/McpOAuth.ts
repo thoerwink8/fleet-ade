@@ -17,7 +17,6 @@ import {
   EnvironmentId,
   mcpClientScopes,
   parseMcpApprovalCode,
-  type RuntimeMode,
 } from "@t3tools/contracts";
 import { encodeOAuthScope } from "@t3tools/shared/oauthScope";
 import * as Clock from "effect/Clock";
@@ -35,7 +34,6 @@ import { HttpServerRequest } from "effect/http";
 
 import { hostedAppUrlConfig } from "../cloud/publicConfig.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
-import * as ServerSettings from "../serverSettings.ts";
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import type * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
@@ -225,10 +223,6 @@ export class McpOAuth extends Context.Service<
       readonly decision: ApprovalDecision;
     }) => Effect.Effect<string, EnvironmentAuth.ServerAuthMcpApprovalCodeError | McpOAuthPageError>;
     readonly deny: (authorization: AuthorizationRequest) => string;
-    /** A managed policy's runtime-mode ceiling, shown on the approval page. */
-    readonly runtimeModeCeiling:
-      | { readonly organization: string; readonly maxRuntimeMode: RuntimeMode }
-      | undefined;
     readonly exchangeCode: (input: {
       readonly request: HttpServerRequest.HttpServerRequest;
       readonly urls: McpOAuthUrls;
@@ -263,7 +257,6 @@ const make = Effect.gen(function* () {
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
   const random = yield* SecureRandom.SecureRandom;
   const digester = yield* Digest.Digest;
-  const serverSettings = yield* ServerSettings.ServerSettingsService;
   const peerClient = yield* PeerMcpClient.PeerMcpClient;
   const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
   const signer = yield* PayloadSigner.fromSecret(
@@ -599,13 +592,7 @@ const make = Effect.gen(function* () {
     },
   );
 
-  const managedPolicy = serverSettings.managedPolicy;
-  const maxRuntimeMode = managedPolicy?.limits?.maxRuntimeMode;
   return McpOAuth.of({
-    runtimeModeCeiling:
-      managedPolicy === undefined || maxRuntimeMode === undefined
-        ? undefined
-        : { organization: managedPolicy.organization, maxRuntimeMode },
     register,
     validateAuthorization,
     approvingSession,

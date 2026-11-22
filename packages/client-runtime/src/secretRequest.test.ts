@@ -5,7 +5,7 @@ import {
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
   secretRequestAnswerInput,
@@ -15,6 +15,25 @@ import {
   secretRequestPrivacyNote,
   secretRequestSources,
 } from "./secretRequest.ts";
+
+// No kind ships, so a readable provider is a stand-in definition.
+vi.mock("@t3tools/secret-provider-definitions/registry", async () => {
+  const Schema = await import("effect/Schema");
+  const definition = {
+    kind: "test_vault",
+    label: "Test vault",
+    configSchema: Schema.Struct({}),
+    isReference: (reference: string) => reference.startsWith("ref://"),
+    referencePlaceholder: "ref://vault/item/field",
+    invalidReferenceMessage: "Use a reference like ref://vault/item/field.",
+  };
+  return {
+    builtInSecretProviderDefinitions: {
+      definitions: [definition],
+      find: (kind: string) => (kind === definition.kind ? definition : undefined),
+    },
+  };
+});
 
 describe("secretRequestDisplay", () => {
   it("never offers the form for a request inherited from another thread", () => {
@@ -90,12 +109,12 @@ describe("secretRequestFailureMessage", () => {
 });
 
 describe("secretRequestSources", () => {
-  const onePassword = SecretProviderId.make("1password");
+  const vault = SecretProviderId.make("vault");
   const providers = {
-    [onePassword]: {
-      kind: SecretProviderKind.make("one_password"),
-      label: "1Password",
-      config: { account: "my" },
+    [vault]: {
+      kind: SecretProviderKind.make("test_vault"),
+      label: "Vault",
+      config: {},
     },
     [SecretProviderId.make("later")]: {
       kind: SecretProviderKind.make("from_a_newer_build"),
@@ -106,7 +125,7 @@ describe("secretRequestSources", () => {
 
   it("offers configured providers only when the server accepts reference answers", () => {
     expect(secretRequestSources({ secretRequestReferences: true }, providers)).toMatchObject([
-      { id: onePassword, label: "1Password" },
+      { id: vault, label: "Vault" },
     ]);
     expect(secretRequestSources({}, providers)).toEqual([]);
     expect(secretRequestSources({ secretRequestReferences: true }, {})).toEqual([]);
@@ -120,11 +139,11 @@ describe("secretRequestSources", () => {
       secretRequestAnswerInput(item, {
         type: "reference",
         source,
-        reference: " op://vault/item/field ",
+        reference: " ref://vault/item/field ",
       })?.answer,
     ).toEqual({
       type: "reference",
-      reference: { provider: onePassword, reference: "op://vault/item/field" },
+      reference: { provider: vault, reference: "ref://vault/item/field" },
     });
     expect(
       secretRequestAnswerInput(item, { type: "reference", source, reference: "vault/item" }),

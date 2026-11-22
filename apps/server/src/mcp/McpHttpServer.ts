@@ -19,7 +19,6 @@ import {
 
 import packageJson from "../../package.json" with { type: "json" };
 import { parseBearerToken } from "../auth/EnvironmentAuth.ts";
-import * as ServerSettings from "../serverSettings.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as HtmlRender from "../htmlRender/HtmlRender.ts";
 import * as PullRequestWatchService from "../pullRequest/PullRequestWatchService.ts";
@@ -199,8 +198,6 @@ const withSenderThread = (
 const makeMcpAuthMiddleware = Effect.gen(function* () {
   const registry = yield* McpSessionRegistry.McpSessionRegistry;
   const clients = yield* Effect.serviceOption(McpClientAuthenticator);
-  const serverSettings = yield* ServerSettings.ServerSettingsService;
-  const runtimeModeCeiling = serverSettings.managedPolicy?.limits?.maxRuntimeMode;
   const coordinator = yield* Effect.serviceOption(ServerEnvironment.ServerEnvironment);
   const authenticateRequest = Effect.fn("McpHttpServer.authenticateRequest")(function* (
     request: HttpServerRequest.HttpServerRequest,
@@ -249,7 +246,7 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
     }
     const asked = withModeLimit(withSenderThread(invocation, request), request);
     if (asked === undefined) return invalidModeLimit;
-    return McpInvocationContext.withRuntimeModeCeiling(asked, runtimeModeCeiling);
+    return asked;
   });
   // Untraced: a span here would wrap the tool call; the HTTP server span already covers it.
   return Effect.fnUntraced(function* (httpEffect) {

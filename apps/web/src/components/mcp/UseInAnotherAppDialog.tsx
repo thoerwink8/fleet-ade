@@ -7,8 +7,6 @@ import {
   AuthRelayReadScope,
   type EnvironmentConnectReachability,
   type EnvironmentId,
-  managedCapabilityDenial,
-  managedRuntimeModeDenial,
   mcpClientScopes,
   sessionGrantsScope,
 } from "@t3tools/contracts";
@@ -36,7 +34,6 @@ import {
   useEnvironmentIdentities,
   usePrimaryEnvironmentId,
 } from "~/state/environments";
-import { useManagedPolicy } from "~/state/managedPolicy";
 import { mintMcpApprovalCodeOn } from "~/state/peerPairingCode";
 import { peerLinkEnvironment } from "~/state/peerLinks";
 import { useEnvironmentQuery } from "~/state/query";
@@ -203,21 +200,14 @@ function useGrantableLevels(environment: EnvironmentPresentation) {
   const environmentId = environment.environmentId;
   const session = useEnvironmentSessionState(environmentId).data;
   const canMint = useEnvironmentScope(environmentId, AuthAccessWriteScope);
-  const policy = useManagedPolicy(environmentId);
-  // The server refuses codes for any level when its policy keeps remote clients out.
-  const remoteDenial = managedCapabilityDenial(policy, "remoteClients");
   return new Map(
     AuthMcpClientAccess.literals.flatMap((level) => {
-      const reason =
-        remoteDenial ??
-        (!canMint
-          ? `此设备需要 ${environment.label} 的“管理访问权限”权限。`
-          : session === null ||
-              !mcpClientScopes(level).every((scope) => sessionGrantsScope(session, scope))
-            ? `此设备无法在 ${environment.label} 上授予此权限。`
-            : level === "read-only"
-              ? undefined
-              : managedRuntimeModeDenial(policy, level));
+      const reason = !canMint
+        ? `此设备需要 ${environment.label} 的“管理访问权限”权限。`
+        : session === null ||
+            !mcpClientScopes(level).every((scope) => sessionGrantsScope(session, scope))
+          ? `此设备无法在 ${environment.label} 上授予此权限。`
+          : undefined;
       return reason === undefined ? [] : [[level, reason] as const];
     }),
   );
@@ -459,8 +449,6 @@ function GateScreen({
                 </>
               ) : null}
             </div>
-          ) : turnOnHere.kind === "policy" ? (
-            <p className="text-sm text-muted-foreground">{turnOnHere.reason}</p>
           ) : (
             <div className="space-y-2 text-sm">
               <CommandBlock command="t3 connect link" />

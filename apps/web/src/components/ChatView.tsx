@@ -3772,7 +3772,6 @@ export default function ChatView(props: ChatViewProps) {
                                     : {
                                         trailing: (
                                           <ComposerContextPermissions
-                                            environmentId={environmentId}
                                             runtimeMode={runtimeMode}
                                             supportedRuntimeModes={
                                               activeProviderStatus?.supportedRuntimeModes
