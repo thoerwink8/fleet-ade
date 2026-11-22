@@ -210,7 +210,9 @@ const authorizeRequest = Effect.fn("EnvironmentRpc.authorize")(function* (
 ) {
   // Fleet summary subscribe calls authorizeGuard and keeps the typed failure.
   yield* authorizeGuard(method, input).pipe(
-    Effect.catchTag("FleetSessionPermissionsUnavailable", (error) => Effect.die(error)),
+    Effect.catchTags({
+      FleetSessionPermissionsUnavailable: (error) => Effect.die(error),
+    }),
   );
 });
 

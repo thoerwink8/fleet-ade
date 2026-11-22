@@ -188,14 +188,17 @@ export function fleetSummaryChanges(
                     let quiet: Fiber.Fiber<void> | undefined;
                     const quietTimer = Effect.sleep("2 seconds").pipe(
                       Effect.andThen(
-                        SubscriptionRef.update(state, (value): FleetSummaryState =>
-                          value.epoch === started.epoch &&
-                          value.cursor !== null &&
-                          value.pending === null &&
-                          value.error === null
-                            ? { ...value, status: "live" }
-                            : value,
-                        ),
+                        Effect.gen(function* () {
+                          const connected = yield* SubscriptionRef.modify(state, (value) =>
+                            value.epoch === started.epoch &&
+                            value.cursor !== null &&
+                            value.pending === null &&
+                            value.error === null
+                              ? ([true, { ...value, status: "live" }] as const)
+                              : ([false, value] as const),
+                          );
+                          if (connected) retries = 0;
+                        }),
                       ),
                     );
                     const outcome = yield* Effect.exit(
@@ -223,7 +226,6 @@ export function fleetSummaryChanges(
                                 rows: current.rows,
                                 cursor: current.cursor,
                               };
-                            retries = 0;
                             quiet = yield* Effect.forkChild(quietTimer);
                           }),
                         ).pipe(Effect.raceFirst(Queue.take(wake)));

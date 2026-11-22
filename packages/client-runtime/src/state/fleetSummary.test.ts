@@ -395,3 +395,33 @@ it.effect("backs off before resubscribing when a snapshot page does not match", 
     expect(yield* Queue.take(inputs)).toEqual({});
   }),
 );
+
+it.effect("lengthens the resync backoff across snapshots that never go live", () =>
+  Effect.gen(function* () {
+    const { inputs, events } = yield* followControlledSummary({
+      authorize: Effect.void,
+      cache: { snapshot: null },
+      onState: () => Effect.void,
+    });
+    const snapshot = (revision: number): FleetSummaryEvent => ({
+      type: "snapshot",
+      revision,
+      page: 1,
+      pageCount: 1,
+      rows: [row(1, revision)],
+    });
+    expect(yield* Queue.take(inputs)).toEqual({});
+    yield* Queue.offer(events, snapshot(3));
+    yield* Queue.offer(events, { type: "resync", reason: "gap" });
+    yield* TestClock.adjust("124 millis");
+    expect(yield* Queue.size(inputs)).toBe(0);
+    yield* TestClock.adjust("126 millis");
+    expect(yield* Queue.take(inputs)).toEqual({});
+    yield* Queue.offer(events, snapshot(4));
+    yield* Queue.offer(events, { type: "resync", reason: "gap" });
+    yield* TestClock.adjust("249 millis");
+    expect(yield* Queue.size(inputs)).toBe(0);
+    yield* TestClock.adjust("251 millis");
+    expect(yield* Queue.take(inputs)).toEqual({});
+  }),
+);
