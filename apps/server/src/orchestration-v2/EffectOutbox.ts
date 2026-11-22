@@ -128,6 +128,11 @@ export const OrchestrationEffectRequestV2 = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("delegated-tasks.stop"),
     reason: Schema.optional(Schema.String),
+    taskId: Schema.optional(NodeId),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("delegated-task.timeout"),
+    taskId: NodeId,
   }),
 ]);
 export type OrchestrationEffectRequestV2 = typeof OrchestrationEffectRequestV2.Type;
@@ -143,6 +148,7 @@ export const REPLAY_SAFE_EFFECT_TYPES_AFTER_PROCESS_LOSS = [
   "attachment.cleanup",
   "thread-title.generate",
   "delegated-tasks.stop",
+  "delegated-task.timeout",
 ] as const satisfies ReadonlyArray<OrchestrationEffectRequestV2["type"]>;
 
 export const PROCESS_BOUND_EFFECT_TYPES = [

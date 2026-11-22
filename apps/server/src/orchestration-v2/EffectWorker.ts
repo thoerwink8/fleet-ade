@@ -616,8 +616,28 @@ export const layerExecutor: Layer.Layer<
                 threadId: effect.threadId,
                 commandId: effect.commandId,
                 reason: effect.request.reason,
+                ...(effect.request.taskId === undefined ? {} : { taskId: effect.request.taskId }),
               })
               .pipe(
+                Effect.mapError(
+                  (cause) =>
+                    new OrchestrationEffectExecutionError({
+                      effectId: effect.id,
+                      effectType: effect.request.type,
+                      cause,
+                    }),
+                ),
+              );
+          case "delegated-task.timeout":
+            return threads
+              .dispatch({
+                type: "delegated_task.timeout",
+                commandId: CommandId.make(`${effect.commandId}:timeout:${effect.request.taskId}`),
+                parentThreadId: effect.threadId,
+                taskId: effect.request.taskId,
+              })
+              .pipe(
+                Effect.asVoid,
                 Effect.mapError(
                   (cause) =>
                     new OrchestrationEffectExecutionError({

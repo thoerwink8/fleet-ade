@@ -1,4 +1,5 @@
 import {
+  BUILTIN_COMMANDER_INSTRUCTIONS,
   DEFAULT_SERVER_SETTINGS,
   ProjectId,
   ProviderDriverKind,
@@ -230,6 +231,56 @@ describe("resolveDispatchAssignment", () => {
   it("uses the environment cap when the project has no override", () => {
     const settings = { ...DEFAULT_SERVER_SETTINGS, dispatchConcurrencyLimit: 3 };
     expect(resolveDispatchAssignment(settings, otherProjectId).concurrencyLimit).toBe(3);
+  });
+
+  it("uses project instructions, then environment instructions, then the built-in text", () => {
+    const environment = {
+      ...DEFAULT_SERVER_SETTINGS,
+      commanderInstructions: "环境守则",
+      dispatchTimeoutMs: 60_000,
+      dispatchStopOnTimeout: true,
+    };
+    expect(resolveDispatchAssignment(environment, projectId).instructions).toBe("环境守则");
+    const project = applyServerSettingsPatch(environment, {
+      projectSettingsOverrides: {
+        [projectId]: { commanderInstructions: "项目守则", dispatchTimeoutMs: null },
+      },
+    });
+    expect(resolveDispatchAssignment(project, projectId)).toMatchObject({
+      instructions: "项目守则",
+      timeoutMs: null,
+      stopOnTimeout: true,
+    });
+    const reset = applyServerSettingsPatch(environment, {
+      projectSettingsOverrides: { [projectId]: {} },
+    });
+    expect(resolveDispatchAssignment(reset, projectId).instructions).toBe("环境守则");
+    expect(
+      resolveDispatchAssignment(
+        { ...DEFAULT_SERVER_SETTINGS, commanderInstructions: "   " },
+        projectId,
+      ).instructions,
+    ).toBe(BUILTIN_COMMANDER_INSTRUCTIONS);
+  });
+
+  it("keeps the commander model off the role cells", () => {
+    const commander = createModelSelection(ProviderInstanceId.make("codex"), "commander");
+    const review = createModelSelection(ProviderInstanceId.make("claudeAgent"), "review");
+    const settings = applyServerSettingsPatch(
+      { ...DEFAULT_SERVER_SETTINGS, dispatchCommanderModelSelection: commander },
+      {
+        projectSettingsOverrides: {
+          [projectId]: { dispatchReviewModelSelection: review },
+          [otherProjectId]: { dispatchCommanderModelSelection: null },
+        },
+      },
+    );
+    const host = resolveDispatchAssignment(settings, projectId);
+    expect(host.commanderModel).toEqual(commander);
+    expect(host.roles.review).toEqual(review);
+    expect(host.roles.code).toBeNull();
+    expect(resolveDispatchAssignment(settings, otherProjectId).commanderModel).toBeNull();
+    expect(resolveDispatchAssignment(settings, otherProjectId).roles.review).toBeNull();
   });
 });
 

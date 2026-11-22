@@ -1287,6 +1287,40 @@ it.effect("refuses worktree isolation for a task there before launching anything
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
+it.effect("accepts cross-environment delegation with a wait timeout", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const thread = yield* makeBoxThread;
+      const b = yield* serveBox(thread);
+      const offers = yield* SubscriptionRef.make<
+        ReadonlyArray<ProviderContinuationRequests.ProviderContinuationRequest>
+      >([]);
+      const database = yield* SqlitePersistence.layerMemory.pipe(Layer.build);
+      const a = yield* makeLaptop(database, offers);
+      yield* linkTo(a.links, b, "auto");
+      yield* seedParent(a);
+      yield* a.settings.updateSettings({ dispatchTimeoutMs: 60_000 });
+      yield* a.orchestrator.dispatch({
+        type: "thread.commander.mark",
+        commandId: CommandId.make("command:mark:laptop-parent-timeout"),
+        threadId: parentThreadId,
+      });
+      const result = yield* a.call("delegate_task", {
+        task: "Run the suite on the box.",
+        target: { environmentId: box.environmentId },
+        mode: "async",
+        timeoutMs: 1,
+      });
+      expect(result.isError, JSON.stringify(result.content)).toBe(false);
+      expect(result.structuredContent).toMatchObject({
+        note: "跨环境不按时限处理",
+        status: "running",
+      });
+      expect(yield* Ref.get(thread.launched)).not.toBeNull();
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
 it.effect("refuses remote delegation at the local concurrency cap before launching", () =>
   Effect.scoped(
     Effect.gen(function* () {

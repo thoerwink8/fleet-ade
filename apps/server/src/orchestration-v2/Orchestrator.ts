@@ -29,8 +29,9 @@ import {
   NonNegativeInt,
   PositiveInt,
   type NodeId,
+  ProjectId,
   type ModelSelection,
-  OrchestrationV2Command,
+  type OrchestrationV2Command,
   type OrchestrationV2InternalCommand,
   type OrchestrationV2LimitRecoveryUpdate,
   type OrchestrationV2Notification,
@@ -77,7 +78,7 @@ import {
   TrimmedNonEmptyString,
 } from "@t3tools/contracts";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { resolveDispatchAssignment, resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { modelSwitchSince } from "./modelSwitch.ts";
 import { combinePullRequestWatchWakes, type PullRequestWatchWake } from "./pullRequestWatch.ts";
@@ -648,6 +649,7 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "delegated_task.remote.request":
     case "delegated_task.remote.complete":
     case "delegated_task.remote.stop":
+    case "delegated_task.timeout":
     case "delegated_task.wake-policy":
     case "delegated_task.completion-delivery.acknowledge":
     case "delegated_task.completion-delivery.dispose":
@@ -693,15 +695,35 @@ function delegatedTasksStopEffect(command: {
   readonly commandId: CommandId;
   readonly threadId: ThreadId;
   readonly reason?: string | undefined;
+  readonly taskId?: NodeId | undefined;
 }): PendingOrchestrationEffectV2 {
   return {
-    id: `effect:${command.commandId}:delegated-tasks.stop`,
+    id:
+      command.taskId === undefined
+        ? `effect:${command.commandId}:delegated-tasks.stop`
+        : `effect:${command.commandId}:delegated-tasks.stop:${command.taskId}`,
     commandId: command.commandId,
     threadId: command.threadId,
     request: {
       type: "delegated-tasks.stop",
       ...(command.reason === undefined ? {} : { reason: command.reason }),
+      ...(command.taskId === undefined ? {} : { taskId: command.taskId }),
     },
+  };
+}
+
+function delegatedTaskTimeoutEffect(input: {
+  readonly commandId: CommandId;
+  readonly threadId: ThreadId;
+  readonly taskId: NodeId;
+  readonly availableAt: DateTime.Utc;
+}): PendingOrchestrationEffectV2 {
+  return {
+    id: `effect:${input.commandId}:delegated-task.timeout:${input.taskId}:${DateTime.toEpochMillis(input.availableAt)}`,
+    commandId: input.commandId,
+    threadId: input.threadId,
+    availableAt: input.availableAt,
+    request: { type: "delegated-task.timeout", taskId: input.taskId },
   };
 }
 
@@ -2795,6 +2817,28 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           queueDelivery,
         ),
       };
+      const parentThreadId = projection.thread.lineage.parentThreadId;
+      const delegatedTask =
+        queuedRun.delegatedTaskId === undefined || parentThreadId === null
+          ? undefined
+          : (yield* projectionStore
+              .getThreadRecords(parentThreadId, ["subagents"], {
+                subagentIds: [queuedRun.delegatedTaskId],
+              })
+              .pipe(
+                Effect.mapError(
+                  (cause) => new OrchestratorProjectionError({ threadId: parentThreadId, cause }),
+                ),
+              )).subagents[0];
+      const delegatedTimeoutEffect =
+        delegatedTask?.timeoutMs !== undefined && delegatedTask.timeoutMs !== null
+          ? delegatedTaskTimeoutEffect({
+              commandId,
+              threadId: projection.thread.lineage.parentThreadId!,
+              taskId: delegatedTask.id,
+              availableAt: DateTime.add(now, { milliseconds: delegatedTask.timeoutMs }),
+            })
+          : null;
       const userTurnItem: OrchestrationV2TurnItem = {
         ...(legacyQueuedTurnItem ?? {
           id: idAllocator.derive.userTurnItem({ messageId: queuedMessage.id }),
@@ -3066,6 +3110,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               detail: detachReason,
             },
           })),
+          ...(delegatedTimeoutEffect === null ? [] : [delegatedTimeoutEffect]),
           {
             // A restart can return this run to the queue after its previous start effect was cancelled.
             id: `effect:${commandId}:provider-turn.start:${queuedRun.id}:${yield* idAllocator.allocate.event({ threadId, commandId })}`,
@@ -6686,6 +6731,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       projection = applyToProjection(projection, event);
     }
     let modelSelection = command.modelSelection ?? projection.thread.modelSelection;
+    if (command.modelSelection === undefined && projection.thread.commander === true) {
+      const commanderModel = resolveDispatchAssignment(
+        yield* serverSettings.getSettings.pipe(Effect.orDie),
+        projection.thread.projectId,
+      ).commanderModel;
+      if (commanderModel !== null) modelSelection = commanderModel;
+    }
     let dispatchMode = resolveMessageDispatchIntent(
       projection,
       command.dispatchMode,
@@ -8978,6 +9030,122 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     },
   );
 
+  const acceptedCommanderDispatch = Effect.fn("orchestrationV2.dispatch.acceptedCommander")(
+    function* (projectId: ProjectId) {
+      const settings = yield* serverSettings.getSettings.pipe(Effect.orDie);
+      const dispatch = resolveDispatchAssignment(settings, projectId);
+      return {
+        timeoutMs: dispatch.timeoutMs,
+        stopOnTimeout: dispatch.stopOnTimeout,
+        instructions: dispatch.instructions,
+      };
+    },
+  );
+
+  const armDelegatedTaskTimeout = (
+    effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+    input: {
+      readonly commandId: CommandId;
+      readonly parentThreadId: ThreadId;
+      readonly taskId: NodeId;
+      readonly timeoutMs: number;
+      readonly startedAt: DateTime.Utc;
+    },
+  ) =>
+    Ref.update(effects, (existing) => [
+      ...existing,
+      delegatedTaskTimeoutEffect({
+        commandId: input.commandId,
+        threadId: input.parentThreadId,
+        taskId: input.taskId,
+        availableAt: DateTime.add(input.startedAt, { milliseconds: input.timeoutMs }),
+      }),
+    ]);
+
+  const dispatchDelegatedTaskTimeout = Effect.fn("orchestrationV2.dispatch.delegatedTaskTimeout")(
+    function* (
+      command: Extract<OrchestrationV2ServerCommand, { readonly type: "delegated_task.timeout" }>,
+      events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+      effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+    ) {
+      const { subagents } = yield* projectionStore
+        .getThreadRecords(command.parentThreadId, ["subagents"], {
+          subagentIds: [command.taskId],
+        })
+        .pipe(
+          Effect.mapError(
+            (cause) => new OrchestratorProjectionError({ threadId: command.parentThreadId, cause }),
+          ),
+        );
+      const task = subagents[0];
+      if (
+        task?.origin !== "app_owned" ||
+        task.timeoutMs == null ||
+        task.timedOutAt !== undefined ||
+        task.childThreadId === null ||
+        !isOrchestrationV2WorkActive(task.status)
+      ) {
+        return;
+      }
+      const child = yield* projectionStore
+        .getThreadRecords(task.childThreadId, ["runs"])
+        .pipe(
+          Effect.mapError(
+            (cause) => new OrchestratorProjectionError({ threadId: task.childThreadId!, cause }),
+          ),
+        );
+      const run = child.runs.find(
+        (candidate) => candidate.delegatedTaskId === task.id && candidate.startedAt !== null,
+      );
+      const startedAt = run?.startedAt;
+      const now = yield* DateTime.now;
+      if (run === undefined || startedAt == null || run.status === "queued") {
+        yield* armDelegatedTaskTimeout(effects, {
+          commandId: command.commandId,
+          parentThreadId: command.parentThreadId,
+          taskId: task.id,
+          timeoutMs: task.timeoutMs,
+          startedAt: now,
+        });
+        return;
+      }
+      const deadline = DateTime.add(startedAt, { milliseconds: task.timeoutMs });
+      if (DateTime.toEpochMillis(now) < DateTime.toEpochMillis(deadline)) {
+        yield* armDelegatedTaskTimeout(effects, {
+          commandId: command.commandId,
+          parentThreadId: command.parentThreadId,
+          taskId: task.id,
+          timeoutMs: DateTime.toEpochMillis(deadline) - DateTime.toEpochMillis(now),
+          startedAt: now,
+        });
+        return;
+      }
+      const timedOut = { ...task, timedOutAt: now, updatedAt: now };
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "subagent.updated",
+        threadId: command.parentThreadId,
+        runId: task.runId ?? undefined,
+        nodeId: task.id,
+        providerInstanceId: task.providerInstanceId,
+        occurredAt: now,
+        payload: timedOut,
+      });
+      if (task.stopOnTimeout !== true) return;
+      yield* Ref.update(effects, (existing) => [
+        ...existing,
+        delegatedTasksStopEffect({
+          commandId: command.commandId,
+          threadId: command.parentThreadId,
+          taskId: task.id,
+          reason: "到点就停止",
+        }),
+      ]);
+    },
+  );
+
   const dispatchDelegatedTaskRequest = Effect.fn("orchestrationV2.dispatch.delegatedTaskRequest")(
     function* (
       command: Extract<OrchestrationV2Command, { readonly type: "delegated_task.request" }>,
@@ -9097,6 +9265,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         model: command.modelSelection.model,
         modelSelection: command.modelSelection,
         ...(command.completionWake === undefined ? {} : { completionWake: command.completionWake }),
+        ...(parentProjection.thread.commander !== true
+          ? {}
+          : yield* acceptedCommanderDispatch(parentProjection.thread.projectId)),
         status: "running",
         result: null,
         startedAt: now,
@@ -9211,6 +9382,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           commandId: command.commandId,
           commandType: command.type,
           cause: `Delegated child thread ${childThreadId} did not create a run.`,
+        });
+      }
+      if (task.timeoutMs != null && task.timeoutMs > 0 && childRun.status !== "queued") {
+        yield* armDelegatedTaskTimeout(effects, {
+          commandId: command.commandId,
+          parentThreadId: command.parentThreadId,
+          taskId: taskNodeId,
+          timeoutMs: task.timeoutMs,
+          startedAt: yield* DateTime.now,
         });
       }
       const spawnTransferId = yield* mapDispatchError(command)(
@@ -14928,6 +15108,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "delegated_task.request":
         yield* dispatchDelegatedTaskRequest(command, events, effects);
         break;
+      case "delegated_task.timeout":
+        yield* dispatchDelegatedTaskTimeout(command, events, effects);
+        break;
       case "delegated_task.remote.request":
         yield* dispatchRemoteDelegatedTaskRequest(command, events);
         break;
@@ -15073,6 +15256,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           // Marking or unmarking again leaves the thread as it is.
           command.type === "thread.commander.mark" ||
           command.type === "thread.commander.unmark" ||
+          command.type === "delegated_task.timeout" ||
           (command.type === "thread.delete" && command.onlyIfUnused === true) ||
           command.type === "thread.batch",
         (_planned) =>

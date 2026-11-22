@@ -1,10 +1,11 @@
 import {
-  type ModelSelection,
+  BUILTIN_COMMANDER_INSTRUCTIONS,
   PROJECT_FILE_BACKED_SETTINGS,
   PROJECT_SCOPED_SERVER_SETTING_KEYS,
   type ProjectFileBackedSettingKey,
   type ProjectId,
   type DispatchRole,
+  type ModelSelection,
   type ProjectScopedServerSettingKey,
   type ProjectSettingsOverrides,
   resolveProjectProviderInstanceEnabled,
@@ -272,6 +273,17 @@ export interface ResolvedDispatchAssignment {
   readonly roles: Readonly<Record<DispatchRole, ModelSelection | null>>;
   /** Null does not cap open delegations. */
   readonly concurrencyLimit: number | null;
+  /** Null does not limit one delegation. Queue time is not included. */
+  readonly timeoutMs: number | null;
+  /** False leaves a timed-out delegation running. */
+  readonly stopOnTimeout: boolean;
+  /** Project text, else environment text, else the built-in instructions. */
+  readonly instructions: string;
+  /**
+   * Host project only. Null keeps the commander thread's current model.
+   * Role cells never read this, and this never reads a role cell.
+   */
+  readonly commanderModel: ModelSelection | null;
 }
 
 /** Project cells cover only the keys that project wrote. An empty cell uses `defaultModelSelection`. */
@@ -282,6 +294,7 @@ export function resolveDispatchAssignment(
   const resolved = resolveProjectSettings(settings, projectId).settings;
   const fallback = resolved.defaultModelSelection;
   const roleModel = (role: DispatchRole) => resolved[DISPATCH_ROLE_KEYS[role]] ?? fallback;
+  const writtenInstructions = resolved.commanderInstructions.trim();
   return {
     roles: {
       code: roleModel("code"),
@@ -290,5 +303,10 @@ export function resolveDispatchAssignment(
       plan: roleModel("plan"),
     },
     concurrencyLimit: resolved.dispatchConcurrencyLimit,
+    timeoutMs: resolved.dispatchTimeoutMs,
+    stopOnTimeout: resolved.dispatchStopOnTimeout,
+    instructions:
+      writtenInstructions.length > 0 ? writtenInstructions : BUILTIN_COMMANDER_INSTRUCTIONS,
+    commanderModel: resolved.dispatchCommanderModelSelection,
   };
 }

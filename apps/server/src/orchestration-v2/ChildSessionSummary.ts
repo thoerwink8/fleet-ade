@@ -461,6 +461,14 @@ export class ChildSessionSummary extends Context.Service<
           Number.isNaN(itemUpdatedMs) ? 0 : itemUpdatedMs,
         );
 
+        const timedOut = yield* sql<{ readonly marked: number }>`
+            SELECT 1 AS marked
+            FROM orchestration_v2_projection_subagents
+            WHERE child_thread_id = ${shell.id}
+              AND origin = 'app_owned'
+              AND json_type(payload_json, '$.timedOutAt') = 'text'
+            LIMIT 1
+          `;
         const pr =
           shell.pullRequests?.find((link) => link.snapshot !== null) ??
           shell.pullRequests?.[0] ??
@@ -471,6 +479,7 @@ export class ChildSessionSummary extends Context.Service<
           createdAtMs: DateTime.toEpochMillis(shell.createdAt),
           activityAtMs,
           status: shell.status,
+          ...(timedOut.length === 0 ? {} : { timedOut: true }),
           approvalCommand,
           waitingForAnswer,
           items: summaryItems,
@@ -668,16 +677,24 @@ export class ChildSessionSummary extends Context.Service<
             if (stored.event.type === "thread.deleted" || stored.event.type === "thread.archived") {
               return internal.recompute(stored.event.threadId, null).pipe(Effect.ignore);
             }
-            return projectionStore.getThreadShell(stored.event.threadId).pipe(
-              Effect.matchEffect({
-                onFailure: (error) =>
-                  Effect.logWarning("child-summary.event-shell-read-failed", {
-                    threadId: stored.event.threadId,
-                    error,
+            const threadIds =
+              stored.event.type === "subagent.updated"
+                ? [stored.event.threadId, stored.event.payload.childThreadId]
+                : [stored.event.threadId];
+            return Effect.forEach(
+              [...new Set(threadIds)].filter((threadId): threadId is ThreadId => threadId !== null),
+              (threadId) =>
+                projectionStore.getThreadShell(threadId).pipe(
+                  Effect.matchEffect({
+                    onFailure: (error) =>
+                      Effect.logWarning("child-summary.event-shell-read-failed", {
+                        threadId,
+                        error,
+                      }),
+                    onSuccess: (shell) => internal.recompute(threadId, shell).pipe(Effect.ignore),
                   }),
-                onSuccess: (shell) =>
-                  internal.recompute(stored.event.threadId, shell).pipe(Effect.ignore),
-              }),
+                ),
+              { discard: true },
             );
           });
         }),

@@ -611,6 +611,37 @@ it.effect.each(["run.interrupt", "thread.stop"] as const)(
     }).pipe(Effect.provide(layerTest)),
 );
 
+it.effect("stopDelegatedTasks with a taskId stops only that app-owned child", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const threads = yield* ThreadManagementService.ThreadManagementService;
+    const parentThreadId = ThreadId.make("thread:stop-one-delegated-task");
+    yield* createWatchingThread(parentThreadId, 21);
+    yield* send(parentThreadId, "work", "start_immediately");
+    const targetThreadId = yield* delegate(parentThreadId, "target task");
+    const siblingThreadId = yield* delegate(parentThreadId, "sibling task");
+    const parent = yield* orchestrator.getThreadProjection(parentThreadId);
+    const target = parent.subagents.find((task) => task.childThreadId === targetThreadId)!;
+    const sibling = parent.subagents.find((task) => task.childThreadId === siblingThreadId)!;
+    assert.equal(target.origin, "app_owned");
+    assert.equal(sibling.origin, "app_owned");
+    assert.notEqual(target.id, sibling.id);
+
+    yield* threads.stopDelegatedTasks({
+      threadId: parentThreadId,
+      commandId: CommandId.make("stop-one-delegated-task"),
+      taskId: target.id,
+    });
+
+    assert.deepEqual((yield* threadState(targetThreadId)).runs, ["interrupted"]);
+    assert.deepEqual((yield* threadState(siblingThreadId)).runs, ["starting"]);
+    assert.deepEqual(yield* threadState(parentThreadId), {
+      runs: ["starting"],
+      watched: [21],
+    });
+  }).pipe(Effect.provide(layerTest)),
+);
+
 it.effect("a repeated Stop that changes nothing still stops the delegated tasks", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;

@@ -926,6 +926,14 @@ export const OrchestrationV2Subagent = Schema.Struct({
   model: Schema.NullOr(Schema.String),
   modelSelection: Schema.optional(ModelSelection),
   completionWake: Schema.optional(Schema.Literals(["always", "settled_only"])),
+  /** Accepted delegation only. Null means this task has no limit. Later setting edits do not change it. */
+  timeoutMs: Schema.optional(Schema.NullOr(PositiveInt)),
+  /** Accepted with `timeoutMs`. True stops the child when the limit is reached. */
+  stopOnTimeout: Schema.optional(Schema.Boolean),
+  /** Accepted commander instructions. Empty is not stored; the built-in text is. */
+  instructions: Schema.optional(Schema.String),
+  /** Set when the limit is reached. The child run stays live unless `stopOnTimeout` stopped it. */
+  timedOutAt: Schema.optional(Schema.DateTimeUtc),
   completionDelivery: Schema.optional(OrchestrationV2DelegatedCompletionTaskDelivery),
   // The run whose unfinished task was cancelled, committed with its Stop.
   cancelledRunId: Schema.optional(RunId),
@@ -2460,6 +2468,7 @@ export const OrchestrationV2SubagentJson = OrchestrationV2Subagent.mapFields((fi
   startedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
   completedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
   updatedAt: Schema.DateTimeUtcFromString,
+  timedOutAt: Schema.optional(Schema.DateTimeUtcFromString),
 }));
 export type OrchestrationV2SubagentJson = typeof OrchestrationV2SubagentJson.Type;
 
@@ -3609,6 +3618,17 @@ const OrchestrationV2InternalCommand = Schema.Union([
     modelSelection: ModelSelection,
     remoteChild: OrchestrationV2RemoteTaskChild,
     completionWake: Schema.optional(Schema.Literals(["always", "settled_only"])),
+  }),
+  /**
+   * Marks one accepted delegation timed out once its own run has been running
+   * for the snapshotted limit. Queue time is not included. A task that is already
+   * finished, or whose run has not started, is left unchanged.
+   */
+  Schema.Struct({
+    type: Schema.Literal("delegated_task.timeout"),
+    commandId: CommandId,
+    parentThreadId: ThreadId,
+    taskId: NodeId,
   }),
   /**
    * Completes a delegated task that ran in a linked environment, with what its

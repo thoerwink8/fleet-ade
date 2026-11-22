@@ -288,7 +288,6 @@ function threadManagementFailure(error: unknown): OrchestratorMcpFailure {
       return failure("invalid_request", error.message);
   }
 }
-
 // Without a reason, a Stop reads as the user's (see RunExecutionService.USER_STOP_REASON).
 function agentStopReason(reason: string | undefined): string {
   return reason === undefined ? "Stopped by an agent" : `Stopped by an agent: ${reason}`;
@@ -2611,13 +2610,14 @@ const make = Effect.gen(function* () {
         yield* requireCapability(callerScope);
         const scope = yield* requireThreadScope(callerScope, "delegate_task");
         // The task's child runs as an ordinary thread there; this thread keeps the task.
-        const { taskId } = yield* remoteDelegation.delegate(scope, {
+        const { taskId, note } = yield* remoteDelegation.delegate(scope, {
           ...input,
           target: { ...input.target, environmentId },
         });
-        return yield* input.mode === "wait"
+        const result = yield* input.mode === "wait"
           ? awaitTask(scope, taskId, taskId, input.timeoutMs)
           : readTask(scope, taskId, false, true);
+        return note === undefined ? result : { ...result, note };
       }
       const { scope, parent } = yield* loadThreadCaller(callerScope, "delegate_task");
       if (
