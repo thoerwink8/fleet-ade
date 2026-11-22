@@ -31,6 +31,7 @@ import {
   type NodeId,
   ProjectId,
   type ModelSelection,
+  type OrchestrationV2Command,
   type OrchestrationV2InternalCommand,
   type OrchestrationV2LimitRecoveryUpdate,
   type OrchestrationV2Notification,

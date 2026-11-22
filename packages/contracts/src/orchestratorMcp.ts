@@ -215,6 +215,7 @@ const OrchestratorMcpExecutedModel = Schema.NullOr(Schema.String).annotate({
   description:
     "Model the provider reported running, or null when unavailable. Can differ from the requested `model`.",
 });
+export const ORCHESTRATOR_MCP_CROSS_ENVIRONMENT_TIMEOUT_NOTE = "跨环境不按时限处理";
 
 export const OrchestratorMcpDelegateTaskResult = Schema.Struct({
   taskId: NodeId,
@@ -239,6 +240,7 @@ export const OrchestratorMcpDelegateTaskResult = Schema.Struct({
   executedModel: Schema.optional(OrchestratorMcpExecutedModel),
   options: Schema.optional(Schema.Array(ProviderOptionSelection)),
   summary: Schema.NullOr(Schema.String),
+  note: Schema.optional(Schema.String),
   resultContextTransferId: Schema.NullOr(ContextTransferId),
   hasPendingQuestion: Schema.Boolean.annotate({
     description:

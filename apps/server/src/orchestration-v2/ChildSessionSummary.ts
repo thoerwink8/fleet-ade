@@ -677,20 +677,24 @@ export class ChildSessionSummary extends Context.Service<
             if (stored.event.type === "thread.deleted" || stored.event.type === "thread.archived") {
               return internal.recompute(stored.event.threadId, null).pipe(Effect.ignore);
             }
-            const threadId =
+            const threadIds =
               stored.event.type === "subagent.updated"
-                ? stored.event.payload.childThreadId
-                : stored.event.threadId;
-            if (threadId === null) return Effect.void;
-            return projectionStore.getThreadShell(threadId).pipe(
-              Effect.matchEffect({
-                onFailure: (error) =>
-                  Effect.logWarning("child-summary.event-shell-read-failed", {
-                    threadId,
-                    error,
+                ? [stored.event.threadId, stored.event.payload.childThreadId]
+                : [stored.event.threadId];
+            return Effect.forEach(
+              [...new Set(threadIds)].filter((threadId): threadId is ThreadId => threadId !== null),
+              (threadId) =>
+                projectionStore.getThreadShell(threadId).pipe(
+                  Effect.matchEffect({
+                    onFailure: (error) =>
+                      Effect.logWarning("child-summary.event-shell-read-failed", {
+                        threadId,
+                        error,
+                      }),
+                    onSuccess: (shell) => internal.recompute(threadId, shell).pipe(Effect.ignore),
                   }),
-                onSuccess: (shell) => internal.recompute(threadId, shell).pipe(Effect.ignore),
-              }),
+                ),
+              { discard: true },
             );
           });
         }),

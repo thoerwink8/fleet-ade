@@ -40,7 +40,6 @@ import * as DelegatedTaskQuestionReactor from "./DelegatedTaskQuestionReactor.ts
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
-import * as EffectWorker from "./EffectWorker.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
@@ -91,9 +90,8 @@ const layerCommanderDispatchTest = Layer.mergeAll(
     { name: "control-reads-commander-dispatch" },
     ProviderAdapterRegistry.layerFromAdapters([adapter]),
     {
-      databaseLayer: layerDatabase,
-      runEffectWorker: false,
       exposeServerSettings: true,
+      runEffectWorker: false,
       settingsOverrides: {
         dispatchTimeoutMs: 60_000,
         dispatchStopOnTimeout: false,
@@ -1580,12 +1578,11 @@ it.effect("snapshots the commander timeout and leaves the child running when it 
   }).pipe(Effect.provide(layerCommanderDispatchTest)),
 );
 
-it("stops only the timed-out delegation when stop-on-timeout was accepted", () =>
+it.effect("stops only the timed-out delegation when stop-on-timeout was accepted", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     const outbox = yield* EffectOutbox.EffectOutboxV2;
-    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
     const { parentThreadId, task } = yield* acceptCommanderDelegation({
       name: "stop-timeout",
       orchestrator,
@@ -1647,25 +1644,31 @@ it("stops only the timed-out delegation when stop-on-timeout was accepted", () =
       parentThreadId,
       taskId: task.id,
     });
-    yield* worker.drain();
-    assert.equal(
-      (yield* projections.getThreadRecords(task.childThreadId!, ["runs"])).runs[0]?.status,
-      "stopping",
+    assert.ok(
+      (yield* projections.getThreadProjection(parentThreadId)).subagents.find(
+        (candidate) => candidate.id === task.id,
+      )!.timedOutAt,
     );
+    assert.isUndefined(
+      (yield* projections.getThreadProjection(parentThreadId)).subagents.find(
+        (candidate) => candidate.id === siblingTask.id,
+      )!.timedOutAt,
+    );
+    const stopEffects = (yield* outbox.listByCommandId(timeoutCommandId)).filter(
+      (effect) => effect.request.type === "delegated-tasks.stop",
+    );
+    assert.equal(stopEffects.length, 1);
     assert.equal(
-      (yield* projections.getThreadRecords(siblingTask.childThreadId!, ["runs"])).runs[0]?.status,
-      "running",
+      stopEffects[0]!.request.type === "delegated-tasks.stop"
+        ? stopEffects[0]!.request.taskId
+        : undefined,
+      task.id,
     );
     assert.isDefined(sibling);
-    assert.equal(
-      (yield* outbox.listByCommandId(timeoutCommandId)).filter(
-        (effect) => effect.request.type === "delegated-tasks.stop",
-      ).length,
-      1,
-    );
-  }).pipe(Effect.provide(layerCommanderDispatchTest)));
+  }).pipe(Effect.provide(layerCommanderDispatchTest)),
+);
 
-it("keeps the accepted timeout and instructions after the settings change", () =>
+it.effect("keeps the accepted timeout and instructions after the settings change", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
@@ -1676,29 +1679,56 @@ it("keeps the accepted timeout and instructions after the settings change", () =
       orchestrator,
       projections,
     });
+    const childRun = (yield* projections.getThreadRecords(task.childThreadId!, ["runs"])).runs[0]!;
+    const startedAt = yield* DateTime.now;
+    yield* projections.apply({
+      id: EventId.make("event:snapshot-run-started"),
+      type: "run.updated",
+      threadId: task.childThreadId!,
+      runId: childRun.id,
+      occurredAt: startedAt,
+      payload: { ...childRun, delegatedTaskId: task.id, status: "running", startedAt },
+    });
     yield* settings.updateSettings({
       dispatchTimeoutMs: 5_000,
       commanderInstructions: "改过的守则",
       dispatchStopOnTimeout: true,
     });
     yield* TestClock.adjust("5 seconds");
+    const beforeDeadline = CommandId.make("snapshot-timeout-before-deadline");
     yield* orchestrator.dispatch({
       type: "delegated_task.timeout",
-      commandId: CommandId.make("snapshot-timeout"),
+      commandId: beforeDeadline,
       parentThreadId,
       taskId: task.id,
     });
-    const retained = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
-    assert.equal(retained.timeoutMs, task.timeoutMs);
-    assert.equal(retained.instructions, "环境守则");
-    assert.equal(retained.stopOnTimeout, false);
+    let retained = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
     assert.isUndefined(retained.timedOutAt);
     assert.isFalse(
-      (yield* outbox.listByCommandId(CommandId.make("snapshot-timeout"))).some(
+      (yield* outbox.listByCommandId(beforeDeadline)).some(
         (effect) => effect.request.type === "delegated-tasks.stop",
       ),
     );
-  }).pipe(Effect.provide(layerCommanderDispatchTest)));
+    yield* TestClock.adjust("55 seconds");
+    const atDeadline = CommandId.make("snapshot-timeout-at-deadline");
+    yield* orchestrator.dispatch({
+      type: "delegated_task.timeout",
+      commandId: atDeadline,
+      parentThreadId,
+      taskId: task.id,
+    });
+    retained = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
+    assert.ok(retained.timedOutAt);
+    assert.equal(retained.timeoutMs, task.timeoutMs);
+    assert.equal(retained.instructions, "环境守则");
+    assert.equal(retained.stopOnTimeout, false);
+    assert.isFalse(
+      (yield* outbox.listByCommandId(atDeadline)).some(
+        (effect) => effect.request.type === "delegated-tasks.stop",
+      ),
+    );
+  }).pipe(Effect.provide(layerCommanderDispatchTest)),
+);
 
 it.effect("uses the host commander model and keeps the current model when that cell is empty", () =>
   Effect.gen(function* () {

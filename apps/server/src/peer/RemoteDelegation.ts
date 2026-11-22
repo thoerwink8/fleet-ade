@@ -1,5 +1,6 @@
 import {
   CommandId,
+  ORCHESTRATOR_MCP_CROSS_ENVIRONMENT_TIMEOUT_NOTE,
   type EnvironmentId,
   NodeId,
   OrchestratorMcpCapabilitiesInput,
@@ -104,7 +105,7 @@ export class RemoteDelegation extends Context.Service<
           readonly environmentId: EnvironmentId;
         };
       },
-    ) => Effect.Effect<{ readonly taskId: NodeId }, OrchestratorMcpFailure>;
+    ) => Effect.Effect<{ readonly taskId: NodeId; readonly note?: string }, OrchestratorMcpFailure>;
     /**
      * A `t3_thread_send` there that started or queued a run on the thread of
      * one of this thread's tasks that has its result: like a follow-up to a
@@ -290,6 +291,7 @@ const make = Effect.gen(function* () {
         });
       }
       const parentNodeId = parentRun.rootNodeId;
+      let note: string | undefined;
       if (parent.thread.commander === true) {
         const settings = yield* serverSettings.getSettings.pipe(
           Effect.mapError(
@@ -300,8 +302,12 @@ const make = Effect.gen(function* () {
               }),
           ),
         );
-        const limit = resolveProjectSettings(settings, parent.thread.projectId).settings
-          .dispatchConcurrencyLimit;
+        const dispatch = resolveProjectSettings(settings, parent.thread.projectId).settings;
+        note =
+          dispatch.dispatchTimeoutMs === null
+            ? undefined
+            : ORCHESTRATOR_MCP_CROSS_ENVIRONMENT_TIMEOUT_NOTE;
+        const limit = dispatch.dispatchConcurrencyLimit;
         if (limit !== null) {
           const open = yield* projections.countOpenAppOwnedDelegations(scope.thread.threadId).pipe(
             Effect.mapError(
@@ -319,13 +325,6 @@ const make = Effect.gen(function* () {
             });
           }
         }
-      }
-      if (input.timeoutMs != null) {
-        return yield* new OrchestratorMcpFailure({
-          code: "invalid_request",
-          message:
-            "Timeouts are not supported for cross-environment delegation: this environment cannot observe the remote child run's startedAt.",
-        });
       }
       // A worktree there would branch from a commit this checkout has and the
       // other may not, so a remote task runs in that project's checkout.
@@ -477,7 +476,7 @@ const make = Effect.gen(function* () {
         });
       }
       yield* followOne(scope.thread.threadId, taskId).pipe(Effect.forkIn(followers));
-      return { taskId };
+      return { taskId, ...(note === undefined ? {} : { note }) };
     },
   );
 

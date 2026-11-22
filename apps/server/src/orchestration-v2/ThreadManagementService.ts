@@ -39,8 +39,9 @@ import {
   resolveProjectProviderInstanceEnabled,
   RunId,
   type ScheduledTaskId,
-  ThreadId,
   type TurnItemId,
+  ThreadId,
+  NodeId,
 } from "@t3tools/contracts";
 import { delegatedTaskProgress } from "@t3tools/provider-core/server/subagentProjection";
 import { threadTranscriptHeader } from "@t3tools/shared/threadTranscript";
@@ -126,6 +127,8 @@ function existingThreadIdsForCommand(
     case "delegated_task.request":
       return [command.parentThreadId];
     case "delegated_task.timeout":
+      return [command.parentThreadId];
+    case "delegated_task.wake-policy":
       return [command.parentThreadId];
     case "delegated_task.completion-delivery.acknowledge":
     case "delegated_task.completion-delivery.dispose":
