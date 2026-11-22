@@ -1067,15 +1067,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "secret-providers",
     title: "凭据提供方",
     to: "/settings/secrets",
-    searchTerms: ["1password vault credentials api key"],
-    secretsFeatureOnly: true,
-  },
-  {
-    id: "secret-providers-add",
-    title: "添加凭据提供方",
-    to: "/settings/secrets",
-    targetId: "secret-providers",
-    searchTerms: ["new 1password vault op cli account"],
+    searchTerms: ["vault credentials api key"],
     secretsFeatureOnly: true,
   },
   {

@@ -5,11 +5,30 @@ import { userEvent } from "vite-plus/test/browser";
 import { render, type Screen } from "../../../test/render";
 import { SecretSourceInput } from "./SecretSourceInput";
 
+// No kind ships, so the reference syntax check runs against a stand-in definition.
+vi.mock("@t3tools/secret-provider-definitions/registry", async () => {
+  const Schema = await import("effect/Schema");
+  const definition = {
+    kind: "test_vault",
+    label: "Test vault",
+    configSchema: Schema.Struct({}),
+    isReference: (reference: string) => reference.startsWith("ref://"),
+    referencePlaceholder: "ref://vault/item/field",
+    invalidReferenceMessage: "Use a reference like ref://vault/item/field.",
+  };
+  return {
+    builtInSecretProviderDefinitions: {
+      definitions: [definition],
+      find: (kind: string) => (kind === definition.kind ? definition : undefined),
+    },
+  };
+});
+
 const personal = SecretProviderId.make("personal");
 const work = SecretProviderId.make("work");
 const sources = [
-  { id: personal, kind: SecretProviderKind.make("one_password"), label: "个人" },
-  { id: work, kind: SecretProviderKind.make("one_password"), label: "Work" },
+  { id: personal, kind: SecretProviderKind.make("test_vault"), label: "个人" },
+  { id: work, kind: SecretProviderKind.make("test_vault"), label: "Work" },
 ];
 
 const reference = (screen: Screen) => screen.getByRole("textbox", { name: "API 密钥 引用" });
@@ -27,7 +46,7 @@ describe("SecretSourceInput", () => {
     await using screen = await render(
       <SecretSourceInput
         aria-label="API 密钥"
-        value={{ provider: personal, reference: "op://Private/OpenAI/credential" }}
+        value={{ provider: personal, reference: "ref://Private/OpenAI/credential" }}
         sources={sources}
         onCommit={() => {}}
         onSecretChange={onSecretChange}
@@ -41,10 +60,10 @@ describe("SecretSourceInput", () => {
     expect(onValidityChange).toHaveBeenLastCalledWith(false);
     await expect.element(reference(screen)).toHaveValue("");
 
-    await commitReference(screen, "op://Shared/OpenAI/credential");
+    await commitReference(screen, "ref://Shared/OpenAI/credential");
     expect(onSecretChange).toHaveBeenCalledExactlyOnceWith({
       provider: work,
-      reference: "op://Shared/OpenAI/credential",
+      reference: "ref://Shared/OpenAI/credential",
     });
     expect(onValidityChange).toHaveBeenLastCalledWith(true);
   });
@@ -54,7 +73,7 @@ describe("SecretSourceInput", () => {
     await using screen = await render(
       <SecretSourceInput
         aria-label="API 密钥"
-        value={{ provider: personal, reference: "op://Private/OpenAI/credential" }}
+        value={{ provider: personal, reference: "ref://Private/OpenAI/credential" }}
         sources={sources}
         onCommit={() => {}}
         onSecretChange={onSecretChange}
@@ -68,13 +87,13 @@ describe("SecretSourceInput", () => {
     expect(onSecretChange).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
-  it("rejects a reference 1Password cannot read", async () => {
+  it("rejects a reference its provider cannot read", async () => {
     const onSecretChange = vi.fn();
     const onValidityChange = vi.fn();
     await using screen = await render(
       <SecretSourceInput
         aria-label="API 密钥"
-        value={{ provider: personal, reference: "op://Private/OpenAI/credential" }}
+        value={{ provider: personal, reference: "ref://Private/OpenAI/credential" }}
         sources={sources}
         onCommit={() => {}}
         onSecretChange={onSecretChange}
@@ -87,11 +106,11 @@ describe("SecretSourceInput", () => {
     expect(onValidityChange).toHaveBeenLastCalledWith(false);
     await expect.element(reference(screen)).toHaveAttribute("aria-invalid", "true");
     await expect.element(reference(screen)).toHaveValue("Private/OpenAI/credential");
-    await commitReference(screen, "op://Private/OpenAI/replacement");
+    await commitReference(screen, "ref://Private/OpenAI/replacement");
     expect(onValidityChange).toHaveBeenLastCalledWith(true);
     expect(onSecretChange).toHaveBeenCalledExactlyOnceWith({
       provider: personal,
-      reference: "op://Private/OpenAI/replacement",
+      reference: "ref://Private/OpenAI/replacement",
     });
   });
 });

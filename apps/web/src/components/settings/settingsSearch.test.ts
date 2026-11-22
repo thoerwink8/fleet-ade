@@ -77,7 +77,7 @@ describe("searchSettings", () => {
 
   it("hides the Secrets page from nav and search while the secrets feature is disabled", () => {
     expect(SETTINGS_NAV_GROUPS.flatMap((group) => group.paths)).not.toContain("/settings/secrets");
-    expect(searchSettings("1password").map((item) => item.to)).not.toContain("/settings/secrets");
+    expect(searchSettings("vault").map((item) => item.to)).not.toContain("/settings/secrets");
   });
 
   it("finds the Scheduled tasks page", () => {

@@ -30,7 +30,6 @@ const workspaceFiles = [
   "packages/provider-grok/package.json",
   "packages/secret-provider-core/package.json",
   "packages/secret-provider-definitions/package.json",
-  "packages/secret-provider-onepassword/package.json",
   "packages/source-control-core/package.json",
   "packages/source-control-definitions/package.json",
   "packages/source-control-github/package.json",

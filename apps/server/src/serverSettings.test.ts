@@ -19,6 +19,7 @@ import {
 } from "@t3tools/contracts";
 import { createModelSelection } from "@t3tools/shared/model";
 import { assert, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -40,6 +41,26 @@ import * as ServerSettingsModule from "./serverSettings.ts";
 import { SECRET_REDACTED } from "./settingsSecrets.ts";
 import * as ManagedPolicy from "./policy/ManagedPolicy.ts";
 import { resolveProviderInstanceTerminalEnvironment } from "./terminal/Manager.ts";
+
+// No kind ships, so the rules for a loaded kind run against a stand-in definition.
+vi.mock("./secrets/secretProviderDefinitions.ts", async () => {
+  const { makeSecretProviderDefinitionRegistry } =
+    await import("@t3tools/secret-provider-core/shared/definition");
+  const { SecretProviderKind } = await import("@t3tools/contracts");
+  const Schema = await import("effect/Schema");
+  return {
+    secretProviderDefinitions: makeSecretProviderDefinitionRegistry([
+      {
+        kind: SecretProviderKind.make("test_vault"),
+        label: "Test vault",
+        configSchema: Schema.Struct({ account: Schema.String.check(Schema.isPattern(/^[a-z]+$/)) }),
+        isReference: (reference) => reference.startsWith("ref://"),
+        referencePlaceholder: "ref://vault/item/field",
+        invalidReferenceMessage: "Use a reference like ref://vault/item/field.",
+      },
+    ]),
+  };
+});
 
 const decodeServerSettings = Schema.decodeUnknownEffect(ServerSettings);
 const decodeServerSettingsJson = Schema.decodeUnknownEffect(Schema.fromJsonString(ServerSettings));
@@ -340,16 +361,18 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
     Effect.gen(function* () {
       const settings = yield* decodeServerSettings({
         secretProviders: {
-          personal: { kind: "one_password", label: "个人", config: { account: "my" } },
+          personal: { kind: "test_vault", label: "个人", config: { account: "my" } },
           vault: { kind: "openbao", label: "Vault", config: { token: "bao-token" } },
+          retired: { kind: "one_password", label: "1Password", config: { account: "my" } },
         },
       });
       assert.deepStrictEqual<unknown>(
         ServerSettingsModule.redactServerSettingsForClient(settings, { secretReferences: true })
           .secretProviders,
         {
-          personal: { kind: "one_password", label: "个人", config: { account: "my" } },
+          personal: { kind: "test_vault", label: "个人", config: { account: "my" } },
           vault: { kind: "openbao", label: "Vault" },
+          retired: { kind: "one_password", label: "1Password" },
         },
       );
     }),
@@ -364,9 +387,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           Effect.flip,
         );
       for (const entry of [
-        { kind: "one_password", label: "个人", config: { account: "--help" } },
-        { kind: "one_password", label: "个人" },
+        { kind: "test_vault", label: "个人", config: { account: "--help" } },
+        { kind: "test_vault", label: "个人" },
         { kind: "openbao", label: "Vault", config: { address: "https://x" } },
+        { kind: "one_password", label: "1Password", config: { account: "my" } },
       ]) {
         assert.deepInclude(yield* write(entry), { operation: "write-secret-provider" });
       }
@@ -1398,7 +1422,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       {
         label: "secret reference then redacted",
         duplicate: {
-          value: { provider: SecretProviderId.make("personal"), reference: "op://Private/FOO" },
+          value: { provider: SecretProviderId.make("personal"), reference: "ref://Private/FOO" },
           sensitive: true,
         },
         redactedLast: true,
@@ -1632,7 +1656,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         }
         const secret = {
           provider: SecretProviderId.make("personal"),
-          reference: "op://Private/Antigravity/token",
+          reference: "ref://Private/Antigravity/token",
         };
         const referenced = yield* service.updateProviderInstance({
           operation: "upsert",
@@ -1768,11 +1792,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
 
         const reference = {
           provider: SecretProviderId.make("personal"),
-          reference: "op://Private/Bitbucket/token",
+          reference: "ref://Private/Bitbucket/token",
         };
         const gitHubReference = {
           provider: SecretProviderId.make("personal"),
-          reference: "op://Private/GitHub/token",
+          reference: "ref://Private/GitHub/token",
         };
         yield* serverSettings.updateSettings({
           sourceControlHosts: {
@@ -1803,11 +1827,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         // A client that cannot decode references sees saved secrets and can send them back.
         const usageReference = {
           provider: SecretProviderId.make("personal"),
-          reference: "op://Private/Hub/key",
+          reference: "ref://Private/Hub/key",
         };
         const antigravityReference = {
           provider: SecretProviderId.make("personal"),
-          reference: "op://Private/Gemini/key",
+          reference: "ref://Private/Gemini/key",
         };
         const antigravity = ProviderInstanceId.make("antigravity");
         const hub = UsageLimitSourceId.make("hub");
@@ -1839,7 +1863,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         const legacy = ServerSettingsModule.redactServerSettingsForClient(withUsage, {
           secretReferences: false,
         });
-        assert.notInclude(JSON.stringify(legacy), "op://");
+        assert.notInclude(JSON.stringify(legacy), "ref://");
         assert.equal(legacy.sourceControlHosts.bitbucket?.accessToken, SECRET_REDACTED);
         assert.equal(legacy.usageLimitSources[hub]?.managementKey, SECRET_REDACTED);
         assert.equal(legacy.textGenerators[router]?.apiKey, SECRET_REDACTED);
@@ -1869,15 +1893,15 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       const service = yield* ServerSettingsModule.ServerSettingsService;
       const personal = (reference: string) => ({
         provider: SecretProviderId.make("personal"),
-        reference: `op://Private/${reference}`,
+        reference: `ref://Private/${reference}`,
       });
-      const work = { provider: SecretProviderId.make("work"), reference: "op://Work/token" };
+      const work = { provider: SecretProviderId.make("work"), reference: "ref://Work/token" };
       const instanceId = ProviderInstanceId.make("antigravity_refs");
       const hub = UsageLimitSourceId.make("hub");
       yield* decodeServerSettingsPatch({
         secretProviders: {
-          personal: { kind: "one_password", label: "个人", config: { account: "my" } },
-          work: { kind: "one_password", label: "Work", config: { account: "work" } },
+          personal: { kind: "test_vault", label: "个人", config: { account: "my" } },
+          work: { kind: "test_vault", label: "Work", config: { account: "work" } },
         },
       }).pipe(Effect.flatMap(service.updateSettings));
       yield* service.updateSettings({
@@ -1917,7 +1941,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           },
         },
       });
-      assert.notInclude(JSON.stringify(removed), "op://Private");
+      assert.notInclude(JSON.stringify(removed), "ref://Private");
       assert.deepEqual(removed.providerInstances[instanceId]?.environment, [
         { name: "WORK_TOKEN", value: work, sensitive: true },
         { name: "PLAIN", value: "kept", sensitive: false },
@@ -2949,12 +2973,12 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
         // Removing a secret provider still clears a hidden variable that read from it.
         const reference = {
           provider: SecretProviderId.make("personal"),
-          reference: "op://Private/Anthropic/key",
+          reference: "ref://Private/Anthropic/key",
         };
         yield* withPolicy(undefined, (service) =>
           decodeServerSettingsPatch({
             secretProviders: {
-              personal: { kind: "one_password", label: "个人", config: { account: "my" } },
+              personal: { kind: "test_vault", label: "个人", config: { account: "my" } },
             },
           }).pipe(
             Effect.flatMap(service.updateSettings),
@@ -2974,7 +2998,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))(
           service.updateSettings({ secretProviders: { [reference.provider]: null } }),
         );
         const cleared = yield* withPolicy(undefined, (service) => service.getSettings);
-        assert.notInclude(JSON.stringify(cleared), "op://Private");
+        assert.notInclude(JSON.stringify(cleared), "ref://Private");
       }).pipe(Effect.provide(shared));
     });
 
