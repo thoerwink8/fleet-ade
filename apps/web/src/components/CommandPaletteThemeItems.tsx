@@ -1,19 +1,14 @@
-import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
 import { MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
 
-import { useCustomThemes } from "../hooks/useCustomThemes";
-import { useEnvironmentThemeDefinitions } from "../hooks/useEnvironmentTheme";
 import { useTheme } from "../hooks/useTheme";
-import { getThemeDefinition } from "../themePalette";
+import { BUILT_IN_THEMES, getThemeDefinition } from "../themePalette";
 import {
   ADDON_ICON_CLASS,
   ITEM_ICON_CLASS,
-  type CommandPaletteActionItem,
   type CommandPaletteSubmenuItem,
 } from "./CommandPalette.logic";
-import { toggleThemeEditorForTheme } from "./settings/themeEditorStore";
 import {
-  STANDARD_THEME_CARDS,
+  STANDARD_THEME_CARD,
   getThemeCardDefinition,
   ThemePreviewCircle,
 } from "./settings/ThemePreviewCircles";
@@ -35,35 +30,14 @@ export function notifyThemeSaveFailure(): void {
   );
 }
 
-// Reads its own source hooks so the compiler caches the cards on them. Taking the
-// sources as arguments would leave it hook-free, and the compiler would cache nothing.
-function useThemeCards() {
-  const customThemes = useCustomThemes();
-  const environmentThemes = useEnvironmentThemeDefinitions();
-  const seen = new Set<string>();
-  return [
-    ...STANDARD_THEME_CARDS.map((card) => ({ ...card, id: null })),
-    ...[...BUILT_IN_THEMES, ...customThemes, ...environmentThemes]
-      .filter((definition) => {
-        if (seen.has(definition.id)) return false;
-        seen.add(definition.id);
-        return true;
-      })
-      .map(getThemeCardDefinition),
-  ];
-}
+const THEME_CARDS = [
+  { ...STANDARD_THEME_CARD, id: null },
+  ...BUILT_IN_THEMES.map(getThemeCardDefinition),
+];
 
 export function useCommandPaletteThemeItems() {
-  const {
-    theme,
-    themeHalves,
-    resolvedTheme,
-    appearanceMode,
-    setAppearanceMode,
-    setTheme,
-    setThemeHalf,
-  } = useTheme();
-  const themeCards = useThemeCards();
+  const { theme, appearanceMode, setAppearanceMode, setTheme } = useTheme();
+  const activeThemeId = getThemeDefinition(theme)?.id ?? null;
 
   const changeThemeItem: CommandPaletteSubmenuItem = {
     kind: "submenu",
@@ -77,16 +51,15 @@ export function useCommandPaletteThemeItems() {
       {
         value: "themes",
         label: "切换主题",
-        items: themeCards.map(({ id, label, previews }) => ({
+        items: THEME_CARDS.map(({ id, label, previews }) => ({
           kind: "action",
           value: id === null ? "theme:standard" : `theme:palette:${id}`,
           title: label,
-          description: previews.length === 1 ? `用于${previews[0]!.mode}模式` : undefined,
           searchTerms: [label, "theme", "appearance"],
           icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
           titleTrailingContent: (
             <span className="flex shrink-0 items-center gap-2">
-              {(themeHalves?.[resolvedTheme] ?? getThemeDefinition(theme)?.id ?? null) === id ? (
+              {activeThemeId === id ? (
                 <span className="text-xs text-muted-foreground/70">当前</span>
               ) : null}
               <span className="flex items-center gap-1" aria-hidden>
@@ -102,11 +75,7 @@ export function useCommandPaletteThemeItems() {
             </span>
           ),
           run: async () => {
-            const saved =
-              previews.length === 1 && id !== null
-                ? setThemeHalf(previews[0]!.mode, id)
-                : setTheme(id ?? appearanceMode);
-            if (!saved) notifyThemeSaveFailure();
+            if (!setTheme(id ?? appearanceMode)) notifyThemeSaveFailure();
           },
         })),
       },
@@ -143,21 +112,5 @@ export function useCommandPaletteThemeItems() {
     ],
   };
 
-  const themeEditorItem: CommandPaletteActionItem = {
-    kind: "action",
-    value: "action:theme-editor",
-    searchTerms: ["theme", "appearance", "colors", "palette", "customize"],
-    title: "开关主题编辑器",
-    icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
-    shortcutCommand: "themeEditor.toggle",
-    run: async () => {
-      toggleThemeEditorForTheme({
-        theme,
-        themeHalves,
-        initialAppearance: resolvedTheme,
-      });
-    },
-  };
-
-  return { changeThemeItem, changeAppearanceItem, themeEditorItem };
+  return { changeThemeItem, changeAppearanceItem };
 }

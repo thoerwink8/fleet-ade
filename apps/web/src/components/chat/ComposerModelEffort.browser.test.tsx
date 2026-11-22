@@ -82,16 +82,14 @@ function Column() {
       <div data-model-picker-effort>
         <ComposerEffortColumn traits={traits} />
       </div>
-      <p role="status">{describeComposerEffort(traits, "bars", "sm").suffix}</p>
+      <p role="status">{describeComposerEffort(traits, "sm").suffix}</p>
     </>
   );
 }
 
-it("draws an agent's reasoning as bars and keeps its mode out of the levels", async () => {
+it("names an agent's reasoning level and keeps its mode out of the levels", async () => {
   await using screen = await render(<Column />, { router: false }); // no routes involved
-  const status = screen.getByRole("status");
-  expect(status.element().querySelector("[data-composer-effort-glyph]")).not.toBeNull();
-  await expect.element(status).toHaveTextContent("");
+  await expect.element(screen.getByRole("status")).toHaveTextContent("Medium");
 
   const levels = screen.getByRole("radiogroup", { name: "正在思考" });
   await expect.element(levels.getByRole("radio")).toHaveLength(3);

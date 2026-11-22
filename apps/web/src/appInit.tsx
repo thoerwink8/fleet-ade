@@ -6,18 +6,8 @@ import {
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import type { ClientSettings } from "@t3tools/contracts/settings";
 import { createBrowserHistory, createHashHistory } from "@tanstack/react-router";
-import * as Schema from "effect/Schema";
 
-import { applyAppearanceContrast } from "./appearanceContrast";
-import {
-  applyAppearanceFontVariables,
-  CHAT_READING_SIZE_REM,
-  CHAT_READING_SIZE_STORAGE_KEY,
-  ChatReadingSizeSchema,
-  DEFAULT_CHAT_READING_SIZE,
-  type ChatReadingSize,
-  TYPOGRAPHY_ADVANCED_STORAGE_KEY,
-} from "./appearanceFonts";
+import { applyFontScale, applyListMarkerWidth } from "./appearanceFonts";
 import { retainThreadOverlaysForThread } from "./components/chat/threadOverlayRetention";
 import { resolveWindowTitleThreadStatus } from "./components/Sidebar.logic";
 import { startBackgroundThreadAnnouncements } from "./components/BackgroundThreadAnnouncer";
@@ -39,9 +29,6 @@ import {
   subscribeDraftThreadPromotion,
   useComposerDraftStore,
 } from "./composerDraftStore";
-import { startDefaultThemeAdoption } from "./hooks/useDefaultTheme";
-import { startEnvironmentThemeRepaint } from "./hooks/useEnvironmentTheme";
-import { readLocalStorageValue, subscribeLocalStorageKey } from "./hooks/useLocalStorage";
 import { startHostEnvironmentLookup } from "./state/primaryEnvironment";
 import {
   getClientSettings,
@@ -72,70 +59,22 @@ import { resolveActiveThreadRouteRef, resolveThreadRouteTarget } from "./threadR
 function startClientAppearance(): void {
   const root = document.documentElement;
   let applied: ClientSettings | null = null;
-  let appliedSeparateFonts: boolean | null = null;
-  let appliedReadingSize: ChatReadingSize | null = null;
+  applyListMarkerWidth(root);
   const apply = () => {
     const settings = getClientSettings();
     const previous = applied;
     applied = settings;
-    const separateFonts = readLocalStorageValue(
-      TYPOGRAPHY_ADVANCED_STORAGE_KEY,
-      false,
-      Schema.Boolean,
-    );
-    const previousSeparateFonts = appliedSeparateFonts;
-    appliedSeparateFonts = separateFonts;
-    const readingSize = readLocalStorageValue(
-      CHAT_READING_SIZE_STORAGE_KEY,
-      DEFAULT_CHAT_READING_SIZE,
-      ChatReadingSizeSchema,
-    );
-    if (appliedReadingSize !== readingSize) {
-      appliedReadingSize = readingSize;
-      root.style.setProperty("--font-size-prose", CHAT_READING_SIZE_REM[readingSize]);
-    }
     if (previous?.diffColorScheme !== settings.diffColorScheme) {
       root.dataset.diffColorScheme = settings.diffColorScheme;
     }
     if (previous?.chatWidth !== settings.chatWidth) {
       root.dataset.chatWidth = settings.chatWidth;
     }
-    if (previous?.appearanceContrast !== settings.appearanceContrast) {
-      applyAppearanceContrast(root, settings.appearanceContrast);
-    }
-    if (previous?.glassOpacity !== settings.glassOpacity) {
-      root.style.setProperty("--glass-opacity", `${settings.glassOpacity}%`);
-      if (settings.glassOpacity === 100) {
-        root.style.setProperty("--glass-blur", "0px");
-      } else {
-        root.style.removeProperty("--glass-blur");
-      }
-    }
-    if (
-      previous?.fontFamilySans !== settings.fontFamilySans ||
-      previous.fontFamilyCode !== settings.fontFamilyCode ||
-      previous.fontFamilyComposer !== settings.fontFamilyComposer ||
-      previous.fontSizeInterface !== settings.fontSizeInterface ||
-      previous.fontSizePrompt !== settings.fontSizePrompt ||
-      previous.fontSizeCode !== settings.fontSizeCode ||
-      previous.fontSmoothing !== settings.fontSmoothing ||
-      previousSeparateFonts !== separateFonts
-    ) {
-      applyAppearanceFontVariables(root, {
-        sans: settings.fontFamilySans,
-        code: settings.fontFamilyCode,
-        composer: settings.fontFamilyComposer,
-        sizeInterface: settings.fontSizeInterface,
-        sizePrompt: settings.fontSizePrompt,
-        sizeCode: settings.fontSizeCode,
-        smoothing: settings.fontSmoothing,
-        separate: separateFonts,
-      });
+    if (previous?.fontScale !== settings.fontScale) {
+      applyFontScale(root, settings.fontScale);
     }
   };
   subscribeClientSettings(apply);
-  subscribeLocalStorageKey(TYPOGRAPHY_ADVANCED_STORAGE_KEY, apply);
-  subscribeLocalStorageKey(CHAT_READING_SIZE_STORAGE_KEY, apply);
   apply();
 }
 
@@ -267,9 +206,7 @@ export function startAppServices(): AppRouter {
   startClientAppearance();
   startDocumentTitle(router);
   startHostEnvironmentLookup();
-  startEnvironmentThemeRepaint();
   startBrowserChromeThemeSync(router);
-  startDefaultThemeAdoption();
   startModelPreferencesMigration();
   installChatRouteCommands(router);
   installCommandPaletteCommands(router);

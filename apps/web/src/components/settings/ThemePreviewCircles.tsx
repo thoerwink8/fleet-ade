@@ -1,11 +1,9 @@
-import { MoonIcon, SunIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import {
   STANDARD_THEME_PREVIEW_COLORS as SHARED_STANDARD_THEME_PREVIEW_COLORS,
   THEME_PREVIEW_RENDER_SPECS,
 } from "@t3tools/shared/themePreview";
 import { cn } from "../../lib/utils";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   getThemeColorsForMode,
   getThemeModes,
@@ -55,16 +53,14 @@ const STANDARD_THEME_PREVIEW_COLORS: Record<
   },
 };
 
-export const STANDARD_THEME_CARDS: ReadonlyArray<ThemeCardDefinition> = [
-  {
-    id: "default",
-    label: "T3 Code",
-    previews: (["light", "dark"] as const).map((mode) => ({
-      mode,
-      colors: STANDARD_THEME_PREVIEW_COLORS[mode],
-    })),
-  },
-];
+export const STANDARD_THEME_CARD: ThemeCardDefinition = {
+  id: "default",
+  label: "默认",
+  previews: (["light", "dark"] as const).map((mode) => ({
+    mode,
+    colors: STANDARD_THEME_PREVIEW_COLORS[mode],
+  })),
+};
 
 export function previewColorsOf(
   card: ThemeCardDefinition,
@@ -145,69 +141,5 @@ export function ThemePreviewCircle({
         }}
       />
     </span>
-  );
-}
-
-export function ThemePreviewCircles({
-  label,
-  activeModes,
-  onSelectMode,
-  previews,
-}: {
-  label: string;
-  activeModes: ReadonlyArray<ThemeMode>;
-  onSelectMode: (mode: ThemeMode) => void;
-  previews: ThemeCardDefinition["previews"];
-}) {
-  return (
-    <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3">
-      {previews.map((preview) => {
-        const mode = preview.mode;
-        const isPicked = activeModes.includes(mode);
-        return (
-          <Tooltip key={mode}>
-            <TooltipTrigger
-              render={
-                <button
-                  aria-label={`使用 ${label} 的${mode}模式`}
-                  aria-pressed={isPicked}
-                  className={cn(
-                    "relative flex size-[68px] shrink-0 transform-gpu cursor-pointer items-center justify-center rounded-full p-1.5 outline-none transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-5 focus-visible:outline-foreground/60",
-                    isPicked && "hover:scale-100",
-                  )}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onSelectMode(mode);
-                  }}
-                  type="button"
-                >
-                  <ThemePreviewCircle colors={preview.colors} mode={mode} />
-                  {isPicked ? (
-                    <>
-                      <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{ boxShadow: "inset 0 0 0 2px var(--ring)" }}
-                      />
-                      <span
-                        aria-hidden
-                        className="pointer-events-none absolute bottom-0.5 right-0.5 flex size-5 items-center justify-center rounded-full border border-border/70 bg-background text-foreground shadow-sm"
-                      >
-                        {mode === "light" ? (
-                          <SunIcon className="size-3" />
-                        ) : (
-                          <MoonIcon className="size-3" />
-                        )}
-                      </span>
-                    </>
-                  ) : null}
-                </button>
-              }
-            />
-            <TooltipPopup>{mode === "light" ? "仅用于浅色模式" : "仅用于深色模式"}</TooltipPopup>
-          </Tooltip>
-        );
-      })}
-    </div>
   );
 }

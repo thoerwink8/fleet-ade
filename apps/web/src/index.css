@@ -91,11 +91,8 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 }
 
 :root {
+  -webkit-font-smoothing: antialiased;
   --app-scrollbar-width: 6px;
-  --appearance-contrast-base: 100%;
-  --appearance-contrast-boost: 0%;
-  --appearance-contrast-border-boost: 0%;
-  --appearance-contrast-target: black;
   --app-scrollbar-thumb: rgb(217 217 217);
   --app-scrollbar-thumb-hover: rgb(191 191 191);
   /*
@@ -164,7 +161,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   }
 
   @variant dark {
-    --appearance-contrast-target: white;
     --app-scrollbar-thumb: rgb(255 255 255 / 8%);
     --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
     --glass-blur: 16px;
@@ -782,30 +778,10 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     display: none;
   }
 
-  /* Each maintainer palette gives the same line art its own material: rose
-     vellum, forest drafting paper, marine cyanotype, copper, and violet ink.
+  /* Each built-in palette gives the same line art its own material: forest
+     drafting paper and copper.
      These colors stay deliberately deep at the top edge so the white stage
      wordmark and controls retain contrast in both appearance modes. */
-  html[data-theme-id="t3-chat"] {
-    --stage-art-top: oklch(0.760675 0.141361 348.019);
-    --stage-art-mid: oklch(0.588093 0.188832 353.138);
-    --stage-art-bottom: oklch(0.383959 0.135096 348.656);
-    --stage-art-highlight: oklch(0.949689 0.034241 339.171);
-    --stage-art-secondary: oklch(0.763402 0.163836 352.525);
-    --stage-art-tertiary: oklch(0.70819 0.180285 311.949);
-    --stage-art-line: oklch(0.952158 0.034194 336.179);
-
-    @variant dark {
-      --stage-art-top: oklch(0.540689 0.143665 347.587);
-      --stage-art-mid: oklch(0.396586 0.126592 347.6);
-      --stage-art-bottom: oklch(0.249959 0.079694 340.523);
-      --stage-art-highlight: oklch(0.921297 0.051708 343.229);
-      --stage-art-secondary: oklch(0.667398 0.165674 352.549);
-      --stage-art-tertiary: oklch(0.609315 0.163722 306.315);
-      --stage-art-line: oklch(0.945349 0.036045 341.433);
-    }
-  }
-
   html[data-theme-id="grove"] {
     --stage-art-top: oklch(0.751465 0.112731 157.313);
     --stage-art-mid: oklch(0.567105 0.11099 158.859);
@@ -837,26 +813,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
       --stage-night-secondary: oklch(0.586553 0.093722 157.365);
       --stage-night-tertiary: oklch(0.6364 0.101769 82.985);
       --stage-night-line: oklch(0.913292 0.035718 156.976);
-    }
-  }
-
-  html[data-theme-id="ocean"] {
-    --stage-art-top: oklch(0.792993 0.088072 220.421);
-    --stage-art-mid: oklch(0.590296 0.116841 243.184);
-    --stage-art-bottom: oklch(0.409123 0.093718 247.98);
-    --stage-art-highlight: oklch(0.971217 0.023008 213.615);
-    --stage-art-secondary: oklch(0.788391 0.090856 215.684);
-    --stage-art-tertiary: oklch(0.76441 0.099607 187.893);
-    --stage-art-line: oklch(0.976025 0.019647 212.543);
-
-    @variant dark {
-      --stage-art-top: oklch(0.59663 0.089167 233.427);
-      --stage-art-mid: oklch(0.461094 0.084904 243.478);
-      --stage-art-bottom: oklch(0.294818 0.05947 250.526);
-      --stage-art-highlight: oklch(0.952907 0.032224 221.27);
-      --stage-art-secondary: oklch(0.732079 0.09296 224.414);
-      --stage-art-tertiary: oklch(0.720885 0.095495 190.903);
-      --stage-art-line: oklch(0.961039 0.027355 219.756);
     }
   }
 
@@ -894,55 +850,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     }
   }
 
-  html[data-theme-id="iris"] {
-    --stage-art-top: oklch(0.738305 0.113454 298.926);
-    --stage-art-mid: oklch(0.551826 0.159189 294.531);
-    --stage-art-bottom: oklch(0.37147 0.133317 289.999);
-    --stage-art-highlight: oklch(0.949472 0.029204 303.081);
-    --stage-art-secondary: oklch(0.745085 0.125892 298.647);
-    --stage-art-tertiary: oklch(0.73066 0.167815 340.964);
-    --stage-art-line: oklch(0.960278 0.024064 306.969);
-
-    @variant dark {
-      --stage-art-top: oklch(0.57297 0.145973 295.185);
-      --stage-art-mid: oklch(0.419499 0.13752 292.131);
-      --stage-art-bottom: oklch(0.274235 0.095798 286.608);
-      --stage-art-highlight: oklch(0.916698 0.047206 300.224);
-      --stage-art-secondary: oklch(0.670994 0.13095 296.689);
-      --stage-art-tertiary: oklch(0.679357 0.165376 340.439);
-      --stage-art-line: oklch(0.940582 0.032921 299.076);
-    }
-  }
-
-  :is(html[data-theme-id="t3-chat"], html[data-theme-id="ocean"], html[data-theme-id="iris"]) {
-    --stage-night-top: color-mix(in oklch, var(--stage-art-top) 38%, var(--stage-night-base-top));
-    --stage-night-mid: color-mix(in oklch, var(--stage-art-mid) 38%, var(--stage-night-base-mid));
-    --stage-night-bottom: color-mix(
-      in oklch,
-      var(--stage-art-bottom) 38%,
-      var(--stage-night-base-bottom)
-    );
-    --stage-night-highlight: var(--stage-art-highlight);
-    --stage-night-secondary: color-mix(
-      in oklch,
-      var(--stage-art-secondary) 55%,
-      var(--stage-night-mid)
-    );
-    --stage-night-tertiary: color-mix(
-      in oklch,
-      var(--stage-art-tertiary) 60%,
-      var(--stage-night-top)
-    );
-    --stage-night-line: color-mix(in oklch, var(--stage-art-line) 82%, oklch(1 0 0));
-  }
-
-  :is(
-    html[data-theme-id="t3-chat"],
-    html[data-theme-id="grove"],
-    html[data-theme-id="ocean"],
-    html[data-theme-id="ember"],
-    html[data-theme-id="iris"]
-  ) {
+  :is(html[data-theme-id="grove"], html[data-theme-id="ember"]) {
     --stage-art-celeste-highlight: var(--stage-art-highlight);
     --stage-art-celeste-secondary: var(--stage-art-secondary);
     --stage-art-violet-highlight: var(--stage-art-highlight);
@@ -1403,79 +1311,6 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --terminal-selection-background: var(--app-theme-terminal-selection-background);
 }
 
-/* Theme-token dependency probes are restored synchronously, before paint. Keep
-   transitions from observing the temporary sentinel color in between. */
-html[data-theme-token-probe],
-html[data-theme-token-probe] *,
-html[data-theme-token-probe] *::before,
-html[data-theme-token-probe] *::after {
-  transition: none !important;
-}
-
-#theme-inspector-spotlight {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh;
-  overflow: visible;
-  pointer-events: none;
-}
-
-[data-slot="popover-positioner"]:has([data-theme-editor-panel]),
-[data-slot="tooltip-positioner"]:has([data-theme-editor-panel]) {
-  z-index: 120;
-}
-
-.theme-inspector-spotlight-dimmer {
-  fill: rgb(2 3 8 / 54%);
-}
-
-.theme-inspector-spotlight-glow {
-  fill: color-mix(in oklab, var(--ring) 9%, transparent);
-  stroke: color-mix(in oklab, var(--ring) 72%, white);
-  stroke-width: 2px;
-  opacity: 0.92;
-  vector-effect: non-scaling-stroke;
-}
-
-#theme-inspector-hover {
-  position: fixed;
-  z-index: 101;
-  pointer-events: none;
-  background: color-mix(in oklab, var(--ring) 7%, transparent);
-  border: 1px solid color-mix(in oklab, var(--ring) 70%, white);
-  box-shadow:
-    0 0 0 3px color-mix(in oklab, var(--ring) 16%, transparent),
-    0 0 18px color-mix(in oklab, var(--ring) 38%, transparent);
-}
-
-#theme-inspector-hover [data-theme-inspector-hover-label] {
-  position: absolute;
-  left: 0;
-  max-width: 12rem;
-  overflow: hidden;
-  padding: 0.2rem 0.45rem;
-  border: 1px solid color-mix(in oklab, var(--ring) 48%, var(--contrast-border));
-  border-radius: 0.4rem;
-  background: var(--popover);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 24%);
-  color: var(--contrast-popover-foreground);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-#theme-inspector-hover[data-placement="above"] [data-theme-inspector-hover-label] {
-  bottom: calc(100% + 0.35rem);
-}
-
-#theme-inspector-hover[data-placement="below"] [data-theme-inspector-hover-label] {
-  top: calc(100% + 0.35rem);
-}
-
 /* Workspace actions use a small, separate chrome hierarchy. Keeping these
    roles explicit prevents the thread toolbar from falling back to the default
    dark-mode whites while preserving the same theme file across clients. */
@@ -1553,28 +1388,6 @@ html[data-theme-id] :is(.chat-markdown, .composer-tiptap) .chat-markdown-codeblo
   color: color-mix(in srgb, var(--code-foreground) 72%, transparent);
 }
 
-/* T3 Chat renders inline code and compact chat artifacts with its translucent
-   secondary surface flattened over the light chat canvas. The raw muted and
-   secondary tokens are substantially darker than those visible pixels. */
-html[data-theme-id="t3-chat"] {
-  @variant light {
-    & .chat-markdown :not(pre) > code,
-    & [data-changed-files-state],
-    & [data-changed-files-header] {
-      background-color: var(--message-surface);
-    }
-
-    & .chat-markdown :not(pre) > code,
-    & [data-changed-files-state] {
-      border-color: transparent;
-    }
-
-    & .chat-markdown :not(pre) > code {
-      color: var(--contrast-message-foreground);
-    }
-  }
-}
-
 html[data-theme-id] [data-app-sidebar] {
   --background: var(--app-theme-canvas);
   --foreground: var(--app-theme-text);
@@ -1603,127 +1416,27 @@ html[data-theme-id] [data-app-sidebar] {
   }
 }
 
-/* T3 Chat's panel divider is deliberately pink, and its resize affordance
-   keeps that color while hovered. Do not neutralize this branded edge. */
-html[data-theme-id="t3-chat"] [data-app-sidebar] {
-  @variant dark {
-    border-color: var(--contrast-sidebar-border);
-  }
-}
-
-/* Recompute contrast wherever a subtree owns its own semantic color palette. */
+/* Subtrees that own a semantic palette (the themed sidebar) resolve these against their own tokens. */
 :root,
 [data-app-sidebar] {
-  --contrast-toolbar-foreground: color-mix(
-    in oklab,
-    color-mix(
-      in oklab,
-      var(--toolbar-foreground) var(--appearance-contrast-base),
-      var(--toolbar-background)
-    ),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-toolbar-border: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--toolbar-border) var(--appearance-contrast-base), transparent),
-    var(--toolbar-foreground) var(--appearance-contrast-border-boost)
-  );
-  --contrast-toolbar-control-foreground: color-mix(
-    in oklab,
-    color-mix(
-      in oklab,
-      var(--toolbar-control-foreground) var(--appearance-contrast-base),
-      var(--toolbar-control)
-    ),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-input: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--input) var(--appearance-contrast-base), transparent),
-    var(--foreground) var(--appearance-contrast-border-boost)
-  );
-  --contrast-border: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--border) var(--appearance-contrast-base), transparent),
-    var(--foreground) var(--appearance-contrast-border-boost)
-  );
-  --contrast-foreground: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--foreground) var(--appearance-contrast-base), var(--background)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-muted-foreground: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--muted-foreground) var(--appearance-contrast-base), var(--background)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-placeholder: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--placeholder) var(--appearance-contrast-base), var(--background)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-secondary-label: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--secondary-label) var(--appearance-contrast-base), var(--background)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-icon-muted: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--icon-muted) var(--appearance-contrast-base), var(--background)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-card-foreground: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--card-foreground) var(--appearance-contrast-base), var(--card)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-popover-foreground: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--popover-foreground) var(--appearance-contrast-base), var(--popover)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-accent-foreground: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--accent-foreground) var(--appearance-contrast-base), var(--accent)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-secondary-foreground: color-mix(
-    in oklab,
-    color-mix(
-      in oklab,
-      var(--secondary-foreground) var(--appearance-contrast-base),
-      var(--secondary)
-    ),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-message-foreground: color-mix(
-    in oklab,
-    color-mix(
-      in oklab,
-      var(--message-foreground) var(--appearance-contrast-base),
-      var(--message-surface)
-    ),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-sidebar-foreground: color-mix(
-    in oklab,
-    color-mix(in oklab, var(--sidebar-foreground) var(--appearance-contrast-base), var(--sidebar)),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-sidebar-muted-foreground: color-mix(
-    in oklab,
-    color-mix(
-      in oklab,
-      var(--sidebar-muted-foreground) var(--appearance-contrast-base),
-      var(--sidebar)
-    ),
-    var(--appearance-contrast-target) var(--appearance-contrast-boost)
-  );
-  --contrast-sidebar-border: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--sidebar-border) var(--appearance-contrast-base), transparent),
-    var(--sidebar-foreground) var(--appearance-contrast-border-boost)
-  );
+  --contrast-toolbar-foreground: var(--toolbar-foreground);
+  --contrast-toolbar-border: var(--toolbar-border);
+  --contrast-toolbar-control-foreground: var(--toolbar-control-foreground);
+  --contrast-input: var(--input);
+  --contrast-border: var(--border);
+  --contrast-foreground: var(--foreground);
+  --contrast-muted-foreground: var(--muted-foreground);
+  --contrast-placeholder: var(--placeholder);
+  --contrast-secondary-label: var(--secondary-label);
+  --contrast-icon-muted: var(--icon-muted);
+  --contrast-card-foreground: var(--card-foreground);
+  --contrast-popover-foreground: var(--popover-foreground);
+  --contrast-accent-foreground: var(--accent-foreground);
+  --contrast-secondary-foreground: var(--secondary-foreground);
+  --contrast-message-foreground: var(--message-foreground);
+  --contrast-sidebar-foreground: var(--sidebar-foreground);
+  --contrast-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --contrast-sidebar-border: var(--sidebar-border);
 }
 
 body {
@@ -1784,14 +1497,6 @@ body {
 :root {
   --surface-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
   --surface-grain-size: 256px 256px;
-}
-
-/* The live T3 Chat texture is a 128px grayscale tile with a constant 7/255
-   alpha. Keep our procedural texture cheap while matching that scale and
-   strength for the branded preset. */
-html[data-theme-id="t3-chat"] {
-  --surface-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02745'/%3E%3C/svg%3E");
-  --surface-grain-size: 128px 128px;
 }
 
 body {

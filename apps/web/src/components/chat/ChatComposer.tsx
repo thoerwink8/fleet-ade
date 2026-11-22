@@ -253,7 +253,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { Kbd } from "../ui/kbd";
 import { useSoftwareKeyboardOpen } from "../../hooks/useSoftwareKeyboardOpen";
 import { useStableCallback } from "../../hooks/useStableCallback";
-import { usePanelAnimationSettings } from "../../panelAnimations";
+import { PANEL_ANIMATION } from "../../panelAnimations";
 import { readEnvironmentScope, readPreparedConnection } from "../../state/session";
 import type { ReviewCommentContext } from "../../reviewCommentContext";
 import { useComposerRestingTransition } from "./useComposerRestingTransition";
@@ -2272,8 +2272,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onShowMore={expandMobileComposer}
       />
     ) : null;
-  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
-    usePanelAnimationSettings();
+  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } = PANEL_ANIMATION;
   const composerMainSurfaceRef = useComposerRestingTransition(
     composerControlsCollapsed,
     restingComposerControlsRef,
@@ -2311,7 +2310,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       compatibleRuntimeModeOptions={compatibleRuntimeModeOptions}
       handleRuntimeModeChange={handleRuntimeModeChange}
       composerControlsCollapsed={composerControlsCollapsed}
-      effortDisplay={settings.effortDisplay}
       permissionsShownInStrip={props.permissionsShownInStrip}
       composerControlsHidden={composerControlsHidden}
       restingHiddenBlockCount={restingHiddenBlockCount}

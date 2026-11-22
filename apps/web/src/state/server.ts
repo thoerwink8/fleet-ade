@@ -1,7 +1,6 @@
 import {
   DEFAULT_SERVER_SETTINGS,
   type EnvironmentId,
-  type EnvironmentTheme,
   type ServerConfig,
   type ServerConfigStreamEvent,
   type ServerLifecycleLegacyThreadMigrationPayload,
@@ -25,14 +24,12 @@ import { isConnectedWithConfig } from "../components/settings/scopedSettings";
 import { environmentCatalog } from "../connection/catalog";
 import { connectionAtomRuntime } from "../connection/runtime";
 import { environmentAtomList } from "./environmentAtomList";
-import { primaryEnvironmentIdAtom, themeEnvironmentIdAtom } from "./primaryEnvironment";
+import { primaryEnvironmentIdAtom } from "./primaryEnvironment";
 import { environmentSession } from "./session";
 import { reuseProvidersIgnoringCheckedAt } from "./serverProviders.logic";
 
-// Subscribe to every environment's themes; primary can change without reconnecting or updating the subscription.
 export const serverEnvironment = createServerEnvironmentAtoms(connectionAtomRuntime, {
   initialConfigValueAtom: environmentSession.initialConfigValueAtom,
-  environmentThemes: true,
   usageLimitSources: true,
   usageLimitsCommand: true,
 });
@@ -163,22 +160,6 @@ export const primaryServerKeybindingsAtom = createShortcutKeybindingsAtom({
   primaryConfigAtom: primaryServerConfigAtom,
   environmentsAtom: environmentConnectionsAtom,
 }).pipe(Atom.withLabel("web-primary-server-keybindings"));
-
-const EMPTY_ENVIRONMENT_THEMES: ReadonlyArray<EnvironmentTheme> = [];
-
-const themeServerConfigAtom = Atom.make((get): ServerConfig | null => {
-  const environmentId = get(themeEnvironmentIdAtom);
-  return environmentId === null ? null : get(serverEnvironment.configValueAtom(environmentId));
-}).pipe(Atom.withLabel("web-theme-server-config"));
-
-export const themeServerEnvironmentThemesAtom = Atom.make(
-  (get): ReadonlyArray<EnvironmentTheme> =>
-    get(themeServerConfigAtom)?.environmentThemes ?? EMPTY_ENVIRONMENT_THEMES,
-).pipe(Atom.withLabel("web-theme-server-environment-themes"));
-
-export const themeServerSettingsAtom = Atom.make(
-  (get): ServerSettings => get(themeServerConfigAtom)?.settings ?? DEFAULT_SERVER_SETTINGS,
-).pipe(Atom.withLabel("web-theme-server-settings"));
 
 export const providersIgnoringCheckedAtAtom = Atom.family((environmentId: EnvironmentId) =>
   Atom.make((get): ReadonlyArray<ServerProvider> =>

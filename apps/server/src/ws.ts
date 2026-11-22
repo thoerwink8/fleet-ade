@@ -103,7 +103,6 @@ import { RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as NativeChildWorkQuery from "./orchestration-v2/NativeChildWorkQuery.ts";
 import * as ServerConfig from "./config.ts";
-import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import * as ThreadManagementService from "./orchestration-v2/ThreadManagementService.ts";
@@ -1389,7 +1388,6 @@ export const layerWsRpc = (
       const checkpointDiffQuery = yield* CheckpointDiffQuery.CheckpointDiffQuery;
       const nativeChildWork = yield* NativeChildWorkQuery.NativeChildWorkQuery;
       const keybindings = yield* Keybindings.Keybindings;
-      const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const directEndpoints = yield* DirectEndpoints.DirectEndpoints;
@@ -3155,16 +3153,6 @@ export const layerWsRpc = (
                 Stream.debounce(Duration.millis(PROVIDER_STATUS_DEBOUNCE_MS)),
               );
               // Gate capability-specific events; older clients reject them and lose their config subscription.
-              const environmentThemeUpdates =
-                input.environmentThemes === true
-                  ? environmentTheme.streamChanges.pipe(
-                      Stream.map((themes) => ({
-                        version: 1 as const,
-                        type: "environmentThemesUpdated" as const,
-                        payload: { themes },
-                      })),
-                    )
-                  : Stream.empty;
               const usageLimitSourceUpdates =
                 input.usageLimitSources === true
                   ? usageLimitSources.streamChanges.pipe(
@@ -3190,10 +3178,7 @@ export const layerWsRpc = (
                 keybindingsUpdates,
                 Stream.merge(
                   providerStatuses,
-                  Stream.merge(
-                    settingsUpdates,
-                    Stream.merge(environmentThemeUpdates, usageLimitSourceUpdates),
-                  ),
+                  Stream.merge(settingsUpdates, usageLimitSourceUpdates),
                 ),
               );
 

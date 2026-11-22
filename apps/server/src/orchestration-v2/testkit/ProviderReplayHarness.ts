@@ -97,7 +97,6 @@ export function makeReplayServerConfig(
     const providerLogsDir = path.join(logsDir, "provider");
     const terminalLogsDir = path.join(logsDir, "terminals");
     const attachmentsDir = path.join(stateDir, "attachments");
-    const environmentThemesDir = path.join(stateDir, "themes");
     const worktreesDir = path.join(baseDir, "worktrees");
     const providerStatusCacheDir = path.join(baseDir, "caches");
 
@@ -107,7 +106,6 @@ export function makeReplayServerConfig(
       providerLogsDir,
       terminalLogsDir,
       attachmentsDir,
-      environmentThemesDir,
       worktreesDir,
       providerStatusCacheDir,
     ]) {
@@ -151,7 +149,6 @@ export function makeReplayServerConfig(
       worktreesDir,
       attachmentsDir,
       browserArtifactsDir: path.join(stateDir, "browser-artifacts"),
-      environmentThemesDir,
       logsDir,
       serverLogPath: path.join(logsDir, "server.log"),
       serverTracePath: path.join(logsDir, "server.trace.ndjson"),

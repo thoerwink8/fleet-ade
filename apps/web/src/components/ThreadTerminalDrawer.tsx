@@ -31,7 +31,6 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
-import * as Schema from "effect/Schema";
 import { AsyncResult } from "effect/reactivity";
 import {
   type PointerEvent as ReactPointerEvent,
@@ -78,7 +77,6 @@ import { confirmTerminalClose } from "~/lib/terminalCloseConfirm";
 import { useClientSettings } from "../hooks/useSettings";
 import { getFileMetadataQueryAtom } from "../hooks/useFileMetadata";
 import { FileMetadataThreadContext } from "../hooks/FileMetadataThreadProvider";
-import { useLocalStorage } from "../hooks/useLocalStorage";
 import { attachedTerminalSessionAtom } from "../state/terminalSessions";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { serverEnvironment } from "../state/server";
@@ -95,11 +93,7 @@ import {
   focusTerminalViewport,
   registerTerminalFocusTarget,
 } from "../lib/terminalFocus";
-import {
-  resolveTerminalFontPreference,
-  resolveTerminalFontSizePreference,
-  TYPOGRAPHY_ADVANCED_STORAGE_KEY,
-} from "../appearanceFonts";
+import { FONT_SCALES } from "../appearanceFonts";
 
 const MIN_DRAWER_HEIGHT = 180;
 const MAX_DRAWER_HEIGHT_RATIO = 0.75;
@@ -311,11 +305,6 @@ function readThemeColor(styles: CSSStyleDeclaration, variable: string, fallback:
   return normalizeComputedColor(styles.getPropertyValue(variable), fallback);
 }
 
-function terminalFontOptions(family: string, size: number): { family?: string; size: number } {
-  const trimmed = family.trim();
-  return trimmed.length > 0 ? { family: trimmed, size } : { size };
-}
-
 export function terminalThemeFromApp(mountElement?: HTMLElement | null): GhosttyTheme {
   const drawerSurface =
     mountElement?.closest("[data-thread-terminal-drawer]") ??
@@ -454,7 +443,6 @@ export function shouldHandleTerminalExit(
 }
 
 interface TerminalViewportProps {
-  advancedTypography: boolean;
   threadRef: ScopedThreadRef;
   threadId: ThreadId;
   terminalId: string;
@@ -490,7 +478,6 @@ function TerminalViewport(props: TerminalViewportProps) {
 }
 
 function TerminalSessionViewport({
-  advancedTypography,
   threadRef,
   threadId,
   terminalId,
@@ -579,21 +566,9 @@ function TerminalSessionViewport({
   });
   const canAddSelectionToChat = useEffectEvent(() => onAddTerminalContext !== undefined);
   const readTerminalLabel = useEffectEvent(() => terminalLabel);
-  const terminalFontFamily = useClientSettings((settings) =>
-    resolveTerminalFontPreference({
-      advanced: advancedTypography,
-      code: settings.fontFamilyCode,
-      terminal: settings.fontFamilyTerminal,
-    }),
-  );
-  const terminalFontSize = useClientSettings((settings) =>
-    resolveTerminalFontSizePreference({
-      advanced: advancedTypography,
-      code: settings.fontSizeCode,
-      terminal: settings.fontSizeTerminal,
-    }),
-  );
-  const terminalFontRef = useRef({ family: terminalFontFamily, size: terminalFontSize });
+  // The terminal uses the code size and its own default monospace face.
+  const terminalFontSize = useClientSettings((settings) => FONT_SCALES[settings.fontScale].code);
+  const terminalFontRef = useRef({ size: terminalFontSize });
   // Keyed by the launch (see TerminalViewport), so the atom is fixed for this surface.
   const terminalSessionAtom = attachedTerminalSessionAtom(environmentId, {
     threadId,
@@ -676,13 +651,12 @@ function TerminalSessionViewport({
     if (visible) consumePendingTerminalFocus(threadRef, terminalId);
   }, [terminalId, threadRef, visible]);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- applies font family and size changes to the live Ghostty terminal surface
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- applies font size changes to the live Ghostty terminal surface
   useEffect(() => {
-    const current = terminalFontRef.current;
-    if (current.family === terminalFontFamily && current.size === terminalFontSize) return;
-    terminalFontRef.current = { family: terminalFontFamily, size: terminalFontSize };
-    void terminalRef.current?.setFont(terminalFontOptions(terminalFontFamily, terminalFontSize));
-  }, [terminalFontFamily, terminalFontSize]);
+    if (terminalFontRef.current.size === terminalFontSize) return;
+    terminalFontRef.current = { size: terminalFontSize };
+    void terminalRef.current?.setFont({ size: terminalFontSize });
+  }, [terminalFontSize]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- creates the Ghostty terminal in the mount node and subscribes it to the terminal session
   useEffect(() => {
@@ -699,7 +673,7 @@ function TerminalSessionViewport({
       const setupFont = terminalFontRef.current;
       const terminalOptions = withLiveVisibility(visibleRef, {
         theme: terminalThemeFromApp(mount),
-        font: terminalFontOptions(setupFont.family, setupFont.size),
+        font: { size: setupFont.size },
         onData: (data) => handleData(data),
         onResize: (cols, rows) => void resizeTerminal(cols, rows),
         onSelectionChange: () => {},
@@ -727,8 +701,8 @@ function TerminalSessionViewport({
       terminal.input.readOnly = !hasTerminalWriteAccess();
       // Reapply font settings hydrated during loading, when terminalRef was null.
       const currentFont = terminalFontRef.current;
-      if (currentFont.family !== setupFont.family || currentFont.size !== setupFont.size) {
-        void terminal.setFont(terminalFontOptions(currentFont.family, currentFont.size));
+      if (currentFont.size !== setupFont.size) {
+        void terminal.setFont({ size: currentFont.size });
       }
       const latestSession = readTerminalSession();
       terminal.setSharedGrid(latestSession.grid);
@@ -1189,7 +1163,6 @@ function TerminalSplitPanes({
   resolveLaunchLocation,
   onActiveTerminalChange,
   onCloseTerminal,
-  advancedTypography,
   threadRef,
   threadId,
   onAddTerminalContext,
@@ -1203,7 +1176,6 @@ function TerminalSplitPanes({
   resolveLaunchLocation: (terminalId: string) => TerminalLaunchLocation;
   onActiveTerminalChange: (terminalId: string) => void;
   onCloseTerminal: (terminalId: string, threadRef?: ScopedThreadRef) => void;
-  advancedTypography: boolean;
   threadRef: ScopedThreadRef;
   threadId: ThreadId;
   onAddTerminalContext: (selection: TerminalContextSelection) => void;
@@ -1241,7 +1213,6 @@ function TerminalSplitPanes({
           >
             <div className="h-full">
               <TerminalViewport
-                advancedTypography={advancedTypography}
                 threadRef={threadRef}
                 threadId={threadId}
                 terminalId={terminalId}
@@ -1395,11 +1366,6 @@ export default function ThreadTerminalDrawer({
   const canOperateTerminal = useEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope);
   const terminalArea = workspaceAreaProps("terminal", 5, "Terminal");
   const isPanel = mode === "panel";
-  const [advancedTypography] = useLocalStorage(
-    TYPOGRAPHY_ADVANCED_STORAGE_KEY,
-    false,
-    Schema.Boolean,
-  );
   const drawerRef = useRef<HTMLElement | null>(null);
   const [drawerLayout, setDrawerLayout] = useState(() => readDrawerLayout(null));
   const maxDrawerHeight = resolveTerminalDrawerMaxHeight({ ...drawerLayout, composerHeight });
@@ -1792,7 +1758,6 @@ export default function ThreadTerminalDrawer({
               resolveLaunchLocation={resolveTerminalLaunchLocation}
               onActiveTerminalChange={onActiveTerminalChange}
               onCloseTerminal={onCloseTerminal}
-              advancedTypography={advancedTypography}
               threadRef={threadRef}
               threadId={threadId}
               onAddTerminalContext={onAddTerminalContext}

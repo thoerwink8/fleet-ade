@@ -114,66 +114,9 @@ export const DEFAULT_SNOOZE_PRESETS: ReadonlyArray<SnoozePresetSetting> = [
   { kind: "at", day: "monday", time: "09:00" },
 ];
 
-export const MIN_GLASS_OPACITY = 40;
-export const MAX_GLASS_OPACITY = 100;
-export const GlassOpacity = Schema.Int.check(
-  Schema.isBetween({
-    minimum: MIN_GLASS_OPACITY,
-    maximum: MAX_GLASS_OPACITY,
-  }),
-);
-export type GlassOpacity = typeof GlassOpacity.Type;
-const DEFAULT_GLASS_OPACITY: GlassOpacity = 80;
-
-export const MIN_APPEARANCE_CONTRAST = 50;
-export const MAX_APPEARANCE_CONTRAST = 200;
-export const AppearanceContrast = Schema.Int.check(
-  Schema.isBetween({ minimum: MIN_APPEARANCE_CONTRAST, maximum: MAX_APPEARANCE_CONTRAST }),
-);
-export type AppearanceContrast = typeof AppearanceContrast.Type;
-const DEFAULT_APPEARANCE_CONTRAST: AppearanceContrast = 100;
-export const MIN_PANEL_ANIMATION_DURATION_MS = 0;
-export const MAX_PANEL_ANIMATION_DURATION_MS = 400;
-export const PanelAnimationDurationMs = Schema.Int.check(
-  Schema.isBetween({
-    minimum: MIN_PANEL_ANIMATION_DURATION_MS,
-    maximum: MAX_PANEL_ANIMATION_DURATION_MS,
-  }),
-);
-export type PanelAnimationDurationMs = typeof PanelAnimationDurationMs.Type;
-const DEFAULT_PANEL_ANIMATION_DURATION_MS: PanelAnimationDurationMs = 0;
-
-export const MIN_INTERFACE_FONT_SIZE = 12;
-export const MAX_INTERFACE_FONT_SIZE = 20;
-export const InterfaceFontSize = Schema.Int.check(
-  Schema.isBetween({ minimum: MIN_INTERFACE_FONT_SIZE, maximum: MAX_INTERFACE_FONT_SIZE }),
-);
-export type InterfaceFontSize = typeof InterfaceFontSize.Type;
-export const DEFAULT_INTERFACE_FONT_SIZE: InterfaceFontSize = 16;
-
-export const MIN_PROMPT_FONT_SIZE = 12;
-export const MAX_PROMPT_FONT_SIZE = 20;
-export const PromptFontSize = Schema.Int.check(
-  Schema.isBetween({ minimum: MIN_PROMPT_FONT_SIZE, maximum: MAX_PROMPT_FONT_SIZE }),
-);
-export type PromptFontSize = typeof PromptFontSize.Type;
-export const DEFAULT_PROMPT_FONT_SIZE: PromptFontSize = 14;
-
-export const MIN_CODE_FONT_SIZE = 10;
-export const MAX_CODE_FONT_SIZE = 18;
-export const CodeFontSize = Schema.Int.check(
-  Schema.isBetween({ minimum: MIN_CODE_FONT_SIZE, maximum: MAX_CODE_FONT_SIZE }),
-);
-export type CodeFontSize = typeof CodeFontSize.Type;
-export const DEFAULT_CODE_FONT_SIZE: CodeFontSize = 13;
-
-export const MIN_TERMINAL_FONT_SIZE = 8;
-export const MAX_TERMINAL_FONT_SIZE = 20;
-export const TerminalFontSize = Schema.Int.check(
-  Schema.isBetween({ minimum: MIN_TERMINAL_FONT_SIZE, maximum: MAX_TERMINAL_FONT_SIZE }),
-);
-export type TerminalFontSize = typeof TerminalFontSize.Type;
-const DEFAULT_TERMINAL_FONT_SIZE: TerminalFontSize = 12;
+/** One size step for the interface, prompt, code and terminal together. */
+export const FontScale = Schema.Literals(["standard", "comfortable", "large"]);
+export type FontScale = typeof FontScale.Type;
 
 // "artwork" follows the running channel and shows nothing on Latest. The fixed artwork
 // modes let any channel opt into a specific channel's art.
@@ -211,14 +154,6 @@ const LegacyConfirmQuit = Schema.Boolean.pipe(
 
 const QuitConfirmationModeSetting = Schema.Union([QuitConfirmationMode, LegacyConfirmQuit]);
 
-export const FontFamilyPreference = Schema.String.check(Schema.isMaxLength(200));
-export type FontFamilyPreference = typeof FontFamilyPreference.Type;
-
-/** Clients apply each environment theme set once; later local choices persist until the next set. Empty clears it. */
-export const DefaultThemePreference = Schema.String.check(Schema.isMaxLength(64));
-// Excluded from RPC patches so t3 theme set can validate syntax and resolvability.
-export type DefaultThemePreference = typeof DefaultThemePreference.Type;
-
 export const LoadBalancingWeights = Schema.Record(
   TrimmedNonEmptyString,
   Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
@@ -228,10 +163,6 @@ export const DiffColorScheme = Schema.Literals(["red-green", "blue-orange"]);
 
 export const ChatWidth = Schema.Literals(["comfortable", "wide", "full"]);
 export type ChatWidth = typeof ChatWidth.Type;
-
-/** How the composer shows reasoning effort: the level's name, or rising bars. */
-export const EffortDisplay = Schema.Literals(["label", "bars"]);
-export type EffortDisplay = typeof EffortDisplay.Type;
 
 export const ToolCallVisibility = Schema.Literals(["showAll", "hideSuccessful", "hideAll", "zen"]);
 export type ToolCallVisibility = typeof ToolCallVisibility.Type;
@@ -266,16 +197,8 @@ export const ClientSettingsSchema = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
   ),
   chatWidth: ChatWidth.pipe(Schema.withDecodingDefault(Effect.succeed("comfortable" as const))),
-  effortDisplay: EffortDisplay.pipe(Schema.withDecodingDefault(Effect.succeed("label" as const))),
   loadBalancingEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   loadBalancingWeights: LoadBalancingWeights.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
-  appearanceContrast: AppearanceContrast.pipe(
-    Schema.withDecodingDefault(Effect.succeed(DEFAULT_APPEARANCE_CONTRAST)),
-  ),
-  // Zero avoids per-frame layout work from width/height transitions.
-  panelAnimationDurationMs: PanelAnimationDurationMs.pipe(
-    Schema.withDecodingDefault(Effect.succeed(DEFAULT_PANEL_ANIMATION_DURATION_MS)),
-  ),
 
   confirmQuit: QuitConfirmationModeSetting.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_QUIT_CONFIRMATION_MODE)),
@@ -289,27 +212,7 @@ export const ClientSettingsSchema = Schema.Struct({
   environmentIdentificationMode: EnvironmentIdentificationMode.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_ENVIRONMENT_IDENTIFICATION_MODE)),
   ),
-  glassOpacity: GlassOpacity.pipe(
-    Schema.withDecodingDefault(Effect.succeed(DEFAULT_GLASS_OPACITY)),
-  ),
-  fontSizeInterface: InterfaceFontSize.pipe(
-    Schema.withDecodingDefault(Effect.succeed(DEFAULT_INTERFACE_FONT_SIZE)),
-  ),
-  fontSizePrompt: PromptFontSize.pipe(
-    Schema.withDecodingDefault(Effect.succeed(DEFAULT_PROMPT_FONT_SIZE)),
-  ),
-  fontSizeCode: CodeFontSize.pipe(
-    Schema.withDecodingDefault(Effect.succeed(DEFAULT_CODE_FONT_SIZE)),
-  ),
-  fontSizeTerminal: TerminalFontSize.pipe(
-    Schema.withDecodingDefault(Effect.succeed(DEFAULT_TERMINAL_FONT_SIZE)),
-  ),
-  fontFamilyCode: FontFamilyPreference.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
-  fontFamilyComposer: FontFamilyPreference.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
-  fontFamilySans: FontFamilyPreference.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
-  fontFamilyTerminal: FontFamilyPreference.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
-
-  fontSmoothing: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  fontScale: FontScale.pipe(Schema.withDecodingDefault(Effect.succeed("standard" as const))),
   // Older installs also decode to null; onboarding must additionally require an empty workspace.
   onboardingCompletedAt: Schema.NullOr(Schema.String).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
@@ -1392,11 +1295,6 @@ export const ServerSettings = Schema.Struct({
   backgroundActivityProfile: BackgroundActivityProfile.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_BACKGROUND_ACTIVITY_PROFILE)),
   ),
-  defaultTheme: DefaultThemePreference.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
-  /** Distinguishes repeated sets of the same theme so clients apply each one. */
-  defaultThemeSetAt: Schema.String.check(Schema.isMaxLength(64)).pipe(
-    Schema.withDecodingDefault(Effect.succeed("")),
-  ),
   environmentIcon: ForwardCompatibleNullable(EnvironmentMachineKind).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
@@ -1940,11 +1838,8 @@ export const ClientSettingsPatch = Schema.Struct({
   inAppNotificationsEnabled: Schema.optionalKey(Schema.Boolean),
   diffColorScheme: Schema.optionalKey(DiffColorScheme),
   chatWidth: Schema.optionalKey(ChatWidth),
-  effortDisplay: Schema.optionalKey(EffortDisplay),
   loadBalancingEnabled: Schema.optionalKey(Schema.Boolean),
   loadBalancingWeights: Schema.optionalKey(LoadBalancingWeights),
-  appearanceContrast: Schema.optionalKey(AppearanceContrast),
-  panelAnimationDurationMs: Schema.optionalKey(PanelAnimationDurationMs),
   confirmQuit: Schema.optionalKey(QuitConfirmationMode),
   confirmThreadArchive: Schema.optionalKey(Schema.Boolean),
   confirmThreadDelete: Schema.optionalKey(Schema.Boolean),
@@ -1953,17 +1848,8 @@ export const ClientSettingsPatch = Schema.Struct({
   diffIgnoreWhitespace: Schema.optionalKey(Schema.Boolean),
   diffLayout: Schema.optionalKey(DiffLayout),
   environmentIdentificationMode: Schema.optionalKey(EnvironmentIdentificationMode),
-  glassOpacity: Schema.optionalKey(GlassOpacity),
   onboardingCompletedAt: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  fontSizeInterface: Schema.optionalKey(InterfaceFontSize),
-  fontSizePrompt: Schema.optionalKey(PromptFontSize),
-  fontSizeCode: Schema.optionalKey(CodeFontSize),
-  fontSizeTerminal: Schema.optionalKey(TerminalFontSize),
-  fontFamilyCode: Schema.optionalKey(FontFamilyPreference),
-  fontFamilyComposer: Schema.optionalKey(FontFamilyPreference),
-  fontFamilySans: Schema.optionalKey(FontFamilyPreference),
-  fontFamilyTerminal: Schema.optionalKey(FontFamilyPreference),
-  fontSmoothing: Schema.optionalKey(Schema.Boolean),
+  fontScale: Schema.optionalKey(FontScale),
   persistComposerContextStrip: Schema.optionalKey(Schema.Boolean),
   favorites: Schema.optionalKey(ModelFavorites),
   providerModelPreferences: Schema.optionalKey(ProviderModelPreferences),

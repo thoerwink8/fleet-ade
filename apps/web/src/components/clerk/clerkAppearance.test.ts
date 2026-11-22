@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import {
-  EMBER_THEME,
-  GROVE_THEME,
-  IRIS_THEME,
-  OCEAN_THEME,
-  T3_CHAT_THEME,
-  themeColorToHex,
-  type ThemeColors,
-} from "../../themePalette";
+import { EMBER_THEME, GROVE_THEME, themeColorToHex, type ThemeColors } from "../../themePalette";
 import { clerkAppearance } from "./clerkAppearance";
 
 function contrastRatio(first: string, second: string): number {
@@ -40,13 +32,7 @@ function mixThemeColors(first: string, second: string, firstWeight: number): str
   return `#${mixed.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
-const builtInThemeModes = [
-  T3_CHAT_THEME,
-  GROVE_THEME,
-  OCEAN_THEME,
-  EMBER_THEME,
-  IRIS_THEME,
-].flatMap((theme) =>
+const builtInThemeModes = [GROVE_THEME, EMBER_THEME].flatMap((theme) =>
   [theme.colors, theme.variants?.dark].filter((colors): colors is ThemeColors => !!colors),
 );
 

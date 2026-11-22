@@ -78,39 +78,6 @@ export function hasChangedBackgroundActivitySettings(
   );
 }
 
-type TypographySettings = Pick<
-  UnifiedSettings,
-  | "fontFamilySans"
-  | "fontFamilyComposer"
-  | "fontFamilyCode"
-  | "fontFamilyTerminal"
-  | "fontSizeInterface"
-  | "fontSizePrompt"
-  | "fontSizeCode"
-  | "fontSizeTerminal"
->;
-
-export function getChangedTypographySettingLabels(settings: TypographySettings): string[] {
-  return [
-    ...(settings.fontFamilySans !== DEFAULT_UNIFIED_SETTINGS.fontFamilySans ||
-    settings.fontSizeInterface !== DEFAULT_UNIFIED_SETTINGS.fontSizeInterface
-      ? ["界面字体"]
-      : []),
-    ...(settings.fontFamilyComposer !== DEFAULT_UNIFIED_SETTINGS.fontFamilyComposer ||
-    settings.fontSizePrompt !== DEFAULT_UNIFIED_SETTINGS.fontSizePrompt
-      ? ["提示词字体"]
-      : []),
-    ...(settings.fontFamilyCode !== DEFAULT_UNIFIED_SETTINGS.fontFamilyCode ||
-    settings.fontSizeCode !== DEFAULT_UNIFIED_SETTINGS.fontSizeCode
-      ? ["代码字体"]
-      : []),
-    ...(settings.fontFamilyTerminal !== DEFAULT_UNIFIED_SETTINGS.fontFamilyTerminal ||
-    settings.fontSizeTerminal !== DEFAULT_UNIFIED_SETTINGS.fontSizeTerminal
-      ? ["终端字体"]
-      : []),
-  ];
-}
-
 export function resolveBackgroundActivityProfileOption(
   settings: ServerSettings,
 ): BackgroundActivityProfile | "advanced" {

@@ -61,7 +61,7 @@ import {
   applyServerConfigProjection,
   reuseUnchanged,
   type ServerConfigProjection,
-  withoutEnvironmentThemes,
+  withoutUsageLimitSources,
 } from "./serverConfigProjection.ts";
 
 export type { ServerConfigProjection } from "./serverConfigProjection.ts";
@@ -373,7 +373,6 @@ const cachedConfigSnapshotEvent = (config: ServerConfig): ServerConfigStreamEven
 });
 
 export interface ServerConfigSubscriptionOptions {
-  readonly environmentThemes?: boolean;
   readonly usageLimitSources?: boolean;
   readonly usageLimitsCommand?: boolean;
   readonly providerCatalogsOnDemand?: boolean;
@@ -475,8 +474,8 @@ export const makeEnvironmentServerConfigState = Effect.fn("EnvironmentServerConf
     );
     const state = yield* SubscriptionRef.make<Option.Option<ServerConfigProjection>>(
       Option.map(cachedConfig, (cached) => ({
-        config: withoutEnvironmentThemes(cached),
-        latestEvent: cachedConfigSnapshotEvent(withoutEnvironmentThemes(cached)),
+        config: withoutUsageLimitSources(cached),
+        latestEvent: cachedConfigSnapshotEvent(withoutUsageLimitSources(cached)),
         source: "cache" as const,
       })),
     );
@@ -488,12 +487,7 @@ export const makeEnvironmentServerConfigState = Effect.fn("EnvironmentServerConf
       config: ServerConfig,
     ) {
       // A cached stall would read as a fresh freeze on the next launch.
-      const {
-        environmentThemes: _themes,
-        usageLimitSources: _sources,
-        lastEventLoopStall: _stall,
-        ...cacheable
-      } = config;
+      const { usageLimitSources: _sources, lastEventLoopStall: _stall, ...cacheable } = config;
       if (lastPersisted !== undefined && sameCacheValue(lastPersisted, cacheable)) {
         return true;
       }
@@ -543,7 +537,6 @@ export const makeEnvironmentServerConfigState = Effect.fn("EnvironmentServerConf
     // Written and read inside the one update loop below.
     let fetchedCatalogs: ReadonlyArray<FetchedMachineCatalog> = [];
     const configUpdates = subscribe(WS_METHODS.subscribeServerConfig, {
-      ...(subscription.environmentThemes === true ? { environmentThemes: true } : {}),
       ...(subscription.usageLimitSources === true ? { usageLimitSources: true } : {}),
       ...(subscription.usageLimitsCommand === true ? { usageLimitsCommand: true } : {}),
       ...(subscription.providerCatalogsOnDemand === true ? { providerCatalogsOnDemand: true } : {}),
@@ -838,7 +831,6 @@ export function createServerEnvironmentAtoms<R, E>(
     readonly initialConfigValueAtom: (
       environmentId: EnvironmentId,
     ) => Atom.Atom<ServerConfig | null>;
-    readonly environmentThemes?: boolean;
     readonly usageLimitSources?: boolean;
     readonly usageLimitsCommand?: boolean;
     readonly providerCatalogsOnDemand?: boolean;
@@ -866,7 +858,6 @@ export function createServerEnvironmentAtoms<R, E>(
         serverConfigStateChanges(
           environmentId,
           {
-            ...(options.environmentThemes === true ? { environmentThemes: true } : {}),
             ...(options.usageLimitSources === true ? { usageLimitSources: true } : {}),
             ...(options.usageLimitsCommand === true ? { usageLimitsCommand: true } : {}),
             ...(options.providerCatalogsOnDemand === true

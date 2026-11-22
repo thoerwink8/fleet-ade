@@ -1,11 +1,9 @@
 import {
   buildTraitsTriggerDisplay,
-  getDescriptorStringValue,
   isReasoningControl,
   selectableProviderOptionChoices,
 } from "@t3tools/client-runtime/model-traits";
 import type { ProviderOptionDescriptor, RuntimeMode } from "@t3tools/contracts";
-import type { EffortDisplay } from "@t3tools/contracts/settings";
 import { getProviderOptionCurrentLabel } from "@t3tools/shared/model";
 import { CheckIcon, ChevronRightIcon, ChevronUpIcon, WorkflowIcon } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, use, useRef, useState } from "react";
@@ -24,7 +22,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { ComposerControlSize } from "./ComposerControl";
 import { ComposerPermissionsSection, type RuntimeModeOption } from "./ComposerFooterControls";
 import { composerFloatingLayerProps, focusCheckedPermission } from "./composerEventScope";
-import { EffortGlyph, FastBolt, resolveEffortGlyph } from "./EffortGlyph";
+import { FastBolt } from "./FastBolt";
 import { DockedPickerContext } from "./ProviderModelPicker";
 import {
   getTraitsSectionVisibility,
@@ -77,13 +75,11 @@ function columnControls(
 }
 
 /**
- * What the model trigger shows after the model name: the effort word (or bars, per the
- * Appearance setting), a bolt for Fast, a workflow icon for Ultracode, and other traits such as a
- * context window.
+ * What the model trigger shows after the model name: the effort word, a bolt for Fast, a
+ * workflow icon for Ultracode, and other traits such as a context window.
  */
 export function describeComposerEffort(
   traits: TraitsSelectionInput | null,
-  effortDisplay: EffortDisplay,
   size: ComposerControlSize,
 ): { suffix: ReactNode; detail: string | null } {
   if (!traits) return { suffix: null, detail: null };
@@ -106,29 +102,17 @@ export function describeComposerEffort(
     columnControls(visibility.selectDescriptors, visibility.booleanDescriptors).effort
       ?.descriptor ?? null;
   const ultrathink = visibility.ultrathinkPromptControlled && reasoning === primary;
-  const glyph =
-    reasoning?.type === "select"
-      ? resolveEffortGlyph(
-          reasoning,
-          ultrathink
-            ? "ultrathink"
-            : getDescriptorStringValue(reasoning, modelSelection, traits.reportedModelSelection),
-        )
-      : null;
-  // Workflow levels such as Ultracode always show their name; the setting names every level.
-  const word = glyph
-    ? (glyph.special ?? (effortDisplay === "label" ? glyph.label : null))
-    : !reasoning
-      ? null
-      : reasoning.type === "boolean"
-        ? `${reasoning.label} ${reasoning.currentValue === true ? "On" : "Off"}`
-        : ultrathink
-          ? "Ultrathink"
-          : (getProviderOptionCurrentLabel(
-              reasoning,
-              modelSelection,
-              traits.reportedModelSelection,
-            ) ?? (reasoning.id === "thinking" ? reasoning.label : null));
+  const word = !reasoning
+    ? null
+    : reasoning.type === "boolean"
+      ? `${reasoning.label} ${reasoning.currentValue === true ? "On" : "Off"}`
+      : ultrathink
+        ? "Ultrathink"
+        : (getProviderOptionCurrentLabel(
+            reasoning,
+            modelSelection,
+            traits.reportedModelSelection,
+          ) ?? (reasoning.id === "thinking" ? reasoning.label : null));
   const fast = display.speedLabel === "Fast" || display.speedLabel === "Ultrafast";
   // Agent options such as modes live in the picker; the trigger adds only the context window.
   const contextWindow =
@@ -138,7 +122,7 @@ export function describeComposerEffort(
       modelSelection,
       traits.reportedModelSelection,
     );
-  if (!word && !glyph && !fast && !display.ultracode && !contextWindow)
+  if (!word && !fast && !display.ultracode && !contextWindow)
     return { suffix: null, detail: display.label };
   return {
     detail: display.label,
@@ -159,8 +143,6 @@ export function describeComposerEffort(
               {word}
             </span>
           </>
-        ) : glyph ? (
-          <EffortGlyph count={glyph.count} filled={glyph.filled} size={size} />
         ) : null}
         {fast ? <FastBolt ultra={display.speedLabel === "Ultrafast"} /> : null}
         {display.ultracode ? (
