@@ -9,6 +9,7 @@ import {
   compareModelManifests,
   decideModelManifestWrite,
   formatModelManifest,
+  formatModelManifestDiff,
   validateModelManifest,
 } from "./sync-models.ts";
 
@@ -58,6 +59,7 @@ describe("compareModelManifests", () => {
         fields: [{ field: "name", from: "Old name", to: "New name" }],
       },
     ]);
+    assert.deepStrictEqual(diff.reordered, []);
   });
 
   it("reports no differences for equal manifests", () => {
@@ -66,8 +68,30 @@ describe("compareModelManifests", () => {
         manifest([{ slug: "same", name: "Same" }]),
         manifest([{ slug: "same", name: "Same" }]),
       ),
-      { added: [], removed: [], changed: [], changes: [] },
+      { added: [], removed: [], changed: [], reordered: [], changes: [] },
     );
+  });
+
+  it("reports a shared-slug reorder and prints it", async () => {
+    const current = manifest([
+      { slug: "first", name: "First" },
+      { slug: "second", name: "Second" },
+    ]);
+    const next = manifest([
+      { slug: "second", name: "Second" },
+      { slug: "first", name: "First" },
+    ]);
+    const diff = compareModelManifests(current, next);
+    assert.deepStrictEqual(diff.added, []);
+    assert.deepStrictEqual(diff.removed, []);
+    assert.deepStrictEqual(diff.changed, []);
+    assert.deepStrictEqual(diff.reordered, [
+      { provider: "synthetic", from: ["first", "second"], to: ["second", "first"] },
+    ]);
+    assert.deepStrictEqual(formatModelManifestDiff(diff), [
+      "模型顺序 synthetic：first、second -> second、first",
+    ]);
+    assert.equal((await decideModelManifestWrite(current, next, "{}")).write, true);
   });
 
   it("reports envelope and provider catalog changes", async () => {
@@ -157,6 +181,7 @@ describe("compareModelManifests", () => {
       added: [],
       removed: [],
       changed: [],
+      reordered: [],
     });
     assert.deepStrictEqual(await decideModelManifestWrite(current, reordered, "{}"), {
       write: false,
