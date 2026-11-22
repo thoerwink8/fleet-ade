@@ -12,6 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 import type { EnvironmentRegistry } from "../connection/registry.ts";
+import { FleetSessionPermissionsUnavailable } from "../rpc/client.ts";
 import { createEnvironmentSessionAtoms } from "./session.ts";
 
 function makeCommandPermissions<R, E>(
@@ -57,7 +58,9 @@ function makeCommandPermissions<R, E>(
             Effect.orElseSucceed(() => Option.none<AuthSessionState>()),
           );
           if (Option.isNone(session) && method === WS_METHODS.fleetSummarySubscribe) {
-            return yield* Effect.die(new Error("Fleet session permissions unavailable"));
+            return yield* new FleetSessionPermissionsUnavailable({
+              message: "Fleet session permissions unavailable",
+            });
           }
           const missing = scopes.find(
             (scope) => Option.isNone(session) || !sessionGrantsScope(session.value, scope),

@@ -168,6 +168,17 @@ export function fleetSummaryChanges(
                 const wake = yield* Queue.unbounded<void>();
                 const run = Effect.gen(function* () {
                   let retries = 0;
+                  const pauseBeforeRetry = Effect.fn("FleetSummary.pauseBeforeRetry")(function* (
+                    storageFailure: boolean,
+                  ) {
+                    const jitter = yield* Random.next;
+                    yield* Effect.sleep(
+                      storageFailure
+                        ? 60_000
+                        : Duration.toMillis(subscriptionRetryDelay(250, retries++)) *
+                            (0.5 + jitter * 0.5),
+                    );
+                  });
                   while (true) {
                     yield* waitUntilVisible;
                     yield* SubscriptionRef.update(state, (current) =>
@@ -177,48 +188,55 @@ export function fleetSummaryChanges(
                     let quiet: Fiber.Fiber<void> | undefined;
                     const quietTimer = Effect.sleep("2 seconds").pipe(
                       Effect.andThen(
-                        SubscriptionRef.update(state, (value): FleetSummaryState =>
-                          value.epoch === started.epoch &&
-                          value.cursor !== null &&
-                          value.pending === null &&
-                          value.error === null
-                            ? { ...value, status: "live" }
-                            : value,
-                        ),
+                        Effect.gen(function* () {
+                          const connected = yield* SubscriptionRef.modify(state, (value) =>
+                            value.epoch === started.epoch &&
+                            value.cursor !== null &&
+                            value.pending === null &&
+                            value.error === null
+                              ? ([true, { ...value, status: "live" }] as const)
+                              : ([false, value] as const),
+                          );
+                          if (connected) retries = 0;
+                        }),
                       ),
                     );
-                    quiet = yield* Effect.forkChild(quietTimer);
-                    const stream = subscribeFleetSummaryInSession(
-                      session.value,
-                      started.cursor === null ? {} : { cursor: started.cursor },
-                    );
                     const outcome = yield* Effect.exit(
-                      Stream.runForEach(stream, (event) =>
-                        Effect.gen(function* () {
-                          if (quiet !== undefined) yield* Fiber.interrupt(quiet);
-                          yield* SubscriptionRef.update(state, (current) =>
-                            applyFleetSummaryEvent(current, event, started.epoch),
-                          );
-                          const current = yield* SubscriptionRef.get(state);
-                          if (current.epoch !== started.epoch) {
-                            cache.snapshot = { sourceId, rows: current.rows, cursor: null };
-                            yield* Queue.offer(wake, undefined);
-                            return;
-                          }
-                          if (current.cursor !== null)
-                            cache.snapshot = {
-                              sourceId,
-                              rows: current.rows,
-                              cursor: current.cursor,
-                            };
-                          retries = 0;
-                          quiet = yield* Effect.forkChild(quietTimer);
-                        }),
-                      ).pipe(Effect.raceFirst(Queue.take(wake))),
+                      Effect.gen(function* () {
+                        const stream = yield* subscribeFleetSummaryInSession(
+                          session.value,
+                          started.cursor === null ? {} : { cursor: started.cursor },
+                        );
+                        quiet = yield* Effect.forkChild(quietTimer);
+                        return yield* Stream.runForEach(stream, (event) =>
+                          Effect.gen(function* () {
+                            if (quiet !== undefined) yield* Fiber.interrupt(quiet);
+                            yield* SubscriptionRef.update(state, (current) =>
+                              applyFleetSummaryEvent(current, event, started.epoch),
+                            );
+                            const current = yield* SubscriptionRef.get(state);
+                            if (current.epoch !== started.epoch) {
+                              cache.snapshot = { sourceId, rows: current.rows, cursor: null };
+                              yield* Queue.offer(wake, undefined);
+                              return;
+                            }
+                            if (current.cursor !== null)
+                              cache.snapshot = {
+                                sourceId,
+                                rows: current.rows,
+                                cursor: current.cursor,
+                              };
+                            quiet = yield* Effect.forkChild(quietTimer);
+                          }),
+                        ).pipe(Effect.raceFirst(Queue.take(wake)));
+                      }),
                     );
                     if (quiet !== undefined) yield* Fiber.interrupt(quiet);
                     const current = yield* SubscriptionRef.get(state);
-                    if (current.epoch !== started.epoch) continue;
+                    if (current.epoch !== started.epoch) {
+                      yield* pauseBeforeRetry(false);
+                      continue;
+                    }
                     if (outcome._tag === "Failure" && isAuthorizationFailure(outcome.cause)) {
                       yield* SubscriptionRef.update(state, (value): FleetSummaryState => ({
                         ...value,
@@ -242,13 +260,7 @@ export function fleetSummaryChanges(
                       pending: null,
                       eventBuffer: [],
                     }));
-                    const jitter = yield* Random.next;
-                    yield* Effect.sleep(
-                      storage
-                        ? 60_000
-                        : Duration.toMillis(subscriptionRetryDelay(250, retries++)) *
-                            (0.5 + jitter * 0.5),
-                    );
+                    yield* pauseBeforeRetry(storage);
                   }
                 });
                 yield* Effect.forkScoped(run);
