@@ -35,10 +35,17 @@ export function ThreadSearchMatchExcerpt(props: {
     readonly snippet: string;
     readonly query: string;
   };
+  size?: "xs" | "ui";
 }) {
   const isUser = props.match.source === "user";
   return (
-    <span className="truncate text-xs text-muted-foreground/85">
+    <span
+      className={
+        props.size === "ui"
+          ? "truncate text-ui text-muted-foreground/85"
+          : "truncate text-xs text-muted-foreground/85"
+      }
+    >
       <span className={isUser ? "text-info-foreground" : "text-success-foreground"}>
         {isUser ? "你：" : "智能体："}
       </span>{" "}

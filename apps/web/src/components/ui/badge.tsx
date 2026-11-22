@@ -24,6 +24,7 @@ const badgeVariants = cva(
           "h-5.5 min-w-5.5 px-[calc(--spacing(1)-1px)] text-sm sm:h-4.5 sm:min-w-4.5 sm:text-xs",
         lg: "h-6.5 min-w-6.5 px-[calc(--spacing(1.5)-1px)] text-base sm:h-5.5 sm:min-w-5.5 sm:text-sm",
         row: "h-6 min-w-6 px-[calc(--spacing(1.5)-1px)] text-row",
+        ui: "h-5 min-w-5 px-[calc(--spacing(1.5)-1px)] text-ui",
         // Fractional leading rounds font metrics and raises fixed-height labels, especially under zoom.
         sm: "h-5 min-w-5 rounded-[.25rem] px-[calc(--spacing(1)-1px)] text-xs leading-none sm:h-4 sm:min-w-4",
       },
@@ -48,6 +49,13 @@ const badgeVariants = cva(
           "bg-[color-mix(in_srgb,var(--label)_8%,transparent)] text-[color-mix(in_srgb,var(--label)_30%,var(--color-foreground))] dark:bg-[color-mix(in_srgb,var(--label)_12%,transparent)] dark:text-[color-mix(in_srgb,var(--label)_45%,var(--color-foreground))]",
       },
     },
+    compoundVariants: [
+      {
+        variant: ["dot-attention", "dot-active", "dot-blocked", "dot-waiting", "dot-done"],
+        size: "ui",
+        className: "h-5 min-w-0 text-ui sm:h-5 sm:min-w-0 sm:text-ui",
+      },
+    ],
   },
 );
 

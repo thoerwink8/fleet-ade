@@ -244,6 +244,7 @@ export function ThreadPullRequestBadgeControl({
   number,
   url,
   status,
+  size = "xs",
   onOpenList,
   onOpenPullRequest,
 }: {
@@ -253,6 +254,7 @@ export function ThreadPullRequestBadgeControl({
   number?: number | undefined;
   url?: string | undefined;
   status: PrStatusIndicator | null;
+  size?: "xs" | "row";
   onOpenList: () => void;
   onOpenPullRequest: (event: MouseEvent<HTMLElement>, url?: string) => void;
 }) {
@@ -266,6 +268,7 @@ export function ThreadPullRequestBadgeControl({
       url={url}
       number={number}
       status={status}
+      size={size}
       pullRequests={pullRequests}
       onOpenList={onOpenList}
       onOpenPullRequest={onOpenPullRequest}
@@ -280,6 +283,7 @@ function PullRequestBadge({
   url,
   number,
   status,
+  size = "xs",
   pullRequests,
   onOpenList,
   onOpenPullRequest,
@@ -290,6 +294,7 @@ function PullRequestBadge({
   url: string | undefined;
   number: number | undefined;
   status: PrStatusIndicator | null;
+  size?: "xs" | "row";
   pullRequests: ReadonlyArray<ThreadPullRequestLink>;
   onOpenList: () => void;
   onOpenPullRequest: (event: MouseEvent<HTMLElement>, url?: string) => void;
@@ -319,7 +324,11 @@ function PullRequestBadge({
     <Tooltip key={opensList ? "list" : "link"}>
       <TooltipTrigger render={control}>
         <span
-          className={cn("contents font-normal text-xs tabular-nums", presentation.toneClassName)}
+          className={cn(
+            "contents font-normal tabular-nums",
+            size === "row" ? "text-ui" : "text-xs",
+            presentation.toneClassName,
+          )}
         >
           <presentation.Icon aria-hidden className="size-3 shrink-0" />
           <span className="text-secondary-label">{presentation.text}</span>
@@ -575,7 +584,7 @@ export function ThreadTerminalStatusButton({
             aria-label={label}
             data-testid={`sidebar-terminal-status-${threadRef.threadId}`}
             className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-sm outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+              "inline-flex h-6 min-w-6 shrink-0 cursor-pointer items-center justify-center rounded-sm outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
               status?.colorClass,
             )}
             onPointerDown={(event) => event.stopPropagation()}
