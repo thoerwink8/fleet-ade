@@ -15,7 +15,6 @@ import { useComposerMenuState } from "./useComposerMenuState";
 
 export type RuntimeModeOption = {
   mode: RuntimeMode;
-  disabledReason?: string;
 } & (typeof runtimeModeConfig)[RuntimeMode];
 const supervisedRuntimeModeOption: RuntimeModeOption = {
   mode: "approval-required" as const,
@@ -144,7 +143,6 @@ export function ComposerPermissionsSection(props: {
             <MenuPrimitive.RadioItem
               key={option.mode}
               value={option.mode}
-              disabled={option.disabledReason !== undefined}
               label={option.label}
               aria-label={option.label}
               aria-describedby={`${descriptionId}-${option.mode}`}
@@ -163,7 +161,7 @@ export function ComposerPermissionsSection(props: {
       {/* Static per-mode descriptions for screen readers; the preview below is visual only. */}
       {props.runtimeModeOptions.map((option) => (
         <span key={option.mode} id={`${descriptionId}-${option.mode}`} className="sr-only">
-          {option.disabledReason ?? option.description}
+          {option.description}
         </span>
       ))}
       <div className="grid gap-0.5" aria-hidden="true">
@@ -177,9 +175,7 @@ export function ComposerPermissionsSection(props: {
           {shown.label}
         </span>
         {/* Two lines reserved so the menu does not shift while you preview modes. */}
-        <span className="min-h-8 text-muted-foreground text-meta">
-          {shown.disabledReason ?? shown.description}
-        </span>
+        <span className="min-h-8 text-muted-foreground text-meta">{shown.description}</span>
       </div>
     </div>
   );

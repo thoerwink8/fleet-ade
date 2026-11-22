@@ -7,8 +7,6 @@ import {
   type DesktopUpdateChannel,
   IDLE_COMPACTION_MODES,
   globalIdleCompaction,
-  managedUpdatesDenial,
-  managedUpdatesMessage,
   ProviderDriverKind,
   type ProviderInstanceId,
   type SidebarProjectGroupingMode,
@@ -63,7 +61,6 @@ import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettings";
 import { SnoozePresetsRow } from "./SnoozePresetsSettings";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
-import { usePrimaryManagedPolicy } from "../../state/managedPolicy";
 import {
   getTextGenerationModelOptionsByInstance,
   resolveAppModelSelectionState,
@@ -163,13 +160,6 @@ function AboutVersionSection() {
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
-  // The desktop updates this machine, whose policy the primary environment reports.
-  const primaryPolicy = usePrimaryManagedPolicy();
-  const updatesDenial = hasDesktopBridge ? managedUpdatesDenial(primaryPolicy) : undefined;
-  const nightlyDeniedBy =
-    hasDesktopBridge && primaryPolicy?.limits?.updates?.allowNightly === false
-      ? primaryPolicy.organization
-      : undefined;
   const selectedHostedAppChannel = hasDesktopBridge ? null : HOSTED_APP_CHANNEL;
   // A switch that failed part way leaves this app or a server on the other track.
   // With its updater off, a switch cannot move this app, so it is not counted.
@@ -252,7 +242,7 @@ function AboutVersionSection() {
             stackedThreadToast({
               type: "error",
               title: "无法检查更新",
-              description: updatesDenial ?? result.state.message ?? "此版本不支持自动更新。",
+              description: result.state.message ?? "此版本不支持自动更新。",
             }),
           );
         }
@@ -286,7 +276,7 @@ function AboutVersionSection() {
   const description =
     action === "download" || action === "install"
       ? "有可用更新。"
-      : (getDesktopUpdateDisabledReason(updateState, updatesDenial) ?? "应用的当前版本。");
+      : (getDesktopUpdateDisabledReason(updateState) ?? "应用的当前版本。");
 
   return (
     <>
@@ -294,7 +284,6 @@ function AboutVersionSection() {
         id={searchableSetting("app-version").id}
         title={<AboutVersionTitle />}
         description={description}
-        managed={updatesDenial}
         control={
           <Tooltip>
             <TooltipTrigger
@@ -317,13 +306,7 @@ function AboutVersionSection() {
         <SettingsRow
           {...searchableSetting("update-track")}
           description={
-            nightlyDeniedBy !== undefined ? (
-              `${managedUpdatesMessage(nightlyDeniedBy)}${
-                selectedUpdateChannel === "nightly"
-                  ? "每夜构建不可用，请改到稳定版以继续接收更新。"
-                  : "每夜构建不可用。"
-              }`
-            ) : unswitchedMachines > 0 ? (
+            unswitchedMachines > 0 ? (
               <>
                 {unswitchedMachines === 1
                   ? "还有 1 台机器在使用"
@@ -343,7 +326,6 @@ function AboutVersionSection() {
               "切换此应用，以及所有数据库受目标版本支持的已连接机器。"
             )
           }
-          managed={updatesDenial}
           control={
             <Select
               value={selectedUpdateChannel}
@@ -365,11 +347,7 @@ function AboutVersionSection() {
                 <SelectItem hideIndicator value="latest">
                   稳定版
                 </SelectItem>
-                <SelectItem
-                  hideIndicator
-                  value="nightly"
-                  disabled={nightlyDeniedBy !== undefined && selectedUpdateChannel !== "nightly"}
-                >
+                <SelectItem hideIndicator value="nightly">
                   Nightly 版
                 </SelectItem>
               </SelectPopup>
@@ -2204,30 +2182,9 @@ export function MaintenanceSettingsPanel() {
 }
 
 export function AboutSettingsPanel() {
-  const primaryPolicy = usePrimaryManagedPolicy();
-
   return (
     <SettingsPageContainer>
       <SettingsSection id="about" title="应用">
-        {primaryPolicy ? (
-          <SettingsRow
-            title="组织"
-            description={`此环境由 ${primaryPolicy.organization} 管理，部分设置和功能遵循其策略。`}
-            control={
-              primaryPolicy.supportUrl ? (
-                <Button
-                  render={
-                    <a href={primaryPolicy.supportUrl} target="_blank" rel="noreferrer noopener" />
-                  }
-                  size="sm"
-                  variant="outline"
-                >
-                  获取帮助
-                </Button>
-              ) : null
-            }
-          />
-        ) : null}
         {isElectron || HOSTED_APP_CHANNEL ? (
           <AboutVersionSection />
         ) : (

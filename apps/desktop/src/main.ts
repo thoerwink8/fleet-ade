@@ -49,7 +49,6 @@ import * as DesktopBackendPool from "./backend/DesktopBackendPool.ts";
 import * as DesktopLocalEnvironmentAuth from "./backend/DesktopLocalEnvironmentAuth.ts";
 import * as DesktopNetworkInterfaces from "./backend/DesktopNetworkInterfaces.ts";
 import * as DesktopEnvironment from "./app/DesktopEnvironment.ts";
-import * as DesktopManagedPolicy from "./app/DesktopManagedPolicy.ts";
 import * as DesktopLifecycle from "./app/DesktopLifecycle.ts";
 import * as DesktopLinuxUrlHandler from "./app/DesktopLinuxUrlHandler.ts";
 import * as DesktopShutdown from "./app/DesktopShutdown.ts";
@@ -68,7 +67,6 @@ import * as DesktopState from "./app/DesktopState.ts";
 import * as DesktopLegacyLocalStorage from "./app/DesktopLegacyLocalStorage.ts";
 import * as DesktopTelemetryPublisher from "./telemetry/DesktopTelemetryPublisher.ts";
 import * as DesktopRendererHistory from "./telemetry/DesktopRendererHistory.ts";
-import * as DesktopUpdatePolicy from "./updates/DesktopUpdatePolicy.ts";
 import * as DesktopUpdates from "./updates/DesktopUpdates.ts";
 import * as DesktopWindow from "./window/DesktopWindow.ts";
 import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
@@ -139,7 +137,6 @@ const layerElectron = Layer.mergeAll(
 
 const layerDesktopFoundation = Layer.mergeAll(
   MacPermissions.layer,
-  DesktopManagedPolicy.layer,
   DesktopState.layer,
   DesktopShutdown.layer,
   DesktopLegacyLocalStorage.layer,
@@ -198,13 +195,7 @@ const layerDesktopApplication = Layer.mergeAll(
   DesktopCliCommand.layer,
 ).pipe(
   Layer.provideMerge(layerDesktopSnapShot),
-  Layer.provideMerge(
-    DesktopUpdates.layer.pipe(
-      Layer.provide(DesktopUpdatePolicy.layer),
-      // The same layer as the foundation's, so the policy is still read once.
-      Layer.provide(DesktopManagedPolicy.layer),
-    ),
-  ),
+  Layer.provideMerge(DesktopUpdates.layer),
   // Updates closes the same tunnels the SSH IPC opens before quitAndInstall.
   Layer.provideMerge(layerDesktopSsh),
   Layer.provideMerge(layerDesktopWslBackend),

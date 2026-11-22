@@ -1,6 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
-import type { ManagedPolicyDocument } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Deferred from "effect/Deferred";
@@ -18,7 +17,6 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import packageJson from "../../package.json" with { type: "json" };
 import * as ServerConfig from "../config.ts";
 import * as DesktopAppUpdate from "../desktopUpdate/DesktopAppUpdate.ts";
-import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as ServiceLauncherClient from "./serviceLauncherClient.ts";
 import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
@@ -35,7 +33,6 @@ interface HarnessOptions {
   readonly httpClient?: HttpClient.HttpClient;
   readonly requestUpdate?: ServiceLauncherClient.ServiceLauncherClient["Service"]["requestUpdate"];
   readonly desktopAppUpdate?: DesktopAppUpdate.DesktopAppUpdate["Service"];
-  readonly policy?: ManagedPolicyDocument;
 }
 
 const archiveBytes = new TextEncoder().encode("not really a tarball");
@@ -170,7 +167,6 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
     Effect.provide(
       Layer.mergeAll(
         ServerConfig.layer({ ...config, mode: options.mode ?? "web" }),
-        ManagedPolicy.layerTest(options.policy),
         // The build names no release host, so the test supplies one.
         ConfigProvider.layer(
           ConfigProvider.fromEnv({
@@ -248,64 +244,6 @@ it.layer(NodeServices.layer)("server self update", (it) => {
         (yield* desktop.selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip)).reason,
       ).toContain("desktop app");
       expect([...web.order, ...desktop.order]).toEqual([]);
-    }),
-  );
-
-  it.effect("refuses every update when the managed policy turns updates off", () =>
-    Effect.gen(function* () {
-      const policy: ManagedPolicyDocument = {
-        schemaVersion: 1,
-        organization: "Example Corp",
-        limits: { updates: { mode: "off" } },
-      };
-      const service = yield* makeHarness({ policy });
-      const desktop = yield* makeHarness({
-        mode: "desktop",
-        policy,
-        desktopAppUpdate: {
-          available: true,
-          run: () => Effect.die("unexpected desktop app update run"),
-          commit: () => Effect.never,
-        },
-      });
-      for (const harness of [service, desktop]) {
-        expect(
-          (yield* harness.selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip)).reason,
-        ).toBe("Example Corp 管理 T3 Code 的更新。");
-      }
-      expect([...service.order, ...desktop.order]).toEqual([]);
-    }),
-  );
-
-  it.effect("lets a user start an update, but only to stable without nightly", () =>
-    Effect.gen(function* () {
-      const { selfUpdate, order, urls } = yield* makeHarness({
-        policy: {
-          schemaVersion: 1,
-          organization: "Example Corp",
-          limits: {
-            updates: {
-              mode: "auto",
-              allowNightly: false,
-              feedUrl: "https://updates.example.com/t3code/",
-            },
-          },
-        },
-      });
-      expect(
-        (yield* selfUpdate.update({ targetVersion: "1.2.0-nightly.20261028.1" }).pipe(Effect.flip))
-          .reason,
-      ).toBe("Example Corp 管理 T3 Code 的更新。只能安装稳定版。");
-      expect(order).toEqual([]);
-      // The mirror lists only 1.1.0's archive.
-      expect((yield* selfUpdate.update({ targetVersion: "1.2.0" }).pipe(Effect.flip)).reason).toBe(
-        "Example Corp's update mirror has no t3@1.2.0 for this machine.",
-      );
-      expect((yield* selfUpdate.update({ targetVersion: "1.1.0" })).updateId).toBe("launcher-id");
-      // The release comes from the policy's mirror, not GitHub.
-      expect(urls.length).toBeGreaterThan(0);
-      for (const url of urls)
-        expect(url).toMatch(/^https:\/\/updates\.example\.com\/t3code\/v1\.[12]\.0\//);
     }),
   );
 

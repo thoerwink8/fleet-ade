@@ -33,8 +33,6 @@ describe("shouldBundleCliDependency", () => {
   it("leaves native addons and their dlopen wrappers external", () => {
     for (const id of [
       "node-pty",
-      "ffi-rs",
-      "@yuuang/ffi-rs-win32-x64-msvc",
       "@ff-labs/fff-node",
       "@napi-rs/keyring",
       "@clerk/electron-passkeys",
@@ -220,23 +218,23 @@ describe("findEsmImportsOfExternalPackages", () => {
       'import { createRequire } from "node:module";',
       'const pty = () => import("node-pty");',
       'const data = () => import("@ff-labs/fff-bin-linux-x64-gnu", { with: { type: "json" } });',
-      'const lazy = () => import(/* @vite-ignore */ "ffi-rs");',
+      'const lazy = () => import(/* @vite-ignore */ "@napi-rs/keyring");',
       'const local = () => import("./chunk-abc.mjs");',
     ].join("\n");
 
     assert.deepStrictEqual(findEsmImportsOfExternalPackages(source), [
       "@ff-labs/fff-bin-linux-x64-gnu",
       "@ff-labs/fff-node",
-      "ffi-rs",
+      "@napi-rs/keyring",
       "node-pty",
     ]);
   });
 
   it("flags side-effect imports and re-exports too", () => {
-    const source = ['import "msgpackr-extract";', 'export { load } from "ffi-rs";'].join("\n");
+    const source = ['import "msgpackr-extract";', 'export { spawn } from "node-pty";'].join("\n");
     assert.deepStrictEqual(findEsmImportsOfExternalPackages(source), [
-      "ffi-rs",
       "msgpackr-extract",
+      "node-pty",
     ]);
   });
 

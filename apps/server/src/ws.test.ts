@@ -135,7 +135,6 @@ import * as ServerConfigModule from "./config.ts";
 import * as Keybindings from "./keybindings.ts";
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import * as ServerSettings from "./serverSettings.ts";
-import * as ManagedPolicy from "./policy/ManagedPolicy.ts";
 
 import * as EventStore from "./orchestration-v2/EventStore.ts";
 import * as ThreadManagement from "./orchestration-v2/ThreadManagementService.ts";
@@ -906,9 +905,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
 const layerConfigSources = Layer.mergeAll(
   Keybindings.layer,
   AssetSigner.layer.pipe(Layer.provide(ServerSecretStore.layer)),
-  ServerSettings.layer.pipe(
-    Layer.provide(Layer.merge(ServerSecretStore.layer, ManagedPolicy.layerTest())),
-  ),
+  ServerSettings.layer.pipe(Layer.provide(ServerSecretStore.layer)),
 ).pipe(
   Layer.provideMerge(Layer.fresh(SqlitePersistence.layerMemory)),
   Layer.provideMerge(

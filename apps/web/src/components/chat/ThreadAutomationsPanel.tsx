@@ -42,9 +42,7 @@ function taskScheduleLine(task: ScheduledTask, timeZone: string | undefined) {
   return (
     <>
       {scheduleLabel(task.schedule, timeZone, task.nextRunAt)}
-      {task.blockedByPolicy !== undefined ? (
-        ` · ${task.blockedByPolicy}`
-      ) : task.enabled && task.nextRunAt !== null ? (
+      {task.enabled && task.nextRunAt !== null ? (
         <>
           {" · next "}
           <ScheduledRelativeLabel value={task.nextRunAt} />

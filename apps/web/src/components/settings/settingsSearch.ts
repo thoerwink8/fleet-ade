@@ -66,7 +66,6 @@ export interface SettingsSearchItem {
   readonly wslAvailableOnly?: boolean;
   readonly managedTunnelOnly?: boolean;
   readonly peerLinksOnly?: boolean;
-  readonly textGeneratorsOnly?: boolean;
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
 }
@@ -81,8 +80,6 @@ export interface SettingsSearchAvailability {
   readonly hasThreadAutoSettlement: boolean;
   readonly managedTunnelActive?: boolean;
   readonly hasPeerLinkHost?: boolean;
-  /** An environment without a provider allow-list, which hides text generators. */
-  readonly hasTextGeneratorsEnvironment?: boolean;
   readonly hasPrimaryEnvironment?: boolean;
 }
 
@@ -821,7 +818,6 @@ export const SETTINGS_SEARCH_ITEMS = [
       "model api api key openai openrouter anthropic ollama lm studio custom endpoint base url thread titles commit messages",
     ],
     providerSettingsOnly: true,
-    textGeneratorsOnly: true,
   },
   {
     id: "provider-health-check-interval",
@@ -1227,8 +1223,7 @@ export function filterAvailableSettingsSearchItems(
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
       (!item.managedTunnelOnly || availability.managedTunnelActive === true) &&
-      (!item.peerLinksOnly || availability.hasPeerLinkHost === true) &&
-      (!item.textGeneratorsOnly || availability.hasTextGeneratorsEnvironment === true),
+      (!item.peerLinksOnly || availability.hasPeerLinkHost === true),
   );
 }
 

@@ -2,11 +2,7 @@ import { useComposerTypingGuard } from "./useComposerTypingGuard";
 import { insertAttachmentReferencesForDraft } from "./composerAttachmentReferences";
 import { DESKTOP_PASTE_AS_TEXT_EVENT } from "../../lib/desktopPasteAsText";
 import { BackgroundThreadContext } from "./backgroundThread";
-import {
-  resolveCompatibleRuntimeMode,
-  runtimeModeConfig,
-  resolveRuntimeModeOptions,
-} from "./runtimeModeConfig";
+import { resolveCompatibleRuntimeMode, resolveRuntimeModeOptions } from "./runtimeModeConfig";
 import { isLocalEnvironmentDisabled } from "../../localEnvironment";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useRightPanelStore } from "~/rightPanelStore";
@@ -38,8 +34,6 @@ import type {
 import {
   EnvironmentRequestInvalidError,
   AuthOrchestrationOperateScope,
-  clampManagedRuntimeMode,
-  managedRuntimeModeDenial,
   ProviderDriverKind,
   ProviderInstanceId,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
@@ -229,12 +223,10 @@ import { observeResize } from "~/lib/observeResize";
 
 const isEnvironmentRequestInvalidError = Schema.is(EnvironmentRequestInvalidError);
 import { toastManager } from "../ui/toast";
-import { BuildingIcon, PlayIcon, ReplyIcon } from "lucide-react";
+import { PlayIcon, ReplyIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { assistantCitationLabel } from "@t3tools/shared/assistantCitations";
 import { assistantCitationNavigation } from "../../lib/assistantCitationNavigation";
-import { Button } from "../ui/button";
-import { useManagedPolicy } from "../../state/managedPolicy";
 import { hasProviderSetup } from "./ProviderStatusBanner";
 import { type AppModelOption, getAppModelOptionsForInstance } from "../../modelSelection";
 import type { UnifiedSettings } from "@t3tools/contracts/settings";
@@ -896,18 +888,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       runtimeMode,
       selectedProviderEntry?.snapshot.supportedRuntimeModes,
     );
-  // Modes above an administrator's ceiling stay listed, disabled with the reason.
-  const managedPolicy = useManagedPolicy(environmentId);
-  const compatibleRuntimeModeOptions = resolveRuntimeModeOptions(
-    compatibleRuntimeModes,
-    managedPolicy,
-  );
-  // A thread or draft already above the ceiling would be refused; offer the broadest mode left.
-  const runtimeModeCeilingDenial = managedRuntimeModeDenial(managedPolicy, compatibleRuntimeMode);
-  const runtimeModeCeilingFallback =
-    runtimeModeCeilingDenial === undefined
-      ? undefined
-      : clampManagedRuntimeMode(managedPolicy, compatibleRuntimeMode, compatibleRuntimeModes);
+  const compatibleRuntimeModeOptions = resolveRuntimeModeOptions(compatibleRuntimeModes);
 
   const providerSendBlockReason = getAntigravitySendBlockReason(
     selectedProviderEntry?.snapshot,
@@ -919,7 +900,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (activePendingProgress
       ? attachmentBlockReason
       : (attachmentBlockReason ??
-        runtimeModeCeilingDenial ??
         (multipleModelSelections === null ? providerSendBlockReason : null)));
   const isSendDisabled = sendDisabledReason !== null;
   const selectedProviderStatus = selectedProviderEntry?.snapshot ?? null;
@@ -2402,32 +2382,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         },
       ]
     : [];
-  const bannerItems: readonly ComposerBannerStackItem[] =
-    runtimeModeCeilingDenial === undefined || activePendingProgress
-      ? [...props.bannerItems, ...replyBannerItems]
-      : [
-          ...props.bannerItems,
-          ...replyBannerItems,
-          {
-            id: "managed-runtime-mode",
-            variant: "warning",
-            icon: <BuildingIcon />,
-            title: runtimeModeCeilingDenial,
-            ...(runtimeModeCeilingFallback === undefined
-              ? {}
-              : {
-                  actions: (
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => handleRuntimeModeChange(runtimeModeCeilingFallback)}
-                    >
-                      切换到 {runtimeModeConfig[runtimeModeCeilingFallback].label}
-                    </Button>
-                  ),
-                }),
-          },
-        ];
+  const bannerItems: readonly ComposerBannerStackItem[] = [
+    ...props.bannerItems,
+    ...replyBannerItems,
+  ];
   const shelfItems = hasBlockingComposerTopDrawer
     ? bannerItems.filter(
         (item) =>

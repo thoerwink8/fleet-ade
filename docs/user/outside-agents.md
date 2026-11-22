@@ -71,8 +71,7 @@ web app, **Use a sign-in code instead** opens the environment's own page.
 
 A code from **Use T3 Code in another app (MCP)** already carries the level you
 picked there. With another code, choose what the agent may do here: **Auto** is
-selected by default, or the closest lower mode allowed by your organization’s
-policy. Approving without a code starts at **Read only**:
+selected by default. Approving without a code starts at **Read only**:
 
 - **Read only** lets the agent read projects and threads and see
   the available providers and models. It cannot change anything.

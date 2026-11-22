@@ -1740,9 +1740,6 @@ export const layerWsRpc = (
           ...(config.maxConcurrentSessions === undefined
             ? {}
             : { startupMaxConcurrentSessions: config.maxConcurrentSessions }),
-          ...(serverSettings.managedPolicy === undefined
-            ? {}
-            : { managedPolicy: serverSettings.managedPolicy }),
           shellResumeCompletionMarker: true,
           shellThreadFamilies: true,
           threadLinkMetadata: true,

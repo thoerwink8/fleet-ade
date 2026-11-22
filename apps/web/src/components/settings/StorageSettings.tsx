@@ -570,9 +570,6 @@ export function WorktreeCleanupSection() {
     )
       ? "所选机器的设置各不相同"
       : undefined;
-  // A policy locks these through worktreeCleanup, which also reaches each project's own rules.
-  const lockablePath = (key: keyof WorktreeCleanupRules) =>
-    isProjectScope ? ["worktreeCleanup"] : ["worktreeCleanup", `storageCleanup.${key}`];
   const update = (patch: Partial<StorageCleanupSettings>, options?: SaveOptions) =>
     updateSettings({ storageCleanup: patch }, options);
   const updateWorktree = (patch: Partial<WorktreeCleanupRules>, options?: SaveOptions) =>
@@ -654,7 +651,6 @@ export function WorktreeCleanupSection() {
             <SettingsRow
               title="删除会话时删除工作树"
               status={ruleStatus("worktreeOnDelete")}
-              managedPaths={lockablePath("worktreeOnDelete")}
               description="删除活跃或已归档会话时，移除不再使用的工作树。保留有本地改动的工作树。"
               serverScoped={!isProjectScope}
               control={
@@ -668,7 +664,6 @@ export function WorktreeCleanupSection() {
             <SettingsRow
               title="删除已合并的工作树"
               status={ruleStatus("worktreeOnMerge")}
-              managedPaths={lockablePath("worktreeOnMerge")}
               description="移除 pull request 已合并且提交已包含在默认分支中的工作树。"
               serverScoped={!isProjectScope}
               control={
@@ -682,7 +677,6 @@ export function WorktreeCleanupSection() {
             <SettingsRow
               title="删除不活跃的工作树"
               status={ruleStatus("worktreeAfterDays")}
-              managedPaths={lockablePath("worktreeAfterDays")}
               description="会话闲置达到设定天数后移除其工作树。保留分支和会话历史。"
               serverScoped={!isProjectScope}
               control={
@@ -707,7 +701,6 @@ export function WorktreeCleanupSection() {
                 ) && (
                   <SettingsRow
                     title="删除已收尾的工作树"
-                    managedPaths={lockablePath("worktreeSettledAfterDays")}
                     status={[
                       ruleStatus("worktreeSettledAfterDays"),
                       environments.length > connectedEnvironments.length
@@ -733,7 +726,6 @@ export function WorktreeCleanupSection() {
               <SettingsRow
                 title="删除无改动的工作树"
                 status={ruleStatus("worktreeUnchanged")}
-                managedPaths={lockablePath("worktreeUnchanged")}
                 description="移除相较于默认分支没有新增提交的工作树。"
                 serverScoped={!isProjectScope}
                 control={
@@ -751,7 +743,6 @@ export function WorktreeCleanupSection() {
                 <SettingsRow
                   {...searchableSetting("storage-worktree-keep-when")}
                   status={ruleStatus("worktreeKeepWhen")}
-                  managedPaths={lockablePath("worktreeKeepWhen")}
                   description={
                     settings.worktreeKeepWhen === "any-local-files"
                       ? "包括已忽略的文件，但不含 node_modules。"
@@ -855,7 +846,6 @@ export function StorageCleanupSections() {
           <SettingsRow
             title="删除旧浏览器产物"
             status={artifactsStatus}
-            managedPaths={["storageCleanup.browserArtifactsAfterDays"]}
             description="删除保存超过设定天数的浏览器截图和录制。旧的截图和录制链接将无法打开。"
             serverScoped
             control={
@@ -873,7 +863,6 @@ export function StorageCleanupSections() {
           <SettingsRow
             title="删除旧轮转日志"
             status={logsStatus}
-            managedPaths={["storageCleanup.logsAfterDays"]}
             description="删除超过设定天数且不再写入的轮转日志文件。保留当前日志。"
             serverScoped
             control={

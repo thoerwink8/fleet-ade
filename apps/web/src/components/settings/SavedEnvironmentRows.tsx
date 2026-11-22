@@ -12,7 +12,6 @@ import {
   type EnvironmentId,
   connectReachabilityHelpUrl,
   formatConnectReachable,
-  managedCapabilityDenial,
   resolveEnvironmentMachineKind,
 } from "@t3tools/contracts";
 import {
@@ -58,7 +57,6 @@ import { environmentCatalog } from "~/connection/catalog";
 import { readEnvironmentScope } from "~/state/session";
 import { type EnvironmentPresentation, useRelayEnvironmentDiscovery } from "~/state/environments";
 import { APP_VERSION } from "~/branding";
-import { useManagedPolicy } from "~/state/managedPolicy";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { serverEnvironment } from "~/state/server";
 import {
@@ -537,8 +535,6 @@ function ConfiguredCloudLinkRow({
     reconcileCloudState,
   } = useCloudLinkController(environmentId);
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
-  // The server unlinks and refuses relay changes under such a policy; unlinking stays possible.
-  const connectDenial = managedCapabilityDenial(useManagedPolicy(environmentId), "connect");
   const turnOn = useT3ConnectTurnOn(environmentId);
   // Turning on links from this desktop's own backend only; turning off works from anywhere.
   const showSwitch = isElectron && (turnOn.kind !== "on-host" || managedTunnelActive);
@@ -653,24 +649,21 @@ function ConfiguredCloudLinkRow({
         <SettingsRow
           title={searchableSetting("t3-connect").title}
           description={
-            connectDenial !== undefined && !managedTunnelActive
-              ? connectDenial
-              : signedOut
-                ? "登录后，你的其他设备就能通过 T3 Connect 访问此环境。"
-                : linkRevoked
-                  ? "此环境已从 T3 Connect 移除。开启后可重新关联。"
-                  : managedTunnelActive
-                    ? reachability?.status === "unreachable"
-                      ? "T3 Connect 已开启，但其他设备无法访问此环境。"
-                      : reachability?.status === "reachable"
-                        ? "你的其他设备可以通过 T3 Connect 访问此环境。"
-                        : "T3 Connect 已开启，尚未检查能否访问。"
-                    : managedTunnelOutOfSync
-                      ? "T3 Connect 状态不同步。此环境的关联仅用于发布智能体活动，其他设备无法连接。请开启 T3 Connect 修复。"
-                      : "让你的其他设备通过 T3 Connect 访问此环境。"
+            signedOut
+              ? "登录后，你的其他设备就能通过 T3 Connect 访问此环境。"
+              : linkRevoked
+                ? "此环境已从 T3 Connect 移除。开启后可重新关联。"
+                : managedTunnelActive
+                  ? reachability?.status === "unreachable"
+                    ? "T3 Connect 已开启，但其他设备无法访问此环境。"
+                    : reachability?.status === "reachable"
+                      ? "你的其他设备可以通过 T3 Connect 访问此环境。"
+                      : "T3 Connect 已开启，尚未检查能否访问。"
+                  : managedTunnelOutOfSync
+                    ? "T3 Connect 状态不同步。此环境的关联仅用于发布智能体活动，其他设备无法连接。请开启 T3 Connect 修复。"
+                    : "让你的其他设备通过 T3 Connect 访问此环境。"
           }
           status={operationError ?? cloudLinkState.error ?? reachabilityStatus}
-          managed={managedTunnelActive ? undefined : connectDenial}
           control={
             signedOut ? (
               signInButton
@@ -684,9 +677,7 @@ function ConfiguredCloudLinkRow({
             )
           }
         >
-          {signedOut || connectDenial !== undefined ? null : (
-            <T3ConnectTunnelUsage tunnelLimit={tunnelLimit} />
-          )}
+          {signedOut ? null : <T3ConnectTunnelUsage tunnelLimit={tunnelLimit} />}
         </SettingsRow>
       ) : linkRevoked ? (
         <SettingsRow
@@ -707,7 +698,6 @@ function ConfiguredCloudLinkRow({
               ? "登录后即可向手机通知和实时活动发送活动信息。"
               : "无需 T3 Connect，即可将活动发送到手机通知和实时活动。"
           }
-          managed={connectDenial}
           control={
             signedOut ? (
               signInButton
@@ -727,7 +717,6 @@ function ConfiguredCloudLinkRow({
         <SettingsRow
           title={searchableSetting("hold-webhooks-while-offline").title}
           description="此环境离线时，最多保留 webhook 请求 24 小时，恢复后再投递。关闭时，T3 Connect 仅转发请求，不保存任何内容。"
-          managed={connectDenial}
           control={
             <CloudLinkSwitch
               ariaLabel="此环境离线时保留 webhook 请求"
