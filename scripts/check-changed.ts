@@ -419,8 +419,9 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
       }),
     ).pipe(Effect.catch((error) => Effect.succeed({ ok: false, output: error.message })));
 
-  // Resolve without the lockfile in a temp copy to preserve the working tree and lockfile.
-  // Cached registry metadata limits this to patches stranded by local changes, not registry drift.
+  // Resolve in a temp copy to preserve the working tree and lockfile. The lockfile comes along so
+  // only what local changes touch is re-resolved; without it a newer upstream release of an
+  // unrelated package fails the install on a peer mismatch before any patch is checked.
   const checkPatches = Effect.scoped(
     Effect.gen(function* () {
       const temp = yield* fs.makeTempDirectoryScoped({ prefix: "t3-patch-check-" });
@@ -432,7 +433,7 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
       yield* copy("package.json");
       yield* copy("pnpm-workspace.yaml");
       for (const pkg of packages) yield* copy(`${pkg.dir}/package.json`);
-      for (const extra of ["patches", ".pnpmfile.cjs"]) {
+      for (const extra of ["pnpm-lock.yaml", "patches", ".pnpmfile.cjs"]) {
         if (yield* fs.exists(inRoot(extra))) yield* copy(extra);
       }
       const result = yield* vp(["install", "--lockfile-only", "--ignore-scripts"], temp);
