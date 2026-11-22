@@ -79,7 +79,7 @@ export interface McpClientSession {
   readonly sessionId: AuthSessionId;
   readonly label: string;
   readonly access: AuthMcpClientAccess;
-  /** Another Fleet ADE environment's link, whose work here stays within it. */
+  /** Another T3 Code environment's link, whose work here stays within it. */
   readonly peerLink: boolean;
   readonly environmentId?: string;
 }

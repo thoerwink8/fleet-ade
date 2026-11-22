@@ -24,7 +24,7 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as GitHubClient from "../shared/definition.ts";
 
 /**
- * The public client ID of the Fleet ADE for GitHub app, which the device flow needs (no secret).
+ * The public client ID of the T3 Code for GitHub app, which the device flow needs (no secret).
  * Unset turns the app sign-in off: no app tokens, no sign-in, nothing for clients to show.
  */
 export const CLIENT_ID_VARIABLE = "T3CODE_GITHUB_APP_CLIENT_ID";
@@ -73,7 +73,7 @@ export class GitHubAppSessionError extends Schema.TaggedError<GitHubAppSessionEr
   { host: Schema.String, cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return `Could not refresh the ${GitHubClient.APP_SIGN_IN.appName} sign-in for ${this.host}. Check the server's connection to GitHub, or sign in again in Settings → Source Control.`;
+    return `Could not refresh the ${GitHubClient.APP_SIGN_IN.appName} sign-in for ${this.host}. Check the server's connection to GitHub, or sign in again in Settings → Code → Source control.`;
   }
 }
 

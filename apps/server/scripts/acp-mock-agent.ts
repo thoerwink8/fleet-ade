@@ -1208,9 +1208,9 @@ const program = Effect.gen(function* () {
             rawInput: { variant: "WebFetch", url: "https://example.invalid" },
             rawOutput: {
               type: "WebFetch",
-              Content: { url: "https://example.invalid", content: "Fleet ADE page" },
+              Content: { url: "https://example.invalid", content: "T3 Code page" },
             },
-            content: [{ type: "content", content: { type: "text", text: "Fleet ADE page" } }],
+            content: [{ type: "content", content: { type: "text", text: "T3 Code page" } }],
           },
           {
             sessionUpdate: "tool_call_update",

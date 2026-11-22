@@ -38,7 +38,7 @@ sends startup timings, and every report carries a random ID for the install. Rep
 the T3 Connect relay to Axiom. They do not include your threads, prompts, or connection details,
 but an error message can quote a value the app was handling.
 
-To stop sending them, turn off **Send crash reports** in **Settings > About T3 Code > Diagnostics**.
+To stop sending them, turn off **Send crash reports** in **Settings > About > Diagnostics**.
 
 The mobile app also sends relay connection traces when its build has tracing configured. These
 carry an identifier for the current app session. **Send crash reports** does not control these
