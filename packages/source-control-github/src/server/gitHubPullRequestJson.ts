@@ -14,7 +14,6 @@ import type {
   PullRequestChecksState,
   PullRequestComment,
   PullRequestCommit,
-  PullRequestFileViewedState,
   PullRequestLabel,
   PullRequestMergeCapabilities,
   PullRequestMergeMethod,
@@ -23,16 +22,8 @@ import type {
   PullRequestMergeability,
   PullRequestReaction,
   PullRequestReactionContent,
-  PullRequestReviewCommentDraft,
   PullRequestReviewDecision,
-  PullRequestReviewPosition,
   PullRequestReviewThread,
-  PullRequestReviewVerdict,
-  PullRequestReviewerCandidate,
-  PullRequestReviewerCandidateList,
-  PullRequestReviewerKind,
-  PullRequestLabelCandidate,
-  PullRequestLabelCandidateList,
   PullRequestState,
   PullRequestThreadComment,
 } from "@t3tools/contracts";
@@ -41,7 +32,6 @@ import { decodeJsonResult } from "@t3tools/shared/schemaJson";
 import { dedupeChecks } from "@t3tools/source-control-core/server/pullRequestChecks";
 import type { ProviderChangeRequestSummary } from "@t3tools/source-control-core/server/PullRequestProvider";
 
-import type * as GitHubSchema from "../../schema/github.graphql.ts";
 import type {
   PullRequestSummaryRepositoryPullRequestPullRequest as SummarizedPullRequest,
   PullRequestWatchFingerprintRepositoryPullRequestPullRequest as WatchedPullRequest,
@@ -55,21 +45,17 @@ import {
 import type { PullRequestActionSummary } from "./pullRequestMutations.graphql.ts";
 import type {
   CheckContext,
-  LabelCandidates,
   PullRequestActivity,
   PullRequestCommitStats,
   PullRequestCheckContexts,
   PullRequestCore,
-  PullRequestFilesViewed,
   PullRequestFileStats,
   PullRequestHeads,
   PullRequestPreview as PullRequestPreviewQuery,
-  PullRequestSubject,
   RepositoryAuthors,
   RepositoryLabels,
   RepositoryReferences,
   ReferenceCandidate,
-  ReviewerCandidates,
   ViewerPermissions,
 } from "./pullRequestReads.graphql.ts";
 import type {
@@ -168,25 +154,6 @@ const REACTION_CONTENT_BY_GITHUB: Readonly<Record<string, PullRequestReactionCon
   EYES: "eyes",
 };
 
-const GITHUB_REACTION_BY_CONTENT: Readonly<
-  Record<PullRequestReactionContent, GitHubSchema.ReactionContent>
-> = {
-  "thumbs-up": "THUMBS_UP",
-  "thumbs-down": "THUMBS_DOWN",
-  laugh: "LAUGH",
-  hooray: "HOORAY",
-  confused: "CONFUSED",
-  heart: "HEART",
-  rocket: "ROCKET",
-  eyes: "EYES",
-};
-
-export function gitHubReactionContent(
-  content: PullRequestReactionContent,
-): GitHubSchema.ReactionContent {
-  return GITHUB_REACTION_BY_CONTENT[content];
-}
-
 /** Keep the viewer in counts, not actors, to avoid duplicating 'You'. */
 function toReactions(
   groups: ReadonlyArray<ReactionGroup> | null | undefined,
@@ -254,83 +221,6 @@ export function toPullRequestNodeId(result: {
   readonly repository: { readonly pullRequest: { readonly id: string } | null } | null;
 }): string | null {
   return result.repository?.pullRequest?.id ?? null;
-}
-
-export function isSubjectOfPullRequest(result: PullRequestSubject.Result): boolean {
-  const expected = result.repository?.pullRequest?.id ?? null;
-  const node = result.node;
-  const actual =
-    node === null
-      ? null
-      : node.__typename === "IssueComment"
-        ? (node.pullRequest?.id ?? null)
-        : node.__typename === "PullRequestReviewComment"
-          ? node.reviewCommentPullRequest.id
-          : node.__typename === "PullRequestReview"
-            ? node.reviewPullRequest.id
-            : node.id;
-  return expected !== null && actual !== null && expected === actual;
-}
-
-const ReviewSubmissionSchema = Schema.Struct({
-  event: Schema.Literals(["COMMENT", "APPROVE", "REQUEST_CHANGES"]),
-  body: Schema.String,
-  comments: Schema.Array(
-    Schema.Struct({
-      path: Schema.String,
-      start_line: Schema.optional(Schema.Int),
-      start_side: Schema.optional(Schema.Literals(["LEFT", "RIGHT"])),
-      line: Schema.Int,
-      side: Schema.Literals(["LEFT", "RIGHT"]),
-      body: Schema.String,
-    }),
-  ),
-});
-
-const REVIEW_EVENTS: Record<PullRequestReviewVerdict, "COMMENT" | "APPROVE" | "REQUEST_CHANGES"> = {
-  comment: "COMMENT",
-  approve: "APPROVE",
-  "request-changes": "REQUEST_CHANGES",
-};
-
-function gitHubReviewPosition(position: PullRequestReviewPosition): {
-  readonly line: number;
-  readonly side: "LEFT" | "RIGHT";
-} {
-  switch (position.kind) {
-    case "added":
-      return { line: position.newLine, side: "RIGHT" };
-    case "deleted":
-      return { line: position.oldLine, side: "LEFT" };
-    case "context":
-      return position.side === "left"
-        ? { line: position.oldLine, side: "LEFT" }
-        : { line: position.newLine, side: "RIGHT" };
-  }
-}
-
-export function buildReviewSubmission(input: {
-  readonly verdict: PullRequestReviewVerdict;
-  readonly body: string;
-  readonly comments: ReadonlyArray<PullRequestReviewCommentDraft>;
-}): typeof ReviewSubmissionSchema.Type {
-  return {
-    event: REVIEW_EVENTS[input.verdict],
-    body: input.body,
-    comments: input.comments.map((comment) => {
-      const end = gitHubReviewPosition(comment.position);
-      const start =
-        comment.startPosition === undefined ? null : gitHubReviewPosition(comment.startPosition);
-      // GitHub refuses a start that is the end itself, so a one-line range is sent as one line.
-      const ranged = start !== null && (start.line !== end.line || start.side !== end.side);
-      return {
-        path: comment.path,
-        ...(ranged ? { start_line: start.line, start_side: start.side } : {}),
-        ...end,
-        body: comment.body,
-      };
-    }),
-  };
 }
 
 export interface GitHubPullRequestListItem {
@@ -1555,101 +1445,6 @@ export interface GitHubBaseComparison {
   readonly viewerCanUpdate: boolean;
 }
 
-/** assignableUsers avoids push/read:org requirements. Keep requested outsiders/apps removable. */
-export function toReviewerCandidates(
-  result: ReviewerCandidates.Result,
-  query?: string,
-): PullRequestReviewerCandidateList | null {
-  const repository = result.repository;
-  if (repository == null) return null;
-  const pullRequest = repository.pullRequest;
-  const author = trimmed(pullRequest?.author?.login);
-  const candidates = new Map<string, PullRequestReviewerCandidate>();
-  for (const { requestedReviewer: raw } of nodesOf(pullRequest?.reviewRequests)) {
-    if (raw === null) continue;
-    const slug = "slug" in raw ? trimmed(raw.slug) : null;
-    const id = slug ?? ("login" in raw ? trimmed(raw.login) : null);
-    if (id === null) continue;
-    candidates.set(`${slug === null ? "user" : "team"} ${id}`, {
-      id,
-      kind: slug === null ? "user" : "team",
-      // Match reviewer rows' org/slug so requests can be withdrawn.
-      login: slug === null ? id : (trimmed("combinedSlug" in raw ? raw.combinedSlug : null) ?? id),
-      name: trimmed("teamName" in raw ? raw.teamName : "name" in raw ? raw.name : null),
-      avatarUrl: trimmed(
-        "teamAvatarUrl" in raw ? raw.teamAvatarUrl : "avatarUrl" in raw ? raw.avatarUrl : null,
-      ),
-      isRequested: true,
-    });
-  }
-  const hostMatches = new Set<string>();
-  for (const node of nodesOf(repository.assignableUsers)) {
-    const login = trimmed(node.login);
-    if (login !== null) hostMatches.add(login);
-    if (login === null || login === author || candidates.has(`user ${login}`)) continue;
-    candidates.set(`user ${login}`, {
-      id: login,
-      kind: "user",
-      login,
-      name: trimmed(node.name),
-      avatarUrl: trimmed(node.avatarUrl),
-      isRequested: false,
-    });
-  }
-  return {
-    candidates: [...candidates.values()].filter(
-      (candidate) => !query?.trim() || (candidate.kind === "user" && hostMatches.has(candidate.id)),
-    ),
-    truncated: repository.assignableUsers.pageInfo.hasNextPage,
-  };
-}
-
-const ReviewerRequestSchema = Schema.Struct({
-  reviewers: Schema.Array(Schema.String),
-  team_reviewers: Schema.Array(Schema.String),
-});
-
-export function buildReviewerRequest(
-  reviewers: ReadonlyArray<{ readonly id: string; readonly kind: PullRequestReviewerKind }>,
-): typeof ReviewerRequestSchema.Type {
-  return {
-    reviewers: reviewers.flatMap((reviewer) => (reviewer.kind === "user" ? [reviewer.id] : [])),
-    team_reviewers: reviewers.flatMap((reviewer) =>
-      reviewer.kind === "team" ? [reviewer.id] : [],
-    ),
-  };
-}
-
-/** Keep applied labels removable even when absent from the repository page. */
-export function toLabelCandidates(
-  result: LabelCandidates.Result,
-): PullRequestLabelCandidateList | null {
-  const repository = result.repository;
-  if (repository == null) return null;
-  const applied = new Set(
-    nodesOf(repository.pullRequest?.labels).flatMap((label) => trimmed(label.name) ?? []),
-  );
-  const candidates = new Map<string, PullRequestLabelCandidate>();
-  for (const node of nodesOf(repository.labels)) {
-    const name = trimmed(node.name);
-    if (name === null) continue;
-    candidates.set(name, {
-      name,
-      color: trimmed(node.color),
-      description: trimmed(node.description),
-      isApplied: applied.has(name),
-    });
-  }
-  const missing = [...applied].filter((name) => !candidates.has(name));
-  return {
-    candidates: [
-      ...missing.map((name) => ({ name, color: null, description: null, isApplied: true })),
-      ...candidates.values(),
-    ],
-    truncated: repository.labels?.pageInfo.hasNextPage === true,
-  };
-}
-
 export function toRepositoryLabels(
   result: RepositoryLabels.Result,
 ): { readonly items: ReadonlyArray<PullRequestLabel>; readonly truncated: boolean } | null {
@@ -1736,12 +1531,6 @@ export function toRepositoryReferences(result: RepositoryReferences.Result): {
     }),
     truncated: result.search.pageInfo.hasNextPage,
   };
-}
-
-export function buildLabelRequest(labels: ReadonlyArray<string>): {
-  readonly labels: ReadonlyArray<string>;
-} {
-  return { labels };
 }
 
 export interface GitHubViewerAccess {
@@ -1842,39 +1631,6 @@ function toFilesPatch(entries: ReadonlyArray<unknown>): GitHubPullRequestFilesPa
     truncated,
     rawCount: entries.length,
     omittedFileStats,
-  };
-}
-
-export interface GitHubPullRequestFilesViewedPage {
-  readonly files: ReadonlyArray<{
-    readonly path: string;
-    readonly state: PullRequestFileViewedState;
-  }>;
-  readonly nextCursor: string | null;
-}
-
-function toFileViewedState(raw: string): PullRequestFileViewedState {
-  switch (raw.trim().toUpperCase()) {
-    case "VIEWED":
-      return "viewed";
-    case "DISMISSED":
-      return "dismissed";
-    default:
-      return "unviewed";
-  }
-}
-
-export function toPullRequestFilesViewedPage(
-  result: PullRequestFilesViewed.Result,
-): GitHubPullRequestFilesViewedPage {
-  const files = result.repository?.pullRequest?.files;
-  return {
-    files: nodesOf(files).flatMap((node) =>
-      node.path.length === 0
-        ? []
-        : [{ path: node.path, state: toFileViewedState(node.viewerViewedState) }],
-    ),
-    nextCursor: nextCursorOf(files?.pageInfo),
   };
 }
 

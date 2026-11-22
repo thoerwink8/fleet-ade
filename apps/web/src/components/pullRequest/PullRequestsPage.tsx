@@ -1,22 +1,16 @@
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { applyPullRequestDraftFilterChange } from "@t3tools/client-runtime/pull-request-query";
 import { Spinner } from "~/components/ui/spinner";
-import type { PullRequestSpeedActionResult } from "~/components/pullRequest/PullRequestSpeedActions";
-import { usePullRequestCloseBatch } from "~/components/pullRequest/usePullRequestActions";
-import { SidebarPointerSensor } from "~/components/Sidebar.pointer";
-import { resolveSidebarSweepKeys } from "~/components/Sidebar.logic";
 import { sortProjectsByGroupOrder } from "@t3tools/client-runtime/state/project-grouping";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import type {
   EnvironmentId,
   ProjectId,
-  PullRequestAction,
   PullRequestInvolvement,
   PullRequestListCursors,
   PullRequestListInput,
   PullRequestListResult,
   PullRequestListState,
-  PullRequestSummary,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
@@ -30,6 +24,7 @@ import {
   pullRequestDiffStatKey,
   pullRequestEntryKey,
   rankPullRequestMatches,
+  reusePullRequestEntries,
   pullRequestStatsRefreshBatches,
   pullRequestStatsRequestBatches,
   retainVisiblePullRequestStatsBatches,
@@ -40,10 +35,6 @@ import {
   type PullRequestStatsPolicy,
   type PullRequestStatsScope,
   type PullRequestPartitionsSnapshot,
-  type PullRequestListOverride,
-  pullRequestOverrideAfterAction,
-  reusePullRequestEntries,
-  settlePullRequestOverrides,
   comparePullRequestsByRecency,
   largestPullRequestReadCount,
 } from "./pullRequestList.logic";
@@ -73,7 +64,6 @@ import {
   usePullRequestScope,
   type PullRequestsSearch,
 } from "./usePullRequestListView";
-import { PipelineRunsSection } from "./PipelineRunsSection";
 import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
 import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
 import { PullRequestListGhost } from "./PullRequestGhosts";
@@ -83,7 +73,6 @@ import { RightPanelTabs } from "../RightPanelTabs";
 import { isCommandPaletteOpen } from "~/commandPaletteBus";
 import { isElectron } from "~/env";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "~/keybindings";
-import { registerCommands } from "~/shortcuts/dispatcher";
 import { isTerminalFocused } from "~/lib/terminalFocus";
 import { PanelLayoutControls, RightPanelMaximizeControl } from "../chat/PanelLayoutControls";
 import { Button } from "../ui/button";
@@ -144,6 +133,7 @@ const EMPTY_PARTITIONS: PullRequestPartitionsSnapshot = { authored: [], reviewin
 const NO_LIST_TARGETS: ReadonlyArray<EnvironmentQueryTarget<PullRequestListInput>> = [];
 const EMPTY_TERMINAL_LABELS = new Map<string, string>();
 const EMPTY_PENDING_SURFACES = new Set<string>();
+const EMPTY_OVERRIDES = new Map<string, never>();
 export function PullRequestsPage() {
   const search = useSearch({ from: "/_chat/pull-requests" });
   const sort = search.sort ?? "ready";
@@ -440,43 +430,6 @@ export function PullRequestsPage() {
     source: MergedPullRequestList;
     entries: ReadonlyArray<EnvironmentPullRequestEntry>;
   } | null>(null);
-  const [overrides, setOverrides] = useState<ReadonlyMap<string, PullRequestListOverride>>(
-    () => new Map(),
-  );
-  const overrideToken = useRef(0);
-  const overrideEntry = (
-    entry: EnvironmentPullRequestEntry,
-    action: PullRequestAction,
-    reply?: PullRequestSummary,
-  ): number | null => {
-    const token = ++overrideToken.current;
-    const override = pullRequestOverrideAfterAction(entry, action, new Date(), token, reply);
-    if (override === null) return null;
-    setOverrides((current) => new Map(current).set(pullRequestEntryKey(entry), override));
-    return token;
-  };
-  const revertOverride = (key: string, token: number | null) => {
-    if (token === null) return;
-    setOverrides((current) => {
-      if (current.get(key)?.token !== token) return current;
-      const next = new Map(current);
-      next.delete(key);
-      return next;
-    });
-  };
-  const detailOverrideTokens = useRef(new Map<string, number | null>());
-  const onSpeedAction = useStableCallback(
-    ({ entry, action, reply }: PullRequestSpeedActionResult) => {
-      // Some hosts accept a merge before it completes. Without a reply, let the next read say so.
-      if (reply !== undefined || action !== "merge") overrideEntry(entry, action, reply);
-    },
-  );
-  const onBatchClosed = useStableCallback(
-    (entry: EnvironmentPullRequestEntry, reply: PullRequestSummary | undefined) => {
-      onSpeedAction({ entry, action: "close", reply });
-    },
-  );
-  const { close: closeBatch, closingKeys } = usePullRequestCloseBatch(onBatchClosed);
   const [snapshotEnvironmentKey, setSnapshotEnvironmentKey] = useState("");
   if (environmentKey.length > 0 && snapshotEnvironmentKey !== environmentKey) {
     setSnapshotEnvironmentKey(environmentKey);
@@ -602,10 +555,6 @@ export function PullRequestsPage() {
         ),
       });
     }
-    const answeredEntries = answered.entries;
-    setOverrides((current) =>
-      settlePullRequestOverrides(current, answeredEntries, pullRequestEntryKey, Date.now()),
-    );
   }
 
   // From this question's own answer, never from the rows being held while it travels: a
@@ -700,13 +649,7 @@ export function PullRequestsPage() {
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const {
-    entries,
-    listedPullRequestTabStatuses,
-    groups,
-    entriesByStatsKey,
-    heldPullRequestsBySurface,
-  } = pullRequestGroups({
+  const { entries, listedPullRequestTabStatuses, groups, entriesByStatsKey } = pullRequestGroups({
     known: ordered?.key === filterKey ? ordered.entries : (listData?.entries ?? []),
     // The baseline was read without typed qualifiers, and rows cannot be checked for `checks:`.
     baseline: typedParsed.filters.checks === undefined ? baselineQuery.data?.entries : undefined,
@@ -920,126 +863,22 @@ export function PullRequestsPage() {
     refreshListAndStats(requestedStatsScope);
     setDetailRefreshToken((token) => token + 1);
   };
-  const {
-    hosts,
-    displayGroups,
-    shownCount,
-    hostActionsOf,
-    closeSweepRows,
-    listedPullRequestsBySurface,
-  } = usePullRequestDisplayGroups({
-    answered,
-    host: search.host,
-    groups,
-    statsByRow,
-    overrides,
-    state: search.state,
-    localFilters,
-    hasLocalFilters,
-    viewers,
-    sort,
-    text: typedParsed.text,
-    involvement: search.involvement,
-  });
+  const { hosts, displayGroups, shownCount, listedPullRequestsBySurface } =
+    usePullRequestDisplayGroups({
+      answered,
+      host: search.host,
+      groups,
+      statsByRow,
+      overrides: EMPTY_OVERRIDES,
+      state: search.state,
+      localFilters,
+      hasLocalFilters,
+      viewers,
+      sort,
+      text: typedParsed.text,
+      involvement: search.involvement,
+    });
   const showProvider = hosts.length > 1;
-  const [closeSweepKeys, setCloseSweepKeys] = useState<ReadonlySet<string>>(() => new Set());
-  const closeSensorRef = useRef<SidebarPointerSensor | null>(null);
-  // A sweep spans many renders; each step reads the rows on screen at that moment.
-  const readCloseSweep = useStableCallback(() => ({
-    displayGroups,
-    closeSweepRows,
-    closingKeys,
-    closeBatch,
-    hostActionsOf,
-  }));
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- cancels the pointer close-sweep sensor when the list changes or on unmount
-  useEffect(
-    () => () => closeSensorRef.current?.cancel(),
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- The pointer sensor lives outside React; a new list under a sweep in progress must end it.
-    [filterKey, search.q, sort],
-  );
-  const startCloseSweep = useStableCallback(
-    (entry: EnvironmentPullRequestEntry, event: PointerEvent) => {
-      closeSensorRef.current?.cancel();
-      const originKey = pullRequestEntryKey(entry);
-      const group = readCloseSweep().displayGroups.find((candidate) =>
-        candidate.entries.some((row) => pullRequestEntryKey(row) === originKey),
-      );
-      if (!group || readCloseSweep().closingKeys.has(originKey)) return;
-      const orderedKeys = readCloseSweep().displayGroups.flatMap((candidate) =>
-        candidate.entries.map(pullRequestEntryKey),
-      );
-      const canClose = (key: string) => {
-        const row = readCloseSweep().closeSweepRows.get(key);
-        return (
-          row?.groupKey === group.key &&
-          row.entry.state === "open" &&
-          readCloseSweep().hostActionsOf(row.entry).has("close") &&
-          !readCloseSweep().closingKeys.has(key) &&
-          !scrollRef.current?.querySelector(
-            `[data-pull-request-key="${CSS.escape(key)}"] [data-pull-request-action-pending="true"]`,
-          )
-        );
-      };
-      let sweptKeys: string[] = [];
-      let targetKey: string | null = null;
-      const sweepTo = (key: string) => {
-        if (key === targetKey) return;
-        targetKey = key;
-        sweptKeys = resolveSidebarSweepKeys(orderedKeys, originKey, key, canClose);
-        setCloseSweepKeys(new Set(sweptKeys));
-      };
-      // Only while a sweep runs: Escape ends it, ahead of any other scope that would also take it.
-      const releaseEscape = registerCommands(
-        {},
-        {
-          capture: true,
-          onKeyDown: (keyEvent) => {
-            if (keyEvent.key !== "Escape") return false;
-            keyEvent.preventDefault();
-            sensor.cancel();
-          },
-        },
-      );
-      const sensor = new SidebarPointerSensor({
-        active: originKey,
-        event,
-        options: {
-          distance: 6,
-          onAttach: () => {},
-          onFinish: () => {
-            releaseEscape();
-            if (closeSensorRef.current === sensor) closeSensorRef.current = null;
-            setCloseSweepKeys(new Set());
-          },
-        },
-        onPending: () => {},
-        onStart: () => sweepTo(originKey),
-        onMove: ({ y }) => {
-          const viewport = scrollRef.current;
-          if (!viewport) return;
-          const bounds = viewport.getBoundingClientRect();
-          const visibleY = Math.min(Math.max(y, bounds.top), bounds.bottom - 1);
-          let key: string | null = null;
-          for (const row of viewport.querySelectorAll<HTMLElement>("[data-pull-request-key]")) {
-            if (key !== null && row.getBoundingClientRect().top > visibleY) break;
-            key = row.dataset.pullRequestKey ?? null;
-          }
-          if (key !== null) sweepTo(key);
-        },
-        onEnd: () => {
-          const batch = sweptKeys.filter(canClose).flatMap((key) => {
-            const row = readCloseSweep().closeSweepRows.get(key);
-            return row ? [row.entry] : [];
-          });
-          void readCloseSweep().closeBatch(batch);
-        },
-        onCancel: () => {},
-        onAbort: () => {},
-      });
-      closeSensorRef.current = sensor;
-    },
-  );
   const rightPanelAvailable = selectedPullRequestSurface !== null;
   const mobileSidebarSheetMounted = useMobileSidebarSheetMounted();
   const [maximized, setMaximized] = useState(false);
@@ -1048,7 +887,6 @@ export function PullRequestsPage() {
   const toggleRightPanelMaximized = () => {
     if (rightPanelState.isOpen) setMaximized((value) => !value);
   };
-  const onGuideShown = () => setMaximized(true);
   // updateSearch leaves selectedUrl out, so a reload does not reveal the link again.
   const consumeLinkedUrl = useEffectEvent(() => updateSearch({}));
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- opens the URL-linked pull request in the right panel store
@@ -1178,7 +1016,6 @@ export function PullRequestsPage() {
     (!querySettled || (showingCarried && listQuery.isPending));
   const listBody = (
     <>
-      <PipelineRunsSection />
       {!capabilityKnown ? (
         <PullRequestListGhost rows={7} caption="正在加载 PR…" />
       ) : !pullRequestsSupported ? (
@@ -1225,11 +1062,6 @@ export function PullRequestsPage() {
           statsRef={registerStatsRow}
           onSelect={selectEntry}
           onIntent={prefetchEntry}
-          hostActionsOf={hostActionsOf}
-          onActed={onSpeedAction}
-          closingKeys={closingKeys}
-          sweepingKeys={closeSweepKeys}
-          onCloseSweepStart={startCloseSweep}
         />
       )}
 
@@ -1551,24 +1383,6 @@ export function PullRequestsPage() {
                   .settlePullRequestReveal(rightPanelRef, renderedPullRequestSurface.id, revealUrl);
               }}
               environmentId={panelEnvironmentId}
-              onGuideShown={onGuideShown}
-              onSelectPullRequest={(reference) => {
-                if (rightPanelRef === null) return;
-                useRightPanelStore.getState().openPullRequest(rightPanelRef, {
-                  projectId: reference.projectId,
-                  repository: reference.repository,
-                  number: reference.number,
-                  ...(reference.host ? { host: reference.host } : {}),
-                  environmentId: panelEnvironmentId,
-                });
-                updateSearch({
-                  repository: reference.repository,
-                  number: reference.number,
-                  selectedHost: reference.host,
-                  selectedProjectId: reference.projectId,
-                  selectedEnvironmentId: panelEnvironmentId,
-                });
-              }}
               reference={pullRequestPanelReference({
                 ...renderedPullRequestSurface,
                 projectId: renderedPullRequestSurface.projectId as ProjectId,
@@ -1579,41 +1393,6 @@ export function PullRequestsPage() {
                 ) ?? null
               }
               refreshToken={detailRefreshToken}
-              tabOnPage
-              onActed={(action, phase = "done", reply) => {
-                // From every row held, not the ones on screen: a pull request closed from an open
-                // list has left the screen, and reopening it has to find it anyway.
-                const acted = heldPullRequestsBySurface.get(
-                  pullRequestListEntryId(renderedPullRequestSurface),
-                );
-                if (reply !== undefined) {
-                  if (acted !== undefined) {
-                    if (action !== undefined) overrideEntry(acted, action, reply);
-                    detailOverrideTokens.current.delete(pullRequestEntryKey(acted));
-                  }
-                  return;
-                }
-                const stateOnly =
-                  action !== undefined &&
-                  acted !== undefined &&
-                  pullRequestOverrideAfterAction(acted, action, new Date(), 0) !== null;
-                if (stateOnly) {
-                  const key = pullRequestEntryKey(acted);
-                  if (phase === "sent" && action !== "merge") {
-                    detailOverrideTokens.current.set(key, overrideEntry(acted, action));
-                  }
-                  if (phase === "failed" && action !== "merge") {
-                    revertOverride(key, detailOverrideTokens.current.get(key) ?? null);
-                  }
-                  if (phase !== "sent") detailOverrideTokens.current.delete(key);
-                  if (phase === "done" && action === "merge") {
-                    overrideEntry(acted, action);
-                    refreshListAndStats(undefined, panelEnvironmentId);
-                  }
-                  return;
-                }
-                if (phase === "done") refreshListAndStats(undefined, panelEnvironmentId);
-              }}
             />
           </RightPanelTabs>
         ) : null}

@@ -4,15 +4,10 @@ import {
   type ProviderInstanceId,
   type ServerSettings,
   type SourceControlWritingStyleMode,
-  textGeneratorForSelection,
 } from "@t3tools/contracts";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts/settings";
 import { createModelSelection } from "@t3tools/shared/model";
-import {
-  resolveReviewGuideModelSelection,
-  resolveSourceControlWriterModelSelection,
-} from "@t3tools/shared/serverSettings";
-
+import { resolveSourceControlWriterModelSelection } from "@t3tools/shared/serverSettings";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -20,7 +15,6 @@ import {
 } from "./useScopedSettings";
 import { useScopedModelDisabledReason } from "./useScopedModelAvailability";
 import { useSettingsScope } from "./SettingsScopeContext";
-import { providerInstanceEntriesFor } from "../../providerInstances";
 import { useTextGenerationTargets } from "../../textGenerators";
 import {
   getTextGenerationModelOptionsByInstance,
@@ -64,7 +58,6 @@ const MODE_OPTIONS: Record<SourceControlWritingStyleMode, { label: string; descr
 export function SourceControlWritingSettingsSection() {
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
-  const mixedReviewGuidesEnabled = useScopedSettingsMixed(["reviewGuidesEnabled"]);
   const navigate = useNavigate();
   const { environment, connectedEnvironments, targets, target } = useSettingsScope();
   const environmentId = environment?.environmentId ?? null;
@@ -90,10 +83,6 @@ export function SourceControlWritingSettingsSection() {
   const templatesMixed = styleFieldMixed("followChangeRequestTemplates");
   const writingStyleMixed = modeMixed || instructionsMixed;
   const mixedWriterModel = useScopedSettingsMixed(["sourceControlWriterModelSelection"]);
-  const mixedReviewGuideModel = useScopedSettingsMixed(["reviewGuideModelSelection"]);
-  const mixedReviewGuideInstructions = useScopedSettingsMixed(["reviewGuideInstructions"]);
-  const reviewGuideInstructionsEdited = useRef(false);
-  const scopeKey = targets.map((target) => `${target.environmentId}:${target.projectId}`).join(",");
   const customInstructionsRef = useRef<HTMLTextAreaElement>(null);
   const [editingAllInstructions, setEditingAllInstructions] = useState(false);
   const [allInstructions, setAllInstructions] = useState<string | null>(null);
@@ -107,12 +96,6 @@ export function SourceControlWritingSettingsSection() {
   const textGenerationProviders = serverProviders.filter(
     (provider) => provider.supportsTextGeneration !== false,
   );
-  const instanceEntries = providerInstanceEntriesFor(
-    textGenerationProviders,
-    settings,
-    target?.projectId ?? null,
-  );
-  // Text generators may write source control text, but never review guides.
   const writerTargets = useTextGenerationTargets({
     environmentId,
     settings,
@@ -158,37 +141,6 @@ export function SourceControlWritingSettingsSection() {
   const writerModelDisabledReason = useScopedModelDisabledReason(settings, writerEntries, true);
   const writerInstanceEntry = writerEntries.find(
     (entry) => entry.instanceId === activeSelection.instanceId,
-  );
-  const usesReviewGuideModel = settings.reviewGuideModelSelection !== null;
-  // Resolve against agents this project can use, so the fallback never lands on one it turned off.
-  const projectAgentProviders = textGenerationProviders.filter((provider) =>
-    instanceEntries.some(
-      (entry) => entry.instanceId === provider.instanceId && entry.enabled && entry.isAvailable,
-    ),
-  );
-  const reviewGuideSelection = resolveAppModelSelectionState(
-    {
-      ...settings,
-      textGenerationModelSelection: resolveReviewGuideModelSelection(
-        settings,
-        projectAgentProviders,
-        target?.projectId ?? null,
-      ),
-    },
-    projectAgentProviders,
-  );
-  const reviewGuideModelOptionsByInstance = getTextGenerationModelOptionsByInstance(
-    settings,
-    projectAgentProviders,
-    reviewGuideSelection.instanceId,
-    reviewGuideSelection.model,
-  );
-  const canEnableReviewGuideModel = instanceEntries.some(
-    (entry) =>
-      entry.instanceId === reviewGuideSelection.instanceId && entry.enabled && entry.isAvailable,
-  );
-  const reviewGuideInstanceEntry = instanceEntries.find(
-    (entry) => entry.instanceId === reviewGuideSelection.instanceId,
   );
 
   return (
@@ -305,166 +257,6 @@ export function SourceControlWritingSettingsSection() {
           </div>
         ) : null}
       </SettingsRow>
-
-      <SettingsRow
-        serverScoped
-        settingKeys={["reviewGuidesEnabled"]}
-        mixed={mixedReviewGuidesEnabled}
-        {...searchableSetting("review-guides")}
-        description="为 pull request 添加“导览”标签页。智能体会解释改动，并指出需要审查的决策。"
-        control={
-          <Switch
-            mixed={mixedReviewGuidesEnabled}
-            checked={mixedReviewGuidesEnabled ? false : settings.reviewGuidesEnabled}
-            onCheckedChange={(checked) => updateSettings({ reviewGuidesEnabled: Boolean(checked) })}
-            aria-label="审查导览"
-          />
-        }
-      />
-
-      {settings.reviewGuidesEnabled || mixedReviewGuidesEnabled ? (
-        <>
-          <SettingsRow
-            serverScoped
-            settingKeys={["reviewGuideModelSelection"]}
-            {...searchableSetting("review-guide-model")}
-            description="必须是编程智能体：它会分多步阅读 pull request。关闭时使用文案模型；若文案模型是文本生成器，则改用 Codex 或 Claude。"
-            control={
-              !hasServerTargets ? (
-                <span className="text-sm text-muted-foreground">
-                  连接一个环境以选择其审查导览模型。
-                </span>
-              ) : (
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {(usesReviewGuideModel || mixedReviewGuideModel) && canEnableReviewGuideModel ? (
-                    <ProviderModelPicker
-                      environmentId={environmentId}
-                      activeInstanceId={reviewGuideSelection.instanceId}
-                      model={reviewGuideSelection.model}
-                      lockedProvider={null}
-                      instanceEntries={instanceEntries}
-                      modelOptionsByInstance={reviewGuideModelOptionsByInstance}
-                      triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                      triggerAriaLabel="审查导览模型"
-                      {...(mixedReviewGuideModel ? { triggerLabel: "各不相同" } : {})}
-                      getModelDisabledReason={writerModelDisabledReason}
-                      onInstanceModelChange={(instanceId, model) => {
-                        const reason = writerModelDisabledReason(instanceId, model);
-                        if (reason) {
-                          toastManager.add({
-                            type: "error",
-                            title: "未保存审查导览模型",
-                            description: reason,
-                          });
-                          return;
-                        }
-                        updateSettings({
-                          reviewGuideModelSelection: createModelSelection(instanceId, model),
-                        });
-                      }}
-                    />
-                  ) : null}
-                  {usesReviewGuideModel &&
-                  canEnableReviewGuideModel &&
-                  !mixedReviewGuideModel &&
-                  reviewGuideInstanceEntry ? (
-                    <TraitsPicker
-                      provider={reviewGuideInstanceEntry.driverKind}
-                      models={reviewGuideInstanceEntry.models}
-                      model={reviewGuideSelection.model}
-                      modelOptions={reviewGuideSelection.options ?? []}
-                      allowPromptInjectedEffort={false}
-                      includePlanAgent={selectsPlanAgent(reviewGuideSelection.options)}
-                      triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                      onModelOptionsChange={(options) =>
-                        updateSettings({
-                          reviewGuideModelSelection: createModelSelection(
-                            reviewGuideSelection.instanceId,
-                            reviewGuideSelection.model,
-                            options,
-                          ),
-                        })
-                      }
-                    />
-                  ) : null}
-                  <Switch
-                    mixed={mixedReviewGuideModel}
-                    checked={mixedReviewGuideModel ? false : usesReviewGuideModel}
-                    disabled={!usesReviewGuideModel && !canEnableReviewGuideModel}
-                    onCheckedChange={(checked) => {
-                      if (!checked) {
-                        updateSettings({ reviewGuideModelSelection: null });
-                        return;
-                      }
-                      const seed = textGeneratorForSelection(settings, activeSelection.instanceId)
-                        ? reviewGuideSelection
-                        : activeSelection;
-                      const reason = writerModelDisabledReason(seed.instanceId, seed.model);
-                      if (reason) {
-                        toastManager.add({
-                          type: "error",
-                          title: "未保存审查导览模型",
-                          description: reason,
-                        });
-                        return;
-                      }
-                      updateSettings({
-                        reviewGuideModelSelection: createModelSelection(
-                          seed.instanceId,
-                          seed.model,
-                          seed.options,
-                        ),
-                      });
-                    }}
-                    aria-label="使用单独的审查导览模型"
-                  />
-                </div>
-              )
-            }
-          />
-
-          <SettingsRow
-            serverScoped
-            settingKeys={["reviewGuideInstructions"]}
-            {...searchableSetting("review-guide-instructions")}
-            description="你的审查导览偏好：先展示什么、重点解释什么、跳过什么。导览的格式和覆盖范围保持不变。"
-            resetAction={
-              mixedReviewGuideInstructions || settings.reviewGuideInstructions !== "" ? (
-                <SettingResetButton
-                  label="审查导览说明"
-                  onClick={() => updateSettings({ reviewGuideInstructions: "" })}
-                />
-              ) : null
-            }
-          >
-            <div className="mt-3 max-w-2xl pb-3.5">
-              <Textarea
-                key={`${scopeKey}:${mixedReviewGuideInstructions}:${settings.reviewGuideInstructions}`}
-                aria-label="审查导览说明"
-                onChange={() => {
-                  reviewGuideInstructionsEdited.current = true;
-                }}
-                rows={4}
-                defaultValue={mixedReviewGuideInstructions ? "" : settings.reviewGuideInstructions}
-                placeholder={
-                  mixedReviewGuideInstructions
-                    ? "各不相同。输入指令后将应用到所有所选目标。"
-                    : "先展示服务接口，再展示实现。跳过不影响行为的测试文件。摘要不超过两句话。"
-                }
-                onBlur={(event) => {
-                  const value = event.target.value.trim();
-                  if (
-                    reviewGuideInstructionsEdited.current &&
-                    (mixedReviewGuideInstructions || value !== settings.reviewGuideInstructions)
-                  )
-                    updateSettings({ reviewGuideInstructions: value });
-                  reviewGuideInstructionsEdited.current = false;
-                }}
-              />
-            </div>
-          </SettingsRow>
-        </>
-      ) : null}
       <AdvancedSettings
         targetIds={[
           searchableSetting("follow-change-request-templates").id,

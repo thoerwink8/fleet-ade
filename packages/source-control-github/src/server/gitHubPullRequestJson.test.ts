@@ -3,8 +3,6 @@ import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  buildReviewSubmission,
-  buildReviewerRequest,
   pullRequestLookup,
   referenceSearchQuery,
   toRepositoryReferences,
@@ -13,12 +11,9 @@ import {
   decodePullRequestStacksJson,
   LenientPullRequestList,
   reviewThreadConversation,
-  toLabelCandidates,
   toPullRequestActivityPage,
   toPullRequestCore,
-  toPullRequestFilesViewedPage,
   toPullRequestRows,
-  toReviewerCandidates,
   toReviewThreadCommentsPage,
   toCanWrite,
   toReviewThreadPage,
@@ -26,11 +21,8 @@ import {
 } from "./gitHubPullRequestJson.ts";
 import { PullRequestWatchFingerprint } from "./pullRequestBatches.graphql.ts";
 import {
-  LabelCandidates,
   PullRequestActivity,
   PullRequestCore,
-  PullRequestFilesViewed,
-  ReviewerCandidates,
   ViewerPermissions,
 } from "./pullRequestReads.graphql.ts";
 import { ReviewThreadComments, ReviewThreads } from "./pullRequestReviews.graphql.ts";
@@ -210,12 +202,6 @@ const decodeReviewThreadsJson = (raw: string) =>
 const decodeReviewThreadCommentsJson = (raw: string) =>
   through(ReviewThreadComments.result, toReviewThreadCommentsPage)(withReviewDefaults(raw));
 const decodeViewerPermissionsJson = through(ViewerPermissions.result, toViewerPermissions);
-const decodeLabelCandidatesJson = through(LabelCandidates.result, toLabelCandidates);
-const decodeReviewerCandidatesJson = through(ReviewerCandidates.result, toReviewerCandidates);
-const decodePullRequestFilesViewedJson = through(
-  PullRequestFilesViewed.result,
-  toPullRequestFilesViewedPage,
-);
 
 function listJson(entries: ReadonlyArray<Record<string, unknown>>): string {
   return JSON.stringify({
@@ -1155,40 +1141,6 @@ describe("viewer permission decoding", () => {
   });
 });
 
-describe("label candidate decoding", () => {
-  const labelsJson = (input: {
-    readonly defined: ReadonlyArray<Record<string, unknown>>;
-    readonly applied?: ReadonlyArray<string>;
-    readonly hasNextPage?: boolean;
-  }) =>
-    JSON.stringify({
-      data: {
-        repository: {
-          labels: {
-            pageInfo: { hasNextPage: input.hasNextPage ?? false },
-            nodes: input.defined,
-          },
-          pullRequest: { labels: { nodes: (input.applied ?? []).map((name) => ({ name })) } },
-        },
-      },
-    });
-
-  it("keeps a worn label the repository no longer defines, so it can be taken off", () => {
-    const list = expectSuccess(
-      decodeLabelCandidatesJson(
-        labelsJson({
-          defined: [{ name: "bug", color: "d73a4a", description: null }],
-          applied: ["legacy"],
-        }),
-      ),
-    );
-    expect(list.candidates.map((label) => [label.name, label.isApplied])).toEqual([
-      ["legacy", true],
-      ["bug", false],
-    ]);
-  });
-});
-
 describe("review thread decoding", () => {
   const threadsJson = (
     nodes: ReadonlyArray<Record<string, unknown>>,
@@ -1375,168 +1327,6 @@ describe("ReviewThreads", () => {
   });
 });
 
-describe("reviewer candidate decoding", () => {
-  const candidatesJson = (input: {
-    readonly assignable: ReadonlyArray<Record<string, unknown> | null>;
-    readonly requested?: ReadonlyArray<Record<string, unknown> | null>;
-    readonly author?: string;
-    readonly hasNextPage?: boolean;
-  }) =>
-    JSON.stringify({
-      data: {
-        repository: {
-          assignableUsers: {
-            pageInfo: { hasNextPage: input.hasNextPage ?? false },
-            nodes: input.assignable.map((node) =>
-              node === null ? null : { name: null, avatarUrl: "", ...node },
-            ),
-          },
-          pullRequest: {
-            author: input.author === undefined ? null : { __typename: "User", login: input.author },
-            reviewRequests: {
-              nodes: (input.requested ?? []).map((requestedReviewer) => ({
-                requestedReviewer:
-                  requestedReviewer === null
-                    ? null
-                    : "slug" in requestedReviewer
-                      ? {
-                          __typename: "Team",
-                          teamAvatarUrl: null,
-                          ...requestedReviewer,
-                        }
-                      : { __typename: "User", name: null, avatarUrl: "", ...requestedReviewer },
-              })),
-            },
-          },
-        },
-      },
-    });
-
-  it("leaves the author out of the people their own pull request can be sent to", () => {
-    const list = expectSuccess(
-      decodeReviewerCandidatesJson(
-        candidatesJson({
-          assignable: [{ login: "bilal" }, { login: "octocat", name: "The Octocat" }],
-          author: "bilal",
-        }),
-      ),
-    );
-    expect(list.candidates).toEqual([
-      {
-        id: "octocat",
-        kind: "user",
-        login: "octocat",
-        name: "The Octocat",
-        avatarUrl: null,
-        isRequested: false,
-      },
-    ]);
-    expect(list.truncated).toBe(false);
-  });
-
-  it("keeps a requested team apart from the people, so the request can be taken back", () => {
-    const list = expectSuccess(
-      decodeReviewerCandidatesJson(
-        candidatesJson({
-          assignable: [{ login: "octocat" }],
-          requested: [{ slug: "reviewers", combinedSlug: "acme/reviewers", teamName: "Reviewers" }],
-        }),
-      ),
-    );
-    expect(list.candidates).toEqual([
-      {
-        id: "reviewers",
-        kind: "team",
-        login: "acme/reviewers",
-        name: "Reviewers",
-        avatarUrl: null,
-        isRequested: true,
-      },
-      {
-        id: "octocat",
-        kind: "user",
-        login: "octocat",
-        name: null,
-        avatarUrl: null,
-        isRequested: false,
-      },
-    ]);
-  });
-});
-
-describe("reviewer request payload", () => {
-  it("sends people and teams in the two lists GitHub keeps them in", () => {
-    expect(
-      buildReviewerRequest([
-        { id: "octocat", kind: "user" },
-        { id: "reviewers", kind: "team" },
-        { id: "hubot", kind: "user" },
-      ]),
-    ).toEqual({ reviewers: ["octocat", "hubot"], team_reviewers: ["reviewers"] });
-  });
-});
-
-describe("review submission payload", () => {
-  it("sends the verdict, the summary and every line comment in one body", () => {
-    const payload = buildReviewSubmission({
-      verdict: "request-changes",
-      body: "Two things.",
-      comments: [
-        {
-          path: "src/a.ts",
-          position: { kind: "added", newLine: 12 },
-          body: "rename this",
-        },
-        {
-          path: "src/b.ts",
-          position: { kind: "deleted", oldLine: 3 },
-          body: "why remove?",
-        },
-      ],
-    });
-    expect(payload).toEqual({
-      event: "REQUEST_CHANGES",
-      body: "Two things.",
-      comments: [
-        { path: "src/a.ts", line: 12, side: "RIGHT", body: "rename this" },
-        { path: "src/b.ts", line: 3, side: "LEFT", body: "why remove?" },
-      ],
-    });
-  });
-
-  it("sends a range from its first line, and a one-line range as one line", () => {
-    const payload = buildReviewSubmission({
-      verdict: "comment",
-      body: "",
-      comments: [
-        {
-          path: "src/a.ts",
-          startPosition: { kind: "context", oldLine: 4, newLine: 5, side: "right" },
-          position: { kind: "added", newLine: 9 },
-          body: "this block",
-        },
-        {
-          path: "src/b.ts",
-          startPosition: { kind: "added", newLine: 2 },
-          position: { kind: "added", newLine: 2 },
-          body: "this line",
-        },
-      ],
-    });
-    expect(payload.comments).toEqual([
-      {
-        path: "src/a.ts",
-        start_line: 5,
-        start_side: "RIGHT",
-        line: 9,
-        side: "RIGHT",
-        body: "this block",
-      },
-      { path: "src/b.ts", line: 2, side: "RIGHT", body: "this line" },
-    ]);
-  });
-});
-
 describe("decodePullRequestFilesJson", () => {
   it("preserves spaces and literal backslashes in both rename paths", () => {
     const result = expectSuccess(
@@ -1643,31 +1433,6 @@ describe("decodePullRequestFilesJson", () => {
     expect(result.patch).toContain("diff --git a/src/app.ts b/src/app.ts");
     expect(result.truncated).toBe(true);
     expect(result.rawCount).toBe(2);
-  });
-});
-
-describe("decodePullRequestFilesViewedJson", () => {
-  const page = (
-    nodes: ReadonlyArray<unknown>,
-    pageInfo: { hasNextPage: boolean; endCursor: string | null },
-  ) =>
-    JSON.stringify({
-      data: { repository: { pullRequest: { files: { pageInfo, nodes } } } },
-    });
-
-  it("treats a state it has never heard of as unread rather than failing the page", () => {
-    const decoded = decodePullRequestFilesViewedJson(
-      page([{ path: "src/a.ts", viewerViewedState: "SOMETHING_NEW" }], {
-        hasNextPage: false,
-        endCursor: null,
-      }),
-    );
-    expect(Result.isSuccess(decoded)).toBe(true);
-    if (!Result.isSuccess(decoded)) return;
-    expect(decoded.success).toEqual({
-      files: [{ path: "src/a.ts", state: "unviewed" }],
-      nextCursor: null,
-    });
   });
 });
 

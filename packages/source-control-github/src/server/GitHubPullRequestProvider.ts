@@ -43,7 +43,6 @@ const CAPABILITIES: PullRequestCapabilities = {
   reactions: true,
   mentions: true,
   referenceSigils: ["#"],
-  viewedFiles: "host",
   review: {
     inlineComment: true,
     rangeComment: true,
@@ -670,54 +669,8 @@ export const make = Effect.gen(function* () {
     getDiffFileContents: (input) =>
       cli.getPullRequestDiffFileContents(input).pipe(Effect.mapError(fail("getDiffFileContents"))),
 
-    getFilesViewed: (input) =>
-      cli.getPullRequestFilesViewed(input).pipe(Effect.mapError(fail("getFilesViewed"))),
-
     getFileStats: (input) =>
       cli.getPullRequestFileStats(input).pipe(Effect.mapError(fail("getFileStats"))),
-    setFilesViewed: (input) =>
-      cli.setPullRequestFilesViewed(input).pipe(Effect.mapError(fail("setFilesViewed"))),
-
-    listReviewerCandidates: (input) =>
-      cli.listReviewerCandidates(input).pipe(Effect.mapError(fail("listReviewerCandidates"))),
-
-    setReviewerRequest: (input) =>
-      cli
-        .setReviewerRequest({
-          cwd: input.cwd,
-          repository: input.repository,
-          host: input.host,
-          number: input.number,
-          reviewers: input.reviewers,
-          requested: input.requested,
-        })
-        .pipe(Effect.mapError(fail("setReviewerRequest"))),
-
-    listLabelCandidates: (input) =>
-      cli.listLabelCandidates(input).pipe(Effect.mapError(fail("listLabelCandidates"))),
-
-    listRepositoryLabels: (input) =>
-      cli.listRepositoryLabels(input).pipe(Effect.mapError(fail("listRepositoryLabels"))),
-
-    searchRepositoryAuthors: (input) =>
-      cli.searchRepositoryAuthors(input).pipe(Effect.mapError(fail("searchRepositoryAuthors"))),
-
-    searchRepositoryReferences: (input) =>
-      cli
-        .searchRepositoryReferences(input)
-        .pipe(Effect.mapError(fail("searchRepositoryReferences"))),
-
-    setLabels: (input) =>
-      cli
-        .setLabels({
-          cwd: input.cwd,
-          repository: input.repository,
-          host: input.host,
-          number: input.number,
-          labels: input.labels,
-          applied: input.applied,
-        })
-        .pipe(Effect.mapError(fail("setLabels"))),
 
     runAction: (input) =>
       cli
@@ -736,73 +689,6 @@ export const make = Effect.gen(function* () {
           ...(input.updateMethod === undefined ? {} : { updateMethod: input.updateMethod }),
         })
         .pipe(Effect.mapError(fail("runAction"))),
-
-    updateChangeRequest: (input) =>
-      cli
-        .updatePullRequest({
-          ...(input.maintainerCanModify === undefined
-            ? {}
-            : { maintainerCanModify: input.maintainerCanModify }),
-          cwd: input.cwd,
-          repository: input.repository,
-          host: input.host,
-          number: input.number,
-          ...(input.title === undefined ? {} : { title: input.title }),
-          ...(input.body === undefined ? {} : { body: input.body }),
-        })
-        .pipe(Effect.mapError(fail("updateChangeRequest"))),
-
-    comment: (input) => cli.commentOnPullRequest(input).pipe(Effect.mapError(fail("comment"))),
-
-    updateComment: (input) =>
-      cli
-        .updateComment({
-          cwd: input.cwd,
-          repository: input.repository,
-          host: input.host,
-          number: input.number,
-          commentId: input.commentId,
-          kind: input.kind,
-          body: input.body,
-        })
-        .pipe(Effect.mapError(fail("updateComment"))),
-
-    submitReview: (input) => cli.submitReview(input).pipe(Effect.mapError(fail("submitReview"))),
-
-    replyToThread: (input) =>
-      cli
-        .replyToReviewThread({
-          cwd: input.cwd,
-          repository: input.repository,
-          host: input.host,
-          threadId: input.threadId,
-          body: input.body,
-        })
-        .pipe(Effect.mapError(fail("replyToThread"))),
-
-    setReaction: (input) =>
-      cli
-        .setReaction({
-          cwd: input.cwd,
-          repository: input.repository,
-          host: input.host,
-          number: input.number,
-          ...(input.subjectId === undefined ? {} : { subjectId: input.subjectId }),
-          content: input.content,
-          reacted: input.reacted,
-        })
-        .pipe(Effect.mapError(fail("setReaction"))),
-
-    setThreadResolution: (input) =>
-      cli
-        .setReviewThreadResolution({
-          cwd: input.cwd,
-          repository: input.repository,
-          host: input.host,
-          threadId: input.threadId,
-          resolved: input.resolved,
-        })
-        .pipe(Effect.mapError(fail("setThreadResolution"))),
   };
 
   return provider;

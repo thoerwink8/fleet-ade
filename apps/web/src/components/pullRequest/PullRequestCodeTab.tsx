@@ -17,58 +17,35 @@ import type { CodeViewAnnotationArgs, CodeViewDiffItem } from "@pierre/diffs/rea
 import type {
   EnvironmentId,
   PullRequestDetailView,
-  PullRequestDiffSide,
   PullRequestDiffResult,
+  PullRequestDiffSide,
   PullRequestOmittedFileStat,
   PullRequestRef,
-  PullRequestReviewPosition,
-  PullRequestReviewThread,
-  PullRequestThreadCommentsResult,
 } from "@t3tools/contracts";
 import { SOURCE_CONTROL_MEDIA_ASSET } from "@t3tools/contracts";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
   Columns2Icon,
   FlaskConicalOffIcon,
   FolderTreeIcon,
-  InfoIcon,
-  MessageSquareOffIcon,
   PilcrowIcon,
   Rows3Icon,
   Settings2Icon,
   TextWrapIcon,
   TriangleAlertIcon,
-  ChevronsDownUpIcon,
-  ChevronsUpDownIcon,
 } from "lucide-react";
 import { useAtomRefresh } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
-import {
-  createContext,
-  use,
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { observeIntersection } from "~/lib/observeIntersection";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useClientSettings, updateClientSettings } from "~/hooks/useSettings";
 import { useRenderedAppearance } from "~/hooks/useTheme";
 import { areAllDiffFilesCollapsed } from "~/lib/diffCollapse";
-import {
-  pullRequestFindingKey,
-  type PullRequestChatSubject,
-  type PullRequestFinding,
-} from "./pullRequestDetail.logic";
-import {
-  canEditPullRequestComment,
-  canResolvePullRequestThread,
-} from "@t3tools/client-runtime/pull-request-editing";
-import { fileDiffRows } from "@t3tools/client-runtime/review-guide-tour";
 import { isTestChangedFile } from "@t3tools/shared/changedFileKind";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
 import { orderDiffFiles } from "./pullRequestFileOrder.logic";
@@ -79,18 +56,10 @@ import {
   getRenderablePatch,
   resolveDiffThemeName,
   resolveFileDiffPath,
-  resolveFileDiffPreviousPath,
   type RenderablePatch,
 } from "~/lib/diffRendering";
-import { APP_BASE_NAME } from "~/branding";
 import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
-import { cn } from "~/lib/utils";
 import { createPullRequestDiffFileContentsLoader } from "~/lib/diffFileContents";
-import {
-  buildDiffReviewComment,
-  resolveDiffReviewAnchor,
-  type ReviewCommentContext,
-} from "~/reviewCommentContext";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -98,7 +67,6 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { ChatMarkdownAssetImage } from "../chat/ChatMarkdownMedia";
 import { DiffPanelLoadingState } from "../DiffPanelShell";
 import { useDiffWorkerPool } from "../DiffWorkerPoolProvider";
-import { DiffCommentAnnotation } from "../diffs/DiffCommentAnnotation";
 import { DiffFileTree } from "../diffs/DiffFileTree";
 import { FileExplorerPane } from "../files/FileExplorerPane";
 import { useCodeViewFileReveal } from "../diffs/useCodeViewFileReveal";
@@ -106,8 +74,6 @@ import { useHideTestFiles } from "../diffs/useHideTestFiles";
 import { diffFileTreeEntries, orderDiffFilesLikeTree } from "../diffs/diffFileTree.logic";
 import { StyledDiffCodeView } from "../diffs/StyledDiffCodeView";
 import { Button } from "../ui/button";
-import { Checkbox } from "../ui/checkbox";
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -118,44 +84,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/menu";
-import { toastManager } from "../ui/toast";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
-  getReviewPositionAnchor,
-  InlineReviewThreads,
-  PendingReviewCommentCard,
-  ReviewThreadCard,
-  toViewerSide,
-} from "./PullRequestReviewAnnotation";
-import { pullRequestCompletionScope } from "./PullRequestMarkdownTextarea";
-import {
-  getFileViewedRange,
   isFileDiffCollapsed,
-  isLineInFileDiff,
   withFileDiffFold,
   type DiffFoldOverride,
   type FileDiffFoldChoices,
 } from "./pullRequestDiff.logic";
 import { PullRequestDiffStat, PullRequestMetaLine } from "./pullRequestPresentation";
 import { PullRequestDiffUnavailableState } from "./PullRequestDiffUnavailableState";
-import { usePullRequestFilesViewed } from "./usePullRequestFilesViewed";
-import {
-  nextPendingReviewCommentId,
-  pullRequestReviewKey,
-  usePendingReviewComments,
-  usePullRequestReviewStore,
-  type PendingReviewComment,
-} from "./pullRequestReviewStore";
 
-interface ReviewAnnotationGroup {
-  readonly threads: ReadonlyArray<PullRequestReviewThread>;
-  readonly pending: ReadonlyArray<PendingReviewComment>;
-  readonly draft: boolean;
+interface DiffAnnotationMetadata {
   readonly image?: { readonly url: string; readonly path: string };
 }
 
-type ReviewAnnotation = DiffLineAnnotation<ReviewAnnotationGroup>;
+type DiffAnnotation = DiffLineAnnotation<DiffAnnotationMetadata>;
 
 const COMMIT_PAGE_SIZE = 10;
 
@@ -249,102 +193,8 @@ function diffModel(
   return model;
 }
 
-const threadsByPathCache = new WeakMap<
-  ReadonlyArray<PullRequestReviewThread>,
-  ReadonlyMap<string, ReadonlyArray<PullRequestReviewThread>>
->();
-
-function reviewThreadsByPath(threads: ReadonlyArray<PullRequestReviewThread>) {
-  let byPath = threadsByPathCache.get(threads);
-  if (byPath === undefined) {
-    const grouped = new Map<string, PullRequestReviewThread[]>();
-    for (const thread of threads) {
-      const list = grouped.get(thread.path);
-      if (list) list.push(thread);
-      else grouped.set(thread.path, [thread]);
-    }
-    threadsByPathCache.set(threads, (byPath = grouped));
-  }
-  return byPath;
-}
-
-interface FileViewedToggleState {
-  readonly enabled: boolean;
-  readonly isViewed: (path: string) => boolean;
-  readonly isStale: (path: string) => boolean;
-  readonly setFileViewed: (fileKey: string, viewed: boolean, extendRange: boolean) => void;
-}
-
-// Context updates viewed toggles without invalidating memoized header portals.
-const FileViewedToggleContext = createContext<FileViewedToggleState | null>(null);
-
-function FileViewedToggle({
-  fileKey,
-  path,
-  stat,
-}: {
-  readonly fileKey: string;
-  readonly path: string;
-  readonly stat: ReactNode;
-}) {
-  const viewedFiles = use(FileViewedToggleContext);
-  if (viewedFiles === null || !viewedFiles.enabled) return stat;
-  const viewed = viewedFiles.isViewed(path);
-  const stale = viewedFiles.isStale(path);
-  return (
-    <span className="flex items-center gap-3">
-      {stat}
-      <label
-        data-viewed-toggle=""
-        className="flex w-18 shrink-0 cursor-pointer select-none items-center gap-1.5 text-2xs text-muted-foreground"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <Checkbox
-          aria-label={stale ? "有更新" : "已查看"}
-          checked={viewed}
-          onCheckedChange={(next, details) =>
-            viewedFiles.setFileViewed(
-              fileKey,
-              next === true,
-              "shiftKey" in details.event && details.event.shiftKey === true,
-            )
-          }
-        />
-        {stale ? (
-          <Tooltip>
-            <TooltipTrigger render={<span className="text-warning-foreground" />}>
-              有更新
-            </TooltipTrigger>
-            <TooltipPopup side="bottom">你标记已查看后，此文件有新的推送。</TooltipPopup>
-          </Tooltip>
-        ) : (
-          <span className="@max-xs:hidden">已查看</span>
-        )}
-      </label>
-    </span>
-  );
-}
-
-interface MutableAnnotationGroup {
-  readonly side: PullRequestDiffSide;
-  readonly line: number;
-  readonly threads: PullRequestReviewThread[];
-  readonly pending: PendingReviewComment[];
-  draft: boolean;
-}
-
-interface DraftAnchor {
-  readonly fileKey: string;
-  readonly path: string;
-  readonly oldPath: string | null;
-  readonly position: PullRequestReviewPosition;
-  readonly startPosition?: PullRequestReviewPosition;
-  readonly range: SelectedLineRange;
-}
-
-export interface PullRequestAgentSelectionInput {
-  readonly comment: ReviewCommentContext;
-  readonly request: string;
+function toViewerSide(side: PullRequestDiffSide): "deletions" | "additions" {
+  return side === "left" ? "deletions" : "additions";
 }
 
 function PullRequestCodeTab({
@@ -354,12 +204,6 @@ function PullRequestCodeTab({
   detail,
   selectedCommitOid,
   onSelectedCommitChange,
-  pendingFinding,
-  fixFindingLabel = "在会话中修复",
-  onFixFinding,
-  onAddToChat,
-  onAddToAgentSelection,
-  onRefresh,
   refreshToken = 0,
   backgroundRefreshToken = 0,
   revealRequest = null,
@@ -372,13 +216,6 @@ function PullRequestCodeTab({
   detail: PullRequestDetailView;
   selectedCommitOid: string | null;
   onSelectedCommitChange: (oid: string | null) => void;
-  pendingFinding?: string | null;
-  fixFindingLabel?: string;
-  onFixFinding?: (finding: PullRequestFinding) => void;
-  /** Absent where there is no composer beside the panel to add a conversation to. */
-  onAddToChat?: (subject: PullRequestChatSubject) => void;
-  onAddToAgentSelection?: (input: PullRequestAgentSelectionInput) => void;
-  onRefresh: () => void;
   refreshToken?: number;
   backgroundRefreshToken?: number;
   /** A clicked link to a file or line range, until onRevealSettled reports it shown. */
@@ -396,7 +233,6 @@ function PullRequestCodeTab({
     wordWrap: settings.wordWrap,
   }));
   const [foldChoices, setFoldChoices] = useState<FileDiffFoldChoices>(() => new Map());
-  const [lastViewedFileKey, setLastViewedFileKey] = useState<string | null>(null);
   const [visibleCommitCount, setVisibleCommitCount] = useState(COMMIT_PAGE_SIZE);
   const [foldOverride, setFoldOverride] = useState<DiffFoldOverride>(null);
   const effectiveFoldOverride =
@@ -411,13 +247,6 @@ function PullRequestCodeTab({
     Schema.Boolean,
   );
   const [hideTestFiles, setHideTestFiles] = useHideTestFiles();
-  const [selectedLines, setSelectedLines] = useState<{
-    id: string;
-    range: SelectedLineRange;
-  } | null>(null);
-  const [draft, setDraft] = useState<DraftAnchor | null>(null);
-  const [threadPending, setThreadPending] = useState(false);
-  const [orphansOpen, setOrphansOpen] = useState(false);
   // Scope slices before reset to prevent using a previous pull request's data or cursor.
   const [sliceState, setSliceState] = useState<{
     readonly key: string;
@@ -425,26 +254,25 @@ function PullRequestCodeTab({
     readonly slices: ReadonlyArray<DiffSlice>;
   }>({ key: "", cursor: null, slices: NO_SLICES });
 
-  const referenceKey = pullRequestReviewKey(reference);
-  // A commit opened from the timeline or left selected across a force-push may no longer be
-  // part of the pull request; read it as "All commits" instead of requesting its diff.
+  const referenceKey = JSON.stringify([
+    reference.projectId,
+    reference.host ?? null,
+    reference.repository,
+    reference.number,
+  ]);
+  // A commit left selected across a force-push may no longer be part of the pull request;
+  // read it as "All commits" instead of requesting its diff.
   const commit =
     selectedCommitOid !== null && detail.commits.some((entry) => entry.oid === selectedCommitOid)
       ? selectedCommitOid
       : null;
   const scopeKey = JSON.stringify([environmentId, referenceKey, commit]);
-  // The panel keeps this mounted across pull requests, so an open composer would otherwise
-  // survive the switch and attach its comment to whichever one is on screen when it is sent.
   const [stateScopeKey, setStateScopeKey] = useState(scopeKey);
   if (stateScopeKey !== scopeKey) {
     setStateScopeKey(scopeKey);
-    setLastViewedFileKey(null);
-    setDraft(null);
-    setSelectedLines(null);
     setFoldChoices(new Map());
     setFoldOverride(null);
     setVisibleCommitCount(COMMIT_PAGE_SIZE);
-    setOrphansOpen(false);
     setSliceState({ key: scopeKey, cursor: null, slices: NO_SLICES });
   }
 
@@ -516,39 +344,10 @@ function PullRequestCodeTab({
       input: { ...reference, ...(commit === null ? {} : { commit }) },
     }),
   );
-  const reviewKey = referenceKey;
-  const pendingComments = usePendingReviewComments(reference);
-  const addComment = usePullRequestReviewStore((store) => store.addComment);
-  const removeComment = usePullRequestReviewStore((store) => store.removeComment);
-  const replyToThread = useAtomCommand(pullRequestEnvironment.replyToThread, {
-    reportFailure: false,
-  });
-  const setThreadResolution = useAtomCommand(pullRequestEnvironment.setThreadResolution, {
-    reportFailure: false,
-  });
-  const updateComment = useAtomCommand(pullRequestEnvironment.updateComment, {
-    reportFailure: false,
-  });
-  const loadThreadComments = useAtomCommand(pullRequestEnvironment.threadComments, {
-    reportFailure: false,
-  });
   const getDiffFileContents = useAtomCommand(pullRequestEnvironment.diffFileContents);
 
-  const viewedFilesStore = detail.capabilities.viewedFiles;
-  const filesViewed = usePullRequestFilesViewed({
-    environmentId,
-    reference,
-    enabled: viewedFilesStore !== undefined,
-  });
-  const {
-    setViewed,
-    refresh: refreshFilesViewed,
-    enabled: filesViewedEnabled,
-    isViewed: isFileViewed,
-    isStale: isFileViewedStale,
-  } = filesViewed;
   const appliedRefreshToken = useRef(refreshToken);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a new refresh token clears loaded slices and refetches the first diff page and viewed files
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a new refresh token clears loaded slices and refetches the first diff page
   useEffect(() => {
     if (appliedRefreshToken.current === refreshToken) return;
     appliedRefreshToken.current = refreshToken;
@@ -557,18 +356,16 @@ function PullRequestCodeTab({
     // applied page is forgotten too.
     setAppliedPage(null);
     refreshFirstDiffPage();
-    refreshFilesViewed();
-  }, [refreshToken, scopeKey, refreshFirstDiffPage, refreshFilesViewed]);
+  }, [refreshToken, scopeKey, refreshFirstDiffPage]);
   const appliedBackgroundRefreshToken = useRef(backgroundRefreshToken);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a background refresh token refetches the first diff page and viewed files while keeping slices
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a background refresh token refetches the first diff page while keeping slices
   useEffect(() => {
     if (appliedBackgroundRefreshToken.current === backgroundRefreshToken) return;
     appliedBackgroundRefreshToken.current = backgroundRefreshToken;
     // Keeping slices mounted preserves scroll; the page merge invalidates changed pages.
     setSliceState((previous) => ({ ...previous, cursor: null }));
     refreshFirstDiffPage();
-    refreshFilesViewed();
-  }, [backgroundRefreshToken, refreshFirstDiffPage, refreshFilesViewed]);
+  }, [backgroundRefreshToken, refreshFirstDiffPage]);
 
   const codeViewReveal = useCodeViewFileReveal();
   const answeredRevealNonce = useRef<number | null>(null);
@@ -579,18 +376,6 @@ function PullRequestCodeTab({
     commit,
     cacheKey: `pull-request:${referenceKey}:${detail.updatedAt}:${commit ?? "all"}`,
   });
-  const completionScope = pullRequestCompletionScope(detail, environmentId, reference);
-  const hostReview = detail.capabilities.review;
-  const review = {
-    inlineComment: hostReview.inlineComment && detail.viewerPermissions.comment,
-    reply: hostReview.reply && detail.viewerPermissions.comment,
-    resolve: hostReview.resolve && detail.viewerPermissions.resolve,
-  };
-  const canCommentOnLines = review.inlineComment && commit === null;
-  const rangeComments = hostReview.rangeComment === true;
-  // Agent context is local, so it does not require host comment permission.
-  const canSelectLines =
-    commit === null && (review.inlineComment || onAddToAgentSelection !== undefined);
   const { parsedSlices, loadedFiles, sourceFileStats } = diffModel(
     loadedSlices,
     `pull-request:${scopeKey}:${resolvedTheme}:${ignoreWhitespace}`,
@@ -621,28 +406,12 @@ function PullRequestCodeTab({
       })
     : loadedFiles;
   const hiddenTestFileCount = loadedFiles.length - files.length;
-  const filePaths = files.map((file) => resolveFileDiffPath(file));
   const omittedFileStats = new Map(
     loadedSlices.flatMap((slice) =>
       slice.omittedFileStats.map((file) => [file.path, file] as const),
     ),
   );
   const fileTreeEntries = diffFileTreeEntries(files);
-  const threadsByPath = reviewThreadsByPath(detail.reviewThreads);
-  // File membership does not guarantee a rendered hunk for the thread.
-  const placedThreadIds = (() => {
-    const placed = new Set<string>();
-    // Commit diffs use different line coordinates; list conversations separately.
-    if (commit !== null) return placed;
-    for (const file of files) {
-      for (const thread of threadsByPath.get(resolveFileDiffPath(file)) ?? []) {
-        if (thread.line !== null && isLineInFileDiff(file, thread.side, thread.line)) {
-          placed.add(thread.id);
-        }
-      }
-    }
-    return placed;
-  })();
 
   const imageRevision = commit ?? detail.headSha;
   const rawFileUrl = sourceControlClients.find(detail.provider)?.rawFileUrl;
@@ -661,95 +430,20 @@ function PullRequestCodeTab({
   const annotatedFiles = files.map((fileDiff) => {
     const fileKey = buildFileDiffRenderKey(fileDiff);
     const path = resolveFileDiffPath(fileDiff);
-    const groups = new Map<string, MutableAnnotationGroup>();
-    // Stacked view draws a context row once, so its old side shares the new side's annotation.
-    const contextNewLines = new Map<number, number>();
-    const groupAt = (anchorSide: PullRequestDiffSide, anchorLine: number) => {
-      if (anchorSide === "left" && diffLayout !== "split" && contextNewLines.size === 0) {
-        for (const row of fileDiffRows(fileDiff)) {
-          if (row.oldLine !== null && row.newLine !== null) {
-            contextNewLines.set(row.oldLine, row.newLine);
-          }
-        }
-      }
-      const contextLine = anchorSide === "left" ? contextNewLines.get(anchorLine) : undefined;
-      const side = contextLine === undefined ? anchorSide : "right";
-      const line = contextLine ?? anchorLine;
-      const key = `${side}:${line}`;
-      const existing = groups.get(key);
-      if (existing) return existing;
-      const created: MutableAnnotationGroup = {
-        side,
-        line,
-        threads: [],
-        pending: [],
-        draft: false,
-      };
-      groups.set(key, created);
-      return created;
-    };
-
-    for (const thread of threadsByPath.get(path) ?? []) {
-      if (thread.line === null || !placedThreadIds.has(thread.id)) continue;
-      groupAt(thread.side, thread.line).threads.push(thread);
-    }
-    if (commit === null) {
-      for (const comment of pendingComments) {
-        if (comment.path !== path) continue;
-        const anchor = getReviewPositionAnchor(comment.position);
-        groupAt(anchor.side, anchor.line).pending.push(comment);
-      }
-    }
-    if (draft?.fileKey === fileKey) {
-      const anchor = getReviewPositionAnchor(draft.position);
-      groupAt(anchor.side, anchor.line).draft = true;
-    }
-
-    const annotations: ReviewAnnotation[] = [...groups.values()].map((group) => ({
-      side: toViewerSide(group.side),
-      lineNumber: group.line,
-      metadata: { threads: group.threads, pending: group.pending, draft: group.draft },
-    }));
+    const annotations: DiffAnnotation[] = [];
     const imageUrl = imagePreviewUrl(fileDiff, path);
     if (imageUrl !== null) {
       annotations.push({
         side: "additions",
         lineNumber: 0,
-        metadata: { threads: [], pending: [], draft: false, image: { url: imageUrl, path } },
+        metadata: { image: { url: imageUrl, path } },
       });
     }
     return {
       fileKey,
-      path,
       fileDiff,
       annotations,
-      // The viewer redraws annotations only when their version changes.
-      annotationsVersion: fnv1a32(
-        annotations
-          .map(
-            ({ side, lineNumber, metadata }) =>
-              `${side}:${lineNumber}:${metadata.image?.url ?? ""}:${metadata.draft ? "d" : ""}:${metadata.pending
-                .map((comment) => `${comment.id}:${comment.body}`)
-                .join(",")}:${metadata.threads
-                .map(
-                  (thread) =>
-                    `${thread.id}:${thread.isResolved ? "r" : ""}:${
-                      thread.isOutdated ? "o" : ""
-                    }:${thread.comments
-                      .map(
-                        (comment) =>
-                          `${comment.id}:${comment.author?.login ?? ""}:${comment.createdAt}:${comment.body}:${(
-                            comment.reactions ?? []
-                          )
-                            .map((r) => `${r.content}:${r.count}:${r.viewerHasReacted ? "v" : ""}`)
-                            .join(",")}`,
-                      )
-                      .join(";")}`,
-                )
-                .join(",")}`,
-          )
-          .join("|"),
-      ),
+      annotationsVersion: fnv1a32(imageUrl ?? ""),
     };
   });
 
@@ -785,27 +479,16 @@ function PullRequestCodeTab({
       </div>
     );
 
-  // A stale mark means the file changed since it was viewed; Fold all and Expand all outrank marks.
-  const foldsAsViewed = (path: string) =>
-    foldOverride === null && filesViewedEnabled && isFileViewed(path) && !isFileViewedStale(path);
-  const items: CodeViewDiffItem<ReviewAnnotationGroup>[] = annotatedFiles.map(
-    ({ fileKey, path, fileDiff, annotations, annotationsVersion }) => {
-      const collapsed = isFileDiffCollapsed(
-        fileKey,
-        effectiveFoldOverride,
-        foldChoices,
-        foldsAsViewed(path),
-      );
-      const viewedMark = filesViewedEnabled
-        ? `e${isFileViewed(path) ? "v" : ""}${isFileViewedStale(path) ? "s" : ""}`
-        : "";
+  const items: CodeViewDiffItem<DiffAnnotationMetadata>[] = annotatedFiles.map(
+    ({ fileKey, fileDiff, annotations, annotationsVersion }) => {
+      const collapsed = isFileDiffCollapsed(fileKey, effectiveFoldOverride, foldChoices);
       return {
         id: fileKey,
         type: "diff" as const,
         fileDiff,
         annotations,
         collapsed,
-        version: fnv1a32(`${collapsed ? "1" : "0"}:${viewedMark}:${annotationsVersion}`),
+        version: fnv1a32(`${collapsed ? "1" : "0"}:${annotationsVersion}`),
       };
     },
   );
@@ -837,45 +520,19 @@ function PullRequestCodeTab({
   };
 
   const toggleFile = (fileKey: string) => {
-    const path = annotatedFiles.find((file) => file.fileKey === fileKey)?.path;
-    const viewed = path !== undefined && foldsAsViewed(path);
     setFoldChoices((current) =>
       withFileDiffFold(
         current,
         fileKey,
-        !isFileDiffCollapsed(fileKey, effectiveFoldOverride, current, viewed),
+        !isFileDiffCollapsed(fileKey, effectiveFoldOverride, current),
       ),
     );
-  };
-
-  const setFileViewed = (fileKey: string, viewed: boolean, extendRange: boolean) => {
-    const range = getFileViewedRange(
-      annotatedFiles,
-      fileKey,
-      extendRange ? lastViewedFileKey : null,
-    );
-    setLastViewedFileKey(fileKey);
-    for (const file of range) {
-      // A commit's diff names that commit's version of the file, not the head's.
-      setViewed(file.path, viewed, commit === null ? file.fileDiff.newObjectId : undefined);
-    }
-    setFoldChoices((current) =>
-      range.reduce((next, file) => withFileDiffFold(next, file.fileKey, viewed), current),
-    );
-  };
-  const fileViewedToggle = {
-    enabled: filesViewedEnabled,
-    isViewed: isFileViewed,
-    isStale: isFileViewedStale,
-    setFileViewed,
   };
 
   const revealFile = (path: string, range?: SelectedLineRange) => {
     const item = items.find((candidate) => resolveFileDiffPath(candidate.fileDiff) === path);
     if (item === undefined) return;
-    // Record the unfold even when already open, so a Viewed mark that loads later cannot fold it.
     setFoldChoices((current) => withFileDiffFold(current, item.id, false));
-    if (range) setSelectedLines({ id: item.id, range });
     codeViewReveal.request(item.id, range);
   };
 
@@ -889,59 +546,6 @@ function PullRequestCodeTab({
       (left, right) => Date.parse(right.committedDate) - Date.parse(left.committedDate),
     );
 
-  const beginComment = (
-    range: SelectedLineRange | null,
-    context: { item: CodeViewItem<ReviewAnnotationGroup> },
-  ) => {
-    if (!range || !canSelectLines) return;
-    const item = context.item;
-    if (item.type !== "diff") return;
-    const file = files.find((candidate) => buildFileDiffRenderKey(candidate) === item.id);
-    if (!file) return;
-    // On a host without ranged comments a range collapses to its last line: one that silently
-    // lost its first line there would be worse than one line.
-    const path = resolveFileDiffPath(file);
-    const previousPath = resolveFileDiffPreviousPath(file);
-    const sourceFile = parsedSlices
-      .flatMap((slice) => (slice?.kind === "files" ? slice.sourceFiles : []))
-      .find((candidate) => resolveFileDiffPath(candidate) === path);
-    const anchor =
-      (sourceFile && resolveDiffReviewAnchor(sourceFile, range, rangeComments)) ??
-      resolveDiffReviewAnchor(file, range, rangeComments);
-    if (anchor === null) return;
-    setDraft({
-      fileKey: item.id,
-      path,
-      oldPath: previousPath === path ? null : previousPath,
-      ...anchor,
-      range,
-    });
-  };
-
-  const finishSelection = (
-    anchor: DraftAnchor,
-    text: string,
-    onFinish: (comment: ReviewCommentContext) => void,
-  ) => {
-    const file = files.find((candidate) => buildFileDiffRenderKey(candidate) === anchor.fileKey);
-    const comment =
-      file === undefined
-        ? null
-        : buildDiffReviewComment({
-            id: `pull-request-selection:${anchor.fileKey}:${anchor.range.start}:${anchor.range.end}`,
-            sectionId: `pull-request:${detail.number}`,
-            sectionTitle: `PR #${detail.number} 审查`,
-            filePath: anchor.path,
-            fileDiff: file,
-            range: anchor.range,
-            text,
-          });
-    setDraft(null);
-    setSelectedLines(null);
-    if (comment !== null) onFinish(comment);
-  };
-
-  // Stable props preserve viewer portals during selection, typing, and review updates.
   const renderCodeViewFooter = () =>
     nextCursor === null ? null : (
       <div
@@ -961,7 +565,7 @@ function PullRequestCodeTab({
       </div>
     );
 
-  const renderHeaderPrefix = (item: CodeViewItem<ReviewAnnotationGroup>) => {
+  const renderHeaderPrefix = (item: CodeViewItem<DiffAnnotationMetadata>) => {
     const collapsed = item.collapsed === true;
     return (
       <Button
@@ -984,7 +588,7 @@ function PullRequestCodeTab({
     );
   };
 
-  const renderHeaderMetadata = (item: CodeViewItem<ReviewAnnotationGroup>) => {
+  const renderHeaderMetadata = (item: CodeViewItem<DiffAnnotationMetadata>) => {
     if (item.type !== "diff") return null;
     let { additions, deletions } = sourceFileStats.get(item.id) ?? getDiffLineStat([item.fileDiff]);
     const path = resolveFileDiffPath(item.fileDiff);
@@ -993,16 +597,10 @@ function PullRequestCodeTab({
       if (withheld) ({ additions, deletions } = withheld);
     }
     return (
-      <FileViewedToggle
-        fileKey={item.id}
-        path={path}
-        stat={
-          <PullRequestDiffStat
-            additions={additions}
-            deletions={deletions}
-            className="font-mono text-2xs"
-          />
-        }
+      <PullRequestDiffStat
+        additions={additions}
+        deletions={deletions}
+        className="font-mono text-2xs"
       />
     );
   };
@@ -1016,180 +614,30 @@ function PullRequestCodeTab({
     themeType: resolvedTheme,
     stickyHeaders: true,
     loadDiffFiles,
-    enableGutterUtility: canSelectLines && draft === null,
-    enableLineSelection: canSelectLines && draft === null,
-    onGutterUtilityClick: beginComment,
-    onLineSelectionEnd: beginComment,
     onPostRender: codeViewReveal.flush,
     // Find may repeat requests before render; only unfold, never toggle.
-    onRevealSearchMatch: (item: CodeViewItem<ReviewAnnotationGroup>) =>
+    onRevealSearchMatch: (item: CodeViewItem<DiffAnnotationMetadata>) =>
       setFoldChoices((current) => withFileDiffFold(current, item.id, false)),
   };
 
-  const runThreadCommand = async (
-    label: string,
-    run: () => Promise<{ readonly _tag: string }>,
-  ): Promise<boolean> => {
-    if (threadPending) return false;
-    setThreadPending(true);
-    const result = await run();
-    setThreadPending(false);
-    if (result._tag === "Failure") {
-      toastManager.add({ type: "error", title: label });
-      return false;
-    }
-    onRefresh();
-    return true;
-  };
-
-  const renderThreadCard = (thread: PullRequestReviewThread, hidden?: boolean) => (
-    <ReviewThreadCard
-      // Host thread ids can collide across pull requests.
-      key={`${reference.projectId}#${reference.number}:${thread.id}`}
-      thread={thread}
-      workspaceRoot={detail.workspaceRoot}
-      canReply={review.reply}
-      canResolve={review.resolve && canResolvePullRequestThread(detail, thread)}
-      canReact={detail.capabilities.reactions === true}
-      environmentId={environmentId}
-      reference={reference}
-      completionScope={completionScope}
-      pending={threadPending}
-      fixPending={pendingFinding === pullRequestFindingKey({ kind: "thread", thread })}
-      fixLabel={fixFindingLabel}
-      {...(onFixFinding ? { onFix: () => onFixFinding({ kind: "thread", thread }) } : {})}
-      {...(onAddToChat
-        ? { onAddToChat: (loaded) => onAddToChat({ kind: "thread", thread: loaded }) }
-        : {})}
-      onLoadMore={async (cursor): Promise<PullRequestThreadCommentsResult | null> => {
-        const result = await loadThreadComments({
-          environmentId,
-          input: { ...reference, threadId: thread.id, cursor },
-        });
-        if (result._tag === "Failure") {
-          toastManager.add({
-            type: "error",
-            title: "无法加载更多评论",
-          });
-          return null;
-        }
-        return result.value;
-      }}
-      onReply={(body) =>
-        runThreadCommand("无法发表回复", () =>
-          replyToThread({
-            environmentId,
-            input: { ...reference, threadId: thread.id, body },
-          }),
-        )
-      }
-      canEditComment={(comment) =>
-        canEditPullRequestComment(detail, {
-          author: comment.author,
-          kind: "review-comment",
-          canEdit: comment.canEdit,
-        })
-      }
-      onEditComment={(commentId, body) =>
-        runThreadCommand("无法保存评论", () =>
-          updateComment({
-            environmentId,
-            input: { ...reference, commentId, kind: "review-comment", body },
-          }),
-        )
-      }
-      onToggleResolved={() =>
-        void runThreadCommand("无法更新这条讨论", () =>
-          setThreadResolution({
-            environmentId,
-            input: { ...reference, threadId: thread.id, resolved: !thread.isResolved },
-          }),
-        )
-      }
-      onReacted={onRefresh}
-      {...(hidden === undefined ? {} : { hidden })}
-    />
-  );
-
-  const renderAnnotation = (...[annotation]: CodeViewAnnotationArgs<ReviewAnnotationGroup>) => (
-    // Folded resolved conversations alone add no row, so the code reads straight through.
-    <div className="relative font-sans text-foreground has-[>:not([data-resolved-threads])]:py-1">
-      {annotation.metadata.image ? (
-        <div className="flex justify-center p-3">
-          <ChatMarkdownAssetImage
-            environmentId={environmentId}
-            resource={{
-              _tag: SOURCE_CONTROL_MEDIA_ASSET,
-              cwd: detail.workspaceRoot,
-              url: annotation.metadata.image.url,
-              repository: detail.repository,
-            }}
-            alt={annotation.metadata.image.path}
-          />
-        </div>
-      ) : null}
-      <InlineReviewThreads threads={annotation.metadata.threads} renderThread={renderThreadCard} />
-      {annotation.metadata.pending.map((comment) => (
-        <PendingReviewCommentCard
-          key={comment.id}
-          comment={comment}
-          onRemove={() => removeComment(reviewKey, comment.id)}
-        />
-      ))}
-      {annotation.metadata.draft && draft && canSelectLines ? (
-        <DiffCommentAnnotation
-          kind="draft"
-          rangeLabel={`${draft.path}:${getReviewPositionAnchor(draft.position).line}`}
-          text=""
-          completionScope={canCommentOnLines ? completionScope : null}
-          submitLabel={canCommentOnLines ? "添加到审查" : "添加给智能体"}
-          {...(canCommentOnLines && onAddToAgentSelection
-            ? {
-                secondaryAction: {
-                  label: "添加给智能体",
-                  onAction: (text: string) =>
-                    finishSelection(draft, text, (comment) =>
-                      onAddToAgentSelection({ comment, request: text }),
-                    ),
-                },
-              }
-            : {})}
-          onCancel={() => {
-            setDraft(null);
-            setSelectedLines(null);
+  const renderAnnotation = (...[annotation]: CodeViewAnnotationArgs<DiffAnnotationMetadata>) =>
+    annotation.metadata.image ? (
+      <div className="relative flex justify-center p-3 font-sans text-foreground">
+        <ChatMarkdownAssetImage
+          environmentId={environmentId}
+          resource={{
+            _tag: SOURCE_CONTROL_MEDIA_ASSET,
+            cwd: detail.workspaceRoot,
+            url: annotation.metadata.image.url,
+            repository: detail.repository,
           }}
-          onComment={(body) => {
-            if (!canCommentOnLines) {
-              if (onAddToAgentSelection) {
-                finishSelection(draft, body, (comment) =>
-                  onAddToAgentSelection({ comment, request: body }),
-                );
-              }
-              return;
-            }
-            addComment(reviewKey, {
-              id: nextPendingReviewCommentId(),
-              path: draft.path,
-              ...(draft.oldPath === null ? {} : { oldPath: draft.oldPath }),
-              ...(draft.startPosition === undefined ? {} : { startPosition: draft.startPosition }),
-              position: draft.position,
-              body,
-            });
-            setDraft(null);
-            setSelectedLines(null);
-          }}
+          alt={annotation.metadata.image.path}
         />
-      ) : null}
-    </div>
-  );
+      </div>
+    ) : null;
 
   const selectedCommit = orderedCommits.find((entry) => entry.oid === commit);
   const scopeLabel = selectedCommit ? selectedCommit.messageHeadline : "全部提交";
-  const changeIgnoreWhitespace = (next: boolean) => {
-    setIgnoreWhitespace(next);
-    setDraft(null);
-    setSelectedLines(null);
-  };
   const toolbar = (
     <div className="@container flex h-10 min-h-10 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-background px-4 text-xs text-muted-foreground">
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -1242,62 +690,13 @@ function PullRequestCodeTab({
         ) : null}
         <PullRequestMetaLine>
           <span className="shrink-0 tabular-nums">
-            {files.length} {files.length === 1 ? "文件" : "文件"}
+            {files.length} 文件
             {nextCursor === null ? "" : "+"}
           </span>
           {hiddenTestFileCount > 0 ? (
             <Button type="button" size="xs" variant="link" onClick={() => setHideTestFiles(false)}>
               已隐藏 {hiddenTestFileCount} 个测试文件
             </Button>
-          ) : null}
-          {filesViewed.enabled && files.length > 0 ? (
-            <span className="flex min-w-0 items-center gap-1 tabular-nums">
-              <span className="shrink-0">
-                {filePaths.filter(isFileViewed).length} / {files.length}
-              </span>
-              <span className="truncate">
-                {viewedFilesStore === "environment" ? `已在 ${APP_BASE_NAME} 中查看` : "已查看"}
-              </span>
-              {viewedFilesStore === "environment" ? (
-                <Tooltip>
-                  <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
-                    <InfoIcon
-                      aria-label="这些勾选保存在此处，而非托管平台"
-                      className="text-muted-foreground size-3.5"
-                    />
-                  </TooltipTrigger>
-                  <TooltipPopup side="bottom">
-                    此托管平台不保存你已阅读哪些文件的共享记录，因此这些勾选由当前环境保存。它们会在此环境关联的各应用之间同步，但托管平台自带的网页界面不会显示。
-                  </TooltipPopup>
-                </Tooltip>
-              ) : null}
-              {filesViewed.error !== null ? (
-                <Tooltip>
-                  <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
-                    <TriangleAlertIcon
-                      aria-label="无法读取你的勾选"
-                      className="size-3.5 text-warning-foreground"
-                    />
-                  </TooltipTrigger>
-                  <TooltipPopup side="bottom">
-                    下面的勾选是上次读到的结果；如果还没读到，就是空的。{filesViewed.error}
-                  </TooltipPopup>
-                </Tooltip>
-              ) : null}
-              {filesViewed.truncated ? (
-                <Tooltip>
-                  <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
-                    <TriangleAlertIcon
-                      aria-label="此计数只涵盖改动的一部分"
-                      className="size-3.5 text-warning-foreground"
-                    />
-                  </TooltipTrigger>
-                  <TooltipPopup side="bottom">
-                    此改动的文件数超过托管平台一次能返回的勾选数量，因此计数偏小，下方部分勾选框初始为空。
-                  </TooltipPopup>
-                </Tooltip>
-              ) : null}
-            </span>
           ) : null}
           {withheldContent ? (
             <Tooltip>
@@ -1309,19 +708,6 @@ function PullRequestCodeTab({
               </TooltipTrigger>
               <TooltipPopup side="bottom">
                 托管平台未提供此差异的一部分：二进制文件，或体积过大无法内联显示的改动。
-              </TooltipPopup>
-            </Tooltip>
-          ) : null}
-          {commit !== null && review.inlineComment ? (
-            <Tooltip>
-              <TooltipTrigger render={<span className="flex shrink-0 items-center" />}>
-                <MessageSquareOffIcon
-                  aria-label="请基于完整改动添加行内评论"
-                  className="size-3.5"
-                />
-              </TooltipTrigger>
-              <TooltipPopup side="bottom">
-                评论会锚定到整个改动，请切换到“全部提交”再写评论。
               </TooltipPopup>
             </Tooltip>
           ) : null}
@@ -1346,7 +732,7 @@ function PullRequestCodeTab({
           <DropdownMenuContent align="end">
             <DropdownMenuCheckboxItem
               checked={ignoreWhitespace}
-              onCheckedChange={(checked) => changeIgnoreWhitespace(checked)}
+              onCheckedChange={(checked) => setIgnoreWhitespace(checked)}
             >
               隐藏空白字符改动
             </DropdownMenuCheckboxItem>
@@ -1383,7 +769,7 @@ function PullRequestCodeTab({
                   variant="ghost"
                   size="sm"
                   pressed={ignoreWhitespace}
-                  onPressedChange={(pressed) => changeIgnoreWhitespace(Boolean(pressed))}
+                  onPressedChange={(pressed) => setIgnoreWhitespace(Boolean(pressed))}
                 />
               }
             >
@@ -1496,6 +882,7 @@ function PullRequestCodeTab({
       </div>
     </div>
   );
+
   // A file not loaded yet pages forward each time a slice arrives; once loaded, the viewer
   // positions it when it renders it.
   const answerReveal = useEffectEvent(() => {
@@ -1597,68 +984,9 @@ function PullRequestCodeTab({
     );
   }
 
-  const orphanThreads = detail.reviewThreads.filter((thread) => !placedThreadIds.has(thread.id));
-  const orphanFiles = new Map<string, PullRequestReviewThread[]>();
-  for (const thread of orphanThreads) {
-    const existing = orphanFiles.get(thread.path);
-    if (existing) existing.push(thread);
-    else orphanFiles.set(thread.path, [thread]);
-  }
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       {toolbar}
-      {orphanFiles.size > 0 ? (
-        <div className="shrink-0 border-b border-border/60">
-          <Collapsible open={orphansOpen} onOpenChange={setOrphansOpen}>
-            <h2>
-              <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-xs text-muted-foreground">
-                <span>
-                  {nextCursor === null ? "不在当前差异中的对话" : "不在已加载差异中的对话"}
-                </span>
-                <ChevronRightIcon
-                  aria-hidden
-                  className={cn("size-3.5 transition-transform", orphansOpen && "rotate-90")}
-                />
-                <span aria-hidden className="tabular-nums">
-                  {orphanThreads.length}
-                </span>
-                <span className="sr-only">
-                  {orphanThreads.length === 1
-                    ? "1 conversation"
-                    : `${orphanThreads.length} conversations`}
-                </span>
-              </CollapsibleTrigger>
-            </h2>
-            <CollapsiblePanel>
-              <div className="max-h-64 space-y-1 overflow-auto px-1 pb-1">
-                {[...orphanFiles].map(([path, threads]) => (
-                  <div key={path}>
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <p className="truncate px-3 text-xs text-muted-foreground">{path}</p>
-                        }
-                      />
-                      <TooltipPopup side="top">{path}</TooltipPopup>
-                    </Tooltip>
-                    <div className="mt-1 space-y-2">
-                      {threads.map((thread) => (
-                        <div key={thread.id}>
-                          {thread.line === null ? null : (
-                            <p className="px-3 text-xs text-muted-foreground">Line {thread.line}</p>
-                          )}
-                          {renderThreadCard(thread)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CollapsiblePanel>
-          </Collapsible>
-        </div>
-      ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
           className="relative min-h-0 min-w-0 flex-1"
@@ -1674,7 +1002,6 @@ function PullRequestCodeTab({
               if (node instanceof HTMLButtonElement || node instanceof HTMLAnchorElement) {
                 return;
               }
-              if (node.hasAttribute("data-viewed-toggle")) return;
               if (node.hasAttribute("data-diffs-header")) {
                 const filePath = node.querySelector("[data-title]")?.textContent?.trim();
                 if (filePath === undefined || filePath === "") return;
@@ -1688,22 +1015,18 @@ function PullRequestCodeTab({
           }}
         >
           {/* The viewer must own its scroll element to position virtual rows within it. */}
-          <FileViewedToggleContext value={fileViewedToggle}>
-            <StyledDiffCodeView<ReviewAnnotationGroup>
-              className="@container h-full overflow-auto [scrollbar-gutter:stable]"
-              containerRef={scrollerRef}
-              viewerRef={codeViewReveal.attach}
-              items={items}
-              selectedLines={selectedLines}
-              onSelectedLinesChange={setSelectedLines}
-              options={diffViewOptions}
-              renderCodeViewFooter={renderCodeViewFooter}
-              renderHeaderPrefix={renderHeaderPrefix}
-              renderHeaderMetadata={renderHeaderMetadata}
-              renderAnnotation={renderAnnotation}
-              unsafeCSSExtra={REPLACE_FILE_COUNTS_CSS}
-            />
-          </FileViewedToggleContext>
+          <StyledDiffCodeView<DiffAnnotationMetadata>
+            className="@container h-full overflow-auto [scrollbar-gutter:stable]"
+            containerRef={scrollerRef}
+            viewerRef={codeViewReveal.attach}
+            items={items}
+            options={diffViewOptions}
+            renderCodeViewFooter={renderCodeViewFooter}
+            renderHeaderPrefix={renderHeaderPrefix}
+            renderHeaderMetadata={renderHeaderMetadata}
+            renderAnnotation={renderAnnotation}
+            unsafeCSSExtra={REPLACE_FILE_COUNTS_CSS}
+          />
         </div>
         {fileTreeOpen ? (
           <FileExplorerPane

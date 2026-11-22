@@ -14,7 +14,6 @@ import type {
   PullRequestCheck,
   PullRequestChecks,
   PullRequestComment,
-  PullRequestFileViewed,
   PullRequestCommit,
   PullRequestInvolvement,
   PullRequestLabel,
@@ -26,20 +25,14 @@ import type {
   PullRequestMergeability,
   PullRequestOmittedFileStat,
   PullRequestReaction,
-  PullRequestReactionContent,
-  PullRequestReviewCommentDraft,
   PullRequestReviewDecision,
   PullRequestOverviewThread,
   PullRequestReviewThread,
-  PullRequestThreadCommentsResult,
-  PullRequestReviewVerdict,
-  PullRequestReviewerCandidateList,
-  PullRequestReviewerKind,
-  PullRequestLabelCandidateList,
   PullRequestState,
-  PullRequestPreview,
+  PullRequestThreadCommentsResult,
   PullRequestUpdateMethod,
   PullRequestViewerPermissions,
+  PullRequestPreview,
   SourceControlProviderKind,
 } from "@t3tools/contracts";
 import { SourceControlProviderKind as SourceControlProviderKindSchema } from "@t3tools/contracts";
@@ -245,12 +238,6 @@ export interface ProviderDiffFileContents {
 export interface ProviderDiffFilePaths {
   readonly files: ReadonlyArray<{ readonly oldPath: string; readonly newPath: string }>;
   readonly nextCursor: string | null;
-}
-
-export interface ProviderFilesViewed {
-  readonly files: ReadonlyArray<PullRequestFileViewed>;
-  /** More files exist; missing entries are unknown, not "unviewed". */
-  readonly truncated: boolean;
 }
 
 export interface ProviderFileStats {
@@ -463,10 +450,6 @@ export interface PullRequestProviderApi {
     },
   ) => Effect.Effect<ProviderDiffFileContents, PullRequestProviderError>;
 
-  readonly getFilesViewed?: (
-    input: ProviderRepositoryRef & { readonly number: number },
-  ) => Effect.Effect<ProviderFilesViewed, PullRequestProviderError>;
-
   /** Line counts for every changed file. Optional: a host without one shows no breakdown. */
   readonly getFileStats?: (
     input: ProviderRepositoryRef & { readonly number: number },
@@ -476,12 +459,6 @@ export interface PullRequestProviderApi {
    * A host with no bulk form is still owed one round trip for the batch rather than one per
    * file, since the point of gathering presses is that the host is asked once.
    */
-  readonly setFilesViewed?: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly files: ReadonlyArray<{ readonly path: string; readonly viewed: boolean }>;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
 
   /** Required for `environment` viewed marks to invalidate them after changes. */
   readonly getFileRevisions?: (
@@ -503,62 +480,6 @@ export interface PullRequestProviderApi {
       readonly updateMethod?: PullRequestUpdateMethod;
     },
   ) => Effect.Effect<ProviderChangeRequestSummary | void, PullRequestProviderError>;
-
-  /** Requires edit capability and at least one field. */
-  readonly updateChangeRequest?: (
-    input: ProviderRepositoryRef & {
-      readonly maintainerCanModify?: boolean | undefined;
-      readonly number: number;
-      readonly title?: string | undefined;
-      readonly body?: string | undefined;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  readonly comment: (
-    input: ProviderRepositoryRef & { readonly number: number; readonly body: string },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  readonly updateComment?: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly commentId: string;
-      readonly kind: "issue-comment" | "review-comment";
-      readonly body: string;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  readonly submitReview: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly verdict: PullRequestReviewVerdict;
-      readonly body: string;
-      readonly comments: ReadonlyArray<PullRequestReviewCommentDraft>;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  /** Exclude the author using host-specific account identities. */
-  readonly listReviewerCandidates: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      /** Asks the host to search past its first page of candidates. */
-      readonly query?: string | undefined;
-    },
-  ) => Effect.Effect<PullRequestReviewerCandidateList, PullRequestProviderError>;
-
-  readonly setReviewerRequest: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly reviewers: ReadonlyArray<{
-        readonly id: string;
-        readonly kind: PullRequestReviewerKind;
-      }>;
-      readonly requested: boolean;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  readonly listLabelCandidates?: (
-    input: ProviderRepositoryRef & { readonly number: number },
-  ) => Effect.Effect<PullRequestLabelCandidateList, PullRequestProviderError>;
 
   /**
    * The labels a repository offers, for narrowing a listing by. `query` narrows by name as far as
@@ -589,38 +510,4 @@ export interface PullRequestProviderApi {
     ProviderFilterOptionPage<PullRequestReferenceCandidate>,
     PullRequestProviderError
   >;
-
-  readonly setLabels?: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly labels: ReadonlyArray<string>;
-      readonly applied: boolean;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  readonly replyToThread: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly threadId: string;
-      readonly body: string;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  /** `subjectId` is the conversation's remark ID; absent targets the change request description. */
-  readonly setReaction: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly subjectId?: string | undefined;
-      readonly content: PullRequestReactionContent;
-      readonly reacted: boolean;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
-
-  readonly setThreadResolution: (
-    input: ProviderRepositoryRef & {
-      readonly number: number;
-      readonly threadId: string;
-      readonly resolved: boolean;
-    },
-  ) => Effect.Effect<void, PullRequestProviderError>;
 }

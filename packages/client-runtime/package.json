@@ -467,10 +467,6 @@
       "types": "./src/sourceControlClients.ts",
       "default": "./src/sourceControlClients.ts"
     },
-    "./review-guide-tour": {
-      "types": "./src/reviewGuideTour.ts",
-      "default": "./src/reviewGuideTour.ts"
-    },
     "./state/query-persistence": {
       "types": "./src/state/queryPersistence.ts",
       "default": "./src/state/queryPersistence.ts"
@@ -483,14 +479,6 @@
       "types": "./src/pullRequestChecks.ts",
       "default": "./src/pullRequestChecks.ts"
     },
-    "./pull-request-editing": {
-      "types": "./src/pullRequestEditing.ts",
-      "default": "./src/pullRequestEditing.ts"
-    },
-    "./pull-request-reactions": {
-      "types": "./src/pullRequestReactions.ts",
-      "default": "./src/pullRequestReactions.ts"
-    },
     "./pull-request-reply": {
       "types": "./src/pullRequestReply.ts",
       "default": "./src/pullRequestReply.ts"
@@ -502,10 +490,6 @@
     "./model-traits": {
       "types": "./src/modelTraits.ts",
       "default": "./src/modelTraits.ts"
-    },
-    "./pull-request-reviewers": {
-      "types": "./src/pullRequestReviewers.ts",
-      "default": "./src/pullRequestReviewers.ts"
     },
     "./provider-clients": {
       "types": "./src/providerClients.ts",

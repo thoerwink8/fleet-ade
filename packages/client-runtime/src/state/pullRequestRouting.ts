@@ -40,26 +40,9 @@ const reads = new Set<string>([
   WS_METHODS.pullRequestsActivity,
   WS_METHODS.pullRequestsThreadComments,
   WS_METHODS.pullRequestsDiffFileContents,
-  WS_METHODS.pullRequestsFilesViewed,
   WS_METHODS.pullRequestsChangeBreakdown,
-  WS_METHODS.pullRequestsReviewerCandidates,
-  WS_METHODS.pullRequestsLabelCandidates,
 ]);
-// Review guides are not routed: each server keeps its own, so another server answering would
-// report none, or start a run nobody on the pull request's own server can see.
-const writes = new Set<string>([
-  WS_METHODS.pullRequestsSetFilesViewed,
-  WS_METHODS.pullRequestsRunAction,
-  WS_METHODS.pullRequestsUpdate,
-  WS_METHODS.pullRequestsComment,
-  WS_METHODS.pullRequestsUpdateComment,
-  WS_METHODS.pullRequestsSubmitReview,
-  WS_METHODS.pullRequestsReplyToThread,
-  WS_METHODS.pullRequestsSetReaction,
-  WS_METHODS.pullRequestsSetThreadResolution,
-  WS_METHODS.pullRequestsRequestReviewers,
-  WS_METHODS.pullRequestsSetLabels,
-]);
+const writes = new Set<string>([WS_METHODS.pullRequestsRunAction]);
 const isRef = Schema.is(PullRequestRef);
 const hasState = Schema.is(
   Schema.Struct({ state: PullRequestState, isDraft: Schema.optional(Schema.Boolean) }),
@@ -300,20 +283,14 @@ export function createPullRequestRouter() {
         targets,
         ([target, refs]) =>
           invalidateTarget(registry, origin.target.environmentId, target, [
-            ...refs.map((reference) => ({
-              reference,
-              ...(tag === WS_METHODS.pullRequestsSetFilesViewed ? { filesViewedOnly: true } : {}),
-            })),
-            ...(tag === WS_METHODS.pullRequestsSetFilesViewed ? [] : [{}]),
+            ...refs.map((reference) => ({ reference })),
+            {},
           ]),
         { concurrency: 4, discard: true },
       );
     });
-    // A failed viewed-files batch may have applied some paths. Other writes invalidate on success.
     const finish = (operation: ReturnType<typeof request<T>>) =>
-      tag === WS_METHODS.pullRequestsSetFilesViewed
-        ? operation.pipe(Effect.ensuring(invalidateReaders))
-        : operation.pipe(Effect.tap(() => invalidateReaders));
+      operation.pipe(Effect.tap(() => invalidateReaders));
     const alternatives = [];
     for (const [id, entry] of entries) {
       if (id === origin.target.environmentId) continue;

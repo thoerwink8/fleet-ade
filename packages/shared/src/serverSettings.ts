@@ -8,7 +8,6 @@ import {
   type IdleCompactionMode,
   isProviderAvailable,
   isUnconfiguredDefaultInstanceEnabled,
-  resolveProjectProviderInstanceEnabled,
   resolveProviderInstanceEnabled,
   resolveTextGenerationSelectionEnabled,
   textGeneratorForSelection,
@@ -137,21 +136,6 @@ export function resolveSourceControlWriterModelSelection(
     isTextGenerationTargetUsable(settings, providers, selection.instanceId)
     ? selection
     : settings.textGenerationModelSelection;
-}
-
-export function resolveReviewGuideModelSelection(
-  settings: ServerSettings,
-  providers: ReadonlyArray<ServerProvider> | undefined,
-  projectId: ProjectId | null,
-): ModelSelection {
-  const selection = settings.reviewGuideModelSelection;
-  // Text generators cannot investigate a checkout, so they never write review guides.
-  return selection &&
-    textGeneratorForSelection(settings, selection.instanceId) === undefined &&
-    resolveProjectProviderInstanceEnabled(settings, projectId, selection.instanceId) &&
-    isTextGenerationTargetUsable(settings, providers, selection.instanceId)
-    ? selection
-    : resolveSourceControlWriterModelSelection(settings, providers, projectId);
 }
 
 export interface PersistedServerObservabilitySettings {
@@ -605,9 +589,6 @@ export function applyServerSettingsPatch(
       : {}),
     ...(patch.sourceControlWriterModelSelection !== undefined
       ? { sourceControlWriterModelSelection: patch.sourceControlWriterModelSelection }
-      : {}),
-    ...(patch.reviewGuideModelSelection !== undefined
-      ? { reviewGuideModelSelection: patch.reviewGuideModelSelection }
       : {}),
     ...(patch.maxConcurrentSessions !== undefined
       ? { maxConcurrentSessions: patch.maxConcurrentSessions }

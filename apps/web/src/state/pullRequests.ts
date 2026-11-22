@@ -40,7 +40,6 @@ import {
 } from "../components/pullRequest/pullRequestList.logic";
 import { writePullRequestDetailSnapshot } from "../components/pullRequest/pullRequestDetail.logic";
 import { pullRequestChecksState } from "../components/pullRequest/pullRequestPresentation";
-import { useGuideRunStore } from "../components/pullRequest/guide/guideRunStore";
 import { formatEnvironmentQueryError } from "./query";
 import { environmentThreadShells } from "./threads";
 
@@ -406,20 +405,6 @@ export const pullRequestEnvironment = createPullRequestEnvironmentAtoms(connecti
           observedAt,
         }),
       );
-    }),
-  // Covers runs started elsewhere (another client, an agent) as well as this client's own.
-  reviewGuide: ({ environmentId, input }, guide) =>
-    Effect.map(Clock.currentTimeMillis, (since) => {
-      if (guide.run?._tag !== "Running") return;
-      useGuideRunStore.getState().watch({
-        environmentId,
-        reference: input,
-        title: null,
-        previousGuideAt: guide.guide?.generatedAt ?? null,
-        previousFailedAt: null,
-        since,
-        answeredRunning: true,
-      });
     }),
 });
 

@@ -23,7 +23,7 @@ const RIGHT_PANEL_KINDS = [
 ] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
-export type PullRequestDetailTab = "summary" | "guide" | "timeline" | "code";
+export type PullRequestDetailTab = "code";
 
 export type RightPanelSurface =
   | {
@@ -256,7 +256,7 @@ export function pullRequestSurface(target: {
   repository: string;
   number: number;
   url?: string;
-  detailTab?: PullRequestDetailTab;
+  detailTab?: PullRequestDetailTab | string;
 }): PullRequestSurface {
   return {
     id: pullRequestSurfaceId(target),
@@ -267,7 +267,7 @@ export function pullRequestSurface(target: {
     repository: target.repository,
     number: target.number,
     ...(typeof target.url === "string" ? { url: target.url } : {}),
-    ...(target.detailTab === undefined ? {} : { detailTab: target.detailTab }),
+    ...(typeof target.detailTab === "string" ? { detailTab: "code" as const } : {}),
   };
 }
 
@@ -687,19 +687,20 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             };
           }),
         ),
-      setPullRequestDetailTab: (ref, surfaceId, detailTab) =>
+      setPullRequestDetailTab: (ref, surfaceId, _detailTab) =>
         set((state) => {
           const threadKey = scopedThreadKey(ref);
           const existing = state.byThreadKey[threadKey]?.surfaces.find(
             (surface) => surface.id === surfaceId,
           );
-          if (existing?.kind !== "pull-request" || (existing.detailTab ?? "summary") === detailTab)
+          const normalized = "code" as const;
+          if (existing?.kind !== "pull-request" || (existing.detailTab ?? "code") === normalized)
             return state;
           return automaticUpdate(state, threadKey, (current) => ({
             ...current,
             surfaces: current.surfaces.map((surface) =>
               surface.id === surfaceId && surface.kind === "pull-request"
-                ? { ...surface, detailTab }
+                ? { ...surface, detailTab: normalized }
                 : surface,
             ),
           }));

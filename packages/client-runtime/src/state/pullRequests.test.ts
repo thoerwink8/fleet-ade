@@ -4,7 +4,6 @@ import { vi } from "vite-plus/test";
 import {
   EnvironmentId,
   AuthSourceControlWriteScope,
-  AuthOrchestrationOperateScope,
   ProjectId,
   PullRequestOperationError,
   WS_METHODS,
@@ -12,7 +11,6 @@ import {
   type PullRequestListInput,
 } from "@t3tools/contracts";
 import { expect, it } from "@effect/vitest";
-import * as Schema from "effect/Schema";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as TestClock from "effect/testing/TestClock";
@@ -55,8 +53,6 @@ const trustedRouting = {
   set: () => Effect.void,
   forget: () => Effect.void,
 };
-
-class MutationRefused extends Schema.TaggedError<MutationRefused>()("MutationRefused", {}) {}
 
 it.effect.each([
   "prefers the local environment with the same github account",
@@ -419,68 +415,6 @@ it.effect.each(["origin", "alternate"] as const)(
       yield* Deferred.succeed(release, undefined);
       expect(yield* Fiber.join(first)).toBeNull();
     }),
-);
-
-it.effect("forgets routed viewed marks when a viewed-files batch fails", () =>
-  Effect.gen(function* () {
-    const reference = {
-      projectId: ProjectId.make("project-1"),
-      host: "github.com",
-      repository: "acme/web",
-      number: 7,
-    };
-    const invalidations: { environment: string; input: unknown }[] = [];
-    const identity = () =>
-      Effect.succeed({
-        host: reference.host,
-        provider: "github",
-        accountId: "123",
-        viewer: "maria-rcks",
-      });
-    const clientFor = (environment: string) =>
-      ({
-        [WS_METHODS.pullRequestsRouting]: identity,
-        [WS_METHODS.pullRequestsRoutingIdentity]: identity,
-        [WS_METHODS.pullRequestsFilesViewed]: () =>
-          Effect.succeed({ files: [{ path: "a.ts", state: "unviewed" }], truncated: false }),
-        // The host may have applied part of the batch before refusing the rest.
-        [WS_METHODS.pullRequestsSetFilesViewed]: () => Effect.fail("second path refused"),
-        [WS_METHODS.pullRequestsInvalidate]: (input: unknown) =>
-          Effect.sync(() => {
-            invalidations.push({ environment, input });
-          }),
-      }) as unknown as WsRpcProtocolClient;
-    const { environmentRegistry, supervisor } = yield* makeTestRuntime(
-      clientFor("origin"),
-      clientFor("local"),
-    );
-    const route = createPullRequestRouter();
-    const write = yield* Effect.gen(function* () {
-      yield* route(WS_METHODS.pullRequestsFilesViewed, reference);
-      return yield* Effect.exit(
-        route(WS_METHODS.pullRequestsSetFilesViewed, {
-          ...reference,
-          files: [
-            { path: "a.ts", viewed: true },
-            { path: "b.ts", viewed: true },
-          ],
-        }),
-      );
-    }).pipe(
-      Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, environmentRegistry),
-      Effect.provideService(PullRequestRoutingPermissions, trustedRouting),
-      Effect.provideService(RpcPermissionGuard, { authorize: () => Effect.void }),
-      Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
-    );
-    expect(write._tag).toBe("Failure");
-    expect(invalidations).toContainEqual({
-      environment: "local",
-      input: { reference: expect.objectContaining(reference), filesViewedOnly: true },
-    });
-    for (const call of invalidations) {
-      expect(call.input).toMatchObject({ filesViewedOnly: true });
-    }
-  }),
 );
 
 const TARGET = new PrimaryConnectionTarget({
@@ -1662,7 +1596,7 @@ it.effect.each([
     }),
 );
 
-it.effect("keeps hover previews fresh after edits and turns", () =>
+it.effect("keeps hover previews fresh after actions and turns", () =>
   Effect.gen(function* () {
     const refreshEvents = yield* PubSub.unbounded<number>();
     let title = "Original title";
@@ -1683,10 +1617,6 @@ it.effect("keeps hover previews fresh after edits and turns", () =>
       [WS_METHODS.pullRequestsSubscribeRefreshes]: () => Stream.fromPubSub(refreshEvents),
       [WS_METHODS.pullRequestsPreview]: read,
       [WS_METHODS.pullRequestsDetail]: read,
-      [WS_METHODS.pullRequestsUpdate]: (input: { title: string }) =>
-        Effect.sync(() => {
-          title = input.title;
-        }),
       [WS_METHODS.pullRequestsRunAction]: () =>
         Effect.sync(() => {
           title = "Closed";
@@ -1703,13 +1633,6 @@ it.effect("keeps hover previews fresh after edits and turns", () =>
     ).toBe(title);
     yield* Effect.promise(() => executeAtomQuery(registry, preview));
     expect(reads).toBe(1);
-    const edited = yield* Effect.promise(() =>
-      atoms.update.run(registry, { ...target, input: { ...reference, title: "Edited" } }),
-    );
-    expect(AsyncResult.isSuccess(edited)).toBe(true);
-    expect(
-      (yield* AtomRegistry.getResult(registry, preview, { suspendOnWaiting: true })).title,
-    ).toBe("Edited");
     yield* Effect.promise(() =>
       atoms.runAction.run(registry, { ...target, input: { ...reference, action: "close" } }),
     );
@@ -2034,121 +1957,6 @@ it.effect("keeps live detail reads separate from reads that allow stale data", (
   }),
 );
 
-it.effect("updates cached labels after successful edits without rereading the host", () =>
-  Effect.gen(function* () {
-    let detailReads = 0;
-    let candidateReads = 0;
-    let refuse = false;
-    let failDetail = false;
-    const existing = { name: "existing", color: "111111" };
-    const addedLabel = { name: "new", color: "abcdef" };
-    const detailRefreshStarted = yield* Latch.make();
-    const releaseDetailRefresh = yield* Latch.make();
-    const client = {
-      [WS_METHODS.pullRequestsSubscribeRefreshes]: () => Stream.never,
-      [WS_METHODS.pullRequestsDetail]: () =>
-        Effect.gen(function* () {
-          detailReads++;
-          if (failDetail) {
-            yield* detailRefreshStarted.open;
-            yield* releaseDetailRefresh.await;
-            return yield* new MutationRefused();
-          }
-          return { title: "keep this title", labels: [existing] };
-        }),
-      [WS_METHODS.pullRequestsLabelCandidates]: () =>
-        Effect.sync(() => {
-          candidateReads++;
-          return {
-            candidates: [
-              { ...existing, description: null, isApplied: true },
-              { ...addedLabel, description: "description", isApplied: false },
-            ],
-            truncated: false,
-          };
-        }),
-      [WS_METHODS.pullRequestsSetLabels]: () =>
-        refuse ? Effect.fail(new MutationRefused()) : Effect.void,
-    } as unknown as WsRpcProtocolClient;
-    const { atoms, registry } = yield* makeTestRuntime(client);
-    const target = {
-      environmentId: TARGET.environmentId,
-      input: {
-        projectId: ProjectId.make("project-1"),
-        repository: "acme/web",
-        number: 1,
-        host: "github.example.com",
-      },
-    };
-    const detail = atoms.detail({ ...target, input: { ...target.input, allowStale: false } });
-    const candidates = atoms.labelCandidates(target);
-    registry.mount(detail);
-    const unmountCandidates = registry.mount(candidates);
-    yield* AtomRegistry.getResult(registry, detail, { suspendOnWaiting: true });
-    yield* AtomRegistry.getResult(registry, candidates, { suspendOnWaiting: true });
-
-    const added = yield* Effect.promise(() =>
-      atoms.setLabels.run(registry, {
-        ...target,
-        input: {
-          host: target.input.host,
-          projectId: target.input.projectId,
-          repository: target.input.repository,
-          number: target.input.number,
-          labels: ["new"],
-          applied: true,
-        },
-      }),
-    );
-    expect(AsyncResult.isSuccess(added)).toBe(true);
-    expect(yield* AtomRegistry.getResult(registry, detail)).toEqual({
-      title: "keep this title",
-      labels: [existing, addedLabel],
-    });
-    unmountCandidates();
-    registry.mount(atoms.labelCandidates(target));
-    expect((yield* AtomRegistry.getResult(registry, candidates)).candidates[1]).toEqual({
-      ...addedLabel,
-      description: "description",
-      isApplied: true,
-    });
-
-    for (const name of ["existing", "new"]) {
-      refuse = name === "new";
-      const result = yield* Effect.promise(() =>
-        atoms.setLabels.run(registry, {
-          ...target,
-          input: { ...target.input, labels: [name], applied: false },
-        }),
-      );
-      expect(result._tag).toBe(refuse ? "Failure" : "Success");
-      expect((yield* AtomRegistry.getResult(registry, detail)).labels).toEqual([addedLabel]);
-      expect((yield* AtomRegistry.getResult(registry, candidates)).candidates).toMatchObject([
-        { name: "existing", isApplied: false },
-        { name: "new", isApplied: true },
-      ]);
-    }
-    expect(detailReads).toBe(1);
-    expect(candidateReads).toBe(1);
-
-    failDetail = true;
-    registry.refresh(detail);
-    yield* detailRefreshStarted.await;
-    expect(registry.get(detail).waiting).toBe(true);
-    expect(AsyncResult.getOrThrow(registry.get(detail)).labels).toEqual([addedLabel]);
-    yield* releaseDetailRefresh.open;
-    yield* Effect.exit(AtomRegistry.getResult(registry, detail, { suspendOnWaiting: true }));
-    expect(AsyncResult.isFailure(registry.get(detail))).toBe(true);
-    expect(AsyncResult.getOrThrow(registry.get(detail)).labels).toEqual([addedLabel]);
-    failDetail = false;
-    registry.refresh(detail);
-    expect(
-      (yield* AtomRegistry.getResult(registry, detail, { suspendOnWaiting: true })).labels,
-    ).toEqual([existing]);
-    expect(detailReads).toBe(3);
-  }),
-);
-
 vi.mock("./session.ts", () => ({
   createEnvironmentSessionAtoms: () => ({
     sessionStateAtom: grantedSessions,
@@ -2217,48 +2025,5 @@ it.effect("denies a routed write when only the origin has source-control permiss
     );
     expect(error._tag).toBe("EnvironmentAuthorizationError");
     expect(writes).toBe(0);
-  }),
-);
-
-it.effect("publishes the accepted guide run before the follow-up read finishes", () =>
-  Effect.gen(function* () {
-    const accepted = {
-      guide: null,
-      currentHeadSha: "head",
-      run: { _tag: "Running" as const, headSha: "head", startedAt: "2026-10-11T00:00:00.000Z" },
-    };
-    let reads = 0;
-    const refreshStarted = yield* Latch.make();
-    const client = {
-      [WS_METHODS.pullRequestsSubscribeRefreshes]: () => Stream.never,
-      [WS_METHODS.pullRequestsReviewGuide]: () =>
-        Effect.gen(function* () {
-          if (++reads > 1) {
-            yield* refreshStarted.open;
-            return yield* Effect.never;
-          }
-          return { guide: null, run: null, currentHeadSha: "head" };
-        }),
-      [WS_METHODS.pullRequestsGenerateReviewGuide]: () => Effect.succeed(accepted),
-    } as unknown as WsRpcProtocolClient;
-    const { atoms, registry } = yield* makeTestRuntime(client);
-    const target = {
-      environmentId: TARGET.environmentId,
-      input: { projectId: ProjectId.make("project-1"), repository: "acme/web", number: 1 },
-    };
-    registry.update(
-      grantedSessions(target.environmentId),
-      AsyncResult.map((session) => ({
-        ...session,
-        scopes: [...(session.scopes ?? []), AuthOrchestrationOperateScope],
-      })),
-    );
-    const query = atoms.reviewGuide(target);
-    registry.mount(query);
-    yield* AtomRegistry.getResult(registry, query, { suspendOnWaiting: true });
-    const result = yield* Effect.promise(() => atoms.generateReviewGuide.run(registry, target));
-    expect(result._tag).toBe("Success");
-    yield* refreshStarted.await;
-    expect(AsyncResult.getOrElse(registry.get(query), () => null)).toEqual(accepted);
   }),
 );

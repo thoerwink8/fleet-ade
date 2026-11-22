@@ -3,7 +3,6 @@ import type {
   ChatAttachment,
   ModelSelection,
   ProjectId,
-  PullRequestReviewGuide,
   TextGenerationError,
 } from "@t3tools/contracts";
 import type * as Effect from "effect/Effect";
@@ -77,33 +76,6 @@ export interface ThreadTitleGenerationResult {
   title: string;
   needsRefinement?: boolean | undefined;
 }
-
-export interface ReviewGuideStackLayer {
-  readonly number: number;
-  readonly title: string | null;
-  readonly headSha: string | null;
-  readonly state: "open" | "closed" | "merged";
-}
-
-export interface ReviewGuideGenerationInput {
-  cwd: string;
-  number: number;
-  title: string;
-  description: string;
-  baseBranch: string;
-  baseCommit: string;
-  settledReview: string;
-  instructions?: string | undefined;
-  stack?: ReadonlyArray<ReviewGuideStackLayer> | undefined;
-  modelSelection: ModelSelection;
-  projectId?: ProjectId | null | undefined;
-}
-
-export type ReviewGuideGenerationResult = Omit<
-  PullRequestReviewGuide,
-  "headSha" | "generatedAt" | "modelSelection"
->;
-
 export interface ProviderTextGeneration {
   readonly generateCommitMessage: (
     input: CommitMessageGenerationInput,
@@ -120,8 +92,4 @@ export interface ProviderTextGeneration {
   readonly generateThreadTitle: (
     input: ThreadTitleGenerationInput,
   ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
-
-  readonly generateReviewGuide: (
-    input: ReviewGuideGenerationInput,
-  ) => Effect.Effect<ReviewGuideGenerationResult, TextGenerationError>;
 }

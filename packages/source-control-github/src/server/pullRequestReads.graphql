@@ -557,26 +557,6 @@ query RepositoryAuthors($owner: String!, $name: String!, $query: String) {
   }
 }
 
-# Which files of a pull request the signed-in account has cleared. GraphQL only, since the REST
-# files endpoint the patch is read from carries no viewed state, so this is a second read rather
-# than a wider version of the first.
-query PullRequestFilesViewed($owner: String!, $name: String!, $number: Int!, $after: String) {
-  repository(owner: $owner, name: $name) {
-    pullRequest(number: $number) {
-      files(first: 100, after: $after) {
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-        nodes {
-          path
-          viewerViewedState
-        }
-      }
-    }
-  }
-}
-
 query PullRequestFileStats($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
