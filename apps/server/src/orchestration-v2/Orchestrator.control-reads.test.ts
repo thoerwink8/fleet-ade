@@ -468,6 +468,76 @@ it.effect("marks a never-visited thread's first completion unread", () =>
   }).pipe(Effect.provide(layerTest)),
 );
 
+const createVisitedThread = Effect.fn("test.createVisitedThread")(function* (name: string) {
+  const orchestrator = yield* Orchestrator.OrchestratorV2;
+  const threadId = ThreadId.make(`thread:${name}`);
+  yield* orchestrator.dispatch({
+    type: "thread.create",
+    commandId: CommandId.make(`create-${name}`),
+    threadId,
+    projectId: ProjectId.make(`project:${name}`),
+    title: "Visit watermark",
+    modelSelection,
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    branch: null,
+    worktreePath: null,
+    createdBy: "user",
+    creationSource: "web",
+  });
+  return threadId;
+});
+
+it.effect(
+  "does not mark server activity after a visit as read when the client clock is ahead",
+  () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const threadId = yield* createVisitedThread("visit-fast-clock");
+      const clientAhead = DateTime.add(yield* DateTime.now, { hours: 1 });
+      yield* orchestrator.dispatch({
+        type: "thread.visit",
+        commandId: CommandId.make("visit-fast-clock"),
+        threadId,
+        visitedAt: DateTime.formatIso(clientAhead),
+      });
+      yield* TestClock.adjust("1 minute");
+      const laterActivity = yield* DateTime.now;
+      const visited = yield* projections.getThread(threadId);
+      assert.ok(visited.lastVisitedAt);
+      assert.isBelow(
+        DateTime.toEpochMillis(visited.lastVisitedAt),
+        DateTime.toEpochMillis(laterActivity),
+      );
+    }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect(
+  "still marks activity already on the server as read when the client clock is behind",
+  () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const threadId = yield* createVisitedThread("visit-slow-clock");
+      const activityAt = (yield* projections.getThread(threadId)).updatedAt;
+      yield* TestClock.adjust("1 minute");
+      const clientBehind = DateTime.subtract(yield* DateTime.now, { hours: 1 });
+      yield* orchestrator.dispatch({
+        type: "thread.visit",
+        commandId: CommandId.make("visit-slow-clock"),
+        threadId,
+        visitedAt: DateTime.formatIso(clientBehind),
+      });
+      const visited = yield* projections.getThread(threadId);
+      assert.ok(visited.lastVisitedAt);
+      assert.isAtLeast(
+        DateTime.toEpochMillis(visited.lastVisitedAt),
+        DateTime.toEpochMillis(activityAt),
+      );
+    }).pipe(Effect.provide(layerTest)),
+);
+
 const completeAndSnoozeThread = Effect.fn("test.completeAndSnoozeThread")(function* (
   name: string,
   snoozeMinutes: number,
@@ -528,6 +598,7 @@ it.effect("mark unread retires an expired snooze so a dismissed wake stays dismi
       1,
     );
     yield* TestClock.adjust("2 minutes");
+    const dismissedAt = yield* DateTime.now;
     yield* orchestrator.dispatch({
       type: "thread.visit",
       commandId: CommandId.make("dismiss-woke"),
@@ -535,7 +606,7 @@ it.effect("mark unread retires an expired snooze so a dismissed wake stays dismi
       visitedAt: DateTime.formatIso(snoozedUntil),
     });
     const dismissed = yield* projections.getThread(threadId);
-    assert.deepEqual(dismissed.lastVisitedAt, snoozedUntil);
+    assert.deepEqual(dismissed.lastVisitedAt, dismissedAt);
 
     yield* orchestrator.dispatch({
       type: "thread.mark-unread",

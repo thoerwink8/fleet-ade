@@ -3179,7 +3179,9 @@ export const OrchestrationV2Command = Schema.Union([
     type: Schema.Literal("thread.visit"),
     commandId: CommandId,
     threadId: ThreadId,
-    visitedAt: IsoDateTime,
+    // Older servers store this client value as the read watermark. Current
+    // servers stamp lastVisitedAt from their own clock and ignore it.
+    visitedAt: Schema.optional(IsoDateTime),
     // The user opened the thread, as opposed to new activity on an open one.
     // Older servers ignore both fields and only move the read watermark.
     opened: Schema.optional(Schema.Boolean),

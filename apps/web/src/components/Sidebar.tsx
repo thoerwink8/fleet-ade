@@ -200,6 +200,7 @@ import {
   type SidebarListItem,
   type SidebarSection,
   resolveSidebarRowThreadId,
+  attentionDismissVisitedAt,
 } from "./Sidebar.logic";
 import {
   createSidebarCollisionDetection,
@@ -2883,7 +2884,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             return;
           }
           case "dismiss-attention": {
-            acknowledgeWoke(threadRef, new Date().toISOString());
+            acknowledgeWoke(
+              threadRef,
+              attentionDismissVisitedAt(
+                thread,
+                threadWokeAt(thread, { now: new Date().toISOString() }),
+              ),
+            );
             const canUndo =
               serverConfigs.get(threadRef.environmentId)?.environment.capabilities
                 .threadVisitedTracking === true;

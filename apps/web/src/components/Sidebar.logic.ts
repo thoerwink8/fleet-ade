@@ -906,6 +906,33 @@ export function useThreadJumpHintsVisible(
   );
 }
 
+/**
+ * Time to send when dismissing attention on a server that still stores the
+ * client's `visitedAt`. Only stamps the server already issued: a device clock
+ * ahead of those stamps hides later activity, and one behind leaves this item unread.
+ */
+export function attentionDismissVisitedAt(
+  thread: {
+    readonly updatedAt: string;
+    readonly latestRun?: { readonly completedAt?: string | null } | null;
+    readonly runtime?: { readonly updatedAt?: string | null } | null;
+  },
+  wokeAt: string | null,
+): string {
+  let latest = thread.updatedAt;
+  let latestMs = Date.parse(latest);
+  for (const candidate of [thread.latestRun?.completedAt, thread.runtime?.updatedAt, wokeAt]) {
+    if (candidate == null) continue;
+    const candidateMs = Date.parse(candidate);
+    if (Number.isNaN(candidateMs)) continue;
+    if (Number.isNaN(latestMs) || candidateMs > latestMs) {
+      latest = candidate;
+      latestMs = candidateMs;
+    }
+  }
+  return latest;
+}
+
 export function resolveThreadLastVisitedAt(
   serverLastVisitedAt: string | null | undefined,
   localLastVisitedAt: string | undefined,

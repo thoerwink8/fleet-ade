@@ -9932,6 +9932,7 @@ it.layer(layerSharedApplicationDataPlaneTest)("visited projection", (it) => {
       const createdUpdatedAt = created.thread.updatedAt;
 
       yield* TestClock.adjust("1 second");
+      const serverVisitedAt = yield* DateTime.now;
       yield* orchestrator.dispatch({
         type: "thread.visit",
         commandId: CommandId.make("runtime-layer-visited-thread-visit"),
@@ -9940,7 +9941,7 @@ it.layer(layerSharedApplicationDataPlaneTest)("visited projection", (it) => {
       });
       const visited = yield* orchestrator.getThreadProjection(threadId);
       assert.isNotNull(visited.thread.lastVisitedAt);
-      assert.equal(DateTime.formatIso(visited.thread.lastVisitedAt!), visitedAt);
+      assert.deepEqual(visited.thread.lastVisitedAt, serverVisitedAt);
       assert.deepEqual(visited.thread.updatedAt, createdUpdatedAt);
 
       yield* orchestrator.dispatch({
@@ -9950,12 +9951,12 @@ it.layer(layerSharedApplicationDataPlaneTest)("visited projection", (it) => {
         visitedAt: "2026-07-24T00:30:00.000Z",
       });
       const afterStaleVisit = yield* orchestrator.getThreadProjection(threadId);
-      assert.equal(DateTime.formatIso(afterStaleVisit.thread.lastVisitedAt!), visitedAt);
+      assert.deepEqual(afterStaleVisit.thread.lastVisitedAt, serverVisitedAt);
 
       const shell = yield* orchestrator.getShellSnapshot();
       const thread = shell.threads.find((candidate) => candidate.id === threadId);
       assert.isDefined(thread);
-      assert.equal(DateTime.formatIso(thread!.lastVisitedAt!), visitedAt);
+      assert.deepEqual(thread!.lastVisitedAt, serverVisitedAt);
       assert.deepEqual(thread!.updatedAt, createdUpdatedAt);
 
       const markUnread = yield* orchestrator
@@ -9974,18 +9975,19 @@ it.layer(layerSharedApplicationDataPlaneTest)("visited projection", (it) => {
         'item:visited:unreadable-history', ${threadId}, 1, 'dynamic_tool', 'completed',
         ${visitedAt}, '{broken'
       )`;
-      const nextVisitedAt = "2026-07-24T02:00:00.000Z";
+      yield* TestClock.adjust("1 second");
+      const nextServerVisitedAt = yield* DateTime.now;
       yield* orchestrator.dispatch({
         type: "thread.visit",
         commandId: CommandId.make("runtime-layer-visited-without-history"),
         threadId,
-        visitedAt: nextVisitedAt,
+        visitedAt: "2026-07-24T02:00:00.000Z",
       });
       const [watermark] = yield* sql<{ readonly visited_at: string; readonly updated_at: string }>`
         SELECT json_extract(payload_json, '$.lastVisitedAt') AS visited_at, updated_at
         FROM orchestration_v2_projection_threads WHERE thread_id = ${threadId}
       `;
-      assert.equal(watermark!.visited_at, nextVisitedAt);
+      assert.equal(watermark!.visited_at, DateTime.formatIso(nextServerVisitedAt));
       assert.equal(watermark!.updated_at, DateTime.formatIso(createdUpdatedAt));
       const invalidVisit = yield* orchestrator
         .dispatch({
@@ -10096,14 +10098,17 @@ it.layer(layerSharedApplicationDataPlaneTest)("visited projection", (it) => {
       assert.deepEqual(shell!.latestRunCompletedAt, turnCompletedAt);
       assert.deepEqual(shell!.lastVisitedAt, projection.thread.lastVisitedAt);
 
+      const clockBefore = DateTime.toEpochMillis(yield* DateTime.now);
+      yield* TestClock.setTime(DateTime.toEpochMillis(turnCompletedAt));
       yield* orchestrator.dispatch({
         type: "thread.visit",
         commandId: CommandId.make(`${threadId}:visit`),
         threadId,
-        visitedAt: DateTime.formatIso(turnCompletedAt),
+        visitedAt: DateTime.formatIso(DateTime.subtract(turnCompletedAt, { hours: 5 })),
       });
       const revisited = yield* orchestrator.getThreadShell(threadId);
       assert.deepEqual(revisited!.lastVisitedAt, turnCompletedAt);
+      yield* TestClock.setTime(clockBefore);
     }),
   );
 });

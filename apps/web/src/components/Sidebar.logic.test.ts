@@ -11,6 +11,7 @@ import {
   applyThreadBatch,
   batchDeleteConfirmText,
   getFallbackThreadIdAfterDelete,
+  attentionDismissVisitedAt,
   hasUnseenCompletion,
   resolveSidebarRowThreadId,
   orderItemsByPreferredIds,
@@ -1645,6 +1646,32 @@ describe("commander sidebar pinning", () => {
       pinnedOrder: ["a1", "p1"],
       activeOrder: [],
     });
+  });
+});
+
+describe("attentionDismissVisitedAt", () => {
+  const updatedAt = "2026-03-09T10:00:00.000Z";
+
+  it("uses the latest server stamp, including a wake after updatedAt", () => {
+    expect(
+      attentionDismissVisitedAt(
+        {
+          updatedAt,
+          latestRun: { completedAt: "2026-03-09T09:00:00.000Z" },
+          runtime: { updatedAt: "2026-03-09T09:30:00.000Z" },
+        },
+        "2026-03-09T11:00:00.000Z",
+      ),
+    ).toBe("2026-03-09T11:00:00.000Z");
+  });
+
+  it("keeps updatedAt when the other stamps are earlier or missing", () => {
+    expect(
+      attentionDismissVisitedAt(
+        { updatedAt, latestRun: { completedAt: null }, runtime: null },
+        null,
+      ),
+    ).toBe(updatedAt);
   });
 });
 
