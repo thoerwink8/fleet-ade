@@ -2849,6 +2849,131 @@ describe("AcpAdapterV2", () => {
     }).pipe(Effect.provide(layerTest)),
   );
 
+  it.effect("persists a bounded subset of streamed root and child tool updates", () =>
+    Effect.gen(function* () {
+      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const mockAgentPath = yield* bundledMockAgentPath;
+      type Runtime = AcpSessionRuntime.AcpSessionRuntime["Service"];
+      let handler: Parameters<Runtime["handleSessionUpdate"]>[0] | undefined;
+      const file = `${"x = 1\\n".repeat(800)}END_OF_FILE\\n`;
+      const streamedWrite = (toolCallId: string): Array<EffectAcpSchema.SessionUpdate> => [
+        {
+          sessionUpdate: "tool_call",
+          toolCallId,
+          title: "Writing ./audit.py",
+          kind: "edit",
+          status: "pending",
+        },
+        ...Array.from({ length: 200 }, (_, index) => ({
+          sessionUpdate: "tool_call_update" as const,
+          toolCallId,
+          title: "Writing ./audit.py",
+          content: [
+            {
+              type: "diff" as const,
+              path: "/repo/audit.py",
+              oldText: null,
+              newText: file.slice(0, Math.ceil((file.length * (index + 1)) / 200)),
+            },
+          ],
+          rawInput: { file_path: "/repo/audit.py", content: file },
+        })),
+        {
+          sessionUpdate: "tool_call_update",
+          toolCallId,
+          status: "completed",
+          content: [{ type: "diff", path: "/repo/audit.py", oldText: null, newText: file }],
+        },
+      ];
+      const instanceId = ProviderInstanceId.make("acp-streamed-tool-bounds");
+      const adapter = yield* makeAcpAdapterV2({
+        instanceId,
+        selfInvocation: yield* resolveSelfInvocation(),
+        flavor: {
+          driver: ACP_TEST_DRIVER,
+          capabilities: AcpProviderCapabilitiesV2,
+          extractSubagentUpdate: (toolCall) =>
+            toolCall.toolCallId === "child-start"
+              ? {
+                  nativeTaskId: "child-start-task",
+                  prompt: "Write audit.py",
+                  title: "Write audit.py",
+                  model: null,
+                  status: toolCall.status === "completed" ? "completed" : "running",
+                  childSessionId: "child-session",
+                  result: null,
+                }
+              : undefined,
+          makeRuntime: makeMockRuntime({
+            childProcessSpawner,
+            mockAgentPath,
+            wrapRuntime: (runtime) => ({
+              ...runtime,
+              handleSessionUpdate: (next) =>
+                Effect.sync(() => {
+                  handler = next;
+                }).pipe(Effect.andThen(runtime.handleSessionUpdate(next))),
+              prompt: () =>
+                Effect.gen(function* () {
+                  assert.isDefined(handler);
+                  for (const update of streamedWrite("root-write"))
+                    yield* handler!({ sessionId: "mock-session-1", update });
+                  const childStart = streamedWrite("child-start")[0];
+                  if (childStart === undefined) throw new Error("Missing child tool start");
+                  yield* handler!({ sessionId: "mock-session-1", update: childStart });
+                  for (const update of streamedWrite("child-start").slice(1))
+                    yield* handler!({ sessionId: "child-session", update });
+                  return { stopReason: "end_turn" as const };
+                }),
+            }),
+          }),
+        },
+      });
+      const threadId = ThreadId.make("thread-acp-streamed-tool-bounds");
+      const modelSelection = { instanceId, model: "default" } as const;
+      const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+        runtimeMode: "full-access",
+        interactionMode: "default",
+        cwd: process.cwd(),
+      });
+      const runtime = yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("provider-session-acp-streamed-tool-bounds"),
+        modelSelection,
+        runtimePolicy,
+      });
+      const providerThread = yield* runtime.ensureThread({
+        threadId,
+        modelSelection,
+        runtimePolicy,
+      });
+      yield* runtime.startTurn(
+        makeTurnInput({
+          threadId,
+          providerThread,
+          instanceId,
+          runtimePolicy,
+          now: yield* DateTime.now,
+        }),
+      );
+      const items = Array.from(
+        yield* runtime.events.pipe(
+          Stream.takeUntil((event) => event.type === "turn.terminal"),
+          Stream.runCollect,
+        ),
+      ).flatMap((event) => (event.type === "turn_item.updated" ? [event.turnItem] : []));
+      const writes = items.filter(
+        (item) =>
+          item.nativeItemRef?.nativeId?.endsWith("root-write") === true ||
+          item.nativeItemRef?.nativeId?.endsWith("child-start") === true,
+      );
+      assert.isAtLeast(writes.length, 20);
+      assert.isAtMost(writes.length, 50);
+      assert.equal(writes.at(-1)?.status, "completed");
+      assert.include(JSON.stringify(writes.at(-1)), "END_OF_FILE");
+    }).pipe(Effect.provide(layerTest)),
+  );
+
   it.effect("keeps protocol diagnostics off unless a protocol logger is supplied", () =>
     Effect.gen(function* () {
       const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;

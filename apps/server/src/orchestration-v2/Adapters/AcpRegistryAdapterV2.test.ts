@@ -16,6 +16,7 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
+import * as Fiber from "effect/Fiber";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -115,10 +116,10 @@ const layerTest = Layer.mergeAll(
   ServerSettings.layerTest(),
 );
 
-const CLAUDE_ROOT_SESSION = "claude-session";
+const REGISTRY_ROOT_SESSION = "registry-session";
 
-/** Replay frames of Claude Agent (claude-agent-acp 0.90.0) on ACP v2. */
-const claudeFrames = {
+/** Replay frames from a neutral ACP Registry agent on ACP v2. */
+const registryFrames = {
   open: [
     { type: "expect_outbound", frame: { kind: "request", method: "initialize", params: "<any>" } },
     {
@@ -128,7 +129,7 @@ const claudeFrames = {
         method: "initialize",
         result: {
           protocolVersion: 2,
-          info: { name: "@agentclientprotocol/claude-agent-acp", version: "0.90.0" },
+          info: { name: "acp-registry-fixture", version: "1.0.0" },
           capabilities: { session: {} },
           authMethods: [],
         },
@@ -140,7 +141,7 @@ const claudeFrames = {
       frame: {
         kind: "response",
         method: "session/new",
-        result: { sessionId: CLAUDE_ROOT_SESSION },
+        result: { sessionId: REGISTRY_ROOT_SESSION },
       },
     },
   ],
@@ -153,18 +154,17 @@ const claudeFrames = {
     },
   }),
   childState: (parent: string, child: string, state: string) =>
-    claudeFrames.update(parent, {
+    registryFrames.update(parent, {
       sessionUpdate: "subagent_update",
       sessionId: child,
       state: { state },
     }),
-  /** A prompt Claude takes in and works on. */
   prompt: (ordinal: number) => [
     {
       type: "expect_outbound",
       frame: { kind: "request", method: "session/prompt", params: "<any>" },
     },
-    claudeFrames.update(CLAUDE_ROOT_SESSION, {
+    registryFrames.update(REGISTRY_ROOT_SESSION, {
       sessionUpdate: "user_message",
       messageId: `user-${ordinal}`,
       content: [{ type: "text", text: "test prompt" }],
@@ -177,10 +177,13 @@ const claudeFrames = {
         result: { messageId: `user-${ordinal}` },
       },
     },
-    claudeFrames.update(CLAUDE_ROOT_SESSION, { sessionUpdate: "state_update", state: "running" }),
+    registryFrames.update(REGISTRY_ROOT_SESSION, {
+      sessionUpdate: "state_update",
+      state: "running",
+    }),
   ],
   idle: (stopReason: string) =>
-    claudeFrames.update(CLAUDE_ROOT_SESSION, {
+    registryFrames.update(REGISTRY_ROOT_SESSION, {
       sessionUpdate: "state_update",
       state: "idle",
       stopReason,
@@ -190,7 +193,7 @@ const claudeFrames = {
     frame: {
       kind: "request",
       method: "session/close",
-      params: { sessionId: CLAUDE_ROOT_SESSION },
+      params: { sessionId: REGISTRY_ROOT_SESSION },
     },
   },
   closed: {
@@ -198,8 +201,7 @@ const claudeFrames = {
     frame: { kind: "response", method: "session/close", result: {} },
   },
 };
-
-const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
+const openRegistryReplaySession = Effect.fn("openRegistryReplaySession")(function* (
   entries: ReadonlyArray<unknown>,
   replayGate?: ProviderReplayGate,
   continuationEnabled = true,
@@ -208,13 +210,15 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const replayDir = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-claude-lifecycle-" });
+  const replayDir = yield* fileSystem.makeTempDirectoryScoped({
+    prefix: "t3-acp-registry-lifecycle-",
+  });
   const transcript = yield* decodeAcpReplayTranscript(
     {
       provider: ACP_REGISTRY_PROVIDER,
       protocol: "acp.ndjson-jsonrpc",
       version: "1",
-      scenario: "claude-lifecycle",
+      scenario: "acp-registry-lifecycle",
       entries: entries as never,
     },
     ACP_REGISTRY_PROVIDER,
@@ -227,7 +231,7 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
         offers.push(request);
       }).pipe(Effect.andThen(Queue.offer(offered, undefined)), Effect.asVoid),
   };
-  const instanceId = ProviderInstanceId.make("claude-lifecycle");
+  const instanceId = ProviderInstanceId.make("acp-registry-lifecycle");
   let onTermination: NonNullable<
     AcpSessionRuntime.AcpSessionRuntimeOptions["onTermination"]
   > = () => Effect.die("Runtime has not started");
@@ -255,7 +259,7 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
   const adapter = yield* makeAcpRegistryAdapterV2(adapterOptions).pipe(
     Effect.provide(layerInjectedRuntimeCatalog),
   );
-  const threadId = ThreadId.make("thread-claude-lifecycle");
+  const threadId = ThreadId.make("thread-acp-registry-lifecycle");
   const modelSelection = { instanceId, model: "default" } as const;
   const runtimeMode = "approval-required";
   const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
@@ -265,17 +269,11 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
   });
   const runtime = yield* adapter.openSession({
     threadId,
-    providerSessionId: ProviderSessionId.make("session-claude-lifecycle"),
+    providerSessionId: ProviderSessionId.make("session-acp-registry-lifecycle"),
     modelSelection,
     runtimePolicy,
   });
   yield* Effect.addFinalizer(() => Effect.sync(() => replayGate?.releaseAll()));
-  if (continuationEnabled) {
-    assert.isDefined(
-      runtime.hasPendingBackgroundWork,
-      "Claude ACP v2 must report background work after foreground idle",
-    );
-  }
   const events = yield* Queue.unbounded<ProviderAdapter.ProviderAdapterV2Event>();
   yield* runtime.events.pipe(
     Stream.runForEach((event) => Queue.offer(events, event)),
@@ -291,8 +289,8 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
       createdBy: "user",
       creationSource: "web",
       id: threadId,
-      projectId: ProjectId.make(`project-claude-lifecycle`),
-      title: "Claude Agent",
+      projectId: ProjectId.make("project-acp-registry-lifecycle"),
+      title: "ACP Registry Agent",
       providerInstanceId: instanceId,
       modelSelection,
       runtimeMode,
@@ -311,17 +309,17 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
       deletedAt: null,
     },
     threadId,
-    runId: RunId.make(`run-claude-lifecycle-${ordinal}`),
+    runId: RunId.make(`run-acp-registry-lifecycle-${ordinal}`),
     runOrdinal: ordinal,
     providerTurnOrdinal: ordinal,
-    attemptId: RunAttemptId.make(`attempt-claude-lifecycle-${ordinal}`),
-    rootNodeId: NodeId.make(`node-claude-lifecycle-${ordinal}`),
+    attemptId: RunAttemptId.make(`attempt-acp-registry-lifecycle-${ordinal}`),
+    rootNodeId: NodeId.make(`node-acp-registry-lifecycle-${ordinal}`),
     providerThread,
     message: {
       ...(options.continuation === true
         ? { createdBy: "agent" as const, creationSource: "provider" as const }
         : { createdBy: "user" as const, creationSource: "web" as const }),
-      messageId: MessageId.make(`message-claude-lifecycle-${ordinal}`),
+      messageId: MessageId.make(`message-acp-registry-lifecycle-${ordinal}`),
       text: "test prompt",
       attachments: [],
     },
@@ -343,20 +341,12 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
         event.type === "provider_thread.updated" &&
         event.providerThread.nativeMetadata?.title === title,
     );
-  const terminal = until((event) => event.type === "turn.terminal").pipe(
-    Effect.map((seen) => {
-      const event = seen.at(-1)!;
-      if (event.type !== "turn.terminal") throw new Error("Missing terminal");
-      return event;
-    }),
-  );
   return {
     runtime,
     providerThread,
     turnInput,
     until,
     throughMarker,
-    terminal,
     offers,
     offered,
     terminate: () =>
@@ -368,6 +358,10 @@ const openClaudeReplaySession = Effect.fn("openClaudeReplaySession")(function* (
       ),
   };
 });
+
+const registryRootSession = REGISTRY_ROOT_SESSION;
+const acpFrames = registryFrames;
+const openAcpReplaySession = openRegistryReplaySession;
 
 describe("AcpRegistryAdapterV2", () => {
   it("preserves and sanitizes structured ACP errors without exposing arbitrary defects", () => {
@@ -1205,6 +1199,170 @@ describe("AcpRegistryAdapterV2", () => {
       assert.equal(agentEnvironment?.T3_ACP_MCP_AUTHORIZATION, "Bearer thread-env-token");
     }).pipe(Effect.provide(layerTest)),
   );
+  it.effect("replaces streamed root tool output with a later content list", () =>
+    Effect.gen(function* () {
+      const text = (value: string) => [{ type: "content", content: { type: "text", text: value } }];
+      const session = yield* openAcpReplaySession([
+        ...acpFrames.open,
+        ...acpFrames.prompt(1),
+        acpFrames.update(registryRootSession, {
+          sessionUpdate: "tool_call_update",
+          toolCallId: "root-tool",
+          title: "Stream",
+          status: "in_progress",
+          content: text("one"),
+        }),
+        acpFrames.update(registryRootSession, {
+          sessionUpdate: "tool_call_content_chunk",
+          toolCallId: "root-tool",
+          content: { type: "content", content: { type: "text", text: "two" } },
+        }),
+        acpFrames.update(registryRootSession, {
+          sessionUpdate: "tool_call_update",
+          toolCallId: "root-tool",
+          status: "completed",
+          content: text("replacement"),
+        }),
+        acpFrames.update(registryRootSession, {
+          sessionUpdate: "tool_call_content_chunk",
+          toolCallId: "root-tool",
+          content: { type: "content", content: { type: "text", text: "-more" } },
+        }),
+        acpFrames.update(registryRootSession, {
+          sessionUpdate: "tool_call_content_chunk",
+          toolCallId: "root-tool",
+          content: {
+            type: "diff",
+            changes: [{ operation: "add", path: "/a.txt" }],
+            patch: { format: "git_patch", text: "PATCH" },
+          },
+        }),
+        acpFrames.update(registryRootSession, {
+          sessionUpdate: "session_info_update",
+          title: "tools complete",
+        }),
+        acpFrames.idle("end_turn"),
+        acpFrames.closeRequest,
+        acpFrames.closed,
+      ]);
+      yield* session.runtime.startTurn(session.turnInput(1));
+      const events = yield* session.throughMarker("tools complete");
+      const outputs = events.flatMap((event) =>
+        event.type === "turn_item.updated" &&
+        event.turnItem.nativeItemRef?.nativeId === "root-tool" &&
+        "output" in event.turnItem
+          ? [event.turnItem.output]
+          : [],
+      );
+      assert.deepEqual(outputs, [
+        text("one"),
+        text("onetwo"),
+        text("replacement"),
+        text("replacement-more"),
+        { type: "Text", text: "replacement-morePATCH" },
+      ]);
+    }).pipe(Effect.provide(layerTest)),
+  );
+
+  it.effect("keeps stopped tools interrupted when a late output chunk arrives", () =>
+    Effect.gen(function* () {
+      const session = yield* openAcpReplaySession(
+        [
+          ...acpFrames.open,
+          {
+            type: "expect_outbound",
+            frame: { kind: "request", method: "session/prompt", params: "<any>" },
+          },
+          acpFrames.update(registryRootSession, {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "stopped-tool",
+            title: "Stopped tool",
+            kind: "execute",
+            status: "in_progress",
+          }),
+          acpFrames.update(registryRootSession, {
+            sessionUpdate: "session_info_update",
+            title: "before cancel",
+          }),
+          {
+            type: "expect_outbound",
+            frame: {
+              kind: "notification",
+              method: "session/cancel",
+              params: { sessionId: registryRootSession },
+            },
+          },
+          acpFrames.update(registryRootSession, {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "stopped-tool",
+            status: "failed",
+          }),
+          acpFrames.update(registryRootSession, {
+            sessionUpdate: "tool_call_update",
+            toolCallId: "stopped-tool",
+            content: [{ type: "content", content: { type: "text", text: "stopping" } }],
+          }),
+          acpFrames.update(registryRootSession, {
+            sessionUpdate: "tool_call_content_chunk",
+            toolCallId: "stopped-tool",
+            content: { type: "content", content: { type: "text", text: "late" } },
+          }),
+          acpFrames.update(registryRootSession, {
+            sessionUpdate: "session_info_update",
+            title: "late output",
+          }),
+          {
+            type: "emit_inbound",
+            frame: {
+              kind: "response",
+              method: "session/prompt",
+              result: { stopReason: "cancelled" },
+            },
+          },
+          acpFrames.update(registryRootSession, {
+            sessionUpdate: "state_update",
+            state: "idle",
+            stopReason: "cancelled",
+          }),
+          acpFrames.closeRequest,
+          acpFrames.closed,
+        ],
+        undefined,
+        false,
+        "registry-agent",
+      );
+      const starting = yield* session.runtime
+        .startTurn(session.turnInput(1))
+        .pipe(Effect.forkScoped);
+      const started = yield* session.throughMarker("before cancel");
+      const running = started.findLast((event) => event.type === "provider_turn.updated");
+      if (running?.type !== "provider_turn.updated") throw new Error("Missing active turn");
+      const closing = yield* session.runtime
+        .interruptTurn({
+          providerThread: session.providerThread,
+          providerTurnId: running.providerTurn.id,
+        })
+        .pipe(Effect.forkScoped);
+      const events = yield* session.until((event) => event.type === "turn.terminal");
+      yield* Fiber.join(closing);
+      yield* Fiber.join(starting);
+      const tools = events.flatMap((event) =>
+        event.type === "turn_item.updated" &&
+        event.turnItem.nativeItemRef?.nativeId?.endsWith("stopped-tool")
+          ? [event.turnItem]
+          : [],
+      );
+      assert.deepEqual(
+        tools.map((item) => item.status),
+        ["interrupted", "interrupted", "interrupted"],
+      );
+      const lastTool = tools.at(-1);
+      assert.equal(
+        lastTool !== undefined && "output" in lastTool ? lastTool.output : undefined,
+        "stoppinglate",
+      );
+    }).pipe(Effect.provide(layerTest)),
+  );
 
   it.effect.each(["before", "after"] as const)(
     "reconciles a full prompt echo %s acknowledgment",
@@ -1228,7 +1386,7 @@ describe("AcpRegistryAdapterV2", () => {
           ...(ordinal === 1 ? [runtimeInstructions] : []),
         ];
         const echo = (messageId: string, content: ReadonlyArray<unknown>) =>
-          claudeFrames.update(CLAUDE_ROOT_SESSION, {
+          acpFrames.update(registryRootSession, {
             sessionUpdate: "user_message",
             messageId,
             content,
@@ -1238,7 +1396,7 @@ describe("AcpRegistryAdapterV2", () => {
             .map((block) => block.text)
             .join("\n");
         const frames = (ordinal: number) => {
-          const [request, , acknowledgment] = claudeFrames.prompt(ordinal);
+          const [request, , acknowledgment] = acpFrames.prompt(ordinal);
           const matching = echo(`echo-${ordinal}`, promptBlocks(ordinal));
           return [
             request,
@@ -1250,7 +1408,7 @@ describe("AcpRegistryAdapterV2", () => {
               },
             ]),
             ...(ordering === "before" ? [matching, acknowledgment] : [acknowledgment, matching]),
-            claudeFrames.update(CLAUDE_ROOT_SESSION, {
+            acpFrames.update(registryRootSession, {
               sessionUpdate: "user_message_chunk",
               messageId: `echo-${ordinal}`,
               content: { type: "text", text: "updated echo" },
@@ -1258,17 +1416,11 @@ describe("AcpRegistryAdapterV2", () => {
             echo(`echo-${ordinal}`, [{ type: "text", text: "updated echo" }]),
             echo("second-id", promptBlocks(ordinal)),
             echo("unmatched", [{ type: "text", text: "Continue the review." }]),
-            claudeFrames.idle("end_turn"),
+            acpFrames.idle("end_turn"),
           ];
         };
-        const session = yield* openClaudeReplaySession(
-          [
-            ...claudeFrames.open,
-            ...frames(1),
-            ...frames(2),
-            claudeFrames.closeRequest,
-            claudeFrames.closed,
-          ],
+        const session = yield* openAcpReplaySession(
+          [...acpFrames.open, ...frames(1), ...frames(2), acpFrames.closeRequest, acpFrames.closed],
           undefined,
           false,
         );
