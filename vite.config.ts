@@ -80,6 +80,11 @@ const RESTRICTED_UI_VARIANT_PATTERNS = [
     message:
       "Render the components/ui export instead of borrowing its class recipe (render={<Button …/>}, SelectButton, ToggleGroup).",
   },
+  {
+    group: ["@fleet/design/react", "@fleet/design/react/*"],
+    message:
+      "Import the control from components/ui. Only components/ui wraps @fleet/design, so its API can change in one place.",
+  },
 ];
 
 const RESTRICTED_PULL_REQUEST_GLYPH_IMPORTS = {
