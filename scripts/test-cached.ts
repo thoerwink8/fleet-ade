@@ -83,17 +83,20 @@ interface TaskSummary {
   };
 }
 const ran: Array<TaskSummary> = [];
-let env: NodeJS.ProcessEnv = process.env;
+const env = { ...process.env, T3_CACHED_TESTS: JSON.stringify(request) };
 const started = performance.now();
-const { status, failed } = runEveryTask(
+const { status, failed, cleared } = runEveryTask(
   Object.keys(tasks).filter((task) => task !== "test-cache"),
   (only, alone) => {
     const runStarted = Date.now();
-    env = { ...process.env, T3_CACHED_TESTS: JSON.stringify({ ...request, only }) };
     const result = NodeChildProcess.spawnSync(
       NodePath.join(root, "node_modules/.bin/vp"),
       ["run", "--concurrency-limit", String(alone ? 1 : concurrency), "test-cache"],
-      { cwd: root, env, stdio: "inherit" },
+      {
+        cwd: root,
+        env: { ...env, T3_CACHED_TESTS: JSON.stringify({ ...request, only }) },
+        stdio: "inherit",
+      },
     );
     if (result.error) throw result.error;
     // A run that dies before it writes a summary leaves the previous run's file in place.
@@ -121,13 +124,17 @@ const { status, failed } = runEveryTask(
 );
 const cacheRunMs = performance.now() - started;
 process.exitCode = status;
+const listTasks = (names: ReadonlyArray<string>) => {
+  for (const task of names) console.error(`  ${tasks[task]!.cwd ?? "."}: ${tasks[task]!.command}`);
+};
 if (failed.length > 0) {
   console.error(`\nFailed test tasks (${failed.length}):`);
-  for (const task of failed) {
-    console.error(`  ${tasks[task]!.cwd ?? "."}: ${tasks[task]!.command}`);
-  }
+  listTasks(failed);
+} else if (cleared.length > 0) {
+  console.error("\nA test run failed, but every task it stopped passed when rerun alone:");
+  listTasks(cleared);
 } else if (status !== 0) {
-  console.error("\nA test run failed, but every task it stopped passed when rerun alone.");
+  console.error("\nThe task runner failed without naming a test task. The rest did not run.");
 }
 if (verifyHits > 0) {
   const rank = (task: string) =>

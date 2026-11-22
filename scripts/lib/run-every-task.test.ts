@@ -28,6 +28,7 @@ describe("runEveryTask", () => {
       broken: [],
       status: 0,
       failed: [],
+      cleared: [],
       calls: [["a", "b", "c", "d", "e"]],
     },
     {
@@ -35,6 +36,7 @@ describe("runEveryTask", () => {
       broken: ["a", "e"],
       status: 1,
       failed: ["a", "e"],
+      cleared: ["b"],
       calls: [["a", "b", "c", "d", "e"], ["a"], ["b"], ["c", "d", "e"]],
     },
     {
@@ -42,11 +44,16 @@ describe("runEveryTask", () => {
       broken: ["c", "d"],
       status: 1,
       failed: ["c", "d"],
+      cleared: [],
       calls: [["a", "b", "c", "d", "e"], ["c"], ["d"], ["e"]],
     },
-  ])("$name", ({ broken, status, failed, calls }) => {
+  ])("$name", ({ broken, status, failed, cleared, calls }) => {
     const runner = fakeRunner(broken);
-    expect(runEveryTask(["a", "b", "c", "d", "e"], runner.run)).toEqual({ status, failed });
+    expect(runEveryTask(["a", "b", "c", "d", "e"], runner.run)).toEqual({
+      status,
+      failed,
+      cleared,
+    });
     expect(runner.calls).toEqual(calls);
   });
 
@@ -56,7 +63,7 @@ describe("runEveryTask", () => {
       calls += 1;
       return { status: 2, outcomes: new Map() };
     });
-    expect(result).toEqual({ status: 2, failed: [] });
+    expect(result).toEqual({ status: 2, failed: [], cleared: [] });
     expect(calls).toBe(1);
   });
 });
