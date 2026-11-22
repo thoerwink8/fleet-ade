@@ -20,11 +20,12 @@ import {
   retainSettingsScope,
   validateSettingsRouteSearch,
 } from "../components/settings/settingsScopeNavigation";
+import { SettingsPathMissingView } from "../components/settings/SettingsPathMissingView";
+import { resolveSettingsPath } from "../components/settings/settingsPath.logic";
 import {
   getSettingsSearchTargetScope,
   getThreadAutoSettlementSearchAvailability,
   isSettingsSearchScopeAvailable,
-  movedSettingsRedirect,
 } from "../components/settings/settingsSearch";
 
 function RestoreDeviceDefaultsButton({ onRestored }: { onRestored: () => void }) {
@@ -46,6 +47,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
   const { scope, connectedEnvironments } = useSettingsScope();
   const { environments } = useEnvironments();
   const hash = useLocation({ select: (location) => location.hash });
+  if (resolveSettingsPath(pathname, hash).kind === "missing") return children;
   const searchTarget = getSettingsSearchTargetScope(hash);
   const autoSettlementAvailability = searchTarget?.requiresThreadAutoSettlement
     ? getThreadAutoSettlementSearchAvailability(environments, scope)
@@ -180,12 +182,16 @@ function SettingsRouteLayout() {
 export const Route = createFileRoute("/_chat/settings")({
   validateSearch: validateSettingsRouteSearch,
   search: { middlewares: [retainSettingsScope] },
-  beforeLoad: async ({ location }) => {
-    if (location.pathname === "/settings") {
-      throw redirect({ to: "/settings/general", replace: true });
-    }
-    const moved = movedSettingsRedirect(location.pathname, location.hash);
-    if (moved) throw redirect({ ...moved, search: true, replace: true });
+  beforeLoad: ({ location }) => {
+    const decision = resolveSettingsPath(location.pathname, location.hash);
+    if (decision.kind !== "redirect") return;
+    throw redirect({
+      to: decision.to,
+      ...(decision.hash ? { hash: decision.hash } : {}),
+      ...(decision.retainSearch ? { search: true } : {}),
+      replace: true,
+    });
   },
+  notFoundComponent: SettingsPathMissingView,
   component: SettingsRouteLayout,
 });
