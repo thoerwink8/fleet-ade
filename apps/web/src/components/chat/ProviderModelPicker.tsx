@@ -381,13 +381,11 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                 acpRegistryAgentId={activeEntry.acpRegistryAgentId}
                 acpRegistryIconUrl={activeEntry.acpRegistryIconUrl}
                 showBadge={showInstanceBadge}
-                className="size-4"
+                badgePlacement="inline"
+                className="h-4 min-w-4"
                 iconClassName={cn("size-4", props.activeProviderIconClassName)}
                 indicatorBackground={props.instanceIndicatorBackground ?? "var(--contrast-input)"}
-                badgeClassName={cn(
-                  "right-[-0.125rem] bottom-[-0.125rem] h-3 min-w-3 px-0.5 text-5xs",
-                  size === "xs" && "shadow-none",
-                )}
+                {...(size === "xs" ? { badgeClassName: "shadow-none" } : {})}
               />
             </span>
           ) : null}

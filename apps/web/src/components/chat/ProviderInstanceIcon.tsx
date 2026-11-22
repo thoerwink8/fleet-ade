@@ -94,6 +94,7 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
   acpRegistryIconUrl?: string | undefined;
   showBadge?: boolean;
   badgeContent?: "initials" | "none";
+  badgePlacement?: "corner" | "inline";
   size?: "default" | "compact";
   className?: string;
   iconClassName?: string;
@@ -111,6 +112,7 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       } as CSSProperties)
     : undefined;
   const badgeContent = props.badgeContent ?? "initials";
+  const badgePlacement = props.badgePlacement ?? "corner";
   const iconClassName = cn(props.size === "compact" && "size-3.5", props.iconClassName);
   const isAcpRegistry = props.driverKind === "acpRegistry";
   // A custom OpenAI-compatible endpoint has no brand: show its name, marked with the protocol.
@@ -120,22 +122,29 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
     agentId: props.acpRegistryAgentId,
     iconUrl: props.acpRegistryIconUrl,
   });
+  const isOmpTextTile =
+    isAcpRegistry && acpRegistryIconUrl == null && props.displayName.trim().toLowerCase() === "omp";
+  const hasInlineBadge =
+    badgePlacement === "inline" && !isCustomEndpoint && Boolean(props.showBadge);
 
   return (
     <span
       className={cn(
         "relative isolate z-30 inline-flex shrink-0 items-center justify-center overflow-visible",
         props.className,
+        (hasInlineBadge || (badgePlacement === "inline" && isOmpTextTile)) && "w-auto",
+        hasInlineBadge && "gap-1",
       )}
       style={accentStyle}
       data-provider-accent-color={accentColor}
     >
       {isAcpRegistry ? (
-        acpRegistryIconUrl == null && props.displayName.trim().toLowerCase() === "omp" ? (
+        isOmpTextTile ? (
           <span
             className={cn(
               "flex size-5 shrink-0 items-center justify-center rounded-md border bg-card text-4xs font-semibold leading-none text-foreground",
               iconClassName,
+              badgePlacement === "inline" && "w-auto min-w-4 px-1",
             )}
             aria-hidden
           >
@@ -175,10 +184,15 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
         <ProviderPackageIcon
           icon={packageIcon}
           className={cn("size-5 shrink-0", iconClassName)}
+          {...(hasInlineBadge ? { "data-composer-control-icon": "" } : {})}
           aria-hidden
         />
       ) : Icon ? (
-        <Icon className={cn("size-5 shrink-0", iconClassName)} aria-hidden />
+        <Icon
+          className={cn("size-5 shrink-0", iconClassName)}
+          {...(hasInlineBadge ? { "data-composer-control-icon": "" } : {})}
+          aria-hidden
+        />
       ) : (
         <span className={cn("text-3xs font-semibold leading-none", iconClassName)}>
           {providerInstanceInitials(props.displayName)}
@@ -187,11 +201,15 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
       {isCustomEndpoint ? null : props.showBadge ? (
         <span
           className={cn(
-            "pointer-events-none absolute right-0 bottom-0 z-10 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border px-0.5 text-4xs font-semibold leading-none shadow-sm",
+            "pointer-events-none flex items-center justify-center rounded-full border font-semibold leading-none shadow-sm",
+            hasInlineBadge
+              ? "h-3.5 min-w-3.5 px-1 text-5xs"
+              : "absolute right-0 bottom-0 z-10 h-3.5 min-w-3.5 px-0.5 text-4xs",
             accentColor
               ? "bg-(--provider-accent) text-(--provider-accent-foreground)"
               : "bg-card text-muted-foreground",
-            props.size === "compact" &&
+            !hasInlineBadge &&
+              props.size === "compact" &&
               "right-[-0.1875rem] bottom-[-0.1875rem] h-3 min-w-3 px-0.5 text-5xs",
             props.badgeClassName,
           )}
