@@ -706,6 +706,12 @@ export const OrchestratorMcpCapabilitiesResult = Schema.Struct({
         plan: Schema.NullOr(ModelSelection),
       }),
       concurrencyLimit: Schema.NullOr(PositiveInt),
+      /** Null does not limit one delegation. */
+      timeoutMs: Schema.optional(Schema.NullOr(PositiveInt)),
+      stopOnTimeout: Schema.optional(Schema.Boolean),
+      instructions: Schema.optional(Schema.String),
+      /** Null keeps this commander thread's current model. */
+      commanderModel: Schema.optional(Schema.NullOr(ModelSelection)),
     }),
   ),
 });

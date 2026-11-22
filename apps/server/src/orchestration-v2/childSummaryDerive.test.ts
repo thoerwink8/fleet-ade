@@ -118,6 +118,15 @@ it("marks three quiet minutes as stuck without rewriting the sentence", () => {
   assert.strictEqual(before.list.phase, "在做");
 });
 
+it("marks a live delegation timed out without ending it", () => {
+  const timedOut = deriveChildSummary(base({ status: "running", timedOut: true }), 0).list;
+  assert.strictEqual(timedOut.phase, "卡住");
+  assert.strictEqual(timedOut.reason, "超时");
+  assert.strictEqual(timedOut.conclusion, null);
+  const finished = deriveChildSummary(base({ status: "completed", timedOut: true }), 0).list;
+  assert.strictEqual(finished.reason, "没有 PR");
+});
+
 it("treats command approval as the only needs-you stuck reason", () => {
   const approval = deriveChildSummary(
     base({ status: "waiting", approvalCommand: "rm -rf data\nextra" }),

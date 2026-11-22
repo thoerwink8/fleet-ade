@@ -882,6 +882,19 @@ export type WorktreeCleanup = typeof WorktreeCleanup.Type;
 export const DispatchRole = Schema.Literals(["code", "review", "readonly", "plan"]);
 export type DispatchRole = typeof DispatchRole.Type;
 
+/** Used when neither the project nor the environment wrote commander instructions. */
+export const BUILTIN_COMMANDER_INSTRUCTIONS = [
+  "同一件活已经有子会话还在做，就发回那一条，不新开。",
+  "一件活一棵工作树、一条分支。分支名用这个仓已有的命名设置。已经领了单的，用那张单定下的那条分支。",
+  "交代写全：做成什么样、怎么算做完、别碰什么、要跑哪些测试。没写的不替它扩大范围。",
+  "子会话不合并。",
+  "回报里要有做到哪、PR 号、头提交、核对命令的真实结果、没做的和原因。指挥会话核对这几项，不照抄回报里的句子。",
+  "过了沉默时限先看它卡在哪，不要因为没说话就再派一个。",
+  "时限到了只标超时，除非这次交代写明到点就停。",
+  "子会话不再往下派。若还是派了，动态栏不单列孙会话，只在那条直接子会话的行上写「它还派了 K 个」。点开完整会话才看下层。",
+  "已领的单只从本任期指挥会话派。不领单的随手活可以在本机做。",
+].join("\n");
+
 export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "worktreeCleanup",
   "defaultModelSelection",
@@ -911,6 +924,10 @@ export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "dispatchReadonlyModelSelection",
   "dispatchPlanModelSelection",
   "dispatchConcurrencyLimit",
+  "dispatchTimeoutMs",
+  "dispatchStopOnTimeout",
+  "commanderInstructions",
+  "dispatchCommanderModelSelection",
 ] as const;
 export type ProjectScopedServerSettingKey = (typeof PROJECT_SCOPED_SERVER_SETTING_KEYS)[number];
 
@@ -950,6 +967,10 @@ export const ProjectSettingsOverrides = Schema.Struct({
   dispatchReadonlyModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   dispatchPlanModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   dispatchConcurrencyLimit: Schema.optionalKey(Schema.NullOr(PositiveInt)),
+  dispatchTimeoutMs: Schema.optionalKey(Schema.NullOr(PositiveInt)),
+  dispatchStopOnTimeout: Schema.optionalKey(Schema.Boolean),
+  commanderInstructions: Schema.optionalKey(TrimmedString),
+  dispatchCommanderModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   providerInstances: Schema.optionalKey(
     Schema.Record(ProviderInstanceId, ProjectProviderInstanceOverride),
   ),
@@ -984,6 +1005,8 @@ const NULLABLE_PROJECT_SETTINGS_OVERRIDES: ReadonlySet<ProjectScopedServerSettin
   "dispatchReadonlyModelSelection",
   "dispatchPlanModelSelection",
   "dispatchConcurrencyLimit",
+  "dispatchTimeoutMs",
+  "dispatchCommanderModelSelection",
 ]);
 
 /** Reclaimable bytes from which the offline `t3 doctor` repair is worth suggesting. */
@@ -1333,6 +1356,18 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   dispatchConcurrencyLimit: Schema.NullOr(PositiveInt).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  /** Null does not limit one delegation. The clock starts when its run starts, not while queued. */
+  dispatchTimeoutMs: Schema.NullOr(PositiveInt).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  /** Off: a timed-out delegation stays running. On: stop it through the existing cancel path. */
+  dispatchStopOnTimeout: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  /** Empty uses the built-in commander instructions. */
+  commanderInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  /** Null keeps the commander thread's current model. Role cells do not read this. */
+  dispatchCommanderModelSelection: Schema.NullOr(ModelSelection).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
   threadTitleInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
@@ -1710,6 +1745,10 @@ export const ServerSettingsPatch = Schema.Struct({
   dispatchReadonlyModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   dispatchPlanModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   dispatchConcurrencyLimit: Schema.optionalKey(Schema.NullOr(PositiveInt)),
+  dispatchTimeoutMs: Schema.optionalKey(Schema.NullOr(PositiveInt)),
+  dispatchStopOnTimeout: Schema.optionalKey(Schema.Boolean),
+  commanderInstructions: Schema.optionalKey(TrimmedString),
+  dispatchCommanderModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
   threadTitleInstructions: Schema.optionalKey(TrimmedString),
   branchNamingMode: Schema.optionalKey(BranchNamingMode),
   branchNamePrefix: Schema.optionalKey(TrimmedString),

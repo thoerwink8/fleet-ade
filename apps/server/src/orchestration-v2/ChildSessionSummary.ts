@@ -461,6 +461,14 @@ export class ChildSessionSummary extends Context.Service<
           Number.isNaN(itemUpdatedMs) ? 0 : itemUpdatedMs,
         );
 
+        const timedOut = yield* sql<{ readonly marked: number }>`
+            SELECT 1 AS marked
+            FROM orchestration_v2_projection_subagents
+            WHERE child_thread_id = ${shell.id}
+              AND origin = 'app_owned'
+              AND json_type(payload_json, '$.timedOutAt') = 'string'
+            LIMIT 1
+          `;
         const pr =
           shell.pullRequests?.find((link) => link.snapshot !== null) ??
           shell.pullRequests?.[0] ??
@@ -471,6 +479,7 @@ export class ChildSessionSummary extends Context.Service<
           createdAtMs: DateTime.toEpochMillis(shell.createdAt),
           activityAtMs,
           status: shell.status,
+          ...(timedOut.length === 0 ? {} : { timedOut: true }),
           approvalCommand,
           waitingForAnswer,
           items: summaryItems,

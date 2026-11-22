@@ -123,7 +123,8 @@ function existingThreadIdsForCommand(
       return command.sourceThreadId === command.targetThreadId
         ? [command.sourceThreadId]
         : [command.sourceThreadId, command.targetThreadId];
-    case "delegated_task.request":
+    case "delegated_task.timeout":
+      return [command.parentThreadId];
     case "delegated_task.wake-policy":
     case "delegated_task.completion-delivery.acknowledge":
     case "delegated_task.completion-delivery.dispose":
@@ -502,6 +503,8 @@ export interface ThreadManagementServiceShape {
     readonly threadId: ThreadId;
     readonly commandId: CommandId;
     readonly reason?: string | undefined;
+    /** Stops this app-owned task only. Omit to stop every direct child. */
+    readonly taskId?: NodeId | undefined;
   }) => Effect.Effect<
     void,
     Orchestrator.OrchestratorV2Error | ThreadManagementProviderInstanceDisabledError
@@ -1558,6 +1561,7 @@ const make = Effect.gen(function* () {
     const stoppedChildThreadIds = new Set<ThreadId>();
     for (const task of subagents) {
       if (task.origin !== "app_owned") continue;
+      if (input.taskId !== undefined && task.id !== input.taskId) continue;
       if (task.childThreadId === null) {
         // A task in a linked environment ends here; its follower then stops it there.
         // One with its result keeps it, but its thread there may run follow-up work.

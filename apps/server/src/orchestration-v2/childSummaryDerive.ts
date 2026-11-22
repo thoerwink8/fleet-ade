@@ -51,6 +51,8 @@ export interface SummaryFacts {
   readonly createdAtMs: number;
   readonly activityAtMs: number;
   readonly status: string;
+  /** The delegation reached its snapshotted limit. The run itself may still be live. */
+  readonly timedOut?: boolean;
   /** Set when a command approval is waiting. Other approvals are not needs-you. */
   readonly approvalCommand: string | null;
   readonly waitingForAnswer: boolean;
@@ -178,7 +180,11 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
   let needsYou = false;
   let activity = activityFromItems(facts);
 
-  if (facts.status === "failed") {
+  if (facts.timedOut === true && LIVE_STATUSES[facts.status] === true) {
+    phase = "卡住";
+    reason = "超时";
+    activity = "超时";
+  } else if (facts.status === "failed") {
     phase = "卡住";
     reason = "失败";
     activity = "失败";

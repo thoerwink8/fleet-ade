@@ -547,6 +547,7 @@ export function layerWithRegistry<Error>(
     Layer.provide(Layer.mergeAll(layerStores, layerEffectExecutorProvided, layerEventSinkProvided)),
   );
   const layerReplayRuntime = Layer.mergeAll(
+    layerServerSettings,
     layerEffectOutboxProvided,
     layerOrchestratorProvided,
     layerProviderSessionManagerProvided,

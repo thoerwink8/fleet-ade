@@ -11,6 +11,7 @@ import {
   ClientSettingsSchema,
   ClientSettingsPatch,
   ClaudeSettings,
+  BUILTIN_COMMANDER_INSTRUCTIONS,
   DEFAULT_SERVER_SETTINGS,
   globalIdleCompaction,
   idleCompactionPatch,
@@ -572,6 +573,41 @@ describe("server model preferences", () => {
     const input = { favorites: [], providerModelPreferences: {} };
     expect(encodeServerSettings(decodeServerSettings(input))).toMatchObject(input);
     expect(decodeServerSettingsPatch(input)).toEqual(input);
+  });
+});
+
+describe("commander dispatch settings", () => {
+  it("defaults the timeout off, keeps the built-in instructions out of storage, and leaves the commander model empty", () => {
+    const decoded = decodeServerSettings({});
+    expect(decoded.dispatchTimeoutMs).toBeNull();
+    expect(decoded.dispatchStopOnTimeout).toBe(false);
+    expect(decoded.commanderInstructions).toBe("");
+    expect(decoded.dispatchCommanderModelSelection).toBeNull();
+    expect(decoded).not.toHaveProperty("dispatchSilenceMs");
+    expect(BUILTIN_COMMANDER_INSTRUCTIONS).toContain("时限到了只标超时");
+  });
+
+  it("lets a project override only the commander keys it writes", () => {
+    const projectId = ProjectId.make("project-commander");
+    const decoded = decodeServerSettings({
+      dispatchTimeoutMs: 60_000,
+      commanderInstructions: "环境守则",
+      projectSettingsOverrides: {
+        [projectId]: {
+          dispatchTimeoutMs: null,
+          dispatchStopOnTimeout: true,
+          commanderInstructions: "项目守则",
+        },
+      },
+    });
+    expect(decoded.projectSettingsOverrides[projectId]).toMatchObject({
+      dispatchTimeoutMs: null,
+      dispatchStopOnTimeout: true,
+      commanderInstructions: "项目守则",
+    });
+    expect(decoded.projectSettingsOverrides[projectId]).not.toHaveProperty(
+      "dispatchCommanderModelSelection",
+    );
   });
 });
 

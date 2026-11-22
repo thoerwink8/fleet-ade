@@ -1,3 +1,4 @@
+import * as DateTime from "effect/DateTime";
 import { assert, it } from "@effect/vitest";
 import {
   CommandId,
@@ -18,11 +19,11 @@ import {
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
-import * as DateTime from "effect/DateTime";
-import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
+import * as Deferred from "effect/Deferred";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Fiber from "effect/Fiber";
 import * as Metric from "effect/Metric";
 import * as Result from "effect/Result";
 import * as Stream from "effect/Stream";
@@ -34,6 +35,7 @@ import {
   orchestrationCommandsTotal,
 } from "../observability/Metrics.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as DelegatedTaskQuestionReactor from "./DelegatedTaskQuestionReactor.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
@@ -78,6 +80,25 @@ const layerConcurrencyLimitTest = Layer.mergeAll(
       databaseLayer: layerDatabase,
       runEffectWorker: false,
       settingsOverrides: { dispatchConcurrencyLimit: 1 },
+    },
+  ),
+);
+const layerCommanderDispatchTest = Layer.mergeAll(
+  layerDatabase,
+  ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
+  EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
+  ProviderReplayHarness.layerWithRegistry(
+    { name: "control-reads-commander-dispatch" },
+    ProviderAdapterRegistry.layerFromAdapters([adapter]),
+    {
+      databaseLayer: layerDatabase,
+      runEffectWorker: false,
+      settingsOverrides: {
+        dispatchTimeoutMs: 60_000,
+        dispatchStopOnTimeout: false,
+        commanderInstructions: "环境守则",
+        dispatchCommanderModelSelection: { instanceId, model: "commander-model" },
+      },
     },
   ),
 );
@@ -1371,6 +1392,244 @@ it.effect("counts accepted queued delegations against the commander limit", () =
     }
     assert.lengthOf((yield* projections.getThreadProjection(parentThreadId)).subagents, 1);
   }).pipe(Effect.provide(layerConcurrencyLimitTest)),
+);
+
+const acceptCommanderDelegation = Effect.fn("test.acceptCommanderDelegation")(function* (input: {
+  readonly name: string;
+  readonly orchestrator: Orchestrator.OrchestratorV2["Service"];
+  readonly projections: ProjectionStore.ProjectionStoreV2["Service"];
+}) {
+  const parentThreadId = ThreadId.make(`thread:${input.name}`);
+  const projectId = ProjectId.make(`project:${input.name}`);
+  yield* input.orchestrator.dispatch({
+    type: "thread.create",
+    commandId: CommandId.make(`create-${input.name}`),
+    threadId: parentThreadId,
+    projectId,
+    title: "Commander",
+    modelSelection,
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    branch: null,
+    worktreePath: null,
+    createdBy: "user",
+    creationSource: "web",
+  });
+  yield* input.orchestrator.dispatch({
+    type: "thread.commander.mark",
+    commandId: CommandId.make(`mark-${input.name}`),
+    threadId: parentThreadId,
+  });
+  yield* input.orchestrator.dispatch({
+    type: "message.dispatch",
+    commandId: CommandId.make(`start-${input.name}`),
+    threadId: parentThreadId,
+    messageId: MessageId.make(`message:${input.name}`),
+    text: "继续",
+    attachments: [],
+    dispatchMode: { type: "start_immediately" },
+    createdBy: "user",
+    creationSource: "web",
+  });
+  const parentRun = (yield* input.projections.getThreadProjection(parentThreadId)).runs[0]!;
+  yield* input.orchestrator.dispatch({
+    type: "delegated_task.request",
+    commandId: CommandId.make(`delegate-${input.name}`),
+    parentThreadId,
+    parentRunId: parentRun.id,
+    parentNodeId: parentRun.rootNodeId!,
+    task: "Review the changes",
+    modelSelection,
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    createdBy: "agent",
+    creationSource: "mcp",
+  });
+  const task = (yield* input.projections.getThreadProjection(parentThreadId)).subagents[0]!;
+  return { parentThreadId, task };
+});
+
+it.effect("snapshots the commander timeout and leaves the child running when it is reached", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const { parentThreadId, task } = yield* acceptCommanderDelegation({
+      name: "timeout",
+      orchestrator,
+      projections,
+    });
+    assert.equal(task.timeoutMs, 60_000);
+    assert.equal(task.stopOnTimeout, false);
+    assert.equal(task.instructions, "环境守则");
+    const childRun = (yield* projections.getThreadRecords(task.childThreadId!, ["runs"])).runs[0]!;
+    assert.isNull(childRun.startedAt);
+    const timeoutEffects = yield* outbox.listByCommandId(CommandId.make("delegate-timeout"));
+    if (!timeoutEffects.some((effect) => effect.request.type === "delegated-task.timeout")) {
+      assert.fail("expected the snapshotted timeout effect");
+    }
+    const timeoutCommandId = CommandId.make("timeout-wake-1");
+    yield* TestClock.adjust("1 minute");
+    yield* orchestrator.dispatch({
+      type: "delegated_task.timeout",
+      commandId: timeoutCommandId,
+      parentThreadId,
+      taskId: task.id,
+    });
+    const waiting = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
+    assert.isUndefined(waiting.timedOutAt);
+    assert.equal(
+      (yield* projections.getThreadRecords(task.childThreadId!, ["runs"])).runs[0]?.status,
+      "starting",
+    );
+    const now = yield* DateTime.now;
+    yield* projections.apply({
+      id: EventId.make("event:timeout-run-started"),
+      type: "run.updated",
+      threadId: task.childThreadId!,
+      runId: childRun.id,
+      occurredAt: now,
+      payload: { ...childRun, delegatedTaskId: task.id, status: "running", startedAt: now },
+    });
+    yield* TestClock.adjust("1 minute");
+    yield* orchestrator.dispatch({
+      type: "delegated_task.timeout",
+      commandId: CommandId.make("timeout-wake-2"),
+      parentThreadId,
+      taskId: task.id,
+    });
+    const timedOut = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
+    assert.ok(timedOut.timedOutAt);
+    assert.equal(timedOut.instructions, "环境守则");
+    const live = (yield* projections.getThreadRecords(task.childThreadId!, ["runs"])).runs[0]!;
+    assert.equal(live.status, "running");
+    const effects = yield* outbox.listByCommandId(CommandId.make("timeout-wake-2"));
+    assert.isFalse(effects.some((effect) => effect.request.type === "delegated-tasks.stop"));
+  }).pipe(Effect.provide(layerCommanderDispatchTest)),
+);
+
+it.effect("stops only the timed-out delegation when stop-on-timeout was accepted", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const { parentThreadId, task } = yield* acceptCommanderDelegation({
+      name: "stop-timeout",
+      orchestrator,
+      projections,
+    });
+    const now = yield* DateTime.now;
+    yield* projections.apply({
+      id: EventId.make("event:stop-timeout-snapshot"),
+      type: "subagent.updated",
+      threadId: parentThreadId,
+      occurredAt: now,
+      payload: { ...task, stopOnTimeout: true },
+    });
+    const childRun = (yield* projections.getThreadRecords(task.childThreadId!, ["runs"])).runs[0]!;
+    yield* projections.apply({
+      id: EventId.make("event:stop-timeout-run"),
+      type: "run.updated",
+      threadId: task.childThreadId!,
+      runId: childRun.id,
+      occurredAt: now,
+      payload: { ...childRun, delegatedTaskId: task.id, status: "running", startedAt: now },
+    });
+    yield* TestClock.adjust("1 minute");
+    const timeoutCommandId = CommandId.make("stop-timeout-wake");
+    yield* orchestrator.dispatch({
+      type: "delegated_task.timeout",
+      commandId: timeoutCommandId,
+      parentThreadId,
+      taskId: task.id,
+    });
+    const stop = yield* outbox.get(`effect:${timeoutCommandId}:delegated-tasks.stop:${task.id}`);
+    if (Option.isNone(stop)) {
+      assert.fail("expected stop-on-timeout to use the existing stop");
+    }
+    const stopEffect = stop.value;
+    assert.equal(stopEffect.request.type, "delegated-tasks.stop");
+    assert.equal(stopEffect.request.taskId, task.id);
+    assert.equal(stopEffect.threadId, parentThreadId);
+  }).pipe(Effect.provide(layerCommanderDispatchTest)),
+);
+
+it.effect("keeps the accepted timeout and instructions after the settings change", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const settings = yield* ServerSettings.ServerSettingsService;
+    const { parentThreadId, task } = yield* acceptCommanderDelegation({
+      name: "snapshot",
+      orchestrator,
+      projections,
+    });
+    yield* settings.updateSettings({
+      dispatchTimeoutMs: 5_000,
+      commanderInstructions: "改过的守则",
+      dispatchStopOnTimeout: true,
+    });
+    const retained = (yield* projections.getThreadProjection(parentThreadId)).subagents[0]!;
+    assert.equal(retained.timeoutMs, task.timeoutMs);
+    assert.equal(retained.instructions, "环境守则");
+    assert.equal(retained.stopOnTimeout, false);
+  }).pipe(Effect.provide(layerCommanderDispatchTest)),
+);
+
+it.effect("uses the host commander model and keeps the current model when that cell is empty", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const settings = yield* ServerSettings.ServerSettingsService;
+    const threadId = ThreadId.make("thread:commander-self");
+    const projectId = ProjectId.make("project:commander-self");
+    yield* orchestrator.dispatch({
+      type: "thread.create",
+      commandId: CommandId.make("create-commander-self"),
+      threadId,
+      projectId,
+      title: "Commander",
+      modelSelection,
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      branch: null,
+      worktreePath: null,
+      createdBy: "user",
+      creationSource: "web",
+    });
+    yield* orchestrator.dispatch({
+      type: "thread.commander.mark",
+      commandId: CommandId.make("mark-commander-self"),
+      threadId,
+    });
+    yield* orchestrator.dispatch({
+      type: "message.dispatch",
+      commandId: CommandId.make("turn-commander-self"),
+      threadId,
+      messageId: MessageId.make("message:commander-self"),
+      text: "下一回合",
+      attachments: [],
+      dispatchMode: { type: "start_immediately" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const selected = (yield* projections.getThreadProjection(threadId)).runs[0]!;
+    assert.equal(selected.modelSelection.model, "commander-model");
+    yield* settings.updateSettings({ dispatchCommanderModelSelection: null });
+    yield* orchestrator.dispatch({
+      type: "message.dispatch",
+      commandId: CommandId.make("turn-commander-self-empty"),
+      threadId,
+      messageId: MessageId.make("message:commander-self-empty"),
+      text: "保持当前模型",
+      attachments: [],
+      dispatchMode: { type: "queue_after_active" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const retained = (yield* projections.getThreadProjection(threadId)).runs.at(-1)!;
+    assert.equal(retained.modelSelection.model, "commander-model");
+  }).pipe(Effect.provide(layerCommanderDispatchTest)),
 );
 
 it.effect("wakes the parent once when its delegated task asks a question", () =>
