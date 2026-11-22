@@ -28,8 +28,8 @@ export const AcpRegistrySettings = makeProviderSettingsSchema(
       Schema.withDecodingDefault(Effect.succeed("")),
       Schema.annotateKey({
         title: "Registry 智能体 ID",
-        description: "官方 ACP Registry 里的智能体标识，例如 'devin'。",
-        providerSettingsForm: { placeholder: "devin", clearWhenEmpty: "persist" },
+        description: "官方 ACP Registry 里的智能体标识。",
+        providerSettingsForm: { placeholder: "agent-id", clearWhenEmpty: "persist" },
       }),
     ),
     commandPath: TrimmedString.pipe(

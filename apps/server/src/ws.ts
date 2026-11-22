@@ -257,8 +257,6 @@ import {
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
 } from "@t3tools/shared/usageLimits";
-import * as AgentSessionScanner from "./project/AgentSessionScanner.ts";
-import * as AgentSessionImporter from "./project/AgentSessionImporter.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import { requestUrl } from "./requestUrl.ts";
 
@@ -1382,8 +1380,6 @@ export const layerWsRpc = (
       const repositoryIdentityResolver =
         yield* RepositoryIdentityResolver.RepositoryIdentityResolver;
       const projectEnrichment = yield* ProjectEnrichmentService.ProjectEnrichmentService;
-      const agentSessionScanner = yield* AgentSessionScanner.AgentSessionScanner;
-      const agentSessionImporter = yield* AgentSessionImporter.AgentSessionImporter;
       const checkpointDiffQuery = yield* CheckpointDiffQuery.CheckpointDiffQuery;
       const nativeChildWork = yield* NativeChildWorkQuery.NativeChildWorkQuery;
       const keybindings = yield* Keybindings.Keybindings;
@@ -1486,7 +1482,7 @@ export const layerWsRpc = (
                 ...session,
                 importedThreadId: thread === null ? null : threadId,
                 ...(thread !== null &&
-                AgentSessionImporter.isNativeHistoryPending({
+                AcpRegistrySessions.isNativeHistoryPending({
                   historyOrigin: thread.historyOrigin,
                   hasRun: thread.latestRunId !== null,
                 })
@@ -2852,9 +2848,6 @@ export const layerWsRpc = (
           ),
         [WS_METHODS.attachmentsCreateUploadUrl]: (input) => issueAttachmentUploadUrl(input),
         [WS_METHODS.attachmentsDelete]: (input) => deletePendingAttachment(input.attachmentId),
-        [WS_METHODS.agentSessionsScan]: () => agentSessionScanner.scan,
-        [WS_METHODS.agentSessionsImport]: (input) =>
-          agentSessionImporter.importRecentAgentThreads(input),
         [WS_METHODS.assetsCreateUrl]:
           /* Request instrumentation already owns the span; keep this helper in that context. */
           Effect.fnUntraced(function* (input) {

@@ -479,7 +479,7 @@ export const layerWithOptions = (
         readonly mcpCredentialId: string | undefined;
         readonly issued: boolean;
       }
-      /** ACP and OpenCode consume credentials during openSession; reserve them against revocation until publication. */
+      /** ACP consumes credentials during openSession; reserve them against revocation until publication. */
       const mcpCredentialReservations = new Map<string, number>();
       const mcpReservationKey = (threadId: ThreadId, mcpCredentialId: string) =>
         `${threadId}\0${mcpCredentialId}`;
@@ -846,8 +846,8 @@ export const layerWithOptions = (
       });
 
       // Read the session's provider threads as soon as it leaves the live map, before a
-      // replacement reports its own tasks. Keep OpenCode's background work: its background
-      // subagents share a server and can outlive the session.
+      // replacement reports its own tasks. ACP background subagents share a server and can
+      // outlive the session.
       const readReleasedProviderThreads = Effect.fn(
         "ProviderSessionManager.readReleasedProviderThreads",
       )(

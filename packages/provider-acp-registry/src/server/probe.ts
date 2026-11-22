@@ -399,7 +399,7 @@ export const probeAcpRegistryConfiguration = Effect.fn("AcpRegistryProbe.probeCo
         );
       }
       const initialized = initializeResult.success;
-      // Agents that persist sessions (omp, OpenCode) would keep one empty session per probe,
+      // Agents that persist sessions (omp) would keep one empty session per probe,
       // so the disposable session/new probe only runs when the agent advertises session/delete
       // and the finalizer below can remove it again.
       if (initialized.agentCapabilities?.sessionCapabilities?.delete == null) {

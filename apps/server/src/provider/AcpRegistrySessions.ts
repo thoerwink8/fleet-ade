@@ -1,8 +1,16 @@
 import {
   AcpRegistryOperationError,
   CommandId,
+  EventId,
+  MessageId,
+  ThreadId,
+  TurnItemId,
   type AcpRegistryImportSessionInput,
   type AcpRegistryImportSessionResult,
+  type OrchestrationV2AppThread,
+  type OrchestrationV2ConversationMessage,
+  type OrchestrationV2DomainEvent,
+  type OrchestrationV2TurnItem,
   type Project,
   type ProjectId,
   type ProviderDriverKind,
@@ -12,19 +20,127 @@ import * as AcpRegistryRuntimeCoordinator from "@t3tools/provider-acp-registry/s
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import type { ProviderInstance } from "@t3tools/provider-core/server/driver";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 
+import * as EventSink from "../orchestration-v2/EventSink.ts";
+import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
+import * as ProviderAdapterRegistry from "../orchestration-v2/ProviderAdapterRegistry.ts";
+import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
-import * as AgentSessionImporter from "../project/AgentSessionImporter.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerRuntimeStartup from "../serverRuntimeStartup.ts";
 import * as ProviderInstanceRegistry from "./ProviderInstanceRegistry.ts";
 import * as ProviderRegistry from "./ProviderRegistry.ts";
 
+// ACP imports read history while holding the session-mutation lock, and an agent can
+// leave session/load unanswered longer than its own open deadline.
+const NATIVE_HISTORY_READ_TIMEOUT = "2 minutes";
+
+/**
+ * Whether a thread bound to a native session still lacks its native history.
+ * Once a turn has run, the native session also holds that turn's messages, so
+ * its history can no longer be imported as run-less items.
+ */
+export function isNativeHistoryPending(input: {
+  readonly historyOrigin: OrchestrationV2AppThread["historyOrigin"];
+  readonly hasRun: boolean;
+}): boolean {
+  return input.historyOrigin !== "v1_import" && !input.hasRun;
+}
+
+interface NativeHistoryMessage {
+  readonly role: "user" | "assistant" | "reasoning";
+  readonly text: string;
+  readonly createdAt: string;
+}
+
+function nativeHistoryMessageEvents(input: {
+  readonly threadId: ThreadId;
+  readonly index: number;
+  readonly message: NativeHistoryMessage;
+}): ReadonlyArray<OrchestrationV2DomainEvent> {
+  const ordinal = input.index + 1;
+  const suffix = String(input.index).padStart(6, "0");
+  const messageId = MessageId.make(`${input.threadId}:${suffix}`);
+  const turnItemId = TurnItemId.make(`acp-native-history:turn-item:${input.threadId}:${suffix}`);
+  const at = DateTime.makeUnsafe(input.message.createdAt);
+  const common = {
+    id: turnItemId,
+    threadId: input.threadId,
+    runId: null,
+    nodeId: null,
+    providerThreadId: null,
+    providerTurnId: null,
+    nativeItemRef: null,
+    parentItemId: null,
+    ordinal,
+    status: "completed" as const,
+    title: null,
+    startedAt: at,
+    completedAt: at,
+    updatedAt: at,
+  };
+  const turnItemEvent = (payload: OrchestrationV2TurnItem): OrchestrationV2DomainEvent => ({
+    id: EventId.make(turnItemId),
+    type: "turn-item.updated",
+    threadId: input.threadId,
+    occurredAt: at,
+    payload,
+  });
+  if (input.message.role === "reasoning") {
+    return [
+      turnItemEvent({ ...common, type: "reasoning", text: input.message.text, streaming: false }),
+    ];
+  }
+  const message: OrchestrationV2ConversationMessage = {
+    createdBy: input.message.role === "user" ? "user" : "agent",
+    creationSource: "server",
+    id: messageId,
+    threadId: input.threadId,
+    runId: null,
+    nodeId: null,
+    role: input.message.role,
+    text: input.message.text,
+    attachments: [],
+    streaming: false,
+    createdAt: at,
+    updatedAt: at,
+  };
+  const turnItem: OrchestrationV2TurnItem =
+    input.message.role === "user"
+      ? {
+          ...common,
+          createdBy: "user",
+          creationSource: "server",
+          type: "user_message",
+          messageId,
+          inputIntent: "turn_start",
+          text: input.message.text,
+          attachments: [],
+        }
+      : {
+          ...common,
+          type: "assistant_message",
+          messageId,
+          text: input.message.text,
+          streaming: false,
+        };
+  return [
+    {
+      id: EventId.make(`acp-native-history:message:${input.threadId}:${suffix}`),
+      type: "message.updated",
+      threadId: input.threadId,
+      occurredAt: at,
+      payload: message,
+    },
+    turnItemEvent(turnItem),
+  ];
+}
 export const importedThreadId = (input: {
   readonly driver: ProviderDriverKind;
   readonly instanceId: ProviderInstanceId;
@@ -65,7 +181,11 @@ const make = Effect.gen(function* () {
   const threadManagement = yield* ThreadManagementService.ThreadManagementService;
   const threadLaunch = yield* ThreadLaunchService.ThreadLaunchService;
   const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
-  const agentSessionImporter = yield* AgentSessionImporter.AgentSessionImporter;
+  const orchestrator = yield* Orchestrator.OrchestratorV2;
+  const eventSink = yield* EventSink.EventSinkV2;
+  const idAllocator = yield* IdAllocator.IdAllocatorV2;
+  const registry = yield* ProviderAdapterRegistry.ProviderAdapterRegistryV2;
+  const threadCommands = yield* ThreadCommandExecutor.ThreadCommandExecutor;
   const random = yield* SecureRandom.SecureRandom;
 
   const project = Effect.fn("AcpRegistrySessions.project")(function* (projectId: ProjectId) {
@@ -88,6 +208,105 @@ const make = Effect.gen(function* () {
         }),
     );
   });
+
+  /**
+   * Loading a native session replays its history only into the adapter's own
+   * snapshot, so copy that snapshot into the thread as run-less history. The
+   * `v1_import` origin keeps it in forks and marks the import done, so a call
+   * after a failed read repairs the thread and any later call does nothing.
+   */
+  const importNativeHistory = Effect.fn("AcpRegistrySessions.importNativeHistory")(
+    function* (input: { readonly threadId: ThreadId; readonly workspaceRoot: string }) {
+      const pendingThread = Effect.map(
+        orchestrator.getThreadRecords(input.threadId, ["providerThreads", "runs"]),
+        (records) =>
+          isNativeHistoryPending({
+            historyOrigin: records.thread.historyOrigin,
+            hasRun: records.runs.length > 0,
+          })
+            ? records
+            : null,
+      );
+      // Thread commands write whole thread rows, so hold their lock from the
+      // re-read through the write to keep both this marker and their changes.
+      const commit = (messages: ReadonlyArray<NativeHistoryMessage>) =>
+        threadCommands.withLock(
+          input.threadId,
+          Effect.gen(function* () {
+            const current = yield* pendingThread;
+            if (current === null) return 0;
+            yield* eventSink.write({
+              events: [
+                ...messages.flatMap((message, index) =>
+                  nativeHistoryMessageEvents({ threadId: input.threadId, index, message }),
+                ),
+                {
+                  id: EventId.make(`acp-native-history:thread:${input.threadId}:native-history`),
+                  type: "thread.metadata-updated",
+                  threadId: input.threadId,
+                  providerInstanceId: current.thread.providerInstanceId,
+                  occurredAt: yield* DateTime.now,
+                  payload: { ...current.thread, historyOrigin: "v1_import" },
+                },
+              ],
+            });
+            return messages.length;
+          }),
+        );
+      const records = yield* pendingThread;
+      if (records === null) return 0;
+      const { thread, providerThreads } = records;
+      const providerThread = providerThreads.find(
+        (candidate) =>
+          candidate.appThreadId === input.threadId && candidate.nativeThreadRef !== null,
+      );
+      const nativeThreadId = providerThread?.nativeThreadRef?.nativeId;
+      if (providerThread === undefined || nativeThreadId == null) return 0;
+      const providerSessionId = yield* idAllocator.allocate.providerSession({
+        providerInstanceId: providerThread.providerInstanceId,
+        threadId: input.threadId,
+      });
+      // The registry admits this open against sign-in changes, like any other open.
+      const adapter = yield* registry.get(thread.modelSelection.instanceId);
+      const snapshot = yield* adapter
+        .openSession({
+          threadId: input.threadId,
+          providerSessionId,
+          modelSelection: thread.modelSelection,
+          runtimePolicy: {
+            runtimeMode: thread.runtimeMode,
+            interactionMode: thread.interactionMode,
+            cwd: thread.worktreePath ?? input.workspaceRoot,
+          },
+          initialNativeThreadId: nativeThreadId,
+          ...(providerThread.nativeMetadata?.itemIdentityVersion === undefined
+            ? {}
+            : {
+                initialProviderItemIdentityVersion:
+                  providerThread.nativeMetadata.itemIdentityVersion,
+              }),
+        })
+        .pipe(
+          Effect.flatMap((session) => session.readThreadSnapshot({ providerThread })),
+          Effect.timeout(NATIVE_HISTORY_READ_TIMEOUT),
+          Effect.scoped,
+        );
+      const reasoningIds = new Set(snapshot.reasoningMessageIds);
+      const messages = snapshot.messages.flatMap((message) =>
+        (message.role === "user" || message.role === "assistant") && message.text.trim() !== ""
+          ? [
+              {
+                role: reasoningIds.has(message.id) ? ("reasoning" as const) : message.role,
+                text: message.text,
+                createdAt: DateTime.formatIso(message.createdAt),
+              },
+            ]
+          : [],
+      );
+      // Loading the session can take a while, and the thread is usable meanwhile.
+      return yield* commit(messages);
+    },
+  );
 
   const sessionManager = Effect.fn("AcpRegistrySessions.sessionManager")(function* (
     instanceId: ProviderInstanceId,
@@ -139,11 +358,11 @@ const make = Effect.gen(function* () {
       ),
     );
     if (existing !== null) {
-      const repairing = AgentSessionImporter.isNativeHistoryPending({
+      const repairing = isNativeHistoryPending({
         historyOrigin: existing.historyOrigin,
         hasRun: existing.latestRunId !== null,
       });
-      yield* agentSessionImporter.importNativeHistory({ threadId, workspaceRoot }).pipe(
+      yield* importNativeHistory({ threadId, workspaceRoot }).pipe(
         Effect.mapError(
           (cause) =>
             new AcpRegistryOperationError({
@@ -211,7 +430,7 @@ const make = Effect.gen(function* () {
       });
     }
     // The thread is usable without its history, so a failed read only logs.
-    yield* agentSessionImporter.importNativeHistory({ threadId, workspaceRoot }).pipe(
+    yield* importNativeHistory({ threadId, workspaceRoot }).pipe(
       Effect.catch((cause) =>
         Effect.logWarning("Could not import ACP session history", {
           instanceId: input.instanceId,

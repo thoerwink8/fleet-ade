@@ -57,8 +57,6 @@ import { vi } from "vite-plus/test";
 import * as AssetSigner from "./assets/AssetSigner.ts";
 import * as AcpRegistryRuntimeCoordinator from "@t3tools/provider-acp-registry/server/AcpRegistryRuntimeCoordinator";
 import * as AcpRegistrySupport from "@t3tools/provider-acp-registry/server/AcpRegistrySupport";
-import * as AgentSessionImporter from "./project/AgentSessionImporter.ts";
-import * as AgentSessionScanner from "./project/AgentSessionScanner.ts";
 import * as AntigravityInstallation from "./provider/AntigravityInstallation.ts";
 import * as ProviderInstallation from "./provider/providerInstallation.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
@@ -142,6 +140,7 @@ import * as ProjectionStore from "./orchestration-v2/ProjectionStore.ts";
 import * as EventSink from "./orchestration-v2/EventSink.ts";
 import * as LegacyV1ThreadImporter from "./orchestration-v2/legacy/LegacyV1ThreadImporter.ts";
 import * as ThreadCommandExecutor from "./orchestration-v2/ThreadCommandExecutor.ts";
+import * as ProviderAdapterRegistry from "./orchestration-v2/ProviderAdapterRegistry.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { projectIdentitiesDigest } from "./orchestration-v2/ShellStream.ts";
 import { ChildSessionSummary } from "./orchestration-v2/ChildSessionSummary.ts";
@@ -837,8 +836,6 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(AcpRegistryRuntimeCoordinator.AcpRegistryRuntimeCoordinator)({}),
   Layer.mock(AcpRegistrySupport.AcpRegistryCatalog)({}),
   Layer.mock(AcpRegistrySessions.AcpRegistrySessions)({}),
-  Layer.mock(AgentSessionImporter.AgentSessionImporter)({}),
-  Layer.mock(AgentSessionScanner.AgentSessionScanner)({}),
   Layer.mock(AntigravityInstallation.AntigravityInstallation)({ managedDirectory: "/unused" }),
   Layer.mock(BackgroundPolicy.BackgroundPolicy)({}),
   Layer.mock(CheckpointDiffQuery.CheckpointDiffQuery)({}),
@@ -851,6 +848,8 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(ModelManifest.ModelManifest)({}),
   Layer.mock(OrchestrationEventStore.OrchestrationEventStore)({}),
   Layer.mock(Orchestrator.OrchestratorV2)({}),
+  Layer.mock(ProviderAdapterRegistry.ProviderAdapterRegistryV2)({}),
+  IdAllocator.layer,
   Layer.mock(OtlpEndpointCheck.OtlpEndpointCheck)({}),
   Layer.mock(PairingGrantStore.PairingGrantStore)({}),
   Layer.mock(PeerLinks.PeerLinks)({}),
@@ -2273,7 +2272,6 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
     const pending = yield* seedAcpThread("pending", { imported: false, ran: false });
     const complete = yield* seedAcpThread("complete", { imported: true, ran: false });
     const ran = yield* seedAcpThread("ran", { imported: false, ran: true });
-    const repaired: Array<ThreadId> = [];
     const session = (sessionId: string) => ({
       sessionId,
       cwd: "/workspace/acp",
@@ -2338,13 +2336,25 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
             ),
       }),
       // Repairing an existing thread must not launch another one.
+      Layer.mock(Orchestrator.OrchestratorV2)({
+        getThreadRecords: (threadId, fields, filter) =>
+          projections
+            .getThreadRecords(threadId, fields, filter)
+            .pipe(
+              Effect.mapError(
+                (cause) => new Orchestrator.OrchestratorProjectionError({ threadId, cause }),
+              ),
+            ),
+      }),
       Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
-      Layer.mock(AgentSessionImporter.AgentSessionImporter)({
-        importNativeHistory: ({ threadId }) =>
-          Effect.sync(() => repaired.push(threadId)).pipe(Effect.as(1)),
+      Layer.mock(ThreadCommandExecutor.ThreadCommandExecutor)({
+        withLock: (_threadId, effect) => effect,
       }),
     );
-    const services = AcpRegistrySessions.layer.pipe(Layer.provideMerge(dependencies));
+    const services = Layer.merge(
+      dependencies,
+      AcpRegistrySessions.layer.pipe(Layer.provide(dependencies)),
+    );
     const client = yield* RpcTest.makeClient(acpSessionRpcs).pipe(
       Effect.provide(
         layerWsRpc(
@@ -2388,6 +2398,5 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
       sessionId: "pending",
     });
     assert.deepEqual(imported, { threadId: pending, imported: true });
-    assert.deepEqual(repaired, [pending]);
   }).pipe(Effect.provide(EventSink.layer.pipe(Layer.provideMerge(acpStores)))),
 );

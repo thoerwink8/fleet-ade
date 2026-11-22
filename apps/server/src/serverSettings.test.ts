@@ -790,6 +790,11 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         providerInstances: {
           cursor: { driver: "cursor", enabled: true, config: {} },
           opencode: { driver: "opencode", enabled: false, config: {} },
+          devin: {
+            driver: "acpRegistry",
+            enabled: true,
+            config: { agentId: "devin", source: "registry" },
+          },
         },
         defaultModelSelection: { instanceId: "cursor", model: "composer-1" },
         fallbackModelSelection: { instanceId: "opencode", model: "opencode/gpt-5" },
@@ -814,6 +819,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
           settings.providerInstances[ProviderInstanceId.make("opencode")]!,
         ),
       );
+      assert.deepEqual(settings.providerInstances[ProviderInstanceId.make("devin")]?.config, {
+        agentId: "devin",
+        source: "registry",
+      });
       assert.deepEqual(settings.defaultModelSelection, {
         instanceId: ProviderInstanceId.make("cursor"),
         model: "composer-1",
