@@ -14,6 +14,13 @@ const descriptor = {
 } as const;
 
 describe("ExecutionEnvironmentDescriptor", () => {
+  it("drops the triage capability that older servers still advertise", () => {
+    expect(
+      decodeDescriptor({ ...descriptor, capabilities: { repositoryIdentity: true, triage: true } })
+        .capabilities,
+    ).toEqual({ repositoryIdentity: true });
+  });
+
   it("decodes old, recognized and future manual installation descriptors", () => {
     expect(decodeDescriptor(descriptor).capabilities.serverInstallation).toBeUndefined();
     for (const installation of [

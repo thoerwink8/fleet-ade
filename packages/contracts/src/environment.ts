@@ -180,8 +180,6 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   mcpApprovalCodes: Schema.optionalKey(Schema.Boolean),
   /** Agent sign-ins on its T3 Connect address are approved on the hosted app, without a code. */
   mcpHostedApproval: Schema.optionalKey(Schema.Boolean),
-  /** Server answers server.prepareTriage. */
-  triage: Schema.optionalKey(Schema.Boolean),
   /** Server accepts `{ type: "once" }` scheduled tasks; older servers reject them on save. */
   oneTimeSchedules: Schema.optionalKey(Schema.Boolean),
   /** Server honors `freshContext` on sends; older servers ignore it and keep the old context. */
