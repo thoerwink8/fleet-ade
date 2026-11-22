@@ -929,17 +929,30 @@ export const makeAcpPatchedProtocol = Effect.fn("makeAcpPatchedProtocol")(functi
     Effect.onExit((exit) =>
       Exit.match(exit, {
         onFailure: (cause) => {
-          const error = new AcpError.AcpTransportError({
+          const writeError = new AcpError.AcpTransportError({
             detail: Cause.hasInterruptsOnly(cause)
               ? "The ACP output writer was interrupted while closing"
               : "Failed to write an outgoing ACP message",
             cause,
           });
-          return failOutgoingWrites(error).pipe(
-            Effect.andThen(
-              Cause.hasInterruptsOnly(cause)
-                ? Effect.void
-                : handleTermination(() => Effect.succeed(error)),
+          if (Cause.hasInterruptsOnly(cause) || options.terminationError === undefined) {
+            return failOutgoingWrites(writeError).pipe(
+              Effect.andThen(
+                Cause.hasInterruptsOnly(cause)
+                  ? Effect.void
+                  : handleTermination(() => Effect.succeed(writeError)),
+              ),
+            );
+          }
+          // EPIPE from a runtime that already aborted is the process exit, not a transport fault.
+          return options.terminationError.pipe(
+            Effect.timeoutOption("250 millis"),
+            Effect.provideService(Clock.Clock, Clock.Clock.defaultValue()),
+            Effect.map(Option.getOrElse(() => writeError)),
+            Effect.flatMap((error) =>
+              failOutgoingWrites(error).pipe(
+                Effect.andThen(handleTermination(() => Effect.succeed(error))),
+              ),
             ),
           );
         },

@@ -270,8 +270,7 @@ async function expandsUnloadedFile(collapsed: boolean) {
   await expect.element(toggle).toHaveAttribute("aria-expanded", "false");
 }
 
-// quarantine: #214 关一基线：点 Expand 超时
-it.skip("expands an unloaded file on the first click with default collapse false", () =>
+it("expands an unloaded file on the first click with default collapse false", () =>
   expandsUnloadedFile(false));
 
 it("expands an unloaded file on the first click with default collapse true", () =>
