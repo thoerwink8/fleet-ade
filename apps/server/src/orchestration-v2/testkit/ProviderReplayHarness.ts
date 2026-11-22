@@ -549,7 +549,6 @@ export function layerWithRegistry<Error>(
   const layerEffectWorkerProvided = EffectWorker.layer.pipe(
     Layer.provide(Layer.mergeAll(layerStores, layerEffectExecutorProvided, layerEventSinkProvided)),
   );
-  // Share one continuation queue across adapters, orchestrator, and worker through layer memoization.
   const layerReplayRuntime = Layer.mergeAll(
     ...(options.exposeServerSettings === true ? ([layerServerSettings] as const) : ([] as const)),
     layerEffectOutboxProvided,

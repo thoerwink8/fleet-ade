@@ -90,6 +90,7 @@ const layerCommanderDispatchTest = Layer.mergeAll(
     { name: "control-reads-commander-dispatch" },
     ProviderAdapterRegistry.layerFromAdapters([adapter]),
     {
+      databaseLayer: layerDatabase,
       exposeServerSettings: true,
       runEffectWorker: false,
       settingsOverrides: {

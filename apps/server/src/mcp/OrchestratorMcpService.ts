@@ -286,8 +286,6 @@ function threadManagementFailure(error: unknown): OrchestratorMcpFailure {
       return failure("orchestration_error", error.message);
     case "ThreadManagementProviderInstanceDisabledError":
       return failure("invalid_request", error.message);
-    default:
-      return failure("orchestration_error", errorMessage(error));
   }
 }
 // Without a reason, a Stop reads as the user's (see RunExecutionService.USER_STOP_REASON).
