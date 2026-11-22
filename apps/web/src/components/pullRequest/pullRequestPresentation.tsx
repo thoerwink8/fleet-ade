@@ -330,65 +330,6 @@ const REVIEW_OUTCOME_PRESENTATION = {
   }
 >;
 
-export function pullRequestReviewOutcomeToneClassName(outcome: PullRequestReviewOutcome): string {
-  return REVIEW_OUTCOME_PRESENTATION[outcome].toneClassName;
-}
-
-// Mix rings with the background to prevent avatars showing through their overlap.
-export function pullRequestReviewOutcomeRingClassName(
-  outcome: PullRequestReviewOutcome,
-  stale = false,
-): string {
-  const presentation = REVIEW_OUTCOME_PRESENTATION[outcome];
-  return stale ? presentation.staleRingClassName : presentation.ringClassName;
-}
-
-export function pullRequestReviewOutcomeStaleLabel(outcome: PullRequestReviewOutcome): string {
-  return `${REVIEW_OUTCOME_PRESENTATION[outcome].label}较早的更改`;
-}
-
-export function PullRequestReviewOutcomeIcon({
-  outcome,
-  className,
-}: {
-  outcome: PullRequestReviewOutcome;
-  className?: string;
-}) {
-  const presentation = REVIEW_OUTCOME_PRESENTATION[outcome];
-  return (
-    <presentation.Icon
-      aria-hidden
-      className={cn("size-3.5 shrink-0", presentation.toneClassName, className)}
-    />
-  );
-}
-
-// Ring color alone blends into colorful bot avatars; the glyph gives each verdict a shape.
-export function PullRequestReviewOutcomeAvatarBadge({
-  outcome,
-  stale = false,
-}: {
-  outcome: PullRequestReviewOutcome;
-  stale?: boolean;
-}) {
-  const presentation = REVIEW_OUTCOME_PRESENTATION[outcome];
-  return (
-    <presentation.Icon
-      aria-hidden
-      strokeWidth={3}
-      className={cn(
-        "absolute -right-1 -bottom-1 size-3 text-background",
-        presentation.fillClassName,
-        stale && "opacity-50",
-      )}
-    />
-  );
-}
-
-export function pullRequestReviewOutcomeLabel(outcome: PullRequestReviewOutcome): string {
-  return REVIEW_OUTCOME_PRESENTATION[outcome].label;
-}
-
 export function PullRequestReviewOutcomeBadge({
   outcome,
   className,

@@ -19,7 +19,6 @@ import {
   PersistentThreadTerminalPanel,
   type PersistentThreadTerminalPanelProps,
 } from "../PersistentThreadTerminals";
-import { pullRequestPanelContext } from "../pullRequest/pullRequestDetail.logic";
 import { PullRequestDetailPanel } from "../pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "../pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "../pullRequest/PullRequestsUnavailableState";
@@ -113,39 +112,16 @@ export function RightPanelSurfaceContent(props: {
           shortcutsEnabled={visible && props.activeSurfaceId === surface.id}
           key={`${scopedThreadKey(threadRef)}:${surface.id}`}
           environmentId={props.environmentId}
-          onSelectPullRequest={(reference) => {
-            useRightPanelStore.getState().openPullRequest(threadRef, {
-              projectId: reference.projectId,
-              repository: reference.repository,
-              number: reference.number,
-              ...(reference.host ? { host: reference.host } : {}),
-            });
-          }}
-          threadRef={threadRef}
           reference={{
             projectId: surface.projectId as ProjectId,
             ...(surface.host ? { host: surface.host } : {}),
             repository: surface.repository,
             number: surface.number,
           }}
-          initialTab={surface.detailTab ?? "summary"}
           revealUrl={surface.revealUrl}
           onRevealSettled={(revealUrl) => {
             useRightPanelStore.getState().settlePullRequestReveal(threadRef, surface.id, revealUrl);
           }}
-          onTabChange={(tab) => {
-            useRightPanelStore.getState().setPullRequestDetailTab(threadRef, surface.id, tab);
-          }}
-          context={pullRequestPanelContext(
-            {
-              projectId: pullRequest.projectId,
-              pullRequests: pullRequest.pullRequests,
-              linkedPullRequest: pullRequest.linkedPullRequest,
-              branchPullRequest: pullRequest.branchPullRequest,
-            },
-            surface,
-          )}
-          composerDraftTarget={props.composerDraftTarget}
           onBack={pullRequest.onBack}
         />
       );

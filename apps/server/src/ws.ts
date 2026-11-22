@@ -2618,8 +2618,6 @@ export const layerWsRpc = (
           withPullRequestViewer(input, pullRequests.filesViewed(input)),
         [WS_METHODS.pullRequestsChangeBreakdown]: (input) =>
           withPullRequestViewer(input, pullRequests.changeBreakdown(input)),
-        [WS_METHODS.pullRequestsSetFilesViewed]: (input) =>
-          withPullRequestViewer(input, pullRequests.setFilesViewed(input)),
         [WS_METHODS.pullRequestsRunAction]: (input) =>
           withPullRequestViewer(input, pullRequests.runAction(input)).pipe(
             Effect.tap(() =>
@@ -2630,20 +2628,6 @@ export const layerWsRpc = (
               ),
             ),
           ),
-        [WS_METHODS.pullRequestsUpdate]: (input) =>
-          withPullRequestViewer(input, pullRequests.update(input)),
-        [WS_METHODS.pullRequestsComment]: (input) =>
-          withPullRequestViewer(input, pullRequests.comment(input)),
-        [WS_METHODS.pullRequestsUpdateComment]: (input) =>
-          withPullRequestViewer(input, pullRequests.updateComment(input)),
-        [WS_METHODS.pullRequestsSubmitReview]: (input) =>
-          withPullRequestViewer(input, pullRequests.submitReview(input)),
-        [WS_METHODS.pullRequestsReplyToThread]: (input) =>
-          withPullRequestViewer(input, pullRequests.replyToThread(input)),
-        [WS_METHODS.pullRequestsSetThreadResolution]: (input) =>
-          withPullRequestViewer(input, pullRequests.setThreadResolution(input)),
-        [WS_METHODS.pullRequestsSetReaction]: (input) =>
-          withPullRequestViewer(input, pullRequests.setReaction(input)),
         [WS_METHODS.pullRequestsReportState]: (input) => pullRequests.reportState(input),
         [WS_METHODS.pullRequestsInvalidate]: (input) =>
           pullRequests
@@ -2662,14 +2646,6 @@ export const layerWsRpc = (
         [WS_METHODS.pullRequestsSubscribeRefreshes]: () => pullRequests.subscribeRefreshes,
         [WS_METHODS.pullRequestsSubscribeLinkedThreadRefreshes]: () =>
           pullRequests.subscribeLinkedThreadRefreshes,
-        [WS_METHODS.pullRequestsReviewerCandidates]: (input) =>
-          withPullRequestViewer(input, pullRequests.reviewerCandidates(input)),
-        [WS_METHODS.pullRequestsRequestReviewers]: (input) =>
-          withPullRequestViewer(input, pullRequests.requestReviewers(input)),
-        [WS_METHODS.pullRequestsLabelCandidates]: (input) =>
-          withPullRequestViewer(input, pullRequests.labelCandidates(input)),
-        [WS_METHODS.pullRequestsSetLabels]: (input) =>
-          withPullRequestViewer(input, pullRequests.setLabels(input)),
         [WS_METHODS.sourceControlLookupRepository]: (input) =>
           sourceControlRepositories.lookupRepository(input),
         [WS_METHODS.sourceControlCloneRepository]: (input) =>

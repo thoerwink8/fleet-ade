@@ -1,42 +1,12 @@
-import {
-  parsePullRequestAnchor,
-  pullRequestLinkCommit,
-  resolvePullRequestReviewAnchor,
-  type PullRequestAnchor,
-} from "@t3tools/shared/pullRequestAnchor";
+import { parsePullRequestAnchor, pullRequestLinkCommit } from "@t3tools/shared/pullRequestAnchor";
 import { projectChangeRequestUrl } from "@t3tools/client-runtime/change-request-links";
-import { normalizeThreadPullRequestKey } from "@t3tools/client-runtime/thread-pull-requests";
 import { useAtomValue } from "@effect/atom-react";
-import { usePullRequestStack } from "~/state/usePullRequestStack";
-import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
-  isAtomCommandInterrupted,
-  squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import {
-  AuthOrchestrationOperateScope,
-  AuthSourceControlWriteScope,
   type EnvironmentId,
-  type PullRequestAction,
-  type PullRequestDetail,
-  type PullRequestMergeMethod,
   type PullRequestListEntry,
-  type PullRequestUpdateMethod,
   type PullRequestRef,
-  type PullRequestReviewGuideStop,
-  type PullRequestSummary,
-  resolveEnvironmentMachineKind,
-  type ScopedThreadRef,
 } from "@t3tools/contracts";
-import {
-  ArrowDownUpIcon,
-  ArrowLeftIcon,
-  CircleDotIcon,
-  FileDiffIcon,
-  GitCommitHorizontalIcon,
-  MessageSquareIcon,
-  PanelRightIcon,
-} from "lucide-react";
+import { ArrowLeftIcon, FileDiffIcon, PanelRightIcon } from "lucide-react";
 import {
   lazy,
   Suspense,
@@ -47,179 +17,43 @@ import {
   useState,
 } from "react";
 
-import { type DraftId, useComposerDraftStore } from "~/composerDraftStore";
-import { type PullRequestDetailTab, useRightPanelStore } from "~/rightPanelStore";
-import { useEnvironmentSettings } from "~/hooks/useSettings";
-import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { isCommandPaletteOpen } from "~/commandPaletteBus";
 import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings";
 import { primaryServerKeybindingsAtom } from "~/state/server";
-import {
-  usePullRequestDefaultMergeMethodResolver,
-  writeHandoffToComposer,
-} from "./usePullRequestActions";
-import { offHeadPullRequestCheckoutToast } from "./pullRequestCheckoutToast";
-import { usePreparePullRequestThreadAction } from "~/state/sourceControlActions";
 import { cn } from "~/lib/utils";
-import { readLocalApi } from "~/localApi";
-import type { ReviewCommentContext } from "~/reviewCommentContext";
 import { useProjects, useServerConfigs } from "~/state/entities";
-import { useEnvironments } from "~/state/environments";
-import { useEnvironmentQuery } from "~/state/query";
-import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
 import { pullRequestEnvironment, usePullRequestTurnRefresh } from "~/state/pullRequests";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { PullRequestStackMenu } from "./PullRequestStackMenu";
-import { pullRequestCompletionScope } from "./PullRequestMarkdownTextarea";
-import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
 import {
   capitalizeTerm,
   sourceControlClients,
 } from "@t3tools/client-runtime/source-control-clients";
-import { PullRequestThreadLinks } from "./PullRequestThreadLinks";
-import { vcsEnvironment } from "~/state/vcs";
 import { RelativeTime } from "~/components/RelativeTime";
-import { useUiStateStore } from "~/uiStateStore";
 
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
-import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { MiddleTruncate } from "../ui/middle-truncate";
-import {
-  PullRequestChecksStatusLine,
-  PullRequestDetailHeaderBody,
-  PullRequestDetailTabBar,
-} from "./PullRequestDetailLayout";
-import { PullRequestDetailGhost, PullRequestTimelineGhost } from "./PullRequestGhosts";
-import { PullRequestCopyableCode } from "./PullRequestCopyableCode";
+import { PullRequestDetailHeaderBody, PullRequestDetailTitleRow } from "./PullRequestDetailLayout";
+import { PullRequestDetailGhost } from "./PullRequestGhosts";
 import { pullRequestRefKey, usePullRequestDetail } from "./usePullRequestDetail";
-import { PullRequestActionsMenu } from "./PullRequestActionsMenu";
-import {
-  PullRequestApproveWorkflowsButton,
-  PullRequestCheckoutMenu,
-  PullRequestPrimaryAction,
-  PullRequestResolveConflictsButton,
-} from "./PullRequestDetailActions";
-import { PullRequestBaseBranch } from "./PullRequestBaseBranch";
 import { PullRequestDetailCrumbs } from "./PullRequestDetailCrumbs";
-import { PullRequestTitleEditor } from "./PullRequestTitleEditor";
-import { PullRequestActivityUnavailableState } from "./PullRequestActivityUnavailableState";
 import { SourceControlAppAccessNotice } from "../SourceControlAppAccessNotice";
 import { DiffPanelLoadingState } from "../DiffPanelShell";
 import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
-import type { PullRequestAgentSelectionInput } from "./PullRequestCodeTab";
 import { openOnHostLabel } from "./pullRequestLinkContextMenu";
-import { PullRequestMarkdownContext } from "./PullRequestMarkdown";
-import { pullRequestMarkdownPlugins } from "./pullRequestMarkdown.logic";
-import { PullRequestComposer } from "./PullRequestComposer";
-import { PullRequestSummaryTab } from "./PullRequestSummaryTab";
-import { PullRequestTimelineTab } from "./PullRequestTimelineTab";
-import {
-  buildAddSelectionToAgentHandoff,
-  buildAskAboutGuideStopHandoff,
-  buildAskAboutPullRequestHandoff,
-  buildExplainPullRequestHandoff,
-  buildFixFindingHandoff,
-  buildFixFindingsHandoff,
-  buildPullRequestCommentContext,
-  buildPullRequestContext,
-  buildResolveConflictsPrompt,
-  latestPullRequestReviewOutcomes,
-  loadingPullRequestCheckoutCommand,
-  isPullRequestNotFound,
-  isStackedPullRequestBase,
-  pullRequestActionNeedsHostRefresh,
-  pullRequestCheckoutCommand,
-  pullRequestTimelineEventMatches,
-  buildPullRequestTimeline,
-  pullRequestFindingKey,
-  pullRequestHandoffLabels,
-  PULL_REQUEST_MERGE_METHOD_LABELS,
-  checkoutFailureDescription,
-  readableFailure,
-  resolvePullRequestReferenceHost,
-  resolvePullRequestPrimaryControl,
-  allowedPullRequestMergeMethods,
-  allowsSinglePullRequestMerge,
-  canDeletePullRequestBranch,
-  isPullRequestConflicting,
-  resolveBaseFreshness,
-  resolvePullRequestMergeMethod,
-  type PullRequestChatSubject,
-  type PullRequestFinding,
-  shouldRefreshPullRequestActivity,
-} from "./pullRequestDetail.logic";
-import { resolvePickableEnvironments } from "./pullRequestProjectAssignment.logic";
-import { PullRequestChecksPopover } from "./PullRequestChecksPopover";
+import { isPullRequestNotFound, resolvePullRequestReferenceHost } from "./pullRequestDetail.logic";
 import {
   PullRequestActorLabel,
-  PullRequestMetaLine,
-  PullRequestReviewOutcomeIcon,
-  pullRequestChecksState,
-  pullRequestChecksStatePresentation,
-  pullRequestReviewOutcomeToneClassName,
+  PullRequestDiffStat,
   resolvePullRequestState,
-  summarizePullRequestChecks,
 } from "./pullRequestPresentation";
-import { PullRequestGuideTab } from "./PullRequestGuideTab";
-import { guideRunKey, useGuideRunStore } from "./guide/guideRunStore";
-import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
 
-const actionFailureLabels = (term: string): Record<PullRequestAction, string> => ({
-  merge: `无法合并此 ${term}`,
-  ready: "无法将其标记为可审查",
-  draft: "无法将其转为草稿",
-  close: `无法关闭此 ${term}`,
-  reopen: `无法重新打开此 ${term}`,
-  "update-branch": "无法更新此分支",
-  "enable-auto-merge": "无法启用自动合并",
-  "disable-auto-merge": "无法关闭自动合并",
-  revert: `无法打开还原 ${term}`,
-  "delete-branch": "无法删除此分支",
-  "approve-workflows": "无法批准工作流",
-});
-
-const actionFailureHints = (term: string): Record<PullRequestAction, string> => ({
-  merge: "托管平台拒绝了合并。请确认你有写入权限、其要求的检查已通过，且分支没有冲突。",
-  ready: "托管平台拒绝了该操作。请确认你对此仓库有写入权限。",
-  draft: "托管平台拒绝了该操作。请确认你对此仓库有写入权限。",
-  close: "托管平台拒绝了该操作。请确认你有写入权限，或该项由你创建。",
-  reopen: "托管平台拒绝了该操作。请确认你有写入权限，且分支仍然存在。",
-  "update-branch":
-    "托管平台拒绝了该操作。请确认你有该分支的写入权限（fork 分支还需要其作者允许维护者编辑），且它与基础分支没有冲突。",
-  "enable-auto-merge":
-    "托管平台拒绝了该操作。请确认此仓库允许自动合并、你有写入权限，且仍有尚未满足的合并条件。",
-  "disable-auto-merge": "托管平台拒绝了该操作。请确认你有写入权限，且尚未完成合并。",
-  revert: `托管平台拒绝了该操作。请确认你有写入权限，且此 ${term} 已在托管平台上合并。`,
-  "delete-branch":
-    "托管平台拒绝了该操作。请确认你对源仓库有写入权限，且分支在此页面加载后没有变动。",
-  "approve-workflows":
-    "托管平台拒绝了该操作。请确认你有 Actions 的写入权限，且这些工作流运行仍在等待批准。",
-});
-
-const UPDATE_BRANCH_REBASE_FAILURE_HINT =
-  "托管平台拒绝了该操作。变基在应用提交时遇到冲突就会停止；改用合并提交更新或许可行。";
-
-const TABS: ReadonlyArray<{ value: PullRequestDetailTab; label: string }> = [
-  { value: "summary", label: "摘要" },
-  { value: "guide", label: "导览" },
-  { value: "timeline", label: "动态" },
-  { value: "code", label: "代码" },
-];
-
-// Defer the diff viewer's worker pool until Code is approached.
+// Defer the diff viewer's worker pool until Code renders.
 const loadCodeTab = () => import("./PullRequestCodeTab");
 const PullRequestCodeTab = lazy(loadCodeTab);
-
-function reportCheckoutCommandError(error: Error) {
-  toastManager.add({
-    type: "error",
-    title: "无法复制检出工作副本的命令",
-    description: error.message,
-  });
-}
 
 function resolvePullRequestReference(
   requestedReference: PullRequestRef,
@@ -235,103 +69,36 @@ function resolvePullRequestReference(
       };
 }
 
-function pullRequestMarkdownContext(
-  detail: Pick<PullRequestDetail, "provider" | "url" | "repository"> | null,
-  threadRef: ScopedThreadRef | null,
-) {
-  return {
-    remarkPlugins: pullRequestMarkdownPlugins(detail),
-    lineBreaks: sourceControlClients.find(detail?.provider ?? "")?.hardLineBreaks ?? false,
-    threadRef,
-    repository: detail?.repository ?? null,
-  };
-}
-
-function pullRequestStackReference(
-  detail: Pick<PullRequestDetail, "url" | "capabilities"> | null,
-  reference: PullRequestRef,
-  supportsThreadPullRequests: boolean,
-) {
-  return detail === null || detail.capabilities.stacks !== true || !supportsThreadPullRequests
-    ? null
-    : {
-        ...reference,
-        host: reference.host ?? sourceControlClients.parseChangeRequestUrl(detail.url)?.link.host,
-      };
-}
-
-function linkedTab(anchor: PullRequestAnchor | null): PullRequestDetailTab | null {
-  switch (anchor?.kind) {
-    case "code":
-    case "diff":
-      return "code";
-    case "commits":
-    case "timeline":
-      return "timeline";
-    case "checks":
-    case "summary":
-      return "summary";
-    default:
-      return null;
-  }
-}
-
 export function PullRequestDetailPanel({
   environmentId,
   shortcutsEnabled,
   getShortcutContext,
-  threadRef = null,
   reference: requestedReference,
   listEntry = null,
   refreshToken: forcedRefreshToken = 0,
-  tabOnPage = false,
-  onActed,
   onClose,
-  context = "page",
-  composerDraftTarget,
   onBack,
-  onSelectPullRequest,
-  onGuideShown,
   revealUrl,
   onRevealSettled,
-  initialTab = "summary",
-  onTabChange,
 }: {
   environmentId: EnvironmentId;
   shortcutsEnabled: boolean;
   getShortcutContext: () => ShortcutMatchContext;
-  onSelectPullRequest?: ((reference: PullRequestRef) => void) | undefined;
-  threadRef?: ScopedThreadRef | null;
   reference: PullRequestRef;
   listEntry?: PullRequestListEntry | null;
   refreshToken?: number;
-  /**
-   * The pull requests page's panel: its tab lives in the guide run store, where a review guide
-   * notification can switch it.
-   */
-  tabOnPage?: boolean;
-  onActed?: (
-    action?: PullRequestAction,
-    phase?: "sent" | "done" | "failed",
-    reply?: PullRequestSummary,
-  ) => void;
   onClose?: () => void;
-  context?: "page" | "thread";
-  composerDraftTarget?: ScopedThreadRef | DraftId;
   onBack?: (() => void) | undefined;
-  onGuideShown?: (() => void) | undefined;
   /** A clicked link into this pull request, waiting to be shown. */
   revealUrl?: string | undefined;
   /** Reports the link it was given shown or missing, so a newer link stays pending. */
   onRevealSettled?: ((revealUrl: string) => void) | undefined;
-  initialTab?: PullRequestDetailTab;
-  onTabChange?: ((tab: PullRequestDetailTab) => void) | undefined;
 }) {
   const environmentConfigs = useServerConfigs();
   const projects = useProjects();
   const project = projects.find(
-    (project) =>
-      project.id === requestedReference.projectId && project.environmentId === environmentId,
+    (candidate) =>
+      candidate.id === requestedReference.projectId && candidate.environmentId === environmentId,
   );
   const repositoryIdentity = project?.repositoryIdentity;
   const supportsThreadPullRequests = environmentConfigs.get(environmentId) !== undefined;
@@ -340,7 +107,6 @@ export function PullRequestDetailPanel({
     repositoryIdentity,
     supportsThreadPullRequests,
   );
-  const loadingCheckoutCommand = loadingPullRequestCheckoutCommand(reference, repositoryIdentity);
   const unavailableHostUrl = projectChangeRequestUrl(
     repositoryIdentity,
     reference.repository,
@@ -355,145 +121,55 @@ export function PullRequestDetailPanel({
     listEntry.number === reference.number
       ? listEntry
       : null;
-  const linkedReference = sourceControlClients.parseChangeRequestUrl(
-    matchingListEntry?.url ?? unavailableHostUrl ?? "",
-  )?.link;
-  useEnvironmentQuery(
-    context === "page" &&
-      supportsThreadPullRequests &&
-      linkedReference &&
-      (reference.host === undefined ||
-        reference.host.toLowerCase() === linkedReference.host.toLowerCase())
-      ? pullRequestEnvironment.linkedThreads({
-          environmentId,
-          input: { ...reference, ...normalizeThreadPullRequestKey(linkedReference) },
-        })
-      : null,
-  );
-  useEnvironmentQuery(pullRequestEnvironment.changeBreakdown({ environmentId, input: reference }));
-  const [threadPickerOpen, setThreadPickerOpen] = useState(false);
-  const [openReviewRequest, setOpenReviewRequest] = useState(0);
-  const {
-    canWriteSourceControl,
-    detailQuery,
-    activityQuery,
-    activity,
-    sharedSummary,
-    coreDetail,
-    detail,
-  } = usePullRequestDetail(environmentId, reference, matchingListEntry);
-  const revealAnchor = parsePullRequestAnchor(revealUrl);
-  const [selectedTab, setTab] = useState<PullRequestDetailTab>(
-    () => linkedTab(revealAnchor) ?? initialTab,
-  );
-  const reviewGuidesEnabled = useEnvironmentSettings(
+
+  const { detailQuery, activityQuery, sharedSummary, detail } = usePullRequestDetail(
     environmentId,
-    (settings) => settings.reviewGuidesEnabled,
+    reference,
+    matchingListEntry,
   );
-  const guideKey = guideRunKey(environmentId, reference);
-  const pageTab = useGuideRunStore((state) =>
-    tabOnPage && state.pageDetailTab?.key === guideKey ? state.pageDetailTab.tab : null,
-  );
-  const requestedTab = tabOnPage ? (pageTab ?? initialTab) : selectedTab;
-  const isTabAvailable = (value: PullRequestDetailTab) =>
-    (value !== "code" || detail === null || detail.capabilities.diff) &&
-    (value !== "guide" || reviewGuidesEnabled);
-  // An unavailable tab falls back without overwriting the saved selection.
-  const tab = isTabAvailable(requestedTab) ? requestedTab : "summary";
-  const selectTab = (next: PullRequestDetailTab) => {
-    if (tabOnPage) useGuideRunStore.getState().showPageDetailTab(guideKey, next);
-    else setTab(next);
-    onTabChange?.(next);
-  };
-  const [timelineOrder, setTimelineOrder] = useState<"newest" | "oldest">("newest");
+
+  const revealAnchor = parsePullRequestAnchor(revealUrl);
   const [codeCommitScope, setCodeCommitScope] = useState<{
     readonly pullRequestKey: string;
     readonly oid: string | null;
   }>(() => ({ pullRequestKey, oid: pullRequestLinkCommit(revealUrl) }));
   const selectedCodeCommitOid =
     codeCommitScope.pullRequestKey === pullRequestKey ? codeCommitScope.oid : null;
-  const selectCodeCommit = (oid: string | null) => {
-    setCodeCommitScope({ pullRequestKey, oid });
-  };
-  const openCommit = (oid: string) => {
-    selectCodeCommit(oid);
-    selectTab("code");
-  };
-  const [codeRevealRequest, setCodeRevealRequest] = useState<{
-    readonly path: string;
-    readonly nonce: number;
-  } | null>(null);
-  const openFileInCode = (path: string) => {
-    selectCodeCommit(null);
-    setCodeRevealRequest((previous) => ({ path, nonce: (previous?.nonce ?? 0) + 1 }));
-    void loadCodeTab();
-    selectTab("code");
-  };
-  // Cached activity can predate a linked comment, so a miss waits for one host read. `after` is
-  // when that read's invalidation finished; null while it runs.
-  const revealHostRead = useRef<{ readonly url: string; readonly after: number | null } | null>(
-    null,
-  );
-  const settleReveal = (url: string) => {
-    revealHostRead.current = null;
-    onRevealSettled?.(url);
-  };
   const followLink = useEffectEvent(() => {
     if (revealUrl === undefined) return;
-    const next = linkedTab(revealAnchor);
-    if (next === null) return settleReveal(revealUrl);
-    if (next === "code") {
-      selectCodeCommit(pullRequestLinkCommit(revealUrl));
+    if (revealAnchor?.kind === "diff" || revealAnchor?.kind === "code") {
+      setCodeCommitScope({ pullRequestKey, oid: pullRequestLinkCommit(revealUrl) });
       void loadCodeTab();
+      if (revealAnchor.kind === "code") onRevealSettled?.(revealUrl);
+      return;
     }
-    selectTab(next);
-    // These name a tab, not a place in it.
-    if (revealAnchor?.kind === "code" || revealAnchor?.kind === "commits") settleReveal(revealUrl);
+    if (revealAnchor?.kind === "commits") {
+      setCodeCommitScope({ pullRequestKey, oid: pullRequestLinkCommit(revealUrl) });
+      void loadCodeTab();
+      onRevealSettled?.(revealUrl);
+      return;
+    }
+    onRevealSettled?.(revealUrl);
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a clicked link lives in the panel store and selects its tab even when the panel is already mounted
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a linked URL in the panel store selects the commit scope
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- link navigation selects the PR tab and commit scope
+    // oxlint-disable-next-line react/set-state-in-effect -- link navigation selects the commit scope
     followLink();
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- each clicked link is a navigation request
   }, [revealUrl]);
+
+  const [condensedScope, setCondensedScope] = useState<{
+    readonly key: string;
+    readonly condensed: boolean;
+  }>({ key: `${environmentId}:${pullRequestKey}`, condensed: false });
   const tabScopeKey = `${environmentId}:${pullRequestKey}`;
-  const [tabMountState, setTabMountState] = useState(() => ({
-    key: tabScopeKey,
-    tabs: new Set<PullRequestDetailTab>([tab]),
-  }));
-  // Hidden Code tabs must not fetch later pull requests' diffs.
-  const mountedTabs =
-    tabMountState.key === tabScopeKey ? tabMountState.tabs : new Set<PullRequestDetailTab>([tab]);
-  if (tabMountState.key !== tabScopeKey) {
-    setTabMountState({ key: tabScopeKey, tabs: new Set([tab]) });
-  } else if (!tabMountState.tabs.has(tab)) {
-    setTabMountState({ key: tabScopeKey, tabs: new Set(tabMountState.tabs).add(tab) });
-  }
-  // Each tab restores the condensed state its own scrolling left behind.
-  const [condensedByTab, setCondensedByTab] = useState<
-    Partial<Record<PullRequestDetailTab, boolean>>
-  >({});
-  const condensed = condensedByTab[tab] ?? false;
-  const scrollerByTab = useRef<Partial<Record<PullRequestDetailTab, HTMLElement | null>>>({});
-  // Fresh ref callbacks would detach and reattach every scroller on each render.
-  const [scrollerRefs] = useState(() => ({
-    summary: (node: HTMLElement | null) => {
-      scrollerByTab.current.summary = node;
-    },
-    timeline: (node: HTMLElement | null) => {
-      scrollerByTab.current.timeline = node;
-    },
-    code: (node: HTMLElement | null) => {
-      scrollerByTab.current.code = node;
-    },
-  }));
+  const condensed = condensedScope.key === tabScopeKey ? condensedScope.condensed : false;
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const foldRef = useRef<HTMLDivElement | null>(null);
   const condensedRowRef = useRef<HTMLDivElement | null>(null);
-  // Save the target before collapse: the browser may clamp scrollTop as the viewport grows,
-  // so applying a delta afterward would compensate twice.
   const compensationRef = useRef<{
-    tab: PullRequestDetailTab;
-    scroller: HTMLElement;
+    scopeKey: string;
+    scroller: HTMLDivElement;
     target: number;
   } | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- restores the scroller's scrollTop before paint after the header condenses
@@ -503,31 +179,18 @@ export function PullRequestDetailPanel({
     compensationRef.current = null;
     if (
       !condensed ||
-      compensation.tab !== tab ||
-      scrollerByTab.current[tab] !== compensation.scroller
-    )
+      compensation.scopeKey !== tabScopeKey ||
+      scrollerRef.current !== compensation.scroller
+    ) {
       return;
+    }
     compensation.scroller.scrollTop = Math.max(0, compensation.target);
-  }, [condensed, tab]);
-  const lastSelectedMergeMethod = useUiStateStore((state) => state.pullRequestMergeMethod);
-  const setLastSelectedMergeMethod = useUiStateStore((state) => state.setPullRequestMergeMethod);
-  const resolveProjectDefaultMergeMethod = usePullRequestDefaultMergeMethodResolver(
-    environmentId,
-    reference.projectId,
-  );
-  const projectDefaultMergeMethod = resolveProjectDefaultMergeMethod();
-  const [mergeMethodSelection, setMergeMethodSelection] = useState<{
-    readonly pullRequestKey: string;
-    readonly method: PullRequestMergeMethod;
-  } | null>(null);
-  const setMergeMethod = (method: PullRequestMergeMethod) => {
-    setMergeMethodSelection({ pullRequestKey, method });
-  };
-  const [handoff, setHandoff] = useState<string | null>(null);
+  }, [condensed, tabScopeKey]);
+
   const turnRefresh = usePullRequestTurnRefresh(environmentId);
-  const handoffSummary = detail ?? sharedSummary;
+  const summaryMeta = detail ?? sharedSummary;
   const terminology = sourceControlClients.get(
-    handoffSummary?.provider ?? listEntry?.provider ?? repositoryIdentity?.provider,
+    summaryMeta?.provider ?? listEntry?.provider ?? repositoryIdentity?.provider,
   ).changeRequest;
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const { copyToClipboard: copyReference } = useCopyToClipboard<string>({
@@ -556,99 +219,23 @@ export function PullRequestDetailPanel({
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, []);
-  const autoMergeKey = `${pullRequestKey}:${detail?.autoMergeMethod ?? ""}`;
-  const [seenAutoMergeKey, setSeenAutoMergeKey] = useState<string | null>(null);
-  if (seenAutoMergeKey !== autoMergeKey) {
-    setSeenAutoMergeKey(autoMergeKey);
-    if (detail?.autoMergeMethod !== undefined) setMergeMethod(detail.autoMergeMethod);
-  }
+
   const repositoryUrl =
     detail === null
       ? null
       : (sourceControlClients.parseChangeRequestUrl(detail.url)?.link.repositoryUrl ?? null);
   const hostClient = sourceControlClients.get(detail?.provider);
   const openOnHostText = openOnHostLabel(hostClient);
-  const markdownContext = pullRequestMarkdownContext(detail, threadRef);
   const authorProfileUrl =
     detail?.author && repositoryUrl !== null
       ? hostClient.authorProfileUrl(detail.author.login, repositoryUrl)
       : null;
-  const checkoutCommand = handoffSummary
-    ? pullRequestCheckoutCommand(
-        handoffSummary.provider,
-        handoffSummary.number,
-        handoffSummary.headBranch,
-        detail?.headRepositoryNameWithOwner,
-        sourceControlClients.parseChangeRequestUrl(handoffSummary.url)?.link.repositoryUrl ?? null,
-      )
-    : loadingCheckoutCommand;
-  const branchRefsQuery = useEnvironmentQuery(
-    detail === null
-      ? null
-      : vcsEnvironment.listRefs({
-          environmentId,
-          input: {
-            cwd: detail.workspaceRoot,
-            includeMatchingRemoteRefs: true,
-            limit: 2,
-          },
-        }),
-  );
-  const isStackedPullRequest =
-    detail !== null &&
-    isStackedPullRequestBase(detail.baseBranch, branchRefsQuery.data?.refs ?? []);
-  const stackReference = pullRequestStackReference(detail, reference, supportsThreadPullRequests);
-  const nativeStackQuery = usePullRequestStack(environmentId, stackReference);
-  const nativeStack = nativeStackQuery.data;
-  const supportsStackActions =
-    supportsThreadPullRequests &&
-    detail?.capabilities.stacks === true &&
-    detail.capabilities.stackActions === true;
-  const canMergeSinglePullRequest = allowsSinglePullRequestMerge({
-    supportsStackActions,
-    hasStack: nativeStack !== null,
-    stackPending: !nativeStackQuery.isFresh,
-    stackError: nativeStackQuery.error,
-  });
-  const stackOwnsMerge = supportsStackActions && nativeStack !== null;
-  const mergeBlockedReason = canMergeSinglePullRequest
-    ? null
-    : nativeStackQuery.error
-      ? "无法检查堆叠归属"
-      : "正在检查堆叠归属…";
-  const activityPending = activityQuery.isPending && activity === null;
-  const activityError = activity === null ? activityQuery.error : null;
+
   const refreshDetail = () => {
     detailQuery.refresh();
     activityQuery.refresh();
-    nativeStackQuery.refresh();
   };
   const [refreshToken, setRefreshToken] = useState(0);
-  const [activityRevision, setActivityRevision] = useState<{
-    readonly key: string;
-    readonly updatedAt: string;
-  } | null>(null);
-  const [activityRevalidations, setActivityRevalidations] = useState(0);
-  const coreUpdatedAt = coreDetail?.updatedAt ?? null;
-  if (
-    coreUpdatedAt !== null &&
-    (activityRevision?.key !== tabScopeKey || activityRevision.updatedAt !== coreUpdatedAt)
-  ) {
-    const next = { key: tabScopeKey, updatedAt: coreUpdatedAt };
-    if (!shouldRefreshPullRequestActivity(activityRevision, next)) {
-      setActivityRevision(next);
-    } else if (!activityQuery.isPending) {
-      // Interrupting a mutation's activity refresh can leave SWR displaying stale data.
-      setActivityRevision(next);
-      setActivityRevalidations((count) => count + 1);
-      setRefreshToken((token) => token + 1);
-    }
-  }
-  const revalidateActivity = useEffectEvent(() => activityQuery.refresh());
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- refreshes the activity query after commit when render counts a new detail revision
-  useEffect(() => {
-    if (activityRevalidations > 0) revalidateActivity();
-  }, [activityRevalidations]);
   useLiveRefresh(
     () => {
       detailQuery.refresh();
@@ -656,74 +243,11 @@ export function PullRequestDetailPanel({
     { key: `pull-request:${environmentId}:${pullRequestKey}` },
   );
   const invalidate = useAtomCommand(pullRequestEnvironment.invalidate, { reportFailure: false });
-  const [isInvalidating, setIsInvalidating] = useState(false);
-  const refreshing = isInvalidating || detailQuery.isPending;
-  /** Resolves whether the host cache was invalidated before the refetch. */
-  const refetchFromHost = async () => {
-    setIsInvalidating(true);
-    // Atom commands settle without throwing, so reset always runs.
-    const invalidated = await invalidate({ environmentId, input: { reference } });
+  const refreshFromHost = async () => {
+    await invalidate({ environmentId, input: { reference } });
     refreshDetail();
     setRefreshToken((token) => token + 1);
-    setIsInvalidating(false);
-    return invalidated._tag === "Success";
   };
-  const refreshFromHost = async () => {
-    await refetchFromHost();
-  };
-  const timelineAnchor =
-    revealAnchor?.kind !== "timeline"
-      ? null
-      : detail === null
-        ? revealAnchor.anchor
-        : resolvePullRequestReviewAnchor(
-            revealAnchor.anchor,
-            detail.comments,
-            detail.reviewThreads,
-          );
-  // Loaded activity without the linked item, keyed by load so a refetch is checked again.
-  const revealMissedAt =
-    timelineAnchor !== null &&
-    detail !== null &&
-    !activityQuery.isPending &&
-    !buildPullRequestTimeline(detail).some((event) =>
-      pullRequestTimelineEventMatches(event, timelineAnchor),
-    )
-      ? activityQuery.dataUpdatedAt
-      : null;
-  const revealReadFailed = revealMissedAt !== null && activityQuery.error !== null;
-  const readHostForReveal = useEffectEvent(() => {
-    if (revealUrl === undefined || revealMissedAt === null) return;
-    const read = revealHostRead.current;
-    if (read?.url !== revealUrl) {
-      const request = { url: revealUrl, after: null };
-      revealHostRead.current = request;
-      void refetchFromHost().then((invalidated) => {
-        if (revealHostRead.current !== request) return;
-        // Without an invalidation the refetch could only repeat the cached read.
-        if (!invalidated) return settleReveal(request.url);
-        revealHostRead.current = { url: request.url, after: Date.now() };
-      });
-      return;
-    }
-    // A read that finished before the invalidation cannot show the item is missing. `after` is
-    // stamped once the refetch was requested, so a read in that same millisecond is the new one.
-    if (read.after !== null && (revealReadFailed || revealMissedAt >= read.after)) {
-      settleReveal(revealUrl);
-    }
-  });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a linked comment missing from cached activity asks the host once before the link settles
-  useEffect(() => {
-    readHostForReveal();
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- each load that misses the linked item is checked against the host read
-  }, [revealMissedAt, revealReadFailed, revealUrl]);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a host read outliving the panel must not settle a later link
-  useEffect(
-    () => () => {
-      revealHostRead.current = null;
-    },
-    [],
-  );
   const refreshFromHostOnRequest = useEffectEvent(() => void refreshFromHost());
   const appliedForcedToken = useRef(forcedRefreshToken);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a new forced refresh token invalidates the host cache and refetches
@@ -732,686 +256,25 @@ export function PullRequestDetailPanel({
     appliedForcedToken.current = forcedRefreshToken;
     refreshFromHostOnRequest();
   }, [forcedRefreshToken]);
-  const runAction = useAtomCommand(pullRequestEnvironment.runAction, {
-    reportFailure: false,
-  });
-  const postComment = useAtomCommand(pullRequestEnvironment.comment, {
-    reportFailure: false,
-  });
-  const [pendingAction, setPendingAction] = useState<PullRequestAction | null>(null);
-  const actionPending = pendingAction !== null;
-  const newThread = useNewThreadHandler();
-  const { environments } = useEnvironments();
-  const pickableEnvironments =
-    context === "page"
-      ? resolvePickableEnvironments(
-          { environmentId, projectId: reference.projectId },
-          projects,
-          environments.map((environment) => ({
-            environmentId: environment.environmentId,
-            label: environment.label,
-            machine: resolveEnvironmentMachineKind(environment.serverConfig),
-          })),
-        )
-      : [];
-  const [actingScope, setActingScope] = useState<{
-    readonly pullRequestKey: string;
-    readonly environmentId: EnvironmentId;
-  } | null>(null);
-  const chosenEnvironmentId =
-    actingScope?.pullRequestKey === pullRequestKey ? actingScope.environmentId : environmentId;
-  const acting =
-    pickableEnvironments.find((entry) => entry.environmentId === chosenEnvironmentId) ?? null;
-  const actingEnvironmentId = acting?.environmentId ?? environmentId;
-  const checkoutRoot =
-    acting?.workspaceRoot ?? detail?.workspaceRoot ?? project?.workspaceRoot ?? null;
-  const canOperateThread = useEnvironmentScope(actingEnvironmentId, AuthOrchestrationOperateScope);
-  const prepareThread = usePreparePullRequestThreadAction({
-    environmentId: actingEnvironmentId,
-    cwd: checkoutRoot,
-  });
 
-  const finishAction = async (
-    action: PullRequestAction,
-    method?: PullRequestMergeMethod,
-    updateMethod?: PullRequestUpdateMethod,
-  ) => {
-    onActed?.(action, "sent");
-    const result = await runAction({
-      environmentId,
-      input: {
-        ...reference,
-        action,
-        ...(method ? { mergeMethod: method } : {}),
-        ...(updateMethod ? { updateMethod } : {}),
-      },
-    });
-    setPendingAction(null);
-    if (result._tag === "Failure") {
-      // The host did not report which strategies it allows; explain the failure after the attempt.
-      const failure = squashAtomCommandFailure(result);
-      const hint =
-        updateMethod === "rebase"
-          ? UPDATE_BRANCH_REBASE_FAILURE_HINT
-          : actionFailureHints(terminology.singular)[action];
-      toastManager.add({
-        type: "error",
-        title: actionFailureLabels(terminology.singular)[action],
-        description: readableFailure(failure, hint),
-      });
-      onActed?.(action, "failed");
-      return false;
-    }
-    if (action === "revert") {
-      toastManager.add({ type: "success", title: `已打开还原 ${terminology.singular}` });
-    }
-    if (action === "delete-branch") {
-      toastManager.add({ type: "success", title: "已删除分支" });
-    }
-    if (pullRequestActionNeedsHostRefresh(action)) {
-      void refreshFromHost();
-    } else {
-      // The action command already showed the reply in the detail or re-read it.
-      activityQuery.refresh();
-      nativeStackQuery.refresh();
-    }
-    onActed?.(action, "done", result.value);
-    return true;
-  };
-
-  const perform = async (
-    action: PullRequestAction,
-    method?: PullRequestMergeMethod,
-    updateMethod?: PullRequestUpdateMethod,
-  ) => {
-    if (!canWriteSourceControl || pendingAction !== null) return false;
-    setPendingAction(action);
-    return finishAction(action, method, updateMethod);
-  };
-
-  const performCommentAction = async (body: string, action: "close" | "reopen") => {
-    if (!canWriteSourceControl || pendingAction !== null) return { commentPosted: false };
-    setPendingAction(action);
-    const commentResult = await postComment({
-      environmentId,
-      input: { ...reference, body },
-    });
-    if (commentResult._tag === "Failure") {
-      setPendingAction(null);
-      toastManager.add({ type: "error", title: "无法发表评论" });
-      return { commentPosted: false };
-    }
-    const actionSucceeded = await finishAction(action);
-    // Refresh the posted comment even if the subsequent state change fails.
-    if (!actionSucceeded) refreshDetail();
-    return { commentPosted: true };
-  };
-
-  type ThreadTask = {
-    prompt: string;
-    reviewComments?: ReadonlyArray<ReviewCommentContext>;
-  };
-
-  const attachTarget = composerDraftTarget ?? null;
-  const canPrepareWorktree = prepareThread.isAllowed && canOperateThread;
-  const canFixFindings = attachTarget !== null || canPrepareWorktree;
-  const handoffLabels = pullRequestHandoffLabels(attachTarget !== null);
-  const guideWriter = useReviewGuideWriter({
-    environmentId,
-    reference,
-    title: detail?.title ?? null,
-  });
-  const writeGuide = () => {
-    void guideWriter.write();
-    if (guideWriter.data?.guide == null) selectTab("guide");
-  };
-
-  const openThreadWithTask = async (
-    projectRef: ReturnType<typeof scopeProjectRef>,
-    task: ThreadTask | null,
-    opened?: { draftId: DraftId },
-  ): Promise<{ draftId: DraftId } | null> => {
-    const session =
-      opened ??
-      (await newThread(projectRef).then(
-        (result) => result,
-        () => null,
-      ));
-    if (session === null) return null;
-    if (task === null) return session;
-    writeHandoffToComposer(session.draftId, task);
-    return session;
-  };
-
-  const startAsk = async (
-    kind: string,
-    task: ThreadTask,
-    options?: { readonly keepGuide?: boolean },
-  ) => {
-    if (!detail || handoff !== null) return;
-    if (attachTarget !== null) {
-      writeHandoffToComposer(attachTarget, task);
-      toastManager.add({
-        type: "success",
-        title: "已添加到输入框",
-        description:
-          task.prompt.length > 0
-            ? "问题已在输入框中。请检查后发送。"
-            : `${terminology.singular} 已在输入框中。输入你的问题后发送。`,
-      });
-      return;
-    }
-    setHandoff(kind);
-    const projectRef = scopeProjectRef(actingEnvironmentId, acting?.projectId ?? detail.projectId);
-    const opened = await openThreadWithTask(projectRef, task);
-    setHandoff(null);
-    if (opened !== null && options?.keepGuide === true) {
-      const draft = useComposerDraftStore.getState().getDraftSession(opened.draftId);
-      if (draft !== null) {
-        useRightPanelStore
-          .getState()
-          .openPullRequest(scopeThreadRef(draft.environmentId, draft.threadId), {
-            environmentId,
-            projectId: reference.projectId,
-            ...(reference.host === undefined ? {} : { host: reference.host }),
-            repository: reference.repository,
-            number: reference.number,
-            url: detail.url,
-            detailTab: "guide",
-          });
-      }
-    }
-    if (opened === null) {
-      toastManager.add({
-        type: "error",
-        title: "无法打开会话",
-        description: "请从项目中重试，或先打开一个会话。",
-      });
-      return;
-    }
-    toastManager.add({
-      type: "success",
-      title: "已在会话中提问",
-      description:
-        task.prompt.length > 0
-          ? "问题已在输入框中。请检查后发送。"
-          : `${terminology.singular} 已在输入框中。输入你的问题后发送。`,
-    });
-  };
-
-  const startHandoff = async (
-    kind: string,
-    task: { prompt: string; reviewComments?: ReadonlyArray<ReviewCommentContext> } | null,
-    mode: "worktree" | "local" = "worktree",
-  ) => {
-    if (!handoffSummary || handoff !== null) return;
-    if (attachTarget !== null && task !== null) {
-      writeHandoffToComposer(attachTarget, task);
-      toastManager.add({
-        type: "success",
-        title: "已添加到输入框",
-        description: "任务已在输入框中。请检查后发送。",
-      });
-      return;
-    }
-    if (checkoutRoot === null) return;
-    if (
-      !prepareThread.isAllowed ||
-      !readEnvironmentScope(actingEnvironmentId, AuthSourceControlWriteScope)
-    ) {
-      return;
-    }
-    if (
-      mode === "worktree" &&
-      !readEnvironmentScope(actingEnvironmentId, AuthOrchestrationOperateScope)
-    ) {
-      return;
-    }
-    setHandoff(kind);
-    const toastId = toastManager.add({
-      type: "loading",
-      title: `正在准备 ${terminology.singular} 的工作副本…`,
-    });
-    const projectRef = scopeProjectRef(
-      actingEnvironmentId,
-      acting?.projectId ?? handoffSummary.projectId,
-    );
-    // Checkout setup requires the thread to exist first.
-    const opened = await newThread(projectRef).then(
-      (session) => session,
-      () => null,
-    );
-    if (opened === null) {
-      setHandoff(null);
-      toastManager.update(toastId, {
-        type: "error",
-        title: "无法为工作副本打开会话",
-        description: "请从项目中重试，或先打开一个会话。",
-      });
-      return;
-    }
-    const prepared = await prepareThread.run({
-      reference: handoffSummary.url,
-      mode,
-      threadId: opened.threadId,
-    });
-    if (prepared._tag === "Failure") {
-      setHandoff(null);
-      toastManager.update(toastId, {
-        type: "error",
-        title: `无法准备 ${terminology.singular} 的工作副本`,
-        description: checkoutFailureDescription(
-          isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
-        ),
-      });
-      return;
-    }
-    const pointed = await newThread(projectRef, {
-      branch: prepared.value.branch,
-      worktreePath: prepared.value.worktreePath,
-      envMode: prepared.value.worktreePath === null ? "local" : "worktree",
-    }).then(
-      (session) => session,
-      () => null,
-    );
-    if (pointed === null) {
-      setHandoff(null);
-      // Sending after failed rebinding would use the previous checkout.
-      toastManager.update(toastId, {
-        type: "error",
-        title: "已检出，但会话仍在原处",
-        description: `工作副本已在 \`${prepared.value.branch}\` 上准备好。请从分支选择器将会话指向它，然后再次提问。`,
-      });
-      return;
-    }
-    // The draft carries the pull request until its first send makes it a thread, which links it.
-    useComposerDraftStore.getState().setDraftThreadContext(pointed.draftId, {
-      checkoutPullRequest: {
-        url: prepared.value.pullRequest.url,
-        branch: prepared.value.branch,
-      },
-    });
-    setHandoff(null);
-    if (task === null) {
-      toastManager.update(
-        toastId,
-        prepared.value.isOnPullRequestHead
-          ? {
-              type: "success",
-              title: mode === "local" ? "已在此检出" : "已检出",
-              description:
-                mode === "local"
-                  ? `此仓库已切换到 ${terminology.singular} 的分支，并在其上打开了会话。`
-                  : `${terminology.singular} 已位于独立工作树中，并在其上打开了会话。`,
-            }
-          : offHeadPullRequestCheckoutToast(terminology),
-      );
-      return;
-    }
-    // The task goes on the checkout draft: if the user typed into `opened` while the
-    // checkout ran, that is no longer the draft the user is looking at.
-    await openThreadWithTask(projectRef, task, pointed);
-    toastManager.update(
-      toastId,
-      prepared.value.isOnPullRequestHead
-        ? {
-            type: "success",
-            title: "工作副本已就绪",
-            description: "任务已在输入框中。请检查后发送。",
-          }
-        : offHeadPullRequestCheckoutToast(terminology),
-    );
-  };
-
-  const askAboutPullRequest = () => {
-    if (!detail) return;
-    void startAsk("ask", {
-      ...buildAskAboutPullRequestHandoff({
-        number: detail.number,
-        title: detail.title,
-        url: detail.url,
-        headBranch: detail.headBranch,
-        baseBranch: detail.baseBranch,
-        state: detail.state,
-        isDraft: detail.isDraft,
-      }),
-    });
-  };
-
-  const explainPullRequest = () => {
-    if (!detail) return;
-    void startAsk("explain", {
-      ...buildExplainPullRequestHandoff({
-        number: detail.number,
-        title: detail.title,
-        url: detail.url,
-        headBranch: detail.headBranch,
-        baseBranch: detail.baseBranch,
-        state: detail.state,
-        isDraft: detail.isDraft,
-      }),
-    });
-  };
-
-  const askAboutGuideStop = (stop: PullRequestReviewGuideStop, index: number, question: string) => {
-    if (!detail) return;
-    void startAsk(
-      `guide-stop:${index}`,
-      buildAskAboutGuideStopHandoff({
-        number: detail.number,
-        title: detail.title,
-        url: detail.url,
-        headBranch: detail.headBranch,
-        baseBranch: detail.baseBranch,
-        state: detail.state,
-        isDraft: detail.isDraft,
-        stop: {
-          index,
-          title: stop.title,
-          summary: stop.summary,
-          attention: stop.attention?.note ?? null,
-          excerpts: stop.excerpts,
-        },
-        question,
-      }),
-      { keepGuide: true },
-    );
-  };
-
-  const addSelectionToAgent = (
-    selection: PullRequestAgentSelectionInput,
-    options?: { readonly keepGuide?: boolean },
-  ) => {
-    if (!detail) return;
-    void startAsk(
-      `selection:${selection.comment.id}`,
-      buildAddSelectionToAgentHandoff({
-        number: detail.number,
-        title: detail.title,
-        url: detail.url,
-        headBranch: detail.headBranch,
-        baseBranch: detail.baseBranch,
-        state: detail.state,
-        isDraft: detail.isDraft,
-        comment: selection.comment,
-        request: selection.request,
-      }),
-      options,
-    );
-  };
-
-  /**
-   * Brings a remark into the composer beside this panel, with the pull request it belongs to,
-   * and nothing else: what to ask about it is the reader's to write. A remark on a line travels
-   * as its whole conversation, the way fixing one does.
-   */
-  const addCommentToChat = (subject: PullRequestChatSubject) => {
-    if (!detail || attachTarget === null) return;
-    const thread =
-      subject.kind === "comment"
-        ? detail.reviewThreads.find((candidate) =>
-            candidate.comments.some((comment) => comment.id === subject.comment.id),
-          )
-        : undefined;
-    const comment = buildPullRequestCommentContext(
-      detail,
-      thread === undefined ? subject : { kind: "thread", thread },
-    );
-    if (comment === null) return;
-    const store = useComposerDraftStore.getState();
-    const reference = buildPullRequestContext({
-      number: detail.number,
-      title: detail.title,
-      url: detail.url,
-      headBranch: detail.headBranch,
-      baseBranch: detail.baseBranch,
-      state: detail.state,
-      isDraft: detail.isDraft,
-    });
-    const hasReference = (store.getComposerDraft(attachTarget)?.reviewComments ?? []).some(
-      (existing) => existing.pullRequest?.url === detail.url,
-    );
-    // The active editor may be answering a provider question rather than editing this draft.
-    if (!hasReference) store.addReviewComment(attachTarget, reference, { insertAtCaret: false });
-    store.addReviewComment(attachTarget, comment, { insertAtCaret: false });
-    toastManager.add({ type: "success", title: "已添加到输入框" });
-  };
-
-  const startCheckout = (mode: "worktree" | "local") => {
-    if (!handoffSummary) return;
-    void startHandoff(`checkout:${mode}`, null, mode);
-  };
-
-  const startFixFinding = (finding: PullRequestFinding) => {
-    if (!detail) return;
-    void startHandoff(
-      pullRequestFindingKey(finding),
-      buildFixFindingHandoff({
-        number: detail.number,
-        title: detail.title,
-        url: detail.url,
-        headBranch: detail.headBranch,
-        baseBranch: detail.baseBranch,
-        state: detail.state,
-        isDraft: detail.isDraft,
-        finding,
-        inThisThread: attachTarget !== null,
-      }),
-    );
-  };
-
-  const startFixFindings = () => {
-    if (!detail) return;
-    void startHandoff(
-      "findings",
-      buildFixFindingsHandoff({
-        number: detail.number,
-        title: detail.title,
-        url: detail.url,
-        headBranch: detail.headBranch,
-        baseBranch: detail.baseBranch,
-        state: detail.state,
-        isDraft: detail.isDraft,
-        reviewThreads: detail.reviewThreads,
-        comments: detail.comments,
-        checks: checksStale ? [] : detail.checks,
-        commentsTruncated: detail.commentsTruncated,
-        inThisThread: attachTarget !== null,
-      }),
-    );
-  };
-
-  const startResolveConflicts = () => {
-    if (!handoffSummary) return;
-    void startHandoff("conflicts", {
-      prompt: buildResolveConflictsPrompt({
-        number: handoffSummary.number,
-        url: handoffSummary.url,
-        headBranch: handoffSummary.headBranch,
-        baseBranch: handoffSummary.baseBranch,
-        inThisThread: attachTarget !== null,
-      }),
-    });
-  };
-
-  const selectMergeMethod = (method: PullRequestMergeMethod) => {
-    setMergeMethod(method);
-    setLastSelectedMergeMethod(method);
-  };
-  const selectActingEnvironment = (next: EnvironmentId) =>
-    setActingScope({ pullRequestKey, environmentId: next });
-  const allowedMergeMethods = allowedPullRequestMergeMethods(detail);
-  const currentMergeMethod =
-    mergeMethodSelection?.pullRequestKey === pullRequestKey ? mergeMethodSelection.method : null;
-  const selectedMergeMethod = resolvePullRequestMergeMethod(
-    allowedMergeMethods,
-    currentMergeMethod,
-    projectDefaultMergeMethod,
-    lastSelectedMergeMethod,
-  );
-  const selectedMergeMethodLabel = PULL_REQUEST_MERGE_METHOD_LABELS[selectedMergeMethod];
-  const pendingAutoMergeLabel = `自动合并（${selectedMergeMethodLabel.toLowerCase()}）`;
-  const conflicting = isPullRequestConflicting(detail);
-  const autoMergeArmed = detail?.state === "open" && detail.autoMergeEnabled === true;
-  const armedMergeMethod = detail?.autoMergeMethod;
-  const armedAutoMergeLabel = armedMergeMethod
-    ? `自动合并（${PULL_REQUEST_MERGE_METHOD_LABELS[armedMergeMethod].toLowerCase()}）`
-    : "自动合并";
-  const workflowApprovalsRequired =
-    detail?.state === "open" ? (detail.workflowApprovalsRequired ?? 0) : 0;
-  const freshness = detail === null ? null : resolveBaseFreshness(detail);
-  const visibleTabs = TABS.filter((item) => isTabAvailable(item.value));
-  const can = (action: PullRequestAction) =>
-    detail?.capabilities.actions.includes(action) === true &&
-    detail.viewerPermissions.actions.includes(action);
-  const detailChecksState = detail ? pullRequestChecksState(detail.checks) : null;
-  const latestChecksState =
-    sharedSummary?.checksState === undefined ? detailChecksState : sharedSummary.checksState;
-  // List rollups can omit workflows awaiting approval. Only refreshed detail can clear those.
-  const checksState =
-    latestChecksState !== "failing" &&
-    detail?.checks.some((check) => check.status === "action-required")
-      ? "pending"
-      : latestChecksState;
-  const checksStale = checksState !== detailChecksState;
-  const primaryAction = detail
-    ? resolvePullRequestPrimaryControl({
-        state: detail.state,
-        isDraft: detail.isDraft,
-        mergeability: detail.mergeability,
-        checksState,
-        autoMergeEnabled: detail.autoMergeEnabled,
-        hasMergeMethod: allowedMergeMethods.length > 0,
-        canMerge: !stackOwnsMerge && can("merge"),
-        canMarkReady: can("ready"),
-        canEnableAutoMerge: !stackOwnsMerge && can("enable-auto-merge"),
-      })
-    : null;
-  const showsDraftToggle =
-    detail?.state === "open" &&
-    can(detail.isDraft ? "ready" : "draft") &&
-    !(detail.isDraft && primaryAction === "ready");
-  const showsAutoMerge =
-    canMergeSinglePullRequest &&
-    detail?.state === "open" &&
-    ((autoMergeArmed && can("disable-auto-merge")) ||
-      (!autoMergeArmed &&
-        primaryAction !== "enable-auto-merge" &&
-        !detail.isDraft &&
-        !conflicting &&
-        can("enable-auto-merge") &&
-        allowedMergeMethods.length > 0));
-  const showsMergeNow =
-    canMergeSinglePullRequest &&
-    detail?.state === "open" &&
-    (primaryAction === "enable-auto-merge" || primaryAction === "auto-merge-armed") &&
-    can("merge") &&
-    !detail.isDraft &&
-    !conflicting &&
-    allowedMergeMethods.length > 0;
-  const showsMergeMethods =
-    detail?.state === "open" &&
-    can("merge") &&
-    !detail.isDraft &&
-    !conflicting &&
-    allowedMergeMethods.length > 1;
   const statePresentation = detail
     ? resolvePullRequestState({ state: detail.state, isDraft: detail.isDraft })
     : null;
-  const showsDeleteBranch = detail !== null && canDeletePullRequestBranch(detail);
-  const environmentConnected = environments.some(
-    (environment) =>
-      environment.environmentId === environmentId && environment.connection.phase === "connected",
-  );
-  const confirmDeleteBranch = async () => {
-    if (detail === null) return;
-    const confirmed = await readLocalApi()?.dialogs.confirm(
-      [
-        `删除分支 ${detail.headBranch}？`,
-        `这会从 ${detail.headBranch} 删除 ${detail.headRepositoryNameWithOwner ?? detail.repository}。本地分支和工作树不受影响。`,
-      ].join("\n"),
-      { variant: "destructive" },
-    );
-    if (confirmed) void perform("delete-branch");
-  };
-  const showsApproveWorkflows =
-    workflowApprovalsRequired > 0 && !checksStale && can("approve-workflows");
-  const checksSummary = checksStale
-    ? checksState === null
-      ? "未报告任何检查"
-      : pullRequestChecksStatePresentation(checksState).label
-    : detail
-      ? summarizePullRequestChecks(detail.checks)
-      : null;
-  const approvalCount =
-    detail && !detail.commentsTruncated
-      ? latestPullRequestReviewOutcomes(detail.comments, detail.commits).filter(
-          (entry) => entry.outcome === "approved" && !entry.stale,
-        ).length
-      : 0;
-
-  const checkoutControl =
-    context === "page" ? (
-      <PullRequestCheckoutMenu
-        term={terminology.singular}
-        handoff={handoff}
-        checkoutRoot={checkoutRoot}
-        canPrepareWorktree={canPrepareWorktree}
-        canCheckoutHere={prepareThread.isAllowed}
-        onCheckout={startCheckout}
-        pickableEnvironments={pickableEnvironments}
-        actingEnvironmentId={actingEnvironmentId}
-        onActingEnvironmentChange={selectActingEnvironment}
-      />
-    ) : null;
-
-  const resolveConflictsControl = (
-    <PullRequestResolveConflictsButton
-      handoff={handoff}
-      unavailable={attachTarget === null && (checkoutRoot === null || !canPrepareWorktree)}
-      onResolve={startResolveConflicts}
-    />
-  );
 
   if (detailQuery.isPending && !detail) {
     return (
       <PullRequestDetailGhost
         seed={matchingListEntry}
         summary={sharedSummary}
-        checkoutCommand={checkoutCommand}
-        onCheckoutError={reportCheckoutCommandError}
         number={reference.number}
-        tabs={visibleTabs}
-        activeTab={tab}
         {...(onBack ? { onBack } : {})}
         {...(onClose ? { onClose } : {})}
-        actions={
-          handoffSummary ? (
-            <TooltipProvider delay={150} closeDelay={150} timeout={400}>
-              {handoffSummary.state === "open" && handoffSummary.mergeability === "conflicting"
-                ? resolveConflictsControl
-                : null}
-              {checkoutControl}
-            </TooltipProvider>
-          ) : undefined
-        }
       />
     );
   }
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col bg-background">
-      {threadPickerOpen && detail ? (
-        <PullRequestThreadLinks
-          key={`${environmentId}:${detail.url}`}
-          display="picker"
-          environmentId={environmentId}
-          reference={reference}
-          url={detail.url}
-          threadRef={null}
-          onPickerOpenChange={setThreadPickerOpen}
-        />
-      ) : null}
       <div
         className={cn(
           "@container/pr-header grid min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2",
@@ -1428,105 +291,6 @@ export function PullRequestDetailPanel({
           onBack={onBack}
         />
         <div className="mr-4 flex h-7 shrink-0 select-none items-center justify-end gap-1">
-          {detail ? (
-            <TooltipProvider delay={150} closeDelay={150} timeout={400}>
-              {context === "page" ? (
-                <PullRequestThreadLinks
-                  display="count"
-                  environmentId={environmentId}
-                  reference={reference}
-                  url={detail.url}
-                  threadRef={null}
-                />
-              ) : null}
-              {!nativeStack && supportsStackActions && nativeStackQuery.error ? (
-                <Button variant="ghost" size="xs" onClick={nativeStackQuery.refresh}>
-                  重试查询堆叠
-                </Button>
-              ) : null}
-              {nativeStack ? (
-                <PullRequestStackMenu
-                  hostLabel={hostClient.label}
-                  terminology={terminology}
-                  stack={nativeStack}
-                  notice={nativeStackQuery.notice}
-                  onRetry={nativeStackQuery.error ? nativeStackQuery.refresh : undefined}
-                  reference={reference}
-                  environmentId={environmentId}
-                  onSelect={onSelectPullRequest}
-                  mergeMethod={selectedMergeMethod}
-                  stale={!nativeStackQuery.isFresh}
-                  canMerge={supportsStackActions && can("merge") && allowedMergeMethods.length > 0}
-                  canRebase={supportsStackActions && detail.viewerPermissions.stackRebase === true}
-                  onActed={() => {
-                    refreshDetail();
-                    onActed?.();
-                  }}
-                />
-              ) : null}
-              <PullRequestPrimaryAction
-                mergeBlockedReason={mergeBlockedReason}
-                pullRequestKey={pullRequestKey}
-                primaryAction={primaryAction}
-                autoMergeArmed={autoMergeArmed}
-                armedAutoMergeLabel={armedAutoMergeLabel}
-                pendingAutoMergeLabel={pendingAutoMergeLabel}
-                selectedMergeMethod={selectedMergeMethod}
-                selectedMergeMethodLabel={selectedMergeMethodLabel}
-                statePresentation={statePresentation}
-                pendingAction={pendingAction}
-                perform={perform}
-                resolveConflicts={resolveConflictsControl}
-              />
-              {checkoutControl}
-              <PullRequestActionsMenu
-                environmentId={environmentId}
-                reference={reference}
-                pullRequestKey={pullRequestKey}
-                detail={detail}
-                terminology={terminology}
-                linkThreadRef={
-                  threadRef ??
-                  (typeof composerDraftTarget === "object" ? composerDraftTarget : null)
-                }
-                onThreadPickerOpenChange={setThreadPickerOpen}
-                refreshing={refreshing}
-                refreshFromHost={refreshFromHost}
-                handoff={handoff}
-                attachesToComposer={attachTarget !== null}
-                askAboutPullRequest={askAboutPullRequest}
-                explainPullRequest={explainPullRequest}
-                canFixFindings={canFixFindings}
-                startFixFindings={startFixFindings}
-                handoffLabels={handoffLabels}
-                canWriteGuide={reviewGuidesEnabled && guideWriter.canWrite}
-                guideRunning={guideWriter.running}
-                guideWritten={guideWriter.data?.guide != null}
-                writeGuide={writeGuide}
-                pickableEnvironments={pickableEnvironments}
-                actingEnvironmentId={actingEnvironmentId}
-                onActingEnvironmentChange={selectActingEnvironment}
-                can={can}
-                autoMergeArmed={autoMergeArmed}
-                showsDraftToggle={showsDraftToggle}
-                showsMergeNow={showsMergeNow}
-                showsAutoMerge={showsAutoMerge}
-                showsMergeMethods={showsMergeMethods}
-                allowedMergeMethods={allowedMergeMethods}
-                selectedMergeMethod={selectedMergeMethod}
-                onSelectMergeMethod={selectMergeMethod}
-                showsDeleteBranch={showsDeleteBranch}
-                environmentConnected={environmentConnected}
-                canWriteSourceControl={canWriteSourceControl}
-                onMaintainerEditsSaved={refreshDetail}
-                confirmDeleteBranch={confirmDeleteBranch}
-                pendingAction={pendingAction}
-                perform={perform}
-                openOnHostText={openOnHostText}
-                copyReference={copyReference}
-              />
-            </TooltipProvider>
-          ) : null}
           {onClose ? (
             <Button
               size="icon-xs"
@@ -1573,14 +337,16 @@ export function PullRequestDetailPanel({
                   </span>
                   <span aria-hidden className="h-3 w-px shrink-0 bg-border/70" />
                   <span className="flex min-w-0 flex-1 items-center gap-1.5 font-mono text-2xs text-muted-foreground/65">
-                    <PullRequestBaseBranch
-                      baseBranch={detail.baseBranch}
-                      freshness={freshness}
-                      stacked={isStackedPullRequest}
-                      pending={actionPending}
-                      onUpdate={(method) => void perform("update-branch", undefined, method)}
-                      iconClassName="size-3"
-                    />
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <code className="inline-flex min-w-0 max-w-[40%] shrink-0">
+                            <MiddleTruncate value={detail.baseBranch} showTitle={false} />
+                          </code>
+                        }
+                      />
+                      <TooltipPopup side="top">{detail.baseBranch}</TooltipPopup>
+                    </Tooltip>
                     <ArrowLeftIcon
                       aria-label="接收来自以下分支的更改"
                       className="size-3 shrink-0 opacity-60"
@@ -1606,13 +372,10 @@ export function PullRequestDetailPanel({
                       <FileDiffIcon aria-hidden className="size-3 self-center" />
                       {detail.changedFiles.toLocaleString("zh-CN")}
                     </span>
-                    <PullRequestChangeBreakdownStat
-                      environmentId={environmentId}
-                      reference={reference}
+                    <PullRequestDiffStat
                       additions={detail.additions}
                       deletions={detail.deletions}
                       className="shrink-0 font-mono text-2xs"
-                      eager
                     />
                   </span>
                 </div>
@@ -1642,14 +405,11 @@ export function PullRequestDetailPanel({
             {detail ? (
               <PullRequestDetailHeaderBody
                 title={
-                  <PullRequestTitleEditor
-                    environmentId={environmentId}
-                    reference={reference}
-                    pullRequestKey={pullRequestKey}
-                    detail={detail}
-                    canWriteSourceControl={canWriteSourceControl}
-                    onSaved={refreshDetail}
-                  />
+                  <PullRequestDetailTitleRow>
+                    <h1 className="truncate text-base font-semibold leading-snug">
+                      {detail.title}
+                    </h1>
+                  </PullRequestDetailTitleRow>
                 }
                 author={
                   <PullRequestActorLabel actor={detail.author} profileUrl={authorProfileUrl} />
@@ -1659,158 +419,42 @@ export function PullRequestDetailPanel({
                     已更新 <RelativeTime timestamp={detail.updatedAt} />
                   </span>
                 }
-                checkout={
-                  checkoutCommand ? (
-                    <PullRequestCopyableCode
-                      key={checkoutCommand}
-                      value={checkoutCommand}
-                      target={`${terminology.singular} checkout command`}
-                      copyLabel="复制检出工作副本的命令"
-                      copiedLabel="已复制检出工作副本的命令"
-                      className="ml-auto font-mono"
-                      tooltipSide="bottom"
-                      onError={reportCheckoutCommandError}
-                    />
-                  ) : null
-                }
                 base={
-                  <PullRequestBaseBranch
-                    baseBranch={detail.baseBranch}
-                    freshness={freshness}
-                    stacked={isStackedPullRequest}
-                    pending={actionPending}
-                    onUpdate={(method) => void perform("update-branch", undefined, method)}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <code className="inline-flex min-w-0 max-w-[40%] shrink-0">
+                          <MiddleTruncate value={detail.baseBranch} showTitle={false} />
+                        </code>
+                      }
+                    />
+                    <TooltipPopup side="top">{detail.baseBranch}</TooltipPopup>
+                  </Tooltip>
                 }
                 head={
-                  <PullRequestCopyableCode
-                    key={detail.headBranch}
-                    value={detail.headBranch}
-                    target="branch name"
-                    copyLabel={`复制 ${terminology.singular} 分支`}
-                    copiedLabel="已复制分支名称"
-                  />
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <code className="flex min-w-0 flex-1">
+                          <MiddleTruncate value={detail.headBranch} showTitle={false} />
+                        </code>
+                      }
+                    />
+                    <TooltipPopup side="top">{detail.headBranch}</TooltipPopup>
+                  </Tooltip>
                 }
                 files={`${detail.changedFiles.toLocaleString("zh-CN")} ${detail.changedFiles === 1 ? "file" : "files"}`}
                 diffStat={
-                  <PullRequestChangeBreakdownStat
-                    environmentId={environmentId}
-                    reference={reference}
+                  <PullRequestDiffStat
                     additions={detail.additions}
                     deletions={detail.deletions}
                     className="shrink-0 font-mono text-xs"
-                    eager
                   />
                 }
               />
             ) : null}
           </div>
         </div>
-
-        {detail ? (
-          <PullRequestDetailTabBar
-            tabs={visibleTabs}
-            value={tab}
-            onValueChange={selectTab}
-            onTabIntent={(item) => {
-              if (item === "code") void loadCodeTab();
-            }}
-          >
-            {tab === "summary" ? (
-              showsApproveWorkflows ? (
-                <PullRequestApproveWorkflowsButton
-                  pullRequestKey={pullRequestKey}
-                  pendingAction={pendingAction}
-                  perform={perform}
-                />
-              ) : (
-                <PullRequestChecksStatusLine
-                  className="text-muted-foreground"
-                  aria-label={checksSummary ? `检查：${checksSummary}` : "检查"}
-                  icon={
-                    checksState !== null ? (
-                      <PullRequestChecksPopover
-                        checks={detail.checks}
-                        stale={checksStale}
-                        checksState={checksState}
-                      />
-                    ) : (
-                      <CircleDotIcon aria-hidden className="size-3.5" />
-                    )
-                  }
-                  label={checksSummary}
-                />
-              )
-            ) : tab === "timeline" ? (
-              <div className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                <PullRequestMetaLine
-                  className={cn(
-                    "whitespace-nowrap text-2xs transition-opacity",
-                    (activityPending || activityError) && "opacity-35",
-                  )}
-                >
-                  <span
-                    className="inline-flex items-center gap-1"
-                    aria-label={
-                      activityError
-                        ? "评论不可用"
-                        : `${detail.commentCount.toLocaleString("zh-CN")} ${
-                            detail.commentCount === 1 ? "comment" : "comments"
-                          }`
-                    }
-                  >
-                    <MessageSquareIcon aria-hidden className="size-3" />
-                    {activityError
-                      ? "-"
-                      : activityPending
-                        ? "…"
-                        : detail.commentCount.toLocaleString("zh-CN")}
-                  </span>
-                  <span
-                    className="inline-flex items-center gap-1"
-                    aria-label={
-                      activityError
-                        ? "提交不可用"
-                        : `${detail.commits.length.toLocaleString("zh-CN")} ${
-                            detail.commits.length === 1 ? "commit" : "commits"
-                          }`
-                    }
-                  >
-                    <GitCommitHorizontalIcon aria-hidden className="size-3" />
-                    {activityError
-                      ? "-"
-                      : activityPending
-                        ? "…"
-                        : detail.commits.length.toLocaleString("zh-CN")}
-                  </span>
-                  {approvalCount > 0 ? (
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1",
-                        pullRequestReviewOutcomeToneClassName("approved"),
-                      )}
-                    >
-                      <PullRequestReviewOutcomeIcon outcome="approved" className="size-3" />
-                      {approvalCount.toLocaleString("zh-CN")}
-                      <span className="sr-only">{approvalCount === 1 ? "个批准" : "个批准"}</span>
-                    </span>
-                  ) : null}
-                </PullRequestMetaLine>
-                <Button
-                  size="xs"
-                  variant="ghost-muted"
-                  aria-label={timelineOrder === "newest" ? "先显示最早的动态" : "先显示最新的动态"}
-                  onClick={() =>
-                    setTimelineOrder((value) => (value === "newest" ? "oldest" : "newest"))
-                  }
-                >
-                  <ArrowDownUpIcon aria-hidden className="size-3" />
-                  {timelineOrder === "newest" ? "最新在前" : "最早在前"}
-                </Button>
-              </div>
-            ) : null}
-          </PullRequestDetailTabBar>
-        ) : null}
       </div>
 
       <SourceControlAppAccessNotice
@@ -1823,20 +467,24 @@ export function PullRequestDetailPanel({
       <div
         className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
         onScrollCapture={(event) => {
-          const scroller = scrollerByTab.current[tab];
-          if (event.target !== scroller || scroller === null || scroller === undefined) return;
+          const scroller = scrollerRef.current;
+          if (event.target !== scroller || scroller === null) return;
           const top = scroller.scrollTop;
-          const previous = condensedByTab[tab] ?? false;
+          const previous = condensed;
           const foldHeight = foldRef.current?.scrollHeight ?? 0;
           let next = previous;
           if (previous) {
             if (top < 4 && foldHeight > 0) next = false;
           } else if (foldHeight > 0 && top > foldHeight + 32) {
             const chromeDelta = foldHeight - (condensedRowRef.current?.scrollHeight ?? 0);
-            compensationRef.current = { tab, scroller, target: top - chromeDelta };
+            compensationRef.current = {
+              scopeKey: tabScopeKey,
+              scroller,
+              target: top - chromeDelta,
+            };
             next = true;
           }
-          if (next !== previous) setCondensedByTab({ ...condensedByTab, [tab]: next });
+          if (next !== previous) setCondensedScope({ key: tabScopeKey, condensed: next });
         }}
       >
         {detailQuery.error && !detail ? (
@@ -1861,144 +509,28 @@ export function PullRequestDetailPanel({
               : {})}
           />
         ) : detail ? (
-          <PullRequestMarkdownContext value={markdownContext}>
-            {mountedTabs.has("summary") ? (
-              <div className={cn("absolute inset-0", tab !== "summary" && "invisible")}>
-                <PullRequestSummaryTab
-                  scrollerRef={scrollerRefs.summary}
-                  revealUrl={tab === "summary" ? revealUrl : undefined}
-                  onRevealSettled={settleReveal}
-                  environmentId={environmentId}
-                  threadRef={threadRef}
-                  reference={reference}
-                  detail={detail}
-                  activityPending={activityPending}
-                  checksStale={checksStale}
-                  activityError={activityError}
-                  pendingFinding={handoff}
-                  fixFindingLabel={handoffLabels.fixFinding}
-                  fixCheckLabel={handoffLabels.fixCheck}
-                  {...(canFixFindings ? { onFixFinding: startFixFinding } : {})}
-                  {...(attachTarget === null ? {} : { onAddToChat: addCommentToChat })}
-                  onRefresh={refreshDetail}
-                  onRefreshChecks={refreshFromHost}
-                />
-              </div>
-            ) : null}
-            {mountedTabs.has("guide") ? (
-              <div
-                className={cn("absolute inset-0", tab !== "guide" && "invisible")}
-                // Read by the guide run notifier, which stays quiet for a guide on screen.
-                data-guide-shown={tab === "guide" ? guideKey : undefined}
-              >
-                <PullRequestGuideTab
-                  environmentId={environmentId}
-                  reference={reference}
-                  active={tab === "guide"}
-                  title={detail.title}
-                  workspaceRoot={detail.workspaceRoot}
-                  canComment={
-                    detail.capabilities.review.inlineComment && detail.viewerPermissions.comment
-                  }
-                  rangeComments={detail.capabilities.review.rangeComment === true}
-                  completionScope={pullRequestCompletionScope(detail, environmentId, reference)}
-                  onAskAboutLines={(comment, request) =>
-                    addSelectionToAgent({ comment, request }, { keepGuide: true })
-                  }
-                  onAskAboutStop={askAboutGuideStop}
-                  onFinishReview={
-                    detail.capabilities.review.verdicts.some((verdict) =>
-                      detail.viewerPermissions.verdicts.includes(verdict),
-                    )
-                      ? () => setOpenReviewRequest((count) => count + 1)
-                      : null
-                  }
-                  onOpenFile={openFileInCode}
-                  onTourShown={onGuideShown}
-                />
-              </div>
-            ) : null}
-            {mountedTabs.has("timeline") ? (
-              <div className={cn("absolute inset-0", tab !== "timeline" && "invisible")}>
-                {activityPending ? (
-                  <PullRequestTimelineGhost />
-                ) : activityError ? (
-                  <PullRequestActivityUnavailableState
-                    error={activityError}
-                    term={terminology.singular}
-                    onRetry={activityQuery.refresh}
-                  />
-                ) : (
-                  <PullRequestTimelineTab
-                    scrollerRef={scrollerRefs.timeline}
-                    revealUrl={tab === "timeline" ? revealUrl : undefined}
-                    onRevealSettled={settleReveal}
-                    detail={detail}
-                    environmentId={environmentId}
-                    threadRef={threadRef}
-                    reference={reference}
-                    order={timelineOrder}
-                    onOpenCommit={openCommit}
-                    {...(attachTarget === null ? {} : { onAddToChat: addCommentToChat })}
-                    onRefresh={refreshDetail}
-                  />
-                )}
-              </div>
-            ) : null}
-            {mountedTabs.has("code") ? (
-              <div className={cn("absolute inset-0", tab !== "code" && "invisible")}>
-                <Suspense
-                  fallback={
-                    <DiffPanelLoadingState label={`正在加载 ${terminology.singular} 差异…`} />
-                  }
-                >
-                  <PullRequestCodeTab
-                    scrollerRef={scrollerRefs.code}
-                    onAddToAgentSelection={addSelectionToAgent}
-                    environmentId={environmentId}
-                    reference={reference}
-                    detail={detail}
-                    selectedCommitOid={selectedCodeCommitOid}
-                    onSelectedCommitChange={selectCodeCommit}
-                    pendingFinding={handoff}
-                    fixFindingLabel={handoffLabels.fixFinding}
-                    {...(canFixFindings ? { onFixFinding: startFixFinding } : {})}
-                    {...(attachTarget === null ? {} : { onAddToChat: addCommentToChat })}
-                    onRefresh={refreshDetail}
-                    refreshToken={refreshToken}
-                    backgroundRefreshToken={turnRefresh ?? 0}
-                    revealRequest={codeRevealRequest}
-                    revealUrl={tab === "code" ? revealUrl : undefined}
-                    onRevealSettled={settleReveal}
-                  />
-                </Suspense>
-              </div>
-            ) : null}
-          </PullRequestMarkdownContext>
+          <div className="absolute inset-0">
+            <Suspense
+              fallback={<DiffPanelLoadingState label={`正在加载 ${terminology.singular} 差异…`} />}
+            >
+              <PullRequestCodeTab
+                scrollerRef={(node) => {
+                  scrollerRef.current = node;
+                }}
+                environmentId={environmentId}
+                reference={reference}
+                detail={detail}
+                selectedCommitOid={selectedCodeCommitOid}
+                onSelectedCommitChange={(oid) => setCodeCommitScope({ pullRequestKey, oid })}
+                refreshToken={refreshToken}
+                backgroundRefreshToken={turnRefresh ?? 0}
+                revealUrl={revealUrl}
+                {...(onRevealSettled ? { onRevealSettled } : {})}
+              />
+            </Suspense>
+          </div>
         ) : null}
       </div>
-
-      {detail ? (
-        <div className="absolute right-4 bottom-3 z-20">
-          <PullRequestComposer
-            key={JSON.stringify([
-              environmentId,
-              reference.projectId,
-              reference.host,
-              reference.repository,
-              reference.number,
-            ])}
-            environmentId={environmentId}
-            reference={reference}
-            detail={detail}
-            actionPending={actionPending}
-            onCommentAction={performCommentAction}
-            onCommented={refreshDetail}
-            onReviewSubmitted={refreshDetail}
-            openReviewRequest={openReviewRequest}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }

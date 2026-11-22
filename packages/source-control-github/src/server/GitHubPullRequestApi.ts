@@ -33,13 +33,7 @@ import {
   type PullRequestListState,
   type PullRequestMergeMethod,
   type PullRequestOmittedFileStat,
-  type PullRequestReactionContent,
-  type PullRequestReviewCommentDraft,
-  type PullRequestReviewVerdict,
-  type PullRequestReviewerCandidateList,
-  type PullRequestReviewerKind,
   type PullRequestLabel,
-  type PullRequestLabelCandidateList,
   type PullRequestThreadCommentsResult,
   type PullRequestUpdateMethod,
   type PullRequestPreview,
@@ -64,8 +58,6 @@ import { PullRequestReviewsGraphQLGroup } from "./pullRequestReviews.graphql.ts"
 import * as SourceControlHost from "@t3tools/source-control-core/server/SourceControlHost";
 import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
 import {
-  buildReviewSubmission,
-  buildReviewerRequest,
   decodeCommitFilesJson,
   pullRequestChecksFromContexts,
   decodeWorkflowRunsJson,
@@ -73,12 +65,10 @@ import {
   type GitHubPullRequestCore,
   type GitHubPullRequestFileStat,
   type GitHubPullRequestWatchFingerprint,
-  isSubjectOfPullRequest,
   LenientPullRequestList,
   LenientPullRequestSearch,
   pageRows,
   pullRequestLookup,
-  toLabelCandidates,
   toRepositoryAuthors,
   toRepositoryReferences,
   referenceSearchQuery,
@@ -98,7 +88,6 @@ import {
   toPullRequestSummary,
   toPullRequestWatchFingerprint,
   toReviewDismissalsPage,
-  toReviewerCandidates,
   toReviewThreadCommentsPage,
   toLaterReviewThreadPage,
   toReviewThreadPage,
@@ -106,9 +95,7 @@ import {
   toViewerPermissions,
   decodePullRequestFilesJson,
   decodePullRequestStacksJson,
-  buildLabelRequest,
   PULL_REQUEST_SEARCH_MAX_ROWS,
-  gitHubReactionContent,
   reviewThreadConversation,
   type GitHubPullRequestActivity,
   type GitHubPullRequestActivityPage,
@@ -397,9 +384,8 @@ const PULL_REQUEST_FALLBACK_MAX_ROWS = 1_000;
 
 const DIFF_FILES_PAGE_SIZE = 100;
 const FILES_VIEWED_MAX_PAGES = 5;
-const FILES_VIEWED_PER_REQUEST = 100;
 
-export const NODE_ID_CACHE_CAPACITY = 128;
+const NODE_ID_CACHE_CAPACITY = 128;
 
 const REVIEW_THREAD_PAGES = 10;
 
@@ -610,18 +596,6 @@ export class GitHubPullRequestApi extends Context.Service<
       readonly number: number;
     }) => Effect.Effect<GitHubPullRequestFileStats, GitHubPullRequestApiError>;
 
-    /**
-     * GitHub takes a single path per mutation, so a burst is batched with aliases into one
-     * document rather than one subprocess per press.
-     */
-    readonly setPullRequestFilesViewed: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly files: ReadonlyArray<{ readonly path: string; readonly viewed: boolean }>;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
     readonly listReviewThreadComments: (input: {
       readonly cwd: string;
       readonly repository: string;
@@ -645,33 +619,6 @@ export class GitHubPullRequestApi extends Context.Service<
       readonly number: number;
       readonly allowReserve?: boolean | undefined;
     }) => Effect.Effect<GitHubViewerAccess & GitHubRepositoryAccess, GitHubPullRequestApiError>;
-
-    readonly listReviewerCandidates: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly query?: string | undefined;
-    }) => Effect.Effect<PullRequestReviewerCandidateList, GitHubPullRequestApiError>;
-
-    readonly setReviewerRequest: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly reviewers: ReadonlyArray<{
-        readonly id: string;
-        readonly kind: PullRequestReviewerKind;
-      }>;
-      readonly requested: boolean;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
-    readonly listLabelCandidates: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-    }) => Effect.Effect<PullRequestLabelCandidateList, GitHubPullRequestApiError>;
 
     readonly listRepositoryLabels: (input: {
       readonly cwd: string;
@@ -706,15 +653,6 @@ export class GitHubPullRequestApi extends Context.Service<
       GitHubPullRequestApiError
     >;
 
-    readonly setLabels: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly labels: ReadonlyArray<string>;
-      readonly applied: boolean;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
     readonly runPullRequestAction: (input: {
       readonly cwd: string;
       readonly repository: string;
@@ -727,70 +665,6 @@ export class GitHubPullRequestApi extends Context.Service<
       readonly mergeMethod?: PullRequestMergeMethod;
       readonly updateMethod?: PullRequestUpdateMethod;
     }) => Effect.Effect<ProviderChangeRequestSummary | void, GitHubPullRequestApiError>;
-
-    readonly commentOnPullRequest: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly body: string;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
-    readonly submitReview: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly verdict: PullRequestReviewVerdict;
-      readonly body: string;
-      readonly comments: ReadonlyArray<PullRequestReviewCommentDraft>;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
-    readonly replyToReviewThread: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly threadId: string;
-      readonly body: string;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
-    readonly setReviewThreadResolution: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly threadId: string;
-      readonly resolved: boolean;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
-    readonly setReaction: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly subjectId?: string | undefined;
-      readonly content: PullRequestReactionContent;
-      readonly reacted: boolean;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
-    readonly updatePullRequest: (input: {
-      readonly maintainerCanModify?: boolean | undefined;
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly title?: string | undefined;
-      readonly body?: string | undefined;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
-
-    readonly updateComment: (input: {
-      readonly cwd: string;
-      readonly repository: string;
-      readonly host: string;
-      readonly number: number;
-      readonly commentId: string;
-      readonly kind: "issue-comment" | "review-comment";
-      readonly body: string;
-    }) => Effect.Effect<void, GitHubPullRequestApiError>;
   }
 >()("@t3tools/source-control-github/server/GitHubPullRequestApi") {}
 
@@ -1192,21 +1066,6 @@ export const make = Effect.gen(function* () {
         }),
       ),
     );
-  };
-
-  /** Mutations follow node IDs; reject IDs from other PRs. */
-  const subjectBelongsToPullRequest = (input: {
-    readonly cwd: string;
-    readonly repository: string;
-    readonly host: string;
-    readonly number: number;
-    readonly subjectId: string;
-    readonly operation: string;
-  }) => {
-    const { owner, name } = parseRepositorySelector(input.repository);
-    return client
-      .PullRequestSubject({ owner, name, number: input.number, subjectId: input.subjectId })
-      .pipe(graphql({ ...input, allowReserve: true }), Effect.map(isSubjectOfPullRequest));
   };
 
   const decodeWith = <A>(
@@ -1812,10 +1671,6 @@ export const make = Effect.gen(function* () {
   const stackMembershipResolver = GraphQLResolver.aliased(client.PullRequestStackMembership, {
     batchKey: GitHubGraphQlClient.batchKey,
   }).pipe(RequestResolver.batchN(STAT_ALIASES_PER_REQUEST));
-  // GitHub has no bulk viewed-file mutation; aliases combine individual paths into one request.
-  const setFileViewedResolver = GraphQLResolver.aliased(client.SetFileViewed, {
-    batchKey: GitHubGraphQlClient.batchKey,
-  }).pipe(RequestResolver.batchN(FILES_VIEWED_PER_REQUEST));
 
   return GitHubPullRequestApi.of({
     withVerifiedCredential,
@@ -2381,45 +2236,6 @@ export const make = Effect.gen(function* () {
         );
     }),
 
-    listReviewerCandidates: Effect.fn("GitHubPullRequestApi.listReviewerCandidates")(
-      function (input) {
-        const { owner, name } = parseRepositorySelector(input.repository);
-        const operation = "listReviewerCandidates";
-        return client
-          .ReviewerCandidates({ owner, name, number: input.number, query: input.query ?? null })
-          .pipe(
-            graphql({ ...input, operation, allowReserve: true }),
-            Effect.map((result) => toReviewerCandidates(result, input.query)),
-            Effect.flatMap(found({ ...input, operation })),
-          );
-      },
-    ),
-
-    setReviewerRequest: Effect.fn("GitHubPullRequestApi.setReviewerRequest")(function (input) {
-      const { owner, name } = parseRepositorySelector(input.repository);
-      return api
-        .rest({
-          host: input.host,
-          operation: "setReviewerRequest",
-          method: input.requested ? "POST" : "DELETE",
-          path: `repos/${owner}/${name}/pulls/${input.number}/requested_reviewers`,
-          body: buildReviewerRequest(input.reviewers),
-        })
-        .pipe(Effect.asVoid);
-    }),
-
-    listLabelCandidates: Effect.fn("GitHubPullRequestApi.listLabelCandidates")(function (input) {
-      const { owner, name } = parseRepositorySelector(input.repository);
-      const operation = "listLabelCandidates";
-      return client
-        .LabelCandidates({ owner, name, number: input.number })
-        .pipe(
-          graphql({ ...input, operation, allowReserve: true }),
-          Effect.map(toLabelCandidates),
-          Effect.flatMap(found({ ...input, operation })),
-        );
-    }),
-
     listRepositoryLabels: Effect.fn("GitHubPullRequestApi.listRepositoryLabels")(function (input) {
       const { owner, name } = parseRepositorySelector(input.repository);
       const operation = "listRepositoryLabels";
@@ -2471,34 +2287,6 @@ export const make = Effect.gen(function* () {
         );
       },
     ),
-
-    setLabels: Effect.fn("GitHubPullRequestApi.setLabels")(function (input) {
-      const { owner, name } = parseRepositorySelector(input.repository);
-      const issue = `repos/${owner}/${name}/issues/${input.number}/labels`;
-      if (input.applied) {
-        return api
-          .rest({
-            host: input.host,
-            operation: "setLabels",
-            method: "POST",
-            path: issue,
-            body: buildLabelRequest(input.labels),
-          })
-          .pipe(Effect.asVoid);
-      }
-      return Effect.forEach(
-        input.labels,
-        (label) =>
-          api.rest({
-            host: input.host,
-            operation: "setLabels",
-            method: "DELETE",
-            path: `${issue}/${encodeURIComponent(label)}`,
-          }),
-        { concurrency: 1, discard: true },
-      );
-    }),
-
     runPullRequestAction: Effect.fn("GitHubPullRequestApi.runPullRequestAction")(function (input) {
       if (input.action === "delete-branch") {
         return Effect.gen(function* () {
@@ -2767,40 +2555,6 @@ export const make = Effect.gen(function* () {
       });
     }),
 
-    commentOnPullRequest: Effect.fn("GitHubPullRequestApi.commentOnPullRequest")(function (input) {
-      return pullRequestNodeId({ ...input, operation: "commentOnPullRequest" }).pipe(
-        Effect.flatMap((subjectId) =>
-          client
-            .AddComment({ subjectId, body: input.body })
-            .pipe(graphql({ ...input, operation: "commentOnPullRequest" })),
-        ),
-        Effect.asVoid,
-      );
-    }),
-
-    submitReview: Effect.fn("GitHubPullRequestApi.submitReview")(function (input) {
-      const { owner, name } = parseRepositorySelector(input.repository);
-      return api
-        .rest({
-          host: input.host,
-          operation: "submitReview",
-          method: "POST",
-          path: `repos/${owner}/${name}/pulls/${input.number}/reviews`,
-          body: buildReviewSubmission({
-            verdict: input.verdict,
-            body: input.body,
-            comments: input.comments,
-          }),
-        })
-        .pipe(Effect.asVoid);
-    }),
-
-    replyToReviewThread: Effect.fn("GitHubPullRequestApi.replyToReviewThread")(function (input) {
-      return client
-        .AddReviewThreadReply({ threadId: input.threadId, body: input.body })
-        .pipe(graphql({ ...input, operation: "replyToReviewThread" }), Effect.asVoid);
-    }),
-
     getPullRequestFilesViewed: Effect.fn("GitHubPullRequestApi.getPullRequestFilesViewed")(
       function (input) {
         const { owner, name } = parseRepositorySelector(input.repository);
@@ -2860,119 +2614,6 @@ export const make = Effect.gen(function* () {
         );
       },
     ),
-
-    setPullRequestFilesViewed: Effect.fn("GitHubPullRequestApi.setPullRequestFilesViewed")(
-      function (input) {
-        if (input.files.length === 0) return Effect.void;
-        const target = { ...input, operation: "setPullRequestFilesViewed" };
-        return pullRequestNodeId(target).pipe(
-          Effect.flatMap((pullRequestId) =>
-            // Top-level mutation fields run in order, so the last toggle for a path wins.
-            Effect.forEach(
-              input.files,
-              (file) =>
-                GraphQLResolver.request(
-                  { pullRequestId, path: file.path, viewed: file.viewed },
-                  setFileViewedResolver,
-                ),
-              { concurrency: "unbounded", discard: true },
-            ),
-          ),
-          graphql(target),
-        );
-      },
-    ),
-
-    setReviewThreadResolution: Effect.fn("GitHubPullRequestApi.setReviewThreadResolution")(
-      function (input) {
-        return (
-          input.resolved
-            ? client.ResolveReviewThread({ threadId: input.threadId }).pipe(Effect.asVoid)
-            : client.UnresolveReviewThread({ threadId: input.threadId }).pipe(Effect.asVoid)
-        ).pipe(graphql({ ...input, operation: "setReviewThreadResolution" }));
-      },
-    ),
-
-    setReaction: Effect.fn("GitHubPullRequestApi.setReaction")(function (input) {
-      const givenSubjectId = input.subjectId;
-      const subjectId =
-        givenSubjectId === undefined
-          ? pullRequestNodeId({ ...input, operation: "setReaction" })
-          : subjectBelongsToPullRequest({
-              ...input,
-              subjectId: givenSubjectId,
-              operation: "setReaction",
-            }).pipe(
-              Effect.flatMap((belongs) =>
-                belongs
-                  ? Effect.succeed(givenSubjectId)
-                  : Effect.fail(
-                      new GitHubSubjectScopeError({
-                        cwd: input.cwd,
-                        operation: "setReaction",
-                      }),
-                    ),
-              ),
-            );
-      return subjectId.pipe(
-        Effect.flatMap((subjectId) => {
-          const variables = { subjectId, content: gitHubReactionContent(input.content) };
-          return (
-            input.reacted
-              ? client.AddReaction(variables).pipe(Effect.asVoid)
-              : client.RemoveReaction(variables).pipe(Effect.asVoid)
-          ).pipe(graphql({ ...input, operation: "setReaction" }));
-        }),
-      );
-    }),
-
-    updatePullRequest: Effect.fn("GitHubPullRequestApi.updatePullRequest")(function (input) {
-      return pullRequestNodeId({ ...input, operation: "updatePullRequest" }).pipe(
-        Effect.flatMap((pullRequestId) =>
-          client
-            .UpdatePullRequest({
-              pullRequestId,
-              ...(input.maintainerCanModify === undefined
-                ? {}
-                : { maintainerCanModify: input.maintainerCanModify }),
-              ...(input.title === undefined ? {} : { title: input.title }),
-              ...(input.body === undefined ? {} : { body: input.body }),
-            })
-            .pipe(graphql({ ...input, operation: "updatePullRequest" })),
-        ),
-        Effect.asVoid,
-      );
-    }),
-
-    updateComment: Effect.fn("GitHubPullRequestApi.updateComment")(function (input) {
-      return subjectBelongsToPullRequest({
-        cwd: input.cwd,
-        repository: input.repository,
-        host: input.host,
-        number: input.number,
-        subjectId: input.commentId,
-        operation: "updateComment",
-      }).pipe(
-        Effect.flatMap((belongs) =>
-          belongs
-            ? Effect.succeed(input.commentId)
-            : Effect.fail(
-                new GitHubSubjectScopeError({
-                  cwd: input.cwd,
-                  operation: "updateComment",
-                }),
-              ),
-        ),
-        Effect.flatMap((commentId) => {
-          const variables = { commentId, body: input.body };
-          return (
-            input.kind === "issue-comment"
-              ? client.UpdateIssueComment(variables).pipe(Effect.asVoid)
-              : client.UpdateReviewComment(variables).pipe(Effect.asVoid)
-          ).pipe(graphql({ ...input, operation: "updateComment" }));
-        }),
-      );
-    }),
   });
 });
 

@@ -58,15 +58,6 @@ export function fakePullRequestProvider(
     getChangeRequestActivity: () => Effect.die("unused"),
     getDiff: () => Effect.die("unused"),
     runAction: () => Effect.void,
-    updateChangeRequest: () => Effect.void,
-    comment: () => Effect.void,
-    updateComment: () => Effect.void,
-    submitReview: () => Effect.void,
-    replyToThread: () => Effect.void,
-    setThreadResolution: () => Effect.void,
-    setReaction: () => Effect.void,
-    listReviewerCandidates: () => Effect.succeed({ candidates: [], truncated: false }),
-    setReviewerRequest: () => Effect.void,
     ...overrides,
   };
 }

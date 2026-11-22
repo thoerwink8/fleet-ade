@@ -1,10 +1,4 @@
-import type {
-  EnvironmentId,
-  ProjectId,
-  PullRequestDetailView,
-  PullRequestRef,
-  PullRequestReferenceCandidate,
-} from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId, PullRequestReferenceCandidate } from "@t3tools/contracts";
 import {
   debouncedPullRequestCompletionSearch,
   detectPullRequestComposerTrigger,
@@ -35,17 +29,6 @@ export interface PullRequestCompletionScope {
   readonly support: PullRequestCompletionSupport;
 }
 
-/** Null on hosts that complete nothing, so no sigil opens a list that cannot fill. */
-export function pullRequestCompletionScope(
-  detail: Pick<PullRequestDetailView, "capabilities">,
-  environmentId: EnvironmentId,
-  reference: PullRequestRef,
-): PullRequestCompletionScope | null {
-  const { mentions, referenceSigils } = detail.capabilities;
-  return mentions === true || (referenceSigils?.length ?? 0) > 0
-    ? { environmentId, projectId: reference.projectId, support: { mentions, referenceSigils } }
-    : null;
-}
 // About a full list of suggestions. The popup fits itself to the space it opens into, so it never
 // flips once results grow it; the side is picked up front from the room a full list needs.
 const SUGGESTION_LIST_HEIGHT = 320;

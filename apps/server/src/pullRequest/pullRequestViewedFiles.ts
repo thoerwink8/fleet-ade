@@ -1,13 +1,10 @@
 import * as Clock from "effect/Clock";
-import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as Semaphore from "effect/Semaphore";
 import {
   PullRequestOperationError,
   type PullRequestFilesViewedResult,
   type PullRequestRef,
-  type PullRequestSetFilesViewedInput,
 } from "@t3tools/contracts";
 
 import type * as PullRequestFilesViewed from "../persistence/PullRequestFilesViewed.ts";
@@ -224,72 +221,6 @@ export const make = (dependencies: Dependencies) => {
     },
   );
 
-  // Serialize presses so slower tick lookups cannot overwrite later unticks.
-  const filesViewedGates = new Map<
-    string,
-    { readonly gate: Semaphore.Semaphore; pending: number }
-  >();
-
-  const inFilesViewedOrder = (
-    project: SupportedProject,
-    number: number,
-    write: Effect.Effect<void, PullRequestError>,
-  ) =>
-    // Atomically find, register and queue on gates; yielding during creation lets concurrent presses use separate gates.
-    Effect.suspend(() => {
-      const key = `${project.project.id} ${project.remote} ${number}`;
-      const held = filesViewedGates.get(key);
-      const entry = held ?? { gate: Semaphore.makeUnsafe(1), pending: 0 };
-      if (held === undefined) filesViewedGates.set(key, entry);
-      entry.pending += 1;
-      return entry.gate
-        .withPermits(1)(write)
-        .pipe(
-          Effect.ensuring(
-            Effect.sync(() => {
-              entry.pending -= 1;
-              if (entry.pending === 0) filesViewedGates.delete(key);
-            }),
-          ),
-        );
-    });
-
-  const environmentSetFilesViewed = Effect.fn("pullRequestViewedFiles.environmentSetFilesViewed")(
-    function* (
-      project: SupportedProject,
-      input: PullRequestSetFilesViewedInput,
-    ): Effect.fn.Return<void, PullRequestError> {
-      const viewer = yield* requiredViewerOf(project, "setFilesViewed");
-      const cleared = input.files
-        .filter((file) => file.viewed && file.revision === undefined)
-        .map((file) => file.path);
-      const revisions =
-        cleared.length === 0
-          ? null
-          : yield* fileRevisionsOf(project, input, cleared, "setFilesViewed", "fresh").pipe(
-              Effect.catch((error) =>
-                Effect.logWarning("recording viewed files without what the head has of them", {
-                  operation: "setFilesViewed",
-                  reason: error._tag,
-                }).pipe(Effect.as(null)),
-              ),
-            );
-      const viewedAt = DateTime.formatIso(yield* DateTime.now);
-      yield* filesViewedStore
-        .set({
-          ...filesViewedScope(project, input.number, viewer),
-          // Shown revisions win over the head; missing paths have null baselines; empty means deleted.
-          files: input.files.map((file) => ({
-            path: file.path,
-            revision: file.revision ?? revisions?.get(file.path) ?? null,
-            viewed: file.viewed,
-          })),
-          viewedAt,
-        })
-        .pipe(Effect.mapError(toFilesViewedStoreError("setFilesViewed")));
-    },
-  );
-
   const filesViewed = (input: PullRequestRef) =>
     requireProject(input).pipe(
       Effect.flatMap((project): Effect.Effect<PullRequestFilesViewedResult, PullRequestError> => {
@@ -314,36 +245,5 @@ export const make = (dependencies: Dependencies) => {
       }),
     );
 
-  const setFilesViewed = (
-    input: PullRequestSetFilesViewedInput,
-  ): Effect.Effect<void, PullRequestError> =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        const write = project.api.setFilesViewed;
-        if (project.api.capabilities.viewedFiles === "host" && write) {
-          return write({
-            cwd: project.project.workspaceRoot,
-            repository: project.repository,
-            host: project.host,
-            number: input.number,
-            files: input.files,
-          }).pipe(Effect.mapError(toPullRequestError("setFilesViewed")));
-        }
-        if (project.api.capabilities.viewedFiles === "environment") {
-          return inFilesViewedOrder(
-            project,
-            input.number,
-            environmentSetFilesViewed(project, input),
-          );
-        }
-        return Effect.fail(
-          new PullRequestOperationError({
-            operation: "setFilesViewed",
-            detail: "This host does not track which files a reader has seen.",
-          }),
-        );
-      }),
-    );
-
-  return { filesViewed, setFilesViewed };
+  return { filesViewed };
 };

@@ -1,12 +1,7 @@
-import type { PullRequestAction } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { SearchIcon } from "lucide-react";
 import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
 import { PullRequestStackPopover } from "./PullRequestStackPopover";
-import {
-  PullRequestSpeedActions,
-  type PullRequestSpeedActionResult,
-} from "./PullRequestSpeedActions";
 import { memo, type RefCallback } from "react";
 
 import { cn } from "~/lib/utils";
@@ -79,11 +74,6 @@ function PullRequestRowImpl({
   statsRef,
   onSelect,
   onIntent,
-  hostActions,
-  onActed,
-  closing = false,
-  sweeping = false,
-  onCloseSweepStart,
 }: {
   entry: EnvironmentPullRequestEntry;
   selected: boolean;
@@ -97,13 +87,8 @@ function PullRequestRowImpl({
   onSelect: (entry: PullRequestRowTarget) => void;
   /** The row the pointer or focus rests on, or null when it leaves. */
   onIntent?: (entry: PullRequestRowTarget | null) => void;
-  hostActions: ReadonlySet<PullRequestAction>;
-  onActed: (result: PullRequestSpeedActionResult) => void;
-  closing?: boolean;
-  sweeping?: boolean;
-  onCloseSweepStart?: (entry: EnvironmentPullRequestEntry, event: PointerEvent) => void;
 }) {
-  const { Icon, providerName, terminology } = getSourceControlPresentationForKind(entry.provider);
+  const { Icon, providerName } = getSourceControlPresentationForKind(entry.provider);
   return (
     <div
       ref={statsRef}
@@ -248,17 +233,6 @@ function PullRequestRowImpl({
           updatedAt={entry.updatedAt}
         />
       </button>
-      {hostActions.size > 0 ? (
-        <PullRequestSpeedActions
-          entry={entry}
-          hostActions={hostActions}
-          terminology={terminology}
-          onActed={onActed}
-          closing={closing}
-          sweeping={sweeping}
-          {...(onCloseSweepStart ? { onCloseSweepStart } : {})}
-        />
-      ) : null}
     </div>
   );
 }

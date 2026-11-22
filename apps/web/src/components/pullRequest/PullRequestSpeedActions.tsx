@@ -3,7 +3,6 @@ import type { PullRequestAction, PullRequestSummary } from "@t3tools/contracts";
 import { createContext, use, type ReactNode } from "react";
 import type { ChangeRequestTerminology } from "@t3tools/client-runtime/source-control-clients";
 
-import { useShortcutModifierState } from "~/shortcutModifierState";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useUiStateStore } from "~/uiStateStore";
 import { Button } from "../ui/button";
@@ -128,14 +127,6 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
  * row's action group, not the rows or their buttons, in one commit.
  */
 export const PullRequestSpeedModeContext = createContext(false);
-
-/** Tracks Shift for the quick actions below it. */
-export function PullRequestSpeedModeProvider({ children }: { children: ReactNode }) {
-  const modifiers = useShortcutModifierState(true);
-  const speedMode =
-    modifiers.shiftKey && !modifiers.metaKey && !modifiers.ctrlKey && !modifiers.altKey;
-  return <PullRequestSpeedModeContext value={speedMode}>{children}</PullRequestSpeedModeContext>;
-}
 
 function SpeedModeGroup({
   busy,

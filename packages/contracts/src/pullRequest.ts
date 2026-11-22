@@ -170,9 +170,25 @@ export type PullRequestComment = typeof PullRequestComment.Type;
 export const PullRequestDiffSide = Schema.Literals(["left", "right"]);
 export type PullRequestDiffSide = typeof PullRequestDiffSide.Type;
 
+export const PullRequestReviewPosition = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("added"),
+    newLine: PositiveInt,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("deleted"),
+    oldLine: PositiveInt,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("context"),
+    oldLine: PositiveInt,
+    newLine: PositiveInt,
+    side: PullRequestDiffSide,
+  }),
+]);
+export type PullRequestReviewPosition = typeof PullRequestReviewPosition.Type;
 export const PullRequestReviewVerdict = Schema.Literals(["comment", "approve", "request-changes"]);
 export type PullRequestReviewVerdict = typeof PullRequestReviewVerdict.Type;
-
 export const PullRequestThreadComment = Schema.Struct({
   id: TrimmedNonEmptyString,
   author: Schema.NullOr(PullRequestActor),
@@ -214,33 +230,6 @@ export type PullRequestConversationThread = PullRequestReviewThread | PullReques
 
 export const PullRequestReviewerKind = Schema.Literals(["user", "team"]);
 export type PullRequestReviewerKind = typeof PullRequestReviewerKind.Type;
-
-export const PullRequestReviewerCandidate = Schema.Struct({
-  ...PullRequestActor.fields,
-  id: TrimmedNonEmptyString,
-  kind: PullRequestReviewerKind,
-  isRequested: Schema.Boolean,
-});
-export type PullRequestReviewerCandidate = typeof PullRequestReviewerCandidate.Type;
-
-export const PullRequestReviewerCandidateList = Schema.Struct({
-  candidates: Schema.Array(PullRequestReviewerCandidate),
-  truncated: Schema.Boolean,
-});
-export type PullRequestReviewerCandidateList = typeof PullRequestReviewerCandidateList.Type;
-
-export const PullRequestLabelCandidate = Schema.Struct({
-  ...PullRequestLabel.fields,
-  description: Schema.NullOr(Schema.String),
-  isApplied: Schema.Boolean,
-});
-export type PullRequestLabelCandidate = typeof PullRequestLabelCandidate.Type;
-
-export const PullRequestLabelCandidateList = Schema.Struct({
-  candidates: Schema.Array(PullRequestLabelCandidate),
-  truncated: Schema.Boolean,
-});
-export type PullRequestLabelCandidateList = typeof PullRequestLabelCandidateList.Type;
 
 export const PullRequestCommit = Schema.Struct({
   oid: TrimmedNonEmptyString,
@@ -447,13 +436,6 @@ export const PullRequestRef = Schema.Struct({
   number: PositiveInt,
 });
 export type PullRequestRef = typeof PullRequestRef.Type;
-
-/** `query` asks the host for matches past the first page of candidates. */
-export const PullRequestReviewerCandidatesInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  query: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(100))),
-});
-export type PullRequestReviewerCandidatesInput = typeof PullRequestReviewerCandidatesInput.Type;
 
 export const PullRequestRoutingIdentityInput = Schema.Struct({
   host: TrimmedNonEmptyString,
@@ -702,13 +684,6 @@ export const PullRequestActivity = Schema.Struct({
 });
 export type PullRequestActivity = typeof PullRequestActivity.Type;
 
-export const pullRequestConversationThreads = (
-  activity: Pick<PullRequestActivity, "reviewThreads" | "overviewThreads">,
-): ReadonlyArray<PullRequestConversationThread> =>
-  activity.overviewThreads === undefined || activity.overviewThreads.length === 0
-    ? activity.reviewThreads
-    : [...activity.reviewThreads, ...activity.overviewThreads];
-
 export const PullRequestDetailView = Schema.Struct({
   ...PullRequestDetail.fields,
   ...PullRequestActivity.fields,
@@ -800,27 +775,11 @@ export const PullRequestChangeBreakdown = Schema.NullOr(
 );
 export type PullRequestChangeBreakdown = typeof PullRequestChangeBreakdown.Type;
 
-const MAX_FILES_VIEWED_PRESSES = 500;
-
-export const PullRequestSetFilesViewedInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  files: Schema.Array(
-    Schema.Struct({
-      path: FilePath,
-      viewed: Schema.Boolean,
-      /** The file's version in the diff the reader was shown; without it the head's is recorded. */
-      revision: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(256))),
-    }),
-  ).check(Schema.isMaxLength(MAX_FILES_VIEWED_PRESSES)),
-});
-export type PullRequestSetFilesViewedInput = typeof PullRequestSetFilesViewedInput.Type;
-
 export const PullRequestStackHead = Schema.Struct({
   number: PositiveInt,
   headSha: TrimmedNonEmptyString,
 });
 export type PullRequestStackHead = typeof PullRequestStackHead.Type;
-
 export const PullRequestActionInput = Schema.Struct({
   /** Native stack scope; only send to environments advertising pullRequestStackActions. */
   stackNumber: Schema.optional(PositiveInt),
@@ -833,72 +792,6 @@ export const PullRequestActionInput = Schema.Struct({
   replyWithSummary: Schema.optional(Schema.Literal(true)),
 });
 export type PullRequestActionInput = typeof PullRequestActionInput.Type;
-
-// Preserve whitespace because it affects Markdown formatting.
-const CommentBody = Schema.String.check(Schema.isNonEmpty()).check(Schema.isMaxLength(65_536));
-
-export const PullRequestCommentInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  body: CommentBody,
-});
-export type PullRequestCommentInput = typeof PullRequestCommentInput.Type;
-
-export const PullRequestUpdateInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  title: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(1024))),
-  body: Schema.optional(Schema.String.check(Schema.isMaxLength(65_536))),
-  maintainerCanModify: Schema.optional(Schema.Boolean),
-});
-export type PullRequestUpdateInput = typeof PullRequestUpdateInput.Type;
-
-/** Comment kind selects the endpoint; GitHub uses separate mutations for conversation and line comments. */
-export const PullRequestCommentUpdateInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  commentId: TrimmedNonEmptyString,
-  kind: Schema.Literals(["issue-comment", "review-comment"]),
-  body: CommentBody,
-});
-export type PullRequestCommentUpdateInput = typeof PullRequestCommentUpdateInput.Type;
-
-export const PullRequestReviewPosition = Schema.Union([
-  Schema.Struct({
-    kind: Schema.Literal("added"),
-    newLine: PositiveInt,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("deleted"),
-    oldLine: PositiveInt,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("context"),
-    oldLine: PositiveInt,
-    newLine: PositiveInt,
-    side: PullRequestDiffSide,
-  }),
-]);
-export type PullRequestReviewPosition = typeof PullRequestReviewPosition.Type;
-
-export const PullRequestReviewCommentDraft = Schema.Struct({
-  path: TrimmedNonEmptyString,
-  /** GitLab needs both names for renamed-file comments; hosts using one path ignore this. */
-  oldPath: Schema.optional(TrimmedNonEmptyString),
-  position: PullRequestReviewPosition,
-  /**
-   * The first line of a comment on a range, which ends at `position`. Sent only to a host whose
-   * capabilities include `review.rangeComment`.
-   */
-  startPosition: Schema.optional(PullRequestReviewPosition),
-  body: CommentBody,
-});
-export type PullRequestReviewCommentDraft = typeof PullRequestReviewCommentDraft.Type;
-
-export const PullRequestSubmitReviewInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  verdict: PullRequestReviewVerdict,
-  body: Schema.String.check(Schema.isMaxLength(65_536)),
-  comments: Schema.Array(PullRequestReviewCommentDraft),
-});
-export type PullRequestSubmitReviewInput = typeof PullRequestSubmitReviewInput.Type;
 
 export const PullRequestThreadCommentsInput = Schema.Struct({
   ...PullRequestRef.fields,
@@ -914,44 +807,6 @@ export const PullRequestThreadCommentsResult = Schema.Struct({
   hiddenCount: Schema.optional(NonNegativeInt),
 });
 export type PullRequestThreadCommentsResult = typeof PullRequestThreadCommentsResult.Type;
-
-export const PullRequestThreadReplyInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  threadId: TrimmedNonEmptyString,
-  body: CommentBody,
-});
-export type PullRequestThreadReplyInput = typeof PullRequestThreadReplyInput.Type;
-
-export const PullRequestThreadResolutionInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  threadId: TrimmedNonEmptyString,
-  resolved: Schema.Boolean,
-});
-export type PullRequestThreadResolutionInput = typeof PullRequestThreadResolutionInput.Type;
-
-export const PullRequestReactionInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  subjectId: Schema.optional(TrimmedNonEmptyString),
-  content: PullRequestReactionContent,
-  reacted: Schema.Boolean,
-});
-export type PullRequestReactionInput = typeof PullRequestReactionInput.Type;
-
-export const PullRequestReviewerRequestInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  reviewers: Schema.Array(
-    Schema.Struct({ id: TrimmedNonEmptyString, kind: PullRequestReviewerKind }),
-  ).check(Schema.isMinLength(1), Schema.isMaxLength(25)),
-  requested: Schema.Boolean,
-});
-export type PullRequestReviewerRequestInput = typeof PullRequestReviewerRequestInput.Type;
-
-export const PullRequestLabelChangeInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  labels: Schema.Array(TrimmedNonEmptyString).check(Schema.isMinLength(1), Schema.isMaxLength(25)),
-  applied: Schema.Boolean,
-});
-export type PullRequestLabelChangeInput = typeof PullRequestLabelChangeInput.Type;
 
 /**
  * The names keep their `cli-` prefix for wire compatibility; for a host read with a credential

@@ -910,20 +910,20 @@ describe("rightPanelStore", () => {
     const otherEnvironment = scopeThreadRef("env-2" as EnvironmentId, refA.threadId);
     const selections = [
       [refA, pr, "code"],
-      [refB, pr, "guide"],
-      [otherEnvironment, pr, "timeline"],
-      [refA, otherPr, "summary"],
+      [refB, pr, "code"],
+      [otherEnvironment, pr, "code"],
+      [refA, otherPr, "code"],
     ] as const;
     const store = useRightPanelStore.getState();
     for (const [ref, reference, tab] of selections) {
       store.openPullRequest(ref, reference);
-      store.setPullRequestDetailTab(ref, pullRequestSurfaceId(reference), "guide");
+      store.setPullRequestDetailTab(ref, pullRequestSurfaceId(reference), "code");
       store.setPullRequestDetailTab(ref, pullRequestSurfaceId(reference), tab);
     }
 
     store.openPullRequest(refA, pr);
     const revision = store.getUserActionRevision(refA);
-    store.setPullRequestDetailTab(refA, pullRequestSurfaceId(pr), "timeline");
+    store.setPullRequestDetailTab(refA, pullRequestSurfaceId(pr), "code");
     expect(store.openProactive(refA, linkedPullRequest, revision)).toBe(true);
     expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual(
       linkedPullRequest,
@@ -944,7 +944,7 @@ describe("rightPanelStore", () => {
       });
       const active = selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, ref);
       expect(active?.id).toBe(pullRequestSurfaceId(reference));
-      expect(active?.kind === "pull-request" && (active.detailTab ?? "summary")).toBe(tab);
+      expect(active?.kind === "pull-request" && (active.detailTab ?? "code")).toBe(tab);
       store.closeSurface(ref, active!.id);
       await reopenClosedView(useClosedViewStore.getState().entries[0]!, {
         workspaceAvailable: true,
@@ -953,8 +953,33 @@ describe("rightPanelStore", () => {
         useRightPanelStore.getState().byThreadKey,
         ref,
       );
-      expect(reopened?.kind === "pull-request" && (reopened.detailTab ?? "summary")).toBe(tab);
+      expect(reopened?.kind === "pull-request" && (reopened.detailTab ?? "code")).toBe(tab);
     }
+  });
+
+  it("normalizes a persisted non-code detail tab back to code on migrate", () => {
+    const pr = { projectId: "project-a", repository: "pingdotgg/t3code", number: 12 };
+    const surfaceId = pullRequestSurfaceId(pr);
+    const migrated = migratePersistedRightPanelState({
+      byThreadKey: {
+        "env-1:thread-A": {
+          isOpen: true,
+          activeSurfaceId: surfaceId,
+          surfaces: [
+            {
+              id: surfaceId,
+              kind: "pull-request",
+              projectId: pr.projectId,
+              repository: pr.repository,
+              number: pr.number,
+              detailTab: "guide",
+            },
+          ],
+        },
+      },
+    });
+    const surface = selectThreadRightPanelState(migrated.byThreadKey, refA).surfaces[0];
+    expect(surface?.kind === "pull-request" ? (surface.detailTab ?? "code") : null).toBe("code");
   });
 
   it("keeps matching repository and number on different hosts as separate tabs", () => {

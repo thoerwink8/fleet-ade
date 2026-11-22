@@ -11,7 +11,6 @@ import {
   PullRequestFilesViewedResult,
   PullRequestLinkedThreadsResult,
   type EnvironmentId,
-  type PullRequestActor,
   type PullRequestActionInput,
   type PullRequestListInput,
   type PullRequestListStatsInput,
@@ -538,16 +537,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       },
     ),
   );
-  // Pages read the strict detail and other surfaces the default one; patch whichever is loaded
-  // without starting a read of the other.
-  const loadedDetails = (
-    registry: AtomRegistry.AtomRegistry,
-    target: { readonly environmentId: EnvironmentId; readonly input: PullRequestRef },
-  ) =>
-    [
-      detail({ ...target, input: { ...target.input, allowStale: undefined } }),
-      detail({ ...target, input: { ...target.input, allowStale: false } }),
-    ].filter((atom) => registry.getNodes().has(atom));
   const detailReadVersions = Atom.family((source: ReturnType<typeof detail>) =>
     Atom.family((answer: ReturnType<typeof detailAnswers>) =>
       Atom.make((get) => {
@@ -604,14 +593,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
   // Hover cards read their own atoms, so a pending or failed hover read never decides where a
   // click on the same link goes.
   const previewCard = previewQuery("environment-data:pull-requests:preview-card");
-  const labelCandidates = writableQueryFamily(
-    createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:pull-requests:label-candidates",
-      tag: WS_METHODS.pullRequestsLabelCandidates,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsLabelCandidates, input),
-      staleTimeMs: 60_000,
-    }),
-  );
   const reviewGuide = writableQueryFamily(
     createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:pull-requests:review-guide",
@@ -623,21 +604,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       ...(onAnswer.reviewGuide === undefined ? {} : { onAnswer: onAnswer.reviewGuide }),
     }),
   );
-  const reviewerCandidates = writableQueryFamily(
-    createEnvironmentRpcQueryAtomFamily(runtime, {
-      label: "environment-data:pull-requests:reviewer-candidates",
-      tag: WS_METHODS.pullRequestsReviewerCandidates,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsReviewerCandidates, input),
-      staleTimeMs: 60_000,
-    }),
-  );
-  // Asked only when the menu's first page is not everybody, so a query cannot be answered from it.
-  const reviewerSearch = createEnvironmentRpcQueryAtomFamily(runtime, {
-    label: "environment-data:pull-requests:reviewer-search",
-    tag: WS_METHODS.pullRequestsReviewerCandidates,
-    execute: (input) => routedRequest(WS_METHODS.pullRequestsReviewerCandidates, input),
-    staleTimeMs: 60_000,
-  });
   const loadDiff = Effect.fn("PullRequests.loadDiff")(function* (input: PullRequestDiffInput) {
     const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
     const loader = yield* PullRequestDiffLoader.PullRequestDiffLoader;
@@ -852,21 +818,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       staleTimeMs: 60_000,
       refreshTrigger: ({ environmentId }) => refreshes({ environmentId, input: {} }),
     }),
-    /**
-     * One write in flight per change request: the host applies these in order, and a reader
-     * ticking down a file list faster than the round trip would otherwise race their own presses.
-     */
-    setFilesViewed: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:set-files-viewed",
-      tag: WS_METHODS.pullRequestsSetFilesViewed,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsSetFilesViewed, input),
-      scheduler: commandScheduler,
-      concurrency: {
-        mode: "serial",
-        key: ({ environmentId, input }) =>
-          JSON.stringify([environmentId, input.projectId, input.repository, input.number]),
-      },
-    }),
     runAction: createEnvironmentRpcCommand(runtime, {
       tag: WS_METHODS.pullRequestsRunAction,
       label: "environment-data:pull-requests:run-action",
@@ -894,138 +845,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
       scheduler: commandScheduler,
       concurrency: serialPerEnvironment,
     }),
-    update: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:update",
-      tag: WS_METHODS.pullRequestsUpdate,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsUpdate, input),
-      onSuccess: (target, registry) => Effect.sync(() => registry.refresh(preview(target))),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-    }),
-    comment: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:comment",
-      tag: WS_METHODS.pullRequestsComment,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsComment, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-    }),
-    updateComment: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:update-comment",
-      tag: WS_METHODS.pullRequestsUpdateComment,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsUpdateComment, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-      onSuccess: ({ environmentId, input: { projectId, host, repository, number } }, registry) =>
-        Effect.sync(() =>
-          registry.refresh(
-            activity({
-              environmentId,
-              input: { projectId, ...(host === undefined ? {} : { host }), repository, number },
-            }),
-          ),
-        ),
-    }),
-    submitReview: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:submit-review",
-      tag: WS_METHODS.pullRequestsSubmitReview,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsSubmitReview, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-    }),
-    replyToThread: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:reply-to-thread",
-      tag: WS_METHODS.pullRequestsReplyToThread,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsReplyToThread, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-    }),
-    reviewerCandidates,
-    /** The host's search for reviewers past the first page, keyed by what was typed. */
-    reviewerSearch,
-    requestReviewers: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:request-reviewers",
-      tag: WS_METHODS.pullRequestsRequestReviewers,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsRequestReviewers, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-      onSuccess: (target, registry) =>
-        Effect.sync(() => {
-          const { reviewers, requested } = target.input;
-          const candidatesAtom = reviewerCandidates(target);
-          const candidates = AsyncResult.getOrElse(registry.get(candidatesAtom), () => null);
-          const selected =
-            candidates?.candidates.filter((candidate) =>
-              reviewers.some(
-                (reviewer) => reviewer.id === candidate.id && reviewer.kind === candidate.kind,
-              ),
-            ) ?? [];
-          const missingIdentities = selected.length < reviewers.length;
-          // Somebody found only by the host's search is not in the loaded list yet; the host
-          // puts requested reviewers first, so reading it again brings them in.
-          updateCached(
-            registry,
-            candidatesAtom,
-            (value) => ({
-              ...value,
-              candidates: value.candidates.map((candidate) =>
-                selected.includes(candidate) ? { ...candidate, isRequested: requested } : candidate,
-              ),
-            }),
-            missingIdentities,
-          );
-          const selectedLogins = new Set(
-            selected.map((candidate) => candidate.login.toLowerCase()),
-          );
-          const updateReviewers = (
-            actors: ReadonlyArray<PullRequestActor>,
-            keep = (_actor: PullRequestActor) => false,
-          ) =>
-            requested
-              ? [
-                  ...actors,
-                  ...selected
-                    .filter(
-                      (candidate) =>
-                        !actors.some(
-                          (actor) => actor.login.toLowerCase() === candidate.login.toLowerCase(),
-                        ),
-                    )
-                    .map(({ login, name, avatarUrl }) => ({ login, name, avatarUrl })),
-                ]
-              : actors.filter(
-                  (actor) => !selectedLogins.has(actor.login.toLowerCase()) || keep(actor),
-                );
-          for (const atom of loadedDetails(registry, target)) {
-            updateCached(
-              registry,
-              atom,
-              (value) => ({
-                ...value,
-                reviewers: updateReviewers(value.reviewers),
-              }),
-              missingIdentities,
-            );
-          }
-          updateCached(
-            registry,
-            activity(target),
-            (value) => ({
-              ...value,
-              reviewers:
-                value.reviewers === undefined
-                  ? undefined
-                  : updateReviewers(value.reviewers, (actor) =>
-                      value.comments.some(
-                        (comment) =>
-                          (comment.kind === "review" || comment.kind === "review-comment") &&
-                          comment.author?.login.toLowerCase() === actor.login.toLowerCase(),
-                      ),
-                    ),
-            }),
-            missingIdentities,
-          );
-        }),
-    }),
     reviewGuide,
     generateReviewGuide: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pull-requests:generate-review-guide",
@@ -1035,59 +854,6 @@ export function createPullRequestEnvironmentAtoms<R, E>(
         Effect.sync(() => {
           updateCached(registry, reviewGuide(target), () => result, true);
         }),
-    }),
-    labelCandidates,
-    setLabels: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:set-labels",
-      tag: WS_METHODS.pullRequestsSetLabels,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsSetLabels, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-      onSuccess: (target, registry) =>
-        Effect.sync(() => {
-          const { labels, applied } = target.input;
-          const candidatesAtom = labelCandidates(target);
-          const candidates = AsyncResult.getOrElse(registry.get(candidatesAtom), () => null);
-          const names = new Set(labels);
-          updateCached(registry, candidatesAtom, (value) => ({
-            ...value,
-            candidates: value.candidates.map((candidate) =>
-              names.has(candidate.name) ? { ...candidate, isApplied: applied } : candidate,
-            ),
-          }));
-          for (const atom of loadedDetails(registry, target)) {
-            updateCached(registry, atom, (value) => ({
-              ...value,
-              labels: applied
-                ? [
-                    ...value.labels,
-                    ...labels
-                      .filter((name) => !value.labels.some((label) => label.name === name))
-                      .map((name) => ({
-                        name,
-                        color:
-                          candidates?.candidates.find((candidate) => candidate.name === name)
-                            ?.color ?? null,
-                      })),
-                  ]
-                : value.labels.filter((label) => !names.has(label.name)),
-            }));
-          }
-        }),
-    }),
-    setThreadResolution: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:set-thread-resolution",
-      tag: WS_METHODS.pullRequestsSetThreadResolution,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsSetThreadResolution, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
-    }),
-    setReaction: createEnvironmentRpcCommand(runtime, {
-      label: "environment-data:pull-requests:set-reaction",
-      tag: WS_METHODS.pullRequestsSetReaction,
-      execute: (input) => routedRequest(WS_METHODS.pullRequestsSetReaction, input),
-      scheduler: commandScheduler,
-      concurrency: serialPerEnvironment,
     }),
     /**
      * A separate request rather than a flag on a read, so only a person's refresh spends

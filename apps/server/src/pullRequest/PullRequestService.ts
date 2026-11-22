@@ -24,8 +24,6 @@ import {
   type PullRequestAction,
   type PullRequestActionInput,
   type PullRequestActivity,
-  type PullRequestCommentInput,
-  type PullRequestCommentUpdateInput,
   type PullRequestDetail,
   type PullRequestPreview,
   type PullRequestChecks,
@@ -51,27 +49,15 @@ import {
   type PullRequestLabel,
   type PullRequestListStatsResult,
   type PullRequestProviderSummary,
-  type PullRequestReactionInput,
   type PullRequestRef,
   type PullRequestRoutingResult,
   type PullRequestRoutingIdentityInput,
   type PullRequestRoutingIdentityResult,
-  type PullRequestReviewVerdict,
-  type PullRequestReviewerCandidateList,
-  type PullRequestReviewerCandidatesInput,
-  type PullRequestReviewerRequestInput,
-  type PullRequestLabelCandidateList,
-  type PullRequestLabelChangeInput,
-  type PullRequestSetFilesViewedInput,
   type PullRequestState,
-  type PullRequestSubmitReviewInput,
   PullRequestStack,
   PullRequestSummary,
-  type PullRequestThreadReplyInput,
-  type PullRequestThreadResolutionInput,
   type PullRequestThreadCommentsInput,
   type PullRequestThreadCommentsResult,
-  type PullRequestUpdateInput,
   type SourceControlProviderInfo,
   SourceControlProviderKind,
   type ThreadPullRequestKey,
@@ -262,57 +248,18 @@ export class PullRequestService extends Context.Service<
     readonly filesViewed: (
       input: PullRequestRef,
     ) => Effect.Effect<PullRequestFilesViewedResult, PullRequestError>;
-    readonly setFilesViewed: (
-      input: PullRequestSetFilesViewedInput,
-    ) => Effect.Effect<void, PullRequestError>;
     readonly changeBreakdown: (
       input: PullRequestRef,
     ) => Effect.Effect<PullRequestChangeBreakdown, PullRequestError>;
     readonly runAction: (
       input: PullRequestActionInput,
     ) => Effect.Effect<PullRequestSummary | undefined, PullRequestError>;
-    readonly update: (input: PullRequestUpdateInput) => Effect.Effect<void, PullRequestError>;
-    readonly comment: (input: PullRequestCommentInput) => Effect.Effect<void, PullRequestError>;
-    readonly updateComment: (
-      input: PullRequestCommentUpdateInput,
-    ) => Effect.Effect<void, PullRequestError>;
-    readonly submitReview: (
-      input: PullRequestSubmitReviewInput,
-    ) => Effect.Effect<void, PullRequestError>;
-    readonly replyToThread: (
-      input: PullRequestThreadReplyInput,
-    ) => Effect.Effect<void, PullRequestError>;
-    readonly setThreadResolution: (
-      input: PullRequestThreadResolutionInput,
-    ) => Effect.Effect<void, PullRequestError>;
-    readonly setReaction: (
-      input: PullRequestReactionInput,
-    ) => Effect.Effect<void, PullRequestError>;
-    readonly reviewerCandidates: (
-      input: PullRequestReviewerCandidatesInput,
-    ) => Effect.Effect<PullRequestReviewerCandidateList, PullRequestError>;
-    readonly requestReviewers: (
-      input: PullRequestReviewerRequestInput,
-    ) => Effect.Effect<void, PullRequestError>;
-    readonly labelCandidates: (
-      input: PullRequestRef,
-    ) => Effect.Effect<PullRequestLabelCandidateList, PullRequestError>;
-    readonly setLabels: (
-      input: PullRequestLabelChangeInput,
-    ) => Effect.Effect<void, PullRequestError>;
     readonly invalidate: (
       input: PullRequestInvalidateInput,
       options?: { readonly notifyReaders?: boolean },
     ) => Effect.Effect<void>;
   }
 >()("t3/pullRequest/PullRequestService") {}
-
-const VERDICT_LABELS: Record<PullRequestReviewVerdict, string> = {
-  comment: "review",
-  approve: "approve",
-  "request-changes": "request changes on",
-};
-
 const ACTION_ACCESS_REFUSALS: Record<PullRequestAction, string> = {
   merge: "You need write access on this repository to merge.",
   ready:
@@ -334,9 +281,6 @@ const ACTION_ACCESS_REFUSALS: Record<PullRequestAction, string> = {
   "approve-workflows":
     "You need write access on this repository to approve workflows from a fork pull request.",
 };
-
-const REVIEWER_REQUEST_REFUSAL = "You need write access on this repository to ask for a review.";
-const LABEL_CHANGE_REFUSAL = "You need triage access on this repository to change its labels.";
 
 export interface SupportedProject {
   readonly cursorKey: string;
@@ -602,6 +546,7 @@ function withRateLimitBackoff(
           getReviewThreadComments: wrap("getReviewThreadComments", api.getReviewThreadComments),
         }),
     getViewerPermissions: interactive("getViewerPermissions", api.getViewerPermissions),
+    runAction: interactive("runAction", api.runAction),
     getDiff: wrap("getDiff", api.getDiff),
     ...(api.getDiffFilePaths === undefined
       ? {}
@@ -615,29 +560,9 @@ function withRateLimitBackoff(
     ...(api.getFileStats === undefined
       ? {}
       : { getFileStats: wrap("getFileStats", api.getFileStats) }),
-    ...(api.setFilesViewed === undefined
-      ? {}
-      : { setFilesViewed: interactive("setFilesViewed", api.setFilesViewed) }),
     ...(api.getFileRevisions === undefined
       ? {}
       : { getFileRevisions: wrap("getFileRevisions", api.getFileRevisions) }),
-    runAction: interactive("runAction", api.runAction),
-    ...(api.updateChangeRequest === undefined
-      ? {}
-      : {
-          updateChangeRequest: interactive("updateChangeRequest", api.updateChangeRequest),
-        }),
-    comment: interactive("comment", api.comment),
-    ...(api.updateComment === undefined
-      ? {}
-      : { updateComment: interactive("updateComment", api.updateComment) }),
-    submitReview: interactive("submitReview", api.submitReview),
-    listReviewerCandidates: interactive("listReviewerCandidates", api.listReviewerCandidates),
-    setReviewerRequest: interactive("setReviewerRequest", api.setReviewerRequest),
-    ...(api.listLabelCandidates === undefined
-      ? {}
-      : { listLabelCandidates: interactive("listLabelCandidates", api.listLabelCandidates) }),
-    ...(api.setLabels === undefined ? {} : { setLabels: interactive("setLabels", api.setLabels) }),
     ...(api.listRepositoryLabels === undefined
       ? {}
       : { listRepositoryLabels: interactive("listRepositoryLabels", api.listRepositoryLabels) }),
@@ -657,9 +582,6 @@ function withRateLimitBackoff(
             api.searchRepositoryReferences,
           ),
         }),
-    replyToThread: interactive("replyToThread", api.replyToThread),
-    setReaction: interactive("setReaction", api.setReaction),
-    setThreadResolution: interactive("setThreadResolution", api.setThreadResolution),
   };
   // Optional provider methods must be forwarded too; returning the interface alone permits omissions.
   return wrapped satisfies PullRequestProviderApi &
@@ -2063,33 +1985,6 @@ export const make = Effect.gen(function* () {
   const context = yield* Effect.context<never>();
   const scope = yield* Effect.scope;
   const runFork = Effect.runForkWith(context);
-
-  // Refuse failed viewer lookups; unnamed fallbacks hide marks and orphan subsequent writes.
-  const requiredViewerOf = (
-    project: SupportedProject,
-    operation: string,
-  ): Effect.Effect<string | null, PullRequestError> =>
-    resolveViewers([project], new Map(), { allowPaused: true }).pipe(
-      Effect.flatMap(([resolved]) => {
-        const error = resolved?.error ?? null;
-        return error === null
-          ? Effect.succeed(resolved?.viewer ?? null)
-          : Effect.fail(toPullRequestError(operation)(error));
-      }),
-    );
-
-  const setFilesViewed: PullRequestService["Service"]["setFilesViewed"] = (input) =>
-    canonicalRef(input).pipe(
-      Effect.flatMap((ref) =>
-        viewedFiles.setFilesViewed(input).pipe(
-          // Deliberately not `invalidatedByMutation`: ticking a file off says nothing about the
-          // change request, and dropping a 300-file diff on every checkbox is the whole cost of
-          // the feature.
-          Effect.ensuring(Effect.sync(() => bumpFilesViewedEpoch(ref))),
-        ),
-      ),
-    );
-
   type ActionOutcome = {
     readonly repository: string;
     readonly summary: PullRequestSummary | undefined;
@@ -2261,362 +2156,6 @@ export const make = Effect.gen(function* () {
       }),
     );
 
-  const comment: PullRequestService["Service"]["comment"] = (input) =>
-    (input.body.trim().length === 0
-      ? Effect.fail(
-          new PullRequestOperationError({
-            operation: "comment",
-            detail: "A comment cannot be empty.",
-          }),
-        )
-      : requireProject(input)
-    ).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        if (!project.api.capabilities.comment) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "comment",
-              detail: "This host cannot post a comment on a change request.",
-            }),
-          );
-        }
-        return viewerPermissionsOf(project, input, "comment").pipe(
-          Effect.flatMap((viewer): Effect.Effect<void, PullRequestError> => {
-            if (!viewer.comment) {
-              return Effect.fail(
-                new PullRequestOperationError({
-                  operation: "comment",
-                  detail:
-                    "You need write access on this repository to comment on a change request.",
-                }),
-              );
-            }
-            return project.api
-              .comment({
-                cwd: project.project.workspaceRoot,
-                repository: project.repository,
-                host: project.host,
-                number: input.number,
-                body: input.body,
-              })
-              .pipe(Effect.mapError(toPullRequestError("comment")));
-          }),
-        );
-      }),
-    );
-
-  // Hosts let authors edit without reporting that permission; checking it would wrongly deny access.
-  const update: PullRequestService["Service"]["update"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        const rewrite = project.api.updateChangeRequest;
-        if (project.api.capabilities.edit?.changeRequest !== true || rewrite === undefined) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "update",
-              detail: "This host cannot rewrite a change request.",
-            }),
-          );
-        }
-        if (
-          input.maintainerCanModify !== undefined &&
-          project.api.capabilities.edit?.maintainerEdits !== true
-        ) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "update",
-              detail: "This host does not support maintainer edits.",
-            }),
-          );
-        }
-        if (
-          input.title === undefined &&
-          input.body === undefined &&
-          input.maintainerCanModify === undefined
-        ) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "update",
-              detail: "Nothing was changed.",
-            }),
-          );
-        }
-        return rewrite({
-          cwd: project.project.workspaceRoot,
-          repository: project.repository,
-          host: project.host,
-          number: input.number,
-          ...(input.maintainerCanModify === undefined
-            ? {}
-            : { maintainerCanModify: input.maintainerCanModify }),
-          ...(input.title === undefined ? {} : { title: input.title }),
-          ...(input.body === undefined ? {} : { body: input.body }),
-        }).pipe(Effect.mapError(toPullRequestError("update")));
-      }),
-    );
-
-  const updateComment: PullRequestService["Service"]["updateComment"] = (input) =>
-    (input.body.trim().length === 0
-      ? Effect.fail(
-          new PullRequestOperationError({
-            operation: "updateComment",
-            detail: "A comment cannot be empty.",
-          }),
-        )
-      : requireProject(input)
-    ).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        const rewrite = project.api.updateComment;
-        if (project.api.capabilities.edit?.comment !== true || rewrite === undefined) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "updateComment",
-              detail: "This host cannot rewrite a comment.",
-            }),
-          );
-        }
-        return rewrite({
-          cwd: project.project.workspaceRoot,
-          repository: project.repository,
-          host: project.host,
-          number: input.number,
-          commentId: input.commentId,
-          kind: input.kind,
-          body: input.body,
-        }).pipe(Effect.mapError(toPullRequestError("updateComment")));
-      }),
-    );
-
-  const submitReview: PullRequestService["Service"]["submitReview"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        const review = project.api.capabilities.review;
-        const refuse = (detail: string) =>
-          Effect.fail(new PullRequestOperationError({ operation: "submitReview", detail }));
-        if (!review.verdicts.includes(input.verdict)) {
-          return refuse(`This host cannot ${VERDICT_LABELS[input.verdict]} a change request.`);
-        }
-        if (input.comments.length > 0 && !review.inlineComment) {
-          return refuse("This host cannot comment on a line of a change request.");
-        }
-        if (
-          input.verdict !== "approve" &&
-          input.body.trim().length === 0 &&
-          input.comments.length === 0
-        ) {
-          return refuse("A review needs a summary or at least one comment.");
-        }
-        return viewerPermissionsOf(project, input, "submitReview").pipe(
-          Effect.flatMap((viewer): Effect.Effect<void, PullRequestError> => {
-            if (!viewer.verdicts.includes(input.verdict)) {
-              return refuse(
-                `You need write access on this repository to ${
-                  VERDICT_LABELS[input.verdict]
-                } a change request.`,
-              );
-            }
-            if (input.comments.length > 0 && !viewer.comment) {
-              return refuse(
-                "You need write access on this repository to comment on a line of a change request.",
-              );
-            }
-            return project.api
-              .submitReview({
-                cwd: project.project.workspaceRoot,
-                repository: project.repository,
-                host: project.host,
-                number: input.number,
-                verdict: input.verdict,
-                body: input.body,
-                comments: input.comments,
-              })
-              .pipe(Effect.mapError(toPullRequestError("submitReview")));
-          }),
-        );
-      }),
-    );
-
-  const replyToThread: PullRequestService["Service"]["replyToThread"] = (input) =>
-    (input.body.trim().length === 0
-      ? Effect.fail(
-          new PullRequestOperationError({
-            operation: "replyToThread",
-            detail: "A reply cannot be empty.",
-          }),
-        )
-      : requireProject(input)
-    ).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        if (!project.api.capabilities.review.reply) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "replyToThread",
-              detail: "This host cannot reply to a review conversation.",
-            }),
-          );
-        }
-        return viewerPermissionsOf(project, input, "replyToThread").pipe(
-          Effect.flatMap((viewer): Effect.Effect<void, PullRequestError> => {
-            if (!viewer.comment) {
-              return Effect.fail(
-                new PullRequestOperationError({
-                  operation: "replyToThread",
-                  detail:
-                    "You need write access on this repository to reply to a review conversation.",
-                }),
-              );
-            }
-            return project.api
-              .replyToThread({
-                cwd: project.project.workspaceRoot,
-                repository: project.repository,
-                host: project.host,
-                number: input.number,
-                threadId: input.threadId,
-                body: input.body,
-              })
-              .pipe(Effect.mapError(toPullRequestError("replyToThread")));
-          }),
-        );
-      }),
-    );
-
-  const setThreadResolution: PullRequestService["Service"]["setThreadResolution"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        if (!project.api.capabilities.review.resolve) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "setThreadResolution",
-              detail: "This host cannot resolve a review conversation.",
-            }),
-          );
-        }
-        return viewerPermissionsOf(project, input, "setThreadResolution").pipe(
-          Effect.flatMap((viewer): Effect.Effect<void, PullRequestError> => {
-            if (!viewer.resolve) {
-              return Effect.fail(
-                new PullRequestOperationError({
-                  operation: "setThreadResolution",
-                  detail:
-                    "You need write access on this repository, or to have opened this change request, to resolve a review conversation.",
-                }),
-              );
-            }
-            return project.api
-              .setThreadResolution({
-                cwd: project.project.workspaceRoot,
-                repository: project.repository,
-                host: project.host,
-                number: input.number,
-                threadId: input.threadId,
-                resolved: input.resolved,
-              })
-              .pipe(Effect.mapError(toPullRequestError("setThreadResolution")));
-          }),
-        );
-      }),
-    );
-
-  // Hosts permit reactions from any reader; reading the PR already checks access.
-  const setReaction: PullRequestService["Service"]["setReaction"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        if (project.api.capabilities.reactions !== true) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "setReaction",
-              detail: "This host has no reactions.",
-            }),
-          );
-        }
-        return project.api
-          .setReaction({
-            cwd: project.project.workspaceRoot,
-            repository: project.repository,
-            host: project.host,
-            number: input.number,
-            ...(input.subjectId === undefined ? {} : { subjectId: input.subjectId }),
-            content: input.content,
-            reacted: input.reacted,
-          })
-          .pipe(Effect.mapError(toPullRequestError("setReaction")));
-      }),
-    );
-
-  const reviewerCandidates: PullRequestService["Service"]["reviewerCandidates"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap(
-        (project): Effect.Effect<PullRequestReviewerCandidateList, PullRequestError> => {
-          if (!project.api.capabilities.reviewers.listCandidates) {
-            return Effect.fail(
-              new PullRequestOperationError({
-                operation: "reviewerCandidates",
-                detail: "This host cannot say who may review a change request.",
-              }),
-            );
-          }
-          return viewerPermissionsOf(project, input, "reviewerCandidates").pipe(
-            Effect.flatMap(
-              (viewer): Effect.Effect<PullRequestReviewerCandidateList, PullRequestError> =>
-                viewer.requestReviewers
-                  ? project.api
-                      .listReviewerCandidates({
-                        cwd: project.project.workspaceRoot,
-                        repository: project.repository,
-                        host: project.host,
-                        number: input.number,
-                        query: input.query,
-                      })
-                      .pipe(Effect.mapError(toPullRequestError("reviewerCandidates")))
-                  : Effect.fail(
-                      new PullRequestOperationError({
-                        operation: "reviewerCandidates",
-                        detail: REVIEWER_REQUEST_REFUSAL,
-                      }),
-                    ),
-            ),
-          );
-        },
-      ),
-    );
-
-  const requestReviewers: PullRequestService["Service"]["requestReviewers"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        if (!project.api.capabilities.reviewers.request) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "requestReviewers",
-              detail: "This host cannot ask somebody for a review.",
-            }),
-          );
-        }
-        return viewerPermissionsOf(project, input, "requestReviewers").pipe(
-          Effect.flatMap((viewer): Effect.Effect<void, PullRequestError> => {
-            if (!viewer.requestReviewers) {
-              return Effect.fail(
-                new PullRequestOperationError({
-                  operation: "requestReviewers",
-                  detail: REVIEWER_REQUEST_REFUSAL,
-                }),
-              );
-            }
-            return project.api
-              .setReviewerRequest({
-                cwd: project.project.workspaceRoot,
-                repository: project.repository,
-                host: project.host,
-                number: input.number,
-                reviewers: input.reviewers,
-                requested: input.requested,
-              })
-              .pipe(Effect.mapError(toPullRequestError("requestReviewers")));
-          }),
-        );
-      }),
-    );
-
   const filterOptions: PullRequestService["Service"]["filterOptions"] = Effect.fn(
     "PullRequestService.filterOptions",
   )(function* (input) {
@@ -2683,73 +2222,6 @@ export const make = Effect.gen(function* () {
     });
     return { labels: [], authors: items, references: [], truncated };
   });
-
-  const labelCandidates: PullRequestService["Service"]["labelCandidates"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<PullRequestLabelCandidateList, PullRequestError> => {
-        const list = project.api.listLabelCandidates;
-        if (project.api.capabilities.labels !== true || list === undefined) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "labelCandidates",
-              detail: "This host cannot change the labels on a change request.",
-            }),
-          );
-        }
-        return viewerPermissionsOf(project, input, "labelCandidates").pipe(
-          Effect.flatMap(
-            (viewer): Effect.Effect<PullRequestLabelCandidateList, PullRequestError> =>
-              viewer.labels === false
-                ? Effect.fail(
-                    new PullRequestOperationError({
-                      operation: "labelCandidates",
-                      detail: LABEL_CHANGE_REFUSAL,
-                    }),
-                  )
-                : list({
-                    cwd: project.project.workspaceRoot,
-                    repository: project.repository,
-                    host: project.host,
-                    number: input.number,
-                  }).pipe(Effect.mapError(toPullRequestError("labelCandidates"))),
-          ),
-        );
-      }),
-    );
-
-  const setLabels: PullRequestService["Service"]["setLabels"] = (input) =>
-    requireProject(input).pipe(
-      Effect.flatMap((project): Effect.Effect<void, PullRequestError> => {
-        const change = project.api.setLabels;
-        if (project.api.capabilities.labels !== true || change === undefined) {
-          return Effect.fail(
-            new PullRequestOperationError({
-              operation: "setLabels",
-              detail: "This host cannot change the labels on a change request.",
-            }),
-          );
-        }
-        return viewerPermissionsOf(project, input, "setLabels").pipe(
-          Effect.flatMap((viewer): Effect.Effect<void, PullRequestError> =>
-            viewer.labels === false
-              ? Effect.fail(
-                  new PullRequestOperationError({
-                    operation: "setLabels",
-                    detail: LABEL_CHANGE_REFUSAL,
-                  }),
-                )
-              : change({
-                  cwd: project.project.workspaceRoot,
-                  repository: project.repository,
-                  host: project.host,
-                  number: input.number,
-                  labels: input.labels,
-                  applied: input.applied,
-                }).pipe(Effect.mapError(toPullRequestError("setLabels"))),
-          ),
-        );
-      }),
-    );
 
   /**
    * The line counts for rows already on the page, which the listing left out because on GitHub
@@ -3005,7 +2477,7 @@ export const make = Effect.gen(function* () {
   const viewedFiles = ViewedFiles.make({
     filesViewedStore,
     requireProject,
-    requiredViewerOf,
+    requiredViewerOf: (project) => viewerOf(project),
     toPullRequestError,
     runFork,
     refEpoch,
@@ -3696,62 +3168,6 @@ export const make = Effect.gen(function* () {
     (revision) => revision + 1,
   );
 
-  const invalidatedByMutation =
-    <I extends PullRequestRef>(
-      method: (input: I) => Effect.Effect<void, PullRequestError>,
-    ): ((input: I) => Effect.Effect<void, PullRequestError>) =>
-    (input) =>
-      Effect.gen(function* () {
-        const ref = yield* canonicalRef(input);
-        yield* readCache.invalidate(refScope(ref)).pipe(
-          Effect.andThen(method(input)),
-          Effect.ensuring(readCache.invalidate(refScope(ref))),
-          Effect.tap(() =>
-            Effect.sync(() => {
-              bumpRefEpoch(ref);
-              listingsEpoch = ++epochCounter;
-            }),
-          ),
-        );
-        yield* SubscriptionRef.set(pullRequestRefreshes, listingsEpoch);
-      });
-  const runActionAndInvalidate: PullRequestService["Service"]["runAction"] = Effect.fn(
-    "PullRequestService.runActionAndInvalidate",
-  )(function* (input) {
-    const ref = yield* canonicalRef(input);
-    yield* readCache.invalidate(refScope(ref));
-    const { repository, summary } = yield* runAction(input).pipe(
-      Effect.ensuring(readCache.invalidate(refScope(ref))),
-    );
-    bumpRefEpoch({ ...ref, repository });
-    listingsEpoch = ++epochCounter;
-    yield* SubscriptionRef.set(pullRequestRefreshes, listingsEpoch);
-    if (input.action === "merge") {
-      // A successful merge action can merely enqueue the PR or enable auto-merge.
-      const merged = summary?.state === "merged" ? summary : null;
-      const confirmed =
-        merged?.mergedAt != null
-          ? merged
-          : yield* summaryUncached({ ...input, repository }).pipe(
-              Effect.map((reread) => (reread.state === "merged" ? reread : merged)),
-              Effect.catch((error) =>
-                Effect.logWarning("failed to confirm pull request merge", { error }).pipe(
-                  Effect.as(merged),
-                ),
-              ),
-            );
-      if (confirmed?.state === "merged") {
-        yield* PubSub.publish(mergedPullRequests, {
-          projectId: input.projectId,
-          repository,
-          number: input.number,
-          mergedAt: confirmed.mergedAt ?? DateTime.formatIso(yield* DateTime.now),
-        });
-      }
-    }
-    return input.replyWithSummary === true ? summary : undefined;
-  });
-
   const credentialCached =
     <I extends PullRequestRef, Args extends ReadonlyArray<unknown>, A, E>(
       read: (input: I, ...args: Args) => Effect.Effect<A, E>,
@@ -3912,22 +3328,43 @@ export const make = Effect.gen(function* () {
     diff: credentialCached(diff),
     diffFileContents,
     filesViewed: credentialCached(filesViewed),
-    setFilesViewed,
     changeBreakdown: credentialCached((input) =>
       Cache.get(changeBreakdownCache, refCacheKey(input)),
     ),
-    runAction: runActionAndInvalidate,
-    update: invalidatedByMutation(update),
-    comment: invalidatedByMutation(comment),
-    updateComment: invalidatedByMutation(updateComment),
-    submitReview: invalidatedByMutation(submitReview),
-    replyToThread: invalidatedByMutation(replyToThread),
-    setThreadResolution: invalidatedByMutation(setThreadResolution),
-    setReaction: invalidatedByMutation(setReaction),
-    reviewerCandidates,
-    requestReviewers: invalidatedByMutation(requestReviewers),
-    labelCandidates,
-    setLabels: invalidatedByMutation(setLabels),
+    runAction: Effect.fn("PullRequestService.runActionAndInvalidate")(function* (input) {
+      const ref = yield* canonicalRef(input);
+      yield* readCache.invalidate(refScope(ref));
+      const { repository, summary } = yield* runAction(input).pipe(
+        Effect.ensuring(readCache.invalidate(refScope(ref))),
+      );
+      bumpRefEpoch({ ...ref, repository });
+      listingsEpoch = ++epochCounter;
+      yield* SubscriptionRef.set(pullRequestRefreshes, listingsEpoch);
+      if (input.action === "merge") {
+        // A successful merge action can merely enqueue the PR or enable auto-merge.
+        const merged = summary?.state === "merged" ? summary : null;
+        const confirmed =
+          merged?.mergedAt != null
+            ? merged
+            : yield* summaryUncached({ ...input, repository }).pipe(
+                Effect.map((reread) => (reread.state === "merged" ? reread : merged)),
+                Effect.catch((error) =>
+                  Effect.logWarning("failed to confirm pull request merge", { error }).pipe(
+                    Effect.as(merged),
+                  ),
+                ),
+              );
+        if (confirmed?.state === "merged") {
+          yield* PubSub.publish(mergedPullRequests, {
+            projectId: input.projectId,
+            repository,
+            number: input.number,
+            mergedAt: confirmed.mergedAt ?? DateTime.formatIso(yield* DateTime.now),
+          });
+        }
+      }
+      return input.replyWithSummary === true ? summary : undefined;
+    }),
     invalidate,
   });
 });

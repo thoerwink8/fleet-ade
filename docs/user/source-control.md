@@ -87,28 +87,21 @@ Choose how commit messages and pull request titles and descriptions are written 
 project's instructions and recent commit subjects. **Custom instructions** applies your own
 instructions to commits and pull requests.
 
-## Review and merge
+## Review pull requests
 
-Open **Pull requests** to review changes and comments, request reviewers, check out a branch,
-or merge. You can edit review titles and descriptions and your own comments where the host allows it.
-Where you can edit a description, you can also tick its checkboxes from the Summary tab
-(the Overview tab on mobile).
+Open **Pull requests** to browse pull requests, view their changed files, and inspect pipeline runs.
+The page keeps the list, search, and links that open a pull request's diff. Pull request creation
+remains available from a thread's Git actions.
 
-A link to part of a pull request opens that part: a comment or review is marked in the activity, a
-changed-line link opens the file at those lines, a checks link opens the checks, and a commit link
-opens that commit's changes. On web and desktop, hovering a comment or commit link previews it.
+The diff view supports comparing all commits or one commit, loading large changes in pages, opening
+the file tree, and changing the layout, wrapping, whitespace, and file visibility options.
 
-On mobile, **Pull requests** lists reviews across your connected environments. Open a review
-to read its description, activity, commits, and changed files. Line comments stay as drafts
-until you submit the review. **Work on PR** opens a chat with the review attached; sending
-the first message prepares a worktree from the review's branch.
+The pipeline section shows the repository's runs grouped by status. Each run includes its status,
+metrics when available, and a link to its logs or run details.
 
-Previously loaded lists, review details, guides, and diff pages remain readable on mobile
-without a connection, including after restarting the app. Saved content refreshes when the
-environment reconnects; submitting changes requires a connection.
-
-GitHub supports auto-merge while checks are outstanding, approving waiting fork workflows, and
-opening a revert pull request for a merged change.
+Agents can monitor a pull request with `watch_pull_request`. The server continues checking the
+pull request and wakes the agent for failed or completed checks, review changes, conflicts, and
+other watch events. See [Linked pull requests](#linked-pull-requests) for the monitoring rules.
 
 Pull request sharing is off by default. In Settings → Environments → Pull request sharing (Pull
 request routing under Environments on mobile), choose **Read PRs** or **Read and act** for each
@@ -118,60 +111,13 @@ Enable both the original environment and the environment answering its requests 
 only enable it for environments you control and trust. Changing a saved endpoint or removing an
 environment clears its permission.
 
-Review details, linked PR status, and permitted review actions can then use another connected
+Diffs, linked PR status, and permitted source-control reads can then use another connected
 environment signed in to the same account on the same host. Each needs a project on that host.
 A connected local environment is preferred for actions and can answer slow or failed reads.
 Browsers and mobile clients need a paired environment to use its GitHub credentials.
 Credentials stay on their machines. Previously verified credentials remain usable for routing
-for ten minutes during a GitHub outage; new credentials must be verified first. An action with
-an uncertain result is never automatically retried elsewhere. Listings, diffs, and checkout or
-PR creation from Git actions continue to use the project's environment.
-
-### Review guides
-
-Review guides are in beta. Turn on **Review guides** in Settings → Source control to add the
-**Guide** tab to pull requests on that server. On mobile, move between stops with **Next**
-and the back button; a stale guide offers a rewrite and hides excerpts that no longer match
-the current change.
-
-The **Guide** tab gives you a tour of a pull request without reading it line by line: stops
-through the change in reading order. Each stop points at the lines worth reading, and a stop marked
-**Look closely** has a call only a maintainer can make. Mechanical changes such as renames and
-snapshots are grouped at the end, and every changed file appears somewhere on the tour.
-Conversations already resolved in review are left out. For a pull request in a stack, the guide
-covers that layer only, and may point out what a lower layer introduced or what a higher one uses.
-
-Choose **Write guide** to have the review guide model from Settings → Source control read the
-change in a temporary checkout; without one set, the source control writer model is used. Nothing
-in the checkout is changed, and a large pull request takes a few minutes; you can go elsewhere in
-the app. On web, you are told when the guide is ready; on mobile, return to the guide to check
-its progress. Claude and Codex can write guides. The guide is
-kept for everyone using this server. To write it again, for example after a push or after changing
-the model or instructions, choose **Rewrite guide** from the pull request's **⋯** menu.
-
-On web, while reading a stop, select lines in an excerpt to add a comment to your review or ask an agent
-about them; comments wait with the ones from the **Code** tab until you send the review. Choose a
-suggested question, or **Ask about this stop**, to open a thread that already knows which stop you
-are on. **Finish review** on the last stop opens the review with everything you collected.
-
-Agents can write guides too: ask one to prepare guides for a set of pull requests, and it starts
-them for you. Each is read through the project whose checkout has that repository.
-
-To shape guides to your taste, write **Review guide instructions** in Settings → Source control,
-such as what to show first or what to skip; projects can override them. They change emphasis and
-ordering, not the guide's layout or which files it covers.
-
-### Mark files as viewed
-
-Tick a file off in the **Code** tab once you have read it and it collapses; the toolbar keeps a
-running count. A tick belongs to the pull request rather than to a commit, so scoping the tab to a
-single commit keeps them. A file pushed to after you cleared it comes back marked **Changed**.
-
-On GitHub these are GitHub's own viewed marks, so a review carries between T3 Code and github.com
-in either direction.
-
-On mobile, open a changed file and mark it viewed from its header. Viewed files collapse,
-and their marks follow the same rules as on web and desktop.
+for ten minutes during a GitHub outage; new credentials must be verified first. Listings, diffs,
+and checkout or PR creation from Git actions continue to use the project's environment.
 
 ## Troubleshooting
 
@@ -179,8 +125,8 @@ and their marks follow the same rules as on web and desktop.
 - **GitHub sign-in cannot be verified:** update GitHub CLI to at least 2.81.0, or save a token in Settings → Source control.
 - **Push fails despite a connected account:** check the Git remote's credentials. SSH and HTTPS
   remotes can require separate setup from the hosting provider's API access.
-- **A review cannot load:** open it on the host website while resolving connectivity, permissions,
-  or rate limits.
+- **A pull request cannot load:** open it on the host website while resolving connectivity,
+  permissions, or rate limits.
 
 ## Linked pull requests
 
