@@ -28,6 +28,10 @@ describe("cachedTestTasks", () => {
     );
     const key = Object.keys(first).find((key) => key !== "test-cache")!;
     expect(second[key]).toEqual(first[key]);
+    const narrowed = cachedTestTasks(
+      JSON.stringify({ files: ["src/a.test.ts", "src/b.test.ts"], groupSize: 1, only: [key] }),
+    );
+    expect(narrowed).toEqual({ [key]: first[key], "test-cache": first["test-cache"] });
   });
 
   it("keeps shell metacharacters in filenames out of the command", () => {
