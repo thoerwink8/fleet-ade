@@ -31,6 +31,7 @@
     "vite.config.ts",
     "test",
     "scripts/warm-dep-cache.ts",
+    "../../scripts/lib/browserTestApiPort.ts",
     "../../scripts/lib/public-config.ts",
     "../../scripts/lib/third-party-licenses.ts"
   ]
