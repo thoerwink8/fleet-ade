@@ -18,9 +18,9 @@ import { beginAcpMockPrompt } from "./acpMockCancellationState.ts";
 
 const requestLogPath = process.env.T3_ACP_REQUEST_LOG_PATH;
 const antigravityProfile = process.env.T3_ACP_ANTIGRAVITY === "1";
-// GitHub Copilot CLI advertises URL-shaped session mode ids.
-const copilotModesProfile = process.env.T3_ACP_COPILOT_MODES === "1";
-const copilotModeId = (name: string) =>
+// Some registry agents advertise URL-shaped session mode ids.
+const urlModesProfile = process.env.T3_ACP_URL_MODES === "1";
+const urlModeId = (name: string) =>
   `https://agentclientprotocol.com/protocol/session-modes#${name}`;
 const modeOptionCategory = process.env.T3_ACP_MODE_OPTION_CATEGORY ?? "mode";
 // Comma-separated command names the mock advertises, so `/compact` support is testable.
@@ -35,7 +35,6 @@ const emitInterleavedAssistantToolCalls =
 const emitV2Fidelity = process.env.T3_ACP_EMIT_V2_FIDELITY === "1";
 const emitNotice = process.env.T3_ACP_EMIT_NOTICE === "1";
 const hangCloseSession = process.env.T3_ACP_HANG_CLOSE_SESSION === "1";
-const vibeRetryOutcome = process.env.T3_ACP_VIBE_RETRY_OUTCOME;
 const emitGenericToolPlaceholders = process.env.T3_ACP_EMIT_GENERIC_TOOL_PLACEHOLDERS === "1";
 const emitInTurnTaskOutputThenLateDuplicate =
   process.env.T3_ACP_EMIT_IN_TURN_TASKOUTPUT_THEN_LATE_DUPLICATE === "1";
@@ -110,8 +109,8 @@ const sessionId = "mock-session-1";
 
 let currentModeId = antigravityProfile
   ? (process.env.T3_ACP_INITIAL_MODE ?? "default")
-  : copilotModesProfile
-    ? copilotModeId("agent")
+  : urlModesProfile
+    ? urlModeId("agent")
     : "ask";
 let currentModelId = antigravityProfile ? "gemini-test-low" : "default";
 let parameterizedModelPicker = false;
@@ -282,7 +281,7 @@ function configOptions(): ReadonlyArray<AcpSchema.SessionConfigOption> {
   }
 
   return [
-    // Mirrors GitHub Copilot, whose default agent is the empty-valued choice.
+    // Some agents use an empty string as the built-in default choice.
     ...(emitEmptyDefaultAgentOption
       ? [
           {
@@ -292,7 +291,7 @@ function configOptions(): ReadonlyArray<AcpSchema.SessionConfigOption> {
             type: "select" as const,
             currentValue: currentAgent,
             options: [
-              { value: "", name: "Copilot" },
+              { value: "", name: "Agent" },
               { value: "example", name: "example" },
             ],
           },
@@ -337,11 +336,11 @@ const availableModes: ReadonlyArray<AcpCompat.SessionMode> = antigravityProfile
       { id: "auto_edit", name: "Auto edit" },
       { id: "yolo", name: "YOLO" },
     ]
-  : copilotModesProfile
+  : urlModesProfile
     ? [
-        { id: copilotModeId("agent"), name: "Agent" },
-        { id: copilotModeId("plan"), name: "Plan" },
-        { id: copilotModeId("autopilot"), name: "Autopilot" },
+        { id: urlModeId("agent"), name: "Agent" },
+        { id: urlModeId("plan"), name: "Plan" },
+        { id: urlModeId("autopilot"), name: "Autopilot" },
       ]
     : [
         {
@@ -979,69 +978,6 @@ const program = Effect.gen(function* () {
           );
           NodeFS.appendFileSync(clientFsProbeLogPath, `${encodeJson(outcome)}\n`, "utf8");
         }
-      }
-
-      if (vibeRetryOutcome !== undefined) {
-        if (vibeRetryOutcome === "recovered") {
-          yield* Effect.sync(() =>
-            writeJsonRpcNotification("session/update", {
-              sessionId: requestedSessionId,
-              update: {
-                sessionUpdate: "tool_call",
-                toolCallId: "tool-before-retry",
-                title: "Read file",
-                kind: "read",
-                status: "in_progress",
-              },
-            }),
-          );
-        }
-        for (const [index, noticeSessionId] of [
-          "unrelated-session",
-          requestedSessionId,
-          requestedSessionId,
-        ].entries()) {
-          if (index === 2 && vibeRetryOutcome === "recovered") {
-            yield* Effect.sync(() =>
-              writeJsonRpcNotification("session/update", {
-                sessionId: requestedSessionId,
-                update: {
-                  sessionUpdate: "tool_call_update",
-                  toolCallId: "tool-before-retry",
-                  status: "in_progress",
-                  rawOutput: { progress: "still reading" },
-                },
-              }),
-            );
-          }
-          yield* Effect.sync(() =>
-            writeJsonRpcNotification("_session/retrying", {
-              sessionId: noticeSessionId,
-              category: "rate_limited",
-              detail: "Rate limit reached. Retrying. api_key=private-key",
-            }),
-          );
-        }
-        if (vibeRetryOutcome === "failed") {
-          return yield* new AcpError.AcpRequestError({
-            code: -31001,
-            errorMessage: "Rate limit exceeded for mistral (model: mistral-vibe-cli-latest).",
-          });
-        }
-        if (vibeRetryOutcome === "completed") {
-          return yield* finishPrompt(requestedSessionId, "end_turn");
-        }
-        if (vibeRetryOutcome === "cancelled") {
-          return yield* finishPrompt(requestedSessionId, "cancelled");
-        }
-        yield* agent.client.sessionUpdate({
-          sessionId: requestedSessionId,
-          update: {
-            sessionUpdate: "agent_message_chunk",
-            content: { type: "text", text: "Recovered answer" },
-          },
-        });
-        return yield* finishPrompt(requestedSessionId, "end_turn");
       }
 
       if (terminalOutputBytes > 0) {

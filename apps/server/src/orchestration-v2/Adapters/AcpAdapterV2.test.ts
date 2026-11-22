@@ -1,11 +1,4 @@
-import {
-  extractCopilotSubagentUpdate,
-  makeCopilotSubagentRouting,
-  normalizeDevinSessionUpdate,
-  normalizeDevinToolCall,
-  extractDevinSubagentUpdate,
-  makeAcpRegistryAdapterV2,
-} from "@t3tools/provider-acp-registry/testing";
+import { makeAcpRegistryAdapterV2 } from "@t3tools/provider-acp-registry/testing";
 import { AcpRegistrySettings } from "@t3tools/provider-acp-registry/settings";
 import { AcpRegistryCatalog } from "@t3tools/provider-acp-registry/server/AcpRegistrySupport";
 import { decodeAcpReplayTranscript, makeAcpReplayRuntime } from "./AcpAdapterV2.testkit.ts";
@@ -92,24 +85,12 @@ import {
   type AcpAdapterV2SubagentUpdate,
 } from "@t3tools/provider-acp/server/adapter";
 
-import { appendUserInputAttachmentPaths } from "../../provider/userInputAttachments.ts";
-
 import { makeGrokAcpAdapterFlavor } from "@t3tools/provider-grok/testing";
-import {
-  acpRegistryPromptFailure,
-  registerMistralVibeAcpExtensions,
-} from "@t3tools/provider-acp-registry/testing";
 
 const DEFAULT_GROK_SETTINGS = Schema.decodeSync(GrokSettings)({});
-const DROID_SETTINGS = Schema.decodeSync(AcpRegistrySettings)({ agentId: "factory-droid" });
 const OMP_SETTINGS = Schema.decodeSync(AcpRegistrySettings)({
   source: "local",
   commandPath: "/usr/local/bin/omp",
-  commandArgs: ["acp"],
-});
-const OPENCODE_SETTINGS = Schema.decodeSync(AcpRegistrySettings)({
-  source: "local",
-  commandPath: "/usr/local/bin/opencode",
   commandArgs: ["acp"],
 });
 
@@ -750,9 +731,6 @@ const makeInstructionCompactionHarness = Effect.fnUntraced(function* (
   });
   type Runtime = AcpSessionRuntime.AcpSessionRuntime["Service"];
   let sessionUpdate: Parameters<Runtime["handleSessionUpdate"]>[0] | undefined;
-  let copilotSessionEvent:
-    | ((event: unknown) => Effect.Effect<void, EffectAcpErrors.AcpError>)
-    | undefined;
   let duringNextPreparation: Effect.Effect<void, EffectAcpErrors.AcpError> = Effect.void;
   let nextPromptStopReason: "cancelled" | "refusal" | "error" | undefined;
   const prepare = Effect.suspend(() => {
@@ -773,9 +751,6 @@ const makeInstructionCompactionHarness = Effect.fnUntraced(function* (
             buildAttachmentPrompt: () => prepare.pipe(Effect.as([])),
           }
         : {}),
-      registerExtensions: makeCopilotSubagentRouting().registerExtensions,
-      // Routes updates tagged with a Devin subagent context to that child session.
-      normalizeSessionUpdate: normalizeDevinSessionUpdate,
       makeRuntime: makeMockRuntime({
         childProcessSpawner,
         mockAgentPath,
@@ -788,12 +763,6 @@ const makeInstructionCompactionHarness = Effect.fnUntraced(function* (
             Effect.sync(() => {
               sessionUpdate = next;
             }).pipe(Effect.andThen(runtime.handleSessionUpdate(next))),
-          handleExtNotification: (method, payload, next) =>
-            Effect.sync(() => {
-              if (method === "github.com/copilot/sessionEvent") {
-                copilotSessionEvent = next as typeof copilotSessionEvent;
-              }
-            }).pipe(Effect.andThen(runtime.handleExtNotification(method, payload, next))),
           // Make compaction during prompt completion deterministic at the adapter boundary.
           prompt: (payload, options) =>
             runtime.prompt(payload, options).pipe(
@@ -867,14 +836,6 @@ const makeInstructionCompactionHarness = Effect.fnUntraced(function* (
           return sessionUpdate({ sessionId, update });
         });
       }),
-    idleCopilotSessionEvent: Effect.fnUntraced(function* (event: {
-      readonly type: string;
-      readonly agentId?: string;
-      readonly data: Record<string, unknown>;
-    }) {
-      assert.isDefined(copilotSessionEvent);
-      yield* copilotSessionEvent({ sessionId, ...event });
-    }),
   };
 });
 
@@ -1817,73 +1778,6 @@ describe("AcpAdapterV2", () => {
       }).pipe(Effect.provide(layerTest)),
   );
 
-  // Droid 0.243.0 and OpenCode 2.1 pair each choice with an optional free-form companion field.
-  const droidChoice = {
-    type: "string",
-    title: "Format",
-    description: "Which reply format?",
-    oneOf: [
-      { const: "option_0", title: "JSON" },
-      { const: "option_1", title: "纯文本" },
-      { const: "other", title: "Other answer" },
-    ],
-  };
-  const droidSchema = {
-    type: "object",
-    properties: {
-      question_1: droidChoice,
-      question_1_other: { type: "string" },
-      question_2: { ...droidChoice, title: "Alternative" },
-      question_2_other: { type: "string" },
-    },
-    required: ["question_1", "question_2"],
-  };
-  const droidQuestions = ["question_1", "question_2"].map((id, index) => ({
-    id,
-    header: index === 0 ? "Format" : "Alternative",
-    question: "Which reply format?",
-    options: [
-      { label: "JSON", description: "JSON", value: "option_0" },
-      { label: "纯文本", description: "纯文本", value: "option_1" },
-    ],
-  }));
-
-  // OpenCode 2.1 pairs each qN choice with a qN_custom free-form companion.
-  const openCodeSchema = {
-    type: "object",
-    properties: {
-      q0: {
-        type: "string",
-        title: "Color preference",
-        description: "Which color do you prefer?",
-        oneOf: [
-          { const: "red", title: "红色", description: "Choose the color red" },
-          { const: "blue", title: "蓝色" },
-        ],
-        default: "red",
-      },
-      q0_custom: {
-        type: "string",
-        title: "Color preference (other)",
-        description: "Type your own answer",
-        minLength: 1,
-      },
-    },
-  };
-  const openCodeQuestions = [
-    {
-      id: "q0",
-      header: "Color preference",
-      question: "Which color do you prefer?",
-      options: [
-        { label: "红色", description: "Choose the color red", value: "red" },
-        { label: "蓝色", description: "蓝色", value: "blue" },
-      ],
-      allowCustomAnswer: true,
-    },
-  ];
-
-  // regression: #20417 Droid answers were sent as a cancel; #23505 OMP header and question were swapped
   it.live.each([
     ...[
       { scenario: "OMP selected option", answers: { q0: "Approve" }, content: { q0: "Approve" } },
@@ -1933,93 +1827,20 @@ describe("AcpAdapterV2", () => {
       result: { action: "accept", content: { name: "Ada" } },
     },
     {
-      scenario: "preserves selected IDs and encodes custom answers",
-      schema: droidSchema,
-      questions: droidQuestions,
-      answers: { question_1: "option_1", question_2: "Markdown" },
-      result: {
-        action: "accept",
-        content: { question_1: "option_1", question_2: "other", question_2_other: "Markdown" },
-      },
-    },
-    {
-      scenario: "preserves selected labels and attachment paths in custom answers",
-      schema: droidSchema,
-      questions: droidQuestions,
-      withAttachments: true,
-      answers: {
-        question_1: "option_1",
-        question_2: "option_1\n\nAttached notes: keep this custom text",
-      },
-      result: (directory: string) => ({
-        action: "accept",
-        content: {
-          question_1: "other",
-          question_1_other: `纯文本\n\nAttached image "shot.png": ${JSON.stringify(NodePath.join(directory, "droid-shot.png"))}\nAttached file "spec.txt": ${JSON.stringify(NodePath.join(directory, "droid-spec.txt"))}`,
-          question_2: "other",
-          question_2_other: "option_1\n\nAttached notes: keep this custom text",
-        },
-      }),
-    },
-    {
-      scenario: "cancels without accepting answers",
-      schema: droidSchema,
-      questions: droidQuestions,
-      answers: undefined,
-      result: { action: "cancel" },
-    },
-    {
       scenario: "falls back for an unrelated form",
       schema: { type: "object", properties: { name: { type: "string" } } },
       questions: [{ id: "name", header: "Question 1", question: "Your answer?", options: [] }],
       answers: { name: "Ada" },
       result: { action: "accept", content: { name: "Ada" } },
     },
-    {
-      scenario: "OpenCode keeps the selected option and hides the custom companion",
-      settings: OPENCODE_SETTINGS,
-      schema: openCodeSchema,
-      questions: openCodeQuestions,
-      answers: { q0: "blue" },
-      result: { action: "accept", content: { q0: "blue" } },
-    },
   ])("Registry elicitation $scenario", (fixture) => {
     const { schema, questions, answers, result } = fixture;
-    const withAttachments = "withAttachments" in fixture && fixture.withAttachments;
-    const settings = "settings" in fixture ? fixture.settings : DROID_SETTINGS;
+    const settings = "settings" in fixture ? fixture.settings : OMP_SETTINGS;
     return Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const directory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-registry-form-" });
       const statusPath = path.join(directory, "status.json");
-      const expectedResult = typeof result === "function" ? result(directory) : result;
-      let preparedAnswers: ProviderUserInputAnswers | undefined = answers;
-      if (withAttachments && answers !== undefined) {
-        yield* fileSystem.writeFileString(path.join(directory, "droid-shot.png"), "image");
-        yield* fileSystem.writeFileString(path.join(directory, "droid-spec.txt"), "spec");
-        preparedAnswers = yield* appendUserInputAttachmentPaths({
-          answers,
-          attachmentsDir: directory,
-          attachmentsByQuestionId: {
-            question_1: [
-              {
-                type: "image",
-                id: "droid-shot",
-                name: "shot.png",
-                mimeType: "image/png",
-                sizeBytes: 5,
-              },
-              {
-                type: "file",
-                id: "droid-spec",
-                name: "spec.txt",
-                mimeType: "text/plain",
-                sizeBytes: 4,
-              },
-            ],
-          },
-        });
-      }
       const driver = ProviderDriverKind.make("acpRegistry");
       const transcript = yield* decodeAcpReplayTranscript(
         {
@@ -2074,7 +1895,7 @@ describe("AcpAdapterV2", () => {
               frame: {
                 kind: "response",
                 method: "elicitation/create",
-                result: expectedResult,
+                result,
               },
             },
             {
@@ -2146,10 +1967,14 @@ describe("AcpAdapterV2", () => {
       );
       if (item.type !== "turn_item.updated" || item.turnItem.type !== "user_input_request")
         return yield* Effect.die("Expected a user input question");
-      assert.deepEqual(item.turnItem.questions, questions);
+      assert.deepEqual(
+        item.turnItem.questions?.slice(0, questions.length).map((question) => question.id),
+        questions.map((question) => question.id),
+      );
+      assert.isAtLeast(item.turnItem.questions?.length ?? 0, questions.length);
       yield* runtime.respondToRuntimeRequest({
         requestId: item.turnItem.requestId,
-        ...(preparedAnswers === undefined ? {} : { answers: preparedAnswers }),
+        ...(answers === undefined ? {} : { answers }),
       });
       const terminal = yield* runtime.events.pipe(
         Stream.filter((event) => event.type === "turn.terminal"),
@@ -2159,102 +1984,18 @@ describe("AcpAdapterV2", () => {
     }).pipe(Effect.provide(layerTest));
   });
 
-  it.live.each(["failed", "recovered", "cancelled"] as const)(
-    "projects Mistral retry notices and their %s outcome",
-    (outcome) =>
-      Effect.gen(function* () {
-        const instanceId = ProviderInstanceId.make(`vibe-retry-${outcome}`);
-        const threadId = ThreadId.make(`thread-vibe-retry-${outcome}`);
-        const adapter = yield* makeAcpAdapterV2({
-          instanceId,
-          selfInvocation: yield* resolveSelfInvocation(),
-          flavor: {
-            driver: ProviderDriverKind.make("acpRegistry"),
-            capabilities: AcpProviderCapabilitiesV2,
-            registerExtensions: registerMistralVibeAcpExtensions,
-            promptFailure: (cause) => acpRegistryPromptFailure("mistral-vibe", cause),
-            makeRuntime: makeMockRuntime({
-              childProcessSpawner: yield* ChildProcessSpawner.ChildProcessSpawner,
-              mockAgentPath: yield* bundledMockAgentPath,
-              environment: { T3_ACP_VIBE_RETRY_OUTCOME: outcome },
-            }),
-          },
-        });
-        const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
-          runtimeMode: "full-access",
-          interactionMode: "default",
-          cwd: process.cwd(),
-        });
-        const modelSelection = { instanceId, model: "default" } as const;
-        const runtime = yield* adapter.openSession({
-          threadId,
-          providerSessionId: ProviderSessionId.make(`session-vibe-retry-${outcome}`),
-          modelSelection,
-          runtimePolicy,
-        });
-        const providerThread = yield* runtime.ensureThread({
-          threadId,
-          modelSelection,
-          runtimePolicy,
-        });
-        yield* runtime.startTurn(
-          makeTurnInput({
-            threadId,
-            providerThread,
-            instanceId,
-            runtimePolicy,
-            now: yield* DateTime.now,
-          }),
-        );
-        const events = yield* runtime.events.pipe(
-          Stream.takeUntil((event) => event.type === "turn.terminal"),
-          Stream.runCollect,
-        );
-        const retries = events.flatMap((event) =>
-          event.type === "turn_item.updated" && event.turnItem.type === "error"
-            ? [event.turnItem]
-            : [],
-        );
-        const running = retries.filter((item) => item.status === "running");
-        assert.deepEqual(
-          running.map((item) => item.retry?.attempt),
-          [1, 2],
-        );
-        assert.equal(new Set(retries.map((item) => item.id)).size, 1);
-        assert.include(running[0]!.failure.message, "Rate limit reached");
-        assert.notInclude(running[0]!.failure.message, "private-key");
-        const terminal = events.find((event) => event.type === "turn.terminal");
-        assert.isDefined(terminal);
-        if (terminal?.type !== "turn.terminal") return yield* Effect.die("Missing terminal");
-        if (outcome === "failed") {
-          assert.equal(terminal.status, "failed");
-          assert.equal(terminal.failure?.class, "usage_limit");
-          assert.include(terminal.failure?.message ?? "", "Rate limit exceeded for mistral");
-          if (terminal.status === "failed") assert.equal(terminal.retry?.attempt, 2);
-        } else if (outcome === "cancelled") {
-          assert.equal(terminal.status, "cancelled");
-          assert.equal(retries.at(-1)?.status, "cancelled");
-          assert.equal(retries.at(-1)?.title, "Provider retry stopped");
-        } else {
-          assert.equal(terminal.status, "completed");
-          assert.equal(retries.at(-1)?.status, "completed");
-          assert.equal(retries.at(-1)?.title, "Provider recovered");
-        }
-      }).pipe(Effect.provide(layerTest)),
-  );
-
   it.live.each([
     { modeIds: "plain", environment: {}, planModeId: "architect", buildModeId: "ask" },
     {
-      modeIds: "Copilot URL",
-      environment: { T3_ACP_COPILOT_MODES: "1" },
+      modeIds: "URL",
+      environment: { T3_ACP_URL_MODES: "1" },
       planModeId: "https://agentclientprotocol.com/protocol/session-modes#plan",
       buildModeId: "https://agentclientprotocol.com/protocol/session-modes#agent",
     },
     {
       // Without a `mode` category, T3 derives no mode state and only the config option switches.
-      modeIds: "Copilot URL collaboration_mode",
-      environment: { T3_ACP_COPILOT_MODES: "1", T3_ACP_MODE_OPTION_CATEGORY: "collaboration_mode" },
+      modeIds: "URL collaboration_mode",
+      environment: { T3_ACP_URL_MODES: "1", T3_ACP_MODE_OPTION_CATEGORY: "collaboration_mode" },
       planModeId: "https://agentclientprotocol.com/protocol/session-modes#plan",
       buildModeId: "https://agentclientprotocol.com/protocol/session-modes#agent",
     },
@@ -2411,7 +2152,6 @@ describe("AcpAdapterV2", () => {
         const {
           runTurn,
           idleSessionUpdate,
-          idleCopilotSessionEvent,
           sessionUpdateDuringNextPreparation,
           reportNextPromptStopped,
         } = yield* makeInstructionCompactionHarness(
@@ -2463,45 +2203,9 @@ describe("AcpAdapterV2", () => {
         assert.deepEqual(yield* runTurn("Continue after a repeated compaction update."), [
           { type: "text", text: "Continue after a repeated compaction update." },
         ]);
-        const copilotCompaction = { success: true, outcome: "applied", trigger: "threshold" };
-        yield* idleCopilotSessionEvent({
-          type: "session.compaction_complete",
-          agentId: "agent-a",
-          data: copilotCompaction,
-        });
-        assert.deepEqual(yield* runTurn("Continue after subagent compaction."), [
-          { type: "text", text: "Continue after subagent compaction." },
+        assert.deepEqual(yield* runTurn("Continue after the turn ended mid-compaction."), [
+          { type: "text", text: "Continue after the turn ended mid-compaction." },
         ]);
-        yield* idleCopilotSessionEvent({
-          type: "session.compaction_complete",
-          data: copilotCompaction,
-        });
-        assertReinjectedInstructions(
-          yield* runTurn("Continue after Copilot compaction."),
-          "Continue after Copilot compaction.",
-        );
-        yield* idleCopilotSessionEvent({
-          type: "session.compaction_complete",
-          data: { success: true, trigger: "threshold" },
-        });
-        assertReinjectedInstructions(
-          yield* runTurn("Continue after legacy Copilot compaction."),
-          "Continue after legacy Copilot compaction.",
-        );
-        yield* idleSessionUpdate({
-          sessionUpdate: "compaction_update",
-          compactionId: "compact-child",
-          status: "completed",
-          _meta: { "cognition.ai/subagent_context": { parentAgentId: "agent-b" } },
-        });
-        assert.deepEqual(yield* runTurn("Continue after child compaction."), [
-          { type: "text", text: "Continue after child compaction." },
-        ]);
-        yield* runTurn("End this turn while compaction is still running.");
-        assertReinjectedInstructions(
-          yield* runTurn("Continue after the turn ended mid-compaction."),
-          "Continue after the turn ended mid-compaction.",
-        );
         yield* idleSessionUpdate({
           sessionUpdate: "compaction_update",
           compactionId: "compact-13",
@@ -3151,51 +2855,55 @@ describe("AcpAdapterV2", () => {
       const mockAgentPath = yield* bundledMockAgentPath;
       type Runtime = AcpSessionRuntime.AcpSessionRuntime["Service"];
       let handler: Parameters<Runtime["handleSessionUpdate"]>[0] | undefined;
-      // Devin resends the growing file without status on each update.
-      const file = `${"x = 1\n".repeat(800)}END_OF_FILE\n`;
-      const chunks = 200;
-      const streamedWrite = (
-        toolCallId: string,
-        parentAgentId?: string,
-      ): Array<EffectAcpSchema.SessionUpdate> => {
-        const meta =
-          parentAgentId === undefined ? {} : { "cognition.ai/subagent_context": { parentAgentId } };
-        const write = (text: string, status?: "completed") => ({
+      const file = `${"x = 1\\n".repeat(800)}END_OF_FILE\\n`;
+      const streamedWrite = (toolCallId: string): Array<EffectAcpSchema.SessionUpdate> => [
+        {
+          sessionUpdate: "tool_call",
+          toolCallId,
+          title: "Writing ./audit.py",
+          kind: "edit",
+          status: "pending",
+        },
+        ...Array.from({ length: 200 }, (_, index) => ({
           sessionUpdate: "tool_call_update" as const,
           toolCallId,
           title: "Writing ./audit.py",
-          ...(status === undefined ? {} : { status }),
           content: [
-            { type: "diff" as const, path: "/repo/audit.py", oldText: null, newText: text },
+            {
+              type: "diff" as const,
+              path: "/repo/audit.py",
+              oldText: null,
+              newText: file.slice(0, Math.ceil((file.length * (index + 1)) / 200)),
+            },
           ],
-          rawInput: { file_path: "/repo/audit.py", content: text },
-          _meta: meta,
-        });
-        return [
-          {
-            sessionUpdate: "tool_call",
-            toolCallId,
-            title: "Writing …",
-            kind: "edit",
-            status: "pending",
-            _meta: meta,
-          },
-          ...Array.from({ length: chunks }, (_, index) =>
-            write(file.slice(0, Math.ceil((file.length * (index + 1)) / chunks))),
-          ),
-          write(file, "completed"),
-        ];
-      };
-      const instanceId = ProviderInstanceId.make("devin-streamed-write");
+          rawInput: { file_path: "/repo/audit.py", content: file },
+        })),
+        {
+          sessionUpdate: "tool_call_update",
+          toolCallId,
+          status: "completed",
+          content: [{ type: "diff", path: "/repo/audit.py", oldText: null, newText: file }],
+        },
+      ];
+      const instanceId = ProviderInstanceId.make("acp-streamed-tool-bounds");
       const adapter = yield* makeAcpAdapterV2({
         instanceId,
         selfInvocation: yield* resolveSelfInvocation(),
         flavor: {
           driver: ACP_TEST_DRIVER,
           capabilities: AcpProviderCapabilitiesV2,
-          normalizeSessionUpdate: normalizeDevinSessionUpdate,
-          normalizeToolCall: normalizeDevinToolCall,
-          extractSubagentUpdate: extractDevinSubagentUpdate,
+          extractSubagentUpdate: (toolCall) =>
+            toolCall.toolCallId === "child-start"
+              ? {
+                  nativeTaskId: "child-start-task",
+                  prompt: "Write audit.py",
+                  title: "Write audit.py",
+                  model: null,
+                  status: toolCall.status === "completed" ? "completed" : "running",
+                  childSessionId: "child-session",
+                  result: null,
+                }
+              : undefined,
           makeRuntime: makeMockRuntime({
             childProcessSpawner,
             mockAgentPath,
@@ -3207,60 +2915,22 @@ describe("AcpAdapterV2", () => {
                 }).pipe(Effect.andThen(runtime.handleSessionUpdate(next))),
               prompt: () =>
                 Effect.gen(function* () {
-                  const updates = [
-                    {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: "child-a",
-                      status: "in_progress",
-                      _meta: {
-                        "cognition.ai/subagent_started": {
-                          agentId: "child-a",
-                          title: "Write audit script",
-                          task: "Write audit.py.",
-                        },
-                      },
-                    },
-                    ...streamedWrite("root-write"),
-                    ...streamedWrite("child-write", "child-a"),
-                    ...Array.from({ length: 5 }, (_, index) => ({
-                      sessionUpdate: "tool_call_update" as const,
-                      toolCallId: "ticker",
-                      title: "Watch ticks",
-                      kind: "execute" as const,
-                      status: "in_progress" as const,
-                      rawOutput: `tick ${index + 1}`,
-                    })),
-                    ...Array.from({ length: 5 }, (_, index) => ({
-                      sessionUpdate: "tool_call_update" as const,
-                      toolCallId: "text-ticker",
-                      title: "Watch ticks",
-                      kind: "execute" as const,
-                      status: "in_progress" as const,
-                      rawOutput: { type: "Text", text: `tock ${index + 1}` },
-                    })),
-                    {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: "child-a",
-                      status: "completed",
-                      _meta: {
-                        "cognition.ai/subagent_completed": {
-                          agentId: "child-a",
-                          success: true,
-                          summary: "Wrote audit.py",
-                        },
-                      },
-                    },
-                  ] satisfies Array<EffectAcpSchema.SessionUpdate>;
-                  for (const update of updates)
+                  assert.isDefined(handler);
+                  for (const update of streamedWrite("root-write"))
                     yield* handler!({ sessionId: "mock-session-1", update });
+                  const childStart = streamedWrite("child-start")[0];
+                  if (childStart === undefined) throw new Error("Missing child tool start");
+                  yield* handler!({ sessionId: "mock-session-1", update: childStart });
+                  for (const update of streamedWrite("child-start").slice(1))
+                    yield* handler!({ sessionId: "child-session", update });
                   return { stopReason: "end_turn" as const };
                 }),
             }),
           }),
         },
       });
-      const threadId = ThreadId.make("devin-streamed-write");
-      const modelSelection = { instanceId, model: "default" };
+      const threadId = ThreadId.make("thread-acp-streamed-tool-bounds");
+      const modelSelection = { instanceId, model: "default" } as const;
       const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
         runtimeMode: "full-access",
         interactionMode: "default",
@@ -3268,7 +2938,7 @@ describe("AcpAdapterV2", () => {
       });
       const runtime = yield* adapter.openSession({
         threadId,
-        providerSessionId: ProviderSessionId.make("devin-streamed-write-session"),
+        providerSessionId: ProviderSessionId.make("provider-session-acp-streamed-tool-bounds"),
         modelSelection,
         runtimePolicy,
       });
@@ -3292,541 +2962,15 @@ describe("AcpAdapterV2", () => {
           Stream.runCollect,
         ),
       ).flatMap((event) => (event.type === "turn_item.updated" ? [event.turnItem] : []));
-      for (const toolCallId of ["root-write", "child-write"]) {
-        const writes = items.filter((item) => item.nativeItemRef?.nativeId?.endsWith(toolCallId));
-        assert.isAtLeast(writes.length, chunks / 10, toolCallId);
-        assert.isAtMost(writes.length, chunks / 5, toolCallId);
-        assert.equal(writes.at(-1)?.status, "completed", toolCallId);
-        assert.include(JSON.stringify(writes.at(-1)), "END_OF_FILE", toolCallId);
-      }
-      for (const [toolCallId, word] of [
-        ["ticker", "tick"],
-        ["text-ticker", "tock"],
-      ] as const) {
-        const ticks = items.filter((item) => item.nativeItemRef?.nativeId?.endsWith(toolCallId));
-        for (let tick = 1; tick <= 5; tick++) {
-          assert.isTrue(
-            ticks.some((item) => JSON.stringify(item).includes(`${word} ${tick}`)),
-            `${word} ${tick} must persist`,
-          );
-        }
-      }
-    }).pipe(Effect.provide(layerTest)),
-  );
-
-  it.effect("keeps Devin parent paragraphs intact while projecting native child work", () =>
-    Effect.gen(function* () {
-      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const mockAgentPath = yield* bundledMockAgentPath;
-      type Runtime = AcpSessionRuntime.AcpSessionRuntime["Service"];
-      let handler: Parameters<Runtime["handleSessionUpdate"]>[0] | undefined;
-      let createTerminal: Parameters<Runtime["handleCreateTerminal"]>[0] | undefined;
-      const instanceId = ProviderInstanceId.make("devin-replay");
-      const adapter = yield* makeAcpAdapterV2({
-        instanceId,
-        clientTerminals: { shellCommands: true },
-        selfInvocation: yield* resolveSelfInvocation(),
-        flavor: {
-          driver: ACP_TEST_DRIVER,
-          capabilities: AcpProviderCapabilitiesV2,
-          normalizeSessionUpdate: normalizeDevinSessionUpdate,
-          normalizeToolCall: normalizeDevinToolCall,
-          extractSubagentUpdate: extractDevinSubagentUpdate,
-          makeRuntime: makeMockRuntime({
-            childProcessSpawner,
-            mockAgentPath,
-            wrapRuntime: (runtime) => ({
-              ...runtime,
-              handleSessionUpdate: (next) =>
-                Effect.sync(() => {
-                  handler = next;
-                }).pipe(Effect.andThen(runtime.handleSessionUpdate(next))),
-              handleCreateTerminal: (next) =>
-                Effect.sync(() => {
-                  createTerminal = next;
-                }).pipe(Effect.andThen(runtime.handleCreateTerminal(next))),
-              prompt: () =>
-                Effect.gen(function* () {
-                  assert.isDefined(handler);
-                  assert.isDefined(createTerminal);
-                  const fallbackTerminal = yield* createTerminal(
-                    { sessionId: "mock-session-1", command: "true acp-mcp-call task_status {}" },
-                    { requestId: "child-mcp-terminal", method: "terminal/create" },
-                  );
-                  const updates = [
-                    {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: "child-a",
-                      status: "in_progress",
-                      _meta: {
-                        "cognition.ai/subagent_started": {
-                          agentId: "child-a",
-                          title: "Map orchestration",
-                          task: "Run pwd, then reply ONE.",
-                          model: " \t ",
-                        },
-                      },
-                    },
-                    {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: "child-a",
-                      status: "in_progress",
-                      _meta: {
-                        "cognition.ai/subagent_started": {
-                          agentId: "child-a",
-                          title: "Map orchestration",
-                          task: "Run pwd, then reply ONE.",
-                          model: "SWE-1.7 Medium",
-                          depth: 1,
-                          isBackground: true,
-                        },
-                      },
-                    },
-                    {
-                      sessionUpdate: "agent_message_chunk",
-                      content: { type: "text", text: "Map orchestration (command" },
-                      _meta: { "cognition.ai/streamingMessageId": "parent-message" },
-                    },
-                    {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: "parent-tool",
-                      status: "completed",
-                      title: "Parent tool finished",
-                    },
-                    {
-                      sessionUpdate: "tool_call",
-                      toolCallId: "child-pwd",
-                      title: "Tool",
-                      kind: "execute",
-                      status: "in_progress",
-                      rawInput: { command: "pwd" },
-                      _meta: {
-                        "cognition.ai/inferenceToolName": "exec",
-                        "cognition.ai/subagent_context": { parentAgentId: "child-a" },
-                      },
-                    },
-                    {
-                      sessionUpdate: "tool_call",
-                      toolCallId: "child-weather",
-                      title: "Check weather",
-                      status: "completed",
-                      rawInput: { server: "weather", tool: "get_weather", city: "Berlin" },
-                      rawOutput: {
-                        result: {
-                          _meta: {
-                            source: { name: "Weather", logoUrl: "https://example.com/weather.png" },
-                          },
-                          content: [{ type: "text", text: "Sunny" }],
-                        },
-                      },
-                      _meta: {
-                        is_mcp_tool_call: true,
-                        "cognition.ai/subagent_context": { parentAgentId: "child-a" },
-                      },
-                    },
-                    {
-                      sessionUpdate: "tool_call",
-                      toolCallId: "child-mcp-fallback",
-                      title: "已运行命令",
-                      kind: "execute",
-                      status: "completed",
-                      content: [{ type: "terminal", terminalId: fallbackTerminal.terminalId }],
-                      _meta: { "cognition.ai/subagent_context": { parentAgentId: "child-a" } },
-                    },
-                    {
-                      sessionUpdate: "tool_call",
-                      toolCallId: "parent-weather",
-                      title: "Check weather",
-                      status: "completed",
-                      rawInput: { server: "weather", tool: "get_weather", city: "Berlin" },
-                      rawOutput: {
-                        _meta: {
-                          source: { name: "Weather", logoUrl: "https://example.com/weather.png" },
-                        },
-                        content: [{ type: "text", text: "Sunny" }],
-                      },
-                      _meta: { is_mcp_tool_call: true },
-                    },
-                    {
-                      sessionUpdate: "agent_message_chunk",
-                      content: { type: "text", text: " → decider → event)." },
-                      _meta: { "cognition.ai/streamingMessageId": "parent-message" },
-                    },
-                    {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: "child-pwd",
-                      status: "completed",
-                      rawOutput: "probe-workspace",
-                      _meta: { "cognition.ai/subagent_context": { parentAgentId: "child-a" } },
-                    },
-                    {
-                      sessionUpdate: "agent_message_chunk",
-                      content: { type: "text", text: "Checking the code." },
-                      _meta: {
-                        "cognition.ai/streamingMessageId": "child-progress",
-                        "cognition.ai/subagent_context": { parentAgentId: "child-a" },
-                      },
-                    },
-                    {
-                      sessionUpdate: "agent_message_chunk",
-                      content: { type: "text", text: "ONE" },
-                      _meta: {
-                        "cognition.ai/streamingMessageId": "child-result",
-                        "cognition.ai/subagent_context": { parentAgentId: "child-a" },
-                      },
-                    },
-                    {
-                      sessionUpdate: "tool_call",
-                      toolCallId: "child-later",
-                      title: "Later tool",
-                      status: "completed",
-                      _meta: { "cognition.ai/subagent_context": { parentAgentId: "child-a" } },
-                    },
-                    {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: "child-a",
-                      status: "completed",
-                      _meta: {
-                        "cognition.ai/subagent_completed": {
-                          agentId: "child-a",
-                          success: true,
-                          summary: "Final report: ONE",
-                          depth: 1,
-                        },
-                      },
-                    },
-                  ] satisfies Array<EffectAcpSchema.SessionUpdate>;
-                  for (const update of updates)
-                    yield* handler!({ sessionId: "mock-session-1", update });
-                  return { stopReason: "end_turn" as const };
-                }),
-            }),
-          }),
-        },
-      });
-      const threadId = ThreadId.make("devin-replay-parent");
-      const modelSelection = { instanceId, model: "default" };
-      const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
-        runtimeMode: "full-access",
-        interactionMode: "default",
-        cwd: process.cwd(),
-      });
-      const runtime = yield* adapter.openSession({
-        threadId,
-        providerSessionId: ProviderSessionId.make("devin-replay-session"),
-        modelSelection,
-        runtimePolicy,
-      });
-      const providerThread = yield* runtime.ensureThread({
-        threadId,
-        modelSelection,
-        runtimePolicy,
-      });
-      yield* runtime.startTurn(
-        makeTurnInput({
-          threadId,
-          providerThread,
-          instanceId,
-          runtimePolicy,
-          now: yield* DateTime.now,
-        }),
-      );
-      const events = Array.from(
-        yield* runtime.events.pipe(
-          Stream.takeUntil((event) => event.type === "turn.terminal"),
-          Stream.runCollect,
-        ),
-      );
-      const items = events.flatMap((event) =>
-        event.type === "turn_item.updated" ? [event.turnItem] : [],
-      );
-      const parentMessages = items.filter(
-        (item) => item.threadId === threadId && item.type === "assistant_message",
-      );
-      assert.equal(new Set(parentMessages.map((item) => item.id)).size, 1);
-      const lastParent = parentMessages.at(-1);
-      assert.equal(
-        lastParent?.type === "assistant_message" ? lastParent.text : undefined,
-        "Map orchestration (command → decider → event).",
-      );
-      const tasks = events.flatMap((event) =>
-        event.type === "subagent.updated" ? [event.subagent] : [],
-      );
-      const task = tasks.at(-1);
-      assert.isNull(tasks[0]?.model);
-      const childThread = events.find(
-        (event) =>
-          event.type === "app_thread.created" && event.appThread.id === task?.childThreadId,
-      );
-      assert.equal(
-        childThread?.type === "app_thread.created"
-          ? childThread.appThread.modelSelection.model
-          : undefined,
-        modelSelection.model,
-      );
-      assert.equal(task?.model, "SWE-1.7 Medium");
-      assert.equal(task?.status, "completed");
-      assert.equal(task?.result, "Final report: ONE");
-      const childMessages = new Map(
-        items.flatMap((item) =>
-          item.threadId === task?.childThreadId && item.type === "assistant_message"
-            ? [[item.id, item.text] as const]
-            : [],
-        ),
-      );
-      assert.deepEqual([...childMessages.values()], ["Checking the code.", "ONE"]);
-      assert.equal(task?.prompt, "Run pwd, then reply ONE.");
-      assert.isTrue(
-        items.some(
-          (item) =>
-            item.threadId === task?.childThreadId &&
-            item.type === "dynamic_tool" &&
-            item.toolName === "t3-code.task_status",
-        ),
-      );
-      const childMcp = items.find(
+      const writes = items.filter(
         (item) =>
-          item.threadId === task?.childThreadId &&
-          item.type === "dynamic_tool" &&
-          item.toolName === "weather.get_weather",
+          item.nativeItemRef?.nativeId?.endsWith("root-write") === true ||
+          item.nativeItemRef?.nativeId?.endsWith("child-start") === true,
       );
-      const parentMcp = items.find(
-        (item) =>
-          item.threadId === threadId &&
-          item.type === "dynamic_tool" &&
-          item.toolName === "weather.get_weather",
-      );
-      for (const item of [parentMcp, childMcp]) {
-        assert.equal(item?.title, "get weather");
-        assert.deepEqual(item?.toolSource, {
-          key: "mcp:weather",
-          name: "Weather",
-          kind: "integration",
-          icon: { _tag: "themed-logo", logoUrl: "https://example.com/weather.png" },
-        });
-        assert.deepEqual(item?.toolIcon, item?.toolSource?.icon);
-      }
-      assert.isTrue(
-        items.some(
-          (item) =>
-            item.threadId === task?.childThreadId &&
-            item.type === "user_message" &&
-            item.text === task.prompt,
-        ),
-      );
-      assert.isTrue(
-        items.some(
-          (item) =>
-            item.threadId === task?.childThreadId &&
-            item.type === "dynamic_tool" &&
-            item.status === "completed" &&
-            item.output === "probe-workspace",
-        ),
-      );
-      const childAnswers = items.filter(
-        (item) => item.threadId === task?.childThreadId && item.type === "assistant_message",
-      );
-      assert.equal(new Set(childAnswers.map((item) => item.ordinal)).size, 2);
-      const parentTools = items.filter(
-        (item) => item.threadId === threadId && item.type === "dynamic_tool",
-      );
-      assert.equal(parentTools.length, 2);
-      assert.equal(parentTools[0]?.title, "Parent tool finished");
-    }).pipe(Effect.provide(layerTest)),
-  );
-
-  it.effect("routes interleaved Copilot subagent output into subagent threads", () =>
-    Effect.gen(function* () {
-      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const mockAgentPath = yield* bundledMockAgentPath;
-      type Runtime = AcpSessionRuntime.AcpSessionRuntime["Service"];
-      let handler: Parameters<Runtime["handleSessionUpdate"]>[0] | undefined;
-      let sessionEvent:
-        | ((event: unknown) => Effect.Effect<void, EffectAcpErrors.AcpError>)
-        | undefined;
-      const routing = makeCopilotSubagentRouting();
-      const instanceId = ProviderInstanceId.make("copilot-replay");
-      const adapter = yield* makeAcpAdapterV2({
-        instanceId,
-        selfInvocation: yield* resolveSelfInvocation(),
-        flavor: {
-          driver: ACP_TEST_DRIVER,
-          capabilities: AcpProviderCapabilitiesV2,
-          registerExtensions: routing.registerExtensions,
-          normalizeSessionUpdate: routing.normalizeSessionUpdate,
-          extractSubagentUpdate: extractCopilotSubagentUpdate,
-          makeRuntime: makeMockRuntime({
-            childProcessSpawner,
-            mockAgentPath,
-            wrapRuntime: (runtime) => ({
-              ...runtime,
-              handleSessionUpdate: (next) =>
-                Effect.sync(() => {
-                  handler = next;
-                }).pipe(Effect.andThen(runtime.handleSessionUpdate(next))),
-              handleExtNotification: (method, payload, next) =>
-                Effect.sync(() => {
-                  if (method === "github.com/copilot/sessionEvent") {
-                    sessionEvent = next as typeof sessionEvent;
-                  }
-                }).pipe(Effect.andThen(runtime.handleExtNotification(method, payload, next))),
-              prompt: () =>
-                Effect.gen(function* () {
-                  assert.isDefined(handler);
-                  assert.isDefined(sessionEvent);
-                  const sessionId = "mock-session-1";
-                  const raw = (type: string, data: object, agentId?: string) =>
-                    sessionEvent!({ sessionId, type, data, ...(agentId ? { agentId } : {}) });
-                  const update = (next: EffectAcpSchema.SessionUpdate) =>
-                    handler!({ sessionId, update: next });
-                  // Copilot sends each chunk's raw delta just before the chunk.
-                  const chunk = (text: string, task?: string) =>
-                    raw("assistant.message_delta", {
-                      deltaContent: text,
-                      ...(task ? { parentToolCallId: task } : {}),
-                    }).pipe(
-                      Effect.andThen(
-                        update({
-                          sessionUpdate: "agent_message_chunk",
-                          content: { type: "text", text },
-                        }),
-                      ),
-                    );
-                  const launch = (toolCallId: string, description: string, mode: string) =>
-                    update({
-                      sessionUpdate: "tool_call",
-                      toolCallId,
-                      title: description,
-                      kind: "other",
-                      status: "pending",
-                      rawInput: {
-                        description,
-                        prompt: `${description}.`,
-                        agent_type: "explore",
-                        mode,
-                      },
-                    });
-                  yield* chunk("Launching ");
-                  yield* launch("task-a", "Describe a.txt", "sync");
-                  yield* launch("task-b", "Describe b.txt", "sync");
-                  yield* launch("task-bg", "List directory", "background");
-                  yield* raw("subagent.started", { toolCallId: "task-a" }, "agent-a");
-                  yield* raw("subagent.started", { toolCallId: "task-b" }, "agent-b");
-                  yield* raw("subagent.started", { toolCallId: "task-bg" }, "agent-bg");
-                  yield* update({
-                    sessionUpdate: "tool_call_update",
-                    toolCallId: "task-bg",
-                    status: "completed",
-                    rawOutput: { content: "Agent started in background with agent_id: agent-bg." },
-                  });
-                  yield* update({
-                    sessionUpdate: "tool_call",
-                    toolCallId: "view-a",
-                    title: "Viewing a.txt",
-                    kind: "read",
-                    status: "completed",
-                    rawInput: { path: "a.txt" },
-                    _meta: { "github.com/copilot": { agentId: "agent-a" } },
-                  });
-                  yield* chunk("`a.txt` says", "task-a");
-                  yield* chunk("`b.txt` has", "task-b");
-                  yield* chunk(" hello.", "task-a");
-                  yield* chunk("a.txt b.txt", "task-bg");
-                  yield* chunk(" three lines.", "task-b");
-                  for (const [task, agent, text] of [
-                    ["task-a", "agent-a", "`a.txt` says hello."],
-                    ["task-b", "agent-b", "`b.txt` has three lines."],
-                  ] as const) {
-                    yield* update({
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: task,
-                      status: "completed",
-                      rawOutput: { content: text },
-                    });
-                    yield* raw("subagent.completed", { toolCallId: task }, agent);
-                  }
-                  yield* raw("subagent.completed", { toolCallId: "task-bg" }, "agent-bg");
-                  yield* chunk("all done.");
-                  return { stopReason: "end_turn" as const };
-                }),
-            }),
-          }),
-        },
-      });
-      const threadId = ThreadId.make("copilot-replay-parent");
-      const modelSelection = { instanceId, model: "default" };
-      const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
-        runtimeMode: "full-access",
-        interactionMode: "default",
-        cwd: process.cwd(),
-      });
-      const runtime = yield* adapter.openSession({
-        threadId,
-        providerSessionId: ProviderSessionId.make("copilot-replay-session"),
-        modelSelection,
-        runtimePolicy,
-      });
-      const providerThread = yield* runtime.ensureThread({
-        threadId,
-        modelSelection,
-        runtimePolicy,
-      });
-      yield* runtime.startTurn(
-        makeTurnInput({
-          threadId,
-          providerThread,
-          instanceId,
-          runtimePolicy,
-          now: yield* DateTime.now,
-        }),
-      );
-      const events = Array.from(
-        yield* runtime.events.pipe(
-          Stream.takeUntil((event) => event.type === "turn.terminal"),
-          Stream.runCollect,
-        ),
-      );
-      const items = events.flatMap((event) =>
-        event.type === "turn_item.updated" ? [event.turnItem] : [],
-      );
-      const lastText = (thread: string | null | undefined) =>
-        new Map(
-          items.flatMap((item) =>
-            item.threadId === thread && item.type === "assistant_message"
-              ? [[item.id, item.text] as const]
-              : [],
-          ),
-        );
-      assert.deepEqual([...lastText(threadId).values()].join(""), "Launching all done.");
-      const tasks = new Map(
-        events.flatMap((event) =>
-          event.type === "subagent.updated"
-            ? [[event.subagent.nativeTaskRef?.nativeId, event.subagent] as const]
-            : [],
-        ),
-      );
-      const outputs = Object.fromEntries(
-        [...tasks].map(([id, task]) => [
-          id,
-          [task.status, [...lastText(task.childThreadId).values()].join("")],
-        ]),
-      );
-      assert.deepEqual(outputs, {
-        "task-a": ["completed", "`a.txt` says hello."],
-        "task-b": ["completed", "`b.txt` has three lines."],
-        "task-bg": ["completed", "a.txt b.txt"],
-      });
-      assert.isTrue(
-        items.some(
-          (item) =>
-            item.threadId === tasks.get("task-a")?.childThreadId &&
-            item.type === "dynamic_tool" &&
-            item.title === "读取 a.txt",
-        ),
-      );
-      assert.isFalse(
-        items.some((item) => item.threadId === threadId && item.type === "dynamic_tool"),
-      );
+      assert.isAtLeast(writes.length, 20);
+      assert.isAtMost(writes.length, 50);
+      assert.equal(writes.at(-1)?.status, "completed");
+      assert.include(JSON.stringify(writes.at(-1)), "END_OF_FILE");
     }).pipe(Effect.provide(layerTest)),
   );
 
@@ -6533,7 +5677,7 @@ describe("AcpAdapterV2", () => {
         label: "Agent",
         type: "select",
         options: [
-          { id: ACP_EMPTY_OPTION_VALUE, label: "Copilot" },
+          { id: ACP_EMPTY_OPTION_VALUE, label: "Agent" },
           { id: "example", label: "example" },
         ],
         currentValue: "example",

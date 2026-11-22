@@ -14,10 +14,6 @@ configuration, compaction, and agent-terminal updates when the agent supports th
 negotiates ACP v1 for Registry agents that have not migrated yet, so they continue to work through
 the same generic integration.
 
-Claude Agent uses the ACP v2 preview by default for Registry and local `claude-agent-acp`
-commands. If you encounter preview issues, set `CLAUDE_AGENT_ACP_EXPERIMENTAL_V2=0` in the
-provider instance's environment overrides to use ACP v1.
-
 ## Add an agent
 
 1. Open **Settings → Providers**.
@@ -32,7 +28,7 @@ code; review an agent's source and license before adding it.
 
 In **Settings → Providers → Add provider**, select **Show more**, then **Local ACP command**. Enter the executable
 name or path on the selected environment, add one literal argument per row, and choose a display
-name. For DeepSeek Harness, use `dsh` with arguments `--profile` and `acp`.
+name.
 
 Local commands require no registry entry or download. Environment overrides apply to the command;
 credentials and skills remain managed by the installed agent or its wrapper. Models and reasoning
@@ -71,10 +67,6 @@ If the agent advertises logout, choose **Sign out**. Changing a shared agent log
 threads for instances of that same agent on the environment. Thread history and workspace files
 are kept. ACP does not describe account isolation, so adding another instance does not guarantee
 a separate account; use the agent's own configuration to isolate accounts when supported.
-
-If an agent cannot complete its advertised flow remotely, its CLI remains available on the
-server. For example, Codex supports `codex login --device-auth`, and Grok Build supports
-`grok login --device-auth`.
 
 ## Models and options
 
@@ -117,9 +109,8 @@ When a registry agent asks for approval, T3 Code answers by the thread's
 **Auto-accept edits** approves edits and shows the rest, and **Auto** and **Full access** approve
 automatically. File reads and searches never wait for approval.
 
-Devin runs its commands through T3 Code's terminals, and those commands follow the thread's
-permission mode. For other agents, T3 Code shows the command, output, and exit status the agent
-reports but does not run or stop their terminals.
+T3 Code shows the command, output, and exit status a registry agent reports but does not run or
+stop its terminals.
 
 Registry agents can schedule work and use T3's MCP tools. Child-task presentation depends on what
 the agent exposes: ACP has no portable native subagent-lineage contract, so richer delegation views
