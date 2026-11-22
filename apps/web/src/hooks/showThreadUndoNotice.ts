@@ -51,6 +51,42 @@ export function threadUndoLabel(keybindings: Parameters<typeof shortcutLabelForC
 }
 
 let announcedSummary: string | null = null;
+let settleToastId: ReturnType<typeof toastManager.add> | null = null;
+
+function closeSettleToast() {
+  if (settleToastId === null) return;
+  const id = settleToastId;
+  settleToastId = null;
+  toastManager.close(id);
+}
+
+function syncSettleToast(notice: UndoNotice | null) {
+  if (notice === null || notice.action !== "Settled") {
+    closeSettleToast();
+    return;
+  }
+  const title = notice.count === 1 ? "已收尾" : `已收尾 ${notice.count} 个会话`;
+  const actionProps = {
+    children: "撤销",
+    onClick: () => {
+      void undoLatestThreadAction();
+    },
+  };
+  if (settleToastId !== null) {
+    toastManager.update(settleToastId, { title, timeout: 5_000, actionProps });
+    return;
+  }
+  const id = toastManager.add({
+    type: "success",
+    title,
+    timeout: 5_000,
+    actionProps,
+    onRemove: () => {
+      if (settleToastId === id) settleToastId = null;
+    },
+  });
+  settleToastId = id;
+}
 
 // A live region that mounts already filled is skipped by screen readers, and settling
 // usually moves focus to the next thread at the same moment, so the notice is announced
@@ -60,6 +96,7 @@ function setNotice(notice: UndoNotice | null) {
   const summary = notice ? threadUndoNoticeSummary(notice) : null;
   if (summary === announcedSummary) return;
   announcedSummary = summary;
+  syncSettleToast(notice);
   if (summary) {
     const label = threadUndoLabel(appAtomRegistry.get(primaryServerKeybindingsAtom));
     announce(`${summary}, ${label}`, "thread-undo-notice");

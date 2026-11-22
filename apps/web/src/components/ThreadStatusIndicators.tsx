@@ -244,7 +244,6 @@ export function ThreadPullRequestBadgeControl({
   number,
   url,
   status,
-  size = "xs",
   onOpenList,
   onOpenPullRequest,
 }: {
@@ -254,7 +253,6 @@ export function ThreadPullRequestBadgeControl({
   number?: number | undefined;
   url?: string | undefined;
   status: PrStatusIndicator | null;
-  size?: "xs" | "row";
   onOpenList: () => void;
   onOpenPullRequest: (event: MouseEvent<HTMLElement>, url?: string) => void;
 }) {
@@ -268,7 +266,6 @@ export function ThreadPullRequestBadgeControl({
       url={url}
       number={number}
       status={status}
-      size={size}
       pullRequests={pullRequests}
       onOpenList={onOpenList}
       onOpenPullRequest={onOpenPullRequest}
@@ -283,7 +280,6 @@ function PullRequestBadge({
   url,
   number,
   status,
-  size = "xs",
   pullRequests,
   onOpenList,
   onOpenPullRequest,
@@ -294,7 +290,6 @@ function PullRequestBadge({
   url: string | undefined;
   number: number | undefined;
   status: PrStatusIndicator | null;
-  size?: "xs" | "row";
   pullRequests: ReadonlyArray<ThreadPullRequestLink>;
   onOpenList: () => void;
   onOpenPullRequest: (event: MouseEvent<HTMLElement>, url?: string) => void;
@@ -323,13 +318,7 @@ function PullRequestBadge({
   return (
     <Tooltip key={opensList ? "list" : "link"}>
       <TooltipTrigger render={control}>
-        <span
-          className={cn(
-            "contents font-normal tabular-nums",
-            size === "row" ? "text-ui" : "text-xs",
-            presentation.toneClassName,
-          )}
-        >
+        <span className={cn("contents font-normal tabular-nums", presentation.toneClassName)}>
           <presentation.Icon aria-hidden className="size-3 shrink-0" />
           <span className="text-secondary-label">{presentation.text}</span>
         </span>

@@ -35,14 +35,14 @@ export function ThreadSearchMatchExcerpt(props: {
     readonly snippet: string;
     readonly query: string;
   };
-  size?: "xs" | "ui";
+  size?: "xs" | "row";
 }) {
   const isUser = props.match.source === "user";
   return (
     <span
       className={
-        props.size === "ui"
-          ? "truncate text-ui text-muted-foreground/85"
+        props.size === "row"
+          ? "truncate text-row text-muted-foreground/85"
           : "truncate text-xs text-muted-foreground/85"
       }
     >

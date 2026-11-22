@@ -281,14 +281,22 @@ describe("delete navigation", () => {
 });
 
 describe("settle and snooze Undo", () => {
-  it("un-settles from the notice and expires the Undo after a manual un-settle", async () => {
+  it("shows a settle undo toast, un-settles from it, and closes it after a manual un-settle", async () => {
     const add = vi.spyOn(toastManager, "add").mockReturnValue("toast");
+    const close = vi.spyOn(toastManager, "close").mockImplementation(() => {});
     const actions = useThreadActions();
     await actions.settleThread(target);
     expect(useThreadUndoNotice.getState().notice).toMatchObject({ action: "Settled", count: 1 });
-    expect(add).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "success",
+        title: "已收尾",
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
     const undo = currentUndo();
     await actions.unsettleThread(target);
+    expect(close).toHaveBeenCalledWith("toast");
     await undo();
     expect(commands.unsettle).toHaveBeenCalledOnce();
   });

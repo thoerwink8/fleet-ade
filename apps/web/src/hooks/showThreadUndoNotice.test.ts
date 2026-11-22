@@ -109,4 +109,52 @@ describe("thread undo notice", () => {
     expect(add).toHaveBeenCalledOnce();
     expect(announce).not.toHaveBeenCalled();
   });
+
+  it("shows and updates a settle toast with undo and closes it when undone or expired", async () => {
+    const add = vi.spyOn(toastManager, "add").mockReturnValue("settle-toast");
+    const update = vi.spyOn(toastManager, "update").mockImplementation(() => {});
+    const close = vi.spyOn(toastManager, "close").mockImplementation(() => {});
+    const undoFirst = vi.fn(async () => AsyncResult.success(undefined));
+    const undoSecond = vi.fn(async () => AsyncResult.success(undefined));
+
+    showThreadUndoNotice({
+      action: "Settled",
+      failureTitle: "无法撤销收尾",
+      undo: undoFirst,
+      claim: ThreadUndo.begin("settle", "env/first"),
+    });
+    expect(add).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        type: "success",
+        title: "已收尾",
+        timeout: 5_000,
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
+
+    showThreadUndoNotice({
+      action: "Settled",
+      failureTitle: "无法撤销收尾",
+      undo: undoSecond,
+      claim: ThreadUndo.begin("settle", "env/second"),
+    });
+    expect(update).toHaveBeenCalledExactlyOnceWith(
+      "settle-toast",
+      expect.objectContaining({
+        title: "已收尾 2 个会话",
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
+
+    const updatePayload = update.mock.calls[0]?.[1];
+    const actionOnClick =
+      typeof updatePayload === "object" && updatePayload !== null
+        ? (updatePayload.actionProps?.onClick as (() => void) | undefined)
+        : undefined;
+    actionOnClick?.();
+    await Promise.resolve();
+    expect(close).toHaveBeenCalledExactlyOnceWith("settle-toast");
+    expect(undoFirst).toHaveBeenCalledOnce();
+    expect(undoSecond).toHaveBeenCalledOnce();
+  });
 });
