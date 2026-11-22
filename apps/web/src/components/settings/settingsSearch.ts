@@ -79,25 +79,25 @@ export interface SettingsSearchAvailability {
 }
 
 export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
-  "/settings/diagnostics": "\u7ef4\u62a4",
-  "/settings/projects": "\u4ee3\u7801",
-  "/settings/general": "\u901a\u7528",
-  "/settings/network": "\u901a\u7528",
-  "/settings/appearance": "\u5916\u89c2",
-  "/settings/chat": "\u4f1a\u8bdd",
-  "/settings/diffs": "\u5916\u89c2",
-  "/settings/keybindings": "\u901a\u7528",
-  "/settings/providers": "\u667a\u80fd\u4f53",
-  "/settings/threads": "\u4f1a\u8bdd",
-  "/settings/scheduled-tasks": "\u5b9a\u65f6",
-  "/settings/source-control": "\u4ee3\u7801",
-  "/settings/worktrees": "\u4ee3\u7801",
-  "/settings/connections": "\u8fde\u63a5",
-  "/settings/access": "\u8fde\u63a5",
-  "/settings/secrets": "\u8fde\u63a5",
-  "/settings/maintenance": "\u7ef4\u62a4",
-  "/settings/about": "\u7ef4\u62a4",
-  "/settings/archived": "\u4f1a\u8bdd",
+  "/settings/diagnostics": "维护",
+  "/settings/projects": "代码",
+  "/settings/general": "通用",
+  "/settings/network": "通用",
+  "/settings/appearance": "外观",
+  "/settings/chat": "会话",
+  "/settings/diffs": "外观",
+  "/settings/keybindings": "通用",
+  "/settings/providers": "智能体",
+  "/settings/threads": "会话",
+  "/settings/scheduled-tasks": "定时",
+  "/settings/source-control": "代码",
+  "/settings/worktrees": "代码",
+  "/settings/connections": "连接",
+  "/settings/access": "连接",
+  "/settings/secrets": "连接",
+  "/settings/maintenance": "维护",
+  "/settings/about": "维护",
+  "/settings/archived": "会话",
 };
 
 /** Sidebar order. Eight sections, each a single entry; the pages that used to be
@@ -107,14 +107,14 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   readonly headingHidden?: true;
   readonly paths: ReadonlyArray<SettingsPath>;
 }> = [
-  { heading: "\u901a\u7528", headingHidden: true, paths: ["/settings/general"] },
-  { heading: "\u5916\u89c2", headingHidden: true, paths: ["/settings/appearance"] },
-  { heading: "\u667a\u80fd\u4f53", headingHidden: true, paths: ["/settings/providers"] },
-  { heading: "\u4f1a\u8bdd", headingHidden: true, paths: ["/settings/threads"] },
-  { heading: "\u5b9a\u65f6", headingHidden: true, paths: ["/settings/scheduled-tasks"] },
-  { heading: "\u4ee3\u7801", headingHidden: true, paths: ["/settings/projects"] },
-  { heading: "\u8fde\u63a5", headingHidden: true, paths: ["/settings/connections"] },
-  { heading: "\u7ef4\u62a4", headingHidden: true, paths: ["/settings/maintenance"] },
+  { heading: "通用", headingHidden: true, paths: ["/settings/general"] },
+  { heading: "外观", headingHidden: true, paths: ["/settings/appearance"] },
+  { heading: "智能体", headingHidden: true, paths: ["/settings/providers"] },
+  { heading: "会话", headingHidden: true, paths: ["/settings/threads"] },
+  { heading: "定时", headingHidden: true, paths: ["/settings/scheduled-tasks"] },
+  { heading: "代码", headingHidden: true, paths: ["/settings/projects"] },
+  { heading: "连接", headingHidden: true, paths: ["/settings/connections"] },
+  { heading: "维护", headingHidden: true, paths: ["/settings/maintenance"] },
 ];
 
 export function keybindingSearchAnchorId<Command extends KeybindingCommand>(command: Command) {
@@ -644,7 +644,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "telemetry-export",
     title: "OpenTelemetry 导出",
-    to: "/settings/maintenance",
+    to: "/settings/diagnostics",
     targetId: "telemetry-export",
     scope: "environment",
     searchTerms: ["OTel OTLP telemetry export endpoints logs traces metrics Grafana"],
@@ -949,21 +949,26 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
 };
 
 /** Pages folded into one of the eight sections. Their rows keep working through the anchor. */
-const RENAMED_SETTINGS_PATHS: Readonly<Record<string, SettingsPath>> = {
-  "/settings/integrations": "/settings/providers",
-  "/settings/storage": "/settings/maintenance",
-  "/settings/beta": "/settings/maintenance",
-  "/settings/labs": "/settings/maintenance",
-  "/settings/network": "/settings/general",
-  "/settings/keybindings": "/settings/general",
-  "/settings/chat": "/settings/threads",
-  "/settings/archived": "/settings/threads",
-  "/settings/diffs": "/settings/appearance",
-  "/settings/source-control": "/settings/projects",
-  "/settings/worktrees": "/settings/projects",
-  "/settings/access": "/settings/connections",
-  "/settings/secrets": "/settings/connections",
-  "/settings/about": "/settings/maintenance",
+interface RenamedSettingsTarget {
+  readonly to: SettingsPath;
+  readonly defaultHash?: string;
+}
+
+const RENAMED_SETTINGS_PATHS: Readonly<Record<string, RenamedSettingsTarget>> = {
+  "/settings/integrations": { to: "/settings/providers" },
+  "/settings/storage": { to: "/settings/maintenance", defaultHash: "storage-artifacts" },
+  "/settings/beta": { to: "/settings/maintenance" },
+  "/settings/labs": { to: "/settings/maintenance" },
+  "/settings/network": { to: "/settings/general", defaultHash: "network" },
+  "/settings/keybindings": { to: "/settings/general", defaultHash: "keybindings" },
+  "/settings/chat": { to: "/settings/threads", defaultHash: "composer" },
+  "/settings/archived": { to: "/settings/threads", defaultHash: "archive" },
+  "/settings/diffs": { to: "/settings/appearance", defaultHash: "diffs" },
+  "/settings/source-control": { to: "/settings/projects", defaultHash: "source-control" },
+  "/settings/worktrees": { to: "/settings/projects", defaultHash: "worktree-creation" },
+  "/settings/access": { to: "/settings/connections", defaultHash: "connections-environment" },
+  "/settings/secrets": { to: "/settings/connections", defaultHash: "secret-providers" },
+  "/settings/about": { to: "/settings/maintenance", defaultHash: "about" },
 };
 const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
   "/settings/general",
@@ -980,15 +985,24 @@ const MOVED_SECTION_ANCHORS: Readonly<Record<string, SettingsPath>> = {
 };
 
 /** Where an old settings link now lives. Its anchor finds the page its row moved to. */
-export function movedSettingsPath(pathname: string, hash: string): SettingsPath | null {
+export function movedSettingsRedirect(
+  pathname: string,
+  hash: string,
+): { readonly to: SettingsPath; readonly hash?: string } | null {
   if (!SPLIT_SETTINGS_PATHS.has(pathname)) return null;
   const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;
   const anchored = hash
     ? (items.find((item) => item.id === hash) ?? items.find((item) => item.targetId === hash))
     : undefined;
-  const to =
-    anchored?.to ?? MOVED_SECTION_ANCHORS[hash] ?? RENAMED_SETTINGS_PATHS[pathname] ?? null;
-  return to === pathname ? null : to;
+  const renamed = RENAMED_SETTINGS_PATHS[pathname];
+  const to = anchored?.to ?? MOVED_SECTION_ANCHORS[hash] ?? renamed?.to ?? null;
+  if (to === null || to === pathname) return null;
+  if (hash) return { to, hash };
+  return renamed?.defaultHash ? { to, hash: renamed.defaultHash } : { to };
+}
+
+export function movedSettingsPath(pathname: string, hash: string): SettingsPath | null {
+  return movedSettingsRedirect(pathname, hash)?.to ?? null;
 }
 
 export function getSettingsSearchTargetScope(targetId: string) {

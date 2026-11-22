@@ -596,7 +596,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
 
   const openSourceControlSettings = () => {
     handleOpenChange(false);
-    void navigate({ to: "/settings/source-control" });
+    void navigate({ to: "/settings/projects", hash: "source-control" });
   };
 
   return (

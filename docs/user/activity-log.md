@@ -20,7 +20,7 @@ were affected.
 
 ## Hide tool calls
 
-**Tool calls in chat** in **Settings → Chat** (web and desktop) or **Settings → Appearance**
+**Tool calls in chat** in **Settings → Threads** (web and desktop) or **Settings → Appearance**
 (mobile) hides commands, file edits, searches, and MCP tool calls
 from the conversation. **Hide successful** shows a call while it runs and keeps
 it only if it fails. **Hide all** hides every call and shows **Thinking** while the agent works.

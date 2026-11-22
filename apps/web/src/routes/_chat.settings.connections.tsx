@@ -8,8 +8,7 @@ import { isSecretsFeatureEnabled } from "../env";
 function SettingsConnectionsRoute() {
   return (
     <SettingsPageContainer>
-      <ConnectionsSettings view="environments" />
-      <ConnectionsSettings view="access" />
+      <ConnectionsSettings view="all" />
       {isSecretsFeatureEnabled ? <SecretsSettingsPanel /> : null}
     </SettingsPageContainer>
   );

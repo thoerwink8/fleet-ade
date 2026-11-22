@@ -460,6 +460,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() !== "linux")("installer chec
           const versions = NodePath.join(home, "runtime/versions");
           if (validChecksum) {
             expect(code, `${checksumTool}: ${output}`).toBe(0);
+            expect(output).toContain(`Installed Fleet ADE ${version}`);
             expect(
               await NodeFSP.readFile(NodePath.join(versions, version, ".install-complete"), "utf8"),
             ).toBe("1.2.3\n");

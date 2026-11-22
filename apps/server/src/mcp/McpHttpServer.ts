@@ -635,7 +635,7 @@ export const layerInProcessMcpServer = McpServer.middleware<{
 
 export const layerMcpTransport = <RA, RE, RR>(registrations: Layer.Layer<RA, RE, RR>) =>
   McpServer.layerHttp({
-    name: "Fleet ADE",
+    name: "T3 Code",
     version: packageJson.version,
     path: "/mcp",
     // The first protocol is the fallback for clients that offer an unknown version.

@@ -4,12 +4,17 @@ import {
   AboutSettingsPanel,
   MaintenanceSettingsPanel,
 } from "../components/settings/SettingsPanels";
-import { SettingsPageContainer } from "../components/settings/settingsLayout";
+import {
+  SettingsEnvironmentScopeGate,
+  SettingsPageContainer,
+} from "../components/settings/settingsLayout";
 
 function SettingsMaintenanceRoute() {
   return (
     <SettingsPageContainer>
-      <MaintenanceSettingsPanel />
+      <SettingsEnvironmentScopeGate>
+        <MaintenanceSettingsPanel />
+      </SettingsEnvironmentScopeGate>
       <AboutSettingsPanel />
     </SettingsPageContainer>
   );

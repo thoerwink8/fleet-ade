@@ -814,7 +814,11 @@ function ManageAccessButton({
       variant="ghost"
       onClick={() => {
         close();
-        void navigate({ to: "/settings/access", search: { machine: environment.environmentId } });
+        void navigate({
+          to: "/settings/connections",
+          hash: "connections-environment",
+          search: { machine: environment.environmentId },
+        });
       }}
     >
       {label}

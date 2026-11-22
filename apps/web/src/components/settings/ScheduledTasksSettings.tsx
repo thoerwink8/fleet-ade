@@ -1183,7 +1183,11 @@ function WebhookDeliveryMode({ environmentId }: { readonly environmentId: Enviro
       {cloudLink.data.holdWebhooksWhileOffline
         ? "此环境离线时，请求最多保留 24 小时。"
         : "实时转发。此环境离线时，请求会失败。"}
-      <Link to="/settings/access" className="underline underline-offset-2">
+      <Link
+        to="/settings/connections"
+        hash="connections-environment"
+        className="underline underline-offset-2"
+      >
         在“连接”中更改
       </Link>
     </p>

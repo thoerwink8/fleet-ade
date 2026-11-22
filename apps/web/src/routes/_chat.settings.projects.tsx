@@ -3,14 +3,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ProjectsSettings } from "../components/settings/ProjectsSettings";
 import { SourceControlSettingsPanel } from "../components/settings/SourceControlSettings";
 import { WorktreesSettingsPanel } from "../components/settings/WorktreesSettings";
-import { SettingsPageContainer } from "../components/settings/settingsLayout";
+import {
+  SettingsEnvironmentScopeGate,
+  SettingsPageContainer,
+} from "../components/settings/settingsLayout";
 
 function SettingsProjectsRoute() {
   return (
     <SettingsPageContainer>
       <ProjectsSettings />
-      <SourceControlSettingsPanel />
-      <WorktreesSettingsPanel />
+      <SettingsEnvironmentScopeGate>
+        <SourceControlSettingsPanel />
+        <WorktreesSettingsPanel />
+      </SettingsEnvironmentScopeGate>
     </SettingsPageContainer>
   );
 }

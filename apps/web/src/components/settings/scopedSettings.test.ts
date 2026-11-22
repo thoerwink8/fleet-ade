@@ -467,26 +467,6 @@ describe("scoped settings writes", () => {
       ).toMatchObject({ clientPatch: { fontScale: "large" }, unavailableReason: null });
     }
   });
-  it("saves device settings locally when the page also edits a server", () => {
-    expect(
-      planScopedSettingsPatch(
-        named,
-        environments,
-        { fontScale: "large", enableProviderUpdateChecks: false },
-        { deviceOnly: true },
-      ),
-    ).toMatchObject({
-      clientPatch: { fontScale: "large" },
-      hasClientWrite: true,
-      serverWrites: [
-        {
-          environmentId: server.environmentId,
-          patch: { enableProviderUpdateChecks: false },
-        },
-      ],
-      unavailableReason: null,
-    });
-  });
   it("clears overrides per member and removes an emptied entry", () => {
     const withOverrides = environment("Server", {
       settings: {

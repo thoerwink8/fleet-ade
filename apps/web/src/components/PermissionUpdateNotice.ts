@@ -50,7 +50,7 @@ function showPermissionNotice(
       children: "打开连接设置",
       onClick: () => {
         dismiss();
-        void router.navigate({ to: "/settings/access" });
+        void router.navigate({ to: "/settings/connections", hash: "connections-environment" });
       },
     },
     data: {

@@ -602,6 +602,23 @@ export function SettingsPageContainer({
   );
 }
 
+/** Environment panels on a merged page show a connect notice; the rest of the page stays usable. */
+export function SettingsEnvironmentScopeGate({ children }: { readonly children: ReactNode }) {
+  const scope = useOptionalSettingsScope();
+  if (scope === null) return children;
+  if (scope.scope.kind === "unavailable") {
+    return <p className="text-sm text-muted-foreground">{scope.scope.message}</p>;
+  }
+  if (scope.scope.kind === "environment" && scope.connectedEnvironments.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        重新连接 {scope.scope.label}，才能改它的设置。
+      </p>
+    );
+  }
+  return children;
+}
+
 export function scrollToSettingsTarget(
   targetId: string,
   { highlight = true }: { readonly highlight?: boolean } = {},

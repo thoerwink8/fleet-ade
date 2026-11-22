@@ -156,15 +156,19 @@ function LocalVersionStatusLabel() {
 }
 
 /** Environments lists the machines this app connects to; access covers who may reach one of them. */
-export function ConnectionsSettings({ view }: { readonly view: "environments" | "access" }) {
-  return view === "access" ? (
-    <AccessSettings />
+export function ConnectionsSettings({
+  view,
+}: {
+  readonly view: "environments" | "access" | "all";
+}) {
+  return view === "access" || view === "all" ? (
+    <AccessSettings view={view} />
   ) : (
-    <ConnectionsSettingsContent view="environments" accessEnvironmentId={null} />
+    <ConnectionsSettingsContent view={view} accessEnvironmentId={null} />
   );
 }
 
-function AccessSettings() {
+function AccessSettings({ view }: { readonly view: "access" | "all" }) {
   // A link that names an environment, such as the MCP wizard's, opens the page on it. The
   // settings layout remounts this page when the link changes.
   const linkedEnvironmentId = useSearch({
@@ -226,7 +230,7 @@ function AccessSettings() {
   return (
     <ConnectionsSettingsContent
       key={accessEnvironmentId ?? "none"}
-      view="access"
+      view={view}
       accessEnvironmentId={accessEnvironmentId}
       accessEnvironmentPicker={picker}
     />
@@ -238,7 +242,7 @@ function ConnectionsSettingsContent({
   accessEnvironmentId,
   accessEnvironmentPicker = null,
 }: {
-  readonly view: "environments" | "access";
+  readonly view: "environments" | "access" | "all";
   readonly accessEnvironmentId: EnvironmentId | null;
   readonly accessEnvironmentPicker?: ReactNode;
 }) {
@@ -379,7 +383,7 @@ function ConnectionsSettingsContent({
   const canMaintain = useEnvironmentScope(accessEnvironmentId, AuthEnvironmentMaintainScope);
   const canManageRelay = useEnvironmentScope(accessEnvironmentId, AuthRelayWriteScope);
   const canManageLocalBackend = isPrimaryAccess && !isLocalEnvironmentDisabled() && canMaintain;
-  const showsAccess = view === "access";
+  const showsAccess = view !== "environments";
   const authAccessChanges = useEnvironmentQuery(
     showsAccess && canReadAccess && accessEnvironmentId !== null
       ? authEnvironment.accessChanges({
@@ -1567,53 +1571,68 @@ function ConnectionsSettingsContent({
     </>
   );
 
-  if (showsAccess) return <SettingsPageContainer>{primarySettings}</SettingsPageContainer>;
+  const showsEnvironments = view !== "access";
 
   return (
     <SettingsPageContainer>
-      {desktopBridge ? (
-        <SettingsSection id="this-app" title="此应用">
-          <LocalEnvironmentSetting />
-        </SettingsSection>
-      ) : null}
-      <SettingsSection
-        {...searchableSetting("remote-environments")}
-        title="环境"
-        headerAction={
-          <div className="flex items-center gap-1">
-            {savedServerUpdateTargets.length > 0 ? (
-              <ServerUpdatesAction targets={savedServerUpdateTargets} variant="ghost-muted" />
-            ) : null}
-            <AddEnvironmentDialog
-              open={addBackendDialogOpen}
-              routeTarget={routeTarget}
-              error={savedBackendError}
+      {showsEnvironments ? (
+        <>
+          {desktopBridge ? (
+            <SettingsSection id="this-app" title="此应用">
+              <LocalEnvironmentSetting />
+            </SettingsSection>
+          ) : null}
+          <SettingsSection
+            {...searchableSetting("remote-environments")}
+            title="环境"
+            headerAction={
+              <div className="flex items-center gap-1">
+                {savedServerUpdateTargets.length > 0 ? (
+                  <ServerUpdatesAction targets={savedServerUpdateTargets} variant="ghost-muted" />
+                ) : null}
+                <AddEnvironmentDialog
+                  open={addBackendDialogOpen}
+                  routeTarget={routeTarget}
+                  error={savedBackendError}
+                  savedEnvironments={savedEnvironments}
+                  onOpenChange={handleAddBackendDialogOpenChange}
+                  onErrorChange={setSavedBackendError}
+                />
+              </div>
+            }
+          >
+            {listedEnvironments.map((environment) => (
+              <SavedBackendListRow
+                key={environment.environmentId}
+                environment={environment}
+                removingEnvironmentId={removingSavedEnvironmentId}
+                onSetEnabled={handleSetSavedBackendEnabled}
+                onRemove={handleRemoveSavedBackend}
+                onAddRoute={(target) => {
+                  setRouteTarget(target);
+                  setSavedBackendError(null);
+                  setAddBackendDialogOpen(true);
+                }}
+              />
+            ))}
+            <CloudRemoteEnvironmentRows
+              primaryEnvironmentId={primaryEnvironmentId}
               savedEnvironments={savedEnvironments}
-              onOpenChange={handleAddBackendDialogOpenChange}
-              onErrorChange={setSavedBackendError}
             />
-          </div>
-        }
-      >
-        {listedEnvironments.map((environment) => (
-          <SavedBackendListRow
-            key={environment.environmentId}
-            environment={environment}
-            removingEnvironmentId={removingSavedEnvironmentId}
-            onSetEnabled={handleSetSavedBackendEnabled}
-            onRemove={handleRemoveSavedBackend}
-            onAddRoute={(target) => {
-              setRouteTarget(target);
-              setSavedBackendError(null);
-              setAddBackendDialogOpen(true);
-            }}
-          />
-        ))}
-        <CloudRemoteEnvironmentRows
-          primaryEnvironmentId={primaryEnvironmentId}
-          savedEnvironments={savedEnvironments}
-        />
-      </SettingsSection>
+          </SettingsSection>
+          {peerLinkHosts.map((environment, index) => (
+            <LinkedEnvironmentsSettings
+              key={environment.environmentId}
+              environmentId={environment.environmentId}
+              environmentLabel={peerLinkHosts.length > 1 ? environment.label : null}
+              isSearchTarget={index === 0}
+            />
+          ))}
+          <LoadBalancingSettings environments={loadBalancingEnvironments} />
+          <PullRequestRoutingSettings environments={loadBalancingEnvironments} />
+        </>
+      ) : null}
+      {showsAccess ? primarySettings : null}
       {hasCloudPublicConfig() ? (
         <RemoveT3ConnectEnvironmentDialog
           environmentLabel={pendingT3ConnectRemoval?.label ?? null}
@@ -1626,16 +1645,6 @@ function ConnectionsSettingsContent({
           }}
         />
       ) : null}
-      {peerLinkHosts.map((environment, index) => (
-        <LinkedEnvironmentsSettings
-          key={environment.environmentId}
-          environmentId={environment.environmentId}
-          environmentLabel={peerLinkHosts.length > 1 ? environment.label : null}
-          isSearchTarget={index === 0}
-        />
-      ))}
-      <LoadBalancingSettings environments={loadBalancingEnvironments} />
-      <PullRequestRoutingSettings environments={loadBalancingEnvironments} />
     </SettingsPageContainer>
   );
 }

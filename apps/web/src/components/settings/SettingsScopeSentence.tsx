@@ -49,12 +49,7 @@ import {
 
 export const SETTINGS_DEVICE_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/settings/appearance",
-  "/settings/chat",
-  "/settings/diffs",
   "/settings/connections",
-  // Access picks its environment on the page itself.
-  "/settings/access",
-  "/settings/about",
 ]);
 
 interface SettingsScopeMenuProps {

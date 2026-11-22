@@ -50,7 +50,7 @@ export function relayProtectedErrorMessage(error: RelayProtectedError): string {
         return "此环境的 T3 Connect 隧道仍在设置中。";
       }
       if (error.reason === "endpoint_provider_not_managed") {
-        return "此环境仅关联了智能体活动发布，无法接受连接。请在那台电脑上打开「设置 → 共享与访问」，开启 T3 Connect。";
+        return "此环境仅关联了智能体活动发布，无法接受连接。请在那台电脑上打开「设置 → 连接」，开启 T3 Connect。";
       }
       return error.reason
         ? `中继拒绝了环境连接请求（${error.reason}）。`

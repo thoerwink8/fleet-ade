@@ -3,6 +3,12 @@ T3 Code
 # 产品名，界面保留英文
 T3 Connect
 # 产品名，界面保留英文
+Fleet ADE
+# 客户端产品名
+Fleet ADE Desktop
+# 客户端产品名
+Fleet ADE Web
+# 产品名，界面保留英文
 Agent Platform
 # 产品名，界面保留英文
 ACP Registry

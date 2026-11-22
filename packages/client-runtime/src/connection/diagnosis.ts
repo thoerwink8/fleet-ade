@@ -154,7 +154,7 @@ function headline(host: string, located: Located, failure: ConnectionAttemptErro
 }
 
 function steps(host: string, located: Located, failure: ConnectionAttemptError | null): string[] {
-  const checkHost = `请在 ${host} 上查看“设置 > 共享与访问”，或运行 \`t3 connect status\`。`;
+  const checkHost = `请在 ${host} 上查看“设置 > 连接”，或运行 \`t3 connect status\`。`;
   switch (located.cause) {
     case "offline":
       return ["请将此设备连接到互联网。Fleet ADE 会自动重新连接。"];
@@ -170,14 +170,14 @@ function steps(host: string, located: Located, failure: ConnectionAttemptError |
     case "not_linked":
       return [
         "请确认此设备与主机登录了同一个 T3 Connect 账户。",
-        `请在 ${host} 上打开“设置 > 共享与访问”，并开启 T3 Connect。`,
+        `请在 ${host} 上打开“设置 > 连接”，并开启 T3 Connect。`,
       ];
     case "tunnel_pending":
       return ["请稍等片刻。Fleet ADE 会自动重试。", checkHost];
     case "relay_error":
       return ["请等几分钟。Fleet ADE 会自动重试。", "如果仍然失败，请复制诊断信息并反馈。"];
     case "tunnel_not_enabled":
-      return [`请在 ${host} 上打开“设置 > 共享与访问”，并开启 T3 Connect。`];
+      return [`请在 ${host} 上打开“设置 > 连接”，并开启 T3 Connect。`];
     case "released":
     case "tunnel_down":
       return [

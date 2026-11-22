@@ -105,16 +105,16 @@ Nix manages both the desktop app and the bundled
 
 The desktop app includes the `t3` command-line tool. A new install sets it up
 on first launch; after an update, or any time, choose **Install** next to
-**t3 command** in **Settings → About**. On macOS and Linux it adds a `t3` link
+**t3 command** in **Settings → Maintenance**. On macOS and Linux it adds a `t3` link
 in `~/.local/bin` (or `~/bin`); on Windows it adds the app's command folder to
 your `PATH`. Open a new terminal afterwards. If the folder is not on your
-`PATH`, **Add to PATH** in **Settings → About** adds one
+`PATH`, **Add to PATH** in **Settings → Maintenance** adds one
 line to your shell's startup file. **Remove** takes it off, and the app does not
 add it again. If you already have another `t3`, it stays as it is.
 
 ### Windows Subsystem for Linux
 
-Choose a WSL distro in **Settings → Sharing & access** to run agents and projects
+Choose a WSL distro in **Settings → Connections** to run agents and projects
 there. Install the provider CLIs inside that distro. T3 Code installs its own
 server runtime there automatically; the first launch after an app update can
 take longer.
