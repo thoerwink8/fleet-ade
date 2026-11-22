@@ -219,6 +219,11 @@ export type ModelManifestDiff = {
       readonly to: unknown;
     }>;
   }>;
+  readonly reordered: ReadonlyArray<{
+    readonly provider: string;
+    readonly from: ReadonlyArray<string>;
+    readonly to: ReadonlyArray<string>;
+  }>;
   readonly changes: ReadonlyArray<ModelManifestChange>;
 };
 
@@ -288,7 +293,33 @@ export function compareModelManifests(
       nextProviders[provider]?.models,
     );
   }
-  return { added, removed, changed, changes };
+  return { added, removed, changed, reordered: reorderedModels(current, next), changes };
+}
+
+function reorderedModels(
+  current: ModelManifest.ModelManifestData,
+  next: ModelManifest.ModelManifestData,
+): ModelManifestDiff["reordered"] {
+  const currentProviders = current.providers ?? {};
+  const nextProviders = next.providers ?? {};
+  const reordered: Array<ModelManifestDiff["reordered"][number]> = [];
+  for (const provider of Object.keys(currentProviders).sort()) {
+    const currentCatalog = currentProviders[provider];
+    const nextCatalog = nextProviders[provider];
+    if (!currentCatalog || !nextCatalog) continue;
+    const nextSlugs = new Set(nextCatalog.models.map((model) => model.slug));
+    const shared = new Set(
+      currentCatalog.models.map((model) => model.slug).filter((slug) => nextSlugs.has(slug)),
+    );
+    const from = currentCatalog.models
+      .map((model) => model.slug)
+      .filter((slug) => shared.has(slug));
+    const to = nextCatalog.models.map((model) => model.slug).filter((slug) => shared.has(slug));
+    if (from.length !== to.length || from.some((slug, index) => slug !== to[index])) {
+      reordered.push({ provider, from, to });
+    }
+  }
+  return reordered;
 }
 
 function addChange(
@@ -376,29 +407,38 @@ function printValue(value: unknown): string {
   return text.length > 160 ? `${text.slice(0, 157)}...` : text;
 }
 
-function printDiff(diff: ModelManifestDiff): void {
-  if (diff.changes.length === 0) {
-    console.log("已是最新");
-    return;
-  }
+export function formatModelManifestDiff(diff: ModelManifestDiff): ReadonlyArray<string> {
+  if (diff.changes.length === 0) return ["已是最新"];
+  const lines: Array<string> = [];
   for (const change of diff.changes) {
     if (change.path.endsWith(".models")) continue;
-    console.log(`清单改动 ${change.path}：${printValue(change.from)} -> ${printValue(change.to)}`);
+    lines.push(`清单改动 ${change.path}：${printValue(change.from)} -> ${printValue(change.to)}`);
   }
-  if (diff.added.length)
-    console.log(
+  if (diff.added.length > 0) {
+    lines.push(
       `新增模型：${diff.added.map(({ provider, model }) => `${provider}/${model.slug}`).join("、")}`,
     );
-  if (diff.removed.length)
-    console.log(
+  }
+  if (diff.removed.length > 0) {
+    lines.push(
       `删除模型：${diff.removed.map(({ provider, model }) => `${provider}/${model.slug}`).join("、")}`,
     );
+  }
   for (const model of diff.changed) {
-    for (const field of model.fields)
-      console.log(
+    for (const field of model.fields) {
+      lines.push(
         `模型改动 ${model.provider}/${model.slug}.${field.field}：${printValue(field.from)} -> ${printValue(field.to)}`,
       );
+    }
   }
+  for (const order of diff.reordered) {
+    lines.push(`模型顺序 ${order.provider}：${order.from.join("、")} -> ${order.to.join("、")}`);
+  }
+  return lines;
+}
+
+function printDiff(diff: ModelManifestDiff): void {
+  for (const line of formatModelManifestDiff(diff)) console.log(line);
 }
 
 async function writeManifest(text: string): Promise<void> {
