@@ -3669,19 +3669,15 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cause: `Thread ${command.threadId} is deleted.`,
       });
     }
-    const visitedAt = DateTime.make(command.visitedAt);
-    if (Option.isNone(visitedAt)) {
+    if (command.visitedAt !== undefined && Option.isNone(DateTime.make(command.visitedAt))) {
       return yield* new OrchestratorDispatchError({
         commandId: command.commandId,
         commandType: command.type,
         cause: `Thread ${command.threadId} visit time ${command.visitedAt} is not a valid timestamp.`,
       });
     }
-    const movesForward =
-      thread.lastVisitedAt === null ||
-      DateTime.toEpochMillis(visitedAt.value) > DateTime.toEpochMillis(thread.lastVisitedAt);
     const occurredAt = yield* DateTime.now;
-    // Opens are timed by the server clock so devices with skewed clocks agree.
+    // Opens and the read watermark use this clock so skewed device clocks agree.
     const opens = command.opened
       ? recordThreadOpen(
           thread.opens ?? null,
@@ -3701,7 +3697,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       occurredAt,
       payload: {
         ...thread,
-        ...(movesForward ? { lastVisitedAt: visitedAt.value } : {}),
+        lastVisitedAt: occurredAt,
         ...(opens ? { opens } : {}),
       },
     });
