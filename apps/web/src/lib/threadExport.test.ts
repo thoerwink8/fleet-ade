@@ -2,8 +2,10 @@ import {
   EnvironmentId,
   MessageId,
   NonNegativeInt,
+  RunId,
   ThreadId,
   TurnItemId,
+  type OrchestrationV2ConversationMessage,
   type OrchestrationV2ProjectedTurnItem,
   type OrchestrationV2TurnItem,
 } from "@t3tools/contracts";
@@ -123,7 +125,11 @@ function makeProjectedRow(
   };
 }
 
-function makeUserRow(index: number, text: string): OrchestrationV2ProjectedTurnItem {
+function makeUserRow(
+  index: number,
+  text: string,
+  overrides?: Partial<Extract<OrchestrationV2TurnItem, { type: "user_message" }>>,
+): OrchestrationV2ProjectedTurnItem {
   return makeProjectedRow(index, {
     ...makeBaseFields(index),
     type: "user_message",
@@ -135,16 +141,46 @@ function makeUserRow(index: number, text: string): OrchestrationV2ProjectedTurnI
     inputIntent: "turn_start",
     text,
     attachments: [],
+    ...overrides,
   });
 }
 
-function makeAssistantRow(index: number, text: string): OrchestrationV2ProjectedTurnItem {
+function makeUserMessage(
+  id: string,
+  text: string,
+  createdAt: string,
+  overrides?: Partial<OrchestrationV2ConversationMessage>,
+): OrchestrationV2ConversationMessage {
+  const at = DateTime.makeUnsafe(createdAt);
+  return {
+    id: MessageId.make(id),
+    threadId: THREAD_ID,
+    runId: null,
+    nodeId: null,
+    role: "user",
+    text,
+    attachments: [],
+    streaming: false,
+    createdBy: "user",
+    creationSource: "web",
+    createdAt: at,
+    updatedAt: at,
+    ...overrides,
+  };
+}
+
+function makeAssistantRow(
+  index: number,
+  text: string,
+  overrides?: Partial<Extract<OrchestrationV2TurnItem, { type: "assistant_message" }>>,
+): OrchestrationV2ProjectedTurnItem {
   return makeProjectedRow(index, {
     ...makeBaseFields(index),
     type: "assistant_message",
     messageId: MessageId.make(`msg-assistant-${index}`),
     text,
     streaming: false,
+    ...overrides,
   });
 }
 
@@ -230,6 +266,79 @@ describe("buildThreadMarkdown", () => {
     expect(markdown).toContain(codeBlock);
   });
 
+  it("closes an interrupted assistant fence before the next user heading", () => {
+    const markdown = buildThreadMarkdown({
+      title: "打断",
+      exportedAt: new Date(2026, 10, 21, 10, 0),
+      items: [
+        makeAssistantRow(0, "写到一半：\n\n```ts\nconst answer =", { status: "interrupted" }),
+        makeUserRow(1, "接着写"),
+      ],
+    });
+
+    const open = markdown.indexOf("```ts");
+    const userHeading = markdown.indexOf("## 你");
+    expect(markdown.slice(open, userHeading).split("\n")).toContain("```");
+    expect(markdown).toContain("## 你\n\n接着写");
+  });
+
+  it("exports user-authored steer, queued, and interrupted input, and skips system injections", () => {
+    const queuedRunId = RunId.make("run-queued");
+    const markdown = buildThreadMarkdown({
+      title: "各类用户消息",
+      exportedAt: new Date(2026, 10, 21, 10, 0),
+      items: [
+        makeUserRow(0, "正常开一轮"),
+        makeUserRow(1, "引导一句", { inputIntent: "steer" }),
+        makeUserRow(2, "排队插进来", { inputIntent: "queued_turn", status: "completed" }),
+        makeUserRow(3, "排队改成引导", { inputIntent: "promoted_queued_to_steer" }),
+        makeUserRow(4, "这轮被打断了", { status: "interrupted" }),
+        makeUserRow(5, "服务端替你压缩", {
+          createdBy: "agent",
+          creationSource: "server",
+          idleCompaction: "beforeCacheExpires",
+        }),
+        makeUserRow(6, "系统写入的提示", { createdBy: "system", creationSource: "server" }),
+        makeUserRow(7, "工作流脚本", {
+          createdBy: "agent",
+          creationSource: "provider",
+          workflowScript: true,
+        }),
+        makeAssistantRow(8, "助手还在"),
+      ],
+      messages: [
+        makeUserMessage("hidden-queued", "还在队列里", "2026-11-21T09:00:00Z", {
+          runId: queuedRunId,
+        }),
+        makeUserMessage("system-wake", "监视到了更新", "2026-11-21T09:10:00Z", {
+          createdBy: "agent",
+          creationSource: "server",
+          runId: queuedRunId,
+          notification: {
+            source: { kind: "system" },
+            outcome: "updated",
+            summary: "监视到了更新",
+          },
+        }),
+      ],
+      runs: [{ id: queuedRunId, status: "queued" }],
+    });
+
+    expect(markdown.match(/^## 你$/gm)).toHaveLength(6);
+    expect(markdown).toContain("## 你\n\n还在队列里");
+    expect(markdown).toContain("## 你\n\n正常开一轮");
+    expect(markdown).toContain("## 你\n\n引导一句");
+    expect(markdown).toContain("## 你\n\n排队插进来");
+    expect(markdown).toContain("## 你\n\n排队改成引导");
+    expect(markdown).toContain("## 你\n\n这轮被打断了");
+    expect(markdown).toContain("## 助手\n\n助手还在");
+    expect(markdown).not.toContain("服务端替你压缩");
+    expect(markdown).not.toContain("系统写入的提示");
+    expect(markdown).not.toContain("工作流脚本");
+    expect(markdown).not.toContain("监视到了更新");
+    expect(markdown.indexOf("还在队列里")).toBeLessThan(markdown.indexOf("正常开一轮"));
+  });
+
   it("adds a truncation notice at the top when truncated is true", () => {
     const markdown = buildThreadMarkdown({
       title: "长会话",
@@ -266,6 +375,8 @@ describe("loadAllThreadHistory", () => {
     expect(outcome).toEqual({
       _tag: "ready",
       items: snapshots[1]!.visibleTurnItems,
+      messages: [],
+      runs: [],
       truncated: false,
     });
   });
@@ -287,6 +398,8 @@ describe("loadAllThreadHistory", () => {
     expect(outcome).toEqual({
       _tag: "ready",
       items: snapshot.visibleTurnItems,
+      messages: [],
+      runs: [],
       truncated: true,
     });
   });
