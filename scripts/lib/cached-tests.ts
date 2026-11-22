@@ -44,6 +44,13 @@ export function cachedTestTasks(
   if (!Array.isArray(uncached) || !uncached.every((file) => typeof file === "string")) {
     throw new Error("Invalid uncached test files");
   }
+  const only = "only" in request ? request.only : undefined;
+  if (
+    only !== undefined &&
+    (!Array.isArray(only) || !only.every((task) => typeof task === "string"))
+  ) {
+    throw new Error("Invalid cached test task selection");
+  }
   const files: Array<string> = [];
   for (const file of request.files) {
     if (
@@ -111,8 +118,13 @@ export function cachedTestTasks(
       };
     }
   }
+  // Narrowing by task name keeps every group, and so every cache key, as it was in the full run.
+  const selected =
+    only === undefined
+      ? tasks
+      : Object.fromEntries(Object.entries(tasks).filter(([task]) => only.includes(task)));
   return {
-    ...tasks,
-    "test-cache": { command: 'node -e ""', dependsOn: Object.keys(tasks), cache: false },
+    ...selected,
+    "test-cache": { command: 'node -e ""', dependsOn: Object.keys(selected), cache: false },
   };
 }
