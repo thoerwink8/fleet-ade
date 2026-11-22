@@ -121,6 +121,28 @@ describe("CodexAdapterV2 context usage", () => {
       reasoningOutputTokens: 1_000,
       updatedAt: "2026-08-29T00:00:00.000Z",
     });
+
+    const secondTurn = CodexAdapterV2.codexProviderTurnTokenUsage(
+      {
+        total: {
+          totalTokens: 180_800,
+          inputTokens: 160_000,
+          cachedInputTokens: 20_000,
+          outputTokens: 20_800,
+          reasoningOutputTokens: 5_200,
+        },
+        last: {
+          totalTokens: 50_800,
+          inputTokens: 50_000,
+          cachedInputTokens: 12_000,
+          outputTokens: 800,
+          reasoningOutputTokens: 200,
+        },
+        modelContextWindow: 200_000,
+      },
+      "2026-08-29T00:01:00.000Z",
+    );
+    assert.equal(secondTurn.outputTokens, 800);
   });
 });
 
