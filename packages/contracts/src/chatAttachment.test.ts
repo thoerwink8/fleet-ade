@@ -3,14 +3,9 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
-import {
-  ChatAttachment,
-  PROVIDER_SEND_TURN_MAX_FILE_BYTES,
-  SnapShotAccessibility,
-} from "./chatAttachment.ts";
+import { ChatAttachment, PROVIDER_SEND_TURN_MAX_FILE_BYTES } from "./chatAttachment.ts";
 
 const decodeAttachment = Schema.decodeUnknownEffect(ChatAttachment);
-const decodeSnapShotAccessibility = Schema.decodeUnknownEffect(SnapShotAccessibility);
 
 it.effect("tolerates attachment types from newer builds", () =>
   Effect.gen(function* () {
@@ -43,27 +38,28 @@ it.effect("rejects malformed known attachment types instead of tolerating them",
   }),
 );
 
-it.effect("rejects accessibility trees above the serialized payload limit", () =>
+it.effect("reads an image saved with captured-window data as a plain image", () =>
   Effect.gen(function* () {
-    const result = yield* Effect.exit(
-      decodeSnapShotAccessibility({
-        format: "element-tree",
-        coordinateSpace: "captured-image",
-        imageSize: { width: 800, height: 600 },
-        truncated: false,
-        root: {
-          role: "window",
-          bounds: { x: 0, y: 0, width: 800, height: 600 },
-          children: Array.from({ length: 10 }, () => ({
-            role: "text",
-            value: "x".repeat(8_000),
-            bounds: null,
-            children: [],
-          })),
-        },
-      }),
-    );
-
-    assert.strictEqual(Exit.isFailure(result), true);
+    const attachment = yield* decodeAttachment({
+      type: "image",
+      id: "thread-1-00000000-0000-4000-8000-000000000004-png",
+      name: "window.png",
+      mimeType: "image/png",
+      sizeBytes: 12,
+      source: {
+        kind: "snap-shot",
+        capturedAt: "2026-08-24T11:00:00.000Z",
+        appName: "Editor",
+        windowTitle: "main.ts",
+        accessibility: { format: "flat-text", text: "Saved text", truncated: false },
+      },
+    });
+    assert.deepStrictEqual(attachment, {
+      type: "image",
+      id: "thread-1-00000000-0000-4000-8000-000000000004-png",
+      name: "window.png",
+      mimeType: "image/png",
+      sizeBytes: 12,
+    });
   }),
 );

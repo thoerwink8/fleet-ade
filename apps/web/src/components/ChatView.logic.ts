@@ -1337,7 +1337,6 @@ export function optimisticMessageAttachments(
           mimeType: attachment.mimeType,
           sizeBytes: attachment.sizeBytes,
           previewUrl: attachment.previewUrl,
-          ...(attachment.source ? { source: attachment.source } : {}),
         }
       : {
           type: "file" as const,

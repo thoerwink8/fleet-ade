@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { SnapShotSource } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
@@ -9,13 +8,6 @@ import { ExpandedImageDialog } from "./ExpandedImageDialog";
 
 const PIXEL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-
-const snapShotSource: SnapShotSource = {
-  kind: "snap-shot",
-  capturedAt: "2026-01-01T00:00:00.000Z",
-  appName: "Finder",
-  windowTitle: "Downloads",
-};
 
 const D2_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1174 920"><rect width="1174" height="920"/></svg>';
@@ -29,7 +21,7 @@ function ImagePreviewOpener() {
       </button>
       {open && (
         <ExpandedImageDialog
-          preview={{ images: [{ src: PIXEL, name: "shot.png", source: snapShotSource }], index: 0 }}
+          preview={{ images: [{ src: PIXEL, name: "shot.png" }], index: 0 }}
           onClose={() => setOpen(false)}
         />
       )}
@@ -95,26 +87,26 @@ describe("ExpandedImageDialog", () => {
     },
   );
 
-  it("Escape closes a popup opened inside the dialog before the dialog", async () => {
+  it("Escape closes a context menu opened inside the dialog before the dialog", async () => {
     const onClose = vi.fn();
     await using screen = await render(
       <ExpandedImageDialog
-        preview={{ images: [{ src: PIXEL, name: "shot.png", source: snapShotSource }], index: 0 }}
+        preview={{ images: [{ src: PIXEL, name: "shot.png" }], index: 0 }}
         onClose={onClose}
       />,
       // The dialog renders no links and reads no route.
       { router: false },
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "没有无障碍数据" }));
-    await expect.element(screen.getByText("无障碍数据")).toBeVisible();
+    await userEvent.click(screen.getByRole("region", { name: "shot.png，可缩放图片" }), {
+      button: "right",
+    });
+    await expect.element(page.getByRole("menu")).toBeVisible();
 
     await userEvent.keyboard("{Escape}");
-    await expect.element(screen.getByText("无障碍数据")).not.toBeInTheDocument();
+    await expect.element(page.getByRole("menu")).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
-    // Focus returns to the popup's trigger and opens its tooltip; leave it for a plain control.
-    (screen.getByRole("button", { name: "关闭图片预览" }).element() as HTMLElement).focus();
     await userEvent.keyboard("{Escape}");
     await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
