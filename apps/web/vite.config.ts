@@ -17,7 +17,13 @@ import {
   DEV_PROXIED_ORIGIN_PRESERVING_PREFIXES,
   DEV_PROXIED_PATH_PREFIXES,
 } from "@t3tools/shared/devProxy";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 
+import {
+  excludedPortRangesForPlatform,
+  pickBrowserTestApiPort,
+  readNetshExcludedPortText,
+} from "../../scripts/lib/browserTestApiPort";
 import { loadRepoEnv } from "../../scripts/lib/public-config";
 import { thirdPartyLicensesPlugin } from "../../scripts/lib/third-party-licenses";
 import { tailwindPlugins } from "./vite/tailwind";
@@ -98,10 +104,16 @@ const unitTestProject = {
   },
 } satisfies TestProjectInlineConfiguration;
 
-// Hash checkout paths to ports 20000-23999; Vitest's fixed port collides under inherited strictPort.
-// The block sits below every OS's dynamic range: Windows reserves pieces of its own for Hyper-V, and
-// binding inside one fails with EACCES, which strictPort: false does not step past.
-const browserTestApiPort = 20_000 + ((Hash.string(import.meta.dirname) >>> 0) % 4_000);
+// Spread checkouts across 20000-23999. netsh runs only while Vitest loads this file;
+// strictPort still only moves when the port is already taken.
+const browserTestApiPort = pickBrowserTestApiPort(
+  Hash.string(import.meta.dirname),
+  excludedPortRangesForPlatform(
+    process.env.VITEST === "true",
+    HostProcess.Platform.defaultValue(),
+    readNetshExcludedPortText,
+  ),
+);
 
 const browserTestProject = {
   extends: true,
