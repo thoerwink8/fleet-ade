@@ -348,7 +348,6 @@ export function prepareTurnAttachments(input: {
         mimeType: attachment.mimeType,
         sizeBytes: attachment.sizeBytes,
         dataUrl: await readFileAsDataUrl(attachment.file),
-        ...(attachment.source ? { source: attachment.source } : {}),
       };
     }),
   );

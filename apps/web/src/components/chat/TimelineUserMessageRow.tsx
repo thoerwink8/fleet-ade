@@ -53,10 +53,6 @@ import {
   buildAttachmentVideoPreview,
   buildExpandedImagePreview,
 } from "./ExpandedImagePreview";
-import {
-  SNAP_SHOT_ATTACHMENT_FRAME_CLASS,
-  SnapShotAttachmentDetails,
-} from "./SnapShotAttachmentDetails";
 import { GuestMessageName, guestBubbleClassName } from "./guestMessageStyle";
 import { MessageCopyButton } from "./MessageCopyButton";
 import { promptLinkFor } from "../promptLinks/copyPromptLink";
@@ -518,11 +514,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   // A lone image keeps its own shape; a 4:3 crop hides most of a wide screenshot.
   const loneImage = standaloneMedia && userVideos.length === 0 && regularImages.length === 1;
   // Several images share one rounded shape, split by hairlines.
-  const collage =
-    standaloneMedia &&
-    userVideos.length === 0 &&
-    regularImages.length > 1 &&
-    regularImages.every((image) => image.source?.kind !== "snap-shot");
+  const collage = standaloneMedia && userVideos.length === 0 && regularImages.length > 1;
   // Corners that touch the bubble or a neighbouring message tighten, like the bubble's.
   const mediaCornerClassName = cn(
     row.groupedWithPrevious && "rounded-tr-md",
@@ -703,31 +695,20 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
             key={image.id}
             className={cn(
               "bg-background/70",
-              image.source?.kind === "snap-shot" && image.previewUrl
-                ? cn(
-                    "col-span-2",
-                    standaloneMedia
-                      ? cn(
-                          MEDIA_EDGE_CLASS_NAME,
-                          "min-h-16 justify-self-end overflow-hidden rounded-2xl",
-                          loneImage && mediaCornerClassName,
-                        )
-                      : SNAP_SHOT_ATTACHMENT_FRAME_CLASS,
-                  )
-                : loneImage
-                  ? cn(MEDIA_EDGE_CLASS_NAME, "overflow-hidden rounded-2xl", mediaCornerClassName)
-                  : collage
-                    ? cn(
-                        "overflow-hidden bg-background",
-                        regularImages.length === 3 && index === 0 && "row-span-2",
-                        regularImages.length > 3 &&
-                          regularImages.length % 2 === 1 &&
-                          index === regularImages.length - 1 &&
-                          "col-span-2",
-                      )
-                    : standaloneMedia
-                      ? cn(MEDIA_EDGE_CLASS_NAME, "aspect-[4/3] overflow-hidden rounded-2xl")
-                      : "aspect-[4/3] overflow-hidden rounded-lg border border-border/80",
+              loneImage
+                ? cn(MEDIA_EDGE_CLASS_NAME, "overflow-hidden rounded-2xl", mediaCornerClassName)
+                : collage
+                  ? cn(
+                      "overflow-hidden bg-background",
+                      regularImages.length === 3 && index === 0 && "row-span-2",
+                      regularImages.length > 3 &&
+                        regularImages.length % 2 === 1 &&
+                        index === regularImages.length - 1 &&
+                        "col-span-2",
+                    )
+                  : standaloneMedia
+                    ? cn(MEDIA_EDGE_CLASS_NAME, "aspect-[4/3] overflow-hidden rounded-2xl")
+                    : "aspect-[4/3] overflow-hidden rounded-lg border border-border/80",
             )}
           >
             {image.previewUrl ? (
@@ -751,11 +732,9 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                   loading="lazy"
                   className={cn(
                     "block transform-gpu",
-                    standaloneMedia && image.source?.kind === "snap-shot"
-                      ? "h-auto max-h-48 w-auto min-w-24 max-w-full object-contain"
-                      : loneImage
-                        ? "h-48 w-auto min-w-24 max-w-full object-cover"
-                        : "size-full object-cover",
+                    loneImage
+                      ? "h-48 w-auto min-w-24 max-w-full object-cover"
+                      : "size-full object-cover",
                   )}
                 />
               </button>
@@ -770,9 +749,6 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
                 {image.name}
               </div>
             )}
-            {image.previewUrl && image.source?.kind === "snap-shot" ? (
-              <SnapShotAttachmentDetails source={image.source} />
-            ) : null}
           </div>
         ))}
         {userVideos.map((file) => (

@@ -106,10 +106,6 @@ Muse Code
 T3 Chat
 # 产品名
 Office
-# 桌面环境名
-GNOME
-# 产品功能名
-SnapShots
 # 图标库名
 Lucide
 # 密钥管理产品名

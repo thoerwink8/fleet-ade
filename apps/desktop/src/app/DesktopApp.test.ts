@@ -43,7 +43,6 @@ import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 import * as ElectronSafeStorage from "../electron/ElectronSafeStorage.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
-import * as DesktopSnapShot from "../snapShot/DesktopSnapShot.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
 import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import * as DesktopApplicationMenu from "../window/DesktopApplicationMenu.ts";
@@ -66,7 +65,6 @@ import * as ElectronMenu from "../electron/ElectronMenu.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronTheme from "../electron/ElectronTheme.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
-import * as MacPermissions from "../permissions/MacPermissions.ts";
 
 it.effect.each([false, true])(
   "stops backends together before flushing history and cancels Linux registration, stop defect=%s",
@@ -156,9 +154,6 @@ it.effect.each([false, true])(
           Effect.provideService(DesktopLegacyLocalStorage.DesktopLegacyLocalStorage, {
             load: () => Effect.void,
           } as unknown as DesktopLegacyLocalStorage.DesktopLegacyLocalStorage["Service"]),
-          Effect.provideService(DesktopSnapShot.DesktopSnapShot, {
-            initialize: Effect.void,
-          } as DesktopSnapShot.DesktopSnapShot["Service"]),
           Effect.provideService(DesktopState.DesktopState, {
             quitting,
           } as DesktopState.DesktopState["Service"]),
@@ -225,7 +220,6 @@ it.effect.each([false, true])(
             Layer.mock(ElectronShell.ElectronShell, {}),
             Layer.mock(ElectronTheme.ElectronTheme, {}),
             Layer.mock(ElectronWindow.ElectronWindow, {}),
-            Layer.mock(MacPermissions.MacPermissions, {}),
             FileSystem.layerNoop({}),
             Layer.mock(NetService.NetService, {}),
             Path.layer,

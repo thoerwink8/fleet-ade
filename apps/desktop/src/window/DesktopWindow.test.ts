@@ -1,7 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
-import { DesktopSnapShotId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -44,7 +43,7 @@ import * as ElectronMenu from "../electron/ElectronMenu.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronTheme from "../electron/ElectronTheme.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
-import { SNAP_SHOT_EVENT_CHANNEL } from "../ipc/channels.ts";
+import { MENU_ACTION_CHANNEL } from "../ipc/channels.ts";
 import * as DesktopServerExposure from "../backend/DesktopServerExposure.ts";
 import * as DesktopWindow from "./DesktopWindow.ts";
 
@@ -286,7 +285,6 @@ function layerTest(input: {
         : Effect.succeedSome(input.focusedWindow),
     setMain: (window) => Ref.set(input.mainWindow, Option.some(window)),
     clearMain: () => Ref.set(input.mainWindow, Option.none()),
-    prepareReveal: () => Effect.succeed(false),
     reveal: (window) => Effect.sync(() => input.onReveal?.(window)),
     sendAll: () => Effect.void,
     destroyAll: input.destroyAll ?? Effect.void,
@@ -387,7 +385,6 @@ const makeSplashScenario = (createOutcomes: readonly (Electron.BrowserWindow | n
       focusedMainOrFirst: currentMainOrFirst,
       setMain: (window) => Ref.set(mainWindow, Option.some(window)),
       clearMain: () => Ref.set(mainWindow, Option.none()),
-      prepareReveal: () => Effect.succeed(false),
       reveal: (window) => Ref.update(revealedWindows, (windows) => [...windows, window]),
       sendAll: () => Effect.void,
       destroyAll: Effect.void,
@@ -422,9 +419,6 @@ const makeSplashScenario = (createOutcomes: readonly (Electron.BrowserWindow | n
 
     return { layer, createCalls, mainWindow, revealedWindows } as const;
   });
-
-const captureOne = DesktopSnapShotId.make("11111111-1111-4111-8111-111111111111");
-const captureTwo = DesktopSnapShotId.make("22222222-2222-4222-8222-222222222222");
 
 describe("DesktopWindow", () => {
   it("restores bounds only when the window fits within a connected display", () => {
@@ -1334,7 +1328,7 @@ describe("DesktopWindow", () => {
       }),
   );
 
-  it.effect("delivers capture completion and late errors without taking focus back", () =>
+  it.effect("delivers a menu action that asks for no reveal without taking focus", () =>
     Effect.gen(function* () {
       const operations: Array<string> = [];
       let foreground = "Discord";
@@ -1361,24 +1355,22 @@ describe("DesktopWindow", () => {
         yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
         operations.length = 0;
         foreground = "Discord";
-        yield* desktopWindow.dispatchSnapShotEvent({ type: "started", id: captureOne });
+        yield* desktopWindow.dispatchMenuAction("new-thread");
         assert.equal(foreground, "T3 Code");
         foreground = "Explorer";
-        yield* desktopWindow.dispatchSnapShotEvent({ type: "ready", id: captureOne });
-        yield* desktopWindow.dispatchSnapShotEvent({ type: "failed", id: captureTwo });
+        yield* desktopWindow.dispatchMenuAction("paste-as-text", { reveal: false });
 
         assert.equal(foreground, "Explorer");
-        assert.deepEqual(operations, ["send", "reveal", "send", "send"]);
+        assert.deepEqual(operations, ["send", "reveal", "send"]);
         assert.deepEqual(fakeWindow.send.mock.calls, [
-          [SNAP_SHOT_EVENT_CHANNEL, { type: "started", id: captureOne }],
-          [SNAP_SHOT_EVENT_CHANNEL, { type: "ready", id: captureOne }],
-          [SNAP_SHOT_EVENT_CHANNEL, { type: "failed", id: captureTwo }],
+          [MENU_ACTION_CHANNEL, "new-thread"],
+          [MENU_ACTION_CHANNEL, "paste-as-text"],
         ]);
       }).pipe(Effect.provide(layer));
     }),
   );
 
-  it.effect("does not reopen a closed main window for a completed capture", () =>
+  it.effect("does not reopen a closed main window for a menu action that asks for no reveal", () =>
     Effect.gen(function* () {
       const fakeWindow = makeFakeBrowserWindow();
       const createCount = yield* Ref.make(0);
@@ -1391,7 +1383,7 @@ describe("DesktopWindow", () => {
         yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
         fakeWindow.isDestroyed.mockReturnValue(true);
         yield* Ref.set(mainWindow, Option.none());
-        yield* desktopWindow.dispatchSnapShotEvent({ type: "ready", id: captureOne });
+        yield* desktopWindow.dispatchMenuAction("paste-as-text", { reveal: false });
 
         assert.equal(yield* Ref.get(createCount), 1);
         assert.equal(fakeWindow.send.mock.calls.length, 0);
