@@ -108,7 +108,7 @@ const inlineButtonVariants = cva(
     variants: {
       size: {
         default: "",
-        row: "min-h-6 text-row",
+        row: "relative min-h-6 text-row after:absolute after:inset-x-0 after:-inset-y-0.5",
       },
       touchTarget: {
         padded: "pointer-coarse:min-h-11 pointer-coarse:px-1.5",

@@ -255,6 +255,7 @@ import {
   type SidebarProviderEntry,
   type SidebarSweepAction,
 } from "./sidebar/SidebarThreadRow";
+import { resolveDuplicateEmptyThreadTitleSuffixes } from "./sidebar/SidebarThreadRow.logic";
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarDragBoundary,
@@ -608,6 +609,8 @@ function useSidebarThreads(input: {
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
+    nowMinute,
+    orderedThreads,
     orderedThreadKeys: orderedThreads.map(threadShellKey),
     threadByKey: new Map(orderedThreads.map((thread) => [threadShellKey(thread), thread] as const)),
     settledThreadKeys: new Set(settledThreads.map(threadShellKey)),
@@ -1360,6 +1363,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
+    nowMinute,
+    orderedThreads,
     orderedThreadKeys,
     threadByKey,
     settledThreadKeys,
@@ -1435,6 +1440,39 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const threadSearchResultKeys = threadSearchResults.map((thread) =>
     scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
   );
+  const nowMinuteMs = Date.parse(`${nowMinute}:00.000Z`);
+  const duplicateEmptyTitleSuffixByKey = resolveDuplicateEmptyThreadTitleSuffixes({
+    threads: orderedThreads.map((thread) => ({
+      key: threadShellKey(thread),
+      title: thread.title,
+      createdAt: thread.createdAt,
+      latestRun: thread.latestRun,
+      runtime: thread.runtime,
+      latestUserMessageAt: thread.latestUserMessageAt,
+      visibleItemCount: thread.visibleItemCount,
+      turnCount: thread.turnCount,
+      latestMessagePreview: thread.latestMessagePreview,
+    })),
+    timestampFormat,
+    nowMs: nowMinuteMs,
+  });
+  const searchDuplicateEmptyTitleSuffixByKey = isSearchingThreads
+    ? resolveDuplicateEmptyThreadTitleSuffixes({
+        threads: threadSearchResults.map((thread) => ({
+          key: threadShellKey(thread),
+          title: thread.title,
+          createdAt: thread.createdAt,
+          latestRun: thread.latestRun,
+          runtime: thread.runtime,
+          latestUserMessageAt: thread.latestUserMessageAt,
+          visibleItemCount: thread.visibleItemCount,
+          turnCount: thread.turnCount,
+          latestMessagePreview: thread.latestMessagePreview,
+        })),
+        timestampFormat,
+        nowMs: nowMinuteMs,
+      })
+    : null;
 
   // The highlight follows its thread, so rows that arrive late do not move
   // it under Enter; a new query starts at the top.
@@ -3298,6 +3336,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           isSettled={settledThreadKeys.has(threadKey)}
                           key={threadKey}
                           thread={thread}
+                          titleSuffix={searchDuplicateEmptyTitleSuffixByKey?.get(threadKey) ?? null}
                           project={
                             projectByKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null
                           }
@@ -3450,6 +3489,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               optimisticDrop !== null
                             }
                             thread={thread}
+                            titleSuffix={duplicateEmptyTitleSuffixByKey.get(threadKey) ?? null}
                             variant={rowVariant}
                             attention={
                               section === "attention"

@@ -54,7 +54,7 @@ let announcedSummary: string | null = null;
 let settleToastId: ReturnType<typeof toastManager.add> | null = null;
 
 function closeSettleToast() {
-  if (settleToastId === null) return;
+  if (settleToastId == null) return;
   const id = settleToastId;
   settleToastId = null;
   toastManager.close(id);
@@ -72,20 +72,20 @@ function syncSettleToast(notice: UndoNotice | null) {
       void undoLatestThreadAction();
     },
   };
-  if (settleToastId !== null) {
-    toastManager.update(settleToastId, { title, timeout: 5_000, actionProps });
+  if (settleToastId != null) {
+    toastManager.update(settleToastId, { title, timeout: 0, actionProps });
     return;
   }
   const id = toastManager.add({
     type: "success",
     title,
-    timeout: 5_000,
+    timeout: 0,
     actionProps,
     onRemove: () => {
       if (settleToastId === id) settleToastId = null;
     },
   });
-  settleToastId = id;
+  settleToastId = id ?? null;
 }
 
 // A live region that mounts already filled is skipped by screen readers, and settling

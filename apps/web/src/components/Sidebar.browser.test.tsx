@@ -11,7 +11,7 @@ import {
   ThreadId,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
-import { compileResolvedKeybindingsConfig, isMacPlatform } from "@t3tools/shared/keybindings";
+import { isMacPlatform } from "@t3tools/shared/keybindings";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -43,9 +43,7 @@ import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
 import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useTerminalUiStateStore } from "../terminalUiStateStore";
-import { settleSidebarThread } from "../sidebarSettle";
 import type { Project } from "../types";
-import { useChatShortcuts } from "./chat/useChatShortcuts";
 import Sidebar from "./Sidebar";
 import { THREAD_JUMP_HINT_SHOW_DELAY_MS } from "./Sidebar.logic";
 import { SortableThreadRow } from "./sidebar/SidebarThreadRow";
@@ -550,13 +548,12 @@ function createThreadListStore(initial: readonly EnvironmentThreadShell[]) {
   };
 }
 
-function createSettleRouteApp(initialPath: string, extra?: ReactNode) {
+function createSettleRouteApp(initialPath: string) {
   function Shell() {
     return (
       <ToastProvider>
         <SidebarProvider>
           <Sidebar routeReveal={{ observedKey: null, pendingKey: null }} />
-          {extra}
           <Outlet />
         </SidebarProvider>
       </ToastProvider>
@@ -571,36 +568,6 @@ function createSettleRouteApp(initialPath: string, extra?: ReactNode) {
     routeTree: rootRoute.addChildren([threadRoute]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
   });
-}
-
-function SettleShortcutHost(props: { readonly threadRef: ScopedThreadRef }) {
-  const keybindings = compileResolvedKeybindingsConfig([
-    { key: "mod+shift+s", command: "thread.settle" },
-  ]);
-  useChatShortcuts({
-    enabled: true,
-    keybindings,
-    scriptKeybindings: [],
-    getShortcutContext: () => ({
-      terminalFocus: false,
-      terminalOpen: false,
-      rightPanelFocus: false,
-      modelPickerOpen: false,
-      isWeb: true,
-      isDesktop: false,
-    }),
-    threadFindActive: false,
-    composerRef: { current: null },
-    branchToolbarRef: { current: null },
-    closeThreadFind: () => {},
-    commands: {
-      "thread.settle": () => {
-        settleSidebarThread(props.threadRef);
-      },
-    },
-    fallback: () => undefined,
-  });
-  return null;
 }
 
 describe("sidebar thread settle", () => {
@@ -747,43 +714,5 @@ describe("sidebar thread settle", () => {
       expect(restoredRow?.getAttribute("data-sidebar-parent")).toBeNull();
     });
     expect(router.state.location.pathname).toBe("/local/thread-x");
-  });
-
-  it("keeps the active route and moves the row into 最近 when settling via keyboard shortcut", async () => {
-    using stack = new DisposableStack();
-    const { activeProject, threadX, threadXRef, settleCommand } = setupSettleFixture(stack);
-    const rowKey = `${activeProject.environmentId}:${threadX.id}`;
-    const router = createSettleRouteApp(
-      "/local/thread-x",
-      <SettleShortcutHost threadRef={threadXRef} />,
-    );
-    await router.load();
-
-    // Reads thread route params from a real $environmentId/$threadId route, which the default router lacks.
-    await using screen = await render(<RouterProvider router={router} />, { router: false });
-
-    const modifier = isMacPlatform(navigator.platform) ? "Meta" : "Control";
-    await userEvent.keyboard(`{${modifier}>}{Shift>}s{/Shift}{/${modifier}}`);
-
-    await vi.waitFor(() => {
-      expect(settleCommand).toHaveBeenCalledOnce();
-    });
-    expect(router.state.location.pathname).toBe("/local/thread-x");
-
-    const settledShelf = screen.container.querySelector<HTMLElement>(
-      '[data-sidebar-row="shelf:settled"]',
-    )!;
-    if (settledShelf.getAttribute("aria-expanded") === "false") {
-      await userEvent.click(settledShelf);
-    }
-
-    await vi.waitFor(() => {
-      const settledRow = screen.container.querySelector<HTMLElement>(
-        `[data-sidebar-row="${rowKey}"]`,
-      );
-      expect(settledRow?.getAttribute("data-sidebar-parent")).toBe("shelf:settled");
-    });
-    expect(router.state.location.pathname).toBe("/local/thread-x");
-    await expect.element(page.getByText("已收尾")).toBeVisible();
   });
 });

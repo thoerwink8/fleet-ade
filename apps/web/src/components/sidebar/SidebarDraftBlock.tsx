@@ -21,7 +21,11 @@ import {
   type ComposerThreadDraftState,
   type DraftSessionState,
 } from "../../composerDraftStore";
-import { draftPenClassName, draftSurfaceClassName } from "./SidebarThreadRow";
+import {
+  draftPenClassName,
+  draftSurfaceClassName,
+  SIDEBAR_ROW_BUTTON_HIT_AREA,
+} from "./SidebarThreadRow";
 
 const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   draftId: DraftId;
@@ -117,7 +121,10 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                       type="button"
                       aria-label="丢弃草稿"
                       onClick={handleDiscard}
-                      className="pointer-events-none inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100"
+                      className={cn(
+                        SIDEBAR_ROW_BUTTON_HIT_AREA,
+                        "pointer-events-none inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100",
+                      )}
                     >
                       <XIcon className="size-3" />
                     </button>
