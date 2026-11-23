@@ -1105,6 +1105,7 @@ function ComposerPromptEditorTiptapInner(
 
   const editor = useEditor(
     {
+      immediatelyRender: false,
       extensions: richText ? RICH_TEXT_EXTENSIONS : PLAIN_TEXT_EXTENSIONS,
       content: buildDocJson(value, (name) => composerSkillMeta(skills, name), {
         styling: richText,
