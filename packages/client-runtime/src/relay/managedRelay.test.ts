@@ -7,10 +7,14 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 import { RELAY_GATEWAY_TIMEOUT_MESSAGE, relayRequestFailureDetail } from "./errorPresentation.ts";
 import * as ManagedRelay from "./managedRelay.ts";
 import * as RpcHttp from "../rpc/http.ts";
+const decodeManagedRelayDpopKeyLoadError = Schema.decodeSync(
+  ManagedRelay.ManagedRelayDpopKeyLoadError,
+);
 
 function layerManagedRelayTest(
   fetchFn: typeof globalThis.fetch,
@@ -40,6 +44,15 @@ function clerkToken(subject: string, nonce: string): string {
 }
 
 describe("ManagedRelayClient", () => {
+  it("decodes a stored DPoP key error that names the removed expo store", () => {
+    const decoded = decodeManagedRelayDpopKeyLoadError({
+      _tag: "ManagedRelayDpopKeyLoadError",
+      keyStore: "expo-secure-store",
+      cause: { _tag: "Defect", message: "missing" },
+    });
+    expect(decoded.keyStore).toBe("indexed-db");
+  });
+
   it.effect("rejects unsafe relay URLs before sending credentials", () => {
     let requestCount = 0;
     const fetchFn = (() => {

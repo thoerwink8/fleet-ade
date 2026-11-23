@@ -597,6 +597,35 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
   );
 });
 
+effectIt.layer(NodeServices.layer)("SpawnExecutableResolution", (it) => {
+  it.effect("caches by PATH, re-resolves a stale hit, and invalidates when PATH changes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const platform = HostProcess.Platform.defaultValue();
+      const first = yield* fs.makeTempDirectoryScoped({ prefix: "t3-spawn-cache-first-" });
+      const second = yield* fs.makeTempDirectoryScoped({ prefix: "t3-spawn-cache-second-" });
+      const filename = platform === "win32" ? "tool.EXE" : "tool";
+      const firstExecutable = path.join(first, filename);
+      const secondExecutable = path.join(second, filename);
+      yield* fs.writeFileString(firstExecutable, "");
+      yield* fs.writeFileString(secondExecutable, "");
+      if (platform !== "win32") {
+        yield* fs.chmod(firstExecutable, 0o755);
+        yield* fs.chmod(secondExecutable, 0o755);
+      }
+
+      const resolve = yield* SpawnExecutableResolution;
+      const env = platform === "win32" ? { PATHEXT: ".EXE" } : {};
+      const bothPaths = { ...env, PATH: first + NodePath.delimiter + second };
+      expect(resolve("tool", platform, bothPaths)).toBe(firstExecutable);
+      yield* fs.remove(firstExecutable);
+      expect(resolve("tool", platform, bothPaths)).toBe(secondExecutable);
+      expect(resolve("tool", platform, { ...env, PATH: second })).toBe(secondExecutable);
+    }),
+  );
+});
+
 describe("runsGitWithoutConsole", () => {
   const git = "C:\\Program Files\\Git\\ucrt64\\bin\\git.exe";
 

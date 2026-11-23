@@ -2,9 +2,11 @@ import {
   BUILTIN_COMMANDER_INSTRUCTIONS,
   PROJECT_FILE_BACKED_SETTINGS,
   PROJECT_SCOPED_SERVER_SETTING_KEYS,
+  type CommandAssistRows,
   type ProjectFileBackedSettingKey,
   type ProjectId,
   type DispatchRole,
+  fillCommandAssistRows,
   type ModelSelection,
   type ProjectScopedServerSettingKey,
   type ProjectSettingsOverrides,
@@ -139,6 +141,15 @@ function resolveProjectOverrides(
     const value = overrides[key];
     // Forward-compatible decoding can leave a present undefined, which is not an override.
     if (value === undefined) continue;
+    // A project writes the cells it changes. The rest stay on the environment row.
+    if (key === "commandAssist") {
+      effective.commandAssist = {
+        ...settings.commandAssist,
+        ...(value as CommandAssistRows),
+      };
+      sources.commandAssist = "project";
+      continue;
+    }
     if (
       (key === "textGenerationModelSelection" || key === "defaultModelSelection") &&
       value !== undefined &&
@@ -308,5 +319,23 @@ export function resolveDispatchAssignment(
     instructions:
       writtenInstructions.length > 0 ? writtenInstructions : BUILTIN_COMMANDER_INSTRUCTIONS,
     commanderModel: resolved.dispatchCommanderModelSelection,
+  };
+}
+
+export interface ResolvedCommandAssist {
+  readonly rows: CommandAssistRows;
+  /** Empty assist cells use this selection. */
+  readonly textGeneration: ModelSelection;
+}
+
+/** Project cells cover only the assist rows that project wrote. */
+export function resolveCommandAssist(
+  settings: ServerSettings,
+  projectId: ProjectId | null,
+): ResolvedCommandAssist {
+  const resolved = resolveProjectSettings(settings, projectId).settings;
+  return {
+    rows: fillCommandAssistRows(resolved.commandAssist),
+    textGeneration: resolved.textGenerationModelSelection,
   };
 }

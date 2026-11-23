@@ -13,7 +13,7 @@ import type {
 } from "@t3tools/provider-core/server/networkEnvironment";
 
 import { setAgentNetworkSnapshotReader } from "./installSpawnPatch.ts";
-import { readSystemProxy } from "./systemProxy.ts";
+import { readSystemProxy, refreshSystemProxy } from "./systemProxy.ts";
 
 export interface NetworkSnapshot {
   readonly settings: NetworkSettings;
@@ -72,15 +72,20 @@ export function publishNetworkSettings(
     system: readSystemProxy(),
     agents: agentsFromSettings(settings.providerInstances),
   };
+  void refreshSystemProxy();
 }
 
-export function refreshNetworkSystemProxy(force = false): NetworkSnapshot {
-  current = { ...current, system: readSystemProxy(HostProcess.Platform.defaultValue(), force) };
+export async function refreshNetworkSystemProxy(force = false): Promise<NetworkSnapshot> {
+  const system = await refreshSystemProxy(HostProcess.Platform.defaultValue(), force);
+  current = { ...current, system };
   return current;
 }
 
 export function currentNetworkSnapshot(): NetworkSnapshot {
-  return refreshNetworkSystemProxy(false);
+  void refreshSystemProxy();
+  const system = readSystemProxy();
+  if (system !== current.system) current = { ...current, system };
+  return current;
 }
 
 setAgentNetworkSnapshotReader(() => currentNetworkSnapshot());

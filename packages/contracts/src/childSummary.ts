@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import { NonNegativeInt, PositiveInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
@@ -62,6 +63,8 @@ export const ChildSummaryDetail = Schema.Struct({
   branch: Schema.NullOr(Schema.String),
   prNumber: Schema.NullOr(PositiveInt),
   outlook: Schema.NullOr(Schema.String),
+  /** Written by hand-back. Null until that check runs. */
+  handback: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
 });
 export type ChildSummaryDetail = typeof ChildSummaryDetail.Type;
 

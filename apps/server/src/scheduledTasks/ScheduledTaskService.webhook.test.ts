@@ -95,6 +95,29 @@ it.effect(
     ),
 );
 
+it.effect("keeps a stored relay delivery row when a direct webhook arrives", () =>
+  withService(({ service, sql, launches }) =>
+    Effect.gen(function* () {
+      const { task } = yield* service.upsert(yield* webhookTaskInput());
+      yield* sql`
+        INSERT INTO scheduled_task_webhook_relay_deliveries
+          (relay_delivery_id, task_id, seen_at)
+        VALUES ('relay-old-1', ${task.id}, '2026-10-04T10:00:00.000Z')
+      `;
+      const result = yield* service.triggerWebhook(requestFor(task));
+      assert.equal(result._tag, "accepted");
+      yield* Queue.take(launches);
+      const rows = yield* sql<{ relay_delivery_id: string }>`
+        SELECT relay_delivery_id FROM scheduled_task_webhook_relay_deliveries
+      `;
+      assert.deepEqual(
+        rows.map((row) => row.relay_delivery_id),
+        ["relay-old-1"],
+      );
+    }),
+  ),
+);
+
 const waitForSpan = <A, E, R>(work: Effect.Effect<A, E, R>, name: string) =>
   Effect.gen(function* () {
     const done = yield* Deferred.make<void>();

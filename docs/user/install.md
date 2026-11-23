@@ -143,7 +143,7 @@ folder paths, so in the web app use **Add project** instead.
 
 Open the T3 Code web app in your phone's browser to connect to a server on
 another machine. Follow [remote access](./remote-access.md) to link it through
-T3 Connect or a pairing URL.
+Tailscale, a local network, or a pairing URL.
 
 ## Providers
 

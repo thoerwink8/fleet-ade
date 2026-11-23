@@ -24,11 +24,8 @@ import * as DesktopBackendPool from "../../backend/DesktopBackendPool.ts";
 import * as DesktopAppSettings from "../../settings/DesktopAppSettings.ts";
 import * as ElectronDialog from "../../electron/ElectronDialog.ts";
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
-import * as IpcChannels from "../channels.ts";
-import * as DesktopIpc from "../DesktopIpc.ts";
 import {
   getLocalEnvironmentBootstraps,
-  installRelayTelemetryEnabled,
   pickProjectFavicon,
   probeRemoteEditors,
   readMedia,
@@ -180,34 +177,6 @@ describe("getLocalEnvironmentBootstraps", () => {
       assert.deepEqual(result, []);
     }).pipe(Effect.provide(bootstrapsLayer([stoppedInstance])));
   });
-});
-
-describe("installRelayTelemetryEnabled", () => {
-  // The renderer reads this over sync IPC, so the answer must not wait on the filesystem.
-  const relayTelemetryEnabled = (env: NodeJS.ProcessEnv) =>
-    Effect.gen(function* () {
-      const listeners = new Map<string, DesktopIpc.DesktopIpcSyncListener>();
-      const ipcMain: DesktopIpc.DesktopIpcMain = {
-        removeHandler: () => undefined,
-        handle: () => undefined,
-        removeAllListeners: (channel) => void listeners.delete(channel),
-        on: (channel, listener) => void listeners.set(channel, listener),
-      };
-      yield* installRelayTelemetryEnabled().pipe(
-        Effect.provideService(HostProcess.Environment, env),
-        Effect.provide(DesktopIpc.layerTest(ipcMain)),
-      );
-      const event = { returnValue: undefined as unknown };
-      listeners.get(IpcChannels.GET_RELAY_TELEMETRY_ENABLED_CHANNEL)?.(event as never);
-      return event.returnValue;
-    }).pipe(Effect.scoped);
-
-  it.effect("reads the desktop host opt-out before returning the renderer policy", () =>
-    Effect.gen(function* () {
-      assert.isFalse(yield* relayTelemetryEnabled({ T3CODE_TELEMETRY_ENABLED: "false" }));
-      assert.isTrue(yield* relayTelemetryEnabled({}));
-    }),
-  );
 });
 
 describe("readMedia", () => {

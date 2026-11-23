@@ -36,6 +36,7 @@ export * from "./pullRequest.ts";
 export * from "./orchestrationDispatch.ts";
 export * from "./orchestrationProject.ts";
 export * from "./childSummary.ts";
+export * from "./commandAssist.ts";
 export * from "./orchestrationV2.ts";
 export * from "./guestShare.ts";
 export * from "./applicationEvent.ts";

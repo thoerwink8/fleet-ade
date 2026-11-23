@@ -44,10 +44,8 @@ export function isAgentActivityPublishingEnabledValue(value: string | null): boo
   return value === "true";
 }
 
-/**
- * Mirrors the per-publish gate in AgentAwarenessRelay, so the descriptor
-    capability never advertises publishing that the publisher would skip.
- */
+// Mirrors the per-publish gate the environment descriptor advertises, so the
+// capability never advertises publishing that is not configured.
 export const readAgentActivityPublishingActive: (
   secrets: ServerSecretStore.ServerSecretStore["Service"],
 ) => Effect.Effect<boolean> = Effect.fn("config.readAgentActivityPublishingActive")(
@@ -94,7 +92,3 @@ export const readRelayConnection = Effect.all([
     url && environmentCredential ? { url, environmentCredential } : null,
   ),
 );
-
-export const readHoldWebhooksWhileOffline = readSecretString(
-  HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET,
-).pipe(Effect.map((value) => value === "true"));

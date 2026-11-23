@@ -1,5 +1,6 @@
 import * as SessionEndInbox from "../pipeline/SessionEndInbox.ts";
 import { ChildSessionSummary } from "./ChildSessionSummary.ts";
+import * as CommandAssist from "./CommandAssist.ts";
 import * as WorktreeBranchSync from "./WorktreeBranchSync.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
@@ -322,6 +323,11 @@ const layerProviderContinuationWorkerProvided = ProviderContinuationService.laye
     ),
   ),
 );
+const layerCommandAssist = CommandAssist.layer.pipe(
+  Layer.provide(CommandAssist.layerModel),
+  Layer.provide(TextGeneration.layer.pipe(Layer.provide(ProviderInstallationGate.layer))),
+);
+
 const layerThreadTitleRegenerationProvided = ThreadTitleRegenerationService.layer.pipe(
   Layer.provide(
     Layer.mergeAll(
@@ -426,7 +432,7 @@ export const layerProduction = Layer.mergeAll(
     ChildSessionSummary.layer,
     ChildSessionSummary.layerWorker,
     ChildSessionSummary.layerIdle,
-  ).pipe(Layer.provide(Layer.mergeAll(layerEventSink, ProjectionStore.layer))),
+  ).pipe(Layer.provide(Layer.mergeAll(layerEventSink, ProjectionStore.layer, layerCommandAssist))),
 ).pipe(
   Layer.provide(ResourceCleanupService.layer.pipe(Layer.provide(layerScheduledTaskProvided))),
   Layer.provide(Scheduler.layer),

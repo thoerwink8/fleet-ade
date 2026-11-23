@@ -4,12 +4,14 @@ import {
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
+  lookupCommandAssistRow,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import { createModelSelection } from "./model.ts";
 import {
   clearProjectSettingsOverrides,
   hasProjectSettingsOverrides,
+  resolveCommandAssist,
   resolveDispatchAssignment,
   resolveNewThreadEnvMode,
   resolveProjectSettings,
@@ -281,6 +283,57 @@ describe("resolveDispatchAssignment", () => {
     expect(host.roles.code).toBeNull();
     expect(resolveDispatchAssignment(settings, otherProjectId).commanderModel).toBeNull();
     expect(resolveDispatchAssignment(settings, otherProjectId).roles.review).toBeNull();
+  });
+});
+
+describe("resolveCommandAssist", () => {
+  it("lets a project cover one assist row and leaves the others on the environment", () => {
+    const activity = createModelSelection(ProviderInstanceId.make("codex"), "activity");
+    const drift = createModelSelection(ProviderInstanceId.make("claudeAgent"), "drift");
+    const settings = applyServerSettingsPatch(
+      {
+        ...DEFAULT_SERVER_SETTINGS,
+        commandAssist: {
+          ...DEFAULT_SERVER_SETTINGS.commandAssist,
+          drift: { enabled: true, modelSelection: drift },
+        },
+      },
+      {
+        projectSettingsOverrides: {
+          [projectId]: {
+            commandAssist: {
+              activity: { enabled: false, modelSelection: activity },
+            },
+          },
+        },
+      },
+    );
+    const resolved = resolveCommandAssist(settings, projectId);
+    expect(lookupCommandAssistRow(resolved.rows, "activity", resolved.textGeneration)).toEqual({
+      _tag: "skipped",
+      reason: "off",
+    });
+    expect(lookupCommandAssistRow(resolved.rows, "drift", resolved.textGeneration)).toEqual({
+      _tag: "ready",
+      model: drift,
+    });
+    expect(lookupCommandAssistRow(resolved.rows, "patrol", resolved.textGeneration)).toEqual({
+      _tag: "skipped",
+      reason: "off",
+    });
+    expect(lookupCommandAssistRow(resolved.rows, "naming", resolved.textGeneration)).toEqual({
+      _tag: "ready",
+      model: resolved.textGeneration,
+    });
+    const other = resolveCommandAssist(settings, otherProjectId);
+    expect(lookupCommandAssistRow(other.rows, "activity", other.textGeneration)).toEqual({
+      _tag: "skipped",
+      reason: "off",
+    });
+    expect(lookupCommandAssistRow(other.rows, "drift", other.textGeneration)).toEqual({
+      _tag: "ready",
+      model: drift,
+    });
   });
 });
 

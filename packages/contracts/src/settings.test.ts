@@ -7,6 +7,7 @@ import {
   ProviderInstanceEnvironment,
   ProviderInstanceId,
 } from "./providerInstance.ts";
+import { fillCommandAssistRows } from "./commandAssist.ts";
 import {
   ClientSettingsSchema,
   ClientSettingsPatch,
@@ -632,6 +633,58 @@ describe("commander dispatch settings", () => {
     expect(decoded.projectSettingsOverrides[projectId]).not.toHaveProperty(
       "dispatchCommanderModelSelection",
     );
+  });
+});
+
+describe("command assist settings", () => {
+  it("decodes stored settings that have no assist rows", () => {
+    const decoded = decodeServerSettings({
+      dispatchCodeModelSelection: null,
+      dispatchTimeoutMs: 60_000,
+      commanderInstructions: "环境守则",
+    });
+    expect(decoded.commandAssist.naming).toEqual({ enabled: true, modelSelection: null });
+    expect(decoded.commandAssist.activity).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.commandAssist.drift).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.commandAssist.handback).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.commandAssist.speech).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.commandAssist.patrol).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded).not.toHaveProperty("commandAssistTimeoutMs");
+    expect(decoded.dispatchTimeoutMs).toBe(60_000);
+  });
+
+  it("keeps an unknown assist step and lets a project cover one row", () => {
+    const projectId = ProjectId.make("project-assist");
+    const decoded = decodeServerSettings({
+      commandAssist: {
+        futureStep: { enabled: true, modelSelection: null },
+        drift: { enabled: false, modelSelection: null },
+      },
+      projectSettingsOverrides: {
+        [projectId]: {
+          commandAssist: {
+            activity: {
+              enabled: true,
+              modelSelection: { instanceId: "codex", model: "assist-activity" },
+            },
+          },
+        },
+      },
+    });
+    const rows = fillCommandAssistRows(decoded.commandAssist);
+    expect(decoded.commandAssist.futureStep).toEqual({ enabled: true, modelSelection: null });
+    expect(rows.naming).toEqual({ enabled: true, modelSelection: null });
+    expect(rows.drift).toEqual({ enabled: false, modelSelection: null });
+    expect(rows.patrol).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.projectSettingsOverrides[projectId]?.commandAssist).toEqual({
+      activity: {
+        enabled: true,
+        modelSelection: { instanceId: "codex", model: "assist-activity" },
+      },
+    });
+    const again = decodeServerSettings(encodeServerSettings(decoded));
+    expect(again.commandAssist.futureStep).toEqual({ enabled: true, modelSelection: null });
+    expect(again.projectSettingsOverrides[projectId]?.commandAssist?.activity?.enabled).toBe(true);
   });
 });
 

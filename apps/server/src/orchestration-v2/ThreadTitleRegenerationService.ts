@@ -1,8 +1,9 @@
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { isAttachmentOnlyBootstrapPrompt } from "@t3tools/shared/composerContextReferences";
+import { resolveCommandAssist, resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
   CommandId,
   type ChatAttachment,
+  lookupCommandAssistRow,
   type MessageId,
   type OrchestrationV2AppThread,
   type OrchestrationV2ConversationMessage,
@@ -193,10 +194,16 @@ const make = Effect.gen(function* () {
       const inherited = yield* forkSource(projection.thread).pipe(
         Effect.orElseSucceed(() => undefined),
       );
-      const settings = resolveProjectSettings(
-        yield* serverSettings.getSettings,
-        projection.thread.projectId,
-      ).settings;
+      const loaded = yield* serverSettings.getSettings;
+      const settings = resolveProjectSettings(loaded, projection.thread.projectId).settings;
+      const naming = lookupCommandAssistRow(
+        resolveCommandAssist(loaded, projection.thread.projectId).rows,
+        "naming",
+        settings.textGenerationModelSelection,
+      );
+      if (naming._tag !== "ready") {
+        return { status: "unchanged" as const };
+      }
       // Storage cleanup removes worktrees but keeps the path; CLIs cannot spawn in a missing cwd.
       const worktreePath = projection.thread.worktreePath;
       const worktreeExists =
@@ -210,7 +217,7 @@ const make = Effect.gen(function* () {
         ...(input.kind.type === "regenerate" ? { previousTitle: projection.thread.title } : {}),
         ...(inherited === undefined ? {} : { forkSource: inherited }),
         instructions: settings.threadTitleInstructions,
-        modelSelection: settings.textGenerationModelSelection,
+        modelSelection: naming.model,
         projectId: projection.thread.projectId,
       });
       const generatedTitle = result.title.trim();
