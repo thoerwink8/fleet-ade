@@ -258,15 +258,13 @@ export function ServerUpdateAction({
     ) {
       return;
     }
-    if (isDesktopAppUpdate) {
-      const confirmed =
-        (await requestConfirmDialog(
-          `要更新运行 ${serverLabel} 的 Fleet ADE 桌面应用吗？它会在那台机器上关闭并重新启动。`,
-          { initialFocus: "confirm" },
-        )) ?? true;
-      if (!confirmed) {
-        return;
-      }
+    const confirmed =
+      (await requestConfirmDialog(
+        `要更新运行 ${serverLabel} 的 Fleet ADE 桌面应用吗？它会在那台机器上关闭并重新启动。`,
+        { initialFocus: "confirm" },
+      )) ?? true;
+    if (!confirmed) {
+      return;
     }
     if (!canUpdateServer(appAtomRegistry.get(sessionStateAtom))) return;
     await update({
