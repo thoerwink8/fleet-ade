@@ -12,7 +12,7 @@ import {
   type OrchestrationV2RunStatus,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { makeThreadProjectionFixture } from "../../test-fixtures";
 import {
   derivePinnedPlanView,
@@ -61,14 +61,13 @@ function makeTodoPlan(input: {
 }
 
 function makePlanUpdatedEvent(
-  sequence: number,
+  eventIndex: number,
   plan: OrchestrationV2PlanArtifact,
 ): OrchestrationV2DomainEvent {
   return {
-    id: EventId.make(`event-${sequence}`),
-    sequence: PositiveInt.make(sequence),
+    id: EventId.make(`event-${eventIndex}`),
     threadId: plan.threadId,
-    runId: plan.runId,
+    ...(plan.runId === null ? {} : { runId: plan.runId }),
     occurredAt: OCCURRED_AT,
     type: "plan.updated",
     payload: plan,
