@@ -5,11 +5,14 @@ import { visibilityParentKey } from "@t3tools/client-runtime/state/threads";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import { Navigate, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-import ChatView from "./ChatView";
+import { isElectron } from "../env";
+import { LazyChatView } from "./chatViewLoader";
 import { BackgroundThreadContext } from "./chat/backgroundThread";
+import { Skeleton } from "./ui/skeleton";
 import { SidebarInset } from "./ui/sidebar";
+import { WorkspacePageHeader } from "./WorkspacePageHeader";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import {
@@ -43,6 +46,25 @@ function useOpenThreadFamily(threadRef: ScopedThreadRef | null, missing: boolean
     if (ref === null) return;
     return threadFamilies.mount(appAtomRegistry, ref.environmentId, ref.threadId);
   }, [mountedKey]);
+}
+
+/**
+ * Matches the chat topbar chrome while the lazy ChatView chunk resolves, without assuming
+ * whether the thread has messages or a draft hero.
+ */
+function ChatViewLoadingFallback() {
+  return (
+    <div
+      role="status"
+      aria-label="正在加载会话"
+      className="flex min-h-0 min-w-0 flex-1 flex-col bg-background"
+    >
+      <WorkspacePageHeader electron={isElectron} className="border-b border-border bg-background">
+        <Skeleton className="h-4 w-40" />
+      </WorkspacePageHeader>
+      <div className="min-h-0 flex-1 bg-background" />
+    </div>
+  );
 }
 
 /**
@@ -167,7 +189,7 @@ export function ThreadRouteView({
       redirect = <Navigate to="/" replace />;
     } else if (draftSession) {
       view = (
-        <ChatView
+        <LazyChatView
           key={target.draftId}
           draftId={target.draftId}
           environmentId={draftSession.environmentId}
@@ -191,7 +213,7 @@ export function ThreadRouteView({
     } else if (draftRedirect) {
       // Same slot and key as the server route renders, so the swap keeps this instance.
       view = (
-        <ChatView
+        <LazyChatView
           key={target.draftId}
           environmentId={draftRedirect.environmentId}
           threadId={draftRedirect.threadId}
@@ -215,7 +237,7 @@ export function ThreadRouteView({
     if (bootstrapComplete && unlistedThread !== null) redirect = <Navigate to="/" replace />;
   } else if (renderState === "ready" || (renderState === "loading" && serverThreadShell !== null)) {
     view = (
-      <ChatView
+      <LazyChatView
         key={nextHandoffKey?.key}
         environmentId={target.threadRef.environmentId}
         threadId={target.threadRef.threadId}
@@ -229,7 +251,9 @@ export function ThreadRouteView({
       className="h-svh min-h-0 overflow-hidden overscroll-y-none md:h-dvh"
       inert={background}
     >
-      <BackgroundThreadContext value={background}>{view}</BackgroundThreadContext>
+      <BackgroundThreadContext value={background}>
+        <Suspense fallback={background ? null : <ChatViewLoadingFallback />}>{view}</Suspense>
+      </BackgroundThreadContext>
       {background ? null : redirect}
     </SidebarInset>
   );
