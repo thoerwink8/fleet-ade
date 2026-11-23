@@ -6,6 +6,7 @@ import "~/index.css";
 import { render } from "../test/render";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
+import { Checkbox } from "./components/ui/checkbox";
 import {
   applyThemePalette,
   EMBER_THEME,
@@ -186,6 +187,49 @@ describe("standard painted theme colors", () => {
           contrastRatio(badgeStyle.color, badgeStyle.backgroundColor),
           `${appearance} destructive Badge (${badgeStyle.color} on ${badgeStyle.backgroundColor})`,
         ).toBeGreaterThanOrEqual(4.5);
+      }
+    } finally {
+      applyThemePalette("system", "light");
+      root.classList.remove("dark");
+      delete root.dataset.theme;
+    }
+  });
+
+  it("paints fleet-design Checkbox styles in light and dark and follows --primary in Grove and Ember", async () => {
+    const root = document.documentElement;
+    try {
+      applyThemePalette("system", "light");
+      await using screen = await render(
+        createElement(Checkbox, { "aria-label": "Accept", defaultChecked: true }),
+      );
+      const box = screen.getByRole("checkbox", { name: "Accept" }).element();
+
+      for (const [appearance, expectedBg, expectedFg] of [
+        ["light", "rgb(27, 27, 31)", "rgb(255, 255, 255)"],
+        ["dark", "rgb(236, 236, 238)", "rgb(24, 24, 27)"],
+      ] as const) {
+        root.classList.toggle("dark", appearance === "dark");
+        root.dataset.theme = appearance;
+        const style = getComputedStyle(box);
+        expect(style.width, `${appearance} width`).toBe("16px");
+        expect(style.height, `${appearance} height`).toBe("16px");
+        expect(style.borderRadius, `${appearance} radius`).toBe("4px");
+        expect(style.backgroundColor, `${appearance} checked bg`).toBe(expectedBg);
+        expect(style.color, `${appearance} checked mark`).toBe(expectedFg);
+      }
+
+      for (const theme of [GROVE_THEME, EMBER_THEME]) {
+        for (const appearance of ["light", "dark"] as const) {
+          root.classList.toggle("dark", appearance === "dark");
+          root.dataset.theme = appearance;
+          applyThemePalette(theme.id, appearance);
+          const colors = getThemeColorsForMode(theme, appearance)!;
+          expectCloseColor(
+            getComputedStyle(box).backgroundColor,
+            colors.messageAction,
+            `${theme.id} ${appearance} checkbox checked bg`,
+          );
+        }
       }
     } finally {
       applyThemePalette("system", "light");
