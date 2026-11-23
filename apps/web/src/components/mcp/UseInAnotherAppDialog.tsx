@@ -139,7 +139,7 @@ function Wizard({
           <AppStep choice={choice} onChoose={setChoice} />
         ) : step === 1 ? (
           <section className="space-y-3">
-            <h3 className="text-sm font-medium">{appName} 可以做什么？</h3>
+            <h3 className="text-row font-semibold">{appName} 可以做什么？</h3>
             <RadioGroup
               aria-label={`${appName} 可以做什么？`}
               value={access}
@@ -475,7 +475,7 @@ function GateMessage({
 }) {
   return (
     <section className="space-y-3">
-      <h3 className="text-base font-medium">{title}</h3>
+      <h3 className="text-dialog-title font-semibold">{title}</h3>
       {lines.length > 0 ? (
         <div className="space-y-1 text-sm text-muted-foreground">
           {lines.map((line) => (
@@ -497,7 +497,7 @@ function AppStep({
 }) {
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-medium">哪个应用？</h3>
+      <h3 className="text-row font-semibold">哪个应用？</h3>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
         {MCP_APPS.filter((app) => !app.hidden).map((app) => (
           <button

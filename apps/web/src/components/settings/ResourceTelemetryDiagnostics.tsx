@@ -300,7 +300,7 @@ function HealthSource({ label, health }: { label: string; health: ResourceTeleme
   return (
     <div className="flex items-start justify-between gap-4 border-t border-border/50 py-3 first:border-t-0">
       <div className="min-w-0">
-        <div className="text-sm font-medium text-foreground">{label}</div>
+        <div className="text-row font-semibold text-foreground">{label}</div>
         <div className="mt-1 text-2xs leading-relaxed text-muted-foreground/65">
           {expectedInBrowser
             ? "在桌面应用内打开此页面时可用。"
@@ -1159,7 +1159,7 @@ function ResourceTelemetryDiagnosticsBody({
               </>
             ) : (
               <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-5">
-                <div className="text-sm font-medium text-foreground">未连接桌面主机状态信号</div>
+                <div className="text-row font-semibold text-foreground">未连接桌面主机状态信号</div>
                 <p className="mt-1.5 max-w-sm text-2xs leading-relaxed text-muted-foreground/70">
                   电源、闲置、锁定和温度状态由桌面主机提供。当前浏览器会话中的进程遥测仍正常运行。
                 </p>

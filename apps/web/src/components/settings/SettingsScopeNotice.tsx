@@ -144,7 +144,7 @@ export function SettingsScopeNotice({
       >
         {choice.icon}
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">{choice.label}</span>
+          <span className="block truncate text-row font-semibold">{choice.label}</span>
           {choice.secondary ? (
             <Tooltip>
               <TooltipTrigger

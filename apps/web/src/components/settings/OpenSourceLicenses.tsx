@@ -79,7 +79,7 @@ function LicenseNoticeRow({
               className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-panel-open:rotate-90"
             />
             <span className="flex min-w-0 flex-1 items-baseline gap-2">
-              <span className="truncate font-medium text-foreground">{entry.name}</span>
+              <span className="truncate font-semibold text-foreground">{entry.name}</span>
               {entry.version ? (
                 <code className="shrink-0 text-xs text-muted-foreground">{entry.version}</code>
               ) : null}
@@ -206,7 +206,7 @@ function LicenseManifestError({ message, onRetry }: { message: string; onRetry: 
   return (
     <div className="flex flex-col items-start gap-3 px-3 py-5 sm:px-4">
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium text-foreground">开源声明不可用</h3>
+        <h3 className="text-row font-semibold text-foreground">开源声明不可用</h3>
         <p className="max-w-[70ch] text-pretty text-xs leading-normal text-muted-foreground/80">
           {message}
         </p>

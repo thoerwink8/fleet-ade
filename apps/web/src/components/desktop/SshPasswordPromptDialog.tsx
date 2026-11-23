@@ -178,7 +178,7 @@ function ActiveSshPasswordPrompt({
           >
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-foreground">{request.prompt}</p>
+                <p className="text-row font-semibold text-foreground">{request.prompt}</p>
                 {remainingLabel ? (
                   <span
                     className={

@@ -289,7 +289,7 @@ export function McpConsent({
       >
         {acceptsCode ? (
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="connect-agent-pairing-code">
+            <label className="text-row font-semibold" htmlFor="connect-agent-pairing-code">
               登录码
             </label>
             <Input
@@ -318,7 +318,7 @@ export function McpConsent({
           </p>
         ) : (
           <div className="space-y-2">
-            <span id="connect-agent-access-label" className="text-sm font-medium">
+            <span id="connect-agent-access-label" className="text-row font-semibold">
               允许它做什么
             </span>
             <RadioGroup
@@ -410,7 +410,7 @@ export function AccessOption({
         )}
       />
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-foreground">{label}</span>
+        <span className="block text-row font-semibold text-foreground">{label}</span>
         {detail === null ? null : (
           <span className="block text-xs text-muted-foreground">{detail}</span>
         )}

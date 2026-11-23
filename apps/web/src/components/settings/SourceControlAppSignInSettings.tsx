@@ -216,7 +216,7 @@ export function SourceControlAppSignInSettings({
       <div className="flex items-center gap-3 p-3">
         <AppMark signedIn={signedIn} />
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-sm font-medium text-foreground">{appSignIn.appName}</p>
+          <p className="text-row font-semibold text-foreground">{appSignIn.appName}</p>
           <div className="text-xs text-muted-foreground">{subtitle}</div>
         </div>
         <div className="shrink-0">{action}</div>

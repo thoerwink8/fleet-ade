@@ -56,7 +56,9 @@ export function T3ChatUserProfilePage() {
     >
       {linkState.error ? (
         <div className="border-t py-3 text-xs" role="alert">
-          <p className="font-medium text-destructive-foreground">无法加载 T3 Chat 关联</p>
+          <p className="text-meta font-semibold text-destructive-foreground">
+            无法加载 T3 Chat 关联
+          </p>
           <p className="mt-0.5 text-muted-foreground">{linkState.error}</p>
         </div>
       ) : data === null ? null : !data.available ? (
@@ -68,7 +70,7 @@ export function T3ChatUserProfilePage() {
           <ClerkUserProfileRow icon={<MessageSquareIcon className="size-4" />}>
             <div className="flex items-start gap-4">
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm leading-4.5 font-medium text-foreground">
+                <h3 className="truncate text-row font-semibold text-foreground">
                   {link ? link.email : "未关联"}
                 </h3>
                 <p className="mt-1 text-xs leading-4.5 text-muted-foreground">

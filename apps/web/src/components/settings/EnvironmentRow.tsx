@@ -98,7 +98,7 @@ export function EnvironmentRow({
         className={cn("size-4 text-muted-foreground", dimmed && "opacity-60")}
       />
       <div className={cn("min-w-0", dimmed && "opacity-60")}>
-        <p className="truncate text-sm font-medium text-foreground">{label}</p>
+        <p className="truncate text-row font-semibold text-foreground">{label}</p>
         <div className="truncate text-xs text-muted-foreground">{subtitle}</div>
         {below}
       </div>

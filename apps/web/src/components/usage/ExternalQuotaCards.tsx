@@ -20,7 +20,7 @@ function Groups({
 }) {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium">{title}</h3>
+      <h3 className="text-row font-semibold">{title}</h3>
       {report.ok ? (
         report.groups.map((group) => (
           <div key={group.name} className="flex flex-col gap-1">
@@ -52,7 +52,7 @@ function UsageRows({
 }) {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium">{title}</h3>
+      <h3 className="text-row font-semibold">{title}</h3>
       {rows.ok ? (
         rows.agents.length === 0 && rows.models.length === 0 ? (
           <p className="text-sm text-muted-foreground">今天还没有调用。</p>
@@ -110,7 +110,7 @@ export function ExternalQuotaCards({
   return (
     <div className="flex flex-col gap-4 rounded-xl border p-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-medium">额度与今日用量</h2>
+        <h2 className="text-title font-semibold">额度与今日用量</h2>
         <Button size="sm" variant="outline" disabled={reading} onClick={retry}>
           {reading ? "正在读取" : "刷新"}
         </Button>
@@ -130,7 +130,7 @@ export function ExternalQuotaCards({
       {magpieQuotas ? <Groups title="magpie 额度" report={magpieQuotas} /> : null}
       {magpieUsage ? <UsageRows title="magpie 今日用量" rows={magpieUsage} /> : null}
       <section className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium">本机日志用量</h3>
+        <h3 className="text-row font-semibold">本机日志用量</h3>
         {localLines.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             这段时间没有读到本机日志用量。先用本机 Claude、Codex 或 Grok

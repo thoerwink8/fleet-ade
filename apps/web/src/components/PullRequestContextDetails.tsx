@@ -17,7 +17,7 @@ export function PullRequestContextDetails({ metadata }: { metadata: PullRequestC
   ).changeRequest;
   return (
     <div className="max-w-80 space-y-1 overflow-hidden py-0.5 text-left">
-      <div className="flex items-center gap-1.5 text-xs font-medium">
+      <div className="flex items-center gap-1.5 text-meta font-semibold">
         <state.Icon className={cn("size-3.5 shrink-0", state.toneClassName)} />
         <span className="text-foreground">
           {capitalizeTerm(singular)} #{metadata.number}

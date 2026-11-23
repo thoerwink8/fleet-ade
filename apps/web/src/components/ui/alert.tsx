@@ -125,7 +125,7 @@ function Alert({
 }
 
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("font-medium", className)} data-slot="alert-title" {...props} />;
+  return <div className={cn("font-semibold", className)} data-slot="alert-title" {...props} />;
 }
 
 function AlertDescription({ className, ...props }: React.ComponentProps<"div">) {
