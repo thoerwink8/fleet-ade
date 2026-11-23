@@ -22,6 +22,7 @@ const bootScript = (() => {
 
 type BootResult = {
   isDark: boolean;
+  theme: string | undefined;
   themeId: string | undefined;
   themeSelected: string | undefined;
   backgroundColor: string;
@@ -84,6 +85,7 @@ function runBootScript(options: {
 
   return {
     isDark: classes.has("dark"),
+    theme: documentElement.dataset.theme,
     themeId: documentElement.dataset.themeId,
     themeSelected: documentElement.dataset.themeSelected,
     backgroundColor: documentElement.style.backgroundColor,
@@ -114,6 +116,7 @@ describe("index.html boot script", () => {
     prefersDark: boolean;
   }> = [
     { name: "no stored preference on a dark OS", storage: {}, prefersDark: true },
+    { name: "no stored preference on a light OS", storage: {}, prefersDark: false },
     {
       name: "Grove follows a dark OS",
       storage: { [THEME_STORAGE_KEY]: "grove", [THEME_FOLLOW_SYSTEM_STORAGE_KEY]: "true" },
@@ -164,7 +167,9 @@ describe("index.html boot script", () => {
 
   it.each(parityCases)("matches the runtime appearance: $name", ({ storage, prefersDark }) => {
     const boot = runBootScript({ storage, prefersDark });
-    expect(boot.isDark).toBe(runtimeResolvedAppearance(storage, prefersDark) === "dark");
+    const resolved = runtimeResolvedAppearance(storage, prefersDark);
+    expect(boot.isDark).toBe(resolved === "dark");
+    expect(boot.theme).toBe(resolved);
   });
 
   it("keeps every built-in boot splash in sync with the real palettes", () => {
@@ -182,6 +187,7 @@ describe("index.html boot script", () => {
         });
         expect(boot.themeId).toBe(theme.id);
         expect(boot.isDark).toBe(mode === "dark");
+        expect(boot.theme).toBe(mode);
         expect(boot.bootVariables["--boot-background"]).toBe(colors!.canvas);
         expect(boot.bootVariables["--boot-foreground"]).toBe(colors!.text);
         expect(boot.bootVariables["--boot-accent"]).toBe(colors!.accent);
@@ -205,6 +211,7 @@ describe("index.html boot script", () => {
         prefersDark: false,
       });
       expect(boot.isDark).toBe(true);
+      expect(boot.theme).toBe("dark");
       expect(boot.themeId).toBeUndefined();
       expect(boot.themeSelected).toBeUndefined();
       expect(boot.backgroundColor).toBe("#000000");
@@ -215,9 +222,11 @@ describe("index.html boot script", () => {
   it("follows the OS appearance when storage is unavailable", () => {
     const light = runBootScript({ storageThrows: true, prefersDark: false });
     expect(light.isDark).toBe(false);
+    expect(light.theme).toBe("light");
     expect(light.themeId).toBeUndefined();
 
     const dark = runBootScript({ storageThrows: true, prefersDark: true });
     expect(dark.isDark).toBe(true);
+    expect(dark.theme).toBe("dark");
   });
 });
