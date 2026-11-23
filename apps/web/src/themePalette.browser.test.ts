@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import "~/index.css";
 import { render } from "../test/render";
+import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import {
   applyThemePalette,
@@ -28,6 +29,39 @@ function paintedChannels(variable: string, canvas: readonly number[] = [0, 0, 0]
   } finally {
     probe.remove();
   }
+}
+
+function contrastRatio(first: string, second: string): number {
+  const luminance = (value: string) => {
+    const rgb = toRgb(value)!;
+    return [rgb.r, rgb.g, rgb.b]
+      .map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4))
+      .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index]!, 0);
+  };
+  const firstL = luminance(first);
+  const secondL = luminance(second);
+  return (Math.max(firstL, secondL) + 0.05) / (Math.min(firstL, secondL) + 0.05);
+}
+
+function resolvedCssVariable(variable: string): string {
+  const probe = document.createElement("div");
+  probe.style.color = `var(${variable})`;
+  document.body.append(probe);
+  try {
+    return getComputedStyle(probe).color;
+  } finally {
+    probe.remove();
+  }
+}
+
+function expectCloseColor(actualValue: string, expectedValue: string, label: string) {
+  const expected = toRgb(expectedValue)!;
+  const actual = toRgb(actualValue)!;
+  expect(actual.alpha ?? 1, `${label} alpha`).toBeCloseTo(expected.alpha ?? 1, 2);
+  [expected.r, expected.g, expected.b].forEach((channel, index) => {
+    const actualChannel = [actual.r, actual.g, actual.b][index]!;
+    expect(Math.abs(channel * 255 - actualChannel * 255), `${label} ch${index}`).toBeLessThan(1.5);
+  });
 }
 
 describe("standard painted theme colors", () => {
@@ -83,16 +117,75 @@ describe("standard painted theme colors", () => {
           root.classList.toggle("dark", appearance === "dark");
           root.dataset.theme = appearance;
           applyThemePalette(theme.id, appearance);
-          const expected = toRgb(getThemeColorsForMode(theme, appearance)!.chrome)!;
-          const actual = toRgb(getComputedStyle(document.body).backgroundColor)!;
-          [expected.r, expected.g, expected.b].forEach((channel, index) => {
-            const actualChannel = [actual.r, actual.g, actual.b][index]!;
-            expect(
-              Math.abs(channel * 255 - actualChannel * 255),
-              `${theme.id} ${appearance} body`,
-            ).toBeLessThan(1.5);
-          });
+          const colors = getThemeColorsForMode(theme, appearance)!;
+          expectCloseColor(
+            getComputedStyle(document.body).backgroundColor,
+            colors.chrome,
+            `${theme.id} ${appearance} body`,
+          );
+          const expectedVariables: ReadonlyArray<readonly [string, string]> = [
+            ["--background", colors.canvas],
+            ["--foreground", colors.text],
+            ["--primary", colors.messageAction],
+            ["--accent", colors.accentSurface],
+            ["--border", colors.border],
+            // Success and info stay un-themed (pre-bridge Tailwind defaults) in Grove and Ember.
+            ["--info", "oklch(0.623 0.214 259.815)"],
+            ["--success", "oklch(0.696 0.17 162.48)"],
+            ["--warning", colors.warning],
+            [
+              "--info-foreground",
+              appearance === "dark" ? "oklch(0.707 0.165 254.624)" : "oklch(0.488 0.243 264.376)",
+            ],
+            [
+              "--success-foreground",
+              appearance === "dark" ? "oklch(0.765 0.177 163.223)" : "oklch(0.508 0.118 165.612)",
+            ],
+            ["--error", colors.error],
+          ];
+          for (const [variable, expectedColor] of expectedVariables) {
+            expectCloseColor(
+              resolvedCssVariable(variable),
+              expectedColor,
+              `${theme.id} ${appearance} ${variable}`,
+            );
+          }
         }
+      }
+    } finally {
+      applyThemePalette("system", "light");
+      root.classList.remove("dark");
+      delete root.dataset.theme;
+    }
+  });
+
+  it("keeps at least 4.5:1 contrast on destructive Button and Badge in light and dark default themes", async () => {
+    const root = document.documentElement;
+    try {
+      applyThemePalette("system", "light");
+      await using screen = await render(
+        createElement(
+          "div",
+          null,
+          createElement(Button, { variant: "destructive" }, "Delete"),
+          createElement(Badge, { variant: "destructive" }, "Danger"),
+        ),
+      );
+      const buttonEl = screen.getByRole("button").element();
+      const badgeEl = screen.getByText("Danger").element();
+      for (const appearance of ["light", "dark"] as const) {
+        root.classList.toggle("dark", appearance === "dark");
+        root.dataset.theme = appearance;
+        const buttonStyle = getComputedStyle(buttonEl);
+        const badgeStyle = getComputedStyle(badgeEl);
+        expect(
+          contrastRatio(buttonStyle.color, buttonStyle.backgroundColor),
+          `${appearance} destructive Button (${buttonStyle.color} on ${buttonStyle.backgroundColor})`,
+        ).toBeGreaterThanOrEqual(4.5);
+        expect(
+          contrastRatio(badgeStyle.color, badgeStyle.backgroundColor),
+          `${appearance} destructive Badge (${badgeStyle.color} on ${badgeStyle.backgroundColor})`,
+        ).toBeGreaterThanOrEqual(4.5);
       }
     } finally {
       applyThemePalette("system", "light");

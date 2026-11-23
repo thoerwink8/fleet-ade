@@ -286,6 +286,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-input: var(--contrast-input);
   --color-border: var(--contrast-border);
   --color-destructive: var(--destructive);
+  --color-on-destructive: var(--on-destructive);
   --color-accent-foreground: var(--contrast-accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--contrast-muted-foreground);
@@ -1093,6 +1094,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --input: var(--fa-border);
   --ring: var(--fa-focus-ring);
   --destructive-foreground: var(--error-foreground);
+  --on-destructive: var(--fa-on-danger);
   --info: var(--fa-info);
   --info-foreground: var(--fa-info);
   --success: var(--fa-success);
@@ -1232,6 +1234,15 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --error-surface: var(--app-theme-error-surface);
   --destructive: var(--error);
   --destructive-foreground: var(--error-foreground);
+  --on-destructive: #ffffff;
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-700);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-700);
+  @variant dark {
+    --info-foreground: var(--color-blue-400);
+    --success-foreground: var(--color-emerald-400);
+  }
   --warning: var(--app-theme-warning);
   --warning-foreground: var(--app-theme-warning-foreground);
   --warning-surface: var(--app-theme-warning-surface);
