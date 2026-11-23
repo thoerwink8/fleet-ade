@@ -602,19 +602,26 @@ effectIt.layer(NodeServices.layer)("SpawnExecutableResolution", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
+      const platform = HostProcess.Platform.defaultValue();
       const first = yield* fs.makeTempDirectoryScoped({ prefix: "t3-spawn-cache-first-" });
       const second = yield* fs.makeTempDirectoryScoped({ prefix: "t3-spawn-cache-second-" });
-      const firstExecutable = path.join(first, "tool.EXE");
-      const secondExecutable = path.join(second, "tool.EXE");
+      const filename = platform === "win32" ? "tool.EXE" : "tool";
+      const firstExecutable = path.join(first, filename);
+      const secondExecutable = path.join(second, filename);
       yield* fs.writeFileString(firstExecutable, "");
       yield* fs.writeFileString(secondExecutable, "");
+      if (platform !== "win32") {
+        yield* fs.chmod(firstExecutable, 0o755);
+        yield* fs.chmod(secondExecutable, 0o755);
+      }
 
       const resolve = yield* SpawnExecutableResolution;
-      const firstEnvironment = { PATH: first, PATHEXT: ".EXE" };
-      expect(resolve("tool", "win32", firstEnvironment)).toBe(firstExecutable);
+      const env = platform === "win32" ? { PATHEXT: ".EXE" } : {};
+      const firstEnvironment = { ...env, PATH: first };
+      expect(resolve("tool", platform, firstEnvironment)).toBe(firstExecutable);
       yield* fs.remove(firstExecutable);
-      expect(resolve("tool", "win32", firstEnvironment)).toBe(firstExecutable);
-      expect(resolve("tool", "win32", { PATH: second, PATHEXT: ".EXE" })).toBe(secondExecutable);
+      expect(resolve("tool", platform, firstEnvironment)).toBe(firstExecutable);
+      expect(resolve("tool", platform, { ...env, PATH: second })).toBe(secondExecutable);
     }),
   );
 });
