@@ -2,7 +2,7 @@
 
 T3 Code writes some text for you: thread titles, commit messages, pull request titles and
 descriptions, and branch names. Pick the model for this in
-**Settings → Threads → Text generation model**. **Settings → Projects → Source control** can pick a
+**Settings → Threads → Text generation model**. **Settings → Code → Source control** can pick a
 different one.
 
 By default, a coding agent such as Codex or Claude writes this text, starting a session for each
