@@ -33,6 +33,7 @@ import {
   ProviderOptionSelections,
 } from "./model.ts";
 import { ModelSelection } from "./modelSelection.ts";
+import { CommandAssistRows, defaultCommandAssistRows } from "./commandAssist.ts";
 import { ProjectScript, type ProjectMutation } from "./project.ts";
 import { DEFAULT_RUNTIME_MODE, RuntimeMode } from "./providerPolicy.ts";
 import {
@@ -928,6 +929,7 @@ export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "dispatchStopOnTimeout",
   "commanderInstructions",
   "dispatchCommanderModelSelection",
+  "commandAssist",
 ] as const;
 export type ProjectScopedServerSettingKey = (typeof PROJECT_SCOPED_SERVER_SETTING_KEYS)[number];
 
@@ -971,6 +973,7 @@ export const ProjectSettingsOverrides = Schema.Struct({
   dispatchStopOnTimeout: Schema.optionalKey(Schema.Boolean),
   commanderInstructions: Schema.optionalKey(TrimmedString),
   dispatchCommanderModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  commandAssist: Schema.optionalKey(CommandAssistRows),
   providerInstances: Schema.optionalKey(
     Schema.Record(ProviderInstanceId, ProjectProviderInstanceOverride),
   ),
@@ -1370,6 +1373,10 @@ export const ServerSettings = Schema.Struct({
   dispatchCommanderModelSelection: Schema.NullOr(ModelSelection).pipe(
     Schema.withDecodingDefault(Effect.succeed(null)),
   ),
+  /** Known rows default on, except patrol. Unknown step ids stay and are not run. */
+  commandAssist: CommandAssistRows.pipe(
+    Schema.withDecodingDefault(Effect.succeed(defaultCommandAssistRows())),
+  ),
   threadTitleInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   branchNamingMode: BranchNamingMode.pipe(
     Schema.withDecodingDefault(Effect.succeed("static" as const)),
@@ -1749,6 +1756,7 @@ export const ServerSettingsPatch = Schema.Struct({
   dispatchStopOnTimeout: Schema.optionalKey(Schema.Boolean),
   commanderInstructions: Schema.optionalKey(TrimmedString),
   dispatchCommanderModelSelection: Schema.optionalKey(Schema.NullOr(ModelSelection)),
+  commandAssist: Schema.optionalKey(CommandAssistRows),
   threadTitleInstructions: Schema.optionalKey(TrimmedString),
   branchNamingMode: Schema.optionalKey(BranchNamingMode),
   branchNamePrefix: Schema.optionalKey(TrimmedString),
