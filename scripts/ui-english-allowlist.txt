@@ -81,8 +81,6 @@ OpenTelemetry
 # 产品名
 OpenRouter
 # 产品名
-Open VSX
-# 产品名
 Antigravity
 # 本机网关产品名
 magpie
@@ -108,8 +106,6 @@ Claude Code
 Grok Build
 # 产品名
 Muse Code
-# 产品名
-T3 Chat
 # 产品名
 Office
 # 图标库名
@@ -170,8 +166,6 @@ iPhone
 iPad
 # 芯片品牌
 Intel
-# 芯片品牌
-Apple Silicon
 # Git 默认远程名
 origin
 # 工具名
@@ -192,12 +186,6 @@ CLIProxyAPI
 High
 # 设备品牌
 Mac
-# 设备型号
-Mac mini
-# 设备形态名
-Duo
-# 帧率单位
-fps
 # 配置文件名
 keybindings.json
 # 回调技术名
@@ -210,10 +198,6 @@ github.com
 VPS
 # 进程号缩写
 PID
-# 客户端产品名
-T3 Code Desktop
-# 客户端产品名
-T3 Code Web
 # SSH 地址示例
 user@host
 # 数据库错误码
@@ -244,20 +228,12 @@ IPv6
 OpenAI
 # 技术缩写
 SDK
-# 用来识别 Cursor SDK 固定英文错误前缀，对照的是 SDK 异常文本，不是展示文案
-Login succeeded, but creating an SDK API key failed
-# 用来识别 Cursor SDK 固定英文错误前缀，对照的是 SDK 异常文本，不是展示文案
-Login failed or timed out
-# 要用户检查的配置文件路径
-~/.cursor/sandbox.json
 # 协议名
 https
 # 协议名
 http
 # 产品名
 MagicDNS
-# 窗口管理器名
-Niri
 # Codex goal 命令名
 pause
 # Codex goal 命令名

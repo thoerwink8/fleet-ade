@@ -36,9 +36,7 @@ describe("interruptResultDetail", () => {
     expect(interruptResultDetail("Run interrupted before provider start")).toBe(
       "任务在智能体启动前被打断",
     );
-    expect(interruptResultDetail("Interrupted before provider start")).toBe(
-      "在智能体启动前被打断",
-    );
+    expect(interruptResultDetail("Interrupted before provider start")).toBe("在智能体启动前被打断");
   });
 
   it("keeps the current Chinese message unchanged", () => {
