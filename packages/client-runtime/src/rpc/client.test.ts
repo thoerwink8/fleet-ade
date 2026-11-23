@@ -95,9 +95,7 @@ describe("environment RPC", () => {
       const { activeSession, supervisor } = yield* makeHarness();
 
       yield* SubscriptionRef.set(activeSession, Option.some(session(firstClient)));
-      const resultFiber = yield* runStream(WS_METHODS.serverUpdateServerWithProgress, {
-        targetVersion: "0.0.1",
-      }).pipe(
+      const resultFiber = yield* runStream(WS_METHODS.serverUpdateServerWithProgress, { targetVersion: "0.0.1" }).pipe(
         Stream.take(2),
         Stream.runCollect,
         Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor),

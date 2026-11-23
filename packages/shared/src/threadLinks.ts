@@ -171,23 +171,26 @@ export function relabelThreadLinks(
   messageEnvironmentId: EnvironmentId,
   title: (ref: ScopedThreadRef) => string | undefined,
 ): string {
-  return replaceThreadLinks(markdown, (written, label) => {
-    const environmentId = written.environmentId ?? messageEnvironmentId;
-    const decoded = percentDecodedThreadLinkId(written.threadId);
-    const threadId =
-      title({ environmentId, threadId: written.threadId }) === undefined &&
-      decoded !== null &&
-      title({ environmentId, threadId: decoded }) !== undefined
-        ? decoded
-        : written.threadId;
-    const current = title({ environmentId, threadId });
-    if (current === undefined) {
-      if (label !== undefined && written.environmentId === null) return undefined;
-      return label?.trim() || unknownThreadLinkLabel(written, messageEnvironmentId);
-    }
-    return formatThreadLink(
-      { environmentId: written.environmentId, threadId },
-      current.trim() || label || threadId,
-    );
-  });
+  return replaceThreadLinks(
+    markdown,
+    (written, label) => {
+      const environmentId = written.environmentId ?? messageEnvironmentId;
+      const decoded = percentDecodedThreadLinkId(written.threadId);
+      const threadId =
+        title({ environmentId, threadId: written.threadId }) === undefined &&
+        decoded !== null &&
+        title({ environmentId, threadId: decoded }) !== undefined
+          ? decoded
+          : written.threadId;
+      const current = title({ environmentId, threadId });
+      if (current === undefined) {
+        if (label !== undefined && written.environmentId === null) return undefined;
+        return label?.trim() || unknownThreadLinkLabel(written, messageEnvironmentId);
+      }
+      return formatThreadLink(
+        { environmentId: written.environmentId, threadId },
+        current.trim() || label || threadId,
+      );
+    },
+  );
 }

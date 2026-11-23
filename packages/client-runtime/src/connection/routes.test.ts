@@ -182,10 +182,7 @@ describe("learned routes", () => {
       reported: [{ httpBaseUrl: "http://10.0.0.42:3773/" }],
       allowInsecure: true,
     });
-    expect(ids(moved)).toEqual([
-      `learned:${ENVIRONMENT_ID}:http://10.0.0.42:3773@remote`,
-      "remote",
-    ]);
+    expect(ids(moved)).toEqual([`learned:${ENVIRONMENT_ID}:http://10.0.0.42:3773@remote`, "remote"]);
   });
 
   it("keeps a learned route where the user moved it while the server reports it", () => {
@@ -476,3 +473,4 @@ describe("learned routes", () => {
     expect(profileOf(moved![0]!)).toMatchObject({ httpBaseUrl: "https://desk.local:3773/" });
   });
 });
+

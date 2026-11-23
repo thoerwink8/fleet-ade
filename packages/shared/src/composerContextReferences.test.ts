@@ -561,7 +561,7 @@ describe("threadContextRecord", () => {
 });
 
 describe("threadLinkContextReferences", () => {
-  const thread = (environmentId: string, threadId: string) => ({
+    const thread = (environmentId: string, threadId: string) => ({
     environmentId: EnvironmentId.make(environmentId),
     threadId: ThreadId.make(threadId),
   });
@@ -601,7 +601,11 @@ describe("threadLinkContextReferences", () => {
     );
     expect(pasted.records).toEqual([copied, threadContextRecord(thread("env-9", "t9"), "Here")]);
     expect(
-      threadLinkContextReferences("t3-thread://v2/env-9/t9", [], () => undefined).records,
+      threadLinkContextReferences(
+        "t3-thread://v2/env-9/t9",
+        [],
+        () => undefined,
+      ).records,
     ).toEqual([threadContextRecord(thread("env-9", "t9"), "Thread")]);
   });
 

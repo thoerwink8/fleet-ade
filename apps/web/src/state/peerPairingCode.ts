@@ -1,6 +1,11 @@
-import { createPeerPairingCodeCommand } from "@t3tools/client-runtime/state/peerPairingCode";
+import {
+  createPeerPairingCodeCommand,
+} from "@t3tools/client-runtime/state/peerPairingCode";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import type { AuthMcpClientAccess, EnvironmentId } from "@t3tools/contracts";
+import type {
+  AuthMcpClientAccess,
+  EnvironmentId,
+} from "@t3tools/contracts";
 import * as Result from "effect/Result";
 
 import { connectionAtomRuntime } from "../connection/runtime";
@@ -22,3 +27,4 @@ export async function mintPairingCodeOn(
     ? Result.succeed(result.value)
     : Result.fail(squashAtomCommandFailure(result));
 }
+

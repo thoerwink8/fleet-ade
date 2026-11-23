@@ -180,3 +180,4 @@ export function setConnectionEnabledInCatalog(
     disabledEnvironmentIds: registered && !enabled ? [...without, environmentId] : without,
   };
 }
+

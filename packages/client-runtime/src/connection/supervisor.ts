@@ -83,6 +83,7 @@ type SupervisorSignal =
   | { readonly _tag: "Wakeup"; readonly reason: ConnectionWakeups.ConnectionWakeup }
   | { readonly _tag: "BetterRouteAvailable"; readonly routeId: string };
 
+
 type ConnectedLease = ConnectionDriver.EnvironmentConnectionLease & {
   readonly activeRoute: ConnectionRoute | undefined;
 };
@@ -104,7 +105,10 @@ type AttemptOutcome =
 type EstablishmentEvent =
   | {
       readonly _tag: "Completed";
-      readonly exit: Exit.Exit<ConnectionDriver.EnvironmentConnectionLease, ConnectionAttemptError>;
+      readonly exit: Exit.Exit<
+        ConnectionDriver.EnvironmentConnectionLease,
+        ConnectionAttemptError
+      >;
     }
   | { readonly _tag: "Interrupted"; readonly resetRetry: boolean }
   | { readonly _tag: "TimedOut" };
@@ -413,6 +417,7 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
   const signal = Effect.fn("EnvironmentSupervisor.signal")(function* (next: SupervisorSignal) {
     yield* Queue.offer(signals, next);
   });
+
 
   const reportProgress = Effect.fn("EnvironmentSupervisor.reportProgress")(function* (
     attempt: number,
@@ -889,7 +894,8 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
     const connectedLease: ConnectedLease = {
       ...active,
       activeRoute: (yield* currentRoutes).find(
-        (route) => connectionRouteId(route.target) === connectionRouteId(active.prepared.target),
+        (route) =>
+          connectionRouteId(route.target) === connectionRouteId(active.prepared.target),
       ),
     };
     const connectedAt = yield* Clock.currentTimeMillis;
