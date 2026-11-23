@@ -129,6 +129,22 @@ describe("VcsDriverRegistry", () => {
       }).pipe(Effect.provide(makeDiskBackedLayer(repoDir, calls)));
     }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
+  it.effect("returns no repository for a removed worktree without spawning Git", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const repoDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-vcs-registry-" });
+      const worktreeDir = path.join(repoDir, "removed-worktree");
+      const calls: string[] = [];
+
+      yield* Effect.gen(function* () {
+        const registry = yield* VcsDriverRegistry.VcsDriverRegistry;
+        assert.equal(yield* registry.detect({ cwd: worktreeDir }), null);
+        assert.equal(yield* registry.detect({ cwd: worktreeDir }), null);
+        assert.deepEqual(calls, []);
+      }).pipe(Effect.provide(makeDiskBackedLayer(repoDir, calls)));
+    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  );
   const makeFailingLayer = (detectOutput: VcsProcess.VcsProcessOutput) =>
     Layer.effect(VcsDriverRegistry.VcsDriverRegistry, VcsDriverRegistry.make).pipe(
       Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -157,8 +173,10 @@ describe("VcsDriverRegistry", () => {
 
   it.effect("reads only a failed work-tree probe as no repository", () =>
     Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-vcs-registry-" });
       const probeFailure = yield* VcsDriverRegistry.VcsDriverRegistry.pipe(
-        Effect.flatMap((registry) => registry.detect({ cwd: "/repo" })),
+        Effect.flatMap((registry) => registry.detect({ cwd })),
         Effect.provide(
           makeFailingLayer({
             ...processOutput(""),
@@ -171,11 +189,11 @@ describe("VcsDriverRegistry", () => {
 
       // A newline in the root path makes detection ask for it again, and main surfaced that failure.
       const fallbackFailure = yield* VcsDriverRegistry.VcsDriverRegistry.pipe(
-        Effect.flatMap((registry) => registry.detect({ cwd: "/repo" })),
+        Effect.flatMap((registry) => registry.detect({ cwd })),
         Effect.provide(makeFailingLayer(processOutput("true\n/re\npo\n.git\n"))),
         Effect.flip,
       );
       assert.equal(fallbackFailure._tag, "VcsProcessExitError");
-    }),
+    }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 });

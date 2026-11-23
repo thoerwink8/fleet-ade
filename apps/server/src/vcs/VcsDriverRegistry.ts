@@ -165,6 +165,9 @@ export const make = Effect.gen(function* () {
 
   const detect: VcsDriverRegistry["Service"]["detect"] = Effect.fn("VcsDriverRegistry.detect")(
     function* (input) {
+      // A removed worktree can never hold a repository; probing it would still spawn Git.
+      const exists = yield* fileSystem.exists(input.cwd).pipe(Effect.orElseSucceed(() => true));
+      if (!exists) return null;
       const requestedKind = yield* projectConfig.resolveKind(input);
       const key = detectionCacheKey({ cwd: input.cwd, requestedKind });
       const cached = yield* Cache.get(detectionCache, key);

@@ -483,6 +483,10 @@ describe("VcsStatusBroadcaster", () => {
       remoteStatusCalls: 0,
       localInvalidationCalls: 0,
       remoteInvalidationCalls: 0,
+      fileSystem: FileSystem.makeNoop({
+        realPath: (cwd) => Effect.succeed(cwd),
+        exists: () => Effect.succeed(true),
+      }),
     };
 
     return Effect.gen(function* () {
@@ -1005,6 +1009,10 @@ describe("VcsStatusBroadcaster", () => {
       remoteStatusCalls: 0,
       localInvalidationCalls: 0,
       remoteInvalidationCalls: 0,
+      fileSystem: FileSystem.makeNoop({
+        realPath: (cwd) => Effect.succeed(cwd),
+        exists: () => Effect.succeed(true),
+      }),
     };
 
     return Effect.gen(function* () {
@@ -1640,7 +1648,18 @@ describe("VcsStatusBroadcaster", () => {
     let remoteInterruptedDeferred: Deferred.Deferred<void, never> | null = null;
     let remoteStartedDeferred: Deferred.Deferred<void, never> | null = null;
     const layerTest = VcsStatusBroadcaster.layer.pipe(
-      Layer.provideMerge(NodeServices.layer),
+      Layer.provideMerge(
+        Layer.mergeAll(
+          NodeServices.layer,
+          Layer.succeed(
+            FileSystem.FileSystem,
+            FileSystem.makeNoop({
+              realPath: (cwd) => Effect.succeed(cwd),
+              exists: () => Effect.succeed(true),
+            }),
+          ),
+        ),
+      ),
       Layer.provide(layerBackgroundPolicy(() => true)),
       Layer.provide(
         Layer.mock(GitWorkflowService.GitWorkflowService)({
@@ -1855,5 +1874,35 @@ it.effect("does not replay older queued branches after a new subscriber snapshot
     yield* b.refreshBranchStatus({ cwd: "/repo" });
     assert.deepEqual(yield* Queue.take(values), { refName: "latest", isRepo: true });
     yield* Fiber.join(subscriber);
+  }).pipe(Effect.provide(layerTestFor(state)));
+});
+
+it.effect("stops polling remote status while the worktree is gone", () => {
+  const goneTickRan = Deferred.makeUnsafe<void>();
+  let worktreeExists = false;
+  const state = {
+    ...newState(),
+    fileSystem: FileSystem.makeNoop({
+      realPath: (cwd) => Effect.succeed(cwd),
+      exists: (target) => Effect.succeed(target !== "/repo" || worktreeExists),
+    }),
+    // Both tick paths invalidate the local cache: the deleted-cwd branch's publish, and the
+    // remote refresh's trailing local reread.
+    beforeInvalidate: Deferred.succeed(goneTickRan, undefined).pipe(Effect.asVoid),
+  };
+  return Effect.gen(function* () {
+    const b = yield* VcsStatusBroadcaster.VcsStatusBroadcaster;
+    const pull = yield* Stream.toPull(b.streamStatus({ cwd: "/repo" }));
+    const snapshot = yield* pull;
+    assert.equal(snapshot[0]?._tag, "snapshot");
+    assert.equal(state.remoteStatusCalls, 0);
+
+    yield* TestClock.adjust("31 seconds");
+    yield* Deferred.await(goneTickRan);
+    assert.equal(state.remoteStatusCalls, 0);
+
+    worktreeExists = true;
+    yield* TestClock.adjust("31 seconds");
+    assert.isAbove(state.remoteStatusCalls, 0);
   }).pipe(Effect.provide(layerTestFor(state)));
 });
