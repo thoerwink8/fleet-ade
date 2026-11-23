@@ -35,7 +35,7 @@ macOS and Linux, so export it there and restart the app. On Windows, set it as a
 variable.
 
 The web app in a browser, including one the `t3` CLI opens, does not read these environment
-variables. It sends its own connection traces even if the server has opted out. The browser app has
+variables. It can send its own connection traces even if the server has opted out. The browser app has
 no relay tracing toggle.
 
 ## Mobile app diagnostics
@@ -48,7 +48,7 @@ but an error message can quote a value the app was handling.
 
 To stop sending them, turn off **Send crash reports** in **Settings > About > Diagnostics**.
 
-The mobile app also sends relay connection traces. These carry an identifier for the current app
+The mobile app can also send relay connection traces. These carry an identifier for the current app
 session. **Send crash reports** does not control these traces, and the mobile app has no separate
 relay tracing toggle. Server environment variables do not disable mobile tracing.
 
