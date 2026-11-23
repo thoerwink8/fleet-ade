@@ -7,6 +7,8 @@ const FOCUS_BOUNDARY_SELECTOR =
   '[role="dialog"], [role="alertdialog"], [aria-modal="true"], dialog[open], [data-slot$="-popup"]:not([data-slot="tooltip-popup"]):not([role="tooltip"])';
 const FOCUSABLE_SELECTOR =
   'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [contenteditable="true"], [tabindex]';
+const HIDDEN_ANCESTOR_SELECTOR =
+  '[hidden], [inert], [data-closed], [aria-hidden="true"], [data-chat-column-maximized-away="true"], [data-slot="sidebar"][data-state="collapsed"], [data-workspace-unavailable="true"]';
 
 /** Props that make an element one stop in the F6 cycle; `order` sets its place in the cycle. */
 export function workspaceAreaProps(name: string, order: number, label: string) {
@@ -33,13 +35,7 @@ function workspaceArea(element: Element): HTMLElement | null {
 }
 
 function isWorkspaceElementVisible(element: HTMLElement): boolean {
-  if (
-    !element.isConnected ||
-    element.closest(
-      '[hidden], [inert], [data-closed], [aria-hidden="true"], [data-chat-column-maximized-away="true"], [data-slot="sidebar"][data-state="collapsed"], [data-workspace-unavailable="true"]',
-    )
-  )
-    return false;
+  if (!element.isConnected || element.closest(HIDDEN_ANCESTOR_SELECTOR)) return false;
   const style = getComputedStyle(element);
   if (style.display === "none" || style.visibility === "hidden") return false;
   const root = element.getRootNode();
@@ -50,6 +46,41 @@ function isWorkspaceElementVisible(element: HTMLElement): boolean {
   )
     return false;
   return Array.from(element.getClientRects()).some((rect) => rect.width > 0 && rect.height > 0);
+}
+
+function isTabbableWorkspaceElement(element: HTMLElement): boolean {
+  if (
+    !element.isConnected ||
+    element.tabIndex < 0 ||
+    element.matches(":disabled") ||
+    element.hasAttribute("data-base-ui-focus-guard") ||
+    element.closest(HIDDEN_ANCESTOR_SELECTOR)
+  ) {
+    return false;
+  }
+  // checkVisibility honors display/visibility ancestors without excluding content-visibility:auto rows.
+  if (typeof element.checkVisibility === "function") {
+    return element.checkVisibility({ visibilityProperty: true });
+  }
+  return isWorkspaceElementVisible(element);
+}
+
+function collectTabbableElements(root: Document | HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    isTabbableWorkspaceElement,
+  );
+}
+
+function isBlockingFocusBoundaryOpen(doc: Document): boolean {
+  const activePopup = doc.activeElement?.closest<HTMLElement>('[role="menu"], [role="listbox"]');
+  const boundaries = Array.from(doc.querySelectorAll<HTMLElement>(FOCUS_BOUNDARY_SELECTOR));
+  if (activePopup && !activePopup.closest(AREA_SELECTOR)) boundaries.push(activePopup);
+  return boundaries.some(
+    (boundary) =>
+      (boundary.matches('[aria-modal="true"], [data-app-modal], [data-command-palette]') ||
+        boundary.contains(doc.activeElement)) &&
+      isWorkspaceElementVisible(boundary),
+  );
 }
 
 function scrollingAncestors(target: HTMLElement) {
@@ -354,8 +385,72 @@ export function createWorkspaceFocusController(doc: Document) {
     unmarkKeyboardArea();
     onUserInput();
   };
+  // Wrap Tab at the workspace shell edges so focus never drops to document.body.
+  // Runs in bubble phase so dialogs, popups, menus, and editor Tab handlers run first.
+  const onTabKeyDown = (event: KeyboardEvent) => {
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.key !== "Tab" ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    ) {
+      return;
+    }
+    if (isBlockingFocusBoundaryOpen(doc)) return;
+    const active = doc.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      (active.tagName === "IFRAME" || active.tagName === "WEBVIEW")
+    ) {
+      return;
+    }
+    const tabbables = collectTabbableElements(doc);
+    if (tabbables.length === 0) return;
+    if (!(active instanceof HTMLElement) || active === doc.body || active === doc.documentElement) {
+      event.preventDefault();
+      (event.shiftKey ? tabbables.at(-1)! : tabbables[0]!).focus();
+      return;
+    }
+    const index = tabbables.indexOf(active);
+    if (!event.shiftKey) {
+      if (index === tabbables.length - 1) {
+        event.preventDefault();
+        tabbables[0]!.focus();
+        return;
+      }
+      if (index === -1) {
+        const hasFollowing = tabbables.some(
+          (candidate) =>
+            (active.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+        );
+        if (!hasFollowing) {
+          event.preventDefault();
+          tabbables[0]!.focus();
+        }
+      }
+    } else {
+      if (index === 0) {
+        event.preventDefault();
+        tabbables.at(-1)!.focus();
+        return;
+      }
+      if (index === -1) {
+        const hasPreceding = tabbables.some(
+          (candidate) =>
+            (active.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_PRECEDING) !== 0,
+        );
+        if (!hasPreceding) {
+          event.preventDefault();
+          tabbables.at(-1)!.focus();
+        }
+      }
+    }
+  };
   doc.addEventListener("pointerdown", onPointerDown, true);
   doc.addEventListener("keydown", onUserInput, true);
+  doc.addEventListener("keydown", onTabKeyDown);
 
   return {
     move: (direction: 1 | -1, fromArea?: string, closingPalette = false) => {
@@ -371,6 +466,7 @@ export function createWorkspaceFocusController(doc: Document) {
       doc.removeEventListener("focusout", recover);
       doc.removeEventListener("pointerdown", onPointerDown, true);
       doc.removeEventListener("keydown", onUserInput, true);
+      doc.removeEventListener("keydown", onTabKeyDown);
     },
   };
 }
@@ -423,6 +519,23 @@ export function requestWorkspaceContentFocus() {
   // Resolve after the layout commits: closing a maximized panel makes the
   // composer available again, while hiding a sidebar may leave only the panel.
   requestWorkspaceFocus({ area: "content" });
+}
+
+/** Moves focus directly into the visible main landmark for skip-to-content navigation. */
+export function focusWorkspaceMainContent(doc: Document = document): boolean {
+  const main =
+    Array.from(doc.querySelectorAll<HTMLElement>('main[data-slot="sidebar-inset"], main')).find(
+      isWorkspaceElementVisible,
+    ) ?? null;
+  if (!main) return controller?.focus("content") ?? false;
+  const firstTabbable = collectTabbableElements(main)[0];
+  if (firstTabbable) {
+    firstTabbable.focus();
+    return doc.activeElement === firstTabbable;
+  }
+  if (!main.hasAttribute("tabindex")) main.tabIndex = -1;
+  main.focus();
+  return doc.activeElement === main;
 }
 
 let pendingPaletteDirection: 1 | -1 | undefined;

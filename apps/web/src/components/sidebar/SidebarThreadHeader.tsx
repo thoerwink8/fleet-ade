@@ -73,8 +73,9 @@ export function SidebarThreadHeader({
         <Button
           type="button"
           size="icon-micro"
+          touchTarget="compact"
           variant="ghost-muted"
-          className="shrink-0"
+          className="shrink-0 max-md:-mr-2 pointer-coarse:-mr-2"
           aria-label="清除会话搜索"
           onClick={() => {
             onClearSearch();
@@ -135,10 +136,10 @@ export function SidebarHeaderActions({
                   <MenuTrigger
                     render={
                       <SidebarMenuButton
-                        size="icon"
+                        size="icon-sm"
                         type="button"
                         aria-label="更多"
-                        className="relative size-7 shrink-0"
+                        className="relative shrink-0"
                       />
                     }
                   />
@@ -212,11 +213,11 @@ function SidebarHeaderIconButton({
       <TooltipTrigger
         render={
           <SidebarMenuButton
-            size="icon"
+            size="icon-sm"
             type="button"
             aria-label={label}
             {...rest}
-            className={cn("relative size-7 shrink-0", className)}
+            className={cn("relative shrink-0", className)}
           />
         }
       >

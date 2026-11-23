@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 import appCss from "~/index.css?inline";
-import { createWorkspaceFocusController } from "./workspaceFocus";
+import { createWorkspaceFocusController, focusWorkspaceMainContent } from "./workspaceFocus";
 
 function setup() {
   const root = document.createElement("div");
@@ -400,5 +400,34 @@ describe("workspace area focus", () => {
     fixture.controller.move(1);
     expect(document.activeElement).toBe(home);
     expect(outline(), "F6 onto the only, already focused area shows no ring").toBe("solid");
+  });
+
+  it("wraps Tab cleanly at workspace boundaries without dropping focus to document.body", async () => {
+    using fixture = setup();
+    const sidebar = fixture.area("sidebar", 0);
+    const composer = fixture.area("composer", 2);
+
+    composer.button.focus();
+    await userEvent.tab();
+    expect(document.activeElement).toBe(sidebar.button);
+
+    await userEvent.tab({ shift: true });
+    expect(document.activeElement).toBe(composer.button);
+  });
+
+  it("focuses the first tabbable control inside the visible main landmark for skip-to-content", () => {
+    using fixture = setup();
+    fixture.area("sidebar", 0);
+    const main = fixture.append(
+      '<main data-slot="sidebar-inset" style="height: 100px"><button type="button">Header action</button></main>',
+    );
+    const headerButton = main.querySelector("button")!;
+
+    expect(focusWorkspaceMainContent(document)).toBe(true);
+    expect(document.activeElement).toBe(headerButton);
+
+    headerButton.remove();
+    expect(focusWorkspaceMainContent(document)).toBe(true);
+    expect(document.activeElement).toBe(main);
   });
 });

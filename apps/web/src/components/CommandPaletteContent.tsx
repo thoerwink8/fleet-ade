@@ -1,8 +1,16 @@
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode, type RefObject } from "react";
 
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { Command, CommandFooter, CommandInput, CommandPanel } from "./ui/command";
 import { Kbd, KbdGroup } from "./ui/kbd";
+
+export function useHideCommandPaletteKeyboardHints(): boolean {
+  const isCoarsePointer = useMediaQuery({ pointer: "coarse" });
+  const lacksHover = useMediaQuery("(hover: none)");
+  const isMobileViewport = useMediaQuery("max-sm");
+  return isCoarsePointer || lacksHover || isMobileViewport;
+}
 
 /**
  * A view replacing another inside an open dialog mounts with focus on the body,
@@ -64,6 +72,11 @@ export function CommandPaletteContent({
   testId,
   ...commandProps
 }: CommandPaletteContentProps) {
+  const hideKeyboardHints = useHideCommandPaletteKeyboardHints();
+  const hasFooterTrailing =
+    footerTrailing !== null && footerTrailing !== undefined && footerTrailing !== false;
+  const showFooter = !hideKeyboardHints || hasFooterTrailing;
+
   return (
     <div className="contents" data-testid={testId}>
       <Command {...commandProps}>
@@ -90,36 +103,40 @@ export function CommandPaletteContent({
         >
           {children}
         </CommandPanel>
-        <CommandFooter className="max-sm:flex-col max-sm:items-start">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-            <KbdGroup>
-              <Kbd>
-                <ArrowUpIcon />
-              </Kbd>
-              <Kbd>
-                <ArrowDownIcon />
-              </Kbd>
-              <span>移动</span>
-            </KbdGroup>
-            {footerActionLabel !== undefined ? (
-              <KbdGroup>
-                <Kbd>Enter</Kbd>
-                <span>{footerActionLabel}</span>
-              </KbdGroup>
-            ) : null}
-            {showBackHint ? (
-              <KbdGroup>
-                <Kbd>Backspace</Kbd>
-                <span>返回</span>
-              </KbdGroup>
-            ) : null}
-            <KbdGroup>
-              <Kbd>Esc</Kbd>
-              <span>{escapeLabel}</span>
-            </KbdGroup>
-          </div>
-          {footerTrailing}
-        </CommandFooter>
+        {showFooter ? (
+          <CommandFooter className="max-sm:flex-col max-sm:items-start">
+            {hideKeyboardHints ? null : (
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                <KbdGroup>
+                  <Kbd>
+                    <ArrowUpIcon />
+                  </Kbd>
+                  <Kbd>
+                    <ArrowDownIcon />
+                  </Kbd>
+                  <span>移动</span>
+                </KbdGroup>
+                {footerActionLabel !== undefined ? (
+                  <KbdGroup>
+                    <Kbd>Enter</Kbd>
+                    <span>{footerActionLabel}</span>
+                  </KbdGroup>
+                ) : null}
+                {showBackHint ? (
+                  <KbdGroup>
+                    <Kbd>Backspace</Kbd>
+                    <span>返回</span>
+                  </KbdGroup>
+                ) : null}
+                <KbdGroup>
+                  <Kbd>Esc</Kbd>
+                  <span>{escapeLabel}</span>
+                </KbdGroup>
+              </div>
+            )}
+            {footerTrailing}
+          </CommandFooter>
+        ) : null}
       </Command>
     </div>
   );

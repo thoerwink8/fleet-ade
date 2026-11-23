@@ -41,6 +41,7 @@ export function ProjectPinButton(props: {
     >
       <Button
         size="icon-xs"
+        touchTarget="compact"
         variant="ghost-muted"
         tabIndex={-1}
         aria-hidden="true"

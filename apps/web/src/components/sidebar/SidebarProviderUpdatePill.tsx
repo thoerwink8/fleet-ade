@@ -14,6 +14,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 // Matches the pill's `duration-180` class.
 const PROVIDER_UPDATE_PILL_EXIT_MS = 180;
+const DISMISS_BUTTON_TOUCH_TARGET = "max-md:size-8 pointer-coarse:size-8";
 
 const PROVIDER_UPDATE_PILL_STYLES = {
   loading:
@@ -195,7 +196,7 @@ export function SidebarProviderUpdatePill() {
               <button
                 type="button"
                 aria-label="忽略提供方更新提示"
-                className="relative z-[1] mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                className={`relative z-[1] mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${DISMISS_BUTTON_TOUCH_TARGET}`}
                 onClick={() => startExit(displayedView.key, null, displayedView.key)}
               >
                 <XIcon className="size-3.5 shrink-0" />

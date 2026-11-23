@@ -15,6 +15,7 @@ import {
   type CommandPaletteRow,
   type CommandPaletteSubmenuItem,
 } from "./CommandPalette.logic";
+import { useHideCommandPaletteKeyboardHints } from "./CommandPaletteContent";
 import {
   CommandCollection,
   CommandGroup,
@@ -48,6 +49,8 @@ function CommandPaletteEmptyState(props: { emptyStateMessage?: string; isActions
 }
 
 export function CommandPaletteResults(props: CommandPaletteResultsProps) {
+  const hideKeyboardHints = useHideCommandPaletteKeyboardHints();
+
   if (props.groups.length === 0) {
     return <CommandPaletteEmptyState {...props} />;
   }
@@ -66,6 +69,7 @@ export function CommandPaletteResults(props: CommandPaletteResultsProps) {
                   item={item}
                   key={item.value}
                   keybindings={props.keybindings}
+                  hideShortcuts={hideKeyboardHints}
                   isActive={props.highlightedItemValue === item.value}
                   onExecuteItem={props.onExecuteItem}
                 />
@@ -103,6 +107,7 @@ interface CommandPaletteVirtualizedResultsProps extends Omit<CommandPaletteResul
  * unmounted rows. */
 export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualizedResultsProps) {
   const { listRef } = props;
+  const hideKeyboardHints = useHideCommandPaletteKeyboardHints();
   const [scrollFade, setScrollFade] = useState({ top: false, bottom: false });
   const updateScrollFade = () => {
     const metrics = listRef.current?.getState();
@@ -127,7 +132,7 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
         initialScrollOffset={0}
         keyExtractor={(row) => row.key}
         getItemType={(row) => row.kind}
-        extraData={props.highlightedItemValue}
+        extraData={`${hideKeyboardHints ? "1" : "0"}:${props.highlightedItemValue ?? ""}`}
         renderItem={({ item: row }) =>
           row.kind === "label" ? (
             <div className={row.first ? undefined : "pt-1.5"}>
@@ -140,6 +145,7 @@ export function CommandPaletteVirtualizedResults(props: CommandPaletteVirtualize
               index={row.itemIndex}
               item={row.item}
               keybindings={props.keybindings}
+              hideShortcuts={hideKeyboardHints}
               isActive={props.highlightedItemValue === row.item.value}
               onExecuteItem={props.onExecuteItem}
             />
@@ -252,13 +258,15 @@ function DisabledCommandPaletteResultRow(props: {
 function CommandPaletteResultRow(props: {
   index?: number;
   item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
+  hideShortcuts: boolean;
   isActive: boolean;
   keybindings: ResolvedKeybindingsConfig;
   onExecuteItem: (item: CommandPaletteActionItem | CommandPaletteSubmenuItem) => void;
 }) {
-  const shortcutLabel = props.item.shortcutCommand
-    ? shortcutLabelForCommand(props.keybindings, props.item.shortcutCommand)
-    : null;
+  const shortcutLabel =
+    !props.hideShortcuts && props.item.shortcutCommand
+      ? shortcutLabelForCommand(props.keybindings, props.item.shortcutCommand)
+      : null;
 
   return (
     <CommandItem
@@ -315,7 +323,9 @@ function CommandPaletteResultRow(props: {
           name={props.item.pin.name}
           pinned={props.item.pin.pinned}
           onToggle={props.item.pin.toggle}
-          shortcutLabel={shortcutLabelForCommand(props.keybindings, "thread.pin")}
+          shortcutLabel={
+            props.hideShortcuts ? null : shortcutLabelForCommand(props.keybindings, "thread.pin")
+          }
         />
       ) : null}
       {props.item.timestamp ? (
