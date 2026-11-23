@@ -8,15 +8,15 @@ do not need to keep a terminal open.
 Install the `t3` CLI first ([Install T3 Code](./install.md#command-line)), then
 run these commands on the machine that will host T3 Code:
 
-| Task                                  | Command                |
-| ------------------------------------- | ---------------------- |
-| Set up access from your other devices | `t3 up`                |
-| See how your other devices reach it   | `t3 status`            |
-| Install and start                     | `t3 service install`   |
-| Inspect status and log location       | `t3 service status`    |
+| Task                                  | Command                                         |
+| ------------------------------------- | ----------------------------------------------- |
+| Set up access from your other devices | `t3 up`                                         |
+| See how your other devices reach it   | `t3 status`                                     |
+| Install and start                     | `t3 service install`                            |
+| Inspect status and log location       | `t3 service status`                             |
 | Move to a newer release               | install that release, then `t3 service install` |
-| Restart                               | `t3 service restart`   |
-| Stop and remove from startup          | `t3 service uninstall` |
+| Restart                               | `t3 service restart`                            |
+| Stop and remove from startup          | `t3 service uninstall`                          |
 
 Uninstalling the service leaves your projects, threads, and settings intact.
 Running `t3 service install` again repairs a service that `t3 service status`

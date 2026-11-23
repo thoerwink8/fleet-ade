@@ -92,9 +92,9 @@ Update the side the notice names, then reconnect.
 
 The offered action depends on how the server runs:
 
-| Action                     | What to do                                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Update the desktop app** | Update the desktop app on the machine running the server. That closes and relaunches the app on the host. |
+| Action                     | What to do                                                                                                                                                                                                                                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Update the desktop app** | Update the desktop app on the machine running the server. That closes and relaunches the app on the host.                                                                                                                                                                                     |
 | **Install on the host**    | A background service or a server you started by hand is not updated from here. Install the version shown in the notice on that machine, then run `t3 service install` for a service, or stop and start a hand-started server with your usual options such as `--host` or `--tailscale-serve`. |
 
 ## If an update fails
