@@ -1021,7 +1021,7 @@ it("reports unauthenticated when Settings turn off every signed-in host", () => 
   assert.deepStrictEqual(
     auth.detail,
     Option.some(
-      "Every GitHub host gh is signed in to is turned off in Settings → Code → Source control.",
+      "Every GitHub host gh is signed in to is turned off in Settings → Projects → Source control.",
     ),
   );
 });

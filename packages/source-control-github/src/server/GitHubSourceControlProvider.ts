@@ -145,7 +145,7 @@ export function parseGitHubAuth(
         status: "unauthenticated",
         host: fallback.host,
         detail:
-          "Every GitHub host gh is signed in to is turned off in Settings → Code → Source control.",
+          "Every GitHub host gh is signed in to is turned off in Settings → Projects → Source control.",
       }),
       ...accounts,
     };
@@ -296,9 +296,9 @@ export const makeDiscovery = Effect.gen(function* () {
                   status: "unauthenticated",
                   host: "github.com",
                   detail: savedToken
-                    ? "GitHub refused the token saved in Settings. Replace or remove it in Settings → Code → Source control."
+                    ? "GitHub refused the token saved in Settings. Replace or remove it in Settings → Projects → Source control."
                     : signedIn
-                      ? `GitHub refused the ${appName} sign-in. Sign in again in Settings → Code → Source control.`
+                      ? `GitHub refused the ${appName} sign-in. Sign in again in Settings → Projects → Source control.`
                       : `GitHub refused the token in ${tokenSource}. Replace it, or unset it to use \`gh auth login\`.`,
                 })),
           ...accounts,
