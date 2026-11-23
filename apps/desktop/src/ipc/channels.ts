@@ -1,6 +1,3 @@
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-
 export const PICK_FOLDER_CHANNEL = "desktop:pick-folder";
 export const SET_NOTIFICATION_BADGE_CHANNEL = "desktop:set-notification-badge";
 export const PICK_PROJECT_FAVICON_CHANNEL = "desktop:pick-project-favicon";
@@ -23,22 +20,6 @@ export const SYNC_HTML_FULLSCREEN_CHANNEL = "desktop:sync-html-fullscreen";
 export const DESKTOP_APP_ACTIVATION_READY_CHANNEL = "desktop:app-activation-ready";
 export const DESKTOP_APP_ACTIVATION_COMPLETE_CHANNEL = "desktop:app-activation-complete";
 export const DESKTOP_APP_ACTIVATION_REQUEST_CHANNEL = "desktop:app-activation-request";
-const RetiredDesktopUpdateIpc = Schema.Struct({
-  channel: Schema.Literals([
-    "desktop:update-state",
-    "desktop:update-get-state",
-    "desktop:update-set-channel",
-    "desktop:update-download",
-    "desktop:update-install",
-    "desktop:update-check",
-  ]),
-});
-const decodeRetiredDesktopUpdateIpc = Schema.decodeUnknownOption(RetiredDesktopUpdateIpc);
-
-/** Old updater IPC still decodes. Payload keys are dropped. */
-export function ignoreRetiredDesktopUpdateIpc(raw: unknown) {
-  return Option.getOrNull(decodeRetiredDesktopUpdateIpc(raw));
-}
 
 export const CLI_COMMAND_GET_STATE_CHANNEL = "desktop:cli-command-get-state";
 export const CLI_COMMAND_INSTALL_CHANNEL = "desktop:cli-command-install";

@@ -5,7 +5,7 @@ gone. Install the build you want on that machine and, for a background service,
 run `t3 service install`. The service launcher can still finish an update that
 was already pending in `service-state.json` from an older build.
 
-Desktop builds no longer install themselves. Package a Windows build on the machine and install it by hand. A desktop-managed server still refuses a remote server update and tells you to update the desktop app.
+Desktop builds do not install themselves. Build a Windows package on the machine and install it by hand. This server update path does not replace the desktop app.
 
 ## Recovering interrupted threads
 

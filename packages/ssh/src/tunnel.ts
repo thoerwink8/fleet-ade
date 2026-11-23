@@ -1,7 +1,3 @@
-import {
-  DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
-  DESKTOP_UPDATE_IN_PROGRESS_TTL_MS,
-} from "@t3tools/contracts";
 import type {
   DesktopSshEnvironmentBootstrap,
   DesktopSshEnvironmentTarget,
@@ -76,26 +72,19 @@ const REMOTE_PID_EXIT_WAIT_MS = 2_000;
 // The server answers HTTP before it writes server-runtime.json, which is how
 // a launch for another alias finds it.
 const REMOTE_RUNTIME_RECORD_WAIT_SECONDS = 10;
-// The desktop update wait runs under the home lock. Its last poll and the
-// adoption after it each add a reuse probe, and the poll adds one sleep.
-const REMOTE_UPDATE_WAIT_MS =
-  DESKTOP_UPDATE_IN_PROGRESS_TTL_MS +
-  2 * (REMOTE_REUSE_READY_TIMEOUT_MS + SSH_READY_PROBE_TIMEOUT_MS) +
-  1_000;
 // A launch holds the home lock through up to two reuse probes, readiness, two
-// server exit waits, the runtime record wait, and the update wait; each probe
-// may overrun its deadline by one request.
+// server exit waits, and the runtime record wait; each probe may overrun its
+// deadline by one request.
 const REMOTE_LAUNCH_LOCK_WAIT_SECONDS = Math.ceil(
   (REMOTE_READY_TIMEOUT_MS +
     2 * REMOTE_REUSE_READY_TIMEOUT_MS +
     2 * REMOTE_PID_EXIT_WAIT_MS +
     REMOTE_RUNTIME_RECORD_WAIT_SECONDS * 1000 +
-    4 * SSH_READY_PROBE_TIMEOUT_MS +
-    REMOTE_UPDATE_WAIT_MS) /
+    4 * SSH_READY_PROBE_TIMEOUT_MS) /
     1000,
 );
 const REMOTE_LAUNCH_TIMEOUT_MS =
-  REMOTE_LAUNCH_LOCK_WAIT_SECONDS * 1000 + REMOTE_UPDATE_WAIT_MS + REMOTE_LAUNCH_BASE_TIMEOUT_MS;
+  REMOTE_LAUNCH_LOCK_WAIT_SECONDS * 1000 + REMOTE_LAUNCH_BASE_TIMEOUT_MS;
 
 export interface RemoteT3RunnerOptions {
   readonly nodeScriptPath?: string | null;
@@ -732,25 +721,7 @@ try {
 }
 NODE
 }
-# This script ships with the SSH client; older clients do not honor this marker.
-update_remaining() {
-  if [ "$T3_ARCHIVE_MODE" = "1" ]; then
-    "$RUNNER_FILE" __ssh-helper update-remaining "$DEFAULT_SERVER_HOME/runtime/@@T3_UPDATE_MARKER_FILE@@"
-    return
-  fi
-  node - "$DEFAULT_SERVER_HOME/runtime/@@T3_UPDATE_MARKER_FILE@@" <<'NODE'
-const fs = require("node:fs");
-const path = process.argv[2];
-try {
-  const { startedAt, expiresAt } = JSON.parse(fs.readFileSync(path, "utf8"));
-  const now = Date.now();
-  if (Number.isFinite(startedAt) && Number.isFinite(expiresAt) &&
-      startedAt <= now && expiresAt > now && expiresAt > startedAt) {
-    process.stdout.write(String(Math.min(expiresAt - now, @@T3_UPDATE_TTL_MS@@)));
-  }
-} catch {}
-NODE
-}
+
 REMOTE_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
 REMOTE_PORT="$(cat "$PORT_FILE" 2>/dev/null || true)"
 REMOTE_MANAGED="$(cat "$MANAGED_FILE" 2>/dev/null || true)"
@@ -848,29 +819,10 @@ if [ -z "$REMOTE_PORT" ] && [ -z "$DEFAULT_RUNTIME_INFO" ]; then
     break
   done
 fi
-if [ -z "$REMOTE_PORT" ]; then
-  # The sleep count bounds a host clock that stops advancing.
-  UPDATE_WAITED=0
-  UPDATE_SAW_MARKER=0
-  while [ "$UPDATE_WAITED" -le @@T3_UPDATE_TTL_SECONDS@@ ]; do
-    UPDATE_REMAINING="$(update_remaining 2>/dev/null || true)"
-    [ -n "$UPDATE_REMAINING" ] || break
-    UPDATE_SAW_MARKER=1
-    [ "$UPDATE_WAITED" -lt @@T3_UPDATE_TTL_SECONDS@@ ] || break
-    if adopt_default_server; then break; fi
-    REMOTE_PID=""
-    REMOTE_PORT=""
-    REMOTE_MANAGED=""
-    sleep 1
-    UPDATE_WAITED=$((UPDATE_WAITED + 1))
-  done
-  # The desktop clears the marker after publishing runtime, possibly before the first marker read,
-  # so refresh once more before falling back. A cleanly stopped server leaves no runtime file.
-  if { [ "$UPDATE_SAW_MARKER" -eq 1 ] || [ -f "$DEFAULT_RUNTIME_FILE" ]; } && [ -z "$REMOTE_PORT" ] && ! adopt_default_server; then
-    REMOTE_PID=""
-    REMOTE_PORT=""
-    REMOTE_MANAGED=""
-  fi
+if [ -z "$REMOTE_PORT" ] && [ -f "$DEFAULT_RUNTIME_FILE" ] && ! adopt_default_server; then
+  REMOTE_PID=""
+  REMOTE_PORT=""
+  REMOTE_MANAGED=""
 fi
 if [ -z "$REMOTE_PORT" ]; then
   REMOTE_PORT="$(pick_port)" || true
@@ -1014,9 +966,6 @@ export function buildRemoteNodeEnvScript(input?: RemoteT3RunnerOptions): string 
 
 function buildRemoteLaunchScript(input?: RemoteT3RunnerOptions): string {
   return applyScriptPlaceholders(REMOTE_LAUNCH_SCRIPT, {
-    T3_UPDATE_MARKER_FILE: DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
-    T3_UPDATE_TTL_MS: String(DESKTOP_UPDATE_IN_PROGRESS_TTL_MS),
-    T3_UPDATE_TTL_SECONDS: String(DESKTOP_UPDATE_IN_PROGRESS_TTL_MS / 1000),
     T3_ARCHIVE_MODE: isNodeScriptRunner(input) ? "0" : "1",
     T3_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
     T3_RUNNER_SCRIPT: stripTrailingNewlines(buildRemoteT3RunnerScript(input)),

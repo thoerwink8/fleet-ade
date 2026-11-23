@@ -66,7 +66,6 @@ const layerElectronApp = (calls: ElectronAppCalls) =>
         calls.setDockIcon.push(iconPath);
       }),
     appendCommandLineSwitch: () => Effect.void,
-    onBeforeQuitForUpdate: () => Effect.void,
     removeCommandLineSwitch: () => Effect.void,
     on: () => Effect.void,
   } satisfies ElectronApp.ElectronApp["Service"]);

@@ -110,8 +110,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
         expect(descriptor.capabilities.serverInstallation).toEqual(
           mode === "web" ? { kind: "npm-global", prefix } : undefined,
         );
-        expect(descriptor.capabilities.serverSelfUpdate).toBe(
-          mode === "web" ? undefined : "desktop-managed",
+        expect(descriptor.capabilities.serverSelfUpdate).toBe(undefined);
+        expect(descriptor.capabilities.desktopAppInstall).toBe(
+          mode === "desktop" ? true : undefined,
         );
         expect(descriptor.capabilities).toMatchObject({
           settledWorktreeCleanup: true,
@@ -122,50 +123,6 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
         });
       }
     }),
-  );
-  it.effect.each([
-    { desktopAppUpdate: false, advertised: undefined },
-    { desktopAppUpdate: true, advertised: true },
-  ])(
-    "advertises desktop app updates only when the desktop can install them ($desktopAppUpdate)",
-    ({ desktopAppUpdate, advertised }) =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const baseDir = yield* fs.makeTempDirectoryScoped();
-        const config = yield* makeServerConfig(baseDir);
-        yield* fs.makeDirectory(config.stateDir, { recursive: true });
-        const descriptor = yield* Effect.gen(function* () {
-          const environment = yield* ServerEnvironment.ServerEnvironment;
-          return yield* environment.getDescriptor;
-        }).pipe(
-          Effect.provide(
-            ServerEnvironment.layer.pipe(
-              Layer.provide(layerEmptySecretStore),
-              Layer.provide(
-                ServerConfig.layer({
-                  ...config,
-                  mode: "desktop",
-                  desktopTelemetryControlFd: 5,
-                  desktopAppUpdate,
-                }),
-              ),
-            ),
-          ),
-          Effect.provideService(HostProcess.Environment, {}),
-        );
-        const capabilities = descriptor.capabilities;
-        expect({
-          serverSelfUpdate: capabilities.serverSelfUpdate,
-          desktopAppUpdate: capabilities.desktopAppUpdate,
-          desktopAppChannelSwitch: capabilities.desktopAppChannelSwitch,
-          serverSelfUpdateProgress: capabilities.serverSelfUpdateProgress,
-        }).toEqual({
-          serverSelfUpdate: "desktop-managed",
-          desktopAppUpdate: advertised,
-          desktopAppChannelSwitch: advertised,
-          serverSelfUpdateProgress: advertised,
-        });
-      }),
   );
   it.effect.each([
     { name: "missing", content: undefined },

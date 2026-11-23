@@ -22,8 +22,12 @@ import {
   type SettingsSearchItem,
 } from "./settingsSearch";
 
-vi.mock("~/env", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/env")>()),
+const desktop = vi.hoisted(() => ({ enabled: false }));
+vi.mock(import("~/env"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  get isElectron() {
+    return desktop.enabled;
+  },
   isSecretsFeatureEnabled: false,
 }));
 
@@ -118,6 +122,15 @@ describe("searchSettings", () => {
     expect(searchSettings("hold to quit")).toEqual([]);
     expect(searchSettings("wsl")).toEqual([]);
     expect(searchSettings("update track")).toEqual([]);
+  });
+
+  it("does not offer the removed desktop update track in settings search", () => {
+    desktop.enabled = true;
+    try {
+      expect(searchSettings("update track").map((item) => item.id)).not.toContain("update-track");
+    } finally {
+      desktop.enabled = false;
+    }
   });
 
   it("hides settings whose controls are unavailable", () => {

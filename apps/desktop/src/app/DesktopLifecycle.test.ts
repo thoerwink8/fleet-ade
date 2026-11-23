@@ -2,7 +2,6 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as TestClock from "effect/testing/TestClock";
 
@@ -56,7 +55,6 @@ function layerElectronApp(
     setDockIcon: () => Effect.void,
     appendCommandLineSwitch: () => Effect.void,
     removeCommandLineSwitch: () => Effect.void,
-    onBeforeQuitForUpdate: (listener) => registerListener("before-quit-for-update", listener),
     on: (eventName, listener) =>
       registerListener(eventName, listener as unknown as (...args: readonly unknown[]) => void),
   } satisfies ElectronApp.ElectronApp["Service"]);
@@ -107,62 +105,6 @@ function layerDesktopWindow(
 }
 
 describe("DesktopLifecycle", () => {
-  it.effect.each(["darwin", "win32", "linux"] satisfies ReadonlyArray<NodeJS.Platform>)(
-    "lets the updater's quit event proceed on %s",
-    (platform) => {
-      const appListeners = new Map<string, (...args: readonly unknown[]) => void>();
-      let windowsDestroyed = false;
-      const layerEnvironment = Layer.succeed(DesktopEnvironment.DesktopEnvironment, {
-        platform,
-        isDevelopment: false,
-        appImagePath: Option.none(),
-      } as DesktopEnvironment.DesktopEnvironment["Service"]);
-
-      const layer = DesktopLifecycle.layer.pipe(
-        Layer.provideMerge(layerElectronApp(appListeners)),
-        Layer.provideMerge(layerElectronTheme),
-        Layer.provideMerge(
-          layerElectronWindow(
-            Effect.sync(() => {
-              windowsDestroyed = true;
-            }),
-          ),
-        ),
-        Layer.provideMerge(layerDesktopWindow()),
-        Layer.provideMerge(layerEnvironment),
-        Layer.provideMerge(DesktopShutdown.layer),
-        Layer.provideMerge(DesktopState.layer),
-      );
-
-      return Effect.scoped(
-        Effect.gen(function* () {
-          const lifecycle = yield* DesktopLifecycle.DesktopLifecycle;
-          yield* lifecycle.register;
-
-          appListeners.get("before-quit-for-update")?.();
-          yield* Effect.yieldNow;
-
-          let prevented = false;
-          const event = {
-            preventDefault: () => {
-              prevented = true;
-            },
-          } as Electron.Event;
-          appListeners.get("before-quit")?.(event);
-
-          assert.isFalse(
-            prevented,
-            "cancelling this event prevents the updater from completing its relaunch",
-          );
-          assert.isTrue(windowsDestroyed);
-
-          const state = yield* DesktopState.DesktopState;
-          assert.isTrue(yield* Ref.get(state.quitting));
-        }),
-      ).pipe(Effect.provide(layer));
-    },
-  );
-
   it.effect("destroys windows before waiting for backend shutdown", () =>
     Effect.gen(function* () {
       const appListeners = new Map<string, (...args: readonly unknown[]) => void>();

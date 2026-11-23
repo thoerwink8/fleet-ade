@@ -496,40 +496,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
-  it.effect("omits update feeds for pull request preview builds", () =>
+  it.effect("does not generate desktop update feeds", () =>
     Effect.gen(function* () {
-      const preview = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.33-pr.8182.1",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-      const release = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.33",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-
-      const previewChannel = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.41-preview.20260912.1589",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-
-      assert.isNull(preview.publish);
-      assert.isNull(previewChannel.publish);
-      assert.isNull(release.publish);
+      for (const version of ["0.0.33", "0.0.33-pr.8182.1", "0.0.41-preview.20260912.1589"]) {
+        const config = yield* createBuildConfig("mac", "dmg", version, false, undefined);
+        assert.isNull(config.publish);
+      }
     }).pipe(
       Effect.provide(
         ConfigProvider.layer(
@@ -539,52 +511,11 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  it.effect("publishes desktop updates only for an explicit repository", () =>
-    Effect.gen(function* () {
-      const release = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.33",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-      assert.deepStrictEqual(release.publish, [
-        {
-          provider: "github",
-          owner: "example",
-          repo: "updates",
-          releaseType: "release",
-        },
-      ]);
-    }).pipe(
-      Effect.provide(
-        ConfigProvider.layer(
-          ConfigProvider.fromEnv({
-            env: {
-              T3CODE_DESKTOP_UPDATE_REPOSITORY: "example/updates",
-              GITHUB_REPOSITORY: "pingdotgg/t3code",
-            },
-          }),
-        ),
-      ),
-    ),
-  );
-
   it.effect("declares Calendar access for hosted commands in macOS builds", () =>
     Effect.gen(function* () {
       for (const version of ["0.1.0", "0.1.1-nightly.20261019.1"]) {
         for (const signed of [false, true]) {
-          const config = yield* createBuildConfig(
-            "mac",
-            "dmg",
-            version,
-            signed,
-            false,
-            undefined,
-            undefined,
-          );
+          const config = yield* createBuildConfig("mac", "dmg", version, signed, undefined);
           const mac = config.mac as { extendInfo: Record<string, unknown> };
           for (const key of [
             "NSCalendarsUsageDescription",
@@ -1536,7 +1467,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it.effect("signs Windows builds with signtool on Windows and the jsign hook elsewhere", () =>
     Effect.gen(function* () {
       const signedWinConfig = (hostPlatform: string) =>
-        createBuildConfig("win", "nsis", "1.2.3", true, false, undefined, undefined).pipe(
+        createBuildConfig("win", "nsis", "1.2.3", true, undefined).pipe(
           Effect.map((config) => config.win as Record<string, unknown>),
           Effect.provideService(HostProcess.Platform, hostPlatform),
         );
@@ -1615,8 +1546,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
             keepStage: Option.none(),
             signed: Option.none(),
             verbose: Option.none(),
-            mockUpdates: Option.none(),
-            mockUpdateServerPort: Option.none(),
             wslRuntime: Option.none(),
           }),
         );
@@ -1639,8 +1568,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         keepStage: Option.some(false),
         signed: Option.some(false),
         verbose: Option.some(false),
-        mockUpdates: Option.some(false),
-        mockUpdateServerPort: Option.none(),
         wslRuntime: Option.none(),
       }).pipe(
         Effect.provide(
@@ -1651,7 +1578,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
                 T3CODE_DESKTOP_KEEP_STAGE: "true",
                 T3CODE_DESKTOP_SIGNED: "true",
                 T3CODE_DESKTOP_VERBOSE: "true",
-                T3CODE_DESKTOP_MOCK_UPDATES: "true",
               },
             }),
           ),
@@ -1662,7 +1588,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.equal(resolved.keepStage, false);
       assert.equal(resolved.signed, false);
       assert.equal(resolved.verbose, false);
-      assert.equal(resolved.mockUpdates, false);
     }),
   );
 });

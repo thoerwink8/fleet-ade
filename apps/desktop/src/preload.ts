@@ -1,4 +1,5 @@
 import type { DesktopBridge } from "@t3tools/contracts";
+
 import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 
 import * as IpcChannels from "./ipc/channels.ts";
@@ -38,24 +39,6 @@ const syncHtmlFullscreen = () => {
 // A reload or renderer crash never reports the old document's exit, so each document reports its start.
 syncHtmlFullscreen();
 document.addEventListener("fullscreenchange", syncHtmlFullscreen);
-const retiredDesktopUpdateState: DesktopUpdateState = {
-  enabled: false,
-  status: "disabled",
-  channel: "latest",
-  currentVersion: "",
-  hostArch: "other",
-  appArch: "other",
-  runningUnderArm64Translation: false,
-  availableVersion: null,
-  downloadedVersion: null,
-  releaseNotes: [],
-  omittedReleaseCount: 0,
-  downloadPercent: null,
-  checkedAt: null,
-  message: null,
-  errorContext: null,
-  canRetry: false,
-};
 
 let primaryPasteEnabled = true;
 try {
@@ -267,14 +250,6 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.removeListener(IpcChannels.WINDOW_FULLSCREEN_STATE_CHANNEL, wrappedListener);
     };
   },
-  getUpdateState: () => Promise.resolve(retiredDesktopUpdateState),
-  setUpdateChannel: () => Promise.resolve(retiredDesktopUpdateState),
-  checkForUpdate: () => Promise.resolve({ checked: false, state: retiredDesktopUpdateState }),
-  downloadUpdate: () =>
-    Promise.resolve({ accepted: false, completed: false, state: retiredDesktopUpdateState }),
-  installUpdate: () =>
-    Promise.resolve({ accepted: false, completed: false, state: retiredDesktopUpdateState }),
-  onUpdateState: () => () => {},
   cliCommand: {
     getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
     install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),

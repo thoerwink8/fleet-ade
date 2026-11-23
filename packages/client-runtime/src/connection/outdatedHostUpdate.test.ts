@@ -29,12 +29,6 @@ const TARGET = new PrimaryConnectionTarget({
   wsBaseUrl: "wss://build.example.test",
 });
 
-const desktopCapabilities = {
-  repositoryIdentity: true,
-  serverSelfUpdate: "desktop-managed",
-  desktopAppUpdate: true,
-} as const satisfies ExecutionEnvironmentDescriptor["capabilities"];
-
 const descriptor = (
   protocol: number | undefined,
   serverVersion: string,
@@ -181,17 +175,11 @@ class OutdatedHostSocket {
 describe("updateOutdatedHost", () => {
   it.effect("updates a protocol-1 host over a bare socket, then switches it back on", () =>
     Effect.gen(function* () {
-      const blocked = orchestrationProtocolCompatibilityError(
-        descriptor(undefined, "0.0.45", desktopCapabilities),
-      );
+      const blocked = orchestrationProtocolCompatibilityError(descriptor(undefined, "0.0.45"));
       expect(blocked).toMatchObject({ serverUpdateRequired: true });
 
       const sockets: Array<OutdatedHostSocket> = [];
-      let served: ExecutionEnvironmentDescriptor = descriptor(
-        undefined,
-        "0.0.45",
-        desktopCapabilities,
-      );
+      let served: ExecutionEnvironmentDescriptor = descriptor(undefined, "0.0.45");
       const entries = yield* SubscriptionRef.make<
         ReadonlyMap<EnvironmentId, ConnectionCatalogEntry>
       >(

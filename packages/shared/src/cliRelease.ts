@@ -82,11 +82,6 @@ export function crossesReleaseTrack(fromVersion: string, toVersion: string): boo
   return from !== to && from !== "preview" && to !== "preview";
 }
 
-/** The desktop update track a build belongs to. Preview builds have no feed and read as Stable. */
-export function desktopUpdateChannelOf(version: string): "latest" | "nightly" {
-  return cliReleaseChannelOf(version) === "nightly" ? "nightly" : "latest";
-}
-
 /** Draft assets are not downloadable. */
 export function newestCliReleaseVersion(
   releases: ReadonlyArray<{

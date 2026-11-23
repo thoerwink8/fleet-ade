@@ -71,12 +71,16 @@ describe("orchestration protocol compatibility", () => {
     expect(
       withCapabilities({ repositoryIdentity: true, serverSelfUpdate: "desktop-managed" }),
     ).not.toHaveProperty("serverUpdateRequired");
-    expect(
-      withCapabilities({
+    const legacyDesktop = {
+      ...older,
+      capabilities: {
         repositoryIdentity: true,
-        serverSelfUpdate: "desktop-managed",
+        serverSelfUpdate: "desktop-managed" as const,
         desktopAppUpdate: true,
-      }),
-    ).toMatchObject({ serverUpdateRequired: true });
+      },
+    };
+    expect(orchestrationProtocolCompatibilityError(legacyDesktop)).not.toHaveProperty(
+      "serverUpdateRequired",
+    );
   });
 });
