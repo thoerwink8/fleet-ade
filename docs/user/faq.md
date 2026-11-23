@@ -25,11 +25,7 @@ Yes.
 
 ## How much does T3 Code cost?
 
-Nothing. There's no way to pay us to use T3 Code. You bring your own sub. It is free and open source (MIT). You still pay your provider like you already do. T3 Connect is free too, for now. Every account can connect up to 3 machines running T3 Code. Phones and browsers that connect to them do not count. Need more? Link a paid T3 Chat account. [More machines](#can-i-connect-more-than-3-machines-with-t3-connect) We don't want to charge for this, but if the bill gets unacceptable we may have to change course. If you hit limits or have issues, you can always fork it, self host, or use Tailscale. [Install](./install.md)
-
-## Can I connect more than 3 machines with T3 Connect?
-
-Yes. Link your T3 Chat account and T3 Connect raises your limit: up to 10 machines with T3 Chat Pro, or 100 with Premier. Open your account menu in T3 Code, go to **T3 Chat**, and select **Link T3 Chat**. Sign in to T3 Chat and approve. The free T3 Chat plan keeps the normal limit of 3. [More machines with T3 Chat](./remote-access.md#more-machines-with-t3-chat)
+Nothing. There's no way to pay us to use T3 Code. You bring your own sub. It is free and open source (MIT). You still pay your provider like you already do. [Install](./install.md)
 
 ## Why is my Claude 5-hour limit draining so fast?
 
@@ -37,15 +33,11 @@ It shouldn't anymore. T3 Code drives Claude through Anthropic's Agent SDK, and A
 
 ## How do I use T3 Code remotely?
 
-Your agents run wherever T3 Code runs: your desktop, a server, a VPS. You connect to it from anywhere. I do this constantly. Less than 5% of my prompts run on my laptop. Run `t3 up` on that machine and you get really good remote support. T3 Connect is the easy path. LAN pairing and Tailscale work too, and [app.t3.codes](https://app.t3.codes) is the web client. [Remote access](./remote-access.md)
+Your agents run wherever T3 Code runs: your desktop, a server, a VPS. You connect to it from anywhere. Reach the machine over the local network, Tailscale, or SSH. [Remote access](./remote-access.md)
 
 ## How do I use T3 Code on my phone?
 
-Follow [Mobile setup](./install.md#mobile-app), then connect to your computer with T3 Connect or a pairing link. The phone is a remote. Your computer does the work and needs to stay on. [Remote access](./remote-access.md)
-
-## Why does T3 Connect keep disconnecting?
-
-T3 Connect is our built-in alternative to Tailscale for remote connections. If it keeps dropping, open **Settings > Connections**, find the machine, and select **Details**. The first part marked as failed is the cause. I will not be disappointed if you set up Tailscale as a fallback (I do this personally). [T3 Connect troubleshooting](./t3-connect-troubleshooting.md)
+Follow [Mobile setup](./install.md#mobile-app), then connect to your computer with a pairing link or Tailscale. The phone is a remote. Your computer does the work and needs to stay on. [Remote access](./remote-access.md)
 
 ## Will I get banned for using my subscription?
 
@@ -69,7 +61,7 @@ No. T3 Code is a serious developer tool. Locally runnable models are not capable
 
 ## Does my code go to T3 servers?
 
-No. Your code and prompts go from your machine to your provider (Anthropic, OpenAI, etc.), not to us. With T3 Connect, traffic rides a Cloudflare tunnel (`cloudflared` on your machine). Our relay sets up the link. It does not proxy your HTTP or WebSocket sessions. That is the same on Tailscale, LAN, or T3 Connect. T3 Code does not send product usage events. Connection traces for T3 Connect can go to an OpenTelemetry endpoint. [Telemetry](./telemetry.md) explains what is sent and how to turn it off with `T3CODE_TELEMETRY_ENABLED=false`.
+No. Your code and prompts go from your machine to your provider (Anthropic, OpenAI, etc.), not to us. That is the same on Tailscale or the local network. T3 Code does not send product usage events. [Telemetry](./telemetry.md) explains what is sent and how to turn it off with `T3CODE_TELEMETRY_ENABLED=false`.
 
 ## Worktrees are eating my disk. How do I clean them up?
 

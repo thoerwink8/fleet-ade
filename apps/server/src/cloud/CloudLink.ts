@@ -27,7 +27,6 @@ import {
   type RelayManagedEndpointRuntimeConfig,
   RelayOkResponse,
 } from "@t3tools/contracts/relay";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
 import {
   decodeRelayJwt,
   normalizeRelayIssuer,
@@ -68,8 +67,7 @@ import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
-import * as AgentAwarenessRelay from "../relay/AgentAwarenessRelay.ts";
-import { makeRelayEnvironmentClient } from "../relay/relayEnvironmentClient.ts";
+import { makeRelayEnvironmentClient } from "./relayEnvironmentClient.ts";
 import { loopbackUrlHostForAddress } from "../startupAccess.ts";
 import {
   type CliDesiredLinkMode,
@@ -514,7 +512,6 @@ const make = Effect.gen(function* () {
   const cliTokenManager = yield* CliTokenManager.CloudCliTokenManager;
   const httpClient = yield* HttpClient.HttpClient;
   const httpServer = yield* HttpServer.HttpServer;
-  const awarenessRelay = yield* AgentAwarenessRelay.AgentAwarenessRelay;
   const random = yield* SecureRandom.SecureRandom;
   const signature = yield* Signature.Signature;
   const signingKey = yield* EnvironmentSigningKey;
@@ -787,7 +784,6 @@ const make = Effect.gen(function* () {
       );
       yield* secrets.remove(CLOUD_LINK_REVOKED);
       yield* secrets.set(CLOUD_MINT_PUBLIC_KEY, stringToBytes(payload.cloudMintPublicKey));
-      yield* awarenessRelay.requestCatchUp();
       if (endpointRuntimeJson !== null) {
         yield* secrets.set(CLOUD_ENDPOINT_RUNTIME_CONFIG, stringToBytes(endpointRuntimeJson));
       }
@@ -829,7 +825,6 @@ const make = Effect.gen(function* () {
       Effect.flatMap(HttpClientResponse.schemaBodyJson(input.schema)),
       Effect.timeout(input.timeout ?? "10 seconds"),
       Effect.mapError(relayRequestError),
-      withRelayClientTracing,
     );
 
   const reconcileDesiredCloudLinkWith = Effect.fn("environment.cloud.reconcileDesiredLinkWith")(
@@ -1240,7 +1235,6 @@ const make = Effect.gen(function* () {
       httpClient.execute,
       Effect.flatMap(filterRelayResponse),
       Effect.flatMap(HttpClientResponse.schemaBodyJson(RelayOkResponse)),
-      withRelayClientTracing,
     );
     // ok:false means concurrent provisioning owns the tunnel; preserve its config.
     if (!response.ok) {
@@ -1400,7 +1394,6 @@ const make = Effect.gen(function* () {
           ),
         );
       }
-      yield* awarenessRelay.requestCatchUp();
     },
     // Finish or roll back even if the client disconnects mid-update.
     Effect.uninterruptible,

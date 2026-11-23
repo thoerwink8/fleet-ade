@@ -4,7 +4,6 @@ import {
   type ExecutionEnvironmentDescriptor,
 } from "@t3tools/contracts";
 import { RelayEnvironmentConnectScope } from "@t3tools/contracts/relay";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
 import {
   exchangeRemoteDpopAccessToken,
   type RemoteEnvironmentAuthError,
@@ -598,12 +597,10 @@ export const make = Effect.gen(function* () {
     authorizeDpop: Effect.fn("environment.authorization")(function (input) {
       return authorizeDpop(input);
     }),
-    // The relay tracer must wrap span creation, not just the token request.
     authorizeDpopHttp: Effect.fnUntraced(function* (input) {
       return yield* getDpopToken(input).pipe(
         Effect.map(({ token }) => httpAuthorization(token)),
         Effect.withSpan("environment.authorization.http"),
-        withRelayClientTracing,
       );
     }),
     // Untraced: a span here would stay open for the socket's lifetime. Each renewal has its own.
@@ -622,7 +619,6 @@ export const make = Effect.gen(function* () {
         }).pipe(
           Effect.map(({ token }) => token.expiresAtEpochMs),
           Effect.withSpan("environment.authorization.renewSocket"),
-          withRelayClientTracing,
           // A relay blip retries until expiry; a blocked credential ends the loop.
           Effect.catchTags({ ConnectionTransientError: () => Effect.succeed(expiresAtEpochMs) }),
         );

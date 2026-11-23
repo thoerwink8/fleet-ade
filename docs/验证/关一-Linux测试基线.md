@@ -92,7 +92,6 @@ server 是冷缓存，八片都是 `0% cache hit`。退出码 1 的两片各有�
 | packages/client-runtime              | 162  | 2005 | 0    | 0    |
 | packages/shared                      | 102  | 1643 | 0    | 3    |
 | scripts                              | 38   | 268  | 0    | 1    |
-| infra/relay                          | 36   | 304  | 0    | 0    |
 | packages/contracts                   | 32   | 173  | 0    | 0    |
 | oxlint-plugin-t3code                 | 31   | 396  | 0    | 0    |
 | packages/provider-core               | 23   | 264  | 0    | 0    |

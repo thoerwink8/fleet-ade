@@ -33,7 +33,6 @@ dist-electron/
 scripts/.e2e/
 .github/pr-assets/
 native/**/target/
-.alchemy/
 .env*
 !.env.example
 

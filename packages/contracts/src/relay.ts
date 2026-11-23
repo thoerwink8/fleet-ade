@@ -760,7 +760,6 @@ export const RelayJwtSubjectTokenType = "urn:ietf:params:oauth:token-type:jwt" a
 export const RelayAccessTokenType = "urn:ietf:params:oauth:token-type:access_token" as const;
 export const RelayPublicClientId = Schema.Literals(["t3-mobile", "t3-web"]);
 export type RelayPublicClientId = typeof RelayPublicClientId.Type;
-export const RelayMobileClientId = "t3-mobile" as const;
 export const RelayWebClientId = "t3-web" as const;
 
 export const RelayDpopAccessTokenRequest = Schema.Struct({
@@ -883,16 +882,6 @@ export const RelayCloudEnvironmentHealthProofPayload = Schema.Struct({
 });
 export type RelayCloudEnvironmentHealthProofPayload =
   typeof RelayCloudEnvironmentHealthProofPayload.Type;
-
-/** Verify x-t3-relay-delivery with the relay mint key before trusting delivery id, time, or trace context. */
-export const RelayHookDeliveryProofPayload = Schema.Struct({
-  ...RelaySignedJwtRegisteredClaims,
-  environmentId: EnvironmentId,
-  deliveryId: TrimmedNonEmptyString,
-  receivedAt: TrimmedNonEmptyString,
-  hookId: TrimmedNonEmptyString,
-});
-export type RelayHookDeliveryProofPayload = typeof RelayHookDeliveryProofPayload.Type;
 
 export const RelayCloudEnvironmentHealthProof = TrimmedNonEmptyString;
 export type RelayCloudEnvironmentHealthProof = typeof RelayCloudEnvironmentHealthProof.Type;
@@ -1292,22 +1281,6 @@ const RelayHooksGroup = HttpApiGroup.make("hooks")
   )
   .annotate(OpenApi.Description, "Forward webhook requests to an environment.");
 
-export const RelayMobileTelemetrySignal = Schema.Literals(["logs", "metrics", "traces"]);
-export type RelayMobileTelemetrySignal = typeof RelayMobileTelemetrySignal.Type;
-
-// expo-observe appends `<easProjectId>/v1/<signal>` to its endpoint URL and cannot send credentials.
-const RelayMobileTelemetryParams = Schema.Struct({
-  projectId: Schema.String.check(Schema.isGUID()),
-  signal: RelayMobileTelemetrySignal,
-});
-const RelayMobileTelemetryGroup = HttpApiGroup.make("mobileTelemetry")
-  .add(
-    HttpApiEndpoint.post("ingest", "/v1/mobile/observe/:projectId/v1/:signal", {
-      params: RelayMobileTelemetryParams,
-    }),
-  )
-  .annotate(OpenApi.Description, "Receive mobile app telemetry from expo-observe.");
-
 export const RelayApi = HttpApi.make("RelayApi")
   .add(
     RelayHealthGroup,
@@ -1318,7 +1291,6 @@ export const RelayApi = HttpApi.make("RelayApi")
     RelayDpopClientGroup,
     RelayServerGroup,
     RelayHooksGroup,
-    RelayMobileTelemetryGroup,
   )
   .annotate(OpenApi.Title, "T3 Code Relay API")
   .annotate(OpenApi.Version, "1.0.0")
