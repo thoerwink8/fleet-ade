@@ -7,6 +7,9 @@ import * as PlatformError from "effect/PlatformError";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/process";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as FileSystem from "effect/FileSystem";
+import * as Ref from "effect/Ref";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 
@@ -75,6 +78,39 @@ const runWith =
         ),
       ),
     );
+
+it.effect("fails fast without spawning when the working directory is missing", () =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
+    const spawns = yield* Ref.make(0);
+    const spawner = makeSpawner(() =>
+      Ref.update(spawns, (count) => count + 1).pipe(
+        Effect.andThen(Effect.succeed(makeHandle({ stdout: "ok" }))),
+      ),
+    );
+    const tmpDir = yield* fileSystem.makeTempDirectoryScoped({
+      prefix: "process-runner-missing-cwd-",
+    });
+    const filePath = `${tmpDir}/not-a-directory`;
+    yield* fileSystem.writeFileString(filePath, "x");
+
+    for (const cwd of [`${tmpDir}/deleted-worktree`, filePath]) {
+      const error = yield* runWith(spawner)({
+        command: "git",
+        args: ["status"],
+        cwd,
+      }).pipe(Effect.flip);
+      expect(error._tag).toBe("ProcessSpawnError");
+      if (error._tag === "ProcessSpawnError") {
+        expect(error.cause).toMatchObject({ code: "ENOENT" });
+      }
+    }
+    expect(yield* Ref.get(spawns)).toBe(0);
+
+    const ok = yield* runWith(spawner)({ command: "git", args: ["status"], cwd: tmpDir });
+    expect(ok.stdout).toBe("ok");
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
 
 describe("runProcess", () => {
   it.effect("resolves and escapes Windows command shims before spawning", () => {

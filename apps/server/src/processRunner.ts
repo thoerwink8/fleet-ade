@@ -1,6 +1,7 @@
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as PlatformError from "effect/PlatformError";
@@ -263,10 +264,45 @@ function finalizeRunProcess<R>(
 
 const commandName = (command: string) => command.replace(/^.*[\\/]/, "");
 
+// ENOENT cwd is common (deleted worktrees polled by status/settlement): Node's spawn
+// then throws synchronously on the calling thread. Missing or non-directory cwd
+// short-circuits here with the same ProcessSpawnError shape, skipping the native call.
+const missingCwdCause = (cwd: string): NodeJS.ErrnoException =>
+  Object.assign(new Error(`spawn ENOENT: no such file or directory, chdir '${cwd}'`), {
+    code: "ENOENT",
+    syscall: "spawn",
+    path: cwd,
+  });
+
+const isMissingCwdReason = (reason: PlatformError.PlatformError["reason"]): boolean =>
+  reason._tag === "NotFound" ||
+  (reason._tag === "BadResource" &&
+    typeof reason.cause === "object" &&
+    reason.cause !== null &&
+    "code" in reason.cause &&
+    reason.cause.code === "ENOTDIR");
+
 const runProcessCore = Effect.fn("processRunner.runProcessCore")(function* (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   input: ProcessRunInput,
 ): Effect.fn.Return<ProcessRunOutput, ProcessRunError, Scope.Scope> {
+  const maybeFileSystem = yield* Effect.serviceOption(FileSystem.FileSystem);
+  const executionCwd = input.spawnCwd ?? input.cwd;
+  if (executionCwd !== undefined && Option.isSome(maybeFileSystem)) {
+    const cwdUsable = yield* maybeFileSystem.value.stat(executionCwd).pipe(
+      Effect.map((info) => info.type === "Directory"),
+      Effect.catch((error) => Effect.succeed(!isMissingCwdReason(error.reason))),
+    );
+    if (!cwdUsable) {
+      return yield* new ProcessSpawnError({
+        command: input.command,
+        argumentCount: input.args.length,
+        cwd: input.cwd,
+        spawnCwd: input.spawnCwd,
+        cause: missingCwdCause(executionCwd),
+      });
+    }
+  }
   yield* Effect.annotateCurrentSpan("process.command", commandName(input.command));
   const maxOutputBytes = input.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
   const outputMode = input.outputMode ?? "error";

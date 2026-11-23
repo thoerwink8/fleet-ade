@@ -554,6 +554,9 @@ function parseDefaultBranchFromRemoteHeadRef(value: string, remoteName: string):
 }
 
 function isMissingGitCwdError(error: GitCommandError): boolean {
+  if (error.reason === "missing_cwd") {
+    return true;
+  }
   if (!(error.cause instanceof PlatformError.PlatformError)) {
     return false;
   }
@@ -984,6 +987,29 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       const appendTruncationMarker = input.appendTruncationMarker ?? false;
 
       const runGitCommand = Effect.fn("runGitCommand")(function* () {
+        // Status and settlement polls keep firing at deleted worktrees; skipping the
+        // spawn avoids a synchronous process-create failure that stalls the loop.
+        const cwdExists = yield* fileSystem.stat(commandInput.cwd).pipe(
+          Effect.map((info) => info.type === "Directory"),
+          Effect.catch((error) =>
+            Effect.succeed(
+              error.reason._tag !== "NotFound" &&
+                (error.reason._tag !== "BadResource" ||
+                  typeof error.reason.cause !== "object" ||
+                  error.reason.cause === null ||
+                  !("code" in error.reason.cause) ||
+                  error.reason.cause.code !== "ENOTDIR"),
+            ),
+          ),
+        );
+        if (!cwdExists) {
+          return yield* new GitCommandError({
+            ...gitCommandContext(commandInput),
+            reason: "missing_cwd",
+            detail: "Working directory does not exist.",
+          });
+        }
+
         const trace2Monitor = yield* createTrace2Monitor(commandInput, input.progress).pipe(
           Effect.provideService(Path.Path, path),
           Effect.provideService(FileSystem.FileSystem, fileSystem),
