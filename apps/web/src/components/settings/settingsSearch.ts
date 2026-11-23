@@ -49,7 +49,6 @@ export interface SettingsSearchItem {
   readonly scope?: SettingsSearchScope;
   readonly desktopOnly?: boolean;
   readonly windowsOnly?: boolean;
-  readonly releaseChannelOnly?: boolean;
   readonly secretsFeatureOnly?: boolean;
   readonly cloudOnly?: boolean;
   readonly environmentOnly?: boolean;
@@ -642,13 +641,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["about version release"],
   },
   {
-    id: "update-track",
-    title: "更新通道",
-    to: "/settings/maintenance",
-    searchTerms: ["release channel stable latest nightly prerelease"],
-    releaseChannelOnly: true,
-  },
-  {
     id: "cli-command",
     title: "t3 命令",
     to: "/settings/maintenance",
@@ -1122,7 +1114,6 @@ export function settingsForThisPlatform(
   return items.filter(
     (item) =>
       (isElectron || item.desktopOnly !== true) &&
-      (!item.releaseChannelOnly || isElectron) &&
       (!item.secretsFeatureOnly || isSecretsFeatureEnabled) &&
       (!item.windowsOnly || isWindowsPlatform(platform)),
   );
