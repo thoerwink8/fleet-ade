@@ -164,9 +164,10 @@ type StoredAssist = typeof StoredAssistSchema.Type;
 const StoredAssistJson = Schema.fromJsonString(StoredAssistSchema);
 const decodeStored = Schema.decodeUnknownEffect(StoredAssistJson);
 const encodeStored = Schema.encodeSync(StoredAssistJson);
+const decodeAssistState = Schema.decodeSync(StoredAssistSchema);
 
 function emptyState(): StoredAssist {
-  return Schema.decodeSync(StoredAssistSchema)({});
+  return decodeAssistState({});
 }
 
 function stringOrNull(value: unknown): string | null {
