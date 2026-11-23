@@ -220,11 +220,11 @@ thread is deleted, including archived threads and worktrees left by earlier dele
 server waits for sessions and terminals to stop and retries skipped worktrees after restart.
 Existing prompts for deleting a worktree manually remain available when this policy is off.
 
-Choose **Delete now** to run the enabled rules immediately. The latest results show which
+In **Settings → Maintenance**, choose **Delete now** to run the enabled rules immediately. The latest results show which
 worktrees were removed or kept and why, plus any failures.
 Results also list folders in the worktree folder that no thread uses, with their sizes; cleanup never removes them, so remove them manually if you want.
 
-Rotated logs have their own retention period.
+In **Settings → Maintenance**, rotated logs have their own retention period.
 Current logs and message attachments are kept.
 
 ## Project icons
