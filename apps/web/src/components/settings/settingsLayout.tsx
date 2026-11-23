@@ -601,7 +601,7 @@ export function SettingsPageContainer({
       replace: true,
       resetScroll: false,
       hashScrollIntoView: false,
-      state: { settingsTargetHighlight: true },
+      state: (prev) => ({ ...prev, settingsTargetHighlight: true }),
     });
   };
 
