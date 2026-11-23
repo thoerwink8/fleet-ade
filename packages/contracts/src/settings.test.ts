@@ -587,6 +587,30 @@ describe("server model preferences", () => {
   });
 });
 
+describe("pipeline model candidates", () => {
+  it("reads legacy single-model and null storage as ordered lists", () => {
+    const decoded = decodeServerSettings({
+      pipelineAuthorModel: { provider: "claudeAgent", model: "claude-sonnet-4" },
+      pipelineVerifierModel: null,
+    });
+    expect(decoded.pipelineAuthorModel).toEqual([
+      { instanceId: ProviderInstanceId.make("claudeAgent"), model: "claude-sonnet-4" },
+    ]);
+    expect(decoded.pipelineVerifierModel).toEqual([]);
+    // An omitted key is an empty list; a deliberately cleared list round-trips the same way.
+    expect(decodeServerSettings({}).pipelineAuthorModel).toEqual([]);
+    expect(decodeServerSettingsPatch({ pipelineVerifierModel: [] }).pipelineVerifierModel).toEqual(
+      [],
+    );
+    const patch = decodeServerSettingsPatch({
+      pipelineAuthorModel: [{ instanceId: "codex", model: "gpt-6-luna" }],
+    });
+    expect(patch.pipelineAuthorModel).toEqual([
+      { instanceId: ProviderInstanceId.make("codex"), model: "gpt-6-luna" },
+    ]);
+  });
+});
+
 describe("commander dispatch settings", () => {
   it("defaults the timeout off, keeps the built-in instructions out of storage, and leaves the commander model empty", () => {
     const decoded = decodeServerSettings({});

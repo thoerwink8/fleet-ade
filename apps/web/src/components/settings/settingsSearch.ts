@@ -415,6 +415,22 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["claude context compaction idle cache tokens usage summary resume"],
   },
   {
+    id: "pipeline-author-model",
+    title: "流水线写单模型",
+    to: "/settings/providers",
+    scope: "environment-defaults",
+    searchTerms: ["pipeline author model candidates ordered dispatch 写单 流水线"],
+    environmentOnly: true,
+  },
+  {
+    id: "pipeline-verifier-model",
+    title: "流水线验单模型",
+    to: "/settings/providers",
+    scope: "environment-defaults",
+    searchTerms: ["pipeline verifier model candidates ordered cold verify 验单 流水线"],
+    environmentOnly: true,
+  },
+  {
     id: "auto-settle-merged-threads",
     title: "合并后自动收尾会话",
     to: "/settings/threads",
