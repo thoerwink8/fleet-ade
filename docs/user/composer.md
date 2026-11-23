@@ -124,9 +124,6 @@ delete it like other inline context. Copying, reloading, and restoring a
 with its quote, and sending tells the agent which words were quoted and which comment you wrote.
 The quoted text and comment count toward the message limit.
 
-Mobile displays saved quotes and comments, but does not create citations or
-navigate to their sources.
-
 ## Recall a sent prompt
 
 Press `ArrowUp` in an empty composer to bring back the last prompt you sent in this thread. Press
@@ -187,7 +184,7 @@ Windows and Linux to switch the button to the opposite action, then click, or us
 shortcut described above.
 
 On web and desktop, queued messages appear at the end of the thread as dashed messages that have
-not been sent yet. On mobile they appear above the composer. Each shows its text and any attached
+not been sent yet. Each shows its text and any attached
 images. **Send now** sends a message right away, into the running turn if there is one. You can
 also edit or remove it.
 
@@ -207,8 +204,7 @@ composer when it is empty, and is discarded otherwise.
 ## Commands and skills
 
 Type `/` for commands or `$` to add a skill from the selected environment and
-provider. On mobile, both are also available before starting a thread on
-**New task**.
+provider.
 
 The slash menu also includes skills unless you turn off **Settings → Threads →
 Show skills in slash menu**, under Advanced. Only skills enabled for the provider are listed.
@@ -241,7 +237,7 @@ Claude instances can also compact idle threads for you. See
 With Codex, Claude, and Antigravity, send `/goal` followed by what "done" means, for example
 `/goal all tests in packages/api pass`. The agent keeps working across turns
 until it judges the goal met. The thread shows **Goal** while it works, and a
-line at the end of the thread (above the composer on mobile) shows the goal and
+line at the end of the thread shows the goal and
 its progress.
 
 - `/goal` alone shows the current goal. `/goal clear` removes it.
@@ -309,7 +305,7 @@ Markdown with a link in place of each chip. Older messages that were sent before
 show their context. Stashing a prompt keeps its chips and what they point to; restoring brings
 them back.
 
-On mobile, tap a chip to inspect its content. File references open the current file; attached
+Select a chip to inspect its content. File references open the current file; attached
 files show the copy that was attached to the message.
 
 ## Attached files

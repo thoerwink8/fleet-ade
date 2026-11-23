@@ -12,12 +12,6 @@ your model and mode selections, unless the destination project has its own model
 Its branch and workspace mode come from your configured defaults. To continue in
 an existing worktree, use **New thread in this worktree** from the branch toolbar.
 
-On mobile, **New thread** starts in the current thread's project, or else in the
-last project you opened or chose on that device. If neither is available, the
-project picker opens. Turn off **Settings → General → Use last project** to
-choose a project every time. When you pick a project that is on more than one
-machine, the thread starts on a connected one if any is connected.
-
 When you change a new thread's project, T3 Code stays in the current environment
 if that project exists there. Otherwise it selects an environment that has it.
 
@@ -26,8 +20,7 @@ if that project exists there. Otherwise it selects an environment that has it.
 A thread does not need a project. To start one without a project, click **or
 start without a project** under a new thread's heading, pick **No project** from
 the project menu in that heading or from **New thread in...** in the command
-palette, or press `mod+alt+n`. On mobile, pick **No project** from the project
-list. It starts on your current machine; before sending, pick another machine
+palette, or press `mod+alt+n`. It starts on your current machine; before sending, pick another machine
 from the machine menu to move it there. To move a draft into a project, pick the
 project in the heading.
 
@@ -96,12 +89,7 @@ thread is over takes the accent color. Section labels also
 identify empty sections and a collapsed settled shelf.
 
 Drag within the pinned or active section to change its order. Other rows slide aside to show the
-spot where the thread will land. Drops into either section keep the position you choose. On
-mobile, open a thread's menu and choose **Arrange threads**. Drag a handle within or between
-**Pinned** and **Active** to reorder, pin, or unpin. Drop onto the **Settled** divider to
-settle a thread. The dragged card shows the action before you release it. Expand **Snoozed**
-or **Settled** to drag a parked thread back into either live section. Each drop saves; close the sheet to return to the thread list.
-**Move up** and **Move down** are also available in the thread menu. The server
+spot where the thread will land. Drops into either section keep the position you choose. The server
 saves the order, so it survives a refresh and appears on your other connected devices.
 
 On web and desktop, the list also animates section changes made with thread actions such as
@@ -128,7 +116,7 @@ regenerated titles. Select a project to give it its own instructions.
 
 Agents connected through T3 Code can use the same server-owned metadata workflow to
 rename a thread, regenerate its title, or link and unlink a pull request. These changes
-appear on web, desktop, and mobile without requiring the originating browser to remain
+appear across your connected web and desktop clients without requiring the originating browser to remain
 open.
 
 ### Fold working threads (beta)
@@ -192,8 +180,7 @@ archive still work while it is set to **Never**.
 Change these rules in **Settings → Threads**.
 They continue to run when your apps are closed. On web and desktop, choose an environment at the
 top to change only its rules, or **All environments** to update connected environments together.
-Mixed values show where the selected environments disagree. Mobile applies these
-rules to connected environments that support shared settings. Offline environments
+Mixed values show where the selected environments disagree. Offline environments
 and older servers keep their previous values. Changing a rule does not reopen
 already settled threads.
 
@@ -225,8 +212,7 @@ and copying a thread reference. A copied reference uses the thread's pull reques
 link when available, otherwise a link to the thread, which opens it from anywhere
 you paste it and pastes into a composer as a thread chip (see
 [sharing a thread](./prompt-links.md#share-a-thread)). To copy the thread even
-when it has a PR, choose **Copy → Thread** from its context menu, or **Copy
-thread** from its long-press menu on mobile.
+when it has a PR, choose **Copy → Thread** from its context menu.
 **Thread ID** copies the bare ID for scripts and the `t3` CLI. See
 [keybindings](./keybindings.md) for custom configuration.
 
@@ -293,9 +279,6 @@ your next message there. Bring back is available while the thread is idle.
 Closing a side chat you never sent a message in deletes it. To delete one you used,
 choose **Delete** at the top of the side chat. Deleting a thread also deletes its
 side chats.
-
-On mobile, a thread lists its side chats above the composer. Tap one to open it and
-answer its questions.
 
 ## Snooze until later
 

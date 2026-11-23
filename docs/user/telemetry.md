@@ -36,16 +36,14 @@ The web app in a browser, including one the `t3` CLI opens, does not read these 
 variables. It can send its own connection traces even if the server has opted out. The browser app has
 no relay tracing toggle.
 
-## Agent activity for mobile notifications
+## Agent activity
 
 When **Publish agent activity** is enabled on a host, it sends project and thread titles, model
-names, activity status, and environment and thread identifiers to the T3 Connect relay for
-mobile notifications and live activities. The switch is off until you turn it on. Turning off
-relay tracing does not stop this.
+names, activity status, and environment and thread identifiers to the T3 Connect relay. The switch
+is off until you turn it on. Turning off relay tracing does not stop this.
 
 To stop publishing, turn off **Publish agent activity** under **Settings > Connections** on
-the host. Turning off notifications on a phone controls that phone's alerts, not the host's
-publishing setting.
+the host.
 
 ## Export diagnostics to your own receiver
 
