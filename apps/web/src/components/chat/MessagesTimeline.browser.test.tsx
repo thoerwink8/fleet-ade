@@ -2261,3 +2261,27 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     .element(screen.getByRole("button", { name: "Open the current tab", exact: true }))
     .toBeVisible();
 });
+
+const LONG_THREAD_TURNS = 100;
+const LONG_MESSAGE_TEXT = `${"检查这一段会话正文。".repeat(40)}\n\n- 第一条\n- 第二条\n`;
+
+it("shows the recent window of a 100-turn thread in time for cold open", async () => {
+  const entries = Array.from({ length: LONG_THREAD_TURNS }, (_, turn) => [
+    message(`turn ${turn}: ${LONG_MESSAGE_TEXT}`, { role: "user" }, `user-${turn}`),
+    message(`answer ${turn}: ${LONG_MESSAGE_TEXT}`, { role: "assistant" }, `assistant-${turn}`),
+  ]).flat();
+  const original = window.getComputedStyle.bind(window);
+  let measures = 0;
+  vi.spyOn(window, "getComputedStyle").mockImplementation((element, pseudo) => {
+    measures += 1;
+    return original(element, pseudo);
+  });
+  await using screen = await renderTimeline(entries);
+  await expect
+    .element(screen.getByText(`answer ${LONG_THREAD_TURNS - 1}`, { exact: false }))
+    .toBeVisible();
+  const scrollHeight =
+    screen.container.querySelector(".messages-timeline-scroll")?.scrollHeight ?? 0;
+  expect(measures).toBeLessThan(8);
+  expect(scrollHeight).toBeLessThan(20_000);
+});
