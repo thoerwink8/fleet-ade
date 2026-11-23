@@ -9,6 +9,7 @@ import {
   type MessagesTimelineRow,
 } from "./MessagesTimeline.logic";
 import { type HandoffTimelineRun } from "./V2LifecycleRow";
+import { projectTimelineWindow, type TimelineWindowProjection } from "./timelineWindow";
 
 const EMPTY_TIMELINE_RUNS: ReadonlyArray<HandoffTimelineRun> = [];
 
@@ -75,4 +76,27 @@ export function useStableRows(
   );
   setState({ identity, source: rows, stable });
   return stable.result;
+}
+
+export function useTimelineWindowProjection(
+  rows: MessagesTimelineRow[],
+  windowStart: number,
+  pinnedLeadingIndex: number | null,
+): TimelineWindowProjection {
+  const [state, setState] = useState(() => ({
+    rows,
+    windowStart,
+    pinnedLeadingIndex,
+    projection: projectTimelineWindow(rows, windowStart, pinnedLeadingIndex),
+  }));
+  if (
+    state.rows === rows &&
+    state.windowStart === windowStart &&
+    state.pinnedLeadingIndex === pinnedLeadingIndex
+  ) {
+    return state.projection;
+  }
+  const projection = projectTimelineWindow(rows, windowStart, pinnedLeadingIndex);
+  setState({ rows, windowStart, pinnedLeadingIndex, projection });
+  return projection;
 }
