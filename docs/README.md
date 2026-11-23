@@ -22,7 +22,7 @@
 - [Text generation models](./user/text-generation.md)
 - [Usage and limits](./user/usage.md)
 - [Secrets](./user/secrets.md)
-- [Product usage data](./user/telemetry.md)
+- [Telemetry](./user/telemetry.md)
 - [Remote access](./user/remote-access.md)
 - [Outside agents (MCP)](./user/outside-agents.md)
 - [Running in the background](./user/background-service.md)
