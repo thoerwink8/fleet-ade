@@ -12,6 +12,7 @@ const SINGLE_LINE_HEIGHT_PX = 24;
 const MESSAGE_BASE_HEIGHT_PX = 44;
 const ESTIMATED_COLUMNS_PER_LINE = 90;
 const MIN_HIDDEN_PREFIX_ROWS = 3;
+const TARGET_INDEX_LEADING_HEADROOM_ROWS = 4;
 
 function visualLineColumns(line: string): number {
   let columns = 0;
@@ -79,10 +80,9 @@ export function expandTimelineWindowStartForIndex(
   targetFullIndex: number,
 ): number {
   if (currentStart === 0) return 0;
-  if (targetFullIndex <= 4) return 0;
-  if (targetFullIndex < currentStart) {
-    const next = Math.max(0, targetFullIndex - 4);
-    return next < MIN_HIDDEN_PREFIX_ROWS ? 0 : next;
+  const desiredStart = Math.max(0, targetFullIndex - TARGET_INDEX_LEADING_HEADROOM_ROWS);
+  if (desiredStart < currentStart) {
+    return desiredStart < MIN_HIDDEN_PREFIX_ROWS ? 0 : desiredStart;
   }
   return currentStart;
 }

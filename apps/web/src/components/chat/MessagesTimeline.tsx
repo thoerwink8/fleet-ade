@@ -500,6 +500,8 @@ const ConversationTimeline = memo(function ConversationTimeline({
     ready: boolean;
   } | null>(null);
   const disclosureRevealFrameRef = useRef<number | null>(null);
+  const disclosureRevealQueuedRef = useRef(false);
+  const disclosureRevealEpochRef = useRef(0);
 
   // Anchoring keeps the toggled row still, so content that expands below it
   // near the bottom would otherwise land under the composer.
@@ -534,15 +536,34 @@ const ConversationTimeline = memo(function ConversationTimeline({
       element.scrollBy({ top: delta, behavior: prefersReducedMotion ? "auto" : "smooth" });
     }
   });
-  const scheduleDisclosureReveal = () => {
+  const cancelScheduledDisclosureReveal = useStableCallback(() => {
+    disclosureRevealEpochRef.current += 1;
+    disclosureRevealQueuedRef.current = false;
     if (disclosureRevealFrameRef.current !== null) {
       cancelAnimationFrame(disclosureRevealFrameRef.current);
-    }
-    disclosureRevealFrameRef.current = requestAnimationFrame(() => {
       disclosureRevealFrameRef.current = null;
-      revealExpandedDisclosure();
+    }
+  });
+  const scheduleDisclosureReveal = useStableCallback(() => {
+    if (disclosureRevealRef.current === null || disclosureRevealQueuedRef.current) return;
+    disclosureRevealQueuedRef.current = true;
+    const epoch = disclosureRevealEpochRef.current;
+    // LegendList emits totalSize before flushItemSizeUpdates queues its mvcpRecalculate
+    // frame. Deferring rAF registration by one microtask places the reveal after any MVCP
+    // auto-scroll adjustment in that frame so it cannot abort smooth scrolling.
+    void Promise.resolve().then(() => {
+      if (disclosureRevealEpochRef.current !== epoch) return;
+      disclosureRevealQueuedRef.current = false;
+      if (disclosureRevealRef.current === null) return;
+      if (disclosureRevealFrameRef.current !== null) {
+        cancelAnimationFrame(disclosureRevealFrameRef.current);
+      }
+      disclosureRevealFrameRef.current = requestAnimationFrame(() => {
+        disclosureRevealFrameRef.current = null;
+        revealExpandedDisclosure();
+      });
     });
-  };
+  });
 
   const preserveDisclosurePosition = (
     anchorKey: string,
@@ -550,6 +571,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   ) => {
     const list = listRef.current;
     disclosureRevealRef.current = null;
+    cancelScheduledDisclosureReveal();
     // An anchor ends end-follow until the reader scrolls, so a streaming turn keeps the live end.
     if (!list || (isWorking && list.getState().isFollowingEnd)) return;
     if (reveal) {
@@ -1451,12 +1473,14 @@ const ConversationTimeline = memo(function ConversationTimeline({
     const stopRememberingRelease = viewport?.onFollowReleased(rememberReleasedPosition);
     const stopDisclosureReveal = viewport?.subscribe(() => {
       disclosureRevealRef.current = null;
+      cancelScheduledDisclosureReveal();
     });
     let contentSizeFrame: number | null = null;
     // LegendList lays rows out from layout effects; the next frame sees them settled.
     let scheduledData: unknown = null;
     const scheduleContentSizeChanged = () => {
       if (!list) return;
+      scheduleDisclosureReveal();
       const laidOutData = list.getState().data;
       if (contentSizeFrame !== null) {
         if (scheduledData === laidOutData) return;
@@ -1466,22 +1490,22 @@ const ConversationTimeline = memo(function ConversationTimeline({
       contentSizeFrame = requestAnimationFrame(() => {
         contentSizeFrame = null;
         handleContentSizeChanged(laidOutData);
-        revealExpandedDisclosure();
       });
     };
     const stopListeningToContentSize = list
       ?.getState()
       .listen("totalSize", () => scheduleContentSizeChanged());
+    const stopListeningToPositionUpdate = list
+      ?.getState()
+      .listen("lastPositionUpdate", () => scheduleDisclosureReveal());
     scheduleContentSizeChanged();
     return () => {
       stopListeningToContentSize?.();
+      stopListeningToPositionUpdate?.();
       stopRememberingRelease?.();
       stopDisclosureReveal?.();
       if (contentSizeFrame !== null) cancelAnimationFrame(contentSizeFrame);
-      if (disclosureRevealFrameRef.current !== null) {
-        cancelAnimationFrame(disclosureRevealFrameRef.current);
-        disclosureRevealFrameRef.current = null;
-      }
+      cancelScheduledDisclosureReveal();
       detachViewport?.();
       viewport?.dispose();
       if (viewportRef.current === viewport) viewportRef.current = null;
