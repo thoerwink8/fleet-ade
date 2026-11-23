@@ -303,6 +303,34 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
       assert.equal(persisted.includes("browserProfiles"), false);
     }).pipe(Effect.provide(layerServerSettings())),
   );
+  it.effect("ignores retired guest, Clerk, and hosted keys from an older settings file", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      yield* fs.writeFileString(
+        config.settingsPath,
+        JSON.stringify({
+          guestSharingEnabled: true,
+          clerkPublishableKey: "pk_test_old",
+          hostedAppUrl: "https://app.t3.codes",
+          continueThreadsAfterServerUpdate: false,
+        }),
+      );
+
+      const settings = yield* service.getSettings;
+      assert.equal(settings.continueThreadsAfterServerUpdate, false);
+      assert.equal(settings.guestSharingEnabled, true);
+      assert.equal("clerkPublishableKey" in settings, false);
+      assert.equal("hostedAppUrl" in settings, false);
+
+      yield* service.updateSettings({ continueThreadsAfterServerUpdate: true });
+      const persisted = yield* fs.readFileString(config.settingsPath);
+      assert.equal(persisted.includes("clerkPublishableKey"), false);
+      assert.equal(persisted.includes("hostedAppUrl"), false);
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+
   it.effect("ignores relay-only keys from an older settings file", () =>
     Effect.gen(function* () {
       const config = yield* ServerConfig.ServerConfig;

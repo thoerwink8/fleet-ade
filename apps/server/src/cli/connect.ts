@@ -35,13 +35,7 @@ import * as CliState from "../cloud/CliState.ts";
 import * as CliTokenManager from "../cloud/CliTokenManager.ts";
 import { formatReachabilityFailure } from "../cloud/ConnectReachability.ts";
 import { filterRelayResponse } from "../cloud/relayResponse.ts";
-import {
-  CLOUD_LINK_REVOKED,
-  CLOUD_LINKED_USER_ID,
-  isAgentActivityPublishingEnabledValue,
-  PUBLISH_AGENT_ACTIVITY_SECRET,
-  RELAY_URL_SECRET,
-} from "../cloud/config.ts";
+import { CLOUD_LINK_REVOKED, CLOUD_LINKED_USER_ID, RELAY_URL_SECRET } from "../cloud/config.ts";
 import { relayUrlConfig } from "../cloud/publicConfig.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
@@ -599,10 +593,6 @@ const linkEnvironmentForConnect = Effect.fn("cloud.cli.link_environment")(functi
   if (yield* CliState.dropRevokedCloudLink) {
     yield* Console.log("Replacing the link T3 Connect revoked.");
   }
-  if (publishOnly) {
-    const secrets = yield* ServerSecretStore.ServerSecretStore;
-    yield* secrets.set(PUBLISH_AGENT_ACTIVITY_SECRET, stringToBytes("true"));
-  }
   return { identity } as const;
 });
 export { linkEnvironmentForConnect };
@@ -673,7 +663,6 @@ const connectStatusCommand = Command.make("status", {
           authenticated,
           cloudUserId,
           relayUrl,
-          publishAgentActivity,
           revoked,
           executable,
           linkMode,
@@ -683,7 +672,6 @@ const connectStatusCommand = Command.make("status", {
             tokens.hasCredential,
             secrets.get(CLOUD_LINKED_USER_ID),
             secrets.get(RELAY_URL_SECRET),
-            secrets.get(PUBLISH_AGENT_ACTIVITY_SECRET),
             secrets.get(CLOUD_LINK_REVOKED),
             relayClient.resolve,
             CliState.readCliDesiredLinkMode,
@@ -700,9 +688,7 @@ const connectStatusCommand = Command.make("status", {
           revoked: Option.isSome(cloudUserId) && Option.isSome(revoked),
           cloudUserId: Option.isSome(cloudUserId) ? bytesToString(cloudUserId.value) : null,
           relayUrl: Option.isSome(relayUrl) ? bytesToString(relayUrl.value) : null,
-          publishAgentActivity: isAgentActivityPublishingEnabledValue(
-            Option.isSome(publishAgentActivity) ? bytesToString(publishAgentActivity.value) : null,
-          ),
+          publishAgentActivity: false,
           relayClient: executable,
           linkMode,
           reachability,
@@ -733,10 +719,6 @@ const connectPublishCommand = Command.make("publish", {
         const secrets = yield* ServerSecretStore.ServerSecretStore;
         const tokens = yield* CliTokenManager.CloudCliTokenManager;
         const enabled = !flags.disable;
-        yield* secrets.set(
-          PUBLISH_AGENT_ACTIVITY_SECRET,
-          stringToBytes(enabled ? "true" : "false"),
-        );
         if (!enabled) {
           // Cancel unprovisioned publish-only links too, or the next start will recreate them.
           // Managed links also serve the tunnel and must survive.

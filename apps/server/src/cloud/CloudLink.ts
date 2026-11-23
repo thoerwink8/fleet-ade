@@ -53,7 +53,6 @@ import * as Path from "effect/Path";
 import type * as PlatformError from "effect/PlatformError";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
-import * as Semaphore from "effect/Semaphore";
 import {
   HttpClient,
   HttpClientRequest,
@@ -291,9 +290,6 @@ export const shouldRetryCloudLink = (error: unknown): boolean =>
   shouldRetryRelayRequest(error) &&
   !isPermanentLinkError(error) &&
   !(CliTokenManager.isCloudCliCredentialRefreshError(error) && error.requiresLogin);
-
-const rollbackFailed = (cause: unknown) =>
-  Effect.logWarning("Could not roll back a T3 Connect preference", { cause });
 
 const requireRelayUrl = relayUrlConfig.pipe(
   Effect.mapError(
@@ -1258,8 +1254,6 @@ const make = Effect.gen(function* () {
       relayUrl,
       relayIssuer,
       endpointRuntimeConfig,
-      publishAgentActivity,
-      holdWebhooks,
       revoked,
       latestReachability,
     ] = yield* Effect.all(
@@ -1268,8 +1262,6 @@ const make = Effect.gen(function* () {
         secrets.get(RELAY_URL_SECRET),
         secrets.get(RELAY_ISSUER_SECRET),
         secrets.get(CLOUD_ENDPOINT_RUNTIME_CONFIG),
-        secrets.get(PUBLISH_AGENT_ACTIVITY_SECRET),
-        secrets.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET),
         secrets.get(CLOUD_LINK_REVOKED),
         reachability.latest,
       ],
@@ -1293,11 +1285,8 @@ const make = Effect.gen(function* () {
       relayUrl: Option.isSome(relayUrl) ? bytesToString(relayUrl.value) : null,
       relayIssuer: Option.isSome(relayIssuer) ? bytesToString(relayIssuer.value) : null,
       managedTunnelActive: Option.isSome(endpointRuntimeConfig),
-      publishAgentActivity: Option.isSome(publishAgentActivity)
-        ? bytesToString(publishAgentActivity.value) === "true"
-        : false,
-      holdWebhooksWhileOffline:
-        Option.isSome(holdWebhooks) && bytesToString(holdWebhooks.value) === "true",
+      publishAgentActivity: false,
+      holdWebhooksWhileOffline: false,
       ...(Option.isSome(currentReachability) ? { reachability: currentReachability.value } : {}),
       ...(connector?.hostname ? { tunnelHostname: connector.hostname } : {}),
     } satisfies EnvironmentCloudLinkStateResult;
@@ -1338,71 +1327,8 @@ const make = Effect.gen(function* () {
     Effect.catchIf(ServerSecretStore.isSecretStoreError, internalError("remove-relay-config")),
   );
 
-  const pushHoldWebhooksWhileOffline = Effect.fn("CloudPreferences.pushHoldWebhooksWhileOffline")(
-    function* (holdWebhooksWhileOffline: boolean) {
-      const connection = yield* readRelayConnection.pipe(withSecrets);
-      if (connection === null) {
-        return yield* new CloudLinkNotLinkedError({});
-      }
-      const environmentId = yield* environment.getEnvironmentId;
-      const client = yield* makeRelayEnvironmentClient(connection);
-      yield* client.server
-        .updateLinkPreferences({
-          params: { environmentId },
-          payload: { holdWebhooksWhileOffline },
-        })
-        .pipe(Effect.timeout("10 seconds"), Effect.catch(internalError("update-webhook-settings")));
-    },
-  );
-
-  const savePreference = (name: string, value: boolean) =>
-    secrets
-      .set(name, stringToBytes(String(value)))
-      .pipe(Effect.catch(internalError("persist-preferences")));
-
-  const preferencesLock = yield* Semaphore.make(1);
-
-  const savePreferences = Effect.fn("CloudPreferences.update")(
-    function* (input: EnvironmentCloudPreferencesRequest) {
-      // Read rollback targets before changing anything; failed reads must abort.
-      const readCurrent = (name: string) =>
-        secrets.get(name).pipe(Effect.catch(internalError("read-preferences")));
-      const previousActivity = yield* readCurrent(PUBLISH_AGENT_ACTIVITY_SECRET);
-      const previousHold = yield* readCurrent(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET);
-      yield* savePreference(PUBLISH_AGENT_ACTIVITY_SECRET, input.publishAgentActivity);
-      if (input.holdWebhooksWhileOffline !== undefined) {
-        const next = input.holdWebhooksWhileOffline;
-        const previous = Option.match(previousHold, {
-          onNone: () => false,
-          onSome: (bytes) => bytesToString(bytes) === "true",
-        });
-        yield* pushHoldWebhooksWhileOffline(next).pipe(
-          Effect.andThen(
-            savePreference(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET, next).pipe(
-              Effect.tapError(() =>
-                previous === next
-                  ? Effect.void
-                  : pushHoldWebhooksWhileOffline(previous).pipe(Effect.catch(rollbackFailed)),
-              ),
-            ),
-          ),
-          Effect.tapError(() =>
-            Option.match(previousActivity, {
-              onNone: () => secrets.remove(PUBLISH_AGENT_ACTIVITY_SECRET),
-              onSome: (bytes) => secrets.set(PUBLISH_AGENT_ACTIVITY_SECRET, bytes),
-            }).pipe(Effect.catch(rollbackFailed)),
-          ),
-        );
-      }
-    },
-    // Finish or roll back even if the client disconnects mid-update.
-    Effect.uninterruptible,
-    preferencesLock.withPermits(1),
-  );
-
   const updatePreferences = Effect.fn("environment.cloud.preferences")(
-    function* (input: EnvironmentCloudPreferencesRequest) {
-      yield* savePreferences(input);
+    function* (_input: EnvironmentCloudPreferencesRequest) {
       return yield* readCloudLinkState();
     },
     Effect.catchIf(ServerSecretStore.isSecretStoreError, internalError("read-preferences")),
