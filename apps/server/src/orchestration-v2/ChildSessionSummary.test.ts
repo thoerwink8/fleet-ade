@@ -21,8 +21,10 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as ServerSettingsService from "../serverSettings.ts";
 import { liveThreadShell } from "../mcp/McpToolAccess.testkit.ts";
 import { ChildSessionSummary, ChildSessionSummaryInternal } from "./ChildSessionSummary.ts";
+import * as CommandAssist from "./CommandAssist.ts";
 import { EventSinkV2 } from "./EventSink.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import type { SummaryFacts } from "./childSummaryDerive.ts";
@@ -433,4 +435,181 @@ it.effect("reads outlook from command assist and leaves the child phase alone", 
   }).pipe(
     Effect.provide(Layer.merge(ChildSessionSummary.layer.pipe(Layer.provide(database)), database)),
   );
+});
+
+const assistProjectId = ProjectId.make("project:mcp-test");
+
+const seedAssistWorkspace = (threadId: ThreadId, parentThreadId: ThreadId) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* seedProjectionThread(threadId, parentThreadId);
+    yield* sql`
+      INSERT INTO projection_projects (
+        project_id, title, workspace_root, scripts_json, created_at, updated_at
+      ) VALUES (
+        ${assistProjectId}, ${"child"}, ${"/work/child-repo"}, ${"[]"},
+        ${"2026-01-01T00:00:00.000Z"}, ${"2026-01-01T00:00:00.000Z"}
+      )
+    `;
+  });
+
+const assistStack = <E, R>(
+  assist: Layer.Layer<CommandAssist.CommandAssist, E, R>,
+  database: Layer.Layer<SqlClient.SqlClient, E, R>,
+) => {
+  const ready = assist.pipe(Layer.provide(database));
+  const services = Layer.merge(ready, database);
+  return Layer.merge(ChildSessionSummary.layer.pipe(Layer.provide(services)), services);
+};
+
+it.effect("detail triggers one observe with the row opened when activity is on", () => {
+  const gate: { enabled: boolean; queue: Queue.Queue<boolean> | undefined } = {
+    enabled: false,
+    queue: undefined,
+  };
+  const quiet = {
+    called: false,
+    activity: null,
+    drift: null,
+    outlook: null,
+    childPhase: "在跑",
+  };
+  const database = SqlitePersistence.layerMemory;
+  const assist = Layer.succeed(
+    CommandAssist.CommandAssist,
+    CommandAssist.CommandAssist.of({
+      run: () => Effect.die("run is not part of this test"),
+      observe: (input) => {
+        const queue = gate.queue;
+        if (queue === undefined) return Effect.die("observe queue was not ready");
+        return Queue.offer(queue, input.opened).pipe(Effect.as(quiet));
+      },
+      markDriftFalsePositive: () => Effect.void,
+      rememberDispatch: () => Effect.void,
+      handback: () => Effect.die("handback is not part of this test"),
+      tidy: () => Effect.die("tidy is not part of this test"),
+      considerPatrol: () => Effect.die("patrol is not part of this test"),
+      read: () => Effect.die("read is not part of this test"),
+      activityOrDriftEnabled: () => Effect.succeed(gate.enabled),
+    }),
+  );
+  return Effect.gen(function* () {
+    const queue = yield* Queue.unbounded<boolean>();
+    gate.queue = queue;
+    const internal = yield* ChildSessionSummaryInternal;
+    const summary = yield* ChildSessionSummary;
+    const parent = ThreadId.make("thread:opened-parent");
+    const child = ThreadId.make("thread:opened-child");
+    yield* seedAssistWorkspace(child, parent);
+    yield* internal.note(factsFor(child, parent, 0));
+    yield* TestClock.adjust(0);
+    assert.strictEqual(Option.isNone(yield* Queue.poll(queue)), true);
+    gate.enabled = true;
+    const detail = yield* summary.detail({ threadId: child });
+    assert.ok(detail !== null);
+    const opened = yield* Queue.take(queue);
+    assert.strictEqual(opened, true);
+    yield* TestClock.adjust(0);
+    assert.strictEqual(Option.isNone(yield* Queue.poll(queue)), true);
+  }).pipe(Effect.provide(assistStack(assist, database)));
+});
+
+it.effect("default assist rows do not call a model or write state from detail or note", () => {
+  const calls = { complete: 0 };
+  const database = SqlitePersistence.layerMemory;
+  const assist = CommandAssist.layer.pipe(
+    Layer.provide(
+      Layer.succeed(CommandAssist.CommandAssistModel, {
+        complete: () => {
+          calls.complete += 1;
+          return Effect.succeed("{}");
+        },
+      }),
+    ),
+    Layer.provide(ServerSettingsService.layerTest({})),
+    Layer.provide(database),
+  );
+  return Effect.gen(function* () {
+    const internal = yield* ChildSessionSummaryInternal;
+    const summary = yield* ChildSessionSummary;
+    const sql = yield* SqlClient.SqlClient;
+    const parent = ThreadId.make("thread:assist-off-parent");
+    const child = ThreadId.make("thread:assist-off-child");
+    yield* seedAssistWorkspace(child, parent);
+    yield* internal.note(factsFor(child, parent, 0));
+    const detail = yield* summary.detail({ threadId: child });
+    assert.ok(detail !== null);
+    yield* TestClock.adjust(0);
+    const rows = yield* sql<{ readonly total: number }>`
+      SELECT count(*) AS total FROM command_assist_state WHERE thread_id = ${child}
+    `;
+    assert.strictEqual(Number(rows[0]?.total ?? 0), 0);
+    assert.strictEqual(calls.complete, 0);
+  }).pipe(Effect.provide(assistStack(assist, database)));
+});
+
+it.effect("hand-back reads the last assistant message of the current run", () => {
+  const prompts: string[] = [];
+  const database = SqlitePersistence.layerMemory;
+  const assist = CommandAssist.layer.pipe(
+    Layer.provide(
+      Layer.succeed(CommandAssist.CommandAssistModel, {
+        complete: (input) => {
+          prompts.push(input.prompt);
+          return Effect.succeed(JSON.stringify({ answer: "是", reason: "同一件事" }));
+        },
+      }),
+    ),
+    Layer.provide(
+      ServerSettingsService.layerTest({
+        commandAssist: { handback: { enabled: true, modelSelection: null } },
+      }),
+    ),
+    Layer.provide(database),
+  );
+  return Effect.gen(function* () {
+    const internal = yield* ChildSessionSummaryInternal;
+    const assistService = yield* CommandAssist.CommandAssist;
+    const sql = yield* SqlClient.SqlClient;
+    const parent = ThreadId.make("thread:report-parent");
+    const child = ThreadId.make("thread:report-child");
+    yield* seedAssistWorkspace(child, parent);
+    yield* sql`
+      INSERT INTO orchestration_v2_projection_runs (
+        run_id, thread_id, ordinal, provider, status, requested_at, payload_json
+      ) VALUES
+        (${"run-old"}, ${child}, 1, ${"codex"}, ${"completed"}, ${"2026-01-01T00:00:00.000Z"}, ${"{}"}),
+        (${"run-new"}, ${child}, 2, ${"codex"}, ${"completed"}, ${"2026-01-01T00:01:00.000Z"}, ${"{}"})
+    `;
+    yield* sql`
+      INSERT INTO orchestration_v2_projection_turn_items (
+        turn_item_id, thread_id, run_id, ordinal, type, status, updated_at, payload_json
+      ) VALUES
+        (
+          ${"old-last"}, ${child}, ${"run-old"}, 9, ${"assistant_message"}, ${"completed"},
+          ${"2026-01-01T00:00:00.000Z"}, ${JSON.stringify({ text: "旧运行的最后一句" })}
+        ),
+        (
+          ${"new-early"}, ${child}, ${"run-new"}, 1, ${"assistant_message"}, ${"completed"},
+          ${"2026-01-01T00:01:00.000Z"}, ${JSON.stringify({ text: "当前运行的前一句" })}
+        ),
+        (
+          ${"new-last"}, ${child}, ${"run-new"}, 2, ${"assistant_message"}, ${"completed"},
+          ${"2026-01-01T00:02:00.000Z"}, ${JSON.stringify({ text: "当前运行的最后一句" })}
+        )
+    `;
+    yield* internal.note(factsFor(child, parent, 0));
+    yield* assistService.rememberDispatch({
+      threadId: child,
+      goal: "修好解析",
+      avoid: null,
+      testCommands: ["vp test run parser"],
+    });
+    yield* internal.note({ ...factsFor(child, parent, 0), status: "completed" });
+    yield* TestClock.adjust(0);
+    const asked = prompts.filter((prompt) => prompt.includes("当前运行的最后一句"));
+    assert.strictEqual(asked.length, 1);
+    assert.ok(prompts.every((prompt) => !prompt.includes("旧运行的最后一句")));
+    assert.ok(prompts.every((prompt) => !prompt.includes("当前运行的前一句")));
+  }).pipe(Effect.provide(assistStack(assist, database)));
 });

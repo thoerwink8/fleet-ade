@@ -285,6 +285,11 @@ export class ChildSessionSummary extends Context.Service<
         if (Option.isNone(assist)) return;
         const service = assist.value;
         const threadId = input.facts.threadId;
+        const watchAnywhere = yield* service.activityOrDriftEnabled({
+          projectId: null,
+          anywhere: true,
+        });
+        if (!watchAnywhere && !input.handback) return;
         const project = yield* sql<{ readonly projectId: string | null }>`
           SELECT json_extract(payload_json, '$.projectId') AS projectId
           FROM orchestration_v2_projection_threads
@@ -295,6 +300,8 @@ export class ChildSessionSummary extends Context.Service<
         );
         const projectId =
           typeof project[0]?.projectId === "string" ? ProjectId.make(project[0].projectId) : null;
+        const watchHere = yield* service.activityOrDriftEnabled({ projectId, anywhere: false });
+        if (!watchHere && !input.handback) return;
         const roots =
           projectId === null
             ? []
@@ -322,40 +329,42 @@ export class ChildSessionSummary extends Context.Service<
           Effect.orElseSucceed(() => [] as const),
         );
         const runId = run[0]?.runId;
-        const counted =
-          runId === undefined
-            ? []
-            : yield* sql<{ readonly total: number }>`
-                SELECT count(*) AS total
-                FROM orchestration_v2_projection_turn_items
-                WHERE thread_id = ${threadId}
-                  AND run_id = ${runId}
-                  AND type IN ('file_change', 'command_execution')
-              `.pipe(
-                Effect.tapError(warnSql("steps", threadId)),
-                Effect.orElseSucceed(() => [] as const),
-              );
-        const additions = input.detail.files.reduce((sum, file) => sum + file.additions, 0);
-        const deletions = input.detail.files.reduce((sum, file) => sum + file.deletions, 0);
-        yield* service
-          .observe({
-            threadId,
-            projectId,
-            cwd,
-            runId: runId ?? threadId,
-            opened: input.opened,
-            stepCount: Number(counted[0]?.total ?? 0),
-            silence: input.reason === CHILD_SUMMARY_SILENCE_REASON,
-            goal: input.facts.goal ?? "",
-            avoid: input.detail.avoid === "没有写别碰" ? "" : input.detail.avoid,
-            activity: input.detail.activity,
-            files: assistFiles(input.detail),
-            latestCommand: input.detail.latestCommand,
-            additions,
-            deletions,
-            childPhase: input.reason,
-          })
-          .pipe(Effect.ignore);
+        if (watchHere) {
+          const counted =
+            runId === undefined
+              ? []
+              : yield* sql<{ readonly total: number }>`
+                  SELECT count(*) AS total
+                  FROM orchestration_v2_projection_turn_items
+                  WHERE thread_id = ${threadId}
+                    AND run_id = ${runId}
+                    AND type IN ('file_change', 'command_execution')
+                `.pipe(
+                  Effect.tapError(warnSql("steps", threadId)),
+                  Effect.orElseSucceed(() => [] as const),
+                );
+          const additions = input.detail.files.reduce((sum, file) => sum + file.additions, 0);
+          const deletions = input.detail.files.reduce((sum, file) => sum + file.deletions, 0);
+          yield* service
+            .observe({
+              threadId,
+              projectId,
+              cwd,
+              runId: runId ?? threadId,
+              opened: input.opened,
+              stepCount: Number(counted[0]?.total ?? 0),
+              silence: input.reason === CHILD_SUMMARY_SILENCE_REASON,
+              goal: input.facts.goal ?? "",
+              avoid: input.detail.avoid === "没有写别碰" ? "" : input.detail.avoid,
+              activity: input.detail.activity,
+              files: assistFiles(input.detail),
+              latestCommand: input.detail.latestCommand,
+              additions,
+              deletions,
+              childPhase: input.reason,
+            })
+            .pipe(Effect.ignore);
+        }
         if (!input.handback || runId === undefined) return;
         const report = yield* sql<{ readonly text: string | null }>`
           SELECT json_extract(payload_json, '$.text') AS text
