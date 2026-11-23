@@ -792,6 +792,9 @@ const ConversationTimeline = memo(function ConversationTimeline({
     semanticWorkStream,
   });
   const rows = useStableRows(rawRows, listIdentityKey);
+  // Integer start index is safe across history prepends: "load earlier" lives in ListHeaderComponent
+  // (only reachable once start === 0), find/citations force start === 0, and any rare prepend while
+  // start > 0 simply includes those extra rows while MVCP keeps the viewport anchored.
   const [windowState, setWindowState] = useState<{
     readonly identity: string;
     readonly initialized: boolean;
@@ -1137,39 +1140,30 @@ const ConversationTimeline = memo(function ConversationTimeline({
     scheduleMinimapRefresh();
   };
 
-  const handleListScroll = () => {
-    if (windowProjection.windowStart > 0 && !restoringThreadPosition) {
-      const list = listRef.current;
-      const scrollNode = list?.getScrollableNode();
-      const state = list?.getState?.();
-      if (scrollNode && state?.data === visibleRows) {
-        const maxScroll = Math.max(0, scrollNode.scrollHeight - scrollNode.clientHeight);
-        if (maxScroll > 0) {
-          const scrollTop = scrollNode.scrollTop;
-          const pinnedElement =
-            windowProjection.pinnedLeadingIndex !== null ? state.elementAtIndex(0) : undefined;
-          const atPinnedLeadingRow =
-            pinnedElement instanceof HTMLElement &&
-            scrollTop < maxScroll - 2 &&
-            pinnedElement.getBoundingClientRect().bottom > scrollNode.getBoundingClientRect().top;
-          if (scrollTop <= 2 || atPinnedLeadingRow) {
-            setWindowState({ identity: listIdentityKey, initialized: true, start: 0 });
-          } else {
-            const preloadThreshold = Math.min(
-              Math.max(800, scrollNode.clientHeight),
-              maxScroll * 0.5,
-            );
-            if (scrollTop <= preloadThreshold) {
-              setWindowState({
-                identity: listIdentityKey,
-                initialized: true,
-                start: nextExpandedTimelineWindowStart(windowProjection.windowStart),
-              });
-            }
-          }
-        }
-      }
+  const maybeExpandTimelineWindow = () => {
+    if (windowProjection.windowStart === 0 || restoringThreadPosition) return;
+    const list = listRef.current;
+    const scrollNode = list?.getScrollableNode();
+    const state = list?.getState?.();
+    if (!scrollNode || state?.data !== visibleRows || scrollNode.clientHeight <= 0) return;
+    const maxScroll = Math.max(0, scrollNode.scrollHeight - scrollNode.clientHeight);
+    // Keep at least one viewport of scroll headroom above the end so the pinned
+    // leading row stays off-screen and scrolling up disarms maintainScrollAtEndThreshold={1}.
+    const preloadThreshold = Math.min(Math.max(800, scrollNode.clientHeight), maxScroll * 0.5);
+    if (
+      maxScroll <= scrollNode.clientHeight ||
+      (!state.isFollowingEnd && scrollNode.scrollTop <= preloadThreshold)
+    ) {
+      setWindowState({
+        identity: listIdentityKey,
+        initialized: true,
+        start: nextExpandedTimelineWindowStart(windowProjection.windowStart),
+      });
     }
+  };
+
+  const handleListScroll = () => {
+    maybeExpandTimelineWindow();
     handleScroll();
   };
 
@@ -1194,6 +1188,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     // frame the previous thread scheduled laid out the previous thread's rows.
     if (laidOutData === visibleRows) {
       setSettlingListIdentity((current) => (current === listIdentityKey ? null : current));
+      maybeExpandTimelineWindow();
     }
     handleScroll();
   });
