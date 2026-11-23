@@ -266,6 +266,8 @@ function applyTheme(theme: Theme, { suppressTransitions = false } = {}) {
   }
   const resolvedAppearance = resolveThemeAppearance(appearanceMode, systemDark);
   applyThemePalette(theme, resolvedAppearance);
+  // fleet-design's token sheet swaps its --fa-* variables on html[data-theme].
+  document.documentElement.dataset.theme = resolvedAppearance;
   document.documentElement.classList.toggle("dark", resolvedAppearance === "dark");
   lastAppliedTheme = { theme, systemDark, appearanceMode };
   syncBrowserChromeTheme();
