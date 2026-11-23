@@ -45,8 +45,6 @@ import {
 import { useUiStateStore } from "../uiStateStore";
 import { configureClientTracing } from "../observability/clientTracing";
 import { resolveInitialServerAuthGateState } from "../environments/primary";
-import { hasHostedPairingRequest, isHostedStaticApp } from "../hostedPairing";
-import { useHostedPromptLinkLanding } from "../components/promptLinks/HostedPromptLinkLanding";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
 import { useAtomValue } from "@effect/atom-react";
 import { primaryServerConfigAtom, primaryServerWelcomeAtom } from "../state/server";
@@ -56,15 +54,7 @@ import { isChunkLoadError } from "../lib/chunkReloadGuard";
 
 export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
-    if (location.pathname === "/pair" && hasHostedPairingRequest(new URL(window.location.href))) {
-      return {
-        authGateState: {
-          status: "hosted-pairing",
-        } as const,
-      };
-    }
-
-    if (isLocalEnvironmentDisabled() || isHostedStaticApp(new URL(window.location.href))) {
+    if (isLocalEnvironmentDisabled()) {
       return {
         authGateState: {
           status: "hosted-static",
@@ -122,10 +112,6 @@ function RootRouteBranch() {
   // A sync IPC read; the setting only changes across a relaunch.
   const [localEnvironmentDisabled] = useState(isLocalEnvironmentDisabled);
 
-  const hostedPromptLinkLanding = useHostedPromptLinkLanding(
-    authGateState.status === "hosted-static",
-  );
-
   if (
     pathname === "/pair" ||
     pathname === "/connect" ||
@@ -133,11 +119,6 @@ function RootRouteBranch() {
     pathname === "/approve-agent"
   ) {
     return <Outlet />;
-  }
-
-  // Handle links before a redirect loses them.
-  if (hostedPromptLinkLanding !== null) {
-    return hostedPromptLinkLanding;
   }
 
   if (authGateState.status !== "authenticated" && authGateState.status !== "hosted-static") {

@@ -13,7 +13,6 @@ import { useManagedTunnelUsage } from "~/cloud/managedRelayState";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useCloudLinkController } from "~/cloud/useCloudLinkController";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
-import { isHostedStaticApp } from "~/hostedPairing";
 import {
   useEnvironments,
   usePrimaryEnvironment,
@@ -52,10 +51,7 @@ function ConfiguredConnectOnboardingDialog() {
     ConnectOnboardingOptOutSchema,
   );
 
-  const { environments, isReady: environmentsReady } = useEnvironments();
-  // The empty hosted home already adds account computers after sign-in.
-  const homeScreenAddsComputers =
-    isHostedStaticApp() && environmentsReady && environments.length === 0;
+  const { isReady: environmentsReady } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const primarySessionState = useAtomValue(
     primaryEnvironmentId === null
@@ -115,7 +111,7 @@ function ConfiguredConnectOnboardingDialog() {
   const publishStepDecided = !canManageRelay || controller.linkState.target !== null;
 
   if (requestedAccount !== null && openForAccount === null) {
-    if (homeScreenAddsComputers || optOutAccounts.includes(requestedAccount)) {
+    if (optOutAccounts.includes(requestedAccount)) {
       setRequestedAccount(null);
     } else if (sessionScopesKnown && publishStepDecided) {
       setRequestedAccount(null);

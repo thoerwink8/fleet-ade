@@ -1,19 +1,15 @@
 import { Alert, AlertDescription } from "../ui/alert";
 import type { AuthSessionState } from "@t3tools/contracts";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import React, { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { connectPairing } from "../../connection/onboarding";
 import {
   peekPairingTokenFromUrl,
   stripPairingTokenFromUrl,
   submitServerAuthCredential,
 } from "../../environments/primary";
-import { readHostedPairingRequest } from "../../hostedPairing";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { StandalonePage, StandalonePageHeader } from "../ui/standalone-page";
-import { useAtomCommand } from "../../state/use-atom-command";
 
 export function PairingPendingSurface() {
   return (
@@ -131,118 +127,6 @@ export function PairingRouteSurface({
 
       <div className="mt-6 rounded-lg border border-border/70 bg-background/55 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
         {describeSupportedMethods(auth.bootstrapMethods)}
-      </div>
-    </StandalonePage>
-  );
-}
-
-export function HostedPairingRouteSurface() {
-  const connectPairingEnvironment = useAtomCommand(connectPairing, {
-    reportFailure: false,
-  });
-  const [request] = useState(readHostedPairingRequest);
-  const [status, setStatus] = useState<"pairing" | "paired" | "error">(
-    request ? "pairing" : "error",
-  );
-  const [message, setMessage] = useState(
-    request ? "正在连接此后端。" : "此配对链接缺少后端主机或 token。",
-  );
-  const [canRetry, setCanRetry] = useState(false);
-  const submitAttemptedRef = useRef(false);
-  const tokenSubmittedRef = useRef(false);
-
-  const submitHostedPairingRequest = async () => {
-    if (!request) {
-      setStatus("error");
-      setMessage("此配对链接缺少后端主机或 token。");
-      setCanRetry(false);
-      return;
-    }
-
-    if (tokenSubmittedRef.current) {
-      setStatus("error");
-      setMessage("此一次性配对 token 已提交过。请申请新的配对链接。");
-      setCanRetry(false);
-      return;
-    }
-
-    setStatus("pairing");
-    setMessage("正在连接此后端。");
-    setCanRetry(false);
-    tokenSubmittedRef.current = true;
-
-    const result = await connectPairingEnvironment({
-      host: request.host,
-      pairingCode: request.token,
-    });
-    if (result._tag === "Success") {
-      setStatus("paired");
-      setMessage(`${request.label || "此环境"} 已保存在此浏览器中。`);
-      return;
-    }
-
-    tokenSubmittedRef.current = false;
-    setStatus("error");
-    setCanRetry(true);
-    setMessage(
-      `${errorMessageFromUnknown(squashAtomCommandFailure(result))} 如果后端已接受此一次性 token，请先申请新的配对链接再重试。`,
-    );
-  };
-
-  const submitOnMount = useEffectEvent(() => {
-    void submitHostedPairingRequest();
-  });
-
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- strips the pairing token from the URL and submits the hosted pairing request once on mount
-  useEffect(() => {
-    if (submitAttemptedRef.current) {
-      return;
-    }
-    submitAttemptedRef.current = true;
-
-    stripPairingTokenFromUrl();
-    submitOnMount();
-  }, []);
-
-  return (
-    <StandalonePage>
-      <StandalonePageHeader
-        title={
-          status === "paired" ? "后端已配对" : status === "error" ? "配对失败" : "正在配对后端"
-        }
-        description={message}
-      />
-
-      {request ? (
-        <div className="mt-5 rounded-lg border border-border/70 bg-background/55 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
-          主机：<span className="font-mono text-foreground/80">{request.host}</span>
-        </div>
-      ) : null}
-
-      {status === "error" ? (
-        <Alert variant="error" className="mt-5">
-          <AlertDescription>
-            请确认此浏览器能访问该后端、后端为托管客户端启用了跨域，并且在通过 HTTPS
-            打开此页面时后端也使用 HTTPS。
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="mt-6 flex flex-wrap gap-2">
-        {status === "pairing" ? (
-          <Button disabled size="sm">
-            正在配对…
-          </Button>
-        ) : canRetry ? (
-          <Button size="sm" onClick={() => void submitHostedPairingRequest()}>
-            重试
-          </Button>
-        ) : null}
-        {status === "paired" ? (
-          <Button size="sm" variant="outline" onClick={() => (window.location.href = "/")}>
-            打开应用
-          </Button>
-        ) : null}
       </div>
     </StandalonePage>
   );

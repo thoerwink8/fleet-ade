@@ -27,7 +27,7 @@ import { createModelSelection } from "@t3tools/shared/model";
 import { resolvePastedPath } from "@t3tools/shared/path";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
-import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
+import { APP_VERSION } from "../../branding";
 import { AboutVersionTitle } from "./AboutVersionTitle";
 import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
 import {
@@ -41,7 +41,6 @@ import {
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import { isElectron } from "../../env";
-import { buildHostedChannelSelectionUrl, type HostedAppChannel } from "../../hostedPairing";
 import { readAppearanceModePreference, readThemePreference, useTheme } from "../../hooks/useTheme";
 import { useClientSettings, useUpdatePrimarySettings } from "../../hooks/useSettings";
 import {
@@ -154,7 +153,6 @@ function AboutVersionSection() {
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
-  const selectedHostedAppChannel = hasDesktopBridge ? null : HOSTED_APP_CHANNEL;
   // A switch that failed part way leaves this app or a server on the other track.
   // With its updater off, a switch cannot move this app, so it is not counted.
   const appOffTrack =
@@ -340,35 +338,6 @@ function AboutVersionSection() {
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
                   稳定版
-                </SelectItem>
-                <SelectItem hideIndicator value="nightly">
-                  Nightly 版
-                </SelectItem>
-              </SelectPopup>
-            </Select>
-          }
-        />
-      ) : selectedHostedAppChannel ? (
-        <SettingsRow
-          {...searchableSetting("update-track")}
-          description="切换托管版应用的发布通道。"
-          control={
-            <Select
-              value={selectedHostedAppChannel}
-              onValueChange={(value) => {
-                if (value === selectedHostedAppChannel) return;
-                const next = buildHostedChannelSelectionUrl({
-                  channel: value as HostedAppChannel,
-                });
-                if (next) window.location.assign(next);
-              }}
-            >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="更新通道">
-                <SelectValue>{HOSTED_APP_CHANNEL_LABEL}</SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value="latest">
-                  最新版
                 </SelectItem>
                 <SelectItem hideIndicator value="nightly">
                   Nightly 版
@@ -2137,7 +2106,7 @@ export function AboutSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection id="about" title="应用">
-        {isElectron || HOSTED_APP_CHANNEL ? (
+        {isElectron ? (
           <AboutVersionSection />
         ) : (
           <>

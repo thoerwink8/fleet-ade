@@ -42,7 +42,6 @@ import * as Struct from "effect/Struct";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { toastManager } from "~/components/ui/toast";
-import { isHostedStaticApp } from "~/hostedPairing";
 import { environmentCatalog } from "~/connection/catalog";
 import { primaryServerSettingsAtom, serverEnvironment } from "~/state/server";
 import { useEnvironments, usePrimaryEnvironment } from "~/state/environments";
@@ -559,12 +558,11 @@ export function usePrimarySettings<T = UnifiedSettings>(
 }
 
 export const PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE =
-  "此设置保存在服务器上，而托管应用未固定连接某台服务器。请从桌面应用或服务器自身的地址修改。";
+  "此设置保存在服务器上，而当前没有固定连接的服务器。请从桌面应用或服务器自身的地址修改。";
 
-/** Hosted clients have no primary: usePrimarySettings reads defaults and cannot write. */
+/** A missing primary still exposes settings; writes fail with the unavailable message. */
 export function usePrimarySettingsAvailable(): boolean {
-  const primaryEnvironment = usePrimaryEnvironment();
-  return primaryEnvironment !== null || !isHostedStaticApp();
+  return true;
 }
 
 function useSharedSettingsSyncTargetIds(includePending = false): ReadonlyArray<EnvironmentId> {

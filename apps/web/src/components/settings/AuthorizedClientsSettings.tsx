@@ -22,7 +22,7 @@ import {
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { cn } from "../../lib/utils";
 import { formatElapsedDurationLabel, formatExpiresInLabel } from "../../timestampFormat";
-import { resolveDesktopPairingUrl, resolveHostedPairingUrl } from "./pairingUrls";
+import { resolveDesktopPairingUrl } from "./pairingUrls";
 import {
   canRevokeOtherClients,
   isQrShareableEndpoint,
@@ -66,7 +66,6 @@ import {
   endpointDefaultPreferenceKey,
   resolveAdvertisedEndpointPairingUrl,
   resolveCurrentOriginPairingUrl,
-  isHostedAppPairingUrl,
   endpointShareHint,
 } from "./ConnectionsSettings.logic";
 
@@ -155,10 +154,6 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
   const qrPanelId = useId();
 
   const currentOriginPairingUrl = credential ? resolveCurrentOriginPairingUrl(credential) : null;
-  const hostedPairingUrl =
-    credential && endpointUrl != null && endpointUrl !== ""
-      ? resolveHostedPairingUrl(endpointUrl, credential)
-      : null;
   const endpointPairingUrl = (() => {
     const endpoint = selectPairingEndpoint(endpoints, defaultEndpointKey);
     return endpoint && credential
@@ -185,7 +180,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         preferenceKey: endpointDefaultPreferenceKey(endpoint),
         label: endpoint.label,
         url,
-        detail: endpointShareHint(endpoint, url),
+        detail: endpointShareHint(endpoint),
         qrShareable: isQrShareableEndpoint(endpoint),
       });
     }
@@ -194,14 +189,13 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
   const shareablePairingUrl =
     endpointPairingUrl ??
     (credential && endpointUrl != null && endpointUrl !== ""
-      ? (hostedPairingUrl ?? resolveDesktopPairingUrl(endpointUrl, credential))
+      ? resolveDesktopPairingUrl(endpointUrl, credential)
       : !servedByEnvironment || isLoopbackHostname(window.location.hostname)
         ? null
         : currentOriginPairingUrl);
   const [failedCopyValue, setFailedCopyValue] = useState<string | null>(null);
   const revealValue = failedCopyValue ?? shareablePairingUrl ?? credential ?? "";
   const isRevealValueUrl = revealValue !== credential;
-  const isRevealValueHostedAppPairingUrl = isRevealValueUrl && isHostedAppPairingUrl(revealValue);
   const isRevealValueQrShareable =
     endpointCopyOptions.find((option) => option.url === revealValue)?.qrShareable ?? true;
   const canCopyToClipboard =
@@ -211,23 +205,16 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
 
   const { copyToClipboard } = useCopyToClipboard<{
     value: string;
-    kind: "code" | "hosted-link" | "link";
+    kind: "code" | "link";
   }>({
     onCopy: ({ kind }) => {
       toastManager.add({
         type: "success",
-        title:
-          kind === "hosted-link"
-            ? "已复制托管版应用链接"
-            : kind === "link"
-              ? "已复制配对 URL"
-              : "已复制配对码",
+        title: kind === "link" ? "已复制配对 URL" : "已复制配对码",
         description:
-          kind === "hosted-link"
-            ? "在要连接的设备上，用浏览器打开此链接。"
-            : kind === "link"
-              ? "在要与此环境配对的客户端中打开此链接。"
-              : "粘贴到另一个客户端中完成配对。",
+          kind === "link"
+            ? "在要与此环境配对的客户端中打开此链接。"
+            : "粘贴到另一个客户端中完成配对。",
       });
     },
     onError: (error, { value, kind }) => {
@@ -239,11 +226,9 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         stackedThreadToast({
           type: "error",
           title: canCopyToClipboard
-            ? kind === "hosted-link"
-              ? "无法复制托管版应用链接"
-              : kind === "link"
-                ? "无法复制配对 URL"
-                : "无法复制配对码"
+            ? kind === "link"
+              ? "无法复制配对 URL"
+              : "无法复制配对码"
             : "无法复制到剪贴板",
           description: canCopyToClipboard ? error.message : "已显示完整内容，请手动复制。",
         }),
@@ -251,12 +236,9 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
     },
   });
 
-  const copyPairingValue = (value: string, kind: "code" | "hosted-link" | "link") => {
+  const copyPairingValue = (value: string, kind: "code" | "link") => {
     copyToClipboard(value, { value, kind });
   };
-
-  const copyKindForUrl = (url: string): "hosted-link" | "link" =>
-    isHostedAppPairingUrl(url) ? "hosted-link" : "link";
 
   const handleCopyCode = () => {
     if (credential) copyPairingValue(credential, "code");
@@ -339,17 +321,11 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             <DialogPopup className="max-w-md">
               <DialogHeader>
                 <DialogTitle>
-                  {isRevealValueUrl
-                    ? isRevealValueHostedAppPairingUrl
-                      ? "托管版应用配对链接"
-                      : "配对链接"
-                    : "配对码"}
+                  {isRevealValueUrl ? "配对链接" : "配对码"}
                 </DialogTitle>
                 <DialogDescription>
                   {isRevealValueUrl
-                    ? isRevealValueHostedAppPairingUrl
-                      ? "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此托管版应用链接。"
-                      : "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此完整配对 URL。"
+                    ? "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此完整配对 URL。"
                     : "这里无法复制到剪贴板。请手动将此配对码复制到另一个客户端。"}
                 </DialogDescription>
               </DialogHeader>
@@ -455,7 +431,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
                 size="xs"
                 variant="ghost"
                 className="shrink-0"
-                onClick={() => copyPairingValue(qrPairingUrl, copyKindForUrl(qrPairingUrl))}
+                onClick={() => copyPairingValue(qrPairingUrl, "link")}
               >
                 复制链接
               </Button>
