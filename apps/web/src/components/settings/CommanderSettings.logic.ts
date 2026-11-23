@@ -66,7 +66,8 @@ export const COMMANDER_DISPATCH_ROLES: ReadonlyArray<CommanderDispatchRoleConfig
   },
 ];
 
-export const COMMANDER_DISPATCH_SETTING_KEYS: readonly ProjectScopedServerSettingKey[] = [
+export const COMMANDER_DISPATCH_SETTING_KEYS: readonly (CommanderDispatchSettingKey &
+  ProjectScopedServerSettingKey)[] = [
   "dispatchCodeModelSelection",
   "dispatchReviewModelSelection",
   "dispatchReadonlyModelSelection",
@@ -185,7 +186,7 @@ export function hasAnyCommanderSettingToReset(input: {
 }): boolean {
   return COMMANDER_DISPATCH_SETTING_KEYS.some((key) =>
     canResetCommanderSettingRow({
-      key: key as CommanderDispatchSettingKey,
+      key,
       isProjectScope: input.isProjectScope,
       targets: input.targets,
       mixed: scopedSettingsAreMixed(input.targets, [key]),
