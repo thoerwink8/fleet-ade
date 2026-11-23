@@ -10,8 +10,6 @@
 
 <p align="center">
   <a href="https://t3.codes/download"><strong>Download</strong></a> ·
-  <a href="https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824">iOS</a> ·
-  <a href="https://play.google.com/store/apps/details?id=com.t3tools.t3code">Android</a> ·
   <a href="https://app.t3.codes">Web</a> ·
   <a href="./docs/README.md">Docs</a> ·
   <a href="https://discord.gg/jn4EGJjrvv">Discord</a>
@@ -26,7 +24,7 @@
 
 <p align="center">
   <a href="https://t3.codes">
-    <img src="./.github/readme/hero.webp" width="100%" alt="T3 Code on desktop with a finished Claude thread, next to the phone app asking to approve a command from Codex" />
+    <img src="./.github/readme/hero.webp" width="100%" alt="T3 Code on desktop with a finished Claude thread, next to a phone asking to approve a command from Codex" />
   </a>
 </p>
 
@@ -38,7 +36,7 @@ It works with Claude Code, Codex, Grok Build, Antigravity, and any [ACP](./docs/
 
 - **Your subscriptions.** T3 Code does not resell tokens. It drives the agents you are already signed in to.
 - **Every agent in one place.** Change models in the middle of a thread. Let Claude hand a task to Codex.
-- **Desktop, web, and phone.** One server, and every client shows the same threads. There are apps for iOS and Android.
+- **Desktop, web, and phone.** One server, and every client shows the same threads. A phone uses the [web app](./docs/user/install.md#mobile-app).
 - **Remote ready.** Run agents on any machine. Connect over your local network, Tailscale, or [T3 Connect](./docs/user/remote-access.md).
 - **Git built in.** Each thread can work in its own worktree. Review the diff, then commit, push, and open a pull request with one button.
 - **Fast.** Performance is a feature here. We measure it, and we treat a dropped frame as a bug.
@@ -76,7 +74,7 @@ To try it once without an install, run `npx t3@latest`.
 
 ### Phone
 
-Get the app from the [App Store](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or [Google Play](https://play.google.com/store/apps/details?id=com.t3tools.t3code). Then follow [remote access](./docs/user/remote-access.md) to connect it to your computer.
+A phone uses the web app. [Mobile setup](./docs/user/install.md#mobile-app) has the steps, then [remote access](./docs/user/remote-access.md) links it to your computer.
 
 ### Sign in to an agent
 

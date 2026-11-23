@@ -79,7 +79,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         )}
         <AlertDescription>
           {chatGptLimit ? (
-            <p className="font-medium">已达到 ChatGPT 用量上限</p>
+            <p className="text-row font-semibold">已达到 ChatGPT 用量上限</p>
           ) : (
             <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />
           )}

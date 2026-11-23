@@ -225,7 +225,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       {...navArea}
       role="navigation"
       className={cn(
-        "flex w-60 shrink-0 flex-col border-e bg-sidebar text-sidebar-foreground max-md:w-14",
+        "flex w-52 shrink-0 flex-col border-e bg-sidebar text-sidebar-foreground max-md:w-14",
         compactSearchOpen &&
           "max-md:absolute max-md:inset-y-0 max-md:start-0 max-md:z-10 max-md:w-full",
       )}
@@ -331,7 +331,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 ))}
               </SidebarMenu>
             ) : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
                 {compactSearchOpen ? null : (
                   <SidebarMenu className="md:hidden">
                     <SidebarMenuItem>
@@ -344,11 +344,15 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                     </SidebarMenuItem>
                   </SidebarMenu>
                 )}
-                <div onKeyDown={handleSettingsSectionKeyDown} className="flex flex-col gap-4">
+                <div onKeyDown={handleSettingsSectionKeyDown} className="flex flex-col gap-1">
                   {SETTINGS_NAV_GROUPS.map((group, index) => (
                     <div
                       key={group.heading}
-                      className="flex flex-col gap-1 max-md:border-t max-md:border-sidebar-border max-md:pt-4 max-md:first:border-t-0 max-md:first:pt-0"
+                      className={cn(
+                        "flex flex-col gap-1",
+                        !group.headingHidden &&
+                          "mt-3 first:mt-0 max-md:border-t max-md:border-sidebar-border max-md:pt-3 max-md:first:border-t-0 max-md:first:pt-0",
+                      )}
                     >
                       <h3
                         id={`settings-nav-group-${index}`}

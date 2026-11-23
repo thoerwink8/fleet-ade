@@ -88,17 +88,16 @@ t3 pair
 ```
 
 Scan the QR code on your phone or paste the pairing URL into **Add environment**
-in the receiving app. Connection settings are under **Settings → Connections**
-on web and desktop and **Settings → Environments** on mobile. A loopback address
-such as `127.0.0.1` reaches only the device opening the link.
+in the receiving app. Connection settings are under **Settings → Connections**.
+A loopback address such as `127.0.0.1` reaches only the device opening the link.
+
+If your HTTPS endpoint uses a certificate from your own certificate authority,
+install that CA on the phone or computer whose browser opens the link, so the
+browser trusts it.
 
 On a computer with the desktop app, you can open the printed `t3code://pair`
 app link instead. The desktop app asks you to confirm the server address, then
 adds it.
-
-If your HTTPS endpoint uses a certificate from your own certificate authority,
-install that CA on Android as a **CA certificate** in its security settings; the
-Android app then trusts it.
 
 Pairing authorizes that device for future connections. Use a fresh one-time link
 for each new device; you do not need the original token to reconnect. Links
@@ -135,14 +134,12 @@ again, after the other routes, if none of them connect. While connected over a
 later route, T3 Code checks the earlier ones when your network changes, when you
 return to the app, and every minute, and moves back as soon as one works.
 
-On web and desktop, select the route count under the machine's name in
-**Settings → Connections** to see its routes. Drag a route to change the order,
-or remove it. On mobile, open the machine under **Settings → Environments** and
-choose **Edit**. Signing out of T3 Connect removes only that route; a machine
-you can still reach another way stays saved.
+Select the route count under the machine's name in **Settings → Connections**
+to see its routes. Drag a route to change the order, or remove it. Signing out
+of T3 Connect removes only that route; a machine you can still reach another way
+stays saved.
 
-Open **Permissions** next to **Routes** in web or desktop, or **Your permissions**
-in the mobile route details, to see what your current connection can do on that
+Open **Permissions** next to **Routes** to see what your current connection can do on that
 environment. For a remote environment, this is in its route details. Permissions
 shown there apply only to the route marked **In use**; other routes are not
 checked. Direct pairing and T3 Connect have separate sessions and may grant

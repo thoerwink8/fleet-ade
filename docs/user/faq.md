@@ -14,7 +14,7 @@ We were inspired by the Codex desktop app, Conductor, Claude Desktop, and Cursor
 
 - Bring your own sub. Claude, Codex, and whatever else you already have installed.
 - Best in class remote. Run `t3 up` on any box and drive it from anywhere.
-- Best in class mobile app.
+- Use it from a phone. [Mobile setup](./install.md#mobile-app)
 - Truly 100% open source. If we go the wrong direction, fork it.
 
 Every harness feels nearly identical in here, so you can stop worrying about harnesses and focus on building :) [Install](./install.md)
@@ -41,7 +41,7 @@ Your agents run wherever T3 Code runs: your desktop, a server, a VPS. You connec
 
 ## How do I use T3 Code on my phone?
 
-Get the [iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code) app, then connect it to your computer with T3 Connect or a pairing link. The phone is a remote. Your computer does the work and needs to stay on. [Mobile setup](./install.md#mobile-app) · [Remote access](./remote-access.md)
+Follow [Mobile setup](./install.md#mobile-app), then connect to your computer with T3 Connect or a pairing link. The phone is a remote. Your computer does the work and needs to stay on. [Remote access](./remote-access.md)
 
 ## Why does T3 Connect keep disconnecting?
 

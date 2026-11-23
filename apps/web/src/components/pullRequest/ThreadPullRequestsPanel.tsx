@@ -428,7 +428,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-sm font-medium">没有已关联的 PR</p>
+        <p className="text-row font-semibold">没有已关联的 PR</p>
         <p className="max-w-60 text-xs text-muted-foreground">
           智能体从本会话打开的 pull request 会显示在这里。你也可以通过 URL 或编号自行关联。
         </p>

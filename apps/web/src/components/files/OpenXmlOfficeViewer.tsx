@@ -97,7 +97,7 @@ export default function OfficeViewer(props: {
         role="alert"
         className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center"
       >
-        <p className="text-sm font-medium">此文件无法预览</p>
+        <p className="text-row font-semibold">此文件无法预览</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
           {error} 请保存，或用其他应用打开。
         </p>

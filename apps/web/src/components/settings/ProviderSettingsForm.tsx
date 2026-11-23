@@ -520,7 +520,7 @@ function ProviderSettingsFieldRow({
     variant === "dialog"
       ? "text-2xs text-muted-foreground"
       : "mt-1 block text-xs text-muted-foreground";
-  const label = <span className="text-xs font-medium text-foreground">{field.label}</span>;
+  const label = <span className="text-meta font-semibold text-foreground">{field.label}</span>;
   const description = field.description ? (
     <span className={descriptionClassName}>{field.description}</span>
   ) : null;

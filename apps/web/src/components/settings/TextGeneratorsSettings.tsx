@@ -346,7 +346,7 @@ function TextGeneratorWizard({
               <fieldset disabled={checking} className="contents">
                 {existing === null ? (
                   <div className="grid gap-1.5">
-                    <span className="text-sm font-medium">服务</span>
+                    <span className="text-row font-semibold">服务</span>
                     <div
                       role="radiogroup"
                       aria-label="服务"

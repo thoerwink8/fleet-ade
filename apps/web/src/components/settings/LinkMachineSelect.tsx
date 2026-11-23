@@ -67,7 +67,7 @@ export function LinkMachineSelect({
   const labelId = useId();
   return (
     <div className="space-y-1.5">
-      <span id={labelId} className="block text-xs font-medium text-foreground">
+      <span id={labelId} className="block text-meta font-semibold text-foreground">
         机器
       </span>
       <Select

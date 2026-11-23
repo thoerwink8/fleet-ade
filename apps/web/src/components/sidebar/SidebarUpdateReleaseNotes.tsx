@@ -77,7 +77,7 @@ export function SidebarUpdateReleaseNotes({
       <div className="shrink-0 px-1">
         {state.status === "available" ? (
           <div>
-            <div className="whitespace-nowrap text-sm leading-5 font-medium">更新已可下载</div>
+            <div className="whitespace-nowrap text-row font-semibold">更新已可下载</div>
             {state.availableVersion ? (
               <div className="mt-0.5 text-xs leading-4 text-muted-foreground">
                 {releasedAt
@@ -87,7 +87,7 @@ export function SidebarUpdateReleaseNotes({
             ) : null}
           </div>
         ) : (
-          <div className="text-sm leading-5 font-medium">{tooltip}</div>
+          <div className="text-row font-semibold">{tooltip}</div>
         )}
       </div>
       <div className="min-h-0 max-h-[min(28rem,calc(100vh-6rem))] overflow-y-auto px-1 pt-3 pb-1">
@@ -105,7 +105,7 @@ export function SidebarUpdateReleaseNotes({
             <section className={index > 0 ? "mt-4" : undefined} key={releaseNote.version}>
               {generated ? (
                 releaseNote.version !== state.availableVersion && (
-                  <h3 className="mb-1 text-xs leading-4 font-medium text-muted-foreground">
+                  <h3 className="mb-1 text-meta font-semibold text-muted-foreground">
                     {releaseNote.releasedAt
                       ? `${releaseNote.version} · ${formatReleaseAge(releaseNote.releasedAt)}`
                       : releaseNote.version}

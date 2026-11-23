@@ -12,8 +12,6 @@ What can leave the machine:
   browser app has no switch for its own traces.
 - Agent activity, when **Publish agent activity** is on. To turn it off, open
   **Settings > Connections** on the host and turn off **Publish agent activity**.
-- Crash and startup reports from the iOS or Android app. To turn them off, open
-  **Settings > About > Diagnostics** and turn off **Send crash reports**.
 - Traces, metrics, or logs you send to an OpenTelemetry receiver of your own.
 
 Prompts, responses, and file contents are not included.
@@ -37,20 +35,6 @@ variable.
 The web app in a browser, including one the `t3` CLI opens, does not read these environment
 variables. It can send its own connection traces even if the server has opted out. The browser app has
 no relay tracing toggle.
-
-## Mobile app diagnostics
-
-When the iOS or Android app crashes or hits an error, it sends a report to T3 Code: the error
-message, the stack trace, the app version, and the device model and OS version. Each launch also
-sends startup timings, and every report carries a random ID for the install. Reports go through
-the T3 Connect relay to Axiom. They do not include your threads, prompts, or connection details,
-but an error message can quote a value the app was handling.
-
-To stop sending them, turn off **Send crash reports** in **Settings > About > Diagnostics**.
-
-The mobile app can also send relay connection traces. These carry an identifier for the current app
-session. **Send crash reports** does not control these traces, and the mobile app has no separate
-relay tracing toggle. Server environment variables do not disable mobile tracing.
 
 ## Agent activity for mobile notifications
 

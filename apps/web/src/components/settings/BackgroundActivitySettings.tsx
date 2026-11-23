@@ -126,7 +126,7 @@ function BackgroundActivityAdvancedDialog({
           >
             <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">共享策略</div>
+                <div className="text-row font-semibold">共享策略</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   控制后台任务达到设定间隔后是否允许运行。
                 </p>
@@ -164,7 +164,7 @@ function BackgroundActivityAdvancedDialog({
 
             <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">
+                <div className="text-row font-semibold">
                   {searchableSetting("git-fetch-interval").title}
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -194,7 +194,7 @@ function BackgroundActivityAdvancedDialog({
 
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">提供方状态检查间隔</div>
+                <div className="text-row font-semibold">提供方状态检查间隔</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   刷新提供方的可用状态、版本和认证状态。模型目录是否更新取决于“提供方更新检查”设置。
                 </p>
@@ -222,7 +222,7 @@ function BackgroundActivityAdvancedDialog({
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">主机电源监测</div>
+                <div className="text-row font-semibold">主机电源监测</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   客户端活跃时定期检查主机电源状态。
                 </p>
@@ -250,7 +250,7 @@ function BackgroundActivityAdvancedDialog({
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">闲置主机监测</div>
+                <div className="text-row font-semibold">闲置主机监测</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   没有活跃的前台客户端时，定期检查主机电源状态。
                 </p>
@@ -282,7 +282,7 @@ function BackgroundActivityAdvancedDialog({
                   key={key}
                   className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 sm:border-r sm:even:border-r-0"
                 >
-                  <span className="text-sm font-medium">{label}</span>
+                  <span className="text-row font-semibold">{label}</span>
                   <Switch
                     checked={resolvedBackgroundActivity[key]}
                     onCheckedChange={(checked) =>

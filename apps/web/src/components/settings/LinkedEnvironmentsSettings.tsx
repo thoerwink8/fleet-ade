@@ -142,7 +142,7 @@ function LinkedEnvironmentRow({
               }
               pingClassName={null}
             />
-            <h3 className="text-sm font-medium text-foreground">{link.label}</h3>
+            <h3 className="text-row font-semibold text-foreground">{link.label}</h3>
           </div>
           <p className="text-xs text-muted-foreground">
             {accessConfig[link.access].label} · {status}
@@ -301,7 +301,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
             ) : null}
             {needsAddress ? (
               <label className="block space-y-1.5">
-                <span className="block text-xs font-medium text-foreground">地址</span>
+                <span className="block text-meta font-semibold text-foreground">地址</span>
                 <Input
                   value={address}
                   onChange={(event) => {
@@ -326,7 +326,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
             {needsAddress && address.trim() ? <LinkAddressWarning address={address} /> : null}
             {selected === null || canMint ? null : (
               <label className="block space-y-1.5">
-                <span className="block text-xs font-medium text-foreground">配对码</span>
+                <span className="block text-meta font-semibold text-foreground">配对码</span>
                 <Input
                   value={pairingCode}
                   onChange={(event) => setPairingCode(event.target.value)}

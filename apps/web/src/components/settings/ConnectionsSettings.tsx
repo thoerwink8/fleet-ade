@@ -1221,7 +1221,7 @@ function ConnectionsSettingsContent({
             ) : null}
             {accessEnvironment ? (
               <details className="group px-3 sm:px-4">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-md text-row font-semibold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                   权限
                   <ChevronRightIcon
                     aria-hidden
@@ -1495,7 +1495,7 @@ function ConnectionsSettingsContent({
               </DialogHeader>
               <DialogPanel>
                 <label className="block">
-                  <span className="text-sm font-medium text-foreground">HTTPS 端口</span>
+                  <span className="text-row font-semibold text-foreground">HTTPS 端口</span>
                   <Input
                     className="mt-2"
                     type="number"
@@ -1512,7 +1512,7 @@ function ConnectionsSettingsContent({
                   <p className="mt-2 text-xs text-destructive">请输入 1 到 65535 之间的端口。</p>
                 ) : null}
                 <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
-                  <p className="text-xs font-medium text-muted-foreground">HTTPS 端点</p>
+                  <p className="text-meta font-semibold text-muted-foreground">HTTPS 端点</p>
                   <Tooltip>
                     <TooltipTrigger
                       render={

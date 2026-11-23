@@ -138,7 +138,7 @@ function ProjectIconPickerBody({
 
         {mode !== "emoji" ? (
           <div>
-            <div className="mb-2 text-xs font-medium text-muted-foreground">颜色</div>
+            <div className="mb-2 text-meta font-semibold text-muted-foreground">颜色</div>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="图标颜色">
               {PROJECT_ICON_COLORS.map((option) => (
                 <button
@@ -200,7 +200,7 @@ function ProjectIconPickerBody({
               className="size-12"
             />
             <div className="flex-1 space-y-2">
-              <label htmlFor="project-monogram" className="text-sm font-medium">
+              <label htmlFor="project-monogram" className="text-row font-semibold">
                 字母
               </label>
               <Input
@@ -238,7 +238,9 @@ function ProjectIconPickerBody({
               </div>
             </ScrollArea>
             <div>
-              <div className="mb-2 text-xs font-medium text-muted-foreground">或粘贴任意表情</div>
+              <div className="mb-2 text-meta font-semibold text-muted-foreground">
+                或粘贴任意表情
+              </div>
               <Input
                 value={customEmoji}
                 aria-label="自定义表情"

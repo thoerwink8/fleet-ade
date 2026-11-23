@@ -363,7 +363,7 @@ export function UsagePage() {
     <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 @4xl/usage-header:flex">
       <WorkspaceBreadcrumb ariaLabel="用量导航" className="min-w-0">
         <WorkspaceBreadcrumbItem>
-          <h1>用量</h1>
+          <h1 className="text-title font-semibold text-foreground">用量</h1>
         </WorkspaceBreadcrumbItem>
         <WorkspaceBreadcrumbSeparator />
         <WorkspaceBreadcrumbItem className="min-w-10 shrink">
@@ -774,7 +774,7 @@ function UsageOverview({
         </div>
 
         <div className="flex min-w-0 flex-col gap-3">
-          <h2 className="text-sm font-medium text-foreground">
+          <h2 className="text-row font-semibold text-foreground">
             {shownHourly ? "每小时" : "每天"}
             {metric === "tokens" ? "处理的词元" : "费用"}
           </h2>
@@ -795,7 +795,7 @@ function UsageOverview({
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-foreground">总计</h2>
+        <h2 className="text-row font-semibold text-foreground">总计</h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-1 md:grid-cols-5">
           <Metric
             loading={loadingPartial}
@@ -853,7 +853,7 @@ function UsageOverview({
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-foreground">明细</h2>
+          <h2 className="text-row font-semibold text-foreground">明细</h2>
           <ToggleGroup
             aria-label="用量明细"
             variant="segmented"
@@ -1344,7 +1344,7 @@ function UsageSkeleton() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-foreground">总计</h2>
+        <h2 className="text-row font-semibold text-foreground">总计</h2>
         <MetricSkeletons
           labels={["处理的词元", "缓存的输入", "未缓存的输入", "输出", "缓存节省"]}
         />
@@ -1360,7 +1360,7 @@ function UsageSkeleton() {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-foreground">明细</h2>
+          <h2 className="text-row font-semibold text-foreground">明细</h2>
           <Skeleton shape="card" className="h-7 w-28" />
         </div>
         <Skeleton className="h-44" />
