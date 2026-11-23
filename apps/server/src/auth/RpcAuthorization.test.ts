@@ -14,6 +14,8 @@ import {
   AuthSourceControlWriteScope,
   AuthTerminalReadScope,
   AuthTerminalOperateScope,
+  ORCHESTRATION_V2_WS_METHODS,
+  clientRpcRequiredScopes,
   WS_METHODS,
   WsRpcGroup,
 } from "@t3tools/contracts";
@@ -121,6 +123,39 @@ describe("RPC scope middleware", () => {
     }),
   );
 });
+
+it.effect("requires operate permission to mark child drift as a false positive", () =>
+  Effect.gen(function* () {
+    const method = ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive;
+    const group = WsRpcGroup.omit(
+      ...[...WsRpcGroup.requests.keys()].filter(
+        (tag): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, typeof method> => tag !== method,
+      ),
+    );
+    let handled = false;
+    const client = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          group.toLayerHandler(method, () =>
+            Effect.sync(() => {
+              handled = true;
+              return {};
+            }),
+          ),
+          RpcAuthorization.layer([AuthOrchestrationReadScope]),
+        ),
+      ),
+    );
+    expect(clientRpcRequiredScopes(method, { threadId: "child" })).toEqual([
+      AuthOrchestrationOperateScope,
+    ]);
+    expect(
+      yield* client[method]({ threadId: ThreadId.make("child") }).pipe(Effect.flip),
+    ).toMatchObject({ requiredPermission: AuthOrchestrationOperateScope });
+    expect(handled).toBe(false);
+  }),
+);
+
 it.effect.each([
   WS_METHODS.subscribeVcsBranch,
   WS_METHODS.subscribeVcsStatus,

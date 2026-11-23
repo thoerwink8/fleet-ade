@@ -432,7 +432,16 @@ export const layerProduction = Layer.mergeAll(
     ChildSessionSummary.layer,
     ChildSessionSummary.layerWorker,
     ChildSessionSummary.layerIdle,
-  ).pipe(Layer.provide(Layer.mergeAll(layerEventSink, ProjectionStore.layer, layerCommandAssist))),
+  ).pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        layerEventSink,
+        ProjectionStore.layer,
+        layerCommandAssist,
+        layerOrchestratorProvided,
+      ),
+    ),
+  ),
 ).pipe(
   Layer.provide(ResourceCleanupService.layer.pipe(Layer.provide(layerScheduledTaskProvided))),
   Layer.provide(Scheduler.layer),

@@ -48,6 +48,7 @@ import * as EffectWorker from "../orchestration-v2/EffectWorker.ts";
 import * as LegacyV1ThreadImporter from "../orchestration-v2/legacy/LegacyV1ThreadImporter.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts";
+import * as CommandAssist from "../orchestration-v2/CommandAssist.ts";
 import * as ProviderReplayHarness from "../orchestration-v2/testkit/ProviderReplayHarness.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import {
@@ -2642,6 +2643,15 @@ describe("OrchestratorMcpService provider resolution", () => {
         for (const testCase of cases) {
           const dispatched = yield* Ref.make<ReadonlyArray<unknown>>([]);
           let delegated = false;
+          const assistLayer = CommandAssist.layer.pipe(
+            Layer.provide(
+              Layer.succeed(CommandAssist.CommandAssistModel, {
+                complete: () => Effect.succeed("{}"),
+              }),
+            ),
+            Layer.provide(ServerSettings.layerTest()),
+            Layer.provide(SqlitePersistence.layerMemory),
+          );
           const layerDependencies = Layer.mergeAll(
             NodeServices.layer,
             NodeCrypto.layer,
@@ -2772,6 +2782,10 @@ describe("OrchestratorMcpService provider resolution", () => {
               clientRequestId: `delegate-select-${testCase.name}`,
             });
             assert.equal(result.status, "running", testCase.name);
+            const remembered = yield* (yield* CommandAssist.CommandAssist).read(childThreadId);
+            assert.equal(remembered.goal, "Summarize the diff.");
+            assert.isNull(remembered.avoid);
+            assert.isNull(remembered.testCommands);
             const commands = yield* Ref.get(dispatched);
             assert.equal(commands.length, 1, testCase.name);
             const request = commands[0] as {
@@ -2793,7 +2807,14 @@ describe("OrchestratorMcpService provider resolution", () => {
             } else {
               assert.equal(request.modelSelection.model, "codex-alt-model", testCase.name);
             }
-          }).pipe(Effect.provide(layerOrchestratorService.pipe(Layer.provide(layerDependencies))));
+          }).pipe(
+            Effect.provide(
+              layerOrchestratorService.pipe(
+                Layer.provideMerge(assistLayer),
+                Layer.provide(layerDependencies),
+              ),
+            ),
+          );
         }
       }),
   );

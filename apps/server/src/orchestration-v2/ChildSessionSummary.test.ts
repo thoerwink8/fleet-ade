@@ -26,6 +26,7 @@ import { liveThreadShell } from "../mcp/McpToolAccess.testkit.ts";
 import { ChildSessionSummary, ChildSessionSummaryInternal } from "./ChildSessionSummary.ts";
 import * as CommandAssist from "./CommandAssist.ts";
 import { EventSinkV2 } from "./EventSink.ts";
+import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import type { SummaryFacts } from "./childSummaryDerive.ts";
 
@@ -462,6 +463,93 @@ const assistStack = <E, R>(
   return Layer.merge(ChildSessionSummary.layer.pipe(Layer.provide(services)), services);
 };
 
+it.effect("marks the child's current drift as a false positive", () => {
+  const database = SqlitePersistence.layerMemory;
+  const assist = CommandAssist.layer.pipe(
+    Layer.provide(
+      Layer.succeed(CommandAssist.CommandAssistModel, { complete: () => Effect.succeed("{}") }),
+    ),
+    Layer.provide(ServerSettingsService.layerTest({})),
+    Layer.provide(database),
+  );
+  return Effect.gen(function* () {
+    const internal = yield* ChildSessionSummaryInternal;
+    const summary = yield* ChildSessionSummary;
+    const service = yield* CommandAssist.CommandAssist;
+    const sql = yield* SqlClient.SqlClient;
+    const parent = ThreadId.make("thread:mark-parent");
+    const child = ThreadId.make("thread:mark-child");
+    yield* internal.note(factsFor(child, parent, 0));
+    yield* sql`
+      INSERT INTO command_assist_state (thread_id, state_json, updated_at)
+      VALUES (${child}, ${JSON.stringify({ cacheKey: "key-one", drift: "走偏" })}, ${"2026-01-01T00:00:00.000Z"})
+    `;
+    yield* summary.markDriftFalsePositive({ threadId: child });
+    const stored = yield* service.read(child);
+    assert.strictEqual(stored.falsePositiveKey, "key-one");
+    assert.strictEqual(stored.drift, null);
+    assert.strictEqual((yield* summary.detail({ threadId: child }))?.phase, "在做");
+    const missing = yield* summary
+      .markDriftFalsePositive({ threadId: ThreadId.make("thread:missing") })
+      .pipe(Effect.flip);
+    assert.strictEqual(missing._tag, "ChildSummaryReadError");
+  }).pipe(Effect.provide(assistStack(assist, database)));
+});
+
+it.effect("notifies the parent once when an eligible child crosses the silence line", () => {
+  const database = SqlitePersistence.layerMemory;
+  const settings = ServerSettingsService.layerTest({
+    commandAssist: { patrol: { enabled: true, modelSelection: null } },
+  });
+  const assist = CommandAssist.layer.pipe(
+    Layer.provide(
+      Layer.succeed(CommandAssist.CommandAssistModel, { complete: () => Effect.succeed("{}") }),
+    ),
+    Layer.provide(settings),
+    Layer.provide(database),
+  );
+  return Effect.gen(function* () {
+    const delivered = yield* Deferred.make<Orchestrator.OrchestratorV2DispatchResult>();
+    const sent = yield* Ref.make<ReadonlyArray<string>>([]);
+    const engine = Layer.mock(Orchestrator.OrchestratorV2)({
+      dispatch: (command) =>
+        Ref.update(sent, (all) => [...all, command.type]).pipe(
+          Effect.andThen(Deferred.succeed(delivered, { sequence: 1, storedEvents: [] })),
+          Effect.as({ sequence: 1, storedEvents: [] }),
+        ),
+    });
+    const services = Layer.mergeAll(assist, database, engine);
+    yield* Effect.gen(function* () {
+      const internal = yield* ChildSessionSummaryInternal;
+      const service = yield* CommandAssist.CommandAssist;
+      const sql = yield* SqlClient.SqlClient;
+      const parent = ThreadId.make("thread:patrol-parent");
+      const child = ThreadId.make("thread:patrol-child");
+      yield* seedAssistWorkspace(child, parent);
+      yield* sql`
+        INSERT INTO orchestration_v2_projection_runs (run_id, thread_id, ordinal, provider, status, requested_at, payload_json)
+        VALUES (${"patrol-run"}, ${child}, 1, ${"codex"}, ${"running"}, ${"2026-01-01T00:00:00.000Z"}, ${"{}"})
+      `;
+      yield* sql`
+        INSERT INTO orchestration_v2_projection_subagents
+          (subagent_id, thread_id, parent_node_id, provider, child_thread_id, origin, status, updated_at, payload_json)
+        VALUES (${"patrol-task"}, ${parent}, ${"node"}, ${"codex"}, ${child}, ${"app_owned"}, ${"running"}, ${"2026-01-01T00:00:00.000Z"}, ${"{}"})
+      `;
+      yield* internal.note(factsFor(child, parent, 0));
+      yield* TestClock.adjust("4 minutes");
+      yield* internal.markIdle();
+      yield* Deferred.await(delivered);
+      yield* internal.markIdle();
+      assert.deepStrictEqual(yield* Ref.get(sent), ["message.dispatch"]);
+      assert.strictEqual((yield* service.read(child)).patrolCount, 1);
+    }).pipe(
+      Effect.provide(
+        Layer.merge(ChildSessionSummary.layer.pipe(Layer.provide(services)), services),
+      ),
+    );
+  });
+});
+
 it.effect("detail triggers one observe with the row opened when activity is on", () => {
   const gate: { enabled: boolean; queue: Queue.Queue<boolean> | undefined } = {
     enabled: false,
@@ -491,6 +579,7 @@ it.effect("detail triggers one observe with the row opened when activity is on",
       considerPatrol: () => Effect.die("patrol is not part of this test"),
       read: () => Effect.die("read is not part of this test"),
       activityOrDriftEnabled: () => Effect.succeed(gate.enabled),
+      patrolEnabled: () => Effect.succeed(false),
     }),
   );
   return Effect.gen(function* () {

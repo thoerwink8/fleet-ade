@@ -205,6 +205,10 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
       label: "environment-data:orchestration:stop-workflow",
       tag: ORCHESTRATION_V2_WS_METHODS.stopWorkflow,
     }),
+    markChildDriftFalsePositive: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:orchestration:mark-child-drift-false-positive",
+      tag: ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive,
+    }),
     forceStopThread: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:orchestration:force-stop-thread",
       tag: ORCHESTRATION_V2_WS_METHODS.forceStopThread,
