@@ -83,6 +83,8 @@ export async function refreshNetworkSystemProxy(force = false): Promise<NetworkS
 
 export function currentNetworkSnapshot(): NetworkSnapshot {
   void refreshSystemProxy();
+  const system = readSystemProxy();
+  if (system !== current.system) current = { ...current, system };
   return current;
 }
 

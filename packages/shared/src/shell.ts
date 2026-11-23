@@ -102,9 +102,6 @@ function resolveSpawnExecutableWithNode(
     windowsPathExtensions.join(";"),
     command,
   ].join(COMMAND_RESOLUTION_CACHE_KEY_SEPARATOR);
-  const cached = explicitPath ? undefined : spawnExecutableCache.get(cacheKey);
-  if (cached !== undefined) return cached ?? undefined;
-
   const candidates = resolveCommandCandidates(
     command,
     platform,
@@ -122,6 +119,14 @@ function resolveSpawnExecutableWithNode(
       return false;
     }
   };
+
+  // PATH alone can't key executability: an uninstall or a new shim in an earlier
+  // directory keeps the same env. Recheck the hit and rescan when it no longer runs.
+  const cached = explicitPath ? undefined : spawnExecutableCache.get(cacheKey);
+  if (cached !== undefined) {
+    if (isExecutable(cached)) return cached;
+    spawnExecutableCache.delete(cacheKey);
+  }
 
   let resolved: string | undefined;
   if (command.includes("/") || command.includes("\\")) {

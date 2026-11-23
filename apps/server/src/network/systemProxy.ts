@@ -65,6 +65,7 @@ export function refreshSystemProxy(
   force = false,
   now = Date.now(),
 ): Promise<SystemProxyRead> {
+  // A forced call joins a refresh already in flight instead of starting a second read.
   if (pendingRefresh) return pendingRefresh;
   if (!force && now - lastRefreshAt < REFRESH_INTERVAL_MS) {
     return Promise.resolve(readSystemProxy(platform));

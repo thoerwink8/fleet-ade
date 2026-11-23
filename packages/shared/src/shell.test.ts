@@ -598,7 +598,7 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
 });
 
 effectIt.layer(NodeServices.layer)("SpawnExecutableResolution", (it) => {
-  it.effect("caches a result for the same PATH and invalidates it when PATH changes", () =>
+  it.effect("caches by PATH, re-resolves a stale hit, and invalidates when PATH changes", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -617,10 +617,10 @@ effectIt.layer(NodeServices.layer)("SpawnExecutableResolution", (it) => {
 
       const resolve = yield* SpawnExecutableResolution;
       const env = platform === "win32" ? { PATHEXT: ".EXE" } : {};
-      const firstEnvironment = { ...env, PATH: first };
-      expect(resolve("tool", platform, firstEnvironment)).toBe(firstExecutable);
+      const bothPaths = { ...env, PATH: first + NodePath.delimiter + second };
+      expect(resolve("tool", platform, bothPaths)).toBe(firstExecutable);
       yield* fs.remove(firstExecutable);
-      expect(resolve("tool", platform, firstEnvironment)).toBe(firstExecutable);
+      expect(resolve("tool", platform, bothPaths)).toBe(secondExecutable);
       expect(resolve("tool", platform, { ...env, PATH: second })).toBe(secondExecutable);
     }),
   );
