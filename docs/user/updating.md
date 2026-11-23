@@ -187,17 +187,3 @@ clients receive the refreshed catalogs automatically.
 Provider updates do not restart running chats. An existing session can keep
 using the previous CLI until it ends. If discovery fails, check the provider
 status and refresh it again.
-
-## Mobile updates
-
-To update an environment from a phone, open the [web app](./install.md#mobile-app)
-and go to **Settings → Environments**. **Check for updates** finds the latest
-release on that environment's current release channel. Keep the page open while
-the environment updates and reconnects. Hosts that cannot update remotely show
-instructions for updating on the machine instead.
-
-The same page lets you refresh provider status and update supported providers.
-These controls require a connected environment and permission to operate it.
-Provider update checks and restart continuation preferences are in
-**Settings → Maintenance**. If provider update checks are disabled, enable them
-there before refreshing to find newer versions.

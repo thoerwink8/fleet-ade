@@ -64,7 +64,7 @@ clones over HTTPS with Git's credentials for that host instead, and the project'
 HTTPS URL.
 
 To lay clones out like [ghq](https://github.com/x-motemen/ghq), turn on **Clone into host folders**
-under **Settings → Threads** (or **Source control** on mobile). Clones then default to
+under **Settings → Threads**. Clones then default to
 `<host>/<owner>/<repo>` under **Add project starts in**, so set that to `~/ghq` to share ghq's
 folders. You can still change the destination before cloning.
 
@@ -103,8 +103,8 @@ Agents can monitor a pull request with `watch_pull_request`. The server continue
 pull request and wakes the agent for failed or completed checks, review changes, conflicts, and
 other watch events. See [Linked pull requests](#linked-pull-requests) for the monitoring rules.
 
-Pull request sharing is off by default. In Settings → Connections → Pull request sharing (Pull
-request routing under Environments on mobile), choose **Read PRs** or **Read and act** for each
+Pull request sharing is off by default. In Settings → Connections → Pull request sharing,
+choose **Read PRs** or **Read and act** for each
 environment you trust to share its source control access.
 Enable both the original environment and the environment answering its requests on this client.
 **Read and act** can use broader permissions than the original environment's credential;
@@ -114,7 +114,7 @@ environment clears its permission.
 Diffs, linked PR status, and permitted source-control reads can then use another connected
 environment signed in to the same account on the same host. Each needs a project on that host.
 A connected local environment is preferred for actions and can answer slow or failed reads.
-Browsers and mobile clients need a paired environment to use its GitHub credentials.
+Browsers need a paired environment to use its GitHub credentials.
 Credentials stay on their machines. Previously verified credentials remain usable for routing
 for ten minutes during a GitHub outage; new credentials must be verified first. Listings, diffs,
 and checkout or PR creation from Git actions continue to use the project's environment.
@@ -141,8 +141,7 @@ on the Pull requests page, **Link to thread** lets you search for an active thre
 also lists the threads that link to it, including archived threads, so you can return to their context.
 
 Thread badges show a stack's layer count or the current review number with a count of additional
-links. Clicking a badge with more than one review opens the **Linked pull requests** panel. On mobile, the Git overview lists linked reviews and their stacks; tap a review to open it.
-Linking and unlinking are available in the web and desktop clients.
+links. Clicking a badge with more than one review opens the **Linked pull requests** panel.
 
 The **Linked pull requests** panel lists every review and groups stacks. Unlink a review from its
 row menu. An unlinked stack layer stays out of later syncs. Open linked reviews refresh on the server;

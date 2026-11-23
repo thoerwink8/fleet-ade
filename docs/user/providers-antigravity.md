@@ -115,7 +115,7 @@ saved file path for the agent to inspect with its tools.
 ### Subagents
 
 Antigravity groups subagent activity into batches. Open a batch and select
-**Subagent work** (**Work** on mobile) to read each child's role, prompt, and recent steps. This view
+**Subagent work** to read each child's role, prompt, and recent steps. This view
 is read only: you cannot message or control individual subagents, and an idle
 batch does not confirm that every child succeeded. If Antigravity did not record
 which children a batch started, the view says so. See
@@ -162,9 +162,8 @@ times. Limits refresh with provider status and include usage outside T3 Code.
 A server restart keeps your Google sign-in. The provider shows the saved account
 until a session, a refresh, or a sign-out reports something new.
 
-To check access and reload models, use **Refresh provider status** in web or desktop
-provider settings, or **Refresh models** in mobile thread settings. If asked to
-sign in again, use provider settings on web or desktop, or **Settings > Providers** on mobile.
+To check access and reload models, use **Refresh provider status** in
+**Settings > Providers**. If asked to sign in again, sign in from **Settings > Providers**.
 
 If Google reports `SUBSCRIPTION_REQUIRED`, an account restriction, or a usage limit,
 follow the provider's message and any retry time. See [Google's account plans][plans]
