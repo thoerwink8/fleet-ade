@@ -295,26 +295,37 @@ function handbackText(input: {
   };
 }
 
+function jsonText(text: string): string {
+  const trimmed = text.trim();
+  const fenced = /^```(?:json)?[^\n]*\n([\s\S]*?)\n?```$/u.exec(trimmed);
+  return (fenced?.[1] ?? trimmed).trim();
+}
+
+function parseRecord(text: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(jsonText(text));
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 function parseSpeech(text: string): {
   readonly goal: string;
   readonly done: string;
   readonly avoid: string;
   readonly tests: string;
 } | null {
-  try {
-    const value: unknown = JSON.parse(text);
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-    const record = value as Record<string, unknown>;
-    const field = (key: string) => (typeof record[key] === "string" ? record[key] : "");
-    return {
-      goal: field("goal"),
-      done: field("done"),
-      avoid: field("avoid"),
-      tests: field("tests"),
-    };
-  } catch {
-    return null;
-  }
+  const record = parseRecord(text);
+  if (record === null) return null;
+  const field = (key: string) => (typeof record[key] === "string" ? record[key] : "");
+  return {
+    goal: field("goal"),
+    done: field("done"),
+    avoid: field("avoid"),
+    tests: field("tests"),
+  };
 }
 
 function parseActivity(text: string): {
@@ -322,22 +333,41 @@ function parseActivity(text: string): {
   readonly drift?: string | null;
   readonly outlook?: string | null;
 } | null {
-  try {
-    const value: unknown = JSON.parse(text);
-    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
-    const record = value as Record<string, unknown>;
-    return {
-      ...(typeof record.activity === "string" ? { activity: record.activity } : {}),
-      ...(record.drift === null || typeof record.drift === "string"
-        ? { drift: driftText(record.drift as string | null) }
-        : {}),
-      ...(record.outlook === null || typeof record.outlook === "string"
-        ? { outlook: stringOrNull(record.outlook) }
-        : {}),
-    };
-  } catch {
-    return null;
+  const record = parseRecord(text);
+  if (record === null) return null;
+  return {
+    ...(typeof record.activity === "string" ? { activity: record.activity } : {}),
+    ...(record.drift === null || typeof record.drift === "string"
+      ? { drift: driftText(record.drift as string | null) }
+      : {}),
+    ...(record.outlook === null || typeof record.outlook === "string"
+      ? { outlook: stringOrNull(record.outlook) }
+      : {}),
+  };
+}
+
+function activityOrDriftOn(
+  rows: Readonly<Record<string, { readonly enabled: boolean }>> | undefined,
+): boolean {
+  return rows?.activity?.enabled === true || rows?.drift?.enabled === true;
+}
+
+function enabledSomewhere(settings: Parameters<typeof resolveCommandAssist>[0]): boolean {
+  if (activityOrDriftOn(settings.commandAssist)) return true;
+  for (const override of Object.values(settings.projectSettingsOverrides)) {
+    const rows = override.commandAssist;
+    if (rows !== undefined && activityOrDriftOn(rows)) return true;
   }
+  return false;
+}
+
+function handbackSentence(text: string): string {
+  const record = parseRecord(text);
+  const answer = record?.answer;
+  if (record === null || (answer !== "是" && answer !== "否")) return HAND_BACK_FAILED;
+  const reason = typeof record.reason === "string" ? record.reason.trim() : "";
+  const headline = answer === "是" ? "是同一件事" : "不是同一件事";
+  return reason.length > 0 ? `${headline}：${reason}` : headline;
 }
 
 const makeModel = Effect.gen(function* () {
@@ -405,6 +435,10 @@ export class CommandAssist extends Context.Service<
       readonly block: AssistBlock;
     }) => Effect.Effect<CommandAssistPatrol>;
     readonly read: (threadId: ThreadId) => Effect.Effect<StoredAssist>;
+    readonly activityOrDriftEnabled: (input: {
+      readonly projectId: ProjectId | null;
+      readonly anywhere: boolean;
+    }) => Effect.Effect<boolean>;
   }
 >()("t3/orchestration-v2/CommandAssist") {}
 
@@ -498,28 +532,42 @@ const make = Effect.gen(function* () {
   const visibleDrift = (state: StoredAssist, key: string | null) =>
     key !== null && state.falsePositiveKey === key ? null : state.drift;
 
-  const observeTurn: CommandAssist["Service"]["observe"] = Effect.fn("CommandAssist.observe")(
+  const update = <A>(
+    threadId: ThreadId,
+    apply: (state: StoredAssist) => readonly [StoredAssist, A],
+  ) =>
+    locks.withLock(
+      threadId,
+      Effect.gen(function* () {
+        const current = yield* load(threadId);
+        const [next, value] = apply(current);
+        if (next !== current) yield* save(threadId, next);
+        return value;
+      }),
+    );
+
+  const activityOrDriftEnabled: CommandAssist["Service"]["activityOrDriftEnabled"] = Effect.fn(
+    "CommandAssist.activityOrDriftEnabled",
+  )(function* (input) {
+    const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
+    if (settings === null) return false;
+    if (input.anywhere) return enabledSomewhere(settings);
+    const resolved = resolveCommandAssist(settings, input.projectId);
+    return activityOrDriftOn(resolved.rows);
+  });
+
+  const observe: CommandAssist["Service"]["observe"] = Effect.fn("CommandAssist.observe")(
     function* (input) {
       const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
-      const state = yield* load(input.threadId);
-      const facts = clipFacts(input);
-      const key = yield* cacheKey(facts);
-      const runChanged = state.runId !== input.runId;
-      const stepsAt = runChanged ? 0 : state.stepsAtLastCall;
-      const silenceSeen = runChanged ? false : state.silenceSeen;
-      const cached = !runChanged && state.cacheKey === key;
-      const shouldCall =
-        (input.opened && !cached) ||
-        input.stepCount - stepsAt >= COMMAND_ASSIST_STEP_BURST ||
-        (input.silence && !silenceSeen);
-      const show = (next: StoredAssist): CommandAssistObservation => ({
-        called: false,
+      const show = (next: StoredAssist, called: boolean): CommandAssistObservation => ({
+        called,
         activity: next.activity,
         drift: visibleDrift(next, next.cacheKey),
         outlook: next.outlook,
         childPhase: input.childPhase,
       });
-      if (settings === null) return show(state);
+      const current = () => load(input.threadId);
+      if (settings === null) return show(yield* current(), false);
       const resolved = resolveCommandAssist(settings, input.projectId);
       const activity = lookupCommandAssistRow(resolved.rows, "activity", resolved.textGeneration);
       const drift = lookupCommandAssistRow(resolved.rows, "drift", resolved.textGeneration);
@@ -528,90 +576,103 @@ const make = Effect.gen(function* () {
         drift: drift._tag === "ready",
         outlook: activity._tag === "ready",
       };
-      if ((!asks.activity && !asks.drift) || !shouldCall) {
-        const kept = {
-          ...state,
-          runId: input.runId,
-          silenceSeen: silenceSeen || input.silence,
-          stepsAtLastCall: runChanged ? 0 : state.stepsAtLastCall,
-        };
-        yield* save(input.threadId, kept);
-        return show(kept);
-      }
+      if (!asks.activity && !asks.drift) return show(yield* current(), false);
       const selection =
         asks.activity && activity._tag === "ready"
           ? activity.model
           : drift._tag === "ready"
             ? drift.model
             : null;
-      if (selection === null) return show(state);
-      const reserved = {
-        ...state,
-        runId: input.runId,
-        silenceSeen: silenceSeen || input.silence,
-        stepsAtLastCall: input.stepCount,
-        cacheKey: key,
-      };
-      yield* save(input.threadId, reserved);
+      if (selection === null) return show(yield* current(), false);
+      const facts = clipFacts(input);
+      const key = yield* cacheKey(facts);
+      const decision = yield* update(input.threadId, (state) => {
+        const runChanged = state.runId !== input.runId;
+        const stepsAt = runChanged ? 0 : state.stepsAtLastCall;
+        const silenceSeen = runChanged ? false : state.silenceSeen;
+        const cached = !runChanged && state.cacheKey === key;
+        const shouldCall =
+          (input.opened && !cached) ||
+          input.stepCount - stepsAt >= COMMAND_ASSIST_STEP_BURST ||
+          (input.silence && !silenceSeen);
+        const booked: StoredAssist = {
+          ...state,
+          runId: input.runId,
+          silenceSeen: silenceSeen || input.silence,
+          stepsAtLastCall: shouldCall ? input.stepCount : runChanged ? 0 : state.stepsAtLastCall,
+          ...(shouldCall ? { cacheKey: key } : {}),
+        };
+        const unchanged =
+          booked.runId === state.runId &&
+          booked.silenceSeen === state.silenceSeen &&
+          booked.stepsAtLastCall === state.stepsAtLastCall &&
+          booked.cacheKey === state.cacheKey;
+        return [
+          unchanged ? state : booked,
+          { call: shouldCall, silenceSeen: booked.silenceSeen },
+        ] as const;
+      });
+      if (!decision.call) return show(yield* current(), false);
       const result = yield* invoke(selection, {
         projectId: input.projectId,
         cwd: input.cwd,
         prompt: activityPrompt(facts, asks),
       });
-      const base = reserved;
-      if (result._tag !== "completed") {
-        const failedState = { ...base, outlook: asks.outlook ? null : state.outlook };
-        yield* save(input.threadId, failedState);
-        return { ...show(failedState), called: true };
-      }
-      const parsed = parseActivity(result.text);
-      if (parsed === null) {
-        return { ...show(base), called: true };
-      }
-      const next: StoredAssist = {
-        ...base,
-        cacheKey: key,
-        activity:
-          asks.activity && parsed !== null && parsed.activity !== undefined
-            ? parsed.activity
-            : state.activity,
-        drift:
-          asks.drift && parsed !== null && parsed.drift !== undefined ? parsed.drift : state.drift,
-        outlook: asks.outlook
-          ? parsed.outlook !== undefined
-            ? parsed.outlook
-            : state.outlook
-          : state.outlook,
-      };
-      yield* save(input.threadId, next);
-      return { ...show(next), called: true };
+      const merged = yield* update(input.threadId, (state) => {
+        const book = {
+          cacheKey: key,
+          runId: input.runId,
+          stepsAtLastCall: input.stepCount,
+          silenceSeen: state.silenceSeen || decision.silenceSeen,
+        };
+        if (result._tag !== "completed") {
+          const next = { ...state, ...book, outlook: asks.outlook ? null : state.outlook };
+          return [next, next] as const;
+        }
+        const parsed = parseActivity(result.text);
+        if (parsed === null) {
+          const next = { ...state, ...book };
+          return [next, next] as const;
+        }
+        const next: StoredAssist = {
+          ...state,
+          ...book,
+          activity:
+            asks.activity && parsed.activity !== undefined ? parsed.activity : state.activity,
+          drift: asks.drift && parsed.drift !== undefined ? parsed.drift : state.drift,
+          outlook: asks.outlook
+            ? parsed.outlook !== undefined
+              ? parsed.outlook
+              : state.outlook
+            : state.outlook,
+        };
+        return [next, next] as const;
+      });
+      return show(merged, true);
     },
   );
-
-  const observe: CommandAssist["Service"]["observe"] = (input) =>
-    locks.withLock(input.threadId, observeTurn(input));
 
   const markDriftFalsePositive: CommandAssist["Service"]["markDriftFalsePositive"] = Effect.fn(
     "CommandAssist.markDriftFalsePositive",
   )(function* (threadId) {
-    const state = yield* load(threadId);
-    yield* save(threadId, {
-      ...state,
-      falsePositiveKey: state.cacheKey,
-      drift: null,
-    });
+    yield* update(threadId, (state) => [
+      { ...state, falsePositiveKey: state.cacheKey, drift: null },
+      undefined,
+    ]);
   });
 
   const rememberDispatch: CommandAssist["Service"]["rememberDispatch"] = Effect.fn(
     "CommandAssist.rememberDispatch",
   )(function* (input) {
-    const state = yield* load(input.threadId);
-    yield* save(input.threadId, {
-      ...state,
-      goal: input.goal,
-      avoid: input.avoid,
-      testCommands: input.testCommands === null ? null : [...input.testCommands],
-    });
+    yield* update(input.threadId, (state) => [
+      {
+        ...state,
+        goal: input.goal,
+        avoid: input.avoid,
+        testCommands: input.testCommands === null ? null : [...input.testCommands],
+      },
+      undefined,
+    ]);
   });
 
   const handback: CommandAssist["Service"]["handback"] = Effect.fn("CommandAssist.handback")(
@@ -624,23 +685,24 @@ const make = Effect.gen(function* () {
         report: input.report,
         goal: state.goal,
       });
-      if (!query.wantsModel) {
-        yield* save(input.threadId, { ...state, handback: query.text });
-        return { _tag: "completed", text: query.text };
-      }
-      const judged = yield* run("handback", {
-        projectId: input.projectId,
-        cwd: input.cwd,
-        prompt: handbackPrompt(state.goal ?? "", input.report),
-      });
-      const text =
-        judged._tag === "completed"
-          ? `${query.text}\n${judged.text}`
-          : judged._tag === "failed"
-            ? `${query.text}\n${HAND_BACK_FAILED}`
-            : query.text;
-      yield* save(input.threadId, { ...state, handback: text });
-      if (judged._tag === "failed") return judged;
+      const judged = query.wantsModel
+        ? yield* run("handback", {
+            projectId: input.projectId,
+            cwd: input.cwd,
+            prompt: handbackPrompt(state.goal ?? "", input.report),
+          })
+        : null;
+      const sentence =
+        judged === null
+          ? null
+          : judged._tag === "completed"
+            ? handbackSentence(judged.text)
+            : judged._tag === "failed"
+              ? HAND_BACK_FAILED
+              : null;
+      const text = sentence === null ? query.text : `${query.text}\n${sentence}`;
+      yield* update(input.threadId, (current) => [{ ...current, handback: text }, undefined]);
+      if (judged?._tag === "failed") return judged;
       return { _tag: "completed", text };
     },
   );
@@ -652,16 +714,10 @@ const make = Effect.gen(function* () {
       cwd: input.cwd,
       prompt: speechPrompt(clipChars(original, COMMAND_ASSIST_INPUT_LIMIT)),
     });
-    const state = yield* load(input.threadId);
     const empty = { goal: "", done: "", avoid: "", tests: "", note: "没整理成" as string | null };
-    if (result._tag !== "completed") {
-      yield* save(input.threadId, { ...state, ...speechOf(empty) });
-      return { ...empty, original, result };
-    }
-    const parsed = parseSpeech(result.text) ?? empty;
-    const note = parsed === empty ? "没整理成" : null;
-    const speech = { ...parsed, note };
-    yield* save(input.threadId, { ...state, ...speechOf(speech) });
+    const parsed = result._tag === "completed" ? (parseSpeech(result.text) ?? empty) : empty;
+    const speech = { ...parsed, note: parsed === empty ? "没整理成" : null };
+    yield* update(input.threadId, (state) => [{ ...state, ...speechOf(speech) }, undefined]);
     return { ...speech, original, result };
   });
 
@@ -674,23 +730,20 @@ const make = Effect.gen(function* () {
     const resolved = resolveCommandAssist(settings, input.projectId);
     const row = lookupCommandAssistRow(resolved.rows, "patrol", resolved.textGeneration);
     if (row._tag !== "ready") return { sent: false, text: null };
-    const state = yield* load(input.threadId);
-    if (input.kind === "drift") {
-      if (state.patrolDriftKey === input.driftKey) return { sent: false, text: null };
-      yield* save(input.threadId, {
-        ...state,
-        patrolDriftKey: input.driftKey,
-        patrolCount: state.patrolCount + 1,
-      });
-      return { sent: true, text: "可能走偏" };
-    }
-    if (state.patrolSilenceRun === input.runId) return { sent: false, text: null };
-    yield* save(input.threadId, {
-      ...state,
-      patrolSilenceRun: input.runId,
-      patrolCount: state.patrolCount + 1,
+    return yield* update(input.threadId, (state): readonly [StoredAssist, CommandAssistPatrol] => {
+      if (input.kind === "drift") {
+        if (state.patrolDriftKey === input.driftKey) return [state, { sent: false, text: null }];
+        return [
+          { ...state, patrolDriftKey: input.driftKey, patrolCount: state.patrolCount + 1 },
+          { sent: true, text: "可能走偏" },
+        ];
+      }
+      if (state.patrolSilenceRun === input.runId) return [state, { sent: false, text: null }];
+      return [
+        { ...state, patrolSilenceRun: input.runId, patrolCount: state.patrolCount + 1 },
+        { sent: true, text: "没动静" },
+      ];
     });
-    return { sent: true, text: "没动静" };
   });
 
   return CommandAssist.of({
@@ -704,6 +757,7 @@ const make = Effect.gen(function* () {
     read: Effect.fn("CommandAssist.read")(function* (threadId: ThreadId) {
       return yield* load(threadId);
     }),
+    activityOrDriftEnabled,
   });
 });
 

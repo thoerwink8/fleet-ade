@@ -14,6 +14,7 @@ import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -211,6 +212,35 @@ const reply = JSON.stringify({
   outlook: "会改 1 个文件",
 });
 
+it.effect("does not write state when activity and drift are off", () => {
+  const database = SqlitePersistence.layerMemory;
+  const assist = CommandAssist.layer.pipe(
+    Layer.provide(
+      Layer.succeed(CommandAssist.CommandAssistModel, {
+        complete: () => Effect.die("off rows do not call"),
+      }),
+    ),
+    Layer.provide(ServerSettingsService.layerTest({ commandAssist: rows(false, false) })),
+    Layer.provide(database),
+  );
+  const stack = Layer.merge(assist, database);
+  return Effect.gen(function* () {
+    const assist = yield* CommandAssist.CommandAssist;
+    const sql = yield* SqlClient.SqlClient;
+    const thread = ThreadId.make("thread-nosave");
+    yield* assist.observe(facts({ opened: true, stepCount: 40, silence: true, threadId: thread }));
+    const rows = yield* sql<{ readonly total: number }>`
+      SELECT count(*) AS total FROM command_assist_state
+    `;
+    assert.strictEqual(Number(rows[0]?.total ?? 0), 0);
+    yield* sql`
+      INSERT INTO command_assist_state (thread_id, state_json, updated_at)
+      VALUES (${thread}, ${JSON.stringify({ outlook: "共享" })}, ${"2026-01-01T00:00:00.000Z"})
+    `;
+    assert.strictEqual((yield* assist.read(thread)).outlook, "共享");
+  }).pipe(Effect.provide(stack));
+});
+
 it.effect("calls once for summary and drift, and skips the part that is off", () => {
   const prompts: string[] = [];
   const settings = ServerSettingsService.layerTest({ commandAssist: rows(false, false) });
@@ -288,15 +318,8 @@ it.effect(
       const changed = yield* assist.observe(facts({ opened: true, goal: "换成别的目标" }));
       assert.strictEqual(changed.called, true);
       assert.strictEqual(changed.drift, "又走偏了");
+      assert.strictEqual(changed.outlook, "会改 2 个文件");
       assert.strictEqual(changed.childPhase, yield* Ref.get(childPhase));
-
-      next = "not json";
-      const failed = yield* assist.observe(facts({ opened: true, goal: "再换一个目标" }));
-      assert.strictEqual(failed.called, true);
-      assert.strictEqual(failed.outlook, "会改 2 个文件");
-      assert.strictEqual(failed.activity, "在改 b.ts");
-      assert.strictEqual(failed.drift, "又走偏了");
-      assert.strictEqual(failed.childPhase, "在跑");
     }).pipe(
       Effect.provide(
         harness(
@@ -304,6 +327,243 @@ it.effect(
             complete: (input) => {
               prompts.push(input.prompt);
               return Effect.succeed(next);
+            },
+          },
+          settings,
+        ),
+      ),
+    );
+  },
+);
+
+it.effect("leaves the previous sentences when the reply is not the activity object", () => {
+  const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
+  let next = JSON.stringify({
+    activity: "在改 b.ts",
+    drift: "又走偏了",
+    outlook: "会改 2 个文件",
+  });
+  return Effect.gen(function* () {
+    const assist = yield* CommandAssist.CommandAssist;
+    yield* assist.observe(facts({ opened: true, threadId: ThreadId.make("thread-parse") }));
+    next = "not json";
+    const failed = yield* assist.observe(
+      facts({ opened: true, goal: "再换一个目标", threadId: ThreadId.make("thread-parse") }),
+    );
+    assert.strictEqual(failed.called, true);
+    assert.strictEqual(failed.outlook, "会改 2 个文件");
+    assert.strictEqual(failed.activity, "在改 b.ts");
+    assert.strictEqual(failed.drift, "又走偏了");
+    assert.strictEqual(failed.childPhase, "在跑");
+  }).pipe(
+    Effect.provide(
+      harness(
+        {
+          complete: () => Effect.succeed(next),
+        },
+        settings,
+      ),
+    ),
+  );
+});
+
+it.effect("clears outlook when the model fails and leaves the child phase alone", () => {
+  const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
+  let fail = false;
+  return Effect.gen(function* () {
+    const assist = yield* CommandAssist.CommandAssist;
+    const childPhase = yield* Ref.make("在跑");
+    const thread = ThreadId.make("thread-fail");
+    const first = yield* assist.observe(facts({ opened: true, threadId: thread }));
+    assert.strictEqual(first.outlook, "会改 1 个文件");
+    fail = true;
+    const failed = yield* assist.observe(
+      facts({ opened: true, goal: "再换一个目标", threadId: thread }),
+    );
+    assert.strictEqual(failed.called, true);
+    assert.strictEqual(failed.outlook, null);
+    assert.strictEqual(failed.childPhase, "在跑");
+    assert.strictEqual(yield* Ref.get(childPhase), "在跑");
+    assert.strictEqual((yield* assist.read(thread)).outlook, null);
+  }).pipe(
+    Effect.provide(
+      harness(
+        {
+          complete: () => (fail ? Effect.fail({ reason: "调用失败" }) : Effect.succeed(reply)),
+        },
+        settings,
+      ),
+    ),
+  );
+});
+
+it.effect(
+  "clears outlook when the model exceeds 15 seconds and leaves the child phase alone",
+  () => {
+    const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
+    let wait = false;
+    return Effect.gen(function* () {
+      const assist = yield* CommandAssist.CommandAssist;
+      const childPhase = yield* Ref.make("在跑");
+      const thread = ThreadId.make("thread-timeout");
+      const first = yield* assist.observe(facts({ opened: true, threadId: thread }));
+      assert.strictEqual(first.outlook, "会改 1 个文件");
+      wait = true;
+      const fiber = yield* assist
+        .observe(
+          facts({ opened: true, goal: "再换一个目标", threadId: thread, childPhase: "在跑" }),
+        )
+        .pipe(Effect.forkChild);
+      yield* TestClock.adjust(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS));
+      const failed = yield* Fiber.join(fiber);
+      assert.strictEqual(failed.called, true);
+      assert.strictEqual(failed.outlook, null);
+      assert.strictEqual(failed.childPhase, "在跑");
+      assert.strictEqual(yield* Ref.get(childPhase), "在跑");
+      assert.strictEqual((yield* assist.read(thread)).outlook, null);
+    }).pipe(
+      Effect.provide(
+        harness(
+          {
+            complete: () =>
+              wait
+                ? Effect.sleep(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS + 1_000)).pipe(
+                    Effect.as("late"),
+                  )
+                : Effect.succeed(reply),
+          },
+          settings,
+        ),
+      ),
+    );
+  },
+);
+
+it.effect("keeps a false-positive mark written while observe is calling the model", () => {
+  const gate: {
+    started: Deferred.Deferred<void> | undefined;
+    release: Deferred.Deferred<void> | undefined;
+  } = { started: undefined, release: undefined };
+  return Effect.gen(function* () {
+    gate.started = yield* Deferred.make<void>();
+    gate.release = yield* Deferred.make<void>();
+    const assist = yield* CommandAssist.CommandAssist;
+    const thread = ThreadId.make("thread-race");
+    const fiber = yield* assist
+      .observe(facts({ opened: true, threadId: thread }))
+      .pipe(Effect.forkChild);
+    yield* Deferred.await(gate.started);
+    yield* assist.rememberDispatch({
+      threadId: thread,
+      goal: "别覆盖我",
+      avoid: null,
+      testCommands: ["vp test run parser"],
+    });
+    yield* assist.markDriftFalsePositive(thread);
+    yield* Deferred.succeed(gate.release, undefined);
+    const result = yield* Fiber.join(fiber);
+    const stored = yield* assist.read(thread);
+    assert.strictEqual(stored.falsePositiveKey, stored.cacheKey);
+    assert.ok(stored.falsePositiveKey !== null);
+    assert.strictEqual(stored.goal, "别覆盖我");
+    assert.deepStrictEqual(stored.testCommands, ["vp test run parser"]);
+    assert.strictEqual(result.drift, null);
+  }).pipe(
+    Effect.provide(
+      harness(
+        {
+          complete: () => {
+            const started = gate.started;
+            const release = gate.release;
+            if (started === undefined || release === undefined) {
+              return Effect.die("observe gate was not ready");
+            }
+            return Deferred.succeed(started, undefined).pipe(
+              Effect.andThen(Deferred.await(release)),
+              Effect.as(reply),
+            );
+          },
+        },
+        ServerSettingsService.layerTest({ commandAssist: rows(true, true) }),
+      ),
+    ),
+  );
+});
+
+it.effect(
+  "reads a fenced reply as sentences and writes 没核对成 when hand-back is not that object",
+  () => {
+    const fence = (body: string) => "```json\n" + body + "\n```";
+    const settings = ServerSettingsService.layerTest({
+      commandAssist: rows(true, true, false, true, true),
+    });
+    return Effect.gen(function* () {
+      const assist = yield* CommandAssist.CommandAssist;
+      const thread = ThreadId.make("thread-fence");
+      const observed = yield* assist.observe(facts({ opened: true, threadId: thread }));
+      assert.strictEqual(observed.activity, "在改 a.ts");
+      assert.strictEqual(observed.outlook, "会改 1 个文件");
+      const tidied = yield* assist.tidy({
+        threadId: thread,
+        projectId: null,
+        cwd: "/repo",
+        text: "把解析修好",
+        childPhase: "在跑",
+      });
+      assert.strictEqual(tidied.goal, "修好解析");
+      assert.strictEqual(tidied.done, "");
+      yield* assist.rememberDispatch({
+        threadId: thread,
+        goal: "修好解析",
+        avoid: null,
+        testCommands: ["vp test run parser"],
+      });
+      const checked = yield* assist.handback({
+        threadId: thread,
+        projectId: null,
+        cwd: "/repo",
+        prExists: true,
+        headOnBranch: true,
+        report: "vp test run parser",
+        childPhase: "做完",
+      });
+      assert.strictEqual(checked._tag, "completed");
+      if (checked._tag === "completed") {
+        assert.ok(checked.text.includes("不是同一件事：改的是锁"));
+        assert.ok(!checked.text.includes("```"));
+        assert.ok(!checked.text.includes('{"answer"'));
+      }
+      const stored = yield* assist.read(thread);
+      assert.ok(stored.handback?.includes("不是同一件事：改的是锁"));
+      const broken = yield* assist.handback({
+        threadId: thread,
+        projectId: null,
+        cwd: "/repo",
+        prExists: true,
+        headOnBranch: true,
+        report: "vp test run parser 第二遍",
+        childPhase: "做完",
+      });
+      assert.strictEqual(broken._tag, "completed");
+      if (broken._tag === "completed") {
+        assert.ok(broken.text.includes("没核对成"));
+        assert.ok(!broken.text.includes("not-json"));
+      }
+    }).pipe(
+      Effect.provide(
+        harness(
+          {
+            complete: (input) => {
+              if (input.prompt.startsWith("ASK")) {
+                return Effect.succeed(fence(reply));
+              }
+              if (input.prompt.includes("goal") && input.prompt.includes("第二遍")) {
+                return Effect.succeed("not-json");
+              }
+              if (input.prompt.includes('{"answer"')) {
+                return Effect.succeed(fence(JSON.stringify({ answer: "否", reason: "改的是锁" })));
+              }
+              return Effect.succeed(fence(JSON.stringify({ goal: "修好解析" })));
             },
           },
           settings,
