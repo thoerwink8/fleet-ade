@@ -22,39 +22,62 @@ const LINUX: SystemProxyRead = {
   available: false,
 };
 
-let cached: { readonly at: number; readonly value: SystemProxyRead } | undefined;
+let cached: SystemProxyRead = UNAVAILABLE;
+let lastRefreshAt = 0;
+let pendingRefresh: Promise<SystemProxyRead> | undefined;
+const REFRESH_INTERVAL_MS = 2_000;
 
-function readUncached(platform: NodeJS.Platform): SystemProxyRead {
+function readUncached(platform: NodeJS.Platform): Promise<SystemProxyRead> {
+  if (platform !== "win32" && platform !== "darwin") return Promise.resolve(LINUX);
+
+  const { promise, resolve } = Promise.withResolvers<SystemProxyRead>();
   try {
     if (platform === "win32") {
       const systemRoot = process.env.SystemRoot || "C:\\Windows";
-      const text = NodeChildProcess.execFileSync(
+      NodeChildProcess.execFile(
         `${systemRoot}\\System32\\reg.exe`,
         ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"],
         { encoding: "utf8", windowsHide: true, timeout: 3_000 },
+        (error, stdout) => resolve(error ? UNAVAILABLE : parseWindowsInternetSettings(stdout)),
       );
-      return parseWindowsInternetSettings(text);
+    } else {
+      NodeChildProcess.execFile(
+        "/usr/sbin/scutil",
+        ["--proxy"],
+        { encoding: "utf8", timeout: 3_000 },
+        (error, stdout) => resolve(error ? UNAVAILABLE : parseMacScutilProxy(stdout)),
+      );
     }
-    if (platform === "darwin") {
-      const text = NodeChildProcess.execFileSync("/usr/sbin/scutil", ["--proxy"], {
-        encoding: "utf8",
-        timeout: 3_000,
-      });
-      return parseMacScutilProxy(text);
-    }
-    return LINUX;
   } catch {
-    return UNAVAILABLE;
+    resolve(UNAVAILABLE);
   }
+  return promise;
 }
 
 export function readSystemProxy(
   platform: NodeJS.Platform = HostProcess.Platform.defaultValue(),
-  force = false,
 ): SystemProxyRead {
-  const now = Date.now();
-  if (!force && cached && now - cached.at < 2_000) return cached.value;
-  const value = readUncached(platform);
-  cached = { at: now, value };
-  return value;
+  return platform === "win32" || platform === "darwin" ? cached : LINUX;
+}
+
+export function refreshSystemProxy(
+  platform: NodeJS.Platform = HostProcess.Platform.defaultValue(),
+  force = false,
+  now = Date.now(),
+): Promise<SystemProxyRead> {
+  if (pendingRefresh) return pendingRefresh;
+  if (!force && now - lastRefreshAt < REFRESH_INTERVAL_MS) {
+    return Promise.resolve(readSystemProxy(platform));
+  }
+
+  lastRefreshAt = now;
+  pendingRefresh = readUncached(platform)
+    .catch(() => UNAVAILABLE)
+    .then((value) => {
+      cached = value;
+      pendingRefresh = undefined;
+      return value;
+    });
+  void pendingRefresh.catch(() => undefined);
+  return pendingRefresh;
 }

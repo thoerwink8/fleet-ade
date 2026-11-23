@@ -76,6 +76,18 @@ export type SpawnExecutableResolver = (
   env: NodeJS.ProcessEnv,
 ) => string | undefined;
 
+const SPAWN_EXECUTABLE_CACHE_MAX_ENTRIES = 512;
+const spawnExecutableCache = new Map<string, string>();
+
+function cacheSpawnExecutableResult(key: string, value: string | undefined): void {
+  if (value === undefined) return;
+  if (spawnExecutableCache.size >= SPAWN_EXECUTABLE_CACHE_MAX_ENTRIES) {
+    const oldestKey = spawnExecutableCache.keys().next().value;
+    if (oldestKey !== undefined) spawnExecutableCache.delete(oldestKey);
+  }
+  spawnExecutableCache.set(key, value);
+}
+
 function resolveSpawnExecutableWithNode(
   command: string,
   platform: NodeJS.Platform,
@@ -83,6 +95,16 @@ function resolveSpawnExecutableWithNode(
 ): string | undefined {
   const path = platform === "win32" ? NodePath.win32 : NodePath.posix;
   const windowsPathExtensions = platform === "win32" ? resolveWindowsPathExtensions(env) : [];
+  const explicitPath = command.includes("/") || command.includes("\\");
+  const cacheKey = [
+    platform,
+    readEnvPath(env) ?? "",
+    windowsPathExtensions.join(";"),
+    command,
+  ].join(COMMAND_RESOLUTION_CACHE_KEY_SEPARATOR);
+  const cached = explicitPath ? undefined : spawnExecutableCache.get(cacheKey);
+  if (cached !== undefined) return cached ?? undefined;
+
   const candidates = resolveCommandCandidates(
     command,
     platform,
@@ -101,19 +123,21 @@ function resolveSpawnExecutableWithNode(
     }
   };
 
+  let resolved: string | undefined;
   if (command.includes("/") || command.includes("\\")) {
-    return candidates.find(isExecutable);
-  }
-
-  for (const pathEntry of (readEnvPath(env) ?? "").split(pathDelimiterForPlatform(platform))) {
-    const normalizedPathEntry = stripWrappingQuotes(pathEntry.trim());
-    if (normalizedPathEntry.length === 0) continue;
-    for (const candidate of candidates) {
-      const candidatePath = path.join(normalizedPathEntry, candidate);
-      if (isExecutable(candidatePath)) return candidatePath;
+    resolved = candidates.find(isExecutable);
+  } else {
+    for (const pathEntry of (readEnvPath(env) ?? "").split(pathDelimiterForPlatform(platform))) {
+      const normalizedPathEntry = stripWrappingQuotes(pathEntry.trim());
+      if (normalizedPathEntry.length === 0) continue;
+      resolved = candidates
+        .map((candidate) => path.join(normalizedPathEntry, candidate))
+        .find(isExecutable);
+      if (resolved !== undefined) break;
     }
   }
-  return undefined;
+  if (!explicitPath) cacheSpawnExecutableResult(cacheKey, resolved);
+  return resolved;
 }
 
 export const SpawnExecutableResolution = Context.Reference<SpawnExecutableResolver>(

@@ -597,6 +597,28 @@ effectIt.layer(NodeServices.layer)("resolveCommandPath", (it) => {
   );
 });
 
+effectIt.layer(NodeServices.layer)("SpawnExecutableResolution", (it) => {
+  it.effect("caches a result for the same PATH and invalidates it when PATH changes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const first = yield* fs.makeTempDirectoryScoped({ prefix: "t3-spawn-cache-first-" });
+      const second = yield* fs.makeTempDirectoryScoped({ prefix: "t3-spawn-cache-second-" });
+      const firstExecutable = path.join(first, "tool.EXE");
+      const secondExecutable = path.join(second, "tool.EXE");
+      yield* fs.writeFileString(firstExecutable, "");
+      yield* fs.writeFileString(secondExecutable, "");
+
+      const resolve = yield* SpawnExecutableResolution;
+      const firstEnvironment = { PATH: first, PATHEXT: ".EXE" };
+      expect(resolve("tool", "win32", firstEnvironment)).toBe(firstExecutable);
+      yield* fs.remove(firstExecutable);
+      expect(resolve("tool", "win32", firstEnvironment)).toBe(firstExecutable);
+      expect(resolve("tool", "win32", { PATH: second, PATHEXT: ".EXE" })).toBe(secondExecutable);
+    }),
+  );
+});
+
 describe("runsGitWithoutConsole", () => {
   const git = "C:\\Program Files\\Git\\ucrt64\\bin\\git.exe";
 
