@@ -68,7 +68,7 @@ export function T3ChatUserProfilePage() {
           <ClerkUserProfileRow icon={<MessageSquareIcon className="size-4" />}>
             <div className="flex items-start gap-4">
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm leading-4.5 font-medium text-foreground">
+                <h3 className="truncate text-row font-semibold text-foreground">
                   {link ? link.email : "未关联"}
                 </h3>
                 <p className="mt-1 text-xs leading-4.5 text-muted-foreground">

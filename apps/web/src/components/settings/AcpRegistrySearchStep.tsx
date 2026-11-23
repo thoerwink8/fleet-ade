@@ -231,7 +231,7 @@ export function AcpRegistrySearchStep({
                 iconClassName="size-6 rounded-md text-muted-foreground"
               />
               <div className="min-w-0 flex-1">
-                <h4 className="truncate text-sm font-medium text-foreground">
+                <h4 className="truncate text-row font-semibold text-foreground">
                   {OMP_ACP_BUILTIN.name}
                 </h4>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -307,7 +307,9 @@ function AcpRegistryAgentRow({
           />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline gap-2">
-              <h4 className="min-w-0 truncate text-sm font-medium text-foreground">{agent.name}</h4>
+              <h4 className="min-w-0 truncate text-row font-semibold text-foreground">
+                {agent.name}
+              </h4>
             </div>
             {agent.description ? (
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{agent.description}</p>

@@ -563,7 +563,7 @@ function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: nu
   const windows = displayLimitWindows(pool);
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
+      <h2 className="flex items-center gap-2 text-row font-semibold text-foreground">
         <ProviderInstanceIcon
           driverKind={pool.driver}
           displayName={label}
@@ -627,7 +627,7 @@ export function UsageLimitsPooled({
               <OpenAI className="size-5 shrink-0" aria-hidden="true" />
             ) : null}
             <div className="min-w-0 space-y-1">
-              <h2 className="text-sm font-medium">{link.label}</h2>
+              <h2 className="text-row font-semibold">{link.label}</h2>
               <p className="text-xs break-words text-muted-foreground">
                 {link.accounts.join(", ")}
               </p>

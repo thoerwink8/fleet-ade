@@ -55,9 +55,7 @@ function T3ConnectEnvironmentRow(props: {
       <Collapsible open={props.confirmationOpen} onOpenChange={props.onConfirmationChange}>
         <div className="flex items-start gap-4">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm leading-4.5 font-medium text-foreground">
-              {environment.label}
-            </h3>
+            <h3 className="truncate text-row font-semibold text-foreground">{environment.label}</h3>
             <p className="mt-1 text-xs leading-4.5 text-muted-foreground">
               {linkedAtLabel(environment.linkedAt)} · {endpointLabel(environment)}
             </p>

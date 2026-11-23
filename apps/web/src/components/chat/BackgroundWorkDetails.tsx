@@ -57,7 +57,7 @@ export function BackgroundWorkDetails(props: {
               return (
                 <section key={task.taskId} className="space-y-2 text-sm">
                   <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="font-medium">{title}</h3>
+                    <h3 className="text-row font-semibold text-foreground">{title}</h3>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {task.awaited ? "等待中" : "正在运行"}
                     </span>

@@ -982,7 +982,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
         <p
           data-thread-find-ignore="true"
           data-markdown-alert-label=""
-          className={cn("flex items-center gap-1.5 font-medium", alert.titleClassName)}
+          className={cn("flex items-center gap-1.5 font-semibold", alert.titleClassName)}
         >
           <alert.Icon aria-hidden className="size-3.5 shrink-0" />
           {alert.label}

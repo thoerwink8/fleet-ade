@@ -534,7 +534,7 @@ function SidebarUpdateControl() {
             >
               {idleTooltip?.detail ? (
                 <div className="text-left">
-                  <div className="font-medium">{idleTooltip.title}</div>
+                  <div className="font-semibold">{idleTooltip.title}</div>
                   <div className="text-muted-foreground">{idleTooltip.detail}</div>
                 </div>
               ) : (

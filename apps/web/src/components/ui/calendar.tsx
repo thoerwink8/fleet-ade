@@ -50,7 +50,7 @@ export function Calendar({
   const defaultClassNames = {
     button_next: buttonClassNames,
     button_previous: buttonClassNames,
-    caption_label: "text-base sm:text-sm font-medium flex items-center gap-2 h-full",
+    caption_label: "text-base sm:text-row font-semibold flex items-center gap-2 h-full",
     day: "size-(--cell-size) text-sm py-px",
     day_button: cn(
       buttonClassNames,

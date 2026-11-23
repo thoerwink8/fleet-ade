@@ -285,7 +285,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
               tooltipText={`链接创建于 ${formatAccessTimestamp(pairingLink.createdAt)}`}
               dotClassName="bg-warning"
             />
-            <h3 className="text-sm font-medium text-foreground">{primaryLabel}</h3>
+            <h3 className="text-row font-semibold text-foreground">{primaryLabel}</h3>
           </div>
           <p className="text-xs text-muted-foreground">
             <Tooltip>
@@ -533,7 +533,7 @@ const ConnectedClientListRow = memo(function ConnectedClientListRow({
               dotClassName={isLive ? "bg-success" : "bg-muted-foreground/30"}
               pingClassName={isLive ? "bg-success/60 duration-2000" : null}
             />
-            <h3 className="text-sm font-medium text-foreground">{primaryLabel}</h3>
+            <h3 className="text-row font-semibold text-foreground">{primaryLabel}</h3>
             {clientSession.current ? (
               <span className="text-3xs text-muted-foreground/80 rounded-md border border-border/50 bg-muted/50 px-1 py-0.5">
                 此设备
@@ -690,7 +690,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xs font-medium text-foreground">权限</h3>
+                  <h3 className="text-meta font-semibold text-foreground">权限</h3>
                   <p className="text-xs text-muted-foreground">限制已配对客户端可以执行的操作。</p>
                 </div>
                 <div className="flex gap-1">
@@ -877,9 +877,7 @@ export const AdvertisedEndpointListRow = memo(function AdvertisedEndpointListRow
       ) : null}
       <div className="flex min-h-7 min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <div className="flex min-h-7 min-w-0 flex-1 items-center gap-3">
-          <h3 className="shrink-0 text-sm leading-5 font-medium text-foreground">
-            {endpoint.label}
-          </h3>
+          <h3 className="shrink-0 text-row font-semibold text-foreground">{endpoint.label}</h3>
           {shouldShowEndpointUrl ? (
             <Tooltip>
               <TooltipTrigger

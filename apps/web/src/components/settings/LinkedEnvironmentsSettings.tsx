@@ -142,7 +142,7 @@ function LinkedEnvironmentRow({
               }
               pingClassName={null}
             />
-            <h3 className="text-sm font-medium text-foreground">{link.label}</h3>
+            <h3 className="text-row font-semibold text-foreground">{link.label}</h3>
           </div>
           <p className="text-xs text-muted-foreground">
             {accessConfig[link.access].label} · {status}
