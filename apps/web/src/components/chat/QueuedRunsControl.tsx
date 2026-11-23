@@ -27,7 +27,6 @@ import { cn } from "~/lib/utils";
 import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
-import { GuestMessageName } from "./guestMessageStyle";
 import { useScheduledTaskTitle } from "./TimelineUserMessageRow";
 
 export interface EditQueuedRunRequest {
@@ -119,7 +118,7 @@ export function QueuedRunsControl({
     (message) => message.inputIntent === "queued_turn" && !acknowledgedMessageIds.has(message.id),
   );
   const items = [
-    ...queued.map(({ run, text, attachments, context, message }, serverIndex) => ({
+    ...queued.map(({ run, text, attachments, message }, serverIndex) => ({
       key: run.id,
       message,
       runId: run.id,
@@ -127,8 +126,7 @@ export function QueuedRunsControl({
       freshContext: run.freshContext === true,
       serverIndex,
       text,
-      // A guest's message keeps the guest's words; the owner can cancel it, not rewrite it.
-      editable: context?.guest === undefined,
+      editable: true,
       attachments,
       thumbnails: attachments
         .filter((attachment) => attachment.type === "image")
@@ -194,7 +192,6 @@ export function QueuedRunsControl({
       const latest = queued.at(-1);
       if (
         !latest ||
-        latest.context?.guest !== undefined ||
         props.editingRunId !== null ||
         props.editBlockedReason !== null ||
         busyRunId !== null
@@ -434,13 +431,9 @@ function QueuedMessage(props: {
       className={cn(
         "flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg border bg-sidebar px-3 py-1.5 text-meta text-secondary-label",
         props.isEditing ? "border-primary/60" : "border-border",
-        attribution === "guest" && "border-guest/50",
       )}
     >
       {attribution === "t3code" ? <span className="shrink-0">由 Fleet ADE 发送 ·</span> : null}
-      {presentation?.guestName === undefined ? null : (
-        <GuestMessageName name={presentation.guestName} />
-      )}
       <span className="shrink-0 font-medium">{props.tag} ·</span>
       {props.thumbnails.map((thumbnail) => (
         <span

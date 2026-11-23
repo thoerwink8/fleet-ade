@@ -136,11 +136,6 @@ import {
   isUndeliveredMailboxSteer,
 } from "./NotificationMailbox.ts";
 import { EventSinkV2 } from "./EventSink.ts";
-import {
-  guestShareAfterCancelledSend,
-  releasedGuestAttachmentIds,
-  withoutGuestAttribution,
-} from "./GuestShareDecider.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import { withCommandMetrics } from "../observability/Metrics.ts";
 import type { OrchestrationEffectRequestV2, PendingOrchestrationEffectV2 } from "./EffectOutbox.ts";
@@ -191,6 +186,15 @@ import * as ServerSettings from "../serverSettings.ts";
 const isMessageQuestionAnswer = Schema.is(
   Schema.Union([TrimmedNonEmptyString, Schema.NonEmptyArray(TrimmedNonEmptyString)]),
 );
+
+/** A client cannot claim a message came from a guest. Stored guest context still decodes. */
+function stripGuestAttribution<
+  C extends { readonly context?: { readonly guest?: unknown } | undefined },
+>(value: C): C {
+  if (value.context?.guest === undefined) return value;
+  const { guest: _guest, ...context } = value.context;
+  return { ...value, context };
+}
 
 export class OrchestratorDispatchError extends Schema.TaggedError<OrchestratorDispatchError>()(
   "OrchestratorDispatchError",
@@ -3850,27 +3854,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     },
   );
 
-  // Deleted after the share change commits: the files of waiting messages it dismissed or dropped.
-  const releaseGuestAttachments = (
-    command: { readonly commandId: CommandId; readonly threadId: ThreadId },
-    before: OrchestrationV2AppThread["guestShare"],
-    after: OrchestrationV2AppThread["guestShare"],
-    effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
-  ) => {
-    const attachmentIds = releasedGuestAttachmentIds(before ?? null, after ?? null);
-    return attachmentIds.length === 0
-      ? Effect.void
-      : Ref.update(effects, (existing) => [
-          ...existing,
-          {
-            id: `effect:${command.commandId}:${command.threadId}:guest-attachment.cleanup`,
-            commandId: command.commandId,
-            threadId: command.threadId,
-            request: { type: "attachment.cleanup", attachmentIds: [...attachmentIds] },
-          } satisfies PendingOrchestrationEffectV2,
-        ]);
-  };
-
   const dispatchThreadMutation = Effect.fn("orchestrationV2.dispatch.threadMutation")(function* (
     command: Extract<
       OrchestrationV2ServerCommand,
@@ -4412,7 +4395,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             ...thread,
             archivedAt: now,
             titleRegeneration: null,
-            guestShare: null,
             pullRequests: thread.pullRequests?.map((link) => withPullRequestWatch(link, undefined)),
             updatedAt: now,
           };
@@ -4990,8 +4972,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       occurredAt: now,
       payload: updatedThread,
     });
-    // Archiving ends the guest share, so its waiting files go too.
-    yield* releaseGuestAttachments(command, thread.guestShare, updatedThread.guestShare, effects);
 
     if (
       command.type === "thread.model-selection.set" &&
@@ -11366,20 +11346,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       });
     }
     yield* emitQueuedRunCancellation({ command, events, projection, run: queuedRun, now });
-    const emitEvent = emit(events, command);
-    const guest = queuedMessage?.context?.guest;
-    if (guest !== undefined) {
-      const thread = guestShareAfterCancelledSend(projection.thread, guest, now);
-      if (thread !== projection.thread) {
-        yield* emitEvent({
-          type: "thread.guest-share-updated",
-          threadId: command.threadId,
-          providerInstanceId: thread.providerInstanceId,
-          occurredAt: now,
-          payload: thread,
-        });
-      }
-    }
   });
 
   const dispatchQueuedRunEdit = Effect.fn("Orchestrator.dispatchQueuedRunEdit")(function* (
@@ -11425,14 +11391,6 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cause: "Automatic completion deliveries cannot be edited.",
       });
     }
-    // The agent text and the shown text of a guest message must stay the guest's words.
-    if (queuedMessage.context?.guest !== undefined) {
-      return yield* new OrchestratorDispatchError({
-        commandId: command.commandId,
-        commandType: command.type,
-        cause: "A guest's message cannot be edited. Cancel it instead.",
-      });
-    }
     yield* ensureGoalCommandSupported(
       command,
       { text: command.text, attachments: command.attachments ?? queuedMessage.attachments },
@@ -11453,7 +11411,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       ...(queuedRun.rootNodeId === null ? {} : { nodeId: queuedRun.rootNodeId }),
       providerInstanceId: queuedRun.providerInstanceId,
       occurredAt: now,
-      payload: withoutGuestAttribution({
+      payload: stripGuestAttribution({
         ...queuedMessage,
         text: command.text,
         ...editedAttachments,
@@ -11469,7 +11427,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ...(queuedRun.rootNodeId === null ? {} : { nodeId: queuedRun.rootNodeId }),
         providerInstanceId: queuedRun.providerInstanceId,
         occurredAt: now,
-        payload: withoutGuestAttribution({
+        payload: stripGuestAttribution({
           ...queuedTurnItem,
           text: command.text,
           ...editedAttachments,
@@ -14928,7 +14886,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             threadId: command.threadId,
           });
         }
-        const dispatched = withoutGuestAttribution(command);
+        const dispatched = stripGuestAttribution(command);
         cancelUnsettledEffects = yield* dispatchMessage(dispatched, events, effects);
         yield* recordSubagentFollowup(dispatched, events).pipe(mapDispatchError(command));
         break;
