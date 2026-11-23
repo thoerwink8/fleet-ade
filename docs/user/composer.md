@@ -327,7 +327,7 @@ file: a header row with the view toggle, **Copy contents** and **Save file**. A 
 Select an image or video attachment or link to preview it. Playback support depends
 on your browser or device; save an unsupported video to open it in another app.
 
-Right-click media, or long-press it, to save it or copy its path or URL.
+Right-click media to save it or copy its path or URL.
 
 File links refer to the environment's machine, including when you connect remotely.
 Previews use the original file, even outside the workspace. Moving or deleting it
