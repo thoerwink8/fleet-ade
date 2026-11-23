@@ -13,7 +13,7 @@ import {
 } from "./auth.ts";
 
 describe("authorization grants", () => {
-  it("decodes legacy review credentials without offering them in new grants", () => {
+  it("decodes retired scopes without offering them in new grants", () => {
     const decodeAuthEnvironmentScopes = Schema.decodeSync(AuthEnvironmentScopes);
 
     expect(decodeAuthEnvironmentScopes(["review:write"])).toEqual(["review:write"]);
@@ -25,9 +25,14 @@ describe("authorization grants", () => {
     // The preview scope left with the built-in browser; stored sessions and older clients still name it.
     expect(decodeAuthEnvironmentScopes(["preview:operate"])).toEqual(["preview:operate"]);
     expect(decodeAuthGrantScopes(["preview:operate"])).toEqual(["preview:operate"]);
-    expect(AuthStandardClientScopes).not.toContain("preview:operate");
-  });
 
+    // Relay scopes left with T3 Connect; stored credentials still decode but can't be granted.
+    expect(decodeAuthEnvironmentScopes(["relay:read", "relay:write"])).toEqual([
+      "relay:read",
+      "relay:write",
+    ]);
+    expect(() => decodeAuthGrantScopes(["relay:read"])).toThrow();
+  });
   // Keep the pre-granular vocabulary frozen to expose compatibility regressions.
   const oldScopes = Schema.Array(
     Schema.Literals([

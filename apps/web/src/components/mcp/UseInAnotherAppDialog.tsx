@@ -56,7 +56,8 @@ function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentI
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                把这个地址交给同一网络上的应用。它指向当前连接的 {environment.label}。
+                把这个地址交给要接入 MCP 的应用，它需要能访问这个地址。地址指向当前连接的{" "}
+                {environment.label}。
               </p>
               <p className="break-all font-mono text-xs">{mcpUrl}</p>
               <Button

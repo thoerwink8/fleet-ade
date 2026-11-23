@@ -5,6 +5,7 @@ import {
   formatHostedThreadLink,
   formatThreadLink,
   guessThreadLinkRef,
+  hostedThreadLink,
   parseThreadLinkHref,
   relabelThreadLinks,
   threadLinkCandidates,
@@ -208,6 +209,18 @@ describe("hosted thread links", () => {
     );
   });
 
+  it("reads back a v2 link whose ids keep %, :, and / as written", () => {
+    const thread = ref("env.1", "thread:delegated/mcp%3A1.");
+    const href = "t3-thread://v2/env.1/thread:delegated/mcp%3A1.";
+    expect(hostedThreadLink(thread)).toBe(href);
+    expect(formatHostedThreadLink(thread, "See it")).toBe(`[See it](${href})`);
+    expect(parseThreadLinkHref(href)).toEqual(thread);
+    expect(threadLinkRefs(`Open ${href}`, local)).toEqual([
+      thread,
+      ref("env.1", "thread:delegated/mcp:1."),
+    ]);
+  });
+
   it("titles links in every Markdown form", () => {
     const title = titlesIn({ there: { t1: "There" } });
     expect(
@@ -232,6 +245,9 @@ describe("hosted thread links", () => {
     expect(relabelThreadLinks("t3-thread://v2/there/t1", local, () => undefined)).toBe(
       "Thread on another machine",
     );
-    expect(threadLinkRefs("Open t3-thread://v2/there/t%3A1", local).length).toBeGreaterThan(0);
+    expect(threadLinkRefs("Open t3-thread://v2/there/t%3A1", local)).toEqual([
+      ref("there", "t%3A1"),
+      ref("there", "t:1"),
+    ]);
   });
 });
