@@ -2,6 +2,7 @@ import { assert, describe, it, vi } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   CommandId,
+  DEFAULT_SERVER_SETTINGS,
   ChatAttachmentId,
   type ChatAttachment,
   EventId,
@@ -52,6 +53,7 @@ const adapter = {
 function makeHarness(
   options: {
     readonly generateTitle?: TextGeneration.TextGeneration["Service"]["generateThreadTitle"];
+    readonly settings?: Parameters<typeof ServerSettings.layerTest>[0];
   } = {},
 ) {
   const layerDatabase = SqlitePersistence.layerMemory;
@@ -61,7 +63,7 @@ function makeHarness(
     layerRegistry,
     { databaseLayer: layerDatabase, runEffectWorker: false },
   );
-  const layerServerSettings = ServerSettings.layerTest({});
+  const layerServerSettings = ServerSettings.layerTest(options.settings ?? {});
   const layerThreadManagement = ThreadManagement.layer.pipe(
     Layer.provide(layerOrchestrator),
     Layer.provide(layerServerSettings),
@@ -591,6 +593,42 @@ describe("ThreadTitleRegenerationService", () => {
           requestId,
           status: "unchanged",
         });
+      }).pipe(Effect.provide(harness.layer));
+    }),
+  );
+
+  it.effect("keeps the title when the naming row is off", () =>
+    Effect.gen(function* () {
+      const harness = makeHarness({
+        settings: {
+          commandAssist: {
+            ...DEFAULT_SERVER_SETTINGS.commandAssist,
+            naming: { enabled: false, modelSelection: null },
+          },
+        },
+      });
+      yield* Effect.gen(function* () {
+        const threads = yield* ThreadManagement.ThreadManagementService;
+        const titleRegeneration = yield* ThreadTitleRegeneration.ThreadTitleRegenerationService;
+        const threadId = yield* createThread({
+          command: "command:title:naming-off:create",
+          thread: "thread:title:naming-off",
+        });
+        yield* dispatchUserMessage({
+          command: "command:title:naming-off:message",
+          threadId,
+          text: "Some conversation",
+        });
+        const requestId = yield* armRegeneration({
+          command: "command:title:naming-off:1",
+          threadId,
+        });
+
+        yield* titleRegeneration.execute({ threadId, requestId, kind: { type: "regenerate" } });
+
+        assert.equal(harness.generateThreadTitle.mock.calls.length, 0);
+        const projection = yield* threads.getThreadProjection(threadId);
+        assert.equal(projection.thread.title, "Seed title");
       }).pipe(Effect.provide(harness.layer));
     }),
   );

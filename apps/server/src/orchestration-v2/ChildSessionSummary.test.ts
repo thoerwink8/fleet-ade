@@ -404,3 +404,33 @@ it.effect("worker keeps completion newer than a blocked startup scan", () =>
     );
   }),
 );
+
+it.effect("reads outlook from command assist and leaves the child phase alone", () => {
+  const database = SqlitePersistence.layerMemory;
+  return Effect.gen(function* () {
+    const internal = yield* ChildSessionSummaryInternal;
+    const summary = yield* ChildSessionSummary;
+    const sql = yield* SqlClient.SqlClient;
+    const parent = ThreadId.make("thread:outlook-parent");
+    const child = ThreadId.make("thread:outlook-child");
+    yield* internal.note(factsFor(child, parent, 0));
+    const before = yield* summary.detail({ threadId: child });
+    assert.ok(before !== null);
+    assert.strictEqual(before.outlook, null);
+    yield* sql`
+      INSERT INTO command_assist_state (thread_id, state_json, updated_at)
+      VALUES (
+        ${child},
+        ${JSON.stringify({ outlook: "会改 parser.ts，加 3 行" })},
+        ${"2026-11-23T00:00:00.000Z"}
+      )
+    `;
+    const after = yield* summary.detail({ threadId: child });
+    assert.ok(after !== null);
+    assert.strictEqual(after.outlook, "会改 parser.ts，加 3 行");
+    assert.strictEqual(after.phase, before.phase);
+    assert.strictEqual(after.reason, before.reason);
+  }).pipe(
+    Effect.provide(Layer.merge(ChildSessionSummary.layer.pipe(Layer.provide(database)), database)),
+  );
+});
