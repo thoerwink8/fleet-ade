@@ -114,11 +114,7 @@ export const servePeer = <E, R>(
     );
     const layerRoutes = Layer.mergeAll(
       HttpApiBuilder.layer(PeerTestApi).pipe(
-        Layer.provide(
-          McpOAuthHttp.layer.pipe(
-            Layer.provide(McpOAuth.layer),
-          ),
-        ),
+        Layer.provide(McpOAuthHttp.layer.pipe(Layer.provide(McpOAuth.layer))),
         Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
         Layer.provide(AuthHttp.layerAuthenticatedAuth),
       ),

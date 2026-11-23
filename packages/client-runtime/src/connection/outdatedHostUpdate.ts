@@ -25,12 +25,7 @@ import { makeWsRpcProtocolClient, PING_TIMEOUT } from "../rpc/protocol.ts";
 import { resolveServerUpdateProgressResult } from "../state/server.ts";
 import * as ConnectionResolver from "./resolver.ts";
 import * as EnvironmentRegistry from "./registry.ts";
-import {
-  connectionRoutes,
-  routeEntry,
-  routeHttpBaseUrl,
-  usableRoutes,
-} from "./routes.ts";
+import { connectionRoutes, routeEntry, routeHttpBaseUrl, usableRoutes } from "./routes.ts";
 
 // A v1 host restarting into v2 runs migrations before its descriptor answers again.
 const OUTDATED_HOST_RESTART_TIMEOUT = Duration.minutes(4);

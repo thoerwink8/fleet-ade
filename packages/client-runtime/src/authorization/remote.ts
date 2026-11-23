@@ -38,7 +38,6 @@ const clientMetadataTokenExchangeFields = (
   };
 };
 
-
 export const bootstrapRemoteBearerSession = Effect.fn(
   "clientRuntime.authorization.bootstrapRemoteBearerSession",
 )(function* (input: {
@@ -130,7 +129,6 @@ export const issueRemoteWebSocketTicket = Effect.fn(
   );
 });
 
-
 function rpcSocketUrl(wsBaseUrl: string): URL {
   const url = new URL(wsBaseUrl);
   if (url.pathname === "" || url.pathname === "/") {
@@ -158,4 +156,3 @@ export const resolveRemoteWebSocketConnectionUrl = Effect.fn(
   url.searchParams.set("wsTicket", Redacted.value(issued.ticket));
   return url.toString();
 });
-

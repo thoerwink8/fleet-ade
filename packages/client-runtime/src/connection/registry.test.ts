@@ -95,10 +95,7 @@ const SECOND_REMOTE_TARGET = new BearerConnectionTarget({
   connectionId: "remote-connection-2",
 });
 
-const remoteRegistration = (
-  target: BearerConnectionTarget = REMOTE_TARGET,
-  label = target.label,
-) =>
+const remoteRegistration = (target: BearerConnectionTarget = REMOTE_TARGET, label = target.label) =>
   new BearerConnectionRegistration({
     target: new BearerConnectionTarget({ ...target, label }),
     profile: new BearerConnectionProfile({
@@ -626,37 +623,37 @@ describe("EnvironmentRegistry", () => {
   );
 
   it.effect("a switched-off environment stays off after compatibility clears", () =>
-      Effect.gen(function* () {
-        const environmentId = REMOTE_TARGET.environmentId;
-        const harness = yield* makeHarness([REMOTE_TARGET], [], [], {
-          initialDisabled: [environmentId],
+    Effect.gen(function* () {
+      const environmentId = REMOTE_TARGET.environmentId;
+      const harness = yield* makeHarness([REMOTE_TARGET], [], [], {
+        initialDisabled: [environmentId],
+      });
+      yield* Effect.gen(function* () {
+        const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+        yield* registry.start;
+        const error = new ConnectionBlockedError({
+          reason: "unsupported",
+          detail: "Use a compatible client.",
         });
-        yield* Effect.gen(function* () {
-          const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
-          yield* registry.start;
-          const error = new ConnectionBlockedError({
-            reason: "unsupported",
-            detail: "Use a compatible client.",
-          });
-          yield* registry.setCompatibility(environmentId, error);
-          const entry = (yield* SubscriptionRef.get(registry.entries)).get(environmentId);
-          expect(entry).toMatchObject({ enabled: false, unsupportedReason: error.message });
-          expect(yield* Ref.get(harness.sessions)).toHaveLength(0);
-          yield* registry.setCompatibility(environmentId, null);
-          expect((yield* SubscriptionRef.get(registry.entries)).get(environmentId)?.enabled).toBe(
-            false,
-          );
-          expect(yield* registry.state(environmentId)).toMatchObject({ desired: false });
-          expect(yield* Ref.get(harness.storedDisabled)).toEqual(new Set([environmentId]));
-          expect(yield* Ref.get(harness.sessions)).toHaveLength(0);
-          yield* registry.setEnabled(environmentId, true);
-          yield* awaitConnectionState(
-            registry,
-            environmentId,
-            (state) => state.phase === "connected",
-          );
-        }).pipe(Effect.provide(harness.layer));
-      }),
+        yield* registry.setCompatibility(environmentId, error);
+        const entry = (yield* SubscriptionRef.get(registry.entries)).get(environmentId);
+        expect(entry).toMatchObject({ enabled: false, unsupportedReason: error.message });
+        expect(yield* Ref.get(harness.sessions)).toHaveLength(0);
+        yield* registry.setCompatibility(environmentId, null);
+        expect((yield* SubscriptionRef.get(registry.entries)).get(environmentId)?.enabled).toBe(
+          false,
+        );
+        expect(yield* registry.state(environmentId)).toMatchObject({ desired: false });
+        expect(yield* Ref.get(harness.storedDisabled)).toEqual(new Set([environmentId]));
+        expect(yield* Ref.get(harness.sessions)).toHaveLength(0);
+        yield* registry.setEnabled(environmentId, true);
+        yield* awaitConnectionState(
+          registry,
+          environmentId,
+          (state) => state.phase === "connected",
+        );
+      }).pipe(Effect.provide(harness.layer));
+    }),
   );
 
   it.effect("protocol rejection preserves enablement through recovery and relaunch", () =>
@@ -830,7 +827,9 @@ describe("EnvironmentRegistry", () => {
           REMOTE_TARGET.environmentId,
         );
         expect(entry?.enabled).toBe(false);
-        expect((yield* Ref.get(harness.storedDisabled)).has(REMOTE_TARGET.environmentId)).toBe(true);
+        expect((yield* Ref.get(harness.storedDisabled)).has(REMOTE_TARGET.environmentId)).toBe(
+          true,
+        );
         expect(hasRoutes(yield* Ref.get(harness.storedTargets), REMOTE_TARGET.environmentId)).toBe(
           true,
         );
@@ -1085,9 +1084,9 @@ describe("EnvironmentRegistry", () => {
 
         expect(error._tag).toBe("ConnectionPersistenceError");
         expect(yield* Ref.get(harness.releasedSessions)).toBe(0);
-        expect((yield* SubscriptionRef.get(registry.entries)).has(REMOTE_TARGET.environmentId)).toBe(
-          true,
-        );
+        expect(
+          (yield* SubscriptionRef.get(registry.entries)).has(REMOTE_TARGET.environmentId),
+        ).toBe(true);
         expect(hasRoutes(yield* Ref.get(harness.storedTargets), REMOTE_TARGET.environmentId)).toBe(
           true,
         );
@@ -1849,10 +1848,7 @@ describe("EnvironmentRegistry routes", () => {
       );
       yield* Effect.gen(function* () {
         const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
-        yield* registry.removeRoute(
-          LAN_TARGET.environmentId,
-          REMOTE_TARGET.connectionId,
-        );
+        yield* registry.removeRoute(LAN_TARGET.environmentId, REMOTE_TARGET.connectionId);
         yield* registry.remove(SECOND_REMOTE_TARGET.environmentId);
 
         const targets = yield* Ref.get(harness.storedTargets);
@@ -1907,10 +1903,7 @@ describe("EnvironmentRegistry routes", () => {
         ]);
         expect(yield* Ref.get(harness.cacheClears)).toEqual([]);
 
-        yield* registry.removeRoute(
-          LAN_TARGET.environmentId,
-          REMOTE_TARGET.connectionId,
-        );
+        yield* registry.removeRoute(LAN_TARGET.environmentId, REMOTE_TARGET.connectionId);
         expect(hasRoutes(yield* Ref.get(harness.storedTargets), LAN_TARGET.environmentId)).toBe(
           false,
         );

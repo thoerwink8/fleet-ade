@@ -267,7 +267,7 @@ describe("rankMachinesByHint", () => {
           ...machine,
           machine: "server",
           connected: true,
-            linked: false,
+          linked: false,
           urls: [],
         }) as const,
     );

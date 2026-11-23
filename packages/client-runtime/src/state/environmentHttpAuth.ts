@@ -71,10 +71,7 @@ export const executeAuthenticatedEnvironmentHttpRequest = <
 export const executeConnectedEnvironmentHttpRequest = Effect.fn(
   "clientRuntime.state.executeConnectedEnvironmentHttpRequest",
 )(function* <Group extends Parameters<typeof makeEnvironmentHttpApiGroupClient>[1], A, E, R>(
-  input: Omit<
-    Parameters<typeof executeEnvironmentRequest<Group, A, E, R>>[0],
-    "prepared"
-  >,
+  input: Omit<Parameters<typeof executeEnvironmentRequest<Group, A, E, R>>[0], "prepared">,
 ) {
   const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
   const prepared = yield* SubscriptionRef.get(supervisor.prepared);

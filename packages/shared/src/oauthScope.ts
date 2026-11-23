@@ -47,7 +47,6 @@ export function encodeOAuthScope(scopes: ReadonlyArray<string>): string {
   return scopes.join(" ");
 }
 
-
 export function parseAllowedOAuthScope<Scope extends string>(input: {
   readonly value: string;
   readonly allowedScopes: ReadonlySet<Scope>;

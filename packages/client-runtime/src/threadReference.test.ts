@@ -105,5 +105,4 @@ describe("resolveThreadReferenceCopyTarget", () => {
       records: pasted!.records,
     });
   });
-
 });

@@ -32,9 +32,7 @@ describe("presentConnectionDiagnosis", () => {
       detail: "Mac mini did not answer.",
       hop: "server",
     });
-    expect(diagnose(backoff(failure))?.headline).toBe(
-      "Mac mini 上的 Fleet ADE 没有响应",
-    );
+    expect(diagnose(backoff(failure))?.headline).toBe("Mac mini 上的 Fleet ADE 没有响应");
     expect(results(backoff(failure))).toEqual(["device:ok", "server:failed"]);
   });
 

@@ -931,7 +931,6 @@ export class InvalidAppleTeamIdError extends Schema.TaggedError<InvalidAppleTeam
   }
 }
 
-
 const isInvalidAppleTeamIdError = Schema.is(InvalidAppleTeamIdError);
 
 export function resolveMacSigningConfiguration(

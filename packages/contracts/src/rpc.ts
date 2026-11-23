@@ -484,7 +484,6 @@ export const WS_METHODS = {
   scheduledTasksListWebhookDeliveries: "scheduledTasks.listWebhookDeliveries",
   scheduledTasksGetWebhookDelivery: "scheduledTasks.getWebhookDelivery",
 
-
   pullRequestsList: "pullRequests.list",
   pullRequestsListStats: "pullRequests.listStats",
   pullRequestsFilterOptions: "pullRequests.filterOptions",

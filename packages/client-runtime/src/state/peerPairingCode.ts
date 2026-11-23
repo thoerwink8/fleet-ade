@@ -96,4 +96,3 @@ export function createPeerPairingCodeCommand<R, E>(
       ),
   });
 }
-

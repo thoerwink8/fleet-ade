@@ -149,7 +149,11 @@ describe("resolveRemoteOpenState", () => {
 
   it("uses the advertised login username in editor links over a relay", () => {
     const state = resolveRemoteOpenState({
-      target: new BearerConnectionTarget({ environmentId, label: "服务器", connectionId: "remote" }),
+      target: new BearerConnectionTarget({
+        environmentId,
+        label: "服务器",
+        connectionId: "remote",
+      }),
       sshTarget: null,
       isDesktopRenderer: false,
       remoteOpenTargets: [
@@ -168,7 +172,11 @@ describe("resolveRemoteOpenState", () => {
     for (const remoteOpenTargets of [[], undefined] as const) {
       expect(
         resolveRemoteOpenState({
-          target: new BearerConnectionTarget({ environmentId, label: "sol", connectionId: "remote" }),
+          target: new BearerConnectionTarget({
+            environmentId,
+            label: "sol",
+            connectionId: "remote",
+          }),
           sshTarget: null,
           isDesktopRenderer: false,
           remoteOpenTargets,

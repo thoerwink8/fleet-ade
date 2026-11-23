@@ -120,12 +120,9 @@ const withRoutes = <A, E>(
     const random = yield* SecureRandom.SecureRandom;
     const context = Context.make(SecureRandom.SecureRandom, random);
     let routerAuth: EnvironmentAuth.EnvironmentAuth["Service"] | undefined;
-    const layerRoutes = makeLayerRoutes(
-      (auth) => {
-        routerAuth = auth;
-      },
-      peer,
-    );
+    const layerRoutes = makeLayerRoutes((auth) => {
+      routerAuth = auth;
+    }, peer);
     return yield* Effect.acquireUseRelease(
       Effect.sync(() => HttpRouter.toWebHandler(layerRoutes, { disableLogger: true })),
       (web) =>
@@ -777,27 +774,26 @@ it.live("an app approval code approves only an app sign-in, at its own level", (
 it.effect("keeps app sign-in on this server when no hosted app is configured", () =>
   Effect.gen(function* () {
     const handoff = (_tunnelHostname: string, peerLink = false) =>
-      withRoutes(
-        (handler) =>
-          Effect.gen(function* () {
-            const registered = yield* handler(
-              at("/oauth/mcp/register", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: encodeJson({
-                  client_name: "Agent",
-                  redirect_uris: [REDIRECT],
-                  token_endpoint_auth_method: "none",
-                  ...(peerLink ? { software_id: MCP_PEER_LINK_SOFTWARE_ID } : {}),
-                }),
+      withRoutes((handler) =>
+        Effect.gen(function* () {
+          const registered = yield* handler(
+            at("/oauth/mcp/register", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: encodeJson({
+                client_name: "Agent",
+                redirect_uris: [REDIRECT],
+                token_endpoint_auth_method: "none",
+                ...(peerLink ? { software_id: MCP_PEER_LINK_SOFTWARE_ID } : {}),
               }),
-            ).pipe(Effect.flatMap(json<{ client_id: string }>));
-            const query = new URLSearchParams(
-              authorizeParams(registered.client_id, "http://localhost:51234/callback"),
-            );
-            const response = yield* handler(at(`/oauth/mcp/authorize?${query}`));
-            return { location: response.headers.get("location")!, query: query.toString() };
-          }),
+            }),
+          ).pipe(Effect.flatMap(json<{ client_id: string }>));
+          const query = new URLSearchParams(
+            authorizeParams(registered.client_id, "http://localhost:51234/callback"),
+          );
+          const response = yield* handler(at(`/oauth/mcp/authorize?${query}`));
+          return { location: response.headers.get("location")!, query: query.toString() };
+        }),
       );
 
     const onTunnel = yield* handoff("box.example.ts.net");

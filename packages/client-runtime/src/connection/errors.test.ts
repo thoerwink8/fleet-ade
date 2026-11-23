@@ -1,14 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import { mapRemoteEnvironmentError } from "./errors.ts";
-import {
-  EnvironmentAuthInvalidError,
-  EnvironmentScopeRequiredError,
-} from "@t3tools/contracts";
-import {
-  RemoteEnvironmentAuthFetchError,
-  RemoteEnvironmentAuthTimeoutError,
-} from "../rpc/http.ts";
+import { EnvironmentAuthInvalidError, EnvironmentScopeRequiredError } from "@t3tools/contracts";
+import { RemoteEnvironmentAuthFetchError, RemoteEnvironmentAuthTimeoutError } from "../rpc/http.ts";
 
 describe("mapRemoteEnvironmentError", () => {
   it("blocks an invalid credential with the server's trace id", () => {

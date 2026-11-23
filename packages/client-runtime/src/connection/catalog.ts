@@ -78,7 +78,6 @@ export class PrimaryConnectionRegistration extends Schema.TaggedClass<PrimaryCon
   },
 ) {}
 
-
 export class BearerConnectionRegistration extends Schema.TaggedClass<BearerConnectionRegistration>()(
   "BearerConnectionRegistration",
   {

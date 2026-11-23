@@ -9,10 +9,7 @@ import {
 
 export const fetchEnvironmentThreadTranscript = Effect.fn(
   "clientRuntime.state.fetchEnvironmentThreadTranscript",
-)(function* (input: {
-  readonly prepared: PreparedConnection;
-  readonly threadId: ThreadId;
-}) {
+)(function* (input: { readonly prepared: PreparedConnection; readonly threadId: ThreadId }) {
   return yield* executeAuthenticatedEnvironmentHttpRequest({
     ...input,
     group: "orchestration",
