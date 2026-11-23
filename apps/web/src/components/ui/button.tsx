@@ -41,6 +41,9 @@ const buttonVariants = cva(
         xl: "h-11 px-[calc(--spacing(4)-1px)] text-lg sm:h-10 sm:text-base [&_svg:not([class*='size-'])]:size-4",
         xs: "h-7 gap-1 px-[calc(--spacing(2)-1px)] text-sm sm:h-6 sm:text-meta [&_svg:not([class*='size-'])]:size-4",
       },
+      touchTarget: {
+        compact: "max-md:size-8! pointer-coarse:size-8",
+      },
       variant: {
         default:
           "not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] border-primary bg-primary text-primary-foreground shadow-primary/24 shadow-xs [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [:disabled,:active,[data-pressed]]:shadow-none [:hover,[data-pressed]]:bg-primary/90",
@@ -75,19 +78,21 @@ const buttonVariants = cva(
 
 type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
 type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>;
+type ButtonTouchTarget = NonNullable<VariantProps<typeof buttonVariants>["touchTarget"]>;
 
 interface ButtonProps extends useRender.ComponentProps<"button"> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  touchTarget?: ButtonTouchTarget;
 }
 
-function Button({ className, variant, size, render, ...props }: ButtonProps) {
+function Button({ className, variant, size, touchTarget, render, ...props }: ButtonProps) {
   const typeValue: React.ButtonHTMLAttributes<HTMLButtonElement>["type"] = render
     ? undefined
     : "button";
 
   const defaultProps = {
-    className: cn(buttonVariants({ className, size, variant })),
+    className: cn(buttonVariants({ className, size, touchTarget, variant })),
     "data-slot": "button",
     type: typeValue,
   };
@@ -111,6 +116,8 @@ const inlineButtonVariants = cva(
         row: "relative min-h-6 text-row after:absolute after:inset-x-0 after:-inset-y-0.5",
       },
       touchTarget: {
+        compact:
+          "justify-center max-md:-my-1.5 max-md:min-h-8 max-md:min-w-8 pointer-coarse:-my-1.5 pointer-coarse:min-h-8 pointer-coarse:min-w-8",
         padded: "pointer-coarse:min-h-11 pointer-coarse:px-1.5",
       },
       tone: {

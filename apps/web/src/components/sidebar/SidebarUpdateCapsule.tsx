@@ -22,6 +22,9 @@ import {
   retryFailedUpdateRunServers,
 } from "./updateEverythingRun";
 
+const ACTION_BUTTON_TOUCH_TARGET =
+  "max-md:min-h-8 max-md:min-w-8 pointer-coarse:min-h-8 pointer-coarse:min-w-8";
+
 function useNow(intervalMs: number | null): number {
   const step = intervalMs ?? 60_000;
   const subscribe = (onChange: () => void) => {
@@ -114,7 +117,10 @@ export function SidebarUpdateCapsule({
         {view.action !== null ? (
           <button
             type="button"
-            className="relative inline-flex shrink-0 cursor-pointer items-center justify-center pr-3 pl-1.5 text-xs underline decoration-muted-foreground/60 underline-offset-3 hover:decoration-current max-md:min-h-8 max-md:min-w-8 pointer-coarse:min-h-8 pointer-coarse:min-w-8"
+            className={cn(
+              "relative inline-flex shrink-0 cursor-pointer items-center justify-center pr-3 pl-1.5 text-xs underline decoration-muted-foreground/60 underline-offset-3 hover:decoration-current",
+              ACTION_BUTTON_TOUCH_TARGET,
+            )}
             onClick={runAction}
           >
             {actionLabel}

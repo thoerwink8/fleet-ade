@@ -385,6 +385,7 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
             render={
               <SidebarTrigger
                 variant={isSidebarVisible && stageBackdropVariant ? "media-navigation" : "ghost"}
+                touchTarget="compact"
                 className={cn(
                   "pointer-events-auto",
                   isSidebarVisible && stageBackdropVariant && "relative top-auto translate-y-0",

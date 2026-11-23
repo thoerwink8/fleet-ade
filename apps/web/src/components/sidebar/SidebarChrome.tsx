@@ -75,7 +75,8 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
       <div className="relative top-[calc(var(--workspace-controls-top)-env(safe-area-inset-top))] z-10 ml-[calc(var(--workspace-controls-left)+1px-env(safe-area-inset-left))] flex shrink-0 items-center md:hidden">
         <SidebarTrigger
           variant={backdropVariant ? "media-navigation" : "ghost"}
-          className="relative top-auto translate-y-0 max-md:size-8! pointer-coarse:size-8!"
+          touchTarget="compact"
+          className="relative top-auto translate-y-0"
           aria-label="切换主侧边栏"
         />
       </div>
@@ -151,12 +152,13 @@ function HistoryNavigationButton({
           <Button
             aria-label={label}
             className={cn(
-              "[-webkit-app-region:no-drag] pointer-coarse:size-8",
+              "[-webkit-app-region:no-drag]",
               onBackdrop && "relative top-auto translate-y-0",
             )}
             disabled={!enabled}
             onClick={() => navigateHistory(direction)}
             size="icon-sm"
+            touchTarget="compact"
             variant={onBackdrop ? "media-navigation" : "ghost"}
           />
         }
@@ -213,12 +215,7 @@ function SidebarUtilityItem({
       <Tooltip>
         <TooltipTrigger
           render={
-            <SidebarMenuButton
-              aria-label={label}
-              onClick={onClick}
-              size="icon"
-              className="size-7 max-md:size-8 pointer-coarse:size-8"
-            >
+            <SidebarMenuButton aria-label={label} onClick={onClick} size="icon-sm">
               {icon}
             </SidebarMenuButton>
           }
