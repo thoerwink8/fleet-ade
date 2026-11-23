@@ -11,9 +11,6 @@ const trimNonEmptyOption = (value: string): Option.Option<string> => {
 export const trimmedString = (name: string) =>
   Config.String(name).pipe(Config.option, Config.map(Option.flatMap(trimNonEmptyOption)));
 
-const optionalBoolean = (name: string) =>
-  Config.Boolean(name).pipe(Config.option, Config.map(Option.getOrElse(() => false)));
-
 const commaSeparatedStrings = (name: string) =>
   trimmedString(name).pipe(
     Config.map(
@@ -57,11 +54,6 @@ export const DesktopConfig = Config.all({
   ),
   desktopLauncherPath: trimmedString("T3CODE_DESKTOP_LAUNCHER_PATH"),
   appImagePath: trimmedString("APPIMAGE"),
-  disableAutoUpdate: optionalBoolean("T3CODE_DISABLE_AUTO_UPDATE"),
-  mockUpdates: optionalBoolean("T3CODE_DESKTOP_MOCK_UPDATES"),
-  mockUpdateServerPort: Config.Port("T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT").pipe(
-    Config.withDefault(3000),
-  ),
 });
 
 export const layerTest = (env: Readonly<Record<string, string | undefined>>) =>
