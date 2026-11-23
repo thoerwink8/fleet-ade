@@ -115,6 +115,7 @@
             delete document.documentElement.dataset.themeSelected;
           }
           document.documentElement.classList.toggle("dark", isDark);
+          document.documentElement.dataset.theme = mode;
           const chromeColor = builtInSplash
             ? builtInSplash.chrome
             : isDark
@@ -136,6 +137,7 @@
           delete document.documentElement.dataset.themeId;
           delete document.documentElement.dataset.themeSelected;
           document.documentElement.classList.toggle("dark", prefersDark);
+          document.documentElement.dataset.theme = prefersDark ? "dark" : "light";
           const fallbackColor = prefersDark ? DARK_BACKGROUND : LIGHT_BACKGROUND;
           document.documentElement.style.backgroundColor = fallbackColor;
           setThemeColor(fallbackColor);
