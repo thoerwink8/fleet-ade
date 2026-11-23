@@ -119,7 +119,7 @@ const probeOne = Effect.fn("Network.probe")(function* (input: {
 export const inspectNetwork = Effect.fn("Network.inspect")(function* (input: {
   readonly probe: boolean;
 }) {
-  const snapshot = refreshNetworkSystemProxy(true);
+  const snapshot = yield* Effect.promise(() => refreshNetworkSystemProxy(true));
   const route = routeForSnapshot(snapshot);
   const probes = input.probe
     ? yield* Effect.forEach(
