@@ -90,12 +90,23 @@ export const migrate = Effect.gen(function* () {
       reason TEXT NOT NULL,
       needs_you INTEGER NOT NULL,
       last_progress TEXT NOT NULL,
+      branch TEXT,
+      commit_sha TEXT,
       updated_at TEXT NOT NULL,
       stale INTEGER NOT NULL DEFAULT 0,
       stale_reason TEXT,
       revision INTEGER NOT NULL
     )
   `;
+      const summaryColumns = (yield* sql`PRAGMA table_info(fleet_summary_rows)`) as readonly {
+        readonly name: string;
+      }[];
+      if (!summaryColumns.some((column) => column.name === "branch")) {
+        yield* sql`ALTER TABLE fleet_summary_rows ADD COLUMN branch TEXT`;
+      }
+      if (!summaryColumns.some((column) => column.name === "commit_sha")) {
+        yield* sql`ALTER TABLE fleet_summary_rows ADD COLUMN commit_sha TEXT`;
+      }
       yield* sql`
     CREATE TABLE IF NOT EXISTS fleet_summary_changes (
       revision INTEGER PRIMARY KEY,

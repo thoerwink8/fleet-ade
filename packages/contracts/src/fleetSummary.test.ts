@@ -1,6 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
+import * as Schema from "effect/Schema";
 
-import { isBlockingApproval, isUserInputRequest } from "./fleetSummary.ts";
+import {
+  FleetSummaryReportInput,
+  FleetSummaryRow,
+  isBlockingApproval,
+  isUserInputRequest,
+} from "./fleetSummary.ts";
 
 describe("isBlockingApproval", () => {
   it("recognizes only blocking approval requests", () => {
@@ -39,5 +45,45 @@ describe("isUserInputRequest", () => {
       expect(isUserInputRequest(kind)).toBe(false);
       expect(isUserInputRequest(kind, true)).toBe(false);
     }
+  });
+});
+
+describe("FleetSummaryRow branch and commit fields", () => {
+  it("decodes optional branch and commit on summary rows and reports", () => {
+    const decodeRow = Schema.decodeUnknownSync(FleetSummaryRow);
+    const decodeReport = Schema.decodeUnknownSync(FleetSummaryReportInput);
+
+    const row = decodeRow({
+      environmentId: "env-box",
+      threadId: "thread-1",
+      title: "Fix summary",
+      phase: "working",
+      reason: "running",
+      needsYou: false,
+      lastProgress: "running tests",
+      branch: " local/118-fleet-row ",
+      commit: " abc1234def ",
+      updatedAt: "2026-11-24T00:00:00.000Z",
+      stale: false,
+      revision: 1,
+    });
+    expect(row.branch).toBe("local/118-fleet-row");
+    expect(row.commit).toBe("abc1234def");
+
+    const report = decodeReport({
+      type: "upsert-adhoc",
+      threadId: "thread-1",
+      title: "Fix summary",
+      sessionRun: "running",
+      reason: "running",
+      needsYou: false,
+      lastProgress: "running tests",
+      branch: "local/118-fleet-row",
+      commit: "abc1234def",
+    });
+    expect(report).toMatchObject({
+      branch: "local/118-fleet-row",
+      commit: "abc1234def",
+    });
   });
 });

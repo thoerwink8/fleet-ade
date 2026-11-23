@@ -77,6 +77,8 @@ export const FleetSummaryRow = Schema.Struct({
   reason: Schema.String,
   needsYou: Schema.Boolean,
   lastProgress: Schema.String,
+  branch: Schema.optional(TrimmedNonEmptyString),
+  commit: Schema.optional(TrimmedNonEmptyString),
   updatedAt: Schema.String,
   stale: Schema.Boolean,
   staleReason: Schema.optional(Schema.String),
@@ -99,6 +101,8 @@ const reportFields = {
   reason: Schema.String.check(Schema.isMaxLength(200)),
   needsYou: Schema.Boolean,
   lastProgress: Schema.String,
+  branch: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(200))),
+  commit: Schema.optional(TrimmedNonEmptyString.check(Schema.isMaxLength(64))),
 };
 
 export const FleetSummaryUpsertTask = Schema.Struct({

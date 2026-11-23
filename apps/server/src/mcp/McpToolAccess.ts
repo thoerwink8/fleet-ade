@@ -1,5 +1,7 @@
 import {
+  AuthOrchestrationOperateScope,
   type EnvironmentId,
+  mcpClientScopes,
   type OrchestrationV2LinkOrigin,
   OrchestratorMcpEnvironmentTarget,
   OrchestratorMcpFailure,
@@ -21,6 +23,7 @@ import {
   type DispatchModeRefusal,
 } from "../orchestration-v2/DispatchModeLimit.ts";
 import * as PeerForwarding from "../peer/PeerForwarding.ts";
+import * as PeerLinks from "../peer/PeerLinks.ts";
 import { assertNotLinked, assertSameLink, callerLinkOrigin } from "./linkOrigin.ts";
 import * as McpInvocationContext from "./McpInvocationContext.ts";
 import { resolveInteractionMode, resolveRuntimeMode } from "./delegatedTaskModes.ts";
@@ -47,6 +50,7 @@ let declare: <P, A, E, R>(
   handle: (params: P) => Effect.Effect<A, E, R>,
   remote: RemoteCheck<P> | undefined,
   forwarded?: Forwarded<P, A, E, R>,
+  writesRemote?: (params: P) => boolean,
 ) => Declaration<(params: P) => Effect.Effect<A, E, R>>;
 
 /**
@@ -68,6 +72,9 @@ type Forwarded<P, A, E, R> = (
 let forwardedOf: <Handler>(
   declaration: Declaration<Handler>,
 ) => Forwarded<never, unknown, unknown, unknown> | undefined;
+let writesRemoteOf: <Handler>(
+  declaration: Declaration<Handler>,
+) => ((params: never) => boolean) | undefined;
 
 type CheckedHandlerOf<D> = D extends Declaration<infer Handler> ? Handler : never;
 
@@ -86,28 +93,33 @@ export class Declaration<out Handler> {
   readonly #handle: Handler;
   readonly #remote: RemoteCheck<never> | undefined;
   readonly #forwarded: Forwarded<never, unknown, unknown, unknown> | undefined;
+  readonly #writesRemote: ((params: never) => boolean) | undefined;
   private constructor(
     token: typeof builtHere,
     handle: Handler,
     remote: RemoteCheck<never> | undefined,
     forwarded: Forwarded<never, unknown, unknown, unknown> | undefined,
+    writesRemote: ((params: never) => boolean) | undefined,
   ) {
     refuseOutsideConstruction(token);
     this.#handle = handle;
     this.#remote = remote;
     this.#forwarded = forwarded;
+    this.#writesRemote = writesRemote;
   }
   static {
-    declare = (handle, remote, forwarded) =>
+    declare = (handle, remote, forwarded, writesRemote) =>
       new Declaration(
         builtHere,
         handle,
         remote,
         forwarded as Forwarded<never, unknown, unknown, unknown> | undefined,
+        writesRemote as ((params: never) => boolean) | undefined,
       );
     checkedHandler = Struct.lambda<CheckedHandler>((declaration) => declaration.#handle);
     remoteCheckOf = (declaration) => declaration.#remote;
     forwardedOf = (declaration) => declaration.#forwarded;
+    writesRemoteOf = (declaration) => declaration.#writesRemote;
   }
 }
 
@@ -117,8 +129,7 @@ const refuseReadOnlyClient = McpInvocationContext.McpInvocationContext.pipe(
       ? Effect.fail(
           new OrchestratorMcpFailure({
             code: "capability_denied",
-            message:
-              "This tool changes the environment, and this MCP client was approved for read-only access.",
+            message: `This tool requires write permission (${AuthOrchestrationOperateScope}) on this environment; this MCP client was approved for read-only access.`,
           }),
         )
       : Effect.void,
@@ -143,6 +154,8 @@ export const reads = <P, A, E, R>(handle: (params: P) => Effect.Effect<A, E, R>)
   declare(
     (params: P) => handle(params),
     () => Effect.void,
+    undefined,
+    () => false,
   );
 
 export const readsAsCaller = <P, A, E, R>(handle: (params: P) => Effect.Effect<A, E, R>) =>
@@ -309,6 +322,9 @@ export const either = <P, A, E, R, A2, E2, R2>(
   const remotes = [remoteCheckOf(first), remoteCheckOf(second)] as ReadonlyArray<
     RemoteCheck<P> | undefined
   >;
+  const writers = [writesRemoteOf(first), writesRemoteOf(second)] as ReadonlyArray<
+    ((params: P) => boolean) | undefined
+  >;
   return declare(
     (params: P): Effect.Effect<A | A2, E | E2, R | R2> =>
       useFirst(params) ? checkedHandler(first)(params) : checkedHandler(second)(params),
@@ -320,6 +336,8 @@ export const either = <P, A, E, R, A2, E2, R2>(
           message: "This action acts as the calling thread, which is here. Omit environmentId.",
         }),
       ),
+    undefined,
+    (params) => writers[useFirst(params) ? 0 : 1]?.(params) ?? true,
   );
 };
 
@@ -335,6 +353,7 @@ export const afterForwarding = <P, A, E, R, E2, R2>(
     checkedHandler(declaration) as (params: P) => Effect.Effect<A, E | E2, R | R2>,
     remoteCheckOf(declaration) as RemoteCheck<P> | undefined,
     forwarded,
+    writesRemoteOf(declaration) as ((params: P) => boolean) | undefined,
   );
 
 const fullAccessRequired =
@@ -438,6 +457,7 @@ const routed = Effect.fn("McpToolAccess.routed")(function* <Tools extends Record
 ) {
   // Optional so toolkits that never leave this environment build without it.
   const forwarding = yield* Effect.serviceOption(PeerForwarding.PeerForwarding);
+  const peerLinks = yield* Effect.serviceOption(PeerLinks.PeerLinks);
   const handlers: Record<string, unknown> = { ...checked };
   for (const [name, declaration] of Object.entries<Declaration<unknown>>(declarations)) {
     const tool = toolkit.tools[name];
@@ -446,6 +466,7 @@ const routed = Effect.fn("McpToolAccess.routed")(function* <Tools extends Record
     const forwarded = forwardedOf(declaration) as
       | Forwarded<object, unknown, Tool.Failure<Tools[keyof Tools]>, never>
       | undefined;
+    const writesRemote = writesRemoteOf(declaration) as ((params: object) => boolean) | undefined;
     if (remote === undefined)
       return yield* Effect.die(
         `${name} takes a linked environment, but it acts as its calling thread, which is here.`,
@@ -459,6 +480,21 @@ const routed = Effect.fn("McpToolAccess.routed")(function* <Tools extends Record
         const target = PeerForwarding.remoteTarget(scope, environmentId);
         if (target === undefined) return yield* here(params);
         yield* (remote as RemoteCheck<typeof params>)(params);
+        const requiresWrite = writesRemote === undefined ? true : writesRemote(params);
+        if (requiresWrite && Option.isSome(peerLinks)) {
+          const link = yield* peerLinks.value
+            .get(target)
+            .pipe(Effect.orElseSucceed(() => Option.none()));
+          if (
+            Option.isSome(link) &&
+            !mcpClientScopes(link.value.access).includes(AuthOrchestrationOperateScope)
+          ) {
+            return yield* new OrchestratorMcpFailure({
+              code: "capability_denied",
+              message: `Missing write permission (${AuthOrchestrationOperateScope}) on environment ${link.value.label} (${target}); this link was approved for read-only access.`,
+            });
+          }
+        }
         if (Option.isNone(forwarding)) return yield* linksUnavailable;
         const result = yield* forwarding.value.call(scope, tool, target, {
           ...params,

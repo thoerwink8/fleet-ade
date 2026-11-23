@@ -795,3 +795,38 @@ it.effect("同一机器重新领单后旧租约不能覆盖新线程", () =>
     }),
   ),
 );
+
+it.effect("摘要行持久化并推送分支与提交号，变更时递增 revision", () =>
+  serviceTest(
+    Effect.gen(function* () {
+      const summary = yield* FleetSummary.FleetSummary;
+      const initial = yield* summary.report(
+        "environment-a",
+        adhoc("git-thread", { branch: "local/118-fleet-row", commit: "1111111" }),
+      );
+      expect(initial.changed).toBe(true);
+      const snapshot = yield* first(yield* summary.subscribe({}));
+      assert(snapshot?.type === "snapshot");
+      expect(snapshot.rows[0]).toMatchObject({
+        threadId: "git-thread",
+        branch: "local/118-fleet-row",
+        commit: "1111111",
+      });
+
+      const live = yield* summary.subscribe({ cursor: initial.revision });
+      const updated = yield* summary.report(
+        "environment-a",
+        adhoc("git-thread", { branch: "local/118-fleet-row", commit: "2222222" }),
+      );
+      expect(updated.changed).toBe(true);
+      expect(updated.revision).toBe(initial.revision + 1);
+      const event = yield* first(live);
+      assert(event?.type === "upsert");
+      expect(event.row).toMatchObject({
+        threadId: "git-thread",
+        branch: "local/118-fleet-row",
+        commit: "2222222",
+      });
+    }),
+  ),
+);
