@@ -61,7 +61,7 @@ import { getTriggerDisplayModelName } from "./providerIconUtils";
 import { ProviderInstanceIcon, providerTextColor } from "./ProviderInstanceIcon";
 import { cn } from "~/lib/utils";
 import { TimelineSystemDivider } from "./TimelineSystemDivider";
-import { subagentResumedSince } from "./V2LifecycleRow.logic";
+import { interruptResultDetail, subagentResumedSince } from "./V2LifecycleRow.logic";
 import { Button, InlineButton } from "../ui/button";
 import { T3AppIcon } from "../T3AppIcon";
 
@@ -79,7 +79,7 @@ export function V2LifecycleRow(props: {
     return (
       <TimelineSystemDivider
         label="运行已中断"
-        detail={item.message}
+        detail={interruptResultDetail(item.message)}
         icon={CircleStopIcon}
         wrapDetail
       />

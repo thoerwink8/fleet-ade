@@ -17,78 +17,6 @@
   }
 }
 
-/* On mobile, morph the expanded hero composer into the compact docked
-   composer while it moves; the rest of the app remains visually stationary. */
-html[data-mobile-composer-route-transition="true"]::view-transition-old(root),
-html[data-mobile-composer-route-transition="true"]::view-transition-new(root) {
-  animation: none;
-}
-
-html[data-mobile-composer-route-transition="true"]::view-transition-group(t3-mobile-composer) {
-  animation-duration: var(--mobile-composer-transition-duration);
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-html[data-mobile-composer-route-transition="true"]::view-transition-image-pair(t3-mobile-composer) {
-  isolation: isolate;
-}
-
-html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobile-composer) {
-  animation: t3-mobile-composer-old var(--mobile-composer-transition-duration) linear both;
-  mix-blend-mode: normal;
-}
-
-html[data-mobile-composer-route-transition="true"]::view-transition-new(t3-mobile-composer) {
-  animation: t3-mobile-composer-new var(--mobile-composer-transition-duration) linear both;
-  mix-blend-mode: normal;
-}
-
-/* The expanded and compact composers have different internal layouts. Use a
-   brief crossfade while their shared wrapper moves so the layout change does
-   not read as a single-frame cut. */
-@keyframes t3-mobile-composer-old {
-  0%,
-  35% {
-    opacity: 1;
-  }
-  65%,
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes t3-mobile-composer-new {
-  0%,
-  35% {
-    opacity: 0;
-  }
-  65%,
-  100% {
-    opacity: 1;
-  }
-}
-
-html[data-mobile-composer-route-transition="true"]::view-transition-group(t3-mobile-draft-headline) {
-  animation-duration: var(--mobile-composer-transition-duration);
-}
-
-html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobile-draft-headline) {
-  animation: t3-mobile-draft-headline-exit var(--mobile-composer-transition-duration)
-    cubic-bezier(0.4, 0, 1, 1) both;
-  mix-blend-mode: normal;
-}
-
-@keyframes t3-mobile-draft-headline-exit {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-}
-
 :root {
   -webkit-font-smoothing: antialiased;
   --app-scrollbar-width: 6px;
@@ -286,6 +214,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-input: var(--contrast-input);
   --color-border: var(--contrast-border);
   --color-destructive: var(--destructive);
+  --color-on-destructive: var(--on-destructive);
   --color-accent-foreground: var(--contrast-accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--contrast-muted-foreground);
@@ -1049,9 +978,10 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 :root {
   color-scheme: light;
   --radius: 0.5rem;
-  /* Four surfaces, back to front: sidebar, page, card and input, popover. Light mode
-     paints the page a cool light gray so white cards and inputs stand off it. */
-  --background: oklch(0.972 0.003 270);
+  /* fleet-design token bridge: --fa-bg is the page, --fa-panel the sidebar tier,
+     --fa-overlay menus and popovers, --fa-accent the primary action. data-theme
+     resolves them; the dark block below keeps only overrides with no token. */
+  --background: var(--fa-bg);
   --app-chrome-background: var(--background);
   --toolbar-background: var(--app-chrome-background);
   --toolbar-foreground: var(--foreground);
@@ -1059,59 +989,58 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --toolbar-control: var(--popover);
   --toolbar-control-foreground: var(--foreground);
   --toolbar-control-hover: var(--accent);
-  --surface-raised: color-mix(in srgb, var(--card) 20%, transparent);
-  --foreground: var(--color-zinc-900);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-900);
-  --popover: var(--color-white);
-  --popover-foreground: var(--color-zinc-900);
-  --primary: oklch(0.488 0.217 264);
-  --primary-foreground: var(--color-white);
-  --secondary: oklch(0.952 0.004 270);
-  --secondary-foreground: var(--color-zinc-800);
-  --muted: oklch(0.952 0.004 270);
-  /* Four text tiers: foreground, secondary-label (passes AA on every surface),
-     muted-foreground, faint-foreground (separators and shortcut keys). */
-  --muted-foreground: oklch(0.44 0.012 270);
+  --foreground: var(--fa-fg);
+  --surface-raised: var(--fa-panel);
+  --card: var(--fa-panel);
+  --card-foreground: var(--fa-fg);
+  --popover: var(--fa-overlay);
+  --popover-foreground: var(--fa-fg);
+  --primary: var(--fa-accent);
+  --primary-foreground: var(--fa-on-accent);
+  --secondary: var(--fa-panel);
+  --secondary-foreground: var(--fa-fg);
+  --muted: var(--fa-panel);
+  /* --secondary-label stays: the fleet muted tier is dimmer than this app reads. */
+  --muted-foreground: var(--fa-fg-muted);
   --placeholder: var(--muted-foreground);
   --secondary-label: oklch(0.36 0.012 270);
   --faint-foreground: color-mix(in srgb, var(--muted-foreground) 50%, var(--background));
   --icon-muted: var(--muted-foreground);
-  /* One step past the accent, so a user turn stands off the near-white canvas. */
-  --message-surface: color-mix(in srgb, var(--color-zinc-200) 55%, var(--color-zinc-100));
+  --message-surface: var(--fa-selected);
   --message-foreground: var(--foreground);
   --message-action: var(--primary);
   --message-action-foreground: var(--primary-foreground);
   --message-action-hover: color-mix(in srgb, var(--primary) 90%, var(--background));
-  --accent: oklch(0.935 0.004 270);
-  --accent-foreground: var(--color-zinc-900);
-  --error: var(--color-red-500);
-  --error-foreground: var(--color-red-700);
+  --accent: var(--fa-hover);
+  --accent-foreground: var(--fa-fg);
+  --error: var(--fa-danger);
+  --error-foreground: var(--fa-danger);
   --tool-error-icon: var(--error);
   --error-surface: color-mix(in srgb, var(--error) 8%, transparent);
   --destructive: var(--error);
-  --border: var(--color-zinc-200);
-  --input: var(--color-zinc-300);
-  --ring: var(--primary);
+  --border: var(--fa-border);
+  --input: var(--fa-border);
+  --ring: var(--fa-focus-ring);
   --destructive-foreground: var(--error-foreground);
-  --info: var(--color-blue-500);
-  --info-foreground: var(--color-blue-700);
-  --success: var(--color-emerald-500);
-  --success-foreground: var(--color-emerald-700);
-  --warning: var(--color-amber-500);
-  --warning-foreground: var(--color-amber-700);
+  --on-destructive: var(--fa-on-danger);
+  --info: var(--fa-info);
+  --info-foreground: var(--fa-info);
+  --success: var(--fa-success);
+  --success-foreground: var(--fa-success);
+  --warning: var(--fa-warning);
+  --warning-foreground: var(--fa-warning);
   --warning-surface: color-mix(in srgb, var(--warning) 8%, transparent);
   --update: var(--primary);
   --update-foreground: var(--primary);
-  /* Keep every sidebar primitive on the same light surface hierarchy, including
+  /* Keep every sidebar primitive on the same surface hierarchy, including
      portaled mobile sheets and settings navigation outside the app sidebar. */
-  --sidebar: oklch(0.952 0.004 270);
+  --sidebar: var(--fa-panel);
   --sidebar-foreground: var(--foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
   --sidebar-control-surface: var(--card);
-  --sidebar-row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --sidebar-row-hover: var(--fa-hover);
   --sidebar-row-active: var(--card);
-  --sidebar-row-selected: var(--card);
+  --sidebar-row-selected: var(--fa-selected);
   --sidebar-row-current: color-mix(in srgb, var(--primary) 8%, var(--card));
   --sidebar-row-current-border: color-mix(in srgb, var(--primary) 20%, var(--border));
   --sidebar-border: var(--border);
@@ -1125,43 +1054,10 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
   @variant dark {
     color-scheme: dark;
-    /* Three-layer soft neutral dark hierarchy:
-       1) Main stage (--background)
-       2) Sidebar, composer, and cards (--card / --surface-raised / --sidebar)
-       3) Popovers, floating menus, and user turn bubbles (--popover / --message-surface) */
-    --background: oklch(0.175 0.006 260);
-    --surface-raised: oklch(0.205 0.007 260);
-    --foreground: var(--color-neutral-100);
-    --card: oklch(0.205 0.007 260);
-    --card-foreground: var(--color-neutral-100);
-    --popover: oklch(0.238 0.008 260);
-    --popover-foreground: var(--color-neutral-100);
-    --primary: oklch(0.571 0.21 264);
-    --secondary: --alpha(var(--color-white) / 5%);
-    --secondary-foreground: var(--color-neutral-100);
-    --muted: oklch(0.19 0.006 260);
-    --muted-foreground: oklch(0.75 0.008 260);
     --secondary-label: oklch(0.83 0.008 260);
-    --accent: --alpha(var(--color-white) / 6%);
-    --accent-foreground: var(--color-neutral-100);
-    /* A user turn sits above the composer tone, level with the selected sidebar row. */
-    --message-surface: oklch(0.24 0.008 260);
-    --error: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
-    --error-foreground: var(--color-red-400);
-    --tool-error-icon: #fca5a5;
     --error-surface: color-mix(in srgb, var(--error) 16%, transparent);
-    --border: --alpha(var(--color-white) / 9%);
-    --input: --alpha(var(--color-white) / 13%);
-    --info-foreground: var(--color-blue-400);
-    --success-foreground: var(--color-emerald-400);
-    --warning-foreground: var(--color-amber-400);
     --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
-    --update-foreground: var(--color-blue-400);
-    --sidebar: oklch(0.152 0.006 260);
-    --sidebar-control-surface: var(--muted);
-    --sidebar-row-hover: var(--accent);
     --sidebar-row-active: var(--accent);
-    --sidebar-row-selected: oklch(0.245 0.009 260);
     --sidebar-row-current: color-mix(in srgb, var(--primary) 16%, var(--card));
     --sidebar-row-current-border: color-mix(in srgb, var(--primary) 30%, transparent);
     --terminal-cursor: rgb(180 203 255);
@@ -1176,17 +1072,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --background: var(--card);
 
   @variant dark {
-    --foreground: #f1f3f7;
-    --card-foreground: var(--foreground);
-    --accent: oklch(0.24 0.008 260);
-    --accent-foreground: #f7f9ff;
-    --muted: oklch(0.18 0.006 260);
-    --muted-foreground: #b0b5c0;
-    --input: rgb(255 255 255 / 16%);
-    --sidebar-foreground: var(--foreground);
-    --sidebar-muted-foreground: var(--muted-foreground);
-    --sidebar-control-surface: var(--muted);
-    --sidebar-row-hover: color-mix(in srgb, var(--contrast-foreground) 7%, transparent);
     --sidebar-row-active: color-mix(in srgb, var(--contrast-foreground) 11%, transparent);
   }
 }
@@ -1277,6 +1162,15 @@ html[data-theme-id]:not([data-theme-id=""]) {
   --error-surface: var(--app-theme-error-surface);
   --destructive: var(--error);
   --destructive-foreground: var(--error-foreground);
+  --on-destructive: #ffffff;
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-700);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-700);
+  @variant dark {
+    --info-foreground: var(--color-blue-400);
+    --success-foreground: var(--color-emerald-400);
+  }
   --warning: var(--app-theme-warning);
   --warning-foreground: var(--app-theme-warning-foreground);
   --warning-surface: var(--app-theme-warning-surface);

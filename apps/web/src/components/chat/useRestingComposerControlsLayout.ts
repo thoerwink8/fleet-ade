@@ -1,16 +1,14 @@
 import { measureRestingComposerControls } from "./restingComposerControlsMeasurement";
 import { observeResize } from "~/lib/observeResize";
 import { resolveRestingComposerControlsLayout } from "../composerFooterLayout";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 
 export function useRestingComposerControlsLayout(
   host: HTMLDivElement | null,
   useControlsAsHost = false,
 ) {
   const [controls, setControls] = useState<HTMLDivElement | null>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
   const attachControls = (element: HTMLDivElement | null) => {
-    controlsRef.current = element;
     setControls(element);
   };
   const [layout, setLayout] = useState<{
@@ -76,7 +74,6 @@ export function useRestingComposerControlsLayout(
   }, [host, controls, useControlsAsHost, measure]);
 
   return {
-    controlsRef,
     attachControls,
     hiddenBlockCount: layout.hiddenCount,
     iconOnlyBlockCount: layout.iconOnlyCount ?? 0,

@@ -95,7 +95,6 @@ import {
   useComposerDraftStore,
   DraftId,
 } from "./composerDraftStore";
-import { waitForDraftHeroTransition } from "./components/chat/draftHeroTransition";
 import { insertInlineContextReference } from "./lib/composerContextReferences";
 import {
   buildMessageContext,
@@ -1519,7 +1518,7 @@ describe("composerDraftStore draft promotion", () => {
       latestRun: preparingRun,
       latestUserMessageAt: "2026-03-29T00:00:00.000Z",
     });
-    await waitForDraftHeroTransition();
+    await Promise.resolve();
 
     const state = useComposerDraftStore.getState();
     expect(state.getDraftSession(draftId)).toBeNull();
@@ -1536,14 +1535,14 @@ describe("composerDraftStore draft promotion", () => {
       latestRun: preparingRun,
       latestUserMessageAt: "2026-03-29T00:00:00.000Z",
     });
-    await waitForDraftHeroTransition();
+    await Promise.resolve();
     expect(useComposerDraftStore.getState().getDraftSession(draftId)?.promotedTo).toEqual(
       threadRef,
     );
 
     clearBackgroundDraftSubmissionByRef(threadRef);
     h.flush();
-    await waitForDraftHeroTransition();
+    await Promise.resolve();
     expect(useComposerDraftStore.getState().getDraftSession(draftId)).toBeNull();
   });
 
@@ -1558,7 +1557,7 @@ describe("composerDraftStore draft promotion", () => {
     });
     restoreFailedDraftThread(draftId, sent, ThreadId.make("retry-thread"));
     h.flush();
-    await waitForDraftHeroTransition();
+    await Promise.resolve();
     expect(useComposerDraftStore.getState().getDraftSession(draftId)?.threadId).toBe(
       "retry-thread",
     );

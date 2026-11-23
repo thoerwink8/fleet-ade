@@ -1,7 +1,7 @@
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
-import { subagentResumedSince } from "./V2LifecycleRow.logic";
+import { interruptResultDetail, subagentResumedSince } from "./V2LifecycleRow.logic";
 
 const failedAt = "2026-10-09T12:21:00.000Z";
 const beforeFailure = DateTime.makeUnsafe("2026-10-09T12:05:00.000Z");
@@ -28,5 +28,18 @@ describe("subagentResumedSince", () => {
     expect(subagentResumedSince({ status: "failed", startedAt: beforeFailure }, failedAt)).toBe(
       false,
     );
+  });
+});
+
+describe("interruptResultDetail", () => {
+  it("translates the legacy English interrupt message into Chinese", () => {
+    expect(interruptResultDetail("Run interrupted before provider start")).toBe(
+      "任务在智能体启动前被打断",
+    );
+    expect(interruptResultDetail("Interrupted before provider start")).toBe("在智能体启动前被打断");
+  });
+
+  it("keeps the current Chinese message unchanged", () => {
+    expect(interruptResultDetail("任务在智能体启动前被打断")).toBe("任务在智能体启动前被打断");
   });
 });

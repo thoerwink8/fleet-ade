@@ -1,3 +1,4 @@
+import { translateLegacyEnglishLabel } from "../../session-logic";
 import type { OrchestrationV2Subagent } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 
@@ -18,4 +19,9 @@ export function subagentResumedSince(
   return (
     !Number.isNaN(notifiedAtMillis) && DateTime.toEpochMillis(agent.startedAt) > notifiedAtMillis
   );
+}
+
+/** The divider detail shown for a run interrupt result. */
+export function interruptResultDetail(message: string): string {
+  return translateLegacyEnglishLabel(message);
 }

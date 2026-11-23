@@ -54,7 +54,6 @@ import type {
   EnvironmentShellState,
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
-import { waitForDraftHeroTransition } from "./components/chat/draftHeroTransition";
 import { getLocalStorageItem } from "./hooks/useLocalStorage";
 import {
   readInstanceCustomModels,
@@ -4788,7 +4787,7 @@ export function subscribeDraftThreadPromotion(input: {
       for (const [draftId, ref] of owned) {
         if (finalizing.has(draftId)) continue;
         finalizing.add(draftId);
-        void waitForDraftHeroTransition().then(() => {
+        queueMicrotask(() => {
           finalizing.delete(draftId);
           if (disposed) return;
           const current = composerDraftStore.getState().draftThreadsByThreadKey[draftId];
