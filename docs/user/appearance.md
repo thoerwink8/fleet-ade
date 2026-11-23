@@ -19,6 +19,11 @@ A phone uses these same settings. [Mobile setup](./install.md#mobile-app)
 **Font size** offers three steps: Standard, Comfortable, and Large. One step scales the interface,
 the composer, chat text, code, and the terminal together.
 
+## Chat width
+
+**Chat width** caps how wide messages and the composer can grow on large screens: Comfortable,
+Wide, or Full.
+
 ## Composer context
 
 Git-backed projects show branch and worktree controls below the composer while you create a thread.
