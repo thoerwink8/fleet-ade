@@ -17,7 +17,7 @@ export const HAND_BACK_NO_GOAL = "没有目标，没做这句判断";
 export const HAND_BACK_FAILED = "没核对成";
 export const HAND_BACK_ALIGNED = "对得上";
 
-export const COMMAND_ASSIST_STEPS = [
+const COMMAND_ASSIST_STEPS = [
   "naming",
   "activity",
   "drift",
@@ -30,7 +30,7 @@ export type CommandAssistStep = typeof CommandAssistStep.Type;
 
 const KNOWN_STEPS: ReadonlySet<string> = new Set(COMMAND_ASSIST_STEPS);
 
-export function isCommandAssistStep(step: string): step is CommandAssistStep {
+function isCommandAssistStep(step: string): step is CommandAssistStep {
   return KNOWN_STEPS.has(step);
 }
 
@@ -41,7 +41,7 @@ export const CommandAssistRow = Schema.Struct({
 });
 export type CommandAssistRow = typeof CommandAssistRow.Type;
 
-export function defaultCommandAssistRow(step: CommandAssistStep): CommandAssistRow {
+function defaultCommandAssistRow(step: CommandAssistStep): CommandAssistRow {
   return {
     enabled: step !== "patrol",
     modelSelection: null,
