@@ -1,6 +1,7 @@
 import { cn } from "../../lib/utils";
 import { BUILT_IN_THEMES, getThemeDefinition, type ThemeAppearance } from "../../themePalette";
 import { notifyThemeSaveFailure } from "../CommandPaletteThemeItems";
+import { SettingsSectionHeader } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import {
   STANDARD_THEME_CARD,
@@ -50,87 +51,87 @@ export function ThemeLibrary({
   };
 
   return (
-    <div className="space-y-3">
-      <h3 className="flex min-h-7 items-center px-3 text-base font-semibold text-foreground sm:px-4">
-        {searchableSetting("color-scheme").title}
-      </h3>
-      <div aria-label="外观模式" className="grid w-full grid-cols-3 gap-3" role="group">
-        {(["system", "light", "dark"] as const).map((mode) => {
-          const isActive = appearanceMode === mode;
-          return (
-            <button
-              aria-label={mode === "system" ? "跟随系统外观" : `使用${MODE_LABELS[mode]}模式`}
-              aria-pressed={isActive}
-              className={cn(
-                // The accent ring marks the picked tile; focus is a neutral ring set inside it with a gap.
-                "flex cursor-pointer flex-col items-stretch gap-1.5 rounded-xl border p-2 outline-none transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-7 focus-visible:outline-foreground/60",
-                isActive
-                  ? "border-transparent bg-accent/30 ring-2 ring-inset ring-ring"
-                  : "border-border/70 bg-card/60 hover:bg-accent/10",
-              )}
-              key={mode}
-              onClick={() => {
-                if (!setAppearanceMode(mode)) notifyThemeSaveFailure();
-              }}
-              type="button"
-            >
-              <ThemeWireframe
-                className="h-[8.75rem]"
-                panes={
-                  mode === "system"
-                    ? [
-                        { clip: "left", colors: wireframeColors("light") },
-                        { clip: "right", colors: wireframeColors("dark") },
-                      ]
-                    : [{ colors: wireframeColors(mode) }]
-                }
-              />
-              <span
+    <div className="space-y-5 sm:space-y-6">
+      <div className="space-y-1.5">
+        <SettingsSectionHeader as="h3" title={searchableSetting("color-scheme").title} />
+        <div aria-label="外观模式" className="grid w-full grid-cols-3 gap-3" role="group">
+          {(["system", "light", "dark"] as const).map((mode) => {
+            const isActive = appearanceMode === mode;
+            return (
+              <button
+                aria-label={mode === "system" ? "跟随系统外观" : `使用${MODE_LABELS[mode]}模式`}
+                aria-pressed={isActive}
                 className={cn(
-                  "flex items-center justify-center text-xs font-medium",
-                  isActive ? "text-foreground" : "text-muted-foreground",
+                  // The accent ring marks the picked tile; focus is a neutral ring set inside it with a gap.
+                  "flex cursor-pointer flex-col items-stretch gap-1.5 rounded-xl border p-2 outline-none transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-7 focus-visible:outline-foreground/60",
+                  isActive
+                    ? "border-transparent bg-accent/30 ring-2 ring-inset ring-ring"
+                    : "border-border/70 bg-card/60 hover:bg-accent/10",
                 )}
+                key={mode}
+                onClick={() => {
+                  if (!setAppearanceMode(mode)) notifyThemeSaveFailure();
+                }}
+                type="button"
               >
-                {MODE_LABELS[mode]}
-              </span>
-            </button>
-          );
-        })}
+                <ThemeWireframe
+                  className="h-[8.75rem]"
+                  panes={
+                    mode === "system"
+                      ? [
+                          { clip: "left", colors: wireframeColors("light") },
+                          { clip: "right", colors: wireframeColors("dark") },
+                        ]
+                      : [{ colors: wireframeColors(mode) }]
+                  }
+                />
+                <span
+                  className={cn(
+                    "flex items-center justify-center text-xs font-medium",
+                    isActive ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {MODE_LABELS[mode]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <h3 className="flex min-h-8 items-center px-3 pt-5 text-base font-semibold text-foreground sm:px-4">
-        {searchableSetting("theme").title}
-      </h3>
-      <div aria-label="主题" className="grid w-full grid-cols-3 gap-3" role="group">
-        {THEME_CARDS.map((card) => {
-          const isActive = card.themeId === activeThemeId;
-          return (
-            <button
-              aria-label={`使用 ${card.label} 主题`}
-              aria-pressed={isActive}
-              className={cn(
-                "flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 pb-3 pt-4 outline-none transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-7 focus-visible:outline-foreground/60",
-                isActive
-                  ? "border-transparent bg-accent/30 ring-2 ring-inset ring-ring"
-                  : "border-border/70 bg-card/60 hover:bg-accent/10",
-              )}
-              data-theme-library-card={card.id}
-              key={card.id}
-              onClick={() => pickTheme(card.themeId)}
-              type="button"
-            >
-              <span className="flex items-center justify-center gap-2.5">
-                {card.previews.map((preview) => (
-                  <ThemePreviewCircle
-                    colors={preview.colors}
-                    key={preview.mode}
-                    mode={preview.mode}
-                  />
-                ))}
-              </span>
-              <span className="text-sm font-medium text-foreground">{card.label}</span>
-            </button>
-          );
-        })}
+      <div className="space-y-1.5">
+        <SettingsSectionHeader as="h3" title={searchableSetting("theme").title} />
+        <div aria-label="主题" className="grid w-full grid-cols-3 gap-3" role="group">
+          {THEME_CARDS.map((card) => {
+            const isActive = card.themeId === activeThemeId;
+            return (
+              <button
+                aria-label={`使用 ${card.label} 主题`}
+                aria-pressed={isActive}
+                className={cn(
+                  "flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 pb-3 pt-4 outline-none transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-7 focus-visible:outline-foreground/60",
+                  isActive
+                    ? "border-transparent bg-accent/30 ring-2 ring-inset ring-ring"
+                    : "border-border/70 bg-card/60 hover:bg-accent/10",
+                )}
+                data-theme-library-card={card.id}
+                key={card.id}
+                onClick={() => pickTheme(card.themeId)}
+                type="button"
+              >
+                <span className="flex items-center justify-center gap-2.5">
+                  {card.previews.map((preview) => (
+                    <ThemePreviewCircle
+                      colors={preview.colors}
+                      key={preview.mode}
+                      mode={preview.mode}
+                    />
+                  ))}
+                </span>
+                <span className="text-sm font-medium text-foreground">{card.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

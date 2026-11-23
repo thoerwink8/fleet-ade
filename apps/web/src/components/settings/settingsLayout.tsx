@@ -200,6 +200,40 @@ export function PolicyTooltip({ children }: { readonly children: string }) {
   );
 }
 
+export function SettingsSectionHeader({
+  as: Heading = "h2",
+  title,
+  icon,
+  titleAction,
+  headerAction,
+  className,
+}: {
+  as?: "h2" | "h3";
+  title: ReactNode;
+  icon?: ReactNode;
+  titleAction?: ReactNode;
+  headerAction?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      data-settings-scroll-target
+      className={cn("flex min-h-6 items-center justify-between gap-4 px-1", className)}
+    >
+      <div className="flex min-w-0 items-center gap-1">
+        <Heading className="flex min-h-6 items-center gap-2 text-dialog-title font-semibold text-foreground">
+          {icon}
+          {title}
+        </Heading>
+        {titleAction}
+      </div>
+      {headerAction ? (
+        <div className="flex min-h-6 min-w-6 items-center justify-end">{headerAction}</div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SettingsSection({
   title,
   hideTitle = false,
@@ -226,24 +260,17 @@ export function SettingsSection({
       {...sectionProps}
       ref={targetRef}
       tabIndex={sectionProps.id ? -1 : sectionProps.tabIndex}
-      className={cn(!hideTitle && "space-y-2.5", className)}
+      className={cn(!hideTitle && "space-y-1.5", className)}
     >
       {hideTitle ? (
         <h2 className="sr-only">{title}</h2>
       ) : (
-        <div
-          data-settings-scroll-target
-          className="flex min-h-7 items-start justify-between gap-4 px-3 sm:px-4"
-        >
-          <div className="flex min-w-0 items-center gap-1">
-            <h2 className="flex min-h-7 items-center gap-2 text-dialog-title font-semibold text-foreground">
-              {icon}
-              {title}
-            </h2>
-            {titleAction}
-          </div>
-          <div className="flex min-h-7 min-w-7 items-center justify-end">{headerAction}</div>
-        </div>
+        <SettingsSectionHeader
+          title={title}
+          icon={icon}
+          titleAction={titleAction}
+          headerAction={headerAction}
+        />
       )}
       <SettingsGroup data-settings-scroll-target={hideTitle ? "" : undefined} variant={variant}>
         {children}
@@ -464,12 +491,12 @@ export function SettingsRow({
       data-slot="settings-row"
       className={cn(
         "group/settings-row @container/settings-row rounded-xl px-3 sm:px-4 aria-disabled:opacity-64 aria-disabled:[&_*]:text-muted-foreground",
-        children ? "pt-3 pb-1" : "py-3",
+        children ? "pt-2.5 pb-1" : "py-2.5",
         className,
       )}
     >
-      <div className="flex flex-col gap-3 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_auto] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-8">
-        <div className="min-w-0 flex-1 space-y-1">
+      <div className="flex flex-col gap-2 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_auto] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-6">
+        <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex min-h-5 items-center gap-1.5">
             <h3 className="text-row font-semibold text-foreground">{title}</h3>
             {renderedInheritance ? (
@@ -584,13 +611,16 @@ export function SettingsPageContainer({
       onTargetHandled={clearTargetHash}
     >
       {nested ? (
-        <div className={cn("flex flex-col gap-8", className)}>{children}</div>
+        <div className={cn("flex flex-col gap-5 sm:gap-6", className)}>{children}</div>
       ) : (
         <div
           className="topbar-scroll-fade scrollbar-gutter-both flex-1 overflow-y-auto"
           data-settings-page-scroll
         >
-          <WorkspacePageContainer width={width} className={cn("gap-8", className)}>
+          <WorkspacePageContainer
+            width={width}
+            className={cn("gap-5 px-3.5 pt-3.5 pb-8 sm:gap-6 sm:px-5 sm:pt-4 sm:pb-10", className)}
+          >
             <SettingsScopeSentence />
             <SettingsPageContainerNestedContext value={true}>
               {children}
