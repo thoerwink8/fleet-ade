@@ -37,6 +37,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.fleetSummarySubscribe]: "fleetSummary",
   [ORCHESTRATION_V2_WS_METHODS.commandChildren]: "orchestrationV2",
   [ORCHESTRATION_V2_WS_METHODS.commandChildDetail]: "orchestrationV2",
+  [ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive]: "orchestrationV2",
   [ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren]: "orchestrationV2",
   [WS_METHODS.projectsMutate]: "orchestration",
   [WS_METHODS.serverProbe]: "server",
