@@ -121,7 +121,9 @@ export function MobileClientsUserProfilePage() {
             role="alert"
           >
             <div>
-              <p className="font-medium text-destructive-foreground">无法加载移动客户端</p>
+              <p className="text-meta font-semibold text-destructive-foreground">
+                无法加载移动客户端
+              </p>
               <p className="mt-0.5 text-xs text-muted-foreground">{devicesState.error}</p>
             </div>
             <Button size="xs" variant="outline" onClick={devicesState.refresh}>

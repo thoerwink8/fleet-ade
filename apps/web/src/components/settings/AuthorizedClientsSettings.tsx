@@ -101,7 +101,7 @@ function AccessScopeSummary({
         tooltipStyle
         className="w-max max-w-80 whitespace-normal"
       >
-        <p className="mb-1 font-medium">已授予的权限范围</p>
+        <p className="mb-1 text-meta font-semibold">已授予的权限范围</p>
         <div className="flex flex-col gap-0.5">
           {scopes.map((scope) => (
             <code key={scope} className="font-mono text-foreground/85">
@@ -676,7 +676,7 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
           </DialogHeader>
           <DialogPanel>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-foreground">
+              <span className="mb-1.5 block text-meta font-semibold text-foreground">
                 客户端名称（可选）
               </span>
               <Input
@@ -741,7 +741,9 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
                         onCheckedChange={(checked) => togglePairingScope(scope, checked === true)}
                       />
                       <span className="min-w-0">
-                        <span className="block text-xs font-medium text-foreground">{title}</span>
+                        <span className="block text-meta font-semibold text-foreground">
+                          {title}
+                        </span>
                         <span className="block text-xs leading-snug text-muted-foreground">
                           {description}
                         </span>

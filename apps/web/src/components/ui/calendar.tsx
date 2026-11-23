@@ -60,7 +60,7 @@ export function Calendar({
     dropdown_root:
       "relative has-focus:border-ring has-focus:ring-ring/50 has-focus:ring-[3px] has-focus:ring-inset border border-input shadow-xs/5 rounded-lg px-[calc(--spacing(3)-1px)] h-9 sm:h-8 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-me-1",
     dropdowns:
-      "w-full flex items-center text-base sm:text-sm justify-center h-(--cell-size) gap-1.5 *:[span]:font-medium",
+      "w-full flex items-center text-base sm:text-row justify-center h-(--cell-size) gap-1.5 *:[span]:font-semibold",
     hidden: "invisible",
     month: "w-full",
     month_caption:

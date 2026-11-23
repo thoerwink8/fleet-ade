@@ -110,7 +110,7 @@ function NativeChildStep(props: { readonly step: OrchestrationV2NativeChildStep 
   const { step } = props;
   return (
     <li className="flex min-w-0 flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">
+      <span className="text-meta font-semibold text-muted-foreground">
         {stepLabel(step.type)}
         {step.status !== null && step.status !== "DONE" ? ` · ${stepLabel(step.status)}` : ""}
       </span>

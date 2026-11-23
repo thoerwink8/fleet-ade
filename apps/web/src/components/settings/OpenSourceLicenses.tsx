@@ -79,7 +79,7 @@ function LicenseNoticeRow({
               className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-panel-open:rotate-90"
             />
             <span className="flex min-w-0 flex-1 items-baseline gap-2">
-              <span className="truncate font-medium text-foreground">{entry.name}</span>
+              <span className="truncate font-semibold text-foreground">{entry.name}</span>
               {entry.version ? (
                 <code className="shrink-0 text-xs text-muted-foreground">{entry.version}</code>
               ) : null}

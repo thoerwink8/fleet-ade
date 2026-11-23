@@ -56,7 +56,9 @@ export function T3ChatUserProfilePage() {
     >
       {linkState.error ? (
         <div className="border-t py-3 text-xs" role="alert">
-          <p className="font-medium text-destructive-foreground">无法加载 T3 Chat 关联</p>
+          <p className="text-meta font-semibold text-destructive-foreground">
+            无法加载 T3 Chat 关联
+          </p>
           <p className="mt-0.5 text-muted-foreground">{linkState.error}</p>
         </div>
       ) : data === null ? null : !data.available ? (

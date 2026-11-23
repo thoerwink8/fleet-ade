@@ -289,7 +289,7 @@ function CodexArtifactTemplateCard(props: {
           <Icon aria-hidden className="size-5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-foreground">
+          <div className="truncate text-row font-semibold text-foreground">
             {props.template.displayName}
           </div>
           <div className="text-xs text-muted-foreground">{presentationLabel}</div>

@@ -91,7 +91,7 @@ export function PairingRouteSurface({
 
       <form className="mt-6 space-y-4" onSubmit={(event) => void handleSubmit(event)}>
         <div className="space-y-2">
-          <label className="text-sm font-medium" htmlFor="pairing-token">
+          <label className="text-row font-semibold" htmlFor="pairing-token">
             配对 token
           </label>
           <Input

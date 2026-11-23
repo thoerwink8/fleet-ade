@@ -266,7 +266,9 @@ export function T3ConnectUserProfilePage() {
         <T3ConnectTunnelUsage />
         {environmentsState.error ? (
           <div className="mb-4 border-t border-destructive/35 py-3 text-xs" role="alert">
-            <p className="font-medium text-destructive-foreground">无法加载 T3 Connect 环境</p>
+            <p className="text-meta font-semibold text-destructive-foreground">
+              无法加载 T3 Connect 环境
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">{environmentsState.error}</p>
           </div>
         ) : null}

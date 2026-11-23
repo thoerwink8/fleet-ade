@@ -377,7 +377,7 @@ export function AttachmentFilePreview(props: {
     />
   ) : (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
-      <p className="text-sm font-medium">此文件无法预览</p>
+      <p className="text-row font-semibold">此文件无法预览</p>
       <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
         请保存后用支持 {props.name.split(".").at(-1) || "此格式"} 文件的应用打开。
       </p>
@@ -390,7 +390,10 @@ export function AttachmentFilePreview(props: {
         <div className="flex min-w-0 flex-1 items-center text-xs">
           <span className="shrink-0 px-0.5 text-muted-foreground">{props.origin ?? "附件"}</span>
           <ChevronRightIcon className="mx-1 size-3.5 shrink-0 text-muted-foreground/60" />
-          <span aria-current="page" className="min-w-0 truncate px-0.5 font-medium text-foreground">
+          <span
+            aria-current="page"
+            className="min-w-0 truncate px-0.5 font-semibold text-foreground"
+          >
             {props.name}
           </span>
           {props.sizeBytes > 0 ? (

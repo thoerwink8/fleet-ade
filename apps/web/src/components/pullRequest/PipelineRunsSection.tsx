@@ -92,9 +92,7 @@ function RunDetailRow({ run }: { run: PipelineRun }) {
           ) : null}
         </div>
       </div>
-      <p className="min-w-0 text-sm leading-5 font-medium break-words text-foreground">
-        {run.title}
-      </p>
+      <p className="min-w-0 text-row font-semibold break-words text-foreground">{run.title}</p>
       {run.notifyNote ? (
         <p className="text-xs leading-5 text-muted-foreground">{run.notifyNote}</p>
       ) : null}

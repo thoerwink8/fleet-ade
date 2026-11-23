@@ -233,7 +233,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           <DialogPanel>
             <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="flex min-w-0 items-center gap-1.5 font-medium text-sm">
+                <span className="flex min-w-0 items-center gap-1.5 text-row font-semibold">
                   <EnvironmentMachineIcon
                     kind={resolveEnvironmentMachineKind(source?.serverConfig ?? null)}
                     className="size-3.5 shrink-0"
@@ -283,7 +283,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     </SelectPopup>
                   </Select>
                 ) : (
-                  <span className="flex min-w-0 items-center gap-1.5 font-medium text-sm">
+                  <span className="flex min-w-0 items-center gap-1.5 text-row font-semibold">
                     {target ? (
                       <EnvironmentMachineIcon kind={target.machine} className="size-3.5 shrink-0" />
                     ) : null}

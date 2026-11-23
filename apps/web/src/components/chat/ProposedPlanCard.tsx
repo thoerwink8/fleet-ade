@@ -283,7 +283,7 @@ function SavePlanToWorkspaceForm({
       </DialogHeader>
       <DialogPanel>
         <label htmlFor={savePathInputId} className="grid gap-1.5">
-          <span className="text-xs font-medium text-foreground">工作区路径</span>
+          <span className="text-meta font-semibold text-foreground">工作区路径</span>
           <Input
             id={savePathInputId}
             value={savePath}
