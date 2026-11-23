@@ -1690,6 +1690,14 @@ const WsOrchestrationV2CommandChildDetailRpc = Rpc.make(
     error: Schema.Union([ChildSummaryReadError, EnvironmentAuthorizationError]),
   },
 );
+const WsOrchestrationV2MarkChildDriftFalsePositiveRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive,
+  {
+    payload: OrchestrationV2RpcSchemas.markChildDriftFalsePositive.input,
+    success: OrchestrationV2RpcSchemas.markChildDriftFalsePositive.output,
+    error: Schema.Union([ChildSummaryReadError, EnvironmentAuthorizationError]),
+  },
+);
 
 const WsOrchestrationV2SubscribeCommandChildrenRpc = Rpc.make(
   ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren,
@@ -2012,5 +2020,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribePromptSuggestionRpc,
   WsOrchestrationV2CommandChildrenRpc,
   WsOrchestrationV2CommandChildDetailRpc,
+  WsOrchestrationV2MarkChildDriftFalsePositiveRpc,
   WsOrchestrationV2SubscribeCommandChildrenRpc,
 ).middleware(RpcScopeAuthorization);

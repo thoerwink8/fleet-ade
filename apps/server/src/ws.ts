@@ -2134,6 +2134,8 @@ export const layerWsRpc = (
           childSummaries.list({ threadId: input.threadId, cursor: input.cursor }),
         [ORCHESTRATION_V2_WS_METHODS.commandChildDetail]: (input) =>
           childSummaries.detail({ threadId: input.threadId }),
+        [ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive]: (input) =>
+          childSummaries.markDriftFalsePositive(input),
         [ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren]: (input) =>
           childSummaries.subscribe(input.threadId),
         [WS_METHODS.scheduledTasksSubscribe]: (_input) =>

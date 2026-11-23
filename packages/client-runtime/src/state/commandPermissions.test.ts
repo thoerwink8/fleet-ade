@@ -69,6 +69,30 @@ const setup = Effect.gen(function* () {
 });
 
 describe("command permissions", () => {
+  it.effect("requires the destination operate grant to mark child drift", () =>
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      const mark = createCommandPermissions(
+        runtime,
+        ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive,
+      );
+      registry.set(
+        sessions(env),
+        AsyncResult.success({
+          ...grant(false),
+          scopes: [AuthOrchestrationReadScope],
+          permissions: [AuthOrchestrationReadScope],
+        }),
+      );
+      expect(registry.get(mark.permissionAtom(env))).toBe(false);
+      expect(yield* mark.authorize(registry, env).pipe(Effect.flip)).toMatchObject({
+        requiredPermission: AuthOrchestrationOperateScope,
+      });
+      registry.set(sessions(env), AsyncResult.success(grant(true)));
+      expect(registry.get(mark.permissionAtom(env))).toBe(true);
+      yield* mark.authorize(registry, env);
+    }),
+  );
   it.effect("treats unavailable fleet session as retryable, not forbidden", () =>
     Effect.gen(function* () {
       const registry = yield* setup;

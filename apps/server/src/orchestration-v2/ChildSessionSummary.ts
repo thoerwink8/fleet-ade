@@ -14,6 +14,9 @@ import {
 import * as SqlClient from "effect/sql/SqlClient";
 import {
   CHILD_SUMMARY_IDLE_MS,
+  CommandId,
+  MessageId,
+  NodeId,
   CHILD_SUMMARY_PAGE_SIZE,
   type ChildSummaryDetail,
   type ChildSummaryListItem,
@@ -42,6 +45,7 @@ import {
 } from "./childSummaryDerive.ts";
 import * as CommandAssist from "./CommandAssist.ts";
 import { EventSinkV2 } from "./EventSink.ts";
+import * as Orchestrator from "./Orchestrator.ts";
 import { ProjectionStoreV2 } from "./ProjectionStore.ts";
 
 const ACTIVITY_EVENTS: Readonly<Record<string, true>> = {
@@ -246,6 +250,13 @@ export class ChildSessionSummary extends Context.Service<
     readonly detail: (options: {
       readonly threadId: ThreadId;
     }) => Effect.Effect<ChildSummaryDetail | null, ChildSummaryReadError>;
+    readonly rememberDispatch: (input: {
+      readonly threadId: ThreadId;
+      readonly goal: string;
+    }) => Effect.Effect<void>;
+    readonly markDriftFalsePositive: (options: {
+      readonly threadId: ThreadId;
+    }) => Effect.Effect<{}, ChildSummaryReadError>;
     readonly subscribe: (
       threadId: ThreadId,
     ) => Stream.Stream<ChildSummaryStreamEvent, ChildSummaryReadError>;
@@ -271,6 +282,7 @@ export class ChildSessionSummary extends Context.Service<
         });
 
       const assist = yield* Effect.serviceOption(CommandAssist.CommandAssist);
+      const orchestrator = yield* Effect.serviceOption(Orchestrator.OrchestratorV2);
 
       const warnSql = (operation: string, threadId: ThreadId) => (error: unknown) =>
         Effect.logWarning("child-summary.assist-read-failed", { operation, threadId, error });
@@ -289,7 +301,13 @@ export class ChildSessionSummary extends Context.Service<
           projectId: null,
           anywhere: true,
         });
-        if (!watchAnywhere && !input.handback) return;
+        const patrolAnywhere =
+          Option.isSome(orchestrator) &&
+          (yield* service.patrolEnabled({
+            projectId: null,
+            anywhere: true,
+          }));
+        if (!watchAnywhere && !patrolAnywhere && !input.handback) return;
         const project = yield* sql<{ readonly projectId: string | null }>`
           SELECT json_extract(payload_json, '$.projectId') AS projectId
           FROM orchestration_v2_projection_threads
@@ -301,7 +319,9 @@ export class ChildSessionSummary extends Context.Service<
         const projectId =
           typeof project[0]?.projectId === "string" ? ProjectId.make(project[0].projectId) : null;
         const watchHere = yield* service.activityOrDriftEnabled({ projectId, anywhere: false });
-        if (!watchHere && !input.handback) return;
+        const patrolHere =
+          patrolAnywhere && (yield* service.patrolEnabled({ projectId, anywhere: false }));
+        if (!watchHere && !patrolHere && !input.handback) return;
         const roots =
           projectId === null
             ? []
@@ -314,7 +334,7 @@ export class ChildSessionSummary extends Context.Service<
                 Effect.orElseSucceed(() => [] as const),
               );
         const cwd = roots[0]?.cwd?.trim() ?? "";
-        if (cwd.length === 0 || cwd === "/") {
+        if ((watchHere || input.handback) && (cwd.length === 0 || cwd === "/")) {
           yield* Effect.logWarning("child-summary.assist-skipped", { threadId });
           return;
         }
@@ -329,6 +349,7 @@ export class ChildSessionSummary extends Context.Service<
           Effect.orElseSucceed(() => [] as const),
         );
         const runId = run[0]?.runId;
+        let drift: string | null = null;
         if (watchHere) {
           const counted =
             runId === undefined
@@ -345,25 +366,106 @@ export class ChildSessionSummary extends Context.Service<
                 );
           const additions = input.detail.files.reduce((sum, file) => sum + file.additions, 0);
           const deletions = input.detail.files.reduce((sum, file) => sum + file.deletions, 0);
-          yield* service
-            .observe({
-              threadId,
-              projectId,
-              cwd,
-              runId: runId ?? threadId,
-              opened: input.opened,
-              stepCount: Number(counted[0]?.total ?? 0),
-              silence: input.reason === CHILD_SUMMARY_SILENCE_REASON,
-              goal: input.facts.goal ?? "",
-              avoid: input.detail.avoid === "没有写别碰" ? "" : input.detail.avoid,
-              activity: input.detail.activity,
-              files: assistFiles(input.detail),
-              latestCommand: input.detail.latestCommand,
-              additions,
-              deletions,
-              childPhase: input.reason,
-            })
-            .pipe(Effect.ignore);
+          const observed = yield* service.observe({
+            threadId,
+            projectId,
+            cwd,
+            runId: runId ?? threadId,
+            opened: input.opened,
+            stepCount: Number(counted[0]?.total ?? 0),
+            silence: input.reason === CHILD_SUMMARY_SILENCE_REASON,
+            goal: input.facts.goal ?? "",
+            avoid: input.detail.avoid === "没有写别碰" ? "" : input.detail.avoid,
+            activity: input.detail.activity,
+            files: assistFiles(input.detail),
+            latestCommand: input.detail.latestCommand,
+            additions,
+            deletions,
+            childPhase: input.reason,
+          });
+          drift = observed.drift;
+        }
+        if (patrolHere && Option.isSome(orchestrator) && runId !== undefined && !input.opened) {
+          const latest = yield* sql<SummaryRow>`
+            SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary WHERE thread_id = ${threadId}
+          `.pipe(
+            Effect.tapError(warnSql("patrol-row", threadId)),
+            Effect.orElseSucceed(() => [] as const),
+          );
+          const row = latest[0];
+          const pendingCommand =
+            input.facts.items[0]?.type === "command_execution" &&
+            ["running", "pending"].includes(input.facts.items[0].status);
+          const eligible =
+            row !== undefined &&
+            row.reason === input.reason &&
+            input.facts.status === "running" &&
+            !input.facts.waitingForAnswer &&
+            input.facts.approvalCommand === null &&
+            !pendingCommand &&
+            ((row.reason === "在跑" && row.idleEligible === 1) ||
+              row.reason === CHILD_SUMMARY_SILENCE_REASON);
+          if (eligible) {
+            const state = yield* service.read(threadId);
+            const kind =
+              row.reason === CHILD_SUMMARY_SILENCE_REASON
+                ? "silence"
+                : drift !== null &&
+                    state.drift !== null &&
+                    state.falsePositiveKey !== state.cacheKey
+                  ? "drift"
+                  : null;
+            if (kind !== null && (kind === "silence" || state.cacheKey !== null)) {
+              const tasks = yield* sql<{ readonly taskId: string }>`
+                SELECT subagent_id AS taskId FROM orchestration_v2_projection_subagents
+                WHERE child_thread_id = ${threadId} AND thread_id = ${input.facts.parentThreadId}
+                  AND origin = 'app_owned' LIMIT 1
+              `.pipe(
+                Effect.tapError(warnSql("patrol-task", threadId)),
+                Effect.orElseSucceed(() => [] as const),
+              );
+              const taskId = tasks[0]?.taskId;
+              if (taskId !== undefined) {
+                const patrol = yield* service.considerPatrol({
+                  threadId,
+                  projectId,
+                  runId,
+                  kind,
+                  driftKey: state.cacheKey ?? "",
+                  block: null,
+                });
+                if (patrol.sent && patrol.text !== null) {
+                  const key = `${threadId}:${kind}:${kind === "drift" ? state.cacheKey : runId}`;
+                  yield* orchestrator.value
+                    .dispatch({
+                      type: "message.dispatch",
+                      commandId: CommandId.make(`server:child-patrol:${key}`),
+                      threadId: input.facts.parentThreadId,
+                      messageId: MessageId.make(`message:child-patrol:${key}`),
+                      text: `${patrol.text}：${threadId}`,
+                      notification: {
+                        source: {
+                          kind: "delegated_task",
+                          taskIds: [NodeId.make(taskId)],
+                          childThreadId: threadId,
+                        },
+                        outcome: "updated",
+                        summary: patrol.text,
+                      },
+                      attachments: [],
+                      dispatchMode: { type: "queue_after_active" },
+                      createdBy: "agent",
+                      creationSource: "server",
+                    })
+                    .pipe(
+                      Effect.catchCause((cause) =>
+                        Effect.logWarning("child-summary.patrol-send-failed", { threadId, cause }),
+                      ),
+                    );
+                }
+              }
+            }
+          }
         }
         if (!input.handback || runId === undefined) return;
         const report = yield* sql<{ readonly text: string | null }>`
@@ -813,6 +915,30 @@ export class ChildSessionSummary extends Context.Service<
         return detail;
       });
 
+      const rememberDispatch = Effect.fn("ChildSessionSummary.rememberDispatch")(function* (input: {
+        readonly threadId: ThreadId;
+        readonly goal: string;
+      }) {
+        if (Option.isNone(assist)) return;
+        yield* assist.value.rememberDispatch({
+          threadId: input.threadId,
+          goal: input.goal,
+          avoid: null,
+          testCommands: null,
+        });
+      });
+
+      const markDriftFalsePositive = Effect.fn("ChildSessionSummary.markDriftFalsePositive")(
+        function* (options: { readonly threadId: ThreadId }) {
+          const row = yield* getRow(options.threadId);
+          if (row === null || Option.isNone(assist)) {
+            return yield* new ChildSummaryReadError();
+          }
+          yield* assist.value.markDriftFalsePositive(options.threadId);
+          return {};
+        },
+      );
+
       const subscribe = (threadId: ThreadId) =>
         Stream.unwrap(
           Effect.gen(function* () {
@@ -844,7 +970,13 @@ export class ChildSessionSummary extends Context.Service<
 
       return Context.make(
         ChildSessionSummary,
-        ChildSessionSummary.of({ list, detail, subscribe }),
+        ChildSessionSummary.of({
+          list,
+          detail,
+          rememberDispatch,
+          markDriftFalsePositive,
+          subscribe,
+        }),
       ).pipe(
         Context.add(
           ChildSessionSummaryInternal,

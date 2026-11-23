@@ -439,6 +439,10 @@ export class CommandAssist extends Context.Service<
       readonly projectId: ProjectId | null;
       readonly anywhere: boolean;
     }) => Effect.Effect<boolean>;
+    readonly patrolEnabled: (input: {
+      readonly projectId: ProjectId | null;
+      readonly anywhere: boolean;
+    }) => Effect.Effect<boolean>;
   }
 >()("t3/orchestration-v2/CommandAssist") {}
 
@@ -554,6 +558,22 @@ const make = Effect.gen(function* () {
     if (input.anywhere) return enabledSomewhere(settings);
     const resolved = resolveCommandAssist(settings, input.projectId);
     return activityOrDriftOn(resolved.rows);
+  });
+
+  const patrolEnabled: CommandAssist["Service"]["patrolEnabled"] = Effect.fn(
+    "CommandAssist.patrolEnabled",
+  )(function* (input) {
+    const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
+    if (settings === null) return false;
+    if (input.anywhere) {
+      return (
+        settings.commandAssist.patrol?.enabled === true ||
+        Object.values(settings.projectSettingsOverrides).some(
+          (override) => override.commandAssist?.patrol?.enabled === true,
+        )
+      );
+    }
+    return resolveCommandAssist(settings, input.projectId).rows.patrol?.enabled === true;
   });
 
   const observe: CommandAssist["Service"]["observe"] = Effect.fn("CommandAssist.observe")(
@@ -733,8 +753,7 @@ const make = Effect.gen(function* () {
     const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
     if (settings === null) return { sent: false, text: null };
     const resolved = resolveCommandAssist(settings, input.projectId);
-    const row = lookupCommandAssistRow(resolved.rows, "patrol", resolved.textGeneration);
-    if (row._tag !== "ready") return { sent: false, text: null };
+    if (resolved.rows.patrol?.enabled !== true) return { sent: false, text: null };
     return yield* update(input.threadId, (state): readonly [StoredAssist, CommandAssistPatrol] => {
       if (input.kind === "drift") {
         if (state.patrolDriftKey === input.driftKey) return [state, { sent: false, text: null }];
@@ -763,6 +782,7 @@ const make = Effect.gen(function* () {
       return yield* load(threadId);
     }),
     activityOrDriftEnabled,
+    patrolEnabled,
   });
 });
 

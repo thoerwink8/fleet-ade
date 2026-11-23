@@ -2741,6 +2741,9 @@ const make = Effect.gen(function* () {
       }
       const taskId = taskEvent.event.payload.id;
       const childThreadId = taskEvent.event.payload.childThreadId;
+      if (childThreadId !== null && !isRetryOfAcceptedDelegation && result.replayed !== true) {
+        yield* childSessionSummary.rememberDispatch({ threadId: childThreadId, goal: input.task });
+      }
       const childRunEvent = result.storedEvents.find(
         (stored) => stored.event.type === "run.created" && stored.event.threadId === childThreadId,
       );
