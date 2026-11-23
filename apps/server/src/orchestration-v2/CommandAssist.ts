@@ -677,6 +677,11 @@ const make = Effect.gen(function* () {
 
   const handback: CommandAssist["Service"]["handback"] = Effect.fn("CommandAssist.handback")(
     function* (input) {
+      const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
+      if (settings === null) return failed("调用失败");
+      const resolved = resolveCommandAssist(settings, input.projectId);
+      const row = lookupCommandAssistRow(resolved.rows, "handback", resolved.textGeneration);
+      if (row._tag === "skipped" && row.reason !== "no-model") return row;
       const state = yield* load(input.threadId);
       const query = handbackText({
         commands: state.testCommands,

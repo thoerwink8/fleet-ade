@@ -539,6 +539,12 @@ it.effect("default assist rows do not call a model or write state from detail or
     yield* internal.note(factsFor(child, parent, 0));
     const detail = yield* summary.detail({ threadId: child });
     assert.ok(detail !== null);
+    yield* sql`
+      INSERT INTO orchestration_v2_projection_runs (
+        run_id, thread_id, ordinal, provider, status, requested_at, payload_json
+      ) VALUES (${"run-off"}, ${child}, 1, ${"codex"}, ${"completed"}, ${"2026-01-01T00:00:00.000Z"}, ${"{}"})
+    `;
+    yield* internal.note({ ...factsFor(child, parent, 0), status: "completed" });
     yield* TestClock.adjust(0);
     const rows = yield* sql<{ readonly total: number }>`
       SELECT count(*) AS total FROM command_assist_state WHERE thread_id = ${child}
