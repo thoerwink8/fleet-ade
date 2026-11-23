@@ -37,6 +37,7 @@ const EMPTY_SETTING_KEYS: readonly (keyof ServerSettings)[] = [];
 declare module "@tanstack/react-router" {
   interface HistoryState {
     settingsTargetHighlight?: boolean;
+    fromSettingsIndex?: boolean;
   }
 }
 
