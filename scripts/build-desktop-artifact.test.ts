@@ -30,9 +30,9 @@ import {
   readWorkspaceConfig,
   createBuildConfig,
   InvalidMacPasskeyRpDomainError,
-  InvalidMacPasskeyPublishableKeyError,
   UnsupportedDesktopBuildArchitectureError,
   MacPasskeySigningConfigurationResolutionError,
+  MissingMacPasskeyDomainConfigurationError,
   MissingMacPasskeyProvisioningProfileError,
   packWindowsServerAsar,
   preflightWindowsDesktopBuild,
@@ -1358,19 +1358,16 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
-  it("derives macOS passkey signing configuration from the Clerk publishable key", () => {
-    const configuration = resolveMacPasskeySigningConfiguration({
-      T3CODE_APPLE_TEAM_ID: "abc1234567",
-      T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
-      T3CODE_CLERK_PUBLISHABLE_KEY: `pk_test_${btoa("example.clerk.accounts.dev$")}`,
-    });
-
-    assert.deepStrictEqual(configuration, {
-      appId: "com.t3tools.t3code",
-      teamId: "ABC1234567",
-      rpDomains: ["example.clerk.accounts.dev"],
-      provisioningProfilePath: "/tmp/t3code.provisionprofile",
-    });
+  it("ignores a Clerk publishable key when resolving macOS passkey domains", () => {
+    assert.throws(
+      () =>
+        resolveMacPasskeySigningConfiguration({
+          T3CODE_APPLE_TEAM_ID: "abc1234567",
+          T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+          T3CODE_CLERK_PUBLISHABLE_KEY: `pk_test_${btoa("example.clerk.accounts.dev$")}`,
+        }),
+      /T3CODE_CLERK_PASSKEY_RP_DOMAINS is required/u,
+    );
   });
 
   it("normalizes explicit macOS passkey RP domains and renders required entitlements", () => {
@@ -1513,16 +1510,16 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         }),
       /Invalid passkey RP domain/u,
     );
-    const invalidPublishableKeyError = captureError({
+    const missingDomainError = captureError({
       T3CODE_APPLE_TEAM_ID: "ABC1234567",
       T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
       T3CODE_CLERK_PUBLISHABLE_KEY: "pk_test_%",
     });
-    assert.instanceOf(invalidPublishableKeyError, InvalidMacPasskeyPublishableKeyError);
-    assert.ok(invalidPublishableKeyError.cause);
-    assert.equal(invalidPublishableKeyError.message, "T3CODE_CLERK_PUBLISHABLE_KEY is invalid.");
-    assert.notProperty(invalidPublishableKeyError, "publishableKey");
-    assert.notInclude(invalidPublishableKeyError.message, "pk_test_%");
+    assert.instanceOf(missingDomainError, MissingMacPasskeyDomainConfigurationError);
+    assert.equal(
+      missingDomainError.message,
+      "T3CODE_CLERK_PASSKEY_RP_DOMAINS is required for signed macOS passkey builds.",
+    );
   });
 
   it("wraps unknown passkey signing configuration defects without copying cause text", () => {

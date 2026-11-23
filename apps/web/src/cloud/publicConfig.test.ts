@@ -14,6 +14,6 @@ describe("hasCloudPublicConfig", () => {
     vi.stubEnv("VITE_T3CODE_RELAY_URL", "https://relay.example.test");
 
     expect(hasCloudPublicConfig()).toBe(false);
-    expect(resolveCloudPublicConfig().relayUrl).toBe("https://relay.example.test");
+    expect(resolveCloudPublicConfig().relayUrl).toBeNull();
   });
 });

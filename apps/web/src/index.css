@@ -1,6 +1,5 @@
-/* Clerk injects its component styles into the clerk layer (clerkAppearance.cssLayerName). */
 /* fleet-tokens sits lowest so every later layer, and this file's unlayered variables, can override a token. */
-@layer fleet-tokens, theme, base, clerk, components, utilities;
+@layer fleet-tokens, theme, base, components, utilities;
 @import "tailwindcss";
 @import "@fleet/design/tokens.css" layer(fleet-tokens);
 

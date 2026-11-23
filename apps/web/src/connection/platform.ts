@@ -316,31 +316,12 @@ const layerCapabilities = Layer.effectContext(
       identity: Effect.sync(() =>
         Option.fromNullishOr(appAtomRegistry.get(managedRelaySessionAtom)),
       ),
-      clerkToken: Effect.gen(function* () {
-        const session = appAtomRegistry.get(managedRelaySessionAtom);
-        if (session === null) {
-          return yield* new ConnectionBlockedError({
-            reason: "authentication",
-            detail: "请登录 T3 Connect 以连接此环境。",
-          });
-        }
-        const token = yield* session.readClerkToken().pipe(
-          Effect.mapError(
-            (error) =>
-              new ConnectionTransientError({
-                reason: "network",
-                detail: error.message,
-              }),
-          ),
-        );
-        if (token === null) {
-          return yield* new ConnectionBlockedError({
-            reason: "authentication",
-            detail: "T3 Connect 会话不可用。",
-          });
-        }
-        return token;
-      }),
+      clerkToken: Effect.fail(
+        new ConnectionBlockedError({
+          reason: "unsupported",
+          detail: "此连接不经过 T3 Connect。",
+        }),
+      ),
     });
     const identity = ClientCapabilities.RelayDeviceIdentity.of({
       deviceId: Effect.succeedNone,

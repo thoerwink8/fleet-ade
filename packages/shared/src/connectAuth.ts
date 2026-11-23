@@ -7,8 +7,6 @@ const CONNECT_LOOPBACK_CALLBACK_PATH = "/callback";
 
 const CONNECT_AUTHORIZE_PATH = "/connect";
 
-export const CONNECT_OAUTH_SCOPES = ["openid", "profile", "email", "offline_access"] as const;
-
 export interface ConnectAuthorizeRequest {
   readonly state: string;
   readonly challenge: string;

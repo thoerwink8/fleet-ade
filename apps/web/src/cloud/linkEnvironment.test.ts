@@ -188,7 +188,6 @@ function withServices<A, E>(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("VITE_T3CODE_RELAY_URL", "https://relay.example.test");
   relayClientInstallDialog.requestConfirmation.mockResolvedValue(true);
 });
 
@@ -240,22 +239,10 @@ describe("web cloud link environment client", () => {
     }),
   );
 
-  it.effect("reports why the relay kept the environment after a local unlink", () =>
+  it.effect("unlinks locally and does not call a relay", () =>
     Effect.gen(function* () {
-      const fetchMock = vi.fn((input: RequestInfo | URL) =>
-        Promise.resolve(
-          String(input).startsWith("https://relay.example.test/")
-            ? Response.json(
-                {
-                  _tag: "RelayInternalError",
-                  code: "internal_error",
-                  reason: "upstream_unavailable",
-                  traceId: "trace-unlink",
-                },
-                { status: 500 },
-              )
-            : Response.json({ ok: true, endpointRuntimeStatus: null }),
-        ),
+      const fetchMock = vi.fn((_input: RequestInfo | URL) =>
+        Promise.resolve(Response.json({ ok: true, endpointRuntimeStatus: null })),
       );
       vi.stubGlobal("fetch", fetchMock);
       vi.stubGlobal("window", {
@@ -265,23 +252,16 @@ describe("web cloud link environment client", () => {
         } as unknown as DesktopBridge,
       });
 
-      const error = yield* withServices(
+      yield* withServices(
         unlinkEnvironmentFromCloud({
           target: { environmentId: EnvironmentId.make(TARGET.environmentId) },
           clerkToken: "clerk-token",
         }),
-      ).pipe(Effect.flip);
+      );
 
       expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
         "http://127.0.0.1:3000/api/connect/unlink",
-        "https://relay.example.test/v1/client/environment-links/environment-1",
       ]);
-      expect(error).toMatchObject({
-        _tag: "CloudEnvironmentLinkError",
-        message:
-          "已在本地断开，但 T3 Connect 未确认已移除该环境: 中继发生了内部错误（upstream_unavailable）。",
-        traceId: "trace-unlink",
-      });
     }),
   );
 });

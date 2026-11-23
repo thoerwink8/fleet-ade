@@ -39,7 +39,6 @@ import {
 } from "./serviceProtocol.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import { CLOUD_CLI_DESIRED_LINK_SECRET } from "./CliState.ts";
-import * as CliTokenManager from "./CliTokenManager.ts";
 import {
   RelayEnvironmentLinkProofPayload,
   RelayManagedEndpointRecoveryRegistrationRequest,
@@ -110,12 +109,6 @@ describe("consumeCloudReplayGuards", () => {
 });
 
 describe("releaseManagedTunnelOnShutdown", () => {
-  const cliToken: CliTokenManager.PersistedToken = {
-    accessToken: "cli-access-token",
-    refreshToken: "cli-refresh-token",
-    expiresAtEpochMs: Number.MAX_SAFE_INTEGER,
-  };
-
   function makeMemorySecretStore(initial: Iterable<readonly [string, string]> = []) {
     const values = new Map<string, Uint8Array>(
       Array.from(initial, ([name, value]) => [name, new TextEncoder().encode(value)] as const),
@@ -147,7 +140,6 @@ describe("releaseManagedTunnelOnShutdown", () => {
     readonly respond?: () => Response;
     readonly address?: HttpServer.HttpServer["Service"]["address"];
     readonly respondEffect?: Effect.Effect<Response>;
-    readonly getExisting?: CliTokenManager.CloudCliTokenManager["Service"]["getExisting"];
     readonly latestReachability?: ConnectReachability.ConnectReachability["Service"]["latest"];
     readonly connector?: ManagedEndpointRuntime.ConnectorFacts;
   }
@@ -224,16 +216,6 @@ describe("releaseManagedTunnelOnShutdown", () => {
         Effect.provideService(
           EnvironmentAuth.EnvironmentAuth,
           EnvironmentAuth.EnvironmentAuth.of({} as EnvironmentAuth.EnvironmentAuth["Service"]),
-        ),
-        Effect.provideService(
-          CliTokenManager.CloudCliTokenManager,
-          CliTokenManager.CloudCliTokenManager.of({
-            get: unusedSecretStoreOperation(),
-            getExisting: harness.getExisting ?? Effect.succeedSome(cliToken),
-            hasCredential: unusedSecretStoreOperation(),
-            store: () => unusedSecretStoreOperation(),
-            clear: unusedSecretStoreOperation(),
-          }),
         ),
         Effect.provideService(
           HttpClient.HttpClient,
@@ -360,7 +342,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
-  it.effect("stops the connector, releases the relay tunnel, and drops the dead token", () => {
+  it.effect("does not release a managed tunnel without a connect credential", () => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -369,17 +351,11 @@ describe("releaseManagedTunnelOnShutdown", () => {
       const link = yield* CloudLink.CloudLink;
       const released = yield* link.releaseManagedTunnelOnShutdown();
 
-      expect(released).toBe(true);
-      expect(applyConfigCalls).toEqual([null]);
-      expect(requests).toHaveLength(1);
-      const request = requests[0]!;
-      expect(request.method).toBe("DELETE");
-      expect(request.url).toBe(
-        "https://relay.example.test/v1/client/environment-links/env_123/tunnel",
-      );
-      expect(request.headers.authorization).toBe("Bearer cli-access-token");
-      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(false);
-      expect(values.has(CLOUD_ENDPOINT_CONFIRMED_ORIGIN)).toBe(false);
+      expect(released).toBe(false);
+      expect(applyConfigCalls).toEqual([]);
+      expect(requests).toEqual([]);
+      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(true);
+      expect(values.has(CLOUD_ENDPOINT_CONFIRMED_ORIGIN)).toBe(true);
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
@@ -426,7 +402,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
-  it.effect("still releases a pending update when the launcher is stopping", () => {
+  it.effect("leaves a managed tunnel in place when the launcher is stopping", () => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -448,14 +424,13 @@ describe("releaseManagedTunnelOnShutdown", () => {
       expect(yield* pendingServiceUpdateExists).toBe(true);
       const released = yield* link.releaseManagedTunnelOnShutdown();
 
-      expect(released).toBe(true);
-      expect(requests).toHaveLength(1);
-      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(false);
+      expect(released).toBe(false);
+      expect(requests).toEqual([]);
+      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(true);
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
-  // regression: 808d6853555 keep the managed tunnel across remote update restarts
-  it.effect("still releases when the recorded update already settled", () => {
+  it.effect("leaves a managed tunnel in place after a settled update", () => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -471,13 +446,13 @@ describe("releaseManagedTunnelOnShutdown", () => {
 
       const released = yield* link.releaseManagedTunnelOnShutdown();
 
-      expect(released).toBe(true);
-      expect(requests).toHaveLength(1);
-      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(false);
+      expect(released).toBe(false);
+      expect(requests).toEqual([]);
+      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(true);
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
-  it.effect("keeps a runtime config that a fast restart replaced mid-release", () => {
+  it.effect("leaves the stored runtime config when shutdown has no connect credential", () => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -487,9 +462,10 @@ describe("releaseManagedTunnelOnShutdown", () => {
       const link = yield* CloudLink.CloudLink;
       const released = yield* link.releaseManagedTunnelOnShutdown();
 
-      expect(released).toBe(true);
-
-      expect(values.get(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(freshConfig);
+      expect(released).toBe(false);
+      expect(requests).toEqual([]);
+      expect(values.get(CLOUD_ENDPOINT_RUNTIME_CONFIG)).not.toBe(freshConfig);
+      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(true);
     }).pipe(
       provideReleaseHarness({
         store,
@@ -503,7 +479,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     );
   });
 
-  it.effect("keeps the stored connector token when the relay skipped the release", () => {
+  it.effect("leaves the stored connector token when shutdown has no connect credential", () => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -513,7 +489,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
       const released = yield* link.releaseManagedTunnelOnShutdown();
 
       expect(released).toBe(false);
-      expect(requests).toHaveLength(1);
+      expect(requests).toEqual([]);
       expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(true);
     }).pipe(
       provideReleaseHarness({

@@ -53,7 +53,6 @@ it.effect("startup and opening a session do not contact their hosts", () =>
       const config = yield* Effect.promise(() => import("./cloud/publicConfig.ts"));
       const emptyConfig = ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }));
       yield* config.hostedAppUrlConfig.pipe(Effect.provide(emptyConfig), Effect.exit);
-      yield* config.relayUrlConfig.pipe(Effect.provide(emptyConfig), Effect.exit);
 
       const [
         { CodexProviderCapabilitiesV2 },

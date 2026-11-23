@@ -173,7 +173,6 @@ import {
   retryDesiredLinkReconcile,
   retryManagedTunnelRegistration,
 } from "./cloud/managedTunnelStartup.ts";
-import * as CloudCliTokenManager from "./cloud/CliTokenManager.ts";
 import * as CloudCliState from "./cloud/CliState.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as DesktopAppUpdate from "./desktopUpdate/DesktopAppUpdate.ts";
@@ -762,15 +761,7 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
   Layer.provideMerge(layerAuth),
   Layer.provideMerge(Layer.mergeAll(AssetSigner.layer, EnvironmentKeys.layer)),
   Layer.provideMerge(ServerSecretStore.layer),
-  Layer.provideMerge(
-    Layer.mergeAll(
-      CloudCliTokenManager.layer.pipe(
-        Layer.provide(ServerSecretStore.layer),
-        Layer.provide(ExternalLauncher.layer),
-      ),
-      layerCloudManagedEndpointRuntime,
-    ),
-  ),
+  Layer.provideMerge(layerCloudManagedEndpointRuntime),
 );
 
 const layerRuntimeDependencies = layerRuntimeCoreDependencies.pipe(

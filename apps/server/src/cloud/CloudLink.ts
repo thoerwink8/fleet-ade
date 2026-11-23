@@ -15,8 +15,6 @@ import {
   type RelayEnvironmentHealthResponseProofPayload,
   type RelayEnvironmentLinkProof,
   type RelayEnvironmentLinkProofPayload,
-  RelayEnvironmentLinkChallengeResponse,
-  RelayEnvironmentLinkResponse,
   type RelayEnvironmentMintResponse,
   type RelayEnvironmentMintResponseProofPayload,
   type RelayLinkProofRequest,
@@ -25,7 +23,6 @@ import {
   RelayManagedEndpointRecoveryRegistrationResponse,
   RelayManagedEndpointRecoveryResponse,
   type RelayManagedEndpointRuntimeConfig,
-  RelayOkResponse,
 } from "@t3tools/contracts/relay";
 import {
   decodeRelayJwt,
@@ -73,7 +70,6 @@ import {
   readCliDesiredLinkMode,
   setCliDesiredCloudLink,
 } from "./CliState.ts";
-import * as CliTokenManager from "./CliTokenManager.ts";
 import {
   CLOUD_ENDPOINT_CONFIRMED_ORIGIN,
   CLOUD_ENDPOINT_RUNTIME_CONFIG,
@@ -93,7 +89,6 @@ import {
 import { EnvironmentSigningKey } from "./environmentKeys.ts";
 import * as ConnectReachability from "./ConnectReachability.ts";
 import * as ManagedEndpointRuntime from "./ManagedEndpointRuntime.ts";
-import { relayUrlConfig } from "./publicConfig.ts";
 import {
   filterRelayResponse,
   relayRequestError,
@@ -285,15 +280,7 @@ const isPermanentLinkError = Schema.is(
 );
 
 export const shouldRetryCloudLink = (error: unknown): boolean =>
-  shouldRetryRelayRequest(error) &&
-  !isPermanentLinkError(error) &&
-  !(CliTokenManager.isCloudCliCredentialRefreshError(error) && error.requiresLogin);
-
-const requireRelayUrl = relayUrlConfig.pipe(
-  Effect.mapError(
-    (cause) => new CloudLinkInternalError({ operation: "relay-url-unconfigured", cause }),
-  ),
-);
+  shouldRetryRelayRequest(error) && !isPermanentLinkError(error);
 
 function bytesToString(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
@@ -468,7 +455,6 @@ export class CloudLink extends Context.Service<
       | CloudLinkAuthorizationMissingError
       | CloudLinkRelayConfigInvalidError
       | EnvironmentAuth.ServerAuthInternalError
-      | CliTokenManager.CloudCliTokenManagerError
     >;
     readonly registerManagedTunnelRecovery: (
       localOrigin: string,
@@ -490,9 +476,7 @@ export class CloudLink extends Context.Service<
     >;
     readonly releaseManagedTunnelOnShutdown: () => Effect.Effect<
       boolean,
-      | CloudLinkBackgroundError
-      | CliTokenManager.CloudCliTokenManagerError
-      | HttpClientError.HttpClientError
+      CloudLinkBackgroundError | HttpClientError.HttpClientError
     >;
   }
 >()("t3/cloud/CloudLink") {}
@@ -503,7 +487,6 @@ const make = Effect.gen(function* () {
   const endpointRuntime = yield* ManagedEndpointRuntime.CloudManagedEndpointRuntime;
   const reachability = yield* ConnectReachability.ConnectReachability;
   const environmentAuth = yield* EnvironmentAuth.EnvironmentAuth;
-  const cliTokenManager = yield* CliTokenManager.CloudCliTokenManager;
   const httpClient = yield* HttpClient.HttpClient;
   const httpServer = yield* HttpServer.HttpServer;
   const random = yield* SecureRandom.SecureRandom;
@@ -823,74 +806,12 @@ const make = Effect.gen(function* () {
 
   const reconcileDesiredCloudLinkWith = Effect.fn("environment.cloud.reconcileDesiredLinkWith")(
     function* (localOrigin: string) {
-      const parsedOrigin = yield* Effect.try({
+      yield* Effect.try({
         try: () => parseManagedEndpointLocalOrigin(localOrigin),
         catch: () => new CloudLinkOriginInvalidError({ origin: "local" }),
       });
-      const token = yield* cliTokenManager.getExisting.pipe(
-        Effect.flatMap(
-          Option.match({
-            onNone: () => Effect.fail(new CloudLinkAuthorizationMissingError({})),
-            onSome: Effect.succeed,
-          }),
-        ),
-      );
-      const mode = yield* readCliDesiredLinkMode.pipe(withSecrets);
-      const managedTunnelsEnabled = mode !== "publish_only";
-      const relayUrl = yield* requireRelayUrl;
-      const challenge = yield* relayClientRequest({
-        url: `${relayUrl}/v1/client/environment-link-challenges`,
-        token: token.accessToken,
-        payload: {
-          notificationsEnabled: true,
-          liveActivitiesEnabled: true,
-          managedTunnelsEnabled,
-        },
-        schema: RelayEnvironmentLinkChallengeResponse,
-      });
-      const proof = yield* makeCloudLinkProof(
-        {
-          challenge: challenge.challenge,
-          relayIssuer: relayUrl,
-          endpoint: {
-            httpBaseUrl: parsedOrigin.httpBaseUrl,
-            wsBaseUrl: parsedOrigin.wsBaseUrl,
-            providerKind: managedTunnelsEnabled ? "cloudflare_tunnel" : "manual",
-          },
-          origin: parsedOrigin.origin,
-        },
-        parsedOrigin.httpBaseUrl,
-      );
-      const link = yield* relayClientRequest({
-        url: `${relayUrl}/v1/client/environment-links`,
-        token: token.accessToken,
-        payload: {
-          proof,
-          notificationsEnabled: true,
-          liveActivitiesEnabled: true,
-          managedTunnelsEnabled,
-        },
-        schema: RelayEnvironmentLinkResponse,
-        timeout: MANAGED_ENDPOINT_PROVISION_REQUEST_TIMEOUT,
-      });
-      yield* setCliDesiredCloudLink(true, mode).pipe(withSecrets);
-      yield* applyCloudRelayConfig(
-        {
-          relayUrl,
-          relayIssuer: link.relayIssuer,
-          cloudUserId: link.cloudUserId,
-          environmentCredential: link.environmentCredential,
-          cloudMintPublicKey: link.cloudMintPublicKey,
-          endpointRuntime: link.endpointRuntime,
-        },
-        {
-          lockHeld: true,
-          confirmedOrigin: parsedOrigin.origin,
-        },
-      );
-      return mode;
+      return yield* new CloudLinkAuthorizationMissingError({});
     },
-    Effect.catchIf(ServerSecretStore.isSecretStoreError, internalError("persist-desired-link")),
   );
 
   const reconcileDesiredLinkIfStillDesired = Effect.fn(
@@ -1211,39 +1132,7 @@ const make = Effect.gen(function* () {
       yield* Effect.logInfo("Keeping the managed tunnel across the update restart");
       return false;
     }
-    const token = yield* cliTokenManager.getExisting;
-    if (Option.isNone(token)) {
-      return false;
-    }
-    // Use the persisted relay URL; T3CODE_RELAY_URL may have changed since linking.
-    const relayUrl = yield* secrets.get(RELAY_URL_SECRET);
-    if (Option.isNone(relayUrl)) {
-      return false;
-    }
-    const environmentId = yield* environment.getEnvironmentId;
-    yield* endpointRuntime.applyConfig(null);
-    const response = yield* HttpClientRequest.delete(
-      `${bytesToString(relayUrl.value)}/v1/client/environment-links/${encodeURIComponent(environmentId)}/tunnel`,
-    ).pipe(
-      HttpClientRequest.bearerToken(token.value.accessToken),
-      httpClient.execute,
-      Effect.flatMap(filterRelayResponse),
-      Effect.flatMap(HttpClientResponse.schemaBodyJson(RelayOkResponse)),
-    );
-    // ok:false means concurrent provisioning owns the tunnel; preserve its config.
-    if (!response.ok) {
-      return false;
-    }
-    // Released tokens are dead; remove only this shutdown's config to preserve a fast restart's replacement.
-    const storedConfig = yield* secrets.get(CLOUD_ENDPOINT_RUNTIME_CONFIG);
-    if (
-      Option.isSome(storedConfig) &&
-      bytesToString(storedConfig.value) === bytesToString(runtimeConfig.value)
-    ) {
-      yield* secrets.remove(CLOUD_ENDPOINT_RUNTIME_CONFIG);
-      yield* secrets.remove(CLOUD_ENDPOINT_CONFIRMED_ORIGIN);
-    }
-    return true;
+    return false;
   });
 
   const readCloudLinkState = Effect.fn("environment.cloud.readLinkState")(function* () {

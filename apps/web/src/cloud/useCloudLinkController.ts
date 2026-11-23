@@ -16,7 +16,6 @@ import { relayEnvironmentDiscovery } from "../state/relay";
 import { readEnvironmentScope } from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
 import { isCloudEnvironmentLinkError } from "./linkEnvironment";
-import { refreshManagedTunnelUsage } from "./managedRelayState";
 import { unlinkEnvironment as unlinkEnvironmentAtom } from "./linkEnvironmentAtoms";
 import { readCachedCloudLinkState, useCloudLinkState } from "./cloudLinkState";
 import { isManagedTunnelActive } from "./t3ConnectState";
@@ -119,7 +118,6 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
         target,
         clerkToken,
       });
-      refreshManagedTunnelUsage();
       if (unlinkResult._tag === "Failure") {
         if (!isAtomCommandInterrupted(unlinkResult)) {
           const cause = squashAtomCommandFailure(unlinkResult);
