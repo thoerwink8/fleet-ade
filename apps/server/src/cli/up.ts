@@ -247,7 +247,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
       }),
     ).pipe(Effect.catchTags({ QuitError: () => Effect.succeed(null) }));
     if (picked === null) return yield* Console.log("Nothing changed.");
-    routes = { connect: picked.includes("connect"), lan: picked.includes("lan") };
+    routes = { connect: plan.routes.connect, lan: picked.includes("lan") };
   } else if (plan.ask.length > 0 && !flags.yes && !before.service.installed) {
     return yield* new CliError.UserError({
       cause: "routes",

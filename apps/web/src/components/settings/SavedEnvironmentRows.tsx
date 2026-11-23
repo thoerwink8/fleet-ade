@@ -7,10 +7,7 @@ import {
 } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { useState } from "react";
-import {
-  type EnvironmentId,
-  resolveEnvironmentMachineKind,
-} from "@t3tools/contracts";
+import { type EnvironmentId, resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import {
   connectionRoutes,
   hasSavedBearerRoute,
@@ -427,6 +424,24 @@ export function CloudLinkRow(_props: {
   readonly canManageRelay: boolean;
 }) {
   return null;
+}
+
+function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
+  return (
+    <Empty className="min-h-52">
+      <EmptyMedia variant="icon">
+        <ChevronsLeftRightEllipsisIcon />
+      </EmptyMedia>
+      <EmptyHeader>
+        <EmptyTitle>没有已保存的远程环境</EmptyTitle>
+        <EmptyDescription>
+          {cloudEnabled
+            ? "点击“添加环境”配对其他环境，或从 T3 Connect 连接一个环境。"
+            : "点击“添加环境”配对其他环境。"}
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
 }
 
 export function CloudRemoteEnvironmentRows({

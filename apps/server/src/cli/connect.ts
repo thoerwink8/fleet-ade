@@ -131,10 +131,6 @@ function bytesToString(value: Uint8Array): string {
   return new TextDecoder().decode(value);
 }
 
-function stringToBytes(value: string): Uint8Array {
-  return new TextEncoder().encode(value);
-}
-
 interface CloudCliStatus {
   readonly desired: boolean;
   readonly authenticated: boolean;
@@ -658,26 +654,19 @@ const connectStatusCommand = Command.make("status", {
         const secrets = yield* ServerSecretStore.ServerSecretStore;
         const relayClient = yield* RelayClient.RelayClient;
         const tokens = yield* CliTokenManager.CloudCliTokenManager;
-        const [
-          desired,
-          authenticated,
-          cloudUserId,
-          relayUrl,
-          revoked,
-          executable,
-          linkMode,
-        ] = yield* Effect.all(
-          [
-            CliState.readCliDesiredCloudLink,
-            tokens.hasCredential,
-            secrets.get(CLOUD_LINKED_USER_ID),
-            secrets.get(RELAY_URL_SECRET),
-            secrets.get(CLOUD_LINK_REVOKED),
-            relayClient.resolve,
-            CliState.readCliDesiredLinkMode,
-          ],
-          { concurrency: "unbounded" },
-        );
+        const [desired, authenticated, cloudUserId, relayUrl, revoked, executable, linkMode] =
+          yield* Effect.all(
+            [
+              CliState.readCliDesiredCloudLink,
+              tokens.hasCredential,
+              secrets.get(CLOUD_LINKED_USER_ID),
+              secrets.get(RELAY_URL_SECRET),
+              secrets.get(CLOUD_LINK_REVOKED),
+              relayClient.resolve,
+              CliState.readCliDesiredLinkMode,
+            ],
+            { concurrency: "unbounded" },
+          );
         // A publish-only link has no tunnel for other devices to reach.
         const reachability =
           desired && linkMode === "managed" ? yield* checkLiveReachability() : null;

@@ -503,10 +503,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     unknownAttachments.length === 0 &&
     regularImages.length + userVideos.length > 0;
   // Media sent with words sits above the bubble as its own shape, like a chat app.
-  const mediaAboveText =
-    !folded &&
-    !mediaOnly &&
-    regularImages.length + userVideos.length > 0;
+  const mediaAboveText = !folded && !mediaOnly && regularImages.length + userVideos.length > 0;
   const standaloneMedia = mediaOnly || mediaAboveText;
   // A lone image keeps its own shape; a 4:3 crop hides most of a wide screenshot.
   const loneImage = standaloneMedia && userVideos.length === 0 && regularImages.length === 1;
@@ -854,9 +851,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
       >
         {/* Outside the fold so a collapsed message still has a heading to navigate to. */}
         {mediaAboveText ? null : (
-          <MessageAuthorHeading>
-            {folded ? senderLabel : "你"}
-          </MessageAuthorHeading>
+          <MessageAuthorHeading>{folded ? senderLabel : "你"}</MessageAuthorHeading>
         )}
         {folded ? (
           <FoldedMessageHeader

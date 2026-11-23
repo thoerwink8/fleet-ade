@@ -320,9 +320,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
             )}
             <DialogPopup className="max-w-md">
               <DialogHeader>
-                <DialogTitle>
-                  {isRevealValueUrl ? "配对链接" : "配对码"}
-                </DialogTitle>
+                <DialogTitle>{isRevealValueUrl ? "配对链接" : "配对码"}</DialogTitle>
                 <DialogDescription>
                   {isRevealValueUrl
                     ? "这里无法复制到剪贴板。请在要连接的设备上打开或手动复制此完整配对 URL。"

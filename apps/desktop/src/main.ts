@@ -201,6 +201,7 @@ const layerDesktopApplicationRuntime = layerDesktopApplication.pipe(
 
 const layerDesktopRuntime = layerDesktopApplicationRuntime.pipe(
   Layer.provideMerge(DesktopPreReadyPlatform.layer),
+  Layer.provideMerge(NodeServices.layer),
 );
 
 DesktopApp.program.pipe(Effect.provide(layerDesktopRuntime), NodeRuntime.runMain);

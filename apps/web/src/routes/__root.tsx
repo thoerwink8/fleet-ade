@@ -52,7 +52,7 @@ import { readProject } from "../state/entities";
 import { isChunkLoadError } from "../lib/chunkReloadGuard";
 
 export const Route = createRootRoute({
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async () => {
     if (isLocalEnvironmentDisabled()) {
       return {
         authGateState: {

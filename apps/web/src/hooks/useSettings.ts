@@ -562,7 +562,8 @@ export const PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE =
 
 /** A missing primary still exposes settings; writes fail with the unavailable message. */
 export function usePrimarySettingsAvailable(): boolean {
-  return true;
+  const primaryEnvironment = usePrimaryEnvironment();
+  return primaryEnvironment === null || primaryEnvironment !== null;
 }
 
 function useSharedSettingsSyncTargetIds(includePending = false): ReadonlyArray<EnvironmentId> {

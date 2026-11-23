@@ -66,7 +66,6 @@ import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
-import { makeRelayEnvironmentClient } from "./relayEnvironmentClient.ts";
 import { loopbackUrlHostForAddress } from "../startupAccess.ts";
 import {
   type CliDesiredLinkMode,
@@ -87,7 +86,6 @@ import {
   encodeEndpointRuntimeConfigJson,
   HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET,
   PUBLISH_AGENT_ACTIVITY_SECRET,
-  readRelayConnection,
   RELAY_ENVIRONMENT_CREDENTIAL_SECRET,
   RELAY_ISSUER_SECRET,
   RELAY_URL_SECRET,
@@ -1249,24 +1247,18 @@ const make = Effect.gen(function* () {
   });
 
   const readCloudLinkState = Effect.fn("environment.cloud.readLinkState")(function* () {
-    const [
-      cloudUserId,
-      relayUrl,
-      relayIssuer,
-      endpointRuntimeConfig,
-      revoked,
-      latestReachability,
-    ] = yield* Effect.all(
-      [
-        secrets.get(CLOUD_LINKED_USER_ID),
-        secrets.get(RELAY_URL_SECRET),
-        secrets.get(RELAY_ISSUER_SECRET),
-        secrets.get(CLOUD_ENDPOINT_RUNTIME_CONFIG),
-        secrets.get(CLOUD_LINK_REVOKED),
-        reachability.latest,
-      ],
-      { concurrency: 8 },
-    );
+    const [cloudUserId, relayUrl, relayIssuer, endpointRuntimeConfig, revoked, latestReachability] =
+      yield* Effect.all(
+        [
+          secrets.get(CLOUD_LINKED_USER_ID),
+          secrets.get(RELAY_URL_SECRET),
+          secrets.get(RELAY_ISSUER_SECRET),
+          secrets.get(CLOUD_ENDPOINT_RUNTIME_CONFIG),
+          secrets.get(CLOUD_LINK_REVOKED),
+          reachability.latest,
+        ],
+        { concurrency: 8 },
+      );
     // The hostname arrives once cloudflared connects, before any check passes.
     const connector = Option.isSome(endpointRuntimeConfig)
       ? yield* endpointRuntime.inspectConnector

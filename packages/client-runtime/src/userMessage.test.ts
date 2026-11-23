@@ -185,6 +185,8 @@ describe("resolveUserMessagePresentation", () => {
         createdBy: "user",
         text,
         context: {
+          version: 1,
+          records: [],
           guest: {
             guestMessageId: GuestMessageId.make("guest-message:one"),
             name: "Sam",
