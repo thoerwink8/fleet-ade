@@ -4,7 +4,14 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import "~/index.css";
 
 import { render } from "../../../test/render";
-import { Sidebar, SidebarProvider, SidebarRail, SidebarTrigger, useSidebar } from "./sidebar";
+import {
+  Sidebar,
+  SidebarInset,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar,
+} from "./sidebar";
 
 function CollapseFromInside() {
   const { setOpen } = useSidebar();
@@ -29,7 +36,9 @@ function Harness(props: { readonly onResize?: (width: number) => void }) {
         <CollapseFromInside />
         <SidebarRail />
       </Sidebar>
-      <SidebarTrigger />
+      <SidebarInset>
+        <SidebarTrigger />
+      </SidebarInset>
     </SidebarProvider>
   );
 }
@@ -39,12 +48,26 @@ describe("Sidebar", () => {
     await page.viewport(1280, 800);
     await using screen = await render(<Harness />, { router: false /* no routes involved */ });
 
+    const sidebarContainer = screen.container.querySelector<HTMLElement>(
+      '[data-slot="sidebar-container"]',
+    )!;
+    const sidebarInset = screen.container.querySelector<HTMLElement>(
+      '[data-slot="sidebar-inset"]',
+    )!;
+    expect(getComputedStyle(sidebarContainer).position).toBe("fixed");
+    const expandedMainWidth = sidebarInset.getBoundingClientRect().width;
     await userEvent.click(screen.getByRole("button", { name: "Collapse" }));
 
     const sidebar = screen.container.querySelector<HTMLElement>('[data-slot="sidebar"]')!;
     await vi.waitFor(() => expect(sidebar.inert).toBe(true));
     const trigger = screen.container.querySelector('[data-slot="sidebar-trigger"]');
     await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
+    await vi.waitFor(() =>
+      expect(sidebarContainer.getBoundingClientRect().right).toBeLessThanOrEqual(0),
+    );
+    await vi.waitFor(() =>
+      expect(sidebarInset.getBoundingClientRect().width).toBeGreaterThan(expandedMainWidth),
+    );
   });
 
   it("abandons a rail drag when the sidebar collapses mid-drag", async () => {
@@ -166,14 +189,12 @@ it("keeps closed mobile sheet contents mounted and reports the sheet only while 
 it("opens the mobile sheet without a transition while panel animations are off", async () => {
   await page.viewport(390, 844);
   await using screen = await render(
-    <div data-panel-animations="false">
-      <SidebarProvider>
-        <Sidebar>
-          <span>Sheet contents</span>
-        </Sidebar>
-        <SidebarTrigger />
-      </SidebarProvider>
-    </div>,
+    <SidebarProvider>
+      <Sidebar>
+        <span>Sheet contents</span>
+      </Sidebar>
+      <SidebarTrigger />
+    </SidebarProvider>,
     { router: false /* no routes involved */ },
   );
   await userEvent.click(screen.getByRole("button", { name: "切换侧边栏" }));
