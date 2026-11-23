@@ -64,26 +64,20 @@ match in a folded file opens it. Escape closes the search. This shortcut is not
 configurable. A very large uncommitted diff loads its files as you scroll, and
 find only searches the files loaded so far.
 
-## iPad
+## Hardware keyboard
 
-With a hardware keyboard, use `Cmd+1` through `Cmd+9` to open the first nine
-displayed threads. The shortcuts follow the current list filters and order.
 `Cmd+K` opens the command palette to search commands, projects, and threads.
-Use the arrow keys and Return to choose a result, or `Cmd+1` through `Cmd+9` to
-choose directly. Escape or `Cmd+K` closes the palette. Start a search with `>`
-to show only actions.
+Use the arrow keys and Return to choose a result. Escape or `Cmd+K` closes the
+palette. Start a search with `>` to show only actions. `Cmd+1` through `Cmd+9`
+open the first nine displayed threads, following the current list filters and
+order. Those defaults run in the desktop app, so they do not take a browser's
+tab shortcuts. `Cmd+Shift+H` chooses a host.
 
-In a new thread, `Cmd+Shift+H` moves the draft to the next machine.
+On a keyboard that uses Ctrl rather than Command, use Ctrl in place of Cmd.
 
-In the composer, Return sends and `Shift+Return` inserts a new line. While a
-turn is running, `Cmd+Return` sends with the other follow-up action. To make
-Return insert a new line instead, change the Return key behavior in Settings →
-Keyboard; `Cmd+Return` then sends.
-
-## Android
-
-With a hardware keyboard, the composer handles Return as on iPad, with `Ctrl` in
-place of `Cmd`. The on-screen keyboard's Return always inserts a new line.
+While the on-screen keyboard is open, Return inserts a new line. Command+Return,
+or Ctrl+Return, still sends. A hardware keyboard follows **Settings → Threads →
+Send shortcut**. Shift+Return inserts a new line.
 
 ## Edit the configuration file
 

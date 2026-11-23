@@ -141,9 +141,8 @@ there. A thread returns to the top of the active list when it finishes, fails, o
 answer. The Working section lists the thread you last sent work to first. Pinned threads stay in
 the pinned section.
 
-This is on by default. Turn it off with **Settings → General → Working section** on web and desktop,
-or **Settings → General → Working section** on iOS and Android. Each device keeps its own
-choice.
+This is on by default. Turn it off with **Settings → General → Working section**.
+Each device keeps its own choice.
 
 While this is on, the active list is ordered by when each thread last came back to you, so you
 cannot drag or move threads within it. Your saved order returns when you turn it off.
@@ -218,9 +217,8 @@ you last picked for a query ranks higher when you type that query again.
 Threads whose messages contain all your words appear below, under **In
 messages**, and open at the matching message. Message search needs at least
 one word of three or more letters, or two for Chinese, Japanese, and Korean.
-On mobile, the thread list search also lists message matches and opens them at
-the matching message; on an iPad with a keyboard, `Cmd+K` opens the same
-palette.
+On a phone, the thread list search also lists message matches and opens them at
+the matching message. A hardware keyboard opens the same palette with `Cmd/Ctrl+K`.
 
 Use **Settings → General → Keybindings** to find or customize shortcuts for searching files
 and copying a thread reference. A copied reference uses the thread's pull request
@@ -257,10 +255,7 @@ the snooze. Enable **Snooze until limits reset** in thread behavior settings to
 snooze limit stops by default. Providers without a reset time offer manual
 retry and the normal snooze choices.
 
-On web and desktop, use **Agents** to follow work delegated to subagents.
-On mobile, open a subagent from its conversation card or **Agents**. On iOS
-layouts with an inspector, its thread opens beside the parent. Maximize it to
-fill the screen; close the full-screen view to return to the parent and inspector.
+Use **Agents** to follow work delegated to subagents.
 Stop on a thread also stops the subagents it delegated to.
 Before archiving the parent, wait for its delegated tasks to finish or cancel them.
 
@@ -308,7 +303,7 @@ To change the choices in the snooze menu, open **Settings → Threads → Snooze
 Each option is a duration, such as 3 hours, or a time on a day, such as 9:00 PM
 tomorrow. A weekday means the next one after today. Menus list the options soonest
 first and hide a today option after its time passes. Saved with **All environments**
-selected, the options apply to every connected environment, and the mobile app uses them too.
+selected, the options apply to every connected environment.
 
 Choose **Snooze → Custom…** from a thread's menu to pick a date and time in your
 local time zone, or a duration in minutes, hours, or days. Durations start when

@@ -47,7 +47,7 @@ under T3 home. Pass `--yes` from a script.
 A new service answers only on this machine. Other devices reach it through
 T3 Connect, or directly once you choose the local network in `t3 up` (or run
 `t3 up --lan`, which sets `T3CODE_LAN=true` in `service.env`). It then listens on
-your local network and Tailscale addresses, so the desktop and mobile apps on
+your local network and Tailscale addresses, so the desktop app and a browser on
 the same network connect directly instead of through T3 Connect. It still does
 not answer on public addresses. Anyone on the same network can reach the port,
 so a pairing code is all that keeps them out. The hosted web app at app.t3.codes
