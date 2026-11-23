@@ -124,6 +124,7 @@ import * as SourceControlRateLimit from "@t3tools/source-control-core/server/Sou
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as WorktreeSetupTracker from "./project/WorktreeSetupTracker.ts";
 import * as FleetSummary from "./ledger/FleetSummary.ts";
+import { ChildSessionSummary } from "./orchestration-v2/ChildSessionSummary.ts";
 import * as Observability from "./observability/Observability.ts";
 import * as HeapSnapshot from "./observability/HeapSnapshot.ts";
 import * as EventLoopMonitor from "./observability/EventLoopMonitor.ts";
@@ -695,6 +696,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ReplayMarkers.layer,
   FleetClaims.layer,
   FleetSummary.layer,
+  ChildSessionSummary.layerRemoteWorker.pipe(Layer.provide(FleetSummary.layer)),
   Layer.succeed(
     FleetHeartbeat.FleetHeartbeatConfigService,
     FleetHeartbeat.defaultFleetHeartbeatConfig,

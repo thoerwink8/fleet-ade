@@ -48,6 +48,7 @@ import type { ServedPeer } from "../peer/PeerLinks.testkit.ts";
 import * as FleetClaims from "./FleetClaims.ts";
 import * as FleetSummary from "./FleetSummary.ts";
 import * as FleetSummaryReporter from "./FleetSummaryReporter.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 
 const coordinator = descriptorOf("coordinator", "Coordinator");
 const nodeA = descriptorOf("node-a", "Node A");
@@ -1706,6 +1707,90 @@ it.effect("pending request reports needsYou only for blocking approvals", () =>
       expect(nonBlockingRow?.type === "upsert" ? nonBlockingRow.row.needsYou : undefined).toBe(
         false,
       );
+    }),
+  ),
+);
+
+it.effect("reports branch from thread shell and HEAD commit from GitVcsDriver", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const summaryContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
+      const summary = Context.get(summaryContext, FleetSummary.FleetSummary);
+      const threadId = ThreadId.make("git-reported-thread");
+      const currentCommit = yield* Ref.make("aaaa1111bbbb2222");
+      const currentShell = yield* Ref.make(
+        shell(threadId, "running", {
+          title: "Remote work",
+          branch: "local/118-fleet-row",
+          worktreePath: "/work/repo-wt",
+        }),
+      );
+      const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.mock(Orchestrator.OrchestratorV2)({ streamDomainEvents: Stream.never }),
+            localReporterDependencies,
+            Scheduler.layer,
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadShell: () => Ref.get(currentShell),
+            }),
+            Layer.mock(GitVcsDriver.GitVcsDriver)({
+              resolveCommit: ({ cwd, revision }) =>
+                cwd === "/work/repo-wt" && revision === "HEAD"
+                  ? Ref.get(currentCommit).pipe(Effect.map((commitSha) => ({ commitSha })))
+                  : Effect.die("unexpected resolveCommit call"),
+            }),
+            Layer.mock(PeerMcpClient.PeerMcpClient)({
+              call: Effect.fn(function* (
+                request: Parameters<PeerMcpClient.PeerMcpClient["Service"]["call"]>[0],
+              ) {
+                const input = yield* decodeSummaryReport(request.arguments);
+                const result = yield* summary.report("executor", input);
+                return yield* decodePeerResult(request.success, result);
+              }, Effect.orDie),
+            }),
+          ),
+        ),
+        Layer.build,
+      );
+      const reporter = Context.get(reporterContext, FleetSummaryReporter.FleetSummaryReporter);
+      const updates = yield* summary.subscribe({ cursor: 0 });
+      const firstRow = yield* Effect.forkChild(
+        Stream.runCollect(
+          updates.pipe(
+            Stream.filter((e) => e.type === "upsert"),
+            Stream.take(1),
+          ),
+        ),
+      );
+      yield* reporter.trackAdhoc(threadId, EnvironmentId.make("coordinator"));
+      yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+      const [first] = [...(yield* Fiber.join(firstRow))];
+      expect(first?.type).toBe("upsert");
+      if (first?.type === "upsert") {
+        expect(first.row.branch).toBe("local/118-fleet-row");
+        expect(first.row.commit).toBe("aaaa1111bbbb2222");
+      }
+
+      const nextUpdates = yield* summary.subscribe({
+        cursor: first?.type === "upsert" ? first.revision : 0,
+      });
+      const secondRow = yield* Effect.forkChild(
+        Stream.runCollect(
+          nextUpdates.pipe(
+            Stream.filter((e) => e.type === "upsert"),
+            Stream.take(1),
+          ),
+        ),
+      );
+      yield* Ref.set(currentCommit, "cccc3333dddd4444");
+      yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+      const [second] = [...(yield* Fiber.join(secondRow))];
+      expect(second?.type).toBe("upsert");
+      if (second?.type === "upsert") {
+        expect(second.row.branch).toBe("local/118-fleet-row");
+        expect(second.row.commit).toBe("cccc3333dddd4444");
+      }
     }),
   ),
 );

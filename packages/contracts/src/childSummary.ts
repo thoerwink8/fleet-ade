@@ -1,7 +1,13 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { NonNegativeInt, PositiveInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import {
+  EnvironmentId,
+  NonNegativeInt,
+  PositiveInt,
+  ThreadId,
+  TrimmedNonEmptyString,
+} from "./baseSchemas.ts";
 
 /** Three phases only. Finer causes stay in `reason`, not in this enum. */
 export const ChildSummaryPhase = Schema.Literals(["在做", "卡住", "做完"]);
@@ -50,6 +56,15 @@ export const ChildSummaryListItem = Schema.Struct({
   grandchildNote: Schema.NullOr(Schema.String),
   createdAtMs: NonNegativeInt,
   updatedAt: Schema.String,
+  /** Present when this child runs in a linked remote environment. */
+  environmentId: Schema.optional(EnvironmentId),
+  environmentLabel: Schema.optional(Schema.String),
+  title: Schema.optional(Schema.String),
+  repo: Schema.optional(TrimmedNonEmptyString),
+  branch: Schema.optional(Schema.NullOr(Schema.String)),
+  commit: Schema.optional(Schema.NullOr(Schema.String)),
+  stale: Schema.optional(Schema.Boolean),
+  staleReason: Schema.optional(Schema.String),
 });
 export type ChildSummaryListItem = typeof ChildSummaryListItem.Type;
 
@@ -61,6 +76,7 @@ export const ChildSummaryDetail = Schema.Struct({
   files: Schema.Array(ChildSummaryFile).check(Schema.isMaxLength(5)),
   latestCommand: Schema.NullOr(Schema.String),
   branch: Schema.NullOr(Schema.String),
+  commit: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   prNumber: Schema.NullOr(PositiveInt),
   outlook: Schema.NullOr(Schema.String),
   /** Written by hand-back. Null until that check runs. */
