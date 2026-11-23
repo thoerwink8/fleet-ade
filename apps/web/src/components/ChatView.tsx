@@ -269,6 +269,8 @@ import {
 import type { AssistantCitationRequest } from "./chat/AssistantCitationSource";
 import { useCitedHistory } from "./chat/citationProcedure";
 import type { MessagesTimelineHistoryControls } from "./chat/MessagesTimeline";
+import { PinnedPlanCard } from "./chat/PinnedPlanCard";
+import { derivePinnedPlanView } from "./chat/PinnedPlanCard.logic";
 import { ThreadTimeline } from "./chat/ThreadTimeline";
 import { NativeChildWorkDialog } from "./chat/NativeChildWorkDialog";
 import { ProviderSubagentBar } from "./chat/ProviderSubagentBar";
@@ -3068,13 +3070,28 @@ export default function ChatView(props: ChatViewProps) {
     [childInputNow?.waitingLabel ?? null, queuedRunCount === 0 ? null : `${queuedRunCount} queued`]
       .filter((part) => part !== null)
       .join(" · ") || null;
-  // The footer holds the thread's lifecycle status, then your queued messages.
+  const pinnedPlan =
+    isServerThread && serverProjection !== null
+      ? derivePinnedPlanView({
+          plans: serverProjection.plans,
+          runs: serverProjection.runs,
+          isWorking,
+          activeRunId: activeRunningTurnId,
+        })
+      : null;
+  // The footer holds the pinned task plan, thread lifecycle status, then your queued messages.
   const timelineFooter =
+    pinnedPlan === null &&
     pendingHandoff === null &&
     !hasThreadNow &&
     threadStatusLine === null &&
     !hasQueuedTurns ? null : (
       <>
+        {pinnedPlan === null ? null : (
+          <div className="chat-content-lane overflow-x-clip pb-3">
+            <PinnedPlanCard key={routeThreadKey} threadKey={routeThreadKey} plan={pinnedPlan} />
+          </div>
+        )}
         {pendingHandoff === null ? null : (
           <div className="chat-content-lane">
             <HandoffRow
