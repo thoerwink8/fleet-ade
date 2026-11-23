@@ -9,7 +9,11 @@ import {
 } from "react";
 import { useLocation, useRouter, type AnyRouter } from "@tanstack/react-router";
 
-import { moveWorkspaceFocus, workspaceAreaProps } from "../lib/workspaceFocus";
+import {
+  focusWorkspaceMainContent,
+  moveWorkspaceFocus,
+  workspaceAreaProps,
+} from "../lib/workspaceFocus";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { isElectron } from "../env";
 import {
@@ -445,6 +449,18 @@ export function AppSidebarLayout({
       storageKey="chat_thread_sidebar_open"
       style={sidebarProviderStyle}
     >
+      <a
+        href="#main-content"
+        data-skip-to-main=""
+        onClick={(event) => {
+          event.preventDefault();
+          focusWorkspaceMainContent();
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:inline-flex focus:h-8 focus:items-center focus:rounded-md focus:border focus:border-border focus:bg-popover focus:px-3 focus:text-ui focus:font-medium focus:text-popover-foreground focus:shadow-md focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ring"
+      >
+        跳到主内容
+      </a>
+      <SidebarControl showSidebar={showSidebar} />
       {showSidebar ? (
         <>
           <SidebarBrandWidthProbe isElectron={isElectron} onWidthChange={setBrandWidth} />
@@ -473,7 +489,6 @@ export function AppSidebarLayout({
       ) : null}
       {children}
       <BackgroundThreadAnnouncer />
-      <SidebarControl showSidebar={showSidebar} />
       {isElectron ? <HistorySwipeNavigation /> : null}
     </SidebarProvider>
   );

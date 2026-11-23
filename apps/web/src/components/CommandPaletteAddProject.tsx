@@ -9,6 +9,7 @@ import { type ReactNode, useState } from "react";
 
 import { sourceControlIcon } from "~/sourceControlPresentation";
 import { ITEM_ICON_CLASS } from "./CommandPalette.logic";
+import { useHideCommandPaletteKeyboardHints } from "./CommandPaletteContent";
 import { CommandPaletteTitleIcon } from "./CommandPaletteResults";
 import { Button } from "./ui/button";
 import { Kbd, KbdGroup } from "./ui/kbd";
@@ -42,6 +43,7 @@ export function CommandPaletteSubmitButton(props: {
   readonly disabled: boolean;
   readonly onSubmit: () => void;
 }) {
+  const hideKeyboardHints = useHideCommandPaletteKeyboardHints();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -61,9 +63,11 @@ export function CommandPaletteSubmitButton(props: {
         }
       >
         <span>{props.label}</span>
-        <KbdGroup className="pointer-events-none -me-0.5">
-          <Kbd>{props.shortcutLabel}</Kbd>
-        </KbdGroup>
+        {hideKeyboardHints ? null : (
+          <KbdGroup className="pointer-events-none -me-0.5">
+            <Kbd>{props.shortcutLabel}</Kbd>
+          </KbdGroup>
+        )}
       </TooltipTrigger>
       <TooltipPopup side="top">{props.tooltip}</TooltipPopup>
     </Tooltip>

@@ -74,7 +74,7 @@ export function SidebarThreadHeader({
           type="button"
           size="icon-micro"
           variant="ghost-muted"
-          className="shrink-0"
+          className="shrink-0 max-md:-mr-2 max-md:size-8 pointer-coarse:-mr-2 pointer-coarse:size-8"
           aria-label="清除会话搜索"
           onClick={() => {
             onClearSearch();
@@ -138,7 +138,7 @@ export function SidebarHeaderActions({
                         size="icon"
                         type="button"
                         aria-label="更多"
-                        className="relative size-7 shrink-0"
+                        className="relative size-7 shrink-0 max-md:size-8 pointer-coarse:size-8"
                       />
                     }
                   />
@@ -216,7 +216,10 @@ function SidebarHeaderIconButton({
             type="button"
             aria-label={label}
             {...rest}
-            className={cn("relative size-7 shrink-0", className)}
+            className={cn(
+              "relative size-7 shrink-0 max-md:size-8 pointer-coarse:size-8",
+              className,
+            )}
           />
         }
       >

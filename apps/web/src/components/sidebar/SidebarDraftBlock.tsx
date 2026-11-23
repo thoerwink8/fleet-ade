@@ -119,11 +119,12 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                   render={
                     <button
                       type="button"
+                      tabIndex={-1}
                       aria-label="丢弃草稿"
                       onClick={handleDiscard}
                       className={cn(
                         SIDEBAR_ROW_BUTTON_HIT_AREA,
-                        "pointer-events-none inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100",
+                        "pointer-events-none inline-flex h-6 min-w-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100",
                       )}
                     >
                       <XIcon className="size-3" />

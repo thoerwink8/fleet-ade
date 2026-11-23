@@ -246,3 +246,22 @@ it("tells screen readers whether a new project will be published", async () => {
   await option.click();
   await expect.element(option).toHaveAttribute("aria-checked", "true");
 });
+
+it("hides the submit button keycap on touch while keeping the submit button visible", async () => {
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  await page.viewport(1280, 800);
+  await using _viewport = {
+    [Symbol.asyncDispose]: () => page.viewport(viewport.width, viewport.height),
+  };
+  setup();
+  const realMatchMedia = window.matchMedia.bind(window);
+  using _touch = vi
+    .spyOn(window, "matchMedia")
+    .mockImplementation((query) => realMatchMedia(query === "(pointer: coarse)" ? "all" : query));
+  await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
+  await act(() => openCommandPalette({ open: "add-project" }));
+  await page.getByText("Git URL", { exact: true }).click();
+  const submit = page.getByRole("button", { name: "继续 (Enter)" });
+  await expect.element(submit).toBeVisible();
+  expect(submit.element().querySelector('[data-slot="kbd"]')).toBeNull();
+});

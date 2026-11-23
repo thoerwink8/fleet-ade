@@ -42,6 +42,7 @@ export function ProjectPinButton(props: {
       <Button
         size="icon-xs"
         variant="ghost-muted"
+        className="max-md:size-8 pointer-coarse:size-8"
         tabIndex={-1}
         aria-hidden="true"
         title={props.shortcutLabel ? `${action} (${props.shortcutLabel})` : action}

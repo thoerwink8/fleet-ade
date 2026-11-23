@@ -19,6 +19,7 @@ import {
 } from "../../navigationHistory";
 import { primaryServerKeybindingsAtom } from "../../state/server";
 import { cn } from "../../lib/utils";
+import { attachSidebarToolbar } from "../../lib/sidebarTree";
 import { usePullRequestsSupported } from "../../state/environments";
 import {
   resolveEnvironmentIdentificationPillLabel,
@@ -74,7 +75,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
       <div className="relative top-[calc(var(--workspace-controls-top)-env(safe-area-inset-top))] z-10 ml-[calc(var(--workspace-controls-left)+1px-env(safe-area-inset-left))] flex shrink-0 items-center md:hidden">
         <SidebarTrigger
           variant={backdropVariant ? "media-navigation" : "ghost"}
-          className="relative top-auto translate-y-0"
+          className="relative top-auto translate-y-0 max-md:size-8! pointer-coarse:size-8!"
           aria-label="切换主侧边栏"
         />
       </div>
@@ -150,7 +151,7 @@ function HistoryNavigationButton({
           <Button
             aria-label={label}
             className={cn(
-              "[-webkit-app-region:no-drag]",
+              "[-webkit-app-region:no-drag] pointer-coarse:size-8",
               onBackdrop && "relative top-auto translate-y-0",
             )}
             disabled={!enabled}
@@ -175,7 +176,7 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
     <Link
       aria-label="Fleet ADE 首页"
       className={cn(
-        "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex",
+        "relative z-10 ml-[var(--workspace-titlebar-content-left)] hidden h-7 w-fit min-w-0 shrink-0 items-center overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2 focus-visible:ring-inset md:flex pointer-coarse:min-h-8 pointer-coarse:min-w-8",
         onBackdrop ? "text-white" : "text-foreground",
       )}
       to="/"
@@ -212,7 +213,12 @@ function SidebarUtilityItem({
       <Tooltip>
         <TooltipTrigger
           render={
-            <SidebarMenuButton aria-label={label} onClick={onClick} size="icon" className="size-7">
+            <SidebarMenuButton
+              aria-label={label}
+              onClick={onClick}
+              size="icon"
+              className="size-7 max-md:size-8 pointer-coarse:size-8"
+            >
               {icon}
             </SidebarMenuButton>
           }
@@ -268,7 +274,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   };
 
   return (
-    <SidebarMenu className="flex-row items-center">
+    <SidebarMenu ref={attachSidebarToolbar} className="flex-row items-center">
       {isOnUtilityPage ? (
         <SidebarMenuItem className="min-w-0 flex-1">
           <SidebarMenuButton onClick={handleBackClick}>

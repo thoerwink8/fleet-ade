@@ -177,4 +177,47 @@ describe("CommandPalette open intents", () => {
 
     await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/local/parent"));
   });
+
+  it("shows row shortcuts and keyboard footer on desktop, and hides them on touch and narrow viewports", async () => {
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    await page.viewport(1280, 800);
+    await using _viewport = {
+      [Symbol.asyncDispose]: () => page.viewport(viewport.width, viewport.height),
+    };
+
+    setup();
+    await using screen = await render(<CommandPalette>{null}</CommandPalette>);
+    openCommandPalette({});
+
+    await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
+    expect(document.querySelectorAll('[data-slot="command-shortcut"]').length).toBeGreaterThan(0);
+    await expect.element(page.getByText("移动", { exact: true })).toBeVisible();
+    await expect.element(page.getByText("关闭", { exact: true })).toBeVisible();
+
+    await page.viewport(390, 844);
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll('[data-slot="command-shortcut"]')).toHaveLength(0);
+      expect(document.querySelector('[data-slot="command-footer"]')).toBeNull();
+    });
+    await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
+
+    await page.viewport(1194, 834);
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll('[data-slot="command-shortcut"]').length).toBeGreaterThan(0);
+      expect(document.querySelector('[data-slot="command-footer"]')).not.toBeNull();
+    });
+
+    const realMatchMedia = window.matchMedia.bind(window);
+    using _touch = vi
+      .spyOn(window, "matchMedia")
+      .mockImplementation((query) => realMatchMedia(query === "(pointer: coarse)" ? "all" : query));
+    await screen.rerender(<CommandPalette>{null}</CommandPalette>);
+    await act(() => {
+      openCommandPalette({ query: "" });
+    });
+
+    await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
+    expect(document.querySelectorAll('[data-slot="command-shortcut"]')).toHaveLength(0);
+    expect(document.querySelector('[data-slot="command-footer"]')).toBeNull();
+  });
 });

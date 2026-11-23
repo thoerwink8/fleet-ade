@@ -114,7 +114,7 @@ export function SidebarUpdateCapsule({
         {view.action !== null ? (
           <button
             type="button"
-            className="relative shrink-0 cursor-pointer pr-3 pl-1.5 text-xs underline decoration-muted-foreground/60 underline-offset-3 hover:decoration-current"
+            className="relative inline-flex shrink-0 cursor-pointer items-center justify-center pr-3 pl-1.5 text-xs underline decoration-muted-foreground/60 underline-offset-3 hover:decoration-current max-md:min-h-8 max-md:min-w-8 pointer-coarse:min-h-8 pointer-coarse:min-w-8"
             onClick={runAction}
           >
             {actionLabel}

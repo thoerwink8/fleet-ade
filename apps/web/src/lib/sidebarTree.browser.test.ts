@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
-import { installSidebarTree } from "./sidebarTree";
+import { installSidebarToolbar, installSidebarTree } from "./sidebarTree";
 
 function setup() {
   const root = document.createElement("div");
@@ -34,7 +34,7 @@ function press(target: HTMLElement, key: string, init: KeyboardEventInit = {}) {
 }
 
 describe("sidebar keyboard navigation", () => {
-  it("moves focus without activating rows, clamps at the ends, and keeps every row in the Tab order", () => {
+  it("moves focus without activating rows, clamps at the ends, and keeps a single roving Tab stop", () => {
     using tree = setup();
     const first = tree.row("first");
     const second = tree.row("second");
@@ -42,17 +42,20 @@ describe("sidebar keyboard navigation", () => {
     const activate = vi.fn();
     tree.root.addEventListener("click", activate);
     tree.install();
+    expect([first.tabIndex, second.tabIndex, last.tabIndex]).toEqual([0, -1, -1]);
     first.focus();
     press(first, "ArrowDown");
     expect(document.activeElement).toBe(second);
+    expect([first.tabIndex, second.tabIndex, last.tabIndex]).toEqual([-1, 0, -1]);
     press(second, "End");
     expect(document.activeElement).toBe(last);
+    expect([first.tabIndex, second.tabIndex, last.tabIndex]).toEqual([-1, -1, 0]);
     press(last, "ArrowDown");
     expect(document.activeElement).toBe(last);
     press(last, "Home");
     expect(document.activeElement).toBe(first);
+    expect([first.tabIndex, second.tabIndex, last.tabIndex]).toEqual([0, -1, -1]);
     expect(activate).not.toHaveBeenCalled();
-    expect([first.tabIndex, second.tabIndex, last.tabIndex]).toEqual([0, 0, 0]);
   });
 
   it("expands a group before entering its first child and returns to the parent", () => {
@@ -96,25 +99,45 @@ describe("sidebar keyboard navigation", () => {
     expect(document.activeElement).toBe(selected);
   });
 
-  it("leaves every row's buttons in the Tab order", () => {
+  it("keeps row actions out of the Tab order and navigates them with ArrowRight, ArrowLeft, and Escape", () => {
     using tree = setup();
-    const first = tree.row("first");
+    const row = document.createElement("div");
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
+    row.dataset.sidebarRow = "first";
+    const snooze = document.createElement("button");
+    snooze.textContent = "Snooze";
+    const settle = document.createElement("button");
+    settle.textContent = "Settle";
+    row.append(snooze, settle);
+    tree.root.append(row);
     const second = tree.row("second");
-    const action = (owner: string) => {
-      const button = document.createElement("button");
-      button.textContent = `Archive ${owner}`;
-      button.dataset.sidebarActionFor = owner;
-      tree.root.append(button);
-      return button;
-    };
-    const firstAction = action("first");
-    const secondAction = action("second");
     tree.install();
-    first.focus();
-    expect([firstAction.tabIndex, secondAction.tabIndex]).toEqual([0, 0]);
-    press(first, "ArrowDown");
+
+    expect([row.tabIndex, snooze.tabIndex, settle.tabIndex, second.tabIndex]).toEqual([
+      0, -1, -1, -1,
+    ]);
+    row.focus();
+    press(row, "ArrowRight");
+    expect(document.activeElement).toBe(snooze);
+    press(snooze, "ArrowRight");
+    expect(document.activeElement).toBe(settle);
+    press(settle, "ArrowLeft");
+    expect(document.activeElement).toBe(snooze);
+    press(snooze, "ArrowLeft");
+    expect(document.activeElement).toBe(row);
+
+    press(row, "ArrowRight");
+    expect(document.activeElement).toBe(snooze);
+    press(snooze, "Escape");
+    expect(document.activeElement).toBe(row);
+
+    press(row, "ArrowRight");
+    press(snooze, "ArrowDown");
     expect(document.activeElement).toBe(second);
-    expect([firstAction.tabIndex, secondAction.tabIndex]).toEqual([0, 0]);
+    expect([row.tabIndex, snooze.tabIndex, settle.tabIndex, second.tabIndex]).toEqual([
+      -1, -1, -1, 0,
+    ]);
   });
 
   it("keeps a rendered row under a collapsed group reachable", () => {
@@ -184,5 +207,36 @@ describe("sidebar keyboard navigation", () => {
       await Promise.resolve();
       expect(document.activeElement).toBe(document.body);
     }
+  });
+
+  it("manages roving tabindex for a horizontal sidebar toolbar", () => {
+    const bar = document.createElement("div");
+    const buttons = ["设置", "PR", "用量", "机群"].map((label) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      bar.append(button);
+      return button;
+    });
+    document.body.append(bar);
+    const dispose = installSidebarToolbar(bar);
+    using _bar = {
+      [Symbol.dispose]() {
+        dispose();
+        bar.remove();
+      },
+    };
+
+    expect(buttons.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1]);
+    buttons[0]!.focus();
+    press(buttons[0]!, "ArrowRight");
+    expect(document.activeElement).toBe(buttons[1]);
+    expect(buttons.map((b) => b.tabIndex)).toEqual([-1, 0, -1, -1]);
+    press(buttons[1]!, "End");
+    expect(document.activeElement).toBe(buttons[3]);
+    press(buttons[3]!, "ArrowLeft");
+    expect(document.activeElement).toBe(buttons[2]);
+    press(buttons[2]!, "Home");
+    expect(document.activeElement).toBe(buttons[0]);
   });
 });

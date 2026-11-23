@@ -382,12 +382,13 @@ function SnoozeMenuButton(props: {
               render={
                 <button
                   type="button"
+                  tabIndex={-1}
                   aria-label="暂缓会话"
                   onClick={(event) => event.stopPropagation()}
                   onDoubleClick={(event) => event.stopPropagation()}
                   className={cn(
                     SIDEBAR_ROW_BUTTON_HIT_AREA,
-                    "inline-flex h-6 cursor-pointer items-center gap-0.5 rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
+                    "inline-flex h-6 shrink-0 cursor-pointer items-center justify-center gap-0.5 whitespace-nowrap rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
                   )}
                 />
               }
@@ -434,9 +435,10 @@ type SortableThreadRowBag = Pick<
 
 export const draftSurfaceClassName = "bg-warning/4 hover:bg-warning/8";
 export const draftPenClassName = "size-3 shrink-0 text-warning-foreground";
-// Expands 24px (h-6) inline row buttons by 2px top/bottom to meet the 28px hit target without changing row height.
+// Desktop keeps 24px inline buttons with a 28px pseudo hit area; touch and mobile
+// viewports expand the button box to >= 32x32 without changing row height.
 export const SIDEBAR_ROW_BUTTON_HIT_AREA =
-  "relative after:absolute after:inset-x-0 after:-inset-y-0.5";
+  "relative after:absolute after:inset-x-0 after:-inset-y-0.5 max-md:min-h-8 max-md:min-w-8 pointer-coarse:min-h-8 pointer-coarse:min-w-8";
 
 // useSortable memoizes on its `disabled` object, so a fresh one per render
 // re-renders every row and marker on each sidebar update.
@@ -1086,7 +1088,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const prBadge =
     prBadgeShape?.kind === "stack" || pr || currentLinkedPr ? (
       <ThreadPullRequestBadgeControl
-        render={<InlineButton size="row" />}
+        render={
+          <InlineButton
+            size="row"
+            tabIndex={-1}
+            className="justify-center max-md:-my-1.5 max-md:min-h-8 max-md:min-w-8 pointer-coarse:-my-1.5 pointer-coarse:min-h-8 pointer-coarse:min-w-8"
+          />
+        }
         badge={prBadgeShape}
         pullRequests={thread.pullRequests}
         number={pr?.number ?? currentLinkedPr?.number}
@@ -1129,11 +1137,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           render={
             <button
               type="button"
+              tabIndex={-1}
               aria-label="取消置顶会话"
               onClick={handleUnpinClick}
               className={cn(
                 SIDEBAR_ROW_BUTTON_HIT_AREA,
-                "group/unpin -mx-1.5 inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-sm text-muted-foreground/65 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                "group/unpin -mx-1.5 inline-flex h-6 min-w-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground/65 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
               )}
             />
           }
@@ -1224,7 +1233,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "relative ml-auto flex h-6 min-w-8 shrink-0 items-stretch justify-end",
+                    "relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end max-md:h-8 pointer-coarse:h-8",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1247,11 +1256,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           render={
                             <button
                               type="button"
+                              tabIndex={-1}
                               aria-label="忽略已唤醒通知"
                               onClick={handleAcknowledgeWokeClick}
                               className={cn(
                                 SIDEBAR_ROW_BUTTON_HIT_AREA,
-                                "inline-flex h-6 cursor-pointer items-center gap-1 rounded-sm text-row font-medium text-warning-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                                "inline-flex h-6 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-sm text-row font-medium text-warning-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                               )}
                             >
                               <AlarmClockIcon aria-hidden className="size-3" />
@@ -1277,12 +1287,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                     !props.snoozeSupported ? null : (
                       <button
                         type="button"
+                        tabIndex={-1}
                         aria-label="立即唤醒会话"
                         onClick={handleUnsnoozeClick}
                         onPointerDown={handleActionPointerDown}
                         className={cn(
                           SIDEBAR_ROW_BUTTON_HIT_AREA,
-                          "pointer-events-none absolute inset-y-0 right-0 -mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-row text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
+                          "pointer-events-none absolute inset-y-0 right-0 -mr-1 inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md bg-transparent px-1.5 text-row text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
                           isWoke && "group-any-hover/sidebar-row:relative",
                         )}
                       >
@@ -1295,12 +1306,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         render={
                           <button
                             type="button"
+                            tabIndex={-1}
                             aria-label="取消会话收尾"
                             onClick={handleUnsettleClick}
                             onPointerDown={handleActionPointerDown}
                             className={cn(
                               SIDEBAR_ROW_BUTTON_HIT_AREA,
-                              "pointer-events-none absolute inset-y-0 right-0 -mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-row text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
+                              "pointer-events-none absolute inset-y-0 right-0 -mr-1 inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md bg-transparent px-1.5 text-row text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
                               isWoke && "group-any-hover/sidebar-row:relative",
                             )}
                           />
@@ -1316,12 +1328,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         render={
                           <button
                             type="button"
+                            tabIndex={-1}
                             aria-label="收尾会话"
                             onClick={handleSettleClick}
                             onPointerDown={handleActionPointerDown}
                             className={cn(
                               SIDEBAR_ROW_BUTTON_HIT_AREA,
-                              "pointer-events-none absolute inset-y-0 right-0 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-2 text-row text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
+                              "pointer-events-none absolute inset-y-0 right-0 inline-flex cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md bg-transparent px-2 text-row text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:opacity-100",
                               isWoke && "group-any-hover/sidebar-row:relative",
                             )}
                           />
@@ -1415,7 +1428,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "group/sidebar-status-slot relative ml-auto flex h-6 min-w-8 shrink-0 items-stretch justify-end text-row",
+                    "group/sidebar-status-slot relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end text-row",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1435,11 +1448,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                           render={
                             <button
                               type="button"
+                              tabIndex={-1}
                               aria-label="忽略已唤醒通知"
                               onClick={handleAcknowledgeWokeClick}
                               className={cn(
                                 SIDEBAR_ROW_BUTTON_HIT_AREA,
-                                "inline-flex h-6 cursor-pointer items-center gap-1 rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                                "inline-flex h-6 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-sm font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                                 topStatus.className,
                               )}
                             >
@@ -1465,7 +1479,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                       className={cn(
                         // Mouse clicks leave Settle focused; focus-within would pin controls over
                         // the status label after the pointer leaves. Use focus-visible instead.
-                        "pointer-events-none absolute inset-y-0 right-0 flex items-stretch opacity-0 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:static has-[:focus-visible]:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
+                        "pointer-events-none absolute inset-y-0 right-0 flex items-center opacity-0 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:static has-[:focus-visible]:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
                         snoozeMenuOpen && "pointer-events-auto static opacity-100",
                       )}
                     >
@@ -1475,11 +1489,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                             render={
                               <button
                                 type="button"
+                                tabIndex={-1}
                                 aria-label="丢弃草稿"
                                 onClick={handleDiscardDraftClick}
                                 className={cn(
                                   SIDEBAR_ROW_BUTTON_HIT_AREA,
-                                  "inline-flex h-6 cursor-pointer items-center rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
+                                  "inline-flex h-6 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
                                 )}
                               />
                             }
@@ -1505,12 +1520,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                               render={
                                 <button
                                   type="button"
+                                  tabIndex={-1}
                                   aria-label="取消会话收尾"
                                   onClick={handleUnsettleClick}
                                   onPointerDown={handleActionPointerDown}
                                   className={cn(
                                     SIDEBAR_ROW_BUTTON_HIT_AREA,
-                                    "-mr-1 inline-flex h-6 cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
+                                    "-mr-1 inline-flex h-6 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
                                   )}
                                 />
                               }
@@ -1525,12 +1541,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                               render={
                                 <button
                                   type="button"
+                                  tabIndex={-1}
                                   aria-label="收尾会话"
                                   onClick={handleSettleClick}
                                   onPointerDown={handleActionPointerDown}
                                   className={cn(
                                     SIDEBAR_ROW_BUTTON_HIT_AREA,
-                                    "-mr-1 inline-flex h-6 cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
+                                    "-mr-1 inline-flex h-6 shrink-0 cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md bg-transparent px-1.5 text-row text-muted-foreground hover:text-foreground",
                                   )}
                                 />
                               }
