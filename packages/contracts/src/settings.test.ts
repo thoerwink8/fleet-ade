@@ -53,6 +53,16 @@ describe("retired client settings", () => {
     expect(decoded.notificationMode).toBe("off");
   });
 
+  it("ignores retired desktop update keys", () => {
+    const decoded = decodeClientSettings({
+      updateChannel: "nightly",
+      updateChannelConfiguredByUser: true,
+    });
+    expect(decoded).not.toHaveProperty("updateChannel");
+    expect(decoded).not.toHaveProperty("updateChannelConfiguredByUser");
+    expect(decoded.notificationMode).toBe("off");
+  });
+
   it("decodes server settings that still carry the removed default theme", () => {
     const decoded = decodeServerSettings({
       defaultTheme: "nightfall",

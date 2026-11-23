@@ -30,7 +30,6 @@ import {
   applyWslEnableSelection,
   isWslSettingsRowVisible,
   missingTailscaleEndpointDescription,
-  resolveLocalVersionStatusLabel,
   resolveTailscaleServeBaseUrl,
 } from "./ConnectionsSettings.logic";
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
@@ -79,7 +78,6 @@ import { useUiStateStore } from "~/uiStateStore";
 import {
   resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
-  supportsDesktopAppUpdate,
 } from "~/versionSkew";
 import { authEnvironment } from "~/state/auth";
 import { environmentCatalog } from "~/connection/catalog";
@@ -94,7 +92,6 @@ import {
   refreshDesktopNetworkAccessState,
 } from "~/state/desktopNetworkAccess";
 import { desktopWslStateAtom, refreshDesktopWslState } from "~/state/desktopWslState";
-import { useDesktopUpdateState } from "~/state/desktopUpdate";
 import {
   type EnvironmentPresentation,
   useEnvironment,
@@ -142,16 +139,6 @@ const EMPTY_ADVERTISED_ENDPOINTS: ReadonlyArray<AdvertisedEndpoint> = [];
 // Colons are invalid in distro names, keeping picker sentinels collision-free.
 const BACKEND_VALUE_DEFAULT_WSL = "backend:default-wsl";
 const BACKEND_VALUE_WSL_OFF = "backend:wsl-off";
-
-// Subscribes on its own so desktop download progress does not re-render the page.
-function LocalVersionStatusLabel() {
-  const updateState = useDesktopUpdateState();
-  return (
-    <span className="text-xs text-muted-foreground">
-      {resolveLocalVersionStatusLabel(updateState)}
-    </span>
-  );
-}
 
 /** Environments lists the machines this app connects to; access covers who may reach one of them. */
 export function ConnectionsSettings() {
@@ -270,15 +257,14 @@ function ConnectionsSettingsContent({
     ({ environment, updateStatus }): ServerUpdateTarget[] => {
       const mismatch = resolveServerConfigVersionMismatch(environment.serverConfig);
       const selfUpdate = resolveServerSelfUpdateCapability(environment.serverConfig);
-      const desktopAppUpdate = supportsDesktopAppUpdate(environment.serverConfig);
       if (
         !mismatch ||
         updateStatus === "running" ||
         !environment.entry.enabled ||
         environment.connection.phase !== "connected" ||
         isDesktopLocalConnectionTarget(environment.entry.target) ||
-        selfUpdate !== "desktop-managed" ||
-        !desktopAppUpdate
+        selfUpdate === null ||
+        selfUpdate === "desktop-managed"
       ) {
         return [];
       }
@@ -288,7 +274,6 @@ function ConnectionsSettingsContent({
           serverLabel: environment.label,
           selfUpdate,
           installation: environment.serverConfig?.environment.capabilities.serverInstallation,
-          desktopAppUpdate,
           targetVersion: mismatch.clientVersion,
         },
       ];
@@ -1178,7 +1163,9 @@ function ConnectionsSettingsContent({
                       installation={
                         primaryServerConfig?.environment.capabilities.serverInstallation
                       }
-                      desktopAppUpdate={supportsDesktopAppUpdate(primaryServerConfig)}
+                      desktopAppInstall={
+                        primaryServerConfig?.environment.capabilities.desktopAppInstall
+                      }
                       targetVersion={primaryVersionMismatch.clientVersion}
                       label={
                         primaryServerUpdateState.status === "failed"
@@ -1186,8 +1173,6 @@ function ConnectionsSettingsContent({
                           : `更新到 ${primaryVersionMismatch.clientVersion}`
                       }
                     />
-                  ) : primaryServerUpdateState.status === "idle" && primaryServerConfig ? (
-                    <LocalVersionStatusLabel />
                   ) : undefined
                 }
               />

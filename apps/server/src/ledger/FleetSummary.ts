@@ -50,6 +50,8 @@ interface RowRecord {
   readonly reason: string;
   readonly needs_you: number;
   readonly last_progress: string;
+  readonly branch: string | null;
+  readonly commit_sha: string | null;
   readonly updated_at: string;
   readonly stale: number;
   readonly stale_reason: string | null;
@@ -128,6 +130,8 @@ const toRow = (record: RowRecord): FleetSummaryRow => ({
   reason: record.reason,
   needsYou: record.needs_you === 1,
   lastProgress: record.last_progress,
+  ...(record.branch === null ? {} : { branch: record.branch }),
+  ...(record.commit_sha === null ? {} : { commit: record.commit_sha }),
   updatedAt: record.updated_at,
   stale: record.stale === 1,
   ...(record.stale_reason === null ? {} : { staleReason: record.stale_reason }),
@@ -152,6 +156,8 @@ const sameReported = (current: FleetSummaryRow, next: FleetSummaryRow) =>
   current.reason === next.reason &&
   current.needsYou === next.needsYou &&
   current.lastProgress === next.lastProgress &&
+  current.branch === next.branch &&
+  current.commit === next.commit &&
   current.stale === next.stale &&
   current.staleReason === next.staleReason;
 
@@ -187,7 +193,7 @@ const make = Effect.fn("FleetSummary.make")(function* (keepEnvironments: KeepEnv
   const rowById = (rowId: string) =>
     sql<RowRecord>`
       SELECT row_id, environment_id, kind, repo, issue, task_id, thread_id, title, phase,
-        reason, needs_you, last_progress, updated_at, stale, stale_reason, revision
+        reason, needs_you, last_progress, branch, commit_sha, updated_at, stale, stale_reason, revision
       FROM fleet_summary_rows WHERE row_id = ${rowId}
     `.pipe(Effect.map((rows) => (rows[0] === undefined ? undefined : toRow(rows[0]))));
 
@@ -227,7 +233,7 @@ const make = Effect.fn("FleetSummary.make")(function* (keepEnvironments: KeepEnv
           const current = yield* meta;
           const rows = yield* sql<RowRecord>`
             SELECT row_id, environment_id, kind, repo, issue, task_id, thread_id, title, phase,
-              reason, needs_you, last_progress, updated_at, stale, stale_reason, revision
+              reason, needs_you, last_progress, branch, commit_sha, updated_at, stale, stale_reason, revision
             FROM fleet_summary_rows ORDER BY row_id
           `;
           return { revision: current.revision, rows: rows.map(toRow) };
@@ -508,6 +514,8 @@ const make = Effect.fn("FleetSummary.make")(function* (keepEnvironments: KeepEnv
                 reason: canonical.reason,
                 needsYou: canonical.needsYou,
                 lastProgress: progress(canonical.lastProgress),
+                ...(canonical.branch === undefined ? {} : { branch: canonical.branch }),
+                ...(canonical.commit === undefined ? {} : { commit: canonical.commit }),
                 updatedAt: now,
                 stale: preserveStale
                   ? existing.stale
@@ -531,16 +539,18 @@ const make = Effect.fn("FleetSummary.make")(function* (keepEnvironments: KeepEnv
               const row = { ...nextRow, revision };
               yield* sql`INSERT INTO fleet_summary_rows (
               row_id, environment_id, kind, repo, issue, task_id, thread_id, title, phase,
-              reason, needs_you, last_progress, updated_at, stale, stale_reason, revision)
+              reason, needs_you, last_progress, branch, commit_sha, updated_at, stale, stale_reason, revision)
               VALUES (${rowId}, ${row.environmentId}, ${row.repo !== undefined ? "task" : "adhoc"},
                 ${row.repo ?? null}, ${row.issue ?? null}, ${row.taskId ?? null}, ${row.threadId},
                 ${row.title}, ${row.phase}, ${row.reason}, ${row.needsYou ? 1 : 0}, ${row.lastProgress},
+                ${row.branch ?? null}, ${row.commit ?? null},
                 ${row.updatedAt}, ${row.stale ? 1 : 0}, ${row.staleReason ?? null}, ${revision})
               ON CONFLICT(row_id) DO UPDATE SET environment_id = excluded.environment_id,
                 kind = excluded.kind, repo = excluded.repo, issue = excluded.issue,
                 task_id = excluded.task_id, thread_id = excluded.thread_id, title = excluded.title,
                 phase = excluded.phase, reason = excluded.reason, needs_you = excluded.needs_you,
-                last_progress = excluded.last_progress, updated_at = excluded.updated_at,
+                last_progress = excluded.last_progress, branch = excluded.branch,
+                commit_sha = excluded.commit_sha, updated_at = excluded.updated_at,
                 stale = excluded.stale, stale_reason = excluded.stale_reason, revision = excluded.revision`;
               const event: FleetSummaryChangeEvent = { type: "upsert", revision, row };
               yield* recordChange(revision, event);

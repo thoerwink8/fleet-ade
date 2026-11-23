@@ -29,8 +29,8 @@ export function orchestrationProtocolCompatibilityError(
 }
 
 function canSelfUpdate(descriptor: ExecutionEnvironmentDescriptor): boolean {
-  const { serverSelfUpdate, desktopAppUpdate } = descriptor.capabilities;
-  return serverSelfUpdate === "desktop-managed" && desktopAppUpdate === true;
+  const { serverSelfUpdate } = descriptor.capabilities;
+  return serverSelfUpdate !== undefined && serverSelfUpdate !== "desktop-managed";
 }
 
 export function appendOrchestrationProtocol(socketUrl: string): string {

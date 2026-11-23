@@ -18,8 +18,7 @@
     "@t3tools/tailscale": "workspace:*",
     "dbus-next": "0.10.2",
     "effect": "catalog:",
-    "electron": "44.10.1",
-    "electron-updater": "6.8.9"
+    "electron": "44.10.1"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

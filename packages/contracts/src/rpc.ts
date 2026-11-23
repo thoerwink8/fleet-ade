@@ -258,7 +258,6 @@ import {
 } from "./terminal.ts";
 import {
   ServerConfigStreamEvent,
-  DesktopUpdateCommitInput,
   OtlpEndpointCheckInput,
   OtlpEndpointCheckResult,
   ServerConfig,
@@ -445,7 +444,6 @@ export const WS_METHODS = {
   serverUpdateProvider: "server.updateProvider",
   serverUpdateServer: "server.updateServer",
   serverUpdateServerWithProgress: "server.updateServerWithProgress",
-  serverCommitDesktopUpdate: "server.commitDesktopUpdate",
   serverUpsertKeybinding: "server.upsertKeybinding",
   serverRemoveKeybinding: "server.removeKeybinding",
   serverRunStorageCleanup: "server.runStorageCleanup",
@@ -729,12 +727,6 @@ const WsServerUpdateServerWithProgressRpc = Rpc.make(WS_METHODS.serverUpdateServ
   success: ServerSelfUpdateProgressEvent,
   error: Schema.Union([ServerSelfUpdateError, EnvironmentAuthorizationError]),
   stream: true,
-});
-
-const WsServerCommitDesktopUpdateRpc = Rpc.make(WS_METHODS.serverCommitDesktopUpdate, {
-  payload: DesktopUpdateCommitInput,
-  success: ServerSelfUpdateResult,
-  error: Schema.Union([ServerSelfUpdateError, EnvironmentAuthorizationError]),
 });
 
 const WsServerRunStorageCleanupRpc = Rpc.make(WS_METHODS.serverRunStorageCleanup, {
@@ -1690,6 +1682,14 @@ const WsOrchestrationV2CommandChildDetailRpc = Rpc.make(
     error: Schema.Union([ChildSummaryReadError, EnvironmentAuthorizationError]),
   },
 );
+const WsOrchestrationV2MarkChildDriftFalsePositiveRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive,
+  {
+    payload: OrchestrationV2RpcSchemas.markChildDriftFalsePositive.input,
+    success: OrchestrationV2RpcSchemas.markChildDriftFalsePositive.output,
+    error: Schema.Union([ChildSummaryReadError, EnvironmentAuthorizationError]),
+  },
+);
 
 const WsOrchestrationV2SubscribeCommandChildrenRpc = Rpc.make(
   ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren,
@@ -1850,7 +1850,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerUpdateServerRpc,
   WsServerGetNpmReleaseRpc,
   WsServerUpdateServerWithProgressRpc,
-  WsServerCommitDesktopUpdateRpc,
   WsServerUpsertKeybindingRpc,
   WsServerRemoveKeybindingRpc,
   WsServerRunStorageCleanupRpc,
@@ -2012,5 +2011,6 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribePromptSuggestionRpc,
   WsOrchestrationV2CommandChildrenRpc,
   WsOrchestrationV2CommandChildDetailRpc,
+  WsOrchestrationV2MarkChildDriftFalsePositiveRpc,
   WsOrchestrationV2SubscribeCommandChildrenRpc,
 ).middleware(RpcScopeAuthorization);

@@ -1348,7 +1348,7 @@ describe("runtime command runner", () => {
       const scheduler = createAtomCommandScheduler();
       const concurrency = { mode: "serial" as const, key: () => "shared" };
       const command = createRuntimeCommand(runtime, {
-        label: "test.desktop-update-handoff",
+        label: "test.server-update-handoff",
         execute: (_input: void, registry) =>
           Effect.gen(function* () {
             yield* Deferred.await(commitStarting).pipe(

@@ -2,10 +2,6 @@ import {
   DesktopHostTelemetryMessage,
   type DesktopHostTelemetrySnapshot,
   type DesktopTelemetryControlMessage,
-  type DesktopTelemetryCancelDesktopUpdate,
-  type DesktopTelemetryCommitDesktopUpdate,
-  type DesktopTelemetryRequestDesktopUpdate,
-  type DesktopUpdateStatusReport,
   type HostPowerSnapshot,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -70,10 +66,6 @@ export class DesktopTelemetryPublisher extends Context.Service<
       message: DesktopTelemetryControlMessage,
     ) => Effect.Effect<void>;
     readonly removeControlSource: (sourceId: string) => Effect.Effect<void>;
-    readonly publishUpdateReport: (report: DesktopUpdateStatusReport) => Effect.Effect<void>;
-    readonly updateRequests: Stream.Stream<DesktopTelemetryRequestDesktopUpdate>;
-    readonly updateCommits: Stream.Stream<DesktopTelemetryCommitDesktopUpdate>;
-    readonly updateCancellations: Stream.Stream<DesktopTelemetryCancelDesktopUpdate>;
   }
 >()("@t3tools/desktop/telemetry/DesktopTelemetryPublisher") {}
 
@@ -172,11 +164,6 @@ export const make = Effect.fn("desktop.telemetryPublisher.make")(function* () {
   const latest = yield* Ref.make(Option.none<DesktopHostTelemetrySnapshot>());
   const changes = yield* PubSub.sliding<DesktopHostTelemetrySnapshot>(8);
   const sequence = yield* Ref.make(0);
-  const latestUpdateReport = yield* Ref.make(Option.none<DesktopUpdateStatusReport>());
-  const updateReportChanges = yield* PubSub.sliding<DesktopUpdateStatusReport>(16);
-  const updateRequestQueue = yield* Queue.unbounded<DesktopTelemetryRequestDesktopUpdate>();
-  const updateCommitQueue = yield* Queue.unbounded<DesktopTelemetryCommitDesktopUpdate>();
-  const updateCancellationQueue = yield* Queue.unbounded<DesktopTelemetryCancelDesktopUpdate>();
 
   const offer = (event: PowerEvent): void => {
     Queue.offerUnsafe(powerEvents, event);
@@ -346,12 +333,6 @@ export const make = Effect.fn("desktop.telemetryPublisher.make")(function* () {
           active: Duration.millis(message.activeIntervalMs),
           idle: Duration.millis(message.idleIntervalMs),
         }).pipe(Effect.andThen(Queue.offer(sampleTriggers, undefined)), Effect.asVoid);
-      case "requestDesktopUpdate":
-        return Queue.offer(updateRequestQueue, message).pipe(Effect.asVoid);
-      case "commitDesktopUpdate":
-        return Queue.offer(updateCommitQueue, message).pipe(Effect.asVoid);
-      case "cancelDesktopUpdate":
-        return Queue.offer(updateCancellationQueue, message).pipe(Effect.asVoid);
     }
   };
   const removeControlSource: DesktopTelemetryPublisher["Service"]["removeControlSource"] = (
@@ -383,35 +364,14 @@ export const make = Effect.fn("desktop.telemetryPublisher.make")(function* () {
       );
     }),
   );
-  const updateReports = Stream.unwrap(
-    Effect.gen(function* () {
-      const subscription = yield* PubSub.subscribe(updateReportChanges);
-      const initial = yield* Ref.get(latestUpdateReport);
-      return Stream.concat(
-        Option.match(initial, {
-          onNone: () => Stream.empty,
-          onSome: Stream.make,
-        }),
-        Stream.fromSubscription(subscription),
-      );
-    }),
-  );
   const encoded = Stream.concat(
     Stream.make({
       version: 1,
       type: "desktopTelemetryHello",
       electronPid: process.pid,
     } as const),
-    Stream.merge(Stream.merge(snapshots, updateReports), shellEnvironment.updates),
+    Stream.merge(snapshots, shellEnvironment.updates),
   ).pipe(Stream.map((message) => textEncoder.encode(`${encodeMessage(message)}\n`)));
-
-  const publishUpdateReport: DesktopTelemetryPublisher["Service"]["publishUpdateReport"] = (
-    report,
-  ) =>
-    Ref.set(latestUpdateReport, Option.some(report)).pipe(
-      Effect.andThen(PubSub.publish(updateReportChanges, report)),
-      Effect.asVoid,
-    );
 
   return DesktopTelemetryPublisher.of({
     latest: Ref.get(latest),
@@ -419,10 +379,6 @@ export const make = Effect.fn("desktop.telemetryPublisher.make")(function* () {
     encoded,
     handleControlForSource,
     removeControlSource,
-    publishUpdateReport,
-    updateRequests: Stream.fromQueue(updateRequestQueue),
-    updateCommits: Stream.fromQueue(updateCommitQueue),
-    updateCancellations: Stream.fromQueue(updateCancellationQueue),
   });
 });
 

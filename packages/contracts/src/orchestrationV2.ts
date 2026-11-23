@@ -3786,6 +3786,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   subscribePromptSuggestion: "orchestration.subscribePromptSuggestion",
   commandChildren: "orchestration.commandChildren",
   commandChildDetail: "orchestration.commandChildDetail",
+  markChildDriftFalsePositive: "orchestration.markChildDriftFalsePositive",
   subscribeCommandChildren: "orchestration.subscribeCommandChildren",
 } as const;
 
@@ -4543,6 +4544,10 @@ export const OrchestrationV2RpcSchemas = {
   commandChildDetail: {
     input: CommandChildDetailInput,
     output: Schema.NullOr(ChildSummaryDetail),
+  },
+  markChildDriftFalsePositive: {
+    input: CommandChildDetailInput,
+    output: Schema.Struct({}),
   },
   subscribeCommandChildren: {
     input: CommandChildrenInput,

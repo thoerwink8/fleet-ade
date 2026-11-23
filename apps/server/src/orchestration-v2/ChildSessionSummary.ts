@@ -1,4 +1,5 @@
 import {
+  Cause,
   Clock,
   Context,
   DateTime,
@@ -7,6 +8,7 @@ import {
   Option,
   PubSub,
   Schedule,
+  Schema,
   Scope,
   Semaphore,
   Stream,
@@ -14,6 +16,9 @@ import {
 import * as SqlClient from "effect/sql/SqlClient";
 import {
   CHILD_SUMMARY_IDLE_MS,
+  CommandId,
+  MessageId,
+  NodeId,
   CHILD_SUMMARY_PAGE_SIZE,
   type ChildSummaryDetail,
   type ChildSummaryListItem,
@@ -21,27 +26,36 @@ import {
   ChildSummaryCursorError,
   ChildSummaryReadError,
   type CommandChildrenPage,
+  EnvironmentId,
+  type FleetSummaryRow,
+  type OrchestrationV2Subagent,
   type OrchestrationV2ThreadShell,
   ProjectId,
   ThreadId,
 } from "@t3tools/contracts";
 
+import * as FleetSummary from "../ledger/FleetSummary.ts";
+import * as PeerLinks from "../peer/PeerLinks.ts";
 import { forkParked } from "../serverActivation.ts";
 import {
   CHILD_SUMMARY_SILENCE_REASON,
   childSummaryCursor,
   deriveChildSummary,
+  deriveRemoteChildSummary,
   emptyPushLane,
   flushPush,
   offerPush,
   parseChildSummaryCursor,
   toSummaryItem,
   type PushLane,
+  type RemoteLinkState,
+  type RemoteSummaryFacts,
   type SummaryFacts,
   type SummaryItem,
 } from "./childSummaryDerive.ts";
 import * as CommandAssist from "./CommandAssist.ts";
 import { EventSinkV2 } from "./EventSink.ts";
+import * as Orchestrator from "./Orchestrator.ts";
 import { ProjectionStoreV2 } from "./ProjectionStore.ts";
 
 const ACTIVITY_EVENTS: Readonly<Record<string, true>> = {
@@ -73,6 +87,13 @@ interface SummaryRow {
   readonly filesJson: string;
   readonly latestCommand: string | null;
   readonly branch: string | null;
+  readonly commitSha: string | null;
+  readonly environmentId: EnvironmentId | null;
+  readonly environmentLabel: string | null;
+  readonly title: string | null;
+  readonly repo: string | null;
+  readonly stale: number;
+  readonly staleReason: string | null;
   readonly prNumber: number | null;
   readonly prState: string | null;
   readonly grandchildCount: number;
@@ -98,6 +119,14 @@ function storedRowToItem(row: SummaryRow): ChildSummaryListItem {
     grandchildNote: row.grandchildNote,
     createdAtMs: row.createdAtMs,
     updatedAt: row.updatedAt,
+    ...(row.environmentId === null ? {} : { environmentId: row.environmentId }),
+    ...(row.environmentLabel === null ? {} : { environmentLabel: row.environmentLabel }),
+    ...(row.title === null ? {} : { title: row.title }),
+    ...(row.repo === null ? {} : { repo: row.repo }),
+    ...(row.branch === null ? {} : { branch: row.branch }),
+    ...(row.commitSha === null ? {} : { commit: row.commitSha }),
+    ...(row.stale === 1 ? { stale: true } : {}),
+    ...(row.staleReason === null ? {} : { staleReason: row.staleReason }),
   };
 }
 
@@ -120,6 +149,7 @@ function storedRowToDetail(row: SummaryRow): ChildSummaryDetail {
     files,
     latestCommand: row.latestCommand,
     branch: row.branch,
+    commit: row.commitSha,
     prNumber: row.prNumber,
     outlook: null,
     handback: null,
@@ -161,6 +191,13 @@ function sameContent(
     previous.filesJson === filesJsonOf(detail.files) &&
     previous.latestCommand === detail.latestCommand &&
     previous.branch === detail.branch &&
+    previous.commitSha === detail.commit &&
+    previous.environmentId === (list.environmentId ?? null) &&
+    previous.environmentLabel === (list.environmentLabel ?? null) &&
+    previous.title === (list.title ?? null) &&
+    previous.repo === (list.repo ?? null) &&
+    (previous.stale === 1) === (list.stale === true) &&
+    previous.staleReason === (list.staleReason ?? null) &&
     previous.prNumber === detail.prNumber &&
     previous.prState === prState
   );
@@ -181,6 +218,13 @@ const SELECT_COLUMNS = `
     files_json AS filesJson,
     latest_command AS latestCommand,
     branch,
+    commit_sha AS commitSha,
+    environment_id AS environmentId,
+    environment_label AS environmentLabel,
+    title,
+    repo,
+    stale,
+    stale_reason AS staleReason,
     pr_number AS prNumber,
     pr_state AS prState,
     grandchild_count AS grandchildCount,
@@ -221,8 +265,15 @@ interface ItemRow {
   readonly prompt: string | null;
 }
 
+type RemoteSummaryInput = Omit<
+  RemoteSummaryFacts,
+  "previousActivity" | "previousBranch" | "previousCommit" | "previousTitle" | "previousRepo"
+>;
+
 interface ChildSessionSummaryInternalShape {
   readonly note: (facts: SummaryFacts) => Effect.Effect<void, ChildSummaryReadError>;
+  readonly noteRemote: (facts: RemoteSummaryInput) => Effect.Effect<void, ChildSummaryReadError>;
+  readonly removeRemote: (threadId: ThreadId) => Effect.Effect<void, ChildSummaryReadError>;
   readonly recompute: (
     threadId: ThreadId,
     shell: OrchestrationV2ThreadShell | null,
@@ -246,6 +297,13 @@ export class ChildSessionSummary extends Context.Service<
     readonly detail: (options: {
       readonly threadId: ThreadId;
     }) => Effect.Effect<ChildSummaryDetail | null, ChildSummaryReadError>;
+    readonly rememberDispatch: (input: {
+      readonly threadId: ThreadId;
+      readonly goal: string;
+    }) => Effect.Effect<void>;
+    readonly markDriftFalsePositive: (options: {
+      readonly threadId: ThreadId;
+    }) => Effect.Effect<{}, ChildSummaryReadError>;
     readonly subscribe: (
       threadId: ThreadId,
     ) => Stream.Stream<ChildSummaryStreamEvent, ChildSummaryReadError>;
@@ -271,6 +329,7 @@ export class ChildSessionSummary extends Context.Service<
         });
 
       const assist = yield* Effect.serviceOption(CommandAssist.CommandAssist);
+      const orchestrator = yield* Effect.serviceOption(Orchestrator.OrchestratorV2);
 
       const warnSql = (operation: string, threadId: ThreadId) => (error: unknown) =>
         Effect.logWarning("child-summary.assist-read-failed", { operation, threadId, error });
@@ -289,7 +348,13 @@ export class ChildSessionSummary extends Context.Service<
           projectId: null,
           anywhere: true,
         });
-        if (!watchAnywhere && !input.handback) return;
+        const patrolAnywhere =
+          Option.isSome(orchestrator) &&
+          (yield* service.patrolEnabled({
+            projectId: null,
+            anywhere: true,
+          }));
+        if (!watchAnywhere && !patrolAnywhere && !input.handback) return;
         const project = yield* sql<{ readonly projectId: string | null }>`
           SELECT json_extract(payload_json, '$.projectId') AS projectId
           FROM orchestration_v2_projection_threads
@@ -301,7 +366,9 @@ export class ChildSessionSummary extends Context.Service<
         const projectId =
           typeof project[0]?.projectId === "string" ? ProjectId.make(project[0].projectId) : null;
         const watchHere = yield* service.activityOrDriftEnabled({ projectId, anywhere: false });
-        if (!watchHere && !input.handback) return;
+        const patrolHere =
+          patrolAnywhere && (yield* service.patrolEnabled({ projectId, anywhere: false }));
+        if (!watchHere && !patrolHere && !input.handback) return;
         const roots =
           projectId === null
             ? []
@@ -314,7 +381,7 @@ export class ChildSessionSummary extends Context.Service<
                 Effect.orElseSucceed(() => [] as const),
               );
         const cwd = roots[0]?.cwd?.trim() ?? "";
-        if (cwd.length === 0 || cwd === "/") {
+        if ((watchHere || input.handback) && (cwd.length === 0 || cwd === "/")) {
           yield* Effect.logWarning("child-summary.assist-skipped", { threadId });
           return;
         }
@@ -329,6 +396,7 @@ export class ChildSessionSummary extends Context.Service<
           Effect.orElseSucceed(() => [] as const),
         );
         const runId = run[0]?.runId;
+        let drift: string | null = null;
         if (watchHere) {
           const counted =
             runId === undefined
@@ -345,25 +413,106 @@ export class ChildSessionSummary extends Context.Service<
                 );
           const additions = input.detail.files.reduce((sum, file) => sum + file.additions, 0);
           const deletions = input.detail.files.reduce((sum, file) => sum + file.deletions, 0);
-          yield* service
-            .observe({
-              threadId,
-              projectId,
-              cwd,
-              runId: runId ?? threadId,
-              opened: input.opened,
-              stepCount: Number(counted[0]?.total ?? 0),
-              silence: input.reason === CHILD_SUMMARY_SILENCE_REASON,
-              goal: input.facts.goal ?? "",
-              avoid: input.detail.avoid === "没有写别碰" ? "" : input.detail.avoid,
-              activity: input.detail.activity,
-              files: assistFiles(input.detail),
-              latestCommand: input.detail.latestCommand,
-              additions,
-              deletions,
-              childPhase: input.reason,
-            })
-            .pipe(Effect.ignore);
+          const observed = yield* service.observe({
+            threadId,
+            projectId,
+            cwd,
+            runId: runId ?? threadId,
+            opened: input.opened,
+            stepCount: Number(counted[0]?.total ?? 0),
+            silence: input.reason === CHILD_SUMMARY_SILENCE_REASON,
+            goal: input.facts.goal ?? "",
+            avoid: input.detail.avoid === "没有写别碰" ? "" : input.detail.avoid,
+            activity: input.detail.activity,
+            files: assistFiles(input.detail),
+            latestCommand: input.detail.latestCommand,
+            additions,
+            deletions,
+            childPhase: input.reason,
+          });
+          drift = observed.drift;
+        }
+        if (patrolHere && Option.isSome(orchestrator) && runId !== undefined && !input.opened) {
+          const latest = yield* sql<SummaryRow>`
+            SELECT ${sql.literal(SELECT_COLUMNS)} FROM child_session_summary WHERE thread_id = ${threadId}
+          `.pipe(
+            Effect.tapError(warnSql("patrol-row", threadId)),
+            Effect.orElseSucceed(() => [] as const),
+          );
+          const row = latest[0];
+          const pendingCommand =
+            input.facts.items[0]?.type === "command_execution" &&
+            ["running", "pending"].includes(input.facts.items[0].status);
+          const eligible =
+            row !== undefined &&
+            row.reason === input.reason &&
+            input.facts.status === "running" &&
+            !input.facts.waitingForAnswer &&
+            input.facts.approvalCommand === null &&
+            !pendingCommand &&
+            ((row.reason === "在跑" && row.idleEligible === 1) ||
+              row.reason === CHILD_SUMMARY_SILENCE_REASON);
+          if (eligible) {
+            const state = yield* service.read(threadId);
+            const kind =
+              row.reason === CHILD_SUMMARY_SILENCE_REASON
+                ? "silence"
+                : drift !== null &&
+                    state.drift !== null &&
+                    state.falsePositiveKey !== state.cacheKey
+                  ? "drift"
+                  : null;
+            if (kind !== null && (kind === "silence" || state.cacheKey !== null)) {
+              const tasks = yield* sql<{ readonly taskId: string }>`
+                SELECT subagent_id AS taskId FROM orchestration_v2_projection_subagents
+                WHERE child_thread_id = ${threadId} AND thread_id = ${input.facts.parentThreadId}
+                  AND origin = 'app_owned' LIMIT 1
+              `.pipe(
+                Effect.tapError(warnSql("patrol-task", threadId)),
+                Effect.orElseSucceed(() => [] as const),
+              );
+              const taskId = tasks[0]?.taskId;
+              if (taskId !== undefined) {
+                const patrol = yield* service.considerPatrol({
+                  threadId,
+                  projectId,
+                  runId,
+                  kind,
+                  driftKey: state.cacheKey ?? "",
+                  block: null,
+                });
+                if (patrol.sent && patrol.text !== null) {
+                  const key = `${threadId}:${kind}:${kind === "drift" ? state.cacheKey : runId}`;
+                  yield* orchestrator.value
+                    .dispatch({
+                      type: "message.dispatch",
+                      commandId: CommandId.make(`server:child-patrol:${key}`),
+                      threadId: input.facts.parentThreadId,
+                      messageId: MessageId.make(`message:child-patrol:${key}`),
+                      text: `${patrol.text}：${threadId}`,
+                      notification: {
+                        source: {
+                          kind: "delegated_task",
+                          taskIds: [NodeId.make(taskId)],
+                          childThreadId: threadId,
+                        },
+                        outcome: "updated",
+                        summary: patrol.text,
+                      },
+                      attachments: [],
+                      dispatchMode: { type: "queue_after_active" },
+                      createdBy: "agent",
+                      creationSource: "server",
+                    })
+                    .pipe(
+                      Effect.catchCause((cause) =>
+                        Effect.logWarning("child-summary.patrol-send-failed", { threadId, cause }),
+                      ),
+                    );
+                }
+              }
+            }
+          }
         }
         if (!input.handback || runId === undefined) return;
         const report = yield* sql<{ readonly text: string | null }>`
@@ -510,6 +659,97 @@ export class ChildSessionSummary extends Context.Service<
                 opened: false,
               }),
             );
+          }),
+        ),
+      );
+
+      const noteRemote = Effect.fn("ChildSessionSummary.noteRemote")((input: RemoteSummaryInput) =>
+        writeSemaphore.withPermits(1)(
+          Effect.gen(function* () {
+            const nowMs = yield* Clock.currentTimeMillis;
+            const previous = yield* getRow(input.threadId);
+            const derived = deriveRemoteChildSummary({
+              ...input,
+              previousActivity: previous?.activity ?? null,
+              previousBranch: previous?.branch ?? null,
+              previousCommit: previous?.commitSha ?? null,
+              previousTitle: previous?.title ?? null,
+              previousRepo: previous?.repo ?? null,
+            });
+            if (previous !== null && sameContent(previous, derived.list, derived.detail, null)) {
+              return;
+            }
+            const revision = previous === null ? 1 : previous.revision + 1;
+            const updatedAt = isoOf(nowMs);
+            yield* sql`
+              INSERT INTO child_session_summary (
+                thread_id, parent_thread_id, revision, phase, reason, conclusion, needs_you,
+                activity, goal_summary, goal, avoid, files_json, latest_command, branch,
+                commit_sha, environment_id, environment_label, title, repo, stale, stale_reason,
+                pr_number, pr_state, grandchild_count, grandchild_note,
+                created_at_ms, activity_at_ms, idle_eligible, updated_at
+              ) VALUES (
+                ${input.threadId}, ${input.parentThreadId}, ${revision}, ${derived.list.phase},
+                ${derived.list.reason}, ${derived.list.conclusion}, ${derived.list.needsYou ? 1 : 0},
+                ${derived.list.activity}, ${derived.list.goalSummary}, ${derived.detail.goal},
+                ${derived.detail.avoid}, ${"[]"}, ${null}, ${derived.detail.branch},
+                ${derived.detail.commit}, ${derived.list.environmentId ?? null},
+                ${derived.list.environmentLabel ?? null}, ${derived.list.title ?? null},
+                ${derived.list.repo ?? null}, ${derived.list.stale === true ? 1 : 0},
+                ${derived.list.staleReason ?? null},
+                ${null}, ${null}, ${0}, ${null},
+                ${input.createdAtMs}, ${nowMs}, ${0}, ${updatedAt}
+              )
+              ON CONFLICT(thread_id) DO UPDATE SET
+                parent_thread_id = excluded.parent_thread_id,
+                revision = excluded.revision,
+                phase = excluded.phase,
+                reason = excluded.reason,
+                conclusion = excluded.conclusion,
+                needs_you = excluded.needs_you,
+                activity = excluded.activity,
+                goal_summary = excluded.goal_summary,
+                goal = excluded.goal,
+                avoid = excluded.avoid,
+                files_json = excluded.files_json,
+                latest_command = excluded.latest_command,
+                branch = excluded.branch,
+                commit_sha = excluded.commit_sha,
+                environment_id = excluded.environment_id,
+                environment_label = excluded.environment_label,
+                title = excluded.title,
+                repo = excluded.repo,
+                stale = excluded.stale,
+                stale_reason = excluded.stale_reason,
+                pr_number = excluded.pr_number,
+                pr_state = excluded.pr_state,
+                grandchild_count = excluded.grandchild_count,
+                grandchild_note = excluded.grandchild_note,
+                created_at_ms = excluded.created_at_ms,
+                activity_at_ms = excluded.activity_at_ms,
+                idle_eligible = excluded.idle_eligible,
+                updated_at = excluded.updated_at
+            `.pipe(Effect.mapError(readError));
+            yield* publish({ ...derived.list, revision, updatedAt });
+          }),
+        ),
+      );
+
+      const removeRemote = Effect.fn("ChildSessionSummary.removeRemote")((threadId: ThreadId) =>
+        writeSemaphore.withPermits(1)(
+          Effect.gen(function* () {
+            const previous = yield* getRow(threadId);
+            if (previous === null || previous.environmentId === null) return;
+            yield* sql`
+              DELETE FROM child_session_summary
+              WHERE thread_id = ${threadId} AND environment_id IS NOT NULL
+            `.pipe(Effect.mapError(readError));
+            lanes.delete(threadId);
+            yield* PubSub.publish(pubsub, {
+              _tag: "deleted",
+              threadId,
+              parentThreadId: previous.parentThreadId,
+            });
           }),
         ),
       );
@@ -768,6 +1008,9 @@ export class ChildSessionSummary extends Context.Service<
       }) {
         const row = yield* getRow(options.threadId);
         if (row === null) return null;
+        if (row.environmentId !== null) {
+          return storedRowToDetail(row);
+        }
         const assistState = yield* sql<{
           readonly outlook: string | null;
           readonly handback: string | null;
@@ -813,6 +1056,30 @@ export class ChildSessionSummary extends Context.Service<
         return detail;
       });
 
+      const rememberDispatch = Effect.fn("ChildSessionSummary.rememberDispatch")(function* (input: {
+        readonly threadId: ThreadId;
+        readonly goal: string;
+      }) {
+        if (Option.isNone(assist)) return;
+        yield* assist.value.rememberDispatch({
+          threadId: input.threadId,
+          goal: input.goal,
+          avoid: null,
+          testCommands: null,
+        });
+      });
+
+      const markDriftFalsePositive = Effect.fn("ChildSessionSummary.markDriftFalsePositive")(
+        function* (options: { readonly threadId: ThreadId }) {
+          const row = yield* getRow(options.threadId);
+          if (row === null || Option.isNone(assist)) {
+            return yield* new ChildSummaryReadError();
+          }
+          yield* assist.value.markDriftFalsePositive(options.threadId);
+          return {};
+        },
+      );
+
       const subscribe = (threadId: ThreadId) =>
         Stream.unwrap(
           Effect.gen(function* () {
@@ -844,11 +1111,17 @@ export class ChildSessionSummary extends Context.Service<
 
       return Context.make(
         ChildSessionSummary,
-        ChildSessionSummary.of({ list, detail, subscribe }),
+        ChildSessionSummary.of({
+          list,
+          detail,
+          rememberDispatch,
+          markDriftFalsePositive,
+          subscribe,
+        }),
       ).pipe(
         Context.add(
           ChildSessionSummaryInternal,
-          ChildSessionSummaryInternal.of({ note, recompute, markIdle }),
+          ChildSessionSummaryInternal.of({ note, noteRemote, removeRemote, recompute, markIdle }),
         ),
       );
     }),
@@ -874,6 +1147,7 @@ export class ChildSessionSummary extends Context.Service<
           const liveIds = new Set(children.map((child) => child.threadId));
           const rows = yield* sql<{ readonly threadId: string }>`
             SELECT thread_id AS threadId FROM child_session_summary
+            WHERE environment_id IS NULL
           `;
           for (const row of rows) {
             if (!liveIds.has(row.threadId)) {
@@ -935,4 +1209,334 @@ export class ChildSessionSummary extends Context.Service<
       );
     }),
   ).pipe(Layer.provide(ChildSessionSummary.layer));
+
+  /**
+   * Projects remote delegated child tasks into `child_session_summary` using only
+   * `FleetSummary` and local subagent records — never subscribing to remote transcripts.
+   */
+  static readonly layerRemoteWorker: Layer.Layer<
+    never,
+    never,
+    | ChildSessionSummaryInternal
+    | Orchestrator.OrchestratorV2
+    | FleetSummary.FleetSummary
+    | SqlClient.SqlClient
+  > = Layer.effectDiscard(
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const fleetSummary = yield* FleetSummary.FleetSummary;
+      const internal = yield* ChildSessionSummaryInternal;
+      const sql = yield* SqlClient.SqlClient;
+      const peerLinks = yield* Effect.serviceOption(PeerLinks.PeerLinks);
+      const stateLock = yield* Semaphore.make(1);
+      const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+
+      interface RemoteBinding {
+        readonly parentThreadId: ThreadId;
+        readonly environmentId: EnvironmentId;
+        readonly threadId: ThreadId;
+        readonly label: string;
+        readonly createdAtMs: number;
+        readonly updatedAtMs: number;
+        readonly subagentStatus: string;
+        readonly title: string | null;
+        readonly prompt: string;
+        readonly result: string | null;
+      }
+
+      const remoteKey = (environmentId: string, threadId: string) =>
+        `${environmentId}\n${threadId}`;
+
+      const bindings = new Map<string, RemoteBinding>();
+      const fleetRows = new Map<string, FleetSummaryRow>();
+
+      const parseEpochMs = (value: unknown, fallback: number): number => {
+        if (typeof value === "number" && Number.isFinite(value)) return value;
+        if (typeof value === "string") {
+          const parsed = Date.parse(value);
+          if (!Number.isNaN(parsed)) return parsed;
+        }
+        return fallback;
+      };
+
+      const mergeBinding = (incoming: RemoteBinding) => {
+        const key = remoteKey(incoming.environmentId, incoming.threadId);
+        const existing = bindings.get(key);
+        if (existing === undefined) {
+          bindings.set(key, incoming);
+          return incoming;
+        }
+        const createdAtMs = Math.min(existing.createdAtMs, incoming.createdAtMs);
+        const merged =
+          incoming.updatedAtMs >= existing.updatedAtMs
+            ? { ...incoming, createdAtMs }
+            : { ...existing, createdAtMs };
+        bindings.set(key, merged);
+        return merged;
+      };
+
+      const bindingFromPayload = (
+        parentThreadId: ThreadId,
+        payload: {
+          readonly remoteChild?: {
+            readonly environmentId?: unknown;
+            readonly threadId?: unknown;
+            readonly label?: unknown;
+            readonly title?: unknown;
+          };
+          readonly status?: unknown;
+          readonly title?: unknown;
+          readonly prompt?: unknown;
+          readonly result?: unknown;
+          readonly startedAt?: unknown;
+          readonly updatedAt?: unknown;
+        },
+      ): RemoteBinding | null => {
+        const remote = payload.remoteChild;
+        if (
+          remote === undefined ||
+          typeof remote.environmentId !== "string" ||
+          remote.environmentId.trim().length === 0 ||
+          typeof remote.threadId !== "string" ||
+          remote.threadId.trim().length === 0
+        ) {
+          return null;
+        }
+        const updatedAtMs = parseEpochMs(payload.updatedAt, 0);
+        const createdAtMs = parseEpochMs(payload.startedAt, updatedAtMs);
+        return {
+          parentThreadId,
+          environmentId: EnvironmentId.make(remote.environmentId),
+          threadId: ThreadId.make(remote.threadId),
+          label:
+            typeof remote.label === "string" && remote.label.trim().length > 0
+              ? remote.label
+              : remote.environmentId,
+          createdAtMs,
+          updatedAtMs,
+          subagentStatus: typeof payload.status === "string" ? payload.status : "running",
+          title:
+            typeof remote.title === "string" && remote.title.trim().length > 0
+              ? remote.title
+              : typeof payload.title === "string"
+                ? payload.title
+                : null,
+          prompt: typeof payload.prompt === "string" ? payload.prompt : "",
+          result: typeof payload.result === "string" ? payload.result : null,
+        };
+      };
+
+      const bindingFromSubagent = (
+        parentThreadId: ThreadId,
+        subagent: OrchestrationV2Subagent,
+      ): RemoteBinding | null => {
+        if (subagent.remoteChild === undefined) return null;
+        const updatedAtMs = DateTime.toEpochMillis(subagent.updatedAt);
+        const createdAtMs =
+          subagent.startedAt === null ? updatedAtMs : DateTime.toEpochMillis(subagent.startedAt);
+        return {
+          parentThreadId,
+          environmentId: subagent.remoteChild.environmentId,
+          threadId: subagent.remoteChild.threadId,
+          label: subagent.remoteChild.label || subagent.remoteChild.environmentId,
+          createdAtMs,
+          updatedAtMs,
+          subagentStatus: subagent.status,
+          title: subagent.remoteChild.title ?? subagent.title,
+          prompt: subagent.prompt,
+          result: subagent.result,
+        };
+      };
+
+      const resolveLinkState = Effect.fn("ChildSessionSummary.resolveLinkState")(function* (
+        environmentId: EnvironmentId,
+      ): Effect.fn.Return<RemoteLinkState | null> {
+        if (Option.isNone(peerLinks)) return null;
+        const link = yield* peerLinks.value
+          .get(environmentId)
+          .pipe(Effect.orElseSucceed(() => Option.none()));
+        if (Option.isNone(link)) {
+          return { kind: "unreachable", reason: "执行环境未连接" };
+        }
+        const now = yield* DateTime.now;
+        if (DateTime.isLessThanOrEqualTo(link.value.expiresAt, now)) {
+          return { kind: "unreachable", reason: "执行环境链接已过期" };
+        }
+        if (link.value.lastError !== null && link.value.lastError.trim().length > 0) {
+          return { kind: "unreachable", reason: link.value.lastError };
+        }
+        return { kind: "reachable", label: link.value.label };
+      });
+
+      const reconcileBinding = Effect.fn("ChildSessionSummary.reconcileRemoteBinding")(function* (
+        binding: RemoteBinding,
+      ) {
+        const key = remoteKey(binding.environmentId, binding.threadId);
+        const fleetRow = fleetRows.get(key) ?? null;
+        const linkState = yield* resolveLinkState(binding.environmentId);
+        yield* internal
+          .noteRemote({
+            threadId: binding.threadId,
+            parentThreadId: binding.parentThreadId,
+            environmentId: binding.environmentId,
+            environmentLabel: binding.label,
+            createdAtMs: binding.createdAtMs,
+            subagentStatus: binding.subagentStatus,
+            title: binding.title,
+            prompt: binding.prompt,
+            result: binding.result,
+            fleetRow,
+            linkState,
+          })
+          .pipe(Effect.ignore);
+      });
+
+      const seedBindings = Effect.gen(function* () {
+        const subagents = yield* sql<{
+          readonly parentThreadId: string;
+          readonly payloadJson: string;
+        }>`
+          SELECT
+            s.thread_id AS parentThreadId,
+            s.payload_json AS payloadJson
+          FROM orchestration_v2_projection_subagents AS s
+          INNER JOIN orchestration_v2_projection_threads AS p
+            ON p.thread_id = s.thread_id
+          WHERE s.origin = 'app_owned'
+            AND s.child_thread_id IS NULL
+            AND json_extract(s.payload_json, '$.remoteChild.environmentId') IS NOT NULL
+            AND json_extract(s.payload_json, '$.remoteChild.threadId') IS NOT NULL
+            AND p.deleted_at IS NULL
+            AND p.archived_at IS NULL
+        `.pipe(Effect.orElseSucceed(() => [] as const));
+        for (const row of subagents) {
+          const decoded = decodeJson(row.payloadJson);
+          if (Option.isNone(decoded)) continue;
+          const parsed = decoded.value;
+          if (typeof parsed !== "object" || parsed === null) continue;
+          const binding = bindingFromPayload(
+            ThreadId.make(row.parentThreadId),
+            parsed as Parameters<typeof bindingFromPayload>[1],
+          );
+          if (binding !== null) mergeBinding(binding);
+        }
+      });
+
+      const sweepOrphanRemoteRows = Effect.gen(function* () {
+        const liveRemoteIds = new Set([...bindings.values()].map((entry) => entry.threadId));
+        const existing = yield* sql<{ readonly threadId: string }>`
+          SELECT thread_id AS threadId FROM child_session_summary
+          WHERE environment_id IS NOT NULL
+        `.pipe(Effect.orElseSucceed(() => [] as const));
+        for (const row of existing) {
+          const threadId = ThreadId.make(row.threadId);
+          if (!liveRemoteIds.has(threadId)) {
+            yield* internal.removeRemote(threadId).pipe(Effect.ignore);
+          }
+        }
+      });
+
+      const consumeFleetSummary = Effect.scoped(
+        Effect.gen(function* () {
+          const stream = yield* fleetSummary.subscribe({});
+          const pendingSnapshot = new Map<string, FleetSummaryRow>();
+          yield* Stream.runForEach(stream, (event) =>
+            stateLock.withPermits(1)(
+              Effect.gen(function* () {
+                if (event.type === "snapshot") {
+                  for (const row of event.rows) {
+                    if (row.threadId === undefined) continue;
+                    pendingSnapshot.set(remoteKey(row.environmentId, row.threadId), row);
+                  }
+                  if (event.page === event.pageCount) {
+                    fleetRows.clear();
+                    for (const [key, row] of pendingSnapshot) fleetRows.set(key, row);
+                    pendingSnapshot.clear();
+                    yield* sweepOrphanRemoteRows;
+                    for (const binding of bindings.values()) {
+                      yield* reconcileBinding(binding);
+                    }
+                  }
+                  return;
+                }
+                if (event.type === "upsert") {
+                  if (event.row.threadId === undefined) return;
+                  const key = remoteKey(event.row.environmentId, event.row.threadId);
+                  fleetRows.set(key, event.row);
+                  const binding = bindings.get(key);
+                  if (binding !== undefined) yield* reconcileBinding(binding);
+                  return;
+                }
+                if (event.type === "tombstone") {
+                  if (event.key.threadId === undefined) return;
+                  const key = remoteKey(event.key.environmentId, event.key.threadId);
+                  fleetRows.delete(key);
+                  const binding = bindings.get(key);
+                  if (binding !== undefined) yield* reconcileBinding(binding);
+                  return;
+                }
+                // Resync restarts this scoped subscription from a fresh snapshot.
+                return yield* Effect.fail("resync" as const);
+              }),
+            ),
+          );
+        }),
+      ).pipe(
+        Effect.catchCause((cause) => {
+          if (Cause.hasInterruptsOnly(cause)) return Effect.interrupt;
+          const squashed = Cause.squash(cause);
+          if (squashed === "resync") return Effect.void;
+          return Effect.logWarning("child-summary.remote-fleet-stream-failed", { cause }).pipe(
+            Effect.andThen(Effect.sleep("1 second")),
+          );
+        }),
+        Effect.forever,
+      );
+
+      const consumeSubagentEvents = Stream.runForEach(orchestrator.streamDomainEvents, (event) =>
+        stateLock.withPermits(1)(
+          Effect.gen(function* () {
+            if (event.type === "thread.deleted" || event.type === "thread.archived") {
+              for (const [key, binding] of bindings.entries()) {
+                if (binding.parentThreadId !== event.threadId) continue;
+                bindings.delete(key);
+                yield* internal.removeRemote(binding.threadId).pipe(Effect.ignore);
+              }
+              return;
+            }
+            if (
+              event.type !== "subagent.updated" ||
+              event.payload.origin !== "app_owned" ||
+              event.payload.remoteChild === undefined
+            ) {
+              return;
+            }
+            const binding = bindingFromSubagent(event.threadId, event.payload);
+            if (binding === null) return;
+            const merged = mergeBinding(binding);
+            yield* reconcileBinding(merged);
+          }),
+        ),
+      ).pipe(
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.interrupt
+            : Effect.logWarning("child-summary.remote-event-stream-failed", { cause }).pipe(
+                Effect.andThen(Effect.sleep("1 second")),
+              ),
+        ),
+        Effect.forever,
+      );
+
+      yield* forkParked(
+        Effect.gen(function* () {
+          yield* stateLock.withPermits(1)(seedBindings);
+          yield* Effect.all([consumeFleetSummary, consumeSubagentEvents], {
+            concurrency: "unbounded",
+            discard: true,
+          });
+        }),
+      );
+    }),
+  );
 }

@@ -1,12 +1,12 @@
-import type { DesktopUpdateState } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
-import * as Stream from "effect/Stream";
+import * as References from "effect/References";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopState from "./DesktopState.ts";
@@ -14,73 +14,20 @@ import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronTheme from "../electron/ElectronTheme.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
-import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 
-import { createInitialDesktopUpdateState } from "../updates/updateMachine.ts";
 import { listen, resolveStartupRecoveryOffer } from "./DesktopStartupRecovery.ts";
 
-const updateState = (patch: Partial<DesktopUpdateState>): DesktopUpdateState => ({
-  ...createInitialDesktopUpdateState(
-    "0.1.3",
-    { hostArch: "arm64", appArch: "arm64", runningUnderArm64Translation: false },
-    "latest",
-  ),
-  enabled: true,
-  ...patch,
-});
-
 describe("resolveStartupRecoveryOffer", () => {
-  it("offers a newer version before going back", () => {
-    expect(
-      resolveStartupRecoveryOffer(
-        updateState({ status: "available", availableVersion: "0.1.4" }),
-        "0.1.2",
-      ),
-    ).toEqual({ _tag: "Update", version: "0.1.4" });
-  });
-
-  it("offers a retained download after a later check fails", () => {
-    expect(
-      resolveStartupRecoveryOffer(
-        updateState({ status: "error", errorContext: "check", downloadedVersion: "0.1.4" }),
-        null,
-      ),
-    ).toEqual({ _tag: "Update", version: "0.1.4" });
-  });
-
-  it("waits for the update check before offering to go back", () => {
-    expect(resolveStartupRecoveryOffer(updateState({ status: "checking" }), "0.1.2")).toEqual({
-      _tag: "Checking",
-    });
-  });
-
-  it("offers the last version that started when no update exists", () => {
-    expect(resolveStartupRecoveryOffer(updateState({ status: "up-to-date" }), "0.1.2")).toEqual({
+  it("names the last version that started when this build has not", () => {
+    expect(resolveStartupRecoveryOffer("0.1.3", "0.1.2")).toEqual({
       _tag: "Reinstall",
       version: "0.1.2",
     });
   });
 
-  it("does not offer an update that already failed to apply here", () => {
-    expect(
-      resolveStartupRecoveryOffer(
-        updateState({
-          status: "downloaded",
-          downloadedVersion: "0.1.4",
-          notAppliedVersion: "0.1.4",
-        }),
-        "0.1.2",
-      ),
-    ).toEqual({ _tag: "Reinstall", version: "0.1.2" });
-  });
-
-  it("falls back to the releases page when this version never started", () => {
-    expect(resolveStartupRecoveryOffer(updateState({ status: "disabled" }), "0.1.3")).toEqual({
-      _tag: "Releases",
-    });
-    expect(resolveStartupRecoveryOffer(updateState({ status: "up-to-date" }), null)).toEqual({
-      _tag: "Releases",
-    });
+  it("falls back when this version already started or nothing has", () => {
+    expect(resolveStartupRecoveryOffer("0.1.3", "0.1.3")).toEqual({ _tag: "Releases" });
+    expect(resolveStartupRecoveryOffer("0.1.3", null)).toEqual({ _tag: "Releases" });
   });
 });
 
@@ -92,8 +39,8 @@ it.effect.each([
 ])("closes recovery safely with closeMain=$closeMain", ({ visible, started, closeMain }) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const checked = yield* Deferred.make<void>();
       const remembered = yield* Deferred.make<void>();
+      const failureLogged = Promise.withResolvers<void>();
       const shouldRecover = !visible || !started;
       const closed = Promise.withResolvers<void>();
       const loaded: string[] = [];
@@ -123,6 +70,10 @@ it.effect.each([
       } as unknown as Electron.BrowserWindow;
       const state = yield* DesktopState.DesktopState;
       if (started) yield* SubscriptionRef.set(state.primaryBackendStartup, { _tag: "Ready" });
+      const failureLogger = Logger.make(({ message }) => {
+        const text = Array.isArray(message) ? message.map(String).join(" ") : String(message);
+        if (text.includes("primary backend failing to start")) failureLogged.resolve();
+      });
       yield* listen.pipe(
         Effect.provide(
           Layer.mergeAll(
@@ -153,15 +104,10 @@ it.effect.each([
               main: Ref.get(mainRef),
               create: () => Effect.succeed(recovery),
             } as unknown as ElectronWindow.ElectronWindow["Service"]),
-            Layer.succeed(DesktopUpdates.DesktopUpdates, {
-              subscribe: Effect.succeed({
-                latest: updateState({ status: "disabled" }),
-                changes: Stream.empty,
-              }),
-              check: () => Deferred.succeed(checked, undefined),
-            } as unknown as DesktopUpdates.DesktopUpdates["Service"]),
           ),
         ),
+        Effect.provideService(References.MinimumLogLevel, "Warn"),
+        Effect.provide(Logger.layer([failureLogger])),
       );
       appListeners.get("browser-window-created")?.({}, main);
       if (started) yield* Deferred.await(remembered);
@@ -170,7 +116,7 @@ it.effect.each([
         reason: "Server failed before readiness",
         output: "Failure details",
       });
-      yield* Deferred.await(checked);
+      yield* Effect.promise(() => failureLogged.promise);
       expect(loaded.length).toBe(shouldRecover ? 1 : 0);
       if (shouldRecover) {
         expect(decodeURIComponent(loaded[0]!)).toContain("Failure details");

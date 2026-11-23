@@ -124,6 +124,7 @@ import * as SourceControlRateLimit from "@t3tools/source-control-core/server/Sou
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as WorktreeSetupTracker from "./project/WorktreeSetupTracker.ts";
 import * as FleetSummary from "./ledger/FleetSummary.ts";
+import { ChildSessionSummary } from "./orchestration-v2/ChildSessionSummary.ts";
 import * as Observability from "./observability/Observability.ts";
 import * as HeapSnapshot from "./observability/HeapSnapshot.ts";
 import * as EventLoopMonitor from "./observability/EventLoopMonitor.ts";
@@ -175,7 +176,6 @@ import {
 } from "./cloud/managedTunnelStartup.ts";
 import * as CloudCliState from "./cloud/CliState.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
-import * as DesktopAppUpdate from "./desktopUpdate/DesktopAppUpdate.ts";
 import * as ServiceLauncherClient from "./cloud/serviceLauncherClient.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as HostResources from "./resourceTelemetry/HostResources.ts";
@@ -269,11 +269,6 @@ const layerResourceTelemetry = ResourceTelemetry.layer.pipe(
 );
 
 const layerHostPowerMonitor = HostPowerMonitor.layer.pipe(
-  Layer.provide(layerDesktopTelemetryReceiver),
-);
-
-// A fresh receiver layer would open a second reader on the desktop telemetry fd.
-const layerDesktopAppUpdate = DesktopAppUpdate.layer.pipe(
   Layer.provide(layerDesktopTelemetryReceiver),
 );
 
@@ -695,6 +690,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ReplayMarkers.layer,
   FleetClaims.layer,
   FleetSummary.layer,
+  ChildSessionSummary.layerRemoteWorker.pipe(Layer.provide(FleetSummary.layer)),
   Layer.succeed(
     FleetHeartbeat.FleetHeartbeatConfigService,
     FleetHeartbeat.defaultFleetHeartbeatConfig,
@@ -829,7 +825,7 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(layerFleetSummaryReporter),
   Layer.provide(layerServerSettings),
   Layer.provide(PipelineSupervision.layer),
-  Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
+  Layer.provide(ServerSelfUpdate.layer),
   Layer.provide(layerCommandReadiness),
   Layer.provide(ServerHttp.layerBrowserApiCors),
   Layer.provide(ServerHttp.layerHttpCompression),

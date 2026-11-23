@@ -1,8 +1,14 @@
 import { assert, it } from "@effect/vitest";
-import { ThreadId, type ChildSummaryListItem } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  ThreadId,
+  type ChildSummaryListItem,
+  type FleetSummaryRow,
+} from "@t3tools/contracts";
 
 import {
   deriveChildSummary,
+  deriveRemoteChildSummary,
   delegateCorrectionRefusal,
   emptyPushLane,
   flushPush,
@@ -264,4 +270,78 @@ it("refuses a send once a delegated child was stopped", () => {
     }),
     undefined,
   );
+});
+
+it("derives remote child rows from FleetSummary and marks unreachable rows stuck while keeping last progress", () => {
+  const remoteEnv = EnvironmentId.make("env-box");
+  const remoteThread = ThreadId.make("thread:remote-child");
+  const fleetRow: FleetSummaryRow = {
+    environmentId: remoteEnv,
+    repo: "thoerwink8/fleet-ade",
+    threadId: remoteThread,
+    title: "Cross-machine build",
+    phase: "working",
+    reason: "running",
+    needsYou: false,
+    lastProgress: "Running server tests",
+    branch: "local/118-fleet-row",
+    commit: "deadbeef1234",
+    updatedAt: "2026-11-24T00:00:00.000Z",
+    stale: false,
+    revision: 1,
+  };
+  const live = deriveRemoteChildSummary({
+    threadId: remoteThread,
+    parentThreadId: parent,
+    environmentId: remoteEnv,
+    environmentLabel: "Linux Box",
+    createdAtMs: 1000,
+    subagentStatus: "running",
+    title: "Cross-machine build",
+    prompt: "Run server tests on Linux Box",
+    result: null,
+    fleetRow,
+    linkState: { kind: "reachable", label: "Linux Box" },
+    previousActivity: null,
+    previousBranch: null,
+    previousCommit: null,
+    previousTitle: null,
+    previousRepo: null,
+  });
+  assert.strictEqual(live.list.phase, "在做");
+  assert.strictEqual(live.list.environmentId, remoteEnv);
+  assert.strictEqual(live.list.environmentLabel, "Linux Box");
+  assert.strictEqual(live.list.title, "Cross-machine build");
+  assert.strictEqual(live.list.activity, "Running server tests");
+  assert.strictEqual(live.list.branch, "local/118-fleet-row");
+  assert.strictEqual(live.list.commit, "deadbeef1234");
+  assert.strictEqual(live.list.stale, undefined);
+  assert.strictEqual(live.idleEligible, false);
+
+  const offline = deriveRemoteChildSummary({
+    threadId: remoteThread,
+    parentThreadId: parent,
+    environmentId: remoteEnv,
+    environmentLabel: "Linux Box",
+    createdAtMs: 1000,
+    subagentStatus: "running",
+    title: "Cross-machine build",
+    prompt: "Run server tests on Linux Box",
+    result: null,
+    fleetRow: { ...fleetRow, stale: true, staleReason: "environment offline" },
+    linkState: { kind: "reachable", label: "Linux Box" },
+    previousActivity: live.list.activity,
+    previousBranch: live.detail.branch,
+    previousCommit: live.detail.commit,
+    previousTitle: live.list.title ?? null,
+    previousRepo: live.list.repo ?? null,
+  });
+  assert.strictEqual(offline.list.phase, "卡住");
+  assert.strictEqual(offline.list.reason, "执行环境连不上");
+  assert.strictEqual(offline.list.stale, true);
+  assert.strictEqual(offline.list.staleReason, "environment offline");
+  assert.strictEqual(offline.list.needsYou, true);
+  assert.strictEqual(offline.list.activity, "Running server tests");
+  assert.strictEqual(offline.detail.branch, "local/118-fleet-row");
+  assert.strictEqual(offline.detail.commit, "deadbeef1234");
 });

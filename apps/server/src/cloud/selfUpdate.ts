@@ -7,30 +7,45 @@ import {
   type ServerSelfUpdateResult,
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
+import { HttpClient } from "effect/http";
 
-import { crossesReleaseTrack } from "@t3tools/shared/cliRelease";
+import { CLI_RELEASE_BASE_URL_ENV, crossesReleaseTrack } from "@t3tools/shared/cliRelease";
 
 import packageJson from "../../package.json" with { type: "json" };
 import * as ServerConfig from "../config.ts";
-import * as DesktopAppUpdate from "../desktopUpdate/DesktopAppUpdate.ts";
 import { databaseMigrationHead } from "../persistence/databaseMigrationHead.ts";
 import * as ProcessRunner from "../processRunner.ts";
-import { pinnedRuntimePaths, prunePinnedRuntimes } from "./pinnedRuntime.ts";
+import {
+  ensurePinnedRuntimeInstalled,
+  pinnedRuntimeCommand,
+  PinnedRuntimeInstallError,
+  pinnedRuntimePaths,
+  PinnedRuntimePreflightBlockedError,
+  prunePinnedRuntimes,
+} from "./pinnedRuntime.ts";
 import { bootServiceProgramOf, bootServiceUnitPath } from "./bootService.ts";
+import { decodeServicePreflightResult } from "./servicePreflight.ts";
 import * as ServiceLauncherClient from "./serviceLauncherClient.ts";
+import { isExactServiceVersion } from "./serviceProtocol.ts";
+
+// A staged runtime's cold start can take over a minute on a loaded, swapping host.
+const PREFLIGHT_TIMEOUT = Duration.minutes(3);
 
 export function resolveServerSelfUpdateCapability(input: {
-  readonly desktopManaged: boolean;
+  readonly launcherManaged: boolean;
 }): ServerSelfUpdateCapability | null {
-  return input.desktopManaged ? "desktop-managed" : null;
+  return input.launcherManaged ? ("boot-service" as const) : null;
 }
 
 export class ServerSelfUpdate extends Context.Service<
@@ -43,10 +58,6 @@ export class ServerSelfUpdate extends Context.Service<
       ) => Effect.Effect<void, ServerSelfUpdateError>,
       onHandoffAccepted?: () => Effect.Effect<void>,
     ) => Effect.Effect<ServerSelfUpdateResult, ServerSelfUpdateError>;
-    readonly commitDesktopUpdate: (
-      requestId: string,
-      onHandoffAccepted?: () => Effect.Effect<void>,
-    ) => Effect.Effect<never, ServerSelfUpdateError>;
   }
 >()("t3/cloud/selfUpdate/ServerSelfUpdate") {}
 
@@ -115,17 +126,23 @@ export function trackSwitchBlockReason(input: {
 
 export const make = Effect.fn("cloud.server_self_update.make")(function* () {
   const serverConfig = yield* ServerConfig.ServerConfig;
-  const desktopAppUpdate = yield* DesktopAppUpdate.DesktopAppUpdate;
   const launcher = yield* ServiceLauncherClient.ServiceLauncherClient;
-  // Pruning a stopped service's unit reads the user bus through the process runner.
-  yield* ProcessRunner.ProcessRunner;
+  const runner = yield* ProcessRunner.ProcessRunner;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const platform = yield* HostProcess.Platform;
+  const arch = yield* HostProcess.Architecture;
+  const httpClient = yield* HttpClient.HttpClient;
+  const releaseBaseUrl = Option.getOrUndefined(
+    yield* Config.String(CLI_RELEASE_BASE_URL_ENV).pipe(Config.option),
+  );
+  const inFlight = yield* Ref.make(false);
 
   yield* pruneRuntimesOnStart({ baseDir: serverConfig.baseDir, managed: launcher.managed }).pipe(
     Effect.forkScoped,
   );
 
-  const capability: ServerSelfUpdateCapability | null =
-    serverConfig.mode === "desktop" ? "desktop-managed" : null;
+  const capability: ServerSelfUpdateCapability | null = launcher.managed ? "boot-service" : null;
   const failWith = (reason: string, cause?: unknown) =>
     cause === undefined
       ? new ServerSelfUpdateError({ reason })
@@ -141,35 +158,149 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
 
   const update: ServerSelfUpdate["Service"]["update"] = Effect.fn(
     "cloud.server_self_update.update",
-  )(function* (input, reportProgress = () => Effect.void) {
-    if (capability !== "desktop-managed") {
+  )(function* (input, reportProgress = () => Effect.void, onHandoffAccepted = () => Effect.void) {
+    // The target must accept the launcher that will run it, which can be older than this server.
+    const launcherProtocol = launcher.protocol;
+    if (capability === null || launcherProtocol === undefined) {
       return yield* failWith(
-        "This server does not update itself. Install a current build on this machine, and run `t3 service install` when it runs as a background service.",
+        "Remote updates require the Fleet ADE background service. Run `t3 service install` on the server machine.",
       );
     }
-    const unsafeCrossing = input.channel === undefined ? null : crossesTrackUnsafely(input);
+
+    const unsafeCrossing = crossesTrackUnsafely(input);
     if (unsafeCrossing !== null) return yield* failWith(unsafeCrossing);
-    if (desktopAppUpdate.available) {
-      return yield* desktopAppUpdate.run(
-        reportProgress,
-        input.channel === undefined
-          ? undefined
-          : { channel: input.channel, targetVersion: input.targetVersion },
-      );
+    const targetVersion = input.targetVersion.trim();
+    if (!isExactServiceVersion(targetVersion)) {
+      return yield* failWith(`'${targetVersion}' is not an exact t3 version.`);
     }
-    return yield* failWith(
-      "This server is managed by the Fleet ADE desktop app on its machine; update the desktop app to update it.",
-    );
+    if (yield* Ref.getAndSet(inFlight, true)) {
+      return yield* failWith("A server update is already in progress.");
+    }
+
+    return yield* Effect.gen(function* () {
+      yield* reportProgress("downloading");
+      const paths = yield* ensurePinnedRuntimeInstalled({
+        baseDir: serverConfig.baseDir,
+        version: targetVersion,
+        fs,
+        path,
+        runner,
+        httpClient,
+        platform,
+        arch,
+        releaseBaseUrl,
+        validate: (runtime) =>
+          runner
+            .run({
+              command: pinnedRuntimeCommand(runtime).command,
+              args: [
+                ...pinnedRuntimeCommand(runtime).args,
+                "__service-preflight",
+                "--database-path",
+                serverConfig.dbPath,
+                "--launcher-protocol",
+                String(launcherProtocol),
+              ],
+              timeout: PREFLIGHT_TIMEOUT,
+            })
+            .pipe(
+              Effect.mapError(
+                (cause) =>
+                  new PinnedRuntimeInstallError({
+                    step: "running the staged service preflight",
+                    cause,
+                  }),
+              ),
+              Effect.flatMap(
+                (
+                  result,
+                ): Effect.Effect<
+                  void,
+                  PinnedRuntimeInstallError | PinnedRuntimePreflightBlockedError
+                > => {
+                  if (result.code !== 0) {
+                    return Effect.fail(
+                      new PinnedRuntimeInstallError({
+                        step: "running the staged service preflight",
+                        exitCode: Number(result.code),
+                        stdoutLength: result.stdout.length,
+                        stderrLength: result.stderr.length,
+                      }),
+                    );
+                  }
+                  let parsed: unknown;
+                  try {
+                    parsed = JSON.parse(result.stdout.trim());
+                  } catch (cause) {
+                    return Effect.fail(
+                      new PinnedRuntimeInstallError({
+                        step: "decoding the staged service preflight",
+                        cause,
+                      }),
+                    );
+                  }
+                  const preflight = decodeServicePreflightResult(parsed, launcherProtocol);
+                  if (preflight === undefined || preflight.version !== targetVersion) {
+                    return Effect.fail(
+                      new PinnedRuntimeInstallError({
+                        step: "verifying the staged service preflight",
+                      }),
+                    );
+                  }
+                  return preflight.status === "ready"
+                    ? Effect.void
+                    : Effect.fail(
+                        new PinnedRuntimePreflightBlockedError({
+                          version: targetVersion,
+                          reason: preflight.reason,
+                        }),
+                      );
+                },
+              ),
+            ),
+      }).pipe(
+        Effect.mapError((error) => {
+          if (error._tag === "PinnedRuntimePreflightBlockedError") {
+            return failWith(error.reason, error);
+          }
+          const downloadFailure = [
+            error.httpStatus === undefined ? undefined : `HTTP ${error.httpStatus}`,
+            error.downloadHost === undefined ? undefined : `from ${error.downloadHost}`,
+          ]
+            .filter((part) => part !== undefined)
+            .join(" ");
+          return failWith(
+            `Could not prepare t3@${targetVersion} while ${error.step}${downloadFailure ? ` (${downloadFailure})` : ""}.`,
+            error,
+          );
+        }),
+      );
+
+      yield* reportProgress("installing");
+      const updateId = yield* Effect.uninterruptible(
+        launcher.requestUpdate({ targetVersion, dbPath: serverConfig.dbPath }).pipe(
+          Effect.mapError((error) =>
+            failWith(
+              error._tag === "ServiceLauncherRejectedError"
+                ? error.reason
+                : "Could not ask the service launcher to activate the prepared update.",
+              error,
+            ),
+          ),
+          Effect.tap(() => onHandoffAccepted()),
+        ),
+      );
+
+      yield* Effect.logInfo("Server update prepared; handing off to the service launcher.", {
+        updateId,
+        targetVersion,
+        runtimePath: paths.entryPath,
+      });
+      return { targetVersion, method: "boot-service" as const, updateId };
+    }).pipe(Effect.onError(() => Ref.set(inFlight, false)));
   });
 
-  return ServerSelfUpdate.of({
-    update,
-    commitDesktopUpdate: Effect.fn("ServerSelfUpdate.commitDesktopUpdate")(
-      function (requestId, onHandoffAccepted) {
-        return desktopAppUpdate.commit(requestId, onHandoffAccepted);
-      },
-    ),
-  });
+  return ServerSelfUpdate.of({ update });
 });
 
 export const layer = Layer.effect(ServerSelfUpdate, make()).pipe(

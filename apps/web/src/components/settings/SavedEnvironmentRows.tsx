@@ -36,7 +36,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "..
 import {
   resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
-  supportsDesktopAppUpdate,
 } from "~/versionSkew";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { environmentCatalog } from "~/connection/catalog";
@@ -201,13 +200,14 @@ export function SavedBackendListRow({
     .filter((value): value is string => value !== null)
     .join(" · ");
 
+  const selfUpdate = resolveServerSelfUpdateCapability(environment.serverConfig);
   const showUpdateAction =
     enabled &&
     isConnected &&
     versionMismatch !== null &&
     (serverUpdateState.status === "idle" || serverUpdateState.status === "failed") &&
-    resolveServerSelfUpdateCapability(environment.serverConfig) === "desktop-managed" &&
-    supportsDesktopAppUpdate(environment.serverConfig);
+    selfUpdate !== null &&
+    selfUpdate !== "desktop-managed";
 
   const statusTooltip = `${
     unsupported
@@ -355,9 +355,9 @@ export function SavedBackendListRow({
         <ServerUpdateAction
           environmentId={environmentId}
           serverLabel={`${environment.label} 服务器`}
-          selfUpdate={resolveServerSelfUpdateCapability(environment.serverConfig)}
+          selfUpdate={selfUpdate}
           installation={environment.serverConfig?.environment.capabilities.serverInstallation}
-          desktopAppUpdate={supportsDesktopAppUpdate(environment.serverConfig)}
+          desktopAppInstall={environment.serverConfig?.environment.capabilities.desktopAppInstall}
           targetVersion={versionMismatch.clientVersion}
           label={serverUpdateState.status === "failed" ? "重试更新" : "更新"}
           appearance="icon"

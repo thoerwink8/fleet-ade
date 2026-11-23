@@ -8,6 +8,8 @@ import {
   type ChildSummaryFile,
   type ChildSummaryListItem,
   type ChildSummaryPhase,
+  type EnvironmentId,
+  type FleetSummaryRow,
   ThreadId,
 } from "@t3tools/contracts";
 
@@ -244,6 +246,7 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
     grandchildCount: facts.grandchildCount,
     grandchildNote,
     createdAtMs: facts.createdAtMs,
+    ...(facts.branch === null ? {} : { branch: facts.branch }),
   };
   return {
     list,
@@ -254,11 +257,184 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
       files,
       latestCommand: command,
       branch: facts.branch,
+      commit: null,
       prNumber: facts.pr?.number ?? null,
       outlook: null,
       handback: null,
     },
     idleEligible: idleEligible && phase === "在做",
+  };
+}
+
+export type RemoteLinkState =
+  | { readonly kind: "reachable"; readonly label?: string | undefined }
+  | { readonly kind: "unreachable"; readonly reason: string };
+
+export interface RemoteSummaryFacts {
+  readonly threadId: ThreadId;
+  readonly parentThreadId: ThreadId;
+  readonly environmentId: EnvironmentId;
+  readonly environmentLabel: string;
+  readonly createdAtMs: number;
+  readonly subagentStatus: string;
+  readonly title: string | null;
+  readonly prompt: string;
+  readonly result: string | null;
+  readonly fleetRow: FleetSummaryRow | null;
+  readonly linkState: RemoteLinkState | null;
+  readonly previousActivity: string | null;
+  readonly previousBranch: string | null;
+  readonly previousCommit: string | null;
+  readonly previousTitle: string | null;
+  readonly previousRepo: string | null;
+}
+
+function remoteReasonLabel(reason: string, phase: ChildSummaryPhase): string {
+  switch (reason) {
+    case "waiting:command":
+      return "等你批准命令";
+    case "waiting:file-change":
+      return "等你批准改文件";
+    case "waiting:file-read":
+      return "等你批准读文件";
+    case "waiting:permission":
+      return "等你批准权限";
+    case "waiting:mcp-elicitation":
+      return "等你确认";
+    case "waiting:user_input":
+      return "在等你回答";
+    case "waiting:auth_refresh":
+      return "要重新登录";
+    default:
+      if (reason.startsWith("waiting:")) return "等待处理";
+      return (
+        clip(reason, CHILD_SUMMARY_LINE_LIMIT) ||
+        (phase === "做完" ? "已完成" : phase === "卡住" ? "卡住" : "在跑")
+      );
+  }
+}
+
+function unreachableReasonLabel(raw: string): string {
+  if (raw === "environment offline") return "执行环境连不上";
+  if (raw === "lease lost") return "这台机器已不再持有该任务租约";
+  const line = clip(raw, CHILD_SUMMARY_LINE_LIMIT);
+  if (line.length === 0) return "执行环境连不上";
+  return line.startsWith("执行环境") ? line : `执行环境连不上：${line}`;
+}
+
+export function deriveRemoteChildSummary(facts: RemoteSummaryFacts): DerivedChildSummary {
+  const environmentLabel =
+    (facts.linkState?.kind === "reachable" && facts.linkState.label?.trim()) ||
+    facts.environmentLabel;
+  const title = clip(
+    facts.fleetRow?.title?.trim() || facts.title?.trim() || facts.previousTitle?.trim() || "",
+    CHILD_SUMMARY_GOAL_LIMIT,
+  );
+  const goalSource = facts.prompt.trim() || title;
+  const goal = Array.from(goalSource).slice(0, 1000).join("");
+  const goalSummary = Array.from(title || goal)
+    .slice(0, CHILD_SUMMARY_GOAL_LIMIT)
+    .join("");
+  const repo = facts.fleetRow?.repo ?? facts.previousRepo ?? undefined;
+  const branch = facts.fleetRow?.branch ?? facts.previousBranch ?? null;
+  const commit = facts.fleetRow?.commit ?? facts.previousCommit ?? null;
+  const fleetProgress = clip(facts.fleetRow?.lastProgress ?? "", CHILD_SUMMARY_LINE_LIMIT);
+  const subagentDone =
+    facts.subagentStatus === "completed" ||
+    facts.subagentStatus === "cancelled" ||
+    facts.subagentStatus === "interrupted";
+  const subagentFailed = facts.subagentStatus === "failed";
+
+  let phase: ChildSummaryPhase = "在做";
+  let reason = "正在启动";
+  let conclusion: ChildSummaryConclusion | null = null;
+  let needsYou = false;
+  let activity = facts.previousActivity || "正在启动";
+  let stale = false;
+  let staleReason: string | undefined;
+
+  if (subagentDone && (facts.fleetRow === null || facts.fleetRow.phase === "done")) {
+    phase = "做完";
+    conclusion =
+      facts.subagentStatus === "cancelled" || facts.subagentStatus === "interrupted"
+        ? "已取消"
+        : null;
+    reason = conclusion ?? "已完成";
+    activity = fleetProgress || facts.previousActivity || reason;
+  } else if (
+    facts.fleetRow?.stale === true ||
+    (facts.linkState?.kind === "unreachable" && facts.fleetRow?.phase !== "done")
+  ) {
+    phase = "卡住";
+    stale = true;
+    staleReason =
+      facts.fleetRow?.stale === true
+        ? (facts.fleetRow.staleReason ?? "environment offline")
+        : facts.linkState?.kind === "unreachable"
+          ? facts.linkState.reason
+          : "environment offline";
+    reason = unreachableReasonLabel(staleReason);
+    needsYou = true;
+    // Keep the last known progress sentence visible while marking the row stale.
+    activity = fleetProgress || facts.previousActivity || reason;
+  } else if (facts.fleetRow !== null) {
+    phase =
+      facts.fleetRow.phase === "working"
+        ? "在做"
+        : facts.fleetRow.phase === "stuck"
+          ? "卡住"
+          : "做完";
+    reason = remoteReasonLabel(facts.fleetRow.reason, phase);
+    conclusion =
+      phase === "做完" &&
+      (facts.subagentStatus === "cancelled" || facts.subagentStatus === "interrupted")
+        ? "已取消"
+        : null;
+    needsYou = facts.fleetRow.needsYou;
+    activity = fleetProgress || reason;
+  } else if (subagentFailed) {
+    phase = "卡住";
+    reason = clip(facts.result ?? "", CHILD_SUMMARY_LINE_LIMIT) || "失败";
+    activity = facts.previousActivity || reason;
+    needsYou = true;
+  }
+
+  const list: Omit<ChildSummaryListItem, "revision" | "updatedAt"> = {
+    threadId: facts.threadId,
+    parentThreadId: facts.parentThreadId,
+    phase,
+    reason,
+    conclusion,
+    needsYou,
+    activity,
+    goalSummary,
+    grandchildCount: 0,
+    grandchildNote: null,
+    createdAtMs: facts.createdAtMs,
+    environmentId: facts.environmentId,
+    environmentLabel,
+    ...(title.length > 0 ? { title } : {}),
+    ...(repo === undefined ? {} : { repo }),
+    ...(branch === null ? {} : { branch }),
+    ...(commit === null ? {} : { commit }),
+    ...(stale ? { stale: true, ...(staleReason === undefined ? {} : { staleReason }) } : {}),
+  };
+
+  return {
+    list,
+    detail: {
+      ...list,
+      goal,
+      avoid: "没有写别碰",
+      files: [],
+      latestCommand: null,
+      branch,
+      commit,
+      prNumber: null,
+      outlook: null,
+      handback: null,
+    },
+    idleEligible: false,
   };
 }
 
@@ -274,6 +450,14 @@ function sameSummary(
     | "grandchildNote"
     | "grandchildCount"
     | "revision"
+    | "environmentId"
+    | "environmentLabel"
+    | "title"
+    | "repo"
+    | "branch"
+    | "commit"
+    | "stale"
+    | "staleReason"
   >,
   right: typeof left,
 ): boolean {
@@ -286,7 +470,15 @@ function sameSummary(
     left.goalSummary === right.goalSummary &&
     left.grandchildNote === right.grandchildNote &&
     left.grandchildCount === right.grandchildCount &&
-    left.revision === right.revision
+    left.revision === right.revision &&
+    left.environmentId === right.environmentId &&
+    left.environmentLabel === right.environmentLabel &&
+    left.title === right.title &&
+    left.repo === right.repo &&
+    left.branch === right.branch &&
+    left.commit === right.commit &&
+    left.stale === right.stale &&
+    left.staleReason === right.staleReason
   );
 }
 

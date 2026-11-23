@@ -13,12 +13,10 @@ import {
   RUN_STATUS_LABELS,
   resolveUpdateRunMachineStatus,
   type UpdateEverythingRun,
-  type UpdateRunLocalState,
   type UpdateRunMachineView,
 } from "./updateEverything.logic";
 import {
   dismissSettledUpdateRunMachines,
-  postponeUpdateRestart,
   retryFailedUpdateRunServers,
 } from "./updateEverythingRun";
 
@@ -47,42 +45,26 @@ function useUpdateRunMachineViews(run: UpdateEverythingRun): ReadonlyArray<Updat
   }));
 }
 
-function localStatusLabel(run: UpdateEverythingRun, local: UpdateRunLocalState, now: number) {
-  if (run.phase === "countdown" && run.restartAt !== null) {
-    return `${Math.max(0, Math.ceil((run.restartAt - now) / 1000))} 秒后重启`;
-  }
-  if (run.phase === "installing") return "正在重启";
-  if (local?.status === "downloading") {
-    return `downloading${local.percent === null ? "" : ` ${Math.floor(local.percent)}%`}`;
-  }
-  return "在所有服务器之后重启";
-}
-
 export function SidebarUpdateCapsule({
   run,
-  local,
   icon,
-  onRestart,
 }: {
   readonly run: UpdateEverythingRun;
-  readonly local: UpdateRunLocalState;
   readonly icon: ReactNode;
-  readonly onRestart?: () => Promise<void>;
 }) {
   const machines = useUpdateRunMachineViews(run);
   const hasActiveMachine = machines.some(
     ({ status }) => status !== "done" && status !== "failed" && status !== "waiting",
   );
-  const now = useNow(run.phase === "countdown" ? 1_000 : hasActiveMachine ? 30_000 : null);
-  const view = describeUpdateCapsule(run, machines, local, now);
+  const now = useNow(hasActiveMachine ? 30_000 : null);
+  const view = describeUpdateCapsule(run, machines, now);
   const updateServer = useServerUpdate();
   const failed = machines.some(({ status }) => status === "failed");
-  const settled = !hasActiveMachine && run.localVersion === null;
+  const settled = !hasActiveMachine;
 
-  const actionLabel = view.action === "later" ? "稍后" : view.action === "retry" ? "重试" : "忽略";
+  const actionLabel = view.action === "retry" ? "重试" : "忽略";
   const runAction = () => {
-    if (view.action === "later") postponeUpdateRestart();
-    else if (view.action === "retry") retryFailedUpdateRunServers(updateServer);
+    if (view.action === "retry") retryFailedUpdateRunServers(updateServer);
     else dismissSettledUpdateRunMachines();
   };
 
@@ -133,21 +115,6 @@ export function SidebarUpdateCapsule({
       </div>
       <PopoverPopup side="top" align="end" padding="compact" width="sm">
         <div className="flex flex-col gap-1 text-xs">
-          {run.localVersion !== null ? (
-            <div className="flex items-center justify-between gap-3">
-              <span>此应用</span>
-              <span className="text-muted-foreground tabular-nums">
-                {localStatusLabel(run, local, now)}
-              </span>
-            </div>
-          ) : onRestart ? (
-            <div className="flex items-center justify-between gap-3">
-              <span>此应用</span>
-              <Button size="xs" variant="outline" onClick={() => void onRestart()}>
-                重启以更新
-              </Button>
-            </div>
-          ) : null}
           {machines.map(({ machine, status }) => (
             <div key={machine.environmentId} className="flex min-w-0 flex-col">
               <div className="flex items-center justify-between gap-3">

@@ -29,9 +29,7 @@ import { ComposerServerUpdateIcon } from "./ComposerServerUpdateStatus";
 import {
   dismissServerUpdateFailure,
   isServerUpdateFailureDismissed,
-  resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
-  supportsDesktopAppUpdate,
 } from "../../versionSkew";
 
 export type EnvironmentUnavailableState = {
@@ -135,7 +133,6 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
     handleDisconnectActiveEnvironment,
   );
   const autoBalanceUpdateBanner = useAutoBalanceUpdateBanner(autoUpdateEnvironments);
-  const versionMismatch = resolveServerConfigVersionMismatch(serverConfig);
   const versionMismatchServerLabel =
     hasMultipleRegisteredEnvironments && activeThreadEnvironmentId !== null
       ? `${activeEnvironment?.label ?? serverConfig?.environment.label ?? activeThreadEnvironmentId} 服务器`
@@ -143,7 +140,6 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
   const serverUpdateEnvironmentId = activeThreadEnvironmentId;
   const versionMismatchSelfUpdate = resolveServerSelfUpdateCapability(serverConfig);
   const versionMismatchInstallation = serverConfig?.environment.capabilities.serverInstallation;
-  const versionMismatchDesktopAppUpdate = supportsDesktopAppUpdate(serverConfig);
   const serverUpdateState = useAtomValue(
     serverEnvironment.updateStateAtom(serverUpdateEnvironmentId),
   );
@@ -234,16 +230,14 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
             : serverUpdateStageLabel(serverUpdateState.stage),
         actions: !updateFailed ? (
           disconnectAction
-        ) : !versionMismatch ||
-          (versionMismatchSelfUpdate === "desktop-managed" &&
-            !versionMismatchDesktopAppUpdate) ? undefined : (
+        ) : versionMismatchSelfUpdate === "desktop-managed" ? undefined : (
           <ServerUpdateAction
             environmentId={serverUpdateEnvironmentId}
             serverLabel={versionMismatchServerLabel}
             selfUpdate={versionMismatchSelfUpdate}
             installation={versionMismatchInstallation}
-            desktopAppUpdate={versionMismatchDesktopAppUpdate}
-            targetVersion={versionMismatch.clientVersion}
+            desktopAppInstall={serverConfig?.environment.capabilities.desktopAppInstall}
+            targetVersion={serverUpdateState.targetVersion}
             label="重试"
             variant="ghost"
           />

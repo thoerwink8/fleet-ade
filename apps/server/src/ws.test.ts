@@ -191,6 +191,8 @@ const layerWsRpc = (...args: Parameters<typeof makeLayerWsRpc>) =>
         ChildSessionSummary.of({
           list: () => Effect.succeed({ children: [], nextCursor: null }),
           detail: () => Effect.succeed(null),
+          rememberDispatch: () => Effect.void,
+          markDriftFalsePositive: () => Effect.succeed({}),
           subscribe: () => Stream.empty,
         }),
       ),

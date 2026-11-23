@@ -87,9 +87,7 @@ function layerPairingHttp(
           orchestrationProtocolVersion: options?.protocolVersion ?? ORCHESTRATION_PROTOCOL_VERSION,
           capabilities: {
             repositoryIdentity: true,
-            ...(options?.selfUpdate === true
-              ? { serverSelfUpdate: "desktop-managed" as const, desktopAppUpdate: true }
-              : {}),
+            ...(options?.selfUpdate === true ? { serverSelfUpdate: "boot-service" as const } : {}),
           },
         }),
       );

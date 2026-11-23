@@ -3,6 +3,7 @@ import { NodeHttpServer } from "@effect/platform-node";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
+  AuthOrchestrationOperateScope,
   EnvironmentId,
   type OrchestrationV2Run,
   type OrchestrationV2ThreadShell,
@@ -12,6 +13,7 @@ import {
   RunId,
   ThreadId,
 } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
 import { expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -42,6 +44,7 @@ import { liveThreadShell } from "../mcp/McpToolAccess.testkit.ts";
 import * as PeerForwarding from "./PeerForwarding.ts";
 import * as PeerLinks from "./PeerLinks.ts";
 import * as PeerLinkRequests from "./PeerLinkRequests.ts";
+import * as PeerMcpClient from "./PeerMcpClient.ts";
 import { descriptorOf, layerLinkingEnvironment, linkTo, servePeer } from "./PeerLinks.testkit.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { ChildSessionSummary } from "../orchestration-v2/ChildSessionSummary.ts";
@@ -388,7 +391,11 @@ const makeLaptop = Effect.gen(function* () {
         ),
         Effect.provideService(McpSchema.McpServerClient, mcpClient),
       );
-  return { links: Context.get(linking, PeerLinks.PeerLinks), call };
+  return {
+    links: Context.get(linking, PeerLinks.PeerLinks),
+    client: Context.get(linking, PeerMcpClient.PeerMcpClient),
+    call,
+  };
 });
 
 const failureOf = (result: McpSchema.CallToolResult) => {
@@ -732,4 +739,70 @@ it.effect("refuses what a linked environment cannot take before anything leaves"
       expect(yield* Ref.get(b.bearers)).toEqual([]);
     }),
   ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.effect(
+  "refuses correcting a cross-machine child without write permission on that environment and names the missing write scope",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<Seen>(nothingSeen);
+        const linkSession = yield* Ref.make("");
+        const b = yield* serveBox(seen, linkSession);
+        const a = yield* makeLaptop;
+        // Link with read-only access (orchestration:read only, missing orchestration:operate).
+        yield* linkTo(a.links, b, "read-only");
+        const readOnlySessionId = (yield* b.linkedSessions)[0]!.sessionId;
+        yield* Ref.set(linkSession, readOnlySessionId);
+
+        // Reading still works when write permission is absent.
+        const listed = yield* a.call("thread:laptop-full", "t3_thread_list", {
+          environmentId: box.environmentId,
+          projectId: boxProject,
+        });
+        expect(listed.isError).toBe(false);
+
+        // Correcting the remote child is rejected before anything leaves, naming orchestration:operate.
+        yield* Ref.set(b.bearers, []);
+        const refusedLocal = yield* a.call("thread:laptop-full", "t3_thread_send", {
+          environmentId: box.environmentId,
+          threadId: boxThread,
+          message: "纠正方向",
+        });
+        const localFailure = failureOf(refusedLocal);
+        expect(localFailure.code).toBe("capability_denied");
+        expect(localFailure.message).toContain(AuthOrchestrationOperateScope);
+        expect(yield* Ref.get(b.bearers)).toEqual([]);
+        expect((yield* Ref.get(seen)).sends).toEqual([]);
+
+        // The remote environment also authoritatively refuses a read-only link token.
+        const refusedRemote = yield* a.client
+          .call({
+            environmentId: box.environmentId,
+            tool: "t3_thread_send",
+            arguments: { threadId: boxThread, message: "绕过本机检查直接纠正" },
+            limits: { runtimeMode: "full-access", interactionMode: "default" },
+            success: Schema.Struct({}),
+          })
+          .pipe(Effect.flip);
+        expect(refusedRemote.code).toBe("capability_denied");
+        expect(refusedRemote.message).toContain(AuthOrchestrationOperateScope);
+        expect((yield* Ref.get(seen)).sends).toEqual([]);
+
+        // Granting existing session write scope (auto -> orchestration:operate) allows correction.
+        yield* linkTo(a.links, b, "auto");
+        const autoSession = (yield* b.linkedSessions).find(
+          (session) => session.sessionId !== readOnlySessionId,
+        );
+        expect(autoSession).toBeDefined();
+        yield* Ref.set(linkSession, autoSession!.sessionId);
+        const sent = yield* a.call("thread:laptop-full", "t3_thread_send", {
+          environmentId: box.environmentId,
+          threadId: boxThread,
+          message: "现在有写权限了",
+        });
+        expect(sent.isError).toBe(false);
+        expect((yield* Ref.get(seen)).sends).toHaveLength(1);
+      }),
+    ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );

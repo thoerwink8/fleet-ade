@@ -14,11 +14,27 @@ const descriptor = {
 } as const;
 
 describe("ExecutionEnvironmentDescriptor", () => {
-  it("drops the triage capability that older servers still advertise", () => {
+  it("drops retired capabilities from older servers", () => {
     expect(
-      decodeDescriptor({ ...descriptor, capabilities: { repositoryIdentity: true, triage: true } })
-        .capabilities,
+      decodeDescriptor({
+        ...descriptor,
+        capabilities: {
+          repositoryIdentity: true,
+          triage: true,
+          desktopAppUpdate: true,
+          desktopAppChannelSwitch: true,
+        },
+      }).capabilities,
     ).toEqual({ repositoryIdentity: true });
+  });
+
+  it("decodes a desktop-managed installation without an updater", () => {
+    expect(
+      decodeDescriptor({
+        ...descriptor,
+        capabilities: { ...descriptor.capabilities, desktopAppInstall: true },
+      }).capabilities.desktopAppInstall,
+    ).toBe(true);
   });
 
   it("decodes old, recognized and future manual installation descriptors", () => {

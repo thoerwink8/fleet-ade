@@ -2134,6 +2134,8 @@ export const layerWsRpc = (
           childSummaries.list({ threadId: input.threadId, cursor: input.cursor }),
         [ORCHESTRATION_V2_WS_METHODS.commandChildDetail]: (input) =>
           childSummaries.detail({ threadId: input.threadId }),
+        [ORCHESTRATION_V2_WS_METHODS.markChildDriftFalsePositive]: (input) =>
+          childSummaries.markDriftFalsePositive(input),
         [ORCHESTRATION_V2_WS_METHODS.subscribeCommandChildren]: (input) =>
           childSummaries.subscribe(input.threadId),
         [WS_METHODS.scheduledTasksSubscribe]: (_input) =>
@@ -2483,8 +2485,6 @@ export const layerWsRpc = (
         [WS_METHODS.serverGetNpmRelease]: (input) => npmRelease.get(input),
         [WS_METHODS.serverUpdateServerWithProgress]: (input) =>
           ServerSelfUpdate.updateProgressStream(serverSelfUpdate, input),
-        [WS_METHODS.serverCommitDesktopUpdate]: (input) =>
-          serverSelfUpdate.commitDesktopUpdate(input.requestId),
         [WS_METHODS.serverUpsertKeybinding]:
           /* Request instrumentation already owns the span; keep this helper in that context. */
           Effect.fnUntraced(function* (rule) {

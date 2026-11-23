@@ -14,8 +14,7 @@ Python and Visual Studio Build Tools. The workflow installs Node, pnpm, and the
 `x86_64-pc-windows-msvc` Rust target, then runs
 `node scripts/build-desktop-artifact.ts`. That script compiles
 `native/resource-monitor` as part of the build. The workflow does not sign the
-installer, does not read repository secrets, and does not set
-`T3CODE_DESKTOP_UPDATE_REPOSITORY`.
+installer or read repository secrets.
 
 Run **Desktop Windows** from the Actions tab (**Run workflow**). The `version`
 input is the installer version written into the package. Leave it empty to use

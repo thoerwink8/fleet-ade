@@ -25,6 +25,7 @@ import {
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
@@ -35,7 +36,9 @@ import { forkParked } from "../serverActivation.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as PeerMcpClient from "../peer/PeerMcpClient.ts";
+import * as ProjectService from "../project/ProjectService.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as FleetClaims from "./FleetClaims.ts";
 import * as FleetSummary from "./FleetSummary.ts";
 
@@ -45,6 +48,8 @@ const SentFields = Schema.Struct({
   reason: Schema.String,
   needsYou: Schema.Boolean,
   lastProgress: Schema.String,
+  branch: Schema.optional(Schema.String),
+  commit: Schema.optional(Schema.String),
 });
 type SentFields = typeof SentFields.Type;
 const decodeSent = Schema.decodeUnknownSync(Schema.fromJsonString(SentFields));
@@ -112,6 +117,8 @@ const make = Effect.gen(function* () {
   const identity = yield* ServerEnvironment.ServerEnvironmentIdentity;
   const sql = yield* SqlClient.SqlClient;
   const scheduler = yield* Scheduler.Scheduler;
+  const git = yield* Effect.serviceOption(GitVcsDriver.GitVcsDriver);
+  const projects = yield* Effect.serviceOption(ProjectService.ProjectService);
   yield* NodeReads.migrate;
   const selfId = yield* identity.getEnvironmentId;
   const rows = yield* sql<RegistrationRecord>`
@@ -156,17 +163,44 @@ const make = Effect.gen(function* () {
   const pendingTracks = new Map<string, { version: symbol; kind: "task" | "adhoc" }>();
   const sendLane = yield* Semaphore.make(1);
 
-  const reportFields = (shell: OrchestrationV2ThreadShell): SentFields => ({
-    title: shell.title.slice(0, 200),
-    sessionRun: shell.status,
-    reason: (shell.pendingRuntimeRequest !== null
-      ? `waiting:${shell.pendingRuntimeRequest.kind}`
-      : (shell.lastError ?? "")
-    ).slice(0, 200),
-    needsYou:
-      shell.pendingRuntimeRequest !== null &&
-      isBlockingApproval(shell.pendingRuntimeRequest.kind, shell.pendingRuntimeRequest.blocking),
-    lastProgress: (shell.latestVisibleMessage?.text ?? "").slice(0, FLEET_SUMMARY_PROGRESS_LIMIT),
+  const resolveCommit = Effect.fn("FleetSummaryReporter.resolveCommit")(function* (
+    shell: OrchestrationV2ThreadShell,
+  ) {
+    if (Option.isNone(git)) return undefined;
+    let cwd = shell.worktreePath?.trim() || undefined;
+    if (cwd === undefined && Option.isSome(projects)) {
+      const project = yield* projects.value
+        .getById(shell.projectId)
+        .pipe(Effect.orElseSucceed(() => Option.none()));
+      cwd = Option.getOrUndefined(project)?.workspaceRoot?.trim() || undefined;
+    }
+    if (cwd === undefined) return undefined;
+    const resolved = yield* git.value
+      .resolveCommit({ cwd, revision: "HEAD" })
+      .pipe(Effect.orElseSucceed(() => undefined));
+    const commitSha = resolved?.commitSha.trim();
+    return commitSha && commitSha.length > 0 ? commitSha.slice(0, 64) : undefined;
+  });
+
+  const reportFields = Effect.fn("FleetSummaryReporter.reportFields")(function* (
+    shell: OrchestrationV2ThreadShell,
+  ): Effect.fn.Return<SentFields> {
+    const branch = shell.branch?.trim().slice(0, 200);
+    const commit = yield* resolveCommit(shell);
+    return {
+      title: shell.title.slice(0, 200),
+      sessionRun: shell.status,
+      reason: (shell.pendingRuntimeRequest !== null
+        ? `waiting:${shell.pendingRuntimeRequest.kind}`
+        : (shell.lastError ?? "")
+      ).slice(0, 200),
+      needsYou:
+        shell.pendingRuntimeRequest !== null &&
+        isBlockingApproval(shell.pendingRuntimeRequest.kind, shell.pendingRuntimeRequest.blocking),
+      lastProgress: (shell.latestVisibleMessage?.text ?? "").slice(0, FLEET_SUMMARY_PROGRESS_LIMIT),
+      ...(branch !== undefined && branch.length > 0 ? { branch } : {}),
+      ...(commit === undefined ? {} : { commit }),
+    };
   });
 
   const sameFields = (a: SentFields | undefined, b: SentFields) =>
@@ -175,7 +209,9 @@ const make = Effect.gen(function* () {
     a.sessionRun === b.sessionRun &&
     a.reason === b.reason &&
     a.needsYou === b.needsYou &&
-    a.lastProgress === b.lastProgress;
+    a.lastProgress === b.lastProgress &&
+    a.branch === b.branch &&
+    a.commit === b.commit;
 
   // Self-coordination writes this environment's own summary; remote ones go over the link.
   const sendReport = (entry: TrackedTask, input: FleetSummaryReportInput) => {
@@ -328,7 +364,7 @@ const make = Effect.gen(function* () {
       yield* report(key);
       return;
     }
-    const fields = reportFields(shell);
+    const fields = yield* reportFields(shell);
     if (sameFields(entry.sent, fields)) return;
     const input: FleetSummaryReportInput =
       entry.kind === "task"

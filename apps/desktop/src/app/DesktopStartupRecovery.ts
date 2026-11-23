@@ -1,4 +1,3 @@
-import type { DesktopUpdateState } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
@@ -12,7 +11,6 @@ import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
 import * as ElectronTheme from "../electron/ElectronTheme.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
-import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import type { BackendStartupFailure } from "../backend/DesktopBackendManager.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopObservability from "./DesktopObservability.ts";
@@ -27,37 +25,18 @@ const { logInfo, logWarning } = DesktopObservability.makeComponentLogger(
 );
 
 export type StartupRecoveryOffer =
-  | { readonly _tag: "Checking" }
-  | { readonly _tag: "Update"; readonly version: string }
-  | { readonly _tag: "Downloading"; readonly version: string; readonly percent: number | null }
   | { readonly _tag: "Reinstall"; readonly version: string }
   | { readonly _tag: "Releases" };
 
-const STARTUP_RECOVERY_ACTIONS = ["update", "reinstall", "releases", "copy", "quit"] as const;
+const STARTUP_RECOVERY_ACTIONS = ["reinstall", "releases", "copy", "quit"] as const;
 type StartupRecoveryAction = (typeof STARTUP_RECOVERY_ACTIONS)[number];
 
-/** Prefer a newer build, then the last build that started on this machine. */
+/** The last build that started here, otherwise no installable package. */
 export function resolveStartupRecoveryOffer(
-  update: DesktopUpdateState,
+  currentVersion: string,
   lastStartedVersion: string | null,
 ): StartupRecoveryOffer {
-  if (update.status === "downloading" && update.availableVersion !== null) {
-    return {
-      _tag: "Downloading",
-      version: update.availableVersion,
-      percent: update.downloadPercent,
-    };
-  }
-  const updateVersion =
-    update.downloadedVersion ?? (update.status === "available" ? update.availableVersion : null);
-  // A version that already failed to apply here would loop through install and relaunch.
-  if (updateVersion !== null && updateVersion !== update.notAppliedVersion) {
-    return { _tag: "Update", version: updateVersion };
-  }
-  if (update.enabled && (update.status === "idle" || update.status === "checking")) {
-    return { _tag: "Checking" };
-  }
-  if (lastStartedVersion !== null && lastStartedVersion !== update.currentVersion) {
+  if (lastStartedVersion !== null && lastStartedVersion !== currentVersion) {
     return { _tag: "Reinstall", version: lastStartedVersion };
   }
   return { _tag: "Releases" };
@@ -75,18 +54,6 @@ const actionLink = (action: StartupRecoveryAction, label: string, primary = fals
 
 function describeOffer(offer: StartupRecoveryOffer): { text: string; action: string } {
   switch (offer._tag) {
-    case "Checking":
-      return { text: "正在检查是否有更新版本…", action: "" };
-    case "Update":
-      return {
-        text: `版本 ${offer.version} 可用。它可能包含修复。`,
-        action: actionLink("update", `更新到 ${offer.version}`, true),
-      };
-    case "Downloading":
-      return {
-        text: `正在下载 ${offer.version}${offer.percent === null ? "" : `（${Math.floor(offer.percent / 10) * 10}%）`}。下载完成后 Fleet ADE 会重启。`,
-        action: "",
-      };
     case "Reinstall":
       return {
         text: `版本 ${offer.version} 已在这台电脑上正常启动。这个构建不会下载安装包。`,
@@ -133,7 +100,6 @@ export const listen: Effect.Effect<
   void,
   never,
   | DesktopState.DesktopState
-  | DesktopUpdates.DesktopUpdates
   | DesktopEnvironment.DesktopEnvironment
   | ElectronApp.ElectronApp
   | ElectronShell.ElectronShell
@@ -143,7 +109,6 @@ export const listen: Effect.Effect<
   | Scope.Scope
 > = Effect.gen(function* () {
   const { primaryBackendStartup, quitting } = yield* DesktopState.DesktopState;
-  const updates = yield* DesktopUpdates.DesktopUpdates;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const electronApp = yield* ElectronApp.ElectronApp;
   const electronShell = yield* ElectronShell.ElectronShell;
@@ -165,14 +130,8 @@ export const listen: Effect.Effect<
   // The failure that opened the window; later restarts do not reload its details.
   const failureRef = yield* Ref.make(Option.none<BackendStartupFailure>());
   const renderedHtmlRef = yield* Ref.make("");
-  const checkedRef = yield* Ref.make(false);
   let backendHasStarted = false;
-  const { latest, changes: updateChanges } = yield* updates.subscribe;
-  const updateStateRef = yield* Ref.make(latest);
-
-  const offer = Ref.get(updateStateRef).pipe(
-    Effect.map((state) => resolveStartupRecoveryOffer(state, lastStartedVersion)),
-  );
+  const offer = resolveStartupRecoveryOffer(environment.appVersion, lastStartedVersion);
 
   const render = Effect.gen(function* () {
     const window = yield* Ref.get(windowRef);
@@ -181,7 +140,7 @@ export const listen: Effect.Effect<
     const html = buildStartupRecoveryHtml({
       appVersion: environment.appVersion,
       failure: failure.value,
-      offer: yield* offer,
+      offer,
       logDir: environment.logDir,
     });
     if ((yield* Ref.getAndSet(renderedHtmlRef, html)) === html) return;
@@ -192,19 +151,7 @@ export const listen: Effect.Effect<
     action: StartupRecoveryAction,
   ) {
     yield* logInfo("startup recovery action", { action });
-    const current = yield* offer;
     switch (action) {
-      case "update": {
-        if (current._tag !== "Update") return;
-        const state = yield* updates.getState;
-        if (state.downloadedVersion === null) {
-          const download = yield* updates.download;
-          if (!download.completed) return;
-        }
-        // Waits for a running background check; plain install would refuse.
-        yield* updates.installPrepared(current.version);
-        return;
-      }
       case "reinstall":
       case "releases":
         return;
@@ -309,11 +256,6 @@ export const listen: Effect.Effect<
     ),
   );
 
-  yield* updateChanges.pipe(
-    Stream.runForEach((state) => Ref.set(updateStateRef, state).pipe(Effect.andThen(render))),
-    Effect.forkScoped,
-  );
-
   yield* SubscriptionRef.changes(primaryBackendStartup).pipe(
     Stream.runForEach(
       Effect.fn("desktop.startupRecovery.onStartupChange")(function* (startup) {
@@ -331,9 +273,6 @@ export const listen: Effect.Effect<
         // The backend manager already logs each failure's reason.
         yield* logWarning("primary backend failing to start");
         yield* show();
-        if (!(yield* Ref.getAndSet(checkedRef, true))) {
-          yield* updates.check("startup-recovery").pipe(Effect.forkScoped);
-        }
       }),
     ),
     Effect.catchCause((cause) =>
