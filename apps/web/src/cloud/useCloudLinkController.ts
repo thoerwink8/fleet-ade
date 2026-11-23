@@ -1,11 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
-import { useAuth } from "@clerk/react";
 import { findErrorTraceId } from "@t3tools/client-runtime/errors";
 import { AuthRelayReadScope, AuthRelayWriteScope, type EnvironmentId } from "@t3tools/contracts";
 import { ManagedRelay } from "@t3tools/client-runtime/relay";
 import {
   isAtomCommandInterrupted,
-  settlePromise,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import * as Schema from "effect/Schema";
@@ -19,13 +17,8 @@ import { readEnvironmentScope } from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
 import { isCloudEnvironmentLinkError } from "./linkEnvironment";
 import { refreshManagedTunnelUsage } from "./managedRelayState";
-import {
-  linkEnvironment as linkEnvironmentAtom,
-  unlinkEnvironment as unlinkEnvironmentAtom,
-  updateEnvironmentPreferences as updateEnvironmentPreferencesAtom,
-} from "./linkEnvironmentAtoms";
+import { unlinkEnvironment as unlinkEnvironmentAtom } from "./linkEnvironmentAtoms";
 import { readCachedCloudLinkState, useCloudLinkState } from "./cloudLinkState";
-import { resolveRelayClerkTokenOptions } from "./publicConfig";
 import { isManagedTunnelActive } from "./t3ConnectState";
 
 export interface CloudLinkDesiredState {
@@ -34,31 +27,14 @@ export interface CloudLinkDesiredState {
   readonly holdWebhooksWhileOffline?: boolean;
 }
 
-const isManagedRelayRequestFailedError = Schema.is(ManagedRelay.ManagedRelayRequestFailedError);
 const isManagedRelayClientError = Schema.is(ManagedRelay.ManagedRelayClientError);
 
-/** The account's tunnel cap when the relay refused a new tunnel for being at it. */
-function tunnelLimitFromLinkFailure(cause: unknown): number | null {
-  if (!isCloudEnvironmentLinkError(cause)) return null;
-  const relayCause = cause.cause;
-  if (!isManagedRelayRequestFailedError(relayCause)) return null;
-  return relayCause.relayError?._tag === "RelayEnvironmentLinkLimitExceededError"
-    ? relayCause.relayError.maxTunnels
-    : null;
-}
-
 export function useCloudLinkController(environmentId: EnvironmentId | null) {
-  const { getToken, isSignedIn } = useAuth();
+  const isSignedIn = false;
   const refreshRelayEnvironments = useAtomCommand(relayEnvironmentDiscovery.refresh, {
     reportFailure: false,
   });
-  const linkEnvironment = useAtomCommand(linkEnvironmentAtom, {
-    reportFailure: false,
-  });
   const unlinkEnvironment = useAtomCommand(unlinkEnvironmentAtom, {
-    reportFailure: false,
-  });
-  const updateEnvironmentPreferences = useAtomCommand(updateEnvironmentPreferencesAtom, {
     reportFailure: false,
   });
   const cloudLinkState = useCloudLinkState(environmentId);
@@ -133,7 +109,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
     if (!canManageLink()) return false;
     const wantsLink = desired.managedTunnel || desired.publish;
     if (wantsLink && readLinkState() === null) return false;
-    const tokenResult = await settlePromise(() => getToken(resolveRelayClerkTokenOptions()));
+    const clerkToken: string | null = null;
     if (!canManageLink()) return false;
 
     // A failed mutation may have partially applied, so refresh server state on every exit.
@@ -141,7 +117,7 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
       // Unlink needs no relay token; failed token reads must still allow it.
       const unlinkResult = await unlinkEnvironment({
         target,
-        clerkToken: tokenResult._tag === "Success" ? (tokenResult.value ?? null) : null,
+        clerkToken,
       });
       refreshManagedTunnelUsage();
       if (unlinkResult._tag === "Failure") {
@@ -160,60 +136,8 @@ export function useCloudLinkController(environmentId: EnvironmentId | null) {
         return false;
       }
     } else {
-      const currentLinkState = readLinkState();
-      if (currentLinkState === null) return false;
-      if (tokenResult._tag === "Failure") {
-        reportUpdateFailure(squashAtomCommandFailure(tokenResult));
-        return false;
-      }
-      const clerkToken = tokenResult.value;
-      if (!clerkToken) {
-        reportUpdateFailure(new Error("Sign in to T3 Connect before enabling this."));
-        return false;
-      }
-      const currentManagedTunnel = isManagedTunnelActive(currentLinkState, relayProviderKind);
-      if (
-        !currentLinkState.linked ||
-        currentLinkState.linkRevoked === true ||
-        currentManagedTunnel !== desired.managedTunnel
-      ) {
-        const linkResult = await linkEnvironment({
-          target,
-          clerkToken,
-          mode: desired.managedTunnel ? "managed" : "publish_only",
-        });
-        // Any link attempt can change the account's tunnel count.
-        refreshManagedTunnelUsage();
-        if (linkResult._tag === "Failure") {
-          if (!isAtomCommandInterrupted(linkResult)) {
-            const cause = squashAtomCommandFailure(linkResult);
-            // The caller shows an upgrade prompt instead of an error.
-            const limit = tunnelLimitFromLinkFailure(cause);
-            if (limit === null) reportUpdateFailure(cause);
-            else setTunnelLimit(limit);
-          }
-          cloudLinkState.refresh();
-          return false;
-        }
-      }
-      if (!canManageLink() || readLinkState() === null) {
-        cloudLinkState.refresh();
-        return false;
-      }
-      const prefResult = await updateEnvironmentPreferences({
-        target,
-        publishAgentActivity: desired.publish,
-        ...(desired.holdWebhooksWhileOffline === undefined
-          ? {}
-          : { holdWebhooksWhileOffline: desired.holdWebhooksWhileOffline }),
-      });
-      if (prefResult._tag === "Failure") {
-        if (!isAtomCommandInterrupted(prefResult)) {
-          reportUpdateFailure(squashAtomCommandFailure(prefResult));
-        }
-        cloudLinkState.refresh();
-        return false;
-      }
+      reportUpdateFailure(new Error("T3 Connect sign-in is no longer available."));
+      return false;
     }
 
     cloudLinkState.refresh();

@@ -6,11 +6,9 @@ import {
   RouteIcon,
 } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useState } from "react";
 import {
-  AuthRelayWriteScope,
   type EnvironmentId,
-  formatConnectReachable,
   resolveEnvironmentMachineKind,
 } from "@t3tools/contracts";
 import {
@@ -23,8 +21,6 @@ import * as Option from "effect/Option";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { cn } from "../../lib/utils";
-import { SettingsRow } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
 import { EnvironmentIconMenu } from "./EnvironmentIconPicker";
 import { EnvironmentRoutesList } from "./EnvironmentRoutesList";
 import {
@@ -38,7 +34,7 @@ import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/men
 import { Switch } from "../ui/switch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { Button, InlineButton } from "../ui/button";
+import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import {
   resolveServerConfigVersionMismatch,
@@ -46,14 +42,7 @@ import {
   supportsDesktopAppUpdate,
 } from "~/versionSkew";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
-import { isElectron } from "~/env";
-import { useT3ConnectTurnOn } from "~/cloud/useT3ConnectTurnOn";
-import { useCloudLinkController } from "~/cloud/useCloudLinkController";
-import { useManagedTunnelUsage } from "~/cloud/managedRelayState";
-import { useT3ConnectAccountPage } from "../clerk/T3ConnectAccountPages";
-import { TunnelLimitAlert, TunnelUsageMeter } from "../cloud/TunnelUsage";
 import { environmentCatalog } from "~/connection/catalog";
-import { readEnvironmentScope } from "~/state/session";
 import { type EnvironmentPresentation, useRelayEnvironmentDiscovery } from "~/state/environments";
 import { APP_VERSION } from "~/branding";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -64,7 +53,6 @@ import {
   ServerUpdateProgress,
 } from "../ServerUpdateAction";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
-import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 
 type SavedBackendListRowProps = {
   environment: EnvironmentPresentation;
@@ -433,335 +421,12 @@ export function SavedBackendListRow({
   );
 }
 
-function CloudLinkSwitch({
-  checked,
-  disabled,
-  disabledReason,
-  onCheckedChange,
-  ariaLabel = "启用 T3 Connect",
-}: {
-  readonly checked: boolean;
-  readonly disabled: boolean;
-  readonly disabledReason: string | null;
-  readonly onCheckedChange?: (enabled: boolean) => void;
-  readonly ariaLabel?: string;
-}) {
-  const control = (
-    <Switch
-      aria-label={ariaLabel}
-      checked={checked}
-      disabled={disabled}
-      {...(onCheckedChange ? { onCheckedChange } : {})}
-    />
-  );
-  return disabledReason ? (
-    <Tooltip>
-      <TooltipTrigger render={<span className="inline-flex">{control}</span>} />
-      <TooltipPopup side="top">{disabledReason}</TooltipPopup>
-    </Tooltip>
-  ) : (
-    control
-  );
-}
-
-/** Tunnel meter, plus the upgrade prompt after the relay refuses a tunnel at the cap. */
-function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | null }) {
-  const usage = useManagedTunnelUsage();
-  const accountPage = useT3ConnectAccountPage();
-  const openAccountPage = accountPage.open;
-  // Usage when the relay refused. The relay also counts tunnels still being set up, so only
-  // a freed tunnel or a higher cap clears the alert, not a meter that merely shows room.
-  const [usedAtRefusal, setUsedAtRefusal] = useState<number | null>(null);
-  if (tunnelLimit === null) {
-    if (usedAtRefusal !== null) setUsedAtRefusal(null);
-  } else if (usedAtRefusal === null && usage.used !== null) {
-    setUsedAtRefusal(usage.used);
-  }
-  const showLimitAlert =
-    tunnelLimit !== null &&
-    !(usedAtRefusal !== null && usage.used !== null && usage.used < usedAtRefusal) &&
-    !(usage.limit !== null && usage.limit > tunnelLimit);
-  const meter =
-    usage.used !== null && usage.limit !== null ? (
-      <TunnelUsageMeter
-        used={usage.used}
-        limit={usage.limit}
-        action={
-          // At the cap the alert below carries the same actions.
-          !openAccountPage || showLimitAlert ? null : usage.upgrade ? (
-            <InlineButton onClick={() => openAccountPage("t3-chat")}>获取更多隧道</InlineButton>
-          ) : usage.used >= usage.limit ? (
-            <InlineButton onClick={() => openAccountPage("t3-connect")}>管理隧道</InlineButton>
-          ) : null
-        }
-      />
-    ) : null;
-  return (
-    <>
-      {meter || showLimitAlert ? (
-        <div className="flex flex-col gap-3 pb-3">
-          {meter}
-          {showLimitAlert ? (
-            <TunnelLimitAlert
-              upgrade={usage.upgrade}
-              onLinkT3Chat={openAccountPage ? () => openAccountPage("t3-chat") : null}
-              onManageTunnels={openAccountPage ? () => openAccountPage("t3-connect") : null}
-            />
-          ) : null}
-        </div>
-      ) : null}
-      {/* Kept outside the conditional so an open account page does not remount. */}
-      {accountPage.portals}
-    </>
-  );
-}
-
-function ConfiguredCloudLinkRow({
-  environmentId,
-  canManageRelay,
-}: {
-  readonly environmentId: EnvironmentId;
-  readonly canManageRelay: boolean;
-}) {
-  const {
-    isSignedIn,
-    linkState: cloudLinkState,
-    linkRevoked,
-    managedTunnelActive,
-    managedTunnelOutOfSync,
-    publishAgentActivity,
-    holdWebhooksWhileOffline,
-    operationError,
-    tunnelLimit,
-    reconcileCloudState,
-  } = useCloudLinkController(environmentId);
-  const { openAuthPrompt } = useT3ConnectAuthPrompt();
-  const turnOn = useT3ConnectTurnOn(environmentId);
-  // Turning on links from this desktop's own backend only; turning off works from anywhere.
-  const showSwitch = isElectron && (turnOn.kind !== "on-host" || managedTunnelActive);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isUpdatingPreference, setIsUpdatingPreference] = useState(false);
-
-  const disabledReason = canManageRelay ? null : "你的会话无权管理 T3 Connect 访问权限。";
-  const isBusy = isUpdating || isUpdatingPreference;
-  const switchDisabled =
-    !canManageRelay ||
-    !isSignedIn ||
-    cloudLinkState.data === null ||
-    cloudLinkState.isPending ||
-    isBusy;
-  // `isSignedIn` is undefined until Clerk loads. Signed out, one row shows a
-  // sign-in button instead of its switch; the onboarding dialog that opens after
-  // a fresh sign-in offers both linking and publishing.
-  const signedOut = isSignedIn === false;
-  const signInButton = (
-    <Button size="sm" variant="outline" onClick={openAuthPrompt}>
-      登录
-    </Button>
-  );
-  const refreshLinkState = useEffectEvent(cloudLinkState.refresh);
-  // The server rechecks reachability when the tunnel's 30 s readiness poll changes.
-  // Poll while mounted, so a failed read does not stop later ones.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- 30 s interval that refreshes the cloud link reachability while mounted
-  useEffect(() => {
-    const interval = window.setInterval(() => refreshLinkState(), 30_000);
-    return () => window.clearInterval(interval);
-  }, []);
-  const reachability = managedTunnelActive ? cloudLinkState.data?.reachability : undefined;
-  const reachabilityStatus =
-    reachability?.status === "reachable" ? (
-      formatConnectReachable(reachability)
-    ) : reachability?.status === "unreachable" ? (
-      <span className="block text-destructive">
-        {[reachability.reason, reachability.hint, `解决方法：${reachability.fix}`]
-          .filter(Boolean)
-          .join(" ")}
-      </span>
-    ) : null;
-
-  const updateManagedTunnel = async (enabled: boolean) => {
-    if (!readEnvironmentScope(environmentId, AuthRelayWriteScope)) return;
-    setIsUpdating(true);
-    const ok = await reconcileCloudState({ managedTunnel: enabled, publish: publishAgentActivity });
-    if (ok) {
-      toastManager.add({
-        type: "success",
-        title: enabled
-          ? "已关联 T3 Connect"
-          : publishAgentActivity
-            ? "已停用 T3 Connect 隧道"
-            : "已取消关联 T3 Connect",
-        description: enabled
-          ? "可以通过 T3 Connect 访问此环境。"
-          : publishAgentActivity
-            ? "已移除托管隧道。仍会发布智能体活动。"
-            : "无法再通过 T3 Connect 访问此环境。",
-      });
-    }
-    setIsUpdating(false);
-  };
-
-  const updatePublishAgentActivity = async (enabled: boolean) => {
-    if (!readEnvironmentScope(environmentId, AuthRelayWriteScope)) return;
-    setIsUpdatingPreference(true);
-    const ok = await reconcileCloudState({ managedTunnel: managedTunnelActive, publish: enabled });
-    if (ok) {
-      toastManager.add({
-        type: "success",
-        title: enabled ? "已启用智能体活动" : "已停用智能体活动",
-        description: enabled
-          ? "此环境会向你的移动客户端发布智能体活动。"
-          : "此环境将停止发布智能体活动。",
-      });
-    }
-    setIsUpdatingPreference(false);
-  };
-
-  const updateHoldWebhooks = async (enabled: boolean) => {
-    setIsUpdatingPreference(true);
-    const ok = await reconcileCloudState({
-      managedTunnel: managedTunnelActive,
-      publish: publishAgentActivity,
-      holdWebhooksWhileOffline: enabled,
-    });
-    if (ok) {
-      toastManager.add({
-        type: "success",
-        title: enabled ? "已开启离线保留 webhook 请求" : "已停止保留 webhook 请求",
-        description: enabled
-          ? "此环境离线时，T3 Connect 最多保留 webhook 请求 24 小时。"
-          : "现在，发往离线环境的请求会失败。之前保留的请求仍会投递。",
-      });
-    }
-    setIsUpdatingPreference(false);
-  };
-
-  return (
-    <>
-      {showSwitch ? (
-        <SettingsRow
-          title={searchableSetting("t3-connect").title}
-          description={
-            signedOut
-              ? "登录后，你的其他设备就能通过 T3 Connect 访问此环境。"
-              : linkRevoked
-                ? "此环境已从 T3 Connect 移除。开启后可重新关联。"
-                : managedTunnelActive
-                  ? reachability?.status === "unreachable"
-                    ? "T3 Connect 已开启，但其他设备无法访问此环境。"
-                    : reachability?.status === "reachable"
-                      ? "你的其他设备可以通过 T3 Connect 访问此环境。"
-                      : "T3 Connect 已开启，尚未检查能否访问。"
-                  : managedTunnelOutOfSync
-                    ? "T3 Connect 状态不同步。此环境的关联仅用于发布智能体活动，其他设备无法连接。请开启 T3 Connect 修复。"
-                    : "让你的其他设备通过 T3 Connect 访问此环境。"
-          }
-          status={operationError ?? cloudLinkState.error ?? reachabilityStatus}
-          control={
-            signedOut ? (
-              signInButton
-            ) : (
-              <CloudLinkSwitch
-                checked={managedTunnelActive}
-                disabled={switchDisabled}
-                disabledReason={disabledReason}
-                onCheckedChange={(enabled) => void updateManagedTunnel(enabled)}
-              />
-            )
-          }
-        >
-          {signedOut ? null : <T3ConnectTunnelUsage tunnelLimit={tunnelLimit} />}
-        </SettingsRow>
-      ) : linkRevoked ? (
-        <SettingsRow
-          title={searchableSetting("t3-connect").title}
-          description="此环境已从 T3 Connect 移除。请在主机上运行 `t3 connect link` 重新关联。"
-        />
-      ) : isElectron ? (
-        <SettingsRow
-          title={searchableSetting("t3-connect").title}
-          description="请在主机上运行 `t3 connect link`，然后在那里重启 Fleet ADE。"
-        />
-      ) : null}
-      {signedOut && showSwitch ? null : (
-        <SettingsRow
-          title={searchableSetting("publish-agent-activity").title}
-          description={
-            signedOut
-              ? "登录后即可向手机通知和实时活动发送活动信息。"
-              : "无需 T3 Connect，即可将活动发送到手机通知和实时活动。"
-          }
-          control={
-            signedOut ? (
-              signInButton
-            ) : (
-              <CloudLinkSwitch
-                ariaLabel="向移动客户端发布智能体活动"
-                checked={publishAgentActivity}
-                disabled={switchDisabled}
-                disabledReason={disabledReason}
-                onCheckedChange={(enabled) => void updatePublishAgentActivity(enabled)}
-              />
-            )
-          }
-        />
-      )}
-      {managedTunnelActive && !signedOut ? (
-        <SettingsRow
-          title={searchableSetting("hold-webhooks-while-offline").title}
-          description="此环境离线时，最多保留 webhook 请求 24 小时，恢复后再投递。关闭时，T3 Connect 仅转发请求，不保存任何内容。"
-          control={
-            <CloudLinkSwitch
-              ariaLabel="此环境离线时保留 webhook 请求"
-              checked={holdWebhooksWhileOffline}
-              disabled={switchDisabled}
-              disabledReason={disabledReason}
-              onCheckedChange={(enabled) => void updateHoldWebhooks(enabled)}
-            />
-          }
-        />
-      ) : null}
-    </>
-  );
-}
-
-export function CloudLinkRow({
-  environmentId,
-  canReadRelay,
-  canManageRelay,
-}: {
+export function CloudLinkRow(_props: {
   readonly environmentId: EnvironmentId;
   readonly canReadRelay: boolean;
   readonly canManageRelay: boolean;
 }) {
-  if (!hasCloudPublicConfig()) return null;
-  if (!canReadRelay) {
-    return (
-      <SettingsRow
-        title="T3 Connect"
-        description="要编辑这些设置，请在配对此连接时同时授予“查看中继”和“管理中继”权限。"
-      />
-    );
-  }
-  return <ConfiguredCloudLinkRow environmentId={environmentId} canManageRelay={canManageRelay} />;
-}
-
-function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
-  return (
-    <Empty className="min-h-52">
-      <EmptyMedia variant="icon">
-        <ChevronsLeftRightEllipsisIcon />
-      </EmptyMedia>
-      <EmptyHeader>
-        <EmptyTitle>没有已保存的远程环境</EmptyTitle>
-        <EmptyDescription>
-          {cloudEnabled
-            ? "点击“添加环境”配对其他环境，或从 T3 Connect 连接一个环境。"
-            : "点击“添加环境”配对其他环境。"}
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return null;
 }
 
 export function CloudRemoteEnvironmentRows({

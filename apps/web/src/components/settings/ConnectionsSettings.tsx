@@ -81,8 +81,6 @@ import {
   resolveServerSelfUpdateCapability,
   supportsDesktopAppUpdate,
 } from "~/versionSkew";
-import { hasCloudPublicConfig } from "~/cloud/publicConfig";
-import { RemoveT3ConnectEnvironmentDialog } from "../clerk/RemoveT3ConnectEnvironmentDialog";
 import { authEnvironment } from "~/state/auth";
 import { environmentCatalog } from "~/connection/catalog";
 import {
@@ -675,15 +673,7 @@ function ConnectionsSettingsContent({
     }
   };
 
-  // Removing a T3 Connect route preserves account registration; use a separate dialog pointing to
-  // deregistration.
-  const [pendingT3ConnectRemoval, setPendingT3ConnectRemoval] =
-    useState<EnvironmentPresentation | null>(null);
   const handleRemoveSavedBackend = async (environment: EnvironmentPresentation) => {
-    if (environment.relayManaged && hasCloudPublicConfig()) {
-      setPendingT3ConnectRemoval(environment);
-      return;
-    }
     const confirmed = await requestConfirmDialog(
       `从此设备移除 ${environment.label}？
 这会删除这里保存的配对信息、凭据和缓存的会话。若要保留这些内容，请关闭连接。`,
@@ -1615,18 +1605,6 @@ function ConnectionsSettingsContent({
       <LoadBalancingSettings environments={loadBalancingEnvironments} />
       <PullRequestRoutingSettings environments={loadBalancingEnvironments} />
       {primarySettings}
-      {hasCloudPublicConfig() ? (
-        <RemoveT3ConnectEnvironmentDialog
-          environmentLabel={pendingT3ConnectRemoval?.label ?? null}
-          environmentId={pendingT3ConnectRemoval?.environmentId ?? null}
-          onCancel={() => setPendingT3ConnectRemoval(null)}
-          onConfirm={() => {
-            if (!pendingT3ConnectRemoval) return;
-            setPendingT3ConnectRemoval(null);
-            void removeSavedBackend(pendingT3ConnectRemoval);
-          }}
-        />
-      ) : null}
     </SettingsPageContainer>
   );
 }

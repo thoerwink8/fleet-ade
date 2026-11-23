@@ -271,15 +271,6 @@ overrides:
   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-linux-x64-musl': '-'
   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-arm64': '-'
   '@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-x64': '-'
-  '@clerk/backend': 3.27.0
-  '@clerk/clerk-js': 6.42.3
-  '@clerk/clerk-js>@base-org/account': '-'
-  '@clerk/clerk-js>@coinbase/wallet-sdk': '-'
-  '@clerk/clerk-js>@wallet-standard/core': '-'
-  '@clerk/electron': 0.1.10
-  '@clerk/electron-passkeys': 0.0.3
-  '@clerk/react': 6.18.6
-  '@clerk/shared': 4.44.1
   '@effect/atom-react': 4.1.2
   '@effect/platform-bun': 4.1.2
   '@effect/platform-node': 4.1.2
@@ -296,8 +287,6 @@ overrides:
   '@types/node': 24.12.4
   effect: 4.1.3
   node-abi: 4.33.0
-  electron-webauthn>@electron-webauthn/macos: 1.3.1
-  '@electron-webauthn/macos>objc-js': 1.5.0
   lightningcss: 1.33.0
   tailwindcss: 4.3.3
   '@types/ws@^8': 8.18.2
@@ -348,12 +337,6 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@clerk/electron':
-        specifier: 0.1.10
-        version: 0.1.10(@clerk/electron-passkeys@0.0.3)(electron-store@8.2.0)(electron@44.10.1(supports-color@7.2.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@clerk/electron-passkeys':
-        specifier: 0.0.3
-        version: 0.0.3
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6)
@@ -551,15 +534,6 @@ importers:
       '@betteroffice/xlsx':
         specifier: 0.5.1
         version: 0.5.1
-      '@clerk/clerk-js':
-        specifier: 6.42.3
-        version: 6.42.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@clerk/electron':
-        specifier: 0.1.10
-        version: 0.1.10(@clerk/electron-passkeys@0.0.3)(electron-store@8.2.0)(electron@44.10.1(supports-color@7.2.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@clerk/react':
-        specifier: 6.18.6
-        version: 6.18.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@daypicker/react':
         specifier: ^10.0.1
         version: 10.0.1(@types/react@19.3.0)(react@19.3.0)
@@ -1899,70 +1873,6 @@ packages:
   '@clack/prompts@1.8.1':
     resolution: {integrity: sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ==}
     engines: {node: '>= 20.12.0'}
-
-  '@clerk/clerk-js@6.42.3':
-    resolution: {integrity: sha512-hjUf0j4Q6mWSEKC5Mg5WuE1uNu5eYPF8NpMJvGCPAxx7GwJKOTb1Pct2FNybEGf4mC14Xau+ic3jk75GB12joA==}
-    engines: {node: '>=20.9.0'}
-
-  '@clerk/electron-passkeys-darwin-arm64@0.0.3':
-    resolution: {integrity: sha512-oAlrd+GLqP0oREP3hNRc6yNZhXGaQgJss9iCWRQqXjpw1yZD1ZU+L+E2Gfg84vMj/NSUhxbU0Djy0RXhmeUwgg==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@clerk/electron-passkeys-darwin-x64@0.0.3':
-    resolution: {integrity: sha512-0UPAWQEni7o8gjWwd2sP97fPshJmT2w5b8eV/jOPVSP8NqIcFCm5yIFSEx1SfB53LGfzB01A4iEGi2pxiCHqyQ==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@clerk/electron-passkeys-win32-arm64-msvc@0.0.3':
-    resolution: {integrity: sha512-bbRvifm9A/gfPkwC1UyMyF9sYGEs0aen7J2kCcaOIW3K0PXcAbHtsR/gnx4dT0bjFdd21vSa2zlIdERvHc1BiA==}
-    cpu: [arm64]
-    os: [win32]
-
-  '@clerk/electron-passkeys-win32-x64-msvc@0.0.3':
-    resolution: {integrity: sha512-gFaVqKlOKTF2SJ3lMwkZ0oonycQn93p1qSrp5kzzeZBeQ+tGB3gQnjXecrhQy21AzDUyWqVJJ8KrP2HRAwifWg==}
-    cpu: [x64]
-    os: [win32]
-
-  '@clerk/electron-passkeys@0.0.3':
-    resolution: {integrity: sha512-OHhIe88qDL+FxyBalXdXNHAS5eEramr6Rerp+6iNkfkjqT8rx4hHNmfpmjg5/T1/am8QfknbOBZkqoXZlCrjPg==}
-    engines: {node: '>=20.9.0'}
-
-  '@clerk/electron@0.1.10':
-    resolution: {integrity: sha512-Erik4s3N/YqVhOcvB3C+V9uhuimUpT6jlDws8rO4PoRDg1WbNoVbGnc/Z7TNSwfZMj+IzvJbpir/za5tX5Bc4w==}
-    engines: {node: '>=20.9.0'}
-    peerDependencies:
-      '@clerk/electron-passkeys': 0.0.3
-      electron: '>=28'
-      electron-store: ^8.2.0
-      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-    peerDependenciesMeta:
-      '@clerk/electron-passkeys':
-        optional: true
-      electron-store:
-        optional: true
-      react-dom:
-        optional: true
-
-  '@clerk/react@6.18.6':
-    resolution: {integrity: sha512-vNsg5smbANI7Bf8W+2e6p4hR3LlMZvSKT+lih8tVlBZVAQzkoVCgmD7EmiEwMqLz23y8Z0klDBtejQlcpn9Deg==}
-    engines: {node: '>=20.9.0'}
-    peerDependencies:
-      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-
-  '@clerk/shared@4.44.1':
-    resolution: {integrity: sha512-c06U6GtlLJNOKj900rHDSqjVRz0/0zb3RZXVGKUqTulfQxr4Ym543JE6cbOnZVJZCbm0fGPhdRKvHq6fO/SvVw==}
-    engines: {node: '>=20.9.0'}
-    peerDependencies:
-      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-    peerDependenciesMeta:
-      react:
-        optional: true
-      react-dom:
-        optional: true
 
   '@csstools/color-helpers@6.1.1':
     resolution: {integrity: sha512-gLNsunvwf3mCi5u5o46/Z/JcJMnhbHSaZ69rkgPzNM3J4s8hWwpPUQB6/tt0EDFyCiWzxANlx+2LJwpYj4zS1w==}
@@ -4085,13 +3995,6 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@stripe/stripe-js@5.6.0':
-    resolution: {integrity: sha512-w8CEY73X/7tw2KKlL3iOk679V9bWseE4GzNz3zlaYxcTjmcmWOathRb0emgo/QQ3eoNzmq68+2Y2gxluAv3xGw==}
-    engines: {node: '>=12.16'}
-
-  '@swc/helpers@0.5.21':
-    resolution: {integrity: sha512-jI/VAmtdjB/RnI8GTnokyX7Ug8c+g+ffD6QRLa6XQewtnGyukKkKSk3wLTM3b5cjt1jNh9x0jfVlagdN2gDKQg==}
-
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
@@ -4202,9 +4105,6 @@ packages:
   '@tanstack/pacer@0.18.0':
     resolution: {integrity: sha512-qhCRSFei0hokQr3xYcQXqxsRD/LKlgHCxHXtKHrQoImp4x2Zu6tUOpUGVH4y2qexIrzSu3aibQBNNfC3Eay6Mg==}
     engines: {node: '>=18'}
-
-  '@tanstack/query-core@5.102.8':
-    resolution: {integrity: sha512-ZNjkJ33CqvPNec/6lZBnHqLc3EVGPZ9ySLhYahU9TcuRFdmwXewuj0c4hwSWcGHqEUwcSrKeZ+oGcvPBqXcQcg==}
 
   '@tanstack/react-pacer@0.19.4':
     resolution: {integrity: sha512-coj8ULAuR0qFpjAKD44gTgRuZyjxU6Xu+IX5MwwYvr4e61OtZcJshaExoOBKpCGde0Edb12jDnzzj2Im13Qm9Q==}
@@ -4942,12 +4842,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@zxcvbn-ts/core@3.0.4':
-    resolution: {integrity: sha512-aQeiT0F09FuJaAqNrxynlAwZ2mW/1MdXakKWNmGM1Qp/VaY6CnB/GfnMS2T8gB2231Esp1/maCWd8vTG4OuShw==}
-
-  '@zxcvbn-ts/language-common@3.0.4':
-    resolution: {integrity: sha512-viSNNnRYtc7ULXzxrQIVUNwHAPSXRtoIwy/Tq4XQQdIknBzw4vz36lQLF6mvhMlTIlpjoN/Z1GFu/fwiAlUSsw==}
-
   abbrev@4.0.0:
     resolution: {integrity: sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA==}
     engines: {node: ^20.17.0 || >=22.9.0}
@@ -4973,9 +4867,6 @@ packages:
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
-
-  alien-signals@2.0.6:
-    resolution: {integrity: sha512-P3TxJSe31bUHBiblg59oU1PpaWPtmxF9GhJ/cB7OkgJ0qN/ifFSKUI25/v8ZhsT+lIG6ac8DpTOplXxORX6F3Q==}
 
   anser@1.4.10:
     resolution: {integrity: sha512-hCv9AqTQ8ycjpSd3upOJd7vFwW1JaoYQ7tpham03GJ1ca8/65rqn0RpaWpItOAd6ylW9wAw6luXYPJIyPFVOww==}
@@ -5113,9 +5004,6 @@ packages:
   braces@3.0.3:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
-
-  browser-tabs-lock@1.3.0:
-    resolution: {integrity: sha512-g6nHaobTiT0eMZ7jh16YpD2kcjAp+PInbiVq3M1x6KKaEIVhT4v9oURNIpZLOZ3LQbQ3XYfNhMAb/9hzNLIWrw==}
 
   browserslist@4.29.0:
     resolution: {integrity: sha512-3GSvyjvDI4Dur1Meg2BekJquu5uF+9R9a1+5M1Mde192eZoXbeXjzgOsgqPS2V8D5wrrip0gR5Hf/GhWQ9ZzaA==}
@@ -5336,9 +5224,6 @@ packages:
   core-js-compat@3.49.0:
     resolution: {integrity: sha512-VQXt1jr9cBz03b331DFDCCP90b3fanciLkgiOoy8SBHy06gNf+vQ1A3WFLqG7I8TipYIKeYK9wxd0tUrvHcOZA==}
 
-  core-js@3.47.0:
-    resolution: {integrity: sha512-c3Q2VVkGAUyupsjRnaNX6u8Dq2vAdzm9iuPj5FW0fRxzlxgq9Q39MDq10IvmQSpLgHQNyQzQmOo6bgGHmH3NNg==}
-
   core-util-is@1.0.2:
     resolution: {integrity: sha512-3lqz5YjWTYnW6dlDa5TLaTCcShfar1e40rmcJVwCBJC6mWlFuj0eCHIElmG1g5kyuJ/GD+8Wn4FFCcz4gJPfaQ==}
 
@@ -5357,10 +5242,6 @@ packages:
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
-
-  crypto-js@4.2.0:
-    resolution: {integrity: sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==}
-    deprecated: Active development of CryptoJS has been discontinued. This library is no longer maintained.
 
   css-tree@3.2.1:
     resolution: {integrity: sha512-X7sjQzceUhu1u7Y/ylrRZFU2FS6LRiFVp6rKLPg23y3x3c3DOKAwuXGDp+PAGjh6CSnCjYeAul8pcT8bAl+lSA==}
@@ -5724,10 +5605,6 @@ packages:
     resolution: {integrity: sha512-C0AaNuC+mscy6vrAQKAc/rMq+zAPHodfHGZu4sGVehvAQt/JLG1O5zEcYcXSY5zSqr4YVgxsB+pHXTq0i7eDlg==}
     hasBin: true
 
-  fastest-levenshtein@1.0.16:
-    resolution: {integrity: sha512-eRnCtTTtGZFpQCwhJiUOuxPQWRXVKYDn0b2PeHfXL6/Zi53SLAzAHfVhVWK2AryC/WH05kGfxhFIPvTF0SXQzg==}
-    engines: {node: '>= 4.9.1'}
-
   fb-dotslash@0.5.8:
     resolution: {integrity: sha512-XHYLKk9J4BupDxi9bSEhkfss0m+Vr9ChTrjhf9l2iw3jB5C7BnY4GVPoMcqbrTutsKJso6yj2nAB6BI/F2oZaA==}
     engines: {node: '>=20'}
@@ -5876,9 +5753,6 @@ packages:
 
   get-tsconfig@4.14.3:
     resolution: {integrity: sha512-++QEw4DIY7WGoukz+/+A/8dGYPT9l9yIadnmSgZ8Rjr3YVSVDipQSO9CdnJo9ePqFqUUqh+wk9uIaoiAwsiPkA==}
-
-  glob-to-regexp@0.4.1:
-    resolution: {integrity: sha512-lkX1HJXwyMcprw/5YUZc2s7DrpAiHB21/V+E1rHUrVNokkvB6bqMzT0VfV6/86ZNabt1k14YOIaT7nDvOX3Iiw==}
 
   glob@13.0.7:
     resolution: {integrity: sha512-wfsFgXQ8A3SEI9XGf7Nl3Y9l7ffSrGh7SUCT7vU/2CzYPep9kjxAn1S40F9OPKxAMGCVl7HtNlJhrCJUeUq83g==}
@@ -6138,9 +6012,6 @@ packages:
 
   jose@6.2.2:
     resolution: {integrity: sha512-d7kPDd34KO/YnzaDOlikGpOurfF0ByC2sEV4cANCtdqLlTfBlw2p14O/5d/zv40gJPbIQxfES3nSx1/oYNyuZQ==}
-
-  js-cookie@3.0.8:
-    resolution: {integrity: sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw==}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -8068,10 +7939,12 @@ packages:
   yuku-core@0.19.0:
     resolution: {integrity: sha512-kYK9e1XdfirNhkipzW0wmMcSWcVF/CWnuugodfVYRCUwvoBefweL9HzB96OiKEhsx78V5WbUxbJqlizMX869Qg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-parser@0.19.0:
     resolution: {integrity: sha512-XrBh9ZiQK5mJVRxZBAvD6LwRyAYrK3MFtH3+onyuxFL5hFD44EC3QOmIC1FjTj6H2MMwq46/NAI+NZxLZPZgxg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   zod-to-json-schema@3.25.2:
     resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
@@ -8680,70 +8553,6 @@ snapshots:
       fast-string-width: 3.0.2
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
-
-  '@clerk/clerk-js@6.42.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
-    dependencies:
-      '@clerk/shared': 4.44.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@stripe/stripe-js': 5.6.0
-      '@swc/helpers': 0.5.21
-      '@tanstack/query-core': 5.102.8
-      '@zxcvbn-ts/core': 3.0.4
-      '@zxcvbn-ts/language-common': 3.0.4
-      alien-signals: 2.0.6
-      browser-tabs-lock: 1.3.0
-      core-js: 3.47.0
-      crypto-js: 4.2.0
-      dequal: 2.0.3
-    transitivePeerDependencies:
-      - react
-      - react-dom
-
-  '@clerk/electron-passkeys-darwin-arm64@0.0.3':
-    optional: true
-
-  '@clerk/electron-passkeys-darwin-x64@0.0.3':
-    optional: true
-
-  '@clerk/electron-passkeys-win32-arm64-msvc@0.0.3':
-    optional: true
-
-  '@clerk/electron-passkeys-win32-x64-msvc@0.0.3':
-    optional: true
-
-  '@clerk/electron-passkeys@0.0.3':
-    optionalDependencies:
-      '@clerk/electron-passkeys-darwin-arm64': 0.0.3
-      '@clerk/electron-passkeys-darwin-x64': 0.0.3
-      '@clerk/electron-passkeys-win32-arm64-msvc': 0.0.3
-      '@clerk/electron-passkeys-win32-x64-msvc': 0.0.3
-
-  '@clerk/electron@0.1.10(@clerk/electron-passkeys@0.0.3)(electron-store@8.2.0)(electron@44.10.1(supports-color@7.2.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
-    dependencies:
-      '@clerk/clerk-js': 6.42.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@clerk/react': 6.18.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@clerk/shared': 4.44.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      electron: 44.10.1(supports-color@7.2.0)
-      react: 19.3.0
-    optionalDependencies:
-      '@clerk/electron-passkeys': 0.0.3
-      electron-store: 8.2.0
-      react-dom: 19.3.0(react@19.3.0)
-
-  '@clerk/react@6.18.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
-    dependencies:
-      '@clerk/shared': 4.44.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
-
-  '@clerk/shared@4.44.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
-    dependencies:
-      '@tanstack/query-core': 5.102.8
-      dequal: 2.0.3
-      glob-to-regexp: 0.4.1
-      js-cookie: 3.0.8
-    optionalDependencies:
-      react: 19.3.0
-      react-dom: 19.3.0(react@19.3.0)
 
   '@csstools/color-helpers@6.1.1': {}
 
@@ -10328,12 +10137,6 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@stripe/stripe-js@5.6.0': {}
-
-  '@swc/helpers@0.5.21':
-    dependencies:
-      tslib: 2.8.1
-
   '@szmarczak/http-timer@4.0.6':
     dependencies:
       defer-to-connect: 2.0.1
@@ -10414,8 +10217,6 @@ snapshots:
     dependencies:
       '@tanstack/devtools-event-client': 0.4.3
       '@tanstack/store': 0.8.1
-
-  '@tanstack/query-core@5.102.8': {}
 
   '@tanstack/react-pacer@0.19.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
@@ -11210,12 +11011,6 @@ snapshots:
   '@yuuang/ffi-rs-win32-x64-msvc@1.3.2':
     optional: true
 
-  '@zxcvbn-ts/core@3.0.4':
-    dependencies:
-      fastest-levenshtein: 1.0.16
-
-  '@zxcvbn-ts/language-common@3.0.4': {}
-
   abbrev@4.0.0: {}
 
   accepts@2.0.0:
@@ -11241,8 +11036,6 @@ snapshots:
       fast-uri: 3.1.9
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
-
-  alien-signals@2.0.6: {}
 
   anser@1.4.10:
     optional: true
@@ -11434,10 +11227,6 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
     optional: true
-
-  browser-tabs-lock@1.3.0:
-    dependencies:
-      lodash: 4.18.1
 
   browserslist@4.29.0:
     dependencies:
@@ -11661,8 +11450,6 @@ snapshots:
       browserslist: 4.29.0
     optional: true
 
-  core-js@3.47.0: {}
-
   core-util-is@1.0.2: {}
 
   cors@2.8.6:
@@ -11683,8 +11470,6 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
-
-  crypto-js@4.2.0: {}
 
   css-tree@3.2.1:
     dependencies:
@@ -12135,8 +11920,6 @@ snapshots:
       path-expression-matcher: 1.6.2
       strnum: 2.4.2
 
-  fastest-levenshtein@1.0.16: {}
-
   fb-dotslash@0.5.8:
     optional: true
 
@@ -12322,8 +12105,6 @@ snapshots:
   get-tsconfig@4.14.3:
     dependencies:
       resolve-pkg-maps: 1.0.0
-
-  glob-to-regexp@0.4.1: {}
 
   glob@13.0.7:
     dependencies:
@@ -12660,8 +12441,6 @@ snapshots:
   jiti@2.7.0: {}
 
   jose@6.2.2: {}
-
-  js-cookie@3.0.8: {}
 
   js-tokens@4.0.0: {}
 
