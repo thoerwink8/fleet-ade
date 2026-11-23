@@ -11,6 +11,8 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 
+export const CHILD_SUMMARY_SILENCE_REASON = "没动静";
+
 const STOPPED_DELEGATE_STATUSES: Readonly<Record<string, true>> = {
   cancelled: true,
   interrupted: true,
@@ -227,7 +229,7 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
 
   if (idleEligible && nowMs - facts.activityAtMs >= CHILD_SUMMARY_IDLE_MS) {
     phase = "卡住";
-    reason = "没动静";
+    reason = CHILD_SUMMARY_SILENCE_REASON;
   }
 
   const list = {
@@ -254,6 +256,7 @@ export function deriveChildSummary(facts: SummaryFacts, nowMs: number): DerivedC
       branch: facts.branch,
       prNumber: facts.pr?.number ?? null,
       outlook: null,
+      handback: null,
     },
     idleEligible: idleEligible && phase === "在做",
   };

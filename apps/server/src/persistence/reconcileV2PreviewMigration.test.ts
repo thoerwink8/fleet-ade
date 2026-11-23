@@ -48,6 +48,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "CommandAssistState"],
       ]);
       const after = yield* sql`SELECT * FROM pipeline_runs`;
       assert.deepStrictEqual(
@@ -158,6 +159,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "CommandAssistState"],
       ]);
       assert.deepStrictEqual(yield* runMigrations(), []);
       assert.deepStrictEqual(yield* sql`SELECT * FROM orchestration_v2_legacy_imports`, imports);
@@ -187,6 +189,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "CommandAssistState"],
       ]);
       const after = yield* sql<{
         readonly name: string;
@@ -298,6 +301,7 @@ describe("V2 preview upgrade", () => {
         [101, "AuthPeerEnvironmentBinding"],
         [102, "ChildSessionSummary"],
         [103, "ProjectionThreadMessagePreview"],
+        [104, "CommandAssistState"],
       ]);
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );

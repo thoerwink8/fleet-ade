@@ -4,6 +4,7 @@ import {
   DateTime,
   Effect,
   Layer,
+  Option,
   PubSub,
   Schedule,
   Scope,
@@ -21,11 +22,13 @@ import {
   ChildSummaryReadError,
   type CommandChildrenPage,
   type OrchestrationV2ThreadShell,
+  ProjectId,
   ThreadId,
 } from "@t3tools/contracts";
 
 import { forkParked } from "../serverActivation.ts";
 import {
+  CHILD_SUMMARY_SILENCE_REASON,
   childSummaryCursor,
   deriveChildSummary,
   emptyPushLane,
@@ -37,6 +40,7 @@ import {
   type SummaryFacts,
   type SummaryItem,
 } from "./childSummaryDerive.ts";
+import * as CommandAssist from "./CommandAssist.ts";
 import { EventSinkV2 } from "./EventSink.ts";
 import { ProjectionStoreV2 } from "./ProjectionStore.ts";
 
@@ -118,7 +122,18 @@ function storedRowToDetail(row: SummaryRow): ChildSummaryDetail {
     branch: row.branch,
     prNumber: row.prNumber,
     outlook: null,
+    handback: null,
   };
+}
+
+function assistFiles(
+  detail: Omit<ChildSummaryDetail, "revision" | "updatedAt">,
+): CommandAssist.CommandAssistFacts["files"] {
+  return detail.files.map((file) => ({
+    path: file.path,
+    additions: file.additions,
+    deletions: file.deletions,
+  }));
 }
 
 function isoOf(epochMillis: number): string {
@@ -255,6 +270,131 @@ export class ChildSessionSummary extends Context.Service<
           cause: error instanceof Error ? error.cause : undefined,
         });
 
+      const assist = yield* Effect.serviceOption(CommandAssist.CommandAssist);
+
+      const warnSql = (operation: string, threadId: ThreadId) => (error: unknown) =>
+        Effect.logWarning("child-summary.assist-read-failed", { operation, threadId, error });
+
+      const scheduleAssist = Effect.fn("ChildSessionSummary.scheduleAssist")(function* (input: {
+        readonly facts: SummaryFacts;
+        readonly detail: Omit<ChildSummaryDetail, "revision" | "updatedAt">;
+        readonly reason: string;
+        readonly handback: boolean;
+        readonly opened: boolean;
+      }) {
+        if (Option.isNone(assist)) return;
+        const service = assist.value;
+        const threadId = input.facts.threadId;
+        const watchAnywhere = yield* service.activityOrDriftEnabled({
+          projectId: null,
+          anywhere: true,
+        });
+        if (!watchAnywhere && !input.handback) return;
+        const project = yield* sql<{ readonly projectId: string | null }>`
+          SELECT json_extract(payload_json, '$.projectId') AS projectId
+          FROM orchestration_v2_projection_threads
+          WHERE thread_id = ${threadId}
+        `.pipe(
+          Effect.tapError(warnSql("project", threadId)),
+          Effect.orElseSucceed(() => [] as const),
+        );
+        const projectId =
+          typeof project[0]?.projectId === "string" ? ProjectId.make(project[0].projectId) : null;
+        const watchHere = yield* service.activityOrDriftEnabled({ projectId, anywhere: false });
+        if (!watchHere && !input.handback) return;
+        const roots =
+          projectId === null
+            ? []
+            : yield* sql<{ readonly cwd: string | null }>`
+                SELECT workspace_root AS cwd
+                FROM projection_projects
+                WHERE project_id = ${projectId}
+              `.pipe(
+                Effect.tapError(warnSql("workspace", threadId)),
+                Effect.orElseSucceed(() => [] as const),
+              );
+        const cwd = roots[0]?.cwd?.trim() ?? "";
+        if (cwd.length === 0 || cwd === "/") {
+          yield* Effect.logWarning("child-summary.assist-skipped", { threadId });
+          return;
+        }
+        const run = yield* sql<{ readonly runId: string }>`
+          SELECT run_id AS runId
+          FROM orchestration_v2_projection_runs
+          WHERE thread_id = ${threadId}
+          ORDER BY ordinal DESC
+          LIMIT 1
+        `.pipe(
+          Effect.tapError(warnSql("run", threadId)),
+          Effect.orElseSucceed(() => [] as const),
+        );
+        const runId = run[0]?.runId;
+        if (watchHere) {
+          const counted =
+            runId === undefined
+              ? []
+              : yield* sql<{ readonly total: number }>`
+                  SELECT count(*) AS total
+                  FROM orchestration_v2_projection_turn_items
+                  WHERE thread_id = ${threadId}
+                    AND run_id = ${runId}
+                    AND type IN ('file_change', 'command_execution')
+                `.pipe(
+                  Effect.tapError(warnSql("steps", threadId)),
+                  Effect.orElseSucceed(() => [] as const),
+                );
+          const additions = input.detail.files.reduce((sum, file) => sum + file.additions, 0);
+          const deletions = input.detail.files.reduce((sum, file) => sum + file.deletions, 0);
+          yield* service
+            .observe({
+              threadId,
+              projectId,
+              cwd,
+              runId: runId ?? threadId,
+              opened: input.opened,
+              stepCount: Number(counted[0]?.total ?? 0),
+              silence: input.reason === CHILD_SUMMARY_SILENCE_REASON,
+              goal: input.facts.goal ?? "",
+              avoid: input.detail.avoid === "没有写别碰" ? "" : input.detail.avoid,
+              activity: input.detail.activity,
+              files: assistFiles(input.detail),
+              latestCommand: input.detail.latestCommand,
+              additions,
+              deletions,
+              childPhase: input.reason,
+            })
+            .pipe(Effect.ignore);
+        }
+        if (!input.handback || runId === undefined) return;
+        const report = yield* sql<{ readonly text: string | null }>`
+          SELECT json_extract(payload_json, '$.text') AS text
+          FROM orchestration_v2_projection_turn_items
+          WHERE thread_id = ${threadId}
+            AND run_id = ${runId}
+            AND type = 'assistant_message'
+          ORDER BY ordinal DESC
+          LIMIT 1
+        `.pipe(
+          Effect.tapError(warnSql("report", threadId)),
+          Effect.orElseSucceed(() => [] as const),
+        );
+        yield* service
+          .handback({
+            threadId,
+            projectId,
+            cwd,
+            prExists: input.facts.pr !== null && input.facts.pr.state !== "unknown",
+            // Whether that commit is the branch head needs git. Null keeps the check from saying it matched.
+            headOnBranch: null,
+            report: report[0]?.text ?? "",
+            childPhase: input.reason,
+          })
+          .pipe(Effect.ignore);
+      });
+
+      const forkAssist = (work: Effect.Effect<void>) =>
+        work.pipe(Effect.forkScoped, Effect.provideService(Scope.Scope, layerScope), Effect.asVoid);
+
       const publish = Effect.fn("ChildSessionSummary.publish")(function* (
         row: ChildSummaryListItem,
       ) {
@@ -306,6 +446,15 @@ export class ChildSessionSummary extends Context.Service<
               previous !== null &&
               sameContent(previous, derived.list, derived.detail, facts.pr?.state ?? null)
             ) {
+              yield* forkAssist(
+                scheduleAssist({
+                  facts,
+                  detail: derived.detail,
+                  reason: derived.list.reason,
+                  handback: false,
+                  opened: false,
+                }),
+              );
               return;
             }
             const revision = previous === null ? 1 : previous.revision + 1;
@@ -352,6 +501,15 @@ export class ChildSessionSummary extends Context.Service<
                 updated_at = excluded.updated_at
             `.pipe(Effect.mapError(readError));
             yield* publish({ ...derived.list, revision, updatedAt });
+            yield* forkAssist(
+              scheduleAssist({
+                facts,
+                detail: derived.detail,
+                reason: derived.list.reason,
+                handback: derived.list.phase === "做完" && previous?.phase !== "做完",
+                opened: false,
+              }),
+            );
           }),
         ),
       );
@@ -528,7 +686,7 @@ export class ChildSessionSummary extends Context.Service<
               const updatedAt = isoOf(nowMs);
               const updated = yield* sql<{ readonly revision: number }>`
                 UPDATE child_session_summary
-                SET phase = '卡住', reason = '没动静', revision = revision + 1, updated_at = ${updatedAt}
+                SET phase = '卡住', reason = ${CHILD_SUMMARY_SILENCE_REASON}, revision = revision + 1, updated_at = ${updatedAt}
                 WHERE thread_id = ${row.threadId} AND phase = '在做'
                 RETURNING revision
               `.pipe(Effect.mapError(readError));
@@ -541,6 +699,30 @@ export class ChildSessionSummary extends Context.Service<
                 revision,
                 updatedAt,
               });
+              const detail = storedRowToDetail(row);
+              yield* forkAssist(
+                scheduleAssist({
+                  facts: {
+                    threadId: row.threadId,
+                    parentThreadId: row.parentThreadId,
+                    createdAtMs: row.createdAtMs,
+                    activityAtMs: row.activityAtMs,
+                    status: "running",
+                    approvalCommand: null,
+                    waitingForAnswer: false,
+                    items: [],
+                    goal: row.goal,
+                    taskText: null,
+                    branch: row.branch,
+                    pr: row.prNumber === null ? null : { number: row.prNumber, state: "unknown" },
+                    grandchildCount: row.grandchildCount,
+                  },
+                  detail: { ...detail, activity: row.activity },
+                  reason: CHILD_SUMMARY_SILENCE_REASON,
+                  handback: false,
+                  opened: false,
+                }),
+              );
             }
           }),
         );
@@ -585,7 +767,50 @@ export class ChildSessionSummary extends Context.Service<
         readonly threadId: ThreadId;
       }) {
         const row = yield* getRow(options.threadId);
-        return row === null ? null : storedRowToDetail(row);
+        if (row === null) return null;
+        const assistState = yield* sql<{
+          readonly outlook: string | null;
+          readonly handback: string | null;
+        }>`
+          SELECT json_extract(state_json, '$.outlook') AS outlook,
+                 json_extract(state_json, '$.handback') AS handback
+          FROM command_assist_state
+          WHERE thread_id = ${options.threadId}
+        `.pipe(
+          Effect.map((rows) => rows[0] ?? null),
+          Effect.mapError(readError),
+        );
+        const textOrNull = (value: string | null | undefined) =>
+          typeof value === "string" && value.length > 0 ? value : null;
+        const detail = {
+          ...storedRowToDetail(row),
+          outlook: textOrNull(assistState?.outlook),
+          handback: textOrNull(assistState?.handback),
+        };
+        yield* forkAssist(
+          scheduleAssist({
+            facts: {
+              threadId: row.threadId,
+              parentThreadId: row.parentThreadId,
+              createdAtMs: row.createdAtMs,
+              activityAtMs: row.activityAtMs,
+              status: "running",
+              approvalCommand: null,
+              waitingForAnswer: false,
+              items: [],
+              goal: row.goal,
+              taskText: null,
+              branch: row.branch,
+              pr: row.prNumber === null ? null : { number: row.prNumber, state: "unknown" },
+              grandchildCount: row.grandchildCount,
+            },
+            detail,
+            reason: row.reason,
+            handback: false,
+            opened: true,
+          }),
+        );
+        return detail;
       });
 
       const subscribe = (threadId: ThreadId) =>

@@ -274,6 +274,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
           }),
       ),
     );
+  const generatePlainText = nativeGeneration.generatePlainText;
   const textGeneration: ProviderInstance["textGeneration"] = {
     generateCommitMessage: (value) =>
       protect("generateCommitMessage", nativeGeneration.generateCommitMessage(value)),
@@ -283,6 +284,11 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
       protect("generateBranchName", nativeGeneration.generateBranchName(value)),
     generateThreadTitle: (value) =>
       protect("generateThreadTitle", nativeGeneration.generateThreadTitle(value)),
+    ...(generatePlainText === undefined
+      ? {}
+      : {
+          generatePlainText: (value) => protect("generatePlainText", generatePlainText(value)),
+        }),
   };
   return {
     instanceId,

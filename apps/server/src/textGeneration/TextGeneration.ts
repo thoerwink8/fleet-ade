@@ -41,7 +41,8 @@ type TextGenerationOp =
   | "generateCommitMessage"
   | "generatePrContent"
   | "generateBranchName"
-  | "generateThreadTitle";
+  | "generateThreadTitle"
+  | "generatePlainText";
 
 const resolveInstance = (
   registry: ProviderInstanceRegistry.ProviderInstanceRegistry["Service"],
@@ -161,6 +162,24 @@ export const make = Effect.gen(function* () {
         input.modelSelection,
         input.projectId,
         (service, modelSelection) => service.generateBranchName({ ...input, modelSelection }),
+      );
+    }),
+    generatePlainText: Effect.fn("TextGeneration.generatePlainText")(function (input) {
+      return generate(
+        "generatePlainText",
+        input.modelSelection,
+        input.projectId,
+        (service, modelSelection) => {
+          const generatePlainText = service.generatePlainText;
+          return generatePlainText === undefined
+            ? Effect.fail(
+                new TextGenerationError({
+                  operation: "generatePlainText",
+                  detail: "This provider cannot write a short assist reply.",
+                }),
+              )
+            : generatePlainText({ ...input, modelSelection });
+        },
       );
     }),
     generateThreadTitle: Effect.fn("TextGeneration.generateThreadTitle")(function (input) {

@@ -76,6 +76,18 @@ export interface ThreadTitleGenerationResult {
   title: string;
   needsRefinement?: boolean | undefined;
 }
+
+export interface PlainTextGenerationInput {
+  cwd: string;
+  prompt: string;
+  modelSelection: ModelSelection;
+  projectId?: ProjectId | null | undefined;
+}
+
+export interface PlainTextGenerationResult {
+  text: string;
+}
+
 export interface ProviderTextGeneration {
   readonly generateCommitMessage: (
     input: CommitMessageGenerationInput,
@@ -92,4 +104,9 @@ export interface ProviderTextGeneration {
   readonly generateThreadTitle: (
     input: ThreadTitleGenerationInput,
   ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
+
+  /** Optional so providers that only implement the four named generators still typecheck. */
+  readonly generatePlainText?: (
+    input: PlainTextGenerationInput,
+  ) => Effect.Effect<PlainTextGenerationResult, TextGenerationError>;
 }
