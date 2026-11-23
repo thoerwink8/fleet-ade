@@ -1879,13 +1879,14 @@ it.effect("does not replay older queued branches after a new subscriber snapshot
 
 it.effect("stops polling remote status while the worktree is gone", () => {
   const goneTickRan = Deferred.makeUnsafe<void>();
+  let worktreeExists = false;
   const state = {
     ...newState(),
     fileSystem: FileSystem.makeNoop({
       realPath: (cwd) => Effect.succeed(cwd),
-      exists: (target) => Effect.succeed(target !== "/repo"),
+      exists: (target) => Effect.succeed(target !== "/repo" || worktreeExists),
     }),
-    // Both tick paths invalidate the local cache: the deleted-cwd branch's one publish, and the
+    // Both tick paths invalidate the local cache: the deleted-cwd branch's publish, and the
     // remote refresh's trailing local reread.
     beforeInvalidate: Deferred.succeed(goneTickRan, undefined).pipe(Effect.asVoid),
   };
@@ -1898,7 +1899,10 @@ it.effect("stops polling remote status while the worktree is gone", () => {
 
     yield* TestClock.adjust("31 seconds");
     yield* Deferred.await(goneTickRan);
-
     assert.equal(state.remoteStatusCalls, 0);
+
+    worktreeExists = true;
+    yield* TestClock.adjust("31 seconds");
+    assert.isAbove(state.remoteStatusCalls, 0);
   }).pipe(Effect.provide(layerTestFor(state)));
 });

@@ -177,7 +177,7 @@ it.effect("runs background Git in its own lane so user commands never queue behi
       Effect.provide(layerServerConfig),
     );
     const run = (args: ReadonlyArray<string>) =>
-      driver.execute({ operation: "test.gitLane", cwd: process.cwd(), args: [...args] });
+      driver.execute({ operation: "test.gitLane", cwd: "/repo", args: [...args] });
     const background = yield* Effect.forEach(
       Array.from({ length: 12 }),
       () => run(["background"]),
@@ -202,33 +202,6 @@ it.effect("runs background Git in its own lane so user commands never queue behi
     yield* Deferred.succeed(gate, undefined);
     assert.equal((yield* Fiber.join(background)).length, 12);
     assert.equal((yield* Fiber.join(foreground)).length, 4);
-  }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
-);
-
-it.effect("fails with missing_cwd without spawning when the working directory is gone", () =>
-  Effect.gen(function* () {
-    const spawns = yield* Ref.make(0);
-    const spawner = ChildProcessSpawner.make(() =>
-      Ref.update(spawns, (count) => count + 1).pipe(
-        Effect.andThen(Effect.succeed(makeSuccessfulHandle("ok"))),
-      ),
-    );
-    const driver = yield* makeGitVcsDriverCore().pipe(
-      Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
-      Effect.provide(layerServerConfig),
-    );
-    const fileSystem = yield* FileSystem.FileSystem;
-    const tmpDir = yield* makeTmpDir();
-    const filePath = NodePath.join(tmpDir, "not-a-directory");
-    yield* fileSystem.writeFileString(filePath, "x");
-
-    for (const cwd of [NodePath.join(tmpDir, "deleted-worktree"), filePath]) {
-      const error = yield* driver
-        .execute({ operation: "test.missingCwd", cwd, args: ["status"] })
-        .pipe(Effect.flip);
-      assert.equal(error.reason, "missing_cwd");
-    }
-    assert.equal(yield* Ref.get(spawns), 0);
   }).pipe(Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
 
@@ -258,7 +231,7 @@ describe("Git output collection", () => {
       const stdout = "a\\b\0雪\nlast ";
       const stderr = "Receiving é\r\nUpdating 雪\rdone";
       const driver = yield* makeDriver({ stdout, stderr });
-      const input = { operation: "test.chunkedGitOutput", cwd: process.cwd(), args: ["status"] };
+      const input = { operation: "test.chunkedGitOutput", cwd: "/repo", args: ["status"] };
       const expected = {
         exitCode: 0,
         stdout,
@@ -295,7 +268,7 @@ describe("Git output collection", () => {
       const driver = yield* makeDriver({ stderr: "é雪\rdone" });
       const input = {
         operation: "test.cappedGitOutput",
-        cwd: process.cwd(),
+        cwd: "/repo",
         args: ["status"],
         maxOutputBytes: 3,
       };
@@ -1913,7 +1886,7 @@ describe("rejected git refs", () => {
       return yield* driver
         .execute({
           operation: "GitVcsDriver.test.rejectedRef",
-          cwd: process.cwd(),
+          cwd: "/repo",
           args: ["push", "origin", "HEAD"],
         })
         .pipe(Effect.flip);

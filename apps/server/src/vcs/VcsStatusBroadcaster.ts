@@ -650,8 +650,7 @@ export const make = Effect.gen(function* () {
         return activeInterval;
       }
 
-      // A deleted worktree keeps its subscribers; polling it spawns Git in a directory that no
-      // longer exists. Skip the remote read and publish the non-repository local state once.
+      // A deleted worktree keeps its subscribers; refresh local status without probing Git remotely.
       const cwdExists = yield* fs.exists(cwd).pipe(Effect.orElseSucceed(() => true));
       if (!cwdExists) {
         yield* refreshLocalStatusCore(cwd).pipe(
