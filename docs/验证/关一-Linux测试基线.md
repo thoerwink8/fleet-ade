@@ -161,8 +161,6 @@ web，都在 browser（chromium）：
 server：
 
 - `src/provider/AntigravityInstallation.test.ts` explains that the linux-arm64 runtime needs 4 KiB pages when it aborts on a 16 KiB kernel：安装状态是 `cancelled`，期望是 `failed`。
-- `src/cli/theme.test.ts` restores the previous theme when a re-publish fails to set：抛出 `Unknown error: undefined`。
-- `src/cli/theme.test.ts` refuses to write when the settings file cannot be read：抛出 `Unknown error: undefined`。
 
 ### 环境缺件，补上后通过
 
