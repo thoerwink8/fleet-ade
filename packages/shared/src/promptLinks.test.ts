@@ -110,39 +110,19 @@ describe("link round trips", () => {
   });
 
   it("opens a copied thread link in the app at that thread", () => {
-    const origin = "https://app.example.invalid";
-    const link = hostedThreadLink(
-      {
-        environmentId: EnvironmentId.make("env-1"),
-        threadId: ThreadId.make("mcp:1"),
-      },
-      origin,
-    );
-    const path = promptLinkAppPath(link, origin);
-    expect(path).toBe("/env-1/mcp%3A1");
-    const deepLink = promptLinkDeepLink(path!);
+    const link = hostedThreadLink({
+      environmentId: EnvironmentId.make("env-1"),
+      threadId: ThreadId.make("mcp:1"),
+    });
+    const deepLink = promptLinkDeepLink("/env-1/mcp%3A1");
     expect(deepLink).toBe("t3code://threads/env-1/mcp%3A1");
-    expect(promptLinkAppPath(deepLink)).toBe(path);
+    expect(promptLinkAppPath(deepLink)).toBe("/env-1/mcp%3A1");
+    expect(link).toBe("t3-thread://v2/env-1/mcp:1");
   });
 
-  it("maps app scheme and hosted links to in-app paths, and nothing else", () => {
+  it("maps app scheme links to in-app paths, and nothing else", () => {
     expect(promptLinkAppPath("t3code://new?prompt=hi")).toBe("/new?prompt=hi");
     expect(promptLinkAppPath("t3code-dev://threads/env-1/thread-1")).toBe("/env-1/thread-1");
-    const origin = "https://app.example.invalid";
-    expect(promptLinkAppPath("https://app.example.invalid/env-1/thread-1?prompt=go", origin)).toBe(
-      "/env-1/thread-1?prompt=go",
-    );
-    expect(promptLinkAppPath("https://app.example.invalid/threads/env-1/thread-1", origin)).toBe(
-      "/env-1/thread-1",
-    );
-    expect(
-      promptLinkAppPath("https://app.example.invalid/threads/env-1/thread-1?prompt=go", origin),
-    ).toBe("/env-1/thread-1?prompt=go");
-    // The web app's own thread route, reloaded, is no link.
-    expect(promptLinkAppPath("https://app.example.invalid/env-1/thread-1", origin)).toBeNull();
-    expect(promptLinkAppPath("https://app.example.invalid/threads/env-1", origin)).toBeNull();
-    expect(promptLinkAppPath("https://app.example.invalid/settings/general", origin)).toBeNull();
-    expect(promptLinkAppPath("https://evil.test/new?prompt=hi", origin)).toBeNull();
     expect(promptLinkAppPath("https://app.example.invalid/new?prompt=hi")).toBeNull();
     expect(promptLinkAppPath("t3code://app/index.html")).toBeNull();
   });

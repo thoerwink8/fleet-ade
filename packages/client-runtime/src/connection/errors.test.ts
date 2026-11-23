@@ -1,93 +1,42 @@
-import {
-  RelayAuthInvalidError,
-  RelayEnvironmentConnectNotAuthorizedError,
-  RelayEnvironmentEndpointTimedOutError,
-} from "@t3tools/contracts/relay";
 import { describe, expect, it } from "@effect/vitest";
 
-import { mapManagedRelayError, mapRemoteDpopEnvironmentError } from "./errors.ts";
-import { DPOP_UNKNOWN_HINT } from "../relay/errorPresentation.ts";
-import { ManagedRelayRequestFailedError } from "../relay/managedRelay.ts";
-import { NETWORK_BLOCKING_HINT } from "../errors/network.ts";
+import { mapRemoteEnvironmentError } from "./errors.ts";
+import { EnvironmentAuthInvalidError, EnvironmentScopeRequiredError } from "@t3tools/contracts";
 import { RemoteEnvironmentAuthFetchError, RemoteEnvironmentAuthTimeoutError } from "../rpc/http.ts";
 
-describe("mapManagedRelayError", () => {
-  it("keeps a timeout reported by the relay distinct from a local network failure", () => {
-    const relayError = new RelayEnvironmentEndpointTimedOutError({
-      code: "environment_endpoint_timed_out",
-      traceId: "trace-server-timeout",
-    });
-    const mapped = mapManagedRelayError(
-      new ManagedRelayRequestFailedError({
-        action: "connect relay environment",
-        cause: relayError,
-        relayError,
-      }),
-    );
-    expect(mapped).toMatchObject({
-      reason: "timeout",
-      detail: "中继连接环境端点超时。",
-      traceId: "trace-server-timeout",
-    });
-  });
-
-  it("retries a tunnel that is still being set up, and blocks other refusals", () => {
-    const mapConnectRefusal = (reason: RelayEnvironmentConnectNotAuthorizedError["reason"]) => {
-      const relayError = new RelayEnvironmentConnectNotAuthorizedError({
-        code: "environment_connect_not_authorized",
-        reason,
-        traceId: "trace-connect-refused",
-      });
-      return mapManagedRelayError(
-        new ManagedRelayRequestFailedError({
-          action: "connect relay environment",
-          cause: relayError,
-          relayError,
-        }),
-      );
-    };
-
-    expect(mapConnectRefusal("managed_endpoint_allocation_not_ready")).toMatchObject({
-      _tag: "ConnectionTransientError",
-      reason: "endpoint-unavailable",
-      detail: "此环境的 T3 Connect 隧道仍在设置中。",
-      traceId: "trace-connect-refused",
-    });
-    expect(mapConnectRefusal("endpoint_provider_not_managed")).toMatchObject({
-      _tag: "ConnectionBlockedError",
-      reason: "permission",
-      detail: expect.stringContaining("开启 T3 Connect"),
-    });
-    expect(mapConnectRefusal(undefined)).toMatchObject({
-      _tag: "ConnectionBlockedError",
-      reason: "permission",
-    });
-  });
-
-  it("presents clock skew as one possible cause for a generic DPoP error", () => {
-    const mapped = mapManagedRelayError(
-      new ManagedRelayRequestFailedError({
-        action: "connect relay environment",
-        cause: new Error("request failed"),
-        relayError: new RelayAuthInvalidError({
-          code: "auth_invalid",
-          reason: "invalid_dpop",
-          traceId: "trace-1",
-        }),
+describe("mapRemoteEnvironmentError", () => {
+  it("blocks an invalid credential with the server's trace id", () => {
+    const mapped = mapRemoteEnvironmentError(
+      new EnvironmentAuthInvalidError({
+        code: "auth_invalid",
+        reason: "invalid_credential",
         traceId: "trace-1",
       }),
     );
-
     expect(mapped).toMatchObject({
       _tag: "ConnectionBlockedError",
       reason: "authentication",
-      detail: `中继拒绝了 DPoP 证明。 ${DPOP_UNKNOWN_HINT}`,
       traceId: "trace-1",
+      hop: "server",
     });
   });
-});
 
-describe("mapRemoteDpopEnvironmentError", () => {
+  it("blocks a scope refusal as a permission problem", () => {
+    const mapped = mapRemoteEnvironmentError(
+      new EnvironmentScopeRequiredError({
+        code: "insufficient_scope",
+        requiredScope: "orchestration:read",
+        traceId: "trace-2",
+      }),
+    );
+    expect(mapped).toMatchObject({
+      _tag: "ConnectionBlockedError",
+      reason: "permission",
+      traceId: "trace-2",
+      hop: "server",
+    });
+  });
+
   it.each([
     new RemoteEnvironmentAuthFetchError({
       message: "Failed to fetch remote environment endpoint.",
@@ -97,11 +46,12 @@ describe("mapRemoteDpopEnvironmentError", () => {
       requestUrl: "https://environment.example.test",
       timeoutMs: 10_000,
     }),
-  ])("suggests another network when the relay endpoint cannot be reached: $_tag", (error) => {
-    const mapped = mapRemoteDpopEnvironmentError(error);
+  ])("maps $error._tag to a transient error", (error) => {
+    const mapped = mapRemoteEnvironmentError(error);
     expect(mapped).toMatchObject({
       _tag: "ConnectionTransientError",
-      detail: `${error.message} ${NETWORK_BLOCKING_HINT}`,
+      detail: error.message,
+      hop: "server",
     });
   });
 });

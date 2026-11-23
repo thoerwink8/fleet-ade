@@ -52,7 +52,6 @@ import { formatRelativeTime } from "../../timestampFormat";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { getCustomModelOptionsByInstance } from "../../modelSelection";
 import { providerInstanceEntriesFor } from "../../providerInstances";
-import { usePrimaryCloudLinkState } from "../../cloud/cloudLinkState";
 import { requestConfirmDialog } from "../../confirmDialog";
 import { webhookAddress } from "@t3tools/client-runtime/webhook-address";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -1170,27 +1169,7 @@ function WebhookEndpointField({
         </Button>
       </div>
       {note !== null ? <p className="text-xs text-muted-foreground">{note}</p> : null}
-      {endpoint.url !== null ? <WebhookDeliveryMode environmentId={environmentId} /> : null}
     </div>
-  );
-}
-
-function WebhookDeliveryMode({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const cloudLink = usePrimaryCloudLinkState();
-  if (cloudLink.target?.environmentId !== environmentId || cloudLink.data === null) return null;
-  return (
-    <p className="text-xs text-muted-foreground">
-      {cloudLink.data.holdWebhooksWhileOffline
-        ? "此环境离线时，请求最多保留 24 小时。"
-        : "实时转发。此环境离线时，请求会失败。"}
-      <Link
-        to="/settings/connections"
-        hash="connections-environment"
-        className="underline underline-offset-2"
-      >
-        在“连接”中更改
-      </Link>
-    </p>
   );
 }
 

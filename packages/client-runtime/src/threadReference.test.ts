@@ -105,13 +105,4 @@ describe("resolveThreadReferenceCopyTarget", () => {
       records: pasted!.records,
     });
   });
-
-  it("links through the build's hosted app", () => {
-    expect(
-      resolveThreadReferenceCopyTarget({
-        ...thread,
-        hostedAppUrl: "https://preview.example.invalid",
-      })?.value,
-    ).toBe("https://preview.example.invalid/threads/env-1/thread-1");
-  });
 });

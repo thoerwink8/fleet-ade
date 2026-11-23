@@ -10,7 +10,6 @@ import {
 import {
   BearerConnectionTarget,
   ConnectionTransientError,
-  RelayConnectionTarget,
   type SupervisorConnectionState,
 } from "./model.ts";
 import { environmentMcpUrl, presentConnectionState } from "./presentation.ts";
@@ -50,7 +49,7 @@ function supervisorState(overrides: Partial<SupervisorConnectionState>): Supervi
 }
 
 describe("connection presentation", () => {
-  it("copies the T3 Connect MCP address first, then the route this device is connected over", () => {
+  it("copies the route this device is connected over, then the first route with an address", () => {
     const route = (connectionId: string, httpBaseUrl: string): ConnectionRoute => {
       const target = new BearerConnectionTarget({ ...TARGET, connectionId });
       return {
@@ -80,38 +79,24 @@ describe("connection presentation", () => {
       "http://100.115.1.44:3773/mcp",
     );
     expect(environmentMcpUrl({ entry })).toBe("http://192.168.4.53:3773/mcp");
-    expect(
-      environmentMcpUrl({
-        entry,
-        connectedTarget: lan.target,
-        relayHttpBaseUrl: "https://tunnel.example.test",
-      }),
-    ).toBe("https://tunnel.example.test/mcp");
   });
 
-  // regression: #16909 Copy MCP URL falls back to an alternate route when the relay route has no address
+  // regression: #16909 Copy MCP URL falls back to an alternate route when the connected route has no address
   it("passes over routes without an address of their own", () => {
-    const relay = new RelayConnectionTarget({
-      environmentId: TARGET.environmentId,
-      label: TARGET.label,
+    const addressless = new BearerConnectionTarget({
+      ...TARGET,
+      connectionId: "no-profile-route",
     });
     const entry: ConnectionCatalogEntry = {
       ...ENTRY,
-      target: relay,
+      target: addressless,
       profile: Option.none(),
       alternateRoutes: [{ target: ENTRY.target, profile: ENTRY.profile }],
     };
 
-    expect(environmentMcpUrl({ entry, connectedTarget: relay })).toBe(
+    expect(environmentMcpUrl({ entry, connectedTarget: addressless })).toBe(
       "https://environment.example.test/mcp",
     );
-    expect(
-      environmentMcpUrl({
-        entry,
-        connectedTarget: relay,
-        relayHttpBaseUrl: "https://tunnel.example.test",
-      }),
-    ).toBe("https://tunnel.example.test/mcp");
   });
 
   it("distinguishes initial connection, reconnect, and retry errors", () => {

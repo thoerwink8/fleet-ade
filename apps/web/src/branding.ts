@@ -15,7 +15,6 @@ export const APP_BASE_NAME = injectedDesktopAppBranding?.baseName ?? "Fleet ADE"
 export const APP_STAGE_LABEL =
   injectedDesktopAppBranding?.stageLabel ??
   resolveWebAppStageLabel({
-    hostedAppChannel: null,
     development: import.meta.env.DEV,
   });
 export const APP_DISPLAY_NAME =

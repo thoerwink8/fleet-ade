@@ -9,8 +9,6 @@ import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthProvidersManageScope,
-  AuthRelayReadScope,
-  AuthRelayWriteScope,
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
   AuthTerminalOperateScope,
@@ -86,16 +84,6 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
     scope: AuthAccessWriteScope,
     title: "管理访问",
     description: "为其他客户端签发和吊销凭证。",
-  },
-  {
-    scope: AuthRelayReadScope,
-    title: "查看中转",
-    description: "查看托管中转的连接状态。",
-  },
-  {
-    scope: AuthRelayWriteScope,
-    title: "管理中转",
-    description: "修改托管隧道的连接。",
   },
 ];
 

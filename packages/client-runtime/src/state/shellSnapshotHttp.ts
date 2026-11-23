@@ -8,9 +8,7 @@ import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientError, type HttpClientResponse } from "effect/http";
 
-import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
 import type { PreparedConnection } from "../connection/model.ts";
-import * as ManagedRelay from "../relay/managedRelay.ts";
 import {
   executeAuthenticatedEnvironmentHttpRequest,
   withOrchestrationProtocolHeader,
@@ -39,15 +37,11 @@ export type ShellHttpAnswer = ShellHttpSnapshot | OrchestrationV2ShellResumable;
 // setups where /api fails but /ws works, such as a proxy that blocks /api.
 const DEFAULT_SHELL_SNAPSHOT_TIMEOUT_MS = 20_000;
 
-export const fetchEnvironmentShellSnapshot = Effect.fn(
+const fetchEnvironmentShellSnapshot = Effect.fn(
   "clientRuntime.state.fetchEnvironmentShellSnapshot",
 )(function* (
   input: {
     readonly prepared: PreparedConnection;
-    readonly signer: Option.Option<ManagedRelay.ManagedRelayDpopSigner["Service"]>;
-    readonly remoteAuthorization?: Option.Option<
-      RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization["Service"]
-    >;
     readonly timeoutMs?: number;
   } & ShellSnapshotOptions,
 ) {
@@ -129,18 +123,10 @@ export const layer: Layer.Layer<ShellSnapshotLoader, never, HttpClient.HttpClien
   ShellSnapshotLoader,
   Effect.gen(function* () {
     const httpClient = yield* HttpClient.HttpClient;
-    // Resolve the DPoP signer optionally: it is only needed for relay/DPoP
-    // connections, so the loader must not hard-require it.
-    const signer = yield* Effect.serviceOption(ManagedRelay.ManagedRelayDpopSigner);
-    const remoteAuthorization = yield* Effect.serviceOption(
-      RemoteEnvironmentAuthorization.RemoteEnvironmentAuthorization,
-    );
     return ShellSnapshotLoader.of({
       load: Effect.fn("ShellSnapshotLoader.load")(function (prepared, options) {
         return fetchEnvironmentShellSnapshot({
           prepared,
-          signer,
-          remoteAuthorization,
           ...options,
         }).pipe(
           Effect.map(Option.some<ShellHttpAnswer>),

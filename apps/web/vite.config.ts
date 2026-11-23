@@ -267,10 +267,7 @@ function bootstrapTitlePlugin(): Plugin {
       development = !config.isProduction;
     },
     transformIndexHtml(html) {
-      const stageLabel = resolveWebAppStageLabel({
-        hostedAppChannel: null,
-        development,
-      });
+      const stageLabel = resolveWebAppStageLabel({ development });
       const title = formatAppDisplayName({ baseName: "Fleet ADE", stageLabel });
       return html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
     },

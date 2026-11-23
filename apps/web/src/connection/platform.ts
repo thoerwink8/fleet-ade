@@ -21,7 +21,6 @@ import {
 } from "@t3tools/client-runtime/connection";
 import { bootstrapRemoteBearerSession } from "@t3tools/client-runtime/authorization";
 import { fetchRemoteEnvironmentDescriptor } from "@t3tools/client-runtime/environment";
-import { managedRelayAccountChanges, managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
 import { EnvironmentRpcRequestObserver } from "@t3tools/client-runtime/rpc";
 import {
   AuthStandardClientScopes,
@@ -51,7 +50,6 @@ import {
 } from "../environments/primary/target";
 import { clearComposerDraftsEnvironment } from "../composerDraftStore";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
-import { appAtomRegistry } from "../rpc/atomRegistry";
 import { acknowledgeRpcRequest, trackRpcRequestSent } from "../rpc/requestLatencyState";
 import {
   desktopLocalConnectionId,
@@ -139,9 +137,6 @@ const layerWakeups = Wakeups.layer({
               document.removeEventListener("visibilitychange", listener);
             }),
         ).pipe(Effect.asVoid),
-      ),
-      managedRelayAccountChanges(appAtomRegistry).pipe(
-        Stream.map(() => "credentials-changed" as const),
       ),
       networkPathChanges,
     ],
@@ -312,20 +307,6 @@ const layerCapabilities = Layer.effectContext(
     const presentation = ClientCapabilities.ClientPresentation.of({
       metadata: currentClientMetadata(),
     });
-    const cloudSession = ClientCapabilities.CloudSession.of({
-      identity: Effect.sync(() =>
-        Option.fromNullishOr(appAtomRegistry.get(managedRelaySessionAtom)),
-      ),
-      clerkToken: Effect.fail(
-        new ConnectionBlockedError({
-          reason: "unsupported",
-          detail: "此连接不经过 T3 Connect。",
-        }),
-      ),
-    });
-    const identity = ClientCapabilities.RelayDeviceIdentity.of({
-      deviceId: Effect.succeedNone,
-    });
     const primaryAuth = ClientCapabilities.PrimaryEnvironmentAuth.of({
       bearerToken: Effect.tryPromise({
         try: readDesktopPrimaryBearerToken,
@@ -376,9 +357,7 @@ const layerCapabilities = Layer.effectContext(
       }),
     });
 
-    return Context.make(ClientCapabilities.CloudSession, cloudSession).pipe(
-      Context.add(ClientCapabilities.PrimaryEnvironmentAuth, primaryAuth),
-      Context.add(ClientCapabilities.RelayDeviceIdentity, identity),
+    return Context.make(ClientCapabilities.PrimaryEnvironmentAuth, primaryAuth).pipe(
       Context.add(ClientCapabilities.ClientPresentation, presentation),
       Context.add(ClientCapabilities.SshEnvironmentGateway, ssh),
     );

@@ -142,14 +142,10 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   threadPullRequestWatch: Schema.optionalKey(Schema.Boolean),
   pullRequestStackActions: Schema.optionalKey(Schema.Boolean),
   serverSelfUpdate: Schema.optionalKey(ServerSelfUpdateCapability),
-  /** Server answers server.getNpmRelease using its configured npm registry. */
-  npmReleaseLookup: Schema.optionalKey(Schema.Boolean),
   /** Manual commands must update this install, not the host's default global prefix. */
   serverInstallation: ForwardCompatibleOptional(ServerInstallation),
   serverSelfUpdateProgress: Schema.optionalKey(Schema.Boolean),
   serverUpdateThreadContinuation: Schema.optionalKey(Schema.Boolean),
-  /** Only explicit false skips Live Activity seeding; older servers may still publish. */
-  agentActivityPublishing: Schema.optionalKey(Schema.Boolean),
   projectCloneTracking: Schema.optionalKey(Schema.Boolean),
   /** Server keeps `pinned` and `archived` from project.update. Older servers drop them. */
   projectOrganization: Schema.optionalKey(Schema.Boolean),
@@ -176,8 +172,6 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   linkFence: Schema.optionalKey(Schema.Boolean),
   /** Mints pairing codes that approve one agent sign-in at a set level (`AUTO-…`). */
   mcpApprovalCodes: Schema.optionalKey(Schema.Boolean),
-  /** Agent sign-ins on its T3 Connect address are approved on the hosted app, without a code. */
-  mcpHostedApproval: Schema.optionalKey(Schema.Boolean),
   /** Server accepts `{ type: "once" }` scheduled tasks; older servers reject them on save. */
   oneTimeSchedules: Schema.optionalKey(Schema.Boolean),
   /** Server honors `freshContext` on sends; older servers ignore it and keep the old context. */

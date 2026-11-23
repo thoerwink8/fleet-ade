@@ -16,12 +16,10 @@
     "@t3tools/tailscale": "workspace:*",
     "e2e": "0.23.0",
     "effect": "catalog:",
-    "playwright-core": "1.64.1",
-    "plist": "catalog:"
+    "playwright-core": "1.64.1"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@types/plist": "catalog:",
     "esbuild": "0.28.2",
     "postject": "1.0.0-alpha.6",
     "typescript-legacy": "npm:typescript@~6.0.3",

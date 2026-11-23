@@ -14,23 +14,12 @@ import {
 } from "./catalog.ts";
 import { BearerConnectionTarget, type ConnectionTarget } from "./model.ts";
 
-export type ConnectionRouteKind =
-  | "relay"
-  | "loopback"
-  | "lan"
-  | "tailnet"
-  | "vpn"
-  | "public"
-  | "ssh";
-
-export const RELAY_ROUTE_ID = "relay";
+export type ConnectionRouteKind = "loopback" | "lan" | "tailnet" | "vpn" | "public" | "ssh";
 
 export function connectionRouteId(target: ConnectionTarget): string {
   switch (target._tag) {
     case "PrimaryConnectionTarget":
       return "primary";
-    case "RelayConnectionTarget":
-      return RELAY_ROUTE_ID;
     case "BearerConnectionTarget":
     case "SshConnectionTarget":
       return target.connectionId;
@@ -90,8 +79,6 @@ function directAddressKind(hostname: string, tailscale = false) {
 
 export function connectionRouteKind(route: ConnectionRoute): ConnectionRouteKind {
   switch (route.target._tag) {
-    case "RelayConnectionTarget":
-      return "relay";
     case "SshConnectionTarget":
       return "ssh";
     case "PrimaryConnectionTarget":
@@ -135,7 +122,6 @@ const ROUTE_KIND_RANK: Record<ConnectionRouteKind, number> = {
   vpn: 2,
   public: 3,
   ssh: 4,
-  relay: 5,
 };
 
 export function insertRoute(
@@ -188,8 +174,6 @@ function routeAddressKey(route: ConnectionRoute): string | null {
 
 export function connectionRouteLabel(route: ConnectionRoute): string {
   switch (connectionRouteKind(route)) {
-    case "relay":
-      return "T3 Connect";
     case "loopback":
       return "此设备";
     case "lan":
@@ -217,17 +201,9 @@ export function connectionRouteAddress(route: ConnectionRoute): string | null {
   return routeHttpBaseUrl(route);
 }
 
-/** Learned routes alone must not make relay environments manually retryable. */
+/** Learned routes alone must not make an environment manually retryable. */
 export const hasSavedBearerRoute = (entry: ConnectionCatalogEntry) =>
   connectionRoutes(entry).some((r) => !isLearned(r) && r.target._tag === "BearerConnectionTarget");
-
-export function hasRelayRoute(
-  entry: Pick<ConnectionCatalogEntry, "target" | "alternateRoutes">,
-): boolean {
-  return [entry.target, ...(entry.alternateRoutes ?? []).map((route) => route.target)].some(
-    (target) => target._tag === "RelayConnectionTarget",
-  );
-}
 
 export function mergeLearnedRoutes(input: {
   readonly entry: ConnectionCatalogEntry;
@@ -239,14 +215,13 @@ export function mergeLearnedRoutes(input: {
   const { entry } = input;
   const active = input.activeRoute.target;
   const saved = connectionRoutes(entry);
-  if (active._tag !== "RelayConnectionTarget" && active._tag !== "BearerConnectionTarget") {
+  if (active._tag !== "BearerConnectionTarget") {
     return null;
   }
   const activeProfile = Option.getOrNull(input.activeRoute.profile);
   const authorization =
-    active._tag === "RelayConnectionTarget" ||
-    (activeProfile?._tag === "BearerConnectionProfile" &&
-      activeProfile.authorization === "t3-connect")
+    activeProfile?._tag === "BearerConnectionProfile" &&
+    activeProfile.authorization === "t3-connect"
       ? ("t3-connect" as const)
       : undefined;
   const sharedCredential =
@@ -432,9 +407,8 @@ export function isLearned(route: ConnectionRoute): boolean {
 
 /**
  * A learned route borrows the credential of the route it was learned over, so
- * it cannot outlive that route: removing T3 Connect also removes routes learned
- * through it, and removing a paired address removes routes that borrow its
- * token.
+ * it cannot outlive that route: removing a paired address removes routes that
+ * borrow its token.
  */
 export function routesAfterRemoving(
   routes: ReadonlyArray<ConnectionRoute>,
@@ -447,7 +421,8 @@ export function routesAfterRemoving(
     if (!isLearned(route)) return true;
     const profile = Option.getOrNull(route.profile);
     if (profile?._tag === "BearerConnectionProfile" && profile.authorization === "t3-connect") {
-      return removed.target._tag !== "RelayConnectionTarget";
+      // T3 Connect is gone; learned routes borrowing it drop with any removal.
+      return false;
     }
     return credentialConnectionId(connectionRouteId(route.target)) !== removedId;
   });
@@ -467,10 +442,6 @@ export function pendingRouteOrder(
   const saved = new Set(savedIds);
   if (!pending.every((id) => saved.has(id))) return null;
   return pending.some((id, index) => id !== savedIds[index]) ? pending : null;
-}
-
-export function removedWithRelay(entry: ConnectionCatalogEntry): boolean {
-  return routesAfterRemoving(connectionRoutes(entry), RELAY_ROUTE_ID).length === 0;
 }
 
 export function sshTargetKey(target: DesktopSshEnvironmentTarget): string {

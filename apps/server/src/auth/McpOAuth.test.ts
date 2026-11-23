@@ -4,7 +4,6 @@ import {
   AuthMcpClientAccess,
   AuthStandardClientScopes,
   type AuthCreatePairingCredentialInput,
-  type EnvironmentCloudLinkStateResult,
   EnvironmentHttpApi,
   EnvironmentId,
   MCP_PEER_LINK_SOFTWARE_ID,
@@ -28,7 +27,6 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 
-import * as CloudLink from "../cloud/CloudLink.ts";
 import * as ServerConfig from "../config.ts";
 import { makeDpopKey } from "./dpop.testkit.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
@@ -53,13 +51,6 @@ const layerEnvironmentAuth = EnvironmentAuth.layer.pipe(
   Layer.provideMerge(ServerEnvironment.layerIdentity),
   Layer.provide(layerConfig),
 );
-const notLinked: EnvironmentCloudLinkStateResult = {
-  linked: false,
-  cloudUserId: null,
-  relayUrl: null,
-  relayIssuer: null,
-  publishAgentActivity: false,
-};
 const noPeer = Layer.mergeAll(
   Layer.mock(PeerMcpClient.PeerMcpClient)({
     call: () =>
@@ -73,7 +64,6 @@ const noPeer = Layer.mergeAll(
 );
 const makeLayerRoutes = (
   capture: (auth: EnvironmentAuth.EnvironmentAuth["Service"]) => void,
-  linkState: EnvironmentCloudLinkStateResult,
   peer?: Layer.Layer<PeerMcpClient.PeerMcpClient | ServerEnvironment.ServerEnvironment>,
 ) =>
   Layer.mergeAll(
@@ -86,9 +76,6 @@ const makeLayerRoutes = (
         McpOAuthHttp.layer.pipe(
           Layer.provide(McpOAuth.layer.pipe(Layer.provide(peer ?? noPeer))),
           Layer.provide(ServerSettings.layerTest()),
-          Layer.provide(
-            Layer.mock(CloudLink.CloudLink)({ linkState: () => Effect.succeed(linkState) }),
-          ),
         ),
       ),
       Layer.provide(AuthHttp.layerAuthenticatedAuth),
@@ -127,20 +114,15 @@ type Handler = (request: Request) => Effect.Effect<Response>;
 
 const withRoutes = <A, E>(
   use: (handler: Handler, auth: EnvironmentAuth.EnvironmentAuth["Service"]) => Effect.Effect<A, E>,
-  linkState = notLinked,
   peer?: Layer.Layer<PeerMcpClient.PeerMcpClient | ServerEnvironment.ServerEnvironment>,
 ) =>
   Effect.gen(function* () {
     const random = yield* SecureRandom.SecureRandom;
     const context = Context.make(SecureRandom.SecureRandom, random);
     let routerAuth: EnvironmentAuth.EnvironmentAuth["Service"] | undefined;
-    const layerRoutes = makeLayerRoutes(
-      (auth) => {
-        routerAuth = auth;
-      },
-      linkState,
-      peer,
-    );
+    const layerRoutes = makeLayerRoutes((auth) => {
+      routerAuth = auth;
+    }, peer);
     return yield* Effect.acquireUseRelease(
       Effect.sync(() => HttpRouter.toWebHandler(layerRoutes, { disableLogger: true })),
       (web) =>
@@ -791,29 +773,27 @@ it.live("an app approval code approves only an app sign-in, at its own level", (
 
 it.effect("keeps app sign-in on this server when no hosted app is configured", () =>
   Effect.gen(function* () {
-    const handoff = (tunnelHostname: string, peerLink = false) =>
-      withRoutes(
-        (handler) =>
-          Effect.gen(function* () {
-            const registered = yield* handler(
-              at("/oauth/mcp/register", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: encodeJson({
-                  client_name: "Agent",
-                  redirect_uris: [REDIRECT],
-                  token_endpoint_auth_method: "none",
-                  ...(peerLink ? { software_id: MCP_PEER_LINK_SOFTWARE_ID } : {}),
-                }),
+    const handoff = (_tunnelHostname: string, peerLink = false) =>
+      withRoutes((handler) =>
+        Effect.gen(function* () {
+          const registered = yield* handler(
+            at("/oauth/mcp/register", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: encodeJson({
+                client_name: "Agent",
+                redirect_uris: [REDIRECT],
+                token_endpoint_auth_method: "none",
+                ...(peerLink ? { software_id: MCP_PEER_LINK_SOFTWARE_ID } : {}),
               }),
-            ).pipe(Effect.flatMap(json<{ client_id: string }>));
-            const query = new URLSearchParams(
-              authorizeParams(registered.client_id, "http://localhost:51234/callback"),
-            );
-            const response = yield* handler(at(`/oauth/mcp/authorize?${query}`));
-            return { location: response.headers.get("location")!, query: query.toString() };
-          }),
-        { ...notLinked, linked: true, cloudUserId: "user_1", tunnelHostname },
+            }),
+          ).pipe(Effect.flatMap(json<{ client_id: string }>));
+          const query = new URLSearchParams(
+            authorizeParams(registered.client_id, "http://localhost:51234/callback"),
+          );
+          const response = yield* handler(at(`/oauth/mcp/authorize?${query}`));
+          return { location: response.headers.get("location")!, query: query.toString() };
+        }),
       );
 
     const onTunnel = yield* handoff("box.example.ts.net");
@@ -896,7 +876,7 @@ it.live("one-click approves only access the browser session holds the scopes for
       );
       expect(new URL(readOnly.redirectTo!).searchParams.get("code")).toEqual(expect.any(String));
 
-      // The hosted app approves with the owner's T3 Connect session, which sends no cookie.
+      // A bearer session (no cookie) approves the same way.
       const connect = `Bearer ${(yield* auth.issueSession({ scopes: [...AuthStandardClientScopes] })).token}`;
       const connectDetails = yield* details(connect);
       expect(connectDetails.oneClickAccess).toContain("full-access");
@@ -1117,7 +1097,6 @@ it.live("binds a proven peer identity to its link token and nothing else", () =>
           expect(ordinary.environmentId).toBeUndefined();
           expect((yield* Ref.get(proofs)).length).toBe(proofCount);
         }),
-      notLinked,
       peers,
     );
   }),

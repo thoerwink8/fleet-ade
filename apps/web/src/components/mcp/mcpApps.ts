@@ -177,9 +177,6 @@ export const MCP_APPS: readonly McpApp[] = [
   },
 ];
 
-/** The "Something else…" choice: the URL and general steps only. */
-export const OTHER_MCP_APP_STEPS = ["添加一个使用 OAuth 的远程 MCP 服务器。"] as const;
-
 /**
  * The primary button for `app`: its label, the https page it opens, and what it copies first.
  * Null for apps set up with commands. It never copies the approval code.
