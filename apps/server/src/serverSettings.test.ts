@@ -313,7 +313,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("server settings"
         JSON.stringify({
           guestSharingEnabled: true,
           clerkPublishableKey: "pk_test_old",
-          hostedAppUrl: "https://app.t3.codes",
+          hostedAppUrl: "https://hosted.example.test",
           continueThreadsAfterServerUpdate: false,
         }),
       );
