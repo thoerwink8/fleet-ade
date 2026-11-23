@@ -49,18 +49,20 @@ export function getStandardThemeColors(appearance: ThemeAppearance): ThemeColors
   return (standardLightThemeColors ??= decodeThemeColors(T3_CODE_LIGHT_THEME_COLORS));
 }
 
-// index.css paints the light page and bubble and the three-layer dark hierarchy directly.
+// index.css bridges the default theme onto @fleet/design tokens; these are the
+// resolved --fa-* surfaces it paints in each appearance.
 const STANDARD_WEB_PAINTED_COLORS: Record<ThemeAppearance, Partial<ThemeColors>> = {
   light: {
-    canvas: "oklch(0.972 0.003 270)",
-    surfaceRaised: "oklch(0.9776 0.0024 270)",
-    messageSurface: "#ebebed",
+    canvas: "#ffffff",
+    surface: "#f5f5f6",
+    surfaceRaised: "#f5f5f6",
+    messageSurface: "#eaeaeb",
   },
   dark: {
-    canvas: "oklch(0.175 0.006 260)",
-    surface: "oklch(0.205 0.007 260)",
-    surfaceRaised: "oklch(0.205 0.007 260)",
-    messageSurface: "oklch(0.24 0.008 260)",
+    canvas: "#18181b",
+    surface: "#1f1f23",
+    surfaceRaised: "#1f1f23",
+    messageSurface: "#323235",
   },
 };
 
