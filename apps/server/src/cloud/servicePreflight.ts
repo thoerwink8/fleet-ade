@@ -76,28 +76,3 @@ export function runServicePreflight(input: {
 
   return { status: "ready", version, launcherProtocol };
 }
-
-export function decodeServicePreflightResult(
-  value: unknown,
-  launcherProtocol: SupportedLauncherProtocol,
-): ServicePreflightResult | undefined {
-  if (typeof value !== "object" || value === null) {
-    return undefined;
-  }
-  const record = value as Record<string, unknown>;
-  if (
-    record.status === "ready" &&
-    record.launcherProtocol === launcherProtocol &&
-    typeof record.version === "string"
-  ) {
-    return { status: "ready", version: record.version, launcherProtocol };
-  }
-  if (
-    record.status === "blocked" &&
-    typeof record.version === "string" &&
-    typeof record.reason === "string"
-  ) {
-    return { status: "blocked", version: record.version, reason: record.reason };
-  }
-  return undefined;
-}
