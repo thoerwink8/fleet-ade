@@ -1,4 +1,3 @@
-import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { RotateCcwIcon } from "lucide-react";
@@ -6,8 +5,7 @@ import { Button } from "../components/ui/button";
 import { useSettingsRestore } from "../components/settings/SettingsPanels";
 
 import { AppRouteModal, AppRouteModalClose } from "../components/AppRouteModal";
-import { SettingsBreadcrumb } from "../components/settings/SettingsBreadcrumb";
-import { SettingsSidebarNav } from "../components/settings/SettingsSidebarNav";
+import { SettingsShell } from "../components/settings/SettingsShell";
 import {
   SettingsScopeProvider,
   useSettingsScope,
@@ -21,7 +19,10 @@ import {
   validateSettingsRouteSearch,
 } from "../components/settings/settingsScopeNavigation";
 import { SettingsPathMissingView } from "../components/settings/SettingsPathMissingView";
-import { resolveSettingsPath } from "../components/settings/settingsPath.logic";
+import {
+  isSettingsIndexPath,
+  resolveSettingsPath,
+} from "../components/settings/settingsPath.logic";
 import {
   getSettingsSearchTargetScope,
   getThreadAutoSettlementSearchAvailability,
@@ -114,9 +115,13 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
   return children;
 }
 
+function isMobileSettingsViewport(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+}
+
 function SettingsContentLayout() {
-  const contentArea = workspaceAreaProps("settings", 1, "设置内容");
   const location = useLocation();
+  const isIndex = isSettingsIndexPath(location.pathname);
   const { search, environment } = useSettingsScope();
   const contentScopeKey =
     location.pathname === "/settings/diagnostics" || location.pathname === "/settings/providers"
@@ -126,27 +131,23 @@ function SettingsContentLayout() {
 
   return (
     <AppRouteModal label="设置">
-      <div className="relative flex min-h-0 flex-1">
-        <SettingsSidebarNav pathname={location.pathname} />
-        <div {...contentArea} className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <header className="flex h-12 shrink-0 items-center gap-3 border-b ps-4 pe-2 sm:ps-5">
-            <SettingsBreadcrumb pathname={location.pathname} />
-            <div className="ms-auto flex shrink-0 items-center gap-1">
-              {location.pathname === "/settings/general" ? (
-                <RestoreDeviceDefaultsButton
-                  onRestored={() => setRestoreSignal((value) => value + 1)}
-                />
-              ) : null}
-              <AppRouteModalClose />
-            </div>
-          </header>
-          <div key={`${contentScopeKey}:${restoreSignal}`} className="min-h-0 flex flex-1 flex-col">
-            <SettingsScopeBoundary pathname={location.pathname}>
-              <Outlet />
-            </SettingsScopeBoundary>
-          </div>
+      <SettingsShell
+        pathname={location.pathname}
+        headerActions={
+          location.pathname === "/settings/general" ? (
+            <RestoreDeviceDefaultsButton
+              onRestored={() => setRestoreSignal((value) => value + 1)}
+            />
+          ) : null
+        }
+        closeButton={<AppRouteModalClose />}
+      >
+        <div key={`${contentScopeKey}:${restoreSignal}`} className="min-h-0 flex flex-1 flex-col">
+          <SettingsScopeBoundary pathname={location.pathname}>
+            {isIndex ? null : <Outlet />}
+          </SettingsScopeBoundary>
         </div>
-      </div>
+      </SettingsShell>
     </AppRouteModal>
   );
 }
@@ -183,7 +184,9 @@ export const Route = createFileRoute("/_chat/settings")({
   validateSearch: validateSettingsRouteSearch,
   search: { middlewares: [retainSettingsScope] },
   beforeLoad: ({ location }) => {
-    const decision = resolveSettingsPath(location.pathname, location.hash);
+    const decision = resolveSettingsPath(location.pathname, location.hash, {
+      isMobile: isMobileSettingsViewport(),
+    });
     if (decision.kind !== "redirect") return;
     throw redirect({
       to: decision.to,

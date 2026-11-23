@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
-import { resolveSettingsPath } from "./settingsPath.logic";
+import { isSettingsIndexPath, resolveSettingsPath } from "./settingsPath.logic";
 
 describe("resolveSettingsPath", () => {
   it("treats a path in neither the page list nor the rename table as missing", () => {
@@ -22,6 +22,11 @@ describe("resolveSettingsPath", () => {
       to: "/settings/general",
       retainSearch: false,
     });
+    expect(resolveSettingsPath("/settings", "", { isMobile: true })).toEqual({ kind: "page" });
+    expect(resolveSettingsPath("/settings/", "", { isMobile: true })).toEqual({ kind: "page" });
+    expect(isSettingsIndexPath("/settings")).toBe(true);
+    expect(isSettingsIndexPath("/settings/")).toBe(true);
+    expect(isSettingsIndexPath("/settings/general")).toBe(false);
     expect(resolveSettingsPath("/settings/integrations", "")).toEqual({
       kind: "redirect",
       to: "/settings/providers",

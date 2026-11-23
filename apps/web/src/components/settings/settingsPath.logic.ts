@@ -24,9 +24,18 @@ function normalizeSettingsPathname(pathname: string): string {
   return trimmed.toLowerCase();
 }
 
-export function resolveSettingsPath(pathname: string, hash: string): SettingsPathDecision {
+export function isSettingsIndexPath(pathname: string): boolean {
+  return normalizeSettingsPathname(pathname) === "/settings";
+}
+
+export function resolveSettingsPath(
+  pathname: string,
+  hash: string,
+  options?: { readonly isMobile?: boolean },
+): SettingsPathDecision {
   const path = normalizeSettingsPathname(pathname);
   if (path === "/settings") {
+    if (options?.isMobile) return { kind: "page" };
     return { kind: "redirect", to: "/settings/general", retainSearch: false };
   }
   const moved = movedSettingsRedirect(path, hash.replace(/^#/, ""));

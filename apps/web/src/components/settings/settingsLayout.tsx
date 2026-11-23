@@ -37,6 +37,7 @@ const EMPTY_SETTING_KEYS: readonly (keyof ServerSettings)[] = [];
 declare module "@tanstack/react-router" {
   interface HistoryState {
     settingsTargetHighlight?: boolean;
+    fromSettingsIndex?: boolean;
   }
 }
 
@@ -600,7 +601,7 @@ export function SettingsPageContainer({
       replace: true,
       resetScroll: false,
       hashScrollIntoView: false,
-      state: { settingsTargetHighlight: true },
+      state: (prev) => ({ ...prev, settingsTargetHighlight: true }),
     });
   };
 

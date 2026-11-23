@@ -1,8 +1,20 @@
+import "~/index.css";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+  useLocation,
+} from "@tanstack/react-router";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, render } from "../../../test/render";
 import { SidebarProvider } from "../ui/sidebar";
+import { SettingsPageContainer, SettingsSearchTarget } from "./settingsLayout";
+import { SettingsShell } from "./SettingsShell";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
 import { SETTINGS_NAV_GROUPS, SETTINGS_SECTION_LABELS } from "./settingsSearch";
 
@@ -110,4 +122,158 @@ it.each([1280, 390])("names each group by a heading outside it at %ipx wide", as
     expect(heading?.tagName, `the group starting at ${first} has no heading`).toBe("H3");
   }
   expect(page.getByRole("tree").query()).toBeNull();
+});
+
+function RoutedSettingsShell() {
+  const pathname = useLocation({ select: (location) => location.pathname });
+  return (
+    <div className="flex h-screen w-screen flex-col">
+      <SidebarProvider defaultOpen>
+        <SettingsShell pathname={pathname}>
+          <div data-testid="section-body" className="p-4">
+            当前分组：{pathname}
+          </div>
+        </SettingsShell>
+      </SidebarProvider>
+    </div>
+  );
+}
+
+it("navigates two-level settings on phones (list -> section -> back and history.back) while keeping desktop split", async () => {
+  await page.viewport(390, 844);
+  await using screen = await render(<RoutedSettingsShell />, { router: "/settings" });
+
+  const navPane = () => screen.container.querySelector<HTMLElement>("[data-settings-nav-pane]")!;
+  const contentPane = () =>
+    screen.container.querySelector<HTMLElement>("[data-settings-content-pane]")!;
+
+  // 1. Mobile /settings: full-width group list with visible labels and search, content hidden.
+  await expect.element(page.getByRole("combobox", { name: "搜索设置" })).toBeVisible();
+  expect(navPane().getBoundingClientRect().width).toBeGreaterThanOrEqual(window.innerWidth * 0.9);
+  expect(contentPane().getBoundingClientRect().width).toBe(0);
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+
+  const nav = page.getByRole("navigation", { name: "设置分类" }).element();
+  const labels = nav.querySelectorAll<HTMLElement>("[data-settings-section] span");
+  expect(labels.length).toBe(SETTINGS_NAV_GROUPS.flatMap((group) => group.paths).length);
+  for (const label of labels) {
+    expect(label.getBoundingClientRect().width).toBeGreaterThan(1);
+    expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
+  }
+
+  // 2. Tap a section -> full-width content with Back button; nav hidden.
+  await userEvent.click(page.getByRole("button", { name: "外观" }));
+  await vi.waitFor(() =>
+    expect(screen.router?.state.location.pathname).toBe("/settings/appearance"),
+  );
+  const backButton = page.getByRole("button", { name: "返回设置分类" });
+  await expect.element(backButton).toBeVisible();
+  expect(navPane().getBoundingClientRect().width).toBe(0);
+  expect(contentPane().getBoundingClientRect().width).toBeGreaterThanOrEqual(
+    window.innerWidth * 0.9,
+  );
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+
+  // 3. Click Back button -> returns to group list.
+  await userEvent.click(backButton);
+  await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/settings"));
+  await expect.element(page.getByRole("button", { name: "代码" })).toBeVisible();
+  expect(navPane().getBoundingClientRect().width).toBeGreaterThanOrEqual(window.innerWidth * 0.9);
+
+  // 4. Open another section and use browser history.back() -> returns to group list.
+  await userEvent.click(page.getByRole("button", { name: "代码" }));
+  await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/settings/projects"));
+  screen.router?.history.back();
+  await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/settings"));
+  expect(navPane().getBoundingClientRect().width).toBeGreaterThanOrEqual(window.innerWidth * 0.9);
+
+  // 5. Desktop viewport keeps side-by-side layout with 208px sidebar and no mobile back button.
+  await page.viewport(1280, 800);
+  await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/settings/general"));
+  expect(nav.getBoundingClientRect().width).toBe(208);
+  expect(contentPane().getBoundingClientRect().width).toBeGreaterThan(208);
+  expect(backButton.query()).toBeNull();
+});
+
+it("shows section content and back button when deep-linked directly on phones", async () => {
+  await page.viewport(390, 844);
+  await using screen = await render(<RoutedSettingsShell />, { router: "/settings/connections" });
+
+  const navPane = screen.container.querySelector<HTMLElement>("[data-settings-nav-pane]")!;
+  const contentPane = screen.container.querySelector<HTMLElement>("[data-settings-content-pane]")!;
+  const backButton = page.getByRole("button", { name: "返回设置分类" });
+
+  await expect.element(backButton).toBeVisible();
+  expect(navPane.getBoundingClientRect().width).toBe(0);
+  expect(contentPane.getBoundingClientRect().width).toBeGreaterThanOrEqual(window.innerWidth * 0.9);
+
+  await userEvent.click(backButton);
+  await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/settings"));
+  expect(navPane.getBoundingClientRect().width).toBeGreaterThanOrEqual(window.innerWidth * 0.9);
+});
+
+function createSettingsSearchRouter() {
+  const rootRoute = createRootRoute();
+  const settingsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "settings",
+    component: function SettingsLayoutRoute() {
+      const pathname = useLocation({ select: (location) => location.pathname });
+      return (
+        <div className="flex h-screen w-screen flex-col">
+          <SidebarProvider defaultOpen>
+            <SettingsShell pathname={pathname}>
+              <Outlet />
+            </SettingsShell>
+          </SidebarProvider>
+        </div>
+      );
+    },
+  });
+  const settingsIndexRoute = createRoute({
+    getParentRoute: () => settingsRoute,
+    path: "/",
+    component: () => null,
+  });
+  const appearanceRoute = createRoute({
+    getParentRoute: () => settingsRoute,
+    path: "appearance",
+    component: () => (
+      <SettingsPageContainer>
+        <SettingsSearchTarget id="theme">主题设置</SettingsSearchTarget>
+      </SettingsPageContainer>
+    ),
+  });
+  return createRouter({
+    routeTree: rootRoute.addChildren([
+      settingsRoute.addChildren([settingsIndexRoute, appearanceRoute]),
+    ]),
+    history: createMemoryHistory({ initialEntries: ["/settings"] }),
+    disableGlobalCatchBoundary: true,
+  });
+}
+
+it("returns via history.back() after opening a section from search results on phones", async () => {
+  await page.viewport(390, 844);
+  const router = createSettingsSearchRouter();
+  await using _screen = await render(<RouterProvider router={router} />, {
+    // Needs real /settings and /settings/appearance routes so clearTargetHash stays on the section.
+    router: false,
+  });
+  using backSpy = vi.spyOn(router.history, "back");
+
+  await page.getByRole("combobox", { name: "搜索设置" }).fill("主题");
+  await userEvent.click(page.getByRole("option", { name: /主题/ }));
+
+  await vi.waitFor(() => {
+    expect(router.state.location.pathname).toBe("/settings/appearance");
+    expect(router.state.location.hash).toBe("");
+  });
+  const historyLengthBeforeBack = router.history.length;
+  expect(historyLengthBeforeBack).toBe(2);
+
+  await userEvent.click(page.getByRole("button", { name: "返回设置分类" }));
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
+  expect(backSpy).toHaveBeenCalledTimes(1);
+  expect(router.history.length).toBe(historyLengthBeforeBack);
 });
