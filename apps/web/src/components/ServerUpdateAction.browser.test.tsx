@@ -82,7 +82,7 @@ const currentSession = {
   },
 } as const satisfies AuthSessionState;
 
-const success = (method: "boot-service" | "desktop-app" = "boot-service", version = "0.0.31") =>
+const success = (method: "desktop-app" | "boot-service" = "desktop-app", version = "0.0.31") =>
   AsyncResult.success({ targetVersion: version, method });
 
 let sessionAtom: Atom.Writable<SessionResult>;
@@ -124,7 +124,8 @@ function renderAction(props: Partial<Parameters<typeof ServerUpdateAction>[0]> =
     <ServerUpdateAction
       environmentId={"env-test" as EnvironmentId}
       serverLabel="Test server"
-      selfUpdate="boot-service"
+      selfUpdate="desktop-managed"
+      desktopAppUpdate
       targetVersion="0.0.31"
       {...props}
     />,
@@ -132,6 +133,16 @@ function renderAction(props: Partial<Parameters<typeof ServerUpdateAction>[0]> =
 }
 
 describe("ServerUpdateAction", () => {
+  it("renders nothing for a background service that used to update itself", async () => {
+    using _state = setup();
+    await using screen = await renderAction({
+      selfUpdate: "boot-service",
+      desktopAppUpdate: false,
+    });
+    expect(screen.container.querySelector("button")).toBeNull();
+    expect(testState.updateServer).not.toHaveBeenCalled();
+  });
+
   it.each([
     { serverUpdateScope: undefined, scopes: ["orchestration:operate"], allowed: true },
     { serverUpdateScope: undefined, scopes: ["orchestration:read"], allowed: false },
@@ -186,19 +197,21 @@ describe("ServerUpdatesAction", () => {
     {
       environmentId: "batch-a" as EnvironmentId,
       serverLabel: "Laptop",
-      selfUpdate: "boot-service",
+      selfUpdate: "desktop-managed",
+      desktopAppUpdate: true,
       targetVersion: "0.0.31",
     },
     {
       environmentId: "batch-b" as EnvironmentId,
       serverLabel: "Office",
-      selfUpdate: "respawn",
+      selfUpdate: "desktop-managed",
+      desktopAppUpdate: true,
       targetVersion: "0.0.31",
     },
     {
       environmentId: "batch-c" as EnvironmentId,
       serverLabel: "手动",
-      selfUpdate: null,
+      selfUpdate: "boot-service",
       targetVersion: "0.0.31",
     },
   ];

@@ -17,10 +17,36 @@ import {
   isVersionExecutable,
   pinnedRuntimeVersionsDir,
   resolveLauncherPath,
+  windowsShimTarget,
 } from "../cloud/pinnedRuntime.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 import * as CliService from "./service.ts";
-import { findWindowsShim } from "./update.ts";
+
+/** Windows executables see their own path, so find the installer shim by matching t3.cmd targets on PATH. */
+const findWindowsShim = Effect.fn("cli.uninstall.find_windows_shim")(function* (
+  executablePath: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const environment = yield* HostProcess.Environment;
+  const candidates = [
+    ...(environment["T3CODE_INSTALL_BIN_DIR"] ? [environment["T3CODE_INSTALL_BIN_DIR"]] : []),
+    ...(environment["PATH"] ?? environment["Path"] ?? "").split(";"),
+  ].filter((entry) => entry.trim().length > 0);
+  for (const directory of candidates) {
+    const shimPath = path.join(directory, "t3.cmd");
+    const contents = yield* fs.readFileString(shimPath).pipe(Effect.option);
+    if (Option.isNone(contents)) continue;
+    const target = windowsShimTarget(contents.value);
+    if (
+      target !== undefined &&
+      path.resolve(target).toLowerCase() === path.resolve(executablePath).toLowerCase()
+    ) {
+      return shimPath;
+    }
+  }
+  return undefined;
+});
 
 export class CliUninstallError extends Schema.TaggedError<CliUninstallError>()(
   "CliUninstallError",

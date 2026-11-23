@@ -34,7 +34,7 @@ one alone and stops. Set `T3CODE_CHANNEL=nightly` to install the nightly train, 
 | Start the server without a browser    | `t3 serve`                                                              |
 | Use it from your other devices        | `t3 up` ([details](./remote-access.md))                                 |
 | Keep it running in the background     | `t3 service install` ([details](./background-service.md))               |
-| Move to the newest release            | `t3 update`                                                             |
+| Move to another release               | install that release, then `t3 service install`                         |
 | Reclaim database space                | `t3 doctor` ([details](./background-service.md#reclaim-database-space)) |
 | Remove it again                       | `t3 uninstall`                                                          |
 
@@ -65,8 +65,8 @@ cd fleet-ade && vp i && vp run build:desktop
 node apps/server/dist/bin.mjs
 ```
 
-`t3 update` and the background service do not apply to a server run this way;
-update it with `git pull` and a rebuild.
+The background service does not apply to a server run this way; update it
+with `git pull` and a rebuild.
 
 ## Desktop app
 
@@ -99,7 +99,7 @@ Apply the change with `sudo nixos-rebuild switch`. For Home Manager, add
 Update a profile installation with `nix profile upgrade t3code`. For NixOS or
 Home Manager, update your configuration's nixpkgs input or channel and rebuild.
 Nix manages both the desktop app and the bundled
-`t3` command; use Nix to update them instead of the in-app updater or `t3 update`.
+`t3` command; use Nix to update them instead of the in-app updater.
 
 ### The `t3` command
 

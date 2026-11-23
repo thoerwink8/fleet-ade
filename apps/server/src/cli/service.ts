@@ -206,7 +206,7 @@ function formatServiceStatus(
       `  Logs: ${status.logPath}`,
       ...formatProtection(protection),
       ...problems,
-      `  Next: Run \`t3 update ${installedVersion}\` to match it, or pass \`--allow-downgrade\` to \`t3 service install\` explicitly.`,
+      `  Next: Run a t3@${installedVersion} CLI, or pass \`--allow-downgrade\` to \`t3 service install\` explicitly.`,
     ].join("\n");
   }
   return [
@@ -262,14 +262,16 @@ const serviceInstallCommand = Command.make("install", serviceReconcileFlags).pip
 );
 
 const serviceUpdateCommand = Command.make("update", serviceReconcileFlags).pipe(
-  Command.withDescription("Deprecated. Run `t3 update` to move to a newer release."),
+  Command.withDescription(
+    "Deprecated. Run `t3 service install` to repair the service with this CLI.",
+  ),
   Command.unlisted,
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,
       Effect.gen(function* () {
         yield* Console.log(
-          "`t3 service update` is deprecated: run `t3 update` to move to a newer release, or `t3 service install` to repair the service. Repairing now.",
+          "`t3 service update` is deprecated: run `t3 service install` to repair the service with this CLI. Repairing now.",
         );
         const result = yield* reconcileService({ allowDowngrade: flags.allowDowngrade });
         if (!result.changed) {
@@ -285,9 +287,7 @@ const serviceUpdateCommand = Command.make("update", serviceReconcileFlags).pipe(
 );
 
 const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe(
-  Command.withDescription(
-    "Restart the background service. Picks up a version installed by `t3 update` that was not restarted at the time.",
-  ),
+  Command.withDescription("Restart the background service."),
   Command.withHandler((flags) =>
     runServiceCommand(
       flags,

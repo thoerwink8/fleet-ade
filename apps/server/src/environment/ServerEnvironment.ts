@@ -18,7 +18,6 @@ import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { resolveServerInstallation } from "../cli/invocation.ts";
 import { readAgentActivityPublishingActive } from "../cloud/config.ts";
 import { resolveServerSelfUpdateCapability } from "../cloud/selfUpdate.ts";
-import { resolveServiceLauncherMode } from "../cloud/serviceLauncherClient.ts";
 import * as ServerConfig from "../config.ts";
 import { databaseMigrationHead } from "../persistence/databaseMigrationHead.ts";
 import * as ProcessRunner from "../processRunner.ts";
@@ -193,10 +192,8 @@ export const make = Effect.gen(function* () {
   const cwdBaseName = path.basename(serverConfig.cwd).trim();
   const label = yield* resolveServerEnvironmentLabel({ cwdBaseName });
   const machine = yield* detectServerEnvironmentMachineKind();
-  const launcher = yield* resolveServiceLauncherMode();
   const serverSelfUpdate = resolveServerSelfUpdateCapability({
     desktopManaged: serverConfig.mode === "desktop",
-    launcherManaged: launcher.managed,
   });
   const serverInstallation = serverSelfUpdate === null ? yield* resolveServerInstallation : null;
   // The desktop reports whether it can install updates; requests travel over its control fd.
@@ -275,9 +272,7 @@ export const make = Effect.gen(function* () {
       npmReleaseLookup: true,
       ...(serverSelfUpdate === null ? {} : { serverSelfUpdate }),
       ...(serverInstallation === null ? {} : { serverInstallation }),
-      ...(serverSelfUpdate === "boot-service" || desktopAppUpdate
-        ? { serverSelfUpdateProgress: true }
-        : {}),
+      ...(desktopAppUpdate ? { serverSelfUpdateProgress: true } : {}),
       ...(desktopAppUpdate ? { desktopAppUpdate: true, desktopAppChannelSwitch: true } : {}),
       serverBrowser: true,
       peerLinks: true,

@@ -72,11 +72,11 @@ describe("collectServerUpdateTargets", () => {
     );
 
     expect(targets.map((target) => [target.serverLabel, target.targetVersion])).toEqual([
-      ["service", "0.0.50"],
       ["other-desktop", "0.0.50"],
     ]);
     expect(skipped.map((entry) => [entry.label, entry.reason])).toEqual([
-      ["nightly-service", "使用 nightly 通道"],
+      ["service", "需要手动更新"],
+      ["nightly-service", "需要手动更新"],
       ["offline", "未连接"],
       ["never-connected", "未连接"],
       ["no-scope", "没有权限"],
@@ -136,19 +136,16 @@ describe("collectChannelSwitchTargets", () => {
         target.trackOnly ?? false,
       ]),
     ).toEqual([
-      ["old-service", "0.1.3", undefined, false],
       ["linux-desktop", "0.1.3", "latest", false],
       ["stable-desktop", "0.1.3", "latest", false],
       ["current-desktop", "0.1.3", "latest", true],
     ]);
     expect(targets.every((target) => target.targetDatabaseMigration === 69)).toBe(true);
     expect(skipped.map((entry) => [entry.label, entry.reason])).toEqual([
-      ["newer-service", "run `t3 update --channel stable --allow-downgrade` there"],
-      [
-        "new-service",
-        "数据库包含 0.1.3 尚不支持的更改；请继续使用 Nightly，直到 Stable 通道支持这些更改",
-      ],
-      ["old-server", "服务器版本过旧，不支持数据库检查；请先在 Nightly 通道上更新"],
+      ["old-service", "需要手动更新"],
+      ["newer-service", "需要手动更新"],
+      ["new-service", "需要手动更新"],
+      ["old-server", "需要手动更新"],
       ["mac-desktop", "需要在那台 Mac 上切换 Mac 应用"],
       ["preview", "运行的是预览版"],
     ]);
@@ -175,14 +172,10 @@ describe("collectChannelSwitchTargets", () => {
       nightly,
     );
 
-    expect(targets.map((target) => [target.serverLabel, target.targetVersion])).toEqual([
-      ["service", NIGHTLY],
-    ]);
+    expect(targets).toEqual([]);
     expect(skipped.map((entry) => [entry.label, entry.reason])).toEqual([
-      [
-        "ahead",
-        `数据库包含 ${NIGHTLY} 尚不支持的更改；请继续使用 Stable，直到 Nightly 通道支持这些更改`,
-      ],
+      ["service", "需要手动更新"],
+      ["ahead", "需要手动更新"],
       ["old-desktop", "需要更高版本的桌面应用"],
     ]);
   });

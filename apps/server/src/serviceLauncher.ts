@@ -208,7 +208,7 @@ const SERVICE_UNIT_PROGRAMS = [
 
 /**
  * The unit contents with their program pointed at `version`'s runtime. A unit
- * already at that version or a newer one is returned unchanged: `t3 update`
+ * already at that version or a newer one is returned unchanged: a service install
  * may have repointed it to a later version while this commit was in flight.
  */
 function repointServiceUnit(contents: string, version: string): string {

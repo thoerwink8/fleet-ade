@@ -1,18 +1,17 @@
 # Updating T3 Code
 
 The app you use and the server running your agents can be on different machines.
-When a server is behind your web or desktop app, the update button at the bottom
-of the sidebar and **Settings → Connections** offer to update it.
+A desktop app that is hosting a server can be updated from the update button at
+the bottom of the sidebar and from **Settings → Connections**. A background
+service is not updated from another device: install the release you want on
+that machine, then run `t3 service install`.
 
 ## Update everything at once
 
 The update button at the bottom of the sidebar updates every connected machine
-in one step. It updates outdated providers, then servers that are behind, then
-the desktop app you are using. Servers move to the
-version your desktop app is installing, or to your web app's version. A
-background service stays on its current release channel. A remote desktop app
-installs the latest release from its own channel. Hover the button to see what
-it will update.
+in one step. It updates outdated providers, then desktop apps that are behind,
+then the desktop app you are using. A remote desktop app installs the latest
+release from its own channel. Hover the button to see what it will update.
 
 While it runs, the button widens to show progress. It names a machine that is
 taking longer than usual, and offers **Retry** for a server that failed. Click
@@ -22,11 +21,9 @@ restart from the update button when you are ready. A server still restarting
 finishes on its own, and the button keeps showing it after the desktop app
 restarts.
 
-Each server checks that it can install the release before it restarts. If the
-release is not available to a server yet, its update fails, the server keeps
-running, and you can retry. The confirmation lists each machine it skips and
-why, such as a machine that is offline or needs a manual update. Use
-**Settings → Connections** for those.
+The confirmation lists each machine it skips and why, such as a machine that
+is offline or needs a manual update. Use **Settings → Connections** for those.
+A background service is one of the machines that needs a manual update.
 
 If a desktop app restarts on its old version, T3 Code tells you the update did
 not apply. It does not install that version again on its own, even when another
@@ -40,13 +37,9 @@ below.
 
 In the desktop app, change **Settings → Maintenance → Update track**. T3 Code shows each
 connected machine it will move and each one it skips, then moves them in one
-step. Remote servers install the latest release on the new track. Remote desktop
-apps reinstall on the new track. This app reinstalls last. Your threads,
-settings, and data stay.
-
-A background service cannot move to an older release remotely. When Stable is
-older than its Nightly, run `t3 update --channel stable --allow-downgrade` on
-that machine.
+step. Remote desktop apps reinstall on the new track. This app reinstalls last.
+Your threads, settings, and data stay. A background service stays where it is;
+install the release you want on that machine, then run `t3 service install`.
 
 A switch is blocked for a machine whose database already has changes the
 target release does not support, or when T3 Code cannot confirm that it does.
@@ -99,37 +92,14 @@ Update the side the notice names, then reconnect.
 
 The offered action depends on how the server runs:
 
-| Action                     | What to do                                                                                                                                                                                      |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Update server**          | Keep the client open while it installs and reconnects. Supported background services update remotely. For a desktop-hosted server, this also closes and relaunches the desktop app on the host. |
-| **Update the desktop app** | Update the desktop app on the machine running the server, then reopen it if needed.                                                                                                             |
-| **Copy update command**    | Run the command on the named host to update the detected global npm install or installed `t3` command, then restart the server with your usual options.                                         |
-| **Copy relaunch command**  | Stop the command-line server on its host and relaunch with the copied command, keeping your usual subcommand and options. This does not update an installed `t3` command.                       |
-
-On the host, run:
-
-```sh
-t3 update <client-version>
-```
-
-Replace `<client-version>` with the version shown in the notice. The command
-asks before restarting the background service; if you decline, run
-`t3 service restart` when you are ready. For a server you started by hand,
-stop it and start it again afterwards with your usual options such as `--host`
-or `--tailscale-serve`.
-
-If you decline the restart for a background service installed by an older
-release, the service can stay down after a crash or reboot until you run
-`t3 service restart`.
-
-If you run the server with `npx` rather than an installed `t3`, there is
-nothing to update on the host: stop the server and relaunch it as
-`npx t3@<client-version>` with the same subcommand and options.
+| Action                     | What to do                                                                                                                                                                                                                                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Update the desktop app** | Update the desktop app on the machine running the server. That closes and relaunches the app on the host.                                                                                                                                                                                     |
+| **Install on the host**    | A background service or a server you started by hand is not updated from here. Install the version shown in the notice on that machine, then run `t3 service install` for a service, or stop and start a hand-started server with your usual options such as `--host` or `--tailscale-serve`. |
 
 ## If an update fails
 
-Keep the client open until it reconnects or reports a failure. A failed service
-update can roll back to the previous version. If the update still fails:
+Keep the client open until it reconnects or reports a failure. If the update still fails:
 
 1. Retry the offered action once.
 2. Check that you updated the server's machine, not only the device you are using.
@@ -162,10 +132,9 @@ details** to include the error in a bug report.
 
 ## Registries and proxies
 
-Each server checks T3 Code releases, and providers installed with npm, through
-its own npm, so the checks use npm's configured registry, authentication, and
-proxy settings. Providers installed with Homebrew or pnpm check through those
-tools.
+Providers installed with npm are checked through that machine's npm, so the
+checks use npm's configured registry, authentication, and proxy settings.
+Providers installed with Homebrew or pnpm check through those tools.
 Configure npm on the server's machine. If that registry cannot be reached, the
 release shows as unavailable; T3 Code does not try the public registry instead.
 Machines without npm check the public npm registry directly.

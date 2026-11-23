@@ -220,7 +220,9 @@ export function SavedBackendListRow({
     enabled &&
     isConnected &&
     versionMismatch !== null &&
-    (serverUpdateState.status === "idle" || serverUpdateState.status === "failed");
+    (serverUpdateState.status === "idle" || serverUpdateState.status === "failed") &&
+    resolveServerSelfUpdateCapability(environment.serverConfig) === "desktop-managed" &&
+    supportsDesktopAppUpdate(environment.serverConfig);
 
   const statusTooltip = `${
     unsupported

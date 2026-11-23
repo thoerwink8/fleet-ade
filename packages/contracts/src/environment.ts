@@ -58,6 +58,7 @@ export const WorktreeSubmodules = Schema.Literals(["recursive", "top-level", "no
 export type WorktreeSubmodules = typeof WorktreeSubmodules.Type;
 export type ExecutionEnvironmentPlatform = typeof ExecutionEnvironmentPlatform.Type;
 
+// `boot-service` and `respawn` still decode for older servers. This build does not advertise them.
 export const ServerSelfUpdateMethod = Schema.Literals(["boot-service", "respawn", "desktop-app"]);
 export type ServerSelfUpdateMethod = typeof ServerSelfUpdateMethod.Type;
 
@@ -67,7 +68,7 @@ const InstalledPath = Schema.String.check(Schema.isNonEmpty());
 export const ServerInstallation = Schema.Union([
   Schema.Struct({ kind: Schema.Literals(["npx", "pnpm-dlx", "bunx"]) }),
   Schema.Struct({ kind: Schema.Literal("npm-global"), prefix: TrimmedNonEmptyString }),
-  // A launcher symlink into a downloaded runtime, as the install script and `t3 update` leave.
+  // A launcher symlink into a downloaded runtime, as the install script leaves it.
   Schema.Struct({
     kind: Schema.Literal("t3-launcher"),
     launcher: InstalledPath,

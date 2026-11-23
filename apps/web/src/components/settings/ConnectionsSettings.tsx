@@ -279,8 +279,8 @@ function ConnectionsSettingsContent({
         !environment.entry.enabled ||
         environment.connection.phase !== "connected" ||
         isDesktopLocalConnectionTarget(environment.entry.target) ||
-        selfUpdate === null ||
-        (selfUpdate === "desktop-managed" && !desktopAppUpdate)
+        selfUpdate !== "desktop-managed" ||
+        !desktopAppUpdate
       ) {
         return [];
       }

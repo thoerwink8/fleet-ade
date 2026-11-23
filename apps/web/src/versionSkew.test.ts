@@ -12,35 +12,12 @@ import {
   dismissVersionMismatch,
   isServerUpdateFailureDismissed,
   isVersionMismatchDismissed,
-  manualServerUpdateCommand,
   resolveVersionMismatch,
 } from "./versionSkew";
 
 const MISMATCH_HINT = "版本不一致。请让客户端和服务器使用相同的 Fleet ADE 版本。";
 
 describe("versionSkew", () => {
-  it("updates only the proven install and safely quotes its paths", () => {
-    expect(manualServerUpdateCommand("0.0.45", { kind: "npm-global", prefix: "/opt/node" })).toBe(
-      "npm install --global --prefix '/opt/node' t3@0.0.45",
-    );
-    expect(
-      manualServerUpdateCommand("0.0.45", { kind: "npm-global", prefix: "/opt/maria's node" }),
-    ).toBe("npm install --global --prefix '/opt/maria'\\''s node' t3@0.0.45");
-    expect(
-      manualServerUpdateCommand("0.0.45", {
-        kind: "t3-launcher",
-        launcher: "t3",
-        baseDir: "/home/u/.t3",
-      }),
-    ).toBe("'t3' update --base-dir '/home/u/.t3' 0.0.45");
-    expect(
-      manualServerUpdateCommand("0.0.45", {
-        kind: "t3-launcher",
-        launcher: "/opt/maria's bin/t3",
-        baseDir: "/data/t3 home",
-      }),
-    ).toBe("'/opt/maria'\\''s bin/t3' update --base-dir '/data/t3 home' 0.0.45");
-  });
   beforeEach(() => {
     branding.APP_VERSION = "0.0.34";
   });

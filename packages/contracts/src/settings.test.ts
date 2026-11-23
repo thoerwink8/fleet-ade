@@ -61,6 +61,16 @@ describe("retired client settings", () => {
     expect(decoded).not.toHaveProperty("defaultTheme");
     expect(decoded).not.toHaveProperty("defaultThemeSetAt");
   });
+
+  it("ignores a stored self-update key", () => {
+    const decoded = decodeServerSettings({
+      serverSelfUpdate: "boot-service",
+      selfUpdate: true,
+    });
+    expect(decoded).not.toHaveProperty("serverSelfUpdate");
+    expect(decoded).not.toHaveProperty("selfUpdate");
+    expect(decoded.continueThreadsAfterServerUpdate).toBe(true);
+  });
 });
 
 describe("storage cleanup settings", () => {

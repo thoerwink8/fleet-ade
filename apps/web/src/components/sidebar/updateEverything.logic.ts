@@ -6,7 +6,6 @@ import {
   type ServerSelfUpdateCapability,
 } from "@t3tools/contracts";
 import { cliReleaseChannelOf, desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
-import { compareSemverVersions } from "@t3tools/shared/semver";
 
 import {
   resolveServerSelfUpdateCapability,
@@ -93,20 +92,12 @@ export function collectServerUpdateTargets(
     }
     const selfUpdate = resolveServerSelfUpdateCapability(config);
     const desktopAppUpdate = supportsDesktopAppUpdate(config);
-    if (selfUpdate === null) {
+    if (selfUpdate !== "desktop-managed") {
       skip("需要手动更新");
       continue;
     }
-    if (selfUpdate === "desktop-managed" && !desktopAppUpdate) {
+    if (!desktopAppUpdate) {
       skip("需要更高版本的桌面应用");
-      continue;
-    }
-    const serverVersion = config.environment.serverVersion;
-    if (
-      selfUpdate !== "desktop-managed" &&
-      cliReleaseChannelOf(serverVersion) !== cliReleaseChannelOf(targetVersion)
-    ) {
-      skip(`使用 ${cliReleaseChannelOf(serverVersion)} 通道`);
       continue;
     }
     const target: ServerUpdateTarget = {
@@ -254,16 +245,6 @@ export function collectChannelSwitchTargets(
       skip(blocked);
       continue;
     }
-    // Service launchers only accept newer versions, so leaving for an older release is manual.
-    if (
-      move.selfUpdate === "boot-service" &&
-      compareSemverVersions(release.version, serverVersion) <= 0
-    ) {
-      skip(
-        `run \`t3 update --channel ${release.channel === "nightly" ? "nightly" : "stable"} --allow-downgrade\` there`,
-      );
-      continue;
-    }
     targets.push(target(move.selfUpdate, release.version));
   }
   return { targets, skipped };
@@ -296,8 +277,7 @@ function trackSwitchMove(
     return { skip: "运行的是预览版" };
   }
   const selfUpdate = resolveServerSelfUpdateCapability(config);
-  if (selfUpdate === null) return { skip: "需要手动更新" };
-  if (selfUpdate !== "desktop-managed") return { selfUpdate };
+  if (selfUpdate !== "desktop-managed") return { skip: "需要手动更新" };
   if (config.environment.capabilities.desktopAppChannelSwitch !== true) {
     return { skip: "需要更高版本的桌面应用" };
   }
