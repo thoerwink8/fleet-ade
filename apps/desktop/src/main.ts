@@ -37,6 +37,7 @@ import * as DesktopApp from "./app/DesktopApp.ts";
 import * as DesktopAppActivation from "./app/DesktopAppActivation.ts";
 import * as DesktopWebLinks from "./app/DesktopWebLinks.ts";
 import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
+import * as DesktopInstance from "./app/DesktopInstance.ts";
 import * as DesktopConnectionCatalogStore from "./app/DesktopConnectionCatalogStore.ts";
 import * as DesktopCliCommand from "./app/DesktopCliCommand.ts";
 import * as DesktopApplicationMenu from "./window/DesktopApplicationMenu.ts";
@@ -192,6 +193,15 @@ const layerDesktopApplication = Layer.mergeAll(
   Layer.provideMerge(layerDesktopLocalEnvironmentAuth),
 );
 
+// The profile lock and GPU cache clear finish before the application runtime is built.
+// A lost lock quits asynchronously, so this layer interrupts instead of continuing.
+const layerDesktopInstance = DesktopInstance.layer.pipe(
+  Layer.provide(DesktopInstance.synchronousFileSystemLayer),
+  Layer.provideMerge(layerDesktopEnvironment),
+  Layer.provideMerge(NodeServices.layer),
+  Layer.provideMerge(ElectronApp.layer),
+);
+
 const layerDesktopApplicationRuntime = layerDesktopApplication.pipe(
   Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
   Layer.provideMerge(NodeHttpClient.layerUndici),
@@ -199,7 +209,10 @@ const layerDesktopApplicationRuntime = layerDesktopApplication.pipe(
   Layer.provideMerge(layerElectron),
 );
 
-const layerDesktopRuntime = layerDesktopApplicationRuntime.pipe(
+const layerDesktopRuntime = layerDesktopInstance.pipe(
+  Layer.flatMap((instanceContext) =>
+    layerDesktopApplicationRuntime.pipe(Layer.provideMerge(Layer.succeedContext(instanceContext))),
+  ),
   Layer.provideMerge(DesktopPreReadyPlatform.layer),
   Layer.provideMerge(NodeServices.layer),
 );

@@ -226,7 +226,6 @@ export class CloudLinkEndpointUnavailableError extends Schema.TaggedError<CloudL
 }
 
 const INTERNAL_OPERATION_MESSAGES = {
-  "relay-url-unconfigured": "T3CODE_RELAY_URL 必须配置为安全的绝对 HTTPS 地址。",
   "generate-link-proof": "无法生成环境链接凭证。",
   "persist-relay-config": "无法保存环境中继配置。",
   "register-endpoint-origin": "无法注册托管端点来源。",
