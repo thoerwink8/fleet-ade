@@ -650,6 +650,20 @@ export const make = Effect.gen(function* () {
         return activeInterval;
       }
 
+      // A deleted worktree keeps its subscribers; polling it spawns Git in a directory that no
+      // longer exists. Skip the remote read and publish the non-repository local state once.
+      const cwdExists = yield* fs.exists(cwd).pipe(Effect.orElseSucceed(() => true));
+      if (!cwdExists) {
+        yield* refreshLocalStatusCore(cwd).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("VCS local status refresh failed", {
+              cwdLength: cwd.length,
+              ...remoteRefreshFailureDiagnostics(cause),
+            }),
+          ),
+        );
+        return activeInterval;
+      }
       const demandCwds = yield* Ref.get(demandCwdsRef);
       const shouldRun =
         needsInitialRefresh ||
