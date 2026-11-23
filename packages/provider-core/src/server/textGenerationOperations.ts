@@ -5,7 +5,7 @@ import { type ChatAttachment, type ModelSelection, TextGenerationError } from "@
 import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@t3tools/shared/git";
 import { extractJsonObject } from "@t3tools/shared/schemaJson";
 
-import type { ProviderTextGeneration } from "./textGeneration.ts";
+import type { PlainTextGenerationInput, ProviderTextGeneration } from "./textGeneration.ts";
 import {
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
@@ -150,10 +150,32 @@ export function fromRunner(name: string, run: Runner): ProviderTextGeneration {
       ...(generated.needsRefinement ? { needsRefinement: true } : {}),
     };
   });
+
+  const generatePlainText: NonNullable<ProviderTextGeneration["generatePlainText"]> = Effect.fn(
+    `${name}.generatePlainText`,
+  )(function* (input: PlainTextGenerationInput) {
+    const generated = yield* run({
+      operation: "generatePlainText",
+      cwd: input.cwd,
+      modelSelection: input.modelSelection,
+      prompt: input.prompt,
+      outputSchema: Schema.Struct({ text: Schema.String }),
+    });
+    const text = generated.text.trim();
+    if (text.length === 0) {
+      return yield* new TextGenerationError({
+        operation: "generatePlainText",
+        detail: "The model returned an empty reply.",
+      });
+    }
+    return { text };
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generatePlainText,
   } satisfies ProviderTextGeneration;
 }
