@@ -620,10 +620,10 @@ describe("command assist settings", () => {
       commanderInstructions: "环境守则",
     });
     expect(decoded.commandAssist.naming).toEqual({ enabled: true, modelSelection: null });
-    expect(decoded.commandAssist.activity).toEqual({ enabled: true, modelSelection: null });
-    expect(decoded.commandAssist.drift).toEqual({ enabled: true, modelSelection: null });
-    expect(decoded.commandAssist.handback).toEqual({ enabled: true, modelSelection: null });
-    expect(decoded.commandAssist.speech).toEqual({ enabled: true, modelSelection: null });
+    expect(decoded.commandAssist.activity).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.commandAssist.drift).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.commandAssist.handback).toEqual({ enabled: false, modelSelection: null });
+    expect(decoded.commandAssist.speech).toEqual({ enabled: false, modelSelection: null });
     expect(decoded.commandAssist.patrol).toEqual({ enabled: false, modelSelection: null });
     expect(decoded).not.toHaveProperty("commandAssistTimeoutMs");
     expect(decoded.dispatchTimeoutMs).toBe(60_000);

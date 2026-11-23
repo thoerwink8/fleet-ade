@@ -43,7 +43,7 @@ export type CommandAssistRow = typeof CommandAssistRow.Type;
 
 function defaultCommandAssistRow(step: CommandAssistStep): CommandAssistRow {
   return {
-    enabled: step !== "patrol",
+    enabled: step === "naming",
     modelSelection: null,
   };
 }

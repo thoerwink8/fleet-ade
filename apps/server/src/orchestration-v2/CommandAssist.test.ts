@@ -8,7 +8,7 @@ import {
   ServerSettingsError,
   type ServerSettings,
 } from "@t3tools/contracts";
-import type { ThreadTitleGenerationInput } from "@t3tools/provider-core/server/textGeneration";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -22,7 +22,6 @@ import * as CommandAssist from "./CommandAssist.ts";
 import type { CommandAssistRunResult } from "./CommandAssist.ts";
 
 const projectId = ProjectId.make("project-assist");
-const projectOff = ProjectId.make("project-off");
 const named = {
   instanceId: ProviderInstanceId.make("claudeAgent"),
   model: "name-model",
@@ -42,18 +41,22 @@ const layerFor = (
   );
 
 const countingModel = (complete: CommandAssist.CommandAssistModel["Service"]["complete"]) => {
-  const calls = { complete: 0, title: 0 };
+  const calls = { complete: 0 };
   const model: CommandAssist.CommandAssistModel["Service"] = {
     complete: (input) => {
       calls.complete += 1;
       return complete(input);
     },
-    title: (input: ThreadTitleGenerationInput) => {
-      calls.title += 1;
-      return Effect.succeed({ title: input.message });
-    },
   };
   return { calls, model };
+};
+
+const enabledAssist = {
+  ...DEFAULT_SERVER_SETTINGS.commandAssist,
+  activity: { enabled: true, modelSelection: null },
+  drift: { enabled: true, modelSelection: null },
+  handback: { enabled: true, modelSelection: null },
+  speech: { enabled: true, modelSelection: null },
 };
 
 it.effect("skips a row that is off, a row with no model, and an unknown step", () =>
@@ -70,6 +73,7 @@ it.effect("skips a row that is off, a row with no model, and an unknown step", (
               commandAssist: {
                 ...DEFAULT_SERVER_SETTINGS.commandAssist,
                 activity: { enabled: false, modelSelection: named },
+                drift: { enabled: true, modelSelection: null },
                 futureStep: { enabled: true, modelSelection: named },
               },
             } as unknown as ServerSettings),
@@ -92,7 +96,6 @@ it.effect("skips a row that is off, a row with no model, and an unknown step", (
     assert.deepStrictEqual(unknown, { _tag: "skipped", reason: "unknown" });
     assert.deepStrictEqual(missing, { _tag: "skipped", reason: "no-model" });
     assert.strictEqual(calls.complete, 0);
-    assert.strictEqual(calls.title, 0);
   }),
 );
 
@@ -115,13 +118,15 @@ it.effect("returns the model text, and a model failure stays a value", () =>
     assert.strictEqual(yield* Ref.get(childStatus), "running");
   }).pipe(
     Effect.provide(
-      layerFor({
-        complete: (input) =>
-          input.prompt === "drift"
-            ? Effect.fail({ reason: "调用失败" })
-            : Effect.succeed("在改解析器"),
-        title: () => Effect.die("naming uses the existing title generator"),
-      }),
+      layerFor(
+        {
+          complete: (input) =>
+            input.prompt === "drift"
+              ? Effect.fail({ reason: "调用失败" })
+              : Effect.succeed("在改解析器"),
+        },
+        ServerSettingsService.layerTest({ commandAssist: enabledAssist }),
+      ),
     ),
   ),
 );
@@ -142,59 +147,18 @@ it.effect("stops at 15 seconds without holding dispatch or a pull request", () =
     assert.strictEqual(yield* Ref.get(childStatus), "running");
   }).pipe(
     Effect.provide(
-      layerFor({
-        complete: () =>
-          Effect.sleep(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS + 1_000)).pipe(Effect.as("late")),
-        title: () => Effect.die("unused"),
-      }),
+      layerFor(
+        {
+          complete: () =>
+            Effect.sleep(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS + 1_000)).pipe(
+              Effect.as("late"),
+            ),
+        },
+        ServerSettingsService.layerTest({ commandAssist: enabledAssist }),
+      ),
     ),
   ),
 );
-
-it.effect("names through the existing title generator and the naming cell", () => {
-  const seen: Array<string> = [];
-  return Effect.gen(function* () {
-    const assist = yield* CommandAssist.CommandAssist;
-    const namedResult = yield* assist.run("naming", {
-      projectId,
-      cwd: "/repo",
-      prompt: "修解析器",
-    });
-    const skipped = yield* assist.run("naming", {
-      projectId: projectOff,
-      cwd: "/repo",
-      prompt: "另一条",
-    });
-    assert.deepStrictEqual(namedResult, { _tag: "completed", text: "修解析器" });
-    assert.deepStrictEqual(skipped, { _tag: "skipped", reason: "off" });
-    assert.deepStrictEqual(seen, [named.model]);
-  }).pipe(
-    Effect.provide(
-      layerFor(
-        {
-          complete: () => Effect.die("naming does not use the plain assist call"),
-          title: (input) => {
-            seen.push(input.modelSelection.model);
-            return Effect.succeed({ title: input.message });
-          },
-        },
-        ServerSettingsService.layerTest({
-          commandAssist: {
-            ...DEFAULT_SERVER_SETTINGS.commandAssist,
-            naming: { enabled: true, modelSelection: named },
-          },
-          projectSettingsOverrides: {
-            [projectOff]: {
-              commandAssist: {
-                naming: { enabled: false, modelSelection: null },
-              },
-            },
-          },
-        }),
-      ),
-    ),
-  );
-});
 
 const threadId = ThreadId.make("thread-assist");
 
@@ -225,10 +189,14 @@ const rows = (
   activity: boolean,
   drift: boolean,
   patrol = false,
+  handback = false,
+  speech = false,
 ): ServerSettings["commandAssist"] => ({
   ...DEFAULT_SERVER_SETTINGS.commandAssist,
   activity: { enabled: activity, modelSelection: null },
   drift: { enabled: drift, modelSelection: null },
+  handback: { enabled: handback, modelSelection: null },
+  speech: { enabled: speech, modelSelection: null },
   patrol: { enabled: patrol, modelSelection: null },
 });
 
@@ -284,7 +252,6 @@ it.effect("calls once for summary and drift, and skips the part that is off", ()
             prompts.push(input.prompt);
             return Effect.succeed(reply);
           },
-          title: () => Effect.die("unused"),
         },
         settings,
       ),
@@ -326,8 +293,9 @@ it.effect(
       next = "not json";
       const failed = yield* assist.observe(facts({ opened: true, goal: "再换一个目标" }));
       assert.strictEqual(failed.called, true);
-      assert.strictEqual(failed.outlook, null);
+      assert.strictEqual(failed.outlook, "会改 2 个文件");
       assert.strictEqual(failed.activity, "在改 b.ts");
+      assert.strictEqual(failed.drift, "又走偏了");
       assert.strictEqual(failed.childPhase, "在跑");
     }).pipe(
       Effect.provide(
@@ -335,11 +303,8 @@ it.effect(
           {
             complete: (input) => {
               prompts.push(input.prompt);
-              return next === "not json"
-                ? Effect.fail({ reason: "调用失败" })
-                : Effect.succeed(next);
+              return Effect.succeed(next);
             },
-            title: () => Effect.die("unused"),
           },
           settings,
         ),
@@ -380,7 +345,6 @@ it.effect("recomputes on 20 more steps or the first silence of the run, not on a
             prompts.push(input.prompt);
             return Effect.succeed(JSON.stringify({ activity: "在改 a.ts" }));
           },
-          title: () => Effect.die("unused"),
         },
         settings,
       ),
@@ -407,7 +371,6 @@ it.effect("keeps the sentence that was written when the other one is missing", (
       harness(
         {
           complete: () => Effect.succeed(replies.shift() ?? "{}"),
-          title: () => Effect.die("unused"),
         },
         settings,
       ),
@@ -417,7 +380,9 @@ it.effect("keeps the sentence that was written when the other one is missing", (
 
 it.effect("checks the stored commands without a model, and does not judge without a goal", () => {
   const prompts: string[] = [];
-  const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
+  const settings = ServerSettingsService.layerTest({
+    commandAssist: rows(true, true, false, true),
+  });
   return Effect.gen(function* () {
     const assist = yield* CommandAssist.CommandAssist;
     const childPhase = yield* Ref.make("做完");
@@ -476,7 +441,6 @@ it.effect("checks the stored commands without a model, and does not judge withou
             prompts.push(input.prompt);
             return Effect.succeed("是一件事");
           },
-          title: () => Effect.die("unused"),
         },
         settings,
       ),
@@ -485,7 +449,9 @@ it.effect("checks the stored commands without a model, and does not judge withou
 });
 
 it.effect("writes a failed hand-back without blocking the pull request or the child", () => {
-  const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
+  const settings = ServerSettingsService.layerTest({
+    commandAssist: rows(true, true, false, true),
+  });
   return Effect.gen(function* () {
     const assist = yield* CommandAssist.CommandAssist;
     const childPhase = yield* Ref.make("做完");
@@ -525,7 +491,6 @@ it.effect("writes a failed hand-back without blocking the pull request or the ch
             Effect.sleep(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS + 1_000)).pipe(
               Effect.as("late"),
             ),
-          title: () => Effect.die("unused"),
         },
         settings,
       ),
@@ -534,7 +499,9 @@ it.effect("writes a failed hand-back without blocking the pull request or the ch
 });
 
 it.effect("tidies only when asked and leaves blank fields blank", () => {
-  const settings = ServerSettingsService.layerTest({ commandAssist: rows(true, true) });
+  const settings = ServerSettingsService.layerTest({
+    commandAssist: rows(true, true, false, false, true),
+  });
   return Effect.gen(function* () {
     const assist = yield* CommandAssist.CommandAssist;
     const childPhase = yield* Ref.make("在跑");
@@ -563,9 +530,50 @@ it.effect("tidies only when asked and leaves blank fields blank", () => {
             input.prompt.startsWith("ASK")
               ? Effect.succeed(JSON.stringify({ activity: "在改 a.ts" }))
               : Effect.succeed(JSON.stringify({ goal: "修好解析" })),
-          title: () => Effect.die("unused"),
         },
         settings,
+      ),
+    ),
+  );
+});
+
+it.effect("calls the model once when two observes share an input", () => {
+  const gate: {
+    started: Deferred.Deferred<void> | undefined;
+    release: Deferred.Deferred<void> | undefined;
+    calls: number;
+  } = { started: undefined, release: undefined, calls: 0 };
+  return Effect.gen(function* () {
+    gate.started = yield* Deferred.make<void>();
+    gate.release = yield* Deferred.make<void>();
+    gate.calls = 0;
+    const assist = yield* CommandAssist.CommandAssist;
+    const input = facts({ opened: true, threadId: ThreadId.make("thread-once") });
+    const first = yield* assist.observe(input).pipe(Effect.forkChild);
+    yield* Deferred.await(gate.started);
+    const second = yield* assist.observe(input).pipe(Effect.forkChild);
+    yield* Deferred.succeed(gate.release, undefined);
+    const results = yield* Effect.all([Fiber.join(first), Fiber.join(second)]);
+    assert.strictEqual(gate.calls, 1);
+    assert.strictEqual(results.filter((result) => result.called).length, 1);
+  }).pipe(
+    Effect.provide(
+      harness(
+        {
+          complete: () => {
+            gate.calls += 1;
+            const started = gate.started;
+            const release = gate.release;
+            if (started === undefined || release === undefined) {
+              return Effect.die("observe gate was not ready");
+            }
+            return Deferred.succeed(started, undefined).pipe(
+              Effect.andThen(Deferred.await(release)),
+              Effect.as(JSON.stringify({ activity: "在改 a.ts", outlook: "一句" })),
+            );
+          },
+        },
+        ServerSettingsService.layerTest({ commandAssist: rows(true, true) }),
       ),
     ),
   );
@@ -659,7 +667,6 @@ it.effect(
         harness(
           {
             complete: () => Effect.die("patrol does not call a model"),
-            title: () => Effect.die("unused"),
           },
           settings,
         ),

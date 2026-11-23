@@ -150,6 +150,31 @@ it.layer(layerClaudeTextGenerationTest)("ClaudeTextGeneration", (it) => {
       ),
   );
 
+  it.effect("generates plain text outside the project", () =>
+    withFakeClaudeEnv(
+      {
+        output: JSON.stringify({ structured_output: { text: "一句" } }),
+        cwdMustNotBe: process.cwd(),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const generatePlainText = textGeneration.generatePlainText;
+          if (generatePlainText === undefined) {
+            return yield* Effect.die("plain text generation is missing");
+          }
+          const generated = yield* generatePlainText({
+            cwd: process.cwd(),
+            prompt: "Reply with JSON only",
+            modelSelection: {
+              instanceId: ProviderInstanceId.make("claudeAgent"),
+              model: SYNTHETIC_CLAUDE_STANDARD_MODEL,
+            },
+          });
+          expect(generated.text).toBe("一句");
+        }),
+    ),
+  );
+
   it.effect(
     "generates thread titles outside the project with tools, skills, and hooks disabled",
     () =>

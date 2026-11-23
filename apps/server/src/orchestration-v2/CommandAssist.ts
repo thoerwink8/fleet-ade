@@ -12,8 +12,8 @@ import {
   type ProjectId,
   ThreadId,
 } from "@t3tools/contracts";
-import type { ThreadTitleGenerationInput } from "@t3tools/provider-core/server/textGeneration";
 import { resolveCommandAssist } from "@t3tools/shared/projectSettings";
+import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import * as Clock from "effect/Clock";
 import * as Digest from "effect/crypto/Digest";
 import * as Context from "effect/Context";
@@ -22,6 +22,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Hex from "effect/encoding/Hex";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -54,9 +55,6 @@ export class CommandAssistModel extends Context.Service<
     readonly complete: (
       input: CommandAssistCompletion,
     ) => Effect.Effect<string, { readonly reason: string }>;
-    readonly title: (
-      input: ThreadTitleGenerationInput,
-    ) => Effect.Effect<{ readonly title: string }, { readonly reason: string }>;
   }
 >()("t3/orchestration-v2/CommandAssist/CommandAssistModel") {}
 
@@ -133,92 +131,46 @@ export interface CommandAssistPatrol {
   readonly text: string | null;
 }
 
-interface StoredAssist {
-  cacheKey: string | null;
-  activity: string | null;
-  drift: string | null;
-  outlook: string | null;
-  falsePositiveKey: string | null;
-  handback: string | null;
-  speechGoal: string;
-  speechDone: string;
-  speechAvoid: string;
-  speechTests: string;
-  speechNote: string | null;
-  runId: string | null;
-  stepsAtLastCall: number;
-  silenceSeen: boolean;
-  patrolDriftKey: string | null;
-  patrolSilenceRun: string | null;
-  patrolCount: number;
-  testCommands: string[] | null;
-  goal: string | null;
-  avoid: string | null;
-}
+const nullableText = Schema.NullOr(Schema.String).pipe(
+  Schema.withDecodingDefault(Effect.succeed(null)),
+);
+
+const StoredAssistSchema = Schema.Struct({
+  cacheKey: nullableText,
+  activity: nullableText,
+  drift: nullableText,
+  outlook: nullableText,
+  falsePositiveKey: nullableText,
+  handback: nullableText,
+  speechGoal: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  speechDone: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  speechAvoid: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  speechTests: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  speechNote: nullableText,
+  runId: nullableText,
+  stepsAtLastCall: Schema.Number.pipe(Schema.withDecodingDefault(Effect.succeed(0))),
+  silenceSeen: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  patrolDriftKey: nullableText,
+  patrolSilenceRun: nullableText,
+  patrolCount: Schema.Number.pipe(Schema.withDecodingDefault(Effect.succeed(0))),
+  testCommands: Schema.NullOr(Schema.Array(Schema.String)).pipe(
+    Schema.withDecodingDefault(Effect.succeed(null)),
+  ),
+  goal: nullableText,
+  avoid: nullableText,
+});
+type StoredAssist = typeof StoredAssistSchema.Type;
+
+const StoredAssistJson = Schema.fromJsonString(StoredAssistSchema);
+const decodeStored = Schema.decodeUnknownEffect(StoredAssistJson);
+const encodeStored = Schema.encodeSync(StoredAssistJson);
 
 function emptyState(): StoredAssist {
-  return {
-    cacheKey: null,
-    activity: null,
-    drift: null,
-    outlook: null,
-    falsePositiveKey: null,
-    handback: null,
-    speechGoal: "",
-    speechDone: "",
-    speechAvoid: "",
-    speechTests: "",
-    speechNote: null,
-    runId: null,
-    stepsAtLastCall: 0,
-    silenceSeen: false,
-    patrolDriftKey: null,
-    patrolSilenceRun: null,
-    patrolCount: 0,
-    testCommands: null,
-    goal: null,
-    avoid: null,
-  };
+  return Schema.decodeSync(StoredAssistSchema)({});
 }
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" ? value : null;
-}
-
-function readState(value: unknown): StoredAssist {
-  const base = emptyState();
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return base;
-  const record = value as Record<string, unknown>;
-  const commands = Array.isArray(record.testCommands)
-    ? record.testCommands.filter((entry): entry is string => typeof entry === "string")
-    : null;
-  return {
-    ...base,
-    cacheKey: stringOrNull(record.cacheKey),
-    activity: stringOrNull(record.activity),
-    drift: stringOrNull(record.drift),
-    outlook: stringOrNull(record.outlook),
-    falsePositiveKey: stringOrNull(record.falsePositiveKey),
-    handback: stringOrNull(record.handback),
-    speechGoal: typeof record.speechGoal === "string" ? record.speechGoal : "",
-    speechDone: typeof record.speechDone === "string" ? record.speechDone : "",
-    speechAvoid: typeof record.speechAvoid === "string" ? record.speechAvoid : "",
-    speechTests: typeof record.speechTests === "string" ? record.speechTests : "",
-    speechNote: stringOrNull(record.speechNote),
-    runId: stringOrNull(record.runId),
-    stepsAtLastCall:
-      typeof record.stepsAtLastCall === "number" && record.stepsAtLastCall >= 0
-        ? record.stepsAtLastCall
-        : 0,
-    silenceSeen: record.silenceSeen === true,
-    patrolDriftKey: stringOrNull(record.patrolDriftKey),
-    patrolSilenceRun: stringOrNull(record.patrolSilenceRun),
-    patrolCount:
-      typeof record.patrolCount === "number" && record.patrolCount >= 0 ? record.patrolCount : 0,
-    testCommands: Array.isArray(record.testCommands) ? commands : null,
-    goal: stringOrNull(record.goal),
-    avoid: stringOrNull(record.avoid),
-  };
 }
 
 function clipChars(text: string, limit: number): string {
@@ -275,14 +227,42 @@ function activityPrompt(
     asks.drift ? "drift" : "",
     asks.outlook ? "outlook" : "",
   ].filter((part) => part.length > 0);
+  const meanings = [
+    asks.activity ? "activity: one sentence, what this work is doing now." : "",
+    asks.drift
+      ? "drift: null or 否 when it still matches the goal and the avoid list; otherwise one sentence why it drifted."
+      : "",
+    asks.outlook
+      ? "outlook: which files would change, about how many lines, one sentence result, and where that differs from the goal."
+      : "",
+  ].filter((line) => line.length > 0);
   return [
     `ASK ${asked.join(" ")}`,
+    "Reply with JSON only. No markdown. Include only the requested fields.",
+    ...meanings,
     `goal:${facts.goal}`,
     `avoid:${facts.avoid}`,
     `activity:${facts.activity}`,
-    `files:${facts.files.map((file) => file.path).join(",")}`,
+    `files:${facts.files.map((file) => `${file.path} +${file.additions}/-${file.deletions}`).join(",")}`,
     `command:${facts.latestCommand ?? ""}`,
     `lines:+${facts.additions}/-${facts.deletions}`,
+  ].join("\n");
+}
+
+function handbackPrompt(goal: string, report: string): string {
+  return [
+    'Reply with JSON only: {"answer":"是"|"否","reason":""}.',
+    "Question: are this report and the goal the same piece of work? answer is 是 or 否, and reason is one sentence. No other fields.",
+    `goal:${goal}`,
+    `report:${report}`,
+  ].join("\n");
+}
+
+function speechPrompt(text: string): string {
+  return [
+    'Reply with JSON only: {"goal":"","done":"","avoid":"","tests":""}.',
+    "Fill only what the person actually said. Leave a field as an empty string when they did not say it. Do not invent.",
+    text,
   ].join("\n");
 }
 
@@ -378,14 +358,7 @@ const makeModel = Effect.gen(function* () {
       Effect.mapError((error) => ({ reason: clipReason(error.detail) })),
     );
   });
-  const title: CommandAssistModel["Service"]["title"] = Effect.fn("CommandAssistModel.title")(
-    function* (input) {
-      return yield* textGeneration
-        .generateThreadTitle(input)
-        .pipe(Effect.mapError((error) => ({ reason: clipReason(error.detail) })));
-    },
-  );
-  return CommandAssistModel.of({ complete, title });
+  return CommandAssistModel.of({ complete });
 });
 
 export const layerModel = Layer.effect(CommandAssistModel, makeModel);
@@ -439,6 +412,7 @@ const make = Effect.gen(function* () {
   const model = yield* CommandAssistModel;
   const sql = yield* SqlClient.SqlClient;
   const digest = yield* Digest.Digest;
+  const locks = yield* KeyedLock.make<ThreadId>();
 
   const cacheKey = Effect.fn("CommandAssist.cacheKey")(function* (
     facts: ReturnType<typeof clipFacts>,
@@ -452,9 +426,20 @@ const make = Effect.gen(function* () {
   const load = Effect.fn("CommandAssist.load")(function* (threadId: ThreadId) {
     const rows = yield* sql<{ readonly stateJson: string }>`
       SELECT state_json AS stateJson FROM command_assist_state WHERE thread_id = ${threadId}
-    `.pipe(Effect.orElseSucceed(() => [] as const));
+    `.pipe(
+      Effect.tapError((error) =>
+        Effect.logWarning("command-assist.load-failed", { threadId, error }),
+      ),
+      Effect.orElseSucceed(() => [] as const),
+    );
     const raw = rows[0]?.stateJson;
-    return raw === undefined ? emptyState() : decodeState(raw);
+    if (raw === undefined) return emptyState();
+    return yield* decodeStored(raw).pipe(
+      Effect.tapError((error) =>
+        Effect.logWarning("command-assist.state-decode-failed", { threadId, error }),
+      ),
+      Effect.orElseSucceed(() => emptyState()),
+    );
   });
 
   const save = Effect.fn("CommandAssist.save")(function* (threadId: ThreadId, state: StoredAssist) {
@@ -462,35 +447,29 @@ const make = Effect.gen(function* () {
     const updatedAt = DateTime.formatIso(DateTime.makeUnsafe(now));
     yield* sql`
       INSERT INTO command_assist_state (thread_id, state_json, updated_at)
-      VALUES (${threadId}, ${encodeState(state)}, ${updatedAt})
+      VALUES (${threadId}, ${encodeStored(state)}, ${updatedAt})
       ON CONFLICT(thread_id) DO UPDATE SET
         state_json = excluded.state_json,
         updated_at = excluded.updated_at
-    `.pipe(Effect.orElseSucceed(() => undefined));
+    `.pipe(
+      Effect.tapError((error) =>
+        Effect.logWarning("command-assist.save-failed", { threadId, error }),
+      ),
+      Effect.orElseSucceed(() => undefined),
+    );
   });
 
   const invoke = Effect.fn("CommandAssist.invoke")(function* (
-    step: string,
     selection: ModelSelection,
     input: CommandAssistRunInput,
   ) {
     // The limit is a constant so a slow reply cannot stall dispatch or opening a PR.
-    const effect =
-      step === "naming"
-        ? model
-            .title({
-              cwd: input.cwd,
-              message: input.prompt,
-              modelSelection: selection,
-              projectId: input.projectId,
-            })
-            .pipe(Effect.map((result) => result.title))
-        : model.complete({
-            model: selection,
-            projectId: input.projectId,
-            cwd: input.cwd,
-            prompt: input.prompt,
-          });
+    const effect = model.complete({
+      model: selection,
+      projectId: input.projectId,
+      cwd: input.cwd,
+      prompt: input.prompt,
+    });
     return yield* effect.pipe(
       Effect.timeout(Duration.millis(COMMAND_ASSIST_TIMEOUT_MS)),
       Effect.match({
@@ -511,15 +490,14 @@ const make = Effect.gen(function* () {
         resolved.textGeneration,
       );
       if (lookup._tag === "skipped") return lookup;
-      if (step === "patrol") return { _tag: "completed", text: input.prompt };
-      return yield* invoke(step, lookup.model, input);
+      return yield* invoke(lookup.model, input);
     },
   );
 
   const visibleDrift = (state: StoredAssist, key: string | null) =>
     key !== null && state.falsePositiveKey === key ? null : state.drift;
 
-  const observe: CommandAssist["Service"]["observe"] = Effect.fn("CommandAssist.observe")(
+  const observeTurn: CommandAssist["Service"]["observe"] = Effect.fn("CommandAssist.observe")(
     function* (input) {
       const settings = yield* settingsService.getSettings.pipe(Effect.orElseSucceed(() => null));
       const state = yield* load(input.threadId);
@@ -566,23 +544,29 @@ const make = Effect.gen(function* () {
             ? drift.model
             : null;
       if (selection === null) return show(state);
-      const result = yield* invoke("activity", selection, {
-        projectId: input.projectId,
-        cwd: input.cwd,
-        prompt: activityPrompt(facts, asks),
-      });
-      const base = {
+      const reserved = {
         ...state,
         runId: input.runId,
         silenceSeen: silenceSeen || input.silence,
         stepsAtLastCall: input.stepCount,
+        cacheKey: key,
       };
+      yield* save(input.threadId, reserved);
+      const result = yield* invoke(selection, {
+        projectId: input.projectId,
+        cwd: input.cwd,
+        prompt: activityPrompt(facts, asks),
+      });
+      const base = reserved;
       if (result._tag !== "completed") {
         const failedState = { ...base, outlook: asks.outlook ? null : state.outlook };
         yield* save(input.threadId, failedState);
         return { ...show(failedState), called: true };
       }
       const parsed = parseActivity(result.text);
+      if (parsed === null) {
+        return { ...show(base), called: true };
+      }
       const next: StoredAssist = {
         ...base,
         cacheKey: key,
@@ -593,15 +577,18 @@ const make = Effect.gen(function* () {
         drift:
           asks.drift && parsed !== null && parsed.drift !== undefined ? parsed.drift : state.drift,
         outlook: asks.outlook
-          ? parsed !== null && parsed.outlook !== undefined
+          ? parsed.outlook !== undefined
             ? parsed.outlook
-            : null
+            : state.outlook
           : state.outlook,
       };
       yield* save(input.threadId, next);
       return { ...show(next), called: true };
     },
   );
+
+  const observe: CommandAssist["Service"]["observe"] = (input) =>
+    locks.withLock(input.threadId, observeTurn(input));
 
   const markDriftFalsePositive: CommandAssist["Service"]["markDriftFalsePositive"] = Effect.fn(
     "CommandAssist.markDriftFalsePositive",
@@ -643,7 +630,7 @@ const make = Effect.gen(function* () {
       const judged = yield* run("handback", {
         projectId: input.projectId,
         cwd: input.cwd,
-        prompt: `${state.goal ?? ""}\n${input.report}`,
+        prompt: handbackPrompt(state.goal ?? "", input.report),
       });
       const text =
         judged._tag === "completed"
@@ -662,7 +649,7 @@ const make = Effect.gen(function* () {
     const result = yield* run("speech", {
       projectId: input.projectId,
       cwd: input.cwd,
-      prompt: clipChars(original, COMMAND_ASSIST_INPUT_LIMIT),
+      prompt: speechPrompt(clipChars(original, COMMAND_ASSIST_INPUT_LIMIT)),
     });
     const state = yield* load(input.threadId);
     const empty = { goal: "", done: "", avoid: "", tests: "", note: "没整理成" as string | null };
@@ -718,18 +705,6 @@ const make = Effect.gen(function* () {
     }),
   });
 });
-
-function decodeState(raw: string): StoredAssist {
-  try {
-    return readState(JSON.parse(raw));
-  } catch {
-    return emptyState();
-  }
-}
-
-function encodeState(state: StoredAssist): string {
-  return JSON.stringify(state);
-}
 
 function speechOf(speech: {
   readonly goal: string;

@@ -39,7 +39,17 @@ describe("lookupCommandAssistRow", () => {
       _tag: "skipped",
       reason: "off",
     });
-    expect(lookupCommandAssistRow(rows, "activity", null)).toEqual({
+    expect(lookupCommandAssistRow(rows, "activity", text)).toEqual({
+      _tag: "skipped",
+      reason: "off",
+    });
+    expect(
+      lookupCommandAssistRow(
+        { ...rows, activity: { enabled: true, modelSelection: null } },
+        "activity",
+        null,
+      ),
+    ).toEqual({
       _tag: "skipped",
       reason: "no-model",
     });

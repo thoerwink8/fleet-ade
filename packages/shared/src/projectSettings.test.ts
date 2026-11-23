@@ -326,7 +326,10 @@ describe("resolveCommandAssist", () => {
       model: resolved.textGeneration,
     });
     const other = resolveCommandAssist(settings, otherProjectId);
-    expect(lookupCommandAssistRow(other.rows, "activity", other.textGeneration)._tag).toBe("ready");
+    expect(lookupCommandAssistRow(other.rows, "activity", other.textGeneration)).toEqual({
+      _tag: "skipped",
+      reason: "off",
+    });
     expect(lookupCommandAssistRow(other.rows, "drift", other.textGeneration)).toEqual({
       _tag: "ready",
       model: drift,
