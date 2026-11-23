@@ -989,7 +989,9 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       const runGitCommand = Effect.fn("runGitCommand")(function* () {
         // Status and settlement polls keep firing at deleted worktrees; skipping the
         // spawn avoids a synchronous process-create failure that stalls the loop.
-        const cwdExists = yield* fileSystem.stat(commandInput.cwd).pipe(
+        // FileSystem is absent only in tests that drive the driver without it; a
+        // blocking stat there never settles under TestClock, so fall through to spawn.
+        const cwdStat = yield* fileSystem.stat(commandInput.cwd).pipe(
           Effect.map((info) => info.type === "Directory"),
           Effect.catch((error) =>
             Effect.succeed(
@@ -1001,7 +1003,9 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
                   error.reason.cause.code !== "ENOTDIR"),
             ),
           ),
+          Effect.option,
         );
+        const cwdExists = Option.getOrElse(cwdStat, () => true);
         if (!cwdExists) {
           return yield* new GitCommandError({
             ...gitCommandContext(commandInput),
