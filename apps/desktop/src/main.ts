@@ -37,8 +37,8 @@ import * as DesktopApp from "./app/DesktopApp.ts";
 import * as DesktopAppActivation from "./app/DesktopAppActivation.ts";
 import * as DesktopWebLinks from "./app/DesktopWebLinks.ts";
 import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
+import * as DesktopInstance from "./app/DesktopInstance.ts";
 import * as DesktopConnectionCatalogStore from "./app/DesktopConnectionCatalogStore.ts";
-import * as DesktopClerk from "./app/DesktopClerk.ts";
 import * as DesktopCliCommand from "./app/DesktopCliCommand.ts";
 import * as DesktopApplicationMenu from "./window/DesktopApplicationMenu.ts";
 import * as DesktopAssets from "./app/DesktopAssets.ts";
@@ -56,7 +56,6 @@ import * as DesktopServerExposure from "./backend/DesktopServerExposure.ts";
 import * as DesktopClientSettings from "./settings/DesktopClientSettings.ts";
 import * as DesktopSavedEnvironments from "./settings/DesktopSavedEnvironments.ts";
 import * as DesktopAppSettings from "./settings/DesktopAppSettings.ts";
-import * as DesktopPreReadyFileSystem from "./app/DesktopPreReadyFileSystem.ts";
 import * as DesktopPreReadyPlatform from "./app/DesktopPreReadyPlatform.ts";
 import * as DesktopShellEnvironment from "./shell/DesktopShellEnvironment.ts";
 import * as DesktopSshEnvironment from "./ssh/DesktopSshEnvironment.ts";
@@ -194,12 +193,12 @@ const layerDesktopApplication = Layer.mergeAll(
   Layer.provideMerge(layerDesktopLocalEnvironmentAuth),
 );
 
-// Clerk resolves userData before Electron is ready, so it gets the synchronous FileSystem.
-const layerDesktopClerk = DesktopClerk.layer.pipe(
-  Layer.provide(DesktopPreReadyFileSystem.layer),
-  Layer.provideMerge(ElectronShell.layer),
+// The profile lock and GPU cache clear finish before the application runtime is built.
+// A lost lock quits asynchronously, so this layer interrupts instead of continuing.
+const layerDesktopInstance = DesktopInstance.layer.pipe(
+  Layer.provide(DesktopInstance.synchronousFileSystemLayer),
   Layer.provideMerge(layerDesktopEnvironment),
-  Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+  Layer.provideMerge(NodeServices.layer),
   Layer.provideMerge(ElectronApp.layer),
 );
 
@@ -210,12 +209,12 @@ const layerDesktopApplicationRuntime = layerDesktopApplication.pipe(
   Layer.provideMerge(layerElectron),
 );
 
-// Pre-ready setup and Clerk must not yield before Clerk registers its scheme.
-const layerDesktopRuntime = layerDesktopClerk.pipe(
-  Layer.flatMap((clerkContext) =>
-    layerDesktopApplicationRuntime.pipe(Layer.provideMerge(Layer.succeedContext(clerkContext))),
+const layerDesktopRuntime = layerDesktopInstance.pipe(
+  Layer.flatMap((instanceContext) =>
+    layerDesktopApplicationRuntime.pipe(Layer.provideMerge(Layer.succeedContext(instanceContext))),
   ),
   Layer.provideMerge(DesktopPreReadyPlatform.layer),
+  Layer.provideMerge(NodeServices.layer),
 );
 
 DesktopApp.program.pipe(Effect.provide(layerDesktopRuntime), NodeRuntime.runMain);

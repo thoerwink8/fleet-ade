@@ -53,7 +53,6 @@ import {
   buildAttachmentVideoPreview,
   buildExpandedImagePreview,
 } from "./ExpandedImagePreview";
-import { GuestMessageName, guestBubbleClassName } from "./guestMessageStyle";
 import { MessageCopyButton } from "./MessageCopyButton";
 import { promptLinkFor } from "../promptLinks/copyPromptLink";
 import { PierreEntryIcon } from "./PierreEntryIcon";
@@ -498,18 +497,13 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   // Images or videos sent without words show as media, not as a bubble around them.
   const mediaOnly =
     !folded &&
-    userMessage.attribution !== "guest" &&
     resolvedContext.text.trim() === "" &&
     userAudio.length === 0 &&
     unchippedFiles.length === 0 &&
     unknownAttachments.length === 0 &&
     regularImages.length + userVideos.length > 0;
   // Media sent with words sits above the bubble as its own shape, like a chat app.
-  const mediaAboveText =
-    !folded &&
-    userMessage.attribution !== "guest" &&
-    !mediaOnly &&
-    regularImages.length + userVideos.length > 0;
+  const mediaAboveText = !folded && !mediaOnly && regularImages.length + userVideos.length > 0;
   const standaloneMedia = mediaOnly || mediaAboveText;
   // A lone image keeps its own shape; a 4:3 crop hides most of a wide screenshot.
   const loneImage = standaloneMedia && userVideos.length === 0 && regularImages.length === 1;
@@ -523,7 +517,6 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
   // Files sent without words show as cards, not as a bubble around a name chip.
   const fileCardsOnly =
     !folded &&
-    userMessage.attribution !== "guest" &&
     otherUserFiles.length > 0 &&
     regularImages.length + userVideos.length + userAudio.length + unknownAttachments.length === 0 &&
     replaceComposerContextReferences(resolvedContext.text, (reference) =>
@@ -537,7 +530,6 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
     ).trim() === "";
   const audioOnly =
     !folded &&
-    userMessage.attribution !== "guest" &&
     userAudio.length > 0 &&
     regularImages.length + userVideos.length + otherUserFiles.length + unknownAttachments.length ===
       0 &&
@@ -831,12 +823,6 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           由 Fleet ADE 发送
         </p>
       ) : null}
-      {/* The row's heading already names the guest for screen readers. */}
-      {userMessage.guestName !== undefined ? (
-        <div aria-hidden>
-          <GuestMessageName name={userMessage.guestName} />
-        </div>
-      ) : null}
       {(row.message.inputIntent === "steer" ||
         row.message.inputIntent === "promoted_queued_to_steer") &&
       !row.continuesSteer ? (
@@ -858,22 +844,14 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           (mediaAboveText || row.groupedWithPrevious) && "rounded-tr-md",
           row.groupedWithNext && "rounded-br-md",
           BUBBLE_CHIP_CLASS_NAME,
-          userMessage.attribution === "guest"
-            ? guestBubbleClassName()
-            : !mediaOnly && !fileCardsOnly && !audioOnly && "border border-foreground/5 bg-message",
+          !mediaOnly && !fileCardsOnly && !audioOnly && "border border-foreground/5 bg-message",
           !folded && !mediaOnly && !fileCardsOnly && !audioOnly && "px-4 py-3",
           folded && expanded && "w-full",
         )}
       >
         {/* Outside the fold so a collapsed message still has a heading to navigate to. */}
         {mediaAboveText ? null : (
-          <MessageAuthorHeading>
-            {folded
-              ? senderLabel
-              : userMessage.guestName === undefined
-                ? "你"
-                : `${userMessage.guestName}（访客）`}
-          </MessageAuthorHeading>
+          <MessageAuthorHeading>{folded ? senderLabel : "你"}</MessageAuthorHeading>
         )}
         {folded ? (
           <FoldedMessageHeader

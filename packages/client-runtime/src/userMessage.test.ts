@@ -28,12 +28,6 @@ describe("resolveUserMessageGrouping", () => {
       { ...own, createdBy: "agent" as const },
       { ...own, createdBy: "agent" as const, creationSource: "server" as const },
       { ...own, scheduledTaskId: ScheduledTaskId.make("task") },
-      {
-        ...own,
-        context: {
-          guest: { guestMessageId: GuestMessageId.make("guest"), name: "Sam", text: "hi" },
-        },
-      },
     ]) {
       expect(resolveUserMessageGrouping(own, boundary, boundary)).toEqual({
         groupedWithPrevious: false,
@@ -183,13 +177,16 @@ describe("resolveUserMessagePresentation", () => {
     }
   });
 
-  it("shows a guest's own words and name, not the attributed text the agent reads", () => {
+  it("shows the stored text of an old guest message", () => {
+    const text = "Message from guest Sam, sent by the owner:\n\nWhy?";
     expect(
       resolveUserMessagePresentation({
         role: "user",
         createdBy: "user",
-        text: "Message from guest Sam, sent by the owner:\n\nWhy?",
+        text,
         context: {
+          version: 1,
+          records: [],
           guest: {
             guestMessageId: GuestMessageId.make("guest-message:one"),
             name: "Sam",
@@ -197,7 +194,7 @@ describe("resolveUserMessagePresentation", () => {
           },
         },
       }),
-    ).toEqual({ text: "Why?", attribution: "guest", scheduledTaskId: undefined, guestName: "Sam" });
+    ).toEqual({ text, attribution: null, scheduledTaskId: undefined });
   });
 
   it("attributes older server-sent restart continuations to Fleet ADE, not another agent", () => {

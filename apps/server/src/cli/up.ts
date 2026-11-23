@@ -99,7 +99,7 @@ export const planRoutes = (
 ) => {
   const ask = Option.isNone(flags.connect) && Option.isNone(flags.lan);
   const start = {
-    connect: setup.connect === true || (ask && !setup.installed && setup.connect !== null),
+    connect: setup.connect === true,
     lan: setup.lan,
   };
   return {
@@ -107,9 +107,7 @@ export const planRoutes = (
       connect: Option.getOrElse(flags.connect, () => start.connect),
       lan: Option.getOrElse(flags.lan, () => start.lan),
     } satisfies Routes,
-    ask: ask
-      ? (["connect", "lan"] as const).filter((r) => r !== "connect" || setup.connect !== null)
-      : [],
+    ask: ask ? (["lan"] as const) : [],
   };
 };
 
@@ -249,7 +247,7 @@ const setUp = Effect.fn("cli.up")(function* (flags: {
       }),
     ).pipe(Effect.catchTags({ QuitError: () => Effect.succeed(null) }));
     if (picked === null) return yield* Console.log("Nothing changed.");
-    routes = { connect: picked.includes("connect"), lan: picked.includes("lan") };
+    routes = { connect: plan.routes.connect, lan: picked.includes("lan") };
   } else if (plan.ask.length > 0 && !flags.yes && !before.service.installed) {
     return yield* new CliError.UserError({
       cause: "routes",
@@ -443,7 +441,7 @@ export const upCommand = Command.make("up", {
   ),
   yes: Flag.Boolean("yes").pipe(
     Flag.withDescription(
-      "Ask nothing. Keep the access settings; a new machine gets T3 Connect. A restart stops running agent turns.",
+      "Ask nothing. Keep the access settings; a new machine does not turn on LAN. A restart stops running agent turns.",
     ),
     Flag.withDefault(false),
   ),

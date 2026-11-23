@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/react";
 import { useAtomValue } from "@effect/atom-react";
 import { offersLinkedEnvironments } from "@t3tools/client-runtime/link-request";
 import {
@@ -40,7 +39,6 @@ import { useEnvironmentQuery } from "~/state/query";
 import { relayEnvironmentDiscovery } from "~/state/relay";
 import { useEnvironmentScope, useEnvironmentSessionState } from "~/state/session";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
 import { CommandBlock } from "../CommandBlock";
 import { AccessOption, accessConfig } from "../auth/ConnectAgentSurface";
 import { useAccessEnvironment } from "../settings/useAccessEnvironment";
@@ -215,7 +213,6 @@ function useGrantableLevels(environment: EnvironmentPresentation) {
 
 function useGate(environment: EnvironmentPresentation) {
   const environmentId = environment.environmentId;
-  const { isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const controller = useCloudLinkController(environmentId);
   const canReadRelay = useEnvironmentScope(environmentId, AuthRelayReadScope);
   const thisMachine =
@@ -241,7 +238,7 @@ function useGate(environment: EnvironmentPresentation) {
   const connected = environment.connection.phase === "connected";
   const relayEntry = discovery.environments.get(environmentId);
   const gate = resolveMcpGate({
-    signedIn: isSignedIn,
+    signedIn: false,
     connected,
     approvalCodes:
       serverConfig === null
@@ -304,10 +301,10 @@ function useGate(environment: EnvironmentPresentation) {
   const discoverIfUnasked = useEffectEvent(() => {
     if (!thisMachine && !discovery.listed && !discovery.refreshing) void refreshDiscovery();
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- asks T3 Connect for its machine list once the wizard opens signed in
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- asks T3 Connect for its machine list once the wizard opens
   useEffect(() => {
-    if (isSignedIn) discoverIfUnasked();
-  }, [isSignedIn]);
+    discoverIfUnasked();
+  }, []);
   const waiting = gate.kind === "offline" || (connecting && gate.kind === "turn-on");
   const refreshLinkState = useEffectEvent(() => controller.linkState.refresh());
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- polls the server's link state while the tunnel starts; the server has no push for it
@@ -345,7 +342,6 @@ function GateScreen({
 }) {
   const name = environment.label;
   const turnOnHere = useT3ConnectTurnOn(environment.environmentId);
-  const { openAuthPrompt } = useT3ConnectAuthPrompt();
   const retry = (onClick: () => void) => (
     <Button variant="outline" onClick={onClick}>
       重新检查
@@ -369,15 +365,7 @@ function GateScreen({
             `T3 Connect 会为 ${name} 提供这个地址。每个应用仍需你的批准。`,
           ]}
         >
-          {/* Clerk's sign-in is its own modal, so this dialog closes first. */}
-          <Button
-            onClick={() => {
-              close();
-              openAuthPrompt();
-            }}
-          >
-            登录 T3 Connect
-          </Button>
+          <p className="text-sm text-muted-foreground">此版本不提供 T3 Connect 登录。</p>
         </GateMessage>
       );
     case "disconnected":

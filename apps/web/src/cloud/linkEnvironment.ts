@@ -350,7 +350,7 @@ export const linkEnvironmentToCloud: (input: {
   const configuredRelayUrl = relayUrl();
   if (!configuredRelayUrl) {
     return yield* new CloudEnvironmentLinkError({
-      message: "T3CODE_RELAY_URL is not configured.",
+      message: "T3 Connect is not available.",
     });
   }
   const managedTunnelsEnabled = (input.mode ?? "managed") === "managed";

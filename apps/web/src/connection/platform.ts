@@ -50,7 +50,6 @@ import {
   type PrimaryEnvironmentTarget,
 } from "../environments/primary/target";
 import { clearComposerDraftsEnvironment } from "../composerDraftStore";
-import { isHostedStaticApp } from "../hostedPairing";
 import { isLocalEnvironmentDisabled } from "../localEnvironment";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { acknowledgeRpcRequest, trackRpcRequestSent } from "../rpc/requestLatencyState";
@@ -153,7 +152,7 @@ const layerWakeups = Wakeups.layer({
 function currentClientMetadata() {
   return clientPresentationMetadata({
     appVersion: APP_VERSION,
-    hosted: isHostedStaticApp(),
+    hosted: false,
     identity: {
       userAgent: navigator.userAgent,
       platform: navigator.platform,
@@ -317,31 +316,12 @@ const layerCapabilities = Layer.effectContext(
       identity: Effect.sync(() =>
         Option.fromNullishOr(appAtomRegistry.get(managedRelaySessionAtom)),
       ),
-      clerkToken: Effect.gen(function* () {
-        const session = appAtomRegistry.get(managedRelaySessionAtom);
-        if (session === null) {
-          return yield* new ConnectionBlockedError({
-            reason: "authentication",
-            detail: "请登录 T3 Connect 以连接此环境。",
-          });
-        }
-        const token = yield* session.readClerkToken().pipe(
-          Effect.mapError(
-            (error) =>
-              new ConnectionTransientError({
-                reason: "network",
-                detail: error.message,
-              }),
-          ),
-        );
-        if (token === null) {
-          return yield* new ConnectionBlockedError({
-            reason: "authentication",
-            detail: "T3 Connect 会话不可用。",
-          });
-        }
-        return token;
-      }),
+      clerkToken: Effect.fail(
+        new ConnectionBlockedError({
+          reason: "unsupported",
+          detail: "此连接不经过 T3 Connect。",
+        }),
+      ),
     });
     const identity = ClientCapabilities.RelayDeviceIdentity.of({
       deviceId: Effect.succeedNone,
@@ -609,7 +589,7 @@ export function secondaryRegistrationsToRetainAfterTopologyRead(
 const layerPlatformConnectionSource = Layer.effect(
   PlatformConnectionSource.PlatformConnectionSource,
   Effect.gen(function* () {
-    if (isHostedStaticApp() || isLocalEnvironmentDisabled()) {
+    if (isLocalEnvironmentDisabled()) {
       return PlatformConnectionSource.PlatformConnectionSource.of({
         registrations: Stream.empty,
       });

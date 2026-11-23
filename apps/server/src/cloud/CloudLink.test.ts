@@ -1,7 +1,6 @@
 import { EnvironmentId } from "@t3tools/contracts";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
@@ -15,7 +14,6 @@ import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
-import * as CliTokenManager from "./CliTokenManager.ts";
 import * as CloudLink from "./CloudLink.ts";
 import * as ConnectReachability from "./ConnectReachability.ts";
 import * as ManagedEndpointRuntime from "./ManagedEndpointRuntime.ts";
@@ -99,7 +97,6 @@ const withService = <A, E>(
         latest: Effect.succeedNone,
       }),
       Layer.mock(EnvironmentAuth.EnvironmentAuth)({}),
-      Layer.mock(CliTokenManager.CloudCliTokenManager)({}),
       Layer.mock(HttpServer.HttpServer)({
         address: NetAddress.inetAddressFromIpStringUnsafe("127.0.0.1", 3773),
       }),
@@ -126,128 +123,22 @@ const withService = <A, E>(
     );
   });
 
-it.effect("tells the relay before saving the hold setting locally", () =>
-  withService({}, ({ preferences, stored, relayCalls }) =>
+it.effect("ignores stored agent-activity and offline-webhook secrets", () =>
+  withService({}, ({ preferences, stored }) =>
     Effect.gen(function* () {
-      yield* preferences.update({ publishAgentActivity: true, holdWebhooksWhileOffline: true });
-      assert.deepEqual(relayCalls, [true]);
-      assert.equal(
-        new TextDecoder().decode(stored.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET)),
-        "true",
-      );
-    }),
-  ),
-);
-
-it.effect("puts the relay back when the local save fails", () =>
-  withService({ failHoldWrite: true }, ({ preferences, stored, relayCalls }) =>
-    Effect.gen(function* () {
-      const error = yield* preferences
-        .update({ publishAgentActivity: true, holdWebhooksWhileOffline: true })
-        .pipe(Effect.flip);
-      assert.deepInclude(error, {
-        _tag: "CloudLinkInternalError",
-        operation: "persist-preferences",
+      stored.set(PUBLISH_AGENT_ACTIVITY_SECRET, encode("true"));
+      stored.set(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET, encode("true"));
+      const state = yield* preferences.update({
+        publishAgentActivity: true,
+        holdWebhooksWhileOffline: true,
       });
-      assert.deepEqual(relayCalls, [true, false]);
-      assert.equal(
-        new TextDecoder().decode(stored.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET)),
-        "false",
-      );
-    }),
-  ),
-);
-
-it.effect("leaves the relay untouched when the activity setting can't be saved", () =>
-  withService({ failActivityWrite: true }, ({ preferences, stored, relayCalls }) =>
-    Effect.gen(function* () {
-      const error = yield* preferences
-        .update({ publishAgentActivity: true, holdWebhooksWhileOffline: true })
-        .pipe(Effect.flip);
-      assert.deepInclude(error, {
-        _tag: "CloudLinkInternalError",
-        operation: "persist-preferences",
-      });
-      assert.deepEqual(relayCalls, []);
-      assert.equal(
-        new TextDecoder().decode(stored.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET)),
-        "false",
-      );
-    }),
-  ),
-);
-
-it.effect("keeps both settings unchanged when the relay refuses the hold change", () =>
-  withService({ relayFails: true }, ({ preferences, stored }) =>
-    Effect.gen(function* () {
-      yield* preferences
-        .update({ publishAgentActivity: true, holdWebhooksWhileOffline: true })
-        .pipe(Effect.flip);
-      assert.equal(new TextDecoder().decode(stored.get(PUBLISH_AGENT_ACTIVITY_SECRET)), "false");
-      assert.equal(
-        new TextDecoder().decode(stored.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET)),
-        "false",
-      );
-    }),
-  ),
-);
-
-it.effect("two overlapping updates are applied one after the other", () => {
-  let release!: () => void;
-  let started!: () => void;
-  const released = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const firstAtRelay = new Promise<void>((resolve) => {
-    started = resolve;
-  });
-  return withService({ holdFirstRelayCall: { started, released } }, ({ preferences, stored }) =>
-    Effect.gen(function* () {
-      const first = yield* preferences
-        .update({ publishAgentActivity: true, holdWebhooksWhileOffline: true })
-        .pipe(Effect.forkChild);
-      yield* Effect.promise(() => firstAtRelay);
-      const second = yield* preferences
-        .update({ publishAgentActivity: false, holdWebhooksWhileOffline: false })
-        .pipe(Effect.forkChild);
-      yield* Effect.yieldNow;
-      assert.equal(new TextDecoder().decode(stored.get(PUBLISH_AGENT_ACTIVITY_SECRET)), "true");
-      release();
-      yield* Fiber.join(first);
-      yield* Fiber.join(second);
-      assert.equal(new TextDecoder().decode(stored.get(PUBLISH_AGENT_ACTIVITY_SECRET)), "false");
-      assert.equal(
-        new TextDecoder().decode(stored.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET)),
-        "false",
-      );
-    }),
-  );
-});
-
-it.effect("an update the client walks away from still finishes", () => {
-  let release!: () => void;
-  let started!: () => void;
-  const released = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const atRelay = new Promise<void>((resolve) => {
-    started = resolve;
-  });
-  return withService({ holdFirstRelayCall: { started, released } }, ({ preferences, stored }) =>
-    Effect.gen(function* () {
-      const update = yield* preferences
-        .update({ publishAgentActivity: true, holdWebhooksWhileOffline: true })
-        .pipe(Effect.forkChild);
-      yield* Effect.promise(() => atRelay);
-      const interrupted = yield* Fiber.interrupt(update).pipe(Effect.forkChild);
-      yield* Effect.yieldNow;
-      release();
-      yield* Fiber.join(interrupted);
+      assert.equal(state.publishAgentActivity, false);
+      assert.equal(state.holdWebhooksWhileOffline, false);
       assert.equal(new TextDecoder().decode(stored.get(PUBLISH_AGENT_ACTIVITY_SECRET)), "true");
       assert.equal(
         new TextDecoder().decode(stored.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET)),
         "true",
       );
     }),
-  );
-});
+  ),
+);
