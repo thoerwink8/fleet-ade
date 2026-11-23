@@ -1,8 +1,17 @@
 import { converter } from "culori/fn";
+import { createElement } from "react";
 import { describe, expect, it } from "vite-plus/test";
 
 import "~/index.css";
-import { getStandardPaintedThemeColors } from "./themePalette";
+import { render } from "../test/render";
+import { Button } from "./components/ui/button";
+import {
+  applyThemePalette,
+  EMBER_THEME,
+  getStandardPaintedThemeColors,
+  getThemeColorsForMode,
+  GROVE_THEME,
+} from "./themePalette";
 
 const toRgb = converter("rgb");
 
@@ -26,12 +35,14 @@ describe("standard painted theme colors", () => {
     const root = document.documentElement;
     try {
       for (const appearance of ["light", "dark"] as const) {
+        // useTheme applies both: .dark for @variant dark, data-theme for --fa-* tokens.
         root.classList.toggle("dark", appearance === "dark");
+        root.dataset.theme = appearance;
         const colors = getStandardPaintedThemeColors(appearance);
         const canvas = paintedChannels("--background");
         for (const [variable, role] of [
           ["--background", "canvas"],
-          ["--card", "surface"],
+          ["--muted", "surface"],
           ["--surface-raised", "surfaceRaised"],
           ["--message-surface", "messageSurface"],
         ] as const) {
@@ -46,6 +57,47 @@ describe("standard painted theme colors", () => {
       }
     } finally {
       root.classList.remove("dark");
+      delete root.dataset.theme;
+    }
+  });
+
+  it("paints fleet-design body and primary button colors for the default theme while preserving Grove and Ember", async () => {
+    const root = document.documentElement;
+    try {
+      applyThemePalette("system", "light");
+      root.classList.remove("dark");
+      root.dataset.theme = "light";
+      expect(getComputedStyle(document.body).backgroundColor).toBe("rgb(255, 255, 255)");
+
+      await using screen = await render(createElement(Button, null, "Action"));
+      expect(getComputedStyle(screen.getByRole("button").element()).backgroundColor).toBe(
+        "rgb(44, 91, 216)",
+      );
+
+      root.classList.add("dark");
+      root.dataset.theme = "dark";
+      expect(getComputedStyle(document.body).backgroundColor).toBe("rgb(24, 24, 27)");
+
+      for (const theme of [GROVE_THEME, EMBER_THEME]) {
+        for (const appearance of ["light", "dark"] as const) {
+          root.classList.toggle("dark", appearance === "dark");
+          root.dataset.theme = appearance;
+          applyThemePalette(theme.id, appearance);
+          const expected = toRgb(getThemeColorsForMode(theme, appearance)!.chrome)!;
+          const actual = toRgb(getComputedStyle(document.body).backgroundColor)!;
+          [expected.r, expected.g, expected.b].forEach((channel, index) => {
+            const actualChannel = [actual.r, actual.g, actual.b][index]!;
+            expect(
+              Math.abs(channel * 255 - actualChannel * 255),
+              `${theme.id} ${appearance} body`,
+            ).toBeLessThan(1.5);
+          });
+        }
+      }
+    } finally {
+      applyThemePalette("system", "light");
+      root.classList.remove("dark");
+      delete root.dataset.theme;
     }
   });
 });
