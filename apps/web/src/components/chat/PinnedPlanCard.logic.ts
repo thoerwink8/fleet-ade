@@ -57,6 +57,9 @@ export function derivePinnedPlanView(input: {
   readonly isWorking: boolean;
   readonly activeRunId: RunId | null;
 }): PinnedPlanView | null {
+  if (!input.plans.some((plan) => plan.kind === "todo_list" && plan.status !== "superseded")) {
+    return null;
+  }
   const runById = new Map<RunId, PinnedPlanRunSummary>(input.runs.map((run) => [run.id, run]));
 
   let selected: TodoListPlanArtifact | null = null;
