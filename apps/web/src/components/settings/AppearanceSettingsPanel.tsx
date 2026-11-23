@@ -23,6 +23,7 @@ import {
 } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { AdvancedSettings } from "./AdvancedSettings";
+import { MATH_RENDERING_DESCRIPTION } from "./AppearanceSettingsPanel.logic";
 import { TypographySection } from "./TypographySettings";
 import { ThreadDetailsItemsRow } from "./ThreadDetailsItemsRow";
 
@@ -145,7 +146,7 @@ export function AppearanceSettingsPanel() {
         <ThreadDetailsItemsRow />
         <SettingsRow
           {...searchableSetting("math-rendering")}
-          description="在消息和 Markdown 预览中排版 LaTeX 公式，如 $x^2$ 或 \\[x^2\\]。输入框中仍可编辑 TeX 源码。"
+          description={MATH_RENDERING_DESCRIPTION}
           resetAction={
             settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled ? (
               <SettingResetButton
