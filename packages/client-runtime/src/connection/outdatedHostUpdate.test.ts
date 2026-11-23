@@ -338,7 +338,10 @@ describe("updateOutdatedHost", () => {
 
   it.effect("ignores an outdated host that can only update itself from npm", () =>
     Effect.gen(function* () {
-      const blocked = orchestrationProtocolCompatibilityError(descriptor(undefined, "0.0.45"));
+      const blocked = orchestrationProtocolCompatibilityError({
+        ...descriptor(undefined, "0.0.45"),
+        capabilities: { repositoryIdentity: true },
+      });
       expect(blocked).not.toHaveProperty("serverUpdateRequired");
 
       const sockets: Array<OutdatedHostSocket> = [];
@@ -346,8 +349,7 @@ describe("updateOutdatedHost", () => {
         ...descriptor(undefined, "0.0.45"),
         capabilities: {
           repositoryIdentity: true,
-          serverSelfUpdate: "boot-service",
-          serverSelfUpdateProgress: true,
+          serverInstallation: { kind: "npx" },
         },
       };
       const entries = yield* SubscriptionRef.make<

@@ -61,10 +61,14 @@ describe("orchestration protocol compatibility", () => {
 
     expect(
       withCapabilities({ repositoryIdentity: true, serverSelfUpdate: "boot-service" }),
-    ).not.toHaveProperty("serverUpdateRequired");
+    ).toMatchObject({
+      serverUpdateRequired: true,
+    });
     expect(
       withCapabilities({ repositoryIdentity: true, serverSelfUpdate: "respawn" }),
-    ).not.toHaveProperty("serverUpdateRequired");
+    ).toMatchObject({
+      serverUpdateRequired: true,
+    });
     expect(withCapabilities({ repositoryIdentity: true })).not.toHaveProperty(
       "serverUpdateRequired",
     );
