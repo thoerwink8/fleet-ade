@@ -15,10 +15,8 @@ import {
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
-import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
@@ -155,13 +153,12 @@ export function matchesServerUpdateReadyEvent(
  * that comes back as any other process ends the wait, so validation can reject a missing
  * or foreign outcome instead of timing out.
  */
-export function matchesServerUpdateResumeEvent(
+function matchesServerUpdateResumeEvent(
   result: ServerSelfUpdateResult,
   event: ServerLifecycleStreamReadyEvent,
   acceptedAt?: string,
 ): boolean {
   return (
-    (result.method === "desktop-app" && result.desktopUpdateToken !== undefined) ||
     matchesServerUpdateReadyEvent(result, event) ||
     (result.updateId !== undefined && acceptedAt !== undefined && event.payload.at !== acceptedAt)
   );
@@ -233,60 +230,6 @@ export function waitForNextEnvironmentReconnect<E>(
   );
 }
 
-export const runDesktopCommitWithReconnectObserver = Effect.fn(
-  "runDesktopCommitWithReconnectObserver",
-)(function* <EState, ECommit>(
-  stateChanges: Stream.Stream<{ readonly phase: string }, EState>,
-  commit: Effect.Effect<void, ECommit>,
-) {
-  const armed = yield* Deferred.make<void>();
-  const reconnected = yield* Deferred.make<void>();
-  const observer = yield* stateChanges.pipe(
-    Stream.tap(() => Deferred.succeed(armed, undefined)),
-    waitForNextEnvironmentReconnect,
-    Effect.andThen(Deferred.succeed(reconnected, undefined)),
-    Effect.forkChild,
-  );
-  yield* Deferred.await(armed);
-  const commitExit = yield* commit.pipe(Effect.exit);
-  if (Exit.isSuccess(commitExit)) {
-    yield* Fiber.interrupt(observer);
-    return;
-  }
-  if (!isLegacyUpdateHandoffLoss(commitExit.cause)) {
-    yield* Fiber.interrupt(observer);
-    return yield* Effect.failCause(commitExit.cause);
-  }
-  yield* Deferred.await(reconnected).pipe(Effect.timeout(SERVER_UPDATE_RESUME_TIMEOUT));
-  return yield* Effect.failCause(commitExit.cause);
-});
-
-export const waitForDesktopUpdateTarget = Effect.fn("waitForDesktopUpdateTarget")(function* <
-  EReady,
-  ECommit,
->(
-  targetVersion: string,
-  nextReady: Effect.Effect<ServerLifecycleStreamReadyEvent, EReady>,
-  retryCommit: Effect.Effect<void, ECommit>,
-): Effect.fn.Return<ServerLifecycleStreamReadyEvent, EReady | ECommit | ServerUpdateTerminalError> {
-  const maxCommitAttempts = 3;
-  for (let attempt = 1; attempt <= maxCommitAttempts; attempt += 1) {
-    const ready = yield* nextReady;
-    if (ready.payload.environment.serverVersion === targetVersion) return ready;
-    if (attempt === maxCommitAttempts) break;
-    const retryExit = yield* retryCommit.pipe(Effect.exit);
-    if (Exit.isSuccess(retryExit)) break;
-    if (!isLegacyUpdateHandoffLoss(retryExit.cause)) {
-      return yield* Effect.failCause(retryExit.cause);
-    }
-  }
-  return yield* new ServerUpdateTerminalError({
-    targetVersion,
-    status: "failed",
-    reason: "桌面应用已恢复，但未安装准备好的更新。",
-  });
-});
-
 export function serverUpdateStateForProgressEvent(
   fromVersion: string,
   targetVersion: string,
@@ -294,12 +237,7 @@ export function serverUpdateStateForProgressEvent(
 ): Extract<ServerUpdateState, { status: "running" }> {
   return {
     status: "running",
-    stage:
-      event.type !== "complete"
-        ? event.stage
-        : event.result.method === "desktop-app" && event.result.desktopUpdateToken !== undefined
-          ? "installing"
-          : "resuming",
+    stage: event.type !== "complete" ? event.stage : "resuming",
     fromVersion,
     targetVersion,
   };
@@ -940,7 +878,6 @@ export function createServerEnvironmentAtoms<R, E>(
         atomRegistry.get(configValueAtom(target.environmentId))?.environment.serverVersion ??
         targetVersion;
       let currentStage: ServerUpdateStage = "downloading";
-      let desktopCommitLostTransport = false;
       atomRegistry.set(stateAtom, {
         status: "running",
         stage: currentStage,
@@ -950,9 +887,6 @@ export function createServerEnvironmentAtoms<R, E>(
 
       return Effect.gen(function* () {
         const environmentRegistry = yield* EnvironmentRegistry.EnvironmentRegistry;
-        const desktopCommitStarting = yield* Deferred.make<void>();
-        const desktopReconnectObserverArmed = yield* Deferred.make<void>();
-        const desktopReconnected = yield* Deferred.make<void>();
         let accepting: { readonly session: RpcSession; readonly at: string } | undefined;
         let acceptedAt: string | undefined;
         // The baseline only describes the accepting process if the request rides its session,
@@ -963,18 +897,6 @@ export function createServerEnvironmentAtoms<R, E>(
               acceptedAt = accepting?.session === session ? accepting.at : undefined;
             }),
           ),
-        );
-        yield* Deferred.await(desktopCommitStarting).pipe(
-          Effect.andThen(
-            environmentRegistry.stateChanges(target.environmentId).pipe(
-              Stream.tap(() => Deferred.succeed(desktopReconnectObserverArmed, undefined)),
-              Stream.dropWhile((state) => state.phase === "connected"),
-              Stream.filter((state) => state.phase === "connected"),
-              Stream.runHead,
-            ),
-          ),
-          Effect.andThen(Deferred.succeed(desktopReconnected, undefined)),
-          Effect.forkChild,
         );
         const result = yield* scheduleAtomCommandEffect(
           atomRegistry,
@@ -1058,7 +980,7 @@ export function createServerEnvironmentAtoms<R, E>(
                       Effect.exit,
                     );
                   const selfUpdateMethod = currentConfig?.environment.capabilities.serverSelfUpdate;
-                  // Desktop preparation needs its terminal commit token.
+                  // A dropped progress stream after progress still counts as an accepted handoff.
                   const accepted =
                     receivedProgress &&
                     (selfUpdateMethod === "boot-service" || selfUpdateMethod === "respawn")
@@ -1098,26 +1020,6 @@ export function createServerEnvironmentAtoms<R, E>(
                   return yield* Effect.failCause(exit.cause);
                 });
 
-            if (
-              updateResult.method === "desktop-app" &&
-              updateResult.desktopUpdateToken !== undefined
-            ) {
-              yield* Deferred.succeed(desktopCommitStarting, undefined);
-              yield* Deferred.await(desktopReconnectObserverArmed);
-              const commitExit = yield* environmentRegistry
-                .run(
-                  target.environmentId,
-                  request(WS_METHODS.serverCommitDesktopUpdate, {
-                    requestId: updateResult.desktopUpdateToken,
-                  }),
-                )
-                .pipe(Effect.exit);
-              if (Exit.isFailure(commitExit) && !isLegacyUpdateHandoffLoss(commitExit.cause)) {
-                return yield* Effect.failCause(commitExit.cause);
-              }
-              desktopCommitLostTransport = Exit.isFailure(commitExit);
-            }
-
             targetVersion = updateResult.targetVersion;
 
             currentStage = "resuming";
@@ -1131,27 +1033,18 @@ export function createServerEnvironmentAtoms<R, E>(
           }),
         );
 
-        // A track switch's desktop host already on its track's newest build only saved the
-        // track; nothing restarts.
-        if (
-          result.method === "desktop-app" &&
-          result.desktopUpdateToken === undefined &&
-          result.targetVersion === fromVersion
-        ) {
-          atomRegistry.set(stateAtom, IDLE_SERVER_UPDATE_STATE);
-          return result;
+        if (result.method === "desktop-app") {
+          return yield* new ServerUpdateTerminalError({
+            targetVersion: result.targetVersion,
+            status: "failed",
+            reason: "桌面应用不再自动更新。请在那台机器上手动安装。",
+          });
         }
 
         yield* nudgeReconnectDuringUpdateRestart({
           stateChanges: environmentRegistry.stateChanges(target.environmentId),
           retryNow: environmentRegistry.retryNow(target.environmentId),
         }).pipe(Effect.forkChild);
-
-        if (result.method === "desktop-app" && desktopCommitLostTransport) {
-          yield* Deferred.await(desktopReconnected).pipe(
-            Effect.timeout(SERVER_UPDATE_RESUME_TIMEOUT),
-          );
-        }
 
         const waitForReady = environmentRegistry
           .followStream(target.environmentId, subscribe(WS_METHODS.subscribeServerLifecycle, {}))
@@ -1176,25 +1069,7 @@ export function createServerEnvironmentAtoms<R, E>(
             }),
           ),
         );
-        const desktopUpdateToken = result.desktopUpdateToken;
-        const resumed =
-          result.method === "desktop-app" && desktopUpdateToken !== undefined
-            ? yield* waitForDesktopUpdateTarget(
-                result.targetVersion,
-                nextReady,
-                runDesktopCommitWithReconnectObserver(
-                  environmentRegistry.stateChanges(target.environmentId),
-                  environmentRegistry
-                    .run(
-                      target.environmentId,
-                      request(WS_METHODS.serverCommitDesktopUpdate, {
-                        requestId: desktopUpdateToken,
-                      }),
-                    )
-                    .pipe(Effect.asVoid),
-                ),
-              )
-            : yield* nextReady;
+        const resumed = yield* nextReady;
         yield* validateServerUpdateReadyEvent(result, resumed);
 
         atomRegistry.set(stateAtom, IDLE_SERVER_UPDATE_STATE);

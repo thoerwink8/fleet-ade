@@ -7,7 +7,6 @@ import {
 import type { AsyncResult } from "effect/reactivity";
 import { environmentSession } from "~/state/session";
 import type {
-  DesktopUpdateChannel,
   EnvironmentId,
   ServerInstallation,
   ServerSelfUpdateCapability,
@@ -21,11 +20,12 @@ import {
 import { CircleArrowUpIcon } from "lucide-react";
 import { type ComponentProps, useRef, useState } from "react";
 
-import { requestConfirmDialog } from "~/confirmDialog";
+import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { serverEnvironment, updateOutdatedServer } from "~/state/server";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useServerConfigs } from "~/state/entities";
+import { manualServerUpdateCommand } from "~/versionSkew";
 import { crossesReleaseTrack } from "@t3tools/shared/cliRelease";
 import { Button } from "./ui/button";
 import { toastManager } from "./ui/toast";
@@ -42,19 +42,17 @@ export function serverUpdateStageLabel(stage: ServerUpdateStage): string {
   return UPDATE_STAGE_LABELS[stage];
 }
 
-const CROSS_TRACK_NOTE = "在“关于 → 更新通道”中切换通道";
+const CROSS_TRACK_NOTE = "请在服务器所在机器上手动切换更新通道";
 
 /** Hosts refuse a Stable/Nightly crossing outside a track switch, which checks the database first. */
 function refusedCrossing(
   target: {
     readonly selfUpdate: ServerSelfUpdateCapability | null;
     readonly targetVersion: string;
-    readonly channel?: DesktopUpdateChannel | undefined;
   },
   serverVersion: string | undefined,
 ): boolean {
   return (
-    target.channel === undefined &&
     target.selfUpdate !== null &&
     serverVersion !== undefined &&
     crossesReleaseTrack(serverVersion, target.targetVersion)
@@ -74,14 +72,10 @@ export interface ServerUpdateTarget {
   readonly serverLabel: string;
   readonly selfUpdate: ServerSelfUpdateCapability | null;
   readonly installation?: ServerInstallation | undefined;
-  readonly desktopAppUpdate?: boolean;
+  readonly desktopAppInstall?: boolean | undefined;
   readonly targetVersion: string;
-  /** Set only by a track switch; the host's desktop app moves to this track. */
-  readonly channel?: DesktopUpdateChannel;
   /** A track switch's checked release migration; the host re-checks its own database. */
   readonly targetDatabaseMigration?: number;
-  /** The host already runs its track's newest build and only saves the track. */
-  readonly trackOnly?: boolean;
 }
 
 type UpdateButtonProps = Pick<ComponentProps<typeof Button>, "variant" | "size" | "className"> & {
@@ -100,7 +94,7 @@ export function useServerUpdate() {
     target: ServerUpdateTarget,
     { quiet = false }: { readonly quiet?: boolean } = {},
   ): Promise<ServerUpdateOutcome> => {
-    const { environmentId, serverLabel, selfUpdate, targetVersion } = target;
+    const { environmentId, serverLabel, targetVersion } = target;
     if (
       !canUpdateServer(appAtomRegistry.get(environmentSession.sessionStateAtom(environmentId))) ||
       pendingUpdateEnvironmentIds.has(environmentId)
@@ -111,7 +105,6 @@ export function useServerUpdate() {
       environmentId,
       input: {
         targetVersion,
-        ...(target.channel === undefined ? {} : { channel: target.channel }),
         ...(target.targetDatabaseMigration === undefined
           ? {}
           : { targetDatabaseMigration: target.targetDatabaseMigration }),
@@ -134,10 +127,7 @@ export function useServerUpdate() {
       toastManager.add({
         type: "success",
         title: `${serverLabel} 已更新`,
-        description:
-          selfUpdate === "desktop-managed"
-            ? `桌面应用已重新启动，版本为 ${result.value.targetVersion}。`
-            : `已重新连接到 t3@${result.value.targetVersion}。`,
+        description: `已重新连接到 t3@${result.value.targetVersion}。`,
       });
     }
     return { status: "updated" };
@@ -159,8 +149,8 @@ export function ServerUpdatesAction({
   const [isPending, setIsPending] = useState(false);
   const eligible = targets.filter(
     (target) =>
-      target.selfUpdate === "desktop-managed" &&
-      target.desktopAppUpdate === true &&
+      target.selfUpdate !== null &&
+      target.selfUpdate !== "desktop-managed" &&
       !refusedCrossing(target, serverConfigs.get(target.environmentId)?.environment.serverVersion),
   );
   const handleUpdate = async () => {
@@ -171,15 +161,6 @@ export function ServerUpdatesAction({
       const available = eligible.filter(
         (target) => !pendingUpdateEnvironmentIds.has(target.environmentId),
       );
-      const desktopTargets = available.filter((target) => target.selfUpdate === "desktop-managed");
-      if (desktopTargets.length > 0) {
-        const confirmed =
-          (await requestConfirmDialog(
-            `要更新 ${desktopTargets.map((target) => target.serverLabel).join(", ")} 上的 Fleet ADE 桌面应用吗？它们会在那些机器上关闭并重新启动。`,
-            { initialFocus: "confirm" },
-          )) ?? true;
-        if (!confirmed) return;
-      }
       await Promise.all(available.map((target) => update(target)));
     });
     pending.current = false;
@@ -234,22 +215,40 @@ export function ServerUpdateAction({
   environmentId,
   serverLabel,
   selfUpdate,
-  desktopAppUpdate = false,
+  installation,
+  desktopAppInstall = false,
   targetVersion,
-  channel,
   label = "Update",
   variant = "outline",
   size = "xs",
   className,
   appearance = "button",
 }: ServerUpdateTarget & UpdateButtonProps) {
-  const isDesktopAppUpdate = selfUpdate === "desktop-managed";
   const serverVersion = useServerConfigs().get(environmentId)?.environment.serverVersion;
   const sessionStateAtom = environmentSession.sessionStateAtom(environmentId);
   const canUpdate = useAtomValue(sessionStateAtom, canUpdateServer);
   const update = useServerUpdate();
-
-  if (!isDesktopAppUpdate) return null;
+  const updatesInstall =
+    installation?.kind === "npm-global" || installation?.kind === "t3-launcher";
+  const { copyToClipboard } = useCopyToClipboard<{ command: string }>({
+    target: updatesInstall ? "update command" : "relaunch command",
+    onCopy: ({ command }) => {
+      toastManager.add({
+        type: "success",
+        title: updatesInstall ? "已复制更新命令" : "已复制重启命令",
+        description: updatesInstall
+          ? `在 ${command} 上运行 \`${serverLabel}\`，然后按你常用的选项重启 t3。`
+          : `先停止 ${serverLabel} 上的 t3，再用相同的子命令和选项通过 \`${command}\` 重新启动。这不会更新已安装的 t3 命令。`,
+      });
+    },
+    onError: (error) => {
+      toastManager.add({
+        type: "error",
+        title: "无法复制更新命令",
+        description: error.message,
+      });
+    },
+  });
 
   const handleUpdate = async () => {
     if (
@@ -258,25 +257,16 @@ export function ServerUpdateAction({
     ) {
       return;
     }
-    const confirmed =
-      (await requestConfirmDialog(
-        `要更新运行 ${serverLabel} 的 Fleet ADE 桌面应用吗？它会在那台机器上关闭并重新启动。`,
-        { initialFocus: "confirm" },
-      )) ?? true;
-    if (!confirmed) {
-      return;
-    }
     if (!canUpdateServer(appAtomRegistry.get(sessionStateAtom))) return;
     await update({
       environmentId,
       serverLabel,
       selfUpdate,
-      desktopAppUpdate,
       targetVersion,
     });
   };
 
-  if (!desktopAppUpdate) {
+  if (desktopAppInstall || selfUpdate === "desktop-managed") {
     return (
       <span className="text-muted-foreground text-xs">
         请在那台机器上更新桌面应用以更新此服务器。
@@ -284,12 +274,18 @@ export function ServerUpdateAction({
     );
   }
 
-  if (refusedCrossing({ selfUpdate, targetVersion, channel }, serverVersion)) {
+  if (refusedCrossing({ selfUpdate, targetVersion }, serverVersion)) {
     return <CrossTrackNote />;
   }
 
-  const actionLabel = label;
-  const onClick = () => void handleUpdate();
+  const manualCommand =
+    selfUpdate === null ? manualServerUpdateCommand(targetVersion, installation) : null;
+  const actionLabel =
+    manualCommand !== null ? (updatesInstall ? "复制更新命令" : "复制重启命令") : label;
+  const onClick =
+    manualCommand !== null
+      ? () => copyToClipboard(manualCommand, { command: manualCommand })
+      : () => void handleUpdate();
 
   if (appearance === "icon") {
     return (
@@ -301,7 +297,7 @@ export function ServerUpdateAction({
               variant="ghost-muted"
               className={className}
               aria-label={`${actionLabel} for ${serverLabel}`}
-              disabled={!canUpdate}
+              disabled={manualCommand === null && !canUpdate}
               onClick={onClick}
             />
           }
@@ -318,7 +314,7 @@ export function ServerUpdateAction({
       size={size}
       variant={variant}
       className={className}
-      disabled={!canUpdate}
+      disabled={manualCommand === null && !canUpdate}
       onClick={onClick}
     >
       {actionLabel}

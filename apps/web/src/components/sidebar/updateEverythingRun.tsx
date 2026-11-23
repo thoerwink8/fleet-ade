@@ -11,10 +11,8 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 
-import { APP_VERSION } from "~/branding";
 import { environmentCatalog } from "~/connection/catalog";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
-import { desktopUpdateStateAtom } from "~/state/desktopUpdate";
 import { serverEnvironment } from "~/state/server";
 import { resolveVersionMismatch } from "~/versionSkew";
 import type { ServerUpdateOutcome, ServerUpdateTarget } from "../ServerUpdateAction";
@@ -162,27 +160,6 @@ export function waitForServerUpdateHandoff(
   });
 }
 
-let decideRestart: ((restart: boolean) => void) | null = null;
-
-export function waitForUpdateRestart(delayMs: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const decide = (restart: boolean) => {
-      clearTimeout(timer);
-      decideRestart = null;
-      resolve(restart);
-    };
-    const timer = setTimeout(() => decide(true), delayMs);
-    decideRestart = decide;
-    setUpdateEverythingRun(
-      (run) => run && { ...run, phase: "countdown", restartAt: Date.now() + delayMs },
-    );
-  });
-}
-
-export function postponeUpdateRestart(): void {
-  decideRestart?.(false);
-}
-
 const SAVED_RESULT_KEY = "t3code:update-everything-result:v1";
 const SAVED_RESULT_MAX_AGE_MS = 10 * 60 * 1000;
 // Covers a background service's 30-minute trial start, like the server update itself.
@@ -206,46 +183,6 @@ const SavedResult = Schema.Struct({
 });
 const decodeSavedResult = Schema.decodeUnknownOption(Schema.fromJsonString(SavedResult));
 
-export function saveUpdateEverythingResult(result: UpdateEverythingResult): void {
-  const run = appAtomRegistry.get(updateEverythingRunAtom);
-  const handedOff = (run?.machines ?? []).flatMap((machine): HandedOffServer[] => {
-    if (machine.result !== null) return [];
-    const state = appAtomRegistry.get(serverEnvironment.updateStateAtom(machine.environmentId));
-    // Only the desktop-managed server's update state knows its own feed version.
-    const targetVersion =
-      machine.handedOffVersion ??
-      (state.status === "running" ? state.targetVersion : machine.server?.targetVersion);
-    if (targetVersion === undefined) return [];
-    return [
-      {
-        environmentId: machine.environmentId,
-        label: machine.label,
-        targetVersion,
-        startedAt: machine.startedAt,
-      },
-    ];
-  });
-  try {
-    window.localStorage.setItem(
-      SAVED_RESULT_KEY,
-      JSON.stringify({
-        savedAt: Date.now(),
-        localVersion: result.localVersion,
-        updatedServers: result.updatedServers,
-        updatedProviders: result.updatedProviders,
-        failures: result.failures,
-        handedOff,
-      } satisfies typeof SavedResult.Type),
-    );
-  } catch {}
-}
-
-export function clearSavedUpdateEverythingResult(): void {
-  try {
-    window.localStorage.removeItem(SAVED_RESULT_KEY);
-  } catch {}
-}
-
 function takeSavedUpdateEverythingResult(): typeof SavedResult.Type | null {
   try {
     const raw = window.localStorage.getItem(SAVED_RESULT_KEY);
@@ -263,7 +200,7 @@ function takeSavedUpdateEverythingResult(): typeof SavedResult.Type | null {
 }
 
 export function showUpdateEverythingResult(result: UpdateEverythingResult): void {
-  const view = getUpdateEverythingToastView(result, APP_VERSION);
+  const view = getUpdateEverythingToastView(result);
   if (!view) return;
   toastManager.add(
     stackedThreadToast({
@@ -279,9 +216,7 @@ export function showUpdateEverythingResult(result: UpdateEverythingResult): void
 function followHandedOffServers(servers: ReadonlyArray<HandedOffServer>): void {
   if (servers.length === 0) return;
   setUpdateEverythingRun(() => ({
-    localVersion: null,
     phase: "servers",
-    restartAt: null,
     machines: servers.map((server) => ({
       environmentId: server.environmentId,
       label: server.label,
@@ -325,7 +260,6 @@ function followHandedOffServers(servers: ReadonlyArray<HandedOffServer>): void {
       remaining -= 1;
       if (remaining === 0) {
         showUpdateEverythingResult({
-          localVersion: null,
           updatedServers,
           updatedProviders: 0,
           failures,
@@ -361,30 +295,10 @@ function followHandedOffServers(servers: ReadonlyArray<HandedOffServer>): void {
 }
 
 /** Reports, once per launch, how the update run that restarted the app ended. */
-export function startDesktopUpdateLaunchNotice(): () => void {
+export function restoreUpdateRunOnLaunch(): void {
   const saved = takeSavedUpdateEverythingResult();
-  if (saved) {
-    const handedOff = saved.handedOff ?? [];
-    showUpdateEverythingResult({ ...saved, restarting: handedOff.map((server) => server.label) });
-    followHandedOffServers(handedOff);
-  }
-
-  let notifiedNotAppliedVersion: string | null = null;
-  return appAtomRegistry.subscribe(
-    desktopUpdateStateAtom,
-    (result) => {
-      const notAppliedVersion =
-        AsyncResult.getOrElse(result, () => null)?.notAppliedVersion ?? null;
-      if (notAppliedVersion === null || notifiedNotAppliedVersion === notAppliedVersion) return;
-      notifiedNotAppliedVersion = notAppliedVersion;
-      toastManager.add(
-        stackedThreadToast({
-          type: "error",
-          title: "更新未生效",
-          description: `Fleet ADE 仍停留在 ${APP_VERSION}。请从更新按钮重新安装 ${notAppliedVersion}。`,
-        }),
-      );
-    },
-    { immediate: true },
-  );
+  if (!saved) return;
+  const handedOff = saved.handedOff ?? [];
+  showUpdateEverythingResult({ ...saved, restarting: handedOff.map((server) => server.label) });
+  followHandedOffServers(handedOff);
 }

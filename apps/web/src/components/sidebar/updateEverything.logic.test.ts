@@ -2,13 +2,10 @@ import { EnvironmentId, type ServerSelfUpdateCapability } from "@t3tools/contrac
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  collectChannelSwitchTargets,
   collectRestartingMachines,
-  localSwitchBlockReason,
   collectServerUpdateTargets,
   describeUpdateCapsule,
   describeUpdateEverything,
-  runUpdateEverything,
   type UpdateEverythingMachine,
 } from "./updateEverything.logic";
 
@@ -30,9 +27,6 @@ function machine(
         capabilities: {
           repositoryIdentity: true,
           ...(selfUpdate ? { serverSelfUpdate: selfUpdate } : {}),
-          ...(selfUpdate === "desktop-managed"
-            ? { desktopAppUpdate: true, desktopAppChannelSwitch: true }
-            : {}),
         },
       },
       settings: { continueThreadsAfterServerUpdate: false },
@@ -72,11 +66,11 @@ describe("collectServerUpdateTargets", () => {
     );
 
     expect(targets.map((target) => [target.serverLabel, target.targetVersion])).toEqual([
-      ["other-desktop", "0.0.50"],
+      ["service", "0.0.50"],
     ]);
     expect(skipped.map((entry) => [entry.label, entry.reason])).toEqual([
-      ["service", "需要手动更新"],
-      ["nightly-service", "需要手动更新"],
+      ["nightly-service", "使用 nightly 通道"],
+      ["other-desktop", "需要手动更新"],
       ["offline", "未连接"],
       ["never-connected", "未连接"],
       ["no-scope", "没有权限"],
@@ -86,131 +80,8 @@ describe("collectServerUpdateTargets", () => {
   });
 });
 
-describe("collectChannelSwitchTargets", () => {
-  const NIGHTLY = "0.1.4-nightly.20261027.3796";
-  const OLD_NIGHTLY = "0.1.3-nightly.20261001.3500";
-  const NEWER_NIGHTLY = "0.1.4-nightly.20261020.3700";
-  // What each server reports as its database's highest migration.
-  const host = (
-    base: UpdateEverythingMachine,
-    databaseMigration: number | undefined,
-    os: "linux" | "darwin" = "linux",
-  ): UpdateEverythingMachine => ({
-    ...base,
-    serverConfig: {
-      ...base.serverConfig!,
-      environment: {
-        ...base.serverConfig!.environment,
-        platform: { os, arch: "x64" },
-        ...(databaseMigration === undefined ? {} : { databaseMigration }),
-      },
-    },
-  });
-
-  it("moves nightly hosts to stable only when stable knows their database", () => {
-    const stable = { channel: "latest" as const, version: "0.1.3", databaseMigration: 69 };
-    const { targets, skipped } = collectChannelSwitchTargets(
-      [
-        host(machine("this-app", NIGHTLY, "desktop-managed", { hostedByThisApp: true }), 72),
-        host(machine("old-service", OLD_NIGHTLY, "boot-service"), 69),
-        // Service launchers refuse older versions, even when the database allows it.
-        host(machine("newer-service", NEWER_NIGHTLY, "boot-service"), 69),
-        host(machine("linux-desktop", OLD_NIGHTLY, "desktop-managed"), 69),
-        host(machine("new-service", NIGHTLY, "boot-service"), 72),
-        host(machine("old-server", "0.1.2-nightly.20260901.3000", "boot-service"), undefined),
-        host(machine("mac-desktop", OLD_NIGHTLY, "desktop-managed"), 69, "darwin"),
-        host(machine("preview", "0.1.3-preview.20261026.3702", "boot-service"), 69),
-        host(machine("stable", "0.1.3", "boot-service"), 69),
-        host(machine("stable-desktop", "0.1.2", "desktop-managed"), 68),
-        // Already current, but its saved track may still say Nightly.
-        host(machine("current-desktop", "0.1.3", "desktop-managed"), 69, "darwin"),
-      ],
-      stable,
-    );
-
-    expect(
-      targets.map((target) => [
-        target.serverLabel,
-        target.targetVersion,
-        target.channel,
-        target.trackOnly ?? false,
-      ]),
-    ).toEqual([
-      ["linux-desktop", "0.1.3", "latest", false],
-      ["stable-desktop", "0.1.3", "latest", false],
-      ["current-desktop", "0.1.3", "latest", true],
-    ]);
-    expect(targets.every((target) => target.targetDatabaseMigration === 69)).toBe(true);
-    expect(skipped.map((entry) => [entry.label, entry.reason])).toEqual([
-      ["old-service", "需要手动更新"],
-      ["newer-service", "需要手动更新"],
-      ["new-service", "需要手动更新"],
-      ["old-server", "需要手动更新"],
-      ["mac-desktop", "需要在那台 Mac 上切换 Mac 应用"],
-      ["preview", "运行的是预览版"],
-    ]);
-  });
-
-  it("moves stable hosts to nightly only when nightly knows their database", () => {
-    const nightly = { channel: "nightly" as const, version: NIGHTLY, databaseMigration: 72 };
-    const { targets, skipped } = collectChannelSwitchTargets(
-      [
-        host(machine("service", "0.1.2", "boot-service"), 70),
-        // A Stable tag built a migration the latest Nightly does not have yet.
-        host(machine("ahead", "0.1.3", "boot-service"), 73),
-        machine("old-desktop", "0.1.2", "desktop-managed", {
-          serverConfig: {
-            ...machine("old-desktop", "0.1.2", "desktop-managed").serverConfig!,
-            environment: {
-              ...machine("old-desktop", "0.1.2", "desktop-managed").serverConfig!.environment,
-              capabilities: { repositoryIdentity: true, serverSelfUpdate: "desktop-managed" },
-            },
-          },
-        }),
-        machine("current", NIGHTLY, "boot-service"),
-      ],
-      nightly,
-    );
-
-    expect(targets).toEqual([]);
-    expect(skipped.map((entry) => [entry.label, entry.reason])).toEqual([
-      ["service", "需要手动更新"],
-      ["ahead", "需要手动更新"],
-      ["old-desktop", "需要更高版本的桌面应用"],
-    ]);
-  });
-});
-
-describe("localSwitchBlockReason", () => {
-  it("checks every server this app hosts, and only while connected", () => {
-    const stable = { channel: "latest" as const, version: "0.1.3", databaseMigration: 69 };
-    const nightly = "0.1.4-nightly.20261027.3796";
-
-    const windows = { connected: true, databaseMigration: 69 };
-    expect(localSwitchBlockReason(nightly, stable, [windows], 1)).toBeNull();
-    // A WSL server's newer migration blocks the reinstall that would restart it.
-    expect(
-      localSwitchBlockReason(
-        nightly,
-        stable,
-        [windows, { connected: true, databaseMigration: 72 }],
-        2,
-      ),
-    ).toContain("尚不支持的更改");
-    // A WSL backend still starting has no client entry, so its database is unchecked.
-    expect(localSwitchBlockReason(nightly, stable, [windows], 2)).toBe(
-      "服务器未连接，无法检查数据库",
-    );
-    // A cached head from a disconnected server proves nothing.
-    expect(
-      localSwitchBlockReason(nightly, stable, [{ connected: false, databaseMigration: 69 }], 1),
-    ).toBe("服务器未连接，无法检查数据库");
-    expect(localSwitchBlockReason("0.1.3", stable, [], 1)).toBeNull();
-  });
-});
-
 describe("collectRestartingMachines", () => {
-  it("lists updated servers, and this app's servers only when it installs", () => {
+  it("lists the servers the run is updating", () => {
     const withContinuation = (
       id: string,
       overrides: Partial<UpdateEverythingMachine> = {},
@@ -236,50 +107,22 @@ describe("collectRestartingMachines", () => {
       environmentId: EnvironmentId.make(id),
     }));
 
-    expect(collectRestartingMachines(machines, servers, true)).toEqual([
-      { environmentId: "this-app", continuesThreads: true },
+    expect(collectRestartingMachines(machines, servers)).toEqual([
       { environmentId: "alvin", continuesThreads: true },
       { environmentId: "opted-out", continuesThreads: false },
       { environmentId: "old", continuesThreads: false },
     ]);
-    expect(
-      collectRestartingMachines(machines, servers, false).map((entry) => entry.environmentId),
-    ).toEqual(["alvin", "opted-out", "old"]);
-  });
-});
-
-describe("runUpdateEverything", () => {
-  it("still updates remote machines when the local download fails", async () => {
-    const calls: string[] = [];
-    const result = await runUpdateEverything({
-      downloadLocal: async () => false,
-      updateProviders: async () => {
-        calls.push("providers");
-      },
-      updateServers: async () => {
-        calls.push("servers");
-      },
-    });
-
-    expect(calls).toEqual(["providers", "servers"]);
-    expect(result.localReady).toBe(false);
   });
 });
 
 describe("describeUpdateEverything", () => {
-  it("gives each machine one row with its Fleet ADE and provider updates", () => {
+  it("gives each machine one row with its server and provider updates", () => {
     const id = EnvironmentId.make;
     const { rows } = describeUpdateEverything({
-      localVersion: "1.1.0",
-      localMachines: [
-        { environmentId: id("local"), label: "Mainbook" },
-        { environmentId: id("wsl"), label: "Mainbook WSL" },
-      ],
       servers: [
         {
           environmentId: id("npm"),
           serverLabel: "bb-1",
-          selfUpdate: "respawn",
           targetVersion: "1.1.0",
         },
       ],
@@ -297,9 +140,8 @@ describe("describeUpdateEverything", () => {
     expect(
       rows.map(({ label, app, skipped, providers }) => [label, app, skipped, providers]),
     ).toEqual([
-      ["Mainbook", "this-app", null, ["Codex"]],
-      ["Mainbook WSL", "this-app", null, []],
       ["bb-1", "server", null, ["Codex", "Claude"]],
+      ["Mainbook", null, null, ["Codex"]],
       ["alvin", null, "需要手动更新", ["Claude"]],
       ["TheoRoom", null, "未连接", []],
     ]);
@@ -307,7 +149,7 @@ describe("describeUpdateEverything", () => {
 });
 
 describe("describeUpdateCapsule", () => {
-  it("sends failed track switches back through the planner instead of retrying their target", () => {
+  it("retries a failed server update", () => {
     const failed = {
       machine: {
         environmentId: EnvironmentId.make("remote"),
@@ -327,11 +169,8 @@ describe("describeUpdateCapsule", () => {
       },
       status: "failed" as const,
     };
-    const run = { localVersion: null, phase: "servers" as const, restartAt: null, machines: [] };
+    const run = { phase: "servers" as const, machines: [] };
 
-    expect(describeUpdateCapsule(run, [failed], null, 0).action).toBe("retry");
-    expect(describeUpdateCapsule({ ...run, trackSwitch: true }, [failed], null, 0).action).toBe(
-      "dismiss",
-    );
+    expect(describeUpdateCapsule(run, [failed], 0).action).toBe("retry");
   });
 });

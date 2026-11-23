@@ -330,7 +330,7 @@ describe("ResourceTelemetry", () => {
     }),
   );
 
-  it.effect("atomically subscribes while a desktop update is being rebuilt", () =>
+  it.effect("atomically subscribes while a desktop telemetry snapshot is being rebuilt", () =>
     Effect.gen(function* () {
       const startedAt = DateTime.toEpochMillis(yield* DateTime.now);
       const nextDesktopSnapshot = desktopSnapshot(startedAt + 1_000);

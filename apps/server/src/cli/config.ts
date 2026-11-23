@@ -399,7 +399,6 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
   const shellEnvironmentPrepared = bootstrap?.shellEnvironmentPrepared;
   const desktopTelemetryFd = bootstrap?.desktopTelemetryFd;
   const desktopTelemetryControlFd = bootstrap?.desktopTelemetryControlFd;
-  const desktopAppUpdate = bootstrap?.desktopAppUpdate;
   const resourceMonitorPath = bootstrap?.resourceMonitorPath;
   const autoBootstrapProjectFromCwd = Option.getOrElse(
     resolveOptionPrecedence(
@@ -537,7 +536,6 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
     ...(shellEnvironmentPrepared === undefined ? {} : { shellEnvironmentPrepared }),
     desktopTelemetryFd,
     desktopTelemetryControlFd,
-    ...(desktopAppUpdate === undefined ? {} : { desktopAppUpdate }),
     resourceMonitorPath,
     autoBootstrapProjectFromCwd,
     logWebSocketEvents,

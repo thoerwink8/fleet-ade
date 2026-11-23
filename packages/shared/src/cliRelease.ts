@@ -1,8 +1,6 @@
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { compareSemverVersions } from "./semver.ts";
-
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";
 
@@ -82,24 +80,6 @@ export function crossesReleaseTrack(fromVersion: string, toVersion: string): boo
   const from = cliReleaseChannelOf(fromVersion);
   const to = cliReleaseChannelOf(toVersion);
   return from !== to && from !== "preview" && to !== "preview";
-}
-
-/** The desktop update track a build belongs to. Preview builds have no feed and read as Stable. */
-export function desktopUpdateChannelOf(version: string): "latest" | "nightly" {
-  return cliReleaseChannelOf(version) === "nightly" ? "nightly" : "latest";
-}
-
-/** Whether a track switch may install `found` after its database check cleared `checked`: any build
- * on the switch's track at least as new, since later releases only add migrations. */
-export function acceptsTrackSwitchRelease(
-  found: string,
-  channel: "latest" | "nightly",
-  checked: string,
-): boolean {
-  return (
-    cliReleaseChannelOf(found) === (channel === "nightly" ? "nightly" : "stable") &&
-    compareSemverVersions(found, checked) >= 0
-  );
 }
 
 /** Draft assets are not downloadable. */

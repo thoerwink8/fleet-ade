@@ -169,10 +169,6 @@ function makeTestInstance(input: MakeInstanceInput) {
       encoded: input.desktopTelemetryStream ?? Stream.empty,
       handleControlForSource: () => Effect.void,
       removeControlSource: () => Effect.void,
-      publishUpdateReport: () => Effect.void,
-      updateRequests: Stream.empty,
-      updateCommits: Stream.empty,
-      updateCancellations: Stream.empty,
       ...input.desktopTelemetryPublisher,
     }),
     DesktopWslEnvironment.layerTest(
@@ -757,7 +753,7 @@ describe("DesktopBackendManager", () => {
       yield* instance.start;
       yield* Deferred.await(spawned);
 
-      // App quit and the updater stop every backend with this deadline.
+      // App quit stops every backend with this deadline.
       const quitDone = yield* Deferred.make<void>();
       const quitFiber = yield* instance
         .stop({ timeout: DesktopBackendManager.BACKEND_QUIT_STOP_TIMEOUT })

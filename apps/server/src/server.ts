@@ -176,7 +176,6 @@ import {
 } from "./cloud/managedTunnelStartup.ts";
 import * as CloudCliState from "./cloud/CliState.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
-import * as DesktopAppUpdate from "./desktopUpdate/DesktopAppUpdate.ts";
 import * as ServiceLauncherClient from "./cloud/serviceLauncherClient.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
 import * as HostResources from "./resourceTelemetry/HostResources.ts";
@@ -270,11 +269,6 @@ const layerResourceTelemetry = ResourceTelemetry.layer.pipe(
 );
 
 const layerHostPowerMonitor = HostPowerMonitor.layer.pipe(
-  Layer.provide(layerDesktopTelemetryReceiver),
-);
-
-// A fresh receiver layer would open a second reader on the desktop telemetry fd.
-const layerDesktopAppUpdate = DesktopAppUpdate.layer.pipe(
   Layer.provide(layerDesktopTelemetryReceiver),
 );
 
@@ -831,7 +825,7 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(layerFleetSummaryReporter),
   Layer.provide(layerServerSettings),
   Layer.provide(PipelineSupervision.layer),
-  Layer.provide(ServerSelfUpdate.layer.pipe(Layer.provide(layerDesktopAppUpdate))),
+  Layer.provide(ServerSelfUpdate.layer),
   Layer.provide(layerCommandReadiness),
   Layer.provide(ServerHttp.layerBrowserApiCors),
   Layer.provide(ServerHttp.layerHttpCompression),

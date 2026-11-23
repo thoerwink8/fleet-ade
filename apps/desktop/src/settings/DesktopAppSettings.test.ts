@@ -30,8 +30,6 @@ const DesktopSettingsPatch = Schema.Struct({
   serverExposureMode: Schema.optionalKey(Schema.Literals(["local-only", "network-accessible"])),
   tailscaleServeEnabled: Schema.optionalKey(Schema.Boolean),
   tailscaleServePort: Schema.optionalKey(Schema.Number),
-  updateChannel: Schema.optionalKey(Schema.Literals(["latest", "nightly"])),
-  updateChannelConfiguredByUser: Schema.optionalKey(Schema.Boolean),
   wslBackendEnabled: Schema.optionalKey(Schema.Boolean),
   wslMode: Schema.optionalKey(Schema.Literals(["local", "wsl"])),
   wslDistro: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -230,8 +228,6 @@ describe("DesktopSettings", () => {
           serverExposureMode: "network-accessible",
           tailscaleServeEnabled: true,
           tailscaleServePort: 8443,
-          updateChannel: "latest",
-          updateChannelConfiguredByUser: false,
           wslBackendEnabled: false,
           wslOnly: false,
           wslDistro: null,
@@ -310,8 +306,8 @@ describe("DesktopSettings", () => {
         yield* settings.setServerExposureMode("network-accessible");
 
         assert.equal(
-          yield* fileSystem.readLink(environment.desktopSettingsPath),
-          linkedSettingsPath,
+          (yield* fileSystem.readLink(environment.desktopSettingsPath)).replaceAll("\\", "/"),
+          linkedSettingsPath.replaceAll("\\", "/"),
         );
         const persisted = yield* decodeDesktopSettingsPatch(
           yield* fileSystem.readFileString(linkedSettingsPath),
@@ -344,60 +340,27 @@ describe("DesktopSettings", () => {
     ),
   );
 
-  it.effect("migrates legacy implicit update channels to the runtime default", () =>
+  it.effect("ignores retired update channel keys", () =>
     withSettings(
       Effect.gen(function* () {
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fileSystem = yield* FileSystem.FileSystem;
         const settings = yield* DesktopAppSettings.DesktopAppSettings;
-        yield* writeSettingsPatch({
-          serverExposureMode: "local-only",
-          updateChannel: "latest",
-        });
+        yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
+        yield* fileSystem.writeFileString(
+          environment.desktopSettingsPath,
+          JSON.stringify({
+            serverExposureMode: "network-accessible",
+            updateChannel: "nightly",
+            updateChannelConfiguredByUser: true,
+          }),
+        );
 
-        assert.deepEqual(yield* settings.load, {
-          linuxPasswordStore: "auto",
-          localEnvironmentEnabled: true,
-          mainWindowBounds: null,
-          mainWindowMaximized: false,
-          serverExposureMode: "local-only",
-          tailscaleServeEnabled: false,
-          tailscaleServePort: 443,
-          updateChannel: "nightly",
-          updateChannelConfiguredByUser: false,
-          wslBackendEnabled: false,
-          wslOnly: false,
-          wslDistro: null,
-        } satisfies DesktopAppSettings.DesktopSettings);
+        const loaded = yield* settings.load;
+        assert.equal(loaded.serverExposureMode, "network-accessible");
+        assert.equal("updateChannel" in loaded, false);
+        assert.equal("updateChannelConfiguredByUser" in loaded, false);
       }),
-      { appVersion: "0.0.17-nightly.20260415.1" },
-    ),
-  );
-
-  it.effect("preserves explicit stable update channel on nightly builds", () =>
-    withSettings(
-      Effect.gen(function* () {
-        const settings = yield* DesktopAppSettings.DesktopAppSettings;
-        yield* writeSettingsPatch({
-          serverExposureMode: "local-only",
-          updateChannel: "latest",
-          updateChannelConfiguredByUser: true,
-        });
-
-        assert.deepEqual(yield* settings.load, {
-          linuxPasswordStore: "auto",
-          localEnvironmentEnabled: true,
-          mainWindowBounds: null,
-          mainWindowMaximized: false,
-          serverExposureMode: "local-only",
-          tailscaleServeEnabled: false,
-          tailscaleServePort: 443,
-          updateChannel: "latest",
-          updateChannelConfiguredByUser: true,
-          wslBackendEnabled: false,
-          wslOnly: false,
-          wslDistro: null,
-        } satisfies DesktopAppSettings.DesktopSettings);
-      }),
-      { appVersion: "0.0.17-nightly.20260415.1" },
     ),
   );
 

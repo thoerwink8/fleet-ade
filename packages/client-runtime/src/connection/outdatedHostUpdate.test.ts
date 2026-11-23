@@ -29,12 +29,6 @@ const TARGET = new PrimaryConnectionTarget({
   wsBaseUrl: "wss://build.example.test",
 });
 
-const desktopCapabilities = {
-  repositoryIdentity: true,
-  serverSelfUpdate: "desktop-managed",
-  desktopAppUpdate: true,
-} as const satisfies ExecutionEnvironmentDescriptor["capabilities"];
-
 const descriptor = (
   protocol: number | undefined,
   serverVersion: string,
@@ -181,17 +175,11 @@ class OutdatedHostSocket {
 describe("updateOutdatedHost", () => {
   it.effect("updates a protocol-1 host over a bare socket, then switches it back on", () =>
     Effect.gen(function* () {
-      const blocked = orchestrationProtocolCompatibilityError(
-        descriptor(undefined, "0.0.45", desktopCapabilities),
-      );
+      const blocked = orchestrationProtocolCompatibilityError(descriptor(undefined, "0.0.45"));
       expect(blocked).toMatchObject({ serverUpdateRequired: true });
 
       const sockets: Array<OutdatedHostSocket> = [];
-      let served: ExecutionEnvironmentDescriptor = descriptor(
-        undefined,
-        "0.0.45",
-        desktopCapabilities,
-      );
+      let served: ExecutionEnvironmentDescriptor = descriptor(undefined, "0.0.45");
       const entries = yield* SubscriptionRef.make<
         ReadonlyMap<EnvironmentId, ConnectionCatalogEntry>
       >(
@@ -350,7 +338,10 @@ describe("updateOutdatedHost", () => {
 
   it.effect("ignores an outdated host that can only update itself from npm", () =>
     Effect.gen(function* () {
-      const blocked = orchestrationProtocolCompatibilityError(descriptor(undefined, "0.0.45"));
+      const blocked = orchestrationProtocolCompatibilityError({
+        ...descriptor(undefined, "0.0.45"),
+        capabilities: { repositoryIdentity: true },
+      });
       expect(blocked).not.toHaveProperty("serverUpdateRequired");
 
       const sockets: Array<OutdatedHostSocket> = [];
@@ -358,8 +349,7 @@ describe("updateOutdatedHost", () => {
         ...descriptor(undefined, "0.0.45"),
         capabilities: {
           repositoryIdentity: true,
-          serverSelfUpdate: "boot-service",
-          serverSelfUpdateProgress: true,
+          serverInstallation: { kind: "npx" },
         },
       };
       const entries = yield* SubscriptionRef.make<

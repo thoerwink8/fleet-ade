@@ -61,22 +61,30 @@ describe("orchestration protocol compatibility", () => {
 
     expect(
       withCapabilities({ repositoryIdentity: true, serverSelfUpdate: "boot-service" }),
-    ).not.toHaveProperty("serverUpdateRequired");
+    ).toMatchObject({
+      serverUpdateRequired: true,
+    });
     expect(
       withCapabilities({ repositoryIdentity: true, serverSelfUpdate: "respawn" }),
-    ).not.toHaveProperty("serverUpdateRequired");
+    ).toMatchObject({
+      serverUpdateRequired: true,
+    });
     expect(withCapabilities({ repositoryIdentity: true })).not.toHaveProperty(
       "serverUpdateRequired",
     );
     expect(
       withCapabilities({ repositoryIdentity: true, serverSelfUpdate: "desktop-managed" }),
     ).not.toHaveProperty("serverUpdateRequired");
-    expect(
-      withCapabilities({
+    const legacyDesktop = {
+      ...older,
+      capabilities: {
         repositoryIdentity: true,
-        serverSelfUpdate: "desktop-managed",
+        serverSelfUpdate: "desktop-managed" as const,
         desktopAppUpdate: true,
-      }),
-    ).toMatchObject({ serverUpdateRequired: true });
+      },
+    };
+    expect(orchestrationProtocolCompatibilityError(legacyDesktop)).not.toHaveProperty(
+      "serverUpdateRequired",
+    );
   });
 });

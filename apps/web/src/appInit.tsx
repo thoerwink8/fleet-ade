@@ -17,7 +17,7 @@ import { startKeybindingsUpdateToasts } from "./components/KeybindingsUpdateToas
 import { startLegacyThreadMigrationToast } from "./components/LegacyThreadMigrationToast";
 import { startPermissionUpdateNotices } from "./components/PermissionUpdateNotice";
 import { startMainAppLocationTracking } from "./components/sidebar/mainAppLocation";
-import { startDesktopUpdateLaunchNotice } from "./components/sidebar/updateEverythingRun";
+import { restoreUpdateRunOnLaunch } from "./components/sidebar/updateEverythingRun";
 import { startSlowRpcRequestToasts } from "./components/SlowRpcRequestToastCoordinator";
 import { startThreadNotifications } from "./components/ThreadNotificationCoordinator";
 import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL } from "./branding";
@@ -236,7 +236,7 @@ export function startAppServices(): AppRouter {
   startLegacyThreadMigrationToast();
   startPermissionUpdateNotices(router);
   startThreadNotifications(appAtomRegistry, router);
-  if (isElectron) startDesktopUpdateLaunchNotice();
+  if (isElectron) restoreUpdateRunOnLaunch();
 
   return router;
 }

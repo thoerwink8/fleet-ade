@@ -19,7 +19,6 @@ vi.mock("electron", () => ({}));
 vi.mock("../ipc/DesktopIpcHandlers.ts", () => ({
   installDesktopIpcHandlers: () => Effect.void,
 }));
-vi.mock("../updates/DesktopRemoteUpdates.ts", () => ({ listen: Effect.void }));
 vi.mock("./DesktopStartupRecovery.ts", () => ({ listen: Effect.void }));
 
 import * as DesktopApp from "./DesktopApp.ts";
@@ -42,7 +41,6 @@ import * as ElectronSafeStorage from "../electron/ElectronSafeStorage.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
-import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import * as DesktopApplicationMenu from "../window/DesktopApplicationMenu.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
 import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
@@ -135,9 +133,6 @@ it.effect.each([false, true])(
           Effect.provideService(DesktopApplicationMenu.DesktopApplicationMenu, {
             configure: Effect.void,
           }),
-          Effect.provideService(DesktopUpdates.DesktopUpdates, {
-            configure: Effect.void,
-          } as unknown as DesktopUpdates.DesktopUpdates["Service"]),
           Effect.provideService(DesktopLinuxUrlHandler.DesktopLinuxUrlHandler, {
             register: Deferred.succeed(registrationStarted, undefined).pipe(
               Effect.andThen(Deferred.await(releaseRegistration)),
