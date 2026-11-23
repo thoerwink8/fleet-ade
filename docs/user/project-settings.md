@@ -55,7 +55,7 @@ A project on several machines must have every machine connected to pin or archiv
 
 ## Worktree branch names
 
-In **Settings → Code → Worktree branch naming**, choose a static prefix,
+In **Settings → Projects → Worktree branch naming**, choose a static prefix,
 a model-selected semantic prefix such as `feat/` or `fix/`, or custom instructions
 for the complete name. The static prefix defaults to `t3/`; a trailing slash is
 optional, and an empty prefix adds nothing. Invalid characters in a static prefix
@@ -176,7 +176,7 @@ resolve in one order: a project override, then the environment setting, then `t3
 built-in default. Leave a setting on **Inherit** to let the next tier decide.
 
 New worktrees initialize git submodules recursively. If that step is slow because the repository
-declares many nested submodules, set **Submodules** in **Settings → Code** under Advanced (with the project
+declares many nested submodules, set **Submodules** in **Settings → Projects** under Advanced (with the project
 selected to override it there) to **Top level only** to stop at the ones the repository declares
 itself, or **Skip** to leave them for a setup script. It resolves in the same order as the
 workspace default: a `"worktreeSubmodules"` value in the `t3.json` of the branch being checked out
@@ -185,13 +185,13 @@ applies when the project and environment are both on **Inherit**.
 ## Worktree location
 
 New worktrees go in the `worktrees` folder of the T3 home directory. To put them somewhere else,
-such as another drive, set **Settings → Code → Worktree location** to an absolute path like
+such as another drive, set **Settings → Projects → Worktree location** to an absolute path like
 `D:\worktrees` or `~/worktrees`. The setting is per machine. Existing worktrees stay where they
 are, and cleanup covers both the default folder and the custom one.
 
 ## Storage cleanup
 
-Open **Settings → Code → Cleanup** to enable automatic cleanup on one machine or all connected
+Open **Settings → Projects → Cleanup** to enable automatic cleanup on one machine or all connected
 environments. Policies are off by default and run on the server at startup, when changed, and
 hourly. Offline machines keep their existing policies.
 

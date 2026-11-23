@@ -23,7 +23,7 @@ setting in **Settings → Appearance → Diffs**.
 ## Connect an account
 
 Install Git and configure authentication on the machine running your T3 Code server. For a remote
-environment, do this on the remote machine. After signing in, open **Settings → Code → Source control**
+environment, do this on the remote machine. After signing in, open **Settings → Projects → Source control**
 and choose **Rescan**.
 
 ### GitHub
@@ -31,7 +31,7 @@ and choose **Rescan**.
 T3 Code talks to GitHub's API directly and only needs a token. Any of these works, in this
 order of precedence:
 
-1. A token saved in **Settings → Code → Source control → GitHub**. It is kept in the server's secret
+1. A token saved in **Settings → Projects → Source control → GitHub**. It is kept in the server's secret
    store, and works without the GitHub CLI.
 2. `GH_TOKEN` (`GH_ENTERPRISE_TOKEN` with `GH_HOST` for GitHub Enterprise Server) in the
    server's environment.
@@ -83,7 +83,7 @@ If its badge is missing because several remotes hold that branch, set the branch
 the intended remote with `git branch --set-upstream-to=<remote>/<branch>`.
 
 Choose how commit messages and pull request titles and descriptions are written in
-**Settings → Code → Source control → Commits & pull requests**. **Repository conventions** uses the
+**Settings → Projects → Source control → Commits & pull requests**. **Repository conventions** uses the
 project's instructions and recent commit subjects. **Custom instructions** applies your own
 instructions to commits and pull requests.
 
@@ -122,7 +122,7 @@ and checkout or PR creation from Git actions continue to use the project's envir
 ## Troubleshooting
 
 - **Not authenticated:** run `gh auth login` on the server, then rescan.
-- **GitHub sign-in cannot be verified:** update GitHub CLI to at least 2.81.0, or save a token in Settings → Code → Source control.
+- **GitHub sign-in cannot be verified:** update GitHub CLI to at least 2.81.0, or save a token in Settings → Projects → Source control.
 - **Push fails despite a connected account:** check the Git remote's credentials. SSH and HTTPS
   remotes can require separate setup from the hosting provider's API access.
 - **A pull request cannot load:** open it on the host website while resolving connectivity,
