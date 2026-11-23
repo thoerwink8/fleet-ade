@@ -128,7 +128,7 @@ export const layer = Layer.effect(
                 Ref.set(
                   preflightErrorRef,
                   Option.some(
-                    "另一个 Fleet ADE 服务器正在使用此发行版的 T3 主目录，或此目录已配置旧版后台服务。请停止该服务器或与其配对，或在发行版中尝试 `t3 update`。如果旧版启动器无法更新，请运行 `t3 service uninstall`，并可在发行版中使用当前 CLI 运行 `t3 service install` 重新安装。如果 `t3` 缺失或过旧，请使用 `npx t3@latest`，并在每条命令中通过 `--base-dir` 指定该服务的 T3 主目录。",
+                    "另一个 Fleet ADE 服务器正在使用此发行版的 T3 主目录，或此目录已配置旧版后台服务。请停止该服务器或与其配对，或在发行版中安装当前 CLI 后运行 `t3 service install`。如果旧版启动器无法替换，请运行 `t3 service uninstall`，再在发行版中使用当前 CLI 运行 `t3 service install`。如果 `t3` 缺失或过旧，请使用 `npx t3@latest`，并在每条命令中通过 `--base-dir` 指定该服务的 T3 主目录。",
                   ),
                 ),
               ),

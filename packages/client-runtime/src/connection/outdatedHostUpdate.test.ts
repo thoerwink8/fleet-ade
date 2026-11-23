@@ -29,14 +29,27 @@ const TARGET = new PrimaryConnectionTarget({
   wsBaseUrl: "wss://build.example.test",
 });
 
-const descriptor = (protocol: number | undefined, serverVersion: string) =>
+const desktopCapabilities = {
+  repositoryIdentity: true,
+  serverSelfUpdate: "desktop-managed",
+  desktopAppUpdate: true,
+} as const satisfies ExecutionEnvironmentDescriptor["capabilities"];
+
+const descriptor = (
+  protocol: number | undefined,
+  serverVersion: string,
+  capabilities: ExecutionEnvironmentDescriptor["capabilities"] = {
+    repositoryIdentity: true,
+    serverSelfUpdate: "boot-service",
+  },
+) =>
   ({
     environmentId: TARGET.environmentId,
     label: TARGET.label,
     platform: { os: "darwin", arch: "arm64" },
     serverVersion,
     ...(protocol === undefined ? {} : { orchestrationProtocolVersion: protocol }),
-    capabilities: { repositoryIdentity: true, serverSelfUpdate: "boot-service" },
+    capabilities,
   }) satisfies ExecutionEnvironmentDescriptor;
 
 const RpcRequest = Schema.TaggedStruct("Request", {
@@ -168,11 +181,17 @@ class OutdatedHostSocket {
 describe("updateOutdatedHost", () => {
   it.effect("updates a protocol-1 host over a bare socket, then switches it back on", () =>
     Effect.gen(function* () {
-      const blocked = orchestrationProtocolCompatibilityError(descriptor(undefined, "0.0.45"));
+      const blocked = orchestrationProtocolCompatibilityError(
+        descriptor(undefined, "0.0.45", desktopCapabilities),
+      );
       expect(blocked).toMatchObject({ serverUpdateRequired: true });
 
       const sockets: Array<OutdatedHostSocket> = [];
-      let served: ExecutionEnvironmentDescriptor = descriptor(undefined, "0.0.45");
+      let served: ExecutionEnvironmentDescriptor = descriptor(
+        undefined,
+        "0.0.45",
+        desktopCapabilities,
+      );
       const entries = yield* SubscriptionRef.make<
         ReadonlyMap<EnvironmentId, ConnectionCatalogEntry>
       >(
@@ -329,10 +348,10 @@ describe("updateOutdatedHost", () => {
     }),
   );
 
-  it.effect("resumes an outdated host update after progress transport loss", () =>
+  it.effect("ignores an outdated host that can only update itself from npm", () =>
     Effect.gen(function* () {
       const blocked = orchestrationProtocolCompatibilityError(descriptor(undefined, "0.0.45"));
-      expect(blocked).toMatchObject({ serverUpdateRequired: true });
+      expect(blocked).not.toHaveProperty("serverUpdateRequired");
 
       const sockets: Array<OutdatedHostSocket> = [];
       let served: ExecutionEnvironmentDescriptor = {
@@ -390,17 +409,12 @@ describe("updateOutdatedHost", () => {
         ),
       );
 
-      const stages: Array<string> = [];
-      const result = yield* updateOutdatedHost(
+      const error = yield* updateOutdatedHost(
         TARGET.environmentId,
         { targetVersion: "0.0.46" },
-        (stage) =>
-          Effect.sync(() => {
-            stages.push(stage);
-            // Lose the transport only after the consumer has observed progress.
-            if (stage === "downloading") sockets[0]?.close();
-          }),
+        () => Effect.void,
       ).pipe(
+        Effect.flip,
         Effect.provide(
           Layer.mergeAll(
             Layer.succeed(EnvironmentRegistry.EnvironmentRegistry, registry),
@@ -426,13 +440,9 @@ describe("updateOutdatedHost", () => {
         ),
       );
 
-      expect(sockets[0]?.url).not.toContain("orchestrationProtocol");
-      expect(sockets[0]?.requests.map((request) => request.tag)).toEqual([
-        WS_METHODS.serverUpdateServerWithProgress,
-      ]);
-      expect(stages).toEqual(["downloading", "resuming"]);
-      expect(result.targetVersion).toBe("0.0.46");
-      expect(calls).toEqual(["compatibility:clear", "enabled:true"]);
+      expect(error).toMatchObject({ _tag: "OutdatedHostUpdateError" });
+      expect(sockets).toEqual([]);
+      expect(calls).toEqual([]);
     }),
   );
 });

@@ -22,12 +22,10 @@ import { CircleArrowUpIcon } from "lucide-react";
 import { type ComponentProps, useRef, useState } from "react";
 
 import { requestConfirmDialog } from "~/confirmDialog";
-import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { serverEnvironment, updateOutdatedServer } from "~/state/server";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useServerConfigs } from "~/state/entities";
-import { manualServerUpdateCommand } from "~/versionSkew";
 import { crossesReleaseTrack } from "@t3tools/shared/cliRelease";
 import { Button } from "./ui/button";
 import { toastManager } from "./ui/toast";
@@ -161,8 +159,8 @@ export function ServerUpdatesAction({
   const [isPending, setIsPending] = useState(false);
   const eligible = targets.filter(
     (target) =>
-      target.selfUpdate !== null &&
-      (target.selfUpdate !== "desktop-managed" || target.desktopAppUpdate) &&
+      target.selfUpdate === "desktop-managed" &&
+      target.desktopAppUpdate === true &&
       !refusedCrossing(target, serverConfigs.get(target.environmentId)?.environment.serverVersion),
   );
   const handleUpdate = async () => {
@@ -236,7 +234,6 @@ export function ServerUpdateAction({
   environmentId,
   serverLabel,
   selfUpdate,
-  installation,
   desktopAppUpdate = false,
   targetVersion,
   channel,
@@ -251,27 +248,8 @@ export function ServerUpdateAction({
   const sessionStateAtom = environmentSession.sessionStateAtom(environmentId);
   const canUpdate = useAtomValue(sessionStateAtom, canUpdateServer);
   const update = useServerUpdate();
-  const updatesInstall =
-    installation?.kind === "npm-global" || installation?.kind === "t3-launcher";
-  const { copyToClipboard } = useCopyToClipboard<{ command: string }>({
-    target: updatesInstall ? "update command" : "relaunch command",
-    onCopy: ({ command }) => {
-      toastManager.add({
-        type: "success",
-        title: updatesInstall ? "已复制更新命令" : "已复制重启命令",
-        description: updatesInstall
-          ? `在 ${command} 上运行 \`${serverLabel}\`，然后按你常用的选项重启 t3。`
-          : `先停止 ${serverLabel} 上的 t3，再用相同的子命令和选项通过 \`${command}\` 重新启动。这不会更新已安装的 t3 命令。`,
-      });
-    },
-    onError: (error) => {
-      toastManager.add({
-        type: "error",
-        title: "无法复制更新命令",
-        description: error.message,
-      });
-    },
-  });
+
+  if (!isDesktopAppUpdate) return null;
 
   const handleUpdate = async () => {
     if (
@@ -300,7 +278,7 @@ export function ServerUpdateAction({
     });
   };
 
-  if (selfUpdate === "desktop-managed" && !desktopAppUpdate) {
+  if (!desktopAppUpdate) {
     return (
       <span className="text-muted-foreground text-xs">
         请在那台机器上更新桌面应用以更新此服务器。
@@ -312,14 +290,8 @@ export function ServerUpdateAction({
     return <CrossTrackNote />;
   }
 
-  const manualCommand =
-    selfUpdate === null ? manualServerUpdateCommand(targetVersion, installation) : null;
-  const actionLabel =
-    manualCommand !== null ? (updatesInstall ? "复制更新命令" : "复制重启命令") : label;
-  const onClick =
-    manualCommand !== null
-      ? () => copyToClipboard(manualCommand, { command: manualCommand })
-      : () => void handleUpdate();
+  const actionLabel = label;
+  const onClick = () => void handleUpdate();
 
   if (appearance === "icon") {
     return (
@@ -331,7 +303,7 @@ export function ServerUpdateAction({
               variant="ghost-muted"
               className={className}
               aria-label={`${actionLabel} for ${serverLabel}`}
-              disabled={manualCommand === null && !canUpdate}
+              disabled={!canUpdate}
               onClick={onClick}
             />
           }
@@ -348,7 +320,7 @@ export function ServerUpdateAction({
       size={size}
       variant={variant}
       className={className}
-      disabled={manualCommand === null && !canUpdate}
+      disabled={!canUpdate}
       onClick={onClick}
     >
       {actionLabel}

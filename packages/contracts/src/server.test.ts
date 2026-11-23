@@ -7,6 +7,7 @@ import {
   OtlpEndpointCheckInput,
   resolveEnvironmentMachineKind,
   ServerConfigProviderStatusDeltasPayload,
+  ServerLifecycleStreamEvent,
   ServerObservability,
   ServerProvider,
   serverProviderDeltas,
@@ -153,6 +154,46 @@ describe("resolveEnvironmentMachineKind", () => {
     expect(
       resolveEnvironmentMachineKind({ environment: parsed, settings: decodeSettings({}) }),
     ).toBe("server");
+  });
+});
+
+describe("retired self-update events", () => {
+  const decodeReady = Schema.decodeUnknownSync(ServerLifecycleStreamEvent);
+
+  it("decodes a ready event that names a finished self-update and drops an unknown key", () => {
+    const decoded = decodeReady({
+      version: 1,
+      sequence: 1,
+      type: "ready",
+      selfUpdate: "boot-service",
+      payload: {
+        at: "2026-01-01T00:00:00.000Z",
+        environment: {
+          environmentId: "env_old",
+          label: "old",
+          platform: { os: "linux", arch: "x64" },
+          serverVersion: "1.2.3",
+          capabilities: { repositoryIdentity: true, serverSelfUpdate: "boot-service" },
+        },
+        updateOutcome: {
+          id: "old-update",
+          fromVersion: "1.2.2",
+          targetVersion: "1.2.3",
+          status: "committed",
+        },
+      },
+    });
+
+    expect(decoded).not.toHaveProperty("selfUpdate");
+    expect(decoded.type).toBe("ready");
+    if (decoded.type !== "ready") return;
+    expect(decoded.payload.updateOutcome).toEqual({
+      id: "old-update",
+      fromVersion: "1.2.2",
+      targetVersion: "1.2.3",
+      status: "committed",
+    });
+    expect(decoded.payload.environment.capabilities.serverSelfUpdate).toBe("boot-service");
   });
 });
 

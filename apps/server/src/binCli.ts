@@ -25,7 +25,6 @@ import { sharedServerCommandFlags } from "./cli/config.ts";
 import { projectCommand } from "./cli/project.ts";
 import { threadCommand } from "./cli/thread.ts";
 import { runDefaultServerCommand, serveCommand, startCommand } from "./cli/server.ts";
-import { updateCommand } from "./cli/update.ts";
 import {
   confirmCliInstall,
   inTerminalForeground,
@@ -102,7 +101,6 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
       upCommand,
       statusCommand,
       serviceCommand,
-      updateCommand,
       installCommand,
       uninstallCommand,
       // bin.ts runs the bare service invocation; this keeps flags and help working like other commands.

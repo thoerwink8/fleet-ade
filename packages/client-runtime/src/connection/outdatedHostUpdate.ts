@@ -102,9 +102,8 @@ export const updateOutdatedHost = Effect.fn("clientRuntime.connection.updateOutd
 
     const capabilities = descriptor.capabilities;
     if (
-      capabilities.serverSelfUpdate === undefined ||
-      (capabilities.serverSelfUpdate === "desktop-managed" &&
-        capabilities.desktopAppUpdate !== true)
+      capabilities.serverSelfUpdate !== "desktop-managed" ||
+      capabilities.desktopAppUpdate !== true
     ) {
       return yield* new OutdatedHostUpdateError({
         environmentId,
@@ -141,47 +140,23 @@ export const updateOutdatedHost = Effect.fn("clientRuntime.connection.updateOutd
           capabilities.serverSelfUpdateProgress === true
             ? yield* Effect.gen(function* () {
                 const terminal = yield* Ref.make(Option.none<ServerSelfUpdateResult>());
-                let receivedProgress = false;
                 const streamExit = yield* client[WS_METHODS.serverUpdateServerWithProgress](
                   input,
                 ).pipe(
                   Stream.runForEach((event) =>
                     event.type === "complete"
                       ? Ref.set(terminal, Option.some(event.result))
-                      : Effect.sync(() => {
-                          receivedProgress = true;
-                        }).pipe(Effect.andThen(onStage(event.stage))),
+                      : onStage(event.stage),
                   ),
                   Effect.exit,
                 );
-                const selfUpdateMethod = capabilities.serverSelfUpdate;
-                // Desktop preparation needs its terminal commit token.
-                const accepted =
-                  receivedProgress &&
-                  (selfUpdateMethod === "boot-service" || selfUpdateMethod === "respawn")
-                    ? { targetVersion: input.targetVersion, method: selfUpdateMethod }
-                    : undefined;
                 return yield* resolveServerUpdateProgressResult(
                   input.targetVersion,
                   yield* Ref.get(terminal),
                   streamExit,
-                  accepted,
                 );
               })
-            : yield* client[WS_METHODS.serverUpdateServer](input).pipe(
-                // Older servers can drop the socket before acknowledging the restart.
-                Effect.catchCauseIf(
-                  (cause) =>
-                    (capabilities.serverSelfUpdate === "boot-service" ||
-                      capabilities.serverSelfUpdate === "respawn") &&
-                    isLegacyUpdateHandoffLoss(cause),
-                  () =>
-                    Effect.succeed({
-                      targetVersion: input.targetVersion,
-                      method: capabilities.serverSelfUpdate as "boot-service" | "respawn",
-                    } satisfies ServerSelfUpdateResult),
-                ),
-              );
+            : yield* client[WS_METHODS.serverUpdateServer](input);
 
         if (
           updateResult.method === "desktop-app" &&

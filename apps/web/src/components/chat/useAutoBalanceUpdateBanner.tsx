@@ -64,7 +64,7 @@ export function useAutoBalanceUpdateBanner(
         desktopAppUpdate,
         targetVersion: state.status === "idle" ? mismatch!.clientVersion : state.targetVersion,
         connected: environment.connection.phase === "connected",
-        remoteUpdate: selfUpdate !== null && (selfUpdate !== "desktop-managed" || desktopAppUpdate),
+        remoteUpdate: selfUpdate === "desktop-managed" && desktopAppUpdate,
         state,
         dismissKey,
       },

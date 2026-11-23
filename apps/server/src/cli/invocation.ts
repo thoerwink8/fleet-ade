@@ -76,7 +76,7 @@ export const resolveServerInstallation = Effect.gen(function* () {
     if (launcher === undefined) return null;
     // Fails for a runtime started directly, as SSH launches do, or through a copy.
     const link = yield* fs.readLink(launcher);
-    // Keep the home as the link spells it; `t3 update` only repoints links into that spelling.
+    // Keep the home as the link spells it; only a link into that spelling counts.
     const linked = PINNED_RUNTIME_ENTRY.exec(path.resolve(path.dirname(launcher), link));
     if (!linked || (yield* fs.realPath(linked[1] || "/")) !== (runtime[1] || "/")) return null;
     return {
