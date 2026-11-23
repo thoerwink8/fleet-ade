@@ -138,7 +138,17 @@ import {
 } from "./timelineViewport";
 import { useThreadFindPositionReader } from "./useThreadFindPositionReader";
 import { ThreadActivityAnnouncer } from "./ThreadActivityAnnouncer";
-import { useStableHandoffRuns, useIncrementalTimelineRows, useStableRows } from "./useTimelineRows";
+import {
+  useStableHandoffRuns,
+  useIncrementalTimelineRows,
+  useStableRows,
+  useTimelineWindowProjection,
+} from "./useTimelineRows";
+import {
+  computeInitialTimelineWindowStart,
+  expandTimelineWindowStartForIndex,
+  nextExpandedTimelineWindowStart,
+} from "./timelineWindow";
 import { useClientSettings } from "../../hooks/useSettings";
 
 function timelineListStateFor(identity: string): {
@@ -760,6 +770,64 @@ const ConversationTimeline = memo(function ConversationTimeline({
     semanticWorkStream,
   });
   const rows = useStableRows(rawRows, listIdentityKey);
+  const [windowState, setWindowState] = useState<{
+    readonly identity: string;
+    readonly initialized: boolean;
+    readonly start: number;
+  }>(() => ({
+    identity: listIdentityKey,
+    initialized: false,
+    start: 0,
+  }));
+  const needsFullWindow =
+    findActive ||
+    activeFindMatch !== null ||
+    citationRequest !== null ||
+    (restoringThreadPosition && rememberedPosition?.atEnd === false);
+  const anchorFullIndex =
+    anchorMessageId === null
+      ? -1
+      : rows.findIndex(
+          (row) =>
+            row.kind === "message" &&
+            row.message.role === "user" &&
+            row.message.id === anchorMessageId,
+        );
+  let nextWindowState = windowState;
+  if (nextWindowState.identity !== listIdentityKey) {
+    nextWindowState = { identity: listIdentityKey, initialized: false, start: 0 };
+  }
+  if (!nextWindowState.initialized && rows.length > 0) {
+    nextWindowState = {
+      identity: listIdentityKey,
+      initialized: true,
+      start: needsFullWindow ? 0 : computeInitialTimelineWindowStart(rows),
+    };
+  }
+  if (nextWindowState.start > 0) {
+    if (needsFullWindow) {
+      nextWindowState = { ...nextWindowState, start: 0 };
+    } else if (anchorFullIndex >= 0 && anchorFullIndex < nextWindowState.start) {
+      nextWindowState = {
+        ...nextWindowState,
+        start: expandTimelineWindowStartForIndex(nextWindowState.start, anchorFullIndex),
+      };
+    }
+  }
+  if (
+    nextWindowState.identity !== windowState.identity ||
+    nextWindowState.initialized !== windowState.initialized ||
+    nextWindowState.start !== windowState.start
+  ) {
+    setWindowState(nextWindowState);
+  }
+  const firstMessageIndex = rows.findIndex(isMessageRow);
+  const windowProjection = useTimelineWindowProjection(
+    rows,
+    nextWindowState.start,
+    firstMessageIndex >= 0 ? firstMessageIndex : null,
+  );
+  const visibleRows = windowProjection.rows;
   const matchedApprovalRequestIds = new Set<string>();
   for (const row of pendingApprovalRequestIds.size > 0 ? rows : []) {
     const entries =
@@ -779,7 +847,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const minimapRowIndices = minimapItems.map((item) => item.rowIndex);
   const restoreRowIndex =
     restoringThreadPosition && rememberedPosition?.atEnd === false
-      ? rows.findIndex((row) => row.id === rememberedPosition.rowId)
+      ? visibleRows.findIndex((row) => row.id === rememberedPosition.rowId)
       : -1;
   const restoringAlwaysRender =
     restoringThreadPosition && restoreRowIndex >= 0 ? { indices: [restoreRowIndex] } : undefined;
@@ -865,11 +933,11 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const selectedRowIds = useSelectedTimelineRowIds(timelineViewportElement);
   const alwaysRenderIndices = [
     ...(restoringAlwaysRender?.indices ?? []),
-    ...timelineRowSpanIndices(rows, selectedRowIds),
+    ...timelineRowSpanIndices(visibleRows, selectedRowIds),
   ];
   // Screen readers can only reach headings in the DOM. Keeping the first and
   // last messages mounted lets heading navigation wrap to either end.
-  const firstMessageRow = rows.find(isMessageRow);
+  const firstMessageRow = firstMessageIndex >= 0 ? rows[firstMessageIndex] : undefined;
   const lastMessageRow = rows.findLast(isMessageRow);
   const alwaysRenderKeys = [
     ...(firstMessageRow ? [firstMessageRow.id] : []),
@@ -892,7 +960,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const [minimapAtEnd, setMinimapAtEnd] = useState(false);
   const handleAnchorReady = (info: { anchorIndex: number | undefined }) => {
     if (anchorMessageId !== null && info.anchorIndex !== undefined) {
-      onAnchorReady(anchorMessageId, info.anchorIndex);
+      onAnchorReady(anchorMessageId, windowProjection.toFullIndex(info.anchorIndex));
     }
   };
   const handleAnchorSizeChanged = (size: number) => {
@@ -901,7 +969,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     }
   };
   const anchoredEndSpaceConfig = resolveChatListAnchoredEndSpace(
-    rows,
+    visibleRows,
     anchorMessageId,
     (row) => (row.kind === "message" && row.message.role === "user" ? row.message.id : null),
     { anchorOffset: CHAT_TIMELINE_ANCHOR_OFFSET },
@@ -920,7 +988,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
 
   const refreshMinimap = useStableCallback(() => {
     const state = listRef.current?.getState?.();
-    if (restoringThreadPosition || state?.data !== rows) return;
+    if (restoringThreadPosition || state?.data !== visibleRows) return;
     if (!state || minimapItems.length === 0) {
       return;
     }
@@ -941,11 +1009,10 @@ const ConversationTimeline = memo(function ConversationTimeline({
     const visibleRange = resolveTimelineMinimapVisibleRange({ ...state, scroll });
     for (const item of minimapItems) {
       const strip = minimapStripMap.get(item.id);
-      const inView = isTimelineMinimapRowVisible(
-        item.rowIndex,
-        visibleRange.start,
-        visibleRange.end,
-      );
+      const visibleIndex = windowProjection.toVisibleIndex(item.rowIndex);
+      const inView =
+        visibleIndex >= 0 &&
+        isTimelineMinimapRowVisible(visibleIndex, visibleRange.start, visibleRange.end);
       const next = inView ? "true" : "false";
       // Avoid dirtying style state on every scroll tick for unchanged strips.
       if (strip && strip.dataset.inView !== next) {
@@ -961,8 +1028,9 @@ const ConversationTimeline = memo(function ConversationTimeline({
       scrollLength: state.scrollLength - currentInset,
     });
     const nextCurrentIndex = resolveTimelineMinimapCurrentIndex({
-      visibleStart: currentRange.start,
-      visibleEnd: currentRange.end,
+      visibleStart:
+        currentRange.start === null ? null : windowProjection.toFullIndex(currentRange.start),
+      visibleEnd: currentRange.end === null ? null : windowProjection.toFullIndex(currentRange.end),
       rowIndices: minimapRowIndices,
     });
     setMinimapCurrentIndex((current) =>
@@ -999,7 +1067,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   } | null>(null);
   const rememberPosition = (followingEnd: boolean) => {
     const state = listRef.current?.getState?.();
-    if (restoringThreadPosition || state?.data !== rows) return;
+    if (restoringThreadPosition || state?.data !== visibleRows) return;
     const isAtEnd = resolveTimelineIsAtEnd(state);
     const position = state.data.length ? resolveWorkGroupScrollAnchor(state) : undefined;
     if (position && isAtEnd !== undefined) {
@@ -1019,7 +1087,11 @@ const ConversationTimeline = memo(function ConversationTimeline({
             workGroupState: workGroupViewState,
           },
         };
-        lastRememberedRef.current = { data: rows, threadKey: listIdentityKey, position: measured };
+        lastRememberedRef.current = {
+          data: visibleRows,
+          threadKey: listIdentityKey,
+          position: measured,
+        };
         rememberTimelinePosition(listIdentityKey, measured, followingEnd);
       }
     }
@@ -1035,12 +1107,48 @@ const ConversationTimeline = memo(function ConversationTimeline({
   };
 
   const handleScroll = () => {
-    if (restoringThreadPosition || listRef.current?.getState?.().data !== rows) return;
+    if (restoringThreadPosition || listRef.current?.getState?.().data !== visibleRows) return;
     const isAtEnd = rememberPosition(liveFollowEnabled && !anchoredEndSpace);
     if (isAtEnd !== undefined && !citationPositioning) {
       onIsAtEndChange(isAtEnd);
     }
     scheduleMinimapRefresh();
+  };
+
+  const handleListScroll = () => {
+    if (windowProjection.windowStart > 0 && !restoringThreadPosition) {
+      const list = listRef.current;
+      const scrollNode = list?.getScrollableNode();
+      const state = list?.getState?.();
+      if (scrollNode && state?.data === visibleRows) {
+        const maxScroll = Math.max(0, scrollNode.scrollHeight - scrollNode.clientHeight);
+        if (maxScroll > 0) {
+          const scrollTop = scrollNode.scrollTop;
+          const pinnedElement =
+            windowProjection.pinnedLeadingIndex !== null ? state.elementAtIndex(0) : undefined;
+          const atPinnedLeadingRow =
+            pinnedElement instanceof HTMLElement &&
+            scrollTop < maxScroll - 2 &&
+            pinnedElement.getBoundingClientRect().bottom > scrollNode.getBoundingClientRect().top;
+          if (scrollTop <= 2 || atPinnedLeadingRow) {
+            setWindowState({ identity: listIdentityKey, initialized: true, start: 0 });
+          } else {
+            const preloadThreshold = Math.min(
+              Math.max(800, scrollNode.clientHeight),
+              maxScroll * 0.5,
+            );
+            if (scrollTop <= preloadThreshold) {
+              setWindowState({
+                identity: listIdentityKey,
+                initialized: true,
+                start: nextExpandedTimelineWindowStart(windowProjection.windowStart),
+              });
+            }
+          }
+        }
+      }
+    }
+    handleScroll();
   };
 
   const measureTimelineGutter = (viewportElement: HTMLElement) => {
@@ -1062,7 +1170,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   const handleContentSizeChanged = useStableCallback((laidOutData: unknown) => {
     // The first laid-out content of a newly shown thread ends its settling; a
     // frame the previous thread scheduled laid out the previous thread's rows.
-    if (laidOutData === rows) {
+    if (laidOutData === visibleRows) {
       setSettlingListIdentity((current) => (current === listIdentityKey ? null : current));
     }
     handleScroll();
@@ -1234,11 +1342,99 @@ const ConversationTimeline = memo(function ConversationTimeline({
     </>
   );
 
+  const pendingWindowScrollRef = useRef<{
+    readonly identity: string;
+    readonly list: LegendListRef;
+    readonly fullIndex: number;
+    readonly run: (list: LegendListRef, visibleIndex: number) => Promise<void>;
+    readonly resolve: () => void;
+  } | null>(null);
+  const clearPendingWindowScroll = useStableCallback(() => {
+    const pending = pendingWindowScrollRef.current;
+    if (!pending) return;
+    pendingWindowScrollRef.current = null;
+    pending.resolve();
+  });
+  const scrollWithWindowExpansion = useStableCallback(
+    (
+      list: LegendListRef,
+      fullIndex: number,
+      run: (target: LegendListRef, visibleIndex: number) => Promise<void>,
+    ): Promise<void> => {
+      const clampedIndex = Math.max(0, Math.min(fullIndex, Math.max(0, rows.length - 1)));
+      const nextStart = expandTimelineWindowStartForIndex(
+        windowProjection.windowStart,
+        clampedIndex,
+      );
+      if (nextStart < windowProjection.windowStart) {
+        clearPendingWindowScroll();
+        return new Promise<void>((resolve) => {
+          pendingWindowScrollRef.current = {
+            identity: listIdentityKey,
+            list,
+            fullIndex: clampedIndex,
+            run,
+            resolve,
+          };
+          setWindowState({ identity: listIdentityKey, initialized: true, start: nextStart });
+        });
+      }
+      const visibleIndex = windowProjection.toVisibleIndex(clampedIndex);
+      if (visibleIndex < 0) return Promise.resolve();
+      return run(list, visibleIndex);
+    },
+  );
+  const scrollToWindowKey = useStableCallback(
+    (list: LegendListRef, params: Parameters<LegendListRef["scrollToKey"]>[0]) => {
+      const fullIndex = rows.findIndex((row) => row.id === params.key);
+      if (fullIndex < 0) return list.scrollToKey(params);
+      return scrollWithWindowExpansion(list, fullIndex, (target) => target.scrollToKey(params));
+    },
+  );
+  const scrollToWindowItem = useStableCallback(
+    (list: LegendListRef, params: Parameters<LegendListRef["scrollToItem"]>[0]) => {
+      const fullIndex = rows.indexOf(params.item as MessagesTimelineRow);
+      if (fullIndex < 0) return list.scrollToItem(params);
+      return scrollWithWindowExpansion(list, fullIndex, (target) => target.scrollToItem(params));
+    },
+  );
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- resumes an imperative scroll after the expanded timeline window commits to LegendList
+  useLayoutEffect(() => {
+    const pending = pendingWindowScrollRef.current;
+    if (!pending) return;
+    if (pending.identity !== listIdentityKey) {
+      clearPendingWindowScroll();
+      return;
+    }
+    const visibleIndex = windowProjection.toVisibleIndex(pending.fullIndex);
+    if (visibleIndex < 0) return;
+    pendingWindowScrollRef.current = null;
+    void pending.run(pending.list, visibleIndex).then(pending.resolve, pending.resolve);
+  }, [clearPendingWindowScroll, listIdentityKey, windowProjection]);
+
   const canvas = useChatCanvas();
   const registerTimeline = canvas?.registerTimeline;
   // Stable so the list attaches once per mount, not on every render.
   const setTimelineList = useStableCallback((list: LegendListRef | null) => {
-    listRef.current = list;
+    listRef.current = list
+      ? {
+          ...list,
+          scrollToIndex: (params) =>
+            scrollWithWindowExpansion(list, params.index, (target, index) =>
+              target.scrollToIndex({ ...params, index }),
+            ),
+          scrollIndexIntoView: (params) =>
+            scrollWithWindowExpansion(list, params.index, (target, index) =>
+              target.scrollIndexIntoView({ ...params, index }),
+            ),
+          scrollToKey: (params) => scrollToWindowKey(list, params),
+          scrollToItem: (params) => scrollToWindowItem(list, params),
+          cancelScroll: () => {
+            clearPendingWindowScroll();
+            list.cancelScroll();
+          },
+        }
+      : null;
     const scrollNode: HTMLElement | null = list?.getScrollableNode() ?? null;
     registerTimeline?.(scrollNode);
     const viewport = scrollNode
@@ -1293,6 +1489,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
         cancelAnimationFrame(minimapRefreshFrameRef.current);
         minimapRefreshFrameRef.current = null;
       }
+      clearPendingWindowScroll();
       listRef.current = null;
       registerTimeline?.(null);
     };
@@ -1369,7 +1566,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
       </div>
     </TimelineRowCtx>
   );
-  const listExtraData = { identity: listIdentityKey, rowCount: rows.length, sharedState };
+  const listExtraData = { identity: listIdentityKey, rowCount: visibleRows.length, sharedState };
   const timelineListFooter = (
     <TimelineListFooter
       composerInset={anchoredEndSpace ? 0 : contentInsetEndAdjustment}
@@ -1438,7 +1635,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
             ) : null}
             <LegendList<MessagesTimelineRow>
               ref={setTimelineList}
-              data={rows}
+              data={visibleRows}
               extraData={listExtraData}
               keyExtractor={keyExtractor}
               getItemType={getItemType}
@@ -1472,7 +1669,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
                   : maintainVisibleContentPosition
               }
               maintainScrollAtEndThreshold={1}
-              onScroll={handleScroll}
+              onScroll={handleListScroll}
               onItemSizeChanged={scheduleMinimapRefresh}
               onMetricsChange={scheduleMinimapRefresh}
               // Keyboard scrolling only moves the focused element; F6 and clicks land here.
