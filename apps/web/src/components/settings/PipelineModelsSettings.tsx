@@ -166,7 +166,8 @@ function PipelineCandidateRow({
               );
               return (
                 <li
-                  key={`${selection.instanceId}:${selection.model}`}
+                  // oxlint-disable-next-line react/no-array-index-key -- a hand-edited list can repeat the same instance and model; the index is the only stable distinction
+                  key={`${selection.instanceId}:${selection.model}:${index}`}
                   className="flex min-w-0 items-center gap-2"
                 >
                   <ProviderInstanceIcon
