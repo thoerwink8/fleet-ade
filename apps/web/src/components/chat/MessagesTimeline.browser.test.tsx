@@ -522,6 +522,52 @@ describe("MessagesTimeline messages", () => {
     expect(long!.offsetHeight).toBeGreaterThanOrEqual(foldedHeight * 2);
   });
 
+  it("folds a workflow script only when the fold hides at least as much as it shows", async () => {
+    setup();
+    const shortScript = Array.from(
+      { length: 12 },
+      (_, index) => `const line${index} = ${index};`,
+    ).join("\n");
+    const longScript = Array.from(
+      { length: 80 },
+      (_, index) => `const line${index} = ${index};`,
+    ).join("\n");
+    const openingFor = (text: string, id: string) => ({
+      messageId: id,
+      script: text,
+      name: null,
+      description: null,
+      driver: null,
+      providerInstanceId: null,
+      group: null,
+    });
+    await using screen = await renderElement(
+      <MessagesTimeline
+        {...baseProps()}
+        timelineEntries={[message(shortScript, {}, "short-script")] as Entry[]}
+        workflowOpening={openingFor(shortScript, "short-script")}
+      />,
+    );
+    await vi.waitFor(() =>
+      expect(screen.container.querySelector("[data-workflow-opening]")).not.toBeNull(),
+    );
+    expect(screen.buttons("\u663e\u793a\u5b8c\u6574\u811a\u672c")).toHaveLength(0);
+    await screen.rerender(
+      <MessagesTimeline
+        {...baseProps()}
+        timelineEntries={[message(longScript, {}, "long-script")] as Entry[]}
+        workflowOpening={openingFor(longScript, "long-script")}
+      />,
+    );
+    await vi.waitFor(() =>
+      expect(screen.buttons("\u663e\u793a\u5b8c\u6574\u811a\u672c")).toHaveLength(1),
+    );
+    const folded = screen.container.querySelector<HTMLElement>("[data-thread-find-fold]");
+    const foldedHeight = folded!.offsetHeight;
+    await click(screen.button("\u663e\u793a\u5b8c\u6574\u811a\u672c"));
+    expect(folded!.offsetHeight).toBeGreaterThanOrEqual(foldedHeight * 2);
+  });
+
   it("keeps the first and last message headings reachable from either end", async () => {
     setup();
     const props = baseProps();
@@ -593,7 +639,9 @@ describe("MessagesTimeline messages", () => {
     const focus = createWorkspaceFocusController(document);
     using _focus = { [Symbol.dispose]: focus.dispose };
     const viewport = props.listRef.current!.getScrollableNode()!;
-    await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(0));
+    // The cold-open window grows once after first paint and that growth moves the
+    // scroll position; read the settled end only after it has.
+    await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(100));
     const atEnd = viewport.scrollTop;
     page.getByRole("button", { name: "发送" }).element().focus();
     await userEvent.keyboard("{F6}");

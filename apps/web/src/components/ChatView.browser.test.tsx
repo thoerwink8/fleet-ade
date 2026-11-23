@@ -158,6 +158,29 @@ it("retains each thread's diff selection when returning from another thread or S
   });
 });
 
+it("opens a long thread with its newest message and the composer", async () => {
+  const thread = threadWithHistory("long-open", 100);
+  using _environment = installFakeEnvironment([thread]);
+  __setClientSettingsForTests({
+    ...DEFAULT_CLIENT_SETTINGS,
+    onboardingCompletedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const router = getRouter(
+    createMemoryHistory({ initialEntries: [`/${ENVIRONMENT_ID}/${thread.id}`] }),
+  );
+  await router.load();
+  await using _app = await render(<AppRoot router={router} />, {
+    // AppRoot brings its own router.
+    router: false,
+  });
+
+  await expect.element(page.getByText("Answer 99 for long-open.")).toBeVisible();
+  const composer = page.getByTestId("composer-editor");
+  await expect.element(composer).toBeVisible();
+  await composer.fill("next question");
+  await expect.element(composer).toHaveTextContent("next question");
+});
+
 it("a stashed prompt ending in a file chip restores with the chip", async () => {
   using _environment = installFakeEnvironment([]);
   __setClientSettingsForTests({

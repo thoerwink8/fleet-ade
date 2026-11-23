@@ -1101,7 +1101,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
   const revealForFind = () => setExpanded(true);
   const revealRef = findRevealRef(revealForFind);
   const hasVisibleBody = props.text.trim().length > 0;
-  const { ref: contentRef, tallEnough: canCollapse } = useTallEnoughToFold(
+  const { tallEnough: canCollapse, probeProps } = useTallEnoughToFold(
     props.collapsible !== false && hasVisibleBody,
   );
   const isCollapsed = canCollapse && !expanded;
@@ -1128,7 +1128,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
               : undefined
           }
         >
-          <div ref={contentRef}>
+          <div>
             <UserMessageBody
               text={props.text}
               renderContextReference={props.renderContextReference}
@@ -1136,6 +1136,7 @@ const CollapsibleUserMessageBody = memo(function CollapsibleUserMessageBody(prop
               markdownCwd={props.markdownCwd}
             />
           </div>
+          <div aria-hidden="true" data-fold-probe="true" {...probeProps} />
         </div>
       ) : null}
       {showCollapseControl ? (

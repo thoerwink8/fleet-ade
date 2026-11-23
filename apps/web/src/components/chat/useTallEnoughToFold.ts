@@ -1,60 +1,66 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, type Ref, useRef, useState } from "react";
 
+import { useStableCallback } from "~/hooks/useStableCallback";
 import { observeResize } from "~/lib/observeResize";
 
-// The folds clip with `max-h-44`, which is 11rem.
-const FOLDED_HEIGHT_REM = 11;
+// The folds clip with `max-h-44`, which is 11rem. A fold only earns its control when it hides at
+// least as much as it shows, so the content has to reach twice that.
+const FOLD_MIN_HEIGHT = "calc(22rem + 1px)";
 
-let cachedRootRemPx: number | null = null;
-let observingRootFontSize = false;
+// The same threshold in px at the 16px root the app renders with. The probe is exactly this tall,
+// so a reported size below it means the content clipped it.
+const FOLD_MIN_HEIGHT_PX = 22 * 16 + 1;
 
-function readRootRemPx(): number {
-  if (cachedRootRemPx !== null) return cachedRootRemPx;
-  const root = document.documentElement;
-  if (!observingRootFontSize && typeof MutationObserver !== "undefined") {
-    observingRootFontSize = true;
-    new MutationObserver(() => {
-      cachedRootRemPx = null;
-    }).observe(root, { attributes: true, attributeFilter: ["style", "class"] });
-  }
-  const typedFontSize =
-    typeof root.computedStyleMap === "function" ? root.computedStyleMap().get("font-size") : null;
-  if (
-    typedFontSize &&
-    "value" in typedFontSize &&
-    typeof typedFontSize.value === "number" &&
-    Number.isFinite(typedFontSize.value) &&
-    typedFontSize.value > 0
-  ) {
-    cachedRootRemPx = typedFontSize.value;
-    return cachedRootRemPx;
-  }
-  cachedRootRemPx = Number.parseFloat(getComputedStyle(root).fontSize) || 16;
-  return cachedRootRemPx;
+const PROBE_STYLE: CSSProperties = {
+  position: "absolute",
+  insetInlineStart: 0,
+  insetBlockStart: 0,
+  inlineSize: "1px",
+  blockSize: FOLD_MIN_HEIGHT,
+  maxBlockSize: "100%",
+  overflow: "clip",
+  visibility: "hidden",
+  pointerEvents: "none",
+};
+
+export interface TallEnoughToFold {
+  readonly ref: Ref<HTMLDivElement>;
+  readonly tallEnough: boolean;
+  /** Goes on the probe rendered right after the measured content. */
+  readonly probeProps: { readonly ref: Ref<HTMLDivElement>; readonly style: CSSProperties };
 }
 
-/**
- * Put `ref` on the unclipped content inside a fold. `tallEnough` is true when that content is at
- * least twice the folded height, so opening a fold always at least doubles what was on screen.
- */
-export function useTallEnoughToFold(enabled = true) {
-  const ref = useRef<HTMLDivElement>(null);
+const NO_REF: Ref<HTMLDivElement> = () => {};
+
+const DISABLED: TallEnoughToFold = {
+  ref: NO_REF,
+  tallEnough: false,
+  probeProps: { ref: NO_REF, style: { display: "none" } },
+};
+
+/** Probe clipped to the content height; it reaches the threshold only when a fold hides at least as much as it shows. */
+export function useTallEnoughToFold(enabled = true): TallEnoughToFold {
   const [tallEnough, setTallEnough] = useState(false);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the fold depends on the rendered height, which only the DOM knows
-  useLayoutEffect(() => {
-    const content = ref.current;
-    if (!enabled || !content) return;
-    const update = (height: number) => {
-      setTallEnough(height >= FOLDED_HEIGHT_REM * 2 * readRootRemPx());
-    };
-    // Measured here too: waiting for the observer would paint one unfolded frame.
-    update(content.offsetHeight);
-    return observeResize(content, (entries) => {
+  const stopRef = useRef<(() => void) | null>(null);
+  // Stable identity: a fresh ref every render would re-observe and flushSync the row.
+  const ref = useStableCallback((node: HTMLDivElement | null) => {
+    stopRef.current?.();
+    stopRef.current = null;
+    if (node === null) return;
+    const stop = observeResize(node, (entries) => {
       const last = entries.at(-1);
-      const height =
-        last?.borderBoxSize?.[0]?.blockSize ?? last?.contentRect.height ?? content.offsetHeight;
-      update(height);
+      const height = last?.borderBoxSize?.[0]?.blockSize ?? last?.contentRect.height ?? 0;
+      if (height < FOLD_MIN_HEIGHT_PX) return;
+      stop();
+      if (stopRef.current === stop) stopRef.current = null;
+      setTallEnough(true);
     });
-  }, [enabled]);
-  return { ref, tallEnough: enabled && tallEnough };
+    stopRef.current = stop;
+  });
+  if (!enabled) return DISABLED;
+  return {
+    ref,
+    tallEnough,
+    probeProps: { ref, style: PROBE_STYLE },
+  };
 }

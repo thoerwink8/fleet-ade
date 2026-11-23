@@ -207,7 +207,7 @@ function WorkflowMemberRow(props: {
 function WorkflowScript(props: { readonly script: string }) {
   const [expanded, setExpanded] = useState(false);
   const revealRef = findRevealRef(() => setExpanded(true));
-  const { ref: contentRef, tallEnough: canFold } = useTallEnoughToFold();
+  const { tallEnough: canFold, probeProps } = useTallEnoughToFold();
   const folded = canFold && !expanded;
   return (
     <div>
@@ -222,9 +222,10 @@ function WorkflowScript(props: { readonly script: string }) {
             : undefined
         }
       >
-        <div ref={contentRef}>
+        <div>
           <ChatMarkdown text={scriptMarkdown(props.script)} cwd={undefined} />
         </div>
+        <div aria-hidden="true" data-fold-probe="true" {...probeProps} />
       </div>
       {canFold ? (
         <div className="-ms-1">
