@@ -135,7 +135,7 @@ const toastUpdateError: ReportLocalUpdateError = (title, description) => {
   toastManager.add(stackedThreadToast({ type: "error", title, description }));
 };
 
-export async function downloadLocalUpdate(
+async function downloadLocalUpdate(
   bridge: DesktopBridge,
   {
     notifyDownloaded,
@@ -158,7 +158,7 @@ export async function downloadLocalUpdate(
   }
 }
 
-export async function installLocalUpdate(
+async function installLocalUpdate(
   bridge: DesktopBridge,
   reportError: ReportLocalUpdateError = toastUpdateError,
   expectedVersion?: string,
@@ -385,7 +385,7 @@ function SidebarUpdateControl() {
     );
   };
 
-  if (!isElectron && !runsEverything && !isRunningEverything) return null;
+  if (action === "none" && !runsEverything && !isRunningEverything) return null;
 
   const statusIcon = (
     <DesktopUpdateStatusIcon

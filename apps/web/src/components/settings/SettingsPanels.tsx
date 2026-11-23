@@ -1,10 +1,8 @@
-import { useAtomValue } from "@effect/atom-react";
 import { NotificationSettings } from "./NotificationSettings";
 import { CheckIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
-  type DesktopUpdateChannel,
   IDLE_COMPACTION_MODES,
   globalIdleCompaction,
   ProviderDriverKind,
@@ -22,22 +20,12 @@ import {
   ScreenReaderAnnouncements,
   ToolCallVisibility,
 } from "@t3tools/contracts/settings";
-import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
 import { createModelSelection } from "@t3tools/shared/model";
 import { resolvePastedPath } from "@t3tools/shared/path";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
-import { APP_VERSION } from "../../branding";
 import { AboutVersionTitle } from "./AboutVersionTitle";
 import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
-import {
-  canCheckForUpdate,
-  getDesktopUpdateButtonTooltip,
-  getDesktopUpdateDisabledReason,
-  getDesktopUpdateInstallConfirmationMessage,
-  isDesktopUpdateButtonDisabled,
-  resolveDesktopUpdateButtonAction,
-} from "../../components/desktopUpdate.logic";
 import { ProviderModelPicker } from "../chat/ProviderModelPicker";
 import { TraitsPicker } from "../chat/TraitsPicker";
 import { isElectron } from "../../env";
@@ -54,7 +42,6 @@ import { scopedIdleCompaction } from "./scopedSettings";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettings";
 import { SnoozePresetsRow } from "./SnoozePresetsSettings";
-import { useDesktopUpdateState } from "../../state/desktopUpdate";
 import {
   getTextGenerationModelOptionsByInstance,
   resolveAppModelSelectionState,
@@ -63,7 +50,7 @@ import {
 import { useTextGenerationTargets } from "../../textGenerators";
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { isMacPlatform } from "../../lib/utils";
-import { useEnvironmentProviders, useEnvironments } from "../../state/environments";
+import { useEnvironmentProviders } from "../../state/environments";
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import { Button } from "../ui/button";
 import { DraftInput } from "../ui/draft-input";
@@ -72,7 +59,6 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
 import { stackedThreadToast, toastManager } from "../ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   hasChangedBackgroundActivitySettings,
   isProjectGroupingEnabled,
@@ -92,15 +78,6 @@ import { searchableSetting } from "./settingsSearch";
 import { BackgroundActivitySettingsRow } from "./BackgroundActivitySettings";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { StorageCleanupSections } from "./StorageSettings";
-import { UpdateTrackSwitchDialog } from "./UpdateTrackSwitchDialog";
-import { environmentIdsKey } from "~/state/environmentAtomList";
-import { environmentSessionStatesAtom } from "~/state/session";
-import { useCheckProviderUpdates } from "../ProviderUpdatesAction";
-import { canUpdateServer } from "../ServerUpdateAction";
-import { downloadLocalUpdate } from "../sidebar/SidebarUpdatePill";
-import { useUpdateEverythingRun } from "../sidebar/updateEverythingRun";
-import { awaitsTrackSwitch, channelSwitchLabel } from "../sidebar/updateEverything.logic";
-import { isHostedByThisApp } from "../sidebar/useUpdateEverything";
 
 const RESPONSE_STREAMING_MODE_LABELS: Record<ResponseStreamingMode, string> = {
   turn: "等待完整回复",
@@ -138,219 +115,16 @@ const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 function AboutVersionSection() {
-  const updateState = useDesktopUpdateState();
-  const [switchChannel, setSwitchChannel] = useState<DesktopUpdateChannel | null>(null);
-  const [isUpdateActionPending, setIsUpdateActionPending] = useState(false);
-  const { environments } = useEnvironments();
-  const sessionStates = useAtomValue(
-    environmentSessionStatesAtom(
-      environmentIdsKey(environments.map(({ environmentId }) => environmentId)),
-    ),
-  );
-  // A second run would replace the first run's progress and local download.
-  const updateRun = useUpdateEverythingRun();
-  const checkProviderUpdates = useCheckProviderUpdates();
-
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
-  const selectedUpdateChannel = updateState?.channel ?? "latest";
-  // A switch that failed part way leaves this app or a server on the other track.
-  // With its updater off, a switch cannot move this app, so it is not counted.
-  const appOffTrack =
-    updateState?.enabled !== false && desktopUpdateChannelOf(APP_VERSION) !== selectedUpdateChannel;
-  const unswitchedMachines =
-    (appOffTrack ? 1 : 0) +
-    environments.filter(
-      (environment, index) =>
-        environment.connection.phase === "connected" &&
-        canUpdateServer(sessionStates[index]!) &&
-        awaitsTrackSwitch(
-          {
-            serverConfig: environment.serverConfig,
-            hostedByThisApp: isHostedByThisApp(environment),
-          },
-          selectedUpdateChannel,
-        ),
-    ).length;
-
-  const handleButtonClick = async () => {
-    const bridge = window.desktopBridge;
-    if (!bridge) return;
-
-    const action = updateState ? resolveDesktopUpdateButtonAction(updateState) : "none";
-
-    if (action === "download") {
-      void downloadLocalUpdate(bridge, { notifyDownloaded: false });
-      return;
-    }
-
-    if (action === "install") {
-      if (isUpdateActionPending) return;
-      setIsUpdateActionPending(true);
-      let confirmed = false;
-      try {
-        confirmed = await ensureLocalApi().dialogs.confirm(
-          getDesktopUpdateInstallConfirmationMessage(
-            updateState ?? { availableVersion: null, downloadedVersion: null },
-          ),
-          { initialFocus: "confirm" },
-        );
-      } catch (error) {
-        setIsUpdateActionPending(false);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "无法确认更新",
-            description: error instanceof Error ? error.message : "确认更新失败。",
-          }),
-        );
-        return;
-      }
-      if (!confirmed) {
-        setIsUpdateActionPending(false);
-        return;
-      }
-      void bridge
-        .installUpdate()
-        .catch((error: unknown) => {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "无法安装更新",
-              description: error instanceof Error ? error.message : "安装失败。",
-            }),
-          );
-        })
-        .finally(() => setIsUpdateActionPending(false));
-      return;
-    }
-
-    if (typeof bridge.checkForUpdate !== "function") return;
-    void checkProviderUpdates();
-    void bridge
-      .checkForUpdate()
-      .then((result) => {
-        if (!result.checked) {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: "无法检查更新",
-              description: result.state.message ?? "此版本不支持自动更新。",
-            }),
-          );
-        }
-      })
-      .catch((error: unknown) => {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: "无法检查更新",
-            description: error instanceof Error ? error.message : "检查更新失败。",
-          }),
-        );
-      });
-  };
-
-  const action = updateState ? resolveDesktopUpdateButtonAction(updateState) : "none";
-  const buttonTooltip = updateState ? getDesktopUpdateButtonTooltip(updateState) : null;
-  const buttonDisabled =
-    action === "none"
-      ? !canCheckForUpdate(updateState)
-      : isDesktopUpdateButtonDisabled(updateState);
-
-  const actionLabel: Record<string, string> = { download: "下载", install: "安装" };
-  const statusLabel: Record<string, string> = {
-    checking: "正在检查…",
-    downloading: "正在下载…",
-    // Off its track, "up to date" only means no switch is pending; Review moves it.
-    ...(appOffTrack ? {} : { "up-to-date": "已是最新版本" }),
-  };
-  const buttonLabel = actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "检查更新";
-  const description =
-    action === "download" || action === "install"
-      ? "有可用更新。"
-      : (getDesktopUpdateDisabledReason(updateState) ?? "应用的当前版本。");
 
   return (
     <>
       <SettingsRow
         id={searchableSetting("app-version").id}
         title={<AboutVersionTitle />}
-        description={description}
-        control={
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={buttonDisabled || isUpdateActionPending}
-                  onClick={handleButtonClick}
-                >
-                  {buttonLabel}
-                </Button>
-              }
-            />
-            {buttonTooltip ? <TooltipPopup>{buttonTooltip}</TooltipPopup> : null}
-          </Tooltip>
-        }
+        description="应用的当前版本。"
       />
-      {hasDesktopBridge ? (
-        <SettingsRow
-          {...searchableSetting("update-track")}
-          description={
-            unswitchedMachines > 0 ? (
-              <>
-                {unswitchedMachines === 1
-                  ? "还有 1 台机器在使用"
-                  : `还有 ${unswitchedMachines} 台机器在使用`}{" "}
-                {channelSwitchLabel(selectedUpdateChannel === "nightly" ? "latest" : "nightly")}.{" "}
-                {/* The dialog moves what it can and says why it skips the rest. */}
-                <Button
-                  size="xs"
-                  variant="link"
-                  disabled={updateRun !== null}
-                  onClick={() => setSwitchChannel(selectedUpdateChannel)}
-                >
-                  查看
-                </Button>
-              </>
-            ) : (
-              "切换此应用，以及所有数据库受目标版本支持的已连接机器。"
-            )
-          }
-          control={
-            <Select
-              value={selectedUpdateChannel}
-              onValueChange={(value) => {
-                if (value !== selectedUpdateChannel) {
-                  setSwitchChannel(value as DesktopUpdateChannel);
-                }
-              }}
-            >
-              <SelectTrigger
-                size="sm"
-                className="w-full sm:w-40"
-                aria-label="更新通道"
-                disabled={switchChannel !== null || updateRun !== null}
-              >
-                <SelectValue>{channelSwitchLabel(selectedUpdateChannel)}</SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value="latest">
-                  稳定版
-                </SelectItem>
-                <SelectItem hideIndicator value="nightly">
-                  Nightly 版
-                </SelectItem>
-              </SelectPopup>
-            </Select>
-          }
-        />
-      ) : null}
       {hasDesktopBridge ? <CliCommandSettingsRow /> : null}
-      {switchChannel === null ? null : (
-        <UpdateTrackSwitchDialog channel={switchChannel} onClose={() => setSwitchChannel(null)} />
-      )}
     </>
   );
 }

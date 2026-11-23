@@ -639,7 +639,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "app-version",
     title: "版本",
     to: "/settings/maintenance",
-    searchTerms: ["about check for updates download install upgrade release"],
+    searchTerms: ["about version release"],
   },
   {
     id: "update-track",

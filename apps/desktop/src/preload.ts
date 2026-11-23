@@ -38,6 +38,24 @@ const syncHtmlFullscreen = () => {
 // A reload or renderer crash never reports the old document's exit, so each document reports its start.
 syncHtmlFullscreen();
 document.addEventListener("fullscreenchange", syncHtmlFullscreen);
+const retiredDesktopUpdateState: DesktopUpdateState = {
+  enabled: false,
+  status: "disabled",
+  channel: "latest",
+  currentVersion: "",
+  hostArch: "other",
+  appArch: "other",
+  runningUnderArm64Translation: false,
+  availableVersion: null,
+  downloadedVersion: null,
+  releaseNotes: [],
+  omittedReleaseCount: 0,
+  downloadPercent: null,
+  checkedAt: null,
+  message: null,
+  errorContext: null,
+  canRetry: false,
+};
 
 let primaryPasteEnabled = true;
 try {
@@ -249,29 +267,19 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       ipcRenderer.removeListener(IpcChannels.WINDOW_FULLSCREEN_STATE_CHANNEL, wrappedListener);
     };
   },
-  getUpdateState: () => ipcRenderer.invoke(IpcChannels.UPDATE_GET_STATE_CHANNEL),
-  setUpdateChannel: (channel, minimumVersion) =>
-    ipcRenderer.invoke(IpcChannels.UPDATE_SET_CHANNEL_CHANNEL, { channel, minimumVersion }),
-  checkForUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_CHECK_CHANNEL),
-  downloadUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_DOWNLOAD_CHANNEL),
-  installUpdate: (expectedVersion) =>
-    ipcRenderer.invoke(IpcChannels.UPDATE_INSTALL_CHANNEL, expectedVersion),
+  getUpdateState: () => Promise.resolve(retiredDesktopUpdateState),
+  setUpdateChannel: () => Promise.resolve(retiredDesktopUpdateState),
+  checkForUpdate: () => Promise.resolve({ checked: false, state: retiredDesktopUpdateState }),
+  downloadUpdate: () =>
+    Promise.resolve({ accepted: false, completed: false, state: retiredDesktopUpdateState }),
+  installUpdate: () =>
+    Promise.resolve({ accepted: false, completed: false, state: retiredDesktopUpdateState }),
+  onUpdateState: () => () => {},
   cliCommand: {
     getState: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_GET_STATE_CHANNEL),
     install: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_INSTALL_CHANNEL),
     uninstall: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_UNINSTALL_CHANNEL),
     addToPath: () => ipcRenderer.invoke(IpcChannels.CLI_COMMAND_ADD_TO_PATH_CHANNEL),
-  },
-  onUpdateState: (listener) => {
-    const wrappedListener = (_event: Electron.IpcRendererEvent, state: unknown) => {
-      if (typeof state !== "object" || state === null) return;
-      listener(state as Parameters<typeof listener>[0]);
-    };
-
-    ipcRenderer.on(IpcChannels.UPDATE_STATE_CHANNEL, wrappedListener);
-    return () => {
-      ipcRenderer.removeListener(IpcChannels.UPDATE_STATE_CHANNEL, wrappedListener);
-    };
   },
   webLinks: {
     setReady: (ready) => ipcRenderer.invoke(IpcChannels.WEB_LINK_READY_CHANNEL, ready),

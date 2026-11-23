@@ -6,6 +6,8 @@ the bottom of the sidebar and from **Settings → Connections**. A background
 service is not updated from another device: install the release you want on
 that machine, then run `t3 service install`.
 
+本机打 Windows 包，手动安装。桌面应用不再自动检查或安装更新。
+
 ## Update everything at once
 
 The update button at the bottom of the sidebar updates every connected machine
@@ -124,11 +126,9 @@ from Applications again.
 
 ## If the desktop app does not start
 
-If the desktop app's server keeps failing at startup, T3 Code shows a "T3 Code
-could not start" window instead of the app. If a newer version is available,
-choose **Update** to install it. If not, the window links to the last version
-that started on your computer. Download and install it to go back. Use **Copy
-details** to include the error in a bug report.
+If the desktop app's server keeps failing at startup, Fleet ADE shows a window
+that names the last version that started on this computer. This build does not
+download an installer. Copy the error details from that window if you need them.
 
 ## Registries and proxies
 

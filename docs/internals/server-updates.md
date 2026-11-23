@@ -5,12 +5,7 @@ gone. Install the build you want on that machine and, for a background service,
 run `t3 service install`. The service launcher can still finish an update that
 was already pending in `service-state.json` from an older build.
 
-Desktop updates have a two-phase handoff because installing the app stops its
-bundled backend. Preparation returns a token while the connection is alive;
-the client commits that token only after receiving it. Otherwise backend shutdown
-could lose the only successful RPC result. The client must then observe the
-prepared version after reconnecting. If installation fails, desktop restarts the
-stopped backends and replays the failure for the same token.
+Desktop builds no longer install themselves. Package a Windows build on the machine and install it by hand. A desktop-managed server still refuses a remote server update and tells you to update the desktop app.
 
 ## Recovering interrupted threads
 
