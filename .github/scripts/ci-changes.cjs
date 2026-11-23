@@ -23,8 +23,6 @@ const EXTRA_OWNERS = [
   [/^scripts\/lib\//, ["@t3tools/desktop", "@t3tools/web", "t3"]],
   [/^native\/browser-secret\//, ["@t3tools/desktop"]],
   [/^native\/libghostty-vt\//, ["@t3tools/web"]],
-  // apps/server/src/cloud/ConnectReachability.test.ts checks the guide's headings.
-  [/^docs\/user\/t3-connect-troubleshooting\.md$/, ["t3"]],
 ];
 const RUST = /^native\/resource-monitor\//;
 

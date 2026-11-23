@@ -2,16 +2,12 @@ import { EnvironmentHttpApi } from "@t3tools/contracts";
 import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Tracer from "effect/Tracer";
 import * as HttpIncomingMessage from "effect/http/HttpIncomingMessage";
 import type * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
-import * as HttpTraceContext from "effect/http/HttpTraceContext";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 
 import * as Metrics from "../observability/Metrics.ts";
-import * as RelayDeliveryProof from "./RelayDeliveryProof.ts";
 import * as ScheduledTaskService from "./ScheduledTaskService.ts";
 
 /** The relay enforces the same cap. */
@@ -36,12 +32,10 @@ export const layer = HttpApiBuilder.group(
   "webhooks",
   Effect.fnUntraced(function* (handlers) {
     const scheduledTasks = yield* ScheduledTaskService.ScheduledTaskService;
-    const relayDeliveryProof = yield* RelayDeliveryProof.RelayDeliveryProof;
     /**
      * The endpoint is raw so the signature is checked over the exact body
      * bytes; the service checks the token and signature.
      */
-    // Only verified relay deliveries join a trace; direct requests keep their existing context.
     const handler = Effect.fnUntraced(function* ({
       params,
       request,
@@ -83,18 +77,7 @@ export const layer = HttpApiBuilder.group(
         if (typeof value === "string") headers[name.toLowerCase()] = value;
       }
       const queryIndex = request.url.indexOf("?");
-      // The relay's delivery id and receive time count only with its signed
-      // proof; the URL can also be called directly. The receive time matters
-      // for requests the relay held while we were offline.
-      const relay = yield* relayDeliveryProof.verify({ headers, hookId: params.hookId });
-      const relayDeliveryId = Option.isSome(relay) ? relay.value.deliveryId : undefined;
-      const relayReceivedAt = Option.isSome(relay) ? relay.value.receivedAt : undefined;
-
-      // A relay delivery joins the relay's trace, and goes to the T3 Connect
-      // tracer with it. Anyone else's traceparent is never trusted.
-      const relayParent = Option.isSome(relay)
-        ? HttpTraceContext.fromHeaders(request.headers)
-        : Option.none<Tracer.ExternalSpan>();
+      // Headers left by the removed relay are not a delivery identity.
       const result = yield* scheduledTasks
         .triggerWebhook({
           hookId: params.hookId,
@@ -105,14 +88,8 @@ export const layer = HttpApiBuilder.group(
           headers,
           body: body.value,
           bodyText: new TextDecoder().decode(body.value),
-          ...(relayDeliveryId ? { relayDeliveryId } : {}),
-          ...(relayReceivedAt ? { receivedAt: relayReceivedAt } : {}),
         })
         .pipe(
-          Option.isSome(relayParent)
-            ? (effect) =>
-                effect.pipe(Effect.withParentSpan(relayParent.value), withRelayClientTracing)
-            : (effect) => effect,
           Effect.catchCause((cause) =>
             Effect.logWarning("Webhook delivery failed").pipe(
               Effect.annotateLogs({ hookId: params.hookId }),

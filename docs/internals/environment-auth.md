@@ -1,21 +1,20 @@
 # Environment authentication
 
-The environment issues its own sessions and enforces their capabilities. Cloud
-identity and relay credentials belong to a separate trust boundary, described in
-[T3 Connect](./t3-connect.md). A relay token is never an environment login.
+The environment issues its own sessions and enforces their capabilities. A
+credential minted for a linked cloud account is a separate trust boundary. It
+is never an environment login.
 
 ## Authority survives transport changes
 
 Pairing delegates a set of scopes. Exchanging a bootstrap credential can narrow
-that grant but cannot widen it. The default grant includes access and relay
-management: `terminal:operate` is a shell as the server's user and
-`orchestration:operate` can start a full-access agent, and either can mint a
-session with every scope through `t3 auth session issue`, so withholding
-management from the default would not be a boundary. A narrower client gets
-explicit scopes. Creating another pairing link requires both `access:write` and
-every scope being delegated. The
-[auth handlers](../../apps/server/src/auth/http.ts) enforce this at issuance;
-client labels and device metadata have no authorization role.
+that grant but cannot widen it. The default grant includes access management;
+`terminal:operate` is a shell as the server's user and `orchestration:operate`
+can start a full-access agent, and either can mint a session with every scope
+through `t3 auth session issue`.
+Narrower clients get explicit scopes. Creating another pairing link requires
+both `access:write` and every scope being delegated. The [auth handlers](../../apps/server/src/auth/http.ts)
+enforce this at issuance; client labels and device metadata have no
+authorization role.
 
 The access read model contains pairing metadata, never recoverable pairing
 secrets. Only the creation response returns the raw credential. Otherwise read
@@ -38,7 +37,7 @@ approval page names the host access goes to and approving stays the owner's
 call. Every client is public and proves itself with PKCE; a client that asks
 for a secret is registered without one. Client registration is stateless, so an unauthenticated caller cannot grow server
 state. Approval spends a one-time pairing code, or uses a browser session with
-`access:write`; proof-bound T3 Connect codes are refused without being spent.
+`access:write`; proof-bound codes are refused without being spent.
 
 The user grants either read-only access or a runtime-mode ceiling, not a
 scope list: MCP tools are all orchestration, and `orchestration:operate`
@@ -54,8 +53,8 @@ parameters only pick targets; see
 [threadAccess](../../apps/server/src/mcp/threadAccess.ts).
 
 Issuer and resource URLs come from the request's Host and
-`X-Forwarded-Proto`, so one server answers over loopback, Tailscale Serve and a
-T3 Connect tunnel. A proxy that rewrites Host or drops the protocol header
+`X-Forwarded-Proto`, so one server answers over loopback, Tailscale Serve, and
+other reverse proxies. A proxy that rewrites Host or drops the protocol header
 breaks sign-in.
 
 Bearer and DPoP clients obtain short-lived WebSocket tickets through authenticated

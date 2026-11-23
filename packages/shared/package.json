@@ -51,10 +51,6 @@
       "types": "./src/projectFavicon.ts",
       "import": "./src/projectFavicon.ts"
     },
-    "./mobileSourceMaps": {
-      "types": "./src/mobileSourceMaps.ts",
-      "import": "./src/mobileSourceMaps.ts"
-    },
     "./model": {
       "types": "./src/model.ts",
       "import": "./src/model.ts"
@@ -306,10 +302,6 @@
     "./relayClient": {
       "types": "./src/relayClient.ts",
       "import": "./src/relayClient.ts"
-    },
-    "./relayTracing": {
-      "types": "./src/relayTracing.ts",
-      "import": "./src/relayTracing.ts"
     },
     "./preview": {
       "types": "./src/preview.ts",

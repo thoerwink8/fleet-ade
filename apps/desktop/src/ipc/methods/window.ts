@@ -14,7 +14,6 @@ import {
 import { PROJECT_FAVICON_EXTENSIONS } from "@t3tools/shared/projectFavicon";
 import { resolveEditorCommand } from "@t3tools/shared/editor";
 import * as HostProcess from "@t3tools/shared/HostProcess";
-import { isRelayTracingEnabled } from "@t3tools/shared/otelEnvironment";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -66,21 +65,6 @@ export const getAppBranding = DesktopIpc.makeSyncIpcMethod({
     return environment.branding;
   }),
 });
-
-/** Read once here: a sync IPC handler cannot wait on the environment. */
-export const installRelayTelemetryEnabled = Effect.fn("desktop.ipc.window.installRelayTelemetry")(
-  function* () {
-    const ipc = yield* DesktopIpc.DesktopIpc;
-    const enabled = isRelayTracingEnabled(yield* HostProcess.Environment);
-    yield* ipc.handleSync(
-      DesktopIpc.makeSyncIpcMethod({
-        channel: IpcChannels.GET_RELAY_TELEMETRY_ENABLED_CHANNEL,
-        result: Schema.Boolean,
-        handler: () => Effect.succeed(enabled),
-      }),
-    );
-  },
-);
 
 export const getSystemLocale = DesktopIpc.makeSyncIpcMethod({
   channel: IpcChannels.GET_SYSTEM_LOCALE_CHANNEL,

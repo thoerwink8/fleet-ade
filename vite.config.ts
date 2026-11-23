@@ -192,7 +192,6 @@ export default defineConfig({
       ".repos/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
       ".macroscope/ignore.md",
-      ".alchemy",
       "dist",
       "dist-electron",
       "node_modules",

@@ -44,14 +44,13 @@ under T3 home. Pass `--yes` from a script.
 
 ## Local network access
 
-A new service answers only on this machine. Other devices reach it through
-T3 Connect, or directly once you choose the local network in `t3 up` (or run
+A new service answers only on this machine. Other devices reach it
+directly once you choose the local network in `t3 up` (or run
 `t3 up --lan`, which sets `T3CODE_LAN=true` in `service.env`). It then listens on
 your local network and Tailscale addresses, so the desktop app and a browser on
-the same network connect directly instead of through T3 Connect. It still does
+the same network connect directly. It still does
 not answer on public addresses. Anyone on the same network can reach the port,
-so a pairing code is all that keeps them out. The hosted web app at app.t3.codes
-stays on T3 Connect, because browsers block plain HTTP from an HTTPS page.
+so a pairing code is all that keeps them out.
 
 A service installed before `T3CODE_LAN` existed keeps listening on the local
 network. `t3 status` says so, and `t3 up --no-lan` turns it off. Any
@@ -99,8 +98,8 @@ of signing out, and keep the PC awake, for unattended remote access. Installing
 over SSH while nobody is signed in at the PC can fail at the final start step;
 the service is still installed and will start at the next sign-in.
 
-`t3 up` installs the service when you set up T3 Connect, but the two are managed
-separately. Signing out of T3 Connect does not stop or uninstall the service.
+`t3 up --lan` can install the service. The service and network access are managed
+separately. Turning network access off does not stop or uninstall the service.
 
 ## Keep the server responsive when agents use all memory
 
@@ -156,9 +155,6 @@ longer starts at login. If agent work cannot access Desktop, Documents, or
 Downloads, it may need Full Disk Access for the `t3` executable listed in
 `ProgramArguments` in
 `~/Library/LaunchAgents/com.t3tools.t3code.service.plist`.
-
-For failures after signing in to T3 Connect, see
-[connection troubleshooting](./t3-connect-troubleshooting.md).
 
 ## Reclaim database space
 
