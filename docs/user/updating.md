@@ -186,4 +186,5 @@ clients receive the refreshed catalogs automatically.
 
 Provider updates do not restart running chats. An existing session can keep
 using the previous CLI until it ends. If discovery fails, check the provider
-status and refresh it again.
+status and refresh it again. If provider update checks are disabled, enable them in
+**Settings → Maintenance** before refreshing to find newer versions.
