@@ -54,34 +54,57 @@ function seedTouchDraftStore() {
   };
 }
 
-async function emulateTouchPointer(viewport: {
+async function emulatePointer(options: {
   width: number;
   height: number;
+  pointer: "coarse" | "fine";
 }): Promise<AsyncDisposable> {
   const previous = { width: window.innerWidth, height: window.innerHeight };
   const session = cdp();
-  await page.viewport(viewport.width, viewport.height);
-  await session.send("Emulation.setDeviceMetricsOverride", {
-    width: viewport.width,
-    height: viewport.height,
-    deviceScaleFactor: 2,
-    mobile: true,
-  });
-  await session.send("Emulation.setTouchEmulationEnabled", {
-    enabled: true,
-    maxTouchPoints: 5,
-  });
-  await session.send("Emulation.setEmitTouchEventsForMouse", {
-    enabled: true,
-    configuration: "mobile",
-  });
+  const isTouch = options.pointer === "coarse";
+  const cleanup = async () => {
+    await session.send("Emulation.setEmulatedMedia", { features: [] });
+    await session.send("Emulation.setEmitTouchEventsForMouse", {
+      enabled: false,
+      configuration: "desktop",
+    });
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await session.send("Emulation.clearDeviceMetricsOverride");
+    await page.viewport(previous.width, previous.height);
+  };
+  try {
+    await page.viewport(options.width, options.height);
+    await session.send("Emulation.setDeviceMetricsOverride", {
+      width: options.width,
+      height: options.height,
+      deviceScaleFactor: isTouch ? 2 : 1,
+      mobile: isTouch,
+    });
+    await session.send("Emulation.setTouchEmulationEnabled", {
+      enabled: isTouch,
+      ...(isTouch ? { maxTouchPoints: 5 } : {}),
+    });
+    await session.send("Emulation.setEmitTouchEventsForMouse", {
+      enabled: isTouch,
+      configuration: isTouch ? "mobile" : "desktop",
+    });
+    await session.send("Emulation.setEmulatedMedia", {
+      features: isTouch
+        ? [
+            { name: "pointer", value: "coarse" },
+            { name: "hover", value: "none" },
+          ]
+        : [
+            { name: "pointer", value: "fine" },
+            { name: "hover", value: "hover" },
+          ],
+    });
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
   return {
-    async [Symbol.asyncDispose]() {
-      await session.send("Emulation.setEmitTouchEventsForMouse", { enabled: false });
-      await session.send("Emulation.setTouchEmulationEnabled", { enabled: false });
-      await session.send("Emulation.clearDeviceMetricsOverride");
-      await page.viewport(previous.width, previous.height);
-    },
+    [Symbol.asyncDispose]: cleanup,
   };
 }
 
@@ -282,9 +305,54 @@ function expectPointHitsButton(button: Element) {
   expect(hit, `${label} elementFromPoint(${cx.toFixed(1)}, ${cy.toFixed(1)})`).toBe(button);
 }
 
+function expectVisibleInlineLabelBeforeActions(
+  row: HTMLElement,
+  pattern: RegExp,
+  rightActionButtons: HTMLButtonElement[],
+) {
+  const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+  let matchedNode: Text | null = null;
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    const text = node.textContent?.trim() ?? "";
+    if (pattern.test(text)) {
+      matchedNode = node as Text;
+      break;
+    }
+  }
+  expect(matchedNode, `label matching ${pattern} inside row`).not.toBeNull();
+
+  const range = document.createRange();
+  range.selectNodeContents(matchedNode!);
+  const labelRect = range.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+
+  expect(labelRect.width).toBeGreaterThan(0);
+  expect(labelRect.height).toBeGreaterThan(0);
+  expect(labelRect.height).toBeLessThanOrEqual(24);
+  expect(labelRect.left).toBeGreaterThanOrEqual(rowRect.left);
+  expect(labelRect.right).toBeLessThanOrEqual(rowRect.right);
+  expect(labelRect.top).toBeGreaterThanOrEqual(rowRect.top);
+  expect(labelRect.bottom).toBeLessThanOrEqual(rowRect.bottom);
+
+  for (let el = matchedNode!.parentElement; el && el !== row.parentElement; el = el.parentElement) {
+    const style = getComputedStyle(el);
+    expect(style.opacity).toBe("1");
+    expect(style.visibility).toBe("visible");
+    expect(style.display).not.toBe("none");
+  }
+
+  const labelCenterY = (labelRect.top + labelRect.bottom) / 2;
+  for (const button of rightActionButtons) {
+    const btnRect = button.getBoundingClientRect();
+    const btnCenterY = (btnRect.top + btnRect.bottom) / 2;
+    expect(btnRect.left).toBeGreaterThanOrEqual(labelRect.right - 0.5);
+    expect(Math.abs(btnCenterY - labelCenterY)).toBeLessThanOrEqual(6);
+  }
+}
+
 describe("sidebar mobile touch targets", () => {
   it("keeps row actions visible and hit-testable via elementFromPoint at 390x844 under pointer: coarse without hover", async () => {
-    await using _touch = await emulateTouchPointer({ width: 390, height: 844 });
+    await using _pointer = await emulatePointer({ width: 390, height: 844, pointer: "coarse" });
     using _draftStore = seedTouchDraftStore();
     const onCardSettle = vi.fn();
     const onCardThreadClick = vi.fn();
@@ -401,6 +469,19 @@ describe("sidebar mobile touch targets", () => {
       }
     }
 
+    const relativeTimePattern = /^(刚刚|\d+\s*(分钟|小时|天)前)$/;
+    const rowLabelChecks: Array<[HTMLElement, RegExp, HTMLButtonElement[]]> = [
+      [cardRow, relativeTimePattern, [cardDiscardDraft, cardSnooze, cardSettle]],
+      [settledCardRow, relativeTimePattern, [cardUnsettle]],
+      [wokeCardRow, /^已唤醒$/, [cardWokeSnooze, cardWokeSettle]],
+      [slimRow, relativeTimePattern, [slimSettle]],
+      [slimSettledRow, relativeTimePattern, [slimUnsettle]],
+      [slimSnoozedRow, /^2h$/, [slimUnsnooze]],
+    ];
+    for (const [row, pattern, actionButtons] of rowLabelChecks) {
+      expectVisibleInlineLabelBeforeActions(row, pattern, actionButtons);
+    }
+
     // Visual icons stay compact instead of scaling up to fill the 32x32 hit box.
     expect(cardUnpin.querySelector("svg")!.getBoundingClientRect().width).toBeLessThanOrEqual(16);
     expect(cardSnooze.querySelector("svg")!.getBoundingClientRect().width).toBeLessThanOrEqual(16);
@@ -416,16 +497,9 @@ describe("sidebar mobile touch targets", () => {
   });
 
   it("keeps compact desktop button sizes and hover-only row actions at 1280x800", async () => {
-    const previous = { width: window.innerWidth, height: window.innerHeight };
-    await page.viewport(1280, 800);
-    await using _viewport = {
-      [Symbol.asyncDispose]: () => page.viewport(previous.width, previous.height),
-    };
+    await using _pointer = await emulatePointer({ width: 1280, height: 800, pointer: "fine" });
     using _draftStore = seedTouchDraftStore();
     await using screen = await render(<SidebarTouchHarness />);
-
-    expect(window.matchMedia("(pointer: fine)").matches).toBe(true);
-    expect(window.matchMedia("(pointer: coarse)").matches).toBe(false);
 
     const draftRow = screen.container.querySelector<HTMLElement>(
       '[data-testid="sidebar-draft-row"]',

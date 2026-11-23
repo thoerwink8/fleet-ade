@@ -1171,9 +1171,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     ) : null;
 
   if (variant !== "card") {
-    const hasSlimAction =
-      variantAction === "unsnooze" ? props.snoozeSupported : props.settlementSupported;
-    const showSnoozeWakeLabel = variantAction === "unsnooze" && props.snoozeWakeLabelText !== null;
     return (
       <li
         data-thread-item={threadKey}
@@ -1232,19 +1229,15 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end max-md:h-8 pointer-coarse:h-8",
+                    "relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end max-md:h-8 pointer-coarse:h-8 pointer-coarse:gap-1",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
                 >
                   <span
                     className={cn(
-                      "inline-flex items-center justify-end tabular-nums text-secondary-label transition-opacity",
+                      "inline-flex shrink-0 items-center justify-end whitespace-nowrap tabular-nums text-secondary-label transition-opacity",
                       !isWoke && "group-any-hover/sidebar-row:opacity-0",
-                      !isWoke &&
-                        hasSlimAction &&
-                        !showSnoozeWakeLabel &&
-                        "pointer-coarse:pointer-events-none pointer-coarse:absolute pointer-coarse:right-0 pointer-coarse:opacity-0",
                     )}
                   >
                     {variantAction === "unsnooze" && props.snoozeWakeLabelText !== null ? (
@@ -1438,7 +1431,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "group/sidebar-status-slot relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end text-row",
+                    "group/sidebar-status-slot relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end text-row pointer-coarse:gap-1",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1448,10 +1441,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                       isWokeStatus
                         ? "pointer-events-auto"
                         : "pointer-events-none group-has-[:focus-visible]/sidebar-status-slot:absolute group-has-[:focus-visible]/sidebar-status-slot:right-0 group-has-[:focus-visible]/sidebar-status-slot:opacity-0 group-any-hover/sidebar-row:absolute group-any-hover/sidebar-row:right-0 group-any-hover/sidebar-row:opacity-0",
-                      !isWokeStatus &&
-                        hasCardActions &&
-                        "pointer-coarse:absolute pointer-coarse:right-0 pointer-coarse:opacity-0",
-                      "flex items-center self-center justify-self-end tabular-nums text-muted-foreground",
+                      "flex shrink-0 items-center self-center justify-self-end whitespace-nowrap tabular-nums text-muted-foreground",
                       snoozeMenuOpen && "pointer-events-none absolute right-0 opacity-0",
                     )}
                   >
