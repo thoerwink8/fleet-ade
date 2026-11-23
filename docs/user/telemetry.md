@@ -1,15 +1,26 @@
 # Telemetry
 
-T3 Code does not send product usage. Provider, model, token counts, and account identifiers stay on
-your machine.
+T3 Code does not send product usage. Token counts stay on your machine. Model names, project and
+thread titles, activity status, and environment and thread identifiers are sent only when
+**Publish agent activity** is on. That switch is off until you turn it on.
 
-What can leave the machine is relay connection tracing, and traces, metrics, or logs you send to an
-OpenTelemetry receiver of your own. Prompts, responses, and file contents are not included.
+What can leave the machine:
+
+- Relay connection traces, sent to Axiom to diagnose T3 Connect. To turn them off, set
+  `T3CODE_TELEMETRY_ENABLED=false` in the server's environment before you start it. They also stop
+  when `T3CODE_OTEL_SDK_DISABLED` or `OTEL_SDK_DISABLED` turns OpenTelemetry export off. The
+  browser app has no switch for its own traces.
+- Agent activity, when **Publish agent activity** is on. To turn it off, open
+  **Settings > Connections** on the host and turn off **Publish agent activity**.
+- Crash and startup reports from the iOS or Android app. To turn them off, open
+  **Settings > About > Diagnostics** and turn off **Send crash reports**.
+- Traces, metrics, or logs you send to an OpenTelemetry receiver of your own.
+
+Prompts, responses, and file contents are not included.
 
 ## Relay connection diagnostics
 
-When this copy of T3 Code has relay tracing configured, it sends T3 Connect connection traces to
-that OpenTelemetry endpoint (Axiom). A copy with no endpoint configured sends nothing.
+T3 Code sends relay connection traces to Axiom to diagnose T3 Connect connectivity.
 
 Traces record how long a connection step took. A failed trace can include the error message and
 stack trace. Error text can quote a value the app was handling.
@@ -24,14 +35,29 @@ macOS and Linux, so export it there and restart the app. On Windows, set it as a
 variable.
 
 The web app in a browser, including one the `t3` CLI opens, does not read these environment
-variables. When its build has relay tracing configured, it sends its own connection traces even
-if the server has opted out. The browser app has no relay tracing toggle.
+variables. It sends its own connection traces even if the server has opted out. The browser app has
+no relay tracing toggle.
+
+## Mobile app diagnostics
+
+When the iOS or Android app crashes or hits an error, it sends a report to T3 Code: the error
+message, the stack trace, the app version, and the device model and OS version. Each launch also
+sends startup timings, and every report carries a random ID for the install. Reports go through
+the T3 Connect relay to Axiom. They do not include your threads, prompts, or connection details,
+but an error message can quote a value the app was handling.
+
+To stop sending them, turn off **Send crash reports** in **Settings > About > Diagnostics**.
+
+The mobile app also sends relay connection traces. These carry an identifier for the current app
+session. **Send crash reports** does not control these traces, and the mobile app has no separate
+relay tracing toggle. Server environment variables do not disable mobile tracing.
 
 ## Agent activity for mobile notifications
 
 When **Publish agent activity** is enabled on a host, it sends project and thread titles, model
 names, activity status, and environment and thread identifiers to the T3 Connect relay for
-mobile notifications and live activities. Turning off relay tracing does not stop this.
+mobile notifications and live activities. The switch is off until you turn it on. Turning off
+relay tracing does not stop this.
 
 To stop publishing, turn off **Publish agent activity** under **Settings > Connections** on
 the host. Turning off notifications on a phone controls that phone's alerts, not the host's

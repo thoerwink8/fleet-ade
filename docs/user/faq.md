@@ -69,7 +69,7 @@ No. T3 Code is a serious developer tool. Locally runnable models are not capable
 
 ## Does my code go to T3 servers?
 
-No. Your code and prompts go from your machine to your provider (Anthropic, OpenAI, etc.), not to us. With T3 Connect, traffic rides a Cloudflare tunnel (`cloudflared` on your machine). Our relay sets up the link. It does not proxy your HTTP or WebSocket sessions. That is the same on Tailscale, LAN, or T3 Connect. T3 Code does not send product usage events. When relay tracing is configured, connection traces can go to an OpenTelemetry endpoint. [Telemetry](./telemetry.md) explains what is sent and how to turn it off with `T3CODE_TELEMETRY_ENABLED=false`.
+No. Your code and prompts go from your machine to your provider (Anthropic, OpenAI, etc.), not to us. With T3 Connect, traffic rides a Cloudflare tunnel (`cloudflared` on your machine). Our relay sets up the link. It does not proxy your HTTP or WebSocket sessions. That is the same on Tailscale, LAN, or T3 Connect. T3 Code does not send product usage events. Connection traces for T3 Connect can go to an OpenTelemetry endpoint. [Telemetry](./telemetry.md) explains what is sent and how to turn it off with `T3CODE_TELEMETRY_ENABLED=false`.
 
 ## Worktrees are eating my disk. How do I clean them up?
 
