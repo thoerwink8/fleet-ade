@@ -76,7 +76,7 @@ export function RelayClientInstallDialog() {
           {isInstalling ? (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between gap-3 text-sm">
-                <p aria-live="polite" className="font-medium text-foreground">
+                <p aria-live="polite" className="text-row font-semibold text-foreground">
                   {activeStep?.label}
                 </p>
                 <p className="shrink-0 tabular-nums text-muted-foreground">
@@ -95,7 +95,7 @@ export function RelayClientInstallDialog() {
             </div>
           ) : (
             <div className="rounded-xl border border-border/70 bg-muted/35 p-3">
-              <p className="text-sm font-medium text-foreground">托管中继客户端</p>
+              <p className="text-row font-semibold text-foreground">托管中继客户端</p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 Fleet ADE 会在本机下载并安装版本 {view.status === "confirming" ? view.version : ""}
                 。

@@ -1181,7 +1181,7 @@ function CodexWelcomeCard({
       <div className="flex flex-wrap items-center gap-3">
         <OpenAI className="size-5 shrink-0 fill-foreground" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-medium">{title}</h3>
+          <h3 className="text-row font-semibold">{title}</h3>
           <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</div>
         </div>
         {control || secondaryControl ? (

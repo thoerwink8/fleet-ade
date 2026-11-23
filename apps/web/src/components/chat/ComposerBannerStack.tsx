@@ -187,7 +187,7 @@ function NoticeCard({
             detailsLabel={
               typeof item.title === "string" ? `显示完整标题：${item.title}` : "显示标题详情"
             }
-            className="min-w-0 truncate font-medium leading-7 sm:leading-6"
+            className="min-w-0 truncate font-semibold leading-7 sm:leading-6"
           >
             {item.title}
           </NoticeText>

@@ -312,7 +312,7 @@ export function SettingInheritance({
             return (
               <section key={id} className="px-3 py-2.5">
                 {!hasMultipleEnvironments ? (
-                  <h4 className="flex items-center gap-1.5 pb-1.5 text-xs font-medium text-muted-foreground">
+                  <h4 className="flex items-center gap-1.5 pb-1.5 text-meta font-semibold text-muted-foreground">
                     <EnvironmentMachineIcon
                       aria-hidden
                       kind={machine}

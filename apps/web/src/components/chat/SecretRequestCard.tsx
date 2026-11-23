@@ -146,7 +146,7 @@ function PendingSecretRequestForm(props: {
       }}
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <label htmlFor={inputId} className="text-sm font-medium text-foreground">
+        <label htmlFor={inputId} className="text-row font-semibold text-foreground">
           {item.label}
         </label>
         {item.reason.trim() ? (

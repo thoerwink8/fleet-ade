@@ -374,7 +374,7 @@ function OnboardingToggleRow({
   return (
     <div className="flex items-start justify-between gap-4 border-t border-border/60 px-4 py-3 first:border-t-0">
       <div className="min-w-0">
-        <p className="text-sm font-medium">{title}</p>
+        <p className="text-row font-semibold">{title}</p>
         <p className="mt-1 text-xs text-muted-foreground">{description}</p>
       </div>
       <Switch

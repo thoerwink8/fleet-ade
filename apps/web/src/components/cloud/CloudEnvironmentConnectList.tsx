@@ -287,7 +287,7 @@ export function CloudEnvironmentConnectRows({
     if (discoveryProblem !== null && !environmentsState.refreshing) {
       return (
         <div className={ITEM_ROW_CLASSNAME}>
-          <p className="text-sm font-medium text-destructive">无法加载 T3 Connect 环境</p>
+          <p className="text-row font-semibold text-destructive">无法加载 T3 Connect 环境</p>
           <p className="mt-1 text-xs text-muted-foreground">{discoveryProblem}</p>
           <Button
             size="sm"
@@ -386,7 +386,7 @@ export function CloudEnvironmentConnectRows({
             className="size-4 shrink-0 text-muted-foreground"
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{environment.label}</span>
+            <span className="block truncate text-row font-semibold">{environment.label}</span>
             {unsupportedDetail !== null ? (
               <span className="mt-0.5 block text-xs text-muted-foreground">
                 {unsupportedDetail}
@@ -451,7 +451,7 @@ export function CloudEnvironmentConnectRows({
                 kind={machineKind}
                 className="size-4 shrink-0 text-muted-foreground"
               />
-              <p className="truncate text-sm font-medium">{environment.label}</p>
+              <p className="truncate text-row font-semibold">{environment.label}</p>
             </div>
             <p
               className={cn(

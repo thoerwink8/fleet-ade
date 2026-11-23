@@ -480,7 +480,10 @@ export function AddProviderInstanceDialog({
           <>
             <WizardPanel className={cn(isAcpRegistry && wizardStep === identityStep && "min-h-72")}>
               <div className={cn("grid gap-2", wizardStep !== 0 && "hidden")}>
-                <div id="add-instance-driver-label" className="text-sm font-medium text-foreground">
+                <div
+                  id="add-instance-driver-label"
+                  className="text-row font-semibold text-foreground"
+                >
                   提供方
                 </div>
                 <ProviderOptionGrid
@@ -523,7 +526,7 @@ export function AddProviderInstanceDialog({
                         <div className="grid gap-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <h3 className="text-sm font-medium text-foreground">
+                              <h3 className="text-row font-semibold text-foreground">
                                 {isLocalAcp ? "本地 ACP 命令" : "手动输入"}
                               </h3>
                               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -589,7 +592,7 @@ export function AddProviderInstanceDialog({
               {isAcpRegistry && wizardStep === 1 && selectedAcp ? (
                 <div className="mb-4 flex items-start justify-between gap-3 border-b border-border/70 pb-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
+                    <p className="truncate text-row font-semibold text-foreground">
                       {selectedAcp.name}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">

@@ -526,7 +526,7 @@ function InstanceSessionManagement(
         <div className="grid gap-3 border-t border-border/60 px-3 py-3 sm:px-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-medium text-foreground">智能体提供方</p>
+              <p className="text-meta font-semibold text-foreground">智能体提供方</p>
               <p className="text-xs text-muted-foreground">
                 配置不含凭据的路由信息。请求头只能写入，无法读取。
               </p>
@@ -585,7 +585,7 @@ function InstanceSessionManagement(
                   <div key={provider.providerId} className="grid gap-2 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-foreground">
+                        <p className="truncate text-meta font-semibold text-foreground">
                           {provider.providerId}
                         </p>
                         <p className="text-3xs text-muted-foreground">
