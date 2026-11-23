@@ -100,7 +100,11 @@ export function ThemeLibrary({
       </div>
       <div className="space-y-1.5">
         <SettingsSectionHeader as="h3" title={searchableSetting("theme").title} />
-        <div aria-label="主题" className="grid w-full grid-cols-3 gap-3" role="group">
+        <div
+          aria-label="主题"
+          className="@container/theme-grid grid w-full grid-cols-3 gap-3"
+          role="group"
+        >
           {THEME_CARDS.map((card) => {
             const isActive = card.themeId === activeThemeId;
             return (
@@ -108,7 +112,7 @@ export function ThemeLibrary({
                 aria-label={`使用 ${card.label} 主题`}
                 aria-pressed={isActive}
                 className={cn(
-                  "flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 pb-3 pt-4 outline-none transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-7 focus-visible:outline-foreground/60",
+                  "flex min-w-0 cursor-pointer flex-col items-center gap-2 rounded-xl border px-2 pb-2.5 pt-3 outline-none transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-7 focus-visible:outline-foreground/60 @min-[30rem]/theme-grid:px-3 @min-[30rem]/theme-grid:pb-3 @min-[30rem]/theme-grid:pt-4",
                   isActive
                     ? "border-transparent bg-accent/30 ring-2 ring-inset ring-ring"
                     : "border-border/70 bg-card/60 hover:bg-accent/10",
@@ -118,9 +122,10 @@ export function ThemeLibrary({
                 onClick={() => pickTheme(card.themeId)}
                 type="button"
               >
-                <span className="flex items-center justify-center gap-2.5">
+                <span className="flex w-full items-center justify-center gap-1.5 @min-[30rem]/theme-grid:gap-2.5">
                   {card.previews.map((preview) => (
                     <ThemePreviewCircle
+                      className="aspect-square h-auto w-full min-w-0 max-w-14 flex-1 shrink"
                       colors={preview.colors}
                       key={preview.mode}
                       mode={preview.mode}
