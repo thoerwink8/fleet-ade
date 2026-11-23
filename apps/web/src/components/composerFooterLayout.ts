@@ -23,14 +23,6 @@ export function shouldUseCompactComposerFooter(
   return width !== null && width < breakpoint;
 }
 
-export function shouldAnimateComposerRestingTransition(input: {
-  hasCompletedInitialLayout: boolean;
-  stateChanged: boolean;
-  hasInterruptedAnimation: boolean;
-}): boolean {
-  return input.hasCompletedInitialLayout && (input.stateChanged || input.hasInterruptedAnimation);
-}
-
 export function shouldUseCompactComposerPrimaryActions(
   width: number | null,
   options?: { hasWideActions?: boolean },

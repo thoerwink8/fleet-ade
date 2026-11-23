@@ -6,7 +6,7 @@ import { RightPanelSheet } from "./RightPanelSheet";
 
 it("names the open right-panel dialog", async () => {
   await using _screen = await render(
-    <RightPanelSheet open animationDurationMs={0} onClose={() => {}}>
+    <RightPanelSheet open onClose={() => {}}>
       <div>Panel content</div>
     </RightPanelSheet>,
   );

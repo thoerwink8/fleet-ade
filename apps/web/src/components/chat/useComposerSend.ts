@@ -93,7 +93,6 @@ import {
 } from "../../lib/composerContextRecords";
 import { environmentServerConfigsAtom } from "../../state/server";
 import { threadEnvironment } from "../../state/threads";
-import { runMobileComposerTransition } from "./draftHeroTransition";
 import { useClientSettingsHydrated } from "../../hooks/useSettings";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { environmentPresentations } from "../../state/presentation";
@@ -204,8 +203,6 @@ interface ComposerSendInput {
   readonly isSendBusy: boolean;
   readonly sendQueuesBehindSetup: boolean;
   readonly isDraftHeroState: boolean;
-  readonly panelAnimationsActive: boolean;
-  readonly panelAnimationDurationMs: number;
   readonly keepFullHistory: boolean;
   /** `/clear` can arm a fresh session on this thread. */
   readonly freshSessionAvailable: boolean;
@@ -226,7 +223,6 @@ interface ComposerSendInput {
   readonly beginLocalDispatch: LocalDispatchState["beginLocalDispatch"];
   readonly resetLocalDispatch: LocalDispatchState["resetLocalDispatch"];
   readonly beginWorktreeSetup: ReturnType<typeof useWorktreeSetup>["begin"];
-  readonly captureDraftHeroComposerRect: () => void;
   readonly setDockedDraftHeroThreadKey: Dispatch<SetStateAction<string | null>>;
   readonly setSetupQueueSendThreadKey: Dispatch<SetStateAction<string | null>>;
   readonly setOptimisticUserMessages: Dispatch<SetStateAction<ChatMessage[]>>;
@@ -301,8 +297,6 @@ export function useComposerSend(input: ComposerSendInput) {
     isSendBusy,
     sendQueuesBehindSetup,
     isDraftHeroState,
-    panelAnimationsActive,
-    panelAnimationDurationMs,
     keepFullHistory,
     freshSessionAvailable,
     resumeCompactionTokens,
@@ -322,7 +316,6 @@ export function useComposerSend(input: ComposerSendInput) {
     beginLocalDispatch,
     resetLocalDispatch,
     beginWorktreeSetup,
-    captureDraftHeroComposerRect,
     setDockedDraftHeroThreadKey,
     setSetupQueueSendThreadKey,
     setOptimisticUserMessages,
@@ -903,25 +896,9 @@ export function useComposerSend(input: ComposerSendInput) {
       shouldDockDraftHeroForSubmission({ isDraftHeroState, activeThreadKey, submissionIntent }) &&
       activeThreadKey
     ) {
-      let resolveDockStarted: (() => void) | undefined;
-      const dockStarted = new Promise<void>((resolve) => {
-        resolveDockStarted = resolve;
+      flushSync(() => {
+        setDockedDraftHeroThreadKey(activeThreadKey);
       });
-      const dockTransition = runMobileComposerTransition(
-        () => {
-          flushSync(() => {
-            captureDraftHeroComposerRect();
-            setDockedDraftHeroThreadKey(activeThreadKey);
-          });
-          resolveDockStarted?.();
-        },
-        {
-          active: panelAnimationsActive,
-          durationMs: panelAnimationDurationMs,
-        },
-      );
-      void dockTransition.catch(() => resolveDockStarted?.());
-      await dockStarted;
     }
 
     const attachmentCapabilitiesBeforeDispatch = readLiveAttachmentCapabilities();

@@ -70,7 +70,7 @@ it.effect("server code does not fetch the upstream model manifest", () =>
     );
     yield* fs.writeFileString(
       path.join(root, "prompt.ts"),
-      `export const url = "${raw}/.github/triage/PLAYBOOK.md";
+      `export const url = "${raw}/docs/user/install.md";
 `,
     );
     assert.deepStrictEqual(yield* scanUpstreamManifestFetches(root), ["fetch.ts 1"]);
