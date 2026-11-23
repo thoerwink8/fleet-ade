@@ -245,10 +245,8 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { Kbd } from "../ui/kbd";
 import { useSoftwareKeyboardOpen } from "../../hooks/useSoftwareKeyboardOpen";
 import { useStableCallback } from "../../hooks/useStableCallback";
-import { PANEL_ANIMATION } from "../../panelAnimations";
 import { readEnvironmentScope, readPreparedConnection } from "../../state/session";
 import type { ReviewCommentContext } from "../../reviewCommentContext";
-import { useComposerRestingTransition } from "./useComposerRestingTransition";
 import { ComposerCommandMenuLayer } from "./ComposerCommandMenuLayer";
 import { useRestingComposerControlsLayout } from "./useRestingComposerControlsLayout";
 import { useProviderWorkspaceSnapshotRefresh } from "./useProviderWorkspaceSnapshotRefresh";
@@ -420,7 +418,6 @@ export interface ChatComposerProps {
   pullRequestProjectId: ProjectId | null;
   pullRequestRepository: string | null;
   threadPullRequests: ReadonlyArray<ThreadPullRequestLink> | undefined;
-  onComposerOverlayHeightChange: (height: number) => void;
   /** The new-thread strip names the permissions, so the controls row hides its chip. */
   permissionsShownInStrip: boolean;
 
@@ -536,7 +533,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     pullRequestProjectId,
     pullRequestRepository,
     threadPullRequests,
-    onComposerOverlayHeightChange,
     promptRef,
     composerRef,
     composerImagesRef,
@@ -1136,7 +1132,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     null,
   );
   const {
-    controlsRef: restingComposerControlsRef,
     attachControls: attachRestingComposerControls,
     hiddenBlockCount: restingControlsHiddenBlockCount,
     iconOnlyBlockCount: restingControlsIconOnlyBlockCount,
@@ -2252,14 +2247,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         onShowMore={expandMobileComposer}
       />
     ) : null;
-  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } = PANEL_ANIMATION;
-  const composerMainSurfaceRef = useComposerRestingTransition(
-    composerControlsCollapsed,
-    restingComposerControlsRef,
-    onComposerOverlayHeightChange,
-    panelAnimationsActive,
-    panelAnimationDurationMs,
-  );
   const restingHiddenBlockCount = showInlineRestingControls
     ? restingControlsHiddenBlockCount
     : composerControlsCollapsed
@@ -3188,11 +3175,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         />
       </ComposerBanner.Dock>
       <div className="relative">
-        <ComposerSurface.Main
-          ref={composerMainSurfaceRef}
-          data-inline-resting-controls="true"
-          className={composerProviderState.composerFrameClassName}
-        >
+        <ComposerSurface.Main className={composerProviderState.composerFrameClassName}>
           <div
             ref={composerSurfaceRef}
             data-chat-composer-surface="true"

@@ -82,7 +82,6 @@ import { useStableCallback } from "~/hooks/useStableCallback";
 import { useOpenPanelPullRequestUrl } from "~/hooks/useOpenPanelPullRequestUrl";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { toastManager } from "../ui/toast";
-import { PANEL_ANIMATION, usePanelPresence } from "~/panelAnimations";
 import {
   PULL_REQUESTS_PANEL_REF,
   selectActiveRightPanelSurface,
@@ -175,21 +174,9 @@ export function PullRequestsPage() {
   const selectedPullRequestSurface =
     selectedRightPanelSurface?.kind === "pull-request" ? selectedRightPanelSurface : null;
   const activePullRequestSurface = rightPanelState.isOpen ? selectedPullRequestSurface : null;
-  const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } = PANEL_ANIMATION;
-  const rightPanelPresenceValue = {
-    activeSurface: selectedPullRequestSurface,
-    surfaces: rightPanelState.surfaces,
-  };
-  const rightPanelPresence = usePanelPresence(
-    rightPanelState.isOpen && selectedPullRequestSurface !== null,
-    rightPanelPresenceValue,
-    panelAnimationsActive,
-    rightPanelRef?.threadId ?? null,
-    panelAnimationDurationMs,
-  );
-  const rightPanelPresent = rightPanelPresence.present;
-  const renderedPullRequestSurface = rightPanelPresence.value?.activeSurface ?? null;
-  const renderedRightPanelSurfaces = rightPanelPresence.value?.surfaces ?? [];
+  const rightPanelPresent = rightPanelState.isOpen && selectedPullRequestSurface !== null;
+  const renderedPullRequestSurface = rightPanelPresent ? selectedPullRequestSurface : null;
+  const renderedRightPanelSurfaces = rightPanelPresent ? rightPanelState.surfaces : [];
   const panelEnvironmentId =
     (renderedPullRequestSurface?.environmentId as EnvironmentId | undefined) ??
     selectedProject?.environmentId ??
@@ -1194,16 +1181,7 @@ export function PullRequestsPage() {
     rightPanelControl: !pullRequestsSupported ? null : (
       <span
         aria-hidden
-        className={cn(
-          "shrink-0",
-          rightPanelState.isOpen ? "-ml-3 w-0" : "w-7 sm:w-5",
-          panelAnimationsActive && "transition-[width,margin] ease-out",
-        )}
-        style={
-          panelAnimationsActive
-            ? { transitionDuration: `${panelAnimationDurationMs}ms` }
-            : undefined
-        }
+        className={cn("shrink-0", rightPanelState.isOpen ? "-ml-3 w-0" : "w-7 sm:w-5")}
       />
     ),
     titlebarControls:
