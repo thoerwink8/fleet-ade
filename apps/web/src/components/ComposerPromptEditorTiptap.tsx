@@ -1513,19 +1513,20 @@ function ComposerPromptEditorTiptapInner(
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes the disabled prop into the imperative Tiptap editor via setEditable
   useEffect(() => {
-    editor?.setEditable(!disabled);
+    if (!editor || editor.isDestroyed) return;
+    editor.setEditable(!disabled);
   }, [disabled, editor]);
 
   // Push attributes before layout measurements; Tiptap updates them later in a passive effect.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes DOM attributes into the ProseMirror view before layout measurements read them
   useLayoutEffect(() => {
-    if (!editor?.isInitialized) return;
+    if (!editor?.isInitialized || editor.isDestroyed) return;
     editor.view.setProps({ attributes: editorAttributes });
   }, [editor, editorAttributes]);
 
   const readSnapshot = () => {
     const snapshot = snapshotRef.current;
-    if (!editor) return snapshot;
+    if (!editor || editor.isDestroyed) return snapshot;
     const map = serializeEditorDoc(editor.state.doc);
     const { from, to } = editor.state.selection;
     const fromFlat = pmToFlat(map, from);
@@ -1581,7 +1582,11 @@ function ComposerPromptEditorTiptapInner(
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- writes the controlled value and cursor into the Tiptap document before paint
   useLayoutEffect(() => {
     latestValueRef.current = value;
-    if (!editor) return;
+    // Tiptap's useEditor schedules a 1ms destroy timer during render; if React yields
+    // mid-render (for example on a lazy Suspense retry) before commit, the initial
+    // editor can already be destroyed when layout effects run, until useEditor's
+    // passive effect creates a replacement.
+    if (!editor || editor.isDestroyed) return;
     const initialSelection = !hasAppliedControlledSelectionRef.current;
     hasAppliedControlledSelectionRef.current = true;
     const normalizedCursor = clampEditorCursor(value, cursor);
@@ -1665,7 +1670,7 @@ function ComposerPromptEditorTiptapInner(
   // Reconcile loaded or switched provider skills and models without rebuilding citation node views.
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- replaces skill and model chip nodes in the Tiptap document when the provider skill or model list loads or changes
   useEffect(() => {
-    if (!editor || literalText) return;
+    if (!editor || editor.isDestroyed || literalText) return;
     const replacements = skillChipReplacements(
       editor.state.doc,
       (name) => composerSkillMeta(skills, name),
@@ -1676,7 +1681,7 @@ function ComposerPromptEditorTiptapInner(
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- restores ProseMirror focus and caret scroll when the keyed editor remounts, capturing focus on teardown
   useLayoutEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     if (restoreFocusRef.current) {
       restoreFocusRef.current = false;
       editor.view.focus();
@@ -1684,12 +1689,14 @@ function ComposerPromptEditorTiptapInner(
     }
     return () => {
       // Capture focus before the keyed editor's DOM is removed.
-      restoreFocusRef.current = editor.view.hasFocus();
+      if (!editor.isDestroyed) {
+        restoreFocusRef.current = editor.view.hasFocus();
+      }
     };
   }, [editor, restoreFocusRef]);
 
   const focusAt = (nextCursor: number, exactExpandedCursor?: number) => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     // view.focus() writes selection immediately; bare DOM focus waits 20ms and can misplace fast dictation.
     editor.view.focus();
     if (snapshotRef.current.value !== latestValueRef.current) return;
@@ -1743,7 +1750,7 @@ function ComposerPromptEditorTiptapInner(
       },
       requestCitationComment: (request) => {
         citationRequestRef.current = request;
-        if (!editor) return;
+        if (!editor || editor.isDestroyed) return;
         const map = serializeEditorDoc(editor.state.doc);
         if (map.value !== request.value) return;
         const target = map.runs.find(
@@ -1773,7 +1780,7 @@ function ComposerPromptEditorTiptapInner(
         if (edge === "start" ? beforeCaret.includes("\n") : afterCaret.includes("\n")) {
           return false;
         }
-        const rootElement = editor?.view.dom;
+        const rootElement = editor && !editor.isDestroyed ? editor.view.dom : null;
         const selection = window.getSelection();
         if (
           !rootElement ||
@@ -1801,7 +1808,7 @@ function ComposerPromptEditorTiptapInner(
 
   const handleCopyCut = (event: React.ClipboardEvent, cut: boolean) => {
     const build = buildContextClipboardFragment;
-    if (!editor || (cut && !editor.isEditable)) return;
+    if (!editor || editor.isDestroyed || (cut && !editor.isEditable)) return;
     const clipboardData = event.clipboardData;
     const { from, to } = editor.state.selection;
     if (from === to) return;
