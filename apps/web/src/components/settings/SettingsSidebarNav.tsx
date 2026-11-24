@@ -312,7 +312,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                     <h3
                       id={`settings-nav-group-${index}`}
                       className={cn(
-                        "px-2 text-meta font-semibold text-sidebar-muted-foreground",
+                        "px-2 text-meta font-medium text-sidebar-muted-foreground",
                         group.headingHidden && "sr-only",
                       )}
                     >

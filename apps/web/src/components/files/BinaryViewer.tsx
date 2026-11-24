@@ -347,7 +347,7 @@ export default function BinaryViewer(props: {
                   <th
                     key={name}
                     scope="col"
-                    className="border-r border-b border-border/60 px-3 py-2 text-left font-semibold whitespace-nowrap"
+                    className="border-r border-b border-border/60 px-3 py-2 text-left font-medium whitespace-nowrap"
                   >
                     {name}
                   </th>

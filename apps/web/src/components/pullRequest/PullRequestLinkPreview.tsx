@@ -161,7 +161,7 @@ export function PullRequestLinkPreview({
                 ) : subject?.kind === "commit" ? (
                   <LinkedCommit commit={subject.commit} />
                 ) : (
-                  <p className="mt-1 text-row font-semibold text-foreground text-pretty">
+                  <p className="mt-1 text-row font-medium text-foreground text-pretty">
                     {card.title}
                   </p>
                 )}
@@ -232,7 +232,7 @@ function LinkedCommit({
   const author = commit.authors?.[0];
   return (
     <div className="mt-2 min-w-0">
-      <p className="text-row font-semibold text-foreground text-pretty">{commit.messageHeadline}</p>
+      <p className="text-row font-medium text-foreground text-pretty">{commit.messageHeadline}</p>
       <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <code className="shrink-0 font-mono">{commit.oid.slice(0, 7)}</code>
         {author === undefined ? null : (

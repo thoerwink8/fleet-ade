@@ -39,7 +39,7 @@ function PullRequestGroupHeader({
 }) {
   const Icon = GROUP_ICONS[group.key] ?? LayersIcon;
   return (
-    <div className="flex items-center gap-2 px-3 pb-1 text-meta font-semibold text-muted-foreground/70">
+    <div className="flex items-center gap-2 px-3 pb-1 text-meta font-medium text-muted-foreground/70">
       <Icon aria-hidden className="size-3.5 shrink-0" />
       <h2 className="shrink-0">{group.label}</h2>
       <span className="shrink-0 font-normal tabular-nums text-muted-foreground/50">{count}</span>

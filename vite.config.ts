@@ -485,6 +485,10 @@ export default defineConfig({
         rules: { "t3code/max-settings-description-length": "error" },
       },
       {
+        files: ["apps/web/src/**"],
+        rules: { "t3code/max-font-weight": "error" },
+      },
+      {
         files: ["apps/*/src/**", "packages/*/src/**"],
         excludeFiles: [
           "**/*.{test,spec}.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",

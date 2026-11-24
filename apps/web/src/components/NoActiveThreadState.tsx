@@ -12,7 +12,7 @@ export function NoActiveThreadState() {
             <span className="text-xs text-muted-foreground/50">没有打开的会话</span>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-title font-semibold text-foreground md:text-muted-foreground/60">
+              <span className="text-title font-medium text-foreground md:text-muted-foreground/60">
                 没有打开的会话
               </span>
             </div>

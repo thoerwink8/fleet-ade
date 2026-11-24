@@ -88,7 +88,7 @@ function NativeChild(props: { readonly child: OrchestrationV2NativeChildWork }) 
   const { child } = props;
   return (
     <section aria-label={child.role || "子智能体"} className="flex min-w-0 flex-col gap-2">
-      <h3 className="text-row font-semibold text-foreground">{child.role || "子智能体"}</h3>
+      <h3 className="text-row font-medium text-foreground">{child.role || "子智能体"}</h3>
       <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
         {child.prompt}
       </p>
@@ -110,7 +110,7 @@ function NativeChildStep(props: { readonly step: OrchestrationV2NativeChildStep 
   const { step } = props;
   return (
     <li className="flex min-w-0 flex-col gap-1">
-      <span className="text-meta font-semibold text-muted-foreground">
+      <span className="text-meta font-medium text-muted-foreground">
         {stepLabel(step.type)}
         {step.status !== null && step.status !== "DONE" ? ` · ${stepLabel(step.status)}` : ""}
       </span>

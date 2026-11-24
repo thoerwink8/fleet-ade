@@ -116,7 +116,7 @@ function UserFileCard({
         <PierreEntryIcon pathValue={file.name} kind="file" theme={ctx.resolvedTheme} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-row font-semibold group-hover/file:underline">
+        <span className="block truncate text-row font-medium group-hover/file:underline">
           {label}
         </span>
         <span className="block text-xs text-muted-foreground tabular-nums">

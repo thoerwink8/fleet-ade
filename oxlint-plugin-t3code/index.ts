@@ -1,5 +1,6 @@
 import { definePlugin } from "@oxlint/plugins";
 
+import maxFontWeight from "./rules/max-font-weight.ts";
 import maxSettingsDescriptionLength from "./rules/max-settings-description-length.ts";
 import namespaceNodeImports from "./rules/namespace-node-imports.ts";
 import noDomTestEnvironment from "./rules/no-dom-test-environment.ts";
@@ -36,6 +37,7 @@ export default definePlugin({
     name: "t3code",
   },
   rules: {
+    "max-font-weight": maxFontWeight,
     "max-settings-description-length": maxSettingsDescriptionLength,
     "namespace-node-imports": namespaceNodeImports,
     "no-dom-test-environment": noDomTestEnvironment,

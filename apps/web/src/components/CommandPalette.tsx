@@ -1299,7 +1299,7 @@ function OpenCommandPaletteDialog(props: {
         searchTerms: ["new thread", "chat", "create", "draft"],
         title: (
           <>
-            在 <span className="font-semibold">{activeProjectTitle}</span> 中新建会话
+            在 <span className="font-medium">{activeProjectTitle}</span> 中新建会话
           </>
         ),
         searchTitle: `在 ${activeProjectTitle} 中新建会话`,

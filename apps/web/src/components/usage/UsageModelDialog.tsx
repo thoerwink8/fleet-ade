@@ -92,7 +92,7 @@ export function UsageModelDialog({
               {stats.map((stat) => (
                 <div key={stat.label} className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-xs text-muted-foreground">{stat.label}</span>
-                  <span className="text-2xl font-semibold text-foreground">{stat.value}</span>
+                  <span className="text-2xl font-medium text-foreground">{stat.value}</span>
                 </div>
               ))}
             </div>

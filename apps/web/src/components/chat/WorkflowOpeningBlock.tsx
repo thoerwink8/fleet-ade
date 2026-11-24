@@ -65,9 +65,9 @@ export function WorkflowOpeningBlock(props: {
       <header className="flex min-w-0 items-start gap-2">
         <WorkflowIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="text-meta font-semibold text-muted-foreground">工作流已开始</p>
+          <p className="text-meta font-medium text-muted-foreground">工作流已开始</p>
           <h3
-            className="truncate text-row font-semibold text-foreground"
+            className="truncate text-row font-medium text-foreground"
             data-thread-find-text="true"
           >
             {headline.title}
@@ -86,7 +86,7 @@ export function WorkflowOpeningBlock(props: {
       </header>
       {phases.map((phase) => (
         <section key={phase.index} aria-label={`阶段：${phase.title}`}>
-          <h4 className="flex items-baseline gap-2 px-2 pb-0.5 text-meta font-semibold text-muted-foreground">
+          <h4 className="flex items-baseline gap-2 px-2 pb-0.5 text-meta font-medium text-muted-foreground">
             <span className="min-w-0 truncate" data-thread-find-text="true">
               {phase.title}
             </span>
@@ -155,7 +155,7 @@ function WorkflowMemberRow(props: {
             status={member.status}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-meta font-semibold text-foreground">
+            <span className="block truncate text-meta font-medium text-foreground">
               {member.title}
             </span>
             {detail ? (

@@ -231,7 +231,7 @@ export function AcpRegistrySearchStep({
                 iconClassName="size-6 rounded-md text-muted-foreground"
               />
               <div className="min-w-0 flex-1">
-                <h4 className="truncate text-row font-semibold text-foreground">
+                <h4 className="truncate text-row font-medium text-foreground">
                   {OMP_ACP_BUILTIN.name}
                 </h4>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -255,7 +255,7 @@ export function AcpRegistrySearchStep({
       {results ? (
         results.length === 0 ? (
           <div className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-dashed px-4 text-center">
-            <p className="text-row font-semibold">未找到兼容的智能体</p>
+            <p className="text-row font-medium">未找到兼容的智能体</p>
             <p className="mt-1 text-xs text-muted-foreground">试试更宽泛的搜索词。</p>
           </div>
         ) : (
@@ -307,7 +307,7 @@ function AcpRegistryAgentRow({
           />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline gap-2">
-              <h4 className="min-w-0 truncate text-row font-semibold text-foreground">
+              <h4 className="min-w-0 truncate text-row font-medium text-foreground">
                 {agent.name}
               </h4>
             </div>

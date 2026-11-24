@@ -16,7 +16,7 @@ function HighlightedSearchText(props: {
   return splitSearchText(props.text, props.ranges).map((part) =>
     part.highlighted ? (
       <mark
-        className={neutral ? "fa-mark" : "bg-transparent font-semibold text-foreground"}
+        className={neutral ? "fa-mark" : "bg-transparent font-medium text-foreground"}
         key={part.start}
       >
         {part.text}

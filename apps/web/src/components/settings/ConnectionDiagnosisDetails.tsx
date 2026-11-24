@@ -150,7 +150,7 @@ export function ConnectionDiagnosisPanel({
         ))}
       </ol>
       <div>
-        <p className="text-meta font-semibold text-foreground">可以尝试</p>
+        <p className="text-meta font-medium text-foreground">可以尝试</p>
         <ol className="list-decimal pl-4 text-muted-foreground">
           {diagnosis.steps.map((step) => (
             <li key={step}>{step}</li>
