@@ -157,7 +157,7 @@ function StopGenerationButton({
               onStopRequested();
               onInterrupt();
             }}
-            aria-label={stopPhase === "pending" ? "正在停止" : "停止生成"}
+            aria-label={stopPhase === "pending" ? "正在停止" : "停止"}
           />
         }
       >
@@ -165,7 +165,7 @@ function StopGenerationButton({
           <rect x="2" y="2" width="8" height="8" rx="1.5" />
         </svg>
       </TooltipTrigger>
-      <TooltipPopup>{stopPhase === "pending" ? "正在停止…" : "中断"}</TooltipPopup>
+      <TooltipPopup>{stopPhase === "pending" ? "正在停止…" : "停止"}</TooltipPopup>
     </Tooltip>
   );
 }

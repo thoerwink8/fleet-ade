@@ -78,7 +78,7 @@ export function V2LifecycleRow(props: {
   if (item.type === "run_interrupt_result") {
     return (
       <TimelineSystemDivider
-        label="运行已中断"
+        label="已停止"
         detail={interruptResultDetail(item.message)}
         icon={CircleStopIcon}
         wrapDetail

@@ -191,7 +191,7 @@ export function summarizeT3ToolCalls(
       label = phrase("已列出", "列出", `会话 ${times}`);
       break;
     case "thread-interrupt":
-      label = phrase("已请求中断", "中断", quantity(countEntities(threadIds), "个", "会话"));
+      label = phrase("已请求停止", "停止", quantity(countEntities(threadIds), "个", "会话"));
       break;
     case "workflow-stop":
       label = phrase(

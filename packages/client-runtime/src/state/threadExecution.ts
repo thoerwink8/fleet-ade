@@ -281,7 +281,7 @@ const SUBAGENT_STATUS_LABELS: Record<OrchestrationV2ExecutionNode["status"], str
   running: "运行中",
   waiting: "等待中",
   completed: "已完成",
-  interrupted: "已中断",
+  interrupted: "已停止",
   failed: "出错了",
   cancelled: "已取消",
   rolled_back: "已取消",

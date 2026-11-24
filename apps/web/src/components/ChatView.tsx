@@ -1859,7 +1859,7 @@ export default function ChatView(props: ChatViewProps) {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThread.id,
-        error instanceof Error ? error.message : "无法中断当前这一轮。",
+        error instanceof Error ? error.message : "无法停止当前这一轮。",
       );
     }
   };

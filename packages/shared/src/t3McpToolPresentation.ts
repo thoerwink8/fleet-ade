@@ -152,7 +152,7 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_thread_wait: tool(["等待", "正在等待", "已等待", "会话"], "thread-wait"),
   t3_workflow_stop: tool(["停止", "正在停止", "已请求停止", "工作流"], "workflow-stop"),
   t3_background_wait: tool(["更新", "正在更新", "已更新", "后台等待配置"], "background-wait"),
-  t3_thread_interrupt: tool(["中断", "正在中断", "已请求中断", "会话"], "thread-interrupt"),
+  t3_thread_interrupt: tool(["停止", "正在停止", "已请求停止", "会话"], "thread-interrupt"),
   t3_worktree_handoff: tool(["交接至", "正在交接至", "已交接至", "Git 工作树"], "worktree-handoff"),
   t3_worktree_status: tool(["查询", "正在查询", "已查询", "工作树状态"], "worktree-status"),
   run_scheduled_task_now: tool(["运行", "正在运行", "已请求运行", "定时任务"], "schedule-run"),
