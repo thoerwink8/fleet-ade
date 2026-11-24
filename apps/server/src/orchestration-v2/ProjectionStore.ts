@@ -18,6 +18,7 @@ import type {
   OrchestrationV2SearchThreadResult,
   OrchestrationV2ThreadHistoryPage,
 } from "@t3tools/contracts";
+import type { OrchestrationV2RecentlyDeletedThread } from "@t3tools/contracts";
 import {
   latestRootProviderFailureItem,
   latestUnheldRun,
@@ -53,6 +54,7 @@ import type {
   ProviderTurnId,
   RunAttemptId,
 } from "@t3tools/contracts";
+import { THREAD_TRASH_RETENTION_MS } from "@t3tools/contracts";
 import {
   IDLE_COMPACTION_TEXT,
   idleCompactionOf,
@@ -239,7 +241,13 @@ export type ProjectionSettlementCandidate = Pick<
   Pick<OrchestrationV2AppThread, "lastSnoozeWakeAt"> & {
     readonly latestUserAuthoredMessageAt: DateTime.Utc | null;
   };
-
+export interface ProjectionThreadTrash {
+  readonly threadId: ThreadId;
+  readonly projectId: ProjectId;
+  readonly deletedAt: DateTime.Utc;
+  readonly purgeDueAt: number;
+  readonly cascadeRootId: ThreadId;
+}
 const ProjectionCheckpointContext = Schema.Struct({
   runs: Schema.Array(
     OrchestrationV2RunJsonSchema.mapFields(({ id, ordinal, status }) => ({ id, ordinal, status })),
@@ -551,7 +559,17 @@ export interface ProjectionStoreV2Shape {
     fields: ReadonlyArray<K>,
     filter?: ProjectionRecordFilter,
   ) => Effect.Effect<ProjectionRecords<K>, ProjectionStoreV2Error>;
-
+  readonly getThreadTrash: (
+    threadId: ThreadId,
+  ) => Effect.Effect<ProjectionThreadTrash | null, ProjectionStoreV2Error>;
+  readonly getThreadTrashCascade: (
+    cascadeRootId: ThreadId,
+  ) => Effect.Effect<ReadonlyArray<ProjectionThreadTrash>, ProjectionStoreV2Error>;
+  readonly isThreadInTrash: (threadId: ThreadId) => Effect.Effect<boolean, ProjectionStoreV2Error>;
+  readonly getRecentlyDeleted: () => Effect.Effect<
+    ReadonlyArray<OrchestrationV2RecentlyDeletedThread>,
+    ProjectionStoreV2Error
+  >;
   readonly apply: (
     event: OrchestrationV2DomainEvent,
   ) => Effect.Effect<void, ProjectionStoreV2Error>;
@@ -908,6 +926,8 @@ export function applyToProjection(
     case "thread.archived":
     case "thread.unarchived":
     case "thread.deleted":
+    case "thread.restored":
+    case "thread.purged":
     case "thread.settled":
     case "thread.unsettled":
     case "thread.snoozed":
@@ -2366,6 +2386,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             case "thread.archived":
             case "thread.unarchived":
             case "thread.deleted":
+            case "thread.restored":
+            case "thread.purged":
             case "thread.settled":
             case "thread.unsettled":
             case "thread.snoozed":
@@ -2435,6 +2457,28 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 deleted_at = excluded.deleted_at,
                 payload_json = excluded.payload_json
             `;
+              if (event.type === "thread.deleted" && event.payload.deletedAt !== null) {
+                const deletedAt = DateTime.formatIso(event.payload.deletedAt);
+                const purgeDueAt =
+                  DateTime.toEpochMillis(event.payload.deletedAt) + THREAD_TRASH_RETENTION_MS;
+                yield* sql`
+                  INSERT INTO orchestration_v2_projection_thread_trash (
+                    thread_id, project_id, deleted_at, purge_due_at, cascade_root_id
+                  ) VALUES (
+                    ${event.threadId},
+                    ${event.payload.projectId},
+                    ${deletedAt},
+                    ${purgeDueAt},
+                    ${event.cascadeRootId ?? event.threadId}
+                  )
+                  ON CONFLICT(thread_id) DO NOTHING
+                `;
+              } else if (event.type === "thread.restored" || event.type === "thread.purged") {
+                yield* sql`
+                  DELETE FROM orchestration_v2_projection_thread_trash
+                  WHERE thread_id = ${event.threadId}
+                `;
+              }
               break;
             }
             case "run.created":
@@ -3243,6 +3287,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             event.type !== "thread.archived" &&
             event.type !== "thread.unarchived" &&
             event.type !== "thread.deleted" &&
+            event.type !== "thread.restored" &&
+            event.type !== "thread.purged" &&
             event.type !== "thread.settled" &&
             event.type !== "thread.unsettled" &&
             event.type !== "thread.snoozed" &&
@@ -9016,6 +9062,104 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       }));
     }, Effect.mapError(shellSnapshotReadError));
 
+    type ThreadTrashRow = {
+      readonly thread_id: string;
+      readonly project_id: string;
+      readonly deleted_at: string;
+      readonly purge_due_at: number;
+      readonly cascade_root_id: string;
+    };
+    const threadTrashFromRow = (row: ThreadTrashRow): ProjectionThreadTrash => ({
+      threadId: ThreadId.make(row.thread_id),
+      projectId: ProjectId.make(row.project_id),
+      deletedAt: DateTime.makeUnsafe(row.deleted_at),
+      purgeDueAt: row.purge_due_at,
+      cascadeRootId: ThreadId.make(row.cascade_root_id),
+    });
+
+    const getThreadTrash: ProjectionStoreV2Shape["getThreadTrash"] = Effect.fn(
+      "ProjectionStore.getThreadTrash",
+    )(function* (threadId) {
+      const rows = yield* sql<ThreadTrashRow>`
+        SELECT thread_id, project_id, deleted_at, purge_due_at, cascade_root_id
+        FROM orchestration_v2_projection_thread_trash
+        WHERE thread_id = ${threadId}
+      `;
+      const row = rows[0];
+      return row === undefined ? null : threadTrashFromRow(row);
+    }, Effect.mapError(shellSnapshotReadError));
+
+    const getThreadTrashCascade: ProjectionStoreV2Shape["getThreadTrashCascade"] = Effect.fn(
+      "ProjectionStore.getThreadTrashCascade",
+    )(function* (cascadeRootId) {
+      const rows = yield* sql<ThreadTrashRow>`
+        SELECT thread_id, project_id, deleted_at, purge_due_at, cascade_root_id
+        FROM orchestration_v2_projection_thread_trash
+        WHERE cascade_root_id = ${cascadeRootId}
+        ORDER BY deleted_at ASC, thread_id ASC
+      `;
+      return rows.map(threadTrashFromRow);
+    }, Effect.mapError(shellSnapshotReadError));
+
+    const isThreadInTrash: ProjectionStoreV2Shape["isThreadInTrash"] = Effect.fn(
+      "ProjectionStore.isThreadInTrash",
+    )(function* (threadId) {
+      const rows = yield* sql<{ readonly present: number }>`
+        SELECT EXISTS(
+          SELECT 1 FROM orchestration_v2_projection_thread_trash WHERE thread_id = ${threadId}
+        ) AS present
+      `;
+      return rows[0]?.present === 1;
+    }, Effect.mapError(shellSnapshotReadError));
+
+    const getRecentlyDeleted: ProjectionStoreV2Shape["getRecentlyDeleted"] = Effect.fn(
+      "ProjectionStore.getRecentlyDeleted",
+    )(function* () {
+      const rows = yield* sql<{
+        readonly thread_id: string;
+        readonly project_id: string;
+        readonly project_title: string;
+        readonly title: string;
+        readonly deleted_at: string;
+        readonly purge_due_at: number;
+        readonly archived: number;
+        readonly side_chat_count: number;
+        readonly worktree_path: string | null;
+      }>`
+        SELECT
+          trash.thread_id,
+          trash.project_id,
+          project.title AS project_title,
+          thread.title,
+          trash.deleted_at,
+          trash.purge_due_at,
+          thread.archived_at IS NOT NULL AS archived,
+          (
+            SELECT COUNT(*)
+            FROM orchestration_v2_projection_thread_trash AS member
+            WHERE member.cascade_root_id = trash.thread_id
+              AND member.thread_id <> trash.thread_id
+          ) AS side_chat_count,
+          json_extract(thread.payload_json, '$.worktreePath') AS worktree_path
+        FROM orchestration_v2_projection_thread_trash AS trash
+        JOIN orchestration_v2_projection_threads AS thread ON thread.thread_id = trash.thread_id
+        JOIN projection_projects AS project ON project.project_id = trash.project_id
+        WHERE trash.thread_id = trash.cascade_root_id
+        ORDER BY trash.deleted_at DESC, trash.thread_id ASC
+      `;
+      return rows.map((row): OrchestrationV2RecentlyDeletedThread => ({
+        threadId: ThreadId.make(row.thread_id),
+        projectId: ProjectId.make(row.project_id),
+        projectTitle: row.project_title,
+        title: row.title,
+        deletedAt: DateTime.makeUnsafe(row.deleted_at),
+        purgeAt: DateTime.makeUnsafe(row.purge_due_at),
+        archived: row.archived === 1,
+        sideChatCount: row.side_chat_count,
+        worktreePath: row.worktree_path,
+      }));
+    }, Effect.mapError(shellSnapshotReadError));
+
     const getThreadLinkMetadata = Effect.fn("ProjectionStore.getThreadLinkMetadata")(function* (
       threadIds: ReadonlyArray<ThreadId>,
     ) {
@@ -9197,6 +9341,10 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       listActiveSubagentThreadIds: readOnReader(listActiveSubagentThreadIds),
       countThreads: readOnReader(countThreads),
       listActiveShellIndex: readOnReader(listActiveShellIndex),
+      getThreadTrash: readOnReader(getThreadTrash),
+      getThreadTrashCascade: readOnReader(getThreadTrashCascade),
+      isThreadInTrash: readOnReader(isThreadInTrash),
+      getRecentlyDeleted: readOnReader(getRecentlyDeleted),
       readShellSnapshot: readOnReader(readShellSnapshot),
       listOlderSettledThreads: readOnReader(listOlderSettledThreads),
       getThreadShell: readOnReader(getThreadShell),

@@ -15,6 +15,7 @@ import {
   type OrchestrationV2ProviderThread,
   type OrchestrationV2TurnItem,
   type OrchestrationV2ThreadHistoryPage,
+  type OrchestrationV2AppThread,
   type OrchestrationV2ThreadShellSnapshot,
   NodeId,
   PlanId,
@@ -32,6 +33,7 @@ import {
   type ThreadPullRequestLink,
   isLiveSubagentShell,
   isListedThreadLineage,
+  THREAD_TRASH_RETENTION_MS,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -2018,6 +2020,165 @@ const threadWorktreePathsIncludeArchivedOnRequest = Effect.gen(function* () {
   );
 });
 
+const threadTrashLifecycle = Effect.gen(function* () {
+  const store = yield* ProjectionStore.ProjectionStoreV2;
+  const sql = yield* SqlClient.SqlClient;
+  const projectId = ProjectId.make("project:trash");
+  const createdAt = DateTime.makeUnsafe(Date.UTC(2026, 10, 1));
+  const deletedAt = DateTime.makeUnsafe(Date.UTC(2026, 10, 2));
+  const laterDeletedAt = DateTime.makeUnsafe(Date.UTC(2026, 10, 3));
+  const id = (name: string) => ThreadId.make(`thread:trash:${name}`);
+  const payload = (input: {
+    readonly name: string;
+    readonly parent?: string;
+    readonly root?: string;
+    readonly deletedAt?: DateTime.Utc | null;
+    readonly archived?: boolean;
+    readonly worktreePath?: string | null;
+  }): OrchestrationV2AppThread => ({
+    createdBy: "user",
+    creationSource: "web",
+    id: id(input.name),
+    projectId,
+    title: `Trash ${input.name}`,
+    providerInstanceId,
+    modelSelection,
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    branch: null,
+    worktreePath: input.worktreePath ?? null,
+    activeProviderThreadId: null,
+    lineage: {
+      parentThreadId: input.parent === undefined ? null : id(input.parent),
+      relationshipToParent: input.parent === undefined ? null : "subagent",
+      rootThreadId: id(input.root ?? input.name),
+      ...(input.parent === undefined ? {} : { sideChat: true }),
+    },
+    forkedFrom: null,
+    createdAt,
+    updatedAt: createdAt,
+    archivedAt: input.archived === true ? createdAt : null,
+    settledOverride: null,
+    settledAt: null,
+    lastVisitedAt: null,
+    deletedAt: input.deletedAt ?? null,
+  });
+  const create = (thread: OrchestrationV2AppThread, name: string) =>
+    store.apply({
+      id: EventId.make(`event:trash:${name}:created`),
+      type: "thread.created",
+      threadId: thread.id,
+      occurredAt: createdAt,
+      payload: thread,
+    });
+  const remove = (
+    thread: OrchestrationV2AppThread,
+    at: DateTime.Utc,
+    eventName: string,
+    cascadeRootId?: ThreadId,
+  ) =>
+    store.apply({
+      id: EventId.make(`event:trash:${eventName}`),
+      type: "thread.deleted",
+      threadId: thread.id,
+      occurredAt: at,
+      payload: { ...thread, updatedAt: at, deletedAt: at },
+      ...(cascadeRootId === undefined ? {} : { cascadeRootId }),
+    });
+
+  yield* sql`
+    INSERT INTO projection_projects
+      (project_id, title, workspace_root, scripts_json, created_at, updated_at)
+    VALUES (
+      ${projectId}, 'Trash Project', '/tmp/trash-project', '{}',
+      ${DateTime.formatIso(createdAt)}, ${DateTime.formatIso(createdAt)}
+    )
+  `;
+  const root = payload({ name: "root", archived: true, worktreePath: "/tmp/trash-root" });
+  const child = payload({ name: "child", parent: "root", root: "root" });
+  const newer = payload({ name: "newer" });
+  const restored = payload({ name: "restored" });
+  const purged = payload({ name: "purged" });
+  const legacy = payload({ name: "legacy", deletedAt });
+  yield* Effect.forEach(
+    [root, child, newer, restored, purged, legacy],
+    (thread) => create(thread, thread.id),
+    { concurrency: 1 },
+  );
+  assert.isNull(yield* store.getThreadTrash(legacy.id));
+
+  yield* remove(root, deletedAt, "root-deleted");
+  const firstRootTrash = yield* store.getThreadTrash(root.id);
+  assert.isNotNull(firstRootTrash);
+  assert.equal(
+    firstRootTrash?.purgeDueAt,
+    DateTime.toEpochMillis(deletedAt) + THREAD_TRASH_RETENTION_MS,
+  );
+  assert.equal(firstRootTrash?.cascadeRootId, root.id);
+  yield* remove(root, laterDeletedAt, "root-deleted-again");
+  assert.equal((yield* store.getThreadTrash(root.id))?.purgeDueAt, firstRootTrash?.purgeDueAt);
+
+  yield* remove(child, deletedAt, "child-deleted", root.id);
+  const childTrash = yield* store.getThreadTrash(child.id);
+  assert.equal(childTrash?.threadId, child.id);
+  assert.equal(childTrash?.cascadeRootId, root.id);
+  assert.notEqual(childTrash?.threadId, childTrash?.cascadeRootId);
+  yield* remove(newer, laterDeletedAt, "newer-deleted");
+  yield* remove(restored, deletedAt, "restored-deleted");
+  yield* store.apply({
+    id: EventId.make("event:trash:restored"),
+    type: "thread.restored",
+    threadId: restored.id,
+    occurredAt: laterDeletedAt,
+    payload: { ...restored, updatedAt: laterDeletedAt, deletedAt: null },
+  });
+  yield* remove(purged, deletedAt, "purged-deleted");
+  yield* store.apply({
+    id: EventId.make("event:trash:purged"),
+    type: "thread.purged",
+    threadId: purged.id,
+    occurredAt: laterDeletedAt,
+    payload: { ...purged, updatedAt: laterDeletedAt, deletedAt },
+  });
+
+  assert.isTrue(yield* store.isThreadInTrash(child.id));
+  assert.isFalse(yield* store.isThreadInTrash(restored.id));
+  assert.isFalse(yield* store.isThreadInTrash(purged.id));
+  assert.deepEqual(
+    (yield* store.getThreadTrashCascade(root.id)).map((row) => row.threadId),
+    [child.id, root.id],
+  );
+  const recentlyDeleted = yield* store.getRecentlyDeleted();
+  assert.deepEqual(
+    recentlyDeleted.map((item) => item.threadId),
+    [newer.id, root.id],
+  );
+  const rootItem = recentlyDeleted[1];
+  assert.isDefined(rootItem);
+  assert.deepEqual(
+    {
+      projectId: rootItem.projectId,
+      projectTitle: rootItem.projectTitle,
+      title: rootItem.title,
+      deletedAt: DateTime.toEpochMillis(rootItem.deletedAt),
+      purgeAt: DateTime.toEpochMillis(rootItem.purgeAt),
+      archived: rootItem.archived,
+      sideChatCount: rootItem.sideChatCount,
+      worktreePath: rootItem.worktreePath,
+    },
+    {
+      projectId,
+      projectTitle: "Trash Project",
+      title: "Trash root",
+      deletedAt: DateTime.toEpochMillis(deletedAt),
+      purgeAt: DateTime.toEpochMillis(deletedAt) + THREAD_TRASH_RETENTION_MS,
+      archived: true,
+      sideChatCount: 1,
+      worktreePath: "/tmp/trash-root",
+    },
+  );
+});
+
 const commandReadsSkipSettledLeafNodes = Effect.gen(function* () {
   const store = yield* ProjectionStore.ProjectionStoreV2;
   const sql = yield* SqlClient.SqlClient;
@@ -3522,6 +3683,10 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
   it.effect(
     "worktree path and title lookups skip deleted threads, and can include archived ones",
     () => threadWorktreePathsIncludeArchivedOnRequest,
+  );
+  it.effect(
+    "projects recoverable thread trash lifecycle and root listings",
+    () => threadTrashLifecycle,
   );
 
   it.effect(

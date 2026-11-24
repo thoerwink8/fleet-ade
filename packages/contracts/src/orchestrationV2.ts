@@ -2030,7 +2030,6 @@ export const OrchestrationV2DomainEvent = Schema.Union([
     type: Schema.Literals([
       "thread.archived",
       "thread.unarchived",
-      "thread.deleted",
       "thread.restored",
       "thread.purged",
       "thread.settled",
@@ -2056,6 +2055,12 @@ export const OrchestrationV2DomainEvent = Schema.Union([
       "thread.guest-share-updated",
     ]),
     payload: OrchestrationV2AppThread,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2EventBase.fields,
+    type: Schema.Literal("thread.deleted"),
+    payload: OrchestrationV2AppThread,
+    cascadeRootId: Schema.optional(ThreadId),
   }),
   Schema.Struct({
     ...OrchestrationV2EventBase.fields,
@@ -2990,7 +2995,6 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
     type: Schema.Literals([
       "thread.archived",
       "thread.unarchived",
-      "thread.deleted",
       "thread.restored",
       "thread.purged",
       "thread.settled",
@@ -3016,6 +3020,12 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
       "thread.guest-share-updated",
     ]),
     payload: OrchestrationV2AppThreadJson,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2JsonEventBaseFields,
+    type: Schema.Literal("thread.deleted"),
+    payload: OrchestrationV2AppThreadJson,
+    cascadeRootId: Schema.optional(ThreadId),
   }),
   Schema.Struct({
     ...OrchestrationV2JsonEventBaseFields,
