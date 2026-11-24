@@ -1689,7 +1689,6 @@ export default function ChatView(props: ChatViewProps) {
   )
     ? activeProviderStatus
     : null;
-  const hasTimelineTopBanner = Boolean(timelineThreadError) || visibleProviderStatus !== null;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeWorkspaceRoot = activeThreadWorktreePath ?? activeProjectCwd ?? undefined;
@@ -3318,27 +3317,6 @@ export default function ChatView(props: ChatViewProps) {
           >
             <ThreadFind onClose={focusComposerStable} />
             {isWorkspaceFileDragActive ? <WorkspaceFileDropOverlay /> : null}
-            <ChatBannerLane
-              fleetEngineFailure={shownFleetEngineFailure}
-              onDismissFleetEngineFailure={() => {
-                if (fleetEngineFailure !== null) dismissFleetEngineFailure(fleetEngineFailure.kind);
-              }}
-              environmentId={activeThread.environmentId}
-              providerStatus={visibleProviderStatus}
-              providerStatusDismissalKey={providerStatusDismissalKey}
-              onOpenProviderSetup={openProviderSetupStable}
-              threadId={activeThread.id}
-              threadError={timelineThreadError}
-              threadErrorClass={
-                threadErrorIsServerRuntimeError ? (serverRuntime?.lastErrorClass ?? null) : null
-              }
-              threadErrorCode={
-                threadErrorIsServerRuntimeError ? (serverRuntime?.lastErrorCode ?? null) : null
-              }
-              threadErrorBannerKey={threadErrorBannerKey}
-              setThreadError={setThreadError}
-              setThreadErrorBannerDismissTick={setThreadErrorBannerDismissTick}
-            />
             <div
               {...conversationArea}
               className="relative flex min-h-0 flex-1 flex-col bg-background"
@@ -3439,7 +3417,7 @@ export default function ChatView(props: ChatViewProps) {
                   onFooterGrow={onTimelineFooterGrowStable}
                   hideEmptyPlaceholder={isDraftHeroState || threadDetailLoading}
                   emptyPlaceholderInset={composerReservedHeight}
-                  topFadeEnabled={!hasTimelineTopBanner}
+                  topFadeEnabled
                   {...(threadHistoryControls === undefined
                     ? {}
                     : { historyControls: threadHistoryControls })}
@@ -3486,6 +3464,32 @@ export default function ChatView(props: ChatViewProps) {
                     </div>
                   ) : null}
                   <div className="relative z-10">
+                    <ChatBannerLane
+                      fleetEngineFailure={shownFleetEngineFailure}
+                      onDismissFleetEngineFailure={() => {
+                        if (fleetEngineFailure !== null)
+                          dismissFleetEngineFailure(fleetEngineFailure.kind);
+                      }}
+                      environmentId={activeThread.environmentId}
+                      providerStatus={visibleProviderStatus}
+                      providerStatusDismissalKey={providerStatusDismissalKey}
+                      onOpenProviderSetup={openProviderSetupStable}
+                      threadId={activeThread.id}
+                      threadError={timelineThreadError}
+                      threadErrorClass={
+                        threadErrorIsServerRuntimeError
+                          ? (serverRuntime?.lastErrorClass ?? null)
+                          : null
+                      }
+                      threadErrorCode={
+                        threadErrorIsServerRuntimeError
+                          ? (serverRuntime?.lastErrorCode ?? null)
+                          : null
+                      }
+                      threadErrorBannerKey={threadErrorBannerKey}
+                      setThreadError={setThreadError}
+                      setThreadErrorBannerDismissTick={setThreadErrorBannerDismissTick}
+                    />
                     <ContextThresholdNotice
                       usedTokens={activeContextWindow?.usedTokens ?? null}
                       maxTokens={activeContextWindow?.maxTokens ?? null}

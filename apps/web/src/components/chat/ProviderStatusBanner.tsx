@@ -97,6 +97,12 @@ export function hasProviderSetup(status: ServerProvider): boolean {
     status.setup?.canInstall === true
   );
 }
+export function getProviderStatusBannerVariant(status: ServerProvider): "warning" | "error" {
+  const incompatible = getIncompatibleVersion(status);
+  return incompatible?.status !== "broken" && (status.status === "warning" || incompatible !== null)
+    ? "warning"
+    : "error";
+}
 
 export function getProviderStatusMessage(status: ServerProvider): string {
   if (
@@ -169,57 +175,52 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
       ? `${providerName} ${status.version ?? ""} ${incompatible.status === "broken" ? "已知不兼容" : "不受支持"}`
       : `提供方 ${providerName} 状态`;
   const message = incompatible?.message ?? getProviderStatusMessage(status);
-  const isWarning =
-    incompatible?.status !== "broken" && (status.status === "warning" || incompatible !== null);
+  const variant = getProviderStatusBannerVariant(status);
 
   return (
-    <div className="pointer-events-auto mx-auto w-fit max-w-[calc(100%-2rem)] pt-3">
-      <Alert
-        variant={isWarning ? "warning" : "error"}
-        role={incompatible && incompatible.status !== "broken" ? "status" : "alert"}
-        surface="glass"
-        controlAlignment="first-line"
-      >
-        <InfoIcon />
-        <AlertTitle>{title}</AlertTitle>
-        <AlertDescription>
-          <div className="flex flex-col gap-2">
-            <Tooltip>
-              <TooltipTrigger render={<div className="line-clamp-3" />}>{message}</TooltipTrigger>
-              <TooltipPopup side="top" className="whitespace-pre-wrap">
-                {message}
-              </TooltipPopup>
-            </Tooltip>
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              {onOpenProviderSetup && hasProviderSetup(status) ? (
-                <InlineButton onClick={() => onOpenProviderSetup(status.instanceId)}>
-                  打开提供方设置
-                </InlineButton>
-              ) : null}
-              <Button
-                aria-label={`刷新提供方 ${providerName} 的状态`}
-                disabled={!canRefresh || isRefreshing}
-                onClick={() => void refresh()}
-                size="xs"
-                variant="outline"
-              >
-                <RefreshIcon />
-                {isRefreshing ? "正在刷新…" : "刷新"}
-              </Button>
-            </div>
-          </div>
-        </AlertDescription>
-        <AlertAction>
-          <Button
-            aria-label={`关闭提供方 ${providerName} 的提示（${status.status}）`}
-            onClick={onDismiss}
-            size="icon-xs"
-            variant="ghost-muted"
+    <Alert
+      variant={variant}
+      role={incompatible && incompatible.status !== "broken" ? "status" : "alert"}
+      controlAlignment="first-line"
+    >
+      <InfoIcon />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>
+        <Tooltip>
+          <TooltipTrigger render={<div className="line-clamp-3" />}>{message}</TooltipTrigger>
+          <TooltipPopup side="top" className="whitespace-pre-wrap">
+            {message}
+          </TooltipPopup>
+        </Tooltip>
+        {onOpenProviderSetup && hasProviderSetup(status) ? (
+          <InlineButton
+            className="self-start"
+            onClick={() => onOpenProviderSetup(status.instanceId)}
           >
-            <XIcon />
-          </Button>
-        </AlertAction>
-      </Alert>
-    </div>
+            打开提供方设置
+          </InlineButton>
+        ) : null}
+      </AlertDescription>
+      <AlertAction>
+        <Button
+          aria-label={`刷新提供方 ${providerName} 的状态`}
+          disabled={!canRefresh || isRefreshing}
+          onClick={() => void refresh()}
+          size="sm"
+          variant="outline"
+        >
+          <RefreshIcon />
+          {isRefreshing ? "正在刷新…" : "刷新"}
+        </Button>
+        <Button
+          aria-label={`关闭提供方 ${providerName} 的提示（${status.status}）`}
+          onClick={onDismiss}
+          size="icon-sm"
+          variant="ghost-muted"
+        >
+          <XIcon />
+        </Button>
+      </AlertAction>
+    </Alert>
   );
 });

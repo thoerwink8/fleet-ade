@@ -1,10 +1,11 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Children, isValidElement } from "react";
+import { CircleAlertIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "~/lib/utils";
 
-const alertVariants = cva("relative rounded-xl border px-3.5 py-3 text-card-foreground text-sm", {
+const alertVariants = cva("fa-strip", {
   defaultVariants: {
     surface: "default",
     variant: "default",
@@ -12,18 +13,15 @@ const alertVariants = cva("relative rounded-xl border px-3.5 py-3 text-card-fore
   variants: {
     surface: {
       default: "",
-      glass: "alert-glass",
+      glass: "",
     },
     variant: {
-      default: "bg-transparent dark:bg-input/32 [&_svg]:text-muted-foreground",
-      sidebar:
-        "rounded-lg border-sidebar-border bg-sidebar-control-surface px-2 py-1.5 text-xs leading-4 [&_[data-slot=alert-description]]:block [&_[data-slot=alert-description]]:text-sidebar-muted-foreground",
-      error:
-        "border-error/32 bg-error-surface text-error-foreground [&_[data-slot=alert-description]]:text-error-foreground/80 [&_svg]:text-error",
-      info: "border-info/32 bg-info/4 [&_svg]:text-info",
-      success: "border-success/32 bg-success/4 [&_svg]:text-success",
-      warning:
-        "border-warning/32 bg-warning-surface text-warning-foreground [&_[data-slot=alert-description]]:text-warning-foreground/80 [&_svg]:text-warning",
+      default: "",
+      sidebar: "",
+      error: "fa-strip--danger",
+      info: "fa-strip--info",
+      success: "fa-strip--success",
+      warning: "fa-strip--warning",
     },
   },
 });
@@ -46,6 +44,14 @@ function alertChildSlot(child: React.ReactElement): string | undefined {
       return undefined;
   }
 }
+
+/** The strip carries its meaning in the marker alone, so a semantic Alert without one gets this. */
+const DEFAULT_MARKERS = {
+  error: <CircleAlertIcon aria-hidden />,
+  info: <InfoIcon aria-hidden />,
+  success: <CircleCheckIcon aria-hidden />,
+  warning: <TriangleAlertIcon aria-hidden />,
+} as const;
 
 function Alert({
   className,
@@ -77,61 +83,57 @@ function Alert({
     }
   });
 
+  if (icon.length === 0 && variant != null && variant in DEFAULT_MARKERS) {
+    icon.push(DEFAULT_MARKERS[variant as keyof typeof DEFAULT_MARKERS]);
+  }
+
   return (
     <div
-      className={cn(alertVariants({ surface, variant }), className)}
+      className={cn(
+        alertVariants({ surface, variant }),
+        controlAlignment === "first-line" && "items-start",
+        className,
+      )}
       data-slot="alert"
       data-variant={variant ?? "default"}
       role="alert"
       {...props}
     >
-      <div
-        className={cn(
-          "flex gap-2",
-          controlAlignment === "first-line" ? "items-start" : "items-center",
-          controlAlignment === "first-line" &&
-            action.length > 0 &&
-            "min-h-7 pt-1 sm:min-h-6 sm:pt-0.5",
-        )}
-      >
-        {icon.length > 0 && (
-          <div
-            className={cn(
-              "flex shrink-0 items-center justify-center",
-              controlAlignment === "first-line"
-                ? "h-lh w-4 [&>svg]:size-4"
-                : "size-4 [&>svg]:size-full",
-            )}
-          >
-            {icon}
-          </div>
-        )}
-        {content.length > 0 && (
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">{content}</div>
-        )}
-        {action.length > 0 && (
-          <div
-            className={cn(
-              "flex shrink-0 items-center",
-              controlAlignment === "first-line" ? "h-lh self-start" : "self-center",
-            )}
-          >
-            {action}
-          </div>
-        )}
-      </div>
+      {icon.length > 0 && (
+        <div
+          className={cn(
+            "mk items-center justify-center [&>svg]:size-4",
+            controlAlignment === "first-line" ? "h-5 self-start" : "self-center",
+            (variant === undefined || variant === "default" || variant === "sidebar") &&
+              "text-muted-foreground",
+          )}
+        >
+          {icon}
+        </div>
+      )}
+      {content.length > 0 && <div className="grow flex min-w-0 flex-col gap-1">{content}</div>}
+      {action.length > 0 && (
+        <div
+          className={cn(
+            "flex shrink-0 flex-wrap items-center justify-end gap-1",
+            controlAlignment === "first-line" ? "self-start" : "self-center",
+          )}
+        >
+          {action}
+        </div>
+      )}
     </div>
   );
 }
 
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("font-semibold", className)} data-slot="alert-title" {...props} />;
+  return <div className={className} data-slot="alert-title" {...props} />;
 }
 
 function AlertDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("flex flex-col gap-2.5 text-muted-foreground", className)}
+      className={cn("flex flex-col gap-2", className)}
       data-slot="alert-description"
       {...props}
     />
