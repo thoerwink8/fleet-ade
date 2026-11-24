@@ -247,7 +247,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["添加项目的起始目录"]
       : []),
     ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
-      ? ["克隆到域名文件夹"]
+      ? ["克隆到托管平台文件夹"]
       : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
       ? ["取消置顶确认"]
@@ -1397,7 +1397,7 @@ export function ThreadsSettingsPanel() {
           resetAction={
             settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
               <SettingResetButton
-                label="克隆到域名文件夹"
+                label="克隆到托管平台文件夹"
                 onClick={() =>
                   updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
                 }
@@ -1409,7 +1409,7 @@ export function ThreadsSettingsPanel() {
               settingKeys={["ghqCloneLayout"]}
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label="克隆到域名文件夹"
+              aria-label="克隆到托管平台文件夹"
             />
           }
         />

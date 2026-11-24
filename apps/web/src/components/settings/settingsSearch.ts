@@ -587,7 +587,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "ghq-clone-layout",
-    title: "克隆到主机文件夹",
+    title: "克隆到托管平台文件夹",
     to: "/settings/threads",
     scope: "environment-defaults",
     searchTerms: ["ghq clone destination host owner repository root layout"],

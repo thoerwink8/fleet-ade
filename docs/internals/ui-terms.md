@@ -27,7 +27,7 @@
 
 `pnpm ui:no-old-terms`（实现见 [ui-no-old-terms.ts](../../scripts/ui-no-old-terms.ts)）复用 `ui-no-english` 的 AST 扫描范围，跳过注释、日志、类型、对比常量、`data-*` 属性与 `searchTerms`。
 
-1. **硬禁词**（出现于已清理目录的界面文案即报错）：`工作区`、`工作副本`、`独立副本`、`提供方`、`提供商`、`拉取请求`、`合并请求`、`pull request`、`检查点`、`从这里编辑`、`收尾`、`保持唤醒`、`收件箱`、`停止生成`、`聊天记录`、`对话历史`、`引导当前执行`、`加入队列`、`追加消息`、`做完再发`、`插话`、`引导凭据`、`配对 URL`、`默认引用`、`各不相同`、`待批准`、`待输入`、`forget`。
+1. **硬禁词**（出现于已清理目录的界面文案即报错）：词表只在脚本的 `HARD_BANNED_TERMS` 一处维护，上面表里「换掉」列中的旧词是它的来源。被服务端或别处按原文匹配的句子，在脚本的 `EXEMPT_TEXTS` 里按文件和原句登记，同一文件里新出现的旧词仍会报错。
 2. **看上下文用词**（不进硬检查，改前逐处核对语义）：
    - `完成`：会话整理动作/状态用「标为完成」「取消完成」「已完成」；动作完成条件（如「上传完成后」「设置完成后」「段落已完成」）与「目标已完成」保留。
    - `环境` / `环境变量`：操作系统环境变量保留「环境变量」；Fleet ADE 宿主统一改为「电脑」。
@@ -41,4 +41,4 @@
 
 ## 扩展扫描范围
 
-后续批次清理其余目录（如设置子页、`components/files/`、`components/pullRequest/`、`components/usage/`）时，将对应路径加入 `scripts/ui-no-old-terms.ts` 的 `CLEANED_DIRS` / `CLEANED_FILES` 并移除已清理的 `EXCLUDED_FILES` 豁免项。
+后续批次清理其余目录（如设置子页、`components/files/`、`components/pullRequest/`、`components/usage/`）时，将对应路径加入 `scripts/ui-no-old-terms.ts` 的 `CLEANED_DIRS` / `CLEANED_FILES` 并删掉对应的 `EXEMPT_TEXTS` 条目。

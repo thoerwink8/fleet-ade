@@ -81,7 +81,7 @@ describe("ui-no-old-terms", () => {
     ]);
   });
 
-  it("scans cleaned paths while respecting explicit exclusions", () => {
+  it("scans cleaned paths while exempting only the listed sentences", () => {
     const tempRoot = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-old-terms-"));
     try {
       const cleanedFile = NodePath.join(tempRoot, "apps/web/src/components/chat/SampleBanner.tsx");
@@ -93,7 +93,10 @@ describe("ui-no-old-terms", () => {
         "packages/client-runtime/src/state/turnItemPresentation.ts",
       );
       NodeFS.mkdirSync(NodePath.dirname(excludedFile), { recursive: true });
-      NodeFS.writeFileSync(excludedFile, 'const WORKSPACE_PREPARATION_INPUT = "正在准备工作区";\n');
+      NodeFS.writeFileSync(
+        excludedFile,
+        'const WORKSPACE_PREPARATION_INPUT = "正在准备工作区";\nconst other = { label: "新的工作区入口" };\n',
+      );
 
       const hits = scanCleanedPaths(tempRoot);
       expect(hits).toEqual([
@@ -102,6 +105,12 @@ describe("ui-no-old-terms", () => {
           line: 1,
           term: "工作区",
           text: "旧工作区",
+        },
+        {
+          file: "packages/client-runtime/src/state/turnItemPresentation.ts",
+          line: 2,
+          term: "工作区",
+          text: "新的工作区入口",
         },
       ]);
     } finally {

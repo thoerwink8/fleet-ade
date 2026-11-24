@@ -2568,7 +2568,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "有会话未能标为未读",
+              title: "无法将部分会话标为未读",
               description: failures.join("\n"),
             }),
           );
@@ -2589,7 +2589,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "有会话未处理",
+              title: "无法处理部分会话",
               description: failures.join("\n"),
             }),
           );
@@ -2629,7 +2629,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "有会话未能删除",
+            title: "无法删除部分会话",
             description: failures.join("\n"),
           }),
         );

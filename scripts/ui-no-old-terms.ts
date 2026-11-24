@@ -79,15 +79,22 @@ const CLEANED_FILES = [
   "apps/web/src/state/queries.ts",
 ] as const;
 
-// Explicitly documented exceptions that live inside CLEANED_PATHS without holding B7a UI copy.
-const EXCLUDED_FILES = new Set<string>([
-  // Category 3 matching constant for historical server command input (`Orchestrator.ts`).
-  "packages/client-runtime/src/state/turnItemPresentation.ts",
-  // Category 3 / server-generated background task summary asserted by server tests.
-  "packages/shared/src/orchestrationV2PendingBackgroundWork.ts",
-  // B7b settings-only permission scope descriptions; remove in B7b when Settings scope UI is cleaned.
-  "packages/shared/src/authScopeOptions.ts",
-]);
+// Exact sentences that stay in cleaned paths, keyed by file. A new old term in the same file is still reported.
+const EXEMPT_TEXTS: Readonly<Record<string, ReadonlyArray<string>>> = {
+  // Matching constant for the server's historical command input (`Orchestrator.ts`).
+  "packages/client-runtime/src/state/turnItemPresentation.ts": ["正在准备工作区"],
+  // Server-generated background task summary asserted by server tests.
+  "packages/shared/src/orchestrationV2PendingBackgroundWork.ts": ["Watching pull request #"],
+  // Settings-only permission scope descriptions; B7b cleans them and removes these entries.
+  "packages/shared/src/authScopeOptions.ts": [
+    "读取会话、状态、检查点和配置。",
+    "管理提供方",
+    "配置、安装、登录和更新提供方与用量来源。",
+    "提交、推送，管理分支和仓库，以及修改 pull request。",
+    "浏览主机文件、搜索工作区、查看本地改动。",
+    "编辑工作区文件并将计划保存到磁盘。",
+  ],
+};
 
 function normalizeRel(filePath: string, rootDir?: string): string {
   const relative = rootDir ? NodePath.relative(rootDir, filePath) : filePath;
@@ -111,10 +118,7 @@ function collectCleanedFiles(rootDir: string): string[] {
     const full = NodePath.join(rootDir, file);
     if (NodeFS.existsSync(full)) files.push(full);
   }
-  return [...new Set(files)]
-    .filter(included)
-    .filter((file) => !EXCLUDED_FILES.has(normalizeRel(file, rootDir)))
-    .toSorted();
+  return [...new Set(files)].filter(included).toSorted();
 }
 
 export interface OldTermFinding {
@@ -218,7 +222,10 @@ export function scanCleanedPaths(rootDir: string): ReadonlyArray<OldTermFinding>
   for (const file of collectCleanedFiles(rootDir)) {
     const text = NodeFS.readFileSync(file, "utf8");
     const rel = normalizeRel(file, rootDir);
-    findings.push(...scanSourceTextForOldTerms(rel, text));
+    const exempt = EXEMPT_TEXTS[rel] ?? [];
+    findings.push(
+      ...scanSourceTextForOldTerms(rel, text).filter((finding) => !exempt.includes(finding.text)),
+    );
   }
   return findings;
 }
