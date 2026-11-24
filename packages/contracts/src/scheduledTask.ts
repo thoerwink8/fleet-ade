@@ -307,6 +307,10 @@ export const ScheduledTaskDeleteInput = Schema.Struct({
   id: ScheduledTaskId,
 });
 export type ScheduledTaskDeleteInput = typeof ScheduledTaskDeleteInput.Type;
+export const ScheduledTaskUndoDeleteInput = Schema.Struct({
+  id: ScheduledTaskId,
+});
+export type ScheduledTaskUndoDeleteInput = typeof ScheduledTaskUndoDeleteInput.Type;
 
 export const ScheduledTaskRunNowInput = Schema.Struct({
   id: ScheduledTaskId,
@@ -402,6 +406,11 @@ export const ScheduledTaskDeleteResult = Schema.Struct({
   id: ScheduledTaskId,
 });
 export type ScheduledTaskDeleteResult = typeof ScheduledTaskDeleteResult.Type;
+
+export const ScheduledTaskUndoDeleteResult = Schema.Struct({
+  task: ScheduledTask,
+});
+export type ScheduledTaskUndoDeleteResult = typeof ScheduledTaskUndoDeleteResult.Type;
 
 export const ScheduledTaskRunNowResult = Schema.Struct({
   task: ScheduledTask,

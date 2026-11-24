@@ -86,11 +86,7 @@ import { useSettingsScope } from "./SettingsScopeContext";
 import { EnvironmentRow, useEnvironmentTransportLabel } from "./EnvironmentRow";
 import { SettingsGroup } from "./SettingsGroup";
 import { settingsScopeEnvironmentLabel, settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
-import {
-  requestScheduledTaskDelete,
-  useScheduledTaskDeleteHidden,
-} from "./scheduledTaskDeleteUndoClient";
-import { withoutPendingScheduledTaskDeletes } from "./scheduledTaskDeleteUndo";
+import { requestScheduledTaskDelete } from "./scheduledTaskDeleteUndoClient";
 import {
   SCHEDULED_TASK_TEMPLATES,
   WEBHOOK_SIGNATURE_DEFAULTS,
@@ -559,7 +555,6 @@ function ScheduledTaskEnvironmentList({
   readonly onEdit: (environmentId: EnvironmentId, task: ScheduledTask) => void;
 }) {
   const { scope, environments } = useSettingsScope();
-  const hiddenDeletes = useScheduledTaskDeleteHidden();
   const connectedIds = environments.flatMap((environment) =>
     environment.connection.phase === "connected" && environment.serverConfig !== null
       ? [environment.environmentId]
@@ -574,15 +569,9 @@ function ScheduledTaskEnvironmentList({
       environment,
       connected: index >= 0,
       timeZone: data?.timeZone,
-      tasks: data
-        ? withoutPendingScheduledTaskDeletes(
-            data.tasks.filter((task) =>
-              matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
-            ),
-            hiddenDeletes,
-            environment.environmentId,
-          )
-        : undefined,
+      tasks: data?.tasks.filter((task) =>
+        matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
+      ),
       error: query?._tag === "Failure" ? formatEnvironmentQueryError(query.cause) : null,
     };
   });
@@ -715,7 +704,6 @@ function ScheduledTaskEnvironmentSection({
   readonly onEdit: (environmentId: EnvironmentId, task: ScheduledTask) => void;
 }) {
   const { scope } = useSettingsScope();
-  const hiddenDeletes = useScheduledTaskDeleteHidden();
   const connected =
     environment.connection.phase === "connected" && environment.serverConfig !== null;
   const tasksQuery = useEnvironmentQuery(
@@ -726,15 +714,9 @@ function ScheduledTaskEnvironmentSection({
         })
       : null,
   );
-  const tasks = tasksQuery.data
-    ? withoutPendingScheduledTaskDeletes(
-        tasksQuery.data.tasks.filter((task) =>
-          matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
-        ),
-        hiddenDeletes,
-        environment.environmentId,
-      )
-    : undefined;
+  const tasks = tasksQuery.data?.tasks.filter((task) =>
+    matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
+  );
   const linkedTask = tasks?.find((task) => task.id === taskId);
   return (
     <SettingsSection

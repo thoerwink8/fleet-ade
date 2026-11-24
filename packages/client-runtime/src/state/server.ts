@@ -1639,6 +1639,12 @@ export function createServerEnvironmentAtoms<R, E>(
       scheduler: configScheduler,
       concurrency: configConcurrency,
     }),
+    undoScheduledTaskDelete: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:scheduled-task:undo-delete",
+      tag: WS_METHODS.scheduledTasksUndoDelete,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
+    }),
     // Deliberately not on the config lane: run-now blocks until the run is
     // dispatched, and a slow run must not stall settings/keybinding/provider
     // mutations (or other scheduled-task edits) queued behind it.

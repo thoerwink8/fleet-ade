@@ -15,7 +15,6 @@ import { startSshPasswordPromptQueue } from "./components/desktop/SshPasswordPro
 import { startHostFreezeToasts } from "./components/HostFreezeToastCoordinator";
 import { startKeybindingsUpdateToasts } from "./components/KeybindingsUpdateToast";
 import { startLegacyThreadMigrationToast } from "./components/LegacyThreadMigrationToast";
-import { startScheduledTaskDeleteUndo } from "./components/settings/scheduledTaskDeleteUndoClient";
 import { startPermissionUpdateNotices } from "./components/PermissionUpdateNotice";
 import { startMainAppLocationTracking } from "./components/sidebar/mainAppLocation";
 import { restoreUpdateRunOnLaunch } from "./components/sidebar/updateEverythingRun";
@@ -235,7 +234,6 @@ export function startAppServices(): AppRouter {
   startSlowRpcRequestToasts();
   startHostFreezeToasts();
   startLegacyThreadMigrationToast();
-  startScheduledTaskDeleteUndo();
   startPermissionUpdateNotices(router);
   startThreadNotifications(appAtomRegistry, router);
   if (isElectron) restoreUpdateRunOnLaunch();
