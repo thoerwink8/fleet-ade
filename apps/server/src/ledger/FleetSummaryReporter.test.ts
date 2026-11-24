@@ -336,6 +336,7 @@ it.effect("两台互连环境通过真实 MCP 上报各自摘要行，改动只�
         cursor: liveEvents[0]?.type === "upsert" ? liveEvents[0].revision : snapshotRevision,
       });
       yield* a.reporter.handle(fakeEvent(adhocThreadA, "thread.deleted"));
+      yield* a.reporter.handle(fakeEvent(adhocThreadA, "thread.purged"));
       const tombstones = yield* Stream.runCollect(live2.pipe(Stream.take(1)));
       expect(tombstones[0]?.type).toBe("tombstone");
       if (tombstones[0]?.type === "tombstone") {
