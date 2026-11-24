@@ -11,8 +11,8 @@ import {
   NON_COPY_JSX_ATTRS,
   NON_COPY_PROPS_BASE,
   included,
-  isEqualityOrCaseClause,
   isIgnoredInternalCall,
+  isLogCall,
   lineOf,
   literalText,
   propertyName,
@@ -91,6 +91,34 @@ export interface OldTermFinding {
   readonly text: string;
 }
 
+function isEqualityExpression(node: ts.Node): boolean {
+  return (
+    ts.isBinaryExpression(node) &&
+    (node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+      node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
+      node.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken ||
+      node.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsToken)
+  );
+}
+
+function containsObjectOrJsx(node: ts.Node): boolean {
+  let found = false;
+  const check = (child: ts.Node): void => {
+    if (found) return;
+    if (
+      ts.isObjectLiteralExpression(child) ||
+      ts.isJsxElement(child) ||
+      ts.isJsxSelfClosingElement(child)
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(child, check);
+  };
+  check(node);
+  return found;
+}
+
 export function scanSourceTextForOldTerms(
   filePath: string,
   sourceText: string,
@@ -130,8 +158,17 @@ export function scanSourceTextForOldTerms(
     ) {
       return;
     }
-    if (isEqualityOrCaseClause(node)) return;
-    if (ts.isCallExpression(node) && isIgnoredInternalCall(node)) return;
+    if (isEqualityExpression(node)) return;
+    if (ts.isCaseClause(node)) {
+      for (const statement of node.statements) visit(statement);
+      return;
+    }
+    if (ts.isCallExpression(node) && isIgnoredInternalCall(node)) {
+      if (!isLogCall(node) && node.arguments.some(containsObjectOrJsx)) {
+        for (const argument of node.arguments) visit(argument);
+      }
+      return;
+    }
 
     if (ts.isJsxText(node)) {
       checkText(node, node.text);

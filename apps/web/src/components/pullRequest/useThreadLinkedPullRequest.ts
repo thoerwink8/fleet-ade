@@ -89,7 +89,7 @@ export function useThreadLinkedPullRequest(input: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法更新会话的 pull request",
+          title: "无法更新会话的 PR",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );

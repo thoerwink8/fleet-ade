@@ -205,7 +205,7 @@ export function UsagePriceOverrides({
     value: string,
   ) =>
     !row.isNew &&
-    cell.placeholder !== "各不相同" &&
+    cell.placeholder !== "多项不同" &&
     cell.placeholder !== "不可用" &&
     value === cell.value;
   const updateOrDropDraft = (draft: UsagePriceDraft) => {

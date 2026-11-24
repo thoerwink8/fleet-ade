@@ -89,6 +89,25 @@ describe("ui-no-old-terms", () => {
     `;
     const approvalHits = scanSourceTextForOldTerms("ApprovalStatus.tsx", approvalExcerpt);
     expect(approvalHits.map((hit) => `${hit.term}:${hit.text}`)).toEqual(["待批准:待批准"]);
+
+    // Excerpt 6: switch case statements and nested toast builder calls are scanned, while case tags, Set.add, and logs stay ignored
+    const switchAndToastExcerpt = `
+      switch (kind) {
+        case "工作区":
+          return "请求的路径不在工作区内。";
+      }
+      seen.add("工作区");
+      console.warn({ title: "工作区" });
+      toastManager.add(stackedThreadToast({ type: "error", title: "无法更新会话的 pull request" }));
+    `;
+    const switchAndToastHits = scanSourceTextForOldTerms(
+      "filePreviewMode.ts",
+      switchAndToastExcerpt,
+    );
+    expect(switchAndToastHits.map((hit) => `${hit.term}:${hit.text}`)).toEqual([
+      "工作区:请求的路径不在工作区内。",
+      "pull request:无法更新会话的 pull request",
+    ]);
   });
 
   it("scans all client/shared source dirs while exempting only the listed sentences", () => {
