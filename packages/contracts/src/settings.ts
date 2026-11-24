@@ -1094,6 +1094,26 @@ export const StorageCleanupReport = Schema.Struct({
 });
 export type StorageCleanupReport = typeof StorageCleanupReport.Type;
 
+export const StorageCleanupPreviewCategory = Schema.Struct({
+  kind: Schema.Literals(["worktree", "browser-artifacts", "logs"]),
+  count: Schema.Number,
+  bytes: Schema.Number,
+  unknownCount: Schema.Number,
+});
+export type StorageCleanupPreviewCategory = typeof StorageCleanupPreviewCategory.Type;
+
+/** What a cleanup would remove. Bytes omit items whose size could not be measured. */
+export const StorageCleanupPreview = Schema.Struct({
+  categories: Schema.Array(StorageCleanupPreviewCategory),
+  failures: Schema.Array(
+    Schema.Struct({
+      kind: Schema.Literals(["worktree", "browser-artifacts", "logs"]),
+      reason: Schema.String,
+    }),
+  ),
+});
+export type StorageCleanupPreview = typeof StorageCleanupPreview.Type;
+
 export const StorageCleanupSettings = Schema.Struct({
   worktreeKeepWhen: WorktreeKeepWhen.pipe(
     Schema.withDecodingDefault(Effect.succeed("uncommitted-changes")),

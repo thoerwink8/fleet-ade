@@ -2162,6 +2162,10 @@ export const layerWsRpc = (
           Effect.annotateCurrentSpan({ "scheduled_task.id": input.id }).pipe(
             Effect.andThen(scheduledTasks.delete(input)),
           ),
+        [WS_METHODS.scheduledTasksUndoDelete]: (input) =>
+          Effect.annotateCurrentSpan({ "scheduled_task.id": input.id }).pipe(
+            Effect.andThen(scheduledTasks.undoDelete(input)),
+          ),
         [WS_METHODS.scheduledTasksRunNow]: (input) =>
           Effect.annotateCurrentSpan({ "scheduled_task.id": input.id }).pipe(
             Effect.andThen(scheduledTasks.runNow(input)),
@@ -2508,6 +2512,7 @@ export const layerWsRpc = (
             return yield* keybindings.removeKeybindingRule(rule);
           }),
         [WS_METHODS.serverRunStorageCleanup]: () => storageCleanup.runNow,
+        [WS_METHODS.serverPreviewStorageCleanup]: () => storageCleanup.preview,
         [WS_METHODS.serverGetStorageCleanupReport]: () => storageCleanup.reports,
         [WS_METHODS.serverGetDatabaseStorage]: () => databaseStorage.status,
         [WS_METHODS.serverReclaimDatabaseSpace]: () => databaseStorage.requestReclaim,

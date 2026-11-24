@@ -2132,3 +2132,19 @@ it.effect("filters run before replay and coalescing without claiming ignored del
     { workers },
   );
 });
+
+it.effect("a task marked for deletion answers not_found until its delete is undone", () =>
+  withService(({ service }) =>
+    Effect.gen(function* () {
+      const { task } = yield* service.upsert(yield* webhookTaskInput());
+      yield* service.delete({ id: task.id });
+
+      const whilePending = yield* service.triggerWebhook(requestFor(task));
+      assert.equal(whilePending._tag, "not_found");
+
+      yield* service.undoDelete({ id: task.id });
+      const restored = yield* service.triggerWebhook(requestFor(task));
+      assert.equal(restored._tag, "accepted");
+    }),
+  ),
+);
