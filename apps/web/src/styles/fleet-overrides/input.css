@@ -58,7 +58,7 @@
     min-height: var(--fa-ctrl-lg);
   }
 
-  /* iOS Safari zooms the page on focus when a field's type is under 16px. */
+  /* @fleet/design switches the field to 16px below 480px; this app's narrow layout starts at 640px. */
   .fa-input,
   .fa-input__control {
     font-size: 16px;
