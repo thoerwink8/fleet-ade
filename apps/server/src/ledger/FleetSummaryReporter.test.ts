@@ -336,7 +336,6 @@ it.effect("两台互连环境通过真实 MCP 上报各自摘要行，改动只�
         cursor: liveEvents[0]?.type === "upsert" ? liveEvents[0].revision : snapshotRevision,
       });
       yield* a.reporter.handle(fakeEvent(adhocThreadA, "thread.deleted"));
-      yield* a.reporter.handle(fakeEvent(adhocThreadA, "thread.purged"));
       const tombstones = yield* Stream.runCollect(live2.pipe(Stream.take(1)));
       expect(tombstones[0]?.type).toBe("tombstone");
       if (tombstones[0]?.type === "tombstone") {
@@ -524,7 +523,8 @@ it.effect(
         yield* TestClock.adjust("5 seconds");
         expect((yield* snapshot()).rows).toHaveLength(1);
         yield* reporter.handle(fakeEvent(threadId, "thread.deleted"));
-        expect((yield* snapshot()).rows).toHaveLength(1);
+        expect((yield* snapshot()).rows).toEqual([]);
+        // The later permanent delete finds nothing left to tombstone.
         yield* reporter.handle(fakeEvent(threadId, "thread.purged"));
         expect((yield* snapshot()).rows).toEqual([]);
         yield* reporter.handle(fakeEvent(threadId, "run.updated"));
@@ -732,6 +732,7 @@ it.effect(
         ).pipe(Layer.build);
         const localThread = ThreadId.make("local-thread");
         const live = yield* Ref.make(true);
+        const trashed = yield* Ref.make(false);
         const peerCalls = yield* Ref.make(0);
         const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
           Layer.provide(
@@ -749,9 +750,11 @@ it.effect(
                     shell(localThread, value ? "running" : "idle"),
                   ),
                 listActiveShellIndex: () =>
-                  Effect.map(Ref.get(live), (mayBeLive) => [
-                    { id: localThread, mayBeLive } as ProjectionStore.ActiveShellIndexEntry,
-                  ]),
+                  Effect.map(Effect.all([Ref.get(live), Ref.get(trashed)]), ([mayBeLive, gone]) =>
+                    gone
+                      ? []
+                      : [{ id: localThread, mayBeLive } as ProjectionStore.ActiveShellIndexEntry],
+                  ),
               }),
               Layer.mock(PeerLinks.PeerLinks)({
                 list: Effect.succeed([] as ReadonlyArray<PeerLinkSummary>),
@@ -806,6 +809,30 @@ it.effect(
         );
         if (afterSweep[0]?.type !== "snapshot") throw new Error("Expected snapshot");
         expect(afterSweep[0].rows).toEqual([]);
+
+        // Moving a live thread to the trash removes its row at once; restoring brings it back.
+        yield* Ref.set(live, true);
+        yield* TestClock.adjust("5 seconds");
+        const back = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
+        if (back[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(back[0].rows).toHaveLength(1);
+        yield* Ref.set(trashed, true);
+        yield* reporter.handle(fakeEvent(localThread, "thread.deleted"));
+        const trashedRows = yield* Stream.runCollect(
+          (yield* summary.subscribe({})).pipe(Stream.take(1)),
+        );
+        if (trashedRows[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(trashedRows[0].rows).toEqual([]);
+        yield* Ref.set(trashed, false);
+        yield* reporter.handle(fakeEvent(localThread, "thread.restored"));
+        yield* TestClock.adjust("5 seconds");
+        const restored = yield* Stream.runCollect(
+          (yield* summary.subscribe({})).pipe(Stream.take(1)),
+        );
+        if (restored[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(restored[0].rows).toEqual([
+          expect.objectContaining({ environmentId: selfId, threadId: localThread }),
+        ]);
       }),
     ),
 );

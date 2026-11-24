@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`
-    CREATE TABLE orchestration_v2_projection_thread_trash (
+    CREATE TABLE IF NOT EXISTS orchestration_v2_projection_thread_trash (
       thread_id TEXT PRIMARY KEY REFERENCES orchestration_v2_projection_threads(thread_id) ON DELETE CASCADE,
       project_id TEXT NOT NULL,
       deleted_at TEXT NOT NULL,
@@ -14,11 +14,11 @@ export default Effect.gen(function* () {
     )
   `;
   yield* sql`
-    CREATE INDEX orchestration_v2_projection_thread_trash_purge_due_idx
+    CREATE INDEX IF NOT EXISTS orchestration_v2_projection_thread_trash_purge_due_idx
     ON orchestration_v2_projection_thread_trash(purge_due_at)
   `;
   yield* sql`
-    CREATE INDEX orchestration_v2_projection_thread_trash_cascade_root_idx
+    CREATE INDEX IF NOT EXISTS orchestration_v2_projection_thread_trash_cascade_root_idx
     ON orchestration_v2_projection_thread_trash(cascade_root_id)
   `;
 });

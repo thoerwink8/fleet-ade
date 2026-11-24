@@ -2411,6 +2411,17 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             case "thread.guest-share-updated": {
               const payloadJson = yield* encodeThreadPayload(event.payload);
               const payload = parseEncodedPayload(payloadJson);
+              // Only a live thread enters the trash. A repeat delete of a tombstone (permanently
+              // deleted, or deleted before the trash existed) must not make it recoverable.
+              const wasDeleted =
+                event.type === "thread.deleted"
+                  ? (yield* sql<{ readonly present: number }>`
+                      SELECT EXISTS (
+                        SELECT 1 FROM orchestration_v2_projection_threads
+                        WHERE thread_id = ${event.payload.id} AND deleted_at IS NOT NULL
+                      ) AS present
+                    `)[0]?.present === 1
+                  : false;
               yield* sql`
               INSERT INTO orchestration_v2_projection_threads (
                 thread_id,
@@ -2457,7 +2468,11 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 deleted_at = excluded.deleted_at,
                 payload_json = excluded.payload_json
             `;
-              if (event.type === "thread.deleted" && event.payload.deletedAt !== null) {
+              if (
+                event.type === "thread.deleted" &&
+                event.payload.deletedAt !== null &&
+                !wasDeleted
+              ) {
                 const deletedAt = DateTime.formatIso(event.payload.deletedAt);
                 const purgeDueAt =
                   DateTime.toEpochMillis(event.payload.deletedAt) + THREAD_TRASH_RETENTION_MS;

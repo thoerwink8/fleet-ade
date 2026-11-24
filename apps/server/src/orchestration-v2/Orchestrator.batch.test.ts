@@ -523,6 +523,12 @@ it.effect("restores a deleted parent with its side chat and keeps archive state"
 
     const listed = yield* projections.getRecentlyDeleted();
     assert.isFalse(listed.some((item) => item.threadId === parent));
+
+    // A restored thread is a normal thread again: it shows in the shell and takes new messages.
+    assert.isNotNull(yield* projections.getThreadShell(parent));
+    assert.isNotNull(yield* projections.getThreadShell(sideChat));
+    const run = yield* queueRun(parent, "after-restore");
+    assert.notEqual(run.status, "cancelled");
   }).pipe(Effect.provide(layerTest)),
 );
 
@@ -630,6 +636,23 @@ it.effect("restore rejects a deleted project and purge still succeeds", () =>
       .pipe(Effect.flip);
     assert.ok(isDispatchError(afterPurge));
     assert.equal(afterPurge.code, "thread-not-recoverable");
+
+    // A repeated delete of the tombstone must not put it back in the trash.
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("purged-delete-again"),
+      threadId,
+    });
+    assert.isNull(yield* projections.getThreadTrash(threadId));
+    const restoreTombstone = yield* orchestrator
+      .dispatch({
+        type: "thread.restore",
+        commandId: CommandId.make("purged-restore-again"),
+        threadId,
+      })
+      .pipe(Effect.flip);
+    assert.ok(isDispatchError(restoreTombstone));
+    assert.equal(restoreTombstone.code, "thread-not-recoverable");
   }).pipe(Effect.provide(layerTest)),
 );
 

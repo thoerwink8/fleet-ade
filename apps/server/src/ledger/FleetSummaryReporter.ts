@@ -420,7 +420,13 @@ const make = Effect.gen(function* () {
 
   const handle = Effect.fnUntraced(
     function* (event: OrchestrationV2DomainEvent) {
-      if (event.type === "thread.archived" || event.type === "thread.purged") {
+      // A trashed thread leaves the board right away. Restoring it re-registers through the
+      // local session sweep, so only the remote tombstone is sent here.
+      if (
+        event.type === "thread.archived" ||
+        event.type === "thread.deleted" ||
+        event.type === "thread.purged"
+      ) {
         yield* untrack(event.threadId);
       } else {
         yield* sendLane.withPermits(1)(

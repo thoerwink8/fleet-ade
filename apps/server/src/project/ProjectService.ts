@@ -522,6 +522,46 @@ export const make = Effect.gen(function* () {
     }
   });
 
+  // A project has no recovery path, so threads already in its trash go with it: nothing could
+  // restore them and nothing else would release their files.
+  const purgeTrashedChildThread = Effect.fn("ProjectService.purgeTrashedChildThread")(function* (
+    input: ProjectDeleteInput,
+    threadId: ThreadId,
+  ) {
+    if ((yield* threadProjections.getThreadTrash(threadId)) === null) return;
+    const projection = yield* threadProjections.getThreadRecords(threadId, []);
+    const command = {
+      type: "thread.purge" as const,
+      commandId: CommandId.make(`${input.commandId}:purge-thread:${threadId}`),
+      threadId,
+    };
+    const now = yield* DateTime.now;
+    const plan = yield* planThreadPurge({
+      command,
+      projection,
+      attachmentIds: yield* threadProjections.getThreadAttachmentIds(threadId),
+      now,
+      idAllocator,
+    });
+    const committed = yield* eventSink.commitCommand({
+      commandId: command.commandId,
+      commandType: command.type,
+      threadId,
+      acceptedAt: now,
+      events: plan.events,
+      effects: plan.effects,
+    });
+    if (
+      committed.receipt.threadId !== command.threadId ||
+      committed.receipt.commandType !== command.type
+    ) {
+      return yield* Effect.fail("The thread purge command ID belongs to a different command.");
+    }
+    if (committed.receipt.status === "rejected") {
+      return yield* Effect.fail(committed.receipt.error ?? "Thread purge was previously rejected.");
+    }
+  });
+
   const deleteChildThreads = Effect.fn("ProjectService.deleteChildThreads")(function* (
     input: ProjectDeleteInput,
   ) {
@@ -552,6 +592,37 @@ export const make = Effect.gen(function* () {
                 new ProjectOperationError({ operation: "delete-thread", projectId, cause }),
             ),
           ),
+      { concurrency: 1, discard: true },
+    );
+    const trashedRoots = (yield* threadProjections
+      .getRecentlyDeleted()
+      .pipe(
+        Effect.mapError(
+          (cause) => new ProjectOperationError({ operation: "list-threads", projectId, cause }),
+        ),
+      )).filter((item) => item.projectId === projectId);
+    yield* Effect.forEach(
+      trashedRoots,
+      (root) =>
+        Effect.gen(function* () {
+          const members = (yield* threadProjections.getThreadTrashCascade(root.threadId))
+            .map((member) => member.threadId)
+            .filter((memberId) => memberId !== root.threadId)
+            .toSorted();
+          // Root first, then members in id order: the lock order restore and purge use.
+          const ids = [root.threadId, ...members];
+          return yield* ids.toReversed().reduce(
+            (locked, memberId) => threadCommands.withLock(memberId, locked),
+            Effect.forEach(ids, (id) => purgeTrashedChildThread(input, id), {
+              concurrency: 1,
+              discard: true,
+            }),
+          );
+        }).pipe(
+          Effect.mapError(
+            (cause) => new ProjectOperationError({ operation: "delete-thread", projectId, cause }),
+          ),
+        ),
       { concurrency: 1, discard: true },
     );
   });
