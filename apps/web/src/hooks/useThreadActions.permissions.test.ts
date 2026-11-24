@@ -323,6 +323,16 @@ describe("thread action permissions", () => {
     },
   );
 
+  it("batch archive without the grant sends nothing and shows no undo notice", async () => {
+    const outcome = await useThreadActions().archiveThreads([
+      { environmentId: secondary, id: target.threadId },
+    ]);
+    expect([...outcome.archivedKeys]).toEqual([]);
+    expect(outcome.failures).toEqual(["此连接无法修改会话。"]);
+    expect(state.requests).toEqual([]);
+    expect(state.toasts).toEqual([]);
+  });
+
   it.each(["confirmAndDeleteThread"] as const)(
     "%s blocks a forbidden confirmation",
     async (action) => {
