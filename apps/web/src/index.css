@@ -6,6 +6,8 @@
 @import "@fleet/design/styles/checkbox.css" layer(fleet);
 @import "./styles/fleet-overrides/checkbox.css" layer(fleet);
 @import "@fleet/design/styles/tooltip.css" layer(fleet);
+@import "@fleet/design/styles/input.css" layer(fleet);
+@import "./styles/fleet-overrides/input.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
