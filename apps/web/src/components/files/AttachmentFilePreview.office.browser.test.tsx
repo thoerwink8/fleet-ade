@@ -108,7 +108,9 @@ it("rejects oversized embedded images before decoding pixels and retains ordinar
   new DataView(bytes).setUint32(20, 12000);
   const decode = vi.spyOn(globalThis, "createImageBitmap");
   try {
-    await expect(officeImageBitmap(new Blob([bytes]))).rejects.toThrow("pixel limit");
+    await expect(officeImageBitmap(new Blob([bytes]))).rejects.toThrow(
+      "这张内嵌图片超出预览像素上限。",
+    );
     expect(decode).not.toHaveBeenCalled();
     const bitmap = await officeImageBitmap(blob);
     expect([bitmap.width, bitmap.height]).toEqual([2, 3]);
@@ -977,7 +979,7 @@ it.each(['<u val="double"/>', '<u val="double"></u>'])(
     archive.file("xl/styles.xml", "<styleSheet><numFmts/><numFmts/></styleSheet>");
     await expect(
       prepareOffice(await archive.generateAsync({ type: "arraybuffer" }), "xlsx"),
-    ).rejects.toThrow("duplicate stylesheet blocks");
+    ).rejects.toThrow("这个工作簿包含重复的样式表块。");
   },
 );
 

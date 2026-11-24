@@ -15,9 +15,7 @@ function failureMessage(result: TitleRegenerationResult): string | null {
     const error = squashAtomCommandFailure(result);
     return error instanceof Error ? error.message : "发生错误。";
   }
-  return result.value?.status === "failed"
-    ? (result.value.message ?? "Title generation failed.")
-    : null;
+  return result.value?.status === "failed" ? (result.value.message ?? "标题生成失败。") : null;
 }
 
 function isKept(result: TitleRegenerationResult): boolean {

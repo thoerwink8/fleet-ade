@@ -86,6 +86,7 @@ import { useSettingsScope } from "./SettingsScopeContext";
 import { EnvironmentRow, useEnvironmentTransportLabel } from "./EnvironmentRow";
 import { SettingsGroup } from "./SettingsGroup";
 import { settingsScopeEnvironmentLabel, settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
+import { requestScheduledTaskDelete } from "./scheduledTaskDeleteUndoClient";
 import {
   SCHEDULED_TASK_TEMPLATES,
   WEBHOOK_SIGNATURE_DEFAULTS,
@@ -786,6 +787,9 @@ function ScheduledTaskRow({
   const canOperate = useAtomValue(
     serverEnvironment.upsertScheduledTask.permissionAtom(environmentId),
   );
+  const canUndoDelete =
+    useEnvironment(environmentId)?.serverConfig?.environment.capabilities
+      .scheduledTaskUndoDelete === true;
   const [busy, setBusy] = useState(false);
   const [deliveriesOpen, setDeliveriesOpen] = useState(false);
   const isWebhook = task.schedule.type === "webhook";
@@ -795,18 +799,13 @@ function ScheduledTaskRow({
   const run = useAtomCommand(serverEnvironment.runScheduledTaskNow, {
     label: "scheduled task run now",
   });
-  const remove = useAtomCommand(serverEnvironment.deleteScheduledTask, {
-    label: "scheduled task delete",
-  });
-  const act = async (action: "toggle" | "run" | "delete") => {
+  const act = async (action: "toggle" | "run") => {
     if (busy || !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
     setBusy(true);
     const result =
       action === "toggle"
         ? await toggle({ environmentId, input: { id: task.id, enabled: !task.enabled } })
-        : action === "run"
-          ? await run({ environmentId, input: { id: task.id } })
-          : await remove({ environmentId, input: { id: task.id } });
+        : await run({ environmentId, input: { id: task.id } });
     setBusy(false);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add(
@@ -885,7 +884,12 @@ function ScheduledTaskRow({
                 </MenuItem>
               )}
               <MenuSeparator />
-              <MenuItem onClick={() => void act("delete")}>
+              <MenuItem
+                onClick={() => {
+                  if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
+                  requestScheduledTaskDelete(environmentId, task, canUndoDelete);
+                }}
+              >
                 <Trash2Icon />
                 删除
               </MenuItem>
@@ -963,7 +967,7 @@ function WebhookDeliveriesDialog({
     >
       <DialogPopup className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Deliveries · {task.title}</DialogTitle>
+          <DialogTitle>投递记录 · {task.title}</DialogTitle>
           <DialogDescription>此任务 webhook URL 最近收到的请求。</DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -1056,8 +1060,7 @@ function WebhookDeliveriesDialog({
                     ) : null}
                     {delivery.missingFields.length > 0 ? (
                       <span className="text-muted-foreground">
-                        {delivery.missingFields.length} empty placeholder
-                        {delivery.missingFields.length === 1 ? "" : "s"}
+                        {delivery.missingFields.length} 个空占位符
                       </span>
                     ) : null}
                   </button>
@@ -1122,7 +1125,7 @@ function WebhookEndpointField({
   const { address: url, copyable, note } = webhookAddress(endpoint, httpBaseUrl);
   const rotateUrl = async () => {
     const confirmed =
-      (await requestConfirmDialog("Rotate this webhook URL?\nThe current URL stops working.", {
+      (await requestConfirmDialog("更换此 webhook URL？\n当前 URL 将失效。", {
         title: "更换这个 webhook URL？",
         confirmLabel: "更换",
         variant: "destructive",
@@ -1167,7 +1170,7 @@ function WebhookEndpointField({
           disabled={rotating || !canRotate}
           onClick={() => void rotateUrl()}
         >
-          Rotate
+          更换
         </Button>
       </div>
       {note !== null ? <p className="text-xs text-muted-foreground">{note}</p> : null}
@@ -2021,7 +2024,7 @@ function ScheduledTaskEditorForm({
                           <SelectValue>{draft.signatureEncoding}</SelectValue>
                         </SelectTrigger>
                         <SelectPopup>
-                          <SelectItem value="hex">hex</SelectItem>
+                          <SelectItem value="hex">十六进制</SelectItem>
                           <SelectItem value="base64">base64</SelectItem>
                         </SelectPopup>
                       </Select>

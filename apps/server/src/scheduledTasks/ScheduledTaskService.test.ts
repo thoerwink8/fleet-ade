@@ -33,6 +33,7 @@ import * as SecretRequests from "../secrets/SecretRequests.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ScheduledTaskService from "./ScheduledTaskService.ts";
+import { nextScheduledRunAt } from "./Schedule.ts";
 
 const isScheduledTaskError = Schema.is(ScheduledTaskError);
 
@@ -921,5 +922,220 @@ it.effect("a run interrupted right after it reserves the task does not block the
       assert.equal(second.threadId, ThreadId.make("thread:launched"));
       assert.equal(yield* Ref.get(launches), 1);
     }).pipe(Effect.provide(layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+const pendingDeleteLayerDependencies = () =>
+  Layer.mergeAll(
+    NodeCrypto.layer,
+    Scheduler.layer,
+    Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
+    Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+      namedProjectsRoot: "/projects",
+      isScratchProject: () => Effect.succeed(false),
+    }),
+    Layer.mock(ThreadManagementService.ThreadManagementService)({}),
+    Layer.mock(SecretRequests.SecretRequests)({}),
+  );
+
+const pendingDeleteInput = {
+  title: "每夜盘点",
+  prompt: "更新昨天的记录。",
+  enabled: true,
+  schedule: { type: "interval", everyMs: 60_000 },
+  projectId: ProjectId.make("project:test"),
+  workspaceStrategy: { type: "root" },
+  modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+  runtimeMode: "full-access",
+  interactionMode: "default",
+} as const;
+
+it.effect("marks a deleted task for undo, restores it whole, then purges it for real", () =>
+  Effect.gen(function* () {
+    const layer = ScheduledTaskService.layer.pipe(Layer.provide(pendingDeleteLayerDependencies()));
+    yield* Effect.gen(function* () {
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      const sql = yield* SqlClient.SqlClient;
+      const { task } = yield* service.upsert(pendingDeleteInput);
+
+      yield* service.delete({ id: task.id });
+      const mark = yield* sql<{ due_at: number }>`
+        SELECT due_at FROM scheduled_task_pending_deletes WHERE task_id = ${task.id}
+      `;
+      assert.lengthOf(mark, 1);
+
+      // Hidden for every reader, and its mark must not hide a sibling task.
+      const { task: sibling } = yield* service.upsert({
+        ...pendingDeleteInput,
+        title: "白班巡检",
+      });
+      assert.deepEqual(
+        (yield* service.list()).tasks.map((listed) => listed.id),
+        [sibling.id],
+      );
+      assert.equal(
+        (yield* service.runNow({ id: task.id }).pipe(Effect.flip)).message,
+        "Schedule task not found.",
+      );
+      assert.equal(
+        (yield* service.setEnabled({ id: task.id, enabled: false }).pipe(Effect.flip)).message,
+        "Schedule task not found.",
+      );
+
+      const restored = yield* service.undoDelete({ id: task.id });
+      assert.deepEqual(restored.task, task);
+      assert.deepEqual(
+        (yield* service.list()).tasks.map((listed) => listed.id).toSorted(),
+        [sibling.id, task.id].toSorted(),
+      );
+
+      yield* service.delete({ id: task.id });
+      yield* TestClock.adjust(
+        `${ScheduledTaskService.SCHEDULED_TASK_PENDING_DELETE_MS + 1_000} millis`,
+      );
+      const [row] = yield* sql`SELECT task_id FROM scheduled_tasks WHERE task_id = ${task.id}`;
+      assert.isUndefined(row);
+      const [markGone] = yield* sql`
+        SELECT task_id FROM scheduled_task_pending_deletes WHERE task_id = ${task.id}
+      `;
+      assert.isUndefined(markGone);
+      assert.deepEqual(
+        (yield* service.list()).tasks.map((listed) => listed.id),
+        [sibling.id],
+      );
+      assert.equal(
+        (yield* service.undoDelete({ id: task.id }).pipe(Effect.flip)).message,
+        "无法撤销：这个定时任务已经删除",
+      );
+    }).pipe(Effect.provide(layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect(
+  "a task deleted across its slot does not run, then catches up under the missed-run rule",
+  () =>
+    Effect.gen(function* () {
+      const now = "2026-09-09T12:00:00.000Z";
+      const sql = yield* SqlClient.SqlClient;
+      yield* insertRow(
+        sql,
+        {
+          id: "task:interval-overdue",
+          next: "2026-09-09T11:59:00.000Z",
+          enabled: 1,
+          status: "never",
+        },
+        now,
+      );
+      yield* insertRow(
+        sql,
+        {
+          id: "task:fixed-overdue",
+          next: "2026-09-09T10:00:00.000Z",
+          enabled: 1,
+          status: "never",
+          scheduleJson: '{"type":"fixed_time","timeOfDay":"10:00"}',
+        },
+        now,
+      );
+
+      const launches = yield* Ref.make(0);
+      const layer = ScheduledTaskService.layer.pipe(
+        Layer.provide(
+          Layer.merge(
+            pendingDeleteLayerDependencies(),
+            Layer.mock(ThreadLaunchService.ThreadLaunchService)({
+              launch: () =>
+                Ref.update(launches, (count) => count + 1).pipe(
+                  Effect.as({
+                    threadId: ThreadId.make("thread:after-undo"),
+                    resumed: false,
+                  } as never),
+                ),
+            }),
+          ),
+        ),
+      );
+      yield* TestClock.setTime(Date.parse(now));
+      yield* Effect.gen(function* () {
+        const service = yield* ScheduledTaskService.ScheduledTaskService;
+        yield* service.delete({ id: ScheduledTaskId.make("task:interval-overdue") });
+        yield* service.delete({ id: ScheduledTaskId.make("task:fixed-overdue") });
+        // Both slots are due while the tasks are marked for deletion.
+        yield* TestClock.adjust("10 seconds");
+        assert.equal(yield* Ref.get(launches), 0);
+
+        yield* service.undoDelete({ id: ScheduledTaskId.make("task:interval-overdue") });
+        // Interval runs have no grace window, so the overdue slot runs at once.
+        yield* TestClock.adjust("10 seconds");
+        assert.equal(yield* Ref.get(launches), 1);
+
+        yield* service.undoDelete({ id: ScheduledTaskId.make("task:fixed-overdue") });
+        // A fixed-time slot over ten minutes late is rescheduled, not run.
+        yield* TestClock.adjust("10 seconds");
+        assert.equal(yield* Ref.get(launches), 1);
+        const [fixed] = yield* sql<{ next_run_at: string | null; last_run_status: string }>`
+          SELECT next_run_at, last_run_status FROM scheduled_tasks
+          WHERE task_id = 'task:fixed-overdue'
+        `;
+        const expectedNext = nextScheduledRunAt(
+          { type: "fixed_time", timeOfDay: "10:00" },
+          DateTime.makeZonedUnsafe(
+            { year: 2026, month: 9, day: 9, hour: 12, minute: 0, second: 30, millisecond: 0 },
+            { timeZone: DateTime.zoneMakeLocal(), adjustForTimeZone: true },
+          ),
+        );
+        assert.equal(
+          fixed?.next_run_at,
+          expectedNext === null ? null : DateTime.formatIso(DateTime.toUtc(expectedNext)),
+        );
+        assert.equal(fixed?.last_run_status, "failed");
+      }).pipe(Effect.provide(layer));
+    }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("a restart inside the undo window still ends with the task purged", () =>
+  Effect.gen(function* () {
+    const layerDependencies = pendingDeleteLayerDependencies();
+    const withServer = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+      Effect.scoped(
+        effect.pipe(
+          Effect.provide(ScheduledTaskService.layer.pipe(Layer.provide(layerDependencies))),
+        ),
+      );
+
+    const taskId = yield* withServer(
+      Effect.gen(function* () {
+        const service = yield* ScheduledTaskService.ScheduledTaskService;
+        const { task } = yield* service.upsert(pendingDeleteInput);
+        yield* service.delete({ id: task.id });
+        return task.id;
+      }),
+    );
+
+    yield* withServer(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* TestClock.adjust(
+          `${ScheduledTaskService.SCHEDULED_TASK_PENDING_DELETE_MS + 1_000} millis`,
+        );
+        const [row] = yield* sql`
+          SELECT task_id FROM scheduled_tasks WHERE task_id = ${taskId}
+        `;
+        assert.isUndefined(row);
+        const [mark] = yield* sql`
+          SELECT task_id FROM scheduled_task_pending_deletes WHERE task_id = ${taskId}
+        `;
+        assert.isUndefined(mark);
+      }),
+    );
+
+    const failure = yield* withServer(
+      Effect.gen(function* () {
+        const service = yield* ScheduledTaskService.ScheduledTaskService;
+        return yield* service.undoDelete({ id: taskId }).pipe(Effect.flip);
+      }),
+    );
+    assert.equal(failure.message, "无法撤销：这个定时任务已经删除");
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );

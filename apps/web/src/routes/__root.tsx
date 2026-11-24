@@ -218,7 +218,7 @@ function errorMessage(error: unknown): string {
     return error;
   }
 
-  return "An unexpected router error occurred.";
+  return "发生了未预期的路由错误。";
 }
 
 function errorDetails(error: unknown): string {
@@ -233,7 +233,7 @@ function errorDetails(error: unknown): string {
   try {
     return JSON.stringify(error, null, 2);
   } catch {
-    return "No additional error details are available.";
+    return "没有更多错误详情。";
   }
 }
 

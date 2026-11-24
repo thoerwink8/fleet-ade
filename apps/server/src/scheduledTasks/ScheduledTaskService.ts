@@ -10,6 +10,8 @@ import {
   ScheduledTaskWebhookDeliveryId,
   type ScheduledTaskDeleteInput,
   type ScheduledTaskDeleteResult,
+  type ScheduledTaskUndoDeleteInput,
+  type ScheduledTaskUndoDeleteResult,
   type ScheduledTaskGetWebhookDeliveryInput,
   type ScheduledTaskGetWebhookDeliveryResult,
   type ScheduledTaskListWebhookDeliveriesInput,
@@ -95,6 +97,9 @@ const LEGACY_DELIVERY_OUTCOMES: ReadonlySet<string> = new Set([
   "rate_limited",
   "expired",
 ]);
+
+// Longer than the 8-second undo notice so a click at its edge still reaches the mark.
+export const SCHEDULED_TASK_PENDING_DELETE_MS = 30_000;
 
 interface WebhookOrigin {
   readonly relayHookBaseUrl: string | null;
@@ -246,6 +251,9 @@ export class ScheduledTaskService extends Context.Service<
     readonly delete: (
       input: ScheduledTaskDeleteInput,
     ) => Effect.Effect<ScheduledTaskDeleteResult, ScheduledTaskError>;
+    readonly undoDelete: (
+      input: ScheduledTaskUndoDeleteInput,
+    ) => Effect.Effect<ScheduledTaskUndoDeleteResult, ScheduledTaskError>;
     /** Deletes only tasks that still target this thread, including their webhook deliveries. */
     readonly deleteForThread: (threadId: ThreadId) => Effect.Effect<void, ScheduledTaskError>;
     /** Points tasks bound to these threads at the project the threads moved to. */
@@ -414,6 +422,8 @@ export const listDueTasks = Effect.fn("ScheduledTaskService.listDueTasks")(funct
     SELECT * FROM scheduled_tasks
     WHERE enabled = 1 AND next_run_at IS NOT NULL
       AND next_run_at <= ${iso(now)} AND last_run_status <> 'running'
+      AND NOT EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+        WHERE pd.task_id = scheduled_tasks.task_id)
     ORDER BY next_run_at ASC, task_id ASC
   `.pipe(NodeSqliteClient.readOnly);
   const tasks: ScheduledTask[] = [];
@@ -474,8 +484,10 @@ export const layer = Layer.effect(
     const changesPubSub = yield* PubSub.sliding<void>(1);
     const dueTasks = DueHint.make();
     const pendingWebhooks = DueHint.make();
+    const pendingDeletes = DueHint.make();
     // Every scheduled_tasks write that can change next_run_at, enabled or run state notifies.
     const notifyChanged = dueTasks.invalidate.pipe(
+      Effect.andThen(pendingDeletes.invalidate),
       Effect.andThen(PubSub.publish(changesPubSub, undefined)),
       Effect.asVoid,
     );
@@ -507,6 +519,8 @@ export const layer = Layer.effect(
         webhook_token,
         webhook_secret
       FROM scheduled_tasks
+      WHERE NOT EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+        WHERE pd.task_id = scheduled_tasks.task_id)
       -- Not updated_at: toggles, runs and edits rewrite it, and clients render
       -- this order as-is, so rows would move under the pointer.
       ORDER BY created_at DESC, task_id ASC
@@ -546,6 +560,8 @@ export const layer = Layer.effect(
         webhook_secret
       FROM scheduled_tasks
       WHERE task_id = ${id}
+        AND NOT EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+          WHERE pd.task_id = scheduled_tasks.task_id)
     `.pipe(NodeSqliteClient.readOnly);
 
     const findTask = Effect.fn("ScheduledTaskService.findTask")(function* (id: ScheduledTaskId) {
@@ -597,7 +613,9 @@ export const layer = Layer.effect(
         readonly secretChanged: boolean;
       },
     ) =>
-      sql<{ task_id: string }>`
+      sql
+        .withTransaction(
+          sql<{ task_id: string }>`
         INSERT INTO scheduled_tasks (
           task_id,
           title,
@@ -648,7 +666,9 @@ export const layer = Layer.effect(
           ${webhook.token},
           ${webhook.secret}
         WHERE ${requireExisting ? 0 : 1} = 1
-           OR EXISTS (SELECT 1 FROM scheduled_tasks WHERE task_id = ${task.id})
+           OR EXISTS (SELECT 1 FROM scheduled_tasks WHERE task_id = ${task.id}
+             AND NOT EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+               WHERE pd.task_id = scheduled_tasks.task_id))
         ON CONFLICT (task_id)
         DO UPDATE SET
           title = excluded.title,
@@ -656,9 +676,13 @@ export const layer = Layer.effect(
           enabled = excluded.enabled,
           schedule_json = excluded.schedule_json,
           project_id = excluded.project_id,
-          -- A first run may bind the thread while this save is in flight; only a
-          -- switch to new threads unbinds.
+          -- A save over a pending-delete row is a new generation: no thread binding,
+          -- run history or token survives, and in-flight runs of the old generation
+          -- must fail their created_at guards.
           thread_id = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.thread_id
             WHEN excluded.thread_mode = 'new_thread' THEN NULL
             WHEN excluded.project_id != scheduled_tasks.project_id THEN excluded.thread_id
             ELSE COALESCE(excluded.thread_id, scheduled_tasks.thread_id)
@@ -668,11 +692,26 @@ export const layer = Layer.effect(
           model_selection_json = excluded.model_selection_json,
           runtime_mode = excluded.runtime_mode,
           interaction_mode = excluded.interaction_mode,
+          created_by = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.created_by
+            ELSE scheduled_tasks.created_by
+          END,
           creation_source = excluded.creation_source,
+          created_at = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.created_at
+            ELSE scheduled_tasks.created_at
+          END,
           updated_at = excluded.updated_at,
           -- Keep a next_run_at that a finishing run moved during this save, unless
           -- another edit changed the schedule or enabled state meanwhile.
           next_run_at = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.next_run_at
             WHEN ${keptSchedule === null ? 0 : 1} = 1
               AND scheduled_tasks.schedule_json IN (
                 excluded.schedule_json,
@@ -681,6 +720,36 @@ export const layer = Layer.effect(
               AND scheduled_tasks.enabled = excluded.enabled
             THEN scheduled_tasks.next_run_at
             ELSE excluded.next_run_at
+          END,
+          last_run_at = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.last_run_at
+            ELSE scheduled_tasks.last_run_at
+          END,
+          last_run_status = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.last_run_status
+            ELSE scheduled_tasks.last_run_status
+          END,
+          last_run_error = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.last_run_error
+            ELSE scheduled_tasks.last_run_error
+          END,
+          last_run_webhook_delivery_id = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.last_run_webhook_delivery_id
+            ELSE scheduled_tasks.last_run_webhook_delivery_id
+          END,
+          run_count = CASE
+            WHEN EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+              WHERE pd.task_id = scheduled_tasks.task_id)
+            THEN excluded.run_count
+            ELSE scheduled_tasks.run_count
           END,
           -- Only rotate changes a live token, so a save racing a rotation
           -- cannot bring the old URL back.
@@ -694,22 +763,37 @@ export const layer = Layer.effect(
           END
         RETURNING task_id
       `.pipe(
-        Effect.mapError((cause) =>
-          taskError("Could not save schedule task.", { taskId: task.id, cause }),
-        ),
-        Effect.flatMap((rows) =>
-          rows.length > 0
-            ? Effect.void
-            : taskError("Schedule task not found.", { taskId: task.id }),
-        ),
-      );
+            // A save over a task still marked for deletion resurrects it and drops the mark.
+            Effect.filterOrElse(
+              (rows) => rows.length === 0,
+              (rows) =>
+                sql`DELETE FROM scheduled_task_pending_deletes WHERE task_id = ${task.id}`.pipe(
+                  Effect.as(rows),
+                ),
+            ),
+          ),
+        )
+        .pipe(
+          Effect.mapError((cause) =>
+            taskError("Could not save schedule task.", { taskId: task.id, cause }),
+          ),
+          Effect.flatMap((rows) =>
+            rows.length > 0
+              ? Effect.void
+              : taskError("Schedule task not found.", { taskId: task.id }),
+          ),
+        );
 
     const deleteRow = (id: ScheduledTaskId) =>
       sql
         .withTransaction(
-          sql`DELETE FROM scheduled_task_webhook_deliveries WHERE task_id = ${id}`.pipe(
-            Effect.andThen(sql`DELETE FROM scheduled_tasks WHERE task_id = ${id}`),
-          ),
+          Effect.gen(function* () {
+            yield* sql`DELETE FROM scheduled_task_webhook_deliveries WHERE task_id = ${id}`;
+            yield* sql`DELETE FROM scheduled_task_webhook_pending WHERE task_id = ${id}`;
+            yield* sql`DELETE FROM scheduled_task_webhook_relay_deliveries WHERE task_id = ${id}`;
+            yield* sql`DELETE FROM scheduled_task_pending_deletes WHERE task_id = ${id}`;
+            yield* sql`DELETE FROM scheduled_tasks WHERE task_id = ${id}`;
+          }),
         )
         .pipe(
           Effect.mapError((cause) =>
@@ -1211,6 +1295,8 @@ export const layer = Layer.effect(
       const [next] = yield* sql<{ next_run_at: string | null }>`
         SELECT MIN(next_run_at) AS next_run_at FROM scheduled_tasks
         WHERE enabled = 1 AND next_run_at IS NOT NULL AND last_run_status <> 'running'
+          AND NOT EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+            WHERE pd.task_id = scheduled_tasks.task_id)
       `.pipe(
         NodeSqliteClient.readOnly,
         Effect.mapError((cause) => taskError("Could not list schedule tasks.", { cause })),
@@ -1308,6 +1394,39 @@ export const layer = Layer.effect(
     );
 
     yield* scheduler.register("scheduled-tasks", runDueTasks());
+
+    // Purges run with the same due-hint machinery as task runs, so a restart or a
+    // window passing with no client connected still ends in the row being gone.
+    const purgeDueDeletes = Effect.fn("ScheduledTaskService.purgeDueDeletes")(function* () {
+      const nowMs = DateTime.toEpochMillis(yield* localNow);
+      if (yield* pendingDeletes.isIdle(nowMs)) return;
+      const readVersion = yield* pendingDeletes.version;
+      const due = yield* sql<{ task_id: string }>`
+        SELECT task_id FROM scheduled_task_pending_deletes
+        WHERE due_at <= ${nowMs}
+        ORDER BY due_at ASC, task_id ASC
+      `.pipe(NodeSqliteClient.readOnly);
+      yield* Effect.forEach(
+        due,
+        ({ task_id }) =>
+          deleteRow(ScheduledTaskId.make(task_id)).pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Could not purge a deleted schedule task", {
+                taskId: task_id,
+                cause,
+              }),
+            ),
+          ),
+        { concurrency: 1, discard: true },
+      );
+      const [next] = yield* sql<{ due_at: number | null }>`
+        SELECT MIN(due_at) AS due_at FROM scheduled_task_pending_deletes
+      `.pipe(NodeSqliteClient.readOnly);
+      yield* pendingDeletes.record(readVersion, next?.due_at ?? Infinity, nowMs);
+      if (due.length > 0) yield* notifyChanged;
+    });
+
+    yield* scheduler.register("scheduled-task-purges", purgeDueDeletes());
 
     const list: ScheduledTaskService["Service"]["list"] = () =>
       listRows().pipe(
@@ -1572,12 +1691,56 @@ export const layer = Layer.effect(
         { discard: true },
       );
 
-    const deleteTask: ScheduledTaskService["Service"]["delete"] = (input) =>
-      deleteRow(input.id).pipe(
-        Effect.andThen(forgetWebhookTask(input.id)),
-        Effect.andThen(notifyChanged),
-        Effect.as({ id: input.id }),
+    // Deleting marks the task for the undo window; the purge pass removes it for real.
+    const deleteTask: ScheduledTaskService["Service"]["delete"] = Effect.fn(
+      "ScheduledTaskService.delete",
+    )(function* (input) {
+      const task = yield* loadTask(input.id);
+      const now = yield* localNow;
+      yield* sql`
+        INSERT INTO scheduled_task_pending_deletes (task_id, marked_at, due_at)
+        VALUES (${task.id}, ${iso(now)}, ${DateTime.toEpochMillis(now) + SCHEDULED_TASK_PENDING_DELETE_MS})
+        ON CONFLICT (task_id) DO UPDATE SET marked_at = excluded.marked_at, due_at = excluded.due_at
+      `.pipe(
+        Effect.mapError((cause) =>
+          taskError("Could not delete schedule task.", { taskId: input.id, cause }),
+        ),
       );
+      yield* forgetWebhookTask(task.id);
+      yield* notifyChanged;
+      return { id: task.id };
+    });
+
+    const undoDeleteTask: ScheduledTaskService["Service"]["undoDelete"] = Effect.fn(
+      "ScheduledTaskService.undoDelete",
+    )(function* (input) {
+      const nowMs = DateTime.toEpochMillis(yield* localNow);
+      const cleared = yield* sql
+        .withTransaction(
+          Effect.gen(function* () {
+            const removed = yield* sql<{ task_id: string }>`
+            DELETE FROM scheduled_task_pending_deletes
+            WHERE task_id = ${input.id} AND due_at > ${nowMs}
+            RETURNING task_id
+          `;
+            if (removed.length === 0) return false;
+            const stillThere = yield* sql`
+            SELECT 1 FROM scheduled_tasks WHERE task_id = ${input.id}
+          `;
+            return stillThere.length > 0;
+          }),
+        )
+        .pipe(
+          Effect.mapError((cause) =>
+            taskError("Could not undo the schedule task delete.", { taskId: input.id, cause }),
+          ),
+        );
+      if (!cleared) {
+        return yield* taskError("无法撤销：这个定时任务已经删除", { taskId: input.id });
+      }
+      yield* notifyChanged;
+      return { task: yield* loadTask(input.id) };
+    });
 
     const deleteForThread = Effect.fn("ScheduledTaskService.deleteForThread")(function* (
       threadId: ThreadId,
@@ -1589,6 +1752,18 @@ export const layer = Layer.effect(
           Effect.gen(function* () {
             yield* sql`
             DELETE FROM scheduled_task_webhook_deliveries
+            WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
+          `;
+            yield* sql`
+            DELETE FROM scheduled_task_webhook_pending
+            WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
+          `;
+            yield* sql`
+            DELETE FROM scheduled_task_webhook_relay_deliveries
+            WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
+          `;
+            yield* sql`
+            DELETE FROM scheduled_task_pending_deletes
             WHERE task_id IN (SELECT task_id FROM scheduled_tasks WHERE thread_id = ${threadId})
           `;
             return yield* sql<{ task_id: ScheduledTaskId }>`
@@ -1820,7 +1995,9 @@ export const layer = Layer.effect(
                 ${input.signatureVerified ? 1 : 0}, ${encodeMissingFieldsJson(input.missing)},
                 ${input.renderedPrompt?.slice(0, WEBHOOK_DELIVERY_LOG_PROMPT_LIMIT) ?? null},
                 ${input.error ?? null}
-              WHERE EXISTS (SELECT 1 FROM scheduled_tasks WHERE task_id = ${input.taskId})
+              WHERE EXISTS (SELECT 1 FROM scheduled_tasks WHERE task_id = ${input.taskId}
+                AND NOT EXISTS (SELECT 1 FROM scheduled_task_pending_deletes pd
+                  WHERE pd.task_id = scheduled_tasks.task_id))
               -- A held request retried after a rate limit reuses its relay
               -- delivery id; the newer attempt replaces the logged one.
               ON CONFLICT (delivery_id) DO UPDATE SET
@@ -2547,6 +2724,7 @@ export const layer = Layer.effect(
       upsert,
       setEnabled,
       delete: deleteTask,
+      undoDelete: undoDeleteTask,
       deleteForThread,
       moveThreadTasks,
       runNow,

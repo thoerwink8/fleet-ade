@@ -64,13 +64,13 @@ function buildDefinitionRegistry(
   const registry = new Map<KnownComposerContextKind, ContextPresentationDefinition>();
   for (const definition of definitions) {
     if (registry.has(definition.kind)) {
-      throw new Error(`Duplicate context presentation definition: ${definition.kind}`);
+      throw new Error(`上下文展示定义重复：${definition.kind}`);
     }
     registry.set(definition.kind, definition);
   }
   for (const kind of COMPOSER_CONTEXT_KINDS) {
     if (!registry.has(kind)) {
-      throw new Error(`Missing context presentation definition: ${kind}`);
+      throw new Error(`缺少上下文展示定义：${kind}`);
     }
   }
   return registry;
@@ -110,13 +110,13 @@ export function createContextPresentationRegistry<TRecord, TRenderContext, TResu
   >();
   for (const handler of options.handlers) {
     if (handlers.has(handler.kind)) {
-      throw new Error(`Duplicate context presentation handler: ${handler.kind}`);
+      throw new Error(`上下文展示处理器重复：${handler.kind}`);
     }
     handlers.set(handler.kind, handler);
   }
   for (const kind of options.requiredKinds ?? []) {
     if (!handlers.has(kind)) {
-      throw new Error(`Missing context presentation handler: ${kind}`);
+      throw new Error(`缺少上下文展示处理器：${kind}`);
     }
   }
 

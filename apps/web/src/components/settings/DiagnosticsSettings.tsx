@@ -520,7 +520,7 @@ function ProcessResourceHistoryChart({
                 }
               />
               <TooltipPopup side="top">
-                Avg {bucket.avgCpuPercent.toFixed(1)}%, peak {bucket.maxCpuPercent.toFixed(1)}%
+                平均 {bucket.avgCpuPercent.toFixed(1)}%，峰值 {bucket.maxCpuPercent.toFixed(1)}%
               </TooltipPopup>
             </Tooltip>
           );
@@ -673,10 +673,10 @@ function DiagnosticsLastChecked({ checkedAt }: { checkedAt: DateTime.Utc | null 
     <span className="text-2xs text-muted-foreground/60">
       {relative.suffix ? (
         <>
-          Checked <span className="font-mono tabular-nums">{relative.value}</span> {relative.suffix}
+          检查于 <span className="font-mono tabular-nums">{relative.value}</span> {relative.suffix}
         </>
       ) : (
-        <>Checked {relative.value}</>
+        <>检查于 {relative.value}</>
       )}
     </span>
   );
@@ -1084,7 +1084,7 @@ function DiagnosticsSettingsBody() {
         }
       >
         <StatsGrid>
-          <StatBlock label="Spans" value={data ? formatCount(data.recordCount) : "..."} />
+          <StatBlock label="Span" value={data ? formatCount(data.recordCount) : "..."} />
           <StatBlock
             label="失败次数"
             value={data ? formatCount(data.failureCount) : "..."}
@@ -1141,7 +1141,7 @@ function DiagnosticsSettingsBody() {
 
       <SettingsSection title="最近的失败">
         {data && data.latestFailures.length > 0 ? (
-          <DiagnosticsTable headers={["Span", "Cause", "Duration", "Ended"]}>
+          <DiagnosticsTable headers={["Span", "原因", "耗时", "结束于"]}>
             {data.latestFailures.map((failure) => (
               <tr key={`${failure.traceId}:${failure.spanId}`}>
                 <td className="px-4 py-3 align-top text-xs font-medium text-foreground first:sm:pl-5">
@@ -1167,7 +1167,7 @@ function DiagnosticsSettingsBody() {
       <SettingsSection title="最常见的失败">
         {data && data.commonFailures.length > 0 ? (
           <DiagnosticsTable
-            headers={["Span", "Count", "Cause", "最后出现时间"]}
+            headers={["Span", "次数", "原因", "最后出现时间"]}
             minTableWidth="min-w-[760px]"
           >
             {data.commonFailures.map((failure) => (
@@ -1195,7 +1195,7 @@ function DiagnosticsSettingsBody() {
       <SettingsSection title="最慢的 Span">
         {data && data.slowestSpans.length > 0 ? (
           <DiagnosticsTable
-            headers={["Span", "Duration", "Ended", "Trace"]}
+            headers={["Span", "耗时", "结束于", "追踪"]}
             minTableWidth="min-w-[900px]"
             columnWidths={["w-[44%]", "w-[14%]", "w-[12%]", "w-[30%]"]}
           >

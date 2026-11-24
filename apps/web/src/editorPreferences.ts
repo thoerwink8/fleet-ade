@@ -27,7 +27,7 @@ export class PreferredEditorEnvironmentRequiredError extends Schema.TaggedError<
   },
 ) {
   override get message(): string {
-    return `Cannot open ${this.targetPath} because no environment is selected.`;
+    return `无法打开 ${this.targetPath}，因为没有选择电脑。`;
   }
 }
 
@@ -40,7 +40,7 @@ export class PreferredEditorUnavailableError extends Schema.TaggedError<Preferre
   },
 ) {
   override get message(): string {
-    return `No available editor can open ${this.targetPath} in environment ${this.environmentId}.`;
+    return `电脑 ${this.environmentId} 中没有可用的编辑器能打开 ${this.targetPath}。`;
   }
 }
 

@@ -170,7 +170,7 @@ function wordDocuments(
   const paragraphText: number[] = [];
   let inText = false;
   let truncated = incomplete;
-  const limit = Symbol("Word preview limit");
+  const limit = Symbol("wordPreviewLimit");
   const countText = (text: string) => {
     if (!inText || paragraphText.length === 0) return;
     const length = paragraphText.at(-1)! + text.length;
@@ -532,8 +532,7 @@ function engineStyles(xml: string) {
   parser.on("opentag", (tag) => {
     if (++depth > 64) throw new Error("此工作簿的 XML 嵌套过深。");
     if (depth !== 2 || !["numFmts", "cellStyleXfs", "cellXfs"].includes(tag.local)) return;
-    if (blocks.has(tag.local))
-      throw new Error("This workbook contains duplicate stylesheet blocks.");
+    if (blocks.has(tag.local)) throw new Error("这个工作簿包含重复的样式表块。");
     blocks.set(tag.local, {
       start: xml.lastIndexOf("<", parser.position - 1),
       end: parser.position,
@@ -807,7 +806,7 @@ function wordXmlCost(xml: string, roles: Set<string> | undefined) {
   const parser = xmlParser();
   let depth = 0;
   let markup = 0;
-  const limit = Symbol("Word style budget");
+  const limit = Symbol("wordStyleBudget");
   const exceeded = {
     bytes: Infinity,
     markup: Infinity,

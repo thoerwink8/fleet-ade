@@ -177,3 +177,22 @@ html[data-theme="dark"]
     linear-gradient(var(--fa-hover), var(--fa-hover)),
     linear-gradient(var(--fa-hover), var(--fa-hover));
 }
+
+/* A pressed toggle keeps the neutral selected fill, not the accent and not the
+   hover gradient, so idle, hover and pressed read as three different states.
+   Disabled stays muted text but the fill remains, so a pressed disabled toggle
+   is still visibly pressed. */
+.fa-btn.ade-toggle:is([aria-pressed="true"], [data-pressed]) {
+  background-color: var(--fa-selected);
+  background-image: none;
+}
+
+.fa-btn.ade-toggle:is([aria-pressed="true"], [data-pressed]):is(
+    [disabled],
+    [data-disabled],
+    [aria-disabled="true"]
+  ) {
+  background-color: var(--fa-selected);
+  background-image: none;
+  color: var(--fa-fg-muted);
+}

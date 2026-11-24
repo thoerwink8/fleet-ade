@@ -494,29 +494,33 @@ export const layerExecutor: Layer.Layer<
                   : { restoreFiles: effect.request.restoreFiles }),
               })
               .pipe(
-                Effect.tapCause((cause) =>
-                  willRetry || Cause.hasInterruptsOnly(cause)
-                    ? Effect.void
-                    : threads
-                        .dispatch({
-                          type: "checkpoint.rollback.fail",
-                          commandId: CommandId.make(`${effect.commandId}:rollback-failed`),
-                          threadId: effect.threadId,
-                          requestId: effect.commandId,
-                          message: Option.match(Cause.findErrorOption(cause), {
-                            onNone: () => CheckpointRollbackService.ROLLBACK_FAILED_MESSAGE,
-                            onSome: CheckpointRollbackService.rollbackFailureClientMessage,
-                          }),
-                        })
-                        .pipe(
-                          Effect.catchCause((recordCause) =>
-                            Effect.logWarning("Failed to record rollback failure", {
-                              effectId: effect.id,
-                              cause: recordCause,
-                            }),
-                          ),
-                        ),
-                ),
+                Effect.tapCause((cause) => {
+                  if (willRetry || Cause.hasInterruptsOnly(cause)) return Effect.void;
+                  const rollbackError = Cause.findErrorOption(cause);
+                  const failureCode = Option.isSome(rollbackError)
+                    ? CheckpointRollbackService.rollbackFailureCode(rollbackError.value)
+                    : undefined;
+                  return threads
+                    .dispatch({
+                      type: "checkpoint.rollback.fail",
+                      commandId: CommandId.make(`${effect.commandId}:rollback-failed`),
+                      threadId: effect.threadId,
+                      requestId: effect.commandId,
+                      message: Option.match(rollbackError, {
+                        onNone: () => CheckpointRollbackService.ROLLBACK_FAILED_MESSAGE,
+                        onSome: CheckpointRollbackService.rollbackFailureClientMessage,
+                      }),
+                      ...(failureCode === undefined ? {} : { code: failureCode }),
+                    })
+                    .pipe(
+                      Effect.catchCause((recordCause) =>
+                        Effect.logWarning("Failed to record rollback failure", {
+                          effectId: effect.id,
+                          cause: recordCause,
+                        }),
+                      ),
+                    );
+                }),
                 Effect.mapError(
                   (cause) =>
                     new OrchestrationEffectExecutionError({

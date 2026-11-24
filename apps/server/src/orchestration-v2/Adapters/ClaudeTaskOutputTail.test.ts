@@ -163,4 +163,31 @@ describe("claudeTaskOutputRoot", () => {
         );
       }).pipe(Effect.provide(NodeServices.layer)),
   );
+
+  it.effect("uses Claude Code's bare claude directory on Windows", () =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      assert.equal(
+        claudeTaskOutputRoot({ TMPDIR: "/var/tmp" }, path, null, "win32"),
+        "/var/tmp/claude",
+      );
+      assert.equal(
+        claudeTaskOutputRoot(
+          { CLAUDE_CODE_TMPDIR: "/srv/claude", TMPDIR: "/var/tmp" },
+          path,
+          null,
+          "win32",
+        ),
+        "/srv/claude/claude",
+      );
+      assert.equal(
+        claudeTaskOutputRoot({ TEMP: "/win/temp", TMP: "/win/tmp" }, path, null, "win32"),
+        "/win/temp/claude",
+      );
+      assert.equal(
+        claudeTaskOutputRoot({ TMPDIR: "tmp" }, path, "/work/project", "win32"),
+        "/work/project/tmp/claude",
+      );
+    }).pipe(Effect.provide(Path.layer)),
+  );
 });

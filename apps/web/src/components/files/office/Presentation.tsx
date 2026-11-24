@@ -79,7 +79,7 @@ export default function Presentation(props: {
         if (slides.length === 0 || slides.length > 500)
           throw new Error("预览仅支持 1 至 500 张幻灯片的演示文稿。");
         setOpened({ slides, paint });
-        onDetails(`${slides.length} slide${slides.length === 1 ? "" : "s"}`);
+        onDetails(`${slides.length} 张幻灯片`);
       })
       .catch(fail);
     return () => {

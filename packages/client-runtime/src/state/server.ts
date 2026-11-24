@@ -1229,6 +1229,11 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverRunStorageCleanup,
       concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
     }),
+    previewStorageCleanup: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:preview-storage-cleanup",
+      tag: WS_METHODS.serverPreviewStorageCleanup,
+      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
+    }),
     databaseStorage,
     databaseCompactionRecommendations,
     reclaimDatabaseSpace: createEnvironmentRpcCommand(runtime, {
@@ -1631,6 +1636,12 @@ export function createServerEnvironmentAtoms<R, E>(
     deleteScheduledTask: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:scheduled-task:delete",
       tag: WS_METHODS.scheduledTasksDelete,
+      scheduler: configScheduler,
+      concurrency: configConcurrency,
+    }),
+    undoScheduledTaskDelete: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:scheduled-task:undo-delete",
+      tag: WS_METHODS.scheduledTasksUndoDelete,
       scheduler: configScheduler,
       concurrency: configConcurrency,
     }),

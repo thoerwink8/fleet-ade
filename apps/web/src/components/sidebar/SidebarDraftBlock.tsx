@@ -1,19 +1,14 @@
-import { discardComposerDraft } from "../../lib/discardComposerDraft";
-import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
-import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
-import { SquarePenIcon, XIcon } from "lucide-react";
+import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
+import { GitBranchIcon, SquarePenIcon, XIcon } from "lucide-react";
 import {
   memo,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { useShallow } from "zustand/react/shallow";
-import { cn } from "~/lib/utils";
-import { resolveSidebarRowAccessibility } from "../Sidebar.logic";
-import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+
+import { textDirection } from "~/textDirection";
 import {
   composerDraftHasUserContent,
   DraftId,
@@ -21,14 +16,71 @@ import {
   type ComposerThreadDraftState,
   type DraftSessionState,
 } from "../../composerDraftStore";
+import { discardComposerDraft } from "../../lib/discardComposerDraft";
+import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
+import { Badge } from "../ui/badge";
 import {
-  draftPenClassName,
-  draftSurfaceClassName,
-  SIDEBAR_ROW_BUTTON_HIT_AREA,
-} from "./SidebarThreadRow";
+  selectVisibleDraftRows,
+  resolveDraftRowPresentation,
+  type DraftRowPresentation,
+  type SidebarDraftRowData,
+} from "./SidebarDraftBlock.logic";
+import { SidebarRelativeTimeLabel, SidebarRowIconButton, SidebarRowShell } from "./SidebarRowShell";
+
+function SidebarDraftDetails(props: {
+  presentation: DraftRowPresentation;
+  project: ProjectFaviconProject | null;
+}) {
+  const { presentation } = props;
+  const metaParts = [
+    presentation.statusLabel,
+    presentation.attachmentSummary,
+    presentation.contextSummary,
+  ].filter(Boolean);
+  return (
+    <div data-testid="sidebar-draft-details">
+      <div className="ade-thread-details__title">{presentation.title}</div>
+      {presentation.detailBody !== null ? (
+        <div
+          className="fa-cap"
+          data-testid="sidebar-draft-detail-body"
+          dir={textDirection(presentation.detailBody)}
+        >
+          {presentation.detailBody}
+        </div>
+      ) : null}
+      <div className="fa-cap" data-testid="sidebar-draft-status">
+        {metaParts.join(" · ")}
+      </div>
+      {presentation.projectDisplayName ? (
+        <div className="fa-cap" data-testid="sidebar-draft-project">
+          {props.project ? (
+            <ProjectFavicon
+              project={props.project}
+              className="mr-1 inline-flex size-3 shrink-0 align-text-bottom"
+            />
+          ) : null}
+          {presentation.projectDisplayName}
+        </div>
+      ) : null}
+      {presentation.branch ? (
+        <div className="fa-cap" data-testid="sidebar-draft-branch">
+          <GitBranchIcon className="mr-1 inline size-3" />
+          {presentation.branch}
+        </div>
+      ) : null}
+      {presentation.createdAt ? (
+        <div className="fa-cap" data-testid="sidebar-draft-time">
+          <SidebarRelativeTimeLabel timestamp={presentation.createdAt} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   draftId: DraftId;
+  session: DraftSessionState;
   composer: ComposerThreadDraftState;
   project: ProjectFaviconProject | null;
   projectDisplayName: string | null;
@@ -37,36 +89,28 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   onDiscard: (draftId: DraftId) => void;
   onContextMenu: (draftId: DraftId, position: { x: number; y: number }) => void;
 }) {
-  const { composer, draftId, onContextMenu, onDiscard, onNavigate } = props;
-  const promptPreview =
-    assistantCitationsToPlainText(
-      replaceComposerContextReferences(composer.prompt, (occurrence) => occurrence.label),
-    )
-      .trim()
-      .split("\n", 1)[0] ?? "";
-  // images mirrors persistedAttachments once rehydration finishes; before
-  // that only the persisted list is populated, hence max not sum.
-  const attachmentCount =
-    Math.max(composer.images.length, composer.persistedAttachments.length) +
-    composer.files.length +
-    composer.terminalContexts.length +
-    composer.previewAnnotations.length +
-    composer.reviewComments.length;
-  const preview =
-    promptPreview.length > 0
-      ? promptPreview
-      : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
-  const accessibility = resolveSidebarRowAccessibility({
-    title: preview,
-    statusLabel: "未发送的草稿",
-    projectDisplayName: props.projectDisplayName,
-    isActive: props.isActive,
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const {
+    composer,
+    draftId,
+    isActive,
+    onContextMenu,
+    onDiscard,
+    onNavigate,
+    projectDisplayName,
+    session,
+  } = props;
+  const presentation = resolveDraftRowPresentation({
+    composer,
+    session,
+    projectDisplayName,
+    isActive,
   });
   const handleActivate = () => onNavigate(draftId);
   const handleKeyDown = (event: ReactKeyboardEvent) => {
-    // Keys targeting the nested discard button belong to the button:
+    // Keys targeting the nested action buttons belong to those buttons:
     // preventDefault here would swallow Space's synthesized click and
-    // navigate instead of discarding.
+    // navigate instead of activating the button.
     if ((event.target as HTMLElement).closest("button")) return;
     if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
       event.preventDefault();
@@ -86,69 +130,45 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
     event.stopPropagation();
     onDiscard(draftId);
   };
+
   return (
-    <li className="list-none py-0.5">
-      <div
-        role="button"
-        tabIndex={0}
-        data-sidebar-row={`draft:${draftId}`}
-        aria-label={accessibility.label}
-        aria-current={accessibility.current}
-        data-testid="sidebar-draft-row"
-        className={cn(
-          "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-lg border border-transparent text-left text-sidebar-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-          props.isActive ? "bg-sidebar-row-active" : draftSurfaceClassName,
-        )}
-        onClick={handleActivate}
-        onContextMenu={handleContextMenu}
-        onKeyDown={handleKeyDown}
-      >
-        <span className="sr-only">{preview}</span>
-        <div className="relative z-10 flex flex-col gap-1 px-3 py-2">
-          <div className="flex h-6 min-w-0 items-center gap-1.5">
-            <SquarePenIcon aria-hidden className={draftPenClassName} />
-            {props.project ? (
-              <ProjectFavicon project={props.project} className="size-4 shrink-0" />
-            ) : null}
-            <span className="min-w-0 flex-1 truncate text-row font-medium text-secondary-label">
-              {props.projectDisplayName}
-            </span>
-            <span className="ml-auto flex h-6 min-w-6 shrink-0 items-center justify-end">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-label="丢弃草稿"
-                      onClick={handleDiscard}
-                      className={cn(
-                        SIDEBAR_ROW_BUTTON_HIT_AREA,
-                        "pointer-events-none inline-flex h-6 min-w-6 shrink-0 cursor-pointer items-center justify-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
-                      )}
-                    >
-                      <XIcon className="size-3" />
-                    </button>
-                  }
-                />
-                <TooltipPopup side="top">丢弃草稿</TooltipPopup>
-              </Tooltip>
-            </span>
-          </div>
-          <div aria-hidden className="min-h-5 truncate text-row font-medium text-foreground/90">
-            {preview}
-          </div>
+    <SidebarRowShell
+      rowKey={`draft:${draftId}`}
+      testId="sidebar-draft-row"
+      ariaLabel={presentation.accessibility.label}
+      ariaCurrent={presentation.accessibility.current}
+      selected={isActive}
+      onClick={handleActivate}
+      onContextMenu={handleContextMenu}
+      onKeyDown={handleKeyDown}
+      detailsOpen={detailsOpen}
+      onDetailsOpenChange={setDetailsOpen}
+      detailsLabel="草稿详情"
+      details={<SidebarDraftDetails presentation={presentation} project={props.project} />}
+      lead={<SquarePenIcon aria-hidden className="size-3.5 text-muted-foreground" />}
+      body={
+        <div className="t" dir={textDirection(presentation.title)} aria-hidden>
+          {presentation.title}
         </div>
-      </div>
-    </li>
+      }
+      endPrefix={
+        <Badge variant="secondary" aria-hidden>
+          {presentation.badgeLabel}
+        </Badge>
+      }
+      meta={
+        presentation.createdAt ? (
+          <SidebarRelativeTimeLabel timestamp={presentation.createdAt} />
+        ) : null
+      }
+      actions={
+        <SidebarRowIconButton label="丢弃草稿" tooltip="丢弃草稿" onClick={handleDiscard}>
+          <XIcon className="size-4" />
+        </SidebarRowIconButton>
+      }
+    />
   );
 });
-
-interface SidebarDraftRowData {
-  draftId: DraftId;
-  session: DraftSessionState;
-  composer: ComposerThreadDraftState;
-}
 
 export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
   projectByKey: ReadonlyMap<string, EnvironmentProject>;
@@ -185,33 +205,13 @@ export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
     }
     setFrozenActive({ routeDraftId: props.routeDraftId, row });
   }
-  const drafts = (() => {
-    const rows: SidebarDraftRowData[] = [];
-    for (const [draftKey, session] of Object.entries(draftThreadsByThreadKey)) {
-      if (session.promotedTo != null) {
-        continue;
-      }
-      if (
-        props.scopedProjectKeys !== null &&
-        !props.scopedProjectKeys.has(`${session.environmentId}:${session.projectId}`)
-      ) {
-        continue;
-      }
-      if (draftKey === props.routeDraftId) {
-        if (frozenActive.routeDraftId === draftKey && frozenActive.row !== null) {
-          rows.push(frozenActive.row);
-        }
-        continue;
-      }
-      const composer = draftsByThreadKey[draftKey];
-      if (!composer || !composerDraftHasUserContent(composer)) {
-        continue;
-      }
-      rows.push({ draftId: DraftId.make(draftKey), session, composer });
-    }
-    rows.sort((left, right) => right.session.createdAt.localeCompare(left.session.createdAt));
-    return rows;
-  })();
+  const drafts = selectVisibleDraftRows({
+    draftThreadsByThreadKey,
+    draftsByThreadKey,
+    scopedProjectKeys: props.scopedProjectKeys,
+    routeDraftId: props.routeDraftId,
+    frozenActive,
+  });
   if (drafts.length === 0) {
     return null;
   }
@@ -223,6 +223,7 @@ export const SidebarDraftBlock = memo(function SidebarDraftBlock(props: {
           <SidebarDraftRow
             key={draftId}
             draftId={draftId}
+            session={session}
             composer={composer}
             project={props.projectByKey.get(projectKey) ?? null}
             projectDisplayName={props.projectDisplayNameByKey.get(projectKey) ?? null}

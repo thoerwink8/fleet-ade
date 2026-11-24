@@ -23,10 +23,11 @@ function stashEntrySnippet(entry: PromptStashEntry): string {
   const fileCount = entry.files?.length ?? 0;
   const attachmentCount = imageCount + fileCount;
   if (attachmentCount === 0) {
-    return "(empty)";
+    return "（空）";
   }
-  const label = imageCount > 0 && fileCount > 0 ? "attachment" : fileCount > 0 ? "文件" : "图片";
-  return `(${attachmentCount} ${label}${attachmentCount === 1 ? "" : "s"})`;
+  if (imageCount > 0 && fileCount > 0) return `（${attachmentCount} 个附件）`;
+  if (fileCount > 0) return `（${fileCount} 个文件）`;
+  return `（${imageCount} 张图片）`;
 }
 
 /** Window capture gives the open menu priority over composer key handlers. */
@@ -193,13 +194,11 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
                 <ComposerBanner.Actions>
                   {entry.pendingImageCount ? (
                     <span className="shrink-0 text-muted-foreground">
-                      saving {entry.pendingImageCount} 图片
-                      {entry.pendingImageCount === 1 ? "" : "s"}…
+                      正在保存 {entry.pendingImageCount} 张图片…
                     </span>
                   ) : missingImageCount(entry) > 0 ? (
                     <span className="shrink-0 text-warning-foreground">
-                      {missingImageCount(entry)} 图片
-                      {missingImageCount(entry) === 1 ? "" : "s"} dropped
+                      {missingImageCount(entry)} 张图片未能保存
                     </span>
                   ) : null}
                   {entry.attachments.length > 0 ? (

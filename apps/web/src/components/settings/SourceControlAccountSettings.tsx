@@ -152,7 +152,7 @@ export function SourceControlAccountSettings({
                         {(value: string) =>
                           value === ACTIVE_ACCOUNT ? (
                             <span className="flex min-w-0 items-center gap-1">
-                              活跃 {cliName} account
+                              活跃 {cliName} 账户
                               {group.activeAccount ? (
                                 <>
                                   (
@@ -173,7 +173,7 @@ export function SourceControlAccountSettings({
                     <SelectPopup align="end" alignItemWithTrigger={false}>
                       <SelectItem value={ACTIVE_ACCOUNT}>
                         <span className="flex min-w-0 items-center gap-1">
-                          活跃 {cliName} account
+                          活跃 {cliName} 账户
                           {group.activeAccount ? (
                             <>
                               (<RedactedLogin revealed={revealed} account={group.activeAccount} />)

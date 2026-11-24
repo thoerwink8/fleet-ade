@@ -156,9 +156,7 @@ describe("document preview contents", () => {
           "</spine></package>",
       )
       .file("chapter.xhtml", "<html><body>" + "<figcaption/>".repeat(30_000) + "</body></html>");
-    await expect(openEpub(archive)).rejects.toThrow(
-      "The rendered document is too large to preview.",
-    );
+    await expect(openEpub(archive)).rejects.toThrow("渲染后的文档过大，无法预览。");
   });
 
   it("decodes rich text formatting and Unicode without showing hidden destinations", () => {
@@ -205,7 +203,7 @@ Third}`;
       "<p>Third</p>",
     ]);
     expect(() => openRtf(bytes(String.raw`{\rtf1 ` + String.raw`\page`.repeat(501) + "}"))).toThrow(
-      "500 pages",
+      "富文本预览只支持 500 页以内的文档。",
     );
   });
 
@@ -217,7 +215,9 @@ Third}`;
     const result = openRtf(input.buffer);
     if (result.type !== "document") throw new Error("Expected document");
     expect(result.pages[0]!.html).toBe("<p>А А<br>あ</p>");
-    expect(() => openRtf(bytes(String.raw`{\rtf1\ansicpg99999 text}`))).toThrow("code page");
+    expect(() => openRtf(bytes(String.raw`{\rtf1\ansicpg99999 text}`))).toThrow(
+      "不支持这份富文本的代码页。",
+    );
   });
 
   it("resolves scoped ODF namespaces and explicit spreadsheet whitespace", async () => {
@@ -249,9 +249,7 @@ Third}`;
       .file("picture.png", pixels);
     const image = archive.file("picture.png")!;
     const read = vi.spyOn(image, "async");
-    await expect(openDocument(archive, "odp")).rejects.toThrow(
-      "The rendered document is too large to preview.",
-    );
+    await expect(openDocument(archive, "odp")).rejects.toThrow("渲染后的文档过大，无法预览。");
     expect(read.mock.calls.filter(([type]) => type === "base64")).toHaveLength(2);
     expect(read).toHaveBeenCalledTimes(5);
   });
@@ -300,12 +298,14 @@ Third}`;
         },
       ],
     });
-    expect(() => openNotebook(bytes('{"nbformat":3,"cells":[]}'))).toThrow("version 4");
+    expect(() => openNotebook(bytes('{"nbformat":3,"cells":[]}'))).toThrow(
+      "预览只支持最多 500 个单元格的第 4 版笔记本。",
+    );
     expect(() =>
       openNotebook(
         bytes(JSON.stringify({ nbformat: 4, cells: Array.from({ length: 501 }, () => ({})) })),
       ),
-    ).toThrow("500 cells");
+    ).toThrow("预览只支持最多 500 个单元格的第 4 版笔记本。");
   });
 
   it("bounds repeated OpenDocument spreadsheet cells and keeps sheet names and values", async () => {
@@ -366,7 +366,7 @@ Third}`;
       "content.xml",
       '<!DOCTYPE x [<!ENTITY external SYSTEM "file:///etc/passwd">]><x>&external;</x>',
     );
-    await expect(openDocument(archive, kind)).rejects.toThrow("unsupported XML");
+    await expect(openDocument(archive, kind)).rejects.toThrow("这份文档包含无效或不支持的 XML。");
   });
 
   it("reads EPUB chapters in spine order and removes active and remote content", async () => {

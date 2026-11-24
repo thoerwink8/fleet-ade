@@ -99,7 +99,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
   });
 
   worker.addEventListener("error", (event) =>
-    fail(new WorkerClosedError({ message: event.message || "The Office engine stopped" })),
+    fail(new WorkerClosedError({ message: event.message || "Office 引擎已停止" })),
   );
   worker.addEventListener("messageerror", () =>
     fail(new WorkerClosedError({ message: "Office 引擎返回了无法读取的回复" })),

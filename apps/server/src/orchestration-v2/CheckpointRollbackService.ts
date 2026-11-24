@@ -2,7 +2,10 @@ import {
   CheckpointId,
   CheckpointScopeId,
   latestProviderTurnForAttempt,
+  type OrchestrationV2CheckCheckpointRestoreInput,
+  type OrchestrationV2CheckCheckpointRestoreResult,
   type OrchestrationV2DomainEvent,
+  type OrchestrationV2RollbackFailureCode,
   ProviderThreadId,
   ThreadId,
   VcsProcessExitError,
@@ -75,6 +78,18 @@ export class CheckpointRollbackExecutionError extends Schema.TaggedError<Checkpo
   }
 }
 
+class CheckpointRestoreCheckError extends Schema.TaggedError<CheckpointRestoreCheckError>()(
+  "CheckpointRestoreCheckError",
+  {
+    threadId: ThreadId,
+    cause: Schema.Defect(),
+  },
+) {
+  override get message(): string {
+    return "Failed to check checkpoint restore safety.";
+  }
+}
+
 const isCheckpointRollbackExecutionError = Schema.is(CheckpointRollbackExecutionError);
 const isVcsProcessExitError = Schema.is(VcsProcessExitError);
 const isCheckpointRestoreError = Schema.is(CheckpointRestoreError);
@@ -85,10 +100,31 @@ const isCheckpointRestoreError = Schema.is(CheckpointRestoreError);
  * output, so they fall back to the generic message.
  */
 export function rollbackFailureClientMessage(error: CheckpointRollbackExecutionError): string {
+  if (error.reason === "shared-workspace") return SHARED_WORKSPACE_RESTORE_MESSAGE;
   const restoreCause = isCheckpointRestoreError(error.cause) ? error.cause.cause : undefined;
   return isVcsProcessExitError(restoreCause) && restoreCause.detail === GIT_INDEX_LOCKED_DETAIL
     ? GIT_INDEX_LOCKED_DETAIL
     : ROLLBACK_FAILED_MESSAGE;
+}
+
+export function rollbackFailureCode(
+  error: CheckpointRollbackExecutionError,
+): OrchestrationV2RollbackFailureCode | undefined {
+  switch (error.reason) {
+    case "shared-workspace":
+      return "shared-workspace";
+    case "rollback-target-invalid":
+      return "checkpoint-unavailable";
+    case "active-provider-changed":
+    case "provider-turn-unavailable":
+      return "rollback-failed";
+    case "unexpected-failure": {
+      const restoreCause = isCheckpointRestoreError(error.cause) ? error.cause.cause : undefined;
+      return isVcsProcessExitError(restoreCause) && restoreCause.detail === GIT_INDEX_LOCKED_DETAIL
+        ? "git-index-locked"
+        : undefined;
+    }
+  }
 }
 
 export interface CheckpointRollbackServiceV2Shape {
@@ -99,6 +135,9 @@ export interface CheckpointRollbackServiceV2Shape {
     readonly scopeId: CheckpointScopeId;
     readonly restoreFiles?: boolean;
   }) => Effect.Effect<void, CheckpointRollbackExecutionError>;
+  readonly checkRestoreSafety: (
+    input: OrchestrationV2CheckCheckpointRestoreInput,
+  ) => Effect.Effect<OrchestrationV2CheckCheckpointRestoreResult, CheckpointRestoreCheckError>;
 }
 
 export class CheckpointRollbackServiceV2 extends Context.Service<
@@ -417,6 +456,71 @@ export const layer: Layer.Layer<
       );
     });
 
+    const checkRestoreSafety = Effect.fn("orchestrationV2.checkpointRollback.checkRestoreSafety")(
+      function* (input: OrchestrationV2CheckCheckpointRestoreInput) {
+        const [thread, checkpointContext] = yield* Effect.all([
+          projections.getThread(input.threadId),
+          projections.getCheckpointContext(input.threadId),
+        ]);
+        const checkpoint = checkpointContext.checkpoints.findLast(
+          (candidate) =>
+            (candidate.status === "ready" || candidate.status === "missing") &&
+            (input.turnCount === 0
+              ? candidate.ordinalWithinScope === 0 && candidate.appRunOrdinal === null
+              : candidate.appRunOrdinal === input.turnCount),
+        );
+        const removedTurnCount = checkpointContext.runs.filter(
+          (run) =>
+            run.ordinal > input.turnCount &&
+            (run.status === "completed" ||
+              run.status === "interrupted" ||
+              run.status === "failed" ||
+              run.status === "cancelled"),
+        ).length;
+        const scope =
+          checkpoint === undefined
+            ? undefined
+            : checkpointContext.checkpointScopes.find(
+                (candidate) => candidate.id === checkpoint.scopeId,
+              );
+        if (checkpoint === undefined || checkpoint.status !== "ready" || scope === undefined) {
+          return {
+            canRestoreFiles: false as const,
+            reason: "checkpoint-missing" as const,
+            removedTurnCount,
+          };
+        }
+        const isolated = yield* isCheckpointRestoreIsolated(thread, scope, {
+          fileSystem,
+          projections,
+          projects,
+          path,
+        });
+        if (!isolated) {
+          return {
+            canRestoreFiles: false as const,
+            reason: "shared-workspace" as const,
+            inProjectDirectory: thread.worktreePath === null,
+            removedTurnCount,
+          };
+        }
+        return {
+          canRestoreFiles: true as const,
+          removedTurnCount,
+        };
+      },
+      (effect, input) =>
+        effect.pipe(
+          Effect.mapError(
+            (cause) =>
+              new CheckpointRestoreCheckError({
+                threadId: input.threadId,
+                cause,
+              }),
+          ),
+        ),
+    );
+
     return CheckpointRollbackServiceV2.of({
       // The inner execute owns the rollback span; this wrapper selects the workspace lease.
       execute: Effect.fnUntraced(
@@ -448,6 +552,7 @@ export const layer: Layer.Layer<
             ),
           ),
       ),
+      checkRestoreSafety,
     });
   }),
 );
