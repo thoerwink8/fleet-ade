@@ -201,3 +201,26 @@ it.each([
     expect(screen.getByRole("button", { name, exact: true }).element()).toBeEnabled();
   },
 );
+
+it("shows a cancellable waiting button when a send is queued behind readiness blockers", async () => {
+  const props = setup();
+  const onCancelPendingSend = vi.fn();
+  await using screen = await render(
+    <ComposerPrimaryActions
+      {...props}
+      isRunning={false}
+      canInterrupt={false}
+      hasSendableContent
+      pendingSendReason="正在压缩图片，好了自动发送"
+      onCancelPendingSend={onCancelPendingSend}
+    />,
+  );
+  const waitingButton = screen
+    .getByRole("button", { name: "正在压缩图片，好了自动发送，点击取消", exact: true })
+    .element() as HTMLButtonElement;
+  expect(waitingButton).toBeEnabled();
+  expect(waitingButton.textContent).toContain("等待中");
+  await act(() => waitingButton.click());
+  expect(onCancelPendingSend).toHaveBeenCalledTimes(1);
+  expect(props.onSubmitMessage).not.toHaveBeenCalled();
+});

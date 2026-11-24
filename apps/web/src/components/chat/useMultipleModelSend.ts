@@ -37,6 +37,7 @@ import {
   draftSendState,
   type MultipleModelTarget,
   type prepareTurnAttachments,
+  recordDraftSendFailure,
   restoreComposerDraft,
   startFanoutThread,
 } from "./chatViewSend";
@@ -227,8 +228,10 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     });
     if (sendResult._tag === "Failure") {
       const error = squashAtomCommandFailure(sendResult);
+      const reason = error instanceof Error ? error.message : "无法发送消息。";
       failedSelections.push(...selections);
-      setThreadError(threadId, error instanceof Error ? error.message : "无法发送消息。");
+      setThreadError(threadId, reason);
+      recordDraftSendFailure(routeThreadKey, reason);
     }
     const restoreFailedDraft = () => {
       appAtomRegistry.set(fanoutSelectionsAtom, failedSelections);

@@ -383,7 +383,12 @@ import {
   useSystemComposerBanners,
 } from "./chat/useSystemComposerBanners";
 import { useLocalDispatchState } from "./chat/useLocalDispatchState";
-import { draftFanoutSelectionsAtom, draftSendState } from "./chat/chatViewSend";
+import {
+  draftFanoutSelectionsAtom,
+  draftSendState,
+  useDraftSendFailure,
+  useDraftSendInFlight,
+} from "./chat/chatViewSend";
 import {
   isCompactCommandMessage,
   type LocalThreadErrorEntry,
@@ -3023,10 +3028,21 @@ export default function ChatView(props: ChatViewProps) {
   };
   const onWorktreeSetupWorkLocallyStable = useStableCallback(onWorktreeSetupWorkLocally);
   const onComposerSendStable = useStableCallback(onSend);
+  const draftSendInFlight = useDraftSendInFlight(routeThreadKey);
+  const draftSendFailure = useDraftSendFailure(routeThreadKey);
   const sendPreviewAnnotation = (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
   ) => {
+    const composer = composerRef.current;
+    if (composer) {
+      composer.submit({
+        dispatchMode: "auto",
+        submissionIntent: "foreground",
+        directAnnotation: { annotation, image },
+      });
+      return;
+    }
     void onSend(undefined, "auto", "foreground", { annotation, image });
   };
   const sendPreviewAnnotationStable = useStableCallback(sendPreviewAnnotation);
@@ -3784,8 +3800,10 @@ export default function ChatView(props: ChatViewProps) {
                                   (setupQueueSendThreadKey !== null &&
                                     setupQueueSendThreadKey === activeThreadKey) ||
                                   queuedRunEdit.isSaving ||
-                                  isResuming
+                                  isResuming ||
+                                  draftSendInFlight
                                 }
+                                previousSendFailure={draftSendFailure}
                                 canResume={canResume}
                                 isRevertingCheckpoint={isRevertingCheckpoint}
                                 sendDisabledReason={

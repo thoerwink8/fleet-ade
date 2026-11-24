@@ -159,6 +159,7 @@ export function useComposerContextImport(input: {
     importTargetKey: string,
   ) => {
     const fail = (reason: string) => {
+      pendingDraftWork.fail(importTargetKey, `无法把“${record.name}”放入这条消息：${reason}`);
       toastManager.add({
         type: "error",
         title: `无法把 ${record.name} 放入这条消息`,
