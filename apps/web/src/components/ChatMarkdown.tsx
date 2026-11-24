@@ -1218,8 +1218,8 @@ const CHAT_MARKDOWN_COMPONENTS = {
                       type: "error",
                       title:
                         operation === "link-pull-request-to-thread"
-                          ? "无法关联 pull request"
-                          : "无法取消关联 pull request",
+                          ? "无法关联 PR"
+                          : "无法取消关联 PR",
                       description: cause instanceof Error ? cause.message : "请求失败。",
                     }),
                   );

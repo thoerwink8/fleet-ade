@@ -140,8 +140,8 @@ const SURFACE_DISABLED_REASONS = {
   terminal: "终端面板仅在项目会话中可用。",
   files: "打开项目后才能使用文件面板。",
   diff: "还没有文件改动。",
-  pullRequest: "此会话的分支尚无 pull request。",
-  pullRequests: "此会话没有可用的已关联 pull request。",
+  pullRequest: "此会话的分支尚无 PR。",
+  pullRequests: "此会话没有可用的已关联 PR。",
   sideChat: "发送第一条消息后才能开始侧聊。",
 } as const;
 
@@ -163,8 +163,8 @@ const SURFACE_UNAVAILABLE_HINTS = {
   terminal: "打开项目后可用。",
   files: "打开项目后可用。",
   diff: "还没有文件改动。",
-  pullRequest: "此分支尚无 pull request。",
-  pullRequests: "没有可用的已关联 pull request。",
+  pullRequest: "此分支尚无 PR。",
+  pullRequests: "没有可用的已关联 PR。",
   sideChat: "发送第一条消息后可用。",
 } as const;
 
