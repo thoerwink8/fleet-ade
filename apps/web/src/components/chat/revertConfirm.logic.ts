@@ -44,20 +44,84 @@ const isRewindFailureError = Schema.is(RewindFailureError);
 const isDispatchCommandError = Schema.is(OrchestrationV2DispatchCommandError);
 const isCheckpointUnavailableError = Schema.is(OrchestrationV2CheckpointUnavailableError);
 
-/** Codes without an entry here (stop-and-rewind) fall back to the server detail. */
-const ROLLBACK_FAILURE_MESSAGES: Readonly<
-  Partial<Record<OrchestrationV2RollbackFailureCode, string>>
-> & {
-  readonly "checkpoint-unavailable": string;
-  readonly "rollback-failed": string;
-} = {
-  "shared-workspace":
-    "无法还原文件：这个目录现在和别的会话或侧聊共用。请重新点回退，选择「只回退会话」保留当前文件改动。",
-  "checkpoint-unavailable":
-    "无法还原文件：这一轮的文件快照不可用。请重新点回退，选择「只回退会话」保留当前文件改动。",
-  "git-index-locked": "无法还原文件：Git 正在执行其他操作。请稍等片刻后重试，或选择只回退会话。",
-  "rollback-failed": "无法回退会话。请重试；如果多次失败，请查看后台服务日志。",
+/** The one thing a person can do about a failed rewind. */
+export type RollbackFailureAction = "retry" | "force-stop" | "cancel" | "dismiss";
+
+export interface RollbackFailurePresentation {
+  readonly message: string;
+  readonly action: RollbackFailureAction;
+}
+
+/**
+ * Every failure code the server can send, with what happened and what to do next. The record is
+ * exhaustive on purpose: a code added to the contract fails to compile until it has a sentence.
+ */
+const ROLLBACK_FAILURE_PRESENTATIONS: Readonly<
+  Record<OrchestrationV2RollbackFailureCode, RollbackFailurePresentation>
+> = {
+  "shared-workspace": {
+    message:
+      "无法还原文件：这个目录现在和别的会话或侧聊共用。请重新点回退，选择「只回退会话」保留当前文件改动。",
+    action: "retry",
+  },
+  "checkpoint-unavailable": {
+    message:
+      "无法还原文件：这一轮的文件快照不可用。请重新点回退，选择「只回退会话」保留当前文件改动。",
+    action: "retry",
+  },
+  "git-index-locked": {
+    message: "无法还原文件：Git 正在执行其他操作。请稍等片刻后重试，或选择只回退会话。",
+    action: "retry",
+  },
+  "rollback-failed": {
+    message: "无法回退会话。请重试；如果多次失败，请查看后台服务日志。",
+    action: "retry",
+  },
+  "target-invalid": {
+    message: "这条消息已经不能回退，可能是会话刚发生了变化。智能体已停止，请重新选择要回退的消息。",
+    action: "dismiss",
+  },
+  "checkpoint-missing": {
+    message: "这一轮的文件快照没有存下来，无法还原文件。请重新点回退，选择「只回退会话」。",
+    action: "retry",
+  },
+  "provider-cannot-rollback": {
+    message: "这个智能体不支持回退会话记录。请改为新建会话。",
+    action: "dismiss",
+  },
+  "provider-cannot-interrupt": {
+    message: "这个智能体在运行中无法被停止，所以不能直接回退。请等它运行结束后再回退。",
+    action: "dismiss",
+  },
+  "provider-turn-unavailable": {
+    message: "智能体找不到这条消息对应的那一轮，无法回退到这里。请选择更早的消息，或新建会话。",
+    action: "dismiss",
+  },
+  "provider-turn-active": {
+    message: "智能体还在收尾这一轮，暂时不能回退。请稍等几秒后重试。",
+    action: "retry",
+  },
+  "interrupt-unresponsive": {
+    message: "智能体没有响应停止。点「强制停止」结束它，回退会接着完成；也可以取消这次回退。",
+    action: "force-stop",
+  },
+  "pending-rollback": {
+    message: "上一次回退还在等智能体停止。请等它完成，或先取消再操作。",
+    action: "cancel",
+  },
+  "rollback-already-pending": {
+    message: "已经有一次回退在等智能体停止。请等它完成，或先取消再回退。",
+    action: "cancel",
+  },
 };
+
+const FALLBACK_FAILURE = ROLLBACK_FAILURE_PRESENTATIONS["rollback-failed"];
+
+export function rollbackFailurePresentation(
+  code: OrchestrationV2RollbackFailureCode,
+): RollbackFailurePresentation {
+  return ROLLBACK_FAILURE_PRESENTATIONS[code];
+}
 
 /** Count settled runs that a rollback to `turnCount` removes, matching ProjectionStore. */
 export function countRollbackTurns(
@@ -124,29 +188,27 @@ export function describeRevertConfirm(input: {
 
 export function formatRollbackFailureMessage(error: unknown): string {
   if (isRewindFailureError(error)) {
-    return (
-      ROLLBACK_FAILURE_MESSAGES[error.code ?? "rollback-failed"] ??
-      (error.rawMessage.trim() || ROLLBACK_FAILURE_MESSAGES["rollback-failed"])
-    );
+    return error.code === undefined
+      ? error.rawMessage.trim() || FALLBACK_FAILURE.message
+      : ROLLBACK_FAILURE_PRESENTATIONS[error.code].message;
   }
   if (
     isDispatchCommandError(error) ||
     (Predicate.isObject(error) && error._tag === "OrchestrationV2DispatchCommandError")
   ) {
     if ("code" in error && isRollbackFailureCode(error.code)) {
-      const known = ROLLBACK_FAILURE_MESSAGES[error.code];
-      if (known !== undefined) return known;
+      return ROLLBACK_FAILURE_PRESENTATIONS[error.code].message;
     }
     if ("detail" in error && typeof error.detail === "string" && error.detail.trim().length > 0) {
       return error.detail.trim();
     }
-    return ROLLBACK_FAILURE_MESSAGES["rollback-failed"];
+    return FALLBACK_FAILURE.message;
   }
   if (
     isCheckpointUnavailableError(error) ||
     (Predicate.isObject(error) && error._tag === "OrchestrationV2CheckpointUnavailableError")
   ) {
-    return ROLLBACK_FAILURE_MESSAGES["checkpoint-unavailable"];
+    return ROLLBACK_FAILURE_PRESENTATIONS["checkpoint-unavailable"].message;
   }
   if (Predicate.isObject(error) && error._tag === "EnvironmentAuthorizationError") {
     return "没有操作此电脑会话的权限。";
@@ -160,8 +222,10 @@ export function formatRollbackFailureMessage(error: unknown): string {
 export function revertButtonLabel(input: {
   readonly isWorking: boolean;
   readonly isRevertingCheckpoint: boolean;
+  /** The server stops a running thread itself, so the button needs no prior Stop. */
+  readonly canRewindWhileWorking?: boolean;
 }): string {
-  if (input.isWorking) return "正在运行，先停止再回退";
+  if (input.isWorking && input.canRewindWhileWorking !== true) return "正在运行，先停止再回退";
   if (input.isRevertingCheckpoint) return "正在回退…";
   return "回退到这条消息之前";
 }

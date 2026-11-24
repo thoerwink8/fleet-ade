@@ -235,6 +235,14 @@ export interface RevertThreadCheckpointInput extends ThreadCommandInput {
   readonly turnCount?: number;
 }
 
+export interface StopAndRollbackThreadInput extends ThreadCommandInput {
+  /** Target app run ordinal; the server resolves its checkpoint once the thread has stopped. */
+  readonly turnCount: number;
+  readonly restoreFiles?: boolean;
+}
+
+export type CancelPendingRollbackInput = ThreadCommandInput;
+
 export type StopThreadSessionInput = ThreadCommandInput;
 
 export interface ForkThreadFromRunInput extends CommandMetadata {
@@ -1110,6 +1118,29 @@ export const revertThreadCheckpoint = Effect.fn("EnvironmentCommands.revertThrea
       threadId: input.threadId,
       scopeId: checkpoint.scopeId,
       checkpointId: checkpoint.id,
+    });
+  },
+);
+
+/** Stops a running thread and rewinds it in one command; the server finishes the rewind. */
+export const stopAndRollbackThread = Effect.fn("EnvironmentCommands.stopAndRollbackThread")(
+  function* (input: StopAndRollbackThreadInput) {
+    return yield* dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: yield* allocateCommandId(input),
+      threadId: input.threadId,
+      turnCount: input.turnCount,
+      ...(input.restoreFiles === undefined ? {} : { restoreFiles: input.restoreFiles }),
+    });
+  },
+);
+
+export const cancelPendingRollback = Effect.fn("EnvironmentCommands.cancelPendingRollback")(
+  function* (input: CancelPendingRollbackInput) {
+    return yield* dispatch({
+      type: "thread.pending-rollback.cancel",
+      commandId: yield* allocateCommandId(input),
+      threadId: input.threadId,
     });
   },
 );

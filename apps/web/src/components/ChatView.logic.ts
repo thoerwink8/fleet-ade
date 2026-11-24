@@ -15,6 +15,7 @@ import type { SetStateAction } from "react";
 import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3tools/shared/model";
 import { getProviderModelCapabilities } from "../providerModels";
 import { RewindFailureError } from "./chat/revertConfirm.logic";
+import { classifyRewindOutcome } from "./chat/stopAndRewind.logic";
 import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
@@ -892,6 +893,77 @@ export async function waitForRevertedMessage(
         accepted = true;
         inspect();
       }, finish);
+  });
+}
+
+/** The person cancelled the rewind this client was waiting on; nothing should be shown. */
+export class RewindCancelledError extends Error {
+  override name = "RewindCancelledError";
+  constructor() {
+    super("回退已取消。");
+  }
+}
+
+/**
+ * Waits for the `thread.stop-and-rollback` this client sent: completed id, this request's stored
+ * failure, or `signal`. Once ended it listens to nothing, so a late outcome is ignored. No
+ * deadline while the rewind is held for the run to stop; other stretches end at `timeoutMs`.
+ */
+export function waitForRollbackOutcome(
+  threadRef: ScopedThreadRef,
+  requestId: CommandId,
+  send: () => Promise<void>,
+  options: { readonly signal?: AbortSignal; readonly timeoutMs?: number } = {},
+): Promise<void> {
+  const { signal, timeoutMs = 120_000 } = options;
+  const threadAtom = environmentThreadDetails.stateAtom(threadRef);
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let unsubscribe = () => {};
+    let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const finish = (error?: unknown) => {
+      if (settled) return;
+      settled = true;
+      if (timeout !== undefined) globalThis.clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
+      unsubscribe();
+      if (error !== undefined) reject(error);
+      else resolve();
+    };
+    const onAbort = () => finish(new RewindCancelledError());
+    const armTimeout = (held: boolean) => {
+      if (held) {
+        if (timeout !== undefined) globalThis.clearTimeout(timeout);
+        timeout = undefined;
+        return;
+      }
+      timeout ??= globalThis.setTimeout(() => {
+        finish(new Error("等待会话回退超时。"));
+      }, timeoutMs);
+    };
+    const inspect = () => {
+      const projection = Option.getOrNull(appAtomRegistry.get(threadAtom).data);
+      if (!projection) return;
+      const outcome = classifyRewindOutcome(projection.thread, requestId);
+      if (outcome.kind === "completed") return finish();
+      if (outcome.kind === "failed") {
+        return finish(
+          new RewindFailureError({
+            rawMessage: outcome.message,
+            ...(outcome.code === undefined ? {} : { code: outcome.code }),
+          }),
+        );
+      }
+      armTimeout(projection.thread.pendingRollback?.requestId === requestId);
+    };
+    if (signal?.aborted === true) {
+      finish(new RewindCancelledError());
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+    unsubscribe = appAtomRegistry.subscribe(threadAtom, inspect);
+    armTimeout(false);
+    Promise.resolve().then(send).then(inspect, finish);
   });
 }
 

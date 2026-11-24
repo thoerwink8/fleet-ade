@@ -2,6 +2,7 @@ import {
   CommandId,
   OrchestrationV2CheckpointUnavailableError,
   OrchestrationV2DispatchCommandError,
+  OrchestrationV2RollbackFailureCode,
   RunId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -13,6 +14,7 @@ import {
   describeRevertConfirm,
   formatRollbackFailureMessage,
   revertButtonLabel,
+  rollbackFailurePresentation,
 } from "./revertConfirm.logic";
 
 describe("describeRevertConfirm", () => {
@@ -160,6 +162,34 @@ describe("revertButtonLabel", () => {
     expect(revertButtonLabel({ isWorking: false, isRevertingCheckpoint: true })).toBe("正在回退…");
     expect(revertButtonLabel({ isWorking: false, isRevertingCheckpoint: false })).toBe(
       "回退到这条消息之前",
+    );
+  });
+});
+
+describe("rollbackFailurePresentation", () => {
+  it.each(OrchestrationV2RollbackFailureCode.literals)(
+    "gives %s a Chinese sentence without the code name and one next step",
+    (code) => {
+      const view = rollbackFailurePresentation(code);
+      expect(view.message).toMatch(/[一-鿿]/u);
+      expect(view.message).not.toContain(code);
+      expect(view.message).not.toMatch(/[A-Za-z]{4,}/u);
+      expect(["retry", "force-stop", "cancel", "dismiss"]).toContain(view.action);
+    },
+  );
+
+  it("sends an unanswered stop to force stop and a busy turn to retry", () => {
+    expect(rollbackFailurePresentation("interrupt-unresponsive").action).toBe("force-stop");
+    expect(rollbackFailurePresentation("provider-turn-active").action).toBe("retry");
+  });
+
+  it("uses the mapped text for a stored failure instead of the server English", () => {
+    const failure = new RewindFailureError({
+      rawMessage: "Rollback target is invalid.",
+      code: "target-invalid",
+    });
+    expect(formatRollbackFailureMessage(failure)).toBe(
+      rollbackFailurePresentation("target-invalid").message,
     );
   });
 });
