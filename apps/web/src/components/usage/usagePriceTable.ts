@@ -39,7 +39,7 @@ export function usageAliasCell(targets: readonly UsagePriceTarget[], model: stri
   if (targets.some((target) => target.aliases === null))
     return { value: "", placeholder: "不可用" };
   const values = targets.map((target) => modelAlias(target, model) ?? "");
-  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "各不相同" };
+  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "多项不同" };
   return { value: values[0] ?? "", placeholder: "无" };
 }
 
@@ -53,7 +53,7 @@ export function usagePriceCell(
     modelPrice(target, model) ? usagePriceForm(model, modelPrice(target, model))[field] : null,
   );
   if (targets.some((target) => target.prices === null)) return { value: "", placeholder: "不可用" };
-  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "各不相同" };
+  if (values.some((value) => value !== values[0])) return { value: "", placeholder: "多项不同" };
   return {
     value: values[0] ?? "",
     placeholder: values[0] === null ? "自动" : optional ? "输入价格" : "0.00",

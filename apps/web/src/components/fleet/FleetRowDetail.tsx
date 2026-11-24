@@ -94,12 +94,12 @@ export function FleetRowDetail({
                 {offline ? <Badge variant="secondary">最后已知</Badge> : null}
                 {row.needsYou ? <Badge variant="dot-attention">要你看</Badge> : null}
                 {!row.needsYou && row.phase === "stuck" ? (
-                  <Badge variant="dot-blocked">卡住</Badge>
+                  <Badge variant="dot-blocked">出错了</Badge>
                 ) : null}
                 {!row.needsYou && row.phase === "working" ? (
-                  <Badge variant="dot-active">在做</Badge>
+                  <Badge variant="dot-active">运行中</Badge>
                 ) : null}
-                {row.phase === "done" ? <Badge variant="dot-done">做完</Badge> : null}
+                {row.phase === "done" ? <Badge variant="dot-done">已完成</Badge> : null}
               </div>
               {row.needsYou || row.phase === "stuck" ? (
                 <div className="flex flex-col gap-1">

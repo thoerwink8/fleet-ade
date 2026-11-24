@@ -40,7 +40,7 @@ function reportScriptFailure(result: AtomCommandResult<unknown, unknown>) {
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: "项目操作保存失败",
+      title: "无法保存项目操作",
       description: error instanceof Error ? error.message : "发生错误。",
     });
   }

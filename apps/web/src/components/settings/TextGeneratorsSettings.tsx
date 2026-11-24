@@ -235,7 +235,7 @@ const TASKS = [
   { key: "textGenerationModelSelection", label: "会话标题和其他生成的文本" },
   {
     key: "sourceControlWriterModelSelection",
-    label: "提交信息、pull request 和分支名称",
+    label: "提交信息、PR 和分支名称",
   },
 ] as const;
 

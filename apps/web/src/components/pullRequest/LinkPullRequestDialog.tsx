@@ -103,7 +103,7 @@ function LinkPullRequestDialog({
     setPending(false);
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      setSubmitError(error instanceof Error ? error.message : "无法关联该 pull request。");
+      setSubmitError(error instanceof Error ? error.message : "无法关联该 PR。");
       return;
     }
     onOpenChange(false);
@@ -112,9 +112,9 @@ function LinkPullRequestDialog({
   const validation = !dirty
     ? null
     : reference.trim().length === 0
-      ? "粘贴 pull request URL，或输入 123 / #123。"
+      ? "粘贴 PR URL，或输入 123 / #123。"
       : resolved === null
-        ? "请使用 pull request URL、123 或 #123。"
+        ? "请使用 PR URL、123 或 #123。"
         : "error" in resolved
           ? resolved.error
           : null;
@@ -124,9 +124,7 @@ function LinkPullRequestDialog({
       <DialogPopup className="max-w-xl" initialFocus={inputRef}>
         <DialogHeader>
           <DialogTitle>关联 PR</DialogTitle>
-          <DialogDescription>
-            通过 URL 或此会话仓库中的编号，将 pull request 关联到此会话。
-          </DialogDescription>
+          <DialogDescription>通过 URL 或此会话仓库中的编号，将 PR 关联到此会话。</DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <Input

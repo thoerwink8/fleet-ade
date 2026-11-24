@@ -376,7 +376,7 @@ function EmptySourceControlDiscovery({
           <EmptyDescription>
             {hasError
               ? error
-              : "在这台电脑上安装 Git，添加工作区所需的可选托管集成或凭据，然后重新扫描。"}
+              : "在这台电脑上安装 Git，添加项目所需的可选托管集成或凭据，然后重新扫描。"}
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>

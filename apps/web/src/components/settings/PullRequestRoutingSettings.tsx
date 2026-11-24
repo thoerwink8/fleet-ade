@@ -93,7 +93,7 @@ export function PullRequestRoutingSettings({
                   if (result._tag === "Failure")
                     toastManager.add({
                       type: "error",
-                      title: "无法保存 pull request 路由权限",
+                      title: "无法保存 PR 路由权限",
                     });
                 },
               );

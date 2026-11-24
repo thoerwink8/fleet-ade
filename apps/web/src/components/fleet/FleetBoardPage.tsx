@@ -71,9 +71,9 @@ export interface FleetSearch {
 
 const STATUS_LABELS: Record<FleetBoardStatus, string> = {
   needsYou: "要你看",
-  stuck: "卡住",
-  working: "在做",
-  done: "做完",
+  stuck: "出错了",
+  working: "运行中",
+  done: "已完成",
 };
 
 function useFleetSearch(): FleetSearch {
@@ -608,7 +608,7 @@ export function FleetBoardPage() {
             ) : allRows.length === 0 ? (
               <FleetBoardEmpty
                 icon={<MonitorIcon />}
-                title="这台汇总电脑上没有在跑或 24 小时内做完的活"
+                title="这台汇总电脑上没有运行中或 24 小时内已完成的任务"
               />
             ) : groups.length === 0 ? (
               <FleetBoardEmpty icon={<SearchIcon />} title="没有符合筛选的" action={clearFilters} />
@@ -681,7 +681,7 @@ export function FleetBoardPage() {
                                 !open && "-rotate-90",
                               )}
                             />
-                            做完 {rows.done.length}
+                            已完成 {rows.done.length}
                           </CollapsibleTrigger>
                           <CollapsiblePanel>
                             <div className="flex flex-col">

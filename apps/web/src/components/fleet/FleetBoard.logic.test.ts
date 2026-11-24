@@ -156,7 +156,7 @@ it("formats reasons, ages and machine names", () => {
   expect(fleetFullReason("line1\nline2")).toBe("line1\nline2");
   expect(fleetStaleReason({ stale: true, staleReason: "environment offline" })).toBeNull();
   expect(fleetStaleReason({ stale: true, staleReason: "lease lost" })).toBe(
-    "卡住 · 这台电脑已不在做这单",
+    "出错了 · 这台电脑已不在处理这单",
   );
   expect(fleetStaleReason({ stale: false, staleReason: "lease lost" })).toBeNull();
   const at = "2026-01-01T00:00:00Z";

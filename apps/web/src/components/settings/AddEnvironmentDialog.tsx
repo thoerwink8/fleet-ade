@@ -411,7 +411,7 @@ export function AddEnvironmentDialog({
       </div>
       <div>
         <span className="mt-1 block text-2xs text-muted-foreground">
-          在这里粘贴完整的配对 URL，即可自动填写两个字段。
+          在这里粘贴完整的配对链接，即可自动填写两个字段。
         </span>
       </div>
     </div>

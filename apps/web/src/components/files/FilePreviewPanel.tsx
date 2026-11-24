@@ -200,7 +200,7 @@ function WorkspaceImagePreview(props: {
     return (
       <MediaActions source={actionsSource}>
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs leading-relaxed text-destructive">
-          无法加载工作区图片。
+          无法加载项目图片。
         </div>
       </MediaActions>
     );
@@ -1557,7 +1557,7 @@ export default function FilePreviewPanel({
                 ) : null}
                 {!isHostFile ? (
                   <p className="text-muted-foreground">
-                    工作区文件夹：{" "}
+                    项目文件夹：{" "}
                     <code className="break-all font-mono select-all">
                       {file.readError?.cwd ?? cwd}
                     </code>

@@ -235,7 +235,7 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "克隆失败",
+            title: "无法克隆",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -414,7 +414,7 @@ function PullRequestLinkCheckout({
   return (
     <LinkPage
       title={`要检出 ${owner}/${name}#${number} 吗？`}
-      description="这会把该 pull request 的代码放到新的工作树中，并在其上运行你项目的设置脚本。"
+      description="这会把该 PR 的代码放到新的工作树中，并在其上运行你项目的设置脚本。"
     >
       <Button
         size="sm"

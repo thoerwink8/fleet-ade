@@ -138,7 +138,7 @@ function BreadcrumbMenuContent(props: {
           <MenuItem disabled>此文件夹已不可用。</MenuItem>
         ) : children.length === 0 ? (
           <MenuItem disabled>
-            {entriesTruncated ? "工作区索引不完整，其中没有此文件夹的可用条目。" : "此文件夹为空。"}
+            {entriesTruncated ? "项目索引不完整，其中没有此文件夹的可用条目。" : "此文件夹为空。"}
           </MenuItem>
         ) : (
           <MenuRadioGroup
@@ -205,7 +205,7 @@ function BreadcrumbMenuContent(props: {
       {entriesTruncated ? (
         <>
           <MenuSeparator />
-          <MenuItem disabled>部分工作区条目未显示。</MenuItem>
+          <MenuItem disabled>部分项目条目未显示。</MenuItem>
         </>
       ) : null}
     </MenuPopup>

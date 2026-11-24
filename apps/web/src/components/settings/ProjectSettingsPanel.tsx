@@ -231,7 +231,7 @@ export function ProjectSettingsPanel({
   }
   if (members.length === 0)
     return (
-      <p className="p-8 text-sm text-muted-foreground">此工作副本在所选项目和电脑中已不可用。</p>
+      <p className="p-8 text-sm text-muted-foreground">此项目目录在所选项目和电脑中已不可用。</p>
     );
   const scopedGroup = scopeProjectSettingsGroup(selected, members);
   return (
@@ -423,7 +423,7 @@ function ProjectDetail({
           variant="outline"
           disabled={!editableIds.has(member.environmentId)}
           onClick={() => void removeMembers([member])}
-          aria-label={`移除工作副本 ${member.workspaceRoot}`}
+          aria-label={`移除项目目录 ${member.workspaceRoot}`}
         >
           移除
         </Button>
@@ -431,9 +431,9 @@ function ProjectDetail({
     </div>
   );
   const checkoutChoices = (
-    <SettingsSection title="工作副本">
+    <SettingsSection title="项目目录">
       <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        分组规则决定每个工作副本如何加入侧边栏中的项目组。修改规则可能会将工作副本移到其他项目。
+        分组规则决定每个项目目录如何加入侧边栏中的项目组。修改规则可能会将项目目录移到其他项目。
       </p>
       {Array.from(checkoutsByEnvironment, ([environmentId, members]) => {
         if (checkoutsByEnvironment.size === 1) {
@@ -514,7 +514,7 @@ function ProjectDetail({
           {!canEditGroup ? (
             <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">
               {group.memberProjects.length > 1
-                ? "修改共享设置需要对本组中的每个工作副本都有修改权限。"
+                ? "修改共享设置需要对本组中的每个项目目录都有修改权限。"
                 : "此连接无法更改此项目。"}
             </p>
           ) : null}
@@ -653,16 +653,16 @@ function ProjectDetail({
           <SettingsRow
             title={
               hasOtherMembers
-                ? "移除工作副本"
+                ? "移除项目目录"
                 : group.memberProjects.length > 1
                   ? "从所有位置移除此项目"
                   : "移除项目"
             }
             description={
               hasOtherMembers
-                ? "删除所选电脑上的工作副本条目及其会话。其他电脑和磁盘上的文件不受影响。"
+                ? "删除所选电脑上的项目目录条目及其会话。其他电脑和磁盘上的文件不受影响。"
                 : group.memberProjects.length > 1
-                  ? `删除所有电脑上的全部 ${group.memberProjects.length} 个工作副本条目及其会话。磁盘上的文件不受影响。`
+                  ? `删除所有电脑上的全部 ${group.memberProjects.length} 个项目目录条目及其会话。磁盘上的文件不受影响。`
                   : "删除项目条目及其会话。磁盘上的文件不受影响。"
             }
             control={
@@ -674,7 +674,7 @@ function ProjectDetail({
               >
                 <Trash2Icon />
                 {hasOtherMembers
-                  ? "移除工作副本"
+                  ? "移除项目目录"
                   : group.memberProjects.length > 1
                     ? "移除所有条目"
                     : "移除项目"}

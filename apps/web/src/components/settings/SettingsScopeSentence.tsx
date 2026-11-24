@@ -309,14 +309,14 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="shrink-0">的</span>
       <ScopeMenu
-        ariaLabel="工作副本范围"
+        ariaLabel="项目目录范围"
         icon={<FolderIcon aria-hidden className="size-3.5 shrink-0" />}
         label={
           selected
             ? settingsScopeCheckoutLabel(selected, checkouts)
             : value.checkout
-              ? "工作副本不可用"
-              : "全部工作副本"
+              ? "项目目录不可用"
+              : "全部项目目录"
         }
         value={value.checkout ?? ALL_CHECKOUTS_VALUE}
         onChange={(next) =>
@@ -327,8 +327,8 @@ function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) 
             ),
           )
         }
-        searchLabel="搜索工作副本"
-        allOption={{ value: ALL_CHECKOUTS_VALUE, label: "全部工作副本" }}
+        searchLabel="搜索项目目录"
+        allOption={{ value: ALL_CHECKOUTS_VALUE, label: "全部项目目录" }}
         options={checkouts.map((member) => ({
           value: member.physicalProjectKey,
           label: fileBasename(member.workspaceRoot),

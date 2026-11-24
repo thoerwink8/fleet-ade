@@ -43,15 +43,15 @@ const MODE_OPTIONS: Record<SourceControlWritingStyleMode, { label: string; descr
   {
     repo_conventions: {
       label: "仓库规范",
-      description: "提交信息以及 pull request 的标题和说明沿用各项目的历史风格。",
+      description: "提交信息以及 PR 的标题和说明沿用各项目的历史风格。",
     },
     conventional_commits: {
       label: "约定式提交",
-      description: "使用约定式提交前缀，pull request 标题和说明保持简短。",
+      description: "使用约定式提交前缀，PR 标题和说明保持简短。",
     },
     custom: {
       label: "自定义指令",
-      description: "按你的指令编写提交信息以及 pull request 的标题和说明。",
+      description: "按你的指令编写提交信息以及 PR 的标题和说明。",
     },
   };
 
@@ -182,7 +182,7 @@ export function SourceControlWritingSettingsSection() {
             <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="提交与 PR 文案">
               <SelectValue>
                 {(value: SourceControlWritingStyleMode | null) =>
-                  value === null ? "混合" : MODE_OPTIONS[value].label
+                  value === null ? "多项不同" : MODE_OPTIONS[value].label
                 }
               </SelectValue>
             </SelectTrigger>
@@ -204,7 +204,7 @@ export function SourceControlWritingSettingsSection() {
                   value={allInstructions ?? ""}
                   onChange={(event) => setAllInstructions(event.target.value)}
                   rows={4}
-                  aria-label="所有所选电脑共用的自定义提交与 pull request 指令"
+                  aria-label="所有所选电脑共用的自定义提交与 PR 指令"
                   placeholder="输入每台所选电脑应使用的指令。"
                 />
                 <Button
@@ -251,8 +251,8 @@ export function SourceControlWritingSettingsSection() {
                 }
               }}
               rows={4}
-              placeholder="提交标题不超过 60 个字符，pull request 说明保持简短直白。"
-              aria-label="自定义提交与 pull request 指令"
+              placeholder="提交标题不超过 60 个字符，PR 说明保持简短直白。"
+              aria-label="自定义提交与 PR 指令"
             />
           </div>
         ) : null}
@@ -268,7 +268,7 @@ export function SourceControlWritingSettingsSection() {
           settingKeys={["sourceControlWritingStyle"]}
           mixed={templatesMixed}
           {...searchableSetting("follow-change-request-templates")}
-          description="仓库有 pull request 模板时使用该模板。"
+          description="仓库有 PR 模板时使用该模板。"
           resetAction={
             templatesMixed ||
             style.followChangeRequestTemplates !== defaults.followChangeRequestTemplates ? (
@@ -304,7 +304,7 @@ export function SourceControlWritingSettingsSection() {
           serverScoped
           settingKeys={["sourceControlWriterModelSelection"]}
           {...searchableSetting("source-control-writer-model")}
-          description="生成提交信息、pull request 文案以及分支或书签名称的模型。关闭时使用这台电脑配置的文本生成模型。"
+          description="生成提交信息、PR 文案以及分支或书签名称的模型。关闭时使用这台电脑配置的文本生成模型。"
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
@@ -325,7 +325,7 @@ export function SourceControlWritingSettingsSection() {
                     modelOptionsByInstance={modelOptionsByInstance}
                     triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
                     triggerAriaLabel="版本控制文案模型"
-                    {...(mixedWriterModel ? { triggerLabel: "各不相同" } : {})}
+                    {...(mixedWriterModel ? { triggerLabel: "多项不同" } : {})}
                     {...(environmentId
                       ? {
                           onOpenProviderSetup: (instanceId: ProviderInstanceId) => {

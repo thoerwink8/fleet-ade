@@ -164,8 +164,8 @@ const NEW_THREAD_DESTINATION = " new-thread";
 
 const WORKSPACE_MODE_LABELS: Record<WorkspaceMode, string> = {
   worktree: "创建新工作树",
-  root: "使用项目工作副本",
-  existing_worktree: "使用指定工作副本",
+  root: "使用项目目录",
+  existing_worktree: "使用指定工作树",
 };
 
 const EMPTY_DRAFT: DraftState = {
@@ -1193,7 +1193,7 @@ function WebhookEndpointField({
 
 const THREAD_MODE_LABELS: Record<ScheduledTaskThreadMode, string> = {
   new_thread: "每次运行新建会话",
-  continue: "在同一会话中继续对话",
+  continue: "在同一会话中继续",
   fresh_session: "在同一会话中运行，每次使用全新上下文",
 };
 
@@ -1254,13 +1254,13 @@ function ScheduledTaskDestination({
   };
   const detail =
     threadMode === "new_thread"
-      ? "每次运行都使用下方的工作区和模型创建新会话。"
+      ? "每次运行都使用下方的目录和模型创建新会话。"
       : ref === null
         ? threadMode === "continue"
-          ? "首次运行使用下方的工作区和模型创建会话，后续运行继续该会话的对话。"
-          : "首次运行使用下方的工作区和模型创建会话。后续运行在该会话中发送消息，每次使用全新上下文，不包含之前运行的内容。"
+          ? "首次运行使用下方的目录和模型创建会话，后续运行继续该会话。"
+          : "首次运行使用下方的目录和模型创建会话。后续运行在该会话中发送消息，每次使用全新上下文，不包含之前运行的内容。"
         : threadMode === "continue"
-          ? "每次运行都在此会话的工作区中使用其当前模型继续对话。"
+          ? "每次运行都在此会话的目录中使用其当前模型继续。"
           : "每次运行都在此会话中使用全新上下文，不包含之前运行的内容。";
   return (
     <Field label="目标会话" htmlFor="scheduled-task-destination">
@@ -1578,7 +1578,7 @@ function ScheduledTaskEditorDialog({
       return;
     }
     if (draft.workspaceMode === "existing_worktree" && !draft.existingWorktreePath.trim()) {
-      reportFailure("请填写工作副本路径", "请输入任务运行所在的工作副本路径。");
+      reportFailure("请填写工作树路径", "请输入任务运行所在的工作树路径。");
       return;
     }
     const modelSelection =
@@ -1826,7 +1826,7 @@ function ScheduledTaskEditorDialog({
                 </Select>
               </Field>
 
-              <Field label="工作区" htmlFor="scheduled-task-workspace">
+              <Field label="目录" htmlFor="scheduled-task-workspace">
                 <Select
                   value={draft.workspaceMode}
                   onValueChange={(value) =>
@@ -1838,8 +1838,8 @@ function ScheduledTaskEditorDialog({
                   </SelectTrigger>
                   <SelectPopup>
                     <SelectItem value="worktree">创建新工作树</SelectItem>
-                    <SelectItem value="root">使用项目工作副本</SelectItem>
-                    <SelectItem value="existing_worktree">使用指定工作副本</SelectItem>
+                    <SelectItem value="root">使用项目目录</SelectItem>
+                    <SelectItem value="existing_worktree">使用指定工作树</SelectItem>
                   </SelectPopup>
                 </Select>
               </Field>
@@ -1863,7 +1863,7 @@ function ScheduledTaskEditorDialog({
               </Field>
             ) : null}
             {draft.workspaceMode === "existing_worktree" ? (
-              <Field label="工作副本路径" htmlFor="scheduled-task-checkout">
+              <Field label="工作树路径" htmlFor="scheduled-task-checkout">
                 <Input
                   id="scheduled-task-checkout"
                   value={draft.existingWorktreePath}

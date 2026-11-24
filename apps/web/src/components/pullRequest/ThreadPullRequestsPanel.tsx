@@ -366,7 +366,7 @@ export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <PullRequestsUnavailableState
         title="已关联的 PR 不可用"
-        error="这台电脑不支持关联多个 pull request。"
+        error="这台电脑不支持关联多个 PR。"
       />
     );
   }
@@ -430,7 +430,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
         <p className="text-row font-medium">没有已关联的 PR</p>
         <p className="max-w-60 text-xs text-muted-foreground">
-          智能体从本会话打开的 pull request 会显示在这里。你也可以通过 URL 或编号自行关联。
+          智能体从本会话打开的 PR 会显示在这里。你也可以通过 URL 或编号自行关联。
         </p>
         <Button size="sm" variant="outline" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />

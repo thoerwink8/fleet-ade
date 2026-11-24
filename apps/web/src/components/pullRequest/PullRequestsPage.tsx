@@ -975,7 +975,7 @@ export function PullRequestsPage() {
       rightPanelAvailable={rightPanelAvailable}
       rightPanelOpen={rightPanelState.isOpen}
       rightPanelShortcutLabel={shortcutLabelForCommand(keybindings, "rightPanel.toggle")}
-      rightPanelUnavailableLabel="请先选择一个 pull request"
+      rightPanelUnavailableLabel="请先选择一个 PR"
       onToggleTerminal={() => undefined}
       onToggleRightPanel={toggleRightPanel}
     />
@@ -1008,7 +1008,7 @@ export function PullRequestsPage() {
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
           title="PR 不可用"
-          error="更新你的 Fleet ADE 后台服务以浏览 pull request。"
+          error="更新你的 Fleet ADE 后台服务以浏览 PR。"
         />
       ) : firstLoad ? (
         <PullRequestListGhost rows={7} caption="正在加载 PR…" />
@@ -1077,7 +1077,7 @@ export function PullRequestsPage() {
               加载更多 PR
             </Button>
           ) : (
-            <span>缩小搜索范围以找到更多 pull request。</span>
+            <span>缩小搜索范围以找到更多 PR。</span>
           )}
         </div>
       ) : null}

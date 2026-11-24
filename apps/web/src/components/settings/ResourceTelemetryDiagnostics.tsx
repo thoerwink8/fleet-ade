@@ -1278,7 +1278,7 @@ function ResourceTelemetryDiagnosticsBody({
       >
         <div className="overflow-hidden rounded-[inherit]">
           <div className="bg-muted/15 px-4 py-3 text-2xs leading-relaxed text-muted-foreground sm:px-5">
-            原生统计显示正在读写的进程。应用层统计标记已知的 T3
+            原生统计显示正在读写的进程。应用层统计标记已知的 Fleet ADE
             操作，帮助你找出进程占用骤增与哪些数据保存和日志写入操作有关。
           </div>
           <AttributionTable entries={snapshot?.attribution.entries ?? []} />

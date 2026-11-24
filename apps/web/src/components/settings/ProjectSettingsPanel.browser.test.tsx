@@ -305,7 +305,7 @@ async function mountSettings(search: SettingsScopeSearch) {
 const nameInput = (screen: Screen) =>
   screen.container.querySelector<HTMLInputElement>('[aria-label="项目名称"]')!;
 const removeCheckout = (screen: Screen, root: string) =>
-  screen.container.querySelector<HTMLButtonElement>(`[aria-label="移除工作副本 ${root}"]`)!;
+  screen.container.querySelector<HTMLButtonElement>(`[aria-label="移除项目目录 ${root}"]`)!;
 const removeAll = (screen: Screen) =>
   [...screen.container.querySelectorAll("button")].find((button) =>
     button.textContent?.includes("移除所有条目"),
@@ -358,7 +358,7 @@ describe("project settings permissions", () => {
     expect(nameInput(screen).disabled).toBe(true);
     expect(removeAll(screen).disabled).toBe(true);
     expect(screen.container.textContent).toContain(
-      "修改共享设置需要对本组中的每个工作副本都有修改权限。",
+      "修改共享设置需要对本组中的每个项目目录都有修改权限。",
     );
     expect(state.update).not.toHaveBeenCalled();
   });
@@ -647,18 +647,18 @@ describe("project settings scope", () => {
     const key = projectKey();
     await using screen = await mountSettings({ project: key, machine: primaryId });
 
-    await userEvent.click(page.getByRole("button", { name: "工作副本范围: 全部工作副本" }));
+    await userEvent.click(page.getByRole("button", { name: "项目目录范围: 全部项目目录" }));
     await userEvent.click(page.getByRole("menuitemradio", { name: /clone-b/ }));
 
-    await expect.element(page.getByRole("button", { name: "工作副本范围: clone-b" })).toBeVisible();
+    await expect.element(page.getByRole("button", { name: "项目目录范围: clone-b" })).toBeVisible();
     expect(screen.router.state.location.search).toMatchObject({
       project: key,
       machine: primaryId,
       checkout: expect.stringContaining("clone-b"),
     });
 
-    await userEvent.click(page.getByRole("button", { name: "工作副本范围: clone-b" }));
-    await userEvent.click(page.getByRole("menuitemradio", { name: "全部工作副本" }));
+    await userEvent.click(page.getByRole("button", { name: "项目目录范围: clone-b" }));
+    await userEvent.click(page.getByRole("menuitemradio", { name: "全部项目目录" }));
 
     await vi.waitFor(() =>
       expect(screen.router.state.location.search).toEqual({ project: key, machine: primaryId }),
@@ -683,8 +683,8 @@ describe("project settings scope", () => {
   });
 
   it.each([
-    [undefined, "此项目在这台电脑上没有工作副本。"],
-    ["removed-checkout", "此工作副本在所选项目和电脑中已不可用。"],
+    [undefined, "此项目在这台电脑上没有项目目录。"],
+    ["removed-checkout", "此项目目录在所选项目和电脑中已不可用。"],
   ])("recovers a stale environment link with checkout %s", async (checkout, message) => {
     setup();
     state.projects = state.projects.filter((project) => project.environmentId === primaryId);

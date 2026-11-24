@@ -31,7 +31,7 @@ export function NoProjectsHero() {
             <EmptyDescription>
               {scratchTargetEnvironmentId === null
                 ? "添加项目，开始你的第一个会话。"
-                : "添加项目，或不关联项目直接开始。"}
+                : "添加项目，或直接新建无项目会话。"}
             </EmptyDescription>
             <div className="mt-4 flex justify-center gap-2">
               <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
@@ -45,7 +45,7 @@ export function NoProjectsHero() {
                   onClick={() => void startScratchThread(scratchTargetEnvironmentId)}
                 >
                   <MessageSquareDashedIcon className="size-4" />
-                  不关联项目开始
+                  新建无项目会话
                 </Button>
               )}
             </div>

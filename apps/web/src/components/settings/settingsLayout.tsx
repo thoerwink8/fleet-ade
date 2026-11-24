@@ -455,7 +455,7 @@ export function SettingsRow({
       }),
     );
   const inheritance: { state: SettingInheritanceState; summary: string } = mixed
-    ? { state: "mixed", summary: "所选电脑之间各不相同" }
+    ? { state: "mixed", summary: "所选电脑之间多项不同" }
     : source === "project"
       ? { state: "overridden", summary: "已为此项目覆盖" }
       : source === "t3.json"

@@ -272,7 +272,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "chat-width",
-    title: "聊天宽度",
+    title: "会话宽度",
     to: "/settings/appearance",
     searchTerms: ["wide full width column layout messages composer monitor"],
   },

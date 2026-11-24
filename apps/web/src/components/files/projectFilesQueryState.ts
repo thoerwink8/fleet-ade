@@ -186,7 +186,7 @@ function failureCause<A>(result: AsyncResult.AsyncResult<A, unknown>): unknown {
 
 function errorMessage(cause: unknown): string | null {
   if (cause === null) return null;
-  return cause instanceof Error ? cause.message : "工作区查询失败。";
+  return cause instanceof Error ? cause.message : "项目查询失败。";
 }
 
 const isProjectReadFileError = Schema.is(ProjectReadFileError);

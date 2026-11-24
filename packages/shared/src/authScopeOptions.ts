@@ -23,7 +23,7 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
   {
     scope: AuthOrchestrationReadScope,
     title: "查看会话",
-    description: "读取会话、状态、回退点和配置。",
+    description: "读取会话、状态、文件快照和配置。",
   },
   {
     scope: AuthOrchestrationOperateScope,
@@ -63,12 +63,12 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
   {
     scope: AuthSourceControlWriteScope,
     title: "修改源代码管理",
-    description: "提交、推送，管理分支和仓库，以及修改 pull request。",
+    description: "提交、推送，管理分支和仓库，以及修改 PR。",
   },
   {
     scope: AuthFilesystemReadScope,
     title: "读取文件",
-    description: "浏览文件、搜索项目、查看本地改动。",
+    description: "浏览电脑文件、搜索项目、查看本地改动。",
   },
   {
     scope: AuthFilesystemWriteScope,
@@ -78,12 +78,12 @@ export const AUTH_SCOPE_OPTIONS: ReadonlyArray<{
   {
     scope: AuthAccessReadScope,
     title: "查看访问",
-    description: "查看配对链接和已授权客户端。",
+    description: "查看配对链接、已授权客户端和关联电脑。",
   },
   {
     scope: AuthAccessWriteScope,
     title: "管理访问",
-    description: "为其他客户端签发和吊销凭证。",
+    description: "为其他客户端创建配对链接、撤销访问权限，以及管理关联电脑。",
   },
 ];
 

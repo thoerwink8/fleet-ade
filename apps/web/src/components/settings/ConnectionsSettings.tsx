@@ -652,7 +652,7 @@ function ConnectionsSettingsContent({
 
   const handleRemoveSavedBackend = async (environment: EnvironmentPresentation) => {
     const confirmed = await requestConfirmDialog(
-      "这会删除这里保存的配对信息、凭据和缓存的会话。若只是暂时不用，请改为断开连接。",
+      "这会删除这里保存的配对信息、密钥和缓存的会话。若只是暂时不用，请改为断开。",
       {
         title: `从此设备移除“${environment.label}”？`,
         confirmLabel: "移除",

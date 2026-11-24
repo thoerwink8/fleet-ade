@@ -337,7 +337,7 @@ export function planScopedSettingsPatch(
         : unscopableKeys.length > 0
           ? "此设置是电脑级设置，无法由项目覆盖。"
           : isProjectScope
-            ? "请连接所选工作副本，或更新它们所在的电脑，以保存项目覆盖设置。"
+            ? "请连接所选项目目录，或更新它们所在的电脑，以保存项目覆盖设置。"
             : `请连接 ${scope.kind === "environment" ? scope.label : "一台电脑"} 以保存此设置。`;
   return { clientPatch, hasClientWrite, serverWrites, unavailableReason };
 }
@@ -360,7 +360,7 @@ export function planScopedSettingsClear(
     unavailableReason:
       serverWrites.length > 0
         ? null
-        : "请连接所选工作副本，或更新它们所在的电脑，以重置此覆盖设置。",
+        : "请连接所选项目目录，或更新它们所在的电脑，以重置此覆盖设置。",
   };
 }
 
