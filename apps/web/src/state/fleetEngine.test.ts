@@ -15,8 +15,10 @@ import {
   FLEET_ENGINE_FAILURE_DISMISSED_STORAGE_KEY,
   FLEET_ENGINE_RETRY_ATTEMPTS,
   FLEET_ENGINE_RETRY_INTERVAL_MS,
+  type FleetEngineManualRetryState,
   createDismissedFleetEngineFailureAtom,
   dismissedFleetEngineFailureAtom,
+  executeFleetEngineStatusCheck,
   fetchFleetEngineStatusWithRetry,
   reconcileFleetEngineFailureDismissal,
   resolveFleetEngineFailure,
@@ -279,9 +281,12 @@ describe("fleet engine failure dismissal", () => {
   });
 
   it.effect(
-    "retries configured failures silently before surfacing them and stops after recovery",
+    "retries configured failures every 5s (2 attempts) before surfacing and stops after recovery",
     () =>
       Effect.gen(function* () {
+        expect(FLEET_ENGINE_RETRY_ATTEMPTS).toBe(2);
+        expect(FLEET_ENGINE_RETRY_INTERVAL_MS).toBe(5_000);
+
         const failedStatus: FleetEngineStatus = {
           ...configuredBaseStatus,
           reachable: false,
@@ -306,7 +311,11 @@ describe("fleet engine failure dismissal", () => {
         expect(yield* Queue.take(recoveryAttemptQueue)).toBe(1);
         expect(yield* Deferred.isDone(recoverySettled)).toBe(false);
 
-        yield* TestClock.adjust(Duration.millis(FLEET_ENGINE_RETRY_INTERVAL_MS));
+        yield* TestClock.adjust("4999 millis");
+        expect(yield* Ref.get(recoveryAttempts)).toBe(1);
+        expect(yield* Deferred.isDone(recoverySettled)).toBe(false);
+
+        yield* TestClock.adjust("1 millis");
         expect(yield* Queue.take(recoveryAttemptQueue)).toBe(2);
         const recovered = yield* Fiber.join(recoveryFiber);
         expect(recovered).toEqual(configuredBaseStatus);
@@ -364,5 +373,101 @@ describe("fleet engine failure dismissal", () => {
         expect(manualResult).toEqual(failedStatus);
         expect(yield* Ref.get(manualRetryAttempts)).toBe(1);
       }),
+  );
+
+  it.effect(
+    "tracks real manual retry progress and shows timestamped feedback on persistent failure",
+    () => {
+      const firstRetryTime = new Date(2026, 10, 24, 14, 5, 9).getTime();
+      const secondRetryTime = new Date(2026, 10, 24, 14, 5, 22).getTime();
+      return Effect.gen(function* () {
+        const failedStatus: FleetEngineStatus = {
+          ...configuredBaseStatus,
+          reachable: false,
+          httpStatus: null,
+          reason: "ECONNREFUSED",
+        };
+        const gate = yield* Deferred.make<void>();
+        const requestStarted = yield* Deferred.make<void>();
+        let state: FleetEngineManualRetryState = {
+          inFlight: false,
+          lastFailedAt: null,
+          failureCount: 0,
+        };
+        const onManualRetryState = (
+          update: (previous: FleetEngineManualRetryState) => FleetEngineManualRetryState,
+        ) => {
+          state = update(state);
+        };
+
+        yield* TestClock.setTime(firstRetryTime);
+
+        const retryFiber = yield* executeFleetEngineStatusCheck({
+          readStatus: Deferred.succeed(requestStarted, undefined).pipe(
+            Effect.andThen(Deferred.await(gate)),
+            Effect.as(failedStatus),
+          ),
+          isManualRetry: true,
+          onManualRetryState,
+        }).pipe(Effect.forkScoped);
+
+        yield* Deferred.await(requestStarted);
+        expect(state.inFlight).toBe(true);
+
+        yield* Deferred.succeed(gate, undefined);
+        const firstStatus = yield* Fiber.join(retryFiber);
+        expect(firstStatus).toEqual(failedStatus);
+        expect(state).toEqual({
+          inFlight: false,
+          lastFailedAt: firstRetryTime,
+          failureCount: 1,
+        });
+
+        const firstFailure = resolveFleetEngineFailure({
+          status: firstStatus,
+          error: null,
+          lastRetryFailedAt: state.lastFailedAt,
+          retryFailureCount: state.failureCount,
+        });
+        expect(firstFailure?.description).toBe(
+          "14:05:09 重试过，还是连不上机群服务，请稍后再试，或去 设置 → 连接 查看。",
+        );
+        expect(firstFailure?.description).not.toContain("引擎");
+
+        yield* TestClock.setTime(secondRetryTime);
+        yield* executeFleetEngineStatusCheck({
+          readStatus: Effect.fail("Transport error"),
+          isManualRetry: true,
+          onManualRetryState,
+        }).pipe(Effect.exit);
+        expect(state).toEqual({
+          inFlight: false,
+          lastFailedAt: secondRetryTime,
+          failureCount: 2,
+        });
+
+        const secondFailure = resolveFleetEngineFailure({
+          status: failedStatus,
+          error: "Transport error",
+          lastRetryFailedAt: state.lastFailedAt,
+          retryFailureCount: state.failureCount,
+        });
+        expect(secondFailure?.description).toBe(
+          "14:05:22 第 2 次重试，还是连不上机群服务，请稍后再试，或去 设置 → 连接 查看。",
+        );
+
+        const recoveredStatus = yield* executeFleetEngineStatusCheck({
+          readStatus: Effect.succeed(configuredBaseStatus),
+          isManualRetry: false,
+          onManualRetryState,
+        });
+        expect(recoveredStatus).toEqual(configuredBaseStatus);
+        expect(state).toEqual({
+          inFlight: false,
+          lastFailedAt: null,
+          failureCount: 0,
+        });
+      });
+    },
   );
 });

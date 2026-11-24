@@ -2,7 +2,7 @@ import { converter, modeOklch, modeRgb, useMode } from "culori/fn";
 import { CircleAlertIcon } from "lucide-react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { page, userEvent } from "vite-plus/test/browser";
+import { cdp, page, userEvent } from "vite-plus/test/browser";
 import {
   EnvironmentId,
   ProviderDriverKind,
@@ -98,10 +98,12 @@ function LaneHarness({
   providerStatus = null,
   error = null,
   engine = null,
+  fleetEngineRetrying = false,
 }: {
   readonly providerStatus?: ServerProvider | null;
   readonly error?: string | null;
   readonly engine?: FleetEngineFailure | null;
+  readonly fleetEngineRetrying?: boolean;
 }) {
   const [threadError, setThreadError] = useState<string | null>(error);
   const [, setDismissTick] = useState(0);
@@ -112,6 +114,7 @@ function LaneHarness({
       <ChatBannerLane
         environmentId={environmentId}
         fleetEngineFailure={engine}
+        fleetEngineRetrying={fleetEngineRetrying}
         onRetryFleetEngine={() => undefined}
         onOpenFleetConnectionsSettings={() => undefined}
         onDismissFleetEngineFailure={() => undefined}
@@ -301,6 +304,65 @@ describe("chat banner lane", () => {
       expect(close.element().getBoundingClientRect().right).toBeLessThanOrEqual(390);
     });
     expect(strip.scrollWidth).toBeLessThanOrEqual(strip.clientWidth + 1);
+  });
+
+  it("renders 28px banner action buttons with >=44px coarse hit targets and retrying feedback at 390px", async () => {
+    const prev = { width: window.innerWidth, height: window.innerHeight };
+    const session = cdp();
+    await page.viewport(390, 844);
+    await session.send("Emulation.setDeviceMetricsOverride", {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 2,
+      mobile: true,
+    });
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    await session.send("Emulation.setEmulatedMedia", {
+      features: [
+        { name: "pointer", value: "coarse" },
+        { name: "hover", value: "none" },
+      ],
+    });
+    await using _pointer = {
+      async [Symbol.asyncDispose]() {
+        await session.send("Emulation.setEmulatedMedia", { features: [] });
+        await session.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+        await session.send("Emulation.clearDeviceMetricsOverride");
+        await page.viewport(prev.width, prev.height);
+      },
+    };
+
+    await using screen = await render(<LaneHarness engine={engineFailure} />);
+    await vi.waitFor(() => expect(window.matchMedia("(pointer: coarse)").matches).toBe(true));
+
+    const strip = screen.getByRole("alert").element();
+    const retryBtn = screen.getByRole("button", { name: "重试" }).element() as HTMLButtonElement;
+    const settingsBtn = screen
+      .getByRole("button", { name: "去 设置 → 连接 查看" })
+      .element() as HTMLButtonElement;
+
+    await vi.waitFor(() => {
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
+      expect(strip.getBoundingClientRect().width).toBeLessThanOrEqual(390);
+      expect(Math.round(retryBtn.getBoundingClientRect().height)).toBe(28);
+      expect(Math.round(settingsBtn.getBoundingClientRect().height)).toBe(28);
+    });
+    expect(
+      Number.parseFloat(getComputedStyle(retryBtn, "::after").minHeight),
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      Number.parseFloat(getComputedStyle(retryBtn, "::after").minWidth),
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      Number.parseFloat(getComputedStyle(settingsBtn, "::after").minHeight),
+    ).toBeGreaterThanOrEqual(44);
+
+    await screen.rerender(<LaneHarness engine={engineFailure} fleetEngineRetrying />);
+    const retryingBtn = screen
+      .getByRole("button", { name: "正在重试…" })
+      .element() as HTMLButtonElement;
+    expect(retryingBtn.disabled).toBe(true);
+    expect(Math.round(retryingBtn.getBoundingClientRect().height)).toBe(28);
   });
 
   it("keeps the provider warning's alert role and its dismissal key", async () => {

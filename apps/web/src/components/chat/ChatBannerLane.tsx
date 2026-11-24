@@ -9,7 +9,7 @@ import { Fragment, useState, type Dispatch, type ReactNode, type SetStateAction 
 import { ChevronDownIcon, ChevronUpIcon, CircleAlertIcon, XIcon } from "lucide-react";
 import type { FleetEngineFailure } from "../../state/fleetEngine";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
-import { Button, InlineButton } from "../ui/button";
+import { Button } from "../ui/button";
 import {
   dismissProviderStatusBannerForSession,
   getProviderStatusBannerKey,
@@ -88,13 +88,18 @@ export function ChatBannerLane(props: {
           <AlertTitle>{fleetEngineFailure.title}</AlertTitle>
           <AlertDescription>
             <span>{fleetEngineFailure.description}</span>
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <InlineButton disabled={fleetEngineRetrying} onClick={onRetryFleetEngine}>
+            <span className="flex flex-wrap items-center gap-2">
+              <Button
+                disabled={fleetEngineRetrying}
+                onClick={onRetryFleetEngine}
+                size="sm"
+                variant="secondary"
+              >
                 {fleetEngineRetrying ? "正在重试…" : "重试"}
-              </InlineButton>
-              <InlineButton onClick={onOpenFleetConnectionsSettings}>
+              </Button>
+              <Button onClick={onOpenFleetConnectionsSettings} size="sm" variant="ghost">
                 去 设置 → 连接 查看
-              </InlineButton>
+              </Button>
             </span>
           </AlertDescription>
           <AlertAction>

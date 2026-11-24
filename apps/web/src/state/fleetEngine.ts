@@ -3,6 +3,7 @@ import { EnvironmentRegistry } from "@t3tools/client-runtime/connection";
 import { executeConnectedEnvironmentHttpRequest } from "@t3tools/client-runtime/state/environmentHttpAuth";
 import type { EnvironmentId, FleetEngineStatus } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
+import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -24,7 +25,7 @@ export interface FleetEngineFailure {
 const FLEET_ENGINE_REQUEST_TIMEOUT_MS = 15_000;
 const FLEET_ENGINE_STALE_TIME_MS = 60_000;
 export const FLEET_ENGINE_RETRY_ATTEMPTS = 2;
-export const FLEET_ENGINE_RETRY_INTERVAL_MS = 15_000;
+export const FLEET_ENGINE_RETRY_INTERVAL_MS = 5_000;
 export const FLEET_ENGINE_FAILURE_DISMISSED_STORAGE_KEY =
   "t3code:fleet-engine-failure-dismissed:v1";
 
@@ -148,15 +149,92 @@ export const fetchFleetEngineStatusWithRetry = Effect.fn("fleetEngine.fetchStatu
   },
 );
 
+export interface FleetEngineManualRetryState {
+  readonly inFlight: boolean;
+  readonly lastFailedAt: number | null;
+  readonly failureCount: number;
+}
+
+const INITIAL_MANUAL_RETRY_STATE: FleetEngineManualRetryState = {
+  inFlight: false,
+  lastFailedAt: null,
+  failureCount: 0,
+};
+
+const manualRetryStateAtom = Atom.family((environmentId: EnvironmentId) =>
+  Atom.make<FleetEngineManualRetryState>(INITIAL_MANUAL_RETRY_STATE).pipe(
+    Atom.keepAlive,
+    Atom.withLabel(`fleet-engine-manual-retry:${environmentId}`),
+  ),
+);
+
 const manualRetryEnvironmentIds = new Set<EnvironmentId>();
+
+export const executeFleetEngineStatusCheck = Effect.fn("fleetEngine.executeStatusCheck")(function* <
+  E,
+  R,
+>(input: {
+  readonly readStatus: Effect.Effect<FleetEngineStatus, E, R>;
+  readonly isManualRetry: boolean;
+  readonly retryIntervalMs?: number;
+  readonly onManualRetryState?: (
+    update: (previous: FleetEngineManualRetryState) => FleetEngineManualRetryState,
+  ) => void;
+}) {
+  if (input.isManualRetry) {
+    input.onManualRetryState?.((previous) => ({
+      ...previous,
+      inFlight: true,
+    }));
+  }
+
+  const exit = yield* Effect.exit(
+    fetchFleetEngineStatusWithRetry(input.readStatus, {
+      maxRetries: input.isManualRetry ? 0 : FLEET_ENGINE_RETRY_ATTEMPTS,
+      retryIntervalMs: input.retryIntervalMs ?? FLEET_ENGINE_RETRY_INTERVAL_MS,
+    }),
+  );
+
+  if (Exit.isSuccess(exit)) {
+    if (resolveFleetEngineFailure({ status: exit.value, error: null }) === null) {
+      input.onManualRetryState?.(() => INITIAL_MANUAL_RETRY_STATE);
+    } else if (input.isManualRetry) {
+      const now = yield* Clock.currentTimeMillis;
+      input.onManualRetryState?.((previous) => ({
+        inFlight: false,
+        lastFailedAt: now,
+        failureCount: previous.failureCount + 1,
+      }));
+    }
+    return exit.value;
+  }
+
+  if (input.isManualRetry) {
+    if (Cause.hasInterruptsOnly(exit.cause)) {
+      input.onManualRetryState?.((previous) => ({
+        ...previous,
+        inFlight: false,
+      }));
+    } else {
+      const now = yield* Clock.currentTimeMillis;
+      input.onManualRetryState?.((previous) => ({
+        inFlight: false,
+        lastFailedAt: now,
+        failureCount: previous.failureCount + 1,
+      }));
+    }
+  }
+  return yield* exit;
+});
 
 const engineStatusAtom = Atom.family((environmentId: EnvironmentId) =>
   connectionAtomRuntime
     .atom(
       Effect.flatMap(EnvironmentRegistry.EnvironmentRegistry, (registry) => {
         const isManualRetry = manualRetryEnvironmentIds.delete(environmentId);
-        return fetchFleetEngineStatusWithRetry(
-          registry.run(
+        const retryAtom = manualRetryStateAtom(environmentId);
+        return executeFleetEngineStatusCheck({
+          readStatus: registry.run(
             environmentId,
             executeConnectedEnvironmentHttpRequest({
               group: "fleetEngine",
@@ -166,11 +244,12 @@ const engineStatusAtom = Atom.family((environmentId: EnvironmentId) =>
               request: ({ client, headers }) => client.status({ headers }),
             }),
           ),
-          {
-            maxRetries: isManualRetry ? 0 : FLEET_ENGINE_RETRY_ATTEMPTS,
-            retryIntervalMs: FLEET_ENGINE_RETRY_INTERVAL_MS,
+          isManualRetry,
+          retryIntervalMs: FLEET_ENGINE_RETRY_INTERVAL_MS,
+          onManualRetryState: (update) => {
+            appAtomRegistry.set(retryAtom, update(appAtomRegistry.get(retryAtom)));
           },
-        );
+        });
       }),
     )
     .pipe(
@@ -180,14 +259,62 @@ const engineStatusAtom = Atom.family((environmentId: EnvironmentId) =>
 );
 
 export function retryFleetEngineStatus(environmentId: EnvironmentId): void {
+  const retryAtom = manualRetryStateAtom(environmentId);
+  const previous = appAtomRegistry.get(retryAtom);
+  if (previous.inFlight) return;
+  appAtomRegistry.set(retryAtom, { ...previous, inFlight: true });
   manualRetryEnvironmentIds.add(environmentId);
   appAtomRegistry.refresh(engineStatusAtom(environmentId));
+}
+
+function formatFleetEngineRetryTime(timestampMs: number): string {
+  const date = new Date(timestampMs);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+function formatFleetEngineFailureDescription(
+  kind: FleetEngineFailureKind,
+  lastRetryFailedAt?: number | null,
+  retryFailureCount?: number,
+): string {
+  if (lastRetryFailedAt !== undefined && lastRetryFailedAt !== null) {
+    const time = formatFleetEngineRetryTime(lastRetryFailedAt);
+    const prefix =
+      retryFailureCount !== undefined && retryFailureCount > 1
+        ? `${time} 第 ${retryFailureCount} 次重试，`
+        : `${time} 重试过，`;
+    switch (kind) {
+      case "timeout":
+        return `${prefix}连接机群服务依然超时，请稍后再试，或去 设置 → 连接 查看。`;
+      case "authentication":
+        return `${prefix}机群服务登录仍已过期，请重新登录后再试，或去 设置 → 连接 查看。`;
+      case "server":
+        return `${prefix}机群服务依然返回异常，请稍后再试，或去 设置 → 连接 查看。`;
+      case "unreachable":
+        return `${prefix}还是连不上机群服务，请稍后再试，或去 设置 → 连接 查看。`;
+    }
+  }
+  switch (kind) {
+    case "timeout":
+      return "连接机群服务超时，请重试，或去 设置 → 连接 查看。";
+    case "authentication":
+      return "机群服务登录已过期，请重新登录后重试，或去 设置 → 连接 查看。";
+    case "server":
+      return "机群服务返回异常，请重试，或去 设置 → 连接 查看。";
+    case "unreachable":
+      return "机群服务没有响应，请重试，或去 设置 → 连接 查看。";
+  }
 }
 
 /** The fleet service's read translated into one user-facing cause, without the raw transport text. */
 export function resolveFleetEngineFailure(input: {
   readonly status: FleetEngineStatus | null;
   readonly error: string | null;
+  readonly lastRetryFailedAt?: number | null;
+  readonly retryFailureCount?: number;
 }): FleetEngineFailure | null {
   const status = input.status;
   if (status?.configured !== true) return null;
@@ -199,10 +326,11 @@ export function resolveFleetEngineFailure(input: {
     return {
       kind,
       title: "连不上机群服务",
-      description:
-        kind === "timeout"
-          ? "连接机群服务超时，请重试，或去 设置 → 连接 查看。"
-          : "机群服务没有响应，请重试，或去 设置 → 连接 查看。",
+      description: formatFleetEngineFailureDescription(
+        kind,
+        input.lastRetryFailedAt,
+        input.retryFailureCount,
+      ),
     };
   }
   const httpStatus = status.httpStatus;
@@ -211,20 +339,32 @@ export function resolveFleetEngineFailure(input: {
       return {
         kind: "authentication",
         title: "机群服务登录已过期",
-        description: "机群服务登录已过期，请重新登录后重试，或去 设置 → 连接 查看。",
+        description: formatFleetEngineFailureDescription(
+          "authentication",
+          input.lastRetryFailedAt,
+          input.retryFailureCount,
+        ),
       };
     }
     if (status.reachable) {
       return {
         kind: "server",
         title: "机群服务出错",
-        description: "机群服务返回异常，请重试，或去 设置 → 连接 查看。",
+        description: formatFleetEngineFailureDescription(
+          "server",
+          input.lastRetryFailedAt,
+          input.retryFailureCount,
+        ),
       };
     }
     return {
       kind: "unreachable",
       title: "连不上机群服务",
-      description: "机群服务没有响应，请重试，或去 设置 → 连接 查看。",
+      description: formatFleetEngineFailureDescription(
+        "unreachable",
+        input.lastRetryFailedAt,
+        input.retryFailureCount,
+      ),
     };
   }
   return null;
@@ -261,20 +401,28 @@ export function useFleetEngineStatus(environmentId: EnvironmentId): {
   readonly status: FleetEngineStatus | null;
   readonly error: string | null;
   readonly isRetrying: boolean;
+  readonly lastRetryFailedAt: number | null;
+  readonly retryFailureCount: number;
 } {
   const result = useAtomValue(engineStatusAtom(environmentId));
+  const manualRetry = useAtomValue(manualRetryStateAtom(environmentId));
+  const isRetrying = result.waiting || manualRetry.inFlight;
   if (result._tag === "Failure") {
     const cause = Cause.squash(result.cause);
     const message = cause instanceof Error ? cause.message : "读不到接口";
     return {
       status: AsyncResult.getOrElse(result, () => null),
       error: message.replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, "").trim() || "读不到接口",
-      isRetrying: result.waiting,
+      isRetrying,
+      lastRetryFailedAt: manualRetry.lastFailedAt,
+      retryFailureCount: manualRetry.failureCount,
     };
   }
   return {
     status: result._tag === "Success" ? result.value : null,
     error: null,
-    isRetrying: result.waiting,
+    isRetrying,
+    lastRetryFailedAt: manualRetry.lastFailedAt,
+    retryFailureCount: manualRetry.failureCount,
   };
 }

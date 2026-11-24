@@ -354,14 +354,65 @@ const resolveWelcomeBase = Effect.gen(function* () {
   } as const;
 });
 
+const launchAutoBootstrapThread = Effect.fn("serverRuntimeStartup.launchAutoBootstrapThread")(
+  function* (project: Pick<Project, "id" | "defaultModelSelection">) {
+    const random = yield* SecureRandom.SecureRandom;
+    const threads = yield* ThreadManagement.ThreadManagementService;
+    const threadLaunch = yield* ThreadLaunch.ThreadLaunchService;
+    const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
+    const serverSettings = yield* ServerSettings.ServerSettingsService;
+
+    const settings = yield* serverSettings.getSettings;
+    const providers = yield* readBootstrapProviders(providerRegistry, settings, project);
+    const existingThread = (yield* threads.listActiveShellIndex()).find(
+      (thread) => thread.projectId === project.id && isListedThreadLineage(thread.lineage),
+    );
+    if (existingThread !== undefined) {
+      return;
+    }
+
+    const modelSelection = resolveAutoBootstrapThreadModelSelection({
+      settings,
+      project,
+      providers,
+    });
+    yield* threadLaunch
+      .launch({
+        commandId: CommandId.make(yield* random.uuidV4()),
+        projectId: project.id,
+        title: "新建会话",
+        modelSelection,
+        interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
+        runtimeMode: resolveProjectSettings(settings, project.id, project).settings
+          .defaultRuntimeMode,
+        workspaceStrategy: { type: "root" },
+        createdBy: "system",
+        creationSource: "server",
+      })
+      .pipe(
+        // The bootstrap thread is optional; its launch must not fail startup.
+        Effect.catchTags({
+          ThreadManagementProviderInstanceDisabledError: (error) =>
+            Effect.logInfo("Skipped bootstrap thread because its provider instance is disabled", {
+              projectId: project.id,
+              instanceId: error.instanceId,
+            }).pipe(Effect.as(undefined)),
+          ThreadLaunchError: (error) =>
+            Effect.logWarning("Failed to launch bootstrap thread", {
+              projectId: project.id,
+              operation: error.operation,
+            }).pipe(Effect.as(undefined)),
+        }),
+      );
+  },
+);
+
 const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
   const random = yield* SecureRandom.SecureRandom;
   const randomUUID = random.uuidV4();
   const serverConfig = yield* ServerConfig.ServerConfig;
   const projects = yield* ProjectService.ProjectService;
   const threads = yield* ThreadManagement.ThreadManagementService;
-  const threadLaunch = yield* ThreadLaunch.ThreadLaunchService;
-  const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
   const path = yield* Path.Path;
 
   let bootstrapProjectId: ProjectId | undefined;
@@ -378,44 +429,19 @@ const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
       (thread) => thread.projectId === project.id && isListedThreadLineage(thread.lineage),
     );
     if (existingThread === undefined) {
-      const serverSettings = yield* ServerSettings.ServerSettingsService;
-      const settings = yield* serverSettings.getSettings;
-      const providers = yield* readBootstrapProviders(providerRegistry, settings, project);
-      const modelSelection = resolveAutoBootstrapThreadModelSelection({
-        settings,
-        project,
-        providers,
-      });
-      const launched = yield* threadLaunch
-        .launch({
-          commandId: CommandId.make(yield* randomUUID),
-          projectId: project.id,
-          title: "新建会话",
-          modelSelection,
-          interactionMode: DEFAULT_PROVIDER_INTERACTION_MODE,
-          runtimeMode: resolveProjectSettings(settings, project.id, project).settings
-            .defaultRuntimeMode,
-          workspaceStrategy: { type: "root" },
-          createdBy: "system",
-          creationSource: "server",
-        })
-        .pipe(
-          // The bootstrap thread is optional; its launch must not prevent opening the app.
-          Effect.catchTags({
-            ThreadManagementProviderInstanceDisabledError: (error) =>
-              Effect.logInfo("Skipped bootstrap thread because its provider instance is disabled", {
-                projectId: project.id,
-                instanceId: error.instanceId,
-              }).pipe(Effect.as(undefined)),
-            ThreadLaunchError: (error) =>
-              Effect.logWarning("Failed to launch bootstrap thread", {
-                projectId: project.id,
-                operation: error.operation,
-              }).pipe(Effect.as(undefined)),
-          }),
-        );
       bootstrapProjectId = project.id;
-      bootstrapThreadId = launched?.threadId;
+      yield* launchAutoBootstrapThread(project).pipe(
+        Effect.withSpan("server.startup.welcome.autobootstrap-thread"),
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.void
+            : Effect.logWarning("Deferred bootstrap thread launch failed", {
+                projectId: project.id,
+                cause: Cause.pretty(cause),
+              }),
+        ),
+        Effect.forkScoped,
+      );
     } else {
       bootstrapProjectId = project.id;
       bootstrapThreadId = existingThread.id;
