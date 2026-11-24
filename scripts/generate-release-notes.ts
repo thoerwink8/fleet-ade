@@ -13,14 +13,14 @@ import { Command, Flag } from "effect/cli";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-// Release notes cover web, desktop, and server. Mobile ships its own store notes.
-const MOBILE_SCOPES = new Set(["mobile", "android", "ios"]);
+// Release notes cover web, desktop, and server; commits scoped to removed clients are dropped.
+const REMOVED_SCOPES: Record<string, true> = { mobile: true, android: true, ios: true };
 const COMMIT_SCOPES = /^[a-z]+\(([^)]*)\)!?:/i;
 const PULL_REQUEST_NUMBER = /\(#(\d+)\)$/;
 const PULL_REQUEST_BODY_LIMIT = 300;
 const SUMMARY_MODEL = "gpt-6.1-terra";
 
-const SUMMARY_INSTRUCTIONS = `Write up to 7 bullet points for the Fleet ADE update popover. Cover web, desktop, and server. Mobile has its own release notes.
+const SUMMARY_INSTRUCTIONS = `Write up to 7 bullet points for the Fleet ADE update popover. Cover web, desktop, and server.
 
 Give a feature a bullet only when it lets users do something they could not do before, removes a real limitation they hit in normal use, or cuts meaningful steps or wait time from a common task. Judge the outcome, regardless of the commit prefix. A new setting, a large diff, or support for one more edge case is not enough.
 
@@ -126,10 +126,10 @@ const pullRequestNumber = (subject: string) => {
   return match ? Number(match[1]) : undefined;
 };
 
-/** Drops a commit only when every scope is mobile, so `fix(web,mobile)` stays. */
+/** Drops a commit only when every scope names a removed client, so `fix(web,mobile)` stays. */
 export function isReleaseNoteCommit(commit: ReleaseCommit): boolean {
   const scopes = COMMIT_SCOPES.exec(commit.subject)?.[1]?.split(",");
-  return !scopes?.every((scope) => MOBILE_SCOPES.has(scope.trim().toLowerCase()));
+  return !scopes?.every((scope) => REMOVED_SCOPES[scope.trim().toLowerCase()] === true);
 }
 
 /** Keeps the prose of a PR body: no images, tables, headings, HTML, or verification sections. */

@@ -1139,7 +1139,7 @@ export function rankMessageMatches<
     .map(({ match }) => match);
 }
 
-/** Palette limits shared by web and mobile. */
+/** Palette limits shared by the web and desktop clients. */
 export const PALETTE_THREAD_LIMIT = 20;
 export const PALETTE_MESSAGE_LIMIT = 10;
 /** Next to matching threads, other groups show only their best few rows. */

@@ -129,7 +129,7 @@ const planFork = (
       title: "Awake fork",
       ...options,
       createdBy: "user",
-      creationSource: "mobile",
+      creationSource: "web",
       createdAt: forkCreatedAt,
     });
   }).pipe(Effect.provide(ThreadForkService.layer));

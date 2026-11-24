@@ -1,8 +1,7 @@
 # Scenarios
 
 A scenario is an [e2e](https://e2e.com/docs) test that shows one behavior in the real app: a real
-server on its own T3 home, real HTTP and WebSocket, and a real browser on the web client or a
-pooled iPhone simulator running the mobile app. The
+server on its own T3 home, real HTTP and WebSocket, and a real browser on the web client. The
 dev replay agent stands in for the model, so a run is free and repeatable. Use one as the proof
 for a bug fix: it fails on the base commit and passes on the fix.
 
@@ -14,26 +13,27 @@ runner; its docs ship in `scripts/node_modules/e2e/docs` and `e2e guide` prints 
 ```ts
 import { expect } from "e2e";
 
-import { test, WEB } from "./t3.ts";
+import { test } from "./t3.ts";
 
-test(
-  "Tab moves from the add-project Git URL field to its submit button",
-  WEB,
-  async ({ t3, app, screen, browser }) => {
-    await t3.project("demo");
-    await t3.open();
+test("Tab moves from the add-project Git URL field to its submit button", async ({
+  t3,
+  app,
+  screen,
+  browser,
+}) => {
+  await t3.project("demo");
+  await t3.open();
 
-    await screen.getByRole("button", "Add project").tap();
-    await screen.getByText("Git URL").tap();
-    await screen.getByRole("combobox").fill("https://github.com/pingdotgg/t3code.git");
-    const submit = screen.getByRole("button", "Continue (Enter)");
-    await expect(submit).toBeEnabled();
+  await screen.getByRole("button", "Add project").tap();
+  await screen.getByText("Git URL").tap();
+  await screen.getByRole("combobox").fill("https://github.com/pingdotgg/t3code.git");
+  const submit = screen.getByRole("button", "Continue (Enter)");
+  await expect(submit).toBeEnabled();
 
-    await browser.keyboard.press("Tab");
-    await app.screenshot("after-tab");
-    await expect(submit).toBeFocused();
-  },
-);
+  await browser.keyboard.press("Tab");
+  await app.screenshot("after-tab");
+  await expect(submit).toBeFocused();
+});
 ```
 
 `screen`, `browser`, `app`, and `expect` are e2e's own. [`t3.ts`](../../scripts/scenarios/t3.ts)
@@ -96,8 +96,8 @@ cd scripts && pnpm exec e2e run scenarios/replay-turn-streams.e2e.ts --headed
 
 e2e starts the dev stack through [`start-app.ts`](../../scripts/scenarios/start-app.ts) on a free
 port, runs the tests, and stops it. Results land in `scripts/.e2e`: `report.json`, `summary.md`,
-and per test a `trace.md`, its screenshots, and a video. `vp run scenarios --target web` runs one
-target; flags go straight after the script name, without `--`.
+and per test a `trace.md`, its screenshots, and a video. Flags go straight after the script name,
+without `--`.
 
 The first run downloads e2e's browser (about 120 MB). To fetch it ahead of time, such as in a
 machine image, run this from the repository root after `vp i`:
@@ -143,19 +143,13 @@ which:
 Each side's result is also written as it ends, to `scripts/.e2e/prove/base.json` and
 `head.json`, so a run that is cut short keeps the side it finished.
 
-It runs the scenario on one target: iOS when the file imports `t3-mobile.ts`, web otherwise.
-`--target web` or `--target ios` overrides that.
-
 The scenario and e2e always come from your checkout. Only the app comes from the commit under
 test: a temporary worktree beside your checkout, installed with `vp i` and removed afterwards (one
-left by a run that was killed is replaced). A
-commit that is your clean `HEAD` runs in place. So a new scenario can prove a fix against a base
-that predates it.
+left by a run that was killed is replaced). A commit that is your clean `HEAD` runs in place. So a
+new scenario can prove a fix against a base that predates it.
 
 ## Other tiers
 
-- **Android.** Add a target with `mobile({ platform: "android", device: simlock("Pixel 9") })`
-  and open the dev client with the Android form of the Expo link. Not built.
 - **Live provider.** Point the default model in `start-app.ts` at a real provider's cheapest
   model. Assertions on exact reply text would not hold.
 

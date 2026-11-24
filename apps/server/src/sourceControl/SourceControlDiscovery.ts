@@ -79,7 +79,7 @@ export const make = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   // Discovery re-reads the login shell so a tool installed since launch
   // resolves here and in every later spawn. Thread views, the palette and
-  // mobile also run discovery, so one interactive shell serves a short window.
+  // remote clients also run discovery, so one interactive shell serves a short window.
   const refreshPath = yield* refreshPathFromLoginShell().pipe(
     Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
     Effect.cachedWithTTL(Duration.seconds(10)),

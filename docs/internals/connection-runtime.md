@@ -1,6 +1,6 @@
 # Connection runtime
 
-Web, the desktop renderer, and mobile share one connection owner per environment
+Web and the desktop renderer share one connection owner per environment
 in `packages/client-runtime`. Platform code supplies storage, credentials, network
 signals, and application lifecycle events. React views consume the runtime.
 Keeping retries and session lifetime here prevents competing reconnect loops when
@@ -25,7 +25,7 @@ answers. If the host answers while the socket delivers no frame, the socket is
 dead and is replaced, even while the network reports offline: at once on
 loopback and LAN, and 2.5 seconds after the check starts elsewhere, where one
 lost packet can stall a live socket. Without that evidence the probe deadline
-decides: 3 seconds on loopback and LAN routes and after a long mobile
+decides: 3 seconds on loopback and LAN routes and after a long
 suspension, when the data on screen is stale; 15 seconds elsewhere, because a
 tailnet over DERP or a VPN can be slower than that on a live socket. A long
 suspension's probe that times out also replaces the socket regardless of the
@@ -86,7 +86,7 @@ ready. A proxy that drops `/api` without an answer then does not hold the
 connect for the HTTP timeout.
 
 Each environment synchronizes at its own time, so a thread list that follows every
-snapshot moves once per environment on each cold start and resume. Mobile lists read
+snapshot moves once per environment on each cold start and resume. Lists read
 [steady shells](../../packages/client-runtime/src/state/steadyShells.ts): an
 environment's rows stay as shown until its connection's server snapshot arrives,
 it is synchronized, or it disconnects, and environments that get there within two
@@ -101,10 +101,7 @@ delete, and their reverses) makes that environment's rows follow the live snapsh
 until it is live. Point reads (a
 thread's own shell, route checks) keep the live snapshot, where a row the server just
 sent must not look missing. The decision reads the snapshot's own sequence: a second
-atom derived from the same shell state can be one update behind the rows. The mobile
-splash screen also waits, for a bounded time, until every enabled environment has
-read its cached shell and Home's list has laid out those rows, so the first frame
-holds all cached rows.
+atom derived from the same shell state can be one update behind the rows.
 
 Shell snapshots can leave rows out when the client asks. Servers that advertise
 `shellThreadFamilies` leave out idle subagent children: a child stays while it
@@ -148,7 +145,7 @@ thread then needs no replay. The shell and detail streams are independent, so
 the shell can report a stop before the detail loads or catches up. A stopped
 thread stays mounted until its own stream is live and shows the stop, and the
 stream then closes and saves the settled state.
-Web and mobile do not keep threads alive.
+Clients do not keep threads alive.
 
 Retain state and cursor together only after an update finishes. Cancellation must
 not advance the cached cursor beyond the applied data, and an old scope must not

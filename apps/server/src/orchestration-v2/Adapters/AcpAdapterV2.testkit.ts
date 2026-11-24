@@ -262,7 +262,7 @@ export function makeTurnInput(input: {
   readonly ordinal?: number;
   readonly modelSelection?: ModelSelection;
   readonly messageCreatedBy?: "user" | "agent";
-  readonly messageCreationSource?: "web" | "mobile" | "mcp" | "provider" | "server";
+  readonly messageCreationSource?: "web" | "mcp" | "provider" | "server";
   readonly messageText?: string;
 }): ProviderAdapter.ProviderAdapterV2TurnInput {
   const ordinal = input.ordinal ?? 1;

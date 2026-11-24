@@ -81,7 +81,7 @@ describe("retainedBreadcrumbTrail", () => {
     ["apps/web/src", "apps/web", "apps/web/src"],
     ["apps/web/src", "", "apps/web/src"],
     ["apps/web/src", "apps/web/src", "apps/web/src"],
-    ["apps/web/src", "apps/mobile", "apps/mobile"],
+    ["apps/web/src", "apps/desktop", "apps/desktop"],
     ["src/lib", "src-old", "src-old"],
     ["apps/web", "apps/web/src/main.tsx", "apps/web/src/main.tsx"],
     ["apps/web/src", "/tmp/report", "/tmp/report"],

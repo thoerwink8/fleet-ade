@@ -1,4 +1,4 @@
-/** The question fields answer handling reads. Web and mobile question types both fit it. */
+/** The question fields answer handling reads. Every client renders the same question model. */
 export interface PendingUserInputQuestion {
   readonly id: string;
   readonly options: ReadonlyArray<{ readonly label: string; readonly value?: string | undefined }>;
