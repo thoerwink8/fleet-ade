@@ -332,40 +332,40 @@ describe("storageCleanupAllocatedBytes", () => {
   });
 });
 
-// A (linux) case needs a case-sensitive filesystem; real Windows and macOS folds case in realPath.
+// A (linux) case needs a case-sensitive filesystem; real Windows and macOS fold case in realPath.
+const caseSensitiveRealPath = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  return {
+    ...fs,
+    realPath: (target: string) =>
+      fs.realPath(target).pipe(
+        Effect.filterOrFail(
+          (real) =>
+            real === path.resolve(target) ||
+            real.toLowerCase() !== path.resolve(target).toLowerCase(),
+          () =>
+            PlatformError.systemError({
+              _tag: "NotFound",
+              module: "FileSystem",
+              method: "realPath",
+              pathOrDescriptor: target,
+            }),
+        ),
+      ),
+  };
+});
+
 const withHostCasing =
   (platform: "win32" | "linux") =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(
-      Effect.provideService(HostProcess.Platform, platform),
-      platform === "win32"
-        ? (self) => self
-        : Effect.provideServiceEffect(
-            FileSystem.FileSystem,
-            Effect.gen(function* () {
-              const fs = yield* FileSystem.FileSystem;
-              const path = yield* Path.Path;
-              return {
-                ...fs,
-                realPath: (target: string) =>
-                  fs.realPath(target).pipe(
-                    Effect.filterOrFail(
-                      (real) =>
-                        real === path.resolve(target) ||
-                        real.toLowerCase() !== path.resolve(target).toLowerCase(),
-                      () =>
-                        PlatformError.systemError({
-                          _tag: "NotFound",
-                          module: "FileSystem",
-                          method: "realPath",
-                          pathOrDescriptor: target,
-                        }),
-                    ),
-                  ),
-              };
-            }),
-          ),
-    );
+  <A, E, R>(effect: Effect.Effect<A, E, R>) => {
+    const withPlatform = effect.pipe(Effect.provideService(HostProcess.Platform, platform));
+    return platform === "win32"
+      ? withPlatform
+      : withPlatform.pipe(
+          Effect.provideServiceEffect(FileSystem.FileSystem, caseSensitiveRealPath),
+        );
+  };
 
 const allocatedBytes = (fs: FileSystem.FileSystem, file: string) =>
   Effect.all([fs.stat(file), HostProcess.isWindows]).pipe(
