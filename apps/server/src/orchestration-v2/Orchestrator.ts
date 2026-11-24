@@ -39,6 +39,9 @@ import {
   type OrchestrationV2ServerCommand,
   type ThreadPullRequestLink,
   type ThreadPullRequestWatch,
+  OrchestrationV2ThreadTrashFailureCode,
+  type OrchestrationV2RecentlyDeletedThread,
+  type OrchestrationV2ThreadTrashFailureCode as OrchestrationV2ThreadTrashFailureCodeType,
   type OrchestrationV2BatchThreadResult,
   type OrchestrationV2AppThread,
   type OrchestrationV2PendingRollback,
@@ -186,13 +189,20 @@ import {
   isForkableSourceRunStatus,
   ThreadForkServiceV2,
 } from "./ThreadForkService.ts";
-import { planThreadDeletion, type ThreadDeletionPlan } from "./ThreadDeletion.ts";
+import {
+  planThreadDeletion,
+  planThreadPurge,
+  type ThreadDeletionPlan,
+  type ThreadPurgePlan,
+} from "./ThreadDeletion.ts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as ServerSettings from "../serverSettings.ts";
 
 const isMessageQuestionAnswer = Schema.is(
   Schema.Union([TrimmedNonEmptyString, Schema.NonEmptyArray(TrimmedNonEmptyString)]),
 );
+const isThreadTrashFailureCode = Schema.is(OrchestrationV2ThreadTrashFailureCode);
+const isRollbackFailureCode = Schema.is(OrchestrationV2RollbackFailureCode);
 
 /** A client cannot claim a message came from a guest. Stored guest context still decodes. */
 function stripGuestAttribution<
@@ -208,7 +218,9 @@ export class OrchestratorDispatchError extends Schema.TaggedError<OrchestratorDi
   {
     commandId: CommandId,
     commandType: Schema.String,
-    code: Schema.optional(OrchestrationV2RollbackFailureCode),
+    code: Schema.optional(
+      Schema.Union([OrchestrationV2RollbackFailureCode, OrchestrationV2ThreadTrashFailureCode]),
+    ),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {
@@ -322,6 +334,8 @@ function threadAfterEvents(
       case "thread.archived":
       case "thread.unarchived":
       case "thread.deleted":
+      case "thread.restored":
+      case "thread.purged":
       case "thread.settled":
       case "thread.unsettled":
       case "thread.snoozed":
@@ -370,9 +384,13 @@ function classifyRollbackCause(cause: unknown): OrchestrationV2RollbackFailureCo
     return "provider-cannot-rollback";
   }
   if (isOrchestratorDispatchError(cause)) {
-    return cause.code ?? classifyRollbackCause(cause.cause);
+    const code = cause.code;
+    return code !== undefined && isRollbackFailureCode(code)
+      ? code
+      : classifyRollbackCause(cause.cause);
   }
-  return dispatchErrorCode(cause) ?? "rollback-failed";
+  const code = dispatchErrorCode(cause);
+  return code !== undefined && isRollbackFailureCode(code) ? code : "rollback-failed";
 }
 
 function rollbackCodeMessage(code: OrchestrationV2RollbackFailureCode): string {
@@ -611,6 +629,10 @@ export interface OrchestratorV2Shape {
   readonly listOlderSettledThreads: (
     query: OlderSettledThreadsQuery,
   ) => Effect.Effect<OlderSettledThreadsListing, OrchestratorV2Error>;
+  readonly listRecentlyDeleted: () => Effect.Effect<
+    ReadonlyArray<OrchestrationV2RecentlyDeletedThread>,
+    OrchestratorV2Error
+  >;
   readonly readShellSnapshot: (
     options?: ShellSnapshotOptions,
   ) => Effect.Effect<
@@ -719,6 +741,8 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
     case "thread.archive":
     case "thread.unarchive":
     case "thread.delete":
+    case "thread.restore":
+    case "thread.purge":
       return command.threadId;
     case "thread.batch":
       return command.threadIds[0]!;
@@ -15024,6 +15048,125 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     }
     return parentRunId;
   });
+  const rejectThreadTrash = (
+    command: Extract<
+      OrchestrationV2ServerCommand,
+      { readonly type: "thread.restore" | "thread.purge" }
+    >,
+    code: OrchestrationV2ThreadTrashFailureCodeType,
+  ) =>
+    new OrchestratorDispatchError({
+      commandId: command.commandId,
+      commandType: command.type,
+      code,
+      cause: { code, message: code },
+    });
+
+  const loadThreadTrashCascade = Effect.fn("Orchestrator.loadThreadTrashCascade")(function* (
+    command: Extract<
+      OrchestrationV2ServerCommand,
+      { readonly type: "thread.restore" | "thread.purge" }
+    >,
+  ) {
+    const thread = yield* projectionStore
+      .getThread(command.threadId)
+      .pipe(
+        Effect.mapError(
+          (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+        ),
+      );
+    if (thread.deletedAt === null) return yield* rejectThreadTrash(command, "thread-not-deleted");
+    const trash = yield* projectionStore
+      .getThreadTrash(command.threadId)
+      .pipe(mapDispatchError(command));
+    if (trash === null) {
+      // A side chat listed in the same batch after its root applied loses its trash row; it stays
+      // a cascade member rather than a recoverable root.
+      const memberRoot = yield* projectionStore.getThreadTrashCascade(command.threadId).pipe(
+        mapDispatchError(command),
+        Effect.map((rows) => rows[0]?.cascadeRootId),
+      );
+      if (memberRoot === undefined) {
+        return yield* rejectThreadTrash(command, "thread-not-recoverable");
+      }
+      return yield* rejectThreadTrash(command, "cascade-member");
+    }
+    if (trash.cascadeRootId !== command.threadId) {
+      return yield* rejectThreadTrash(command, "cascade-member");
+    }
+    if (command.type === "thread.restore") {
+      const project = yield* projects
+        .get(thread.projectId, { includeDeleted: true })
+        .pipe(
+          Effect.mapError(
+            (cause) => new OrchestratorProjectionError({ threadId: command.threadId, cause }),
+          ),
+        );
+      if (Option.isNone(project) || project.value.deletedAt !== null) {
+        return yield* rejectThreadTrash(command, "project-deleted");
+      }
+    }
+    const cascade = yield* projectionStore
+      .getThreadTrashCascade(command.threadId)
+      .pipe(mapDispatchError(command));
+    return [
+      trash,
+      ...cascade
+        .filter((member) => member.threadId !== command.threadId)
+        .toSorted((left, right) => left.threadId.localeCompare(right.threadId)),
+    ];
+  });
+
+  const dispatchThreadRestoreOrPurge = Effect.fn("orchestrationV2.dispatch.threadRestoreOrPurge")(
+    function* (
+      command: Extract<
+        OrchestrationV2ServerCommand,
+        { readonly type: "thread.restore" | "thread.purge" }
+      >,
+      events: Ref.Ref<Array<OrchestrationV2DomainEvent>>,
+      effects: Ref.Ref<Array<PendingOrchestrationEffectV2>>,
+    ) {
+      const cascade = yield* loadThreadTrashCascade(command);
+      const now = yield* DateTime.now;
+      for (const member of cascade) {
+        const projection = yield* projectionStore
+          .getThreadRecords(member.threadId, [])
+          .pipe(
+            Effect.mapError(
+              (cause) => new OrchestratorProjectionError({ threadId: member.threadId, cause }),
+            ),
+          );
+        if (command.type === "thread.restore") {
+          yield* emit(
+            events,
+            command,
+          )({
+            type: "thread.restored",
+            threadId: member.threadId,
+            providerInstanceId: projection.thread.providerInstanceId,
+            occurredAt: now,
+            payload: { ...projection.thread, deletedAt: null, updatedAt: now },
+          });
+          continue;
+        }
+        const plan = yield* mapDispatchError(command)(
+          planThreadPurge({
+            command: { ...command, threadId: member.threadId },
+            projection,
+            attachmentIds: yield* projectionStore
+              .getThreadAttachmentIds(member.threadId)
+              .pipe(mapDispatchError(command)),
+            now,
+            idAllocator,
+            effectScope: `${command.commandId}:${member.threadId}`,
+          }),
+        );
+        yield* Ref.update(events, (existing) => [...existing, ...plan.events]);
+        yield* Ref.update(effects, (existing) => [...existing, ...plan.effects]);
+      }
+      return cascade;
+    },
+  );
 
   const planDeletionsFor = Effect.fn("Orchestrator.planBatchDeletions")(function* (
     command: Extract<
@@ -15033,7 +15176,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     threadIds: ReadonlyArray<ThreadId>,
     now: DateTime.Utc,
   ) {
+    const cascadeRootId = threadIds[0];
     const plans: Array<ThreadDeletionPlan> = [];
+    if (cascadeRootId === undefined) return plans;
     for (const threadId of threadIds) {
       const projection = yield* projectionStore
         .getThreadRecords(threadId, [
@@ -15054,11 +15199,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               threadId,
               ...(command.onlyIfUnused === true ? { onlyIfUnused: true } : {}),
             },
+            cascadeRootId,
             effectScope: `${command.commandId}:${threadId}`,
             projection,
-            attachmentIds: yield* projectionStore
-              .getThreadAttachmentIds(threadId)
-              .pipe(mapDispatchError(command)),
             now,
             idAllocator,
           }),
@@ -15079,7 +15222,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     const items: Array<{
       threadId: ThreadId;
       status: "applied" | "already_target" | "not_found" | "deleted" | "running" | "rejected";
+      reason?: OrchestrationV2ThreadTrashFailureCodeType;
     }> = [];
+    const appliedCascadeMembers = new Set<ThreadId>();
     for (const threadId of command.threadIds) {
       if (seen.has(threadId)) continue;
       seen.add(threadId);
@@ -15091,6 +15236,35 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       );
       if (thread === null) {
         items.push({ threadId, status: "not_found" });
+        continue;
+      }
+      if (command.operation === "restore" || command.operation === "purge") {
+        const operation = command.operation;
+        if (appliedCascadeMembers.has(threadId)) {
+          items.push({ threadId, status: "rejected", reason: "cascade-member" });
+          continue;
+        }
+        const applied = yield* dispatchThreadRestoreOrPurge(
+          { type: `thread.${operation}`, commandId: command.commandId, threadId },
+          events,
+          effects,
+        ).pipe(
+          Effect.map((appliedCascade) => ({ applied: true as const, appliedCascade }) as const),
+          Effect.catchTags({
+            OrchestratorDispatchError: (cause) =>
+              cause.code !== undefined && isThreadTrashFailureCode(cause.code)
+                ? Effect.succeed({ applied: false as const, reason: cause.code } as const)
+                : Effect.fail(cause),
+          }),
+        );
+        if (applied.applied) {
+          for (const member of applied.appliedCascade) {
+            appliedCascadeMembers.add(member.threadId);
+          }
+          items.push({ threadId, status: "applied" });
+        } else {
+          items.push({ threadId, status: "rejected", reason: applied.reason });
+        }
         continue;
       }
       if (thread.deletedAt !== null) {
@@ -15303,10 +15477,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           return yield* mapDispatchError(command)(
             planThreadDeletion({
               command: deletion,
+              cascadeRootId: command.threadId,
               projection,
-              attachmentIds: yield* projectionStore
-                .getThreadAttachmentIds(deletion.threadId)
-                .pipe(mapDispatchError(command)),
               now,
               idAllocator,
             }),
@@ -15336,11 +15508,43 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             }),
           )),
         ];
+        const deletionEvents = plans.flatMap((plan) => plan.events);
+        const deletionEffects = plans.flatMap((plan) => plan.effects);
+        if (command.onlyIfUnused !== true) {
+          return { events: deletionEvents, effects: deletionEffects };
+        }
+        const purgePlans: Array<ThreadPurgePlan> = [];
+        for (const plan of plans) {
+          const deleted = plan.events.find((event) => event.type === "thread.deleted");
+          if (deleted === undefined) continue;
+          purgePlans.push(
+            yield* mapDispatchError(command)(
+              planThreadPurge({
+                command: {
+                  type: "thread.purge",
+                  commandId: command.commandId,
+                  threadId: deleted.threadId,
+                },
+                projection: { thread: deleted.payload },
+                attachmentIds: yield* projectionStore
+                  .getThreadAttachmentIds(deleted.threadId)
+                  .pipe(mapDispatchError(command)),
+                now,
+                idAllocator,
+                effectScope: `${command.commandId}:${deleted.threadId}:purge`,
+              }),
+            ),
+          );
+        }
         return {
-          events: plans.flatMap((plan) => plan.events),
-          effects: plans.flatMap((plan) => plan.effects),
+          events: [...deletionEvents, ...purgePlans.flatMap((plan) => plan.events)],
+          effects: [...deletionEffects, ...purgePlans.flatMap((plan) => plan.effects)],
         };
       }
+      case "thread.restore":
+      case "thread.purge":
+        yield* dispatchThreadRestoreOrPurge(command, events, effects);
+        break;
       case "thread.archive":
       case "thread.unarchive":
       case "thread.settle":
@@ -15751,7 +15955,10 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           // Refusals depend on modes the user can change; a recorded rejection would block the retry.
           if (
             cause._tag === "OrchestratorThreadAboveModeLimitError" ||
-            cause._tag === "OrchestratorDispatchConcurrencyLimitError"
+            cause._tag === "OrchestratorDispatchConcurrencyLimitError" ||
+            (cause._tag === "OrchestratorDispatchError" &&
+              cause.code !== undefined &&
+              isThreadTrashFailureCode(cause.code))
           ) {
             return yield* cause;
           }
@@ -15958,36 +16165,84 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ? dispatch
         : threadDispatch.withLock(command.sourceThreadId, dispatch);
     }
+    if (command.type === "thread.restore" || command.type === "thread.purge") {
+      const trash = yield* projectionStore
+        .getThreadTrash(command.threadId)
+        .pipe(mapDispatchError(command));
+      const rootId = trash?.cascadeRootId ?? command.threadId;
+      const cascade =
+        trash === null
+          ? []
+          : yield* projectionStore.getThreadTrashCascade(rootId).pipe(mapDispatchError(command));
+      const lockIds = [
+        rootId,
+        ...cascade
+          .map((member) => member.threadId)
+          .filter((threadId) => threadId !== rootId)
+          .toSorted(),
+      ];
+      return yield* lockIds
+        .toReversed()
+        .reduce(
+          (locked, threadId) => threadDispatch.withLock(threadId, locked),
+          dispatchWithReceiptEffect(command),
+        );
+    }
     if (command.type === "thread.batch") {
       const lockIds = [...new Set(command.threadIds)].toSorted();
-      // A delete plans each thread's side chats with it; their locks come after their
-      // parent's, same order a single delete takes them.
-      if (command.operation !== "delete") {
-        return yield* lockIds.reduce(
-          (locked, threadId) => threadDispatch.withLock(threadId, locked),
-          dispatchWithReceiptEffect(command, []),
-        );
-      }
-      return yield* lockIds.reduce(
-        (locked, threadId) => threadDispatch.withLock(threadId, locked),
-        Effect.forEach(
-          lockIds,
-          (threadId) =>
-            liveSideChatIds(threadId).pipe(Effect.map((ids) => [threadId, ids] as const)),
-          { concurrency: 1 },
-        ).pipe(
-          Effect.flatMap((entries) => {
-            const sideChatsByParent = new Map(entries.filter(([, ids]) => ids.length > 0));
-            const sideChatIds = [
-              ...new Set(entries.flatMap(([, ids]) => ids.filter((id) => !lockIds.includes(id)))),
-            ].toSorted();
-            return sideChatIds.reduce(
-              (locked, sideChatId) => threadDispatch.withLock(sideChatId, locked),
-              dispatchWithReceiptEffect(command, [], undefined, sideChatsByParent),
-            );
-          }),
-        ),
+      // Every batch locks trash cascades the same way: roots sorted, each root before its
+      // members. A member listed next to its root cannot invert the root's lock order.
+      const trashRows = yield* Effect.forEach(
+        lockIds,
+        (threadId) => projectionStore.getThreadTrash(threadId).pipe(mapDispatchError(command)),
+        { concurrency: 1 },
       );
+      const rootIds = [
+        ...new Set(trashRows.map((trash, index) => trash?.cascadeRootId ?? lockIds[index]!)),
+      ].toSorted();
+      const groups = yield* Effect.forEach(
+        rootIds,
+        (rootId) =>
+          projectionStore.getThreadTrashCascade(rootId).pipe(
+            mapDispatchError(command),
+            Effect.map((members) => [
+              rootId,
+              ...members
+                .map((member) => member.threadId)
+                .filter((memberId) => memberId !== rootId)
+                .toSorted(),
+            ]),
+          ),
+        { concurrency: 1 },
+      );
+      const cascadeLockIds = [...new Set(groups.flat())];
+      // A delete plans each thread's live side chats with it; their locks come after their
+      // parent's, same order a single delete takes them.
+      const inner =
+        command.operation === "delete"
+          ? Effect.forEach(
+              lockIds,
+              (threadId) =>
+                liveSideChatIds(threadId).pipe(Effect.map((ids) => [threadId, ids] as const)),
+              { concurrency: 1 },
+            ).pipe(
+              Effect.flatMap((entries) => {
+                const sideChatsByParent = new Map(entries.filter(([, ids]) => ids.length > 0));
+                const sideChatIds = [
+                  ...new Set(
+                    entries.flatMap(([, ids]) => ids.filter((id) => !lockIds.includes(id))),
+                  ),
+                ].toSorted();
+                return sideChatIds.reduce(
+                  (locked, sideChatId) => threadDispatch.withLock(sideChatId, locked),
+                  dispatchWithReceiptEffect(command, [], undefined, sideChatsByParent),
+                );
+              }),
+            )
+          : dispatchWithReceiptEffect(command, []);
+      return yield* cascadeLockIds
+        .toReversed()
+        .reduce((locked, threadId) => threadDispatch.withLock(threadId, locked), inner);
     }
     if (command.type === "thread.delete") {
       return yield* threadDispatch.withLock(
@@ -16661,6 +16916,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       return projectionStore
         .listOlderSettledThreads(query)
         .pipe(Effect.mapError(shellProjectionError));
+    }),
+    listRecentlyDeleted: Effect.fn("OrchestratorV2.listRecentlyDeleted")(function () {
+      return projectionStore.getRecentlyDeleted().pipe(Effect.mapError(shellProjectionError));
     }),
     readShellSnapshot: Effect.fn("OrchestratorV2.readShellSnapshot")(function (options) {
       return projectionStore

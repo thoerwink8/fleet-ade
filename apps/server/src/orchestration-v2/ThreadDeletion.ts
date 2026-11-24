@@ -2,6 +2,7 @@ import type {
   OrchestrationV2Command,
   OrchestrationV2DomainEvent,
   OrchestrationV2ThreadProjection,
+  ThreadId,
 } from "@t3tools/contracts";
 import type * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -14,13 +15,19 @@ export interface ThreadDeletionPlan {
   readonly effects: ReadonlyArray<PendingOrchestrationEffectV2>;
 }
 
+export interface ThreadPurgePlan {
+  readonly events: ReadonlyArray<OrchestrationV2DomainEvent>;
+  readonly effects: ReadonlyArray<PendingOrchestrationEffectV2>;
+}
+
 export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")(function* (input: {
   readonly command: Extract<OrchestrationV2Command, { readonly type: "thread.delete" }>;
   readonly projection: Pick<
     OrchestrationV2ThreadProjection,
     "thread" | "runs" | "attempts" | "nodes" | "runtimeRequests" | "subagents" | "providerSessions"
   >;
-  readonly attachmentIds: ReadonlyArray<string>;
+  readonly cascadeRootId?: ThreadId;
+  readonly attachmentIds?: ReadonlyArray<string>;
   readonly now: DateTime.Utc;
   readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
   readonly effectScope?: string;
@@ -59,6 +66,7 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     threadId: command.threadId,
     providerInstanceId: projection.thread.providerInstanceId,
     occurredAt: now,
+    cascadeRootId: input.cascadeRootId ?? command.threadId,
     payload: {
       ...projection.thread,
       deletedAt: projection.thread.deletedAt ?? now,
@@ -212,16 +220,10 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     });
   }
   effects.push({
-    id: `effect:${effectScope}:scheduled-tasks.cleanup`,
-    commandId: command.commandId,
-    threadId: command.threadId,
-    request: { type: "scheduled-tasks.cleanup" },
-  });
-  effects.push({
     id: `effect:${effectScope}:terminal.cleanup`,
     commandId: command.commandId,
     threadId: command.threadId,
-    request: { type: "terminal.cleanup" },
+    request: { type: "terminal.cleanup", keepHistory: true },
   });
   effects.push({
     id: `effect:${effectScope}:preview.cleanup`,
@@ -229,6 +231,48 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
     threadId: command.threadId,
     request: { type: "preview.cleanup" },
   });
+  return { events, effects };
+});
+
+export const planThreadPurge = Effect.fn("ThreadDeletion.planThreadPurge")(function* (input: {
+  readonly command: Extract<OrchestrationV2Command, { readonly type: "thread.purge" }>;
+  readonly projection: Pick<OrchestrationV2ThreadProjection, "thread">;
+  readonly attachmentIds: ReadonlyArray<string>;
+  readonly now: DateTime.Utc;
+  readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
+  readonly effectScope?: string;
+}): Effect.fn.Return<ThreadPurgePlan, IdAllocator.IdAllocatorV2Error> {
+  const { command, projection, now, idAllocator } = input;
+  const eventId = yield* idAllocator.allocate.event({
+    threadId: command.threadId,
+    commandId: command.commandId,
+  });
+  const event: OrchestrationV2DomainEvent = {
+    id: eventId,
+    type: "thread.purged",
+    threadId: command.threadId,
+    providerInstanceId: projection.thread.providerInstanceId,
+    occurredAt: now,
+    payload: {
+      ...projection.thread,
+      updatedAt: now,
+    },
+  };
+  const effectScope = input.effectScope ?? command.commandId;
+  const effects: Array<PendingOrchestrationEffectV2> = [
+    {
+      id: `effect:${effectScope}:scheduled-tasks.cleanup`,
+      commandId: command.commandId,
+      threadId: command.threadId,
+      request: { type: "scheduled-tasks.cleanup" },
+    },
+    {
+      id: `effect:${effectScope}:terminal.cleanup`,
+      commandId: command.commandId,
+      threadId: command.threadId,
+      request: { type: "terminal.cleanup" },
+    },
+  ];
   const attachmentIds = Array.from(new Set(input.attachmentIds));
   if (attachmentIds.length > 0) {
     effects.push({
@@ -238,5 +282,5 @@ export const planThreadDeletion = Effect.fn("ThreadDeletion.planThreadDeletion")
       request: { type: "attachment.cleanup", attachmentIds },
     });
   }
-  return { events, effects };
+  return { events: [event], effects };
 });

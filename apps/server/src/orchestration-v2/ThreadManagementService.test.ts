@@ -1083,3 +1083,34 @@ it.effect(
       }).pipe(Effect.provide(layerTest));
     }),
 );
+
+it.effect("restoreThread and purgeThread dispatch the command with the client command id", () => {
+  const threadId = ThreadId.make("thread:thread-management:trash");
+  const commandId = CommandId.make("command:thread-management:trash");
+  const dispatched: Array<OrchestrationV2Command> = [];
+  const layerTest = ThreadManagementService.layer.pipe(
+    Layer.provide(Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({})),
+    Layer.provide(
+      Layer.mock(Orchestrator.OrchestratorV2)({
+        dispatch: (command) =>
+          Effect.sync(() => {
+            dispatched.push(command);
+            return { sequence: 1, storedEvents: [] } as never;
+          }),
+        listRecentlyDeleted: () => Effect.succeed([]),
+      }),
+    ),
+    Layer.provide(ServerSettings.layerTest({})),
+    Layer.provideMerge(layerReceiptsTest),
+  );
+  return Effect.gen(function* () {
+    const service = yield* ThreadManagementService.ThreadManagementService;
+    yield* service.restoreThread({ commandId, threadId });
+    yield* service.purgeThread({ commandId, threadId });
+    expect(dispatched).toEqual([
+      { type: "thread.restore", commandId, threadId },
+      { type: "thread.purge", commandId, threadId },
+    ]);
+    expect(yield* service.listRecentlyDeleted()).toEqual([]);
+  }).pipe(Effect.provide(layerTest));
+});

@@ -22,7 +22,7 @@ import * as Effect from "effect/Effect";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import { applyToProjection, emptyProjection } from "./ProjectionStore.ts";
-import { planThreadDeletion } from "./ThreadDeletion.ts";
+import { planThreadDeletion, planThreadPurge } from "./ThreadDeletion.ts";
 
 const threadId = ThreadId.make("thread:delete-plan");
 const providerInstanceId = ProviderInstanceId.make("codex");
@@ -181,6 +181,7 @@ it.effect("cancels active work without reviving a run while disposing delegated 
     };
     const plan = yield* planThreadDeletion({
       command,
+      cascadeRootId: threadId,
       projection,
       attachmentIds: projection.messages.flatMap((message) =>
         message.attachments.map((attachment) => attachment.id),
@@ -268,6 +269,7 @@ it.effect("queues provider and resource cleanup and preserves an earlier deletio
     };
     const plan = yield* planThreadDeletion({
       command,
+      cascadeRootId: threadId,
       projection,
       attachmentIds: projection.messages.flatMap((message) =>
         message.attachments.map((attachment) => attachment.id),
@@ -296,11 +298,39 @@ it.effect("queues provider and resource cleanup and preserves an earlier deletio
           detail: "Thread deleted.",
           revokeMcpCredential: true,
         },
+        { type: "terminal.cleanup", keepHistory: true },
+        { type: "preview.cleanup" },
+      ],
+    );
+  }).pipe(Effect.provide(IdAllocator.layer)),
+);
+
+it.effect("plans purge effects without touching the projection row", () =>
+  Effect.gen(function* () {
+    const projection = makeProjection();
+    const plan = yield* planThreadPurge({
+      command: { type: "thread.purge", commandId: command.commandId, threadId },
+      projection,
+      attachmentIds: ["shared_file", "shared_file"],
+      now: deletedAt,
+      idAllocator: yield* IdAllocator.IdAllocatorV2,
+    });
+    assert.deepEqual(
+      plan.events.map((event) => [event.type, event.threadId]),
+      [["thread.purged", threadId]],
+    );
+    assert.equal(plan.events[0]?.payload.deletedAt, projection.thread.deletedAt);
+    assert.deepEqual(
+      plan.effects.map((effect) => effect.request),
+      [
         { type: "scheduled-tasks.cleanup" },
         { type: "terminal.cleanup" },
-        { type: "preview.cleanup" },
         { type: "attachment.cleanup", attachmentIds: ["shared_file"] },
       ],
+    );
+    assert.equal(
+      plan.events.reduce(applyToProjection, projection).thread.deletedAt,
+      projection.thread.deletedAt,
     );
   }).pipe(Effect.provide(IdAllocator.layer)),
 );
