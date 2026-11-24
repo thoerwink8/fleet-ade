@@ -1,4 +1,5 @@
 import type {
+  StorageCleanupPreview,
   StorageCleanupReport,
   StorageCleanupSettings,
   WorktreeCleanupRules,
@@ -20,7 +21,15 @@ import { useNowMinute } from "../../hooks/useNowMinute";
 import { useDebouncedValue } from "../../state/queries";
 import { AnimatedHeight } from "../AnimatedHeight";
 import { Button } from "../ui/button";
-import { toastManager } from "../ui/toast";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
@@ -48,6 +57,16 @@ import {
   useUpdateScopedSettings,
 } from "./useScopedSettings";
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
+import {
+  STORAGE_CLEANUP_NOTHING_TO_DELETE,
+  runStorageCleanupIfConfirmed,
+  storageCleanupAmounts,
+  storageCleanupButtonLabel,
+  storageCleanupConfirmState,
+  storageCleanupFailureMessage,
+  storageCleanupFreedMessage,
+  type StorageCleanupConfirmState,
+} from "./storageCleanupConfirm.logic";
 
 export function WorktreesDirectoryRow() {
   const { connectedEnvironments, targets } = useSettingsScope();
@@ -374,8 +393,28 @@ function CleanupSection() {
   const nowMinute = useNowMinute();
   const nowMs = Date.parse(`${nowMinute}:00.000Z`);
   const { connectedEnvironments } = useSettingsScope();
-  const [pending, setPending] = useState(false);
-  const run = useAtomCommand(serverEnvironment.runStorageCleanup);
+  const [phase, setPhase] = useState<
+    | { readonly kind: "idle" }
+    | { readonly kind: "previewing" }
+    | {
+        readonly kind: "confirm";
+        readonly dialog: StorageCleanupConfirmState;
+        readonly amounts: ReturnType<typeof storageCleanupAmounts>;
+      }
+    | { readonly kind: "running" }
+    | { readonly kind: "done"; readonly message: string }
+    | { readonly kind: "failed"; readonly message: string }
+  >({ kind: "idle" });
+  const cleanupLock = useRef(false);
+  const ignoreDialogClose = useRef(false);
+  const previewCleanup = useAtomCommand(serverEnvironment.previewStorageCleanup, {
+    reportFailure: false,
+    reportDefect: false,
+  });
+  const run = useAtomCommand(serverEnvironment.runStorageCleanup, {
+    reportFailure: false,
+    reportDefect: false,
+  });
   const supported = connectedEnvironments.filter(
     (environment) => environment.serverConfig?.environment.capabilities.storageCleanupRun === true,
   );
@@ -431,33 +470,117 @@ function CleanupSection() {
             : "尚未运行清理。",
     };
   });
-  const deleteNow = async () => {
-    if (pending) return;
-    setPending(true);
-    await Promise.all(
-      supported
-        .filter((environment) =>
-          state.some((entry) => entry.environmentId === environment.environmentId && entry.allowed),
-        )
-        .map(async (environment) => {
-          const result = await run({ environmentId: environment.environmentId, input: {} });
-          if (result._tag === "Success") {
-            const failures = result.value.entries.filter((entry) => entry.outcome === "failed");
-            if (failures.length > 0)
-              toastManager.add({
-                type: "error",
-                title: `${environment.label} 清理失败`,
-                description: failures[0]!.reason,
-              });
-          } else if (!isAtomCommandInterrupted(result)) {
-            toastManager.add({
-              type: "error",
-              title: `无法在 ${environment.label} 上运行清理`,
-              description: String(squashAtomCommandFailure(result)),
-            });
-          }
-        }),
-    ).finally(() => setPending(false));
+  const targets = supported.filter((environment) =>
+    state.some((entry) => entry.environmentId === environment.environmentId && entry.allowed),
+  );
+  const missingPreview = supported.filter(
+    (environment) =>
+      environment.serverConfig?.environment.capabilities.storageCleanupPreview !== true,
+  );
+  const previewReady = missingPreview.length === 0;
+  const buttonPhase =
+    phase.kind === "previewing" || phase.kind === "running" || phase.kind === "failed"
+      ? phase.kind
+      : "idle";
+  const openPreview = async () => {
+    if (cleanupLock.current || !hasRules || !previewReady || targets.length === 0) return;
+    cleanupLock.current = true;
+    ignoreDialogClose.current = false;
+    setPhase({ kind: "previewing" });
+    const results = await Promise.all(
+      targets.map(async (environment) => ({
+        environment,
+        result: await previewCleanup({ environmentId: environment.environmentId, input: {} }),
+      })),
+    ).catch((error: unknown) => {
+      cleanupLock.current = false;
+      setPhase({
+        kind: "failed",
+        message: storageCleanupFailureMessage(
+          0,
+          error instanceof Error ? error.message : "无法计算将要删除的内容。",
+        ),
+      });
+      return null;
+    });
+    if (results === null) return;
+    const failures: string[] = [];
+    const previews: Array<{
+      environmentLabel: string | null;
+      categories: StorageCleanupPreview["categories"];
+    }> = [];
+    for (const { environment, result } of results) {
+      const label = settingsScopeEnvironmentLabel(environment, connectedEnvironments);
+      const prefix = targets.length > 1 ? `${label}：` : "";
+      if (result._tag === "Failure") {
+        if (!isAtomCommandInterrupted(result))
+          failures.push(`${prefix}${String(squashAtomCommandFailure(result))}`);
+        continue;
+      }
+      previews.push({
+        environmentLabel: targets.length > 1 ? label : null,
+        categories: result.value.categories,
+      });
+      for (const failure of result.value.failures) failures.push(`${prefix}${failure.reason}`);
+    }
+    cleanupLock.current = false;
+    if (failures.length === 0 && previews.length === 0) {
+      setPhase({ kind: "idle" });
+      return;
+    }
+    const amounts = storageCleanupAmounts(previews);
+    if (amounts.length === 0 && failures.length === 0) {
+      // Nothing to list, so there is nothing to ask about.
+      setPhase({ kind: "done", message: STORAGE_CLEANUP_NOTHING_TO_DELETE });
+      return;
+    }
+    setPhase({
+      kind: "confirm",
+      amounts,
+      dialog: storageCleanupConfirmState({ amounts, failures }),
+    });
+  };
+  const confirmDelete = async () => {
+    if (phase.kind !== "confirm" || cleanupLock.current) return;
+    const dialog = phase.dialog;
+    cleanupLock.current = true;
+    ignoreDialogClose.current = true;
+    setPhase({ kind: "running" });
+    let freed = 0;
+    const failures: string[] = [];
+    const ran = await runStorageCleanupIfConfirmed("confirm", dialog, async () => {
+      const results = await Promise.all(
+        targets.map(async (environment) => ({
+          environment,
+          result: await run({ environmentId: environment.environmentId, input: {} }),
+        })),
+      );
+      for (const { environment, result } of results) {
+        const label = settingsScopeEnvironmentLabel(environment, connectedEnvironments);
+        if (result._tag === "Failure") {
+          if (!isAtomCommandInterrupted(result))
+            failures.push(`${label}：${String(squashAtomCommandFailure(result))}`);
+          continue;
+        }
+        freed += result.value.bytesFreed;
+        const entryFailure = result.value.entries.find((entry) => entry.outcome === "failed");
+        if (entryFailure) failures.push(`${label}：${entryFailure.reason}`);
+      }
+    }).catch((error: unknown) => {
+      failures.push(error instanceof Error ? error.message : "清理没有完成。");
+      return true;
+    });
+    cleanupLock.current = false;
+    ignoreDialogClose.current = false;
+    if (!ran) {
+      setPhase({ kind: "idle" });
+      return;
+    }
+    setPhase(
+      failures.length > 0
+        ? { kind: "failed", message: storageCleanupFailureMessage(freed, failures.join("；")) }
+        : { kind: "done", message: storageCleanupFreedMessage(freed) },
+    );
   };
   return (
     <SettingsSection id="storage-cleanup" title="清理" variant="plain">
@@ -468,26 +591,88 @@ function CleanupSection() {
             <span>
               {!hasRules
                 ? "请先启用一条清理规则。"
-                : summaries.map(({ environment, label, description }) => (
-                    <span key={environment.environmentId} className="block">
-                      {supported.length > 1 ? `${label}: ` : ""}
-                      {description}
-                    </span>
-                  ))}
+                : !previewReady
+                  ? supported.length > 1
+                    ? "有的电脑还不能在删除前列出将要清掉的内容。请先更新。"
+                    : "这台电脑的版本还不能在删除前列出将要清掉的内容。请先更新。"
+                  : summaries.map(({ environment, label, description }) => (
+                      <span key={environment.environmentId} className="block">
+                        {supported.length > 1 ? `${label}：` : ""}
+                        {description}
+                      </span>
+                    ))}
+              {phase.kind === "done" || phase.kind === "failed" ? (
+                <span className="block">{phase.message}</span>
+              ) : null}
             </span>
           }
           control={
             <Button
               variant="outline"
               size="sm"
-              disabled={pending || !hasRules || !state.some((entry) => entry.allowed)}
-              onClick={() => void deleteNow()}
+              disabled={
+                buttonPhase === "previewing" ||
+                buttonPhase === "running" ||
+                phase.kind === "confirm" ||
+                !hasRules ||
+                !previewReady ||
+                targets.length === 0
+              }
+              onClick={() => void openPreview()}
             >
-              {pending ? "正在删除…" : "立即删除"}
+              {storageCleanupButtonLabel(buttonPhase)}
             </Button>
           }
         />
       </SettingsGroup>
+      {phase.kind === "confirm" ? (
+        <AlertDialog
+          open
+          onOpenChange={(open) => {
+            if (open || ignoreDialogClose.current) return;
+            setPhase((current) => (current.kind === "confirm" ? { kind: "idle" } : current));
+          }}
+        >
+          <AlertDialogPopup>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{phase.dialog.title}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {phase.dialog.disabledReason ?? "将按当前的清理规则删除下面这些内容。"}
+              </AlertDialogDescription>
+              {phase.dialog.notice !== null ? (
+                <p className="text-sm text-muted-foreground">{phase.dialog.notice}</p>
+              ) : null}
+              {phase.amounts.length > 0 ? (
+                <ul className="space-y-2 text-sm">
+                  {phase.amounts.map((amount) => (
+                    <li key={amount.key} className="flex items-baseline justify-between gap-4">
+                      <span>{amount.label}</span>
+                      <span className="text-muted-foreground">{amount.detail}</span>
+                    </li>
+                  ))}
+                  <li className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
+                    <span>合计</span>
+                    <span>{formatBytes(phase.dialog.totalBytes)}</span>
+                  </li>
+                </ul>
+              ) : null}
+              {phase.amounts.some((amount) => amount.detail.includes("大小未知")) ? (
+                <p className="text-sm text-muted-foreground">合计不含大小未知的项。</p>
+              ) : null}
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+              <Button
+                variant="destructive"
+                disabled={phase.dialog.confirmDisabled}
+                onClick={() => void confirmDelete()}
+              >
+                {phase.dialog.confirmLabel}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogPopup>
+        </AlertDialog>
+      ) : null}
       {summaries.some(({ report }) => report !== null) && (
         <FoldedSettingsSection
           id="storage-cleanup-last-run"

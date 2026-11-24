@@ -3114,6 +3114,41 @@ describe("storage cleanup reports and local file policies", () => {
       }),
     ),
   );
+  it.live("preview counts expired files and removes nothing", () =>
+    runCleanupTest(
+      Effect.gen(function* () {
+        const { service, fs, config, enableFiles, disable } = yield* cleanupFixture();
+        disable();
+        enableFiles();
+        yield* fs.makeDirectory(config.browserArtifactsDir, { recursive: true });
+        yield* fs.makeDirectory(config.logsDir, { recursive: true });
+        for (const name of ["one.png", "two.webm"]) {
+          const file = config.browserArtifactsDir + "/" + name;
+          yield* fs.writeFileString(file, "capture");
+          yield* fs.utimes(file, 1, 1);
+        }
+        for (const name of ["server.log.1", "server.log.2", "server.log"]) {
+          const file = config.logsDir + "/" + name;
+          yield* fs.writeFileString(file, "log");
+          yield* fs.utimes(file, 1, 1);
+        }
+        const preview = yield* service.preview;
+        const listed = preview.categories.reduce((sum, category) => sum + category.bytes, 0);
+        expect(preview.categories).toEqual([
+          { kind: "browser-artifacts", count: 2, bytes: 14, unknownCount: 0 },
+          { kind: "logs", count: 2, bytes: 6, unknownCount: 0 },
+        ]);
+        expect(listed).toBe(20);
+        expect(preview.failures).toEqual([]);
+        expect(yield* fs.exists(config.browserArtifactsDir + "/one.png")).toBe(true);
+        expect(yield* fs.exists(config.browserArtifactsDir + "/two.webm")).toBe(true);
+        expect(yield* fs.exists(config.logsDir + "/server.log")).toBe(true);
+        expect(yield* fs.exists(config.logsDir + "/server.log.1")).toBe(true);
+        expect(yield* fs.exists(config.logsDir + "/server.log.2")).toBe(true);
+        expect(yield* service.latestReport).toBeNull();
+      }),
+    ),
+  );
   it.live("aggregates expired artifacts and rotated logs while retaining current logs", () =>
     runCleanupTest(
       Effect.gen(function* () {
