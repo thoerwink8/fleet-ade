@@ -1,0 +1,23 @@
+/* The app renders its own toast DOM (collapsible stack, corner close orb, trailing
+   controls) instead of fleet-design's flat row, so .fa-toast supplies only the
+   surface: background, border, radius, shadow, and the m-* mark colors. Fleet's
+   own box metrics would fight the stack's measured heights and offsets. */
+.fa-toast {
+  display: block;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  font: inherit;
+}
+
+/* Base UI marks toasts past the stack limit data-limited; our stack keeps them
+   mounted (scaled/peeked behind, opacity-0) instead of fleet's display:none. */
+.fa-toast[data-limited] {
+  display: block;
+}
+
+/* Grove and Ember define --error for fills; their toast surface is lighter than the page,
+   so the error icon uses the palette's foreground variant to stay legible. */
+html[data-theme-id]:not([data-theme-id=""]) .fa-toast .m-danger {
+  color: var(--error-foreground);
+}
