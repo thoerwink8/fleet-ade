@@ -789,33 +789,40 @@ describe("MessagesTimeline messages", () => {
         Number(/Turn (\d+):/.exec(heading.parentElement?.textContent ?? "")?.[1]),
       );
 
-    const scroll = async (by: number) => {
-      for (let step = 0; step < 40; step++) {
-        await act(() => {
-          viewport.scrollTop += by;
-          viewport.dispatchEvent(new Event("scroll"));
-          vi.advanceTimersByTime(16);
-        });
-      }
+    // Row heights differ from estimatedItemSize=90, so a fixed pixel jump cannot land
+    // inside a row range. Scroll one frame at a time until the DOM shows the target
+    // instead; a run that overshoots the middle scrolls back up through it.
+    const scrollUntil = async (by: number, done: () => boolean) => {
+      await vi.waitFor(
+        async () => {
+          await act(() => {
+            viewport.scrollTop += by;
+            viewport.dispatchEvent(new Event("scroll"));
+            vi.advanceTimersByTime(16);
+          });
+          expect(done()).toBe(true);
+        },
+        { timeout: 15000 },
+      );
       // Wrapping right after a scroll must still reach the first and last message.
       expect(turnsInDomOrder()[0]).toBe(0);
       expect(turnsInDomOrder().at(-1)).toBe(119);
     };
+    const hasMiddleTurn = () => turnsInDomOrder().some((turn) => turn > 0 && turn < 100);
 
     await act(() => {
       viewport.scrollTop = 0;
       viewport.dispatchEvent(new Event("scroll"));
       vi.advanceTimersByTime(300);
     });
-    await scroll(300);
-    // LegendList mounts the scrolled window on a later animation frame than the 16ms step.
-    await vi.waitFor(async () => {
-      await act(() => {
-        vi.advanceTimersByTime(16);
-      });
-      expect(turnsInDomOrder().filter((turn) => turn > 0 && turn < 100).length).toBeGreaterThan(0);
-    });
-    await scroll(-300);
+    await scrollUntil(
+      300,
+      () =>
+        hasMiddleTurn() || viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop <= 1,
+    );
+    await scrollUntil(-300, () => hasMiddleTurn() || viewport.scrollTop <= 0);
+    await scrollUntil(-300, () => viewport.scrollTop <= 0);
+    await vi.waitFor(() => expect(hasMiddleTurn()).toBe(true));
 
     await act(() => vi.advanceTimersByTime(300));
     const turns = turnsInDomOrder();
