@@ -13,10 +13,10 @@ export type ThreadCommandSubtitleVariant =
 
 const THREAD_COMMAND_SUBTITLE_VARIANT: ThreadCommandSubtitleVariant = "favicon-workspace-harness";
 
-export const COMMAND_PALETTE_META_ICON_CLASS = "size-3 shrink-0 text-muted-foreground/70";
+export const COMMAND_PALETTE_META_ICON_CLASS = "size-3 shrink-0";
 
 export function CommandPaletteMetaDot() {
-  return <span className="shrink-0 text-muted-foreground/50">·</span>;
+  return <span className="shrink-0">·</span>;
 }
 
 function WorkspaceIcon(props: { variant: ThreadCommandSubtitleVariant; isWorktree: boolean }) {
@@ -56,12 +56,7 @@ export function ThreadCommandSubtitle(props: {
   }
 
   return (
-    <span
-      className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-1 text-xs text-muted-foreground/70",
-        props.className,
-      )}
-    >
+    <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1", props.className)}>
       {projectLabel ? (
         <span className="inline-flex min-w-0 items-center gap-1">
           {props.project ? (
@@ -95,7 +90,7 @@ export function ThreadCommandSubtitle(props: {
             displayName={props.providerDisplayName ?? props.driverKind}
             acpRegistryAgentId={props.acpRegistryAgentId}
             acpRegistryIconUrl={props.acpRegistryIconUrl}
-            iconClassName="size-3 shrink-0 opacity-70"
+            iconClassName="size-3 shrink-0"
           />
         </>
       ) : null}

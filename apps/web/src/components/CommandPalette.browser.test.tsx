@@ -136,7 +136,7 @@ describe("CommandPalette open intents", () => {
     openCommandPalette({});
     await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
     await userEvent.keyboard("速查");
-    await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
+    await expect.element(page.getByRole("option", { name: /^快捷键速查(?!设置)/ })).toBeVisible();
     await userEvent.keyboard("{Escape}");
     await expect.element(page.getByRole("dialog", { name: "命令面板" })).not.toBeInTheDocument();
     await expect.element(opener).toHaveFocus();
@@ -247,5 +247,62 @@ describe("CommandPalette open intents", () => {
     await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
     expect(document.querySelectorAll('[data-slot="command-shortcut"]')).toHaveLength(0);
     expect(document.querySelector('[data-slot="command-footer"]')).toBeNull();
+  });
+
+  it("filters as you type, keeps Home and End on the caret, runs on Enter, and Escape returns focus", async () => {
+    setup();
+    await using screen = await render(
+      <>
+        <button type="button">打开之前</button>
+        <CommandPalette>{null}</CommandPalette>
+      </>,
+    );
+    const opener = screen.getByRole("button", { name: "打开之前" });
+    opener.element().focus();
+    openCommandPalette({});
+
+    const input = page.getByPlaceholder("搜索命令、项目和会话…");
+    await expect.element(input).toHaveFocus();
+    await input.fill("快捷键速查");
+    await expect.element(page.getByRole("option", { name: /^快捷键速查(?!设置)/ })).toBeVisible();
+    await expect
+      .element(page.getByRole("option", { name: /^在以下位置新建会话/ }))
+      .not.toBeInTheDocument();
+    const field = input.element();
+    if (!(field instanceof HTMLInputElement)) throw new Error("expected a text field");
+    expect(field.selectionStart).toBe("快捷键速查".length);
+    await userEvent.keyboard("{Home}");
+    expect(field.selectionStart).toBe(0);
+    await userEvent.keyboard("{End}");
+    expect(field.selectionStart).toBe("快捷键速查".length);
+
+    await userEvent.keyboard("{Escape}");
+    await expect.element(input).not.toBeInTheDocument();
+    await expect.element(opener).toHaveFocus();
+
+    opener.element().focus();
+    openCommandPalette({ query: "快捷键速查" });
+    const reopened = page.getByPlaceholder("搜索命令、项目和会话…");
+    await expect.element(reopened).toHaveFocus();
+    const cheatsheet = page.getByRole("option", { name: /^快捷键速查(?!设置)/ });
+    await expect.element(cheatsheet).toBeVisible();
+    if (!cheatsheet.element().hasAttribute("data-highlighted")) {
+      await userEvent.keyboard("{ArrowDown}");
+    }
+    await expect.element(cheatsheet).toHaveAttribute("data-highlighted");
+    await userEvent.keyboard("{Enter}");
+    await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).not.toBeInTheDocument();
+    await expect.element(opener).toHaveFocus();
+  });
+
+  it("leaves a nested page on Backspace when the field is empty", async () => {
+    setup();
+    await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
+    openCommandPalette({ open: "new-thread-in" });
+    const nested = page.getByPlaceholder("搜索…");
+    await expect.element(nested).toHaveFocus();
+    await userEvent.keyboard("{Backspace}");
+    await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
+    await expect.element(nested).not.toBeInTheDocument();
   });
 });

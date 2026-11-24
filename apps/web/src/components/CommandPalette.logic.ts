@@ -214,6 +214,15 @@ export function commandPaletteDisabledReason(
   return item.disabled ? (item.disabledReason ?? null) : null;
 }
 
+/** A description or message excerpt is the second line. A hint alone stays on the title line. */
+export function commandPaletteItemLineCount(
+  item: Pick<CommandPaletteItem, "description" | "threadContentMatch">,
+): 1 | 2 {
+  return item.description || item.threadContentMatch ? 2 : 1;
+}
+
+export type CommandPaletteRowMetric = "label" | "item-1" | "item-2";
+
 export interface CommandPaletteActionItem extends CommandPaletteItem {
   readonly kind: "action";
   readonly keepOpen?: boolean;
@@ -305,6 +314,11 @@ export type CommandPaletteRow =
       readonly item: CommandPaletteActionItem | CommandPaletteSubmenuItem;
       readonly itemIndex: number | null;
     };
+
+export function commandPaletteRowMetric(row: CommandPaletteRow): CommandPaletteRowMetric {
+  if (row.kind === "label") return "label";
+  return commandPaletteItemLineCount(row.item) === 2 ? "item-2" : "item-1";
+}
 
 export function buildCommandPaletteRows(groups: ReadonlyArray<CommandPaletteGroup>) {
   const rows: CommandPaletteRow[] = [];

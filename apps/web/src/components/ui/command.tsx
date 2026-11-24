@@ -191,35 +191,58 @@ function CommandCollection({ ...props }: React.ComponentProps<typeof Autocomplet
   return <AutocompleteCollection data-slot="command-collection" {...props} />;
 }
 
-// Pass active to override primitive hover/keyboard highlights when the palette tracks its own row.
+// `active` is the palette's own highlight. Composer rows still pass it and keep
+// the previous accent fill; palette rows map it to data-palette-active.
 function CommandItem({
   className,
   active,
+  lines = 1,
+  hasLead = false,
   ...props
-}: React.ComponentProps<typeof AutocompleteItem> & { active?: boolean }) {
+}: React.ComponentProps<typeof AutocompleteItem> & {
+  active?: boolean;
+  lines?: 1 | 2;
+  hasLead?: boolean;
+}) {
+  const composer = "data-composer-item-id" in props;
   return (
     <AutocompleteItem
       className={cn(
-        "py-1.5 data-selected:bg-foreground/[0.06] data-highlighted:bg-foreground/[0.09] data-highlighted:text-foreground [&[data-highlighted][data-selected]]:bg-foreground/[0.09] [&[data-highlighted][data-selected]]:text-foreground",
-        active !== undefined &&
-          "cursor-pointer hover:bg-transparent hover:text-inherit data-highlighted:bg-transparent data-highlighted:text-inherit data-selected:bg-transparent data-selected:text-inherit [&[data-highlighted][data-selected]]:bg-transparent [&[data-highlighted][data-selected]]:text-inherit",
-        active && "bg-accent! text-accent-foreground!",
+        composer
+          ? cn(
+              "py-1.5 data-selected:bg-foreground/[0.06] data-highlighted:bg-foreground/[0.09] data-highlighted:text-foreground [&[data-highlighted][data-selected]]:bg-foreground/[0.09] [&[data-highlighted][data-selected]]:text-foreground",
+              active !== undefined &&
+                "cursor-pointer hover:bg-transparent hover:text-inherit data-highlighted:bg-transparent data-highlighted:text-inherit data-selected:bg-transparent data-selected:text-inherit [&[data-highlighted][data-selected]]:bg-transparent [&[data-highlighted][data-selected]]:text-inherit",
+              active && "bg-accent! text-accent-foreground!",
+            )
+          : cn(
+              "fa-cmd__row",
+              lines === 2 ? "fa-cmd__row--2" : "fa-cmd__row--1",
+              hasLead && "has-lead",
+            ),
         className,
       )}
-      data-active={active || undefined}
+      data-active={composer ? active || undefined : undefined}
+      data-palette-active={composer || !active ? undefined : ""}
       data-slot="command-item"
       {...props}
     />
   );
 }
 
-function CommandShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
+function CommandShortcut({
+  className,
+  variant = "default",
+  ...props
+}: React.ComponentProps<"kbd"> & { variant?: "default" | "hint" }) {
   const hideKeyboardHints = useHideKeyboardShortcutHints();
   if (hideKeyboardHints) return null;
   return (
     <kbd
       className={cn(
-        "ms-auto font-medium font-sans text-secondary-label text-meta tracking-normal",
+        variant === "hint"
+          ? "st ms-auto"
+          : "ms-auto font-medium font-sans text-secondary-label text-meta tracking-normal",
         className,
       )}
       data-slot="command-shortcut"

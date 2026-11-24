@@ -15,11 +15,6 @@
   height: var(--fa-space-4);
 }
 
-/* @fleet/design 0.3.1 omits icon+lg width; keep icon-lg/icon-xl square at 40px. */
-.fa-btn--icon.fa-btn--lg {
-  width: var(--fa-ctrl-lg);
-}
-
 .fa-btn.ade-btn--multiline {
   height: auto;
   min-height: var(--fa-ctrl);

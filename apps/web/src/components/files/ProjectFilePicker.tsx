@@ -32,15 +32,15 @@ function HighlightedFuzzyText(props: {
   for (const index of props.indices) {
     if (start < index) parts.push(props.value.slice(start, index));
     parts.push(
-      <strong className="font-semibold text-foreground" key={index}>
+      <span className="fa-mark" key={index}>
         {props.value[index]}
-      </strong>,
+      </span>,
     );
     start = index + 1;
   }
   if (start < props.value.length) parts.push(props.value.slice(start));
 
-  return <span className="text-muted-foreground">{parts}</span>;
+  return parts;
 }
 
 function getEmptyStateMessage(query: string, error: string | null, isPending: boolean): string {
@@ -61,9 +61,7 @@ function EmptyProjectFilePicker() {
       testId="project-file-picker"
       value=""
     >
-      <div className="py-10 text-center text-sm text-muted-foreground">
-        打开一个项目以搜索其中的文件。
-      </div>
+      <div className="fa-cmd__empty">打开一个项目以搜索其中的文件。</div>
     </CommandPaletteContent>
   );
 }
