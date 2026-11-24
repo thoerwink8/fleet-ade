@@ -38,7 +38,6 @@ import {
   CircleAlertIcon,
   CircleCheckIcon,
   ClockIcon,
-  EllipsisIcon,
   GitBranchIcon,
   PinIcon,
   PinOffIcon,
@@ -60,12 +59,11 @@ import { useRightPanelStore } from "../../rightPanelStore";
 import { useOpenPrLink } from "../../lib/openPullRequestLink";
 import { useUiStateStore } from "../../uiStateStore";
 import { useThreadSelectionStore } from "../../threadSelectionStore";
-import { useNowMinute } from "../../hooks/useNowMinute";
 import { useNowSecond } from "../../hooks/useNowSecond";
 import { vcsEnvironment, vcsBranchRevalidation } from "../../state/vcs";
 import { useEnvironmentQuery } from "../../state/query";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
-import { formatRelativeTimeLabel, parseTimestampDate } from "../../timestampFormat";
+import { parseTimestampDate } from "../../timestampFormat";
 import type { SidebarThreadSummary } from "../../types";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { cn } from "~/lib/utils";
@@ -119,6 +117,7 @@ import {
   formatSidebarRowDisplayTitle,
   resolveSidebarRowPreviewText,
 } from "./SidebarThreadRow.logic";
+import { SidebarRelativeTimeLabel, SidebarRowIconButton, SidebarRowShell } from "./SidebarRowShell";
 
 // The fields thread rows show. Provider status pushes refresh `checkedAt`,
 // status and auth on every provider; leaving those out keeps each
@@ -134,14 +133,6 @@ export type SidebarProviderEntry = Pick<
   | "acpRegistryIconUrl"
   | "models"
 >;
-// Subscribes to the minute tick itself, so only the label re-renders each
-// minute. The minute is passed as the clock so it is the formatter's input.
-function RelativeTimeLabel(props: { timestamp: string | null }) {
-  const nowMinute = useNowMinute();
-  return props.timestamp === null
-    ? null
-    : formatRelativeTimeLabel(props.timestamp, Date.parse(`${nowMinute}:00.000Z`));
-}
 
 function JumpHintBadge(props: { label: string }) {
   return (
@@ -576,36 +567,6 @@ function SidebarThreadDetails(props: {
   );
 }
 
-function RowIconButton(props: {
-  label: string;
-  tooltip: string;
-  onClick: (event: ReactMouseEvent) => void;
-  onPointerDown?: (event: ReactPointerEvent) => void;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-label={props.label}
-            onClick={props.onClick}
-            onDoubleClick={(event) => event.stopPropagation()}
-            onPointerDown={props.onPointerDown}
-            className={cn("fa-icon-btn", props.className)}
-          />
-        }
-      >
-        {props.children}
-      </TooltipTrigger>
-      <TooltipPopup side="top">{props.tooltip}</TooltipPopup>
-    </Tooltip>
-  );
-}
-
 function SnoozeMenuButton(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -631,7 +592,7 @@ function SnoozeMenuButton(props: {
                   aria-label="暂缓会话"
                   onClick={(event) => event.stopPropagation()}
                   onDoubleClick={(event) => event.stopPropagation()}
-                  className="fa-icon-btn"
+                  className="fa-icon-btn ade-touch-target"
                 />
               }
             />
@@ -674,13 +635,6 @@ type SortableThreadRowBag = Pick<
   ReturnType<typeof useSortable>,
   "listeners" | "setNodeRef" | "transform" | "transition" | "isDragging"
 >;
-
-export const draftSurfaceClassName = "bg-warning/4 hover:bg-warning/8";
-export const draftPenClassName = "size-3 shrink-0 text-warning-foreground";
-// Desktop keeps 24px inline buttons with a 28px pseudo hit area; touch and mobile
-// viewports expand the button box to >= 32x32 without changing row height.
-export const SIDEBAR_ROW_BUTTON_HIT_AREA =
-  "relative after:absolute after:inset-x-0 after:-inset-y-0.5 max-md:min-h-8 max-md:min-w-8 pointer-coarse:min-h-8 pointer-coarse:min-w-8 [&_svg]:pointer-events-none";
 
 // useSortable memoizes on its `disabled` object, so a fresh one per render
 // re-renders every row and marker on each sidebar update.
@@ -1136,9 +1090,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   };
 
   const sortable = props.sortable;
-  const sortableRootProps = sortable
+  const sortableLiAttrs = sortable
     ? {
-        ref: sortable.setNodeRef,
         style: {
           transform: CSS.Translate.toString(sortable.transform),
           transition: sortable.transition,
@@ -1202,7 +1155,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const prBadge =
     prBadgeShape?.kind === "stack" || pr || currentLinkedPr ? (
       <ThreadPullRequestBadgeControl
-        render={<button type="button" tabIndex={-1} className="fa-icon-btn ade-trow-pr" />}
+        render={
+          <button
+            type="button"
+            tabIndex={-1}
+            className="fa-icon-btn ade-trow-pr ade-touch-target"
+          />
+        }
         badge={prBadgeShape}
         pullRequests={thread.pullRequests}
         number={pr?.number ?? currentLinkedPr?.number}
@@ -1236,196 +1195,161 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       : resolveThreadActivityTimestamp(thread);
 
   return (
-    <li
-      data-thread-item={threadKey}
-      {...sortableRootProps}
-      {...(fileDropHandlers ?? {})}
-      className={cn(
-        "list-none [content-visibility:auto]",
-        needsYou ? "[contain-intrinsic-size:auto_52px]" : "[contain-intrinsic-size:auto_32px]",
-        sortable?.isDragging && "relative z-20",
+    <SidebarRowShell
+      liRef={sortable?.setNodeRef}
+      liClassName={sortable?.isDragging ? "relative z-20" : undefined}
+      liProps={{
+        "data-thread-item": threadKey,
+        ...sortableLiAttrs,
+        ...fileDropHandlers,
+      }}
+      multiline={needsYou}
+      rowRef={rowRef}
+      rowKey={threadKey}
+      navigationParent={props.navigationParent}
+      testId={variant === "card" ? "sidebar-row-card" : "sidebar-row-slim"}
+      ariaLabel={accessibility.label}
+      ariaCurrent={accessibility.current}
+      selected={selected}
+      disabled={attentionDisabled}
+      busy={isRegeneratingTitle}
+      rowClassName={cn(
+        isUnread && "ade-trow--unread",
+        isFileDragOver && "ade-trow--file",
+        sortable?.isDragging && "ade-trow--drag",
+        attentionDisabled && "cursor-default",
       )}
-    >
-      <Tooltip
-        disabled={snoozeMenuOpen || Boolean(sortable?.isDragging)}
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-      >
-        <TooltipTrigger
-          render={
-            <div
-              ref={rowRef}
-              role="button"
-              tabIndex={0}
-              data-sidebar-row={threadKey}
-              data-sidebar-parent={props.navigationParent}
-              aria-label={accessibility.label}
-              aria-current={accessibility.current}
-              aria-selected={selected || undefined}
-              aria-disabled={attentionDisabled || undefined}
-              data-testid={variant === "card" ? "sidebar-row-card" : "sidebar-row-slim"}
-              aria-busy={isRegeneratingTitle || undefined}
-              className={cn(
-                "fa-trow w-full text-left select-none",
-                !needsYou && "fa-trow--1",
-                isUnread && "ade-trow--unread",
-                isFileDragOver && "ade-trow--file",
-                sortable?.isDragging && "ade-trow--drag",
-                attentionDisabled && "cursor-default",
-              )}
-              onClick={handleClick}
-              onDoubleClick={handleDoubleClick}
-              onKeyDown={handleKeyDown}
-              onContextMenu={handleContextMenu}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      onKeyDown={handleKeyDown}
+      onContextMenu={handleContextMenu}
+      tooltipDisabled={snoozeMenuOpen || Boolean(sortable?.isDragging)}
+      detailsOpen={detailsOpen}
+      onDetailsOpenChange={setDetailsOpen}
+      detailsLabel="会话详情"
+      details={<SidebarThreadDetails {...detailProps} />}
+      lead={
+        <span className="fa-agent" aria-hidden>
+          {agentMarkLetter(agentName)}
+          {rowMark ? (
+            <span className={cn("fa-dot", rowMark.dot)} role="img" aria-label={rowMark.label} />
+          ) : null}
+        </span>
+      }
+      body={
+        <>
+          {isRenaming ? (
+            <ThreadRenameInput
+              title={renamingTitle}
+              onTitleChange={onRenameTitleChange}
+              onCommit={() => onCommitRename(threadRef, renamingTitle)}
+              onCancel={onCancelRename}
             />
-          }
-        >
-          <span className="lead">
-            <span className="fa-agent" aria-hidden>
-              {agentMarkLetter(agentName)}
-              {rowMark ? (
-                <span className={cn("fa-dot", rowMark.dot)} role="img" aria-label={rowMark.label} />
-              ) : null}
+          ) : (
+            <div
+              className={cn("t", isRegeneratingTitle && "ade-trow-title-pending")}
+              dir={textDirection(displayTitle)}
+              aria-hidden
+            >
+              {displayTitle}
+            </div>
+          )}
+          {attentionReason !== null ? <div className="s">{attentionReason}</div> : null}
+          {isRegeneratingTitle ? (
+            <span role="status" className="sr-only">
+              正在重新生成标题
             </span>
-          </span>
-          <div className="min-w-0">
-            {isRenaming ? (
-              <ThreadRenameInput
-                title={renamingTitle}
-                onTitleChange={onRenameTitleChange}
-                onCommit={() => onCommitRename(threadRef, renamingTitle)}
-                onCancel={onCancelRename}
-              />
-            ) : (
-              <div
-                className={cn("t", isRegeneratingTitle && "ade-trow-title-pending")}
-                dir={textDirection(displayTitle)}
-                aria-hidden
+          ) : null}
+        </>
+      }
+      endClassName={jumpHintLabel ? JUMP_HINT_SLOT_CLASS_NAME : undefined}
+      endOverride={sortable?.isDragging || props.sweepAction !== null ? dragDestination : null}
+      endPrefix={prBadge ? <span className="pr">{prBadge}</span> : null}
+      meta={
+        variantAction === "unsnooze" && props.snoozeWakeLabelText !== null ? (
+          <>
+            <AlarmClockIcon aria-hidden className="mr-1 inline size-3" />
+            {props.snoozeWakeLabelText}
+          </>
+        ) : isWokeStatus ? (
+          "已唤醒"
+        ) : (
+          <SidebarRelativeTimeLabel timestamp={activityTimestamp} />
+        )
+      }
+      actions={
+        <>
+          {showPin && props.pinningSupported && canOperateThread && !sortable?.isDragging ? (
+            <SidebarRowIconButton
+              label="取消置顶会话"
+              tooltip="取消置顶会话"
+              onClick={handleUnpinClick}
+            >
+              <PinIcon className="size-4" />
+            </SidebarRowIconButton>
+          ) : null}
+          {hasUnsentDraft ? (
+            <SidebarRowIconButton
+              label="丢弃草稿"
+              tooltip="丢弃草稿"
+              onClick={handleDiscardDraftClick}
+            >
+              <XIcon className="size-4" />
+            </SidebarRowIconButton>
+          ) : null}
+          {isWokeStatus ? (
+            <SidebarRowIconButton
+              label="忽略已唤醒通知"
+              tooltip="忽略已唤醒通知"
+              onClick={handleAcknowledgeWokeClick}
+            >
+              <AlarmClockIcon className="size-4" />
+            </SidebarRowIconButton>
+          ) : null}
+          {showSnoozeButton && variantAction === "settle" ? (
+            <SnoozeMenuButton
+              open={snoozeMenuOpen}
+              onOpenChange={setSnoozeMenuOpen}
+              onSnooze={handleSnoozePreset}
+              timestampFormat={props.timestampFormat}
+              environmentId={thread.environmentId}
+            />
+          ) : null}
+          {showUnsnooze ? (
+            <SidebarRowIconButton
+              label="立即唤醒会话"
+              tooltip="立即唤醒会话"
+              onClick={handleUnsnoozeClick}
+              onPointerDown={handleActionPointerDown}
+            >
+              <AlarmClockOffIcon className="size-4" />
+            </SidebarRowIconButton>
+          ) : null}
+          {showSettle ? (
+            variantAction === "unsettle" ? (
+              <SidebarRowIconButton
+                label="取消会话收尾"
+                tooltip="取消会话收尾"
+                onClick={handleUnsettleClick}
+                onPointerDown={handleActionPointerDown}
               >
-                {displayTitle}
-              </div>
-            )}
-            {attentionReason !== null ? <div className="s">{attentionReason}</div> : null}
-            {isRegeneratingTitle ? (
-              <span role="status" className="sr-only">
-                正在重新生成标题
-              </span>
-            ) : null}
-          </div>
-          <span className={cn("end", jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME)}>
-            {sortable?.isDragging || props.sweepAction !== null ? (
-              dragDestination
+                <Undo2Icon className="size-4" />
+              </SidebarRowIconButton>
             ) : (
-              <>
-                {prBadge ? <span className="pr">{prBadge}</span> : null}
-                <span className="tm">
-                  {variantAction === "unsnooze" && props.snoozeWakeLabelText !== null ? (
-                    <>
-                      <AlarmClockIcon aria-hidden className="mr-1 inline size-3" />
-                      {props.snoozeWakeLabelText}
-                    </>
-                  ) : isWokeStatus ? (
-                    "已唤醒"
-                  ) : (
-                    <RelativeTimeLabel timestamp={activityTimestamp} />
-                  )}
-                </span>
-                <span className="acts">
-                  {showPin &&
-                  props.pinningSupported &&
-                  canOperateThread &&
-                  !sortable?.isDragging ? (
-                    <RowIconButton
-                      label="取消置顶会话"
-                      tooltip="取消置顶会话"
-                      onClick={handleUnpinClick}
-                    >
-                      <PinIcon className="size-4" />
-                    </RowIconButton>
-                  ) : null}
-                  {hasUnsentDraft ? (
-                    <RowIconButton
-                      label="丢弃草稿"
-                      tooltip="丢弃草稿"
-                      onClick={handleDiscardDraftClick}
-                    >
-                      <XIcon className="size-4" />
-                    </RowIconButton>
-                  ) : null}
-                  {isWokeStatus ? (
-                    <RowIconButton
-                      label="忽略已唤醒通知"
-                      tooltip="忽略已唤醒通知"
-                      onClick={handleAcknowledgeWokeClick}
-                    >
-                      <AlarmClockIcon className="size-4" />
-                    </RowIconButton>
-                  ) : null}
-                  {showSnoozeButton && variantAction === "settle" ? (
-                    <SnoozeMenuButton
-                      open={snoozeMenuOpen}
-                      onOpenChange={setSnoozeMenuOpen}
-                      onSnooze={handleSnoozePreset}
-                      timestampFormat={props.timestampFormat}
-                      environmentId={thread.environmentId}
-                    />
-                  ) : null}
-                  {showUnsnooze ? (
-                    <RowIconButton
-                      label="立即唤醒会话"
-                      tooltip="立即唤醒会话"
-                      onClick={handleUnsnoozeClick}
-                      onPointerDown={handleActionPointerDown}
-                    >
-                      <AlarmClockOffIcon className="size-4" />
-                    </RowIconButton>
-                  ) : null}
-                  {showSettle ? (
-                    variantAction === "unsettle" ? (
-                      <RowIconButton
-                        label="取消会话收尾"
-                        tooltip="取消会话收尾"
-                        onClick={handleUnsettleClick}
-                        onPointerDown={handleActionPointerDown}
-                      >
-                        <Undo2Icon className="size-4" />
-                      </RowIconButton>
-                    ) : (
-                      <RowIconButton
-                        label="收尾会话"
-                        tooltip="收尾会话"
-                        onClick={handleSettleClick}
-                        onPointerDown={handleActionPointerDown}
-                      >
-                        <CheckIcon className="size-4" />
-                      </RowIconButton>
-                    )
-                  ) : null}
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    aria-label="会话详情"
-                    className="fa-icon-btn ade-trow-details"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setDetailsOpen(true);
-                    }}
-                    onDoubleClick={(event) => event.stopPropagation()}
-                  >
-                    <EllipsisIcon className="size-4" />
-                  </button>
-                </span>
-                {jumpHintLabel ? <JumpHintBadge label={jumpHintLabel} /> : null}
-              </>
-            )}
-          </span>
-        </TooltipTrigger>
-        <TooltipPopup variant="panel" side="right" align="start" sideOffset={8}>
-          {detailsOpen ? <SidebarThreadDetails {...detailProps} /> : null}
-        </TooltipPopup>
-      </Tooltip>
-    </li>
+              <SidebarRowIconButton
+                label="收尾会话"
+                tooltip="收尾会话"
+                onClick={handleSettleClick}
+                onPointerDown={handleActionPointerDown}
+              >
+                <CheckIcon className="size-4" />
+              </SidebarRowIconButton>
+            )
+          ) : null}
+        </>
+      }
+      endSuffix={jumpHintLabel ? <JumpHintBadge label={jumpHintLabel} /> : null}
+    />
   );
 });
 
@@ -1604,7 +1528,7 @@ export const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props
                 />
               </span>
               <span className="min-w-8 shrink-0 text-right text-row text-muted-foreground/55 tabular-nums">
-                <RelativeTimeLabel timestamp={resolveThreadActivityTimestamp(thread)} />
+                <SidebarRelativeTimeLabel timestamp={resolveThreadActivityTimestamp(thread)} />
               </span>
             </span>
             {props.searchMatch ? (
