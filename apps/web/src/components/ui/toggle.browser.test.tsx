@@ -7,6 +7,7 @@ import "~/index.css";
 import { render } from "../../../test/render";
 import { applyThemePalette, EMBER_THEME, GROVE_THEME } from "../../themePalette";
 import { Button } from "./button";
+import { Popover, PopoverTrigger } from "./popover";
 import { Toggle } from "./toggle";
 
 const toRgb = converter("rgb");
@@ -195,23 +196,36 @@ describe("Toggle", () => {
     expect(getComputedStyle(el("Pressed Disabled")).backgroundColor).toBe(selected);
   });
 
-  it("stretches the coarse-pointer hit area to 44px without growing the painted box", async () => {
+  it("stretches the coarse-pointer hit area to 44px without growing the painted box, also when a popover trigger renders the toggle", async () => {
     await using _pointer = await emulateCoarsePointer();
     await using screen = await render(
-      <div className="p-12">
+      <div className="flex gap-12 p-12">
         <Toggle aria-label="Touch" size="sm">
           <PlusIcon />
         </Toggle>
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Toggle aria-label="Touch via popover" size="sm">
+                <PlusIcon />
+              </Toggle>
+            }
+          />
+        </Popover>
       </div>,
     );
-    const toggle = screen.getByRole("button", { name: "Touch" }).element();
-    const rect = toggle.getBoundingClientRect();
-    expect(Math.round(rect.height)).toBe(
-      Number.parseFloat(computed("height", "var(--fa-ctrl-sm)")),
-    );
-    expect(Number.parseFloat(getComputedStyle(toggle, "::after").minHeight)).toBe(44);
-    expect(Number.parseFloat(getComputedStyle(toggle, "::after").minWidth)).toBe(44);
-    expect(document.elementFromPoint(rect.left + rect.width / 2, rect.top - 4)).toBe(toggle);
+    for (const name of ["Touch", "Touch via popover"]) {
+      const toggle = screen.getByRole("button", { name }).element();
+      const rect = toggle.getBoundingClientRect();
+      expect(Math.round(rect.height), `${name} painted height`).toBe(
+        Number.parseFloat(computed("height", "var(--fa-ctrl-sm)")),
+      );
+      expect(Number.parseFloat(getComputedStyle(toggle, "::after").minHeight), name).toBe(44);
+      expect(Number.parseFloat(getComputedStyle(toggle, "::after").minWidth), name).toBe(44);
+      expect(document.elementFromPoint(rect.left + rect.width / 2, rect.top - 4), name).toBe(
+        toggle,
+      );
+    }
   });
 
   it("toggles with Space and Enter and shows the library focus ring", async () => {
