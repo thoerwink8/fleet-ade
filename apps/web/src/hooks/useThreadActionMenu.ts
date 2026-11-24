@@ -227,13 +227,13 @@ export function useThreadActionMenu(input: {
           return;
         }
         case "settle":
-          await reportFailure("收尾会话失败", () => settleThread(threadRef));
+          await reportFailure("无法标为完成", () => settleThread(threadRef));
           return;
         case "unsettle":
-          await reportFailure("取消会话收尾失败", () => unsettleThread(threadRef));
+          await reportFailure("无法取消完成", () => unsettleThread(threadRef));
           return;
         case "unsnooze":
-          await reportFailure("唤醒会话失败", () => unsnoozeThread(threadRef));
+          await reportFailure("无法取消暂缓", () => unsnoozeThread(threadRef));
           return;
         case "pin":
           await reportFailure("置顶会话失败", () => pinThread(threadRef));
@@ -250,7 +250,7 @@ export function useThreadActionMenu(input: {
           return;
         case "auto-settle:enabled":
         case "auto-settle:disabled":
-          await reportFailure("更新自动收尾设置失败", () =>
+          await reportFailure("无法更新自动标为完成设置", () =>
             setThreadAutoSettle(threadRef, action === "auto-settle:enabled"),
           );
           return;

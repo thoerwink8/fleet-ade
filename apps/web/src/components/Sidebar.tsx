@@ -1690,7 +1690,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "收尾会话失败",
+            title: "无法标为完成",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1714,7 +1714,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "取消会话收尾失败",
+            title: "无法取消完成",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -1729,7 +1729,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "唤醒会话失败",
+            title: "无法取消暂缓",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -2252,15 +2252,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       switch (plan.kind) {
         case "settle": {
           settlingThreadKeysRef.current.add(activeKey);
-          await run(settleThread(threadRef), "收尾会话失败").finally(() =>
+          await run(settleThread(threadRef), "无法标为完成").finally(() =>
             settlingThreadKeysRef.current.delete(activeKey),
           );
           return;
         }
         case "move-active":
           if (plan.unpin && !(await run(unpinThread(threadRef), "取消置顶会话失败"))) return;
-          if (plan.unsettle && !(await run(unsettleThread(threadRef), "取消会话收尾失败"))) return;
-          if (plan.unsnooze && !(await run(unsnoozeThread(threadRef), "唤醒会话失败"))) return;
+          if (plan.unsettle && !(await run(unsettleThread(threadRef), "无法取消完成"))) return;
+          if (plan.unsnooze && !(await run(unsnoozeThread(threadRef), "无法取消暂缓"))) return;
           break;
         case "pin":
           if (
@@ -2397,7 +2397,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               : []),
             {
               id: "settle",
-              label: `收尾（${count}）`,
+              label: `标为完成（${count}）`,
               disabled: settlingThreads.length === 0 || !canOperateThreads(settlingThreads),
             },
             ...(canSnoozeSelection
@@ -2873,7 +2873,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               toastManager.add(
                 stackedThreadToast({
                   type: "error",
-                  title: "更新自动收尾设置失败",
+                  title: "无法更新自动标为完成设置",
                   description: error instanceof Error ? error.message : "发生错误。",
                 }),
               );
@@ -3710,7 +3710,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionHeader
                                 key="settled-shelf-header"
                                 marker="settled-header"
-                                label="最近"
+                                label="已完成"
                                 count={settledCount}
                                 dragging={from !== null}
                                 isDropTarget={dragTargetSection === "settled"}
@@ -3726,7 +3726,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="settled-placeholder"
                                 marker="settled-placeholder"
-                                label="最近"
+                                label="已完成"
                                 showHint={
                                   from !== null &&
                                   (renderedSettledThreads.length === 0 ||

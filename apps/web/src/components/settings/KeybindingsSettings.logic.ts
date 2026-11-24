@@ -476,7 +476,7 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "thread.previous": "会话：上一个",
   "thread.next": "会话：下一个",
   "thread.copyReference": "PR：复制链接或会话",
-  "thread.settle": "会话：收尾",
+  "thread.settle": "会话：标为完成",
   "thread.pin": "会话：置顶",
   "thread.regenerateTitle": "会话：重新生成标题",
   "thread.undo": "会话：撤销",

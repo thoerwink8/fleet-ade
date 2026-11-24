@@ -705,19 +705,19 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
   settle: (
     <>
       <CircleCheckIcon aria-hidden className="size-3" />
-      收尾
+      标为完成
     </>
   ),
   unsettle: (
     <>
       <Undo2Icon aria-hidden className="size-3" />
-      取消收尾
+      取消完成
     </>
   ),
   wake: (
     <>
       <AlarmClockOffIcon aria-hidden className="size-3" />
-      唤醒
+      取消暂缓
     </>
   ),
 };
@@ -942,7 +942,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                     }
                   : isWoke
                     ? {
-                        label: "已唤醒",
+                        label: "暂缓结束",
                         icon: "woke" as const,
                         className: "text-warning-foreground",
                       }
@@ -1272,7 +1272,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             {props.snoozeWakeLabelText}
           </>
         ) : isWokeStatus ? (
-          "已唤醒"
+          "暂缓结束"
         ) : (
           <SidebarRelativeTimeLabel timestamp={activityTimestamp} />
         )
@@ -1299,8 +1299,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           ) : null}
           {isWokeStatus ? (
             <SidebarRowIconButton
-              label="忽略已唤醒通知"
-              tooltip="忽略已唤醒通知"
+              label="忽略暂缓结束提示"
+              tooltip="忽略暂缓结束提示"
               onClick={handleAcknowledgeWokeClick}
             >
               <AlarmClockIcon className="size-4" />
@@ -1317,8 +1317,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           ) : null}
           {showUnsnooze ? (
             <SidebarRowIconButton
-              label="立即唤醒会话"
-              tooltip="立即唤醒会话"
+              label="取消暂缓"
+              tooltip="取消暂缓"
               onClick={handleUnsnoozeClick}
               onPointerDown={handleActionPointerDown}
             >
@@ -1328,8 +1328,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           {showSettle ? (
             variantAction === "unsettle" ? (
               <SidebarRowIconButton
-                label="取消会话收尾"
-                tooltip="取消会话收尾"
+                label="取消完成"
+                tooltip="取消完成"
                 onClick={handleUnsettleClick}
                 onPointerDown={handleActionPointerDown}
               >
@@ -1337,8 +1337,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               </SidebarRowIconButton>
             ) : (
               <SidebarRowIconButton
-                label="收尾会话"
-                tooltip="收尾会话"
+                label="标为完成"
+                tooltip="标为完成"
                 onClick={handleSettleClick}
                 onPointerDown={handleActionPointerDown}
               >

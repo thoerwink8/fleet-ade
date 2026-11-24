@@ -170,14 +170,14 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["运行中分组"]
       : []),
     ...(settings.sidebarAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays
-      ? ["自动收尾不活跃会话"]
+      ? ["不活跃会话自动标为完成"]
       : []),
     ...(settings.sidebarAutoSettleKeepPullRequests !==
     DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests
       ? ["保留有关联 PR 的会话"]
       : []),
     ...(settings.sidebarAutoSettleOnMerge !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge
-      ? ["合并后自动收尾会话"]
+      ? ["合并后自动标为完成"]
       : []),
     ...(settings.autoResumeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads
       ? ["用量限制解除后继续"]
@@ -234,7 +234,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(isBackgroundActivityDirty ? ["后台活动"] : []),
     ...(settings.keepAwakeWhileAgentsWork !== DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork
-      ? ["智能体工作时保持唤醒"]
+      ? ["智能体工作时保持不休眠"]
       : []),
     ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
       ? ["新会话模式"]
@@ -400,7 +400,7 @@ function AutoSettleDaysInput({
         }
       }}
       onBlur={() => setDraft(String(value))}
-      aria-label="自动收尾前的闲置天数"
+      aria-label="自动标为完成前的闲置天数"
     />
   );
 }
@@ -508,7 +508,7 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           {...setting("working-shelf")}
           description={
-            "将正在执行和监控的会话收起到“运行中”分组。需要你处理时，它们会回到收件箱顶部。实验功能中的简洁侧边栏不显示此分组。"
+            "将正在执行和监控的会话收起到“运行中”分组。需要你处理时，它们会回到列表顶部。实验功能中的简洁侧边栏不显示此分组。"
           }
           resetAction={
             settings.sidebarWorkingShelfEnabled !==
@@ -1487,17 +1487,17 @@ export function ThreadsSettingsPanel() {
       </SettingsSection>
 
       {hasServerTargets ? (
-        <SettingsSection id="auto-settle" title="自动收尾">
+        <SettingsSection id="auto-settle" title="自动标为完成">
           <SettingsRow
             serverScoped
             settingKeys={["sidebarAutoSettleOnMerge"]}
             {...searchableSetting("auto-settle-merged-threads")}
-            description="Pull request 合并后收尾会话。已关闭的 pull request 仍会自动收尾。"
+            description="Pull request 合并后将会话标为完成。已关闭的 pull request 仍会自动标为完成。"
             resetAction={
               settings.sidebarAutoSettleOnMerge !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
                 <SettingResetButton
-                  label="合并后自动收尾"
+                  label="合并后自动标为完成"
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
@@ -1513,7 +1513,7 @@ export function ThreadsSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
                 }
-                aria-label="合并后自动收尾会话"
+                aria-label="合并后自动标为完成"
               />
             }
           />
@@ -1522,12 +1522,12 @@ export function ThreadsSettingsPanel() {
             serverScoped
             settingKeys={["sidebarAutoSettleAfterDays"]}
             {...searchableSetting("auto-settle-inactive-threads")}
-            description="侧边栏中闲置达到此时长的会话会自动收尾。"
+            description="侧边栏中闲置达到此时长的会话会自动标为完成。"
             resetAction={
               settings.sidebarAutoSettleAfterDays !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ? (
                 <SettingResetButton
-                  label="自动收尾"
+                  label="自动标为完成"
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleAfterDays:
@@ -1546,7 +1546,7 @@ export function ThreadsSettingsPanel() {
                     sidebarAutoSettleAfterDays: checked ? AUTO_SETTLE_DEFAULT_DAYS : null,
                   })
                 }
-                aria-label="自动收尾不活跃会话"
+                aria-label="不活跃会话自动标为完成"
               />
             }
           />
@@ -1555,7 +1555,7 @@ export function ThreadsSettingsPanel() {
               serverScoped
               settingKeys={["sidebarAutoSettleAfterDays"]}
               title={searchableSetting("days-before-auto-settle").title}
-              description="会话有新活动时会自动取消收尾。"
+              description="会话有新活动时会自动取消完成。"
               control={
                 <AutoSettleDaysInput
                   value={settings.sidebarAutoSettleAfterDays}
@@ -1569,7 +1569,7 @@ export function ThreadsSettingsPanel() {
               serverScoped
               settingKeys={["sidebarAutoSettleKeepPullRequests"]}
               title="保留有关联 PR 的会话"
-              description="闲置不会让有 pull request 的会话收尾，但合并和关闭仍会。"
+              description="闲置不会让有 pull request 的会话标为完成，但合并和关闭仍会自动标为完成。"
               control={
                 <ScopedSwitch
                   settingKeys={["sidebarAutoSettleKeepPullRequests"]}
@@ -1831,7 +1831,7 @@ export function MaintenanceSettingsPanel() {
             settings.keepAwakeWhileAgentsWork !==
             DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork ? (
               <SettingResetButton
-                label="智能体工作时保持唤醒"
+                label="智能体工作时保持不休眠"
                 onClick={() =>
                   updateSettings({
                     keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,
@@ -1847,7 +1847,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ keepAwakeWhileAgentsWork: Boolean(checked) })
               }
-              aria-label="智能体工作时保持唤醒"
+              aria-label="智能体工作时保持不休眠"
             />
           }
         />

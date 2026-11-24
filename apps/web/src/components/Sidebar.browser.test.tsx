@@ -674,7 +674,7 @@ describe("sidebar thread settle", () => {
     return { activeProject, threadX, threadXRef, store, settleCommand, unsettleCommand };
   };
 
-  it("keeps the active route on settle, moves the row into 最近, and restores it via the undo toast", async () => {
+  it("keeps the active route on settle, moves the row into 已完成, and restores it via the undo toast", async () => {
     using stack = new DisposableStack();
     const { activeProject, threadX, settleCommand, unsettleCommand } = setupSettleFixture(stack);
     const rowKey = `${activeProject.environmentId}:${threadX.id}`;
@@ -690,7 +690,7 @@ describe("sidebar thread settle", () => {
     expect(rowBefore.getAttribute("data-sidebar-parent")).toBeNull();
 
     const settleButton = rowBefore.querySelector<HTMLButtonElement>(
-      'button[aria-label="收尾会话"]',
+      'button[aria-label="标为完成"]',
     )!;
     // Row actions stay hidden until the pointer is over the row.
     await userEvent.hover(rowBefore);
@@ -717,7 +717,7 @@ describe("sidebar thread settle", () => {
     });
     expect(router.state.location.pathname).toBe("/local/thread-x");
 
-    await expect.element(page.getByText("已收尾")).toBeVisible();
+    await expect.element(page.getByText("已标为完成")).toBeVisible();
     const undoButton = page.getByRole("button", { name: "撤销" });
     await expect.element(undoButton).toBeVisible();
     await userEvent.click(undoButton);

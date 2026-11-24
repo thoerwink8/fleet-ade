@@ -92,7 +92,7 @@ export class ThreadSettlementUnsupportedError extends Schema.TaggedError<ThreadS
   },
 ) {
   override get message(): string {
-    return "这台电脑的后台服务尚不支持收尾。请更新后台服务后再使用“收尾”。";
+    return "这台电脑的后台服务尚不支持标为完成。请更新后台服务后再使用“标为完成”。";
   }
 }
 
@@ -137,7 +137,7 @@ export class ThreadAutoSettleOptOutUnsupportedError extends Schema.TaggedError<T
   },
 ) {
   override get message(): string {
-    return "这台电脑的后台服务尚不支持按会话关闭自动收尾。请更新后台服务后再使用该功能。";
+    return "这台电脑的后台服务尚不支持按会话关闭自动标为完成。请更新后台服务后再使用该功能。";
   }
 }
 
@@ -1194,7 +1194,7 @@ export function useThreadActions() {
       action: "Settled",
       claim: action,
       undo: () => runUndoPlan(target, undoPlan),
-      failureTitle: "无法撤销收尾",
+      failureTitle: "无法撤销标为完成",
     });
     return result;
   };
@@ -1307,7 +1307,7 @@ export function useThreadActions() {
       action: "Snoozed",
       claim: action,
       undo: () => runUndoPlan(target, ThreadUndo.planThreadUndo("snooze")),
-      failureTitle: "唤醒会话失败",
+      failureTitle: "无法取消暂缓",
     });
     return result;
   };

@@ -432,7 +432,7 @@ export function ThreadDetailsPrRow({
           />
         </TooltipTrigger>
         <TooltipPopup side="top">
-          关注中：检查完成、有人评论或分支出现冲突时，智能体会被唤醒。点击停止关注。
+          关注中：检查完成、有人评论或分支出现冲突时，智能体会自动继续。点击停止关注。
         </TooltipPopup>
       </Tooltip>
     ) : null;
