@@ -130,7 +130,7 @@ function showWorkspaceContextMenu(event: ReactMouseEvent, workspacePath: string)
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "复制路径失败",
+              title: "无法复制路径",
               description: error instanceof Error ? error.message : "发生错误。",
             }),
           );

@@ -66,7 +66,7 @@ describe("SidebarProviderUpdatePill exit", () => {
     setup([provider("failed")]);
     await using screen = await render(<SidebarProviderUpdatePill />);
     using _timers = fakeTimers();
-    expect(screen.container.textContent).toContain("Claude 更新失败");
+    expect(screen.container.textContent).toContain("无法更新 Claude");
 
     await act(() =>
       screen.container

@@ -269,7 +269,7 @@ export function getUpdateEverythingToastView(result: UpdateEverythingResult): {
   }
   return {
     type: "error",
-    title: parts.length === 0 ? "更新失败" : `已更新 ${joinList(parts)}`,
+    title: parts.length === 0 ? "无法更新" : `已更新 ${joinList(parts)}`,
     description: [...result.failures, ...restarting].join("\n"),
   };
 }

@@ -171,7 +171,7 @@ function EnvironmentCloneToasts({ environmentId }: { environmentId: EnvironmentI
       const cancelled = clone.phase === "cancelled";
       const options = stackedThreadToast({
         type: cancelled ? "info" : "error",
-        title: cancelled ? `已取消克隆 ${name}` : `克隆 ${name} 失败`,
+        title: cancelled ? `已取消克隆 ${name}` : `无法克隆 ${name}`,
         description: cancelled ? clone.destinationPath : (clone.error ?? "克隆失败。"),
         timeout: 0,
         actionProps: {

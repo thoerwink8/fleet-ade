@@ -101,20 +101,20 @@ export function useThreadActionMenu(input: {
     onCopy: ({ path }) => {
       toastManager.add({ type: "success", title: "路径已复制", description: path });
     },
-    onError: (error) => failureToast("复制路径失败", error),
+    onError: (error) => failureToast("无法复制路径", error),
   });
   const { copyToClipboard: copyBranchToClipboard } = useCopyToClipboard<{ branch: string }>({
     target: "branch name",
     onCopy: ({ branch }) => {
       toastManager.add({ type: "success", title: "分支名已复制", description: branch });
     },
-    onError: (error) => failureToast("复制分支名失败", error),
+    onError: (error) => failureToast("无法复制分支名", error),
   });
   const { copyToClipboard: copyThreadIdToClipboard } = useCopyToClipboard<{ threadId: ThreadId }>({
     onCopy: ({ threadId }) => {
       toastManager.add({ type: "success", title: "会话 ID 已复制", description: threadId });
     },
-    onError: (error) => failureToast("复制会话 ID 失败", error),
+    onError: (error) => failureToast("无法复制会话 ID", error),
   });
 
   const openMenu = (position: { x: number; y: number }) => {
@@ -180,7 +180,7 @@ export function useThreadActionMenu(input: {
         if (!preset) return;
         const result = await snoozeThread(threadRef, preset.snoozedUntil);
         if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-          failureToast("暂缓会话失败", squashAtomCommandFailure(result));
+          failureToast("无法暂缓会话", squashAtomCommandFailure(result));
         }
         return;
       }
@@ -236,17 +236,17 @@ export function useThreadActionMenu(input: {
           await reportFailure("无法取消暂缓", () => unsnoozeThread(threadRef));
           return;
         case "pin":
-          await reportFailure("置顶会话失败", () => pinThread(threadRef));
+          await reportFailure("无法置顶会话", () => pinThread(threadRef));
           return;
         case "unpin": {
-          await reportFailure("取消置顶会话失败", () => confirmAndUnpinThread(threadRef));
+          await reportFailure("无法取消置顶会话", () => confirmAndUnpinThread(threadRef));
           return;
         }
         case "mark-commander":
-          await reportFailure("标成指挥失败", () => markCommanderThread(threadRef));
+          await reportFailure("无法标成指挥", () => markCommanderThread(threadRef));
           return;
         case "unmark-commander":
-          await reportFailure("取消指挥失败", () => unmarkCommanderThread(threadRef));
+          await reportFailure("无法取消指挥", () => unmarkCommanderThread(threadRef));
           return;
         case "auto-settle:enabled":
         case "auto-settle:disabled":
@@ -338,7 +338,7 @@ export function useThreadActionMenu(input: {
           });
           if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
             failureToast(
-              didArchive ? "会话已归档，但页面跳转失败" : "归档会话失败",
+              didArchive ? "会话已归档，但无法跳转页面" : "无法归档会话",
               squashAtomCommandFailure(result),
             );
           }
@@ -354,7 +354,7 @@ export function useThreadActionMenu(input: {
             // A missing thread means cleanup failed after deletion; deleteThread already toasted that failure.
             readThreadShell(threadRef) !== null
           ) {
-            failureToast("删除会话失败", squashAtomCommandFailure(deleted));
+            failureToast("无法删除会话", squashAtomCommandFailure(deleted));
           }
           return;
         }

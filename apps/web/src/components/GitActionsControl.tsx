@@ -852,7 +852,7 @@ function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
                 role="alert"
                 className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
               >
-                <p className="text-meta font-medium">发布失败</p>
+                <p className="text-meta font-medium">无法发布</p>
                 <p className="mt-0.5 text-destructive/90">{publishError}</p>
               </div>
             ) : null}
@@ -1292,7 +1292,7 @@ export default function GitActionsControl({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "操作失败",
+          title: "无法执行操作",
           description: error instanceof Error ? error.message : "发生错误。",
           timeout: errorToastTiming.timeout,
           ...(scopedToastData !== undefined ? { data: scopedToastData } : {}),
@@ -1373,7 +1373,7 @@ export default function GitActionsControl({
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "拉取失败",
+              title: "无法拉取",
               description: error instanceof Error ? error.message : "发生错误。",
               timeout: errorToastTiming.timeout,
               ...(threadToastData !== undefined ? { data: threadToastData } : {}),
@@ -1497,7 +1497,7 @@ export default function GitActionsControl({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Git 初始化失败",
+          title: "无法初始化 Git",
           description: error instanceof Error ? error.message : "发生错误。",
           ...(threadToastData !== undefined ? { data: threadToastData } : {}),
         }),

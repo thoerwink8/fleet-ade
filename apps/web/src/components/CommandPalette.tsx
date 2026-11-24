@@ -2036,7 +2036,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "添加项目失败",
+          title: "无法添加项目",
           description: "仅 Windows 支持 Windows 风格路径。",
         }),
       );
@@ -2047,7 +2047,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "添加项目失败",
+          title: "无法添加项目",
           description: "相对路径需要先有活动项目。",
         }),
       );
@@ -2090,7 +2090,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "打开项目失败",
+              title: "无法打开项目",
               description: error instanceof Error ? error.message : "发生错误。",
             }),
           );
@@ -2128,7 +2128,7 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "添加项目失败",
+            title: "无法添加项目",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -2144,7 +2144,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "添加项目失败",
+          title: "无法添加项目",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -2289,7 +2289,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "仓库查询失败",
+              title: "无法查询仓库",
               description: errorMessage(squashAtomCommandFailure(lookupResult)),
             }),
           );
@@ -2337,7 +2337,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "克隆失败",
+          title: "无法克隆仓库",
           description: "仅 Windows 支持 Windows 风格路径。",
         }),
       );
@@ -2348,7 +2348,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "克隆失败",
+          title: "无法克隆仓库",
           description: "相对路径需要先有活动项目。",
         }),
       );
@@ -2381,7 +2381,7 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "克隆失败",
+            title: "无法克隆仓库",
             description: errorMessage(squashAtomCommandFailure(startResult)),
           }),
         );
@@ -2404,7 +2404,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "打开项目失败",
+          title: "无法打开项目",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -2979,7 +2979,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "克隆失败",
+              title: "无法克隆仓库",
               description: "在克隆仓库的电脑上选择文件夹。",
             }),
           );

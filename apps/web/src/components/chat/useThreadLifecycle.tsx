@@ -693,7 +693,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       if (!activeThreadShell || !activeThreadRef || !serverConfigLoaded) return;
       void (
         activeThreadPinned ? confirmAndUnpinThread(activeThreadRef) : pinThread(activeThreadRef)
-      ).then(toastThreadActionFailure(activeThreadPinned ? "取消置顶会话失败" : "置顶会话失败"));
+      ).then(toastThreadActionFailure(activeThreadPinned ? "无法取消置顶会话" : "无法置顶会话"));
     },
     "thread.commander": () => {
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
@@ -702,7 +702,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         activeThreadCommander
           ? unmarkCommanderThread(activeThreadRef)
           : markCommanderThread(activeThreadRef)
-      ).then(toastThreadActionFailure(activeThreadCommander ? "取消指挥失败" : "标成指挥失败"));
+      ).then(toastThreadActionFailure(activeThreadCommander ? "无法取消指挥" : "无法标成指挥"));
     },
     "thread.regenerateTitle": () => {
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;

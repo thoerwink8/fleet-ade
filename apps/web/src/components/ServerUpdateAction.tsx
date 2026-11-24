@@ -117,7 +117,7 @@ export function useServerUpdate() {
       if (!quiet) {
         toastManager.add({
           type: "error",
-          title: `${serverLabel} 更新失败`,
+          title: `无法更新 ${serverLabel}`,
           description: message,
         });
       }
@@ -350,7 +350,7 @@ export function OutdatedServerUpdateAction({
       if (isAtomCommandInterrupted(result)) return;
       toastManager.add({
         type: "error",
-        title: `${serverLabel} 更新失败`,
+        title: `无法更新 ${serverLabel}`,
         description: updateFailureMessage(squashAtomCommandFailure(result)),
       });
       return;

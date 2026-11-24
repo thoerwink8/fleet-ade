@@ -198,7 +198,7 @@ export const ChatHeader = memo(function ChatHeader({
         const error = squashAtomCommandFailure(result);
         toastManager.add({
           type: "error",
-          title: "重命名会话失败",
+          title: "无法重命名会话",
           description: error instanceof Error ? error.message : "发生错误。",
         });
       }

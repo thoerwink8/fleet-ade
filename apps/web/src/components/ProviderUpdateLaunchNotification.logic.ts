@@ -108,8 +108,8 @@ function getProviderFailedUpdateTitle(
   const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
   const attemptedVersion = provider.versionAdvisory?.latestVersion;
   return attemptedVersion
-    ? `${providerName} ${formatVersion(attemptedVersion)} 更新失败`
-    : `${providerName} 更新失败`;
+    ? `无法更新 ${providerName} ${formatVersion(attemptedVersion)}`
+    : `无法更新 ${providerName}`;
 }
 
 export function isProviderUpdateCandidate(
@@ -268,10 +268,8 @@ export function getProviderUpdateRunToastView(runs: ReadonlyArray<ProviderUpdate
     type: "error",
     title:
       failureLines.length < settled.length
-        ? `${failureLines.length} 个智能体中有 ${settled.length} 个更新失败`
-        : settled.length === 1
-          ? "智能体更新失败"
-          : "智能体更新失败",
+        ? `无法更新 ${settled.length} 个中的 ${failureLines.length} 个智能体`
+        : "无法更新智能体",
     description: [...failureLines, ...successMessages].join("\n"),
   };
 }
@@ -365,7 +363,7 @@ export function getProviderUpdateSidebarPillView(
       title:
         failedProviders.length === 1
           ? getProviderFailedUpdateTitle(failedProvider)
-          : `${failedProviders.length} 个智能体更新失败`,
+          : `无法更新 ${failedProviders.length} 个智能体`,
       description: getFailedProviderUpdateDescription(failedProviders),
       dismissible: true,
     });

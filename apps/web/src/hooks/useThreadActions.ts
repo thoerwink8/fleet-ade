@@ -210,7 +210,7 @@ export async function navigateAfterThreadDeletion(navigate: () => Promise<void>)
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "会话已删除，但跳转失败",
+        title: "会话已删除，但无法跳转页面",
         description: error instanceof Error ? error.message : "发生错误。",
       }),
     );
@@ -736,7 +736,7 @@ export function useThreadActions() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: removalFailed ? "无法删除工作树" : "工作树已删除，但刷新 Git 状态失败",
+          title: removalFailed ? "无法删除工作树" : "工作树已删除，但无法刷新 Git 状态",
           description: removalFailed
             ? `无法删除 ${displayWorktreePath ?? orphanedWorktreePath}。${message}`
             : message,
@@ -974,7 +974,7 @@ export function useThreadActions() {
             title:
               removeResult._tag === "Failure"
                 ? "无法删除工作树"
-                : "工作树已删除，但刷新 Git 状态失败",
+                : "工作树已删除，但无法刷新 Git 状态",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );

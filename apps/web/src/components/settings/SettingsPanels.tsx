@@ -1266,7 +1266,7 @@ function ScopedCompactIdleThreadsRow() {
             <SelectValue>
               {(value: string | null) =>
                 value === null
-                  ? "混合"
+                  ? "多项不同"
                   : IDLE_COMPACTION_MODES.find((mode) => mode.value === value)?.label
               }
             </SelectValue>
@@ -1383,7 +1383,7 @@ export function ThreadsSettingsPanel() {
               value={mixedAddProjectBaseDirectory ? "" : settings.addProjectBaseDirectory}
               onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
               normalizeDraft={resolvePastedPath}
-              placeholder={mixedAddProjectBaseDirectory ? "各不相同" : "~/"}
+              placeholder={mixedAddProjectBaseDirectory ? "多项不同" : "~/"}
               spellCheck={false}
               aria-label="添加项目的起始目录"
             />
@@ -1440,7 +1440,7 @@ export function ThreadsSettingsPanel() {
               inputMode="numeric"
               className="w-full sm:w-24"
               value={mixedMaxConcurrentSessions ? "" : String(settings.maxConcurrentSessions ?? "")}
-              placeholder={mixedMaxConcurrentSessions ? "各不相同" : "不限制"}
+              placeholder={mixedMaxConcurrentSessions ? "多项不同" : "不限制"}
               aria-label="同时运行的会话上限"
               onCommit={(value) => {
                 const parsed = parseSessionLimitDraft(value);
@@ -1621,7 +1621,7 @@ export function ThreadsSettingsPanel() {
                   instanceEntries={textGenerationModelInstanceEntries}
                   modelOptionsByInstance={textGenerationModelOptionsByInstance}
                   triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                  {...(mixedTextGenerationModel ? { triggerLabel: "各不相同" } : {})}
+                  {...(mixedTextGenerationModel ? { triggerLabel: "多项不同" } : {})}
                   getModelDisabledReason={textGenerationModelDisabledReason}
                   {...(environmentId
                     ? {
@@ -1724,7 +1724,7 @@ export function ThreadsSettingsPanel() {
                 <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="流式响应">
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
-                      value === null ? "混合" : RESPONSE_STREAMING_MODE_LABELS[value]
+                      value === null ? "多项不同" : RESPONSE_STREAMING_MODE_LABELS[value]
                     }
                   </SelectValue>
                 </SelectTrigger>

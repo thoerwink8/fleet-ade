@@ -1430,7 +1430,7 @@ export function useComposerSend(input: ComposerSendInput) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: submissionIntent === "background" ? "后台任务失败" : "无法开始会话",
+              title: submissionIntent === "background" ? "无法运行后台任务" : "无法开始会话",
               description: error instanceof Error ? error.message : "无法发送消息。",
               actionProps: {
                 children: "打开草稿",

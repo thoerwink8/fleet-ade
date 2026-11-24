@@ -224,7 +224,7 @@ describe("ServerUpdatesAction", () => {
     expect(testState.updateServer).toHaveBeenCalledTimes(2);
     expect(testState.toast).toHaveBeenCalledWith({
       type: "error",
-      title: "Laptop 更新失败",
+      title: "无法更新 Laptop",
       description: "Download failed",
     });
     expect(testState.toast).toHaveBeenCalledWith(
