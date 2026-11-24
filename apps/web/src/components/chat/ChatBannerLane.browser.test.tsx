@@ -351,11 +351,18 @@ describe("chat banner lane", () => {
       Number.parseFloat(getComputedStyle(retryBtn, "::after").minHeight),
     ).toBeGreaterThanOrEqual(44);
     expect(
-      Number.parseFloat(getComputedStyle(retryBtn, "::after").minWidth),
-    ).toBeGreaterThanOrEqual(44);
-    expect(
       Number.parseFloat(getComputedStyle(settingsBtn, "::after").minHeight),
     ).toBeGreaterThanOrEqual(44);
+    // The hit area reaches 20px above and below the 28px button, so a thumb that misses the
+    // painted edge still lands on the button.
+    for (const button of [retryBtn, settingsBtn]) {
+      const rect = button.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      for (const dy of [-20, 20]) {
+        const hit = document.elementFromPoint(x, rect.top + rect.height / 2 + dy);
+        expect(hit === button || button.contains(hit)).toBe(true);
+      }
+    }
 
     await screen.rerender(<LaneHarness engine={engineFailure} fleetEngineRetrying />);
     const retryingBtn = screen
