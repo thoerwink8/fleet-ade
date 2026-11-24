@@ -184,6 +184,27 @@ describe("alert fleet styling", () => {
     },
   );
 
+  it.each([
+    ["error", "--fa-danger"],
+    ["warning", "--fa-warning"],
+    ["info", "--fa-info"],
+    ["success", "--fa-success"],
+  ] as const)("gives an icon-less %s alert its own %s marker", async (variant, colorVariable) => {
+    await using screen = await render(
+      <Alert variant={variant}>
+        <AlertDescription>没有自带图标的提示</AlertDescription>
+      </Alert>,
+    );
+    const icon = screen.getByRole("alert").element().querySelector<SVGElement>("svg")!;
+    expect(icon).not.toBeNull();
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+    expectSameColor(
+      getComputedStyle(icon).color,
+      resolvedCssVariable(colorVariable),
+      "default marker",
+    );
+  });
+
   it("keeps the default variant neutral, with no semantic icon colour", async () => {
     await using screen = await render(
       <Alert variant="default">

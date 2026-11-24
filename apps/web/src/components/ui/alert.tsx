@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Children, isValidElement } from "react";
+import { CircleAlertIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "~/lib/utils";
@@ -44,6 +45,14 @@ function alertChildSlot(child: React.ReactElement): string | undefined {
   }
 }
 
+/** The strip carries its meaning in the marker alone, so a semantic Alert without one gets this. */
+const DEFAULT_MARKERS = {
+  error: <CircleAlertIcon aria-hidden />,
+  info: <InfoIcon aria-hidden />,
+  success: <CircleCheckIcon aria-hidden />,
+  warning: <TriangleAlertIcon aria-hidden />,
+} as const;
+
 function Alert({
   className,
   variant,
@@ -73,6 +82,10 @@ function Alert({
       icon.push(child);
     }
   });
+
+  if (icon.length === 0 && variant != null && variant in DEFAULT_MARKERS) {
+    icon.push(DEFAULT_MARKERS[variant as keyof typeof DEFAULT_MARKERS]);
+  }
 
   return (
     <div
