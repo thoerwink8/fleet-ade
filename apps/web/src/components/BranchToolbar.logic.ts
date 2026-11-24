@@ -92,7 +92,7 @@ export function resolveContextStripLabelsCompact(input: {
 }
 
 export function resolveEnvModeLabel(mode: EnvMode): string {
-  return mode === "worktree" ? "新工作树" : "当前工作副本";
+  return mode === "worktree" ? "新工作树" : "项目目录";
 }
 
 export const WORKTREE_SUBMODULES_LABELS: Record<WorktreeSubmodules, string> = {
@@ -110,7 +110,7 @@ export function resolveLockedWorkspaceLabel(
   effectiveEnvMode: EnvMode,
 ): string {
   if (activeWorktreePath) return activeWorktreePath.split(/[\\/]/).findLast(Boolean) ?? "工作树";
-  return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : "本地工作副本";
+  return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : "项目目录";
 }
 
 export interface PreviousWorktreeSeed {

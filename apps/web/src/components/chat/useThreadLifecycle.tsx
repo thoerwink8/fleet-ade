@@ -376,7 +376,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "切换工作副本失败",
+            title: "无法切换项目目录分支",
             description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -400,7 +400,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "工作副本已切换，但会话无法更新",
+              title: "项目目录已切换，但无法更新会话",
               description: chatActionErrorMessage(squashAtomCommandFailure(updateResult)),
             }),
           );
