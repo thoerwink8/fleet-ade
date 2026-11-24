@@ -35,7 +35,7 @@ function BasicMenu({ onSelect }: { onSelect?: (item: string) => void }) {
 }
 
 describe("Menu", () => {
-  it("uses fleet-design item height (32px at sm+, 14px font, taller on narrow viewports) and solid 8px-padded popup", async () => {
+  it("uses fleet-design item height (32px, 14px font, also on narrow viewports) and a solid 8px-padded popup", async () => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     await page.viewport(390, 844);
     await using _viewport = {
@@ -49,7 +49,7 @@ describe("Menu", () => {
     const popupElement = popup.element();
     const item = page.getByRole("menuitem", { name: "First item" }).element();
 
-    expect(item.getBoundingClientRect().height, "narrow item height").toBeGreaterThan(32);
+    expect(item.getBoundingClientRect().height, "narrow item height").toBe(32);
     expect(getComputedStyle(popupElement).padding, "popup padding").toBe("8px");
 
     await page.viewport(1280, 800);
@@ -86,6 +86,11 @@ describe("Menu", () => {
       item.element().hasAttribute("data-highlighted"),
     )!;
 
+    expect(
+      getComputedStyle(highlightedBefore.element()).outlineStyle,
+      "keyboard-focused item draws no clipped outside ring",
+    ).toBe("none");
+
     await userEvent.keyboard("{ArrowDown}");
     await vi.waitFor(() => {
       const highlightedAfter = [first, second].find((item) =>
@@ -104,6 +109,28 @@ describe("Menu", () => {
     await userEvent.keyboard("{Escape}");
     await expect.element(page.getByRole("menu")).not.toBeInTheDocument();
     await expect.element(trigger).toHaveFocus();
+  });
+
+  it("jumps to the item matching the typed letter", async () => {
+    await using screen = await render(
+      <Menu>
+        <MenuTrigger>Open</MenuTrigger>
+        <MenuPopup>
+          <MenuItem>Alpha</MenuItem>
+          <MenuItem>Bravo</MenuItem>
+          <MenuItem>Charlie</MenuItem>
+        </MenuPopup>
+      </Menu>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Open" }));
+    await expect.element(page.getByRole("menu")).toBeVisible();
+    await userEvent.keyboard("{ArrowDown}");
+    await userEvent.keyboard("c");
+    await vi.waitFor(() => {
+      expect(
+        page.getByRole("menuitem", { name: "Charlie" }).element().hasAttribute("data-highlighted"),
+      ).toBe(true);
+    });
   });
 
   it("distinguishes disabled items from enabled ones across default, Grove, and Ember in light and dark", async () => {
