@@ -6,7 +6,7 @@ import { cn } from "~/lib/utils";
 function RadioGroup({ className, ...props }: RadioGroupPrimitive.Props) {
   return (
     <RadioGroupPrimitive
-      className={cn("fa-radio-group", className)}
+      className={cn("ade-radio-group", className)}
       data-slot="radio-group"
       {...props}
     />
@@ -15,8 +15,8 @@ function RadioGroup({ className, ...props }: RadioGroupPrimitive.Props) {
 
 function Radio({ className, ...props }: RadioPrimitive.Root.Props) {
   return (
-    <RadioPrimitive.Root className={cn("fa-radio", className)} data-slot="radio" {...props}>
-      <RadioPrimitive.Indicator className="fa-radio-indicator" data-slot="radio-indicator" />
+    <RadioPrimitive.Root className={cn("ade-radio", className)} data-slot="radio" {...props}>
+      <RadioPrimitive.Indicator className="ade-radio-indicator" data-slot="radio-indicator" />
     </RadioPrimitive.Root>
   );
 }

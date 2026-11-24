@@ -79,7 +79,7 @@
 
 /* Non-segmented ToggleGroup variants (default / outline / multi) — token-based, no
    shadcn utility classes. */
-.fa-toggle-group {
+.ade-toggle-group {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -87,13 +87,13 @@
   max-width: 100%;
 }
 
-.fa-toggle-group[data-orientation="vertical"],
-.fa-toggle-group[aria-orientation="vertical"] {
+.ade-toggle-group[data-orientation="vertical"],
+.ade-toggle-group[aria-orientation="vertical"] {
   flex-direction: column;
   align-items: stretch;
 }
 
-.fa-toggle-item {
+.ade-toggle-item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -111,74 +111,74 @@
   --fa-hv: linear-gradient(var(--fa-hover), var(--fa-hover));
 }
 
-.fa-toggle-item[data-size="xs"] {
+.ade-toggle-item[data-size="xs"] {
   height: var(--fa-ctrl-xs);
   padding: 0 var(--fa-space-2);
   border-radius: var(--fa-radius-sm);
   font: 500 12px/16px var(--fa-font-sans);
 }
-.fa-toggle-item[data-size="sm"] {
+.ade-toggle-item[data-size="sm"] {
   height: var(--fa-ctrl-sm);
   padding: 0 var(--fa-space-2);
 }
-.fa-toggle-item[data-size="default"] {
+.ade-toggle-item[data-size="default"] {
   height: var(--fa-ctrl);
   padding: 0 var(--fa-space-3);
 }
-.fa-toggle-item[data-size="lg"] {
+.ade-toggle-item[data-size="lg"] {
   height: var(--fa-ctrl-lg);
   padding: 0 var(--fa-space-4);
 }
-.fa-toggle-item[data-size="compact"],
-.fa-toggle-item[data-size="segmented"] {
+.ade-toggle-item[data-size="compact"],
+.ade-toggle-item[data-size="segmented"] {
   height: var(--fa-ctrl-sm);
   padding: 0 var(--fa-space-2);
 }
 
 /* Narrow viewports (< 640px / sm) keep the taller touch targets the old toggle had. */
 @media (max-width: 639.98px) {
-  .fa-toggle-item[data-size="xs"] {
+  .ade-toggle-item[data-size="xs"] {
     height: var(--fa-ctrl-sm);
   }
-  .fa-toggle-item[data-size="sm"] {
+  .ade-toggle-item[data-size="sm"] {
     height: var(--fa-ctrl);
   }
-  .fa-toggle-item[data-size="default"] {
+  .ade-toggle-item[data-size="default"] {
     height: calc(var(--fa-ctrl) + 4px);
   }
 }
 
-.fa-toggle-item[data-variant="outline"] {
+.ade-toggle-item[data-variant="outline"] {
   border-color: var(--fa-border);
   background: var(--fa-bg);
 }
-.fa-toggle-item[data-variant="ghost"] {
+.ade-toggle-item[data-variant="ghost"] {
   color: var(--fa-fg);
 }
-.fa-toggle-item[data-variant="pill"] {
+.ade-toggle-item[data-variant="pill"] {
   border-radius: var(--fa-radius-full);
   padding: 0 var(--fa-space-3);
 }
 
-.fa-toggle-item:hover:not([aria-pressed="true"]):not([data-pressed]):not([disabled]):not(
+.ade-toggle-item:hover:not([aria-pressed="true"]):not([data-pressed]):not([disabled]):not(
     [data-disabled]
   ):not([aria-disabled="true"]) {
   background-image: var(--fa-hv);
   color: var(--fa-fg);
 }
 
-.fa-toggle-item:is([aria-pressed="true"], [data-pressed]) {
+.ade-toggle-item:is([aria-pressed="true"], [data-pressed]) {
   background: var(--fa-panel);
   border-color: var(--fa-fg-muted);
   color: var(--fa-fg);
 }
 
-.fa-toggle-item[data-variant="outline"]:is([aria-pressed="true"], [data-pressed]) {
+.ade-toggle-item[data-variant="outline"]:is([aria-pressed="true"], [data-pressed]) {
   background: var(--fa-panel);
   border-color: var(--fa-fg-muted);
 }
 
-.fa-toggle-item:is([disabled], [data-disabled], [aria-disabled="true"]) {
+.ade-toggle-item:is([disabled], [data-disabled], [aria-disabled="true"]) {
   background: transparent;
   background-image: none;
   border-color: transparent;
@@ -187,12 +187,12 @@
   text-decoration: line-through;
   text-decoration-color: var(--fa-border);
 }
-.fa-toggle-item[data-variant="outline"]:is([disabled], [data-disabled], [aria-disabled="true"]) {
+.ade-toggle-item[data-variant="outline"]:is([disabled], [data-disabled], [aria-disabled="true"]) {
   border-color: var(--fa-border);
 }
 
 :is(html[data-theme-id="grove"], html[data-theme-id="ember"])
-  .fa-toggle-item:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
+  .ade-toggle-item:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
     [aria-pressed="true"],
     [data-pressed]
   ) {
@@ -202,18 +202,18 @@
 }
 
 /* RadioGroup + Radio — @fleet/design has no radio component; tokens only. */
-.fa-radio-group {
+.ade-radio-group {
   display: flex;
   flex-direction: column;
   gap: var(--fa-space-3);
 }
 
-.fa-radio-group[data-orientation="horizontal"],
-.fa-radio-group[aria-orientation="horizontal"] {
+.ade-radio-group[data-orientation="horizontal"],
+.ade-radio-group[aria-orientation="horizontal"] {
   flex-direction: row;
 }
 
-.fa-radio {
+.ade-radio {
   position: relative;
   display: inline-flex;
   flex: none;
@@ -228,24 +228,24 @@
   cursor: pointer;
 }
 
-.fa-radio:hover:not([data-disabled]):not([aria-disabled="true"]):not([disabled]):not(
+.ade-radio:hover:not([data-disabled]):not([aria-disabled="true"]):not([disabled]):not(
     [data-checked]
   ):not([aria-checked="true"]) {
   background-image: var(--fa-hv);
 }
 
-.fa-radio:is([data-checked], [aria-checked="true"]) {
+.ade-radio:is([data-checked], [aria-checked="true"]) {
   border-color: var(--fa-fg);
   background: var(--fa-fg);
 }
 
-.fa-radio:is([disabled], [data-disabled], [aria-disabled="true"]) {
+.ade-radio:is([disabled], [data-disabled], [aria-disabled="true"]) {
   border-color: var(--fa-border);
   background: var(--fa-panel);
   cursor: not-allowed;
 }
 
-.fa-radio:is([disabled], [data-disabled], [aria-disabled="true"]):is(
+.ade-radio:is([disabled], [data-disabled], [aria-disabled="true"]):is(
     [data-checked],
     [aria-checked="true"]
   ) {
@@ -253,11 +253,11 @@
   background: var(--fa-fg-muted);
 }
 
-.fa-radio[aria-invalid="true"] {
+.ade-radio[aria-invalid="true"] {
   border-color: var(--fa-danger);
 }
 
-.fa-radio-indicator {
+.ade-radio-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -267,23 +267,23 @@
   background: var(--fa-bg);
 }
 
-.fa-radio-indicator[data-unchecked] {
+.ade-radio-indicator[data-unchecked] {
   display: none;
 }
 
 @media (max-width: 639.98px) {
-  .fa-radio {
+  .ade-radio {
     width: 18px;
     height: 18px;
   }
-  .fa-radio-indicator {
+  .ade-radio-indicator {
     width: 8px;
     height: 8px;
   }
 }
 
 :is(html[data-theme-id="grove"], html[data-theme-id="ember"])
-  .fa-radio:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
+  .ade-radio:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
     [data-checked],
     [aria-checked="true"]
   ) {
@@ -292,10 +292,10 @@
 }
 
 :is(html[data-theme-id="grove"], html[data-theme-id="ember"])
-  .fa-radio:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
+  .ade-radio:not([disabled]):not([data-disabled]):not([aria-disabled="true"]):is(
     [data-checked],
     [aria-checked="true"]
   )
-  .fa-radio-indicator {
+  .ade-radio-indicator {
   background: var(--primary-foreground);
 }

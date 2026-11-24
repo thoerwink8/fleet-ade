@@ -25,7 +25,7 @@ function ToggleGroup({
   const isSegmented = variant === "segmented";
   return (
     <ToggleGroupPrimitive
-      className={cn(isSegmented ? "fa-seg" : "fa-toggle-group", className)}
+      className={cn(isSegmented ? "fa-seg" : "ade-toggle-group", className)}
       data-size={size}
       data-slot="toggle-group"
       data-variant={variant}
@@ -51,7 +51,7 @@ function Toggle({
 
   return (
     <TogglePrimitive
-      className={cn(resolvedVariant !== "segmented" && "fa-toggle-item", className)}
+      className={cn(resolvedVariant !== "segmented" && "ade-toggle-item", className)}
       data-size={resolvedSize}
       data-slot="toggle"
       data-variant={resolvedVariant}
