@@ -28,8 +28,7 @@
         "setup-worktree.ts",
         "sign-macos.ts",
         "prepare-server-compile-cache.cjs",
-        // .pnpmfile.cjs requires it before dependencies exist; scripts import it.
-        "node-version-check.cjs",
+        // Types for the .cjs that the test imports; knip does not link .d.cts to it.
         "node-version-check.d.cts",
         // release:smoke spawns this by path; knip does not trace execFile.
         "resolve-nightly-release.ts",

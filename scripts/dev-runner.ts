@@ -24,10 +24,6 @@ import { defaultDevMemoryLimitBytes, enforceDevMemoryLimit } from "./lib/dev-mem
 import { type DevShareError, shareDevServer, unshareDevServer } from "./lib/dev-share.ts";
 import { loadRepoEnv } from "./lib/public-config.ts";
 
-import { assertNodeVersion } from "./node-version-check.cjs";
-
-assertNodeVersion();
-
 Object.assign(process.env, loadRepoEnv());
 
 const BASE_SERVER_PORT = 13773;

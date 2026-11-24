@@ -3,10 +3,6 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 
-import { assertNodeVersion } from "./node-version-check.cjs";
-
-assertNodeVersion();
-
 const root = NodePath.resolve(import.meta.dirname, "..");
 const vp = NodePath.join(root, "node_modules", "vite-plus", "bin", "vp");
 

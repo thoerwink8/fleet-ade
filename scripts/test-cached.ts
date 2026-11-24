@@ -9,10 +9,6 @@ import { cachedTestTasks, matchesTestPath, toRepoPath } from "./lib/cached-tests
 import { runEveryTask } from "./lib/run-every-task.ts";
 import { shardedTestFiles } from "./lib/sharded-tests.ts";
 
-import { assertNodeVersion } from "./node-version-check.cjs";
-
-assertNodeVersion();
-
 const root = NodePath.resolve(import.meta.dirname, "..");
 const vp = NodePath.join(root, "node_modules", "vite-plus", "bin", "vp");
 const { values, positionals } = NodeUtil.parseArgs({

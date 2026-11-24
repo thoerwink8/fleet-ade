@@ -41,10 +41,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { decide, readWorkspace } from "../.github/scripts/ci-changes.cjs";
 import { vitePlusCommand } from "./check-changed-command.ts";
 
-import { assertNodeVersion } from "./node-version-check.cjs";
-
-assertNodeVersion();
-
 const GiB = 1024 ** 3;
 
 // A typecheck or test step can take several cores and gigabytes of memory, so

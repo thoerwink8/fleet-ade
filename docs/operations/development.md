@@ -25,9 +25,8 @@ vp run dev
 Open the pairing URL printed by the dev runner. The bare origin does not authenticate
 a new browser.
 
-Entry points (`pnpm` commands via `.pnpmfile.cjs`, `vp test` via `vite.config.ts`, and the
-`scripts/` runners) refuse to run on a Node outside `package.json` `engines.node` and print
-the pinned version instead of failing later on missing APIs.
+`pnpm` commands and `vp` (test, lint, run) stop at once when the running Node is not the one
+pinned in `package.json` `engines.node`; switch to that version and run again.
 
 ## Forge mirror (optional)
 
