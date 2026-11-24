@@ -183,7 +183,7 @@ describe("ServerUpdateAction", () => {
   it("does not offer a CLI relaunch for a desktop-hosted server", async () => {
     using _state = setup();
     await using screen = await renderAction({ selfUpdate: null, desktopAppInstall: true });
-    expect(screen.container.textContent).toContain("请在那台机器上更新桌面应用");
+    expect(screen.container.textContent).toContain("请在那台电脑上更新桌面应用");
     expect(button(screen)).toBeUndefined();
     expect(testState.clipboard).not.toHaveBeenCalled();
   });
@@ -224,7 +224,7 @@ describe("ServerUpdatesAction", () => {
     expect(testState.updateServer).toHaveBeenCalledTimes(2);
     expect(testState.toast).toHaveBeenCalledWith({
       type: "error",
-      title: "Laptop 更新失败",
+      title: "无法更新 Laptop",
       description: "Download failed",
     });
     expect(testState.toast).toHaveBeenCalledWith(

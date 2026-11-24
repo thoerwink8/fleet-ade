@@ -73,11 +73,11 @@ describe("AddProjectToMachineDialog", () => {
     await using screen = await render(<AddProjectToMachineDialogHost />);
 
     await act(() => openAddProjectToMachine({ projectRef, targetEnvironmentId: null }));
-    await expect.element(screen.getByText("添加到另一台机器")).toBeInTheDocument();
+    await expect.element(screen.getByText("添加到另一台电脑")).toBeInTheDocument();
 
     await act(() => project.set(null));
     await act(() => project.set(PROJECT));
-    await expect.element(screen.getByText("添加到另一台机器")).not.toBeInTheDocument();
+    await expect.element(screen.getByText("添加到另一台电脑")).not.toBeInTheDocument();
   });
 
   it("does not reopen for a project that vanished before the dialog showed", async () => {
@@ -90,6 +90,6 @@ describe("AddProjectToMachineDialog", () => {
     });
     await act(() => project.set(PROJECT));
 
-    await expect.element(screen.getByText("添加到另一台机器")).not.toBeInTheDocument();
+    await expect.element(screen.getByText("添加到另一台电脑")).not.toBeInTheDocument();
   });
 });

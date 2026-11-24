@@ -122,7 +122,7 @@ describe("nextThreadAnnouncement", () => {
   });
 
   it("announces the end of a turn that was already running when the thread opened", () => {
-    expect(speak([busy(), idle(secondRun, "failed")])).toEqual(["失败"]);
+    expect(speak([busy(), idle(secondRun, "failed")])).toEqual(["出错了"]);
   });
 
   it("says how the turn ended when a queued message was cancelled before it started", () => {
@@ -206,7 +206,7 @@ describe("nextThreadAnnouncement", () => {
         busy("input"),
         idle(secondRun, "completed"),
       ]),
-    ).toEqual(["待批准", "需要你的输入", "已完成"]);
+    ).toEqual(["等你批准", "等你回答", "已完成"]);
   });
 
   it("announces a second request of the same kind once the first is answered", () => {
@@ -216,6 +216,6 @@ describe("nextThreadAnnouncement", () => {
         busy("approval", secondRun, "running", "request-1"),
         busy("approval", secondRun, "running", "request-2"),
       ]),
-    ).toEqual(["待批准", "待批准"]);
+    ).toEqual(["等你批准", "等你批准"]);
   });
 });

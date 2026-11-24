@@ -145,13 +145,13 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(appearanceMode !== "system" ? ["跟随系统"] : []),
     ...(settings.fontScale !== DEFAULT_UNIFIED_SETTINGS.fontScale ? ["字号"] : []),
     ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? ["差异颜色"] : []),
-    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["聊天宽度"] : []),
+    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["会话宽度"] : []),
     ...(settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled
       ? ["渲染数学公式"]
       : []),
     ...(settings.environmentIdentificationMode !==
     DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode
-      ? ["环境标识"]
+      ? ["电脑标识"]
       : []),
     ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat ? ["时间格式"] : []),
     ...(settings.notificationMode !== DEFAULT_UNIFIED_SETTINGS.notificationMode
@@ -170,14 +170,14 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["运行中分组"]
       : []),
     ...(settings.sidebarAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays
-      ? ["自动收尾不活跃会话"]
+      ? ["不活跃会话自动标为完成"]
       : []),
     ...(settings.sidebarAutoSettleKeepPullRequests !==
     DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests
       ? ["保留有关联 PR 的会话"]
       : []),
     ...(settings.sidebarAutoSettleOnMerge !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge
-      ? ["合并后自动收尾会话"]
+      ? ["合并后自动标为完成"]
       : []),
     ...(settings.autoResumeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads
       ? ["用量限制解除后继续"]
@@ -214,7 +214,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["运行中发送（排队／立即发送）"]
       : []),
     ...(settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility
-      ? ["聊天中的工具调用"]
+      ? ["会话中的工具调用"]
       : []),
     ...(settings.screenReaderAnnouncements !== DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements
       ? ["屏幕阅读器播报"]
@@ -226,7 +226,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["流式响应"]
       : []),
     ...(settings.enableProviderUpdateChecks !== DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks
-      ? ["提供方更新检查"]
+      ? ["智能体更新检查"]
       : []),
     ...(settings.continueThreadsAfterServerUpdate !==
     DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
@@ -234,7 +234,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(isBackgroundActivityDirty ? ["后台活动"] : []),
     ...(settings.keepAwakeWhileAgentsWork !== DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork
-      ? ["智能体工作时保持唤醒"]
+      ? ["智能体工作时保持不休眠"]
       : []),
     ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
       ? ["新会话模式"]
@@ -247,7 +247,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["添加项目的起始目录"]
       : []),
     ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
-      ? ["克隆到主机文件夹"]
+      ? ["克隆到托管平台文件夹"]
       : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
       ? ["取消置顶确认"]
@@ -400,7 +400,7 @@ function AutoSettleDaysInput({
         }
       }}
       onBlur={() => setDraft(String(value))}
-      aria-label="自动收尾前的闲置天数"
+      aria-label="自动标为完成前的闲置天数"
     />
   );
 }
@@ -432,7 +432,7 @@ export function GeneralSettingsPanel() {
       <SettingsSection id="sidebar" title={"侧边栏"}>
         <SettingsRow
           {...setting("project-grouping")}
-          description={"将不同环境中的相同仓库合并显示。"}
+          description={"将不同电脑上的相同仓库合并显示。"}
           resetAction={
             settings.sidebarProjectGroupingMode !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
@@ -508,7 +508,7 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           {...setting("working-shelf")}
           description={
-            "将正在执行和监控的会话收起到“运行中”分组。需要你处理时，它们会回到收件箱顶部。实验功能中的简洁侧边栏不显示此分组。"
+            "将正在执行和监控的会话收起到“运行中”分组。需要你处理时，它们会回到列表顶部。实验功能中的简洁侧边栏不显示此分组。"
           }
           resetAction={
             settings.sidebarWorkingShelfEnabled !==
@@ -588,7 +588,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...setting("delete-confirmation")}
-          description={"删除会话及其聊天记录前询问。"}
+          description={"删除会话及其会话记录前询问。"}
           resetAction={
             settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete ? (
               <SettingResetButton
@@ -815,7 +815,7 @@ export function ChatSettingsPanel() {
         <SettingsRow
           {...searchableSetting("follow-up-behavior")}
           description={
-            "智能体运行时发消息默认执行此操作：「排队」会等当前这一轮做完再发；「立即发送」会立刻发给智能体，会打断当前这一轮。" +
+            "智能体运行时发消息默认执行此操作：「排队」会等当前这一轮结束后再发；「立即发送」会立刻发给智能体，会打断当前这一轮。" +
             (settings.sendShortcut === "mod-enter-multiline"
               ? `单行提示词按 ${modifierLabel}+Enter、多行提示词按 ${modifierLabel}+Shift+Enter，可改用另一种方式。`
               : `按 ${modifierLabel}${settings.sendShortcut === "mod-enter" ? "+Shift" : ""}+Enter 可改用另一种方式。`)
@@ -890,7 +890,7 @@ function ToolCallVisibilityRow() {
       resetAction={
         settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility ? (
           <SettingResetButton
-            label="聊天中的工具调用"
+            label="会话中的工具调用"
             onClick={() =>
               updateSettings({ toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility })
             }
@@ -904,7 +904,7 @@ function ToolCallVisibilityRow() {
             if (isToolCallVisibility(value)) updateSettings({ toolCallVisibility: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="聊天中的工具调用">
+          <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="会话中的工具调用">
             <SelectValue>{TOOL_CALL_VISIBILITY_LABELS[settings.toolCallVisibility]}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -981,7 +981,7 @@ function ScreenReaderWindowTitleRow() {
   return (
     <SettingsRow
       {...searchableSetting("screen-reader-window-title")}
-      description="窗口标题以会话状态（例如“待批准”）和名称开头，这样切换应用时屏幕阅读器会先读到它们。任务栏、共享屏幕和计时工具也会看到。"
+      description="窗口标题以会话状态（例如“等你批准”）和名称开头，这样切换应用时屏幕阅读器会先读到它们。任务栏、共享屏幕和计时工具也会看到。"
       resetAction={
         settings.screenReaderWindowTitle !== DEFAULT_UNIFIED_SETTINGS.screenReaderWindowTitle ? (
           <SettingResetButton
@@ -1065,7 +1065,7 @@ function PullRequestLinksOpenInAppSetting() {
   return (
     <SettingsRow
       {...searchableSetting("pull-request-links-open-in-app")}
-      description="点击 pull request 链接时在 Fleet ADE 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
+      description="点击 PR 链接时在 Fleet ADE 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
       resetAction={
         openInApp ? null : (
           <SettingResetButton
@@ -1155,7 +1155,7 @@ export function DiffsSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("default-diff-file-state")}
-          description="打开差异或 pull request 的“代码”标签页时，文件默认展开还是折叠。"
+          description="打开差异或 PR 的“代码”标签页时，文件默认展开还是折叠。"
           resetAction={
             settings.diffFilesCollapsed !== DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed ? (
               <SettingResetButton
@@ -1197,7 +1197,7 @@ export function DiffsSettingsPanel() {
       <SettingsSection id="pull-requests" title="PR">
         <SettingsRow
           {...searchableSetting("proactive-panels")}
-          description="优先打开关联的 pull request；否则在改动至少 3 个文件或 50 行时打开“改动”面板。"
+          description="优先打开关联的 PR；否则在改动至少 3 个文件或 50 行时打开“改动”面板。"
           resetAction={
             settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled ? (
               <SettingResetButton
@@ -1243,7 +1243,7 @@ function ScopedCompactIdleThreadsRow() {
       settingKeys={["idleCompaction", "compactIdleThreads"]}
       mixed={idleCompaction.mixed}
       {...searchableSetting("compact-idle-threads")}
-      description="空闲且超过 200,000 token 的 Claude 会话何时压缩：在你回来后、提示缓存即将过期前，或从不压缩。每个 Claude 提供方都可以单独覆盖此设置。"
+      description="空闲且超过 200,000 token 的 Claude 会话何时压缩：在你回来后、提示缓存即将过期前，或从不压缩。每个 Claude 账号都可以单独覆盖此设置。"
       resetAction={
         globalIdleCompaction(settings) !== globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) ? (
           <SettingResetButton
@@ -1266,7 +1266,7 @@ function ScopedCompactIdleThreadsRow() {
             <SelectValue>
               {(value: string | null) =>
                 value === null
-                  ? "混合"
+                  ? "多项不同"
                   : IDLE_COMPACTION_MODES.find((mode) => mode.value === value)?.label
               }
             </SelectValue>
@@ -1383,7 +1383,7 @@ export function ThreadsSettingsPanel() {
               value={mixedAddProjectBaseDirectory ? "" : settings.addProjectBaseDirectory}
               onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
               normalizeDraft={resolvePastedPath}
-              placeholder={mixedAddProjectBaseDirectory ? "各不相同" : "~/"}
+              placeholder={mixedAddProjectBaseDirectory ? "多项不同" : "~/"}
               spellCheck={false}
               aria-label="添加项目的起始目录"
             />
@@ -1397,7 +1397,7 @@ export function ThreadsSettingsPanel() {
           resetAction={
             settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
               <SettingResetButton
-                label="克隆到主机文件夹"
+                label="克隆到托管平台文件夹"
                 onClick={() =>
                   updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
                 }
@@ -1409,7 +1409,7 @@ export function ThreadsSettingsPanel() {
               settingKeys={["ghqCloneLayout"]}
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label="克隆到主机文件夹"
+              aria-label="克隆到托管平台文件夹"
             />
           }
         />
@@ -1430,8 +1430,8 @@ export function ThreadsSettingsPanel() {
           {...searchableSetting("max-concurrent-sessions")}
           description={
             startupLimit === undefined
-              ? "按机器内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。"
-              : `按机器内存估计上限；留空表示设置不限制。此环境的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。`
+              ? "按电脑内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会等空位，此设置立即生效。"
+              : `按电脑内存估计上限；留空表示设置不限制。这台电脑的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会等空位，此设置立即生效。`
           }
           control={
             <DraftInput
@@ -1440,7 +1440,7 @@ export function ThreadsSettingsPanel() {
               inputMode="numeric"
               className="w-full sm:w-24"
               value={mixedMaxConcurrentSessions ? "" : String(settings.maxConcurrentSessions ?? "")}
-              placeholder={mixedMaxConcurrentSessions ? "各不相同" : "不限制"}
+              placeholder={mixedMaxConcurrentSessions ? "多项不同" : "不限制"}
               aria-label="同时运行的会话上限"
               onCommit={(value) => {
                 const parsed = parseSessionLimitDraft(value);
@@ -1487,17 +1487,17 @@ export function ThreadsSettingsPanel() {
       </SettingsSection>
 
       {hasServerTargets ? (
-        <SettingsSection id="auto-settle" title="自动收尾">
+        <SettingsSection id="auto-settle" title="自动标为完成">
           <SettingsRow
             serverScoped
             settingKeys={["sidebarAutoSettleOnMerge"]}
             {...searchableSetting("auto-settle-merged-threads")}
-            description="Pull request 合并后收尾会话。已关闭的 pull request 仍会自动收尾。"
+            description="PR 合并后将会话标为完成。已关闭的 PR 仍会自动标为完成。"
             resetAction={
               settings.sidebarAutoSettleOnMerge !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
                 <SettingResetButton
-                  label="合并后自动收尾"
+                  label="合并后自动标为完成"
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
@@ -1513,7 +1513,7 @@ export function ThreadsSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
                 }
-                aria-label="合并后自动收尾会话"
+                aria-label="合并后自动标为完成"
               />
             }
           />
@@ -1522,12 +1522,12 @@ export function ThreadsSettingsPanel() {
             serverScoped
             settingKeys={["sidebarAutoSettleAfterDays"]}
             {...searchableSetting("auto-settle-inactive-threads")}
-            description="侧边栏中闲置达到此时长的会话会自动收尾。"
+            description="侧边栏中闲置达到此时长的会话会自动标为完成。"
             resetAction={
               settings.sidebarAutoSettleAfterDays !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ? (
                 <SettingResetButton
-                  label="自动收尾"
+                  label="自动标为完成"
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleAfterDays:
@@ -1546,7 +1546,7 @@ export function ThreadsSettingsPanel() {
                     sidebarAutoSettleAfterDays: checked ? AUTO_SETTLE_DEFAULT_DAYS : null,
                   })
                 }
-                aria-label="自动收尾不活跃会话"
+                aria-label="不活跃会话自动标为完成"
               />
             }
           />
@@ -1555,7 +1555,7 @@ export function ThreadsSettingsPanel() {
               serverScoped
               settingKeys={["sidebarAutoSettleAfterDays"]}
               title={searchableSetting("days-before-auto-settle").title}
-              description="会话有新活动时会自动取消收尾。"
+              description="会话有新活动时会自动取消完成。"
               control={
                 <AutoSettleDaysInput
                   value={settings.sidebarAutoSettleAfterDays}
@@ -1569,7 +1569,7 @@ export function ThreadsSettingsPanel() {
               serverScoped
               settingKeys={["sidebarAutoSettleKeepPullRequests"]}
               title="保留有关联 PR 的会话"
-              description="闲置不会让有 pull request 的会话收尾，但合并和关闭仍会。"
+              description="闲置不会让有 PR 的会话标为完成，但合并和关闭仍会自动标为完成。"
               control={
                 <ScopedSwitch
                   settingKeys={["sidebarAutoSettleKeepPullRequests"]}
@@ -1590,7 +1590,7 @@ export function ThreadsSettingsPanel() {
           serverScoped
           settingKeys={["textGenerationModelSelection"]}
           {...searchableSetting("text-generation-model")}
-          description="用于生成会话标题和其他文本。版本控制有单独的设置。“提供方”中添加的文本生成器也会显示在这里。"
+          description="用于生成会话标题和其他文本。版本控制有单独的设置。“智能体”中添加的文本生成器也会显示在这里。"
           resetAction={
             hasServerTargets && isTextGenerationModelDirty ? (
               <SettingResetButton
@@ -1607,10 +1607,10 @@ export function ThreadsSettingsPanel() {
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                请连接一个环境以选择其文本生成模型。
+                请连接一台电脑以选择其文本生成模型。
               </span>
             ) : !hasTextGenerationProvider ? (
-              <span className="text-sm text-muted-foreground">没有可用的文本生成提供方。</span>
+              <span className="text-sm text-muted-foreground">没有可用的文本生成智能体。</span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-1.5">
                 <ProviderModelPicker
@@ -1621,7 +1621,7 @@ export function ThreadsSettingsPanel() {
                   instanceEntries={textGenerationModelInstanceEntries}
                   modelOptionsByInstance={textGenerationModelOptionsByInstance}
                   triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                  {...(mixedTextGenerationModel ? { triggerLabel: "各不相同" } : {})}
+                  {...(mixedTextGenerationModel ? { triggerLabel: "多项不同" } : {})}
                   getModelDisabledReason={textGenerationModelDisabledReason}
                   {...(environmentId
                     ? {
@@ -1724,7 +1724,7 @@ export function ThreadsSettingsPanel() {
                 <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="流式响应">
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
-                      value === null ? "混合" : RESPONSE_STREAMING_MODE_LABELS[value]
+                      value === null ? "多项不同" : RESPONSE_STREAMING_MODE_LABELS[value]
                     }
                   </SelectValue>
                 </SelectTrigger>
@@ -1760,12 +1760,12 @@ export function MaintenanceSettingsPanel() {
           serverScoped
           settingKeys={["enableProviderUpdateChecks"]}
           {...searchableSetting("provider-update-checks")}
-          description="检查已安装的提供方 CLI 是否有新版本。"
+          description="检查已安装的智能体 CLI 是否有新版本。"
           resetAction={
             settings.enableProviderUpdateChecks !==
             DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (
               <SettingResetButton
-                label="提供方更新检查"
+                label="智能体更新检查"
                 onClick={() =>
                   updateSettings({
                     enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
@@ -1781,7 +1781,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
               }
-              aria-label="检查提供方版本"
+              aria-label="检查智能体版本"
             />
           }
         />
@@ -1789,8 +1789,8 @@ export function MaintenanceSettingsPanel() {
           {...searchableSetting("continue-threads-after-server-update")}
           serverScoped
           settingKeys={["continueThreadsAfterServerUpdate"]}
-          description="在所选环境中，更新、崩溃或机器重启后自动继续被中断的会话。"
-          status={!hasServerTargets ? "所有选中的已连接环境都必须支持重启后继续。" : undefined}
+          description="在所选电脑上，更新、崩溃或电脑重启后自动继续被中断的会话。"
+          status={!hasServerTargets ? "所有选中的已连接电脑都必须支持重启后继续。" : undefined}
           resetAction={
             hasServerTargets &&
             settings.continueThreadsAfterServerUpdate !==
@@ -1831,7 +1831,7 @@ export function MaintenanceSettingsPanel() {
             settings.keepAwakeWhileAgentsWork !==
             DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork ? (
               <SettingResetButton
-                label="智能体工作时保持唤醒"
+                label="智能体工作时保持不休眠"
                 onClick={() =>
                   updateSettings({
                     keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,
@@ -1847,7 +1847,7 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ keepAwakeWhileAgentsWork: Boolean(checked) })
               }
-              aria-label="智能体工作时保持唤醒"
+              aria-label="智能体工作时保持不休眠"
             />
           }
         />
@@ -1860,8 +1860,8 @@ export function MaintenanceSettingsPanel() {
           {...searchableSetting("diagnostics")}
           description={
             isEnvironmentScope
-              ? "查看此环境的进程、资源占用和日志。"
-              : "逐个查看各环境的进程、资源占用和日志。"
+              ? "查看这台电脑的进程、资源占用和日志。"
+              : "逐个查看各台电脑的进程、资源占用和日志。"
           }
           control={
             <Button

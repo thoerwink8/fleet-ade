@@ -140,8 +140,8 @@ const SURFACE_DISABLED_REASONS = {
   terminal: "终端面板仅在项目会话中可用。",
   files: "打开项目后才能使用文件面板。",
   diff: "还没有文件改动。",
-  pullRequest: "此会话的分支尚无 pull request。",
-  pullRequests: "此会话没有可用的已关联 pull request。",
+  pullRequest: "此会话的分支尚无 PR。",
+  pullRequests: "此会话没有可用的已关联 PR。",
   sideChat: "发送第一条消息后才能开始侧聊。",
 } as const;
 
@@ -163,8 +163,8 @@ const SURFACE_UNAVAILABLE_HINTS = {
   terminal: "打开项目后可用。",
   files: "打开项目后可用。",
   diff: "还没有文件改动。",
-  pullRequest: "此分支尚无 pull request。",
-  pullRequests: "没有可用的已关联 pull request。",
+  pullRequest: "此分支尚无 PR。",
+  pullRequests: "没有可用的已关联 PR。",
   sideChat: "发送第一条消息后可用。",
 } as const;
 
@@ -528,12 +528,12 @@ function SurfaceIcon({
 function sideChatTabState(shell: EnvironmentThreadShell | null) {
   if (shell === null) return null;
   if (shell.hasPendingApprovals || shell.pendingSubagentRequest === "approval") {
-    return "待批准";
+    return "等你批准";
   }
   if (shell.hasPendingUserInput || shell.pendingSubagentRequest === "user_input") {
-    return "待输入";
+    return "等你回答";
   }
-  return threadRuntimeIsActive(shell.runtime) ? "running" : null;
+  return threadRuntimeIsActive(shell.runtime) ? "运行中" : null;
 }
 
 // Static dots: a side chat tab can stay open for a whole run.
@@ -550,7 +550,7 @@ function SideChatTabIcon(props: { environmentId: EnvironmentId | null; threadId:
         <span
           className={cn(
             "absolute -top-0.5 -right-0.5 size-1.5 rounded-full",
-            state === "running" ? "bg-muted-foreground" : "bg-info",
+            state === "运行中" ? "bg-muted-foreground" : "bg-info",
           )}
           aria-hidden
         />
@@ -1030,8 +1030,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       workspaceFocusKey={`panel:${props.environmentId}:${props.activeSurfaceId ?? "empty"}`}
       workspaceLabel={
         focusedSurface
-          ? `工作区面板：${surfaceTitle(focusedSurface, props.terminalLabelsById)}`
-          : "工作区面板"
+          ? `右侧面板：${surfaceTitle(focusedSurface, props.terminalLabelsById)}`
+          : "右侧面板"
       }
       mode={props.mode}
       {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}

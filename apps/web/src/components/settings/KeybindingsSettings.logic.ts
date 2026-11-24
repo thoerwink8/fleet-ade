@@ -417,8 +417,8 @@ export function buildKeybindingCommandOptions(
 }
 
 const COMMAND_LABELS: Readonly<Record<string, string>> = {
-  "workspace.focusNext": "聚焦下一个工作区区域",
-  "workspace.focusPrevious": "聚焦上一个工作区区域",
+  "workspace.focusNext": "聚焦下一个面板区域",
+  "workspace.focusPrevious": "聚焦上一个面板区域",
   "sidebar.toggle": "侧边栏：开关",
   "navigation.back": "导航：后退",
   "navigation.forward": "导航：前进",
@@ -433,7 +433,7 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "rightPanel.toggleMaximized": "右侧面板：最大化或还原",
   "rightPanel.close": "右侧面板：关闭",
   "view.reopenClosed": "重新打开已关闭的标签页",
-  "pullRequest.copyNumber": "拉取请求：复制编号",
+  "pullRequest.copyNumber": "PR：复制编号",
   "diff.toggle": "差异：开关",
   "commandPalette.toggle": "命令面板：开关",
   "filePicker.toggle": "文件选择器：开关",
@@ -446,13 +446,13 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "composer.sendAlternate": "输入框：用另一种方式发送（排队／立即发送）",
   "composer.sendBackground": "输入框：在后台启动",
   "composer.sendAndNewThread": "输入框：发送并新建会话",
-  "composer.host": "输入框：切换主机",
-  "composer.cycleHost": "输入框：循环切换主机",
+  "composer.host": "输入框：切换电脑",
+  "composer.cycleHost": "输入框：循环切换电脑",
   "composer.effort": "输入框：切换推理强度",
   "composer.increaseEffort": "输入框：提高推理强度",
   "composer.decreaseEffort": "输入框：降低推理强度",
   "composer.mode": "输入框：切换模式",
-  "composer.workspace": "输入框：切换工作区",
+  "composer.workspace": "输入框：切换目录",
   "composer.previousWorktree": "输入框：上一个工作树",
   "composer.branch": "输入框：切换分支",
   "chat.new": "新建会话",
@@ -468,15 +468,15 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "usage.period.month": "用量：30 天",
   "usage.period.quarter": "用量：90 天",
   "modelPicker.toggle": "模型选择器：开关",
-  "modelPicker.previousProvider": "模型选择器：上一个提供方",
-  "modelPicker.nextProvider": "模型选择器：下一个提供方",
+  "modelPicker.previousProvider": "模型选择器：上一个智能体",
+  "modelPicker.nextProvider": "模型选择器：下一个智能体",
   "thread.stop": "会话：停止",
   "thread.steerQueuedMessage": "排队：立即发送第一条排队消息",
   "thread.editQueuedMessage": "排队：编辑最后一条排队消息",
   "thread.previous": "会话：上一个",
   "thread.next": "会话：下一个",
   "thread.copyReference": "PR：复制链接或会话",
-  "thread.settle": "会话：收尾",
+  "thread.settle": "会话：标为完成",
   "thread.pin": "会话：置顶",
   "thread.regenerateTitle": "会话：重新生成标题",
   "thread.undo": "会话：撤销",
@@ -494,7 +494,7 @@ export function commandLabel(command: KeybindingCommand): string {
   const raw = String(command);
   if (/^(thread|modelPicker)\.jump\.\d+$/.test(raw)) {
     const [prefix, , n] = raw.split(".");
-    return prefix === "thread" ? `会话：跳到第 ${n} 条` : `模型选择器：跳到第 ${n} 个提供方`;
+    return prefix === "thread" ? `会话：跳到第 ${n} 条` : `模型选择器：跳到第 ${n} 个智能体`;
   }
   if (raw.startsWith("script.") && raw.endsWith(".run")) {
     return `运行脚本：${titleCaseCommandSegment(raw.slice("script.".length, -".run".length))}`;

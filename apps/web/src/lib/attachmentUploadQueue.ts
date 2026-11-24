@@ -218,7 +218,7 @@ async function runUpload(job: UploadJob): Promise<void> {
         reason:
           verification.status === "missing"
             ? "已上传的文件已过期。请移除后重新添加。"
-            : "无法验证已上传的文件。请在服务器重新连接后重试。",
+            : "无法验证已上传的文件。请在电脑重新连接后重试。",
         ...(job.previous ? { previous: job.previous } : {}),
       });
       return;

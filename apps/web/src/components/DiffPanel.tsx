@@ -1066,7 +1066,7 @@ export default function DiffPanel({
                 className="w-72 min-w-0 max-w-[calc(100vw-1rem)] overflow-hidden"
               >
                 <ComboboxSearchInput
-                  placeholder="搜索引用…"
+                  placeholder="搜索分支或标签…"
                   value={baseRefQuery}
                   onChange={(event) => setBaseRefQuery(event.target.value)}
                 />
@@ -1077,7 +1077,7 @@ export default function DiffPanel({
                     <span className="text-right">远端</span>
                   </div>
                 </div>
-                <ComboboxEmpty>没有匹配的引用。</ComboboxEmpty>
+                <ComboboxEmpty>没有匹配的分支或标签。</ComboboxEmpty>
                 <ComboboxList className="max-h-64 min-w-0 overflow-x-hidden">
                   <ComboboxItem
                     className="w-full min-w-0 grid-cols-[1rem_minmax(0,1fr)]"
@@ -1347,7 +1347,7 @@ export default function DiffPanel({
             )}
             {!renderablePatch && toolCallPreview && toolCallPreview.content.length > 0 ? (
               <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
-                <p className="text-muted-foreground">提供方记录了文件内容，但没有差异。</p>
+                <p className="text-muted-foreground">智能体记录了文件内容，但没有差异。</p>
                 {toolCallPreview.content.map(({ label, text }) => (
                   <div key={label} className="space-y-1">
                     <p className="text-muted-foreground">{label}</p>
@@ -1369,7 +1369,7 @@ export default function DiffPanel({
                     toolCallSelection
                       ? "正在加载工具调用差异…"
                       : selectedTurn
-                        ? "正在加载检查点差异…"
+                        ? "正在加载文件快照差异…"
                         : selectedGitScope === "unstaged"
                           ? "正在加载未提交的改动…"
                           : selectedGitScope === "commit"

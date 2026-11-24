@@ -5,6 +5,7 @@ import { selectCheckSteps } from "./check.ts";
 const sampleSteps = [
   { name: "lint" },
   { name: "ui-no-english" },
+  { name: "ui-no-old-terms" },
   { name: "typecheck" },
   { name: "ensure-electron" },
   { name: "chromium" },

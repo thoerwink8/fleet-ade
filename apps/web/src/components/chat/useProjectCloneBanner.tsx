@@ -100,7 +100,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
       id: `project-clone:${projectId}`,
       variant: cancelled ? "warning" : "error",
       icon: <DownloadIcon />,
-      title: cancelled ? `已取消克隆 ${name}` : `克隆 ${name} 失败`,
+      title: cancelled ? `已取消克隆 ${name}` : `无法克隆 ${name}`,
       description: cancelled ? "重试即可重新获取仓库。" : activeProjectClone.error,
       actions: (
         <>

@@ -354,11 +354,11 @@ export function BranchToolbarBranchSelector({
   const [isBranchActionPending, startBranchActionTransition] = useTransition();
   const totalBranchCount = branchRefState.data?.totalCount ?? 0;
   const branchStatusText = isInitialBranchesLoadPending
-    ? "正在加载引用…"
+    ? "正在加载分支…"
     : isFetchingNextPage
-      ? "正在加载更多引用…"
+      ? "正在加载更多分支…"
       : hasNextPage
-        ? `显示 ${refs.length} / ${totalBranchCount} 个引用`
+        ? `显示 ${refs.length} / ${totalBranchCount} 个分支`
         : null;
 
   const copyBranchName = (branchName: string) => {
@@ -485,7 +485,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "切换引用失败。",
+            title: "无法切换分支",
             description: toBranchActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -524,7 +524,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "创建并切换引用失败。",
+            title: "无法创建并切换分支",
             description: toBranchActionErrorMessage(squashAtomCommandFailure(createBranchResult)),
           }),
         );
@@ -656,7 +656,7 @@ export function BranchToolbarBranchSelector({
           value={itemValue}
           onClick={() => selectPickerItem(itemValue)}
         >
-          <span className="truncate">新建引用「{newRefName}」</span>
+          <span className="truncate">新建分支「{newRefName}」</span>
         </ComboboxItem>
       );
     }

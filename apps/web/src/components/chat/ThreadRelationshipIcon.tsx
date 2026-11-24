@@ -11,18 +11,18 @@ export function threadRelationshipStatusLabel(status: string | null): string {
       return "正在启动";
     case "running":
     case "in_progress":
-      return "正在运行";
+      return "运行中";
     case "pending":
     case "queued":
-      return "排队中";
+      return "等空位";
     case "waiting":
     case "blocked":
       return "等待中";
     case "completed":
-      return "完成";
+      return "已完成";
     case "failed":
     case "error":
-      return "失败";
+      return "出错了";
     case "cancelled":
     case "interrupted":
       return "已停止";
@@ -37,7 +37,7 @@ export function threadRelationshipStatusLabel(status: string | null): string {
     case "superseded":
       return "已被替代";
     case "idle":
-      return "闲置";
+      return "空闲";
     default:
       return "未知";
   }

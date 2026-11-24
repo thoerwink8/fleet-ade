@@ -83,7 +83,7 @@ export function resolveLinkPullRequestInput(input: {
   const url = sourceControlClients.parseChangeRequestUrl(parsed)?.link;
   if (url !== undefined) {
     if (!input.hasProject({ ...url, url: parsed })) {
-      return { error: `此环境中没有项目能读取 ${url.host}/${url.repository}。` };
+      return { error: `这台电脑上没有项目能读取 ${url.host}/${url.repository}。` };
     }
     return {
       link: {
@@ -98,8 +98,7 @@ export function resolveLinkPullRequestInput(input: {
   if (!Number.isSafeInteger(number) || number < 1) return null;
   if (input.project === null) {
     return {
-      error:
-        "Paste the full pull request URL; this thread has no repository to resolve the number against.",
+      error: "Paste the full PR URL; this thread has no repository to resolve the number against.",
     };
   }
   const webUrl = input.project.webUrl(number);

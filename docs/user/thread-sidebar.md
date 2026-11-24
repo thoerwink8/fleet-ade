@@ -9,19 +9,19 @@ On web and desktop, **New thread** opens the project picker when you have more t
 open project in the default or project-grouped sidebar. Archived projects don't count. **Shift-click** to start in
 the current project, or use a project's own new-thread action. A new thread carries
 your model and mode selections, unless the destination project has its own model default.
-Its branch and workspace mode come from your configured defaults. To continue in
+Its branch and directory mode come from your configured defaults. To continue in
 an existing worktree, use **New thread in this worktree** from the branch toolbar.
 
-When you change a new thread's project, T3 Code stays in the current environment
-if that project exists there. Otherwise it selects an environment that has it.
+When you change a new thread's project, Fleet ADE stays on the current computer
+if that project exists there. Otherwise it selects a computer that has it.
 
 ### Start without a project
 
 A thread does not need a project. To start one without a project, click **or
 start without a project** under a new thread's heading, pick **No project** from
 the project menu in that heading or from **New thread in...** in the command
-palette, or press `mod+alt+n`. It starts on your current machine; before sending, pick another machine
-from the machine menu to move it there. To move a draft into a project, pick the
+palette, or press `mod+alt+n`. It starts on your current computer; before sending, pick another computer
+from the computer menu to move it there. To move a draft into a project, pick the
 project in the heading.
 
 Each thread without a project works in its own folder under `~/.t3/scratch` (the
@@ -42,7 +42,7 @@ get branch and diff controls.
 
 In a desktop browser or the desktop app, press `Cmd+Enter` on macOS or `Ctrl+Enter`
 on Windows and Linux to start a new thread and immediately open another draft. The
-next draft keeps the workspace mode and base branch you selected. With **New
+next draft keeps the directory mode and base branch you selected. With **New
 worktree**, each background submission creates its own worktree.
 
 To send the same prompt to several models on web or desktop, **Shift-click** models
@@ -70,52 +70,52 @@ files directly; see [Attach files](./composer.md#attach-files).
 On web and desktop, pinning or unpinning a thread keeps the sidebar at your current
 scroll position instead of following the thread to its new place in the list.
 
-Pinning does not prevent automatic settlement. Settling a thread removes its pin.
+Pinning does not prevent auto-completion. Marking a thread complete removes its pin.
 
 On web and desktop, drag a thread between sections to change its state. Drag a thread up into
 the pinned section to pin it at the spot you drop it; drag a pinned thread down into the active
-list to unpin it. Dragging a thread onto the **Settled** header settles it, and dragging a settled
-thread into the active list un-settles it. A snoozed thread can be dragged out of the snoozed
+list to unpin it. Dragging a thread onto the **Completed** header marks it complete, and dragging a completed
+thread into the active list unmarks it. A snoozed thread can be dragged out of the snoozed
 shelf, which wakes it, but threads cannot be dragged into the shelf because snoozing needs a wake
 time. Dragging a pinned thread out of the pinned section does not ask for unpin confirmation.
 Pinned and active boundary labels appear only while dragging, without moving the rows. The
 other rows slide aside to show where the thread will land. When you cross into another section,
 the dragged thread shows the action the drop performs, with its icon: **Pin**, **Unpin**,
-**Settle**, **Un-settle**, or **Wake**. Its status and hover actions hide during the drag. A pinned
+**Mark as done**, **Unmark as done**, or **Unsnooze**. Its status and hover actions hide during the drag. A pinned
 thread keeps its pin only while it stays in the pinned section; once it leaves, the badge takes
 over. Reordering within the same section shows no badge. When there are no pins, drag to the top
 edge to pin a thread. Section labels stay readable for the whole drag, and the section the
 thread is over takes the accent color. Section labels also
-identify empty sections and a collapsed settled shelf.
+identify empty sections and a collapsed completed section.
 
 Drag within the pinned or active section to change its order. Other rows slide aside to show the
 spot where the thread will land. Drops into either section keep the position you choose. The server
 saves the order, so it survives a refresh and appears on your other connected devices.
 
 On web and desktop, the list also animates section changes made with thread actions such as
-**Pin**, **Settle**, and **Snooze**. These transitions respect your system's reduced-motion
+**Pin**, **Mark as done**, and **Snooze**. These transitions respect your system's reduced-motion
 preference. While dragging, rows follow the insertion gap without replaying a second transition
 after the drop.
 
-New threads appear above the active threads you have arranged. Settling clears a thread's active
-position, so using **Un-settle** returns it to the top. Pinning and snoozing preserve its active
-position until you move it again. Thread activity does not change the order. The settled shelf
-continues to use settlement time.
+New threads appear above the active threads you have arranged. Marking a thread complete clears its active
+position, so using **Unmark as done** returns it to the top. Pinning and snoozing preserve its active
+position until you move it again. Thread activity does not change the order. The completed section
+continues to sort by completion time.
 
-If dragging is unavailable for one environment, update the T3 Code server running in that
+If dragging is unavailable for one environment, update the Fleet ADE server running in that
 environment. Pinned and active reordering require server support. Threads from older servers keep
 their default order until the server is updated.
 
 To generate a fresh title from the conversation, open a thread's menu and choose
 **Regenerate title**. The action is unavailable while title generation is in progress
-or when the connected environment needs a server update.
+or when the connected computer needs a background service update.
 
 To change how titles are written, add **Thread title instructions** in **Settings → Threads →
 Text generation**, under Advanced, such as a length limit or an identifier to put first. They apply to new and
 regenerated titles. Select a project to give it its own instructions.
 
-Agents connected through T3 Code can use the same server-owned metadata workflow to
-rename a thread, regenerate its title, or link and unlink a pull request. These changes
+Agents connected through Fleet ADE can use the same server-owned metadata workflow to
+rename a thread, regenerate its title, or link and unlink a PR. These changes
 appear across your connected web and desktop clients without requiring the originating browser to remain
 open.
 
@@ -123,7 +123,7 @@ open.
 
 Threads that are working or waiting on work they will resume from move into a collapsed
 **Working** section below the active list.
-That includes subagents, watched pull requests with checks still running, and background commands or monitors the agent
+That includes subagents, watched PRs with checks still running, and background commands or monitors the agent
 says it is waiting on. A dev server or other process an agent leaves running does not keep a thread
 there. A thread returns to the top of the active list when it finishes, fails, or needs an approval or
 answer. The Working section lists the thread you last sent work to first. Pinned threads stay in
@@ -135,70 +135,69 @@ Each device keeps its own choice.
 While this is on, the active list is ordered by when each thread last came back to you, so you
 cannot drag or move threads within it. Your saved order returns when you turn it off.
 
-## Settle finished work
+## Mark finished work as done
 
-Choose **Settle thread** from its menu to move finished work out of the active list
-without deleting the conversation. **Un-settle thread** restores it to active work
-and prevents automatic settlement until new activity resumes the usual rules.
-Manually settling an idle thread dismisses unanswered async questions without
-sending an answer or restarting the agent. Settling also closes the thread's
+Choose **Mark as done** from its menu to move finished work out of the active list
+without deleting the conversation. **Unmark as done** restores it to active work
+and prevents auto-completion until new activity resumes the usual rules.
+Manually marking an idle thread complete dismisses unanswered async questions without
+sending an answer or restarting the agent. Marking a thread complete also closes its
 terminals that wait at an idle prompt, and keeps their output. A terminal that
 runs a command, such as a dev server, stays open unless its action has **Stop this action
-when the thread settles** enabled in **Settings → Code → Actions**. You can also set
+when the thread completes** enabled in **Settings → Code → Actions**. You can also set
 `"stopOnSettle": true` on a `t3.json` action and import it there. Start the command through
 that action so T3 can stop its terminal and child processes. Commands started through an
-agent's own shell tools are managed by the provider.
+agent's own shell tools are managed by the agent.
 
 To reclaim disk space from settled work, turn on **Run in the thread's worktree when the
-thread settles** for one of the project's actions, or set `"runOnSettle": true` on a
+thread completes** for one of the project's actions, or set `"runOnSettle": true` on a
 `t3.json` script, for example `cargo clean`. It runs each time a thread in its own
 worktree settles, manually or automatically, even if a terminal there still runs a
 command such as a dev server. Threads in the project's main checkout skip it. Its terminal
 closes when the command succeeds and stays open when it fails.
 
-On web and desktop, press a thread's **Settle** button and drag up or down to
-settle every thread in that section between it and the one you release on.
-The **Un-settle** and **Wake** buttons work the same way in their sections.
+On web and desktop, press a thread's **Mark as done** button and drag up or down to
+mark every thread complete in that section between it and the one you release on.
+The **Unmark as done** and **Unsnooze** buttons work the same way in their sections.
 Press `Escape` while dragging to cancel.
 
-By default, environments settle inactive threads after seven days and settle
-threads whose pull request merged. A closed pull request can also settle an idle
-thread. An empty thread's inactivity counts from when it was created.
+By default, computers mark inactive threads complete after seven days and mark
+threads whose PR merged. A closed PR can also mark an idle thread complete. An empty thread's inactivity counts from when it was created.
 Work in progress, pending questions or approvals, and background work the agent
-is waiting on prevent automatic settlement. An open pull request does not prevent inactivity
-settlement unless you turn on **Keep threads with a PR** in **Settings → Threads**,
-but an old closed or merged pull request does not settle work you
+is waiting on prevent auto-completion. An open PR does not prevent inactivity
+auto-completion unless you turn on **Keep threads with a PR** in **Settings → Threads**,
+but an old closed or merged PR does not mark work complete you
 resumed after it closed. Only your own messages count as resuming. A turn that
-finished background work or a pull request watch starts on its own does not.
+finished background work or a PR watch starts on its own does not.
 
-To keep one thread out of the settled shelf no matter how long it sits idle, open its menu,
-choose **Auto-settle behavior**, and pick **Never**. The current option is checked. Pick
+To keep one thread out of the completed section no matter how long it sits idle, open its menu,
+choose **Auto-complete**, and pick **Never**. The current option is checked. Pick
 **Follow settings** to return to the rules in **Settings → Threads**. While those rules are off,
-a thread on **Follow settings** does not settle automatically either. Manual settle, snooze, and
+a thread on **Follow settings** does not auto-complete either. Manual completion, snooze, and
 archive still work while it is set to **Never**.
 
 Change these rules in **Settings → Threads**.
 They continue to run when your apps are closed. On web and desktop, choose an environment at the
 top to change only its rules, or **All environments** to update connected environments together.
-Mixed values show where the selected environments disagree. Offline environments
+When multiple values differ across selected computers, **Multiple values differ** is shown. Offline environments
 and older servers keep their previous values. Changing a rule does not reopen
-already settled threads.
+already completed threads.
 
-## Link a pull request
+## Link a PR
 
-The server finds the PR for each unsettled thread's saved branch, even when your
-apps are closed. Settled threads keep their saved links. Update the server if
+The server finds the PR for each incomplete thread's saved branch, even when your
+apps are closed. Completed threads keep their saved links. Update the server if
 automatic branch links do not appear.
 
-On web and desktop, right-click a pull request link in a thread and choose
+On web and desktop, right-click a PR link in a thread and choose
 **Link to thread** to select a different PR. Use **Unlink from thread** on the
 same link to return to the branch PR, if one exists.
-The linked pull request participates in automatic settlement.
+The linked PR participates in auto-completion.
 
 ## Find and reference work
 
 On web and desktop, open the command palette with `Cmd/Ctrl+K` to search threads
-across connected environments by title, branch, pull request, or project.
+across connected environments by title, branch, PR, or project.
 Threads you open often or recently rank higher, and for three weeks the thread
 you last picked for a query ranks higher when you type that query again.
 Threads whose messages contain all your words appear below, under **In
@@ -208,7 +207,7 @@ On a phone, the thread list search also lists message matches and opens them at
 the matching message. A hardware keyboard opens the same palette with `Cmd/Ctrl+K`.
 
 Use **Settings → General → Keybindings** to find or customize shortcuts for searching files
-and copying a thread reference. A copied reference uses the thread's pull request
+and copying a thread reference. A copied reference uses the thread's PR
 link when available, otherwise a link to the thread, which opens it from anywhere
 you paste it and pastes into a composer as a thread chip (see
 [sharing a thread](./prompt-links.md#share-a-thread)). To copy the thread even
@@ -220,7 +219,7 @@ when it has a PR, choose **Copy → Thread** from its context menu.
 
 **Limited** means the provider stopped on a usage or rate limit. The conversation
 keeps the provider's explanation. Retry after the limit resets, or switch to
-another provider instance.
+another agent account.
 Press **Resume** in an empty composer to continue a limited or interrupted turn
 manually. Do this when the provider reports no reset time, because nothing
 continues the turn on its own.
@@ -236,7 +235,7 @@ archiving, or settling it prevents a pending continuation from starting.
 
 Choose **Snooze until reset** to hide the thread until its allowance returns.
 Snooze and auto-resume are independent: snooze alone wakes the thread without
-sending a message; enabling both wakes and continues it. **Wake now** cancels
+sending a message; enabling both wakes and continues it. **Unsnooze** cancels
 the snooze. Enable **Snooze until limits reset** in thread behavior settings to
 snooze limit stops by default. Providers without a reset time offer manual
 retry and the normal snooze choices.
@@ -291,7 +290,7 @@ selected, the options apply to every connected environment.
 Choose **Snooze → Custom…** from a thread's menu to pick a date and time in your
 local time zone, or a duration in minutes, hours, or days. Durations start when
 you confirm; one day means 24 hours. On web and desktop, you can also snooze
-several selected threads together. Choose **Wake thread** to bring a thread back early.
+several selected threads together. Choose **Unsnooze** to bring a thread back early.
 
 A snoozed thread keeps working and stays hidden until its wake time, even while
 its agent wakes itself for background work. It comes back early for an approval,

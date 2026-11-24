@@ -22,11 +22,11 @@ When a thread has queued messages, `mod+Shift+Enter` sends the first one as a st
 while a turn is running, or as a new turn when the thread is stopped. Change it under
 **Queue: Send First Queued Message** in Keybindings.
 
-Use `mod+shift+m` to choose a model and `mod+shift+h` to choose a host.
-To step a new thread to the next machine instead of opening the menu, bind
-**Composer: Cycle Host** in Keybindings. It has no default shortcut.
+Use `mod+shift+m` to choose a model and `mod+shift+h` to choose a computer.
+To step a new thread to the next computer instead of opening the menu, bind
+**Composer: Cycle Computer** in Keybindings. It has no default shortcut.
 Use `mod+shift+e` for effort, `mod+shift+a` for permissions, `mod+shift+x` for the
-workspace, and `mod+shift+g` for the Git branch. The workspace menu includes the
+directory mode, and `mod+shift+g` for the Git branch. The directory menu includes the
 current checkout, a new worktree, and the previous worktree when available.
 Use `mod+shift+l` to reuse the previous worktree directly.
 
@@ -36,17 +36,17 @@ Both are unbound by default. Increase wraps from the highest level to the
 lowest, and decrease wraps from the lowest level to the highest.
 
 In the model picker, press Left in an empty search field or Shift+Tab to reach
-the provider list. Use Up/Down to move and Enter to choose. Right returns to
+the agent list. Use Up/Down to move and Enter to choose. Right returns to
 model search. Right at the end of the search moves to the highlighted model's effort
-levels, and Left comes back. Choosing a model keeps the picker open on its effort. `mod+shift+up` and `mod+shift+down` switch providers directly and clear the
-search. These provider shortcuts can also be changed in Settings.
+levels, and Left comes back. Choosing a model keeps the picker open on its effort. `mod+shift+up` and `mod+shift+down` switch agents directly and clear the
+search. These agent shortcuts can also be changed in Settings.
 
 These shortcuts run inside the focused web or desktop client. `mod` uses Command
 on macOS and Ctrl on Windows and Linux, including GNOME, KDE Plasma, Niri, and
 Hyprland. If a custom desktop shortcut takes the same keys, choose another binding
 in Settings.
 
-## Copy pull request references
+## Copy PR references
 
 With a PR open in the right panel or on the Pull requests page, use `mod+shift+c`
 to copy its URL and `mod+shift+k` to copy its number with a `#` prefix.
@@ -57,7 +57,7 @@ composer as a thread chip.
 
 ## Find in a diff
 
-Click into a diff in the Diff panel or a pull request's Code tab, then press
+Click into a diff in the Diff panel or a PR's Code tab, then press
 `mod+f` to search every file in it, including folded files and unchanged lines
 hidden between changes. Enter and `Shift+Enter` move between matches, and a
 match in a folded file opens it. Escape closes the search. This shortcut is not
@@ -71,7 +71,7 @@ Use the arrow keys and Return to choose a result. Escape or `Cmd+K` closes the
 palette. Start a search with `>` to show only actions. `Cmd+1` through `Cmd+9`
 open the first nine displayed threads, following the current list filters and
 order. Those defaults run in the desktop app, so they do not take a browser's
-tab shortcuts. `Cmd+Shift+H` chooses a host.
+tab shortcuts. `Cmd+Shift+H` chooses a computer.
 
 On a keyboard that uses Ctrl rather than Command, use Ctrl in place of Cmd.
 
@@ -81,7 +81,7 @@ Send shortcut**. Shift+Return inserts a new line.
 
 ## Edit the configuration file
 
-Keybindings live on the environment's machine, in
+Keybindings live on that computer, in
 `~/.t3/userdata/keybindings.json` by default. You can edit this file directly.
 It is a JSON array of rules:
 
@@ -92,10 +92,10 @@ It is a JSON array of rules:
 ]
 ```
 
-T3 Code creates the file with its defaults and adds new defaults on later startups.
+Fleet ADE creates the file with its defaults and adds new defaults on later startups.
 New defaults do not replace commands you customized. If a new default overlaps one
 of your shortcuts, [rule order](#precedence) decides which runs.
-Invalid rules are ignored; if the file cannot be parsed, T3 Code uses defaults.
+Invalid rules are ignored; if the file cannot be parsed, Fleet ADE uses defaults.
 
 ## Rule shape
 
@@ -150,14 +150,14 @@ a shortcut.
 
 ## Commands with special behavior
 
-`thread.stop` interrupts the running turn in the focused thread. It has no default
+`thread.stop` stops the running turn in the focused thread. It has no default
 shortcut; assign one in **Settings → General → Keybindings**.
 
 `thread.regenerateTitle` generates a new title for the focused thread, like
 **Regenerate title** in the thread menu. It has no default shortcut.
 
 `thread.undo` (`mod+z` by default) reverses the actions shown in the notice at the
-bottom of the sidebar, such as unpin, settle, snooze, archive, or discarding a
+bottom of the sidebar, such as unpin, mark complete, snooze, archive, or discarding a
 draft. Consecutive
 actions of the same kind undo together. The notice remains available for five
 seconds after the latest action. Right after an action, the shortcut works even
@@ -180,7 +180,7 @@ closes the browser tab; rebind `rightPanel.close` and `terminal.close` to an ava
 shortcut such as `alt+w`.
 
 `mod+shift+t` reopens the last closed tab across the app, including files,
-diffs, and pull requests, in the order you closed them. This shortcut does not
+diffs, and PRs, in the order you closed them. This shortcut does not
 undo deleted work. Browsers also use it to reopen their own tabs; choose another
 binding in Settings if the browser takes it first.
 

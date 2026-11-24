@@ -185,7 +185,7 @@ export async function rewindToMessage(input: {
       throw new Error("请等附件准备完成后再回退。");
     }
     const connection = readPreparedConnection(environmentId);
-    if (!connection) throw new Error("环境未连接。");
+    if (!connection) throw new Error("电脑未连接。");
     const files = await prepareRevertedMessageAttachments({
       message,
       environmentId,
@@ -346,7 +346,7 @@ export function prepareTurnAttachments(input: {
         return uploaded;
       }
       if (attachment.type !== "image") {
-        throw new Error("这个服务器不支持文件附件。");
+        throw new Error("这个后台服务不支持文件附件。");
       }
       return {
         type: "image" as const,

@@ -49,7 +49,7 @@ export function resolveEnvironmentOptionLabel(input: {
       if (!label) return false;
       return !GENERIC_LOCAL_ENVIRONMENT_LABELS.has(label.toLowerCase());
     });
-    return preferredLocalLabel ?? "此设备";
+    return preferredLocalLabel ?? "本机";
   }
 
   return runtimeLabel ?? savedLabel ?? input.environmentId;
@@ -92,7 +92,7 @@ export function resolveContextStripLabelsCompact(input: {
 }
 
 export function resolveEnvModeLabel(mode: EnvMode): string {
-  return mode === "worktree" ? "新工作树" : "当前工作副本";
+  return mode === "worktree" ? "新工作树" : "项目目录";
 }
 
 export const WORKTREE_SUBMODULES_LABELS: Record<WorktreeSubmodules, string> = {
@@ -110,7 +110,7 @@ export function resolveLockedWorkspaceLabel(
   effectiveEnvMode: EnvMode,
 ): string {
   if (activeWorktreePath) return activeWorktreePath.split(/[\\/]/).findLast(Boolean) ?? "工作树";
-  return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : "本地工作副本";
+  return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : "项目目录";
 }
 
 export interface PreviousWorktreeSeed {
@@ -214,7 +214,7 @@ export function resolveBranchTriggerLabel(input: {
     startFromOrigin,
   } = input;
   if (!resolvedActiveBranch) {
-    return "选择引用";
+    return "选择分支";
   }
   if (effectiveEnvMode === "worktree" && !activeWorktreePath) {
     // Only the server can determine a local branch's configured remote.

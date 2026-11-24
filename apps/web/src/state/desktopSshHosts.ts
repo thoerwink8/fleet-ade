@@ -34,7 +34,7 @@ class DesktopSshDiscoveryUnavailableError extends Schema.TaggedError<DesktopSshD
   {},
 ) {
   override get message(): string {
-    return "桌面 SSH 主机发现不可用。";
+    return "桌面 SSH 电脑发现不可用。";
   }
 }
 
@@ -43,7 +43,7 @@ class DesktopSshDiscoveryError extends Schema.TaggedError<DesktopSshDiscoveryErr
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "无法发现 SSH 主机。";
+    return "无法发现 SSH 电脑。";
   }
 }
 

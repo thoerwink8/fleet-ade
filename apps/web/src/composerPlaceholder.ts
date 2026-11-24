@@ -20,13 +20,13 @@ export function getComposerPlaceholder(input: {
   const isMac = isMacPlatform(platform);
   const requiresMod = input.sendShortcut === "mod-enter";
   const primaryPrefix = requiresMod ? (isMac ? "⌘Enter " : "Ctrl+Enter ") : "回车";
-  const queueClause = (prefix: string) => `${prefix}排队，等这一轮做完再发`;
+  const queueClause = (prefix: string) => `${prefix}排队，等这一轮结束后再发`;
   const steerClause = (prefix: string) => `${prefix}立即发送（会打断当前这一轮）`;
 
   if (input.hasKeyboard === false) {
     return input.canSteer !== false && input.followUpBehavior === "steer"
       ? "发送后立即发送（会打断当前这一轮）"
-      : "发送后排队，等这一轮做完再发";
+      : "发送后排队，等这一轮结束后再发";
   }
 
   if (input.canSteer === false) {

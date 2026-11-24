@@ -263,7 +263,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "取消会话收尾失败",
+          title: "无法取消完成",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -308,7 +308,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "唤醒会话失败",
+          title: "无法取消暂缓",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -376,7 +376,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "切换工作副本失败",
+            title: "无法切换项目目录分支",
             description: chatActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
           }),
         );
@@ -400,7 +400,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "工作副本已切换，但会话无法更新",
+              title: "项目目录已切换，但无法更新会话",
               description: chatActionErrorMessage(squashAtomCommandFailure(updateResult)),
             }),
           );
@@ -629,14 +629,14 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   const threadStatusLine =
     activeLatestRun?.status === "queued" ||
     (activeThread?.runtime?.status === "starting" && activeThread.runtime.awaitingSlot === true) ? (
-      <ThreadStatusLine icon={<AlarmClockIcon />} label="排队" />
+      <ThreadStatusLine icon={<AlarmClockIcon />} label="等空位" />
     ) : activeThreadSnoozed ? (
       limitRecoveryHoldsSnooze ? null : (
         <ThreadStatusLine
           icon={<AlarmClockIcon />}
           label={snoozeWake && snoozeWake !== "now" ? `已暂缓，还剩 ${snoozeWake}` : "已暂缓"}
           clockMinute={nowMinute}
-          actionLabel={isUnsnoozing ? "正在唤醒…" : "立即唤醒"}
+          actionLabel={isUnsnoozing ? "正在取消暂缓…" : "取消暂缓"}
           actionDisabled={!canOperateThread || isUnsnoozing}
           onAction={() => void handleUnsnoozeActiveThreadStable()}
         />
@@ -644,16 +644,16 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
     ) : activeThreadSettled ? (
       <ThreadStatusLine
         icon={<CheckCircle2Icon />}
-        label={settledAt ? `已收尾 ${formatRelativeTimeLabel(settledAt)}` : "已收尾"}
+        label={settledAt ? `已完成 ${formatRelativeTimeLabel(settledAt)}` : "已完成"}
         clockMinute={nowMinute}
-        actionLabel={isUnsettling ? "正在取消收尾…" : "取消收尾"}
+        actionLabel={isUnsettling ? "正在取消完成…" : "取消完成"}
         actionDisabled={!canOperateThread || isUnsettling}
         onAction={() => void handleUnsettleActiveThreadStable()}
       />
     ) : activeThreadWokeVisible ? (
       <ThreadStatusLine
         icon={<AlarmClockIcon />}
-        label="已从暂缓中唤醒"
+        label="暂缓结束"
         actionLabel="忽略"
         onAction={acknowledgeActiveThreadWokeStable}
       />
@@ -679,7 +679,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         return;
       }
       if (settleSidebarThread(activeThreadRef)) return;
-      void settleThread(activeThreadRef).then(toastThreadActionFailure("收尾会话失败"));
+      void settleThread(activeThreadRef).then(toastThreadActionFailure("无法标为完成"));
     },
     "thread.pin": ({ event }) => {
       // An open project list pins its highlighted project with this key instead.
@@ -693,7 +693,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
       if (!activeThreadShell || !activeThreadRef || !serverConfigLoaded) return;
       void (
         activeThreadPinned ? confirmAndUnpinThread(activeThreadRef) : pinThread(activeThreadRef)
-      ).then(toastThreadActionFailure(activeThreadPinned ? "取消置顶会话失败" : "置顶会话失败"));
+      ).then(toastThreadActionFailure(activeThreadPinned ? "无法取消置顶会话" : "无法置顶会话"));
     },
     "thread.commander": () => {
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;
@@ -702,7 +702,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         activeThreadCommander
           ? unmarkCommanderThread(activeThreadRef)
           : markCommanderThread(activeThreadRef)
-      ).then(toastThreadActionFailure(activeThreadCommander ? "取消指挥失败" : "标成指挥失败"));
+      ).then(toastThreadActionFailure(activeThreadCommander ? "无法取消指挥" : "无法标成指挥"));
     },
     "thread.regenerateTitle": () => {
       if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return false;

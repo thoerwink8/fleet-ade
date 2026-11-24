@@ -25,7 +25,7 @@ export class PullRequestDiffCredentialRejectedError extends Schema.TaggedError<P
   },
 ) {
   override get message(): string {
-    return "此环境会话已失效（invalid_credential）。请刷新页面，或退出并重新打开 Fleet ADE。";
+    return "这台电脑的连接会话已失效（invalid_credential）。请刷新页面，或退出并重新打开 Fleet ADE。";
   }
 }
 

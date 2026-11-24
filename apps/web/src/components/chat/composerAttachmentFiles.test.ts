@@ -143,7 +143,7 @@ describe("composer attachment files", () => {
         supportsAttachmentUploads: false,
         maxFileAttachmentBytes: null,
       }),
-    ).toBe("正在等待服务器，之后才能发送文件附件");
+    ).toBe("正在等待后台服务，之后才能发送文件附件");
   });
 
   it("keeps draft-persisted file uploads when the upload capability flips off", () => {

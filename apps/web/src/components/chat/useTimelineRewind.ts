@@ -118,7 +118,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!message || message.role !== "user") return;
 
     if (!supportsConversationRollback) {
-      setThreadError(activeThread.id, "这个提供方不支持回退对话记录。请改为新建会话。");
+      setThreadError(activeThread.id, "这个智能体不支持回退会话记录。请改为新建会话。");
       return;
     }
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {

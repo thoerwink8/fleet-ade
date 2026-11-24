@@ -50,7 +50,7 @@ describe("orchestration protocol compatibility", () => {
       descriptor(ORCHESTRATION_PROTOCOL_VERSION + 1),
     );
     expect(error).toMatchObject({ reason: "unsupported" });
-    expect(error?.message).toContain("此服务器不支持这个客户端");
+    expect(error?.message).toContain("此后台服务不支持这个客户端");
     expect(error).not.toHaveProperty("serverUpdateRequired");
   });
 

@@ -130,9 +130,9 @@ describe("ThreadActivityAnnouncer", () => {
     expect(heard).toEqual([
       ["运行中", ""],
       ["运行中", "Fleet ADE: Checking the repo"],
-      ["待批准", "Fleet ADE: Checking the repo"],
-      ["待批准", "Fleet ADE: Checking the repo"],
-      ["待批准", "正在运行 rg"],
+      ["等你批准", "Fleet ADE: Checking the repo"],
+      ["等你批准", "Fleet ADE: Checking the repo"],
+      ["等你批准", "正在运行 rg"],
     ]);
   });
 
@@ -151,7 +151,7 @@ describe("ThreadActivityAnnouncer", () => {
       }),
     );
 
-    await expect.element(detail).toHaveTextContent("Fleet ADE: Checking the repo. 待批准");
+    await expect.element(detail).toHaveTextContent("Fleet ADE: Checking the repo. 等你批准");
     await expect.element(status).toHaveTextContent("运行中");
   });
 });

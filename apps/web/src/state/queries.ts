@@ -239,7 +239,7 @@ export function usePaginatedBranches(target: VcsRefTarget) {
           const cause = Cause.squash(failed.cause);
           return cause instanceof Error && cause.message.trim().length > 0
             ? cause.message
-            : "无法加载引用。";
+            : "无法加载分支。";
         })()
       : null;
   const refresh = () => {
@@ -335,7 +335,7 @@ export function useProjectPathSearch(
         ? null
         : canReadFiles
           ? result.error
-          : (fileAccess.error ?? "此连接无法搜索主机文件。"),
+          : (fileAccess.error ?? "此连接无法搜索电脑文件。"),
     isPending:
       !areProjectPathSearchTargetsEqual(normalizedTarget, debouncedTarget) ||
       (hasTarget && (fileAccess.isPending || result.isPending)),
@@ -399,7 +399,7 @@ export function useProjectContentSearch(target: ProjectContentSearchTarget) {
       !hasTarget || isCheckingAccess
         ? null
         : !canReadFiles
-          ? (fileAccess.error ?? "此连接无法搜索主机文件。")
+          ? (fileAccess.error ?? "此连接无法搜索电脑文件。")
           : queryTooLong
             ? `搜索最多支持 ${PROJECT_SEARCH_CONTENTS_QUERY_MAX_LENGTH} 个字符。`
             : result.error,

@@ -162,11 +162,11 @@ export function fileAttachmentCapabilityBlockReason(
     return null;
   }
   if (!input.attachmentUploadsCapabilityKnown) {
-    return "正在等待服务器，之后才能发送文件附件";
+    return "正在等待后台服务，之后才能发送文件附件";
   }
   const maxFileAttachmentBytes = fileAttachmentStagingLimit(input);
   if (maxFileAttachmentBytes === null) {
-    return "这个服务器目前不接受文件附件。请移除文件后再发送。";
+    return "这个后台服务目前不接受文件附件。请移除文件后再发送。";
   }
   const oversizedFile = input.files.find((file) => file.sizeBytes > maxFileAttachmentBytes);
   if (oversizedFile) {
