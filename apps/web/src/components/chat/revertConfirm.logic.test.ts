@@ -25,7 +25,7 @@ describe("describeRevertConfirm", () => {
     expect(view).toEqual({
       title: "回退到这条消息之前？",
       description:
-        "将移除从这条消息起的 3 轮会话记录，并把这条消息的提示词和附件放回输入框。选择「同时还原文件」会把这些轮次里的文件改动一并撤销。",
+        "将删除从这条消息起的 3 轮会话记录，并把这条消息的提示词和附件放回输入框。选择「同时还原文件」会把这些轮次里的文件改动一并撤销。",
       restoreUnavailableReason: null,
       cancelActionLabel: "取消",
       showRestoreFilesAction: true,

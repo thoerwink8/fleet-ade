@@ -209,7 +209,7 @@ export function describeUpdateCapsule(
 }
 
 export const RUN_STATUS_LABELS: Record<UpdateRunMachineStatus, string> = {
-  providers: "正在更新智能体提供方",
+  providers: "正在更新智能体",
   waiting: "waiting",
   downloading: "downloading",
   restarting: "restarting",
@@ -269,7 +269,7 @@ export function getUpdateEverythingToastView(result: UpdateEverythingResult): {
   }
   return {
     type: "error",
-    title: parts.length === 0 ? "更新失败" : `已更新 ${joinList(parts)}`,
+    title: parts.length === 0 ? "无法更新" : `已更新 ${joinList(parts)}`,
     description: [...result.failures, ...restarting].join("\n"),
   };
 }

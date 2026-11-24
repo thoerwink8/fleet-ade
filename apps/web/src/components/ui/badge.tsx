@@ -22,16 +22,16 @@ const badgeVariants = cva(
         outline: "fa-tag",
         chip: "fa-tag ade-badge--chip",
         label: "fa-tag",
-        destructive: "fa-status ade-badge--status",
-        error: "fa-status ade-badge--status",
-        info: "fa-status ade-badge--status",
-        success: "fa-status ade-badge--status",
-        warning: "fa-status ade-badge--status",
-        "dot-attention": "fa-status ade-badge--status",
-        "dot-active": "fa-status ade-badge--status",
-        "dot-blocked": "fa-status ade-badge--status",
-        "dot-waiting": "fa-status ade-badge--status",
-        "dot-done": "fa-status ade-badge--status",
+        destructive: "fa-status",
+        error: "fa-status",
+        info: "fa-status",
+        success: "fa-status",
+        warning: "fa-status",
+        "dot-attention": "fa-status",
+        "dot-active": "fa-status",
+        "dot-blocked": "fa-status",
+        "dot-waiting": "fa-status",
+        "dot-done": "fa-status",
       },
     },
   },
@@ -39,7 +39,7 @@ const badgeVariants = cva(
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
-// fleet-design has no warning dot. warning shares the needs (info) dot until the library adds one.
+// warning still shares the needs (info) dot; .fa-dot--warning exists in the library and is adopted separately.
 const badgeDotClass: Partial<Record<BadgeVariant, string>> = {
   label: "ade-badge__dot--label",
   destructive: "fa-dot--error",

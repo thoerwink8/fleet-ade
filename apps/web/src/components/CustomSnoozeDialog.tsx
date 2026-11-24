@@ -100,7 +100,7 @@ function CustomSnoozeDialog() {
         >
           <DialogHeader>
             <DialogTitle>自定义暂缓</DialogTitle>
-            <DialogDescription>选择暂缓的会话何时回到收件箱。</DialogDescription>
+            <DialogDescription>选择暂缓的会话何时回到会话列表。</DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <div className="flex flex-col gap-4">

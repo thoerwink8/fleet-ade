@@ -99,7 +99,7 @@ export function useOpenInPreferredEditor(
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthOrchestrationOperateScope,
-            message: "此连接无法在此环境中打开编辑器。",
+            message: "此连接无法在这台电脑上打开编辑器。",
           }),
         ),
       );

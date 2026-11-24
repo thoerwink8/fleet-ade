@@ -36,7 +36,7 @@ describe("SidebarThreadUndoNotice", () => {
 
     showThreadUndoNotice({
       action: "Settled",
-      failureTitle: "无法撤销收尾",
+      failureTitle: "无法撤销标为完成",
       undo: async () => AsyncResult.success(undefined),
       claim: ThreadUndo.begin("settle", "env/settled-thread"),
     });

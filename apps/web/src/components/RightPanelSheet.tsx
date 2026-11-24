@@ -24,7 +24,7 @@ export function RightPanelSheet(props: {
         className="w-[min(42vw,28rem)] min-w-80 max-w-[28rem] max-[760px]:w-[min(88vw,24rem)] max-[760px]:min-w-0 wco:mt-(--workspace-topbar-height) wco:h-[calc(100%-var(--workspace-topbar-height))] wco:max-h-[calc(100%-var(--workspace-topbar-height))]"
       >
         <SheetHeader className="sr-only">
-          <SheetTitle>工作区面板</SheetTitle>
+          <SheetTitle>右侧面板</SheetTitle>
         </SheetHeader>
         {props.children}
       </SheetPopup>

@@ -31,9 +31,7 @@ describe("TerminalProviderEnvironmentError", () => {
       providerInstanceId: "codex_work",
       cause,
     });
-    expect(decoded.message).toBe(
-      "Could not prepare the terminal environment for provider instance: codex_work",
-    );
+    expect(decoded.message).toBe("无法为智能体 codex_work 准备终端环境");
     expect(decoded.message).not.toContain("secret backend unavailable");
   });
 });

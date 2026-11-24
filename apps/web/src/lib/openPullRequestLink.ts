@@ -208,7 +208,7 @@ export function useOpenChangeRequestLink(
             const toastId = toastManager.add(
               stackedThreadToast({
                 type: "info",
-                title: "此提交不在该会话的工作区中",
+                title: "此提交不在该会话的项目目录中",
                 actionProps: {
                   children: "打开链接",
                   onClick: () => {
@@ -252,7 +252,7 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法打开 pull request 链接",
+          title: "无法打开 PR 链接",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );

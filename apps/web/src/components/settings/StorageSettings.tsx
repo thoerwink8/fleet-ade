@@ -1,4 +1,7 @@
 import type {
+  EnvironmentId,
+  ProjectScopedServerSettingKey,
+  ServerSettingsPatch,
   StorageCleanupPreview,
   StorageCleanupReport,
   StorageCleanupSettings,
@@ -48,9 +51,11 @@ import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { SettingsScopeNotice } from "./SettingsScopeNotice";
 import { SettingsGroup } from "./SettingsGroup";
 import type { ScopedSettingsTarget } from "./scopedSettings";
+import { planScopedSettingsClear, planScopedSettingsPatch } from "./scopedSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { searchableSetting } from "./settingsSearch";
 import {
+  type ScopedSettingsSaveOptions,
   useClearScopedSettings,
   useScopedSettings,
   useScopedSettingsMixed,
@@ -58,13 +63,20 @@ import {
 } from "./useScopedSettings";
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
 import {
+  DEFAULT_RETENTION_DAYS,
   STORAGE_CLEANUP_NOTHING_TO_DELETE,
+  clampRetentionDays,
+  cleanupPatchCanDeleteMore,
+  decideStorageCleanupRuleConfirm,
+  resolveStorageCleanupSweepFeedback,
   runStorageCleanupIfConfirmed,
   storageCleanupAmounts,
   storageCleanupButtonLabel,
+  storageCleanupChangeIntent,
   storageCleanupConfirmState,
   storageCleanupFailureMessage,
   storageCleanupFreedMessage,
+  type StorageCleanupAmount,
   type StorageCleanupConfirmState,
 } from "./storageCleanupConfirm.logic";
 
@@ -128,62 +140,123 @@ export function WorktreesDirectoryRow() {
   );
 }
 
-type SaveOptions = Parameters<ReturnType<typeof useUpdateScopedSettings>>[1];
+type RetentionRuleChangeCallbacks = {
+  readonly onSaving: () => void;
+  readonly onFailed: () => void;
+  readonly onCancelled: () => void;
+};
 
 function RetentionControl({
   label,
   value,
+  disabled = false,
   onChange,
   minimum = 1,
 }: {
   label: string;
   value: number | null;
-  onChange: (value: number | null, onFailed: () => void) => void;
+  disabled?: boolean;
+  onChange: (value: number | null, callbacks: RetentionRuleChangeCallbacks) => void;
   minimum?: number;
 }) {
   const [draft, setDraft] = useState(value);
   const [savedValue, setSavedValue] = useState(value);
-  // Saving an age can start a cleanup sweep, so turning a rule on only opens a draft.
-  // While its first save is in flight this holds that submission.
-  const [enabling, setEnabling] = useState<"draft" | "edited" | { days: number } | null>(null);
-  // Holds an age until Enter or focus leaves the row: one edited before focus moved to the
-  // switch, so switching off never saves it first, or one stepped toward a rule's first age,
-  // so raising it from 8 never saves a shorter age on the way.
+  const [pendingOn, setPendingOn] = useState<number | null>(null);
+  // Holds an age until Enter or focus leaves the row, so switching off never saves an edited age first,
+  // or while the initial enable save is still pending so stepping does not fire intermediate saves.
   const [held, setHeld] = useState(false);
   // Hides a saved rule's age once it is switched off, so no blur can save it after null.
   const [switchedOff, setSwitchedOff] = useState(false);
+  // Tracks whether the text box has unparsed/unsaved user input, and resets Base UI's internal
+  // `allowInputSyncRef` on Escape or empty-blur by remounting NumberField cleanly.
+  const [inputEdited, setInputEdited] = useState(false);
+  const [inputRevision, setInputRevision] = useState(0);
+  const [focusAfterReset, setFocusAfterReset] = useState(false);
   if (savedValue !== value) {
     setSavedValue(value);
     setDraft(value);
-    setEnabling(null);
+    setPendingOn(null);
     setHeld(false);
     setSwitchedOff(false);
+    setInputEdited(false);
+    setFocusAfterReset(false);
   }
-  const pending = typeof enabling === "object" ? enabling : null;
-  const on = (value !== null && !switchedOff) || enabling !== null;
+  const baseline = pendingOn ?? value;
+  const on = (value !== null && !switchedOff) || pendingOn !== null;
   const row = useRef<HTMLDivElement>(null);
+  const saveTokenRef = useRef(0);
+  const suppressBlurCommitRef = useRef(false);
 
   const commit = (next: number) => {
-    const days = Math.min(3650, Math.max(minimum, Math.round(next)));
-    setDraft(days);
+    const days = clampRetentionDays(next, minimum);
     setHeld(false);
-    if (days === pending?.days) return;
-    if (value !== null) {
-      onChange(days, () => {});
+    setInputEdited(false);
+    if (days === baseline) {
+      setDraft(days);
       return;
     }
-    const submission = { days };
-    setEnabling(submission);
-    onChange(days, () => setEnabling((current) => (current === submission ? null : current)));
+    const token = ++saveTokenRef.current;
+    onChange(days, {
+      onSaving: () => {
+        if (saveTokenRef.current !== token) return;
+        setDraft(days);
+        if (value === null) setPendingOn(days);
+      },
+      onFailed: () => {
+        if (saveTokenRef.current !== token) return;
+        setDraft(baseline);
+      },
+      onCancelled: () => {
+        if (saveTokenRef.current !== token) return;
+        setDraft(baseline);
+      },
+    });
+  };
+
+  const switchOn = () => {
+    if (on) return;
+    suppressBlurCommitRef.current = false;
+    const token = ++saveTokenRef.current;
+    onChange(DEFAULT_RETENTION_DAYS, {
+      onSaving: () => {
+        if (saveTokenRef.current !== token) return;
+        setDraft(DEFAULT_RETENTION_DAYS);
+        setPendingOn(DEFAULT_RETENTION_DAYS);
+      },
+      onFailed: () => {
+        if (saveTokenRef.current !== token) return;
+        setDraft(null);
+        setPendingOn(null);
+      },
+      onCancelled: () => {
+        if (saveTokenRef.current !== token) return;
+        setDraft(null);
+        setPendingOn(null);
+      },
+    });
   };
 
   const switchOff = () => {
     setDraft(value);
     setHeld(false);
-    setEnabling(null);
-    if (value === null && pending === null) return;
+    setPendingOn(null);
+    setInputEdited(false);
+    setFocusAfterReset(false);
+    suppressBlurCommitRef.current = false;
+    if (value === null && pendingOn === null) return;
+    const token = ++saveTokenRef.current;
     setSwitchedOff(true);
-    onChange(null, () => setSwitchedOff(false));
+    onChange(null, {
+      onSaving: () => {},
+      onFailed: () => {
+        if (saveTokenRef.current !== token) return;
+        setSwitchedOff(false);
+      },
+      onCancelled: () => {
+        if (saveTokenRef.current !== token) return;
+        setSwitchedOff(false);
+      },
+    });
   };
 
   return (
@@ -192,25 +265,35 @@ function RetentionControl({
       className="flex items-center gap-3"
       onBlur={(event) => {
         if (event.currentTarget.contains(event.relatedTarget)) return;
+        if (suppressBlurCommitRef.current) {
+          suppressBlurCommitRef.current = false;
+          return;
+        }
         if (held && draft !== null) commit(draft);
-        else setEnabling((current) => (typeof current === "string" ? null : current));
       }}
     >
       {on ? (
         <NumberField
+          key={inputRevision}
           value={draft}
           min={minimum}
           max={3650}
           step={1}
           size="sm"
+          disabled={disabled}
           className="w-auto"
           onValueChange={(next) => {
             setDraft(next);
-            setEnabling((current) => (current === "draft" ? "edited" : current));
           }}
           onValueCommitted={(next, { reason, event }) => {
-            if (next === null) setDraft(value);
-            else if (
+            if (suppressBlurCommitRef.current && reason === "input-blur") return;
+            if (next === null) {
+              setDraft(baseline);
+              setHeld(false);
+              setInputEdited(false);
+              setFocusAfterReset(false);
+              setInputRevision((revision) => revision + 1);
+            } else if (
               reason === "input-blur"
                 ? event instanceof FocusEvent &&
                   event.relatedTarget instanceof Node &&
@@ -226,30 +309,37 @@ function RetentionControl({
             <NumberFieldDecrement aria-label={`减少 ${label}`} />
             <NumberFieldInput
               aria-label={`${label}（天）`}
-              autoFocus={value === null}
+              autoFocus={value === null || focusAfterReset}
               size={5}
               className="w-auto grow-0 text-right"
               // Any typed or pasted edit replaces a held age: NumberField commits it on blur itself,
               // and text it cannot parse yet must not leave the held age to be saved.
-              onChange={() => setHeld(false)}
-              onPaste={() => setHeld(false)}
+              onFocus={() => {
+                suppressBlurCommitRef.current = false;
+              }}
+              onChange={() => {
+                setHeld(false);
+                setInputEdited(true);
+              }}
+              onPaste={() => {
+                setHeld(false);
+                setInputEdited(true);
+              }}
               onKeyDown={(event) => {
                 if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                 if (event.key === "Enter") {
-                  // Blurring lets NumberField parse the visible text and commit it once. It
-                  // skips an unedited value, so an untouched draft is committed here.
-                  const input = event.currentTarget;
-                  const shown =
-                    draft !== null && input.value === new Intl.NumberFormat().format(draft);
-                  if (enabling === "draft" && shown) commit(draft);
-                  input.blur();
-                } else if (event.key === "Escape" && (held || typeof enabling === "string")) {
+                  // Blurring lets NumberField parse the visible text and commit it once.
+                  event.currentTarget.blur();
+                } else if (event.key === "Escape" && (held || inputEdited || draft !== baseline)) {
                   // An unhandled Escape closes the settings page.
                   event.preventDefault();
                   event.stopPropagation();
-                  setDraft(pending?.days ?? value);
+                  suppressBlurCommitRef.current = true;
+                  setDraft(baseline);
                   setHeld(false);
-                  setEnabling((current) => (typeof current === "string" ? null : current));
+                  setInputEdited(false);
+                  setFocusAfterReset(true);
+                  setInputRevision((revision) => revision + 1);
                 }
               }}
             />
@@ -265,13 +355,12 @@ function RetentionControl({
       <Switch
         aria-label={label}
         checked={on}
+        disabled={disabled}
         // Keeps focus in the age field, so switching off never commits an edited age first.
         onMouseDown={(event) => event.preventDefault()}
         onCheckedChange={(enabled) => {
-          if (enabled) {
-            setDraft(8);
-            setEnabling("draft");
-          } else switchOff();
+          if (enabled) switchOn();
+          else switchOff();
         }}
       />
     </div>
@@ -388,6 +477,333 @@ const storageCleanupPermissionsAtom = environmentAtomList(
   "web-storage-cleanup-permissions",
   serverEnvironment.runStorageCleanup.permissionAtom,
 );
+
+function StorageCleanupConfirmDialog({
+  dialog,
+  amounts,
+  onCancel,
+  onConfirm,
+}: {
+  readonly dialog: StorageCleanupConfirmState;
+  readonly amounts: readonly StorageCleanupAmount[];
+  readonly onCancel: () => void;
+  readonly onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <AlertDialogPopup>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {dialog.disabledReason ?? dialog.description}
+          </AlertDialogDescription>
+          {dialog.notice !== null ? (
+            <p className="text-sm text-muted-foreground">{dialog.notice}</p>
+          ) : null}
+          {amounts.length > 0 ? (
+            <ul className="space-y-2 text-sm">
+              {amounts.map((amount) => (
+                <li key={amount.key} className="flex items-baseline justify-between gap-4">
+                  <span>{amount.label}</span>
+                  <span className="text-muted-foreground">{amount.detail}</span>
+                </li>
+              ))}
+              <li className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
+                <span>合计</span>
+                <span>{formatBytes(dialog.totalBytes)}</span>
+              </li>
+            </ul>
+          ) : null}
+          {amounts.some((amount) => amount.detail.includes("大小未知")) ? (
+            <p className="text-sm text-muted-foreground">合计不含大小未知的项。</p>
+          ) : null}
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
+          <Button variant="destructive" disabled={dialog.confirmDisabled} onClick={onConfirm}>
+            {dialog.confirmLabel}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogPopup>
+    </AlertDialog>
+  );
+}
+
+type GuardedCleanupPhase =
+  | { readonly kind: "idle" }
+  | { readonly kind: "previewing" }
+  | {
+      readonly kind: "confirm";
+      readonly amounts: readonly StorageCleanupAmount[];
+      readonly dialog: StorageCleanupConfirmState;
+      readonly onConfirm: () => void;
+      readonly onCancel: () => void;
+    }
+  | { readonly kind: "saving" }
+  | {
+      readonly kind: "awaiting-sweep";
+      readonly targets: ReadonlyArray<{
+        readonly environmentId: EnvironmentId;
+        readonly label: string;
+        readonly beforeReport: StorageCleanupReport | null;
+      }>;
+    }
+  | { readonly kind: "blocked"; readonly message: string };
+
+function useGuardedStorageCleanupUpdate() {
+  const { scope, environments, connectedEnvironments } = useSettingsScope();
+  const updateSettings = useUpdateScopedSettings();
+  const clearSettings = useClearScopedSettings();
+  const previewCleanup = useAtomCommand(serverEnvironment.previewStorageCleanup, {
+    reportFailure: false,
+    reportDefect: false,
+  });
+  const reportSupported = connectedEnvironments.filter(
+    (environment) => environment.serverConfig?.environment.capabilities.storageCleanup === true,
+  );
+  const reportIds = reportSupported.map(({ environmentId }) => environmentId);
+  const reportQueries = useAtomValue(storageCleanupReportsAtom(environmentIdsKey(reportIds)));
+  const reportsByEnvironmentId = new Map<EnvironmentId, StorageCleanupReport | null>(
+    reportIds.map((environmentId, index) => {
+      const query = reportQueries[index];
+      return [environmentId, query && query._tag === "Success" ? query.value : null];
+    }),
+  );
+  const [phase, setPhase] = useState<GuardedCleanupPhase>({ kind: "idle" });
+  const lockRef = useRef(false);
+  const ignoreDialogClose = useRef(false);
+
+  const applyPlan = async (
+    plan: ReturnType<typeof planScopedSettingsPatch>,
+    executeSave: (options: ScopedSettingsSaveOptions) => void,
+    callbacks?: RetentionRuleChangeCallbacks,
+  ) => {
+    if (lockRef.current) {
+      callbacks?.onCancelled();
+      return;
+    }
+    const saveOptions: ScopedSettingsSaveOptions = callbacks?.onFailed
+      ? { onFailed: callbacks.onFailed }
+      : {};
+    if (plan.unavailableReason !== null) {
+      executeSave(saveOptions);
+      return;
+    }
+    const tighteningWrites = plan.serverWrites.filter((write) =>
+      cleanupPatchCanDeleteMore(write.previous, write.patch),
+    );
+    if (tighteningWrites.length === 0) {
+      callbacks?.onSaving();
+      setPhase({ kind: "idle" });
+      executeSave(saveOptions);
+      return;
+    }
+    const intent = tighteningWrites.some(
+      (write) => storageCleanupChangeIntent(write.previous, write.patch) === "enable",
+    )
+      ? "enable"
+      : "update";
+    const envById = new Map(
+      connectedEnvironments.map((environment) => [environment.environmentId, environment]),
+    );
+    const labelForWrite = (write: (typeof plan.serverWrites)[number]) => {
+      const environment = envById.get(write.environmentId);
+      return environment
+        ? settingsScopeEnvironmentLabel(environment, connectedEnvironments)
+        : write.label;
+    };
+    const unsupportedLabels = tighteningWrites.flatMap((write) => {
+      const environment = envById.get(write.environmentId);
+      if (environment?.serverConfig?.environment.capabilities.storageCleanupPatchPreview === true) {
+        return [];
+      }
+      return [labelForWrite(write)];
+    });
+    if (unsupportedLabels.length > 0) {
+      const blocked = decideStorageCleanupRuleConfirm({
+        intent,
+        unsupportedLabels,
+        interruptedOnly: false,
+        previews: [],
+        failures: [],
+      });
+      if (blocked.kind === "blocked") {
+        setPhase({ kind: "blocked", message: blocked.message });
+      }
+      callbacks?.onCancelled();
+      return;
+    }
+    lockRef.current = true;
+    ignoreDialogClose.current = false;
+    setPhase({ kind: "previewing" });
+    const results = await Promise.all(
+      tighteningWrites.map(async (write) => ({
+        write,
+        result: await previewCleanup({
+          environmentId: write.environmentId,
+          input: { patch: write.patch },
+        }),
+      })),
+    ).catch((error: unknown) => {
+      lockRef.current = false;
+      setPhase({
+        kind: "blocked",
+        message: `无法确认将要删除的内容：${error instanceof Error ? error.message : "请重试。"}`,
+      });
+      callbacks?.onCancelled();
+      return null;
+    });
+    if (results === null) return;
+    lockRef.current = false;
+    const failures: string[] = [];
+    const previews: Array<{
+      environmentLabel: string | null;
+      categories: StorageCleanupPreview["categories"];
+    }> = [];
+    let interruptedCount = 0;
+    for (const { write, result } of results) {
+      const label = labelForWrite(write);
+      const prefix = tighteningWrites.length > 1 ? `${label}：` : "";
+      if (result._tag === "Failure") {
+        if (isAtomCommandInterrupted(result)) interruptedCount++;
+        else failures.push(`${prefix}${String(squashAtomCommandFailure(result))}`);
+        continue;
+      }
+      previews.push({
+        environmentLabel: tighteningWrites.length > 1 ? label : null,
+        categories: result.value.categories,
+      });
+      for (const failure of result.value.failures) failures.push(`${prefix}${failure.reason}`);
+    }
+    const decision = decideStorageCleanupRuleConfirm({
+      intent,
+      unsupportedLabels: [],
+      interruptedOnly: interruptedCount > 0 && failures.length === 0,
+      previews,
+      failures,
+    });
+    if (decision.kind === "cancelled") {
+      setPhase({ kind: "idle" });
+      callbacks?.onCancelled();
+      return;
+    }
+    if (decision.kind === "blocked") {
+      setPhase({ kind: "blocked", message: decision.message });
+      callbacks?.onCancelled();
+      return;
+    }
+    if (decision.kind === "apply-immediately") {
+      setPhase({ kind: "idle" });
+      callbacks?.onSaving();
+      executeSave(saveOptions);
+      return;
+    }
+    const commitSave = () => {
+      if (lockRef.current) return;
+      lockRef.current = true;
+      ignoreDialogClose.current = true;
+      const beforeTargets = tighteningWrites.map((write) => ({
+        environmentId: write.environmentId,
+        label: labelForWrite(write),
+        beforeReport: reportsByEnvironmentId.get(write.environmentId) ?? null,
+      }));
+      void runStorageCleanupIfConfirmed("confirm", decision.dialog, async () => {
+        lockRef.current = false;
+        setPhase({ kind: "saving" });
+        callbacks?.onSaving();
+        executeSave({
+          ...saveOptions,
+          onComplete: ({ savedEnvironmentIds }) => {
+            ignoreDialogClose.current = false;
+            const savedSet = new Set(savedEnvironmentIds);
+            const activeTargets = beforeTargets.filter((entry) =>
+              savedSet.has(entry.environmentId),
+            );
+            setPhase(
+              activeTargets.length > 0
+                ? { kind: "awaiting-sweep", targets: activeTargets }
+                : { kind: "idle" },
+            );
+          },
+        });
+      }).then((ran) => {
+        if (!ran) {
+          lockRef.current = false;
+          ignoreDialogClose.current = false;
+          setPhase({ kind: "idle" });
+          callbacks?.onCancelled();
+        }
+      });
+    };
+    setPhase({
+      kind: "confirm",
+      amounts: decision.amounts,
+      dialog: decision.dialog,
+      onCancel: () => {
+        if (ignoreDialogClose.current) return;
+        setPhase((current) => (current.kind === "confirm" ? { kind: "idle" } : current));
+        callbacks?.onCancelled();
+      },
+      onConfirm: commitSave,
+    });
+  };
+
+  const applyPatch = (patch: ServerSettingsPatch, callbacks?: RetentionRuleChangeCallbacks) => {
+    void applyPlan(
+      planScopedSettingsPatch(scope, environments, patch),
+      (options) => updateSettings(patch, options),
+      callbacks,
+    );
+  };
+
+  const applyClear = (
+    keys: readonly ProjectScopedServerSettingKey[],
+    callbacks?: RetentionRuleChangeCallbacks,
+  ) => {
+    void applyPlan(
+      planScopedSettingsClear(scope, environments, keys),
+      (options) => clearSettings(keys, options),
+      callbacks,
+    );
+  };
+
+  const busy = phase.kind === "previewing" || phase.kind === "confirm" || phase.kind === "saving";
+  const statusFeedback =
+    phase.kind === "previewing"
+      ? { tone: "muted" as const, message: "正在计算将要删除的内容…" }
+      : phase.kind === "saving"
+        ? { tone: "muted" as const, message: "正在保存并清理…" }
+        : phase.kind === "blocked"
+          ? { tone: "error" as const, message: phase.message }
+          : phase.kind === "awaiting-sweep"
+            ? (() => {
+                const feedback = resolveStorageCleanupSweepFeedback(
+                  phase.targets,
+                  reportsByEnvironmentId,
+                );
+                return {
+                  tone: feedback.kind === "failed" ? ("error" as const) : ("muted" as const),
+                  message: feedback.message,
+                };
+              })()
+            : null;
+  const confirmDialog =
+    phase.kind === "confirm" ? (
+      <StorageCleanupConfirmDialog
+        dialog={phase.dialog}
+        amounts={phase.amounts}
+        onCancel={phase.onCancel}
+        onConfirm={phase.onConfirm}
+      />
+    ) : null;
+
+  return { busy, applyPatch, applyClear, statusFeedback, confirmDialog };
+}
 
 function CleanupSection() {
   const nowMinute = useNowMinute();
@@ -626,52 +1042,15 @@ function CleanupSection() {
         />
       </SettingsGroup>
       {phase.kind === "confirm" ? (
-        <AlertDialog
-          open
-          onOpenChange={(open) => {
-            if (open || ignoreDialogClose.current) return;
+        <StorageCleanupConfirmDialog
+          dialog={phase.dialog}
+          amounts={phase.amounts}
+          onCancel={() => {
+            if (ignoreDialogClose.current) return;
             setPhase((current) => (current.kind === "confirm" ? { kind: "idle" } : current));
           }}
-        >
-          <AlertDialogPopup>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{phase.dialog.title}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {phase.dialog.disabledReason ?? "将按当前的清理规则删除下面这些内容。"}
-              </AlertDialogDescription>
-              {phase.dialog.notice !== null ? (
-                <p className="text-sm text-muted-foreground">{phase.dialog.notice}</p>
-              ) : null}
-              {phase.amounts.length > 0 ? (
-                <ul className="space-y-2 text-sm">
-                  {phase.amounts.map((amount) => (
-                    <li key={amount.key} className="flex items-baseline justify-between gap-4">
-                      <span>{amount.label}</span>
-                      <span className="text-muted-foreground">{amount.detail}</span>
-                    </li>
-                  ))}
-                  <li className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
-                    <span>合计</span>
-                    <span>{formatBytes(phase.dialog.totalBytes)}</span>
-                  </li>
-                </ul>
-              ) : null}
-              {phase.amounts.some((amount) => amount.detail.includes("大小未知")) ? (
-                <p className="text-sm text-muted-foreground">合计不含大小未知的项。</p>
-              ) : null}
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
-              <Button
-                variant="destructive"
-                disabled={phase.dialog.confirmDisabled}
-                onClick={() => void confirmDelete()}
-              >
-                {phase.dialog.confirmLabel}
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogPopup>
-        </AlertDialog>
+          onConfirm={() => void confirmDelete()}
+        />
       ) : null}
       {summaries.some(({ report }) => report !== null) && (
         <FoldedSettingsSection
@@ -744,8 +1123,8 @@ export function WorktreeCleanupSection() {
       : "inherit";
   const mode = projectMode(target);
   const mixedModes = targets.some((entry) => projectMode(entry) !== mode);
-  const updateSettings = useUpdateScopedSettings();
-  const clearSettings = useClearScopedSettings();
+  const { busy, applyPatch, applyClear, statusFeedback, confirmDialog } =
+    useGuardedStorageCleanupUpdate();
   const ruleStatus = (key: keyof StorageCleanupSettings) =>
     targets.some(
       (target) =>
@@ -755,12 +1134,17 @@ export function WorktreeCleanupSection() {
     )
       ? "所选机器的设置各不相同"
       : undefined;
-  const update = (patch: Partial<StorageCleanupSettings>, options?: SaveOptions) =>
-    updateSettings({ storageCleanup: patch }, options);
-  const updateWorktree = (patch: Partial<WorktreeCleanupRules>, options?: SaveOptions) =>
+  const update = (
+    patch: Partial<StorageCleanupSettings>,
+    callbacks?: RetentionRuleChangeCallbacks,
+  ) => applyPatch({ storageCleanup: patch }, callbacks);
+  const updateWorktree = (
+    patch: Partial<WorktreeCleanupRules>,
+    callbacks?: RetentionRuleChangeCallbacks,
+  ) =>
     isProjectScope
-      ? updateSettings({ worktreeCleanup: { mode: "custom", rules: patch } }, options)
-      : update(patch, options);
+      ? applyPatch({ worktreeCleanup: { mode: "custom", rules: patch } }, callbacks)
+      : update(patch, callbacks);
 
   if (
     isProjectScope &&
@@ -801,14 +1185,16 @@ export function WorktreeCleanupSection() {
             serverScoped
             settingKeys={["worktreeCleanup"]}
             mixed={mixedModes}
+            onResetOverride={() => applyClear(["worktreeCleanup"])}
             control={
               <Select
+                disabled={busy}
                 value={mixedModes ? null : mode}
                 onValueChange={(next) => {
-                  if (next === "inherit") clearSettings(["worktreeCleanup"]);
-                  else if (next === "off") updateSettings({ worktreeCleanup: { mode: "off" } });
+                  if (next === "inherit") applyClear(["worktreeCleanup"]);
+                  else if (next === "off") applyPatch({ worktreeCleanup: { mode: "off" } });
                   else if (next === "custom")
-                    updateSettings({ worktreeCleanup: { mode: "custom", rules: {} } });
+                    applyPatch({ worktreeCleanup: { mode: "custom", rules: {} } });
                 }}
               >
                 <SelectTrigger size="sm" aria-label="自动清理工作树">
@@ -842,6 +1228,7 @@ export function WorktreeCleanupSection() {
                 <Switch
                   aria-label="删除会话时删除工作树"
                   checked={settings.worktreeOnDelete}
+                  disabled={busy}
                   onCheckedChange={(worktreeOnDelete) => updateWorktree({ worktreeOnDelete })}
                 />
               }
@@ -855,6 +1242,7 @@ export function WorktreeCleanupSection() {
                 <Switch
                   aria-label="删除已合并的工作树"
                   checked={settings.worktreeOnMerge}
+                  disabled={busy}
                   onCheckedChange={(worktreeOnMerge) => updateWorktree({ worktreeOnMerge })}
                 />
               }
@@ -868,8 +1256,9 @@ export function WorktreeCleanupSection() {
                 <RetentionControl
                   label="删除不活跃的工作树"
                   value={settings.worktreeAfterDays}
-                  onChange={(worktreeAfterDays, onFailed) =>
-                    updateWorktree({ worktreeAfterDays }, { onFailed })
+                  disabled={busy}
+                  onChange={(worktreeAfterDays, callbacks) =>
+                    updateWorktree({ worktreeAfterDays }, callbacks)
                   }
                 />
               }
@@ -901,8 +1290,9 @@ export function WorktreeCleanupSection() {
                         label="删除已收尾的工作树"
                         value={settings.worktreeSettledAfterDays}
                         minimum={0}
-                        onChange={(worktreeSettledAfterDays, onFailed) =>
-                          updateWorktree({ worktreeSettledAfterDays }, { onFailed })
+                        disabled={busy}
+                        onChange={(worktreeSettledAfterDays, callbacks) =>
+                          updateWorktree({ worktreeSettledAfterDays }, callbacks)
                         }
                       />
                     }
@@ -917,6 +1307,7 @@ export function WorktreeCleanupSection() {
                   <Switch
                     aria-label="删除无改动的工作树"
                     checked={settings.worktreeUnchanged}
+                    disabled={busy}
                     onCheckedChange={(worktreeUnchanged) => updateWorktree({ worktreeUnchanged })}
                   />
                 }
@@ -938,6 +1329,7 @@ export function WorktreeCleanupSection() {
                   serverScoped={!isProjectScope}
                   control={
                     <Select
+                      disabled={busy}
                       value={ruleStatus("worktreeKeepWhen") ? null : settings.worktreeKeepWhen}
                       onValueChange={(next) => {
                         if (
@@ -967,6 +1359,17 @@ export function WorktreeCleanupSection() {
             </AdvancedSettings>
           </>
         )}
+        {statusFeedback ? (
+          <p
+            role="status"
+            className={`px-3 py-2.5 text-xs sm:px-4 ${
+              statusFeedback.tone === "error" ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {statusFeedback.message}
+          </p>
+        ) : null}
+        {confirmDialog}
       </>
     </SettingsSection>
   );
@@ -976,7 +1379,7 @@ export function WorktreeCleanupSection() {
 export function StorageCleanupSections() {
   const { scope, connectedEnvironments, targets } = useSettingsScope();
   const scopedSettings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
+  const { busy, applyPatch, statusFeedback, confirmDialog } = useGuardedStorageCleanupUpdate();
   const settings = scopedSettings.storageCleanup;
   const targetIdsKey = environmentIdsKey(targets.map((target) => target.environmentId).sort());
   const artifactsMixed =
@@ -1002,8 +1405,10 @@ export function StorageCleanupSections() {
       ? "所选机器的设置各不相同"
       : undefined;
   if (scope.kind === "project" || scope.kind === "checkout") return null;
-  const update = (patch: Partial<StorageCleanupSettings>, options: SaveOptions) =>
-    updateSettings({ storageCleanup: patch }, options);
+  const update = (
+    patch: Partial<StorageCleanupSettings>,
+    callbacks: RetentionRuleChangeCallbacks,
+  ) => applyPatch({ storageCleanup: patch }, callbacks);
   const databaseStorageNotice = (
     <DatabaseStorageNotice
       environments={connectedEnvironments.filter(
@@ -1037,8 +1442,9 @@ export function StorageCleanupSections() {
               <RetentionControl
                 label="删除旧浏览器产物"
                 value={settings.browserArtifactsAfterDays}
-                onChange={(browserArtifactsAfterDays, onFailed) =>
-                  update({ browserArtifactsAfterDays }, { onFailed })
+                disabled={busy}
+                onChange={(browserArtifactsAfterDays, callbacks) =>
+                  update({ browserArtifactsAfterDays }, callbacks)
                 }
               />
             }
@@ -1054,11 +1460,23 @@ export function StorageCleanupSections() {
               <RetentionControl
                 label="删除旧轮转日志"
                 value={settings.logsAfterDays}
-                onChange={(logsAfterDays, onFailed) => update({ logsAfterDays }, { onFailed })}
+                disabled={busy}
+                onChange={(logsAfterDays, callbacks) => update({ logsAfterDays }, callbacks)}
               />
             }
           />
         </AnimatedHeight>
+        {statusFeedback ? (
+          <p
+            role="status"
+            className={`px-3 py-2.5 text-xs sm:px-4 ${
+              statusFeedback.tone === "error" ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {statusFeedback.message}
+          </p>
+        ) : null}
+        {confirmDialog}
       </SettingsSection>
       <CleanupSection />
     </>

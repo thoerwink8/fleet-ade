@@ -110,6 +110,6 @@ export function matchComposerEnvironmentItems(input: {
       environmentId: environment.environmentId,
       machine: environment.machine,
       label: environment.label,
-      description: "机器",
+      description: "电脑",
     }));
 }

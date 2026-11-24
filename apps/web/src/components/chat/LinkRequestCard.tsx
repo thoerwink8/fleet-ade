@@ -119,7 +119,7 @@ function PendingLinkRequest(props: {
     >
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-row font-medium text-foreground">
-          {picksMachine(item) ? "将一台机器关联到此环境" : `将 ${target} 关联到此环境`}
+          {picksMachine(item) ? "将一台电脑关联到这台电脑" : `将 ${target} 关联到这台电脑`}
         </p>
         {item.reason.trim() ? <p className="text-sm text-muted-foreground">{item.reason}</p> : null}
       </div>
@@ -140,7 +140,7 @@ function PendingLinkRequest(props: {
             拒绝
           </Button>
           <Button type="button" size="xs" disabled={declining} onClick={() => setOpen(true)}>
-            {picksMachine(item) ? "选择机器…" : "查看关联…"}
+            {picksMachine(item) ? "选择电脑…" : "查看关联…"}
           </Button>
         </div>
       ) : (
@@ -294,8 +294,8 @@ function LinkRequestDialog(props: {
     >
       <WizardPopup>
         <WizardHeader
-          title={pickMachine ? "关联机器" : `关联 ${targetName}`}
-          description="这边的智能体就可以在那边启动会话、发消息并等待。可在那台机器的“共享和访问”里撤销。"
+          title={pickMachine ? "关联电脑" : `关联 ${targetName}`}
+          description="这边的智能体就可以在那边启动会话、发消息并等待。可在那台电脑的“共享和访问”里撤销。"
         >
           {steps.length > 1 && !useExisting ? (
             <WizardSteps
@@ -348,7 +348,7 @@ function LinkRequestDialog(props: {
                     />
                     {target.kind === "machine" ? (
                       <span className="block text-xs text-muted-foreground">
-                        此应用没有可供其他机器访问的 {target.label} 地址。请填写它的 HTTPS 或
+                        此应用没有可供其他电脑访问的 {target.label} 地址。请填写它的 HTTPS 或
                         Tailscale 地址。
                       </span>
                     ) : null}
@@ -388,7 +388,7 @@ function LinkRequestDialog(props: {
             )}
             {useExisting ? (
               <p className="text-xs text-muted-foreground">
-                此环境已关联到 {targetName}。智能体可以照原样使用该关联；可在设置 →
+                这台电脑已关联到 {targetName}。智能体可以照原样使用该关联；可在设置 →
                 连接中更改其访问权限。
               </p>
             ) : null}
@@ -441,7 +441,7 @@ function MachinePicker(props: {
   return (
     <div className="space-y-2">
       <span id={labelId} className="block text-meta font-medium">
-        机器
+        电脑
       </span>
       <RadioGroup
         aria-labelledby={labelId}

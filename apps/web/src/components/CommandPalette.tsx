@@ -750,7 +750,7 @@ function OpenCommandPaletteDialog(props: {
   const isBrowsePending = hasBrowseTarget && (browseAccess.isPending || browseQuery.isPending);
   const browseAccessError =
     hasBrowseTarget && !browseAccess.isPending && !browseAccess.canReadFiles
-      ? (browseAccess.error ?? "此连接无法浏览主机文件夹。")
+      ? (browseAccess.error ?? "此连接无法浏览电脑文件夹。")
       : null;
   const browseEntries = browseResult?.entries ?? EMPTY_BROWSE_ENTRIES;
   const { visibleEntries: visibleBrowseEntries, exactEntry: exactBrowseEntry } =
@@ -1110,7 +1110,7 @@ function OpenCommandPaletteDialog(props: {
               }
             />
             <TooltipPopup align="end" side="left">
-              {disabledHint ?? "打开“设置 → 代码”以配置此提供方。"}
+              {disabledHint ?? "打开“设置 → 代码”以配置此托管平台。"}
             </TooltipPopup>
           </Tooltip>
         </span>
@@ -1155,8 +1155,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "环境不可用",
-          description: `${environment?.label ?? "所选环境"} 未连接。`,
+          title: "电脑不可用",
+          description: `${environment?.label ?? "所选电脑"} 未连接。`,
         }),
       );
       return;
@@ -1185,7 +1185,7 @@ function OpenCommandPaletteDialog(props: {
     title: option.label,
     description: option.isConnected
       ? option.isPrimary
-        ? "此设备"
+        ? "本机"
         : option.environmentId
       : option.status,
     disabled: !option.isConnected,
@@ -1209,7 +1209,7 @@ function OpenCommandPaletteDialog(props: {
   const addProjectEnvironmentGroups = [
     {
       value: "environments",
-      label: "环境",
+      label: "电脑",
       items: addProjectEnvironmentItems,
     },
   ];
@@ -1254,8 +1254,8 @@ function OpenCommandPaletteDialog(props: {
                 kind: "action",
                 value: "action:add-project:connect-environment",
                 searchTerms: ["connect", "environment", "connection", "settings"],
-                title: "连接环境",
-                description: "没有可添加项目的已连接环境",
+                title: "连接电脑",
+                description: "没有可添加项目的已连接电脑",
                 icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
                 keepOpen: true,
                 run: async () => {
@@ -1332,7 +1332,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:new-thread-without-project",
       searchTerms: ["new thread", "no project", "without project", "none", "chat"],
-      title: "不关联项目新建会话",
+      title: "新建无项目会话",
       icon: <MessageSquareDashedIcon className={ITEM_ICON_CLASS} />,
       shortcutCommand: "chat.newWithoutProject",
       run: () => startScratchThread(scratchTargetEnvironmentId),
@@ -1689,7 +1689,7 @@ function OpenCommandPaletteDialog(props: {
   });
 
   for (const direction of [1, -1] as const) {
-    const title = direction === 1 ? "聚焦下一个工作区区域" : "聚焦上一个工作区区域";
+    const title = direction === 1 ? "聚焦下一个面板区域" : "聚焦上一个面板区域";
     actionItems.push({
       kind: "action",
       value: `action:workspace-focus:${direction}`,
@@ -1818,7 +1818,7 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "有会话未能删除",
+            title: "无法删除部分会话",
             description: failures.join("\n"),
           }),
         );
@@ -1838,7 +1838,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "有会话未处理",
+          title: "无法处理部分会话",
           description: failures.join("\n"),
         }),
       );
@@ -1893,7 +1893,7 @@ function OpenCommandPaletteDialog(props: {
                 toastManager.add(
                   stackedThreadToast({
                     type: "error",
-                    title: "有会话未能标为未读",
+                    title: "无法将部分会话标为未读",
                     description: failures.join("\n"),
                   }),
                 );
@@ -2024,8 +2024,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "环境不可用",
-          description: `${environment?.label ?? "所选环境"} 未连接。`,
+          title: "电脑不可用",
+          description: `${environment?.label ?? "所选电脑"} 未连接。`,
         }),
       );
       return;
@@ -2036,7 +2036,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "添加项目失败",
+          title: "无法添加项目",
           description: "仅 Windows 支持 Windows 风格路径。",
         }),
       );
@@ -2047,7 +2047,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "添加项目失败",
+          title: "无法添加项目",
           description: "相对路径需要先有活动项目。",
         }),
       );
@@ -2090,7 +2090,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "打开项目失败",
+              title: "无法打开项目",
               description: error instanceof Error ? error.message : "发生错误。",
             }),
           );
@@ -2128,7 +2128,7 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "添加项目失败",
+            title: "无法添加项目",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );
@@ -2144,7 +2144,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "添加项目失败",
+          title: "无法添加项目",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -2224,8 +2224,8 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "环境不可用",
-          description: `${browseEnvironment?.label ?? "所选环境"} 未连接。`,
+          title: "电脑不可用",
+          description: `${browseEnvironment?.label ?? "所选电脑"} 未连接。`,
         }),
       );
       return;
@@ -2289,7 +2289,7 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "仓库查询失败",
+              title: "无法查询仓库",
               description: errorMessage(squashAtomCommandFailure(lookupResult)),
             }),
           );
@@ -2337,7 +2337,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "克隆失败",
+          title: "无法克隆仓库",
           description: "仅 Windows 支持 Windows 风格路径。",
         }),
       );
@@ -2348,7 +2348,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "克隆失败",
+          title: "无法克隆仓库",
           description: "相对路径需要先有活动项目。",
         }),
       );
@@ -2381,7 +2381,7 @@ function OpenCommandPaletteDialog(props: {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "克隆失败",
+            title: "无法克隆仓库",
             description: errorMessage(squashAtomCommandFailure(startResult)),
           }),
         );
@@ -2404,7 +2404,7 @@ function OpenCommandPaletteDialog(props: {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "打开项目失败",
+          title: "无法打开项目",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );
@@ -2506,7 +2506,7 @@ function OpenCommandPaletteDialog(props: {
       ? null
       : {
           value: "new-project-machines",
-          label: "环境",
+          label: "电脑",
           items: newProjectEnvironmentOptions.map((option) => ({
             ...buildEnvironmentItem(
               option,
@@ -2760,8 +2760,8 @@ function OpenCommandPaletteDialog(props: {
       else
         toastManager.add({
           id: "thread-find-unavailable",
-          title: "此服务器不支持会话搜索。",
-          description: "更新服务器即可启用。",
+          title: "此后台服务不支持会话搜索。",
+          description: "更新后台服务即可启用。",
         });
       return;
     }
@@ -2969,7 +2969,7 @@ function OpenCommandPaletteDialog(props: {
           stackedThreadToast({
             type: "error",
             title: "无法添加 WSL 项目",
-            description: "请先启动对应的 WSL 后端，然后重新选择文件夹。",
+            description: "请先启动对应的 WSL 后台服务，然后重新选择文件夹。",
           }),
         );
         return;
@@ -2979,8 +2979,8 @@ function OpenCommandPaletteDialog(props: {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "克隆失败",
-              description: "在克隆仓库的环境中选择文件夹。",
+              title: "无法克隆仓库",
+              description: "在克隆仓库的电脑上选择文件夹。",
             }),
           );
           return;

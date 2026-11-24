@@ -670,7 +670,7 @@ function WhenExpressionBuilder({
           </div>
         )}
         {parseError ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/75 p-4 text-center text-xs text-destructive backdrop-blur-xs">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-destructive/30 bg-background p-4 text-center text-xs text-destructive">
             请先修正上方表达式，再继续可视化编辑。
           </div>
         ) : null}
@@ -1507,7 +1507,7 @@ export function KeybindingsSettingsPanel() {
       {!canWriteSettings ? (
         <p className="text-xs text-muted-foreground">
           {connectedEnvironments.length === 0
-            ? "请连接一个环境以修改快捷键。"
+            ? "请连接一台电脑以修改快捷键。"
             : "此连接可查看快捷键，但无权修改。"}
         </p>
       ) : null}

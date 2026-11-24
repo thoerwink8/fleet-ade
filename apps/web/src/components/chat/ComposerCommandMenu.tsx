@@ -168,13 +168,13 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
             <p className="text-secondary-label text-xs">
               {props.isLoading
                 ? props.triggerKind === "skill" || props.triggerKind === "slash-command"
-                  ? "正在搜索工作区技能…"
+                  ? "正在搜索项目技能…"
                   : props.triggerKind === "pull-request"
-                    ? "正在查找 pull request…"
-                    : "正在搜索工作区文件…"
+                    ? "正在查找 PR…"
+                    : "正在搜索项目文件…"
                 : (props.emptyStateText ??
                   (props.triggerKind === "skill"
-                    ? "未找到技能。试试输入 / 浏览提供方命令。"
+                    ? "未找到技能。试试输入 / 浏览智能体命令。"
                     : props.triggerKind === "path"
                       ? "没有匹配的文件或文件夹。"
                       : "没有匹配的命令。"))}
@@ -325,7 +325,7 @@ const SKILL_SOURCE_LABEL_BY_KIND: Record<ProviderSkillSourceKind, string> = {
   project: "项目",
   personal: "个人",
   system: "系统",
-  other: "提供方",
+  other: "智能体",
 };
 
 function SkillSourceBadge(props: { kind: ProviderSkillSourceKind; showSkillSuffix: boolean }) {

@@ -277,12 +277,12 @@ export function formatSubagentEffort(input: {
 
 const SUBAGENT_STATUS_LABELS: Record<OrchestrationV2ExecutionNode["status"], string> = {
   idle: "空闲",
-  pending: "执行中",
-  running: "执行中",
+  pending: "运行中",
+  running: "运行中",
   waiting: "等待中",
   completed: "已完成",
-  interrupted: "已中断",
-  failed: "失败",
+  interrupted: "已停止",
+  failed: "出错了",
   cancelled: "已取消",
   rolled_back: "已取消",
 };
@@ -501,7 +501,7 @@ const BACKGROUND_WORK_KINDS: Record<
   BackgroundWorkKind,
   { readonly order: number; readonly singular: string; readonly measure: string }
 > = {
-  subagent: { order: 0, singular: "子代理", measure: "个" },
+  subagent: { order: 0, singular: "子智能体", measure: "个" },
   command: { order: 1, singular: "后台命令", measure: "条" },
   monitor: { order: 2, singular: "监控任务", measure: "个" },
   background_task: { order: 3, singular: "后台任务", measure: "个" },

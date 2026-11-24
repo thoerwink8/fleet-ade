@@ -44,7 +44,7 @@ export function resolveFilesystemReadAccess(input: {
     return {
       canReadFiles: false,
       isPending,
-      error: isPending ? null : (input.connection?.error ?? "此环境未连接。"),
+      error: isPending ? null : (input.connection?.error ?? "这台电脑未连接。"),
     };
   }
   return {

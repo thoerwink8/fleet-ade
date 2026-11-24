@@ -173,9 +173,9 @@ export function PullRequestThreadDialog({
   const validationMessage = !referenceDirty
     ? null
     : reference.trim().length === 0
-      ? `请粘贴 ${terminology.singular} URL、检出工作副本的命令，或输入 123 / #123。`
+      ? `请粘贴 ${terminology.singular} URL、检出命令，或输入 123 / #123。`
       : parsedReference === null
-        ? `请使用 ${terminology.singular} URL、检出工作副本的命令、123 或 #123。`
+        ? `请使用 ${terminology.singular} URL、检出命令、123 或 #123。`
         : null;
   const errorMessage =
     validationMessage ??
@@ -222,7 +222,7 @@ export function PullRequestThreadDialog({
             </span>
             <Input
               ref={referenceInputRef}
-              placeholder={`${terminology.shortLabel} URL、检出工作副本的命令或 #42`}
+              placeholder={`${terminology.shortLabel} URL、检出命令或 #42`}
               value={reference}
               onChange={(event) => {
                 setReferenceDirty(true);

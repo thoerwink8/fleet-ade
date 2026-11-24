@@ -142,7 +142,7 @@ export function presentConnectionDiagnosis(
   );
   add("Route", "Direct");
   add("应用版本", input.clientVersion);
-  add("主机版本", input.serverVersion);
+  add("后台服务版本", input.serverVersion);
   add("Error", failure?.detail);
   add("追踪 ID", failure?.traceId);
 

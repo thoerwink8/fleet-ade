@@ -63,7 +63,7 @@ it.each(["resume", "draft", "question"] as const)(
     );
     await using screen = await render(view());
     using _timers = fakeTimers();
-    const stop = screen.getByRole("button", { name: "停止生成" }).element() as HTMLButtonElement;
+    const stop = screen.getByRole("button", { name: "停止" }).element() as HTMLButtonElement;
     const { x, y, width, height } = stop.getBoundingClientRect();
     const target = () =>
       document.elementFromPoint(x + width / 2, y + height / 2)?.closest("button");
@@ -84,7 +84,7 @@ it.each(["resume", "draft", "question"] as const)(
       }),
     );
     const action = { resume: "继续会话", draft: "发送消息", question: "提交" }[mode];
-    expect(screen.getByRole("button", { name: "停止生成" }).query()).toBeNull();
+    expect(screen.getByRole("button", { name: "停止" }).query()).toBeNull();
     expect(target()).toBe(screen.getByRole("button", { name: action, exact: true }).element());
     await act(() => {
       for (let i = 0; i < 20; i++) target()?.click();
@@ -100,7 +100,7 @@ it.each(["resume", "draft", "question"] as const)(
       { resume: props.onResume, draft: props.onSubmitMessage, question: submit }[mode],
     ).toHaveBeenCalledTimes(1);
     await screen.rerender(view());
-    expect(screen.getByRole("button", { name: "停止生成" }).element()).toBeEnabled();
+    expect(screen.getByRole("button", { name: "停止" }).element()).toBeEnabled();
   },
 );
 
@@ -109,13 +109,13 @@ it("allows retry after ten seconds and protects a late stop", async () => {
   await using screen = await render(<ComposerPrimaryActions {...props} />);
   using _timers = fakeTimers();
   await act(() =>
-    (screen.getByRole("button", { name: "停止生成" }).element() as HTMLButtonElement).click(),
+    (screen.getByRole("button", { name: "停止" }).element() as HTMLButtonElement).click(),
   );
   await act(() => vi.advanceTimersByTime(9_999));
   expect(screen.getByRole("button", { name: "正在停止", exact: true }).element()).toBeDisabled();
   await act(() => vi.advanceTimersByTime(1));
   await act(() =>
-    (screen.getByRole("button", { name: "停止生成" }).element() as HTMLButtonElement).click(),
+    (screen.getByRole("button", { name: "停止" }).element() as HTMLButtonElement).click(),
   );
   await screen.rerender(
     <ComposerPrimaryActions {...props} isRunning={false} canInterrupt={false} canResume />,
@@ -131,7 +131,7 @@ it("keeps Stop pending across a permission failure", async () => {
   const props = setup();
   await using screen = await render(<ComposerPrimaryActions {...props} />);
   await act(() =>
-    (screen.getByRole("button", { name: "停止生成" }).element() as HTMLButtonElement).click(),
+    (screen.getByRole("button", { name: "停止" }).element() as HTMLButtonElement).click(),
   );
   await screen.rerender(
     <ComposerPrimaryActions {...props} canOperateThread={false} canInterrupt={false} />,
@@ -147,12 +147,12 @@ it("keeps a pending stop when the run id clears and resets it for a different ru
   const props = setup();
   await using screen = await render(<ComposerPrimaryActions {...props} runId="first" />);
   await act(() =>
-    (screen.getByRole("button", { name: "停止生成" }).element() as HTMLButtonElement).click(),
+    (screen.getByRole("button", { name: "停止" }).element() as HTMLButtonElement).click(),
   );
   await screen.rerender(<ComposerPrimaryActions {...props} runId={null} />);
   expect(screen.getByRole("button", { name: "正在停止", exact: true }).element()).toBeDisabled();
   await screen.rerender(<ComposerPrimaryActions {...props} runId="second" />);
-  expect(screen.getByRole("button", { name: "停止生成" }).element()).toBeEnabled();
+  expect(screen.getByRole("button", { name: "停止" }).element()).toBeEnabled();
 });
 
 it("swaps the collapsed composer's send button for Stop while a turn can be stopped", async () => {
@@ -173,7 +173,7 @@ it("swaps the collapsed composer's send button for Stop while a turn can be stop
   await expect.element(screen.getByRole("button", { name: "发送消息" })).toBeVisible();
   await screen.rerender(collapsed());
   await act(() =>
-    (screen.getByRole("button", { name: "停止生成" }).element() as HTMLButtonElement).click(),
+    (screen.getByRole("button", { name: "停止" }).element() as HTMLButtonElement).click(),
   );
   expect(onInterrupt).toHaveBeenCalledTimes(1);
   await expect

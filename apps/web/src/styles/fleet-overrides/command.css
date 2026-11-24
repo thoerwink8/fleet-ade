@@ -31,7 +31,7 @@
   box-shadow: none;
 }
 
-/* .fa-cmd__in input sets 14px and outranks the narrow 16px in input.css; iOS Safari zooms under 16px. */
+/* .fa-cmd__in input sets 14px and outranks the 16px in input.css. @fleet/design takes it to 16px below 480px; this app's narrow layout starts at 640px. */
 @media (max-width: 639.98px) {
   .fa-cmd__in input {
     font-size: 16px;

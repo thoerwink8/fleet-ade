@@ -9,6 +9,7 @@ import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import {
   DEFAULT_SERVER_SETTINGS,
+  type EnvironmentId,
   type ProjectScopedServerSettingKey,
   type ServerSettings,
   type UnifiedSettings,
@@ -47,16 +48,30 @@ export function useScopedSettingSource(keys: readonly (keyof ServerSettings)[]) 
   return scopedSettingsSource(targets, keys);
 }
 
+export interface ScopedSettingsSaveResult {
+  readonly savedEnvironmentIds: readonly EnvironmentId[];
+  readonly failedCount: number;
+}
+
+export interface ScopedSettingsSaveOptions {
+  readonly onFailed?: () => void;
+  readonly onComplete?: (result: ScopedSettingsSaveResult) => void;
+}
+
 function useRunScopedPlan() {
   const persistServer = useAtomCommand(serverEnvironment.updateSettings, { reportFailure: false });
-  return (plan: ReturnType<typeof planScopedSettingsPatch>, onFailed?: () => void) => {
+  return (
+    plan: ReturnType<typeof planScopedSettingsPatch>,
+    options?: ScopedSettingsSaveOptions,
+  ) => {
     if (plan.unavailableReason) {
       toastManager.add({
         type: "warning",
         title: "设置未保存",
         description: plan.unavailableReason,
       });
-      onFailed?.();
+      options?.onFailed?.();
+      options?.onComplete?.({ savedEnvironmentIds: [], failedCount: 1 });
       return;
     }
     void persistScopedSettingsPatch(
@@ -78,17 +93,22 @@ function useRunScopedPlan() {
       },
       persistClientSettingsPatch,
     ).then(({ failedEnvironments, savedEnvironments, savedEnvironmentCount }) => {
-      if (failedEnvironments.length === 0) return;
-      onFailed?.();
-      toastManager.add({
-        type: "error",
-        title: savedEnvironmentCount > 0 ? "部分环境已保存设置" : "设置未保存",
-        description: [
-          ...failedEnvironments.map(({ label, message }) => `无法在 ${label} 上保存：${message}`),
-          ...(savedEnvironmentCount > 0
-            ? [`已保存到 ${savedEnvironments.map(({ label }) => label).join(", ")}。`]
-            : []),
-        ].join("\n"),
+      if (failedEnvironments.length > 0) {
+        options?.onFailed?.();
+        toastManager.add({
+          type: "error",
+          title: savedEnvironmentCount > 0 ? "部分环境已保存设置" : "设置未保存",
+          description: [
+            ...failedEnvironments.map(({ label, message }) => `无法在 ${label} 上保存：${message}`),
+            ...(savedEnvironmentCount > 0
+              ? [`已保存到 ${savedEnvironments.map(({ label }) => label).join(", ")}。`]
+              : []),
+          ].join("\n"),
+        });
+      }
+      options?.onComplete?.({
+        savedEnvironmentIds: savedEnvironments.map((environment) => environment.environmentId),
+        failedCount: failedEnvironments.length,
       });
     });
   };
@@ -98,21 +118,21 @@ export function useUpdateScopedSettings(hookOptions?: { readonly deviceOnly?: bo
   const { scope, environments, deviceOnly } = useSettingsScope();
   const run = useRunScopedPlan();
   /** `onFailed` runs when any target rejects or drops the patch, so a draft can fall back. */
-  return (patch: ScopedSettingsPatch, options?: { readonly onFailed?: () => void }) =>
+  return (patch: ScopedSettingsPatch, options?: ScopedSettingsSaveOptions) =>
     run(
       planScopedSettingsPatch(scope, environments, patch, {
         deviceOnly: hookOptions?.deviceOnly ?? deviceOnly,
       }),
-      options?.onFailed,
+      options,
     );
 }
 
 export function useClearScopedSettings() {
   const context = useOptionalSettingsScope();
   const run = useRunScopedPlan();
-  return (keys: readonly ProjectScopedServerSettingKey[]) => {
+  return (keys: readonly ProjectScopedServerSettingKey[], options?: ScopedSettingsSaveOptions) => {
     if (context === null) return;
-    run(planScopedSettingsClear(context.scope, context.environments, keys));
+    run(planScopedSettingsClear(context.scope, context.environments, keys), options);
   };
 }
 

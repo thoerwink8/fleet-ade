@@ -558,7 +558,7 @@ export function usePrimarySettings<T = UnifiedSettings>(
 }
 
 export const PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE =
-  "此设置保存在服务器上，而当前没有固定连接的服务器。请从桌面应用或服务器自身的地址修改。";
+  "此设置保存在后台服务上，而当前没有固定连接的电脑。请从桌面应用或该电脑自身的地址修改。";
 
 /** A missing primary still exposes settings; writes fail with the unavailable message. */
 export function usePrimarySettingsAvailable(): boolean {
@@ -628,7 +628,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
       toastManager.add({
         type: "warning",
         title: "设置未保存",
-        description: `此连接没有权限更改 ${environments.find((target) => target.environmentId === environmentId)?.label ?? "所选环境"} 的设置。`,
+        description: `此连接没有权限更改 ${environments.find((target) => target.environmentId === environmentId)?.label ?? "所选电脑"} 的设置。`,
       });
     }
     if (Object.keys(serverPatch).length > 0 && canWriteServerPatch) {
@@ -692,7 +692,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
             deniedLabels.length > 0
               ? `此连接没有权限更改 ${deniedLabels.join(", ")} 的设置。`
               : targets.size > 0
-                ? "请更新旧版服务器后再保存此设置。"
+                ? "请更新旧版后台服务后再保存此设置。"
                 : undefined,
           );
         } else {
@@ -729,7 +729,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
               .map(({ label }) => label);
             toastManager.add({
               type: "error",
-              title: saved.length > 0 ? "部分环境已保存设置" : "设置未保存",
+              title: saved.length > 0 ? "部分电脑已保存设置" : "设置未保存",
               description: [
                 ...failures,
                 ...(saved.length > 0 ? [`已保存到 ${saved.join(", ")}。`] : []),

@@ -165,7 +165,7 @@ export function showBootError(error: unknown) {
   };
 
   const message = element("div", {}, [
-    element("h1", { textContent: "Fleet ADE 启动失败" }),
+    element("h1", { textContent: "无法启动 Fleet ADE" }),
     element("p", {
       textContent: offline
         ? "浏览器似乎已离线。请检查连接，然后重新加载。"

@@ -40,7 +40,7 @@ export class TraceFileReadError extends Schema.TaggedError<TraceFileReadError>()
   },
 ) {
   override get message(): string {
-    return `Failed to read local trace file '${this.traceFilePath}'.`;
+    return `无法读取本地 trace 文件「${this.traceFilePath}」。`;
   }
 }
 
@@ -445,7 +445,7 @@ export const make = Effect.gen(function* () {
             readFailureError ??
             ({
               kind: "trace-file-not-found",
-              message: "No local trace files were found.",
+              message: "未找到本地 trace 文件。",
             } satisfies TraceDiagnosticsErrorSummary),
         });
       }

@@ -357,7 +357,7 @@ const make = Effect.gen(function* () {
     const client = yield* parseClientId(request.client_id ?? "");
     if (client === undefined) {
       return yield* new McpOAuthPageError({
-        description: "This sign-in link names an unknown app. Start the sign-in again from it.",
+        description: "这个登录链接指向一个未知的应用。请从该应用重新开始登录。",
       });
     }
     const redirectUri = request.redirect_uri;
@@ -366,7 +366,7 @@ const make = Effect.gen(function* () {
       !client.redirectUris.some((registered) => redirectMatches(registered, redirectUri))
     ) {
       return yield* new McpOAuthPageError({
-        description: "This sign-in link sends you to an address the app did not register.",
+        description: "这个登录链接把你带到一个该应用没有登记的地址。",
       });
     }
     const state = request.state;
@@ -456,7 +456,7 @@ const make = Effect.gen(function* () {
       // An approval code is for one app's sign-in, never for linking another environment.
       if (input.authorization.client.peerLink && parseMcpApprovalCode(decision.code)) {
         return yield* new McpOAuthPageError({
-          description: "Linking needs a plain pairing code, not an app approval code.",
+          description: "关联需要普通的配对码，而不是应用登录码。",
         });
       }
       const consumed = yield* environmentAuth
@@ -467,7 +467,7 @@ const make = Effect.gen(function* () {
               Effect.andThen(
                 Effect.fail(
                   new McpOAuthPageError({
-                    description: "The code could not be checked. Try again.",
+                    description: "无法核对此登录码。请重试。",
                   }),
                 ),
               ),
@@ -483,7 +483,7 @@ const make = Effect.gen(function* () {
         !mcpClientScopes(decision.access).every((scope) => session.scopes.includes(scope))
       ) {
         return yield* new McpOAuthPageError({
-          description: "Your session cannot approve this request. Enter a pairing code instead.",
+          description: "你的会话无法批准这个请求。请改用登录码。",
         });
       }
     }

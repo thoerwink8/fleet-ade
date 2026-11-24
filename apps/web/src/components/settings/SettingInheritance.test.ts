@@ -79,7 +79,7 @@ describe("settingInheritanceLayers", () => {
       ["项目", "继承", false],
       ["笔记本电脑", "继承", false],
       ["t3.json", "新工作树", true],
-      ["默认", "当前工作副本", false],
+      ["默认", "项目目录", false],
     ]);
     const settings = { ...DEFAULT_SERVER_SETTINGS, defaultThreadEnvMode: "local" as const };
     const fromEnvironment = settingInheritanceLayers(
@@ -94,9 +94,9 @@ describe("settingInheritanceLayers", () => {
     );
     expect(fromEnvironment.map((layer) => [layer.value, layer.effective])).toEqual([
       ["继承", false],
-      ["当前工作副本", true],
+      ["项目目录", true],
       ["继承", false],
-      ["当前工作副本", false],
+      ["项目目录", false],
     ]);
   });
 });

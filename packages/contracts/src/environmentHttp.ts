@@ -134,7 +134,7 @@ export class EnvironmentRequestInvalidError extends Schema.TaggedError<Environme
   }
 
   override get message(): string {
-    return `The environment rejected the request (${this.reason}).`;
+    return `对端电脑拒绝了该请求（${this.reason}）。`;
   }
 }
 
@@ -153,7 +153,7 @@ export class EnvironmentAuthInvalidError extends Schema.TaggedError<EnvironmentA
   }
 
   override get message(): string {
-    return `The environment rejected this client's credentials (${this.reason}).`;
+    return `对端电脑拒绝了此客户端的凭据（${this.reason}）。`;
   }
 }
 
@@ -172,7 +172,7 @@ export class EnvironmentScopeRequiredError extends Schema.TaggedError<Environmen
   }
 
   override get message(): string {
-    return `This request needs the ${this.requiredPermission ?? this.requiredScope} scope, which this client does not have.`;
+    return `该请求需要 ${this.requiredPermission ?? this.requiredScope} 权限，而此客户端没有。`;
   }
 }
 
@@ -190,7 +190,7 @@ export class EnvironmentOperationForbiddenError extends Schema.TaggedError<Envir
   }
 
   override get message(): string {
-    return `The environment refused this operation (${this.reason}).`;
+    return `对端电脑拒绝了该操作（${this.reason}）。`;
   }
 }
 
@@ -208,7 +208,7 @@ export class EnvironmentInternalError extends Schema.TaggedError<EnvironmentInte
   }
 
   override get message(): string {
-    return `The environment failed to answer this request (${this.reason}).`;
+    return `对端电脑无法应答该请求（${this.reason}）。`;
   }
 }
 
@@ -229,7 +229,7 @@ export class EnvironmentResourceNotFoundError extends Schema.TaggedError<Environ
   }
 
   override get message(): string {
-    return `The environment could not find what this request named (${this.reason}).`;
+    return `对端电脑找不到该请求指定的资源（${this.reason}）。`;
   }
 }
 

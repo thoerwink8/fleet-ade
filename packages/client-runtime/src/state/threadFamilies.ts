@@ -100,7 +100,7 @@ export function createThreadFamilyAtoms<R, ER, E>(
       if (Option.isNone(session)) {
         return yield* new EnvironmentRpcUnavailableError({
           environmentId: supervisor.target.environmentId,
-          message: "此环境没有会话。",
+          message: "这台电脑没有会话。",
         });
       }
       // A config failure fails the read: an empty family would read as "the thread is gone".

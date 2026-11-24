@@ -616,7 +616,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
               }}
               onKeyDown={stopRowToggle}
             >
-              打开对话
+              打开会话
             </button>
           ) : null}
           {notifiedSubagentThreadId ? (

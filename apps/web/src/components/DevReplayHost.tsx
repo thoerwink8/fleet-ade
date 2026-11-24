@@ -45,7 +45,7 @@ export function DevReplayHost() {
   const replay = async (scenario?: string): Promise<ThreadId> => {
     const model = scenario ?? scenarios[0]?.slug;
     if (environmentId === null || project === undefined || model === undefined) {
-      throw new Error("回放需要一个带项目的开发服务器和 Replay（dev）智能体。");
+      throw new Error("回放需要一个带项目的开发后台服务和 Replay（dev）智能体。");
     }
     if (!scenarios.some((candidate) => candidate.slug === model)) {
       throw new Error(`未知的回放场景“${model}”。`);
@@ -113,7 +113,7 @@ export function DevReplayHost() {
     replay(scenario).catch((error: unknown) =>
       toastManager.add({
         type: "error",
-        title: "回放失败",
+        title: "无法回放",
         description: error instanceof Error ? error.message : String(error),
       }),
     );
@@ -130,7 +130,7 @@ export function DevReplayHost() {
         <DialogPanel>
           {scenarios.length === 0 || project === undefined ? (
             <p className="text-sm text-muted-foreground">
-              需要一个项目，以及开发服务器会启动的Replay（dev）智能体。
+              需要一个项目，以及开发后台服务会启动的Replay（dev）智能体。
             </p>
           ) : (
             <div className="flex flex-col items-start gap-1">

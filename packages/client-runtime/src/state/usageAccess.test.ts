@@ -12,7 +12,7 @@ describe("resolveUsageAccess", () => {
       ).toEqual({
         canReadDiagnostics: false,
         isPending: false,
-        error: "此环境未连接。",
+        error: "这台电脑未连接。",
       });
     },
   );

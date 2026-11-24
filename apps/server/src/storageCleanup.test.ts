@@ -1,6 +1,7 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as ByteSize from "effect/ByteSize";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -416,6 +417,7 @@ const cleanupFixture = (
     let snapshotReads = 0;
     let terminalListener: ((event: TerminalMetadataStreamEvent) => Effect.Effect<void>) | undefined;
     let events: Stream.Stream<OrchestrationV2DomainEvent> = Stream.empty;
+    const settingsChanges = yield* Queue.unbounded<import("@t3tools/contracts").ServerSettings>();
     const activated = yield* Deferred.make<void>();
     const context = yield* Layer.build(StorageCleanup.layer).pipe(
       Effect.provideService(GitVcsDriver.GitVcsDriver, {
@@ -439,7 +441,7 @@ const cleanupFixture = (
       }),
       Effect.provideService(Settings.ServerSettingsService, {
         getSettings: Effect.sync(() => settings),
-        subscribeChanges: Effect.succeed(Stream.empty),
+        subscribeChanges: Effect.succeed(Stream.fromQueue(settingsChanges)),
       } as unknown as Settings.ServerSettingsService["Service"]),
       Effect.provideService(ProjectStore.ProjectStoreV2, {
         list: () => Effect.sync(() => projectRoots.map((workspaceRoot) => ({ workspaceRoot }))),
@@ -563,6 +565,11 @@ const cleanupFixture = (
       setSettings: (next: Partial<typeof settings>) => {
         settings = { ...settings, ...next };
       },
+      emitSettingsChange: (next: Partial<typeof settings>) =>
+        Effect.gen(function* () {
+          settings = { ...settings, ...next };
+          yield* Queue.offer(settingsChanges, settings);
+        }),
       setPolicy: (worktreeKeepWhen: WorktreeKeepWhen) => {
         settings = {
           ...settings,
@@ -3205,6 +3212,168 @@ describe("storage cleanup reports and local file policies", () => {
         expect(yield* fs.exists(config.logsDir + "/server.log.1")).toBe(true);
         expect(yield* fs.exists(config.logsDir + "/server.log.2")).toBe(true);
         expect(yield* service.latestReport).toBeNull();
+      }),
+    ),
+  );
+  it.live(
+    "previewWithPatch simulates newly enabled file rules while leaving saved settings and disk untouched",
+    () =>
+      runCleanupTest(
+        Effect.gen(function* () {
+          const { service, fs, config, setSettings } = yield* cleanupFixture({
+            ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+            worktreeAfterDays: null,
+            worktreeOnDelete: false,
+            browserArtifactsAfterDays: null,
+            logsAfterDays: null,
+          });
+          yield* fs.makeDirectory(config.browserArtifactsDir, { recursive: true });
+          yield* fs.makeDirectory(config.logsDir, { recursive: true });
+          const artifact = `${config.browserArtifactsDir}/one.png`;
+          const rotatedLog = `${config.logsDir}/server.log.1`;
+          yield* fs.writeFileString(artifact, "capture");
+          yield* fs.writeFileString(rotatedLog, "log");
+          yield* fs.utimes(artifact, 1, 1);
+          yield* fs.utimes(rotatedLog, 1, 1);
+
+          expect(yield* service.preview).toEqual({ categories: [], failures: [] });
+
+          const preview = yield* service.previewWithPatch({
+            storageCleanup: {
+              browserArtifactsAfterDays: 8,
+              logsAfterDays: 8,
+            },
+          });
+          expect(preview).toEqual({
+            categories: [
+              { kind: "browser-artifacts", count: 1, bytes: 7, unknownCount: 0 },
+              { kind: "logs", count: 1, bytes: 3, unknownCount: 0 },
+            ],
+            failures: [],
+          });
+          expect(yield* fs.exists(artifact)).toBe(true);
+          expect(yield* fs.exists(rotatedLog)).toBe(true);
+          expect(yield* service.preview).toEqual({ categories: [], failures: [] });
+          expect(yield* service.latestReport).toBeNull();
+          setSettings({});
+        }),
+      ),
+  );
+  it.live("previewWithPatch counts newly eligible rotated logs when lowering retention days", () =>
+    runCleanupTest(
+      Effect.gen(function* () {
+        const { service, fs, config } = yield* cleanupFixture({
+          ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+          worktreeAfterDays: null,
+          worktreeOnDelete: false,
+          browserArtifactsAfterDays: null,
+          logsAfterDays: 10,
+        });
+        yield* fs.makeDirectory(config.logsDir, { recursive: true });
+        const rotatedLog = `${config.logsDir}/server.log.1`;
+        yield* fs.writeFileString(rotatedLog, "log");
+        const nowMs = yield* Clock.currentTimeMillis;
+        const fiveDaysAgoSec = Math.floor((nowMs - 5 * DAY_MS) / 1000);
+        yield* fs.utimes(rotatedLog, fiveDaysAgoSec, fiveDaysAgoSec);
+
+        expect(yield* service.preview).toEqual({ categories: [], failures: [] });
+
+        const preview = yield* service.previewWithPatch({
+          storageCleanup: { logsAfterDays: 3 },
+        });
+        expect(preview).toEqual({
+          categories: [{ kind: "logs", count: 1, bytes: 3, unknownCount: 0 }],
+          failures: [],
+        });
+        expect(yield* fs.exists(rotatedLog)).toBe(true);
+        expect(yield* service.latestReport).toBeNull();
+      }),
+    ),
+  );
+  it.live("previewWithPatch counts newly eligible deleted worktrees without removing them", () =>
+    runCleanupTest(
+      Effect.gen(function* () {
+        const { service, fs, worktree, setThreads, setDeletedThreads } = yield* cleanupFixture({
+          ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+          worktreeAfterDays: null,
+          worktreeOnDelete: false,
+          browserArtifactsAfterDays: null,
+          logsAfterDays: null,
+        });
+        setThreads([]);
+        setDeletedThreads([
+          shell({ branch: "feature", worktreePath: worktree, deletedAt: at(-DAY_MS) }),
+        ]);
+
+        expect(yield* service.preview).toEqual({ categories: [], failures: [] });
+
+        const preview = yield* service.previewWithPatch({
+          storageCleanup: { worktreeOnDelete: true },
+        });
+        expect(preview.categories).toMatchObject([{ kind: "worktree", count: 1 }]);
+        expect(preview.failures).toEqual([]);
+        expect(yield* fs.exists(worktree)).toBe(true);
+        expect(yield* service.preview).toEqual({ categories: [], failures: [] });
+        expect(yield* service.latestReport).toBeNull();
+      }),
+    ),
+  );
+  it.live("triggers an automatic sweep when settings changes update storageCleanup", () =>
+    runCleanupTest(
+      Effect.gen(function* () {
+        const { service, fs, config, activate, emitSettingsChange } = yield* cleanupFixture({
+          ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+          worktreeAfterDays: null,
+          worktreeOnDelete: false,
+          browserArtifactsAfterDays: null,
+          logsAfterDays: null,
+        });
+        yield* fs.makeDirectory(config.logsDir, { recursive: true });
+        const rotatedLog = `${config.logsDir}/server.log.1`;
+        yield* fs.writeFileString(rotatedLog, "log");
+        yield* fs.utimes(rotatedLog, 1, 1);
+
+        const initialSweep = yield* service.reports.pipe(
+          Stream.filter((report) => report !== null),
+          Stream.take(1),
+          Stream.runHead,
+          Effect.forkChild,
+        );
+        yield* activate(Stream.empty);
+        yield* Fiber.join(initialSweep);
+        yield* service.drain;
+        expect(yield* fs.exists(rotatedLog)).toBe(true);
+
+        const sweepAfterChange = yield* service.reports.pipe(
+          Stream.filter(
+            (report): report is NonNullable<typeof report> =>
+              report !== null &&
+              report.entries.some((entry) => entry.kind === "logs" && entry.outcome === "removed"),
+          ),
+          Stream.take(1),
+          Stream.runHead,
+          Effect.forkChild,
+        );
+        yield* emitSettingsChange({
+          storageCleanup: {
+            ...DEFAULT_SERVER_SETTINGS.storageCleanup,
+            worktreeAfterDays: null,
+            worktreeOnDelete: false,
+            browserArtifactsAfterDays: null,
+            logsAfterDays: 8,
+          },
+        });
+        const report = yield* Fiber.join(sweepAfterChange);
+        yield* service.drain;
+        expect(Option.isSome(report)).toBe(true);
+        if (Option.isSome(report)) {
+          expect(report.value.trigger).toBe("automatic");
+          expect(report.value.bytesFreed).toBe(3);
+          expect(report.value.entries).toMatchObject([
+            { kind: "logs", outcome: "removed", bytes: 3, files: 1 },
+          ]);
+        }
+        expect(yield* fs.exists(rotatedLog)).toBe(false);
       }),
     ),
   );

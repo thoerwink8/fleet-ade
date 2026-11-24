@@ -175,7 +175,7 @@ function routeAddressKey(route: ConnectionRoute): string | null {
 export function connectionRouteLabel(route: ConnectionRoute): string {
   switch (connectionRouteKind(route)) {
     case "loopback":
-      return "此设备";
+      return "本机";
     case "lan":
       return "LAN";
     case "tailnet":

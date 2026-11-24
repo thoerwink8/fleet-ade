@@ -54,7 +54,7 @@ export const ResolvedKeybindingFromConfig = KeybindingRule.pipe(
             Predicate.isNotNull,
             () =>
               new SchemaIssue.InvalidValue({
-                message: "Invalid keybinding rule",
+                message: "快捷键规则无效",
               }),
           ),
           Effect.map((resolved) => resolved),
@@ -65,7 +65,7 @@ export const ResolvedKeybindingFromConfig = KeybindingRule.pipe(
         if (!key) {
           return yield* Effect.fail(
             new SchemaIssue.InvalidValue({
-              message: "Resolved shortcut cannot be encoded to key string",
+              message: "解析后的快捷键无法编码成按键字符串",
             }),
           );
         }
@@ -194,9 +194,8 @@ export interface KeybindingsChangeEvent {
 
 function trimIssueMessage(message: string): string {
   const trimmed = message.trim();
-  return trimmed.length > 0 ? trimmed : "Invalid keybindings configuration.";
+  return trimmed.length > 0 ? trimmed : "快捷键配置无效。";
 }
-
 function malformedConfigIssue(detail: string): ServerConfigIssue {
   return {
     kind: "keybindings.malformed-config",
@@ -267,7 +266,7 @@ const make = Effect.gen(function* () {
       (cause) =>
         new KeybindingsConfigError({
           configPath: keybindingsConfigPath,
-          detail: "failed to access keybindings config",
+          detail: "无法访问快捷键配置",
           cause,
         }),
     ),
@@ -278,7 +277,7 @@ const make = Effect.gen(function* () {
       (cause) =>
         new KeybindingsConfigError({
           configPath: keybindingsConfigPath,
-          detail: "failed to read keybindings config",
+          detail: "无法读取快捷键配置",
           cause,
         }),
     ),
@@ -300,7 +299,7 @@ const make = Effect.gen(function* () {
         (cause) =>
           new KeybindingsConfigError({
             configPath: keybindingsConfigPath,
-            detail: "expected JSON array",
+            detail: "应为 JSON 数组",
             cause,
           }),
       ),
@@ -334,7 +333,7 @@ const make = Effect.gen(function* () {
     const rawConfig = yield* readRawConfig;
     const decodedEntries = decodeRawKeybindingsEntriesExit(rawConfig);
     if (decodedEntries._tag === "Failure") {
-      const detail = `expected JSON array (${Cause.pretty(decodedEntries.cause)})`;
+      const detail = `应为 JSON 数组（${Cause.pretty(decodedEntries.cause)}）`;
       return {
         keybindings: [],
         issues: [malformedConfigIssue(detail)],
@@ -395,7 +394,7 @@ const make = Effect.gen(function* () {
         (cause) =>
           new KeybindingsConfigError({
             configPath: keybindingsConfigPath,
-            detail: "failed to record keybinding migrations",
+            detail: "无法记录快捷键迁移",
             cause,
           }),
       ),
@@ -417,7 +416,7 @@ const make = Effect.gen(function* () {
         (cause) =>
           new KeybindingsConfigError({
             configPath: keybindingsConfigPath,
-            detail: "failed to write keybindings config",
+            detail: "无法写入快捷键配置",
             cause,
           }),
       ),
@@ -578,7 +577,7 @@ const make = Effect.gen(function* () {
         (cause) =>
           new KeybindingsConfigError({
             configPath: keybindingsConfigPath,
-            detail: "failed to prepare keybindings config directory",
+            detail: "无法准备快捷键配置目录",
             cause,
           }),
       ),

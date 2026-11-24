@@ -68,7 +68,7 @@ function returnFocus(host: HTMLElement, origin: HTMLElement | null) {
 function RightPanelShellFrame(
   props: RightPanelShellProps & { inlineSize: PreviewPanelInlineSize },
 ) {
-  const panelArea = workspaceAreaProps("panel", 4, props.workspaceLabel ?? "工作区面板");
+  const panelArea = workspaceAreaProps("panel", 4, props.workspaceLabel ?? "右侧面板");
   const isInline = props.mode === "inline";
   const collapsible = isInline && props.open !== undefined;
   const open = props.open ?? true;
