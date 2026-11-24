@@ -92,7 +92,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法重新连接环境",
+          title: "无法重新连接电脑",
           description: error instanceof Error ? error.message : "重新连接失败。",
         }),
       );
@@ -120,7 +120,7 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法断开服务器",
+            title: "无法断开电脑",
             description: error instanceof Error ? error.message : "断开连接失败。",
           }),
         );
@@ -135,8 +135,8 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
   const autoBalanceUpdateBanner = useAutoBalanceUpdateBanner(autoUpdateEnvironments);
   const versionMismatchServerLabel =
     hasMultipleRegisteredEnvironments && activeThreadEnvironmentId !== null
-      ? `${activeEnvironment?.label ?? serverConfig?.environment.label ?? activeThreadEnvironmentId} 服务器`
-      : "服务器";
+      ? `${activeEnvironment?.label ?? serverConfig?.environment.label ?? activeThreadEnvironmentId} 后台服务`
+      : "后台服务";
   const serverUpdateEnvironmentId = activeThreadEnvironmentId;
   const versionMismatchSelfUpdate = resolveServerSelfUpdateCapability(serverConfig);
   const versionMismatchInstallation = serverConfig?.environment.capabilities.serverInstallation;
@@ -159,14 +159,14 @@ export function useSystemComposerBanners(input: SystemComposerBannersInput) {
           size="sm"
           variant="ghost"
           disabled={disconnectingEnvironment}
-          title="隐藏这个服务器的会话。可在“环境”设置中重新开启。"
+          title="隐藏这台电脑的会话。可在“连接”设置中重新开启。"
           onClick={() =>
             void handleDisconnectActiveEnvironmentStable(
               activeEnvironmentUnavailableState.environmentId,
             )
           }
         >
-          断开服务器
+          断开电脑
         </Button>
       ) : undefined;
     const environmentReconnecting =

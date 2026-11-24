@@ -291,17 +291,17 @@ export function translateLegacyEnglishLabel(value: string): string {
     case "Tool":
       return "工具";
     case "Preparing workspace":
-      return "正在准备工作区";
+      return "正在准备项目目录";
     case "Workspace ready":
-      return "工作区已就绪";
+      return "项目目录已就绪";
     case "Workspace preparation completed.":
-      return "工作区准备已完成。";
+      return "项目目录准备已完成。";
     case "Workspace preparation cancelled":
-      return "工作区准备已取消";
+      return "项目目录准备已取消";
     case "Workspace preparation failed":
-      return "工作区准备失败";
+      return "项目目录准备失败";
     case "Workspace preparation interrupted":
-      return "工作区准备被打断";
+      return "项目目录准备被打断";
     case "Interrupted before provider start":
       return "在智能体启动前被打断";
     case "Run interrupted before provider start":
@@ -469,7 +469,7 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "checkpoint":
       return {
         ...common,
-        label: title ?? "已创建检查点",
+        label: title ?? "已保存文件快照",
         changedFiles: item.files.map((file) => file.path),
         toolData: item,
       };

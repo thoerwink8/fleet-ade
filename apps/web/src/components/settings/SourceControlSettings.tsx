@@ -252,7 +252,7 @@ function DiscoveryItemRow({
               <span className="truncate text-row font-medium text-foreground">{item.label}</span>
               {version ? <code className="text-xs text-muted-foreground">{version}</code> : null}
               {isVcsNotReady(item) ? (
-                <Badge variant="warning" size="sm">
+                <Badge variant="outline" size="sm">
                   即将推出
                 </Badge>
               ) : null}

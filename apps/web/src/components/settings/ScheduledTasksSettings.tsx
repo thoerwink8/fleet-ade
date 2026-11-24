@@ -351,13 +351,12 @@ export function ScheduledRelativeLabel(props: { value: string | null }) {
 
 function deliveryOutcomeVariant(outcome: string) {
   if (outcome === "accepted") return "success";
-  if (
-    outcome === "duplicate" ||
-    outcome === "coalesced" ||
-    outcome === "disabled" ||
-    outcome === "rate_limited" ||
-    outcome === "expired"
-  ) {
+  // coalesced: the delivery is waiting for its window to close, not a problem.
+  if (outcome === "coalesced") return "info";
+  // duplicate: a repeat that was dropped on purpose; nothing to act on.
+  if (outcome === "duplicate") return "outline";
+  // disabled, rate_limited, expired: the delivery was blocked and the owner may need to act.
+  if (outcome === "disabled" || outcome === "rate_limited" || outcome === "expired") {
     return "warning";
   }
   if (outcome === "dispatch_failed" || outcome === "rejected_signature") return "error";

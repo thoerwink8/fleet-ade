@@ -74,7 +74,7 @@ export class PrimaryEnvironmentPairingCredentialRejectedError extends Schema.Tag
   },
 ) {
   override get message(): string {
-    return "配对 token 无效。请检查后重试。";
+    return "配对码无效。请检查后重试。";
   }
 }
 
@@ -97,7 +97,7 @@ export class PrimaryEnvironmentPairingCredentialRequiredError extends Schema.Tag
   },
 ) {
   override get message(): string {
-    return "请输入配对 token 以继续。";
+    return "请输入配对码以继续。";
   }
 }
 

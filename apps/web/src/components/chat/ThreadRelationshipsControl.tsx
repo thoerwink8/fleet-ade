@@ -171,7 +171,7 @@ function ThreadLineageGroup<Row extends LineageRow>(props: {
           <span className={cn(THREAD_DETAILS_PANEL_LABEL_CLASS, "min-w-0 flex-1 truncate")}>
             {props.label}
           </span>
-          {failedCount > 0 ? <SectionHeaderStatus>{failedCount} 失败</SectionHeaderStatus> : null}
+          {failedCount > 0 ? <SectionHeaderStatus>{failedCount} 出错了</SectionHeaderStatus> : null}
           {expanded ? null : (
             <span className="shrink-0 text-xs font-normal tabular-nums text-muted-foreground">
               {props.rows.length}
@@ -411,7 +411,7 @@ function DelegatedFromRow(props: {
             title={title}
             hint={
               environment === null
-                ? `由 ${label ?? "已关联的环境"} 委派。连接后即可打开父会话。`
+                ? `由 ${label ?? "已关联的电脑"} 委派。连接后即可打开父会话。`
                 : `打开 ${environment.label} 上的父智能体`
             }
           />
@@ -781,7 +781,7 @@ export function ThreadRelationshipsPanel(props: {
       ? "group-hover:opacity-0 group-focus-within:opacity-0 pointer-coarse:opacity-0 [@media(hover:none)]:opacity-0"
       : "";
     const project = projects.find((project) => project.id === node?.thread?.projectId);
-    const relationshipHint = `在当前对话中打开${relationship.toLowerCase()}`;
+    const relationshipHint = `在当前会话中打开${relationship.toLowerCase()}`;
     const RelationshipPopup = agent ? ThreadHoverCardPopup : TooltipPopup;
     const relationshipTooltip = agent ? (
       <SubagentTooltipContent
@@ -906,7 +906,7 @@ export function ThreadRelationshipsPanel(props: {
                     size="sm"
                     variant="ghost"
                     part="secondary"
-                    aria-label={parentTitle ? `合并回 ${parentTitle}` : "合并回原对话"}
+                    aria-label={parentTitle ? `合并回 ${parentTitle}` : "合并回原会话"}
                     disabled={!canMerge || busyAction !== null}
                     onClick={() => void merge()}
                   >
@@ -922,8 +922,8 @@ export function ThreadRelationshipsPanel(props: {
                 {latestMergeBackRun === null
                   ? "请先在这个分叉中完成一次运行，再合并回去"
                   : parentTitle
-                    ? `把这段对话合并回 ${parentTitle}`
-                    : "把这段对话合并回原对话"}
+                    ? `把这个会话合并回 ${parentTitle}`
+                    : "把这个会话合并回原会话"}
               </TooltipPopup>
             </Tooltip>
             <span className="shrink-0 border border-transparent ps-1 pe-2.5 text-2xs font-medium text-muted-foreground">

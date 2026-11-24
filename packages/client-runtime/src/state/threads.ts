@@ -761,7 +761,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
       while (true) {
         const preparedOption = yield* SubscriptionRef.get(supervisor.prepared);
         if (Option.isNone(preparedOption) || Option.isNone(httpClient))
-          return yield* failLoad("环境未连接。");
+          return yield* failLoad("电脑未连接。");
         const views =
           workAnchorId !== undefined
             ? ["work" as const]

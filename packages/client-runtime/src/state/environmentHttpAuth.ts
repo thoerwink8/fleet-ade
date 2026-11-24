@@ -77,7 +77,7 @@ export const executeConnectedEnvironmentHttpRequest = Effect.fn(
   const prepared = yield* SubscriptionRef.get(supervisor.prepared);
   if (Option.isNone(prepared)) {
     return yield* new RemoteEnvironmentAuthFetchError({
-      message: "环境未连接。",
+      message: "电脑未连接。",
       cause: supervisor.target._tag,
     });
   }

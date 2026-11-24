@@ -2279,7 +2279,7 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
     ui({ pendingApprovals: [], timelineEntries: entries(true), isWorking: false }),
   );
   await expect.element(screen.getByRole("group", { name: "命令审批" })).not.toBeInTheDocument();
-  await vi.waitFor(() => expect(screen.text()).not.toContain("等待批准"));
+  await vi.waitFor(() => expect(screen.text()).not.toContain("等你批准"));
   await expect
     .element(screen.getByRole("button", { name: approvals[0]!.detail!, exact: true }))
     .toBeVisible();

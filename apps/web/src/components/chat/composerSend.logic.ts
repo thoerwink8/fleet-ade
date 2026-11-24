@@ -19,8 +19,8 @@ export function loadBalancingSendWarning(input: {
 }) {
   if (input.pending) {
     return {
-      title: "正在检查机器资源",
-      description: "资源检查仍在进行，你可以在输入框中手动选择机器。",
+      title: "正在检查电脑资源",
+      description: "资源检查仍在进行，你可以在输入框中手动选择电脑。",
     };
   }
   const noMachineReadsEveryThread =
@@ -29,10 +29,10 @@ export function loadBalancingSendWarning(input: {
       input.threadContexts.every((record) => record.environmentId === environmentId),
     );
   return {
-    title: "请选择一台机器以继续",
+    title: "请选择一台电脑以继续",
     description: noMachineReadsEveryThread
-      ? "没有一台机器能读取全部附加的会话。请在输入框中选择机器，或移除这些会话。"
-      : "没有符合条件且资源充足的机器。请在输入框中手动选择机器。",
+      ? "没有一台电脑能读取全部附加的会话。请在输入框中选择电脑，或移除这些会话。"
+      : "没有符合条件且资源充足的电脑。请在输入框中手动选择电脑。",
   };
 }
 

@@ -30,7 +30,7 @@ describe("getComposerPlaceholder", () => {
         sendShortcut: "enter",
         platform: "Win32",
       }),
-    ).toBe("回车排队，等这一轮做完再发；Ctrl+Enter 立即发送（会打断当前这一轮）");
+    ).toBe("回车排队，等这一轮结束后再发；Ctrl+Enter 立即发送（会打断当前这一轮）");
   });
 
   it("swaps the two clauses when the user switches default follow-up behavior to steer", () => {
@@ -41,7 +41,7 @@ describe("getComposerPlaceholder", () => {
         sendShortcut: "enter",
         platform: "Win32",
       }),
-    ).toBe("回车立即发送（会打断当前这一轮）；Ctrl+Enter 排队，等这一轮做完再发");
+    ).toBe("回车立即发送（会打断当前这一轮）；Ctrl+Enter 排队，等这一轮结束后再发");
   });
 
   it("shows ⌘ on Mac for both queue and steer defaults", () => {
@@ -52,7 +52,7 @@ describe("getComposerPlaceholder", () => {
         sendShortcut: "enter",
         platform: "MacIntel",
       }),
-    ).toBe("回车排队，等这一轮做完再发；⌘Enter 立即发送（会打断当前这一轮）");
+    ).toBe("回车排队，等这一轮结束后再发；⌘Enter 立即发送（会打断当前这一轮）");
     expect(
       getComposerPlaceholder({
         isRunning: true,
@@ -60,7 +60,7 @@ describe("getComposerPlaceholder", () => {
         sendShortcut: "enter",
         platform: "MacIntel",
       }),
-    ).toBe("回车立即发送（会打断当前这一轮）；⌘Enter 排队，等这一轮做完再发");
+    ).toBe("回车立即发送（会打断当前这一轮）；⌘Enter 排队，等这一轮结束后再发");
   });
 
   it("adapts to mod-enter sendShortcut, canSteer=false, and custom/unbound alternate shortcuts", () => {
@@ -71,7 +71,7 @@ describe("getComposerPlaceholder", () => {
         sendShortcut: "mod-enter",
         platform: "Win32",
       }),
-    ).toBe("Ctrl+Enter 排队，等这一轮做完再发；Ctrl+Shift+Enter 立即发送（会打断当前这一轮）");
+    ).toBe("Ctrl+Enter 排队，等这一轮结束后再发；Ctrl+Shift+Enter 立即发送（会打断当前这一轮）");
     expect(
       getComposerPlaceholder({
         isRunning: true,
@@ -79,7 +79,7 @@ describe("getComposerPlaceholder", () => {
         sendShortcut: "mod-enter",
         platform: "MacIntel",
       }),
-    ).toBe("⌘Enter 立即发送（会打断当前这一轮）；⇧⌘Enter 排队，等这一轮做完再发");
+    ).toBe("⌘Enter 立即发送（会打断当前这一轮）；⇧⌘Enter 排队，等这一轮结束后再发");
     expect(
       getComposerPlaceholder({
         isRunning: true,
@@ -87,7 +87,7 @@ describe("getComposerPlaceholder", () => {
         canSteer: false,
         platform: "Win32",
       }),
-    ).toBe("回车排队，等这一轮做完再发");
+    ).toBe("回车排队，等这一轮结束后再发");
     expect(
       getComposerPlaceholder({
         isRunning: true,
@@ -95,7 +95,7 @@ describe("getComposerPlaceholder", () => {
         alternateShortcutLabel: "Alt+Enter",
         platform: "Win32",
       }),
-    ).toBe("回车排队，等这一轮做完再发；Alt+Enter 立即发送（会打断当前这一轮）");
+    ).toBe("回车排队，等这一轮结束后再发；Alt+Enter 立即发送（会打断当前这一轮）");
     expect(
       getComposerPlaceholder({
         isRunning: true,
@@ -103,7 +103,7 @@ describe("getComposerPlaceholder", () => {
         alternateShortcutLabel: null,
         platform: "Win32",
       }),
-    ).toBe("回车排队，等这一轮做完再发");
+    ).toBe("回车排队，等这一轮结束后再发");
   });
 
   it("names no keys on a device without a keyboard", () => {
@@ -114,13 +114,13 @@ describe("getComposerPlaceholder", () => {
       hasKeyboard: false,
     } as const;
     expect(getComposerPlaceholder({ ...base, followUpBehavior: "queue" })).toBe(
-      "发送后排队，等这一轮做完再发",
+      "发送后排队，等这一轮结束后再发",
     );
     expect(getComposerPlaceholder({ ...base, followUpBehavior: "steer" })).toBe(
       "发送后立即发送（会打断当前这一轮）",
     );
     expect(getComposerPlaceholder({ ...base, followUpBehavior: "steer", canSteer: false })).toBe(
-      "发送后排队，等这一轮做完再发",
+      "发送后排队，等这一轮结束后再发",
     );
     for (const text of [
       getComposerPlaceholder({ ...base, followUpBehavior: "queue" }),

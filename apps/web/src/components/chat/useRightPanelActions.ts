@@ -158,7 +158,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "复制路径失败",
+          title: "无法复制路径",
           description: "剪贴板 API 不可用。",
         }),
       );
@@ -181,7 +181,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "复制路径失败",
+            title: "无法复制路径",
             description: error instanceof Error ? error.message : "发生错误。",
           }),
         );

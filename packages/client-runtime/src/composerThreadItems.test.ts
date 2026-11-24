@@ -99,7 +99,7 @@ describe("matchComposerEnvironmentItems", () => {
         environmentId: "env-vps",
         machine: "cloud",
         label: "Hetzner VPS",
-        description: "机器",
+        description: "电脑",
       },
     ]);
     expect(

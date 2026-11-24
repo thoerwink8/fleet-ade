@@ -549,7 +549,7 @@ export const make = Effect.gen(function* () {
     ) {
       return yield* new ConnectionBlockedError({
         reason: "configuration",
-        detail: `该地址标识为已保存的 ${saved.target.label}。请在该环境的设置中将其添加为路由。`,
+        detail: `该地址标识为已保存的 ${saved.target.label}。请在这台电脑的设置中将其添加为路由。`,
       });
     }
   });

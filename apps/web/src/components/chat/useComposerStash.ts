@@ -162,8 +162,8 @@ export function useComposerStash(input: {
     if (filesToVerify.some((file) => file.environmentId !== environmentId)) {
       toastManager.add({
         type: "error",
-        title: "暂存的文件属于另一个环境",
-        description: "请在收到这些文件的环境中恢复这条提示词。",
+        title: "暂存的文件属于另一台电脑",
+        description: "请在收到这些文件的电脑上恢复这条提示词。",
       });
       return;
     }
@@ -417,7 +417,7 @@ export function useComposerStash(input: {
     if (missingImageReasons.length > 0) {
       toastManager.add({
         type: "warning",
-        title: "部分附件未能恢复",
+        title: "无法恢复部分附件",
         description: missingImageReasons.join(" "),
       });
     }
@@ -607,7 +607,7 @@ export function useComposerStash(input: {
         toastManager.add({
           type: "warning",
           title: "已丢弃最早的暂存提示词",
-          description: `暂存最多保留 ${MAX_STASH_ENTRIES} 条提示词，已移除最早的一条以腾出空间。`,
+          description: `暂存最多保留 ${MAX_STASH_ENTRIES} 条提示词，已删除最早的一条以腾出空间。`,
           data: { hideCopyButton: true },
         });
       }
@@ -645,7 +645,7 @@ export function useComposerStash(input: {
         if (!imagesDurable && durable && images.length > 0) {
           toastManager.add({
             type: "warning",
-            title: "暂存的图片未能保存",
+            title: "无法保存暂存的图片",
             description: "提示词已暂存，但浏览器存储拒绝了其中的图片，刷新后图片会丢失。",
             data: { hideCopyButton: true },
           });
@@ -653,7 +653,7 @@ export function useComposerStash(input: {
       } else if (kept.length > 0) {
         toastManager.add({
           type: "warning",
-          title: "暂存的图片未能附加",
+          title: "无法附加暂存的图片",
           description: `在 ${kept.length} 张图片保存完成前，该提示词已被恢复或删除。如仍需要，请重新附加。`,
           data: { hideCopyButton: true },
         });

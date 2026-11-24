@@ -81,13 +81,13 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
     };
   });
   const summary = subagentGroupSummary(agents);
-  const label = `${members.length} 个子代理`;
+  const label = `${members.length} 个子智能体`;
   const statusSummary = summarizeSubagentStatuses(agents.map(({ status }) => status));
   const activeCount = agents.filter(({ status }) => isOrchestrationV2WorkActive(status)).length;
   const doneCount = agents.filter(({ status }) => status === "completed").length;
   const countsLabel = [
-    activeCount > 0 ? `${activeCount} 在做` : null,
-    doneCount > 0 ? `${doneCount} 做完` : null,
+    activeCount > 0 ? `${activeCount} 运行中` : null,
+    doneCount > 0 ? `${doneCount} 已完成` : null,
   ]
     .filter(Boolean)
     .join(" · ");

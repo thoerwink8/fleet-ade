@@ -191,7 +191,7 @@ export function useComposerAttachmentIntake(input: {
         acceptedImages.push(normalizeComposerImageFileMimeType(file));
       } else {
         if (fileStagingLimit === null) {
-          error = "这个服务器不支持文件附件。";
+          error = "这个后台服务不支持文件附件。";
           continue;
         }
         if (file.size <= 0) {

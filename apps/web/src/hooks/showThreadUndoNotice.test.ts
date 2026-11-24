@@ -119,14 +119,14 @@ describe("thread undo notice", () => {
 
     showThreadUndoNotice({
       action: "Settled",
-      failureTitle: "无法撤销收尾",
+      failureTitle: "无法撤销标为完成",
       undo: undoFirst,
       claim: ThreadUndo.begin("settle", "env/first"),
     });
     expect(add).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         type: "success",
-        title: "已收尾",
+        title: "已标为完成",
         timeout: 0,
         actionProps: expect.objectContaining({ children: "撤销" }),
       }),
@@ -135,14 +135,14 @@ describe("thread undo notice", () => {
     vi.advanceTimersByTime(4_000);
     showThreadUndoNotice({
       action: "Settled",
-      failureTitle: "无法撤销收尾",
+      failureTitle: "无法撤销标为完成",
       undo: undoSecond,
       claim: ThreadUndo.begin("settle", "env/second"),
     });
     expect(update).toHaveBeenCalledExactlyOnceWith(
       "settle-toast",
       expect.objectContaining({
-        title: "已收尾 2 个会话",
+        title: "已标为完成 2 个会话",
         timeout: 0,
         actionProps: expect.objectContaining({ children: "撤销" }),
       }),
@@ -167,7 +167,7 @@ describe("thread undo notice", () => {
     close.mockClear();
     showThreadUndoNotice({
       action: "Settled",
-      failureTitle: "无法撤销收尾",
+      failureTitle: "无法撤销标为完成",
       undo: undoFirst,
       claim: ThreadUndo.begin("settle", "env/third"),
     });

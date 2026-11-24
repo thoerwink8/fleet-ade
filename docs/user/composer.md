@@ -22,7 +22,7 @@ plain Markdown with no styling, turn off **Settings → Threads → Rich text
 composer**. Lines starting with `- `, `1. `, `- [ ] `, `> `, `# ` or `---`
 become lists, task lists, quotes, headings and rules; ` ``` ` followed by Enter
 opens a code block. What you typed is what the agent receives, markers and
-numbering included, and `#1234` without a space still looks up a pull request.
+numbering included, and `#1234` without a space still looks up a PR.
 
 Some styled text containing or touching literal Markdown characters, such as a
 bold `path\` or `2*3`, keeps its styling without showing markers. Use formatting
@@ -42,7 +42,7 @@ it. Very large code blocks are shown without syntax highlighting.
 Attach up to 100 files per message. Each image can be up to 10 MiB, with at most
 80 MiB of images in one message. Other files, including videos, can be up to
 50 MiB each, subject to the environment's upload support and limit. The agent
-receives them on the environment's machine. Provider and model limits still
+receives them on that computer. Provider and model limits still
 apply, including images already in the conversation. A video attachment gives
 the agent a file path; only [Antigravity](./providers-antigravity.md#skills-and-attachments)
 sends supported videos to Gemini models as video.
@@ -81,7 +81,7 @@ start of the composer to edit the most recently queued message. Change
 
 ## Custom models
 
-On web and desktop, use Settings → Providers → **Models** to add an unlisted model with a custom
+On web and desktop, use Settings → Agents → **Models** to add an unlisted model with a custom
 name and options. Only options supported by the provider integration affect turns. Antigravity
 uses its account catalog and does not support custom models.
 
@@ -102,7 +102,7 @@ instance:
 
 ## Model defaults
 
-T3 Code remembers your provider, model, and model options for new threads. A
+Fleet ADE remembers your provider, model, and model options for new threads. A
 project's configured model takes precedence; resetting that project setting
 returns to the remembered selection.
 
@@ -143,15 +143,15 @@ After a Claude or Codex turn completes, the empty composer shows a predicted nex
 Suggestions are always enabled. Press `Tab` to fill it in, then edit or send it, or
 press `Escape` to dismiss it. Each suggestion is one extra request that reuses the turn's prompt
 cache, so it uses a little of your plan's usage. Claude skips suggestions on the first turn of a
-thread and near usage limits. Codex needs version 0.165 or later; if T3 Code manages
-Codex, update it in Settings > Providers. Suggestions show on web and desktop.
+thread and near usage limits. Codex needs version 0.165 or later; if Fleet ADE manages
+Codex, update it in Settings → Agents. Suggestions show on web and desktop.
 
 ## Edit an earlier prompt
 
 On web and desktop, choose **Edit from here** beneath a sent message to rewind
 the conversation to before that message. Choose **Revert and keep changes** to
-leave workspace files as they are, or **Revert files too** to put the workspace back
-to its checkpoint from before that message. That also undoes edits you made yourself.
+leave project files as they are, or **Revert files too** to put the worktree back
+to its file snapshot from before that message. That also undoes edits you made yourself.
 File restore is only offered for threads running in a worktree, and it is
 refused when another thread or agent session also uses that directory, a folder
 inside it, or a folder that contains it, since
@@ -160,7 +160,7 @@ rewinds the conversation only. The selected prompt and its attachments return to
 resending. Any unsent draft stays above the restored prompt.
 
 This removes the selected message and later conversation from the active thread
-and provider history. It does not undo external actions or separate provider
+and provider history. It does not undo external actions or separate agent
 memory. The action is available only when the provider supports rewind.
 
 ## Prompt stash
@@ -170,13 +170,13 @@ the current prompt and its attachments for later. Wait for uploads to finish fir
 With an empty composer, the same shortcut restores a single stash or opens the
 stash menu when there are several.
 
-Stashes containing uploaded files must be restored in their original environment.
+Stashes containing uploaded files must be restored on their original computer.
 Those files are retained for 24 hours. After an upload expires, restore the prompt
 and use **Attach again** or remove the missing file before sending.
 
 ## Queued messages
 
-On web and desktop, the composer shows **Interrupt** while the agent is working and the draft is
+On web and desktop, the composer shows **Stop** while the agent is working and the draft is
 empty. Adding text or attachments replaces it with a send button that shows your
 [Follow-up behavior](#send-while-the-agent-is-working): a queue icon for Queue or a steer arrow for
 Steer. Click it or press your send shortcut to use that action. Hold `Cmd` on macOS or `Ctrl` on
@@ -203,33 +203,33 @@ composer when it is empty, and is discarded otherwise.
 
 ## Commands and skills
 
-Type `/` for commands or `$` to add a skill from the selected environment and
-provider.
+Type `/` for commands or `$` to add a skill from the selected computer and
+agent.
 
 The slash menu also includes skills unless you turn off **Settings → Threads →
-Show skills in slash menu**, under Advanced. Only skills enabled for the provider are listed.
+Show skills in slash menu**, under Advanced. Only skills enabled for the agent are listed.
 
 After you add or change skills, plugins, or MCP servers, use **Restart agent
 session** in the command palette on web and desktop. The conversation continues,
 and your next message starts the agent again with the new setup.
 
-Provider commands must start the message to run. T3 Code commands such as
+Provider commands must start the message to run. Fleet ADE commands such as
 `/model` and skill mentions work on any line.
 
 Send `/compact` in an existing conversation to reduce context usage when the
 provider supports it.
 
 Send `/clear` on its own, or pick it from the slash menu, to start a fresh session
-in the same thread. Your next message goes to a new provider session that doesn't see the
+in the same thread. Your next message goes to a new agent session that doesn't see the
 earlier messages, and the thread marks where it began with **New session**.
 Earlier messages and diffs stay in the thread. Dismiss the notice above the
 composer to keep the current session instead.
 
 On web and desktop, turn on **Context window** in **Settings → Appearance →
 Thread details** to see context usage in the thread details card. It appears
-once the provider reports usage.
+once the agent reports usage.
 
-Claude instances can also compact idle threads for you. See
+Claude agents can also compact idle threads for you. See
 [compact long conversations](./providers-claude.md#compact-long-conversations).
 
 ## Goals
@@ -259,33 +259,33 @@ its brief details. Select a terminal excerpt to open its captured output, or sel
 comment, picked element, or preview annotation to open its full details. Chips read as "Terminal
 excerpt, Terminal 1 lines 3-4" and similar to screen readers.
 
-A pull request appears as its icon and number. Its color reflects whether it was open, draft,
+A PR appears as its icon and number. Its color reflects whether it was open, draft,
 merged, or closed when it was attached. Select it to inspect the captured title and branches,
-then choose **Open pull request** to visit the pull request. On web and desktop, type `#` to browse the newest
-pull requests in the current project's repository. Pull requests linked to the thread are included
+then choose **Open PR** to visit the PR. On web and desktop, type `#` to browse the newest
+PRs in the current project's repository. PRs linked to the thread are included
 from any repository and listed first, after any exact number match. Continue typing digits to filter the recent list
-by any part of its pull request numbers. A complete number is also resolved directly, even when that
-pull request is older than the recent list. Type a single word after `#` to search pull requests in
+by any part of its PR numbers. A complete number is also resolved directly, even when that
+PR is older than the recent list. Type a single word after `#` to search PRs in
 the repository by text. Choose a result to insert it as a chip.
 
 Another thread can be context too. Type `@` followed by part of its title to pick one from
-the same server, or from a machine it links to while the Linked environments beta is on; those
-show the machine's name. On web and desktop you can also drag a thread out of the sidebar and
+the same computer, or from a linked computer while the Linked environments beta is on; those
+show the computer's name. On web and desktop you can also drag a thread out of the sidebar and
 drop it on the composer; a multi-selection drops together. On any client, **Copy thread** copies a
 link to the thread that pastes into a composer as its chip. The chip shows the thread's
 current title and opens it when selected. Your prompt only carries a reference: the agent reads the thread's
 history on demand, so attaching a long thread costs nothing until the agent looks. Attaching a
 thread does not change it, and the agent cannot send messages to it unless you ask.
 
-A thread from a linked machine, picked, pasted or dropped, stays a reference that the agent reads
-on that machine. A pasted link to a thread on any other machine stays a link. Dropping a thread
-from any other environment attaches a saved transcript file. The source
-environment must be connected and up to date. The transcript includes the visible history and
+A thread from a linked computer, picked, pasted or dropped, stays a reference that the agent reads
+on that computer. A pasted link to a thread on any other computer stays a link. Dropping a thread
+from any other computer attaches a saved transcript file. The source
+computer must be connected and up to date. The transcript includes the visible history and
 saved text context at the time of the drop; later messages and the contents of attached files
 are not copied. The agent can read the saved transcript after the source disconnects. Normal
 file attachment limits apply.
 
-Type `@` and part of a model or provider name, such as `@opus`, to name that model for the
+Type `@` and part of a model or agent name, such as `@opus`, to name that model for the
 agent, for example when delegating. It does not change the thread's model. Join words with
 `:`, `/` or `-`, as in `@opus:codex`.
 
@@ -296,8 +296,8 @@ exist only as chips: deleting a file's last chip removes the file from the messa
 
 Copy text that holds chips and paste it into another draft, in the same thread or another one,
 and the chips come along with what they point to. Images and files are fetched again from the
-environment they came from; while that happens the chip shows a dashed outline, and if it cannot
-complete T3 Code tells you and leaves the chip for you to remove or replace. A chip whose
+computer they came from; while that happens the chip shows a dashed outline, and if it cannot
+complete Fleet ADE tells you and leaves the chip for you to remove or replace. A chip whose
 context is no longer available shows the same dashed outline; hover it for what to do.
 
 Copying a message with the copy button, or copying text out of it, gives other apps readable
@@ -314,7 +314,7 @@ Select a file chip in your draft or a sent message to preview it. Code and JSON 
 highlighting; Markdown, HTML, CSV, and TSV offer rendered and raw views. Audio files have
 playback controls. Large text files show a limited preview; save the file to read it in full.
 
-Files open beside the conversation with the same controls as a workspace
+Files open beside the conversation with the same controls as a project file
 file: a header row with the view toggle, **Copy contents** and **Save file**. A ZIP up to
 50 MB opens as a folder list. Select a file inside it to preview, save, or add it to chat.
 
@@ -325,21 +325,21 @@ on your browser or device; save an unsupported video to open it in another app.
 
 Right-click media to save it or copy its path or URL.
 
-File links refer to the environment's machine, including when you connect remotely.
-Previews use the original file, even outside the workspace. Moving or deleting it
+File links refer to that computer, including when you connect remotely.
+Previews use the original file, even outside the project directory. Moving or deleting it
 can break the preview, so save a copy if you need to keep it.
 
-## Files outside the workspace
+## Files outside the project directory
 
-Follow an agent's file link to read a report or other file outside the workspace.
-These files open read-only. An HTML file outside the workspace cannot load scripts,
+Follow an agent's file link to read a report or other file outside the project directory.
+These files open read-only. An HTML file outside the project directory cannot load scripts,
 styles, or images from neighboring files.
 
 ## HTML and PDF files in the file viewer
 
 On web and desktop, HTML and PDF files open as rendered pages. Switch an HTML
 file to source view to read its markup; a link to a specific line opens source
-automatically. HTML previews cannot access your T3 Code session.
+automatically. HTML previews cannot access your Fleet ADE session.
 
 The file viewer recognizes images, HTML, and PDF files by their filename extension,
 including filenames or folders containing `#` or `?`. PDF attachments and links open

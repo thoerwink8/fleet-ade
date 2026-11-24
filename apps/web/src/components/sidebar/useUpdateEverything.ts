@@ -117,7 +117,7 @@ export function useUpdateEverything() {
           if (runOutcome.status !== "updated") {
             providerFailures.set(
               run.environmentId,
-              runOutcome.status === "failed" ? runOutcome.line : "提供方更新已中断",
+              runOutcome.status === "failed" ? runOutcome.line : "智能体更新已停止",
             );
           }
           return runOutcome;

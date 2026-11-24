@@ -39,14 +39,13 @@ const badgeVariants = cva(
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;
 
-// warning still shares the needs (info) dot; .fa-dot--warning exists in the library and is adopted separately.
 const badgeDotClass: Partial<Record<BadgeVariant, string>> = {
   label: "ade-badge__dot--label",
   destructive: "fa-dot--error",
   error: "fa-dot--error",
   info: "fa-dot--needs",
   success: "fa-dot--running",
-  warning: "fa-dot--needs",
+  warning: "fa-dot--warning",
   "dot-attention": "fa-dot--needs",
   "dot-active": "fa-dot--running",
   "dot-blocked": "fa-dot--error",

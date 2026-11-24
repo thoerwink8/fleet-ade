@@ -55,7 +55,7 @@ const readTimeout = (environmentId: EnvironmentId) =>
       Effect.fail(
         new EnvironmentRpcUnavailableError({
           environmentId,
-          message: "环境未响应 PR 请求。",
+          message: "电脑未响应 PR 请求。",
         }),
       ),
   });
@@ -380,7 +380,7 @@ export function createPullRequestRouter() {
           isUnregistered(error)
             ? new EnvironmentRpcUnavailableError({
                 environmentId: id,
-                message: "环境已被移除。",
+                message: "电脑已被移除。",
               })
             : error,
         ),

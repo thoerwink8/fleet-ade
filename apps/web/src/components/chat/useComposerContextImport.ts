@@ -169,7 +169,7 @@ export function useComposerContextImport(input: {
     if (!file) {
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail("它来源的环境未连接。");
+        fail("它来源的电脑未连接。");
         return;
       }
       const result = await createAssetUrl({
@@ -182,7 +182,7 @@ export function useComposerContextImport(input: {
           : null;
       if (!url) {
         const cause = result._tag === "Failure" ? Cause.squash(result.cause) : null;
-        fail(isUnreachable(cause) ? "它来源的环境暂时无法访问。" : "原始附件已不可用。");
+        fail(isUnreachable(cause) ? "它来源的电脑暂时无法访问。" : "原始附件已不可用。");
         return;
       }
       const blob = await downloadAttachmentBlob(url);

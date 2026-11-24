@@ -32,7 +32,7 @@ it("leaves the next attachment its own top edge when there are no notices", asyn
     <ComposerBanner.Column>
       <ComposerBannerStack items={[]} />
       <ComposerBanner.Attachment>
-        <ComposerBanner.Root data-testid="drawer">待批准</ComposerBanner.Root>
+        <ComposerBanner.Root data-testid="drawer">等你批准</ComposerBanner.Root>
       </ComposerBanner.Attachment>
     </ComposerBanner.Column>,
   );

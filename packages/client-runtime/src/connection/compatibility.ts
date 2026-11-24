@@ -19,11 +19,11 @@ export function orchestrationProtocolCompatibilityError(
   return serverProtocolVersion > ORCHESTRATION_PROTOCOL_VERSION
     ? new ConnectionBlockedError({
         reason: "unsupported",
-        detail: `此服务器不支持这个客户端。请更新应用或使用兼容的版本以连接到 ${descriptor.label}。`,
+        detail: `此后台服务不支持这个客户端。请更新应用或使用兼容的版本以连接到 ${descriptor.label}。`,
       })
     : new ConnectionBlockedError({
         reason: "unsupported",
-        detail: `此客户端需要更新的服务器。请更新 ${descriptor.label} 上的 Fleet ADE 后再连接。`,
+        detail: `此客户端需要更新的后台服务。请更新 ${descriptor.label} 上的 Fleet ADE 后再连接。`,
         ...(canSelfUpdate(descriptor) ? { serverUpdateRequired: true } : {}),
       });
 }

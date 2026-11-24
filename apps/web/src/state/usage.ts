@@ -71,7 +71,7 @@ const usageByWindowAtom = Atom.family((windowKey: string) =>
         isPending: result.waiting,
         canReadDiagnostics: true,
         isConnected,
-        error: result._tag === "Failure" ? "此环境无法报告用量。" : null,
+        error: result._tag === "Failure" ? "这台电脑无法报告用量。" : null,
         summary,
       });
     }

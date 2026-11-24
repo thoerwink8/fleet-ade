@@ -183,7 +183,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
               {show.environment || show.openIn || show.scripts ? (
                 <ThreadDetailsSection
                   headingId="thread-details-workspace-heading"
-                  title="工作区"
+                  title="项目"
                   separated={false}
                   showHeading={false}
                 >

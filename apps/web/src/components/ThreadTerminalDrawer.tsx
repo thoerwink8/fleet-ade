@@ -394,7 +394,7 @@ function terminalSelectionMenuItems(options?: {
   return [
     ...(options?.canAddToChat === false
       ? []
-      : ([{ id: "add-to-chat", label: "添加到对话" }] satisfies ContextMenuItem<"add-to-chat">[])),
+      : ([{ id: "add-to-chat", label: "添加到会话" }] satisfies ContextMenuItem<"add-to-chat">[])),
     { id: "copy", label: "复制" },
   ];
 }

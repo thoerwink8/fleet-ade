@@ -73,7 +73,7 @@ export function resolveVersionMismatch(
   return {
     clientVersion: normalizedClientVersion,
     serverVersion: normalizedServerVersion,
-    hint: "版本不一致。请让客户端和服务器使用相同的 Fleet ADE 版本。",
+    hint: "版本不一致。请让客户端和后台服务使用相同的 Fleet ADE 版本。",
   };
 }
 

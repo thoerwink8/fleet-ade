@@ -63,7 +63,7 @@ describe("presentConnectionDiagnosis", () => {
   it("does not report hops as working when the failure names none", () => {
     const failure = new ConnectionBlockedError({
       reason: "authentication",
-      detail: "此地址是 T3 Connect 学习到的。请重新配对该环境。",
+      detail: "此地址是 T3 Connect 学习到的。请重新配对这台电脑。",
     });
     expect(results(backoff(failure))).not.toContainEqual(expect.stringMatching(/:ok$/));
   });

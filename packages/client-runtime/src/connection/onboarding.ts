@@ -94,7 +94,7 @@ function bearerConnectionId(environmentId: EnvironmentId, httpBaseUrl: string): 
 function differentMachineError(label: string) {
   return new ConnectionBlockedError({
     reason: "configuration",
-    detail: `该地址指向另一台机器 ${label}。请将其添加为独立环境。`,
+    detail: `该地址指向另一台电脑 ${label}。请将其添加为独立电脑。`,
   });
 }
 
@@ -213,7 +213,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   ) {
     return yield* new ConnectionBlockedError({
       reason: "configuration",
-      detail: "只能编辑已保存的 bearer 环境。",
+      detail: "只能编辑已保存的 bearer 电脑。",
     });
   }
 
@@ -221,7 +221,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   if (Option.isNone(credential) || !isBearerCredential(credential.value)) {
     return yield* new ConnectionBlockedError({
       reason: "authentication",
-      detail: "已保存的 bearer 凭据不可用。",
+      detail: "已保存的登录信息不可用。",
     });
   }
 
@@ -229,7 +229,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   if (label === "") {
     return yield* new ConnectionBlockedError({
       reason: "configuration",
-      detail: "环境名称不能为空。",
+      detail: "电脑名称不能为空。",
     });
   }
   const httpBaseUrl = yield* Effect.try({
@@ -237,7 +237,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
     catch: (cause) =>
       new ConnectionBlockedError({
         reason: "configuration",
-        detail: cause instanceof Error ? cause.message : "环境 URL 无效。",
+        detail: cause instanceof Error ? cause.message : "电脑 URL 无效。",
       }),
   });
   const connectionId = entry.target.connectionId;

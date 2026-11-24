@@ -16,7 +16,7 @@ describe("navigateAfterThreadDeletion", () => {
     expect(addToast).toHaveBeenCalledOnce();
     expect(addToast).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "会话已删除，但跳转失败",
+        title: "会话已删除，但无法跳转页面",
         description: "route unavailable",
       }),
     );

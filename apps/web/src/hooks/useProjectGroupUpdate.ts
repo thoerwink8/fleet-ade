@@ -53,7 +53,7 @@ export function useProjectGroupUpdate() {
     if (unavailable) {
       return failWith(
         failureTitle,
-        `请先连接 ${unavailable.environmentLabel ?? "所选环境"} 再重试。`,
+        `请先连接 ${unavailable.environmentLabel ?? "所选电脑"} 再重试。`,
       );
     }
     for (const member of members) {
@@ -134,7 +134,7 @@ export function checkProjectAccess(
     (member) => !readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope),
   );
   return denied
-    ? failWith(failureTitle, `此连接无法更改 ${denied.environmentLabel ?? "此环境"} 中的项目。`)
+    ? failWith(failureTitle, `此连接无法更改 ${denied.environmentLabel ?? "这台电脑"} 中的项目。`)
     : null;
 }
 
