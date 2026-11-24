@@ -1452,6 +1452,50 @@ it.effect("two restarts during a pending rewind still roll back exactly once", (
   }).pipe(Effect.provide(layerTest)),
 );
 
+it.effect("two sweeps racing after the thread settles roll back exactly once", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const worker = yield* EffectWorker.OrchestrationEffectWorkerV2;
+    const eventSink = yield* EventSink.EventSinkV2;
+    yield* mockRollbackSuccess;
+    const threadId = ThreadId.make("thread:stop-rewind-racing-sweeps");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    const { run } = yield* promoteRunToRunning(threadId, "stop-rewind-racing-sweeps");
+    yield* orchestrator.dispatch({
+      type: "thread.stop-and-rollback",
+      commandId: CommandId.make("stop-rewind-racing-sweeps"),
+      threadId,
+      turnCount: 0,
+      restoreFiles: false,
+    });
+    const now = yield* DateTime.now;
+    yield* eventSink.write({
+      commandId: CommandId.make("racing-sweeps-settle"),
+      events: [
+        {
+          id: EventId.make("racing-sweeps-settle-run"),
+          type: "run.updated",
+          threadId,
+          runId: run.id,
+          occurredAt: now,
+          payload: { ...run, status: "interrupted", completedAt: now },
+        },
+      ],
+    });
+    yield* worker.drain();
+    // Each sweep gets its own internal command id, so only the thread lock and the
+    // pending requestId keep the second sweep from queueing a second rewind.
+    yield* Effect.all([orchestrator.resumePendingRollbacks, orchestrator.resumePendingRollbacks], {
+      concurrency: "unbounded",
+    });
+    yield* worker.drain();
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback);
+    assert.equal(yield* rollbackEffectCount(threadId), 1);
+  }).pipe(Effect.provide(layerTest)),
+);
+
 it.effect("cancel before settle prevents the rewind entirely", () =>
   Effect.gen(function* () {
     const orchestrator = yield* Orchestrator.OrchestratorV2;
