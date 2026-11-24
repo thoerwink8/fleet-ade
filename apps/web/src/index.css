@@ -18,6 +18,8 @@
 @import "./styles/fleet-overrides/toast.css" layer(fleet);
 @import "@fleet/design/styles/menu.css" layer(fleet);
 @import "./styles/fleet-overrides/menu.css" layer(fleet);
+@import "@fleet/design/styles/button.css" layer(fleet);
+@import "./styles/fleet-overrides/button.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
@@ -1211,7 +1213,9 @@ html[data-theme-id] [data-chat-header] {
   color: var(--contrast-toolbar-foreground);
 }
 
-html[data-theme-id] [data-chat-header] [data-slot="button"],
+html[data-theme-id]
+  [data-chat-header]
+  [data-slot="button"]:not([disabled], [data-disabled], [aria-disabled="true"]),
 html[data-theme-id] [data-chat-header] [data-slot="menu-trigger"],
 html[data-theme-id] [data-chat-header] [data-toolbar-control] {
   --control-icon-color: var(--contrast-toolbar-control-foreground);
@@ -1245,8 +1249,12 @@ html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="tooltip-trigg
   color: color-mix(in oklab, var(--contrast-toolbar-foreground) 55%, var(--toolbar-background));
 }
 
-html[data-theme-id] [data-chat-header] [data-slot="button"]:hover,
-html[data-theme-id] [data-chat-header] [data-slot="button"][data-pressed],
+html[data-theme-id]
+  [data-chat-header]
+  [data-slot="button"]:not([disabled], [data-disabled], [aria-disabled="true"]):hover,
+html[data-theme-id]
+  [data-chat-header]
+  [data-slot="button"]:not([disabled], [data-disabled], [aria-disabled="true"])[data-pressed],
 html[data-theme-id] [data-chat-header] [data-slot="menu-trigger"]:hover,
 html[data-theme-id] [data-chat-header] [data-slot="menu-trigger"][data-pressed],
 html[data-theme-id] [data-chat-header] [data-toolbar-control]:hover,
