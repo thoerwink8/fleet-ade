@@ -105,4 +105,28 @@ describe("getComposerPlaceholder", () => {
       }),
     ).toBe("回车排队，等这一轮做完再发");
   });
+
+  it("names no keys on a device without a keyboard", () => {
+    const base = {
+      isRunning: true,
+      sendShortcut: "enter",
+      platform: "Win32",
+      hasKeyboard: false,
+    } as const;
+    expect(getComposerPlaceholder({ ...base, followUpBehavior: "queue" })).toBe(
+      "发送后排队，等这一轮做完再发",
+    );
+    expect(getComposerPlaceholder({ ...base, followUpBehavior: "steer" })).toBe(
+      "发送后立即发送（会打断当前这一轮）",
+    );
+    expect(getComposerPlaceholder({ ...base, followUpBehavior: "steer", canSteer: false })).toBe(
+      "发送后排队，等这一轮做完再发",
+    );
+    for (const text of [
+      getComposerPlaceholder({ ...base, followUpBehavior: "queue" }),
+      getComposerPlaceholder({ ...base, followUpBehavior: "steer" }),
+    ]) {
+      expect(text).not.toMatch(/Ctrl|⌘|Enter|回车/);
+    }
+  });
 });

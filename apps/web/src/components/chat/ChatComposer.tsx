@@ -3415,6 +3415,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   platform:
                                     typeof navigator !== "undefined" ? navigator.platform : "",
                                   alternateShortcutLabel,
+                                  hasKeyboard: !hideKeyboardHints,
                                 }))
                     }
                     placeholderSuffix={
@@ -3497,25 +3498,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     runId={activeThread?.runtime?.activeRunId ?? null}
                     followUpBehavior={followUpBehavior}
                     canSteer={canSteer}
-<<<<<<< HEAD
                     alternateShortcutLabel={alternateShortcutLabel}
-=======
-                    alternateShortcutLabel={
-                      hideKeyboardHints
-                        ? null
-                        : shortcutLabelForCommand(keybindings, "composer.sendAlternate", {
-                            context: {
-                              composerFocus: true,
-                              draftThreadRoute: routeKind === "draft",
-                              turnRunning: true,
-                              composerRequiresModifier: composerRequiresModifier(
-                                settings.sendShortcut,
-                                prompt,
-                              ),
-                            },
-                          })
-                    }
->>>>>>> ca86ab2fb9 (feat(web): unify touch keyboard shortcut hint hiding)
                     isSendBusy={isSendBusy}
                     sendDisabledReason={primaryActionSendDisabledReason}
                     isEnvironmentUnavailable={primaryActionEnvironmentUnavailable}

@@ -9,35 +9,35 @@ import {
 describe("useKeyboardShortcutHints", () => {
   it.each([
     {
-      name: "shows hints on wide fine-pointer desktop with hover",
-      capabilities: { isCoarsePointer: false, lacksHover: false, isMobileViewport: false },
+      name: "shows hints on a desktop with a mouse",
+      capabilities: { isCoarsePointer: false, hasFinePointer: true },
       expected: false,
     },
     {
-      name: "hides hints on wide touch tablets with coarse primary pointer",
-      capabilities: { isCoarsePointer: true, lacksHover: false, isMobileViewport: false },
+      name: "shows hints on a touch laptop whose primary pointer is fine",
+      capabilities: { isCoarsePointer: false, hasFinePointer: true },
+      expected: false,
+    },
+    {
+      name: "hides hints on a touch-only phone or tablet",
+      capabilities: { isCoarsePointer: true, hasFinePointer: false },
       expected: true,
     },
     {
-      name: "hides hints when primary input lacks hover",
-      capabilities: { isCoarsePointer: false, lacksHover: true, isMobileViewport: false },
-      expected: true,
+      name: "shows hints on a touch tablet with a trackpad or mouse attached",
+      capabilities: { isCoarsePointer: true, hasFinePointer: true },
+      expected: false,
     },
     {
-      name: "hides hints on narrow mobile viewports even with fine pointer",
-      capabilities: { isCoarsePointer: false, lacksHover: false, isMobileViewport: true },
-      expected: true,
-    },
-    {
-      name: "hides hints on phones with coarse pointer, no hover, and narrow viewport",
-      capabilities: { isCoarsePointer: true, lacksHover: true, isMobileViewport: true },
-      expected: true,
+      name: "shows hints when no pointer is reported at all",
+      capabilities: { isCoarsePointer: false, hasFinePointer: false },
+      expected: false,
     },
   ])("$name", ({ capabilities, expected }) => {
     expect(shouldHideKeyboardShortcutHintsFromCapabilities(capabilities)).toBe(expected);
   });
 
-  it("evaluates window.matchMedia queries and defaults to false without a window", () => {
+  it("evaluates window.matchMedia queries and defaults to showing without a window", () => {
     expect(shouldHideKeyboardShortcutHints(undefined)).toBe(false);
 
     const makeWindow = (matchedQueries: ReadonlySet<string>) => ({
@@ -52,13 +52,13 @@ describe("useKeyboardShortcutHints", () => {
     ).toBe(true);
     expect(
       shouldHideKeyboardShortcutHints(
-        makeWindow(new Set([KEYBOARD_SHORTCUT_HINT_MEDIA_QUERIES.noHover])),
+        makeWindow(
+          new Set([
+            KEYBOARD_SHORTCUT_HINT_MEDIA_QUERIES.coarsePointer,
+            KEYBOARD_SHORTCUT_HINT_MEDIA_QUERIES.anyFinePointer,
+          ]),
+        ),
       ),
-    ).toBe(true);
-    expect(
-      shouldHideKeyboardShortcutHints(
-        makeWindow(new Set([KEYBOARD_SHORTCUT_HINT_MEDIA_QUERIES.mobileViewport])),
-      ),
-    ).toBe(true);
+    ).toBe(false);
   });
 });

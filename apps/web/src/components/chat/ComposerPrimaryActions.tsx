@@ -387,14 +387,11 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     submitStatus ??
     (compactsBeforeSend
       ? `先总结 ${compactTokens} token 的历史记录，再发送`
-<<<<<<< HEAD
-      : isRunning && !isEditingQueuedMessage && canSteer
-        ? `点击：${describeActiveTurnAction(followUpBehavior)}；${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}：${describeActiveTurnAction(alternateAction)}`
-=======
-      : isRunning && !isEditingQueuedMessage && canSteer && !hideKeyboardHints
-        ? `点击以${followUpBehavior}，${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}以${alternateAction}`
->>>>>>> ca86ab2fb9 (feat(web): unify touch keyboard shortcut hint hiding)
-        : submitLabel);
+      : isRunning && !isEditingQueuedMessage && canSteer && hideKeyboardHints
+        ? `点击：${describeActiveTurnAction(followUpBehavior)}`
+        : isRunning && !isEditingQueuedMessage && canSteer
+          ? `点击：${describeActiveTurnAction(followUpBehavior)}；${isMacPlatform(navigator.platform) ? "⌘" : "Ctrl"}+点击${alternateShortcutLabel ? `或 ${alternateShortcutLabel}` : ""}：${describeActiveTurnAction(alternateAction)}`
+          : submitLabel);
 
   const sendButton = (
     <button

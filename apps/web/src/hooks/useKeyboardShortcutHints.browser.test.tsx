@@ -10,7 +10,7 @@ import { MenuShortcut } from "../components/ui/menu";
 import { SidebarProvider } from "../components/ui/sidebar";
 import { useVisibleShortcutLabel } from "./useKeyboardShortcutHints";
 
-async function emulateCoarsePointer() {
+async function emulateCoarsePointer(options: { readonly withFinePointer?: boolean } = {}) {
   const prev = { width: window.innerWidth, height: window.innerHeight };
   const session = cdp();
   await page.viewport(390, 844);
@@ -25,6 +25,8 @@ async function emulateCoarsePointer() {
     features: [
       { name: "pointer", value: "coarse" },
       { name: "hover", value: "none" },
+      { name: "any-pointer", value: options.withFinePointer ? "fine" : "coarse" },
+      { name: "any-hover", value: options.withFinePointer ? "hover" : "none" },
     ],
   });
   return {
@@ -98,7 +100,19 @@ describe("useKeyboardShortcutHints browser integration", () => {
     await expect.element(screen.getByLabelText("Visible shortcut")).toHaveTextContent("");
   });
 
-  it("hides all keyboard shortcut hints on narrow mobile viewports", async () => {
+  it("keeps keyboard shortcut hints on a touch device with a trackpad or mouse attached", async () => {
+    await using _pointer = await emulateCoarsePointer({ withFinePointer: true });
+    await using screen = await render(<ShortcutHintsHarness />, {
+      router: false /* no routes involved */,
+    });
+
+    await vi.waitFor(() => expect(window.matchMedia("(any-pointer: fine)").matches).toBe(true));
+
+    expect(screen.container.querySelector('[data-slot="kbd"]')?.textContent).toBe("Ctrl+K");
+    await expect.element(screen.getByLabelText("Visible shortcut")).toHaveTextContent("Ctrl+B");
+  });
+
+  it("keeps keyboard shortcut hints in a narrow desktop window", async () => {
     const prev = { width: window.innerWidth, height: window.innerHeight };
     await page.viewport(390, 844);
     await using _viewport = {
@@ -108,9 +122,7 @@ describe("useKeyboardShortcutHints browser integration", () => {
       router: false /* no routes involved */,
     });
 
-    expect(screen.container.querySelectorAll('[data-slot="kbd"]')).toHaveLength(0);
-    expect(screen.container.querySelector('[data-slot="menu-shortcut"]')).toBeNull();
-    expect(screen.container.querySelector('[data-slot="command-shortcut"]')).toBeNull();
-    await expect.element(screen.getByLabelText("Visible shortcut")).toHaveTextContent("");
+    expect(screen.container.querySelector('[data-slot="kbd"]')?.textContent).toBe("Ctrl+K");
+    await expect.element(screen.getByLabelText("Visible shortcut")).toHaveTextContent("Ctrl+B");
   });
 });
