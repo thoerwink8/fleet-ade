@@ -51,6 +51,8 @@ import {
   workEntryReadOutput,
 } from "./MessagesTimeline.logic";
 import { cn } from "~/lib/utils";
+import { classifyProviderError } from "./providerErrorClassification";
+import { ErrorDetailsDisclosure } from "./ErrorDetailsDisclosure";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { FetchedToolOutput, V2ItemInspector } from "./V2ItemInspector";
 import { SubagentNotificationLink } from "./V2LifecycleRow";
@@ -331,6 +333,17 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   if (pendingApproval) return <TimelinePendingApprovalRow approval={pendingApproval} />;
   if (failureItem?.type === "error" && failureItem.status === "failed") {
     const warning = failureItem.failure.class === "usage_limit";
+    const isWorkspacePrep =
+      failureItem.failure.code === ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE;
+    const classified = classifyProviderError({
+      agentName: "智能体",
+      rawError: failureItem.failure.message,
+      errorClass: failureItem.failure.class,
+      errorCode: failureItem.failure.code ?? null,
+      retryCount: failureItem.retry?.attempt ?? null,
+      usageLimitResetAt: failureItem.failure.resetAt ?? null,
+      timestampFormat,
+    });
     const resetAt = failureItem.failure.resetAt;
     // The reset time is the viewer's local time; naming the zone keeps it
     // unambiguous. Both read the zone now, since the device's can change.
@@ -340,11 +353,13 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       : null;
     const label = warning
       ? `已达到用量上限。${resetTime ? `请在 ${resetTime} 后重试。` : ""}`
-      : workEntry.label;
+      : isWorkspacePrep
+        ? workEntry.label
+        : classified.message;
     const retryRunId =
       failureItem.runId !== null &&
       retryableWorkspacePreparationRunIds.has(failureItem.runId) &&
-      failureItem.failure.code === ORCHESTRATION_V2_WORKSPACE_PREPARATION_FAILURE_CODE
+      isWorkspacePrep
         ? failureItem.runId
         : null;
     return (
@@ -372,10 +387,10 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
           />
         }
       >
-        {!warning ? (
-          <p className="ms-7 whitespace-pre-wrap break-words py-1 text-sm leading-relaxed text-foreground/80">
-            {failureItem.failure.message}
-          </p>
+        {!warning && classified.rawDetail ? (
+          <div className="ms-7 py-1">
+            <ErrorDetailsDisclosure detail={classified.rawDetail} />
+          </div>
         ) : null}
         {retryRunId !== null && onRetryWorkspacePreparation ? (
           <div className="ms-7 pb-1">

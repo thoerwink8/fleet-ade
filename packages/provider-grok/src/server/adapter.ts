@@ -89,6 +89,47 @@ const GROK_DRIVER_KIND = GROK_PROVIDER;
 export const GROK_DEFAULT_INSTANCE_ID = defaultInstanceIdForDriver(GROK_DRIVER_KIND);
 const DEFAULT_GROK_SETTINGS = Schema.decodeSync(GrokSettings)({});
 const isAcpRequestError = Schema.is(EffectAcpErrors.AcpRequestError);
+const isAcpTransportError = Schema.is(EffectAcpErrors.AcpTransportError);
+const GROK_AUTH_MESSAGE_PATTERN =
+  /(?:status(?:\s+code)?|http|code|error)\W{0,3}401\b|\b401\s+(?:unauthorized|error)\b|\bunauthorized\b|invalid_api_key|invalid api key|authentication.*required|authentication.*failed/i;
+const GROK_FORBIDDEN_PATTERN = /\b403\b|forbidden|permission denied/i;
+
+export function grokRequiresSignIn(cause: unknown): boolean {
+  return (
+    isAcpRequestError(cause) &&
+    (cause.code === -32000 ||
+      (!/\b403\b|forbidden/i.test(cause.errorMessage) &&
+        GROK_AUTH_MESSAGE_PATTERN.test(cause.errorMessage)))
+  );
+}
+
+export function grokPromptFailure(cause: unknown) {
+  if (isAcpRequestError(cause)) {
+    const message = isXAiPromptFailureText(cause.cause) ? cause.cause.message : cause.errorMessage;
+    const failureClass =
+      cause.code === xAiRateLimitedErrorCode
+        ? "usage_limit"
+        : cause.code === -32000 ||
+            (!/\b403\b|forbidden/i.test(message) && GROK_AUTH_MESSAGE_PATTERN.test(message))
+          ? "auth_error"
+          : GROK_FORBIDDEN_PATTERN.test(message)
+            ? "permission_error"
+            : "provider_error";
+    return makeProviderFailure({
+      cause,
+      message,
+      code: String(cause.code),
+      class: failureClass,
+      ...(failureClass === "auth_error" || failureClass === "permission_error"
+        ? { retryable: false }
+        : {}),
+    });
+  }
+  return makeProviderFailure({
+    cause,
+    class: isAcpTransportError(cause) ? "transport_error" : "provider_error",
+  });
+}
 
 const GrokProviderCapabilitiesV2 = {
   ...AcpProviderCapabilitiesV2,
@@ -376,19 +417,8 @@ export function makeGrokAcpAdapterFlavor(
     permissionDisposition: (policy, request) =>
       grokLaunchRuntimeMode(policy) === "auto" ? "ask" : acpPermissionDisposition(policy, request),
     approvalOptions: grokApprovalOptions,
-    promptFailure: (cause) =>
-      makeProviderFailure({
-        cause,
-        ...(isAcpRequestError(cause)
-          ? {
-              message: isXAiPromptFailureText(cause.cause)
-                ? cause.cause.message
-                : cause.errorMessage,
-              code: String(cause.code),
-              class: cause.code === xAiRateLimitedErrorCode ? "usage_limit" : "provider_error",
-            }
-          : { class: "provider_error" }),
-      }),
+    requiresSignIn: grokRequiresSignIn,
+    promptFailure: grokPromptFailure,
     registerExtensions: registerGrokAcpExtensions,
     extractSubagentUpdate: extractXAiAcpSubagentUpdate,
     extractSubagentEndNotice: extractXAiAcpSubagentEndNotice,

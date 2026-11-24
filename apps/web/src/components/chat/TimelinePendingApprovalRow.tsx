@@ -36,7 +36,8 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
 }: {
   approval: PendingApproval;
 }) {
-  const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
+  const { respondingRequestIds, canOperateThread, onRespondToApproval, onResendLastUserMessage } =
+    use(TimelineRowCtx);
   const presentation = APPROVAL_PRESENTATION[approval.requestKind];
   const canRespond = approval.responseCapability === "live";
   return (
@@ -96,8 +97,11 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
               ) : null}
             </>
           ) : (
-            <span className="text-warning">
-              提供方进程已退出。请中断或重新开始这次运行后再回应。
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-warning">
+              <span>这一轮已经结束，无法继续操作。</span>
+              {onResendLastUserMessage ? (
+                <InlineButton onClick={onResendLastUserMessage}>重新发送上一条</InlineButton>
+              ) : null}
             </span>
           )}
           {approval.fullAccessOverride ? (

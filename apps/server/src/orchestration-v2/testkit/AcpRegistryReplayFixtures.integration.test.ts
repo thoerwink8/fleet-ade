@@ -181,7 +181,10 @@ describe("ACP registry replay fixtures", () => {
         );
         const errors = projection.turnItems.filter((item) => item.type === "error");
         assert.lengthOf(errors, 1);
-        assert.equal(errors[0]?.failure.class, "provider_error");
+        assert.equal(
+          errors[0]?.failure.class,
+          testCase.code === -32000 ? "auth_error" : "provider_error",
+        );
         if (testCase.code === -32602) {
           assert.equal(
             errors[0]?.failure.message,

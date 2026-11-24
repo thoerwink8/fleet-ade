@@ -108,6 +108,7 @@ import {
   type OrchestrationV2ExecutionNode,
   type OrchestrationV2ProviderCapabilities,
   type OrchestrationV2ProviderFailure,
+  type OrchestrationV2ProviderFailureClass,
   OrchestrationV2ProviderGoal,
   type OrchestrationV2PlanArtifact,
   type OrchestrationV2PlanStep,
@@ -212,6 +213,7 @@ import {
   shouldPersistProviderEvent,
 } from "../../provider/EventNdjsonLogger.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
+import { isCommandMissingCause } from "@t3tools/provider-core/server/snapshotProbe";
 import {
   claudeRateLimitEventToUpdate,
   type ClaudeScopedLimitNames,
@@ -4424,11 +4426,34 @@ function claudeRewrittenVersion(
     : undefined;
 }
 
+function isClaudeNotInstalledCause(cause: unknown): boolean {
+  let current: unknown = cause;
+  const seen = new Set<unknown>();
+  for (let depth = 0; depth < 6 && current !== undefined && current !== null; depth += 1) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    if (
+      isClaudeReclaudeNotFound(current) ||
+      isCommandMissingCause(current) ||
+      (Predicate.isObject(current) && "code" in current && current.code === "ENOENT")
+    ) {
+      return true;
+    }
+    if (Predicate.isObject(current) && "cause" in current) {
+      current = current.cause;
+    } else {
+      break;
+    }
+  }
+  return false;
+}
+
 function providerFailureFromResult(
   message: SDKResultMessage,
   receivedAt: DateTime.Utc,
   failureHint?: string,
   usageLimited = false,
+  options?: { readonly isAuthFailure?: boolean },
 ): OrchestrationV2ProviderFailure | null {
   const gatewayResetAt =
     failureHint === undefined &&
@@ -4452,10 +4477,17 @@ function providerFailureFromResult(
       resetAt: gatewayResetAt,
     });
   }
-  const failureClass =
-    (message.subtype === "success" && message.api_error_status === 429) || usageLimited
-      ? "usage_limit"
-      : "provider_error";
+  const resultApiStatus = message.subtype === "success" ? (message.api_error_status ?? null) : null;
+  const authError =
+    resultApiStatus !== 403 && (options?.isAuthFailure === true || resultApiStatus === 401);
+  const failureClass: OrchestrationV2ProviderFailureClass =
+    resultApiStatus === 403
+      ? "permission_error"
+      : authError
+        ? "auth_error"
+        : resultApiStatus === 429 || usageLimited
+          ? "usage_limit"
+          : "provider_error";
   const listedError = resultUserFacingError(message);
   const apiErrorMessage =
     message.subtype === "success" &&
@@ -4473,6 +4505,9 @@ function providerFailureFromResult(
       message: listedError ?? structuredError ?? message.errors.join("\n"),
       code: message.subtype,
       class: failureClass,
+      ...(failureClass === "auth_error" || failureClass === "permission_error"
+        ? { retryable: false }
+        : {}),
     });
   }
   if (!message.is_error && structuredError === undefined) {
@@ -4494,26 +4529,36 @@ function providerFailureFromResult(
         ? (message.terminal_reason ?? "sdk_result_error")
         : `api_error_${apiErrorStatus}`,
     class: failureClass,
-    retryable: apiErrorStatus === 429 || apiErrorStatus === 529 ? true : null,
+    retryable:
+      failureClass === "auth_error" || failureClass === "permission_error"
+        ? false
+        : apiErrorStatus === 429 || apiErrorStatus === 529
+          ? true
+          : null,
     resetAt: resetAt ?? null,
   });
 }
 
 function providerFailureFromApiRetry(message: SDKAPIRetryMessage): OrchestrationV2ProviderFailure {
   const errorName = message.error.replaceAll("_", " ");
+  const isAuth = message.error_status === 401 || message.error === "authentication_failed";
+  const isPermission = message.error_status === 403;
   return makeProviderFailure({
     message: `Claude API ${errorName}.`,
     code:
       message.error_status === null
         ? message.error
         : `api_error_${Math.trunc(message.error_status)}`,
-    class:
-      message.error_status === 429
-        ? "usage_limit"
-        : message.error_status === null
-          ? "transport_error"
-          : "provider_error",
-    retryable: true,
+    class: isAuth
+      ? "auth_error"
+      : isPermission
+        ? "permission_error"
+        : message.error_status === 429
+          ? "usage_limit"
+          : message.error_status === null
+            ? "transport_error"
+            : "provider_error",
+    retryable: !isAuth && !isPermission,
   });
 }
 
@@ -10433,13 +10478,37 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
 
           if (message.type === "system" && message.subtype === "api_retry") {
             const updatedAt = yield* DateTime.now;
+            const failure = providerFailureFromApiRetry(message);
+            if (failure.class === "auth_error") {
+              const authMessage =
+                context.authenticationFailureMessage ??
+                claudeSignedOutMessage({
+                  configDir: adapterOptions.environment.CLAUDE_CONFIG_DIR,
+                  cwd: path.resolve(context.input.runtimePolicy.cwd ?? "."),
+                });
+              context.authenticationFailureMessage = authMessage;
+              const authFailure: OrchestrationV2ProviderFailure = {
+                ...failure,
+                message: authMessage,
+                retryable: false,
+              };
+              yield* finalizeActiveTurn({
+                context,
+                status: "failed",
+                completedAt: updatedAt,
+                failure: authFailure,
+              });
+              if (!liveQuery.stopping) {
+                yield* liveQuery.query.interrupt.pipe(Effect.ignore, Effect.forkIn(sessionScope));
+              }
+              return;
+            }
             const previous = (yield* Ref.get(providerRetries)).get(context.providerTurnId);
             const retry: OrchestrationV2ProviderRetry = {
               attempt: Math.max(1, Math.trunc(message.attempt)),
               maxAttempts: Math.max(1, Math.trunc(message.max_retries)),
               retryDelayMs: Math.max(0, Math.trunc(message.retry_delay_ms)),
             };
-            const failure = providerFailureFromApiRetry(message);
             const itemOrdinal =
               previous?.itemOrdinal ??
               (yield* resolveItemOrdinal(context, `terminal-failure:${context.providerTurnId}`));
@@ -11225,6 +11294,10 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                     bufferedResultArrivals.get(message) ?? completedAt,
                     failureHint,
                     usageLimited,
+                    {
+                      isAuthFailure:
+                        !permissionDenied && context.authenticationFailureMessage !== undefined,
+                    },
                   );
             const terminalFailure =
               resultFailure?.class === "usage_limit"
@@ -13674,6 +13747,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               new ProviderAdapter.ProviderAdapterOpenSessionError({
                 driver: CLAUDE_PROVIDER,
                 providerSessionId: input.providerSessionId,
+                ...(isClaudeNotInstalledCause(cause) ? { notInstalled: true } : {}),
                 cause,
               }),
           ),

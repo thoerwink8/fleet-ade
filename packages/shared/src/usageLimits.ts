@@ -378,7 +378,7 @@ export function collectLimitNotices(presentations: LimitPresentations): readonly
       if (source.error) {
         notices.add(`${label(environmentLabel, source.label)}: ${source.error}`);
       } else if (source.accounts.length === 0) {
-        notices.add(`${label(environmentLabel, source.label)}: No accounts reported.`);
+        notices.add(`${label(environmentLabel, source.label)}: 暂无账号数据。`);
       }
     }
   }

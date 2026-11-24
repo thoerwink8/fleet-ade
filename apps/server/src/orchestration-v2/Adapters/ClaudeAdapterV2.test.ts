@@ -7452,6 +7452,8 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const terminal = yield* Queue.take(harness.terminalReceipts);
       assert.equal(terminal.status, "failed");
       if (terminal.status !== "failed") return;
+      assert.equal(terminal.failure.class, "auth_error");
+      assert.equal(terminal.failure.retryable, false);
       assert.include(terminal.failure.message, "运行 `claude auth login`");
       assert.include(terminal.failure.message, configDir);
       assert.include(terminal.failure.message, JSON.stringify(cwd));
@@ -7504,6 +7506,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       if (terminal.status !== "failed") return;
       assert.equal(terminal.failure.message, cliText);
       assert.equal(terminal.failure.code, "api_error_403");
+      assert.equal(terminal.failure.class, "permission_error");
     }).pipe(
       Effect.provide(
         Layer.mergeAll(
@@ -8365,7 +8368,10 @@ describe("ClaudeAdapterV2 background wake turns", () => {
       const terminal = yield* Queue.take(harness.terminalReceipts);
       assert.equal(terminal.status, "failed");
       if (terminal.status !== "failed") return;
-      assert.equal(terminal.failure.class, input.seconds > 0 ? "usage_limit" : "provider_error");
+      assert.equal(
+        terminal.failure.class,
+        input.status === 401 ? "auth_error" : input.seconds > 0 ? "usage_limit" : "provider_error",
+      );
       if (input.seconds > 0) {
         assert.equal(terminal.failure.retryable, true);
         assert.equal(
@@ -10766,6 +10772,65 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         }),
       );
       yield* harness.awaitTerminal(1);
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          IdAllocator.layer,
+          McpProviderSessions.layer,
+          NodeServices.layer,
+          NodeCrypto.layer,
+        ),
+      ),
+    ),
+  );
+
+  it.effect("fails immediately without retrying when api_retry reports an auth error", () =>
+    Effect.gen(function* () {
+      const interruptSent = yield* Deferred.make<void>();
+      const harness = yield* makeWakeHarnessWithOptions({
+        interrupt: Deferred.succeed(interruptSent, undefined),
+      });
+      const now = yield* DateTime.now;
+      yield* harness.runtime.startTurn(
+        makeClaudeTestTurnInput({
+          threadId: harness.threadId,
+          providerThread: harness.providerThread,
+          now,
+          attemptId: RunAttemptId.make("attempt-claude-auth-api-retry"),
+          text: "Continue.",
+          attachments: [],
+        }),
+      );
+
+      yield* Queue.offer(
+        harness.sdkMessages,
+        claudeSdkFrame({
+          type: "system",
+          subtype: "api_retry",
+          attempt: 1,
+          max_retries: 10,
+          retry_delay_ms: 1_500,
+          error_status: 401,
+          error: "authentication_failed",
+          uuid: "00000000-0000-4000-8000-000000000205",
+          session_id: WAKE_NATIVE_SESSION,
+        }),
+      );
+
+      const terminal = yield* Queue.take(harness.terminalReceipts);
+      yield* Deferred.await(interruptSent);
+      assert.equal(terminal.status, "failed");
+      if (terminal.status !== "failed") return;
+      assert.equal(terminal.failure.class, "auth_error");
+      assert.equal(terminal.failure.retryable, false);
+      assert.equal(terminal.failure.code, "api_error_401");
+      const retryItems = harness.events.filter(
+        (event) =>
+          event.type === "turn_item.updated" &&
+          event.turnItem.type === "error" &&
+          event.turnItem.retry !== undefined,
+      );
+      assert.isEmpty(retryItems);
     }).pipe(
       Effect.provide(
         Layer.mergeAll(

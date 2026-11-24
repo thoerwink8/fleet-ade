@@ -44,60 +44,82 @@ export function getProviderStatusKey(provider: ServerProvider | undefined): Prov
   return provider?.status ?? "warning";
 }
 
-export function getProviderSummary(provider: ServerProvider | undefined) {
+function splitProviderDiagnosticMessage(
+  message: string | null | undefined,
+  fallbackDetail: string | null,
+): { readonly detail: string | null; readonly rawDetail: string | null } {
+  const trimmed = message?.trim() ?? "";
+  if (trimmed.length === 0) {
+    return { detail: fallbackDetail, rawDetail: null };
+  }
+  if (/\p{Script=Han}/u.test(trimmed)) {
+    return { detail: trimmed, rawDetail: null };
+  }
+  return { detail: fallbackDetail, rawDetail: trimmed };
+}
+
+export function getProviderSummary(provider: ServerProvider | undefined): {
+  readonly headline: string;
+  readonly detail: string | null;
+  readonly rawDetail: string | null;
+} {
   if (!provider) {
     return {
-      headline: "正在检查提供方状态",
-      detail: "正在等待服务器返回安装和认证信息。",
+      headline: "正在检查智能体状态",
+      detail: "正在等待服务器返回安装和登录状态。",
+      rawDetail: null,
     };
   }
   if (!provider.enabled || provider.status === "disabled") {
     return {
-      headline: "Disabled",
-      detail: provider.message ?? "此提供方已安装，但已停用，无法用于 Fleet ADE 的新会话。",
+      headline: "已停用",
+      ...splitProviderDiagnosticMessage(
+        provider.message,
+        "此智能体已安装，但已停用，无法用于 Fleet ADE 的新会话。",
+      ),
     };
   }
   if (!provider.installed) {
     return {
-      headline: "未找到",
-      detail: provider.message ?? "未在 PATH 中找到 CLI。",
+      headline: "未安装",
+      ...splitProviderDiagnosticMessage(provider.message, "这台电脑上还没安装这个智能体。"),
     };
   }
   if (provider.auth.status === "unauthenticated") {
     const authLabel = provider.auth.label ?? provider.auth.type;
     return {
-      headline: authLabel ? `未认证 · ${authLabel}` : "未认证",
-      detail: provider.message ?? null,
+      headline: authLabel ? `未登录 · ${authLabel}` : "未登录",
+      ...splitProviderDiagnosticMessage(provider.message, "登录后即可开始使用。"),
     };
   }
   if (isAntigravitySignInUnchecked(provider)) {
     return {
       headline: "已安装 · 未检查登录状态",
-      detail: provider.message ?? null,
+      ...splitProviderDiagnosticMessage(provider.message, null),
     };
   }
   if (provider.status === "warning") {
     return {
       headline: "需要处理",
-      detail: provider.message ?? "提供方已安装，但服务器无法完成验证。",
+      ...splitProviderDiagnosticMessage(provider.message, "智能体已安装，但暂时无法完成检查。"),
     };
   }
   if (provider.status === "error") {
     return {
       headline: "不可用",
-      detail: provider.message ?? "提供方未通过启动检查。",
+      ...splitProviderDiagnosticMessage(provider.message, "这个智能体暂时无法启动。"),
     };
   }
   if (provider.auth.status === "authenticated") {
     const authLabel = provider.auth.label ?? provider.auth.type;
     return {
-      headline: authLabel ? `已认证 · ${authLabel}` : "已认证",
-      detail: provider.message ?? null,
+      headline: authLabel ? `已登录 · ${authLabel}` : "已登录",
+      ...splitProviderDiagnosticMessage(provider.message, null),
     };
   }
   return {
     headline: "可用",
-    detail: provider.message ?? null,
+    ...splitProviderDiagnosticMessage(provider.message, null),
   };
 }
 

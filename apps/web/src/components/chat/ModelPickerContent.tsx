@@ -25,7 +25,8 @@ import {
 import { ModelListRow } from "./ModelListRow";
 import { ModelPickerSidebar } from "./ModelPickerSidebar";
 import { useProviderWorkspaceSnapshotRefresh } from "./useProviderWorkspaceSnapshotRefresh";
-import { getProviderStatusMessage, hasProviderSetup } from "./ProviderStatusBanner";
+import { hasProviderSetup } from "./ProviderStatusBanner";
+import { classifyProviderError } from "./providerErrorClassification";
 import {
   modelPickerLegacySectionKey,
   modelPickerModelKey,
@@ -212,22 +213,33 @@ function ModelPickerProviderNotices({
     <>
       {setupEntries.length > 0 ? (
         <div className="max-h-44 shrink-0 overflow-y-auto border-t border-border/70 p-2">
-          {setupEntries.map((entry) => (
-            <div key={entry.instanceId} className="px-1 py-1.5 text-xs leading-snug">
-              <p className="line-clamp-3 text-muted-foreground">
-                {getProviderStatusMessage(entry.snapshot)}
-              </p>
-              <InlineButton
-                className="mt-1"
-                onClick={() => {
-                  onRequestClose?.();
-                  onOpenProviderSetup?.(entry.instanceId);
-                }}
-              >
-                {setupEntries.length > 1 ? `设置 ${entry.displayName}` : "打开提供方设置"}
-              </InlineButton>
-            </div>
-          ))}
+          {setupEntries.map((entry) => {
+            const classified = classifyProviderError({
+              agentName: entry.displayName,
+              rawError: entry.snapshot.message ?? null,
+              providerStatus: entry.snapshot,
+            });
+            return (
+              <div key={entry.instanceId} className="px-1 py-1.5 text-xs leading-snug">
+                <p className="line-clamp-3 text-muted-foreground">{classified.message}</p>
+                <InlineButton
+                  className="mt-1"
+                  onClick={() => {
+                    onRequestClose?.();
+                    onOpenProviderSetup?.(entry.instanceId);
+                  }}
+                >
+                  {classified.action?.kind === "sign_in"
+                    ? "去登录"
+                    : classified.action?.kind === "install_help"
+                      ? "查看安装方法"
+                      : setupEntries.length > 1
+                        ? `设置 ${entry.displayName}`
+                        : "打开智能体设置"}
+                </InlineButton>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <ComboboxEmpty className="empty:h-0">{emptyLabel}</ComboboxEmpty>
@@ -244,7 +256,7 @@ function ModelPickerProviderNotices({
               void navigate({ to: "/settings/providers" });
             }}
           >
-            提供方设置
+            智能体设置
           </InlineButton>
         </p>
       ))}

@@ -233,6 +233,7 @@ interface MessagesTimelineProps {
   respondingRequestIds?: TimelineRowSharedState["respondingRequestIds"];
   canOperateThread?: boolean;
   onRespondToApproval?: TimelineRowSharedState["onRespondToApproval"];
+  onResendLastUserMessage?: TimelineRowSharedState["onResendLastUserMessage"];
   citationRequest?: AssistantCitationRequest | null;
   citationHistory?: CitedHistory;
   onCiteAssistantText?: (
@@ -356,6 +357,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   respondingRequestIds = EMPTY_RESPONDING_REQUEST_IDS,
   canOperateThread = false,
   onRespondToApproval,
+  onResendLastUserMessage,
   citationRequest = null,
   citationHistory = CITED_HISTORY_LOADING,
   onCiteAssistantText,
@@ -1231,6 +1233,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     respondingRequestIds,
     canOperateThread,
     onRespondToApproval,
+    onResendLastUserMessage,
     citationRequest: readyCitationRequest,
     onReplyToResponse,
     listRef,

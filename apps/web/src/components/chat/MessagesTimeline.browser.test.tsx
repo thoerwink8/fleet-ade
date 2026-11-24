@@ -2266,9 +2266,7 @@ it("keeps concurrent approvals actionable outside collapsed work and restores se
   await screen.rerender(
     ui({ pendingApprovals: [{ ...approvals[0]!, responseCapability: "not_resumable" }] }),
   );
-  await expect
-    .element(screen.getByText("提供方进程已退出。请中断或重新开始这次运行后再回应。"))
-    .toBeVisible();
+  await expect.element(screen.getByText("这一轮已经结束，无法继续操作。")).toBeVisible();
   await vi.waitFor(() => expect(screen.buttons("批准")).toHaveLength(0));
   await screen.rerender(
     ui({ pendingApprovals: [], timelineEntries: entries(true), isWorking: false }),

@@ -11,10 +11,12 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Exit from "effect/Exit";
+import * as Predicate from "effect/Predicate";
 import * as Semaphore from "effect/Semaphore";
 import * as Scope from "effect/Scope";
 import * as EffectAcpErrors from "effect-acp/errors";
 
+import { isCommandMissingCause } from "@t3tools/provider-core/server/snapshotProbe";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { PULL_REQUEST_LINKING_INSTRUCTIONS } from "@t3tools/provider-core/server/runtimeInstructions";
 import type { AntigravityAuth } from "../../provider/AntigravityAuth.ts";
@@ -205,6 +207,26 @@ export function makeAntigravityAcpAdapterFlavor(
     ),
   );
 
+  function isAntigravityNotInstalledError(cause: unknown): boolean {
+    if (isCommandMissingCause(cause)) return true;
+    if (!Predicate.isObject(cause)) return false;
+    if (cause._tag === "AcpSpawnError") {
+      const inner = "cause" in cause ? cause.cause : undefined;
+      return (
+        isCommandMissingCause(inner) ||
+        (Predicate.isObject(inner) && "code" in inner && inner.code === "ENOENT")
+      );
+    }
+    return (
+      cause._tag === "ProviderSetupError" &&
+      "operation" in cause &&
+      cause.operation === "resolve" &&
+      "detail" in cause &&
+      typeof cause.detail === "string" &&
+      /not installed|missing|incomplete|does not publish/i.test(cause.detail)
+    );
+  }
+
   return {
     driver: ANTIGRAVITY_PROVIDER,
     runtimeHarness: "Antigravity",
@@ -276,6 +298,7 @@ export function makeAntigravityAcpAdapterFlavor(
     // ACP 1.3.0 treats /compact as ordinary model input.
     supportsCompaction: false,
     requiresSignIn: isAntigravitySignInRequiredError,
+    notInstalled: isAntigravityNotInstalledError,
     // Antigravity can leave a prompt open without updates; long tools and approvals pause this.
     promptInactivityTimeout: "15 minutes",
     // 1.4.5 returns the root trajectory's Gemini usageMetadata delta; 1.4.1 returns none.

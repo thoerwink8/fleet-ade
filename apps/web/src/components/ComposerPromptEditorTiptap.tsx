@@ -174,6 +174,7 @@ export interface ComposerPromptEditorProps {
   /** Rendered after the placeholder text, such as a key hint. */
   placeholderSuffix?: ReactNode;
   ariaLabel?: string | undefined;
+  ariaDescribedBy?: string | undefined;
   suggestionListId?: string | undefined;
   activeSuggestionId?: string | undefined;
   isPathQueryActive?: () => boolean;
@@ -934,6 +935,7 @@ function ComposerPromptEditorTiptapInner(
     disabled,
     placeholder,
     ariaLabel,
+    ariaDescribedBy,
     suggestionListId,
     activeSuggestionId,
     isPathQueryActive,
@@ -1087,6 +1089,7 @@ function ComposerPromptEditorTiptapInner(
     role: "textbox",
     "aria-multiline": "true",
     ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
+    ...(ariaDescribedBy ? { "aria-describedby": ariaDescribedBy } : {}),
     ...(disabled ? { "aria-readonly": "true" } : {}),
     ...(!disabled && suggestionListId
       ? {

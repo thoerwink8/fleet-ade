@@ -48,6 +48,7 @@ interface ComposerPrimaryActionsProps {
   alternateShortcutLabel?: string | null;
   isSendBusy: boolean;
   sendDisabledReason: string | null;
+  sendBlockReasonId?: string | undefined;
   isEnvironmentUnavailable: boolean;
   isPreparingWorktree: boolean;
   hasSendableContent: boolean;
@@ -228,6 +229,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   alternateShortcutLabel = null,
   isSendBusy,
   sendDisabledReason,
+  sendBlockReasonId,
   isEnvironmentUnavailable,
   isPreparingWorktree,
   hasSendableContent,
@@ -417,6 +419,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
         isEnvironmentUnavailable ||
         (!hasSendableContent && !showResume)
       }
+      aria-describedby={sendBlockReasonId}
       aria-label={submitStatus ?? submitLabel}
     >
       {stageBackdropVariant ? (

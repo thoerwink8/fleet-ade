@@ -1,6 +1,7 @@
 import {
   latestExecutedRun,
   latestRootProviderFailure,
+  latestRootProviderFailureItem,
   latestUnheldRun,
   threadErrorSummary,
   usageLimitRunPresentedAsLatest,
@@ -384,7 +385,7 @@ export function deriveThreadStructureRuntime(
     providerInstanceId: projection.thread.providerInstanceId,
     providerName: providerSession?.driver ?? null,
     ...threadErrorSummary(
-      latestRootProviderFailure(latestRunProjection, projection.turnItems),
+      latestRootProviderFailureItem(latestRunProjection, projection.turnItems),
       providerSession?.lastError ?? null,
     ),
   };

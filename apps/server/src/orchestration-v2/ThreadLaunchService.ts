@@ -52,6 +52,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import { providerRefusal } from "./ProviderReadinessGate.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
@@ -1064,6 +1065,16 @@ const make = Effect.gen(function* () {
         commandId: input.commandId,
         instanceId: input.modelSelection.instanceId,
       });
+      if (Option.isNone(launchReceipt)) {
+        const refusal = yield* providerRefusal(providerRegistry, input.modelSelection.instanceId);
+        if (refusal !== null) {
+          return yield* mapError(
+            input,
+            input.threadId === undefined ? "create-thread" : "update-thread",
+            input.threadId,
+          )(new Error(refusal));
+        }
+      }
       return yield* Effect.gen(function* () {
         // Recover ids from accepted launch receipts before allocating; retries have no client id and new ids collide with receipts.
         const reusableLaunchReceipt =
