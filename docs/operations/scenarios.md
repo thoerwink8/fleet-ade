@@ -37,7 +37,7 @@ test("Tab moves from the add-project Git URL field to its submit button", async 
 ```
 
 `screen`, `browser`, `app`, and `expect` are e2e's own. [`t3.ts`](../../scripts/scenarios/t3.ts)
-adds one fixture for what e2e cannot know about T3 Code:
+adds one fixture for what e2e cannot know about Fleet ADE:
 
 - `t3.project(title, files)` creates a git repository and adds it as a project.
 - `t3.thread({ project, title, messages })` starts a thread and plays one replayed turn per

@@ -1,8 +1,8 @@
 # Observability
 
-> For maintainers. Using T3 Code? See [docs/user](../user/).
+> For maintainers. Using Fleet ADE? See [docs/user](../user/).
 
-T3 Code has one server-side observability model:
+Fleet ADE has one server-side observability model:
 
 - pretty logs go to stdout for humans
 - completed spans go to a local NDJSON trace file
@@ -238,8 +238,12 @@ macOS app bundle example:
 T3CODE_OTLP_TRACES_URL=http://localhost:4318/v1/traces \
 T3CODE_OTLP_METRICS_URL=http://localhost:4318/v1/metrics \
 T3CODE_OTLP_LOGS_URL=http://localhost:4318/v1/logs \
-"/Applications/T3 Code.app/Contents/MacOS/T3 Code"
+"/Applications/Fleet ADE (Beta).app/Contents/MacOS/Fleet ADE (Beta)"
 ```
+
+A nightly version uses `Fleet ADE (Nightly).app` instead. The bundle name is the
+desktop product name: `Fleet ADE (Beta)` unless the version matches
+`-nightly.YYYYMMDD.N`.
 
 Direct binary example:
 
@@ -642,7 +646,7 @@ release workflow reports `dev`) and `deployment.environment.name` (`development`
 set `VITE_RELEASE_CHANNEL=preview` because their `APP_VERSION` must stay comparable with the
 server's.
 
-Attributes specific to T3 Code use the `t3code.` prefix. The UI runs as `t3code-web` in both a
+Attributes specific to Fleet ADE use the `t3code.` prefix. The UI runs as `t3code-web` in both a
 browser and the desktop window, since it is the same code, and `t3code.client.surface` is `desktop`
 or `web`. The server's `t3code.server.managed_by` is `desktop` when the desktop app launched it and
 `standalone` otherwise. The desktop main process reports `t3code.desktop.mode` as `development` or
@@ -713,7 +717,7 @@ pid="$(jq .pid "${T3CODE_HOME:-$HOME/.t3}/userdata/server-runtime.json")"
 ps -p "$pid" -o command=
 ```
 
-If `ps` shows the T3 Code server, send the signal:
+If `ps` shows the Fleet ADE server, send the signal:
 
 ```bash
 kill -USR2 "$pid"
