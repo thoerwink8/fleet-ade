@@ -408,9 +408,7 @@ export function PullRequestDetailPanel({
               <PullRequestDetailHeaderBody
                 title={
                   <PullRequestDetailTitleRow>
-                    <h1 className="truncate text-base font-semibold leading-snug">
-                      {detail.title}
-                    </h1>
+                    <h1 className="truncate text-base font-medium leading-snug">{detail.title}</h1>
                   </PullRequestDetailTitleRow>
                 }
                 author={

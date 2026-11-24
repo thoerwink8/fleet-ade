@@ -219,7 +219,7 @@ function relationshipThreadTitle(input: {
 function LineageTooltipContent(props: { readonly title: string; readonly hint: string }) {
   return (
     <>
-      <span className="block text-meta font-semibold">{props.title}</span>
+      <span className="block text-meta font-medium">{props.title}</span>
       <span className="block text-muted-foreground">{props.hint}</span>
     </>
   );

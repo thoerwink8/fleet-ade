@@ -149,7 +149,7 @@ export function ProjectActionsSettings() {
                     >
                       <ScriptIcon icon={fileScript.icon ?? "play"} className="size-4 shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-semibold">{fileScript.name}</div>
+                        <div className="truncate font-medium">{fileScript.name}</div>
                         <div className="truncate font-mono text-muted-foreground">
                           {fileScript.command}
                         </div>

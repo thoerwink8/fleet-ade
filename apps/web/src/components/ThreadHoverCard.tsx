@@ -23,7 +23,7 @@ export function ThreadHoverCard({
 }) {
   return (
     <div className="flex min-w-0 max-w-80 flex-col gap-2 px-1 py-2">
-      <div className="min-w-0 truncate text-meta font-semibold text-foreground">{title}</div>
+      <div className="min-w-0 truncate text-meta font-medium text-foreground">{title}</div>
       <div className="grid gap-1.5 pl-0.5 text-xs text-muted-foreground">{children}</div>
       {footer}
     </div>

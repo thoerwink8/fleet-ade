@@ -118,7 +118,7 @@ function PendingLinkRequest(props: {
       className="flex min-w-0 flex-col gap-3 rounded-xl border border-border/60 bg-card p-4"
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-row font-semibold text-foreground">
+        <p className="text-row font-medium text-foreground">
           {picksMachine(item) ? "将一台机器关联到此环境" : `将 ${target} 关联到此环境`}
         </p>
         {item.reason.trim() ? <p className="text-sm text-muted-foreground">{item.reason}</p> : null}
@@ -337,7 +337,7 @@ function LinkRequestDialog(props: {
                 ) : null}
                 {asksAddress ? (
                   <label className="block space-y-1.5">
-                    <span className="block text-meta font-semibold text-foreground">地址</span>
+                    <span className="block text-meta font-medium text-foreground">地址</span>
                     <Input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
@@ -365,9 +365,7 @@ function LinkRequestDialog(props: {
                     {needsAddress ? <LinkAddressWarning address={address} /> : null}
                     {canMint ? null : (
                       <label className="block space-y-1.5">
-                        <span className="block text-meta font-semibold text-foreground">
-                          配对码
-                        </span>
+                        <span className="block text-meta font-medium text-foreground">配对码</span>
                         <Input
                           value={pairingCode}
                           onChange={(event) => setPairingCode(event.target.value)}
@@ -442,7 +440,7 @@ function MachinePicker(props: {
   const labelId = useId();
   return (
     <div className="space-y-2">
-      <span id={labelId} className="block text-meta font-semibold">
+      <span id={labelId} className="block text-meta font-medium">
         机器
       </span>
       <RadioGroup

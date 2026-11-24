@@ -36,7 +36,7 @@ export function ProjectMonogram({
           fill="currentColor"
           className="font-mono"
           fontSize="8.25"
-          fontWeight="700"
+          fontWeight="500"
           textLength={Array.from(monogramSegmenter.segment(text)).length === 1 ? 6 : 12}
           lengthAdjust="spacingAndGlyphs"
           textRendering="geometricPrecision"

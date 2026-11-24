@@ -165,7 +165,7 @@ export const ProposedPlanCard = memo(function ProposedPlanCard({
           {}
           <h3
             data-thread-find-text="true"
-            className="truncate text-row font-semibold text-foreground"
+            className="truncate text-row font-medium text-foreground"
           >
             {title}
           </h3>
@@ -283,7 +283,7 @@ function SavePlanToWorkspaceForm({
       </DialogHeader>
       <DialogPanel>
         <label htmlFor={savePathInputId} className="grid gap-1.5">
-          <span className="text-meta font-semibold text-foreground">工作区路径</span>
+          <span className="text-meta font-medium text-foreground">工作区路径</span>
           <Input
             id={savePathInputId}
             value={savePath}

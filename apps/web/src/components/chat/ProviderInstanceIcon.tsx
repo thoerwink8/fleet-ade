@@ -142,7 +142,7 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
         isOmpTextTile ? (
           <span
             className={cn(
-              "flex size-5 shrink-0 items-center justify-center rounded-md border bg-card text-4xs font-semibold leading-none text-foreground",
+              "flex size-5 shrink-0 items-center justify-center rounded-md border bg-card text-4xs font-medium leading-none text-foreground",
               iconClassName,
               badgePlacement === "inline" && "w-auto min-w-4 px-1",
             )}
@@ -161,7 +161,7 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
         // The tile is a size container: below ~18px it keeps one letter and drops the mark.
         <span
           className={cn(
-            "@container relative flex size-5 shrink-0 items-center justify-center rounded-md border bg-card text-4xs font-semibold leading-none text-foreground",
+            "@container relative flex size-5 shrink-0 items-center justify-center rounded-md border bg-card text-4xs font-medium leading-none text-foreground",
             iconClassName,
           )}
           aria-hidden
@@ -194,14 +194,14 @@ export const ProviderInstanceIcon = memo(function ProviderInstanceIcon(props: {
           aria-hidden
         />
       ) : (
-        <span className={cn("text-3xs font-semibold leading-none", iconClassName)}>
+        <span className={cn("text-3xs font-medium leading-none", iconClassName)}>
           {providerInstanceInitials(props.displayName)}
         </span>
       )}
       {isCustomEndpoint ? null : props.showBadge ? (
         <span
           className={cn(
-            "pointer-events-none flex items-center justify-center rounded-full border font-semibold leading-none shadow-sm",
+            "pointer-events-none flex items-center justify-center rounded-full border font-medium leading-none shadow-sm",
             hasInlineBadge
               ? "h-3.5 min-w-3.5 px-1 text-5xs"
               : "absolute right-0 bottom-0 z-10 h-3.5 min-w-3.5 px-0.5 text-4xs",

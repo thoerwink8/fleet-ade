@@ -18,7 +18,7 @@ export function LinkAccessPicker({
   const selected = accessConfig[value];
   return (
     <div className="space-y-1.5">
-      <span id={labelId} className="block text-meta font-semibold">
+      <span id={labelId} className="block text-meta font-medium">
         这里的智能体在另一环境中的权限
       </span>
       <Select
@@ -42,7 +42,7 @@ export function LinkAccessPicker({
             return (
               <SelectItem key={option} value={option} hideIndicator>
                 <span className="grid min-w-0 gap-0.5 py-0.5">
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
+                  <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
                     <Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
                     {label}
                   </span>

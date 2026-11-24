@@ -161,7 +161,7 @@ function SortableRouteRow({
       )}
     >
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-meta font-semibold text-foreground">
+        <p className="flex items-center gap-1.5 text-meta font-medium text-foreground">
           {label}
           {inUse ? (
             <span className="rounded-sm bg-success/12 px-1 text-2xs font-normal text-success-foreground">

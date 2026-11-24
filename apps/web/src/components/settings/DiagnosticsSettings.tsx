@@ -85,7 +85,7 @@ function StatBlock({
 }) {
   return (
     <div className="min-w-0 border-border/60 px-4 py-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-1.5 text-meta font-semibold uppercase tracking-widest text-muted-foreground/70">
+      <div className="flex min-w-0 items-center gap-1.5 text-meta font-medium uppercase tracking-widest text-muted-foreground/70">
         <span className="min-w-0 truncate">{label}</span>
         {tooltip ? (
           <Tooltip>
@@ -106,7 +106,7 @@ function StatBlock({
       </div>
       <div
         className={cn(
-          "mt-1 truncate font-mono text-lg font-semibold tabular-nums text-foreground",
+          "mt-1 truncate font-mono text-lg font-medium tabular-nums text-foreground",
           tone === "warning" && "text-warning-foreground",
           tone === "danger" && "text-destructive",
         )}
@@ -180,7 +180,7 @@ function DiagnosticsTable({
               <th
                 key={header}
                 className={cn(
-                  "whitespace-nowrap px-4 py-2.5 font-semibold first:sm:pl-5 last:sm:pr-5",
+                  "whitespace-nowrap px-4 py-2.5 font-medium first:sm:pl-5 last:sm:pr-5",
                   !columnWidths && index === headers.length - 1 && "w-px",
                 )}
               >
@@ -365,13 +365,13 @@ function ProcessDiagnosticsTable({
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-2xs uppercase tracking-widest text-muted-foreground/70">
             <tr>
-              <th className="px-4 py-2 font-semibold sm:pl-5">名称</th>
-              <th className="px-3 py-2 text-right font-semibold">CPU</th>
-              <th className="px-3 py-2 text-right font-semibold">内存</th>
-              <th className="px-3 py-2 font-semibold">命令</th>
-              <th className="px-3 py-2 text-right font-semibold">PID</th>
-              <th className="px-3 py-2 font-semibold">类型</th>
-              <th className="p-2 text-right font-semibold sm:pr-4">结束</th>
+              <th className="px-4 py-2 font-medium sm:pl-5">名称</th>
+              <th className="px-3 py-2 text-right font-medium">CPU</th>
+              <th className="px-3 py-2 text-right font-medium">内存</th>
+              <th className="px-3 py-2 font-medium">命令</th>
+              <th className="px-3 py-2 text-right font-medium">PID</th>
+              <th className="px-3 py-2 font-medium">类型</th>
+              <th className="p-2 text-right font-medium sm:pr-4">结束</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -591,14 +591,14 @@ function ProcessResourceHistoryTable({
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-2xs uppercase tracking-widest text-muted-foreground/70">
             <tr>
-              <th className="px-4 py-2 font-semibold sm:pl-5">进程</th>
-              <th className="px-3 py-2 text-right font-semibold">CPU 时间</th>
-              <th className="px-3 py-2 text-right font-semibold">当前</th>
-              <th className="px-3 py-2 text-right font-semibold">平均</th>
-              <th className="px-3 py-2 text-right font-semibold">峰值</th>
-              <th className="px-3 py-2 text-right font-semibold">最大内存</th>
-              <th className="px-3 py-2 font-semibold">命令</th>
-              <th className="px-3 py-2 text-right font-semibold sm:pr-5">PID</th>
+              <th className="px-4 py-2 font-medium sm:pl-5">进程</th>
+              <th className="px-3 py-2 text-right font-medium">CPU 时间</th>
+              <th className="px-3 py-2 text-right font-medium">当前</th>
+              <th className="px-3 py-2 text-right font-medium">平均</th>
+              <th className="px-3 py-2 text-right font-medium">峰值</th>
+              <th className="px-3 py-2 text-right font-medium">最大内存</th>
+              <th className="px-3 py-2 font-medium">命令</th>
+              <th className="px-3 py-2 text-right font-medium sm:pr-5">PID</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -1240,11 +1240,11 @@ function DiagnosticsSettingsBody() {
               </colgroup>
               <thead className="border-b border-border/60 text-2xs uppercase tracking-widest text-muted-foreground/70">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-2.5 font-semibold sm:pl-5">时间</th>
-                  <th className="whitespace-nowrap px-4 py-2.5 font-semibold">级别</th>
-                  <th className="whitespace-nowrap px-4 py-2.5 font-semibold">Span</th>
-                  <th className="whitespace-nowrap px-4 py-2.5 font-semibold">消息</th>
-                  <th className="whitespace-nowrap px-4 py-2.5 font-semibold sm:pr-5">追踪</th>
+                  <th className="whitespace-nowrap px-4 py-2.5 font-medium sm:pl-5">时间</th>
+                  <th className="whitespace-nowrap px-4 py-2.5 font-medium">级别</th>
+                  <th className="whitespace-nowrap px-4 py-2.5 font-medium">Span</th>
+                  <th className="whitespace-nowrap px-4 py-2.5 font-medium">消息</th>
+                  <th className="whitespace-nowrap px-4 py-2.5 font-medium sm:pr-5">追踪</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">

@@ -988,7 +988,7 @@ export function ProviderInstanceCard({
       <PopoverPopup side="bottom" align="end" width="md" aria-label={versionAdvisory.title}>
         <div className="grid min-w-0 gap-3">
           <div className="grid gap-0.5">
-            <p className="text-sm font-semibold leading-tight text-foreground">
+            <p className="text-sm font-medium leading-tight text-foreground">
               {versionAdvisory.title}
             </p>
             <p
@@ -1029,7 +1029,7 @@ export function ProviderInstanceCard({
             </p>
           ) : null}
           {onRunVersionAction && updateCommand ? (
-            <div className="flex items-center gap-2 text-meta font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-2 text-meta font-medium uppercase tracking-wider text-muted-foreground">
               <span aria-hidden className="h-px flex-1 bg-border" />
               或使用以下命令手动更新
               <span aria-hidden className="h-px flex-1 bg-border" />
@@ -1089,7 +1089,7 @@ export function ProviderInstanceCard({
           {titleIconNode}
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-row font-semibold text-foreground">{displayName}</span>
+              <span className="truncate text-row font-medium text-foreground">{displayName}</span>
               {versionLabel ? (
                 <code className="max-w-24 shrink-0 truncate text-xs text-muted-foreground">
                   {versionLabel}

@@ -116,7 +116,7 @@ export function ModelMentionChip(props: {
       copyMarkdown={props.source}
     >
       <div className="space-y-1 p-2 text-sm">
-        <p className="text-row font-semibold">{presentation.label}</p>
+        <p className="text-row font-medium">{presentation.label}</p>
         <p className="text-muted-foreground">{presentation.providerLabel}</p>
         <p className="font-mono text-xs text-muted-foreground">{props.source}</p>
       </div>

@@ -178,7 +178,7 @@ export function PullRequestDetailCrumbs({
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <span className="min-w-0 truncate font-semibold text-foreground">
+                  <span className="min-w-0 truncate font-medium text-foreground">
                     {detail.title}
                   </span>
                 }
