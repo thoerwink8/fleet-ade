@@ -179,6 +179,7 @@ describe("Input, Textarea, and InputGroup", () => {
   });
 
   it("preserves readOnly, addon focus forwarding, textarea rows/autogrow, and Grove/Ember error borders", async () => {
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
     const root = document.documentElement;
     try {
       await using screen = await render(
@@ -190,8 +191,28 @@ describe("Input, Textarea, and InputGroup", () => {
             <InputGroupInput aria-label="Addon target" />
           </InputGroup>
           <Input aria-label="Grove invalid" aria-invalid="true" />
+          <InputGroup className="**:[input]:h-9 sm:**:[input]:h-8">
+            <InputGroupInput aria-label="Forced height" size="sm" />
+          </InputGroup>
         </div>,
       );
+
+      // Callers force inner input heights; the group frame must grow around them (input + 1px border each side), never clip them.
+      const forcedInput = screen.getByRole("textbox", { name: "Forced height" }).element();
+      const forcedFrame = forcedInput.closest('[data-slot="input-group"]')!;
+      for (const [width, expectedInput] of [
+        [1280, "32px"],
+        [390, "36px"],
+      ] as const) {
+        await page.viewport(width, 800);
+        expect(getComputedStyle(forcedInput).height, `${width} forced input height`).toBe(
+          expectedInput,
+        );
+        expect(forcedFrame.getBoundingClientRect().height, `${width} frame wraps input`).toBe(
+          forcedInput.getBoundingClientRect().height + 2,
+        );
+      }
+      await page.viewport(1280, 800);
 
       const readonlyInput = screen.getByRole("textbox", { name: "Readonly input" }).element();
       expect(readonlyInput).toHaveAttribute("readonly");
@@ -220,6 +241,7 @@ describe("Input, Textarea, and InputGroup", () => {
         }
       }
     } finally {
+      await page.viewport(viewport.width, viewport.height);
       root.classList.remove("no-transitions");
       applyThemePalette("system", "light");
       root.classList.remove("dark");

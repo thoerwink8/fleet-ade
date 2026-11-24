@@ -1,11 +1,9 @@
-/* Size variants for single inputs and grouped input frames on sm+ viewports (default stays --fa-ctrl = 32px). */
-.fa-input[data-size="sm"]:not(textarea),
-.fa-input--group:has([data-size="sm"]) {
+/* Size variants for single inputs on sm+ viewports (default stays --fa-ctrl = 32px). */
+.fa-input[data-size="sm"]:not(textarea) {
   height: var(--fa-ctrl-sm);
 }
 
-.fa-input[data-size="compact"]:not(textarea),
-.fa-input--group:has([data-size="compact"]) {
+.fa-input[data-size="compact"]:not(textarea) {
   height: var(--fa-ctrl-sm);
 }
 
@@ -13,26 +11,44 @@
   height: 34px;
 }
 
-.fa-input--group[data-size="lg"] {
-  height: 36px;
+/* Grouped frames grow with their content: callers force inner input heights (for example h-9 sm:h-8), and the frame must wrap them instead of clipping them. */
+.fa-input--group {
+  height: auto;
+  min-height: var(--fa-ctrl);
+}
+
+.fa-input--group:has([data-size="sm"]),
+.fa-input--group:has([data-size="compact"]) {
+  min-height: var(--fa-ctrl-sm);
+}
+
+.fa-input--group .fa-input__control {
+  height: auto;
+  align-self: stretch;
 }
 
 /* Narrow viewports (< 640px / sm) keep taller touch-friendly heights without shrinking mobile controls. */
 @media (max-width: 639.98px) {
-  .fa-input:not(textarea) {
+  .fa-input:not(textarea):not(.fa-input--group) {
     height: 34px;
   }
-  .fa-input[data-size="sm"]:not(textarea),
-  .fa-input--group:has([data-size="sm"]) {
+  .fa-input[data-size="sm"]:not(textarea) {
     height: 30px;
   }
-  .fa-input[data-size="compact"]:not(textarea),
-  .fa-input--group:has([data-size="compact"]) {
+  .fa-input[data-size="compact"]:not(textarea) {
     height: 28px;
   }
-  .fa-input[data-size="lg"]:not(textarea),
-  .fa-input--group[data-size="lg"] {
+  .fa-input[data-size="lg"]:not(textarea) {
     height: 38px;
+  }
+  .fa-input--group {
+    min-height: 34px;
+  }
+  .fa-input--group:has([data-size="sm"]) {
+    min-height: 30px;
+  }
+  .fa-input--group:has([data-size="compact"]) {
+    min-height: 28px;
   }
 }
 
