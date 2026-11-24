@@ -194,6 +194,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   linkedThreadRefreshes: Schema.optionalKey(Schema.Boolean),
   /** Server accepts `thread.batch`; older servers need one command per thread. */
   threadBatchCommands: Schema.optionalKey(Schema.Boolean),
+  /** Server keeps deleted threads recoverable for seven days. */
+  threadTrash: Schema.optionalKey(Schema.Boolean),
 });
 export type ExecutionEnvironmentCapabilities = typeof ExecutionEnvironmentCapabilities.Type;
 

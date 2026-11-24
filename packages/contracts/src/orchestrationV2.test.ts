@@ -2,7 +2,13 @@ import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
 
-import { NodeId, RunAttemptId, TrimmedNonEmptyString } from "./index.ts";
+import {
+  ForwardCompatibleUnion,
+  isUnknownUnionMember,
+  NodeId,
+  RunAttemptId,
+  TrimmedNonEmptyString,
+} from "./index.ts";
 import {
   latestProviderTurnForAttempt,
   OrchestrationV2ProviderCapabilities,
@@ -82,6 +88,53 @@ describe("orchestration V2 contracts", () => {
         { ...detached("event-4", 4), event: { ...detached("event-4", 4).event, payload: {} } },
       ]),
     ).toThrow();
+  });
+
+  it("lets old clients skip restored and purged thread events", () => {
+    const LegacyThreadEvent = Schema.Union([
+      Schema.Struct({
+        id: Schema.String,
+        type: Schema.Literal("thread.deleted"),
+        threadId: Schema.String,
+        occurredAt: Schema.String,
+        payload: Schema.Unknown,
+      }),
+      Schema.Struct({
+        id: Schema.String,
+        type: Schema.Literal("provider-session.detached"),
+        threadId: Schema.String,
+        occurredAt: Schema.String,
+        payload: Schema.Unknown,
+      }),
+    ]);
+    const decode = Schema.decodeUnknownSync(
+      Schema.toCodecJson(ForwardCompatibleUnion(LegacyThreadEvent.members, "type")),
+    );
+
+    for (const type of ["thread.restored", "thread.purged"]) {
+      expect(
+        isUnknownUnionMember(
+          decode({
+            id: `event-${type}`,
+            type,
+            threadId: "thread-1",
+            occurredAt: "now",
+            payload: {},
+          }),
+        ),
+      ).toBe(true);
+    }
+    expect(
+      isUnknownUnionMember(
+        decode({
+          id: "event-deleted",
+          type: "thread.deleted",
+          threadId: "thread-1",
+          occurredAt: "now",
+          payload: {},
+        }),
+      ),
+    ).toBe(false);
   });
 
   it("skips turn item types from a newer server in snapshots and turn-item events", () => {

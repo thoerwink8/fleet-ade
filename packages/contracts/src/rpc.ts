@@ -1514,6 +1514,15 @@ const WsOrchestrationV2GetArchivedShellSnapshotRpc = Rpc.make(
   },
 );
 
+const WsOrchestrationV2GetRecentlyDeletedRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getRecentlyDeleted,
+  {
+    payload: OrchestrationV2RpcSchemas.getRecentlyDeleted.input,
+    success: OrchestrationV2RpcSchemas.getRecentlyDeleted.output,
+    error: Schema.Union([OrchestrationV2GetShellSnapshotError, EnvironmentAuthorizationError]),
+  },
+);
+
 const WsOrchestrationV2GetThreadFamilyRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getThreadFamily, {
   payload: OrchestrationV2RpcSchemas.getThreadFamily.input,
   success: OrchestrationV2RpcSchemas.getThreadFamily.output,
@@ -1996,6 +2005,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SearchThreadRpc,
   WsOrchestrationV2SearchThreadStreamRpc,
   WsOrchestrationV2GetArchivedShellSnapshotRpc,
+  WsOrchestrationV2GetRecentlyDeletedRpc,
   WsOrchestrationV2GetThreadFamilyRpc,
   WsOrchestrationV2GetThreadTitlesRpc,
   WsOrchestrationV2GetThreadLinkMetadataRpc,
