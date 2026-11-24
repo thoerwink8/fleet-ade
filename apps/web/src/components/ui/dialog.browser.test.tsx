@@ -181,6 +181,11 @@ describe("dialog fleet styling", () => {
   }
 
   it("leaves padding to the sections at the fa-space-5 inset", async () => {
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    await page.viewport(1024, 768);
+    await using _viewport = {
+      [Symbol.asyncDispose]: () => page.viewport(viewport.width, viewport.height),
+    };
     await using _screen = await render(
       <Dialog defaultOpen>
         <DialogPopup>
@@ -199,6 +204,12 @@ describe("dialog fleet styling", () => {
     const panel = popup.querySelector<HTMLElement>('[data-slot="dialog-panel"]')!;
     expect(getComputedStyle(header).paddingLeft).toBe(space5.trim());
     expect(getComputedStyle(panel).paddingLeft).toBe(space5.trim());
+    const popupStyle = getComputedStyle(popup);
+    const radiusLg = getComputedStyle(document.documentElement).getPropertyValue("--fa-radius-lg");
+    expect(popupStyle.borderRadius).toBe(radiusLg.trim());
+    expect(popupStyle.backdropFilter).toBe("none");
+    expect(popupStyle.willChange).toBe("auto");
+    expect(toRgb(popupStyle.backgroundColor)?.alpha ?? 1).toBe(1);
   });
 
   it("keeps 4.5:1 title/description contrast on light and dark fleet palettes", async () => {
