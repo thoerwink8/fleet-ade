@@ -99,11 +99,13 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerEnvironmen
           ),
           Effect.provideService(HostProcess.Arguments, ["node", entry]),
           Effect.provideService(HostProcess.IsExecutable, false),
-          Effect.provideService(HostProcess.Platform, "linux"),
           Effect.provideService(HostProcess.Environment, {}),
         );
+        // Windows installs are never reported, and the real filesystem there has no POSIX paths to match.
         expect(descriptor.capabilities.serverInstallation).toEqual(
-          mode === "web" ? { kind: "npm-global", prefix } : undefined,
+          mode === "web" && !(yield* HostProcess.isWindows)
+            ? { kind: "npm-global", prefix }
+            : undefined,
         );
         expect(descriptor.capabilities.serverSelfUpdate).toBe(undefined);
         expect(descriptor.capabilities.desktopAppInstall).toBe(
