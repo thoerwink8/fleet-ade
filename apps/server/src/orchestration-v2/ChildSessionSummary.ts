@@ -64,6 +64,8 @@ const ACTIVITY_EVENTS: Readonly<Record<string, true>> = {
   "thread.pull-request-synced": true,
   "thread.pull-request-link-updated": true,
   "thread.deleted": true,
+  "thread.restored": true,
+  "thread.purged": true,
   "thread.archived": true,
   "run.created": true,
   "run.updated": true,
@@ -1173,7 +1175,11 @@ export class ChildSessionSummary extends Context.Service<
           );
           yield* Stream.runForEach(eventSink.stream({ afterSequence: highWater }), (stored) => {
             if (ACTIVITY_EVENTS[stored.event.type] !== true) return Effect.void;
-            if (stored.event.type === "thread.deleted" || stored.event.type === "thread.archived") {
+            if (
+              stored.event.type === "thread.deleted" ||
+              stored.event.type === "thread.purged" ||
+              stored.event.type === "thread.archived"
+            ) {
               return internal.recompute(stored.event.threadId, null).pipe(Effect.ignore);
             }
             const threadIds =
@@ -1391,7 +1397,9 @@ export class ChildSessionSummary extends Context.Service<
           .pipe(Effect.ignore);
       });
 
-      const seedBindings = Effect.gen(function* () {
+      const seedBindings = Effect.fn("ChildSessionSummary.seedRemoteBindings")(function* (
+        parentThreadId?: ThreadId,
+      ) {
         const subagents = yield* sql<{
           readonly parentThreadId: string;
           readonly payloadJson: string;
@@ -1408,7 +1416,9 @@ export class ChildSessionSummary extends Context.Service<
             AND json_extract(s.payload_json, '$.remoteChild.threadId') IS NOT NULL
             AND p.deleted_at IS NULL
             AND p.archived_at IS NULL
+            AND (${parentThreadId ?? null} IS NULL OR s.thread_id = ${parentThreadId ?? null})
         `.pipe(Effect.orElseSucceed(() => [] as const));
+        const seeded: RemoteBinding[] = [];
         for (const row of subagents) {
           const decoded = decodeJson(row.payloadJson);
           if (Option.isNone(decoded)) continue;
@@ -1418,8 +1428,9 @@ export class ChildSessionSummary extends Context.Service<
             ThreadId.make(row.parentThreadId),
             parsed as Parameters<typeof bindingFromPayload>[1],
           );
-          if (binding !== null) mergeBinding(binding);
+          if (binding !== null) seeded.push(mergeBinding(binding));
         }
+        return seeded;
       });
 
       const sweepOrphanRemoteRows = Effect.gen(function* () {
@@ -1496,7 +1507,17 @@ export class ChildSessionSummary extends Context.Service<
       const consumeSubagentEvents = Stream.runForEach(orchestrator.streamDomainEvents, (event) =>
         stateLock.withPermits(1)(
           Effect.gen(function* () {
-            if (event.type === "thread.deleted" || event.type === "thread.archived") {
+            if (event.type === "thread.restored") {
+              for (const binding of yield* seedBindings(event.threadId)) {
+                yield* reconcileBinding(binding);
+              }
+              return;
+            }
+            if (
+              event.type === "thread.deleted" ||
+              event.type === "thread.purged" ||
+              event.type === "thread.archived"
+            ) {
               for (const [key, binding] of bindings.entries()) {
                 if (binding.parentThreadId !== event.threadId) continue;
                 bindings.delete(key);
@@ -1530,7 +1551,7 @@ export class ChildSessionSummary extends Context.Service<
 
       yield* forkParked(
         Effect.gen(function* () {
-          yield* stateLock.withPermits(1)(seedBindings);
+          yield* stateLock.withPermits(1)(seedBindings());
           yield* Effect.all([consumeFleetSummary, consumeSubagentEvents], {
             concurrency: "unbounded",
             discard: true,

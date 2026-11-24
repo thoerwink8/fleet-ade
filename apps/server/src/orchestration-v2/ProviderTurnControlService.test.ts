@@ -280,6 +280,10 @@ it.effect(
           getThreadSnapshot: () => Effect.die("unused getThreadSnapshot"),
           getThreadSnapshotWindow: () => Effect.die("unused getThreadSnapshotWindow"),
           getPullRequestSnapshot: () => Effect.die("unused getPullRequestSnapshot"),
+          getThreadTrash: () => Effect.die("unused getThreadTrash"),
+          getThreadTrashCascade: () => Effect.die("unused getThreadTrashCascade"),
+          isThreadInTrash: () => Effect.die("unused isThreadInTrash"),
+          getRecentlyDeleted: () => Effect.die("unused getRecentlyDeleted"),
         }),
       );
       const layerSessionManager = Layer.succeed(
