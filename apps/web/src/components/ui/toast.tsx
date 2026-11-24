@@ -79,11 +79,13 @@ type ToastManagerEvent = Parameters<ToastManagerListener>[0];
  * durations: action toasts get ACTION_TOAST_DEFAULT_TIMEOUT_MS, the rest inherit the
  * provider timeout. An explicit per-toast `timeout` always wins.
  */
-function createBufferedToastManager(): BaseToastManager {
+// Open error toasts by failure key. Toasts() prunes it against the live list, since an unmounted provider drops its toasts silently.
+const openErrorToastIds = new Map<string, string>();
+
+function createBufferedToastManager(dedupeErrors: boolean): BaseToastManager {
   const manager = Toast.createToastManager<ThreadToastData>();
   const listeners = new Set<ToastManagerListener>();
   const pending: ToastManagerEvent[] = [];
-  const openErrorToastIds = new Map<string, ReturnType<BaseToastManager["add"]>>();
   manager[" subscribe"]((event) => {
     if (listeners.size === 0) {
       pending.push(event);
@@ -96,7 +98,7 @@ function createBufferedToastManager(): BaseToastManager {
     add(options) {
       const timeout = resolveToastTimeout(options);
       const resolved = timeout === undefined ? options : { ...options, timeout };
-      if (resolved.type !== "error" || typeof resolved.title !== "string") {
+      if (!dedupeErrors || resolved.type !== "error" || typeof resolved.title !== "string") {
         return manager.add(resolved);
       }
       // The same failure again replaces the open one, so repeated errors do not pile up.
@@ -178,8 +180,8 @@ function withResolvedTimeout<T extends ToastTimeoutInput>(
     : updates;
 }
 
-const toastManager = createBufferedToastManager();
-const anchoredToastManager = createBufferedToastManager();
+const toastManager = createBufferedToastManager(true);
+const anchoredToastManager = createBufferedToastManager(false);
 type ToastId = ReturnType<typeof toastManager.add>;
 const threadToastVisibleTimeoutRemainingMs = new Map<ToastId, number>();
 
@@ -674,6 +676,9 @@ function Toasts({ position }: { position: ToastPosition }) {
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- prunes the module-level remaining-time map of toasts the manager has dropped
   useEffect(() => {
     const activeToastIds = new Set(toasts.map((toast) => toast.id));
+    for (const [key, toastId] of openErrorToastIds) {
+      if (!activeToastIds.has(toastId)) openErrorToastIds.delete(key);
+    }
     for (const toastId of threadToastVisibleTimeoutRemainingMs.keys()) {
       if (!activeToastIds.has(toastId)) {
         threadToastVisibleTimeoutRemainingMs.delete(toastId);

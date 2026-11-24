@@ -141,6 +141,21 @@ describe("toastManager", () => {
     await expect.element(error).not.toBeInTheDocument();
   });
 
+  it("shows an error again in a new provider after the old one dropped it", async () => {
+    {
+      await using _first = await render(<ToastProvider>{null}</ToastProvider>);
+      await act(() => {
+        toastManager.add({ type: "error", title: "跨提供方的失败" });
+      });
+      await expect.element(page.getByRole("dialog", { name: "跨提供方的失败" })).toBeVisible();
+    }
+    await using _second = await render(<ToastProvider>{null}</ToastProvider>);
+    await act(() => {
+      toastManager.add({ type: "error", title: "跨提供方的失败" });
+    });
+    await expect.element(page.getByRole("dialog", { name: "跨提供方的失败" })).toBeVisible();
+  });
+
   it("replaces a repeated error and lets its follow-up result time out", async () => {
     await using _screen = await render(<ToastProvider>{null}</ToastProvider>);
     using _timers = fakeTimers();
