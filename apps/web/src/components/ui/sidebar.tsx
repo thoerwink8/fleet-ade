@@ -27,7 +27,7 @@ import * as Schema from "effect/Schema";
 import { announceSidebarVisibility } from "~/lib/accessibilityAnnouncements";
 
 const SIDEBAR_WIDTH = "264px";
-const SIDEBAR_WIDTH_MOBILE = "calc(100vw - var(--spacing) * 3)";
+const SIDEBAR_WIDTH_MOBILE = "min(28rem, calc(100vw - var(--fa-space-12, 3rem)))";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_RESIZE_DEFAULT_MIN_WIDTH = 16 * 16;
 const SIDEBAR_TITLEBAR_CONTROL_SIZE = "max-sm:[--workspace-titlebar-control-size:--spacing(8)]";
@@ -40,6 +40,8 @@ type SidebarContextProps = {
   mobileSheetMounted: boolean;
   setMobileSheetMounted: (mounted: boolean) => void;
   setOpenMobile: (open: boolean) => void;
+  rememberMobileOpener: (element: HTMLElement | null) => void;
+  resolveMobileReturnFocusTarget: (popup: HTMLElement | null) => HTMLElement | null;
   isMobile: boolean;
   toggleSidebar: () => void;
   /** Runs before the desktop sidebar collapses. */
@@ -145,6 +147,7 @@ function createSidebarOpenStore(defaultOpen: boolean, storageKey: string | undef
     open: readStoredSidebarOpen(storageKey) ?? defaultOpen,
     openMobile: false,
   };
+  let mobileOpener: HTMLElement | null = null;
   const listeners = new Set<() => void>();
   const collapseListeners = new Set<() => void>();
   const publish = (next: SidebarOpenState) => {
@@ -162,8 +165,35 @@ function createSidebarOpenStore(defaultOpen: boolean, storageKey: string | undef
     }
     if (storageKey) writeLocalStorageValue(storageKey, open, defaultOpen, Schema.Boolean);
   };
+  const rememberMobileOpener = (element: HTMLElement | null) => {
+    mobileOpener = element;
+  };
   const setOpenMobile = (openMobile: boolean) => {
+    if (
+      openMobile &&
+      !state.openMobile &&
+      mobileOpener === null &&
+      typeof document !== "undefined"
+    ) {
+      mobileOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     if (openMobile !== state.openMobile) publish({ ...state, openMobile });
+  };
+  const resolveMobileReturnFocusTarget = (
+    popup: HTMLElement | null,
+    wrapper: HTMLElement | null,
+  ): HTMLElement | null => {
+    const remembered = mobileOpener;
+    mobileOpener = null;
+    if (remembered && remembered.isConnected && !popup?.contains(remembered)) {
+      return remembered;
+    }
+    if (!wrapper) return null;
+    return (
+      Array.from(wrapper.querySelectorAll<HTMLElement>('[data-sidebar="trigger"]')).find(
+        (element) => !popup?.contains(element),
+      ) ?? null
+    );
   };
   return {
     subscribe: (listener: () => void) => {
@@ -175,6 +205,8 @@ function createSidebarOpenStore(defaultOpen: boolean, storageKey: string | undef
     getSnapshot: () => state,
     setOpen,
     setOpenMobile,
+    rememberMobileOpener,
+    resolveMobileReturnFocusTarget,
     toggle: () => (isMobileViewport() ? setOpenMobile(!state.openMobile) : setOpen(!state.open)),
     onCollapse: (listener: () => void) => {
       collapseListeners.add(listener);
@@ -197,6 +229,7 @@ function SidebarProvider({
   storageKey?: string;
 }) {
   const isMobile = useMediaQuery(SIDEBAR_MOBILE_QUERY);
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
   const [store] = React.useState(() => createSidebarOpenStore(defaultOpen, storageKey));
   const { open, openMobile } = React.useSyncExternalStore(
     store.subscribe,
@@ -222,6 +255,9 @@ function SidebarProvider({
     setMobileSheetMounted,
     setOpen: store.setOpen,
     setOpenMobile: store.setOpenMobile,
+    rememberMobileOpener: store.rememberMobileOpener,
+    resolveMobileReturnFocusTarget: (popup) =>
+      store.resolveMobileReturnFocusTarget(popup, wrapperRef.current),
     state,
     toggleSidebar: store.toggle,
     onCollapse: store.onCollapse,
@@ -230,6 +266,7 @@ function SidebarProvider({
   return (
     <SidebarContext value={contextValue}>
       <div
+        ref={wrapperRef}
         className={cn(
           "group/sidebar-wrapper flex min-h-svh w-full",
           SIDEBAR_TITLEBAR_CONTROL_SIZE,
@@ -291,7 +328,15 @@ function Sidebar({
   collapsible?: "offcanvas" | "icon" | "none";
   resizable?: boolean | SidebarResizableOptions;
 }) {
-  const { isMobile, state, openMobile, setOpenMobile, setMobileSheetMounted } = useSidebar();
+  const {
+    isMobile,
+    state,
+    openMobile,
+    setOpenMobile,
+    setMobileSheetMounted,
+    resolveMobileReturnFocusTarget,
+  } = useSidebar();
+  const mobilePopupRef = React.useRef<HTMLDivElement>(null);
   const offcanvasCollapsed = !isMobile && collapsible === "offcanvas" && state === "collapsed";
 
   const resolvedResizable = resolveSidebarResizable({ collapsible, isMobile, resizable });
@@ -326,12 +371,11 @@ function Sidebar({
         >
           {/* Children stay mounted while closed so their window shortcuts, like thread jumps, keep working. */}
           <SheetPopup
+            ref={mobilePopupRef}
             keepMounted
             transitionDurationMs={0}
-            className={cn(
-              "w-(--sidebar-width) max-w-none bg-sidebar surface-grain p-0 text-sidebar-foreground",
-              className,
-            )}
+            finalFocus={() => resolveMobileReturnFocusTarget(mobilePopupRef.current) ?? true}
+            className={cn("bg-sidebar surface-grain p-0 text-sidebar-foreground", className)}
             data-mobile="true"
             data-sidebar="sidebar"
             data-slot="sidebar"
@@ -430,7 +474,7 @@ function SidebarTrigger({
   touchTarget,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { isMobile, openMobile, rememberMobileOpener, toggleSidebar } = useSidebar();
   const isOpen = useSidebarVisibility();
 
   return (
@@ -441,6 +485,9 @@ function SidebarTrigger({
       aria-pressed={isOpen}
       onClick={(event) => {
         onClick?.(event);
+        if (isMobile && !openMobile) {
+          rememberMobileOpener(event.currentTarget);
+        }
         toggleSidebar();
       }}
       size="icon"
@@ -738,10 +785,24 @@ function SidebarGroup({
   );
 }
 
-function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
+const sidebarMenuTouchRowClasses = {
+  "gap-1": "ade-touch-row ade-touch-row--gap-1 pointer-coarse:gap-1",
+  "gap-2": "ade-touch-row ade-touch-row--gap-2 pointer-coarse:gap-2",
+  "gap-3": "ade-touch-row ade-touch-row--gap-3 pointer-coarse:gap-3",
+} as const;
+
+function SidebarMenu({
+  className,
+  touchRow,
+  ...props
+}: React.ComponentProps<"ul"> & { touchRow?: keyof typeof sidebarMenuTouchRowClasses }) {
   return (
     <ul
-      className={cn("flex w-full min-w-0 flex-col gap-1", className)}
+      className={cn(
+        "flex w-full min-w-0 flex-col gap-1",
+        touchRow && sidebarMenuTouchRowClasses[touchRow],
+        className,
+      )}
       data-sidebar="menu"
       data-slot="sidebar-menu"
       {...props}
@@ -761,7 +822,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full cursor-pointer items-center gap-[var(--sidebar-control-gap)] overflow-hidden text-left outline-hidden ring-ring transition-[width,height,padding] hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:opacity-64 data-[active=true]:bg-sidebar-row-selected data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground data-[state=open]:hover:bg-sidebar-row-hover data-[state=open]:hover:text-sidebar-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-[var(--sidebar-content-inset)]! [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:pointer-events-none [&>svg]:shrink-0 [&>svg]:text-[var(--sidebar-icon-color)] hover:[&>svg]:text-sidebar-foreground active:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
+  "peer/menu-button flex w-full cursor-pointer items-center gap-[var(--sidebar-control-gap)] text-left outline-hidden ring-ring transition-[width,height,padding] hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-inset active:bg-sidebar-row-active active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-64 aria-disabled:pointer-events-none aria-disabled:opacity-64 data-[active=true]:bg-sidebar-row-selected data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground data-[state=open]:hover:bg-sidebar-row-hover data-[state=open]:hover:text-sidebar-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-[var(--sidebar-content-inset)]! [&>span:last-child]:truncate [&>svg:not([class*='size-'])]:size-4 [&>svg]:pointer-events-none [&>svg]:shrink-0 [&>svg]:text-[var(--sidebar-icon-color)] hover:[&>svg]:text-sidebar-foreground active:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
   {
     defaultVariants: {
       size: "default",
@@ -770,12 +831,12 @@ const sidebarMenuButtonVariants = cva(
     variants: {
       size: {
         default:
-          "h-8 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-row",
-        icon: "size-8 justify-center rounded-[var(--control-radius)] p-0",
+          "h-8 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-row",
+        icon: "ade-touch-target relative size-8 justify-center overflow-visible rounded-[var(--control-radius)] p-0",
         "icon-sm":
-          "size-7 justify-center rounded-[var(--control-radius)] p-0 max-md:size-8 pointer-coarse:size-8",
-        lg: "h-12 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-row group-data-[collapsible=icon]:p-0!",
-        sm: "h-7 rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-meta",
+          "ade-touch-target relative size-7 justify-center overflow-visible rounded-[var(--control-radius)] p-0 max-md:size-8 pointer-coarse:size-8",
+        lg: "h-12 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-row group-data-[collapsible=icon]:p-0!",
+        sm: "h-7 overflow-hidden rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-2 text-meta",
       },
       variant: {
         default: "font-normal text-sidebar-muted-foreground",

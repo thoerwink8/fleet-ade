@@ -189,29 +189,7 @@ export function ThreadAutomationsPanel(props: {
                 </p>
               </TooltipPopup>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <ThreadDetailsControl
-                    size="icon-xs"
-                    variant="ghost"
-                    part="icon"
-                    aria-label={`编辑 ${task.title}`}
-                    onClick={() =>
-                      void navigate({
-                        to: "/settings/scheduled-tasks",
-                        search: { environmentId: props.environmentId, taskId: task.id },
-                      })
-                    }
-                  >
-                    <PencilIcon className="size-3.5" />
-                  </ThreadDetailsControl>
-                }
-              />
-              <TooltipPopup>编辑自动化</TooltipPopup>
-            </Tooltip>
-            {/* Webhook tasks need a request from their URL. */}
-            {task.schedule.type === "webhook" ? null : (
+            <span className="ade-touch-row ade-touch-row--gap-3 flex shrink-0 items-center gap-1 pointer-coarse:gap-3">
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -219,19 +197,43 @@ export function ThreadAutomationsPanel(props: {
                       size="icon-xs"
                       variant="ghost"
                       part="icon"
-                      aria-label={`立即运行 ${task.title}`}
-                      disabled={
-                        !canOperate || busyTaskId !== null || task.lastRunStatus === "running"
+                      aria-label={`编辑 ${task.title}`}
+                      onClick={() =>
+                        void navigate({
+                          to: "/settings/scheduled-tasks",
+                          search: { environmentId: props.environmentId, taskId: task.id },
+                        })
                       }
-                      onClick={() => void runNow(task)}
                     >
-                      <PlayIcon className="size-3.5" />
+                      <PencilIcon className="size-3.5" />
                     </ThreadDetailsControl>
                   }
                 />
-                <TooltipPopup>立即运行</TooltipPopup>
+                <TooltipPopup>编辑自动化</TooltipPopup>
               </Tooltip>
-            )}
+              {/* Webhook tasks need a request from their URL. */}
+              {task.schedule.type === "webhook" ? null : (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <ThreadDetailsControl
+                        size="icon-xs"
+                        variant="ghost"
+                        part="icon"
+                        aria-label={`立即运行 ${task.title}`}
+                        disabled={
+                          !canOperate || busyTaskId !== null || task.lastRunStatus === "running"
+                        }
+                        onClick={() => void runNow(task)}
+                      >
+                        <PlayIcon className="size-3.5" />
+                      </ThreadDetailsControl>
+                    }
+                  />
+                  <TooltipPopup>立即运行</TooltipPopup>
+                </Tooltip>
+              )}
+            </span>
             <Switch
               checked={task.enabled}
               disabled={!canOperate || busyTaskId !== null}

@@ -8,6 +8,7 @@ import {
 import { memo, type ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 
 import type { ThreadPanelPresentation } from "../../rightPanelLayout";
 import { PopoverCreateHandle, PopoverTrigger } from "../ui/popover";
@@ -54,6 +55,10 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
   onToggleThreadPanel,
   onToggleRightPanel,
 }: PanelLayoutControlsProps) {
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
+  const visibleThreadPanelShortcut = hideKeyboardHints ? null : threadPanelShortcutLabel;
+  const visibleTerminalShortcut = hideKeyboardHints ? null : terminalShortcutLabel;
+  const visibleRightPanelShortcut = hideKeyboardHints ? null : rightPanelShortcutLabel;
   const threadPanelToggle = (
     <Toggle
       className="relative shrink-0 [-webkit-app-region:no-drag]"
@@ -77,14 +82,14 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
       </TooltipTrigger>
       <TooltipPopup side="bottom">
         切换会话详情
-        {threadPanelShortcutLabel ? ` (${threadPanelShortcutLabel})` : ""}
+        {visibleThreadPanelShortcut ? ` (${visibleThreadPanelShortcut})` : ""}
       </TooltipPopup>
     </Tooltip>
   );
 
   return (
     <div
-      className="flex h-full shrink-0 items-center gap-1 [-webkit-app-region:no-drag]"
+      className="ade-touch-row ade-touch-row--gap-3 flex h-full shrink-0 items-center gap-1 pointer-coarse:gap-3 [-webkit-app-region:no-drag]"
       data-panel-layout-controls
     >
       {showThreadPanelControl ? threadPanelControl : null}
@@ -105,7 +110,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
           </TooltipTrigger>
           <TooltipPopup side="bottom">
             {terminalAvailable
-              ? `切换终端抽屉${terminalShortcutLabel ? ` (${terminalShortcutLabel})` : ""}`
+              ? `切换终端抽屉${visibleTerminalShortcut ? ` (${visibleTerminalShortcut})` : ""}`
               : "终端抽屉不可用"}
           </TooltipPopup>
         </Tooltip>
@@ -128,7 +133,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
           </TooltipTrigger>
           <TooltipPopup side="bottom">
             {rightPanelAvailable
-              ? `切换右侧面板${rightPanelShortcutLabel ? ` (${rightPanelShortcutLabel})` : ""}`
+              ? `切换右侧面板${visibleRightPanelShortcut ? ` (${visibleRightPanelShortcut})` : ""}`
               : rightPanelUnavailableLabel}
           </TooltipPopup>
         </Tooltip>

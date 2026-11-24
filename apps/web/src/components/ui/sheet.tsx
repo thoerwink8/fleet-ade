@@ -28,6 +28,8 @@ function SheetBackdrop({
       className={cn("ade-sheet-backdrop", className)}
       data-layer={layer}
       data-slot="sheet-backdrop"
+      // Base UI skips the backdrop of a dialog rendered inside another dialog tree; the app shell is one.
+      forceRender
       {...props}
     />
   );

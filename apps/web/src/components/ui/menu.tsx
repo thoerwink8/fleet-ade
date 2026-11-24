@@ -3,6 +3,7 @@ import { CheckIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "~/lib/utils";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { renderClosingPositioner } from "./closing-positioner";
 import { Input, type InputProps } from "./input";
 import { Spinner } from "./spinner";
@@ -272,6 +273,8 @@ function MenuSeparator({ className, ...props }: MenuPrimitive.Separator.Props) {
 }
 
 function MenuShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
+  if (hideKeyboardHints) return null;
   return <kbd className={cn("end", className)} data-slot="menu-shortcut" {...props} />;
 }
 

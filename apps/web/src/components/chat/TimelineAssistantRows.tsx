@@ -192,17 +192,19 @@ function AssistantMessageMeta({
       {projectedItem && projectedItem.item.status !== "completed" ? (
         <AssistantStatusBadge status={projectedItem.item.status} />
       ) : null}
-      <AssistantCopyButton
-        message={message}
-        showCopyButton={showCopyButton}
-        streaming={copyStreaming}
-      />
-      {projectedItem?.item.type === "assistant_message" ? (
-        <AssistantForkButton projectedItem={projectedItem} />
-      ) : null}
-      {!message.streaming && projectedItem ? (
-        <AssistantReplyButton message={message} itemId={projectedItem.sourceItemId} />
-      ) : null}
+      <div className="ade-touch-row ade-touch-row--gap-4 flex items-center gap-2 pointer-coarse:gap-4">
+        <AssistantCopyButton
+          message={message}
+          showCopyButton={showCopyButton}
+          streaming={copyStreaming}
+        />
+        {projectedItem?.item.type === "assistant_message" ? (
+          <AssistantForkButton projectedItem={projectedItem} />
+        ) : null}
+        {!message.streaming && projectedItem ? (
+          <AssistantReplyButton message={message} itemId={projectedItem.sourceItemId} />
+        ) : null}
+      </div>
       {!message.streaming && (
         <Tooltip>
           <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>

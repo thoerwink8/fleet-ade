@@ -6,6 +6,7 @@ import {
 import { create } from "zustand";
 
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
+import { shouldHideKeyboardShortcutHints } from "./useKeyboardShortcutHints";
 import { shortcutLabelForCommand } from "../keybindings";
 import { announce, cancelAnnouncement } from "../lib/announce";
 import { appAtomRegistry } from "../rpc/atomRegistry";
@@ -46,6 +47,7 @@ function threadUndoNoticeSummary(notice: Pick<UndoNotice, "action" | "count">): 
 }
 
 export function threadUndoLabel(keybindings: Parameters<typeof shortcutLabelForCommand>[0]) {
+  if (shouldHideKeyboardShortcutHints()) return "撤销";
   const shortcut = shortcutLabelForCommand(keybindings, "thread.undo");
   return shortcut ? `按 ${shortcut} 撤销` : "撤销";
 }

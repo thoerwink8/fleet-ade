@@ -148,6 +148,7 @@ import {
   ComposerContextActionsContext,
   composerContextRecordsFromDraft,
 } from "../composerContextPresentation";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import {
   collectInlineContextIds,
@@ -563,6 +564,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onRemoveEditingQueuedAttachment,
   } = props;
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const composerDraftTargetKey = composerTargetKey(composerDraftTarget);
   const {
     heldRequestIds,
@@ -3236,7 +3238,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   <button
                     type="button"
                     data-chat-composer-transition-actions="true"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-message-action text-message-action-foreground hover:bg-message-action-hover disabled:opacity-64"
+                    className="ade-touch-target flex size-8 shrink-0 items-center justify-center rounded-full bg-message-action text-message-action-foreground hover:bg-message-action-hover disabled:opacity-64"
                     disabled={collapsedComposerPrimaryActionDisabled}
                     aria-label={collapsedComposerPrimaryActionLabel}
                     onPointerDown={(event) => event.preventDefault()}
@@ -3289,13 +3291,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   <ComposerStashMenu
                     composerFormRef={composerFormRef}
                     entries={stashQueue}
-                    stashShortcutLabel={shortcutLabelForCommand(keybindings, "composer.stash", {
-                      context: {
-                        terminalFocus: false,
-                        terminalOpen,
-                        modelPickerOpen: false,
-                      },
-                    })}
+                    stashShortcutLabel={
+                      hideKeyboardHints
+                        ? null
+                        : shortcutLabelForCommand(keybindings, "composer.stash", {
+                            context: {
+                              terminalFocus: false,
+                              terminalOpen,
+                              modelPickerOpen: false,
+                            },
+                          })
+                    }
                     onRestore={restoreStashEntryStable}
                     onDelete={deleteStashEntryStable}
                     onClose={() => setIsStashMenuOpen(false)}
@@ -3409,10 +3415,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                   platform:
                                     typeof navigator !== "undefined" ? navigator.platform : "",
                                   alternateShortcutLabel,
+                                  hasKeyboard: !hideKeyboardHints,
                                 }))
                     }
                     placeholderSuffix={
-                      offeredPromptSuggestion !== null ? (
+                      offeredPromptSuggestion !== null && !hideKeyboardHints ? (
                         <span className="ml-2 inline-flex align-[1px]">
                           <Kbd variant="outline">⇥ Tab</Kbd>
                         </span>
@@ -3463,7 +3470,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   showMobilePendingAnswerActions && "hidden sm:flex",
                 )}
               >
-                {composerAttachButton ? <div className="me-1">{composerAttachButton}</div> : null}
+                {composerAttachButton ? (
+                  <div className="me-1 pointer-coarse:me-2">{composerAttachButton}</div>
+                ) : null}
                 <div
                   data-chat-composer-actions="right"
                   data-chat-composer-transition-actions="true"
@@ -3476,7 +3485,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     ref={attachExpandedComposerControls}
                     data-chat-composer-controls="footer"
                     data-chat-composer-footer-controls="true"
-                    className="relative flex min-w-0 flex-1 items-center justify-start gap-1"
+                    className="ade-touch-row ade-touch-row--gap-1 relative flex min-w-0 flex-1 items-center justify-start gap-1"
                   >
                     {composerControls}
                   </div>

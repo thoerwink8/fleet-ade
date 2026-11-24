@@ -199,7 +199,7 @@ describe("CommandPalette open intents", () => {
     await vi.waitFor(() => expect(screen.router?.state.location.pathname).toBe("/local/parent"));
   });
 
-  it("shows row shortcuts and keyboard footer on desktop, and hides them on touch and narrow viewports", async () => {
+  it("shows row shortcuts and keyboard footer at every window width, and hides them on touch", async () => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     await page.viewport(1280, 800);
     await using _viewport = {
@@ -215,12 +215,11 @@ describe("CommandPalette open intents", () => {
     await expect.element(page.getByText("移动", { exact: true })).toBeVisible();
     await expect.element(page.getByText("关闭", { exact: true })).toBeVisible();
 
+    // A narrow desktop window still has a keyboard, so width alone never hides the hints.
     await page.viewport(390, 844);
-    await vi.waitFor(() => {
-      expect(document.querySelectorAll('[data-slot="command-shortcut"]')).toHaveLength(0);
-      expect(document.querySelector('[data-slot="command-footer"]')).toBeNull();
-    });
     await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
+    expect(document.querySelectorAll('[data-slot="command-shortcut"]').length).toBeGreaterThan(0);
+    expect(document.querySelector('[data-slot="command-footer"]')).not.toBeNull();
 
     await page.viewport(1194, 834);
     await vi.waitFor(() => {
@@ -231,7 +230,15 @@ describe("CommandPalette open intents", () => {
     const realMatchMedia = window.matchMedia.bind(window);
     using _touch = vi
       .spyOn(window, "matchMedia")
-      .mockImplementation((query) => realMatchMedia(query === "(pointer: coarse)" ? "all" : query));
+      .mockImplementation((query) =>
+        realMatchMedia(
+          query === "(pointer: coarse)"
+            ? "all"
+            : query === "(any-pointer: fine)"
+              ? "not all"
+              : query,
+        ),
+      );
     await screen.rerender(<CommandPalette>{null}</CommandPalette>);
     await act(() => {
       openCommandPalette({ query: "" });

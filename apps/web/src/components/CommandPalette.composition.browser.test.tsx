@@ -257,7 +257,11 @@ it("hides the submit button keycap on touch while keeping the submit button visi
   const realMatchMedia = window.matchMedia.bind(window);
   using _touch = vi
     .spyOn(window, "matchMedia")
-    .mockImplementation((query) => realMatchMedia(query === "(pointer: coarse)" ? "all" : query));
+    .mockImplementation((query) =>
+      realMatchMedia(
+        query === "(pointer: coarse)" ? "all" : query === "(any-pointer: fine)" ? "not all" : query,
+      ),
+    );
   await using _screen = await render(<CommandPalette>{null}</CommandPalette>);
   await act(() => openCommandPalette({ open: "add-project" }));
   await page.getByText("Git URL", { exact: true }).click();

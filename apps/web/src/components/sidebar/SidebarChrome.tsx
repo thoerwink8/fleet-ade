@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { shortcutLabelForCommand } from "../../keybindings";
+import { useVisibleShortcutLabel } from "../../hooks/useKeyboardShortcutHints";
 import {
   navigateHistory,
   useCanNavigateHistory,
@@ -140,9 +141,11 @@ function HistoryNavigationButton({
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const enabled = useCanNavigateHistory(direction);
   const label = direction === "back" ? "后退" : "前进";
-  const shortcutLabel = shortcutLabelForCommand(
-    keybindings,
-    direction === "back" ? "navigation.back" : "navigation.forward",
+  const shortcutLabel = useVisibleShortcutLabel(
+    shortcutLabelForCommand(
+      keybindings,
+      direction === "back" ? "navigation.back" : "navigation.forward",
+    ),
   );
   const Icon = direction === "back" ? ArrowLeftIcon : ArrowRightIcon;
   return (
@@ -271,7 +274,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   };
 
   return (
-    <SidebarMenu ref={attachSidebarToolbar} className="flex-row items-center">
+    <SidebarMenu ref={attachSidebarToolbar} touchRow="gap-3" className="flex-row items-center">
       {isOnUtilityPage ? (
         <SidebarMenuItem className="min-w-0 flex-1">
           <SidebarMenuButton onClick={handleBackClick}>

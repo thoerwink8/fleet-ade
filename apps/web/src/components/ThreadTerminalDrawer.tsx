@@ -46,6 +46,7 @@ import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
 import { Button } from "~/components/ui/button";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
 import { readTextFromClipboard, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { cn } from "~/lib/utils";
 import { type TerminalContextSelection } from "~/lib/terminalContext";
 import {
@@ -1133,7 +1134,11 @@ function TerminalActionButton({
         render={
           <button
             type="button"
-            className={cn(className, disabled && "opacity-64 cursor-not-allowed")}
+            className={cn(
+              "ade-touch-target",
+              className,
+              disabled && "opacity-64 cursor-not-allowed",
+            )}
             onClick={disabled ? undefined : onClick}
             aria-label={label}
             aria-disabled={disabled}
@@ -1256,6 +1261,7 @@ function TerminalSidebarGroup({
   onActiveTerminalChange: (terminalId: string) => void;
   onCloseTerminal: (terminalId: string) => void;
 }) {
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const isGroupActive = terminalGroup.terminalIds.includes(activeTerminalId);
   const groupActiveTerminalId = isGroupActive
     ? activeTerminalId
@@ -1296,7 +1302,7 @@ function TerminalSidebarGroup({
           const isActive = terminalId === activeTerminalId;
           const terminalLabel = terminalLabelById.get(terminalId) ?? "终端";
           const closeTerminalLabel = `关闭 ${terminalLabel}${
-            isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""
+            !hideKeyboardHints && isActive && closeShortcutLabel ? ` (${closeShortcutLabel})` : ""
           }`;
           return (
             <div
@@ -1364,6 +1370,7 @@ export default function ThreadTerminalDrawer({
   terminalLaunchLocationsById,
 }: ThreadTerminalDrawerProps) {
   const canOperateTerminal = useEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope);
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const terminalArea = workspaceAreaProps("terminal", 5, "Terminal");
   const isPanel = mode === "panel";
   const drawerRef = useRef<HTMLElement | null>(null);
@@ -1512,18 +1519,18 @@ export default function ThreadTerminalDrawer({
     };
   const splitTerminalActionLabel = hasReachedSplitLimit
     ? `水平拆分终端（每组最多 ${MAX_TERMINALS_PER_GROUP} 个）`
-    : splitShortcutLabel
+    : !hideKeyboardHints && splitShortcutLabel
       ? `水平拆分终端（${splitShortcutLabel}）`
       : "水平拆分终端";
   const splitTerminalVerticalActionLabel = hasReachedSplitLimit
     ? `垂直拆分终端（每组最多 ${MAX_TERMINALS_PER_GROUP} 个）`
-    : splitVerticalShortcutLabel
+    : !hideKeyboardHints && splitVerticalShortcutLabel
       ? `垂直拆分终端（${splitVerticalShortcutLabel}）`
       : "垂直拆分终端";
-  const newTerminalActionLabel = newShortcutLabel ? `新建终端（${newShortcutLabel}）` : "新建终端";
-  const closeTerminalActionLabel = closeShortcutLabel
-    ? `关闭终端（${closeShortcutLabel}）`
-    : "关闭终端";
+  const newTerminalActionLabel =
+    !hideKeyboardHints && newShortcutLabel ? `新建终端（${newShortcutLabel}）` : "新建终端";
+  const closeTerminalActionLabel =
+    !hideKeyboardHints && closeShortcutLabel ? `关闭终端（${closeShortcutLabel}）` : "关闭终端";
   const onSplitTerminalAction = () => {
     if (!canOperateTerminal || hasReachedSplitLimit) return;
     onSplitTerminal();

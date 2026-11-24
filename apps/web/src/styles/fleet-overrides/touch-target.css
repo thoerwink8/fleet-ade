@@ -1,0 +1,99 @@
+/* Touch hit-area primitives for coarse pointers.
+ *
+ * Visual control sizes stay unchanged (24 / 28 / 32px) while ::after extends
+ * the interactive hit box to at least 44x44px under @media (pointer: coarse).
+ * When icon controls sit side-by-side inside .ade-touch-row, each interior
+ * edge is capped at half the row gap (plus border width, since ::after insets
+ * are measured from the padding box) so adjacent hit zones meet cleanly at the
+ * midpoint without overlapping or stealing clicks from a neighbor.
+ */
+
+@media (pointer: coarse) {
+  .ade-touch-target {
+    position: relative;
+  }
+
+  .ade-touch-target::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  .fa-btn,
+  [data-slot="toggle"],
+  [data-slot="composer-control"],
+  .ade-touch-target--bordered {
+    --ade-touch-border: var(--fa-bw-1, 1px);
+  }
+
+  .ade-touch-row {
+    --ade-touch-gap: 0px;
+  }
+
+  .ade-touch-row--gap-1 {
+    --ade-touch-gap: 4px;
+    column-gap: var(--ade-touch-gap);
+  }
+
+  .ade-touch-row--gap-2 {
+    --ade-touch-gap: 8px;
+    column-gap: var(--ade-touch-gap);
+  }
+
+  .ade-touch-row--gap-3 {
+    --ade-touch-gap: 12px;
+    column-gap: var(--ade-touch-gap);
+  }
+
+  .ade-touch-row--gap-4 {
+    --ade-touch-gap: 16px;
+    column-gap: var(--ade-touch-gap);
+  }
+
+  .ade-touch-row--gap-5 {
+    --ade-touch-gap: 20px;
+    column-gap: var(--ade-touch-gap);
+  }
+
+  .ade-touch-row > :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after,
+  .ade-touch-row > * :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after {
+    left: auto;
+    right: auto;
+    inset-inline-start: min(calc(-1 * var(--ade-touch-border, 0px)), calc((100% - 44px) / 2));
+    inset-inline-end: min(calc(-1 * var(--ade-touch-border, 0px)), calc((100% - 44px) / 2));
+    top: 50%;
+    width: auto;
+    min-width: 0;
+    height: max(100%, 44px);
+    min-height: 44px;
+    transform: translateY(-50%);
+  }
+
+  .ade-touch-row
+    > :not(:first-child):is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after,
+  .ade-touch-row
+    > :not(:first-child)
+    :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after {
+    inset-inline-start: max(
+      min(calc(-1 * var(--ade-touch-border, 0px)), calc((100% - 44px) / 2)),
+      calc(-0.5 * var(--ade-touch-gap, 0px) - var(--ade-touch-border, 0px))
+    );
+  }
+
+  .ade-touch-row
+    > :not(:last-child):is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after,
+  .ade-touch-row
+    > :not(:last-child)
+    :is(.fa-btn:not(.ade-btn--touch-compact), .ade-touch-target)::after {
+    inset-inline-end: max(
+      min(calc(-1 * var(--ade-touch-border, 0px)), calc((100% - 44px) / 2)),
+      calc(-0.5 * var(--ade-touch-gap, 0px) - var(--ade-touch-border, 0px))
+    );
+  }
+}

@@ -23,6 +23,7 @@ import { useQuietThreadShell, useThreadProjection } from "../../state/entities";
 import { useEnvironment } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { isImageAttachment, type ChatMessage } from "../../types";
+import { useVisibleShortcutLabel } from "~/hooks/useKeyboardShortcutHints";
 import { cn } from "~/lib/utils";
 import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -86,6 +87,8 @@ export function QueuedRunsControl({
   const projection = useThreadProjection(
     scopeThreadRef(props.environmentId, props.threadId),
   )?.projection;
+  const steerShortcutLabel = useVisibleShortcutLabel(props.steerShortcutLabel);
+  const editShortcutLabel = useVisibleShortcutLabel(props.editShortcutLabel);
   const promote = useAtomCommand(threadEnvironment.promoteQueuedRun);
   const resume = useAtomCommand(threadEnvironment.resumeThreadQueue);
   const cancel = useAtomCommand(threadEnvironment.cancelQueuedRun);
@@ -280,7 +283,7 @@ export function QueuedRunsControl({
                         </Button>
                       </TooltipTrigger>
                       <TooltipPopup>
-                        {`${workflow?.canSendNow ? "用这条消息开始新一轮" : workflow?.promoteSkipsCompaction ? "跳过压缩并发送这条消息" : "发送到当前这一轮"}${item.serverIndex === 0 && props.steerShortcutLabel ? ` (${props.steerShortcutLabel})` : ""}`}
+                        {`${workflow?.canSendNow ? "用这条消息开始新一轮" : workflow?.promoteSkipsCompaction ? "跳过压缩并发送这条消息" : "发送到当前这一轮"}${item.serverIndex === 0 && steerShortcutLabel ? ` (${steerShortcutLabel})` : ""}`}
                       </TooltipPopup>
                     </Tooltip>
                   </>
@@ -334,7 +337,7 @@ export function QueuedRunsControl({
                       </TooltipTrigger>
                       <TooltipPopup>
                         {props.editBlockedReason ??
-                          `在输入框中编辑${item.serverIndex === queued.length - 1 && props.editShortcutLabel ? ` (${props.editShortcutLabel})` : ""}`}
+                          `在输入框中编辑${item.serverIndex === queued.length - 1 && editShortcutLabel ? ` (${editShortcutLabel})` : ""}`}
                       </TooltipPopup>
                     </Tooltip>
                     <Tooltip>
@@ -456,7 +459,7 @@ function QueuedMessage(props: {
           <TooltipPopup className="max-w-96 whitespace-pre-wrap">{props.previewText}</TooltipPopup>
         ) : null}
       </Tooltip>
-      <span className="flex shrink-0 items-center gap-0.5">
+      <span className="ade-touch-row ade-touch-row--gap-2 flex shrink-0 items-center gap-0.5 pointer-coarse:gap-2">
         {attribution === "agent" &&
         senderRef &&
         // Only an environment this client is connected to can open the sender's thread there.

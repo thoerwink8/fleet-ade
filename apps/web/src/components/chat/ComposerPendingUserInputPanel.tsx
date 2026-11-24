@@ -2,6 +2,7 @@ import { type RuntimeRequestId, type ScopedThreadRef } from "@t3tools/contracts"
 import { markdownProseDirection, textDirection } from "~/textDirection";
 import { memo, use, useEffect, useEffectEvent, useRef, useState } from "react";
 import { BackgroundThreadContext } from "./backgroundThread";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { type PendingUserInput } from "../../session-logic";
 import type { PendingUserInputDraftAnswer } from "@t3tools/client-runtime/state/pending-user-input";
@@ -88,6 +89,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
   const responseDisabled = disabled || isResponding || !canRespond;
   const autoAdvanceTimerRef = useRef<number | null>(null);
   const advance = useStableCallback(onAdvance);
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const [optimisticSingleSelect, setOptimisticSingleSelect] = useState<{
     questionId: string;
     optionValue: string;
@@ -302,7 +304,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
                         </span>
                       ) : null}
                     </div>
-                    {index < 9 ? (
+                    {!hideKeyboardHints && index < 9 ? (
                       <span className="flex h-5 w-7 shrink-0 items-center justify-center">
                         <Kbd>{index + 1}</Kbd>
                       </span>
