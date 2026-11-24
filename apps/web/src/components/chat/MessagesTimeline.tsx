@@ -145,7 +145,6 @@ import {
   useTimelineWindowProjection,
 } from "./useTimelineRows";
 import {
-  computeFirstPaintTimelineWindowStart,
   computeInitialTimelineWindowStart,
   expandTimelineWindowStartForIndex,
   nextExpandedTimelineWindowStart,
@@ -166,14 +165,6 @@ function timelineListStateFor(identity: string): {
       expandedEntries: new Set(),
     },
   };
-}
-
-interface TimelineWindowState {
-  readonly identity: string;
-  readonly initialized: boolean;
-  readonly start: number;
-  /** The full initial start deferred to after first paint; null when unneeded. */
-  readonly deferredStart: number | null;
 }
 
 const TIMELINE_LIST_HEADER = <div className="h-3 sm:h-4" />;
@@ -804,12 +795,15 @@ const ConversationTimeline = memo(function ConversationTimeline({
   // Integer start index is safe across history prepends: "load earlier" lives in ListHeaderComponent
   // (only reachable once start === 0), find/citations force start === 0, and any rare prepend while
   // start > 0 simply includes those extra rows while MVCP keeps the viewport anchored.
-  const [windowState, setWindowState] = useState<TimelineWindowState>({
+  const [windowState, setWindowState] = useState<{
+    readonly identity: string;
+    readonly initialized: boolean;
+    readonly start: number;
+  }>(() => ({
     identity: listIdentityKey,
     initialized: false,
     start: 0,
-    deferredStart: null,
-  });
+  }));
   const needsFullWindow =
     findActive ||
     activeFindMatch !== null ||
@@ -826,48 +820,29 @@ const ConversationTimeline = memo(function ConversationTimeline({
         );
   let nextWindowState = windowState;
   if (nextWindowState.identity !== listIdentityKey) {
-    nextWindowState = {
-      identity: listIdentityKey,
-      initialized: false,
-      start: 0,
-      deferredStart: null,
-    };
+    nextWindowState = { identity: listIdentityKey, initialized: false, start: 0 };
   }
   if (!nextWindowState.initialized && rows.length > 0) {
-    if (needsFullWindow) {
-      nextWindowState = {
-        identity: listIdentityKey,
-        initialized: true,
-        start: 0,
-        deferredStart: null,
-      };
-    } else {
-      const firstPaintStart = computeFirstPaintTimelineWindowStart(rows);
-      const initialStart = computeInitialTimelineWindowStart(rows);
-      nextWindowState = {
-        identity: listIdentityKey,
-        initialized: true,
-        start: firstPaintStart,
-        deferredStart: firstPaintStart > initialStart ? initialStart : null,
-      };
-    }
+    nextWindowState = {
+      identity: listIdentityKey,
+      initialized: true,
+      start: needsFullWindow ? 0 : computeInitialTimelineWindowStart(rows),
+    };
   }
-  if (nextWindowState.start > 0 || nextWindowState.deferredStart !== null) {
+  if (nextWindowState.start > 0) {
     if (needsFullWindow) {
-      nextWindowState = { ...nextWindowState, start: 0, deferredStart: null };
+      nextWindowState = { ...nextWindowState, start: 0 };
     } else if (anchorFullIndex >= 0 && anchorFullIndex < nextWindowState.start) {
       nextWindowState = {
         ...nextWindowState,
         start: expandTimelineWindowStartForIndex(nextWindowState.start, anchorFullIndex),
-        deferredStart: null,
       };
     }
   }
   if (
     nextWindowState.identity !== windowState.identity ||
     nextWindowState.initialized !== windowState.initialized ||
-    nextWindowState.start !== windowState.start ||
-    nextWindowState.deferredStart !== windowState.deferredStart
+    nextWindowState.start !== windowState.start
   ) {
     setWindowState(nextWindowState);
   }
@@ -1183,7 +1158,6 @@ const ConversationTimeline = memo(function ConversationTimeline({
         identity: listIdentityKey,
         initialized: true,
         start: nextExpandedTimelineWindowStart(windowProjection.windowStart),
-        deferredStart: null,
       });
     }
   };
@@ -1218,22 +1192,6 @@ const ConversationTimeline = memo(function ConversationTimeline({
     }
     handleScroll();
   });
-
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- grows the cold-open window on the frame after the small tail has painted
-  useEffect(() => {
-    if (windowState.deferredStart === null || windowState.identity !== listIdentityKey) return;
-    const frame = requestAnimationFrame(() => {
-      setWindowState((current) => {
-        if (current.identity !== listIdentityKey) return current;
-        if (current.deferredStart === null) return current;
-        if (current.start <= current.deferredStart) {
-          return { ...current, deferredStart: null };
-        }
-        return { ...current, start: current.deferredStart, deferredStart: null };
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [listIdentityKey, windowState]);
   // The content lane only changes width with the viewport or the chat width
   // setting, never with streamed content; measuring per content frame would
   // force a layout on every chunk.
@@ -1435,12 +1393,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
             run,
             resolve,
           };
-          setWindowState({
-            identity: listIdentityKey,
-            initialized: true,
-            start: nextStart,
-            deferredStart: null,
-          });
+          setWindowState({ identity: listIdentityKey, initialized: true, start: nextStart });
         });
       }
       const visibleIndex = windowProjection.toVisibleIndex(clampedIndex);

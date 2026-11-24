@@ -2,7 +2,6 @@ import { MessageId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
 import {
-  computeFirstPaintTimelineWindowStart,
   computeInitialTimelineWindowStart,
   expandTimelineWindowStartForIndex,
   nextExpandedTimelineWindowStart,
@@ -45,17 +44,6 @@ describe("timelineWindow", () => {
     const start = computeInitialTimelineWindowStart(longRows);
     expect(start).toBeGreaterThan(185);
     expect(start).toBeLessThan(200);
-  });
-
-  it("paints a smaller tail first only when a hidden prefix exists", () => {
-    const rows = (count: number) =>
-      Array.from({ length: count }, (_, index) =>
-        messageRow(`r-${index}`, index % 2 === 0 ? "user" : "assistant", `Row ${index}`),
-      );
-    expect(computeFirstPaintTimelineWindowStart(rows(6))).toBe(0);
-    expect(computeFirstPaintTimelineWindowStart(rows(14))).toBe(0);
-    expect(computeFirstPaintTimelineWindowStart(rows(15))).toBe(9);
-    expect(computeFirstPaintTimelineWindowStart(rows(200))).toBe(194);
   });
 
   it("maps indices across a pinned leading message and the trailing window", () => {

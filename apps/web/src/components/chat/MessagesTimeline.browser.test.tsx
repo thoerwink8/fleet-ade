@@ -639,9 +639,7 @@ describe("MessagesTimeline messages", () => {
     const focus = createWorkspaceFocusController(document);
     using _focus = { [Symbol.dispose]: focus.dispose };
     const viewport = props.listRef.current!.getScrollableNode()!;
-    // The cold-open window grows once after first paint and that growth moves the
-    // scroll position; read the settled end only after it has.
-    await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(100));
+    await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(0));
     const atEnd = viewport.scrollTop;
     page.getByRole("button", { name: "发送" }).element().focus();
     await userEvent.keyboard("{F6}");

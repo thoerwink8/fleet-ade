@@ -4,9 +4,6 @@ import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
 // MessagesTimeline expands upward in steps after layout.
 const INITIAL_TIMELINE_WINDOW_ROWS = 12;
 const TIMELINE_WINDOW_EXPAND_STEP = 24;
-// The first commit mounts only this tail so the cold-open frame stays cheap; the
-// window then grows to the initial size on the frame after first paint.
-const FIRST_PAINT_TIMELINE_WINDOW_ROWS = 6;
 const MIN_HIDDEN_PREFIX_ROWS = 3;
 const TARGET_INDEX_LEADING_HEADROOM_ROWS = 4;
 
@@ -15,15 +12,6 @@ export function computeInitialTimelineWindowStart(
 ): number {
   const start = rows.length - INITIAL_TIMELINE_WINDOW_ROWS;
   return start < MIN_HIDDEN_PREFIX_ROWS ? 0 : start;
-}
-
-export function computeFirstPaintTimelineWindowStart(
-  rows: ReadonlyArray<MessagesTimelineRow>,
-): number {
-  const initialStart = computeInitialTimelineWindowStart(rows);
-  // No hidden prefix means the small first paint buys nothing.
-  if (initialStart === 0) return 0;
-  return Math.max(rows.length - FIRST_PAINT_TIMELINE_WINDOW_ROWS, initialStart);
 }
 
 export function nextExpandedTimelineWindowStart(currentStart: number): number {
