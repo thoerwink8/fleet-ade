@@ -261,6 +261,30 @@ describe("command palette rows", () => {
     expect(ran).toHaveLength(1);
   });
 
+  it("keeps the title on its line when a caller adds a control taller than the line", async () => {
+    const groups: ReadonlyArray<CommandPaletteGroup> = [
+      {
+        value: "tall",
+        label: "命令",
+        items: [
+          action("tall", "Tall trailing control", {
+            description: "第二行说明",
+            titleTrailingContent: <span data-testid="tall-control" style={{ height: 32 }} />,
+          }),
+        ],
+      },
+    ];
+    await using _screen = await render(<Groups groups={groups} highlighted={null} />);
+    const row = page.getByRole("option", { name: /Tall trailing control/ }).element();
+    const line = row.querySelector<HTMLElement>(".l1")!;
+    const title = line.querySelector<HTMLElement>(".x")!;
+    const second = row.querySelector<HTMLElement>(".l2")!;
+    expect(title.getBoundingClientRect().top).toBeCloseTo(line.getBoundingClientRect().top, 1);
+    expect(second.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      line.getBoundingClientRect().bottom - 0.5,
+    );
+  });
+
   it("tints one row when the pointer rests on a row the keyboard has left", async () => {
     function Harness() {
       const [highlighted, setHighlighted] = useState<string | null>("one");

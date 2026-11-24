@@ -85,6 +85,14 @@ button.fa-cmd__row {
   background-image: none;
 }
 
+/* .l1 aligns its children on the text baseline. Controls that callers put in the
+   line (pin button, host picker, checkbox, theme swatches) are taller than the 20px
+   title line, and baseline alignment would push the title off the line (down into the
+   second line on touch). Everything that is not text is centred on the line instead. */
+.fa-cmd__row .l1 > :not(.x, .st, .tm, kbd, .fa-ic) {
+  align-self: center;
+}
+
 /* Project icon previews are 32px. The library lead column is 16 and would clip them. */
 .fa-cmd__row.has-lead:has(.size-8) {
   grid-template-columns: auto minmax(0, 1fr);
