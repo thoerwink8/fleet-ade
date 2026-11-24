@@ -261,9 +261,9 @@ const ACTION_ACCESS_REFUSALS: Record<PullRequestAction, string> = {
   reopen: "要重新打开改动，你需要这个仓库的写入权限，或由你本人发起这次改动。",
   "enable-auto-merge": "自动合并需要这个仓库的写入权限，并且仓库必须允许自动合并。",
   "disable-auto-merge": "要停止在就绪后替你合并，你需要这个仓库的写入权限。",
-  revert: "要发起还原拉取请求，你需要这个仓库的写入权限。",
+  revert: "要发起还原PR，你需要这个仓库的写入权限。",
   "delete-branch": "要删除源仓库的分支，你需要源仓库的写入权限。",
-  "approve-workflows": "要批准来自分支拉取请求的工作流，你需要这个仓库的写入权限。",
+  "approve-workflows": "要批准来自分支PR的工作流，你需要这个仓库的写入权限。",
 };
 
 export interface SupportedProject {
@@ -1956,7 +1956,7 @@ export const make = Effect.gen(function* () {
           : Effect.fail(
               new PullRequestOperationError({
                 operation: "diffFileContents",
-                detail: "这个托管方不能展开拉取请求中未改动的行。",
+                detail: "这个托管方不能展开PR中未改动的行。",
               }),
             );
       }),

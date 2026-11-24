@@ -4876,7 +4876,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
         {
           // Killing a slow checkout partway through strands a half-updated working tree.
           timeoutMs: null,
-          fallbackErrorDetail: "git 无法把检出移动到拉取请求的 head",
+          fallbackErrorDetail: "git 无法把检出移动到PR 的 head",
         },
       );
 

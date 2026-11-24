@@ -138,7 +138,7 @@ export class VcsProcessExitError extends Schema.TaggedError<VcsProcessExitError>
       failureKind === "authentication"
         ? "身份验证失败。"
         : failureKind === "rate-limited"
-          ? "超出 API 速率限制。"
+          ? "API rate limit exceeded."
           : failureKind === "not-found"
             ? (options?.notFoundDetail ?? "找不到 VCS 资源。")
             : "进程以非零状态码退出。";

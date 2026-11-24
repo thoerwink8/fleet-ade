@@ -487,7 +487,7 @@ describe("VcsProcess.run", () => {
       expect(error).toMatchObject({
         command: "node",
         exitCode: 1,
-        detail: "超出 API 速率限制。",
+        detail: "API rate limit exceeded.",
         failureKind: "rate-limited",
         stderrLength: providerStderr.length,
         stderrTruncated: false,
@@ -515,9 +515,9 @@ describe("VcsProcess.run", () => {
       expect(
         yield* fail({
           classifyFailure: (stderr) => (stderr.includes("404") ? "not-found" : null),
-          notFoundDetail: "找不到合并请求。",
+          notFoundDetail: "找不到 PR。",
         }),
-      ).toMatchObject({ failureKind: "not-found", detail: "找不到合并请求。" });
+      ).toMatchObject({ failureKind: "not-found", detail: "找不到 PR。" });
     }).pipe(provideLive),
   );
 

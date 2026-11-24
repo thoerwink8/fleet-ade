@@ -15,7 +15,7 @@ export class RemoteBackendUrlMissingError extends Schema.TaggedError<RemoteBacke
   {},
 ) {
   override get message(): string {
-    return "请输入后端服务地址。";
+    return "请输入后台服务地址。";
   }
 }
 
@@ -40,7 +40,7 @@ export class RemoteBackendUrlInvalidError extends Schema.TaggedError<RemoteBacke
   },
 ) {
   override get message(): string {
-    return "后端服务地址无效。";
+    return "后台服务地址无效。";
   }
 }
 
@@ -49,7 +49,7 @@ export class RemotePairingTokenMissingError extends Schema.TaggedError<RemotePai
   { host: Schema.String },
 ) {
   override get message(): string {
-    return "配对链接缺少令牌。";
+    return "配对链接不完整。";
   }
 }
 

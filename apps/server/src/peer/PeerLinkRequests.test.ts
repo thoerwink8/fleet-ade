@@ -677,7 +677,7 @@ it.live("a declined request links nothing and tells the agent", () =>
       const { messages } = yield* outcomeMessages(a);
       expect(messages).toHaveLength(1);
       expect(messages[0]).toMatchObject({
-        notification: { outcome: "cancelled", summary: `已拒绝关联 ${b.url}` },
+        notification: { outcome: "cancelled", summary: `Declined to link ${b.url}` },
       });
       expect(messages[0]!.text).toContain("declined");
     }),
@@ -1077,7 +1077,7 @@ it.live("a link that expired goes through the card, so the user can link it agai
         })
         .pipe(afterLinksExpire);
       expect(yield* cardOf(a)).toMatchObject({ linkStatus: "failed" });
-      expect((yield* outcomeMessages(a)).messages[0]!.text).toContain("已过期");
+      expect((yield* outcomeMessages(a)).messages[0]!.text).toContain("expired");
     }),
   ),
 );

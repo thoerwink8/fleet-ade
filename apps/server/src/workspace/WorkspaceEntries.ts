@@ -396,7 +396,7 @@ export const make = Effect.gen(function* () {
               relative.split(path.sep).includes(".git") ||
               target.relativePath.split("/").includes(".git")
             ) {
-              throw new Error("目录必须位于项目之内且在 .git 之外。");
+              throw new Error("Directory must be inside the workspace and outside .git.");
             }
             const children = await NodeFSP.readdir(directory, { withFileTypes: true });
             const isSameOrInside = (parent: string, child: string) => {

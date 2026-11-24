@@ -937,6 +937,6 @@ export class ServerSelfUpdateError extends Schema.TaggedError<ServerSelfUpdateEr
   },
 ) {
   override get message(): string {
-    return `后台服务更新失败：${this.reason}`;
+    return `无法更新后台服务：${this.reason}`;
   }
 }

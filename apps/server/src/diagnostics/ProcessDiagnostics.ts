@@ -125,7 +125,9 @@ export const make = Effect.fn("makeProcessDiagnostics")(function* () {
           pid: input.pid,
           signal: input.signal,
           signaled: false,
-          message: Option.some(`进程 ${input.pid} 不是可发送信号的 Fleet ADE 后台服务后代进程。`),
+          message: Option.some(
+            `进程 ${input.pid} 不是 Fleet ADE 后台服务的子进程，不能向它发送信号。`,
+          ),
         };
       }
       return yield* Effect.try({

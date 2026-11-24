@@ -361,7 +361,7 @@ const createFinder = Effect.fn("WorkspaceSearchIndex.createFinder")(function* (
     catch: (cause) =>
       new WorkspaceSearchIndexCreateFailed({
         cwd,
-        reason: "FileFinder.create 意外抛出错误。",
+        reason: "FileFinder.create threw unexpectedly.",
         cause,
       }),
   });
@@ -381,7 +381,7 @@ const waitForIndexReady = Effect.fn("WorkspaceSearchIndex.waitForIndexReady")(fu
     try: () => finder.waitForIndexReady(WORKSPACE_INDEX_SCAN_TIMEOUT_MS),
     catch: (cause) =>
       onFailure({
-        reason: "FileFinder.waitForIndexReady 意外被拒绝。",
+        reason: "FileFinder.waitForIndexReady rejected unexpectedly.",
         cause,
       }),
   });
@@ -445,7 +445,7 @@ export const make = Effect.fn("WorkspaceSearchIndex.make")(function* (
           cwd,
           queryLength: query.length,
           pageSize,
-          reason: `FileFinder.${operation} 意外抛出错误。`,
+          reason: `FileFinder.${operation} threw unexpectedly.`,
           cause,
         }),
     });
@@ -499,7 +499,7 @@ export const make = Effect.fn("WorkspaceSearchIndex.make")(function* (
       catch: (cause) =>
         new WorkspaceSearchIndexRefreshFailed({
           cwd,
-          reason: "FileFinder.scanFilesAsync 意外被拒绝。",
+          reason: "FileFinder.scanFilesAsync rejected unexpectedly.",
           cause,
         }),
     });

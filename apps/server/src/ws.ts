@@ -1987,7 +1987,7 @@ export const layerWsRpc = (
         [ORCHESTRATION_V2_WS_METHODS.getWorktreeThreadIds]: (input) =>
           readOmittableShellRows(
             { worktreePath: input.worktreePath },
-            "无法加载这个项目的会话",
+            "无法加载这个工作树的会话",
           ).pipe(Effect.map(({ threads }) => ({ threadIds: threads.map((thread) => thread.id) }))),
         [ORCHESTRATION_V2_WS_METHODS.getThreadProjection]: (input) =>
           Effect.annotateCurrentSpan({ "orchestration_v2.thread_id": input.threadId }).pipe(
@@ -2411,20 +2411,20 @@ export const layerWsRpc = (
               if (providerThread === undefined || providerSessionId === null) {
                 return yield* new ProviderUploadFeedbackError({
                   threadId: input.threadId,
-                  cause: "这个会话还没有运行过智能体会话。",
+                  cause: "No provider session has run in this thread yet.",
                 });
               }
               const runtime = Option.getOrNull(yield* providerSessionsV2.get(providerSessionId));
               if (runtime === null) {
                 return yield* new ProviderUploadFeedbackError({
                   threadId: input.threadId,
-                  cause: "智能体会话已不在运行。请先发送一条消息。",
+                  cause: "The provider session is no longer running. Send a message first.",
                 });
               }
               if (runtime.uploadFeedback === undefined) {
                 return yield* new ProviderUploadFeedbackError({
                   threadId: input.threadId,
-                  cause: `智能体「${runtime.driver}」不支持上传反馈。`,
+                  cause: `Provider '${runtime.driver}' does not support feedback uploads.`,
                 });
               }
               return yield* runtime.uploadFeedback({

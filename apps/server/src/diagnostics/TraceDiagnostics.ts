@@ -103,8 +103,8 @@ function readExitTag(exit: unknown): string | null {
 }
 
 function readExitCause(exit: unknown): string {
-  if (!isRecordObject(exit) || !("cause" in exit)) return "失败";
-  return toStringValue(exit.cause)?.trim() ?? "失败";
+  if (!isRecordObject(exit) || !("cause" in exit)) return "Failure";
+  return toStringValue(exit.cause)?.trim() ?? "Failure";
 }
 
 function isTraceEvent(value: unknown): value is TraceEventLike {

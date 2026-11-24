@@ -740,7 +740,7 @@ describe("providerMaintenanceRunner", () => {
       assert.strictEqual(updateState?.status, "failed");
       assert.strictEqual(
         updateState?.message,
-        "更新命令以退出码 1 退出: Error: Could not detect the Codex installation method.",
+        "更新命令以退出码 1 退出：Error: Could not detect the Codex installation method.",
       );
       assert.include(updateState?.output ?? "", "checking install");
     }).pipe(
@@ -824,7 +824,7 @@ describe("providerMaintenanceRunner", () => {
 
       const result = yield* updater.updateProvider(CODEX_DRIVER);
 
-      assert.strictEqual(result.providers[0]?.updateState?.message, "更新命令以退出码 1 退出.");
+      assert.strictEqual(result.providers[0]?.updateState?.message, "更新命令以退出码 1 退出。");
     }).pipe(
       Effect.provide(
         Layer.mergeAll(

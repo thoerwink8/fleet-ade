@@ -36,9 +36,9 @@ export class ScratchUnavailableError extends Schema.TaggedError<ScratchUnavailab
 ) {
   override get message(): string {
     if (this.repositoryRoot === undefined) {
-      return "没有项目的会话在这台电脑上不可用。";
+      return "Threads without a project are not available on this environment.";
     }
-    return `没有项目的会话已关闭，因为 Fleet ADE 主目录 ${this.baseDir} 位于 Git 仓库 ${this.repositoryRoot} 之内。如果该仓库是误建的，请把 ${this.repositoryRoot}/.git 移走；否则请把 T3CODE_HOME（或 --base-dir）指向仓库之外的目录。然后重新启动 Fleet ADE。`;
+    return `Threads without a project are off because the T3 home ${this.baseDir} is inside the Git repository ${this.repositoryRoot}. If that repository was created by mistake, move ${this.repositoryRoot}/.git out of the way; otherwise point T3CODE_HOME (or --base-dir) at a folder outside it. Then restart Fleet ADE.`;
   }
 }
 
@@ -50,7 +50,7 @@ export class ScratchFolderError extends Schema.TaggedError<ScratchFolderError>()
   },
 ) {
   override get message(): string {
-    return "无法为没有项目的会话创建目录。";
+    return "Failed to create the folder for threads without a project.";
   }
 }
 
@@ -62,7 +62,7 @@ export class ScratchProjectError extends Schema.TaggedError<ScratchProjectError>
   },
 ) {
   override get message(): string {
-    return "无法为没有项目的会话创建项目。";
+    return "Failed to create the project for threads without a project.";
   }
 }
 
@@ -85,8 +85,8 @@ export class NamedProjectFolderError extends Schema.TaggedError<NamedProjectFold
 ) {
   override get message(): string {
     return isGitCommandError(this.cause) && isMissingExecutable(this.cause.cause)
-      ? "这台电脑没有安装 Git。安装 Git 后才能创建项目。"
-      : "无法创建项目目录。";
+      ? "Git isn't installed on this machine. Install Git to create a project."
+      : "Failed to create the project folder.";
   }
 }
 
@@ -98,7 +98,7 @@ export class NamedProjectCreateError extends Schema.TaggedError<NamedProjectCrea
   },
 ) {
   override get message(): string {
-    return "无法创建项目。";
+    return "Failed to create the project.";
   }
 }
 
@@ -202,13 +202,13 @@ function namedProjectReadme(name: string): string {
 
 function describeCommitFailure(stderr: string): string {
   if (/identity unknown|tell me who you are|no (name|email) was given/i.test(stderr)) {
-    return "这台电脑上的 Git 没有设置名字或邮箱。请设置 user.name 和 user.email，然后提交。";
+    return "Git has no name or email on this machine. Set user.name and user.email, then commit.";
   }
   const lines = stderr
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
-  return lines.at(-1) ?? "Git 无法完成首次提交。";
+  return lines.at(-1) ?? "Git could not make the first commit.";
 }
 
 const isVcsProcessSpawnError = Schema.is(VcsProcessSpawnError);
@@ -413,7 +413,7 @@ const make = Effect.gen(function* () {
     if (Option.isSome(claimed)) return claimed.value;
     return yield* new NamedProjectFolderError({
       folder: path.join(namedProjectsRoot, folderName),
-      cause: `"${folderName}" 的所有目录名都已被占用。`,
+      cause: `Every folder name for "${folderName}" is taken.`,
     });
   });
 

@@ -2364,7 +2364,7 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "runPrStep",
         cwd,
-        detail: "当前处于游离 HEAD，无法创建拉取请求。",
+        detail: "当前处于游离 HEAD，无法创建PR。",
       });
     }
     if (!details.hasUpstream) {
@@ -2438,7 +2438,7 @@ export const make = Effect.gen(function* () {
           new GitManagerError({
             operation: "runPrStep",
             cwd,
-            detail: "无法写入拉取请求正文的临时文件。",
+            detail: "无法写入PR正文的临时文件。",
             cause,
           }),
       ),
@@ -2703,7 +2703,7 @@ export const make = Effect.gen(function* () {
         return yield* new GitManagerError({
           operation: "branchPullRequest",
           cwd: cacheCwd,
-          detail: `有多个远程同时跟踪 ${branch}，它的拉取请求无法确定。`,
+          detail: `有多个远程同时跟踪 ${branch}，它的PR无法确定。`,
         });
       }
       remoteName = matchingRemoteNames[0] ?? null;
@@ -2770,7 +2770,7 @@ export const make = Effect.gen(function* () {
         return yield* new GitManagerError({
           operation: "branchPullRequest",
           cwd: cacheCwd,
-          detail: `查找拉取请求期间，${branch} 的仓库身份发生了变化。`,
+          detail: `查找PR期间，${branch} 的仓库身份发生了变化。`,
         });
       }
     }
@@ -2904,7 +2904,7 @@ export const make = Effect.gen(function* () {
       return yield* new GitManagerError({
         operation: "preparePullRequestThread",
         cwd,
-        detail: `这个仓库有未提交的更改。请先提交或贮藏，再在这里检出拉取请求 #${pullRequestNumber}，或者把它检出到自己的目录里。`,
+        detail: `这个仓库有未提交的更改。请先提交或贮藏，再在这里检出PR #${pullRequestNumber}，或者把它检出到自己的目录里。`,
       });
     }
   });
@@ -3056,7 +3056,7 @@ export const make = Effect.gen(function* () {
                 return yield* new GitManagerError({
                   operation: "preparePullRequestThread",
                   cwd: worktreePath,
-                  detail: "无法为这次检出解析拉取请求的 head。",
+                  detail: "无法为这次检出解析PR的 head。",
                 });
               }
               return yield* gitCore.resolveCommit({
@@ -3154,7 +3154,7 @@ export const make = Effect.gen(function* () {
               new GitManagerError({
                 operation: "preparePullRequestThread",
                 cwd,
-                detail: "获取到的引用与拉取请求的 head 不一致。",
+                detail: "获取到的引用与PR的 head 不一致。",
               }),
           ),
           Effect.catch(() =>
@@ -3165,7 +3165,7 @@ export const make = Effect.gen(function* () {
                   new GitManagerError({
                     operation: "preparePullRequestThread",
                     cwd,
-                    detail: "配置的上游与拉取请求的 head 不一致。",
+                    detail: "配置的上游与PR的 head 不一致。",
                   }),
               ),
             ),
@@ -3419,7 +3419,7 @@ export const make = Effect.gen(function* () {
           return yield* new GitManagerError({
             operation: "runStackedAction",
             cwd: input.cwd,
-            detail: "当前处于游离 HEAD，无法创建拉取请求。",
+            detail: "当前处于游离 HEAD，无法创建PR。",
           });
         }
 

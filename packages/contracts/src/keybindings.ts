@@ -227,6 +227,6 @@ export class KeybindingsConfigError extends Schema.TaggedError<KeybindingsConfig
   },
 ) {
   override get message(): string {
-    return `无法解析 ${this.configPath} 处的键位配置：${this.detail}`;
+    return `无法解析 ${this.configPath} 处的快捷键配置：${this.detail}`;
   }
 }

@@ -1415,7 +1415,7 @@ it.layer(layerGitManagerTest)("GitManager", (it) => {
 
       expect(error).toMatchObject({
         _tag: "GitManagerError",
-        detail: "有多个远程同时跟踪 feature/ambiguous-remote，它的拉取请求无法确定。",
+        detail: "有多个远程同时跟踪 feature/ambiguous-remote，它的PR无法确定。",
       });
       expect(providerCalls).toHaveLength(0);
     }),

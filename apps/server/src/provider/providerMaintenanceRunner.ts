@@ -278,7 +278,7 @@ function failureMessage(result: ProviderMaintenanceCommandResult): string {
       ? `更新命令以退出码 ${result.exitCode} 退出`
       : "更新命令执行失败";
   const reason = failureReason(result);
-  return reason ? `${summary}: ${reason}` : `${summary}.`;
+  return reason ? `${summary}：${reason}` : `${summary}。`;
 }
 
 function isOutdatedProvider(provider: ServerProvider | undefined): boolean {

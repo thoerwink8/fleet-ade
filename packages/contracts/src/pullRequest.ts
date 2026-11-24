@@ -831,11 +831,11 @@ export class PullRequestUnavailableError extends Schema.TaggedError<PullRequestU
   override get message(): string {
     switch (this.reason) {
       case "cli-missing":
-        return this.requirement ?? "读取此托管方所需的工具未安装或未设置。";
+        return this.requirement ?? "The tool this host is read through is not installed or set up.";
       case "cli-unauthenticated":
-        return this.requirement ?? "此托管方没有可用的凭据。";
+        return this.requirement ?? "This host has no working credentials.";
       case "provider-unsupported":
-        return "此项目所在的托管方暂不支持浏览变更请求。";
+        return "Change requests cannot be browsed for this project's host yet.";
     }
   }
 }

@@ -429,7 +429,7 @@ export class GitPullRequestMaterializationError extends Schema.TaggedError<GitPu
   },
 ) {
   override get message(): string {
-    return `无法将拉取请求 #${this.pullRequestNumber} 的分支 ${this.headBranch} 落地为本地分支 ${this.localBranch}。`;
+    return `无法将PR #${this.pullRequestNumber} 的分支 ${this.headBranch} 落地为本地分支 ${this.localBranch}。`;
   }
 }
 

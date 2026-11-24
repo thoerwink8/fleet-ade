@@ -60,7 +60,7 @@ export class ProjectNotFoundError extends Schema.TaggedError<ProjectNotFoundErro
   { projectId: ProjectId },
 ) {
   override get message(): string {
-    return `未找到项目 ${this.projectId}。`;
+    return `Project ${this.projectId} was not found.`;
   }
 }
 
@@ -113,7 +113,7 @@ export class ProjectOperationError extends Schema.TaggedError<ProjectOperationEr
   },
 ) {
   override get message(): string {
-    return `无法执行项目操作 '${this.operation}'${this.projectId === undefined ? "" : `（项目 ${this.projectId}）`}。`;
+    return `Project operation '${this.operation}' failed${this.projectId === undefined ? "" : ` for ${this.projectId}`}.`;
   }
 }
 
@@ -297,7 +297,7 @@ export const make = Effect.gen(function* () {
       .pipe(Effect.mapError(dispatchError));
     if (receipt.projectId !== projectId || receipt.commandType !== command.type) {
       return yield* dispatchError(
-        `命令 ${command.commandId} 已被 ${receipt.commandType} 用于 ${receipt.projectId}。`,
+        `Command ${command.commandId} was already used by ${receipt.commandType} for ${receipt.projectId}.`,
       );
     }
     // Retries re-plan against their own effects; the first receipt determines the outcome.
@@ -315,7 +315,9 @@ export const make = Effect.gen(function* () {
       case "ProjectCommandInvariantError":
         return yield* new ProjectInvalidError({ projectId, detail: rejection.detail });
       default:
-        return yield* dispatchError(rejection ?? receipt.error ?? "该命令此前已被拒绝。");
+        return yield* dispatchError(
+          rejection ?? receipt.error ?? "The command was previously rejected.",
+        );
     }
   }, withCommandMetrics);
 
@@ -325,7 +327,7 @@ export const make = Effect.gen(function* () {
       return yield* new ProjectOperationError({
         operation: "read-project",
         projectId,
-        cause: "已接受的项目命令没有生成项目记录。",
+        cause: "The accepted project command did not produce a project row.",
       });
     }
     return yield* hydrate(row.value);
@@ -483,10 +485,12 @@ export const make = Effect.gen(function* () {
       committed.receipt.threadId !== command.threadId ||
       committed.receipt.commandType !== command.type
     ) {
-      return yield* Effect.fail("该会话删除命令的 ID 属于另一条命令。");
+      return yield* Effect.fail("The thread deletion command ID belongs to a different command.");
     }
     if (committed.receipt.status === "rejected") {
-      return yield* Effect.fail(committed.receipt.error ?? "会话删除此前已被拒绝。");
+      return yield* Effect.fail(
+        committed.receipt.error ?? "Thread deletion was previously rejected.",
+      );
     }
   });
 

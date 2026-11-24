@@ -230,7 +230,9 @@ describe("ProcessDiagnostics", () => {
         pid: CHILD_PID,
         signal: "SIGKILL",
         signaled: false,
-        message: Option.some(`进程 ${CHILD_PID} 不是可发送信号的 Fleet ADE 后台服务后代进程。`),
+        message: Option.some(
+          `进程 ${CHILD_PID} 不是 Fleet ADE 后台服务的子进程，不能向它发送信号。`,
+        ),
       });
 
       const diagnostics = yield* Effect.service(ProcessDiagnostics.ProcessDiagnostics).pipe(
