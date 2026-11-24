@@ -196,7 +196,7 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_project_read: tool(["读取", "正在读取", "已读取", "项目"], "project-read"),
   t3_project_create: tool(["注册", "正在注册", "已注册", "项目"], "project-create"),
   t3_project_update: tool(["更新", "正在更新", "已更新", "项目"], "project-update"),
-  t3_project_delete: tool(["删除", "正在删除", "已删除", "项目"], "project-delete"),
+  t3_project_delete: tool(["移除", "正在移除", "已移除", "项目"], "project-delete"),
   t3_project_clone: tool(["克隆", "正在克隆", "已克隆", "仓库"], "project-clone"),
   t3_attachment_prepare_upload: tool(
     ["准备", "正在准备", "已准备", "附件上传"],

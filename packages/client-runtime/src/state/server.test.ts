@@ -153,7 +153,7 @@ describe("update restart reconnect nudges", () => {
             phase: "blocked",
             lastFailure: {
               reason: "authentication",
-              detail: "电脑凭据无效。",
+              detail: "电脑配对信息无效。",
             },
           },
           { phase: "blocked", lastFailure: { reason: "configuration" } },

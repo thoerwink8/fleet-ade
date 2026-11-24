@@ -1702,7 +1702,7 @@ describe("EnvironmentSupervisor routes", () => {
         checkRoute: () => Effect.succeed("answered"),
         prepare: (_attempt, target) =>
           connectionRouteId(target) === LAN_TARGET.connectionId
-            ? Effect.fail(blocked("电脑凭据无效。"))
+            ? Effect.fail(blocked("电脑配对信息无效。"))
             : Effect.succeed(preparedFor(target)),
       });
       const supervisor = yield* EnvironmentSupervisor.make(LAN_THEN_REMOTE_ENTRY, {

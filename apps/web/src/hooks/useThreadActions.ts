@@ -705,7 +705,7 @@ export function useThreadActions() {
       : AsyncResult.failure(
           Cause.fail(
             new EnvironmentAuthorizationError({
-              message: "此连接已无法移除工作树。",
+              message: "此连接已无法删除工作树。",
               requiredScope: AuthSourceControlWriteScope,
             }),
           ),
@@ -738,7 +738,7 @@ export function useThreadActions() {
           type: "error",
           title: removalFailed ? "无法删除工作树" : "工作树已删除，但刷新 Git 状态失败",
           description: removalFailed
-            ? `无法移除 ${displayWorktreePath ?? orphanedWorktreePath}。${message}`
+            ? `无法删除 ${displayWorktreePath ?? orphanedWorktreePath}。${message}`
             : message,
         }),
       );
@@ -947,7 +947,7 @@ export function useThreadActions() {
         : AsyncResult.failure(
             Cause.fail(
               new EnvironmentAuthorizationError({
-                message: "此连接已无法移除工作树。",
+                message: "此连接已无法删除工作树。",
                 requiredScope: AuthSourceControlWriteScope,
               }),
             ),

@@ -18,7 +18,7 @@ export function profileMissingError(connectionId: string): ConnectionBlockedErro
 export function credentialMissingError(connectionId: string): ConnectionBlockedError {
   return new ConnectionBlockedError({
     reason: "authentication",
-    detail: `连接凭据 ${connectionId} 不可用。`,
+    detail: `连接配对信息 ${connectionId} 不可用。`,
     hop: "device",
   });
 }
@@ -40,7 +40,7 @@ export function mapRemoteEnvironmentError(
     case "EnvironmentAuthInvalidError":
       return new ConnectionBlockedError({
         reason: "authentication",
-        detail: "电脑凭据无效。",
+        detail: "电脑配对信息无效。",
         traceId: error.traceId,
         hop: "server",
       });
@@ -48,7 +48,7 @@ export function mapRemoteEnvironmentError(
     case "EnvironmentOperationForbiddenError":
       return new ConnectionBlockedError({
         reason: "permission",
-        detail: "电脑凭据未授予所需的访问权限。",
+        detail: "电脑配对信息未授予所需的访问权限。",
         traceId: error.traceId,
         hop: "server",
       });

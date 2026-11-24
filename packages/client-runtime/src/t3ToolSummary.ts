@@ -348,7 +348,7 @@ export function summarizeT3ToolCalls(
       label = phrase("已更新", "更新", quantity(countEntities(projectIds), "个", "项目"));
       break;
     case "project-delete":
-      label = phrase("已删除", "删除", quantity(countEntities(projectIds), "个", "项目"));
+      label = phrase("已移除", "移除", quantity(countEntities(projectIds), "个", "项目"));
       break;
     case "project-clone":
       label = phrase("已克隆", "克隆", quantity(countEntities(entityIds("cwd")), "个", "仓库"));

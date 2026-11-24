@@ -607,7 +607,7 @@ export function useComposerStash(input: {
         toastManager.add({
           type: "warning",
           title: "已丢弃最早的暂存提示词",
-          description: `暂存最多保留 ${MAX_STASH_ENTRIES} 条提示词，已移除最早的一条以腾出空间。`,
+          description: `暂存最多保留 ${MAX_STASH_ENTRIES} 条提示词，已删除最早的一条以腾出空间。`,
           data: { hideCopyButton: true },
         });
       }

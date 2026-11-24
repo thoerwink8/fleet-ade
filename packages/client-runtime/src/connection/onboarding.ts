@@ -221,7 +221,7 @@ export const prepareBearerConnectionUpdate = Effect.fn(
   if (Option.isNone(credential) || !isBearerCredential(credential.value)) {
     return yield* new ConnectionBlockedError({
       reason: "authentication",
-      detail: "已保存的 bearer 凭据不可用。",
+      detail: "已保存的登录信息不可用。",
     });
   }
 
