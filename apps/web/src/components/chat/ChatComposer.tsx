@@ -74,7 +74,7 @@ import {
   extendReplacementRangeForTrailingSpace,
   replaceTextRange,
 } from "../../composer-logic";
-import { DEFAULT_COMPOSER_PLACEHOLDER } from "../../composerPlaceholder";
+import { getComposerPlaceholder } from "../../composerPlaceholder";
 import { deriveComposerSendState, getAntigravitySendBlockReason } from "../ChatView.logic";
 import {
   dataTransferHasComposerMention,
@@ -2140,9 +2140,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   );
   // After /clear the next message starts a fresh session that cannot see what the suggestion refers to.
   const freshSessionArmed = useFreshSessionArmed(scopedThreadKey(routeThreadRef));
+  const isTurnRunning = phase === "running" || phase === "connecting";
   // Offered only where the default placeholder would show, so it never hides a pending question.
   const offeredPromptSuggestion =
-    phase !== "running" &&
+    !isTurnRunning &&
     !isSendBusy &&
     !freshSessionArmed &&
     composerContextRecords.size === 0 &&
@@ -2152,6 +2153,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     !showProviderUnavailable
       ? promptSuggestion
       : null;
+  const alternateShortcutLabel = shortcutLabelForCommand(keybindings, "composer.sendAlternate", {
+    context: {
+      composerFocus: true,
+      draftThreadRoute: routeKind === "draft",
+      turnRunning: true,
+      composerRequiresModifier: composerRequiresModifier(settings.sendShortcut, prompt),
+    },
+  });
 
   const onComposerCommandKey = (key: string, event: KeyboardEvent, isTaskItem?: boolean) =>
     composerCommandKeyHandler({
@@ -3391,7 +3400,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                             ? "请在上方选择项目以开始会话"
                             : showProviderUnavailable
                               ? "请在设置中启用一个提供方后再发送消息"
-                              : (offeredPromptSuggestion ?? DEFAULT_COMPOSER_PLACEHOLDER)
+                              : (offeredPromptSuggestion ??
+                                getComposerPlaceholder({
+                                  isRunning: isTurnRunning && !isEditingQueuedMessage,
+                                  followUpBehavior,
+                                  sendShortcut: settings.sendShortcut,
+                                  canSteer,
+                                  platform:
+                                    typeof navigator !== "undefined" ? navigator.platform : "",
+                                  alternateShortcutLabel,
+                                }))
                     }
                     placeholderSuffix={
                       offeredPromptSuggestion !== null ? (
@@ -3468,26 +3486,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     compact={isComposerPrimaryActionsCompact}
                     canOperateThread={canOperateThread}
                     pendingAction={pendingPrimaryAction}
-                    isRunning={phase === "running" || phase === "connecting"}
+                    isRunning={isTurnRunning}
                     canInterrupt={canInterrupt}
                     runId={activeThread?.runtime?.activeRunId ?? null}
                     followUpBehavior={followUpBehavior}
                     canSteer={canSteer}
-                    alternateShortcutLabel={shortcutLabelForCommand(
-                      keybindings,
-                      "composer.sendAlternate",
-                      {
-                        context: {
-                          composerFocus: true,
-                          draftThreadRoute: routeKind === "draft",
-                          turnRunning: true,
-                          composerRequiresModifier: composerRequiresModifier(
-                            settings.sendShortcut,
-                            prompt,
-                          ),
-                        },
-                      },
-                    )}
+                    alternateShortcutLabel={alternateShortcutLabel}
                     isSendBusy={isSendBusy}
                     sendDisabledReason={primaryActionSendDisabledReason}
                     isEnvironmentUnavailable={primaryActionEnvironmentUnavailable}

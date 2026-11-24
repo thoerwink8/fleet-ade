@@ -1,6 +1,10 @@
 import { expect, it } from "vite-plus/test";
 
-import { compactionBlocksSteering } from "./composerDispatch.ts";
+import {
+  alternateComposerDispatchAction,
+  compactionBlocksSteering,
+  resolveComposerDispatchMode,
+} from "./composerDispatch.ts";
 
 it("blocks steering for explicit compaction, and for automatic compaction unless the provider takes steers then", () => {
   const during = (
@@ -46,4 +50,52 @@ it("blocks steering for explicit compaction, and for automatic compaction unless
       messages: [{ id: "user", text: "/compact" }],
     }),
   ).toBe(false);
+});
+
+it("defaults running-turn dispatch to queue, respects explicit defaults, and flips on alternate modifier", () => {
+  expect(resolveComposerDispatchMode({ running: false, alternateModifier: false })).toBe("auto");
+  expect(resolveComposerDispatchMode({ running: true, alternateModifier: false })).toBe("queue");
+  expect(resolveComposerDispatchMode({ running: true, alternateModifier: true })).toBe("steer");
+  expect(alternateComposerDispatchAction()).toBe("steer");
+
+  expect(
+    resolveComposerDispatchMode({
+      running: true,
+      alternateModifier: false,
+      activeTurnDefault: "steer",
+    }),
+  ).toBe("steer");
+  expect(
+    resolveComposerDispatchMode({
+      running: true,
+      alternateModifier: true,
+      activeTurnDefault: "steer",
+    }),
+  ).toBe("queue");
+  expect(alternateComposerDispatchAction("steer")).toBe("queue");
+
+  expect(
+    resolveComposerDispatchMode({
+      running: true,
+      alternateModifier: false,
+      activeTurnDefault: "queue",
+    }),
+  ).toBe("queue");
+  expect(
+    resolveComposerDispatchMode({
+      running: true,
+      alternateModifier: true,
+      activeTurnDefault: "queue",
+    }),
+  ).toBe("steer");
+  expect(alternateComposerDispatchAction("queue")).toBe("steer");
+
+  expect(
+    resolveComposerDispatchMode({
+      running: true,
+      alternateModifier: true,
+      activeTurnDefault: "steer",
+      canSteer: false,
+    }),
+  ).toBe("queue");
 });

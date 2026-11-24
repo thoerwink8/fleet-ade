@@ -94,5 +94,8 @@ describe("summarizeT3ToolCalls", () => {
       label: "已等待 1 个会话",
       failedCount: 0,
     });
+    expect(summarizeT3ToolCalls("queue-steer", [completed({ queuedRunId: "run-1" })]).label).toBe(
+      "已请求立即发送 1 条排队消息",
+    );
   });
 });

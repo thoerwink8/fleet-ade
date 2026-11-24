@@ -78,4 +78,21 @@ describe("clientPersistenceStorage", () => {
     expect(readBrowserClientSettings()).toEqual(settings);
     expect(write).not.toHaveBeenCalled();
   });
+
+  it("defaults omitted followUpBehavior to queue while preserving explicit steer", async () => {
+    const testWindow = getTestWindow();
+    const { readBrowserClientSettings } = await import("./clientPersistenceStorage");
+
+    testWindow.localStorage.setItem(
+      "t3code:client-settings:v1",
+      JSON.stringify({ wordWrap: false }),
+    );
+    expect(readBrowserClientSettings()?.followUpBehavior).toBe("queue");
+
+    testWindow.localStorage.setItem(
+      "t3code:client-settings:v1",
+      JSON.stringify({ followUpBehavior: "steer" }),
+    );
+    expect(readBrowserClientSettings()?.followUpBehavior).toBe("steer");
+  });
 });

@@ -109,8 +109,8 @@ describe("DesktopClientSettings", () => {
         yield* settings.set(clientSettings);
 
         assert.equal(
-          yield* fileSystem.readLink(environment.clientSettingsPath),
-          linkedSettingsPath,
+          (yield* fileSystem.readLink(environment.clientSettingsPath)).replaceAll("\\", "/"),
+          linkedSettingsPath.replaceAll("\\", "/"),
         );
         assert.deepEqual(
           yield* decodeClientSettingsJson(yield* fileSystem.readFileString(linkedSettingsPath)),
@@ -213,6 +213,28 @@ describe("DesktopClientSettings", () => {
         assert.isTrue(Option.isSome(persisted));
         if (Option.isSome(persisted)) {
           assert.equal(persisted.value.timestampFormat, "24-hour");
+          assert.equal(persisted.value.followUpBehavior, "queue");
+        }
+      }),
+    ),
+  );
+
+  it.effect("preserves an explicit steer followUpBehavior in client-settings.json", () =>
+    withClientSettings(
+      Effect.gen(function* () {
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const settings = yield* DesktopClientSettings.DesktopClientSettings;
+        yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
+        yield* fileSystem.writeFileString(
+          environment.clientSettingsPath,
+          `${JSON.stringify({ followUpBehavior: "steer" })}\n`,
+        );
+
+        const persisted = yield* settings.get;
+        assert.isTrue(Option.isSome(persisted));
+        if (Option.isSome(persisted)) {
+          assert.equal(persisted.value.followUpBehavior, "steer");
         }
       }),
     ),

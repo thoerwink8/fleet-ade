@@ -13,6 +13,7 @@ import {
   ClientSettingsPatch,
   ClaudeSettings,
   BUILTIN_COMMANDER_INSTRUCTIONS,
+  DEFAULT_CLIENT_SETTINGS,
   DEFAULT_SERVER_SETTINGS,
   globalIdleCompaction,
   idleCompactionPatch,
@@ -725,5 +726,16 @@ describe("retired snapshot settings", () => {
       expect(decodeClientSettingsPatch(client)).not.toHaveProperty(key);
     }
     expect(decoded.timestampFormat).toBe("24-hour");
+  });
+});
+
+describe("ClientSettings follow-up behavior", () => {
+  it("defaults omitted followUpBehavior to queue and preserves explicitly saved values", () => {
+    expect(DEFAULT_CLIENT_SETTINGS.followUpBehavior).toBe("queue");
+    expect(decodeClientSettings({}).followUpBehavior).toBe("queue");
+    expect(decodeClientSettings({ wordWrap: false }).followUpBehavior).toBe("queue");
+    expect(decodeClientSettings({ followUpBehavior: "steer" }).followUpBehavior).toBe("steer");
+    expect(decodeClientSettings({ followUpBehavior: "queue" }).followUpBehavior).toBe("queue");
+    expect(decodeClientSettingsPatch({})).not.toHaveProperty("followUpBehavior");
   });
 });

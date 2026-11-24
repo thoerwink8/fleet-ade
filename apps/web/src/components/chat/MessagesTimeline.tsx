@@ -2101,7 +2101,7 @@ function AttemptFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "at
           {row.label}
           {error ? ` · ${error}` : ""}
         </span>
-        <span className="text-2xs text-muted-foreground">被引导打断</span>
+        <span className="text-2xs text-muted-foreground">被立即发送打断</span>
       </button>
       {loading ? <WorkHistorySkeleton /> : null}
     </div>
