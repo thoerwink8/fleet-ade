@@ -114,6 +114,30 @@ describe("RPC authorization scopes", () => {
     ).toBe(true);
   });
 
+  it("lets readers list recently deleted threads but restore and purge need operate scope", () => {
+    expect(requiredScopeForRpcMethod(ORCHESTRATION_V2_WS_METHODS.getRecentlyDeleted)).toBe(
+      AuthOrchestrationReadScope,
+    );
+    expect(requiredScopeForRpcMethod(ORCHESTRATION_V2_WS_METHODS.dispatchCommand)).toBe(
+      AuthOrchestrationOperateScope,
+    );
+    const dispatch = WsRpcGroup.requests.get(ORCHESTRATION_V2_WS_METHODS.dispatchCommand);
+    if (dispatch === undefined) throw new Error("dispatchCommand is not registered");
+    const decode = Schema.decodeUnknownExit(dispatch.payloadSchema);
+    for (const command of [
+      { type: "thread.restore", commandId: "restore-1", threadId: "thread-1" },
+      { type: "thread.purge", commandId: "purge-1", threadId: "thread-1" },
+      {
+        type: "thread.batch",
+        commandId: "purge-all-1",
+        operation: "purge",
+        threadIds: ["thread-1"],
+      },
+    ]) {
+      expect(Exit.isSuccess(decode(command))).toBe(true);
+    }
+  });
+
   it("lets thread readers observe and refresh checkout branches", () => {
     for (const method of [WS_METHODS.subscribeVcsBranch, WS_METHODS.vcsRefreshBranch]) {
       expect(requiredScopeForRpcMethod(method)).toBe(AuthOrchestrationReadScope);

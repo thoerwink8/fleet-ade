@@ -519,6 +519,17 @@ it.effect(
         yield* reporter.handle(fakeEvent(threadId, "run.updated"));
         expect((yield* snapshot()).rows).toEqual([]);
 
+        yield* reporter.trackAdhoc(threadId, EnvironmentId.make("coordinator"));
+        yield* TestClock.adjust("5 seconds");
+        expect((yield* snapshot()).rows).toHaveLength(1);
+        yield* reporter.handle(fakeEvent(threadId, "thread.deleted"));
+        expect((yield* snapshot()).rows).toEqual([]);
+        // The later permanent delete finds nothing left to tombstone.
+        yield* reporter.handle(fakeEvent(threadId, "thread.purged"));
+        expect((yield* snapshot()).rows).toEqual([]);
+        yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+        expect((yield* snapshot()).rows).toEqual([]);
+
         // Registration itself publishes an existing shell without waiting for another event.
         yield* reporter.trackAdhoc(threadId, EnvironmentId.make("coordinator"));
         yield* TestClock.adjust("30 seconds");
@@ -721,6 +732,7 @@ it.effect(
         ).pipe(Layer.build);
         const localThread = ThreadId.make("local-thread");
         const live = yield* Ref.make(true);
+        const trashed = yield* Ref.make(false);
         const peerCalls = yield* Ref.make(0);
         const reporterContext = yield* FleetSummaryReporter.layerForTest().pipe(
           Layer.provide(
@@ -738,9 +750,11 @@ it.effect(
                     shell(localThread, value ? "running" : "idle"),
                   ),
                 listActiveShellIndex: () =>
-                  Effect.map(Ref.get(live), (mayBeLive) => [
-                    { id: localThread, mayBeLive } as ProjectionStore.ActiveShellIndexEntry,
-                  ]),
+                  Effect.map(Effect.all([Ref.get(live), Ref.get(trashed)]), ([mayBeLive, gone]) =>
+                    gone
+                      ? []
+                      : [{ id: localThread, mayBeLive } as ProjectionStore.ActiveShellIndexEntry],
+                  ),
               }),
               Layer.mock(PeerLinks.PeerLinks)({
                 list: Effect.succeed([] as ReadonlyArray<PeerLinkSummary>),
@@ -795,6 +809,30 @@ it.effect(
         );
         if (afterSweep[0]?.type !== "snapshot") throw new Error("Expected snapshot");
         expect(afterSweep[0].rows).toEqual([]);
+
+        // Moving a live thread to the trash removes its row at once; restoring brings it back.
+        yield* Ref.set(live, true);
+        yield* TestClock.adjust("5 seconds");
+        const back = yield* Stream.runCollect((yield* summary.subscribe({})).pipe(Stream.take(1)));
+        if (back[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(back[0].rows).toHaveLength(1);
+        yield* Ref.set(trashed, true);
+        yield* reporter.handle(fakeEvent(localThread, "thread.deleted"));
+        const trashedRows = yield* Stream.runCollect(
+          (yield* summary.subscribe({})).pipe(Stream.take(1)),
+        );
+        if (trashedRows[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(trashedRows[0].rows).toEqual([]);
+        yield* Ref.set(trashed, false);
+        yield* reporter.handle(fakeEvent(localThread, "thread.restored"));
+        yield* TestClock.adjust("5 seconds");
+        const restored = yield* Stream.runCollect(
+          (yield* summary.subscribe({})).pipe(Stream.take(1)),
+        );
+        if (restored[0]?.type !== "snapshot") throw new Error("Expected snapshot");
+        expect(restored[0].rows).toEqual([
+          expect.objectContaining({ environmentId: selfId, threadId: localThread }),
+        ]);
       }),
     ),
 );

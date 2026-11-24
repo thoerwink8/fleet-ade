@@ -1,23 +1,30 @@
 import { assert, it } from "@effect/vitest";
 import {
   CommandId,
+  EventId,
+  IsoDateTime,
   MessageId,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
   ThreadId,
 } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as Schema from "effect/Schema";
 
+import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
+import * as ProjectStore from "./ProjectStore.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
+
+const isDispatchError = Schema.is(Orchestrator.OrchestratorDispatchError);
 
 const instanceId = ProviderInstanceId.make("codex");
 const modelSelection = { instanceId, model: "gpt-5.1-codex" };
@@ -33,12 +40,80 @@ const layerTest = Layer.mergeAll(
   layerDatabase,
   ProjectionStore.layer.pipe(Layer.provide(layerDatabase)),
   EffectOutbox.layer.pipe(Layer.provide(layerDatabase)),
+  ProjectStore.layer.pipe(Layer.provide(layerDatabase)),
   ProviderReplayHarness.layerWithRegistry(
     { name: "thread-batch" },
     ProviderAdapterRegistry.layerFromAdapters([adapter]),
     { databaseLayer: layerDatabase, runEffectWorker: false },
   ),
 );
+
+const makeProject = Effect.fn("test.batch.makeProject")(function* (name: string) {
+  const projects = yield* ProjectStore.ProjectStoreV2;
+  const projectId = ProjectId.make(name);
+  yield* projects.apply({
+    sequence: 0,
+    eventId: EventId.make(`event:${name}`),
+    aggregateKind: "project",
+    aggregateId: projectId,
+    occurredAt: IsoDateTime.make("2026-11-01T00:00:00.000Z"),
+    commandId: null,
+    causationEventId: null,
+    correlationId: null,
+    metadata: {},
+    type: "project.created",
+    payload: {
+      projectId,
+      title: name,
+      workspaceRoot: `/workspace/${name}`,
+      defaultModelSelection: null,
+      scripts: [],
+      createdAt: IsoDateTime.make("2026-11-01T00:00:00.000Z"),
+      updatedAt: IsoDateTime.make("2026-11-01T00:00:00.000Z"),
+    },
+  });
+  return projectId;
+});
+
+const deleteProject = Effect.fn("test.batch.deleteProject")(function* (projectId: ProjectId) {
+  const projects = yield* ProjectStore.ProjectStoreV2;
+  yield* projects.apply({
+    sequence: 0,
+    eventId: EventId.make(`event:${projectId}:deleted`),
+    aggregateKind: "project",
+    aggregateId: projectId,
+    occurredAt: IsoDateTime.make("2026-11-02T00:00:00.000Z"),
+    commandId: null,
+    causationEventId: null,
+    correlationId: null,
+    metadata: {},
+    type: "project.deleted",
+    payload: { projectId, deletedAt: IsoDateTime.make("2026-11-02T00:00:00.000Z") },
+  });
+});
+
+const threadInProject = Effect.fn("test.batch.threadInProject")(function* (
+  name: string,
+  projectId: ProjectId,
+) {
+  const orchestrator = yield* Orchestrator.OrchestratorV2;
+  const threadId = ThreadId.make(name);
+  yield* orchestrator.dispatch({
+    type: "thread.create",
+    commandId: CommandId.make(`create-${name}`),
+    threadId,
+    projectId,
+    title: name,
+    modelSelection,
+    runtimeMode: "full-access",
+    interactionMode: "default",
+    branch: null,
+    worktreePath: null,
+    createdBy: "user",
+    creationSource: "web",
+  });
+  return threadId;
+});
 
 const createThread = Effect.fn("test.batch.createThread")(function* (name: string) {
   const orchestrator = yield* Orchestrator.OrchestratorV2;
@@ -280,7 +355,7 @@ it.effect("batch delete plans full cleanup for every thread and side chat", () =
     assert.isNotNull((yield* projections.getThread(sideChat)).deletedAt);
 
     const effects = yield* outbox.listByCommandId(commandId);
-    const kinds = ["terminal.cleanup", "scheduled-tasks.cleanup", "preview.cleanup"] as const;
+    const kinds = ["terminal.cleanup", "preview.cleanup"] as const;
     for (const threadId of [parent, other, sideChat]) {
       for (const kind of kinds) {
         assert.ok(
@@ -293,6 +368,8 @@ it.effect("batch delete plans full cleanup for every thread and side chat", () =
     for (const effect of effects) {
       assert.include(effect.id, String(effect.threadId));
     }
+    assert.isFalse(effects.some((effect) => effect.request.type === "scheduled-tasks.cleanup"));
+    assert.isFalse(effects.some((effect) => effect.request.type === "attachment.cleanup"));
   }).pipe(Effect.provide(layerTest)),
 );
 
@@ -324,5 +401,320 @@ it.effect("a batch that changes nothing still accepts the command", () =>
     });
     assert.equal(replay.replayed, true);
     assert.deepEqual(replay.batch, result.batch);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("deleting an unused thread commits the soft delete and the purge together", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const threadId = yield* createThread("delete-unused");
+    const commandId = CommandId.make("delete-unused-once");
+    const result = yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId,
+      threadId,
+      onlyIfUnused: true,
+    });
+    assert.deepEqual(
+      result.storedEvents.map((stored) => stored.event.type),
+      ["thread.deleted", "thread.purged"],
+    );
+    const deletedEvent = result.storedEvents[0]?.event;
+    assert.ok(deletedEvent?.type === "thread.deleted");
+    assert.deepEqual(deletedEvent.cascadeRootId, threadId);
+    assert.isNull(yield* projections.getThreadTrash(threadId));
+    const effects = yield* outbox.listByCommandId(commandId);
+    assert.deepEqual(
+      effects.map((effect) => effect.request.type),
+      ["scheduled-tasks.cleanup", "terminal.cleanup", "preview.cleanup", "terminal.cleanup"],
+    );
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("a second delete keeps the original deleted timestamp", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const threadId = yield* createThread("delete-twice");
+    const first = yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("delete-twice-first"),
+      threadId,
+    });
+    const deletedAt = (yield* projections.getThread(threadId)).deletedAt;
+    assert.isNotNull(deletedAt);
+    const replayed = yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("delete-twice-first"),
+      threadId,
+    });
+    assert.equal(replayed.replayed, true);
+    assert.equal(
+      DateTime.toEpochMillis((yield* projections.getThread(threadId)).deletedAt!),
+      DateTime.toEpochMillis(deletedAt!),
+    );
+    const again = yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("delete-twice-second"),
+      threadId,
+    });
+    assert.equal(again.sequence > first.sequence, true);
+    assert.equal(
+      DateTime.toEpochMillis((yield* projections.getThread(threadId)).deletedAt!),
+      DateTime.toEpochMillis(deletedAt!),
+    );
+    const trash = yield* projections.getThreadTrash(threadId);
+    assert.deepEqual(trash?.deletedAt, deletedAt);
+    assert.deepEqual(trash?.cascadeRootId, threadId);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("restores a deleted parent with its side chat and keeps archive state", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const projectId = yield* makeProject("restore-project");
+    const parent = yield* threadInProject("restore-parent", projectId);
+    const sideChat = ThreadId.make("restore-side-chat");
+    yield* orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make("restore-fork"),
+      sourceThreadId: parent,
+      targetThreadId: sideChat,
+      sideChat: true,
+      sourcePoint: { type: "latest_stable" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    yield* orchestrator.dispatch({
+      type: "thread.archive",
+      commandId: CommandId.make("restore-archive"),
+      threadId: parent,
+    });
+    const archivedAt = (yield* projections.getThread(parent)).archivedAt;
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("restore-delete"),
+      threadId: parent,
+    });
+    assert.isNotNull(yield* projections.getThreadTrash(parent));
+    assert.isNotNull(yield* projections.getThreadTrash(sideChat));
+
+    const restored = yield* orchestrator.dispatch({
+      type: "thread.restore",
+      commandId: CommandId.make("restore-root"),
+      threadId: parent,
+    });
+    assert.deepEqual(
+      restored.storedEvents.map((stored) => stored.event.type),
+      ["thread.restored", "thread.restored"],
+    );
+    assert.deepEqual(
+      restored.storedEvents.map((stored) => stored.event.threadId),
+      [parent, sideChat],
+    );
+    assert.isNull((yield* projections.getThread(parent)).deletedAt);
+    assert.isNull((yield* projections.getThread(sideChat)).deletedAt);
+    assert.deepEqual((yield* projections.getThread(parent)).archivedAt, archivedAt);
+    assert.isNull(yield* projections.getThreadTrash(parent));
+    assert.isNull(yield* projections.getThreadTrash(sideChat));
+
+    const listed = yield* projections.getRecentlyDeleted();
+    assert.isFalse(listed.some((item) => item.threadId === parent));
+
+    // A restored thread is a normal thread again: it shows in the shell and takes new messages.
+    assert.isNotNull(yield* projections.getThreadShell(parent));
+    assert.isNotNull(yield* projections.getThreadShell(sideChat));
+    const run = yield* queueRun(parent, "after-restore");
+    assert.notEqual(run.status, "cancelled");
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("batch restore reports stable rejection codes per root", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const projectId = yield* makeProject("batch-restore-project");
+    const parent = yield* threadInProject("batch-restore-parent", projectId);
+    const sideChat = ThreadId.make("batch-restore-side-chat");
+    yield* orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make("batch-restore-fork"),
+      sourceThreadId: parent,
+      targetThreadId: sideChat,
+      sideChat: true,
+      sourcePoint: { type: "latest_stable" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const live = yield* threadInProject("batch-restore-live", projectId);
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("batch-restore-delete"),
+      threadId: parent,
+    });
+
+    const failed = yield* orchestrator
+      .dispatch({
+        type: "thread.restore",
+        commandId: CommandId.make("batch-restore-side-request"),
+        threadId: sideChat,
+      })
+      .pipe(Effect.flip);
+    assert.ok(isDispatchError(failed));
+    assert.equal(failed.code, "cascade-member");
+
+    const result = yield* orchestrator.dispatch({
+      type: "thread.batch",
+      commandId: CommandId.make("batch-restore-op"),
+      operation: "restore",
+      threadIds: [live, sideChat, parent],
+    });
+    assert.deepEqual(
+      result.batch?.items.map((item) => [item.threadId, item.status, item.reason]),
+      [
+        [live, "rejected", "thread-not-deleted"],
+        [sideChat, "rejected", "cascade-member"],
+        [parent, "applied", undefined],
+      ],
+    );
+    assert.equal(result.batch?.appliedCount, 1);
+    assert.isNull((yield* projections.getThread(sideChat)).deletedAt);
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("restore rejects a deleted project and purge still succeeds", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const projectId = yield* makeProject("purged-project");
+    const threadId = yield* threadInProject("purged-thread", projectId);
+    yield* deleteProject(projectId);
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("purged-delete"),
+      threadId,
+    });
+
+    const failed = yield* orchestrator
+      .dispatch({
+        type: "thread.restore",
+        commandId: CommandId.make("purged-restore"),
+        threadId,
+      })
+      .pipe(Effect.flip);
+    assert.ok(isDispatchError(failed));
+    assert.equal(failed.code, "project-deleted");
+
+    const commandId = CommandId.make("purged-final");
+    const purged = yield* orchestrator.dispatch({
+      type: "thread.purge",
+      commandId,
+      threadId,
+    });
+    assert.deepEqual(
+      purged.storedEvents.map((stored) => stored.event.type),
+      ["thread.purged"],
+    );
+    const effects = yield* outbox.listByCommandId(commandId);
+    assert.deepEqual(
+      effects.map((effect) => effect.request.type),
+      ["scheduled-tasks.cleanup", "terminal.cleanup"],
+    );
+    assert.isNull(yield* projections.getThreadTrash(threadId));
+    assert.isNotNull((yield* projections.getThread(threadId)).deletedAt);
+
+    const afterPurge = yield* orchestrator
+      .dispatch({
+        type: "thread.purge",
+        commandId: CommandId.make("purged-again"),
+        threadId,
+      })
+      .pipe(Effect.flip);
+    assert.ok(isDispatchError(afterPurge));
+    assert.equal(afterPurge.code, "thread-not-recoverable");
+
+    // A repeated delete of the tombstone must not put it back in the trash.
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("purged-delete-again"),
+      threadId,
+    });
+    assert.isNull(yield* projections.getThreadTrash(threadId));
+    const restoreTombstone = yield* orchestrator
+      .dispatch({
+        type: "thread.restore",
+        commandId: CommandId.make("purged-restore-again"),
+        threadId,
+      })
+      .pipe(Effect.flip);
+    assert.ok(isDispatchError(restoreTombstone));
+    assert.equal(restoreTombstone.code, "thread-not-recoverable");
+  }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("batch purge cascades across the whole group and rejects tombstones", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const projections = yield* ProjectionStore.ProjectionStoreV2;
+    const outbox = yield* EffectOutbox.EffectOutboxV2;
+    const projectId = yield* makeProject("batch-purge-project");
+    const parent = yield* threadInProject("batch-purge-parent", projectId);
+    const sideChat = ThreadId.make("batch-purge-side-chat");
+    yield* orchestrator.dispatch({
+      type: "thread.fork",
+      commandId: CommandId.make("batch-purge-fork"),
+      sourceThreadId: parent,
+      targetThreadId: sideChat,
+      sideChat: true,
+      sourcePoint: { type: "latest_stable" },
+      createdBy: "user",
+      creationSource: "web",
+    });
+    const missing = yield* threadInProject("batch-purge-live", projectId);
+    yield* orchestrator.dispatch({
+      type: "thread.delete",
+      commandId: CommandId.make("batch-purge-delete"),
+      threadId: parent,
+    });
+
+    const commandId = CommandId.make("batch-purge-op");
+    const result = yield* orchestrator.dispatch({
+      type: "thread.batch",
+      commandId,
+      operation: "purge",
+      threadIds: [sideChat, parent, missing],
+    });
+    assert.deepEqual(
+      result.batch?.items.map((item) => [item.threadId, item.status, item.reason]),
+      [
+        [sideChat, "rejected", "cascade-member"],
+        [parent, "applied", undefined],
+        [missing, "rejected", "thread-not-deleted"],
+      ],
+    );
+    assert.deepEqual(
+      result.storedEvents.map((stored) => stored.event.type),
+      ["thread.purged", "thread.purged"],
+    );
+    assert.deepEqual(
+      result.storedEvents.map((stored) => stored.event.threadId),
+      [parent, sideChat],
+    );
+    const effects = yield* outbox.listByCommandId(commandId);
+    assert.deepEqual(
+      effects.map((effect) => [effect.threadId, effect.request.type]).toSorted(),
+      [
+        [parent, "scheduled-tasks.cleanup"],
+        [parent, "terminal.cleanup"],
+        [sideChat, "scheduled-tasks.cleanup"],
+        [sideChat, "terminal.cleanup"],
+      ].toSorted(),
+    );
+    assert.isNull(yield* projections.getThreadTrash(parent));
+    assert.isNull(yield* projections.getThreadTrash(sideChat));
   }).pipe(Effect.provide(layerTest)),
 );

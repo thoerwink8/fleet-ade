@@ -528,3 +528,78 @@ it.effect(
       }).pipe(Effect.provide(layerServices));
     }).pipe(Effect.provide(layerDatabase)),
 );
+
+it.effect("purges the project's already-trashed threads along with it", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const projectId = ProjectId.make("project:trashed-children");
+    const trashed = ThreadId.make("thread:trashed-child");
+    const live = ThreadId.make("thread:live-child");
+    yield* seedProject(projectId);
+    yield* TestClock.setTime(Date.parse("2026-09-04T12:00:00.000Z"));
+
+    yield* Effect.gen(function* () {
+      const eventSink = yield* EventSink.EventSinkV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+      const service = yield* ProjectService.make;
+      yield* eventSink.write({
+        events: [nativeThreadCreated(projectId, trashed), nativeThreadCreated(projectId, live)],
+      });
+      const command = {
+        type: "thread.delete" as const,
+        commandId: CommandId.make("command:trashed-children:thread-delete"),
+        threadId: trashed,
+      };
+      const now = yield* DateTime.now;
+      const plan = yield* planThreadDeletion({
+        command,
+        projection: yield* projections.getThreadRecords(trashed, [
+          "runs",
+          "attempts",
+          "nodes",
+          "runtimeRequests",
+          "subagents",
+          "providerSessions",
+        ]),
+        now,
+        idAllocator,
+      });
+      yield* eventSink.commitCommand({
+        commandId: command.commandId,
+        commandType: command.type,
+        threadId: trashed,
+        acceptedAt: now,
+        events: plan.events,
+        effects: plan.effects,
+      });
+      assert.isNotNull(yield* projections.getThreadTrash(trashed));
+
+      yield* service.delete({
+        commandId: CommandId.make("command:trashed-children:project-delete"),
+        projectId,
+        force: true,
+      });
+
+      assert.isNull(yield* projections.getThreadTrash(trashed));
+      assert.isNull(yield* projections.getThreadTrash(live));
+      const purged = yield* sql<{ readonly stream_id: string }>`
+        SELECT stream_id FROM orchestration_events
+        WHERE event_type = 'thread.purged' ORDER BY stream_id ASC
+      `;
+      assert.deepEqual(
+        purged.map((event) => event.stream_id),
+        [live, trashed],
+      );
+      const cleanup = yield* sql<{ readonly effect_type: string }>`
+        SELECT effect_type FROM orchestration_v2_effect_outbox
+        WHERE thread_id = ${trashed} AND command_id LIKE '%:purge-thread:%'
+        ORDER BY effect_type ASC
+      `;
+      assert.deepEqual(
+        cleanup.map((effect) => effect.effect_type),
+        ["scheduled-tasks.cleanup", "terminal.cleanup"],
+      );
+    }).pipe(Effect.provide(layerServices));
+  }).pipe(Effect.provide(layerDatabase)),
+);

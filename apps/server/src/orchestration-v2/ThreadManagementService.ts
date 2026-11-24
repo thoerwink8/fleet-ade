@@ -1,4 +1,5 @@
 import type {
+  OrchestrationV2RecentlyDeletedThread,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
 } from "@t3tools/contracts";
@@ -451,6 +452,24 @@ export interface ThreadManagementServiceShape {
     readonly projectId?: ProjectId | undefined;
     readonly includeSubagents: boolean;
   }) => Effect.Effect<ReadonlyArray<OrchestrationV2ThreadShell>, ThreadManagementError>;
+  readonly listRecentlyDeleted: () => Effect.Effect<
+    ReadonlyArray<OrchestrationV2RecentlyDeletedThread>,
+    Orchestrator.OrchestratorV2Error
+  >;
+  readonly restoreThread: (input: {
+    readonly commandId: CommandId;
+    readonly threadId: ThreadId;
+  }) => Effect.Effect<
+    Orchestrator.OrchestratorV2DispatchResult,
+    Orchestrator.OrchestratorV2Error | ThreadManagementProviderInstanceDisabledError
+  >;
+  readonly purgeThread: (input: {
+    readonly commandId: CommandId;
+    readonly threadId: ThreadId;
+  }) => Effect.Effect<
+    Orchestrator.OrchestratorV2DispatchResult,
+    Orchestrator.OrchestratorV2Error | ThreadManagementProviderInstanceDisabledError
+  >;
   readonly sendToThread: (
     input: ThreadManagementSendInput,
   ) => Effect.Effect<ThreadManagementSendResult, ThreadManagementFailure>;
@@ -1672,6 +1691,29 @@ const make = Effect.gen(function* () {
     });
   });
 
+  const listRecentlyDeleted: ThreadManagementServiceShape["listRecentlyDeleted"] =
+    orchestrator.listRecentlyDeleted;
+
+  const restoreThread: ThreadManagementServiceShape["restoreThread"] = Effect.fn(
+    "ThreadManagementService.restoreThread",
+  )(function* (input) {
+    return yield* dispatch({
+      type: "thread.restore",
+      commandId: input.commandId,
+      threadId: input.threadId,
+    });
+  });
+
+  const purgeThread: ThreadManagementServiceShape["purgeThread"] = Effect.fn(
+    "ThreadManagementService.purgeThread",
+  )(function* (input) {
+    return yield* dispatch({
+      type: "thread.purge",
+      commandId: input.commandId,
+      threadId: input.threadId,
+    });
+  });
+
   const cancelPendingRollback: ThreadManagementServiceShape["cancelPendingRollback"] = Effect.fn(
     "ThreadManagementService.cancelPendingRollback",
   )(function* (input) {
@@ -1768,6 +1810,9 @@ const make = Effect.gen(function* () {
       );
     }),
     dispatch,
+    listRecentlyDeleted,
+    restoreThread,
+    purgeThread,
     getThreadHistoryPage: Effect.fn("ThreadManagementService.getThreadHistoryPage")(
       function (threadId, cursor, throughEntryId, conversationOnly, workMode) {
         return ensureProjectionTranscript(threadId).pipe(

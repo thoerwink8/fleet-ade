@@ -1845,6 +1845,63 @@ describe("ThreadSettlementServiceV2 worker", () => {
       }).pipe(Effect.provide(fixture.layer));
     }),
   );
+
+  it.effect("does not auto-settle children while their parent is in thread trash", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse(NOW));
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const trashParent = appThread("trash-parent", "settled");
+      const tombstoneParent = appThread("tombstone-parent", "settled");
+      const childOf = (id: string, parent: OrchestrationV2AppThread) => ({
+        ...appThread(id, null),
+        lineage: {
+          parentThreadId: parent.id,
+          rootThreadId: parent.id,
+          relationshipToParent: "subagent" as const,
+        },
+      });
+      const trashChild = childOf("trash-child", trashParent);
+      const tombstoneChild = childOf("tombstone-child", tombstoneParent);
+      for (const thread of [trashParent, tombstoneParent, trashChild, tombstoneChild]) {
+        yield* store.apply({
+          type: "thread.created",
+          id: EventId.make(`created:${thread.id}`),
+          threadId: thread.id,
+          occurredAt: thread.createdAt,
+          payload: thread,
+        });
+      }
+      for (const parent of [trashParent, tombstoneParent]) {
+        yield* store.apply({
+          type: "thread.deleted",
+          id: EventId.make(`deleted:${parent.id}`),
+          threadId: parent.id,
+          occurredAt: DateTime.makeUnsafe(NOW),
+          payload: { ...parent, deletedAt: DateTime.makeUnsafe(NOW) },
+        });
+      }
+      yield* store.apply({
+        type: "thread.purged",
+        id: EventId.make(`purged:${tombstoneParent.id}`),
+        threadId: tombstoneParent.id,
+        occurredAt: DateTime.makeUnsafe(NOW),
+        payload: { ...tombstoneParent, deletedAt: DateTime.makeUnsafe(NOW) },
+      });
+      const fixture = yield* makeHarness({
+        snapshot: makeSnapshot([]),
+        projections: store,
+        settings: { ...DEFAULT_SERVER_SETTINGS, sidebarAutoSettleAfterDays: null },
+      });
+      yield* Effect.gen(function* () {
+        const service = yield* ThreadSettlementService.ThreadSettlementServiceV2;
+        yield* startHarness(service, fixture.activation, fixture.snapshotReads);
+        assert.deepStrictEqual(
+          (yield* Ref.get(fixture.commands)).map((command) => command.threadId),
+          [tombstoneChild.id],
+        );
+      }).pipe(Effect.provide(fixture.layer));
+    }).pipe(Effect.provide(projectionStoreSql)),
+  );
 });
 
 describe("ThreadSettlementServiceV2 terminals", () => {

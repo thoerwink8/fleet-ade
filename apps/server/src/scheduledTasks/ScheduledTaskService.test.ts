@@ -705,6 +705,185 @@ it.effect("a first run whose thread was deleted before it bound removes the task
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
 
+it.effect.each(["trash", "tombstone"] as const)(
+  "keeps a task bound to a deleted thread in trash and drops one whose deletion is a tombstone",
+  (scenario) =>
+    Effect.gen(function* () {
+      const projectId = ProjectId.make("project:test");
+      const threadId = ThreadId.make(`thread:${scenario}`);
+      const taskId = ScheduledTaskId.make(`task:${scenario}`);
+      const layer = ScheduledTaskService.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.mock(ThreadLaunchService.ThreadLaunchService)({
+              launch: () => Effect.succeed({ threadId, resumed: false } as never),
+            }),
+            Layer.mock(ThreadManagementService.ThreadManagementService)({
+              getThreadShell: () =>
+                Effect.succeed(threadShell(projectId, { deletedAt: "2026-11-03T00:00:00Z" })),
+            }),
+            Layer.mock(SecretRequests.SecretRequests)({}),
+            Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+              namedProjectsRoot: "/projects",
+              isScratchProject: () => Effect.succeed(false),
+            }),
+            NodeCrypto.layer,
+            Layer.succeed(Scheduler.Scheduler, { register: () => Effect.void }),
+          ),
+        ),
+      );
+      yield* Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql`
+          INSERT INTO orchestration_v2_projection_threads (
+            thread_id, project_id, title, default_provider, runtime_mode, interaction_mode,
+            created_at, updated_at, payload_json
+          ) VALUES (
+            ${threadId}, ${projectId}, ${"trash"}, ${"codex"}, ${"full-access"}, ${"default"},
+            ${"2026-11-03T00:00:00.000Z"}, ${"2026-11-03T00:00:00.000Z"}, ${"{}"}
+          )
+        `;
+        if (scenario === "trash") {
+          yield* sql`
+            INSERT INTO orchestration_v2_projection_thread_trash (
+              thread_id, project_id, deleted_at, purge_due_at, cascade_root_id
+            ) VALUES (
+              ${threadId}, ${projectId}, ${"2026-11-03T00:00:00.000Z"}, ${1}, ${threadId}
+            )
+          `;
+        }
+        const service = yield* ScheduledTaskService.ScheduledTaskService;
+        const { task } = yield* service.upsert({
+          id: taskId,
+          title: "Triage",
+          prompt: "Triage new issues",
+          enabled: true,
+          schedule: { type: "interval", everyMs: 60_000 },
+          projectId,
+          threadMode: "continue",
+          workspaceStrategy: { type: "root" },
+          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+          runtimeMode: "full-access",
+          interactionMode: "default",
+        });
+        yield* service.runNow({ id: task.id });
+
+        const [bound] = yield* sql<{ readonly thread_id: string | null }>`
+          SELECT thread_id FROM scheduled_tasks WHERE task_id = ${task.id}
+        `;
+        const [pending] = yield* sql<{ readonly task_id: string }>`
+          SELECT task_id FROM scheduled_task_pending_deletes WHERE task_id = ${task.id}
+        `;
+        if (scenario === "trash") {
+          assert.equal(bound?.thread_id, threadId);
+          assert.isUndefined(pending);
+        } else {
+          assert.isUndefined(bound);
+          assert.isUndefined(pending);
+        }
+      }).pipe(Effect.provide(layer));
+    }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
+it.effect("fails a due run for a deleted thread in trash and advances its next run", () =>
+  Effect.gen(function* () {
+    const now = "2026-11-03T00:00:00.000Z";
+    const projectId = ProjectId.make("project:test");
+    const threadId = ThreadId.make("thread:due-trash");
+    const taskId = ScheduledTaskId.make("task:due-trash");
+    const failure = new ThreadManagementService.ThreadManagementThreadNotFoundError({
+      projectId,
+      threadId,
+    });
+    const failures = yield* Ref.make<ReadonlyArray<string>>([]);
+    const runDueWork = yield* Ref.make<Effect.Effect<void>>(Effect.void);
+    const layer = ScheduledTaskService.layer.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
+          Layer.mock(ThreadManagementService.ThreadManagementService)({
+            getThreadShell: () => Effect.succeed(threadShell(projectId, { deletedAt: now })),
+            getThreadRecords: () => Effect.succeed({ runs: [], messages: [] } as never),
+            sendToThread: () =>
+              Ref.update(failures, (all) => [...all, failure._tag]).pipe(
+                Effect.andThen(Effect.fail(failure)),
+              ),
+          }),
+          Layer.mock(SecretRequests.SecretRequests)({}),
+          Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+            namedProjectsRoot: "/projects",
+            isScratchProject: () => Effect.succeed(false),
+          }),
+          NodeCrypto.layer,
+          Layer.mock(Scheduler.Scheduler)({
+            register: (name, work) =>
+              name !== "scheduled-tasks"
+                ? Effect.void
+                : Effect.context<Effect.Services<typeof work>>().pipe(
+                    Effect.flatMap((context) =>
+                      Ref.set(runDueWork, work.pipe(Effect.provideContext(context), Effect.ignore)),
+                    ),
+                  ),
+          }),
+        ),
+      ),
+    );
+    yield* TestClock.setTime(Date.parse(now));
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      const service = yield* ScheduledTaskService.ScheduledTaskService;
+      yield* sql`
+          INSERT INTO orchestration_v2_projection_threads (
+            thread_id, project_id, title, default_provider, runtime_mode, interaction_mode,
+            created_at, updated_at, payload_json
+          ) VALUES (
+            ${threadId}, ${projectId}, ${"trash"}, ${"codex"}, ${"full-access"}, ${"default"},
+            ${now}, ${now}, ${"{}"}
+          )
+        `;
+      yield* sql`
+          INSERT INTO orchestration_v2_projection_thread_trash (
+            thread_id, project_id, deleted_at, purge_due_at, cascade_root_id
+          ) VALUES (${threadId}, ${projectId}, ${now}, ${1}, ${threadId})
+        `;
+      const { task } = yield* service.upsert({
+        id: taskId,
+        title: "Triage",
+        prompt: "Triage new issues",
+        enabled: true,
+        schedule: { type: "interval", everyMs: 60_000 },
+        projectId,
+        threadMode: "continue",
+        workspaceStrategy: { type: "root" },
+        modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      });
+      yield* sql`
+          UPDATE scheduled_tasks SET thread_id = ${threadId} WHERE task_id = ${task.id}
+        `;
+      yield* sql`
+          UPDATE scheduled_tasks SET next_run_at = ${now} WHERE task_id = ${task.id}
+        `;
+      yield* TestClock.adjust("1 millis");
+      yield* Ref.get(runDueWork).pipe(Effect.flatten);
+
+      const [row] = yield* sql<{
+        readonly last_run_status: string;
+        readonly next_run_at: string | null;
+        readonly run_count: number;
+      }>`
+          SELECT last_run_status, next_run_at, run_count FROM scheduled_tasks
+          WHERE task_id = ${task.id}
+        `;
+      assert.equal(row?.last_run_status, "failed");
+      assert.equal(row?.run_count, 1);
+      assert.deepEqual(yield* Ref.get(failures), ["ThreadManagementThreadNotFoundError"]);
+      assert.equal((yield* service.list()).tasks[0]?.threadId, threadId);
+    }).pipe(Effect.provide(layer));
+  }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
+);
+
 it.effect.each(["recreated under the same id", "moved to another project"] as const)(
   "a first run never binds its thread to a task %s",
   (change) =>

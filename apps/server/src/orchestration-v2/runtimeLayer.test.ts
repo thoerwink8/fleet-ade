@@ -538,6 +538,17 @@ it.layer(layerProjectDeletionTest)("project deletion during thread commands", (i
           });
         }
         yield* worker.drain();
+        if (deletion === "thread") {
+          // Soft deletion keeps bound automations until the thread is purged.
+          const keptIds = (yield* tasks.list()).tasks.map((task) => task.id);
+          assert.includeMembers(keptIds, [bound.id, webhook.id]);
+          yield* orchestrator.dispatch({
+            type: "thread.purge",
+            commandId: CommandId.make(`automation-purge:${deletion}`),
+            threadId,
+          });
+          yield* worker.drain();
+        }
         const remainingIds = (yield* tasks.list()).tasks.map((task) => task.id);
         assert.notInclude(remainingIds, bound.id);
         assert.notInclude(remainingIds, webhook.id);
@@ -3017,7 +3028,13 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         commandId: deleteCommandId,
         threadId: sourceThreadId,
       });
-      const cleaned = (yield* outbox.listByCommandId(deleteCommandId)).flatMap((effect) =>
+      const purgeCommandId = CommandId.make("html-fork-purge-source");
+      yield* orchestrator.dispatch({
+        type: "thread.purge",
+        commandId: purgeCommandId,
+        threadId: sourceThreadId,
+      });
+      const cleaned = (yield* outbox.listByCommandId(purgeCommandId)).flatMap((effect) =>
         effect.request.type === "attachment.cleanup" ? effect.request.attachmentIds : [],
       );
       assert.include(cleaned, later.attachmentId);
