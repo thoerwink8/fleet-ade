@@ -14,6 +14,7 @@ import * as Option from "effect/Option";
 import type { SetStateAction } from "react";
 import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3tools/shared/model";
 import { getProviderModelCapabilities } from "../providerModels";
+import { RewindFailureError } from "./chat/revertConfirm.logic";
 import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
@@ -546,7 +547,7 @@ export async function resolveFileAttachmentUrl(input: {
   });
   if (result._tag === "Failure") throw squashAtomCommandFailure(result);
   const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-  if (url === null) throw new Error("The environment returned an invalid attachment URL.");
+  if (url === null) throw new Error("这台电脑返回了无效的附件 URL。");
   return url;
 }
 
@@ -559,7 +560,7 @@ export async function prepareRevertedMessageAttachments(input: {
   return Promise.all(
     (input.message.attachments ?? []).map(async (attachment) => {
       if (attachment.type !== "image" && attachment.type !== "file") {
-        throw new Error("This message has an attachment that cannot be restored.");
+        throw new Error("这条消息的附件无法恢复。");
       }
       const result = await input.createAssetUrl({
         environmentId: input.environmentId,
@@ -574,9 +575,9 @@ export async function prepareRevertedMessageAttachments(input: {
       });
       if (result._tag === "Failure") throw squashAtomCommandFailure(result);
       const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-      if (url === null) throw new Error("The environment returned an invalid attachment URL.");
+      if (url === null) throw new Error("这台电脑返回了无效的附件 URL。");
       const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-      if (!response.ok) throw new Error(`Could not restore attachment: ${attachment.name}`);
+      if (!response.ok) throw new Error(`无法恢复附件：${attachment.name}`);
       return new File([await response.blob()], attachment.name, { type: attachment.mimeType });
     }),
   );
@@ -836,7 +837,7 @@ export async function waitForRevertedMessage(
     return latest === undefined || run.ordinal > latest.ordinal ? run : latest;
   }, undefined);
   if (witness === undefined) {
-    throw new Error("The thread has changed. Select a message to rewind again.");
+    throw new Error("会话已变化。请重新选择要回退的消息。");
   }
   return new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -856,7 +857,12 @@ export async function waitForRevertedMessage(
       if (!thread) return;
       const failure = thread.thread.rollbackFailure;
       if (failure?.requestId === requestId) {
-        finish(new Error(failure.message));
+        finish(
+          new RewindFailureError({
+            rawMessage: failure.message,
+            ...(failure.code === undefined ? {} : { code: failure.code }),
+          }),
+        );
         return;
       }
       if (
@@ -878,7 +884,7 @@ export async function waitForRevertedMessage(
     };
     unsubscribe = appAtomRegistry.subscribe(threadAtom, inspect);
     timeout = globalThis.setTimeout(() => {
-      finish(new Error("Timed out waiting for the thread to rewind."));
+      finish(new Error("等待会话回退超时。"));
     }, timeoutMs);
     Promise.resolve()
       .then(revert)
@@ -1166,7 +1172,7 @@ export function makeModelDisabledReason(
       ...context,
       nextModelSelection: { instanceId, model },
     });
-    return reason ? `${reason.description} Start a new thread to use this model.` : null;
+    return reason ? `${reason.description} 新建一个会话来使用此模型。` : null;
   };
 }
 

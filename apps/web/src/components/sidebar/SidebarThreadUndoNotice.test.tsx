@@ -53,7 +53,7 @@ describe("SidebarThreadUndoNotice", () => {
     });
 
     const html = renderToStaticMarkup(<SidebarThreadUndoNotice />);
-    expect(html).toContain("Unpinned,");
+    expect(html).toContain("已取消置顶，");
     expect(html).toContain("撤销");
   });
 });

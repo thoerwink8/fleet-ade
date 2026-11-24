@@ -195,7 +195,7 @@ function CustomSnoozeDialog() {
                       单位
                       <Select
                         value={unit}
-                        items={{ minutes: "Minutes", hours: "Hours", days: "Days" }}
+                        items={{ minutes: "分钟", hours: "小时", days: "天" }}
                         onValueChange={(value) => {
                           if (value === "minutes" || value === "hours" || value === "days")
                             setUnit(value);

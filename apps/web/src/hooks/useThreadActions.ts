@@ -1206,7 +1206,7 @@ export function useThreadActions() {
     const resolved = resolveThreadTarget(target);
     const confirmationResult = await requestThreadUnpinConfirmation({
       enabled: confirmThreadUnpin,
-      title: resolved?.thread.title ?? "this thread",
+      title: resolved?.thread.title ?? "这个会话",
       confirm: localApi ? (message, options) => localApi.dialogs.confirm(message, options) : null,
     });
     if (confirmationResult._tag === "Failure") {

@@ -291,7 +291,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
     void runProjectScript(
       {
         id: "chat-code-block",
-        name: "Chat code block",
+        name: "代码块",
         command,
         icon: "play",
         runOnWorktreeCreate: false,

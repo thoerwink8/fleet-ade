@@ -188,9 +188,9 @@ function SecretCheckButton(props: {
               onClick={() => void run()}
               aria-label={
                 state?.status === "failed"
-                  ? `${props.label} failed: ${state.detail}`
+                  ? `${props.label} 失败：${state.detail}`
                   : state?.status === "resolved"
-                    ? `${props.label} resolved`
+                    ? `${props.label} 已解析`
                     : props.label
               }
             >

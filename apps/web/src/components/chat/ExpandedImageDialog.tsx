@@ -169,7 +169,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
           if (event.target === event.currentTarget) close();
         }}
       >
-        <DialogTitle className="sr-only">展开 {mediaLabel} preview</DialogTitle>
+        <DialogTitle className="sr-only">展开 {mediaLabel} 预览</DialogTitle>
         <Button
           type="button"
           ref={closeButtonRef}

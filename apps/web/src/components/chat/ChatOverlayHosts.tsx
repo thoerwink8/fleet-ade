@@ -1,9 +1,4 @@
-import type {
-  EnvironmentId,
-  MessageId,
-  OrchestrationV2ThreadProjection,
-  ThreadId,
-} from "@t3tools/contracts";
+import type { EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 
@@ -19,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
-import { findRevertCheckpoint } from "../../session-logic";
+import { describeRevertConfirm, type RevertRestoreAvailability } from "./revertConfirm.logic";
 import { registerThreadOverlay } from "./threadOverlayRetention";
 
 /**
@@ -142,6 +137,8 @@ export function BranchRestoreConfirmHost(props: {
 interface PendingRevert {
   readonly turnCount: number;
   readonly messageId: MessageId;
+  readonly availability: RevertRestoreAvailability;
+  readonly removedTurnCount: number;
 }
 
 const revertConfirmAtom = makeThreadOverlayAtom<PendingRevert>("revert-confirm");
@@ -152,15 +149,20 @@ export function openRevertConfirm(threadKey: string, pending: PendingRevert): vo
 
 export function RevertConfirmHost(props: {
   readonly threadKey: string;
-  readonly checkpoints: OrchestrationV2ThreadProjection["checkpoints"] | undefined;
   readonly onConfirm: (turnCount: number, messageId: MessageId, restoreFiles: boolean) => void;
 }) {
   const pending = useThreadOverlay(revertConfirmAtom, props.threadKey);
-  const canRestoreFiles =
-    pending !== null &&
-    findRevertCheckpoint(props.checkpoints ?? [], pending.turnCount)?.status === "ready";
+  const view =
+    pending === null
+      ? null
+      : describeRevertConfirm({
+          availability: pending.availability,
+          removedTurnCount: pending.removedTurnCount,
+        });
   const confirm = (restoreFiles: boolean) => {
-    if (pending === null || (restoreFiles && !canRestoreFiles)) return;
+    if (pending === null || view === null || (restoreFiles && !view.showRestoreFilesAction)) {
+      return;
+    }
     closeThreadOverlay(revertConfirmAtom);
     props.onConfirm(pending.turnCount, pending.messageId, restoreFiles);
   };
@@ -173,21 +175,26 @@ export function RevertConfirmHost(props: {
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>从这里开始编辑？</AlertDialogTitle>
+          <AlertDialogTitle>{view?.title ?? "回退到这条消息之前？"}</AlertDialogTitle>
           <AlertDialogDescription>
-            对话将回退到这条消息之前，你的提示词和附件会回到输入框。选择“同时还原文件”还会撤销你自己做的修改。
+            {view?.description}
+            {view?.restoreUnavailableReason ? (
+              <span className="mt-2 block text-muted-foreground">
+                {view.restoreUnavailableReason}
+              </span>
+            ) : null}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>取消</AlertDialogClose>
-          <Button
-            variant="destructive-outline"
-            disabled={!canRestoreFiles}
-            onClick={() => confirm(true)}
-          >
-            同时还原文件
-          </Button>
-          <Button onClick={() => confirm(false)}>回退并保留改动</Button>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {view?.cancelActionLabel ?? "取消"}
+          </AlertDialogClose>
+          {view?.showRestoreFilesAction ? (
+            <Button variant="destructive-outline" onClick={() => confirm(true)}>
+              {view.restoreFilesActionLabel}
+            </Button>
+          ) : null}
+          <Button onClick={() => confirm(false)}>{view?.primaryActionLabel ?? "只回退会话"}</Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

@@ -164,19 +164,19 @@ describe("customModelEditor.logic", () => {
     });
 
     expect(validateDraft(draft({ descriptors: [select("", [{ id: "a" }])] }))).toBe(
-      "选项 1 needs an id.",
+      "选项 1 需要一个 id。",
     );
     expect(
       validateDraft(
         draft({ descriptors: [select("effort", [{ id: "a" }]), select("effort", [{ id: "b" }])] }),
       ),
-    ).toBe('选项 2: id "effort" is used twice.');
+    ).toBe("选项 2：id“effort”被使用了两次。");
     expect(validateDraft(draft({ descriptors: [select("effort", [])] }))).toBe(
-      "选项 1 needs at least one choice.",
+      "选项 1 至少需要一个选项。",
     );
     expect(
       validateDraft(draft({ descriptors: [select("effort", [{ id: "a" }, { id: "a" }])] })),
-    ).toBe('选项 1: choice "a" is used twice.');
+    ).toBe("选项 1：选项“a”被使用了两次。");
     expect(validateDraft(draft({ descriptors: [select("effort", [{ id: "a" }])] }))).toBeNull();
   });
 });

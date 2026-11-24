@@ -1219,26 +1219,23 @@ html[data-theme-id] [data-chat-header] [data-toolbar-control] {
 /* The panel layout toggles stay ghost: they render both inside the header and
    in the titlebar strip, so filling them would make them change appearance as
    the panel opens. They only take the themed foreground; hover and pressed
-   keep the base ghost accent. The tooltip trigger's data-slot wins over the
-   toggle's when the trigger renders the toggle, so match both. */
-html[data-theme-id] [data-panel-layout-controls] [data-slot="toggle"],
-html[data-theme-id] [data-panel-layout-controls] [data-slot="tooltip-trigger"],
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="toggle"],
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="tooltip-trigger"] {
+   keep the toggle's own fill. Disabled toggles are excluded so they keep the
+   library's muted text. The tooltip trigger's data-slot wins over the toggle's
+   when the trigger renders the toggle, so match both. */
+html[data-theme-id]
+  [data-panel-layout-controls]
+  [data-slot="toggle"]:not([disabled], [data-disabled], [aria-disabled="true"]),
+html[data-theme-id]
+  [data-panel-layout-controls]
+  [data-slot="tooltip-trigger"]:not([disabled], [data-disabled], [aria-disabled="true"]),
+html[data-theme-id]
+  [data-workspace-titlebar-controls]
+  [data-slot="toggle"]:not([disabled], [data-disabled], [aria-disabled="true"]),
+html[data-theme-id]
+  [data-workspace-titlebar-controls]
+  [data-slot="tooltip-trigger"]:not([disabled], [data-disabled], [aria-disabled="true"]) {
   --control-icon-color: var(--contrast-toolbar-foreground);
   color: var(--contrast-toolbar-foreground);
-}
-
-html[data-theme-id] [data-panel-layout-controls] [data-slot="toggle"]:disabled,
-html[data-theme-id] [data-panel-layout-controls] [data-slot="tooltip-trigger"]:disabled,
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="toggle"]:disabled,
-html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="tooltip-trigger"]:disabled {
-  --control-icon-color: color-mix(
-    in oklab,
-    var(--contrast-toolbar-foreground) 55%,
-    var(--toolbar-background)
-  );
-  color: color-mix(in oklab, var(--contrast-toolbar-foreground) 55%, var(--toolbar-background));
 }
 
 html[data-theme-id]

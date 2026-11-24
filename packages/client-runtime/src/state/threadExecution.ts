@@ -665,7 +665,7 @@ function formatGoalTokens(tokens: number): string {
   if (tokens < 1_000) return `${tokens}`;
   const thousands = Math.round(tokens / 1_000);
   if (thousands < 1_000) return `${thousands}k`;
-  return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")} 分钟`;
+  return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}m`;
 }
 
 export function presentProviderGoal(
@@ -676,15 +676,15 @@ export function presentProviderGoal(
   if (goal.tokensUsed !== undefined && goal.tokensUsed > 0) {
     usage.push(
       goal.tokenBudget == null
-        ? `${formatGoalTokens(goal.tokensUsed)} tokens`
-        : `${formatGoalTokens(goal.tokensUsed)} / ${formatGoalTokens(goal.tokenBudget)} tokens`,
+        ? `${formatGoalTokens(goal.tokensUsed)} 个 token`
+        : `${formatGoalTokens(goal.tokensUsed)} / ${formatGoalTokens(goal.tokenBudget)} 个 token`,
     );
   }
   if (goal.timeUsedSeconds !== undefined && goal.timeUsedSeconds >= 60) {
     usage.push(formatDuration(goal.timeUsedSeconds * 1_000));
   }
   if (goal.checks !== undefined && goal.checks > 0) {
-    usage.push(`${goal.checks} ${goal.checks === 1 ? "check" : "checks"}`);
+    usage.push(`${goal.checks} 次检查`);
   }
   return {
     title: goal.status === "active" && !working ? "已设置目标" : PROVIDER_GOAL_TITLES[goal.status],

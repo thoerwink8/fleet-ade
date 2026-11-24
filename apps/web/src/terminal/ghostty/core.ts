@@ -1322,7 +1322,7 @@ export class GhosttyTerminalCore {
   }
 
   private ensureActive(): void {
-    if (this.disposed) throw new Error("libghostty-vt terminal has been disposed");
+    if (this.disposed) throw new Error("libghostty-vt 终端已销毁");
   }
 }
 

@@ -1405,9 +1405,9 @@ describe("MessagesTimeline automation prompts", () => {
         ],
       },
     );
-    expect(screen.buttons("从这里编辑")).toHaveLength(0);
+    expect(screen.buttons("回退到这条消息之前")).toHaveLength(0);
     await click(screen.button(/^自动化/));
-    expect(screen.buttons("从这里编辑")).toHaveLength(1);
+    expect(screen.buttons("回退到这条消息之前")).toHaveLength(1);
   });
 });
 

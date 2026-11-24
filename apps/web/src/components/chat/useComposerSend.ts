@@ -1341,7 +1341,7 @@ export function useComposerSend(input: ComposerSendInput) {
               title: "已在后台开始",
               timeout: 5_000,
               actionProps: {
-                children: "Open",
+                children: "打开",
                 onClick: () => {
                   void navigate({
                     to: "/$environmentId/$threadId",

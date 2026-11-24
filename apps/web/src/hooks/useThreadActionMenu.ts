@@ -124,7 +124,7 @@ export function useThreadActionMenu(input: {
       if (!api) return;
       const thread = readThreadShell(threadRef);
       if (!thread) {
-        failureToast("Thread actions unavailable", new Error("This thread has not loaded yet."));
+        failureToast("会话操作不可用", new Error("这个会话还没有加载。"));
         return;
       }
       const now = new Date();

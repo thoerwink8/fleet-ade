@@ -465,7 +465,7 @@ function SubagentTimelineLink(props: {
             {props.title}
           </span>
           {remote !== undefined ? (
-            <span className="shrink-0 text-xs text-muted-foreground">星期 {remote.label}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">在 {remote.label}</span>
           ) : null}
         </span>
         <span

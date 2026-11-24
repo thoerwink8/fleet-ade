@@ -104,7 +104,7 @@ function UpdateEverythingDialogContent({
     ),
   );
   const running = stopped + continuing;
-  const threads = `${running} running ${running === 1 ? "thread" : "threads"}`;
+  const threads = `${running} 个运行中的会话`;
   const restarting = new Set(restarts.map((machine) => machine.environmentId));
   const updating = rows.filter((row) => row.app !== null || row.providers.length > 0);
   const skipped = rows.filter((row) => row.skipped !== null);
@@ -143,7 +143,7 @@ function UpdateEverythingDialogContent({
                   <MiddleTruncate value={row.label} />
                 </span>
                 <span>
-                  {row.app !== null ? "Server" : null}
+                  {row.app !== null ? "后台服务" : null}
                   {row.app === null && row.skipped !== null ? (
                     <span className="text-muted-foreground">已跳过</span>
                   ) : null}
@@ -190,16 +190,16 @@ function UpdateEverythingDialogContent({
         {running > 0 ? (
           <p className="self-center text-muted-foreground text-sm max-sm:order-1 max-sm:text-center sm:mr-auto">
             {stopped === 0
-              ? `${threads} will be interrupted and can resume after the restart.`
+              ? `${threads}会被打断，重启后可以继续。`
               : continuing === 0
-                ? `${threads} will be interrupted.`
-                : `${threads} will be interrupted. ${continuing} can resume after the restart.`}
+                ? `${threads}会被打断。`
+                : `${threads}会被打断，其中 ${continuing} 个重启后可以继续。`}
           </p>
         ) : null}
         <AlertDialogClose ref={cancelRef} render={<Button variant="outline" />}>
           取消
         </AlertDialogClose>
-        <Button onClick={onConfirm}>Update</Button>
+        <Button onClick={onConfirm}>更新</Button>
       </AlertDialogFooter>
     </>
   );
@@ -207,5 +207,7 @@ function UpdateEverythingDialogContent({
 
 function RunningThreads({ environmentId }: { readonly environmentId: EnvironmentId }) {
   const count = useAtomValue(runningThreadCountAtom(environmentId));
-  return count > 0 ? <span className="whitespace-nowrap text-warning">{count} running</span> : null;
+  return count > 0 ? (
+    <span className="whitespace-nowrap text-warning">{count} 个运行中</span>
+  ) : null;
 }

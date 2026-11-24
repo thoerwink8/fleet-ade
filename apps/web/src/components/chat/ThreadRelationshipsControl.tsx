@@ -129,7 +129,7 @@ function ThreadLineageRowList(props: {
           className={`flex h-8 w-full cursor-pointer items-center rounded-lg ${THREAD_DETAILS_PANEL_ROW_CONTENT_CLASS} text-sm font-medium text-muted-foreground/70 hover:bg-black/[0.055] hover:text-foreground/80 dark:hover:bg-white/[0.075]`}
         >
           <PlusIcon aria-hidden className="size-4 shrink-0" />
-          显示 {Math.min(props.hiddenCount, THREAD_LINEAGE_PAGE_COUNT)} more
+          再显示 {Math.min(props.hiddenCount, THREAD_LINEAGE_PAGE_COUNT)} 个
         </button>
       ) : null}
     </>
@@ -311,7 +311,7 @@ function RemoteSubagentRow(props: {
           <span
             className={`flex max-w-1/2 shrink-0 gap-1 text-2xs ${failed ? "text-destructive" : "text-muted-foreground"}`}
           >
-            <span className="truncate">星期 {remoteChild.label}</span>
+            <span className="truncate">在 {remoteChild.label}</span>
             <span className="shrink-0">· {threadRelationshipStatusLabel(status)}</span>
           </span>
         </TooltipTrigger>
@@ -402,7 +402,7 @@ function DelegatedFromRow(props: {
           </span>
           {label ? (
             <span className="max-w-1/2 shrink-0 truncate text-2xs text-muted-foreground">
-              星期 {label}
+              在 {label}
             </span>
           ) : null}
         </TooltipTrigger>

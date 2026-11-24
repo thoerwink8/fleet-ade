@@ -74,7 +74,7 @@ export function reviewCommentContextLabel(comment: ReviewCommentPresentation): s
   }
   const diffRange = /^([+-])(\d+)(?: to \1(\d+))?$/u.exec(comment.rangeLabel);
   const rangeLabel = diffRange
-    ? `L${diffRange[2]}${diffRange[3] ? ` to L${diffRange[3]}` : ""}${diffRange[1] === "-" ? " (before)" : ""}`
+    ? `L${diffRange[2]}${diffRange[3] ? ` 到 L${diffRange[3]}` : ""}${diffRange[1] === "-" ? "（修改前）" : ""}`
     : comment.rangeLabel;
   const sectionPullRequest = /^pull-request:(\d+)$/u.exec(comment.sectionId)?.[1];
   const prefix = sectionPullRequest === undefined ? "" : `#${sectionPullRequest} `;
@@ -266,12 +266,11 @@ export function reviewCommentContextRecord(
 
 function previewAnnotationTargetSummary(annotation: PreviewAnnotationPayload): string {
   const parts: string[] = [];
-  const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-  if (annotation.elements.length > 0)
-    parts.push(plural(annotation.elements.length, "selected element"));
-  if (annotation.regions.length > 0) parts.push(plural(annotation.regions.length, "marked region"));
-  if (annotation.strokes.length > 0) parts.push(plural(annotation.strokes.length, "drawing"));
-  return parts.join(", ");
+  const plural = (count: number, noun: string) => `${count} 个${noun}`;
+  if (annotation.elements.length > 0) parts.push(plural(annotation.elements.length, "选中元素"));
+  if (annotation.regions.length > 0) parts.push(plural(annotation.regions.length, "标记区域"));
+  if (annotation.strokes.length > 0) parts.push(plural(annotation.strokes.length, "笔画"));
+  return parts.join("，");
 }
 
 export function previewAnnotationContextRecord(

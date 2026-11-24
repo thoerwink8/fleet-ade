@@ -65,7 +65,7 @@ const state: WorkerState = { deck: undefined };
 
 serveWorker<SlideMethods>({
   open: async (input) => {
-    if (state.deck) throw new Error("The worker already holds a deck");
+    if (state.deck) throw new Error("后台工作线程已持有一份演示文稿");
 
     await initWasm();
 
@@ -100,14 +100,14 @@ serveWorker<SlideMethods>({
 });
 
 function required() {
-  if (!state.deck) throw new Error("The worker holds no deck");
+  if (!state.deck) throw new Error("后台工作线程没有打开演示文稿");
 
   return state.deck;
 }
 
 /** The worker's own font set, which its canvases draw text with. */
 function workerFonts() {
-  if (!("fonts" in self)) throw new Error("This browser has no fonts in workers");
+  if (!("fonts" in self)) throw new Error("这个浏览器的工作线程没有字体");
 
   // SAFETY: a worker's global scope is a FontFaceSource, whose `fonts` is a FontFaceSet (CSS Font Loading, exposed to
   // workers). The window's types declare it on documents only, and workers expose no FontFaceSet to check against.

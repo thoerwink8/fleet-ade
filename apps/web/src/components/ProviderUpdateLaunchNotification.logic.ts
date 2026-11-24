@@ -108,7 +108,7 @@ function getProviderFailedUpdateTitle(
   const providerName = PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver;
   const attemptedVersion = provider.versionAdvisory?.latestVersion;
   return attemptedVersion
-    ? `${providerName} ${formatVersion(attemptedVersion)} update failed`
+    ? `${providerName} ${formatVersion(attemptedVersion)} 更新失败`
     : `${providerName} 更新失败`;
 }
 
@@ -192,9 +192,9 @@ function formatProviderList(providers: ReadonlyArray<Pick<ServerProvider, "drive
     (provider) => PROVIDER_DISPLAY_NAMES[provider.driver] ?? provider.driver,
   );
   if (names.length <= 2) {
-    return names.join(" and ");
+    return names.join(" 和 ");
   }
-  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+  return `${names.slice(0, -1).join("、")} 和 ${names[names.length - 1]}`;
 }
 
 export interface ProviderUpdateRun {
@@ -365,7 +365,7 @@ export function getProviderUpdateSidebarPillView(
       title:
         failedProviders.length === 1
           ? getProviderFailedUpdateTitle(failedProvider)
-          : `${failedProviders.length} provider updates failed`,
+          : `${failedProviders.length} 个智能体更新失败`,
       description: getFailedProviderUpdateDescription(failedProviders),
       dismissible: true,
     });
@@ -451,5 +451,5 @@ function getFailedProviderUpdateDescription(providers: ReadonlyArray<ServerProvi
       return provider.updateState.message;
     }
   }
-  return `${formatProviderList(providers)} failed to update. Check provider settings for details.`;
+  return `${formatProviderList(providers)} 更新失败。请到智能体设置查看详情。`;
 }

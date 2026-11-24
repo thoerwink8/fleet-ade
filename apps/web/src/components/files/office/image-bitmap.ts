@@ -15,6 +15,6 @@ export async function officeImageBitmap(blob: Blob) {
   }
   // Unknown dimensions cannot be decoded safely: compressed bytes do not bound pixel memory.
   if (!size || size.width <= 0 || size.height <= 0 || size.width > 16_777_216 / size.height)
-    throw new Error("This embedded image exceeds the preview pixel limit.");
+    throw new Error("这张内嵌图片超出预览像素上限。");
   return createImageBitmap(blob);
 }

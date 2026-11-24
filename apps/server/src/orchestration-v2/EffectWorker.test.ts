@@ -24,6 +24,7 @@ import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";
+import { SHARED_WORKSPACE_RESTORE_MESSAGE } from "./CheckpointRestoreSafety.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
@@ -149,6 +150,7 @@ function layerExecutorFor(input: {
       CheckpointRollbackService.CheckpointRollbackServiceV2,
       CheckpointRollbackService.CheckpointRollbackServiceV2.of({
         execute: input.rollback ?? (() => Effect.void),
+        checkRestoreSafety: () => Effect.die("unused"),
       }),
     ),
     Layer.succeed(
@@ -273,44 +275,71 @@ it.effect.each([
     name: "a held Git index lock",
     failure: restoreFailure(lockedIndexMessage),
     message: lockedIndexMessage,
+    code: "git-index-locked" as const,
   },
   {
     name: "raw Git output",
     failure: restoreFailure("error: could not clean /private/repo/secret.txt"),
     message: CheckpointRollbackService.ROLLBACK_FAILED_MESSAGE,
+    code: undefined,
   },
-])("reports a rollback blocked by $name only after the last attempt", ({ failure, message }) =>
-  Effect.gen(function* () {
-    const now = yield* DateTime.now;
-    const failures = yield* Ref.make<ReadonlyArray<string>>([]);
-    const layer = layerExecutorFor({
-      events: yield* Ref.make<ReadonlyArray<string>>([]),
-      rollback: () => Effect.fail(failure),
-      threads: {
-        dispatch: (command) =>
-          Ref.update(failures, (current) =>
-            command.type === "checkpoint.rollback.fail" ? [...current, command.message] : current,
-          ).pipe(Effect.as({ sequence: 1, storedEvents: [] })),
-      },
-    });
-    yield* Effect.gen(function* () {
-      const executor = yield* EffectWorker.OrchestrationEffectExecutorV2;
-      const rollback: EffectOutbox.OrchestrationEffectV2 = {
-        ...restartEffect(now, { type: "detach" }),
-        request: {
-          type: "provider-thread.rollback",
-          providerThreadId,
-          checkpointId: rollbackCheckpointId,
-          scopeId: rollbackScopeId,
-          restoreFiles: true,
+  {
+    name: "a shared workspace",
+    failure: new CheckpointRollbackService.CheckpointRollbackExecutionError({
+      reason: "shared-workspace",
+      threadId,
+      providerThreadId,
+      checkpointId: rollbackCheckpointId,
+    }),
+    message: SHARED_WORKSPACE_RESTORE_MESSAGE,
+    code: "shared-workspace" as const,
+  },
+])(
+  "reports a rollback blocked by $name only after the last attempt",
+  ({ failure, message, code }) =>
+    Effect.gen(function* () {
+      const now = yield* DateTime.now;
+      const failures = yield* Ref.make<
+        ReadonlyArray<{ readonly message: string; readonly code?: string }>
+      >([]);
+      const layer = layerExecutorFor({
+        events: yield* Ref.make<ReadonlyArray<string>>([]),
+        rollback: () => Effect.fail(failure),
+        threads: {
+          dispatch: (command) =>
+            Ref.update(failures, (current) =>
+              command.type === "checkpoint.rollback.fail"
+                ? [
+                    ...current,
+                    {
+                      message: command.message,
+                      ...(command.code === undefined ? {} : { code: command.code }),
+                    },
+                  ]
+                : current,
+            ).pipe(Effect.as({ sequence: 1, storedEvents: [] })),
         },
-      };
-      yield* Effect.flip(executor.execute(rollback, { willRetry: true }));
-      assert.deepEqual(yield* Ref.get(failures), []);
-      yield* Effect.flip(executor.execute(rollback, { willRetry: false }));
-    }).pipe(Effect.provide(layer));
-    assert.deepEqual(yield* Ref.get(failures), [message]);
-  }),
+      });
+      yield* Effect.gen(function* () {
+        const executor = yield* EffectWorker.OrchestrationEffectExecutorV2;
+        const rollback: EffectOutbox.OrchestrationEffectV2 = {
+          ...restartEffect(now, { type: "detach" }),
+          request: {
+            type: "provider-thread.rollback",
+            providerThreadId,
+            checkpointId: rollbackCheckpointId,
+            scopeId: rollbackScopeId,
+            restoreFiles: true,
+          },
+        };
+        yield* Effect.flip(executor.execute(rollback, { willRetry: true }));
+        assert.deepEqual(yield* Ref.get(failures), []);
+        yield* Effect.flip(executor.execute(rollback, { willRetry: false }));
+      }).pipe(Effect.provide(layer));
+      assert.deepEqual(yield* Ref.get(failures), [
+        { message, ...(code === undefined ? {} : { code }) },
+      ]);
+    }),
 );
 
 it.effect("does not report an answer whose last delivery attempt is interrupted", () =>

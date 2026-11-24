@@ -306,7 +306,7 @@ function McpConsent({
             />
             <p className="text-xs text-muted-foreground">
               可在「在其他应用中使用 Fleet ADE」（MCP）、设置 → 连接中获取，或在本机运行{" "}
-              <code>t3 auth pairing create</code> on this machine.
+              <code>t3 auth pairing create</code>。
             </p>
           </div>
         ) : null}
