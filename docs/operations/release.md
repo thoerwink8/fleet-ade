@@ -22,7 +22,7 @@ the `version` in `apps/desktop/package.json`. The same version is part of the
 artifact name.
 
 The run uploads an artifact named `desktop-windows-<version>`, kept for 30 days.
-Download `T3-Code-<version>-x64.exe` from that artifact. The workflow does not
+Download `Fleet-ADE-<version>-x64.exe` from that artifact. The workflow does not
 create a GitHub Release, so the build does not become the repository's latest
 release.
 
