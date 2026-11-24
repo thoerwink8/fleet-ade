@@ -518,7 +518,10 @@ function SidebarThreadDetails(props: {
       {props.projectDisplayName ? (
         <div className="fa-cap">
           {props.project ? (
-            <ProjectFavicon project={props.project} className="mr-1 inline size-3" />
+            <ProjectFavicon
+              project={props.project}
+              className="mr-1 inline-flex size-3 shrink-0 align-text-bottom"
+            />
           ) : null}
           {props.projectDisplayName}
         </div>
@@ -814,8 +817,6 @@ type SidebarThreadRowProps = {
   /** Attention rows on a disconnected environment cannot be acted on until reconnected. */
   attentionOffline?: boolean | undefined;
   onFileDropThreads?: ((threadRef: ScopedThreadRef, files: File[]) => void) | undefined;
-  // Counts row renders in tests. The clock label is a child and does not render this.
-  renderMark?: ReactNode;
 };
 
 // Mounted only while renaming, so each rename starts uncommitted.
@@ -1239,6 +1240,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     >
       <Tooltip
         disabled={snoozeMenuOpen || Boolean(sortable?.isDragging)}
+        open={detailsOpen}
         onOpenChange={setDetailsOpen}
       >
         <TooltipTrigger
@@ -1296,7 +1298,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               </div>
             )}
             {attentionReason !== null ? <div className="s">{attentionReason}</div> : null}
-            {props.renderMark}
             {isRegeneratingTitle ? (
               <span role="status" className="sr-only">
                 正在重新生成标题

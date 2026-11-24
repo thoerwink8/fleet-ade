@@ -75,6 +75,20 @@ vi.mock("../../state/entities", async (importOriginal) => ({
     ),
 }));
 
+// useOpenPrLink runs once per row render and nowhere else, so its calls count row renders.
+// A child element passed in as a prop cannot: React skips it when the parent re-renders.
+const rowBodyRenders = vi.hoisted(() => ({ count: 0 }));
+vi.mock("../../lib/openPullRequestLink", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/openPullRequestLink")>();
+  return {
+    ...actual,
+    useOpenPrLink: (...args: Parameters<typeof actual.useOpenPrLink>) => {
+      rowBodyRenders.count += 1;
+      return actual.useOpenPrLink(...args);
+    },
+  };
+});
+
 const environmentId = EnvironmentId.make("local");
 const projectId = ProjectId.make("project-1");
 
@@ -328,6 +342,54 @@ describe("sidebar thread row density", () => {
     });
   });
 
+  it("lays the hover card out from its left padding with a 12px project icon", async () => {
+    const project = {
+      environmentId,
+      workspaceRoot: "/work/example",
+      title: "example",
+      faviconPath: null,
+      projectIcon: { kind: "monogram", text: "EX", color: "amber" },
+    };
+    await using screen = await render(
+      <Host>
+        <ul>
+          <SortableThreadRow {...rowProps("icon", "标题", {}, { project })} />
+        </ul>
+      </Host>,
+    );
+    const row = screen.container.querySelector<HTMLElement>('[data-sidebar-row="local:icon"]')!;
+    await userEvent.hover(row);
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-testid="sidebar-thread-details"]')).not.toBeNull();
+    });
+    const details = document.querySelector<HTMLElement>('[data-testid="sidebar-thread-details"]')!;
+    const card = details.closest<HTMLElement>('[data-slot="tooltip-popup"]')!;
+    const icon = details.querySelector<HTMLElement>("span[aria-hidden]")!;
+    // Layout sizes, not bounding boxes: the card opens at 98% scale.
+    expect(icon.offsetWidth).toBe(12);
+    expect(icon.offsetHeight).toBe(12);
+    // The library's .fa-tip centres its children; the content must fill the card's padding box.
+    const padding =
+      px(getComputedStyle(card).paddingLeft) + px(getComputedStyle(card).paddingRight);
+    expect(details.offsetWidth).toBe(card.clientWidth - padding);
+  });
+
+  it("opens the details card from the always-visible button that touch screens use", async () => {
+    await using screen = await render(
+      <Host>
+        <ul>
+          <SortableThreadRow {...rowProps("touch", "标题")} />
+        </ul>
+      </Host>,
+    );
+    expect(document.querySelector('[data-testid="sidebar-thread-details"]')).toBeNull();
+    // Hidden under a fine pointer, so click through the DOM instead of a pointer event.
+    screen.container.querySelector<HTMLButtonElement>('button[aria-label="会话详情"]')!.click();
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-testid="sidebar-thread-details"]')).not.toBeNull();
+    });
+  });
+
   it("follows selected, hover, and mark colors in the default theme, Grove, and Ember", async () => {
     await using screen = await render(
       <Host>
@@ -406,16 +468,11 @@ describe("sidebar thread row density", () => {
     }
   });
 
-  it("re-renders only the row whose shell changed, and a minute tick does not re-render the row", async () => {
+  it("re-renders only the row whose shell changed", async () => {
     const first = thread("a", "会话 A");
     const second = thread("b", "会话 B");
     shells.reset([first, second]);
     const counts = { a: 0, b: 0 };
-    let clockRowRenders = 0;
-    function ClockRowMark() {
-      clockRowRenders += 1;
-      return null;
-    }
     await using screen = await render(
       <Host>
         <Profiler
@@ -437,6 +494,14 @@ describe("sidebar thread row density", () => {
       </Host>,
     );
     expect(screen.container.querySelectorAll(".t")[0]?.textContent).toBe("会话 A");
+    // Rows commit again after mount (visibility lease). Take the baseline once both are quiet.
+    let settled = "";
+    await vi.waitFor(() => {
+      const now = JSON.stringify(counts);
+      const stable = now === settled;
+      settled = now;
+      expect(stable).toBe(true);
+    });
     const before = { a: counts.a, b: counts.b };
     await act(() => {
       shells.updateTitle(`${environmentId}:a`, "会话 A 已更新");
@@ -444,23 +509,32 @@ describe("sidebar thread row density", () => {
     expect(screen.container.querySelectorAll(".t")[0]?.textContent).toBe("会话 A 已更新");
     expect(counts.a).toBeGreaterThan(before.a);
     expect(counts.b).toBe(before.b);
+  });
 
+  it("ticks the minute label without re-rendering the row", async () => {
     minuteClock.set("2026-03-10T12:00");
     shells.reset([thread("clock", "计时", { updatedAt: "2026-03-10T12:00:30.000Z" })]);
     await using clockScreen = await render(
       <Host>
         <SortableThreadRow
           {...rowProps("clock", "计时", { updatedAt: "2026-03-10T12:00:30.000Z" })}
-          renderMark={<ClockRowMark />}
         />
       </Host>,
     );
-    const marked = clockRowRenders;
+    // The row commits again after mount (visibility lease). Count from once it is quiet.
+    let settled = -1;
+    await vi.waitFor(() => {
+      const now = rowBodyRenders.count;
+      const stable = now === settled;
+      settled = now;
+      expect(stable).toBe(true);
+    });
+    const rowRenders = rowBodyRenders.count;
     expect(clockScreen.container.querySelector(".tm")?.textContent).toBe("刚刚");
     await act(() => {
       minuteClock.set("2026-03-10T12:02");
     });
-    expect(clockRowRenders).toBe(marked);
+    expect(rowBodyRenders.count).toBe(rowRenders);
     expect(clockScreen.container.querySelector(".tm")?.textContent).toBe("1 分钟前");
   });
 });
