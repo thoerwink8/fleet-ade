@@ -37,6 +37,7 @@ import * as RuntimeRequestService from "./RuntimeRequestService.ts";
 import * as ThreadTitleRegenerationService from "./ThreadTitleRegenerationService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as VcsProcess from "../vcs/VcsProcess.ts";
 
 const threadId = ThreadId.make("thread:effect-worker-restart");
 const oldSessionId = ProviderSessionId.make("provider-session:effect-worker-restart:old");
@@ -246,8 +247,7 @@ it.effect.each([
   }),
 );
 
-const lockedIndexMessage =
-  "Git's index is locked. Wait for other Git operations to finish, then try again.";
+const lockedIndexMessage = VcsProcess.GIT_INDEX_LOCKED_DETAIL;
 const rollbackCheckpointId = CheckpointId.make("checkpoint:effect-worker-rollback");
 const rollbackScopeId = CheckpointScopeId.make("checkpoint-scope:effect-worker-rollback");
 const restoreFailure = (detail: string) =>
