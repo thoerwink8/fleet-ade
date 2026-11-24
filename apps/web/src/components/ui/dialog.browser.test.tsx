@@ -13,6 +13,7 @@ import {
   DialogAction,
   DialogClose,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogPanel,
   DialogPopup,
@@ -193,6 +194,9 @@ describe("dialog fleet styling", () => {
             <DialogTitle>Import failed</DialogTitle>
           </DialogHeader>
           <DialogPanel>body</DialogPanel>
+          <DialogFooter>
+            <DialogClose>取消</DialogClose>
+          </DialogFooter>
         </DialogPopup>
       </Dialog>,
     );
@@ -204,6 +208,9 @@ describe("dialog fleet styling", () => {
     const panel = popup.querySelector<HTMLElement>('[data-slot="dialog-panel"]')!;
     expect(getComputedStyle(header).paddingLeft).toBe(space5.trim());
     expect(getComputedStyle(panel).paddingLeft).toBe(space5.trim());
+    const footer = popup.querySelector<HTMLElement>('[data-slot="dialog-footer"]')!;
+    expect(getComputedStyle(footer).paddingLeft).toBe(space5.trim());
+    expect(getComputedStyle(footer).paddingBottom).toBe(space5.trim());
     const popupStyle = getComputedStyle(popup);
     const radiusLg = getComputedStyle(document.documentElement).getPropertyValue("--fa-radius-lg");
     expect(popupStyle.borderRadius).toBe(radiusLg.trim());

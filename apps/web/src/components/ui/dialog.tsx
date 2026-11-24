@@ -191,7 +191,7 @@ function DialogFooter({
   return (
     <div
       className={cn(
-        "fa-dialog__foot flex flex-col-reverse gap-2 px-[var(--fa-space-5)] py-[var(--fa-space-4)] sm:flex-row",
+        "fa-dialog__foot flex flex-col-reverse gap-2 px-[var(--fa-space-5)] pb-[var(--fa-space-5)] pt-[var(--fa-space-4)] sm:flex-row",
         className,
       )}
       data-slot="dialog-footer"
