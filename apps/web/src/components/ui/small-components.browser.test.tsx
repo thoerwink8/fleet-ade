@@ -194,7 +194,10 @@ describe("Empty, Label, and NumberField", () => {
       });
       expect(defaultGroup.getBoundingClientRect().height, "narrow default group height").toBe(36);
       expect(smallGroup.getBoundingClientRect().height, "narrow small group height").toBe(32);
-      expect(getComputedStyle(defaultInput).fontSize, "narrow type stays 14px").toBe("14px");
+      expect(
+        getComputedStyle(defaultInput).fontSize,
+        "narrow type is 16px so iOS does not zoom",
+      ).toBe("16px");
       const after = getComputedStyle(decrement, "::after");
       expect(Number.parseFloat(after.width), "coarse hit width").toBeGreaterThanOrEqual(44);
       expect(Number.parseFloat(after.height), "coarse hit height").toBeGreaterThanOrEqual(44);
