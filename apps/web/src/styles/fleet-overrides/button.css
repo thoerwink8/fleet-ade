@@ -20,17 +20,11 @@
   width: var(--fa-ctrl-lg);
 }
 
-/* Grove and Ember point enabled primary buttons at their active theme accent. */
-:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
-  .fa-btn.fa-btn--primary:not([disabled], [data-disabled], [aria-disabled="true"]) {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
-}
-
 .fa-btn.ade-btn--multiline {
   height: auto;
   min-height: var(--fa-ctrl);
-  padding-block: var(--fa-space-1);
+  /* 4px from the text to the outer edge, so one line still lands on the control height. */
+  padding-block: calc(var(--fa-space-1) - var(--fa-bw-1));
   white-space: normal;
 }
 

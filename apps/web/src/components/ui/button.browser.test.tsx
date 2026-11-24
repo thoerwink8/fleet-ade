@@ -91,6 +91,8 @@ describe("Button", () => {
             if (size.endsWith("multiline")) {
               expect(style.minHeight, `${width}px ${size} minHeight`).toBe(expected);
               expect(style.whiteSpace, `${width}px ${size} whiteSpace`).toBe("normal");
+              // One line of text must still land exactly on the control height.
+              expect(style.height, `${width}px ${size} single-line height`).toBe(expected);
             } else {
               expect(style.height, `${width}px ${size} height`).toBe(expected);
             }
@@ -123,6 +125,12 @@ describe("Button", () => {
           </Button>
           <Button variant="outline">Neutral Outline</Button>
           <Button variant="glass">Solid Glass</Button>
+          <div data-chat-header="">
+            <Button variant="outline">Header Enabled</Button>
+            <Button variant="outline" disabled>
+              Header Disabled
+            </Button>
+          </div>
         </div>,
       );
       const btn = (name: string) => screen.getByRole("button", { name }).element();
@@ -156,6 +164,15 @@ describe("Button", () => {
           expect(getComputedStyle(btn("Disabled Primary")).backgroundColor).toBe(
             "rgba(0, 0, 0, 0)",
           );
+          // The Grove/Ember toolbar fill in the chat header must not reach a disabled button.
+          if (themeId !== "system") {
+            expect(getComputedStyle(btn("Header Disabled")).backgroundColor).toBe(
+              "rgba(0, 0, 0, 0)",
+            );
+            expect(getComputedStyle(btn("Header Enabled")).backgroundColor).not.toBe(
+              "rgba(0, 0, 0, 0)",
+            );
+          }
           expect(getComputedStyle(disabledLink).backgroundColor).toBe("rgba(0, 0, 0, 0)");
           expect(getComputedStyle(disabledLink).cursor).toBe("not-allowed");
         }
