@@ -3610,6 +3610,7 @@ export default function ChatView(props: ChatViewProps) {
                           ? (serverRuntime?.lastErrorCode ?? null)
                           : null
                       }
+                      threadErrorIsAgentError={threadErrorIsServerRuntimeError}
                       threadErrorAgentName={activeAgentName}
                       threadErrorRetryCount={
                         threadErrorIsServerRuntimeError

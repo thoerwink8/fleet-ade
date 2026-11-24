@@ -151,9 +151,8 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
         title: action === "resume" ? "无法修改自动继续" : "无法暂缓会话",
         description: cause instanceof Error ? cause.message : "发生错误。",
       });
-    } finally {
-      setActionPending(false);
     }
+    setActionPending(false);
   }
   const resumeState = getUsageLimitRecoveryButtonsState({
     pendingAction: pendingResume ? "resume" : null,

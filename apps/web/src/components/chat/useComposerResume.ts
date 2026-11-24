@@ -99,7 +99,7 @@ export function useComposerResume(input: ComposerResumeInput) {
       return;
     }
     const sendContext = composerRef.current?.getSendContext();
-    if (sendContext && !sendContext.providerAvailable) {
+    if (sendContext?.providerAvailable === false) {
       return;
     }
     const threadId = activeThread.id;

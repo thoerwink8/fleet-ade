@@ -247,7 +247,8 @@ describe("chat banner lane", () => {
 
   it("takes no space once every banner is dismissed", async () => {
     await using screen = await render(<LaneHarness error="这一轮失败了。" />);
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("智能体出错了");
+    await expect.element(screen.getByRole("alert")).toBeVisible();
+    expect(screen.getByRole("alert").element().textContent).toContain("智能体出错了");
     await userEvent.click(screen.getByRole("button", { name: "关闭错误" }));
     await expect.element(screen.getByTestId("timeline")).toBeVisible();
     expect(screen.container.querySelector('[data-slot="chat-banner-lane"]')).toBeNull();

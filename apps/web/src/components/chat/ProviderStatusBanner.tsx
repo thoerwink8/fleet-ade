@@ -161,9 +161,11 @@ export const ProviderStatusBanner = memo(function ProviderStatusBanner({
         environmentId,
         input: { instanceId: status.instanceId, refreshModels: true },
       });
-    } finally {
+    } catch (cause) {
       setIsRefreshing(false);
+      throw cause;
     }
+    setIsRefreshing(false);
   };
 
   if (!status || getProviderStatusBannerKey(status) === null) {

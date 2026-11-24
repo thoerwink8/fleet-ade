@@ -56,6 +56,7 @@ export function ChatBannerLane(props: {
   threadError: string | null;
   threadErrorClass: OrchestrationV2ProviderFailureClass | null;
   threadErrorCode: string | null;
+  threadErrorIsAgentError?: boolean;
   threadErrorAgentName?: string | null;
   threadErrorRetryCount?: number | null;
   threadErrorUsageLimitResetAt?: string | null;
@@ -82,6 +83,7 @@ export function ChatBannerLane(props: {
     threadError,
     threadErrorClass,
     threadErrorCode,
+    threadErrorIsAgentError,
     threadErrorAgentName,
     threadErrorRetryCount,
     threadErrorUsageLimitResetAt,
@@ -164,6 +166,7 @@ export function ChatBannerLane(props: {
           error={threadError}
           errorClass={threadErrorClass}
           errorCode={threadErrorCode}
+          classifyError={threadErrorIsAgentError ?? true}
           agentName={threadErrorAgentName ?? null}
           retryCount={threadErrorRetryCount ?? null}
           usageLimitResetAt={threadErrorUsageLimitResetAt ?? null}

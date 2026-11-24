@@ -13,6 +13,8 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import { OpenAI } from "../Icons";
+import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
+import { ExpandableText } from "../settings/ExpandableText";
 import { ErrorDetailsDisclosure } from "./ErrorDetailsDisclosure";
 import { classifyProviderError, type AlternativeReadyAgent } from "./providerErrorClassification";
 
@@ -75,6 +77,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   onDismiss,
   errorClass,
   errorCode,
+  classifyError = true,
   agentName,
   retryCount,
   usageLimitResetAt,
@@ -89,6 +92,8 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   error: string | null;
   errorClass?: OrchestrationV2ProviderFailureClass | null;
   errorCode?: string | null;
+  /** False for errors the app wrote itself (a rejected send): they show as written, not as an agent failure. */
+  classifyError?: boolean;
   agentName?: string | null;
   retryCount?: number | null;
   usageLimitResetAt?: string | null;
@@ -103,6 +108,26 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
 }) {
   if (!error) return null;
   const chatGptLimit = isChatGptUsageLimitError(errorCode);
+  if (!classifyError) {
+    return (
+      <Alert
+        variant={getThreadErrorBannerVariant(errorClass, errorCode)}
+        controlAlignment="first-line"
+      >
+        <CircleAlertIcon />
+        <AlertDescription>
+          <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />
+        </AlertDescription>
+        {onDismiss ? (
+          <AlertAction>
+            <Button variant="ghost-muted" size="icon-sm" aria-label="关闭错误" onClick={onDismiss}>
+              <XIcon />
+            </Button>
+          </AlertAction>
+        ) : null}
+      </Alert>
+    );
+  }
   const classified = classifyProviderError({
     agentName: agentName?.trim() || "智能体",
     rawError: error,
@@ -141,8 +166,9 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
           <ErrorDetailsDisclosure detail={classified.rawDetail} />
         </AlertDescription>
       ) : null}
-      {(nextStepAction || onDismiss) && (
+      {(nextStepAction || chatGptLimit || onDismiss) && (
         <AlertAction>
+          {chatGptLimit ? <ChatGptUsageButton variant="default" size="sm" /> : null}
           {nextStepAction ? (
             <Button
               variant={classified.variant === "warning" ? "default" : "outline"}
