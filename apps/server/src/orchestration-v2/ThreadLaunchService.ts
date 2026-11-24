@@ -1064,6 +1064,30 @@ const make = Effect.gen(function* () {
         commandId: input.commandId,
         instanceId: input.modelSelection.instanceId,
       });
+      if (Option.isNone(launchReceipt)) {
+        const providers = yield* providerRegistry.getProviders;
+        const provider = providers.find(
+          (entry) => entry.instanceId === input.modelSelection.instanceId,
+        );
+        if (provider !== undefined) {
+          const operation = input.threadId === undefined ? "create-thread" : "update-thread";
+          const agentName = provider.displayName?.trim() || provider.instanceId;
+          if (!provider.installed) {
+            return yield* mapError(
+              input,
+              operation,
+              input.threadId,
+            )(new Error(`这台电脑上没装 ${agentName}。`));
+          }
+          if (provider.auth.status === "unauthenticated") {
+            return yield* mapError(
+              input,
+              operation,
+              input.threadId,
+            )(new Error(`${agentName} 需要重新登录。`));
+          }
+        }
+      }
       return yield* Effect.gen(function* () {
         // Recover ids from accepted launch receipts before allocating; retries have no client id and new ids collide with receipts.
         const reusableLaunchReceipt =

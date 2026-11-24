@@ -5,9 +5,11 @@ import type {
   ServerProvider,
   ThreadId,
 } from "@t3tools/contracts";
+import type { TimestampFormat } from "@t3tools/contracts/settings";
 import { Fragment, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { ChevronDownIcon, ChevronUpIcon, CircleAlertIcon, XIcon } from "lucide-react";
 import type { FleetEngineFailure } from "../../state/fleetEngine";
+import type { AlternativeReadyAgent } from "./providerErrorClassification";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import {
@@ -49,11 +51,20 @@ export function ChatBannerLane(props: {
   onDismissFleetEngineFailure: () => void;
   providerStatus: ServerProvider | null;
   providerStatusDismissalKey: string | null;
-  onOpenProviderSetup: (instanceId: ProviderInstanceId) => void;
+  onOpenProviderSetup: (instanceId?: ProviderInstanceId) => void;
   threadId: ThreadId;
   threadError: string | null;
   threadErrorClass: OrchestrationV2ProviderFailureClass | null;
   threadErrorCode: string | null;
+  threadErrorAgentName?: string | null;
+  threadErrorRetryCount?: number | null;
+  threadErrorUsageLimitResetAt?: string | null;
+  alternativeAgent?: AlternativeReadyAgent | null;
+  timestampFormat?: TimestampFormat;
+  onSignIn?: () => void;
+  onInstallHelp?: () => void;
+  onSwitchAgent?: (instanceId: ProviderInstanceId) => void;
+  onRetryThreadError?: () => void;
   threadErrorBannerKey: string | null;
   setThreadError: (threadId: ThreadId | null, error: string | null) => void;
   setThreadErrorBannerDismissTick: Dispatch<SetStateAction<number>>;
@@ -71,6 +82,15 @@ export function ChatBannerLane(props: {
     threadError,
     threadErrorClass,
     threadErrorCode,
+    threadErrorAgentName,
+    threadErrorRetryCount,
+    threadErrorUsageLimitResetAt,
+    alternativeAgent,
+    timestampFormat,
+    onSignIn,
+    onInstallHelp,
+    onSwitchAgent,
+    onRetryThreadError,
     threadErrorBannerKey,
     setThreadError,
     setThreadErrorBannerDismissTick,
@@ -126,6 +146,8 @@ export function ChatBannerLane(props: {
           status={providerStatus}
           onDismiss={() => dismissProviderStatusBannerForSession(providerStatusDismissalKey)}
           onOpenProviderSetup={onOpenProviderSetup}
+          alternativeAgent={alternativeAgent ?? null}
+          {...(onSwitchAgent === undefined ? {} : { onSwitchAgent })}
         />
       ),
     });
@@ -142,6 +164,16 @@ export function ChatBannerLane(props: {
           error={threadError}
           errorClass={threadErrorClass}
           errorCode={threadErrorCode}
+          agentName={threadErrorAgentName ?? null}
+          retryCount={threadErrorRetryCount ?? null}
+          usageLimitResetAt={threadErrorUsageLimitResetAt ?? null}
+          providerStatus={providerStatus}
+          alternativeAgent={alternativeAgent ?? null}
+          {...(timestampFormat === undefined ? {} : { timestampFormat })}
+          {...(onSignIn === undefined ? {} : { onSignIn })}
+          {...(onInstallHelp === undefined ? {} : { onInstallHelp })}
+          {...(onSwitchAgent === undefined ? {} : { onSwitchAgent })}
+          {...(onRetryThreadError === undefined ? {} : { onRetry: onRetryThreadError })}
           onDismiss={() => {
             setThreadError(threadId, null);
             dismissThreadErrorBannerForSession(threadErrorBannerKey);

@@ -31,7 +31,8 @@ describe("getProviderSummary", () => {
       }),
     ).toEqual({
       headline: "不可用",
-      detail: "The provider process failed to start.",
+      detail: "这个智能体暂时无法启动。",
+      rawDetail: "The provider process failed to start.",
     });
   });
 
@@ -44,8 +45,9 @@ describe("getProviderSummary", () => {
         message: "Run codex login.",
       }),
     ).toEqual({
-      headline: "未认证",
-      detail: "Run codex login.",
+      headline: "未登录",
+      detail: "登录后即可开始使用。",
+      rawDetail: "Run codex login.",
     });
   });
 });
@@ -66,6 +68,7 @@ describe("Antigravity with unchecked sign-in", () => {
       expect.soft(getProviderSummary(candidate)).toEqual({
         headline: "已安装 · 未检查登录状态",
         detail: unchecked.message,
+        rawDetail: null,
       });
       expect(getProviderStatusKey(candidate)).toBe("neutral");
     }
@@ -77,7 +80,7 @@ describe("Antigravity with unchecked sign-in", () => {
       {
         name: "confirmed sign-out",
         change: { auth: { status: "unauthenticated" } },
-        headline: "未认证",
+        headline: "未登录",
         status: "warning",
       },
       {
@@ -95,7 +98,7 @@ describe("Antigravity with unchecked sign-in", () => {
       {
         name: "missing CLI",
         change: { installed: false },
-        headline: "未找到",
+        headline: "未安装",
         status: "warning",
       },
       {
@@ -119,7 +122,7 @@ describe("Antigravity with unchecked sign-in", () => {
       {
         name: "disabled provider",
         change: { enabled: false },
-        headline: "Disabled",
+        headline: "已停用",
         status: "disabled",
       },
     ] as const;

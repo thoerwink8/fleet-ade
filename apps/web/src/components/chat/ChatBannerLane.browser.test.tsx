@@ -247,7 +247,7 @@ describe("chat banner lane", () => {
 
   it("takes no space once every banner is dismissed", async () => {
     await using screen = await render(<LaneHarness error="这一轮失败了。" />);
-    await expect.element(screen.getByRole("alert")).toHaveTextContent("这一轮失败了。");
+    await expect.element(screen.getByRole("alert")).toHaveTextContent("智能体 出错了");
     await userEvent.click(screen.getByRole("button", { name: "关闭错误" }));
     await expect.element(screen.getByTestId("timeline")).toBeVisible();
     expect(screen.container.querySelector('[data-slot="chat-banner-lane"]')).toBeNull();
@@ -266,15 +266,15 @@ describe("chat banner lane", () => {
     const lane = screen.container.querySelector<HTMLElement>('[data-slot="chat-banner-lane"]')!;
     // Engine error appeared first, thread error second, so the thread error leads.
     expect(lane.querySelectorAll('[data-slot="alert"]')).toHaveLength(1);
-    expect(lane.querySelector('[data-slot="alert"]')!.textContent).toContain("这一轮失败了。");
+    expect(lane.querySelector('[data-slot="alert"]')!.textContent).toContain("智能体 出错了");
     const summary = screen.getByRole("button", { name: "还有 2 条" });
     await expect.element(summary).toBeVisible();
 
     await userEvent.click(summary);
     expect(lane.querySelectorAll('[data-slot="alert"]')).toHaveLength(3);
     const text = lane.textContent!;
-    expect(text.indexOf("这一轮失败了。")).toBeLessThan(text.indexOf("连不上机群服务"));
-    expect(text.indexOf("连不上机群服务")).toBeLessThan(text.indexOf("提供方 Codex 状态"));
+    expect(text.indexOf("智能体 出错了")).toBeLessThan(text.indexOf("连不上机群服务"));
+    expect(text.indexOf("连不上机群服务")).toBeLessThan(text.indexOf("Codex 出错了"));
     expect(screen.getByRole("button", { name: "收起" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "收起" }));
@@ -291,13 +291,13 @@ describe("chat banner lane", () => {
     await using screen = await render(
       <LaneHarness
         providerStatus={warningProvider(
-          "这个提供方的模型列表还没有准备好，稍后刷新就会补上，若一直如此请打开提供方设置检查登录状态。",
+          "这个智能体的模型列表还没有准备好，稍后刷新就会补上，若一直如此请打开智能体设置检查登录状态。",
         )}
       />,
     );
 
     const strip = screen.getByRole("alert").element();
-    const close = screen.getByRole("button", { name: "关闭提供方 Codex 的提示（warning）" });
+    const close = screen.getByRole("button", { name: "关闭 Codex 提示（warning）" });
     await vi.waitFor(() => {
       expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(390);
       expect(strip.getBoundingClientRect().width).toBeLessThanOrEqual(390);
@@ -375,7 +375,7 @@ describe("chat banner lane", () => {
   it("keeps the provider warning's alert role and its dismissal key", async () => {
     const provider = warningProvider();
     await using screen = await render(<LaneHarness providerStatus={provider} />);
-    const strip = screen.getByText("提供方 Codex 状态").element().closest("[data-slot=alert]")!;
+    const strip = screen.getByText("Codex 出错了").element().closest("[data-slot=alert]")!;
     expect(strip.getAttribute("role")).toBe("alert");
     expect(getProviderStatusBannerKey(provider)).not.toBeNull();
     expect(

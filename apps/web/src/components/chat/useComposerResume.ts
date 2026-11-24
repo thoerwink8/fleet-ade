@@ -98,6 +98,10 @@ export function useComposerResume(input: ComposerResumeInput) {
     ) {
       return;
     }
+    const sendContext = composerRef.current?.getSendContext();
+    if (sendContext && !sendContext.providerAvailable) {
+      return;
+    }
     const threadId = activeThread.id;
     sendInFlightRef.current = true;
     setResumingThreadKeys((current) => new Set(current).add(routeThreadKey));

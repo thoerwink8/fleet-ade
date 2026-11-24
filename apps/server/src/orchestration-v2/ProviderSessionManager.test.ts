@@ -5,7 +5,9 @@ import { assert, it } from "@effect/vitest";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import {
   EnvironmentId,
+  MessageId,
   type ModelSelection,
+  NodeId,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2PromptSuggestion,
@@ -17,6 +19,7 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   type ProviderSessionId,
+  RunAttemptId,
   RunId,
   ThreadId,
   TurnItemId,
@@ -3636,6 +3639,169 @@ it.effect("ProviderSessionManagerV2 marks pending runtime requests non-live on r
 
     yield* effect.pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 1000 })));
   }),
+);
+
+it.effect(
+  "ProviderSessionManagerV2 finalizes orphaned active runs when a session exits with no subscribers",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+        const now = yield* DateTime.now;
+        const projectId = yield* idAllocator.allocate.project({
+          fixtureName: "provider-session-manager-orphan-run",
+        });
+        const threadId = yield* idAllocator.allocate.thread({
+          fixtureName: "provider-session-manager-orphan-run",
+          projectId,
+        });
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        const providerThread = makeProviderThread({
+          idAllocator,
+          threadId,
+          providerSessionId,
+          now,
+        });
+        const runId = RunId.make("run-orphaned-on-release");
+        const rootNodeId = NodeId.make("node-orphaned-root");
+        const attemptId = RunAttemptId.make("attempt-orphaned-on-release");
+
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId, now }),
+            {
+              id: yield* idAllocator.allocate.event({ threadId }),
+              type: "provider-thread.updated",
+              threadId,
+              driver: CODEX_DRIVER,
+              occurredAt: now,
+              payload: providerThread,
+            },
+            {
+              id: yield* idAllocator.allocate.event({ threadId, runId }),
+              type: "node.updated",
+              threadId,
+              runId,
+              nodeId: rootNodeId,
+              driver: CODEX_DRIVER,
+              occurredAt: now,
+              payload: {
+                id: rootNodeId,
+                threadId,
+                runId,
+                parentNodeId: null,
+                rootNodeId,
+                kind: "root_turn",
+                status: "running",
+                countsForRun: true,
+                providerThreadId: providerThread.id,
+                providerTurnId: null,
+                nativeItemRef: null,
+                runtimeRequestId: null,
+                checkpointScopeId: null,
+                startedAt: now,
+                completedAt: null,
+              },
+            },
+            {
+              id: yield* idAllocator.allocate.event({ threadId, runId }),
+              type: "run-attempt.updated",
+              threadId,
+              runId,
+              nodeId: rootNodeId,
+              providerInstanceId: modelSelection.instanceId,
+              driver: CODEX_DRIVER,
+              occurredAt: now,
+              payload: {
+                id: attemptId,
+                runId,
+                rootNodeId,
+                attemptOrdinal: 1,
+                providerInstanceId: modelSelection.instanceId,
+                providerThreadId: providerThread.id,
+                providerTurnId: null,
+                reason: "initial",
+                status: "running",
+                startedAt: now,
+                completedAt: null,
+              },
+            },
+            {
+              id: yield* idAllocator.allocate.event({ threadId, runId }),
+              type: "run.updated",
+              threadId,
+              runId,
+              nodeId: rootNodeId,
+              providerInstanceId: modelSelection.instanceId,
+              driver: CODEX_DRIVER,
+              occurredAt: now,
+              payload: {
+                id: runId,
+                threadId,
+                ordinal: 1,
+                providerInstanceId: modelSelection.instanceId,
+                modelSelection,
+                providerThreadId: providerThread.id,
+                userMessageId: MessageId.make("msg-orphaned-on-release"),
+                rootNodeId,
+                activeAttemptId: attemptId,
+                status: "running",
+                requestedAt: now,
+                startedAt: now,
+                completedAt: null,
+                checkpointId: null,
+                contextHandoffId: null,
+              },
+            },
+          ],
+        });
+        const pendingRequest = yield* makePendingRuntimeRequestEvents({
+          idAllocator,
+          threadId,
+          providerSessionId,
+          providerThread,
+          now,
+        });
+        yield* eventSink.write({ events: pendingRequest.events });
+
+        yield* manager.open({
+          threadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        yield* manager.release({
+          providerSessionId,
+          reason: "runtime_error",
+          detail: "process exited",
+        });
+
+        const projection = yield* projectionStore.getThreadProjection(threadId);
+        const releasedRun = projection.runs.find((candidate) => candidate.id === runId);
+        const releasedAttempt = projection.attempts.find((candidate) => candidate.id === attemptId);
+        const releasedRootNode = projection.nodes.find((candidate) => candidate.id === rootNodeId);
+        const releasedRequest = projection.runtimeRequests.find(
+          (candidate) => candidate.id === pendingRequest.requestId,
+        );
+
+        assert.equal(releasedRequest?.status, "expired");
+        assert.equal(releasedRequest?.responseCapability.type, "not_resumable");
+        assert.equal(releasedRun?.status, "failed");
+        assert.equal(releasedRun?.activeAttemptId, null);
+        assert.isNotNull(releasedRun?.completedAt);
+        assert.equal(releasedAttempt?.status, "failed");
+        assert.equal(releasedRootNode?.status, "failed");
+      });
+
+      yield* effect.pipe(Effect.provide(layerTest({ state, idleTimeoutMs: 1000 })));
+    }),
 );
 it.effect("ProviderSessionManagerV2 retries release records that failed to persist", () =>
   Effect.gen(function* () {

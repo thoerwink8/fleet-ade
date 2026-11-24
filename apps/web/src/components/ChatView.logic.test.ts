@@ -16,6 +16,7 @@ import {
 } from "./ChatView.logic";
 import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
 import { deriveProviderInstanceEntries } from "../providerInstances";
+import { evaluateProviderInstanceReadiness } from "./chat/composerProviderReadiness";
 import { ensureInlineContextReferences } from "../lib/composerContextReferences";
 import {
   responseContextRecord,
@@ -47,7 +48,6 @@ import { environmentThreadDetails } from "../state/threads";
 import type { Thread } from "../types";
 import { makeThreadFixture, makeThreadProjectionFixture } from "../test-fixtures";
 import {
-  getAntigravitySendBlockReason,
   resolveComposerProviderSelection,
   resolveWorktreeSetupProgress,
   peekRememberedThreadTimeline,
@@ -640,8 +640,9 @@ describe("resolveComposerProviderSelection", () => {
 
     expect(selection.selectedProviderEntry?.instanceId).toBe(signedOutEntry.instanceId);
     expect(
-      getAntigravitySendBlockReason(selection.selectedProviderEntry?.snapshot, "gemini-pro"),
-    ).toBe("发送前请先在提供方设置中登录 Antigravity。");
+      evaluateProviderInstanceReadiness(selection.selectedProviderEntry?.snapshot, "gemini-pro")
+        ?.reason ?? null,
+    ).toBe("Antigravity 还没登录，无法发送消息。");
   });
 
   it("blocks a saved model that a ready catalog no longer lists", () => {
@@ -650,10 +651,11 @@ describe("resolveComposerProviderSelection", () => {
       models: catalogModels,
     }).snapshot;
 
-    expect(getAntigravitySendBlockReason(provider, "saved-model-not-in-current-catalog")).toBe(
-      "该 Antigravity 模型已不可用。请选择其他模型。",
-    );
-    expect(getAntigravitySendBlockReason(provider, "gemini-pro")).toBeNull();
+    expect(
+      evaluateProviderInstanceReadiness(provider, "saved-model-not-in-current-catalog")?.reason ??
+        null,
+    ).toBe("该 Antigravity 模型已不可用。请选择其他模型。");
+    expect(evaluateProviderInstanceReadiness(provider, "gemini-pro")?.reason ?? null).toBeNull();
   });
 
   it("allows a saved native model to retry after a provider error without changing it", () => {
@@ -663,7 +665,8 @@ describe("resolveComposerProviderSelection", () => {
     }).snapshot;
 
     expect(
-      getAntigravitySendBlockReason(provider, "saved-model-not-in-current-catalog"),
+      evaluateProviderInstanceReadiness(provider, "saved-model-not-in-current-catalog")?.reason ??
+        null,
     ).toBeNull();
   });
 

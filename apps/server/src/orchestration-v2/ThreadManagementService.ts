@@ -69,6 +69,7 @@ import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import { DispatchModeLimit, exceededDispatchModeLimit } from "./DispatchModeLimit.ts";
 import { projectTurnItemForDetail } from "./WireProjection.ts";
 import * as LegacyV1ThreadImporter from "./legacy/LegacyV1ThreadImporter.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
 export type ThreadManagementSendMode = "auto" | "queue" | "steer" | "restart";
@@ -606,6 +607,46 @@ const make = Effect.gen(function* () {
   const legacyImporter = yield* LegacyV1ThreadImporter.LegacyV1ThreadImporter;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const receipts = yield* CommandReceiptStore.CommandReceiptStoreV2;
+  const providerRegistry = yield* Effect.serviceOption(ProviderRegistry.ProviderRegistry);
+
+  const assertProviderInstanceReady = (input: {
+    readonly projectId: ProjectId;
+    readonly commandId: CommandId;
+    readonly commandType: string;
+    readonly instanceId: ProviderInstanceId;
+  }) =>
+    assertProviderInstanceEnabled(input).pipe(
+      Effect.andThen(
+        receipts.getByCommandId(input.commandId).pipe(Effect.orElseSucceed(() => Option.none())),
+      ),
+      Effect.flatMap((receipt) => {
+        if (Option.isSome(receipt) || Option.isNone(providerRegistry)) {
+          return Effect.void;
+        }
+        return providerRegistry.value.getProviders.pipe(
+          Effect.flatMap((providers) => {
+            const provider = providers.find((entry) => entry.instanceId === input.instanceId);
+            if (provider === undefined) return Effect.void;
+            const agentName = provider.displayName?.trim() || provider.instanceId;
+            if (!provider.installed) {
+              return new Orchestrator.OrchestratorCommandRejectedError({
+                commandId: input.commandId,
+                commandType: input.commandType,
+                cause: new Error(`这台电脑上没装 ${agentName}。`),
+              });
+            }
+            if (provider.auth.status === "unauthenticated") {
+              return new Orchestrator.OrchestratorCommandRejectedError({
+                commandId: input.commandId,
+                commandType: input.commandType,
+                cause: new Error(`${agentName} 需要重新登录。`),
+              });
+            }
+            return Effect.void;
+          }),
+        );
+      }),
+    );
 
   const assertProviderInstanceEnabled: ThreadManagementServiceShape["assertProviderInstanceEnabled"] =
     (input) =>
@@ -750,9 +791,10 @@ const make = Effect.gen(function* () {
       case "message.dispatch":
         return orchestrator.getThreadRecords(command.threadId, []).pipe(
           Effect.flatMap((projection) =>
-            assertProviderInstanceEnabled({
+            assertProviderInstanceReady({
               projectId: projection.thread.projectId,
               commandId: command.commandId,
+              commandType: command.type,
               instanceId: (command.modelSelection ?? projection.thread.modelSelection).instanceId,
             }),
           ),
@@ -760,15 +802,15 @@ const make = Effect.gen(function* () {
       case "delegated_task.request":
         return orchestrator.getThreadRecords(command.parentThreadId, []).pipe(
           Effect.flatMap((parent) =>
-            assertProviderInstanceEnabled({
+            assertProviderInstanceReady({
               projectId: parent.thread.projectId,
               commandId: command.commandId,
+              commandType: command.type,
               instanceId: command.modelSelection.instanceId,
             }),
           ),
         );
       case "prepared-run.release":
-      case "prepared-run.retry":
         return orchestrator
           .getThreadRecords(command.threadId, ["runs"], { runIds: [command.runId] })
           .pipe(
@@ -781,6 +823,61 @@ const make = Effect.gen(function* () {
                     commandId: command.commandId,
                     instanceId: run.providerInstanceId,
                   });
+            }),
+          );
+      case "prepared-run.retry":
+        return orchestrator
+          .getThreadRecords(command.threadId, ["runs"], { runIds: [command.runId] })
+          .pipe(
+            Effect.flatMap((projection) => {
+              const run = projection.runs.find((candidate) => candidate.id === command.runId);
+              return run === undefined
+                ? Effect.void
+                : assertProviderInstanceReady({
+                    projectId: projection.thread.projectId,
+                    commandId: command.commandId,
+                    commandType: command.type,
+                    instanceId: run.providerInstanceId,
+                  });
+            }),
+          );
+      case "queue.resume":
+        return orchestrator.getThreadRecords(command.threadId, []).pipe(
+          Effect.flatMap((projection) =>
+            assertProviderInstanceReady({
+              projectId: projection.thread.projectId,
+              commandId: command.commandId,
+              commandType: command.type,
+              instanceId: projection.thread.modelSelection.instanceId,
+            }),
+          ),
+        );
+      case "queued-run.start":
+        return orchestrator
+          .getThreadRecords(command.threadId, ["runs"], { runIds: [command.runId] })
+          .pipe(
+            Effect.flatMap((projection) => {
+              const run = projection.runs.find((candidate) => candidate.id === command.runId);
+              return assertProviderInstanceReady({
+                projectId: projection.thread.projectId,
+                commandId: command.commandId,
+                commandType: command.type,
+                instanceId: run?.providerInstanceId ?? projection.thread.modelSelection.instanceId,
+              });
+            }),
+          );
+      case "queued-message.promote-to-steer":
+        return orchestrator
+          .getThreadRecords(command.threadId, ["runs"], { runIds: [command.queuedRunId] })
+          .pipe(
+            Effect.flatMap((projection) => {
+              const run = projection.runs.find((candidate) => candidate.id === command.queuedRunId);
+              return assertProviderInstanceReady({
+                projectId: projection.thread.projectId,
+                commandId: command.commandId,
+                commandType: command.type,
+                instanceId: run?.providerInstanceId ?? projection.thread.modelSelection.instanceId,
+              });
             }),
           );
       default:

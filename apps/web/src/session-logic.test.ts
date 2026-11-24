@@ -159,7 +159,7 @@ describe("V2 session presentation", () => {
         status: "failed",
         failure: { ...retryItem.failure, class: "usage_limit" },
       }),
-    ).toMatchObject({ label: "已达到用量上限（重试 2/10 次仍失败）" });
+    ).toMatchObject({ label: "已达到用量上限（重试 2/10 次）" });
     const recoveredLimit = {
       ...retryItem,
       status: "completed" as const,
@@ -179,11 +179,11 @@ describe("V2 session presentation", () => {
       optimisticMessages: [],
     });
     if (recoveredEntry?.kind !== "work") throw new Error("Expected recovered provider work");
-    expect(recoveredEntry.entry.label).toBe("提供方已恢复（重试 2/10 次）");
+    expect(recoveredEntry.entry.label).toBe("智能体已恢复（重试 2/10 次）");
     expect(recoveredEntry.entry.sourceActivityKind).not.toBe("runtime.warning");
     expect(workEntryDisplayIndicatesToolFailure(recoveredEntry.entry)).toBe(false);
     expect(providerErrorPresentation(retryItem)).toEqual({
-      label: "正在重试提供方（2/10）",
+      label: "正在重试智能体（2/10）",
       detail: "Claude API overloaded. 1.5 秒后重试。",
     });
     expect(
@@ -192,7 +192,7 @@ describe("V2 session presentation", () => {
         status: "completed",
         completedAt: now,
       }),
-    ).toMatchObject({ label: "提供方已恢复（重试 2/10 次）" });
+    ).toMatchObject({ label: "智能体已恢复（重试 2/10 次）" });
     expect(
       providerErrorPresentation({
         ...retryItem,
@@ -200,7 +200,7 @@ describe("V2 session presentation", () => {
         retry: { ...retryItem.retry, attempt: 10 },
         completedAt: now,
       }),
-    ).toMatchObject({ label: "提供方错误（重试 10/10 次仍失败）" });
+    ).toMatchObject({ label: "连不上智能体（重试 10/10 次）" });
   });
 
   it("assigns run rollback to the turn-start message instead of a later steer", () => {
@@ -574,7 +574,7 @@ describe("V2 session presentation", () => {
     expect(errorEntry?.kind).toBe("work");
     if (errorEntry?.kind === "work") {
       expect(errorEntry.entry.projectedItem).toBe(visibleTurnItems[5]);
-      expect(errorEntry.entry.label).toBe("提供方错误");
+      expect(errorEntry.entry.label).toBe("智能体 出错了");
       expect(errorEntry.entry.detail).toBe("Invalid reasoning effort.");
       expect(errorEntry.entry.tone).toBe("info");
       expect(errorEntry.entry.toolLifecycleStatus).toBe("failed");

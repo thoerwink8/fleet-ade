@@ -64,6 +64,7 @@ import type {
   OrchestrationV2PlanArtifact,
   OrchestrationV2ProviderCapabilities,
   OrchestrationV2ProviderFailure,
+  OrchestrationV2ProviderFailureClass,
   OrchestrationV2ProviderRetry,
   OrchestrationV2ProviderSession,
   OrchestrationV2ProviderThread,
@@ -96,6 +97,7 @@ import * as Function from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Predicate from "effect/Predicate";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
@@ -122,6 +124,7 @@ import {
   shouldPersistProviderEvent,
 } from "../../provider/EventNdjsonLogger.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
+import { isCommandMissingCause } from "@t3tools/provider-core/server/snapshotProbe";
 import { codexAppServerArgs, resolveCodexLaunchArgs } from "../../provider/codexLaunchArgs.ts";
 import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
@@ -1185,6 +1188,72 @@ function codexUsageLimitError(
   );
 }
 
+function isCodexAuthError(
+  code: string | null,
+  errorInfo: CodexErrorInfo | null | undefined,
+  message: string | null | undefined,
+): boolean {
+  const status = codexErrorHttpStatus(errorInfo) ?? codexExhaustionHttpStatus(errorInfo);
+  if (status === 401) return true;
+  if (status === 403) return false;
+  if (code === "unauthorized" || code === "invalidApiKey") return true;
+  const text = message?.trim() ?? "";
+  if (text.length === 0 || /\b403\b|\bforbidden\b/i.test(text)) return false;
+  return /\b401\b|\bunauthorized\b|invalid_api_key|invalid api key|token(?:\s+has)?\s+expired|expired\s+token|authentication\s+failed|credentials?\s+expired|not signed in|sign in again/i.test(
+    text,
+  );
+}
+
+function classifyCodexFailureClass(input: {
+  readonly code: string | null;
+  readonly errorInfo: CodexErrorInfo | null | undefined;
+  readonly message: string | null | undefined;
+  readonly isRetry?: boolean;
+}): OrchestrationV2ProviderFailureClass {
+  if (codexUsageLimitError(input.code, input.errorInfo)) return "usage_limit";
+  if (isCodexAuthError(input.code, input.errorInfo, input.message)) return "auth_error";
+  const status =
+    codexErrorHttpStatus(input.errorInfo) ?? codexExhaustionHttpStatus(input.errorInfo);
+  if (status === 403) return "permission_error";
+  if (
+    input.code?.startsWith("httpConnection") === true ||
+    input.code?.startsWith("responseStream") === true ||
+    (input.isRetry === true && input.code?.startsWith("http") === true) ||
+    status === 502 ||
+    status === 503 ||
+    status === 504 ||
+    status === 529
+  ) {
+    return "transport_error";
+  }
+  return "provider_error";
+}
+
+function isCodexNotInstalledCause(cause: unknown): boolean {
+  let current: unknown = cause;
+  const seen = new Set<unknown>();
+  for (let depth = 0; depth < 6 && current !== undefined && current !== null; depth += 1) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    if (
+      isCommandMissingCause(current) ||
+      (Predicate.isObject(current) && "code" in current && current.code === "ENOENT")
+    ) {
+      return true;
+    }
+    if (Predicate.isObject(current) && "cause" in current) {
+      current = current.cause;
+    } else {
+      break;
+    }
+  }
+  return false;
+}
+
+const isProviderAdapterOpenSessionError = Schema.is(
+  ProviderAdapter.ProviderAdapterOpenSessionError,
+);
+
 /**
  * ChatGPT sharing reports its own reason inside Codex's generic turn error, so
  * the code it names replaces Codex's, and clients pick a recovery from it. Its
@@ -1722,6 +1791,7 @@ export const layerAppServerClientFactory: Layer.Layer<
               new ProviderAdapter.ProviderAdapterOpenSessionError({
                 driver: CODEX_PROVIDER,
                 providerSessionId: input.providerSessionId,
+                ...(isCodexNotInstalledCause(cause) ? { notInstalled: true } : {}),
                 cause,
               }),
           ),
@@ -1859,6 +1929,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     new ProviderAdapter.ProviderAdapterOpenSessionError({
                       driver: CODEX_PROVIDER,
                       providerSessionId: input.providerSessionId,
+                      ...(isCodexNotInstalledCause(cause) ? { notInstalled: true } : {}),
                       cause,
                     }),
                 ),
@@ -5050,6 +5121,16 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           }).pipe(turnTerminalizationPermit.withPermits(1)),
         );
 
+        let fastFailAuthNotificationTurn:
+          | ((input: {
+              readonly context: ActiveCodexTurnContext;
+              readonly nativeThreadId: string;
+              readonly nativeTurnId: string;
+              readonly failure: OrchestrationV2ProviderFailure;
+              readonly failureErrorInfo?: CodexErrorInfo;
+            }) => Effect.Effect<void>)
+          | undefined;
+
         yield* client.handleServerNotification("error", (payload) =>
           Effect.gen(function* () {
             const context = yield* awaitActiveTurn(payload.turnId);
@@ -5057,21 +5138,49 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               return;
             }
             const notificationCode = codexErrorInfoCode(payload.error.codexErrorInfo);
-            if (!payload.willRetry) {
+            const additionalDetails = payload.error.additionalDetails?.trim();
+            const message =
+              additionalDetails === undefined || additionalDetails.length === 0
+                ? payload.error.message
+                : additionalDetails;
+            const notificationClass = classifyCodexFailureClass({
+              code: notificationCode,
+              errorInfo: payload.error.codexErrorInfo,
+              message,
+              isRetry: payload.willRetry,
+            });
+            if (!payload.willRetry || notificationClass === "auth_error") {
+              const failure = withCodexManagedFailure(
+                makeProviderFailure({
+                  message,
+                  code: notificationCode,
+                  class: notificationClass,
+                  ...(notificationClass === "auth_error" || notificationClass === "permission_error"
+                    ? { retryable: false }
+                    : {}),
+                }),
+                payload.error,
+              );
               context.latestProviderFailure = {
                 nativeMessage: payload.error.message,
                 nativeCode: notificationCode,
-                failure: withCodexManagedFailure(
-                  makeProviderFailure({
-                    message: payload.error.additionalDetails?.trim() || payload.error.message,
-                    code: notificationCode,
-                    class: codexUsageLimitError(notificationCode, payload.error.codexErrorInfo)
-                      ? "usage_limit"
-                      : "provider_error",
-                  }),
-                  payload.error,
-                ),
+                failure,
               };
+              if (
+                payload.willRetry &&
+                failure.class === "auth_error" &&
+                fastFailAuthNotificationTurn !== undefined
+              ) {
+                yield* fastFailAuthNotificationTurn({
+                  context,
+                  nativeThreadId: payload.threadId,
+                  nativeTurnId: payload.turnId,
+                  failure,
+                  ...(payload.error.codexErrorInfo === undefined
+                    ? {}
+                    : { failureErrorInfo: payload.error.codexErrorInfo }),
+                });
+              }
               return;
             }
             const updatedAt = yield* DateTime.now;
@@ -5083,20 +5192,12 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               maxAttempts: progress?.maxAttempts ?? null,
               retryDelayMs: null,
             };
-            const code = codexErrorInfoCode(payload.error.codexErrorInfo);
-            const additionalDetails = payload.error.additionalDetails?.trim();
+            const code = notificationCode;
             const failure = withCodexManagedFailure(
               makeProviderFailure({
-                message:
-                  additionalDetails === undefined || additionalDetails.length === 0
-                    ? payload.error.message
-                    : additionalDetails,
+                message,
                 code,
-                class: codexUsageLimitError(code, payload.error.codexErrorInfo)
-                  ? "usage_limit"
-                  : code?.startsWith("http") === true || code?.startsWith("responseStream") === true
-                    ? "transport_error"
-                    : "provider_error",
+                class: notificationClass,
                 retryable: true,
               }),
               payload.error,
@@ -6200,9 +6301,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 input.failureErrorInfo === undefined
                   ? undefined
                   : codexErrorInfoCode(input.failureErrorInfo);
-              const failureClass = codexUsageLimitError(failureCode ?? null, input.failureErrorInfo)
-                ? "usage_limit"
-                : "provider_error";
+              const failureClass = classifyCodexFailureClass({
+                code: failureCode ?? null,
+                errorInfo: input.failureErrorInfo,
+                message: input.failureMessage ?? previousFailure?.nativeMessage,
+              });
               // The notification carries the richer message, so it wins when the
               // completion repeats it. An explicit exhaustion status on the
               // completion still decides the class; a missing one is not evidence.
@@ -6219,6 +6322,9 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                         message: input.failureMessage,
                         code: failureCode,
                         class: failureClass,
+                        ...(failureClass === "auth_error" || failureClass === "permission_error"
+                          ? { retryable: false }
+                          : {}),
                       }),
                       input.failureMessage,
                     );
@@ -6908,6 +7014,35 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               return true;
             }),
           );
+
+        fastFailAuthNotificationTurn = Effect.fn("CodexAdapterV2.fastFailAuthNotificationTurn")(
+          function* (input: {
+            readonly context: ActiveCodexTurnContext;
+            readonly nativeThreadId: string;
+            readonly nativeTurnId: string;
+            readonly failure: OrchestrationV2ProviderFailure;
+            readonly failureErrorInfo?: CodexErrorInfo;
+          }) {
+            const finalized = yield* finalizeCodexTurn({
+              context: input.context,
+              nativeTurnId: input.nativeTurnId,
+              status: "failed",
+              completedAt: yield* DateTime.now,
+              failureMessage: input.failure.message,
+              ...(input.failureErrorInfo === undefined
+                ? {}
+                : { failureErrorInfo: input.failureErrorInfo }),
+            });
+            if (finalized) {
+              yield* client
+                .request("turn/interrupt", {
+                  threadId: input.nativeThreadId,
+                  turnId: input.nativeTurnId,
+                })
+                .pipe(Effect.ignore, Effect.forkIn(scope, { startImmediately: true }));
+            }
+          },
+        );
 
         // A retry that ends on 429 is the same exhaustion responseTooManyFailedAttempts reports.
         const failStalledProviderRetry = Effect.fn("CodexAdapterV2.failStalledProviderRetry")(
@@ -8638,13 +8773,15 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
       },
       (effect, input) =>
         effect.pipe(
-          Effect.mapError(
-            (cause) =>
-              new ProviderAdapter.ProviderAdapterOpenSessionError({
-                driver: CODEX_PROVIDER,
-                providerSessionId: input.providerSessionId,
-                cause,
-              }),
+          Effect.mapError((cause) =>
+            isProviderAdapterOpenSessionError(cause)
+              ? cause
+              : new ProviderAdapter.ProviderAdapterOpenSessionError({
+                  driver: CODEX_PROVIDER,
+                  providerSessionId: input.providerSessionId,
+                  ...(isCodexNotInstalledCause(cause) ? { notInstalled: true } : {}),
+                  cause,
+                }),
           ),
         ),
     ),

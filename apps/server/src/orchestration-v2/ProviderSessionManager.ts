@@ -3,6 +3,7 @@ import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import {
   isOrchestrationV2WorkActive,
   ModelSelection,
+  type NodeId,
   type OrchestrationV2AppThread,
   OrchestrationV2DomainEvent,
   OrchestrationV2ProviderSession,
@@ -624,6 +625,7 @@ export const layerWithOptions = (
           },
           { discard: true },
         );
+        return subscribers.size;
       });
 
       // Server shutdown interrupts subscribers rather than ending them: a
@@ -655,6 +657,7 @@ export const layerWithOptions = (
           },
           { discard: true },
         );
+        return subscribers.size;
       });
 
       const cancelIdleFiber = (fiber: Fiber.Fiber<void, never> | null) =>
@@ -733,6 +736,7 @@ export const layerWithOptions = (
         readonly reason: ProviderSessionReleaseReason;
         readonly releasedAt: DateTime.Utc;
         readonly detachedThreadId?: ThreadId;
+        readonly closeOrphanedRuns?: boolean;
       }) {
         const providerSessionId = input.entry.runtime.providerSessionId;
         const now = yield* DateTime.now;
@@ -741,12 +745,16 @@ export const layerWithOptions = (
           input.reason === "runtime_error"
             ? "Provider session failed before this runtime request was resolved."
             : "Provider session was closed before this runtime request was resolved.";
+        const closeOrphanedRuns =
+          input.closeOrphanedRuns === true && input.reason !== "server_shutdown";
 
         const events: Array<OrchestrationV2DomainEvent> = [];
         for (const threadId of releasedThreadIds(input)) {
           const projection = yield* projectionStore.getThreadRecords(
             threadId,
-            ["runtimeRequests"],
+            closeOrphanedRuns
+              ? ["runtimeRequests", "runs", "attempts", "providerThreads"]
+              : ["runtimeRequests"],
             { runtimeRequestStatuses: ["pending"] },
           );
           const releasedRequests = projection.runtimeRequests.filter(
@@ -759,16 +767,48 @@ export const layerWithOptions = (
               !(input.reason === "server_shutdown" && request.kind === "user_input"),
           );
 
-          if (releasedRequests.length === 0) continue;
+          const sessionProviderThreadIds = closeOrphanedRuns
+            ? new Set(
+                (projection.providerThreads ?? [])
+                  .filter((thread) => thread.providerSessionId === providerSessionId)
+                  .map((thread) => thread.id),
+              )
+            : new Set<ProviderThreadId>();
+          const orphanedRunsCandidate = closeOrphanedRuns
+            ? (projection.runs ?? []).filter(
+                (run) =>
+                  (run.status === "starting" ||
+                    run.status === "running" ||
+                    run.status === "waiting") &&
+                  run.providerThreadId !== null &&
+                  sessionProviderThreadIds.has(run.providerThreadId),
+              )
+            : [];
+
+          if (releasedRequests.length === 0 && orphanedRunsCandidate.length === 0) continue;
+          const nodeIdsToLoad = Array.from(
+            new Set<NodeId>([
+              ...releasedRequests.map((request) => request.nodeId),
+              ...orphanedRunsCandidate.flatMap((run) =>
+                run.rootNodeId === null ? [] : [run.rootNodeId],
+              ),
+            ]),
+          );
           const records = yield* projectionStore.getThreadRecords(
             threadId,
             ["nodes", "turnItems"],
             {
-              nodeIds: releasedRequests.map((request) => request.nodeId),
-              turnItemRequestIds: releasedRequests.map((request) => request.id),
-              turnItemTypes: ["approval_request", "user_input_request"],
+              ...(nodeIdsToLoad.length > 0 ? { nodeIds: nodeIdsToLoad } : {}),
+              ...(releasedRequests.length > 0
+                ? {
+                    turnItemRequestIds: releasedRequests.map((request) => request.id),
+                    turnItemTypes: ["approval_request", "user_input_request"],
+                  }
+                : {}),
             },
           );
+          const updatedNodeIds = new Set<NodeId>();
+          const releasedRequestRunIds = new Set<OrchestrationV2Run["id"]>();
           for (const request of releasedRequests) {
             events.push({
               id: yield* idAllocator.allocate.event({
@@ -793,6 +833,8 @@ export const layerWithOptions = (
 
             const requestNode = records.nodes.find((node) => node.id === request.nodeId);
             if (requestNode !== undefined) {
+              updatedNodeIds.add(requestNode.id);
+              if (requestNode.runId !== null) releasedRequestRunIds.add(requestNode.runId);
               events.push({
                 id: yield* idAllocator.allocate.event({
                   threadId,
@@ -834,6 +876,97 @@ export const layerWithOptions = (
                   status: input.reason === "runtime_error" ? "failed" : "cancelled",
                   completedAt: now,
                   updatedAt: now,
+                },
+              });
+            }
+          }
+
+          if (closeOrphanedRuns) {
+            const orphanedRunStatus = input.reason === "runtime_error" ? "failed" : "interrupted";
+            const orphanedRuns = (projection.runs ?? []).filter(
+              (run) =>
+                (run.status === "starting" ||
+                  run.status === "running" ||
+                  run.status === "waiting") &&
+                ((run.providerThreadId !== null &&
+                  sessionProviderThreadIds.has(run.providerThreadId)) ||
+                  releasedRequestRunIds.has(run.id)),
+            );
+            for (const run of orphanedRuns) {
+              const activeAttempt =
+                run.activeAttemptId === null
+                  ? undefined
+                  : (projection.attempts ?? []).find(
+                      (attempt) => attempt.id === run.activeAttemptId,
+                    );
+              if (
+                activeAttempt !== undefined &&
+                (activeAttempt.status === "pending" || activeAttempt.status === "running")
+              ) {
+                events.push({
+                  id: yield* idAllocator.allocate.event({
+                    threadId,
+                    providerSessionId,
+                  }),
+                  type: "run-attempt.updated",
+                  threadId,
+                  runId: run.id,
+                  nodeId: activeAttempt.rootNodeId,
+                  providerInstanceId: run.providerInstanceId,
+                  driver: input.entry.runtime.driver,
+                  occurredAt: now,
+                  payload: {
+                    ...activeAttempt,
+                    status: orphanedRunStatus,
+                    completedAt: now,
+                  },
+                });
+              }
+              if (run.rootNodeId !== null && !updatedNodeIds.has(run.rootNodeId)) {
+                const rootNode = records.nodes.find((node) => node.id === run.rootNodeId);
+                if (
+                  rootNode !== undefined &&
+                  (rootNode.status === "pending" ||
+                    rootNode.status === "running" ||
+                    rootNode.status === "waiting")
+                ) {
+                  updatedNodeIds.add(rootNode.id);
+                  events.push({
+                    id: yield* idAllocator.allocate.event({
+                      threadId,
+                      providerSessionId,
+                    }),
+                    type: "node.updated",
+                    threadId,
+                    runId: run.id,
+                    nodeId: rootNode.id,
+                    driver: input.entry.runtime.driver,
+                    occurredAt: now,
+                    payload: {
+                      ...rootNode,
+                      status: input.reason === "runtime_error" ? "failed" : "cancelled",
+                      completedAt: now,
+                    },
+                  });
+                }
+              }
+              events.push({
+                id: yield* idAllocator.allocate.event({
+                  threadId,
+                  providerSessionId,
+                }),
+                type: "run.updated",
+                threadId,
+                runId: run.id,
+                ...(run.rootNodeId === null ? {} : { nodeId: run.rootNodeId }),
+                providerInstanceId: run.providerInstanceId,
+                driver: input.entry.runtime.driver,
+                occurredAt: now,
+                payload: {
+                  ...run,
+                  status: orphanedRunStatus,
+                  completedAt: now,
+                  activeAttemptId: null,
                 },
               });
             }
@@ -1017,6 +1150,7 @@ export const layerWithOptions = (
         readonly releasedAt: DateTime.Utc;
         readonly detachedThreadId?: ThreadId;
         readonly replaced: boolean;
+        readonly closeOrphanedRuns?: boolean;
       }) =>
         Effect.all(
           [
@@ -1221,12 +1355,13 @@ export const layerWithOptions = (
                     (thread) => writeReleasedToolCallEvents(thread, releasedAt),
                     { discard: true },
                   ).pipe(logReleaseFailure(input.providerSessionId));
+                  let subscriberCount = 0;
                   if (input.gracefulSubscribers === true) {
-                    yield* endSubscribers(entry, afterDrain);
+                    subscriberCount = yield* endSubscribers(entry, afterDrain);
                   } else if (input.reason === "server_shutdown") {
                     yield* interruptSubscribers(entry);
                   } else {
-                    yield* failSubscribers(
+                    subscriberCount = yield* failSubscribers(
                       entry,
                       input.detail ?? `Provider session released: ${input.reason}.`,
                       afterDrain,
@@ -1243,6 +1378,7 @@ export const layerWithOptions = (
                     ...(input.detail === undefined ? {} : { detail: input.detail }),
                     releasedProviderThreads,
                     releasedAt,
+                    closeOrphanedRuns: input.reason !== "server_shutdown" && subscriberCount === 0,
                     ...detachedThread,
                   };
                   const recorded = yield* Effect.exit(

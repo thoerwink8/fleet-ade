@@ -132,11 +132,26 @@ function turnFailure(
   }
   const [, httpStatus, message, status] = apiError;
   const rateLimited = httpStatus === "429" || status === "RESOURCE_EXHAUSTED";
+  const authFailed = httpStatus === "401" || status === "UNAUTHENTICATED";
+  const permissionDenied = httpStatus === "403" || status === "PERMISSION_DENIED";
+  const transient =
+    status === "UNAVAILABLE" ||
+    status === "DEADLINE_EXCEEDED" ||
+    (httpStatus !== undefined && Number(httpStatus) >= 500);
+  const failureClass = rateLimited
+    ? "usage_limit"
+    : authFailed
+      ? "auth_error"
+      : permissionDenied
+        ? "permission_error"
+        : transient
+          ? "transport_error"
+          : "provider_error";
   return makeProviderFailure({
-    class: rateLimited ? "usage_limit" : "provider_error",
+    class: failureClass,
     message: message!.trim(),
     code: status ?? null,
-    retryable: rateLimited || Number(httpStatus) >= 500,
+    retryable: authFailed || permissionDenied ? false : rateLimited || Number(httpStatus) >= 500,
     resetAt: resetAtFrom(text, now) ?? null,
   });
 }

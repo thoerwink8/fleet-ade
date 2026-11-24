@@ -127,6 +127,8 @@ import {
   makeProviderFailure,
   makeProviderRetryTurnItem,
 } from "@t3tools/provider-core/server/failure";
+import { isCommandMissingCause } from "@t3tools/provider-core/server/snapshotProbe";
+import * as Predicate from "effect/Predicate";
 import { acpSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
 import {
   isProviderNativeImageAttachment,
@@ -360,6 +362,7 @@ export interface AcpAdapterV2Flavor {
     ) => Effect.Effect<OrchestrationV2ProviderFailure | undefined>
   >;
   readonly requiresSignIn?: (cause: unknown) => boolean;
+  readonly notInstalled?: (cause: unknown) => boolean;
   /**
    * Runs before attachment paths, T3 instructions and native slash-command detection,
    * so a rewrite can turn the user's text into a native command.
@@ -1780,6 +1783,89 @@ function shouldPersistToolUpdate(
     skipped + 1 >= TOOL_UPDATE_PERSIST_EVERY;
   context.toolUpdatesSkipped.set(key, persist ? 0 : skipped + 1);
   return persist;
+}
+
+const isAcpRequestErrorSchema = Schema.is(EffectAcpErrors.AcpRequestError);
+
+function acpFailureCauseChain(cause: unknown): ReadonlyArray<unknown> {
+  const chain: Array<unknown> = [];
+  let current: unknown = cause;
+  const seen = new Set<unknown>();
+  for (let depth = 0; depth < 6 && current !== undefined && current !== null; depth += 1) {
+    if (seen.has(current)) break;
+    seen.add(current);
+    chain.push(current);
+    if (Predicate.isObject(current) && "cause" in current) {
+      current = current.cause;
+    } else {
+      break;
+    }
+  }
+  return chain;
+}
+
+export function classifyAcpFailure(
+  cause: unknown,
+  flavor?: Pick<AcpAdapterFlavor, "requiresSignIn" | "notInstalled">,
+): {
+  readonly class: OrchestrationV2ProviderFailure["class"];
+  readonly requiresSignIn: boolean;
+  readonly notInstalled: boolean;
+  readonly retryable?: boolean;
+} {
+  if (flavor?.requiresSignIn?.(cause) === true) {
+    return { class: "auth_error", requiresSignIn: true, notInstalled: false, retryable: false };
+  }
+  if (flavor?.notInstalled?.(cause) === true) {
+    return { class: "not_installed", requiresSignIn: false, notInstalled: true, retryable: false };
+  }
+  for (const node of acpFailureCauseChain(cause)) {
+    if (
+      isCommandMissingCause(node) ||
+      (Predicate.isObject(node) && "code" in node && node.code === "ENOENT")
+    ) {
+      return {
+        class: "not_installed",
+        requiresSignIn: false,
+        notInstalled: true,
+        retryable: false,
+      };
+    }
+    if (isAcpRequestErrorSchema(node)) {
+      if (node.code === -32000) {
+        return { class: "auth_error", requiresSignIn: true, notInstalled: false, retryable: false };
+      }
+      if (
+        !/\b403\b|forbidden/i.test(node.errorMessage) &&
+        /\b401\b|\bunauthorized\b|invalid_api_key|invalid api key|authentication.*required|authentication.*failed|not signed in/i.test(
+          node.errorMessage,
+        )
+      ) {
+        return { class: "auth_error", requiresSignIn: true, notInstalled: false, retryable: false };
+      }
+      if (/\b403\b|forbidden|permission denied/i.test(node.errorMessage)) {
+        return {
+          class: "permission_error",
+          requiresSignIn: false,
+          notInstalled: false,
+          retryable: false,
+        };
+      }
+    }
+    if (
+      Predicate.isObject(node) &&
+      "_tag" in node &&
+      (node._tag === "AcpTransportError" || node._tag === "AcpProcessExitedError")
+    ) {
+      return {
+        class: "transport_error",
+        requiresSignIn: false,
+        notInstalled: false,
+        retryable: true,
+      };
+    }
+  }
+  return { class: "provider_error", requiresSignIn: false, notInstalled: false };
 }
 
 export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
@@ -8749,13 +8835,17 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                     if (!interrupted && flavor.restartRuntimeAfterPromptError?.(failure) === true) {
                       yield* Ref.set(runtimeRestartRequired, true);
                     }
+                    const classifiedFailure = classifyAcpFailure(failure, flavor);
                     yield* finalizeTurn(
                       context,
                       interrupted ? "interrupted" : "failed",
                       flavor.promptFailure?.(failure) ??
                         makeProviderFailure({
                           cause: failure,
-                          class: "provider_error",
+                          class: classifiedFailure.class,
+                          ...(classifiedFailure.retryable === undefined
+                            ? {}
+                            : { retryable: classifiedFailure.retryable }),
                         }),
                     ).pipe(
                       Effect.andThen(
@@ -9694,15 +9784,16 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
       },
       (effect, input) =>
         effect.pipe(
-          Effect.mapError(
-            (cause) =>
-              new ProviderAdapter.ProviderAdapterOpenSessionError({
-                driver,
-                providerSessionId: input.providerSessionId,
-                ...(flavor.requiresSignIn?.(cause) === true ? { requiresSignIn: true } : {}),
-                cause,
-              }),
-          ),
+          Effect.mapError((cause) => {
+            const classified = classifyAcpFailure(cause, flavor);
+            return new ProviderAdapter.ProviderAdapterOpenSessionError({
+              driver,
+              providerSessionId: input.providerSessionId,
+              ...(classified.requiresSignIn ? { requiresSignIn: true } : {}),
+              ...(classified.notInstalled ? { notInstalled: true } : {}),
+              cause,
+            });
+          }),
         ),
     ),
   });

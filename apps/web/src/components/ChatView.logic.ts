@@ -17,7 +17,6 @@ import { getProviderModelCapabilities } from "../providerModels";
 import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
-  ANTIGRAVITY_DEFAULT_MODEL,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   type AssetCreateUrlInput,
   type AssetCreateUrlResult,
@@ -480,36 +479,6 @@ export function resolveComposerProviderSelection(input: {
     lockedContinuationGroupKey,
     unavailableProviderInstanceId,
   };
-}
-
-export function getAntigravitySendBlockReason(
-  provider:
-    | Pick<ServerProvider, "driver" | "installed" | "auth" | "models" | "status">
-    | null
-    | undefined,
-  model: string,
-): string | null {
-  if (provider?.driver !== "antigravity") return null;
-  if (!provider.installed) {
-    return "发送前请先在提供方设置中安装 Antigravity。";
-  }
-  if (provider.auth.status === "unauthenticated") {
-    return "发送前请先在提供方设置中登录 Antigravity。";
-  }
-  const slug = model.trim();
-  if (slug.length === 0) return "发送前请先选择 Antigravity 模型。";
-  if (provider.auth.status === "unknown") return null;
-  if (provider.models.length === 0) {
-    return "发送前请先在提供方设置中刷新 Antigravity 模型。";
-  }
-  if (
-    provider.status === "ready" &&
-    slug !== ANTIGRAVITY_DEFAULT_MODEL &&
-    !provider.models.some((entry) => entry.slug === slug || entry.aliases?.includes(slug))
-  ) {
-    return "该 Antigravity 模型已不可用。请选择其他模型。";
-  }
-  return null;
 }
 
 export function reconcileMountedTerminalThreadIds(input: {

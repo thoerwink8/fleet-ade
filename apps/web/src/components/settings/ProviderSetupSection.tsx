@@ -22,6 +22,7 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SettingsRow } from "./settingsLayout";
 import { ProviderAuthenticationSection } from "./ProviderAuthenticationSection";
+import { ErrorDetailsDisclosure } from "../chat/ErrorDetailsDisclosure";
 
 interface ProviderSetupSectionProps {
   readonly environmentId: EnvironmentId;
@@ -117,6 +118,7 @@ function ProviderSetupActions({
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const pendingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const authActive =
     auth?.phase === "starting" || auth?.phase === "waiting" || auth?.phase === "verifying";
   const installActive =
@@ -132,7 +134,7 @@ function ProviderSetupActions({
     installation === null
       ? "正在检查 Antigravity 运行环境。"
       : installation?.phase === "downloading"
-        ? `Downloading ${(installation.downloadedBytes / 1_000_000).toFixed(1)} MB${installation.totalBytes === null ? "" : ` of ${(installation.totalBytes / 1_000_000).toFixed(1)} MB`}.`
+        ? `正在下载 ${(installation.downloadedBytes / 1_000_000).toFixed(1)} MB${installation.totalBytes === null ? "" : ` / ${(installation.totalBytes / 1_000_000).toFixed(1)} MB`}。`
         : installation?.phase === "extracting"
           ? "正在解压 Antigravity。"
           : installation?.phase === "verifying"
@@ -155,18 +157,25 @@ function ProviderSetupActions({
     pendingRef.current = true;
     setPendingLabel(label);
     setError(null);
+    setErrorDetail(null);
     const settled = await settlePromise(request);
     pendingRef.current = false;
     setPendingLabel(null);
     if (settled._tag === "Failure") {
-      setError("提供方设置失败，请重试。");
+      setError("无法完成智能体设置，请重试。");
       return false;
     }
     const result = settled.value;
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
         const failure = squashAtomCommandFailure(result);
-        setError(failure instanceof Error ? failure.message : "提供方设置失败。");
+        const raw = failure instanceof Error ? failure.message.trim() : "";
+        if (raw && /\p{Script=Han}/u.test(raw)) {
+          setError(raw);
+        } else {
+          setError("无法完成智能体设置，请重试。");
+          if (raw) setErrorDetail(raw);
+        }
       }
       return false;
     }
@@ -203,7 +212,7 @@ function ProviderSetupActions({
             ) : null}
             {!installed && !provider.setup?.canInstall ? (
               <p className="text-muted-foreground">
-                无法自动安装。请设置可执行文件路径或使用其他环境。
+                无法自动安装。请设置可执行文件路径或使用其他电脑。
               </p>
             ) : null}
           </div>
@@ -232,9 +241,16 @@ function ProviderSetupActions({
             {!installActive &&
             installation?.message &&
             installation.message !== installationStatusMessage ? (
-              <p className="text-muted-foreground [overflow-wrap:anywhere]">
-                {installation.message}
-              </p>
+              /\p{Script=Han}/u.test(installation.message) ? (
+                <p className="text-muted-foreground [overflow-wrap:anywhere]">
+                  {installation.message}
+                </p>
+              ) : (
+                <div className="grid gap-1 text-left">
+                  <p className="text-muted-foreground">暂时无法完成安装。</p>
+                  <ErrorDetailsDisclosure detail={installation.message} />
+                </div>
+              )
             ) : null}
             <div className="grid min-h-7 grid-cols-[1.75rem_minmax(0,1fr)] gap-2">
               <div className="col-start-2 row-start-1 grid">
@@ -258,7 +274,7 @@ function ProviderSetupActions({
                     size="sm"
                     variant="outline"
                     disabled={actionsDisabled || authActive}
-                    onClick={() => void runCommand("无法开始安装", () => startInstall(target))}
+                    onClick={() => void runCommand("正在开始安装", () => startInstall(target))}
                   >
                     {installation?.installedVersion
                       ? installation.version &&
@@ -308,8 +324,17 @@ function ProviderSetupActions({
       {error || queryError ? (
         <div className="grid gap-2 px-3 py-3 sm:px-4">
           <p role="alert" className="text-destructive [overflow-wrap:anywhere]">
-            {error ?? queryError}
+            {error ??
+              (queryError && /\p{Script=Han}/u.test(queryError)
+                ? queryError
+                : "无法读取设置状态，请重试。")}
           </p>
+          <ErrorDetailsDisclosure
+            detail={
+              errorDetail ??
+              (!error && queryError && !/\p{Script=Han}/u.test(queryError) ? queryError : null)
+            }
+          />
           {queryError ? (
             <Button
               size="sm"

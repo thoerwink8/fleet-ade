@@ -32,6 +32,12 @@ const RATE_LIMIT_ERROR = errorPayload(
 const INVALID_ARGUMENT_ERROR = errorPayload(
   "Error 400, Message: Request contains an invalid argument., Status: INVALID_ARGUMENT, Details: []",
 );
+const UNAUTHENTICATED_ERROR = errorPayload(
+  "Error 401, Message: Request had invalid authentication credentials., Status: UNAUTHENTICATED, Details: []",
+);
+const PERMISSION_DENIED_ERROR = errorPayload(
+  "Error 403, Message: The caller does not have permission., Status: PERMISSION_DENIED, Details: []",
+);
 // The model's reply quoting the agent's quota notice is an ordinary planner response.
 const QUOTED_NOTICE = Buffer.from(
   "Usage Limit Reached\n\nYou have reached your current quota for this period. Your limit will reset in 1 hour.",
@@ -126,6 +132,30 @@ describe("watchAntigravityPromptOutcome", () => {
           class: "provider_error",
           message: "Request contains an invalid argument.",
           code: "INVALID_ARGUMENT",
+          retryable: false,
+        },
+      );
+      assert.deepEqual(
+        yield* turn([
+          [USER_INPUT, input],
+          [ERROR_MESSAGE, UNAUTHENTICATED_ERROR],
+        ]),
+        {
+          class: "auth_error",
+          message: "Request had invalid authentication credentials.",
+          code: "UNAUTHENTICATED",
+          retryable: false,
+        },
+      );
+      assert.deepEqual(
+        yield* turn([
+          [USER_INPUT, input],
+          [ERROR_MESSAGE, PERMISSION_DENIED_ERROR],
+        ]),
+        {
+          class: "permission_error",
+          message: "The caller does not have permission.",
+          code: "PERMISSION_DENIED",
           retryable: false,
         },
       );

@@ -38,6 +38,7 @@ import type {
 import type { ThreadRunSummary, ThreadRuntimeSummary } from "@t3tools/client-runtime/state/shell";
 import { threadRuntimeHasInterruptibleRun } from "@t3tools/client-runtime/state/thread-execution";
 import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
+import { classifyProviderError } from "./components/chat/providerErrorClassification";
 
 import {
   isImageAttachment,
@@ -351,13 +352,21 @@ function projectedWorkEntryTone(item: OrchestrationV2TurnItem): WorkLogEntry["to
 export function providerErrorPresentation(
   item: Extract<OrchestrationV2TurnItem, { readonly type: "error" }>,
 ): { readonly label: string; readonly detail: string } {
+  const classified = classifyProviderError({
+    agentName: "智能体",
+    rawError: item.failure.message,
+    errorClass: item.failure.class,
+    errorCode: item.failure.code ?? null,
+    retryCount: item.retry?.attempt ?? null,
+    usageLimitResetAt: item.failure.resetAt ?? null,
+  });
   if (item.retry === undefined) {
     return {
       label:
         item.failure.class === "usage_limit"
           ? "已达到用量上限"
           : item.title === null || item.title === undefined || item.title.trim() === ""
-            ? "提供方错误"
+            ? classified.message
             : translateLegacyEnglishLabel(item.title),
       detail: item.failure.message,
     };
@@ -368,12 +377,12 @@ export function providerErrorPresentation(
       : `${item.retry.attempt}/${item.retry.maxAttempts}`;
   const label =
     item.status === "running"
-      ? `正在重试提供方（${progress}）`
+      ? `正在重试智能体（${progress}）`
       : item.status === "completed"
-        ? `提供方已恢复（重试 ${progress} 次）`
+        ? `智能体已恢复（重试 ${progress} 次）`
         : item.status === "failed"
-          ? `${item.failure.class === "usage_limit" ? "已达到用量上限" : "提供方错误"}（重试 ${progress} 次仍失败）`
-          : `已停止重试提供方（${progress}）`;
+          ? `${item.failure.class === "usage_limit" ? "已达到用量上限" : classified.message}（重试 ${progress} 次）`
+          : `已停止重试智能体（${progress}）`;
   const retryDelay =
     item.status === "running" && item.retry.retryDelayMs !== null && item.retry.retryDelayMs > 0
       ? item.retry.retryDelayMs < 1_000

@@ -484,6 +484,12 @@ describe("thread open stats", () => {
     const opens = { openedAt: 1, score: 1, picks: [{ query: "upl", at: 1 }] };
     expect(decode({ ...shell, opens }).opens).toEqual(opens);
     expect(decode({ ...shell, opens: { openedAt: "2026-10-01", score: 1 } }).opens).toBeNull();
+    expect(
+      decode({ ...shell, lastErrorClass: "auth_error", lastErrorRetryCount: 2 }),
+    ).toMatchObject({ lastErrorClass: "auth_error", lastErrorRetryCount: 2 });
+    expect(decode({ ...shell, lastErrorClass: "not_installed" }).lastErrorClass).toBe(
+      "not_installed",
+    );
   });
 });
 

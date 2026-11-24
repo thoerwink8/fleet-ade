@@ -3,7 +3,10 @@ import { RunId } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { usageLimitRecoveryBannerItem } from "./UsageLimitRecoveryBanner";
+import {
+  getUsageLimitRecoveryButtonsState,
+  usageLimitRecoveryBannerItem,
+} from "./UsageLimitRecoveryBanner";
 
 const stoppedAt = new Date(2026, 9, 20, 12, 0);
 
@@ -52,5 +55,25 @@ describe("usageLimitRecoveryBannerItem", () => {
     });
     expect(item.title).toBe("已达到 ChatGPT 用量上限");
     expect(item.description).toBe("17:30 重置");
+  });
+
+  it("keeps resume and snooze saving states independent", () => {
+    const resuming = getUsageLimitRecoveryButtonsState({
+      pendingAction: "resume",
+      scheduled: false,
+      snoozed: false,
+      resetPassed: false,
+    });
+    expect(resuming.resume).toEqual({ disabled: true, label: "正在保存…" });
+    expect(resuming.snooze).toEqual({ disabled: false, label: "暂缓到重置时" });
+
+    const snoozing = getUsageLimitRecoveryButtonsState({
+      pendingAction: "snooze",
+      scheduled: false,
+      snoozed: false,
+      resetPassed: false,
+    });
+    expect(snoozing.resume).toEqual({ disabled: false, label: "重置后自动继续" });
+    expect(snoozing.snooze).toEqual({ disabled: true, label: "正在保存…" });
   });
 });
