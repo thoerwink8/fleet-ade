@@ -335,8 +335,8 @@ function ScaledRows(props: Omit<Parameters<typeof RowPage>[0], "page">) {
     pendingEnd.current = false;
     node.scrollTop += delta * (nativeTail ? 1 : (scale * 29) / rowHeight());
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Install a non-passive native wheel listener so virtual scrolling can prevent the browser's default scroll.
-  useEffect(() => {
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Install a non-passive native wheel listener before paint, so a wheel in the first frame is not dropped.
+  useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
     const wheel = (event: WheelEvent) => onWheel(event);
