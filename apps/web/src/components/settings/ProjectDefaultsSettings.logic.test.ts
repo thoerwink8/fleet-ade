@@ -83,7 +83,7 @@ describe("resolveDefaultModelSettingsPresentation", () => {
     });
     expect(present(withoutClaude)).toEqual({
       selection: savedClaude,
-      providerNote: "这台电脑上没有这个提供方。",
+      providerNote: "这台电脑上没有这个智能体。",
     });
   });
 

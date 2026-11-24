@@ -510,7 +510,7 @@ export function SourceControlSettingsPanel() {
             title={`版本控制${environmentSuffix}`}
             headerAction={scanButton}
           />
-          <SourceControlSectionSkeleton title="版本控制提供方" />
+          <SourceControlSectionSkeleton title="代码托管平台" />
         </>
       ) : hasDiscoveryItems ? (
         <>
@@ -529,9 +529,7 @@ export function SourceControlSettingsPanel() {
           {result.sourceControlProviders.length > 0 ? (
             <SettingsSection
               id={hasVersionControlSystems ? undefined : searchableSetting("source-control").id}
-              title={
-                hasVersionControlSystems ? "版本控制提供方" : `版本控制提供方${environmentSuffix}`
-              }
+              title={hasVersionControlSystems ? "代码托管平台" : `代码托管平台${environmentSuffix}`}
               headerAction={hasVersionControlSystems ? null : scanButton}
             >
               {result.sourceControlProviders.map((item) => (

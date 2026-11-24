@@ -175,7 +175,7 @@ it("does not import with provider management alone", async () => {
   setup();
   grants.scopes.delete("orchestration:operate");
   await using screen = await renderSection();
-  await screen.click("列出运行实例");
+  await screen.click("列出原生会话");
   expect(screen.button("导入").disabled).toBe(true);
   await screen.click("导入");
   expect(commands.import).not.toHaveBeenCalled();
@@ -184,7 +184,7 @@ it("does not import with provider management alone", async () => {
 it("rechecks task access after confirming deletion", async () => {
   setup();
   await using screen = await renderSection();
-  await screen.click("列出运行实例");
+  await screen.click("列出原生会话");
   dialogs.confirm.mockImplementationOnce(async () => {
     grants.scopes.delete("orchestration:operate");
     return true;
@@ -204,7 +204,7 @@ it.each(["Save", "Disable"])("keeps other provider edits through a %s refetch", 
   const response = { _tag: "Success" as const, value: { providers } };
   commands.listProviders.mockResolvedValue(response);
   await using screen = await renderSection();
-  await screen.click("列出提供方");
+  await screen.click("列出模型服务");
   const input = (label: string) =>
     screen.container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
   await userEvent.fill(input("other 基础 URL"), "https://other.example.test/v1");
@@ -253,7 +253,7 @@ it.each([true, false])(
     await using screen = await renderSection({ canList, projects: [] });
     await screen.setProjects([project]);
     const action = screen.getByRole("button", {
-      name: canList ? "列出运行实例" : "列出提供方",
+      name: canList ? "列出原生会话" : "列出模型服务",
     });
     await expect.element(action).toBeEnabled();
     if (!canList) {
@@ -294,12 +294,12 @@ it.each([true, false])(
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "ACP 运行实例所属项目" : "ACP 提供方所属项目",
+          name: canList ? "ACP 原生会话所属项目" : "ACP 模型服务所属项目",
         }),
       )
       .toHaveFocus();
-    if (canList) await screen.getByRole("button", { name: "列出运行实例" }).click();
-    await screen.getByRole("button", { name: "列出提供方" }).click();
+    if (canList) await screen.getByRole("button", { name: "列出原生会话" }).click();
+    await screen.getByRole("button", { name: "列出模型服务" }).click();
     await userEvent.fill(
       screen.getByRole("textbox", { name: "google 基础 URL" }),
       "https://draft.test",
@@ -310,7 +310,7 @@ it.each([true, false])(
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "ACP 运行实例所属项目" : "ACP 提供方所属项目",
+          name: canList ? "ACP 原生会话所属项目" : "ACP 模型服务所属项目",
         }),
       )
       .toHaveTextContent("Second");
@@ -336,7 +336,7 @@ it.each([true, false])(
     await expect
       .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
       .not.toBeInTheDocument();
-    await screen.getByRole("button", { name: "列出提供方" }).click();
+    await screen.getByRole("button", { name: "列出模型服务" }).click();
     expect(commands.listProviders).toHaveBeenLastCalledWith({
       environmentId,
       input: { instanceId, projectId },
@@ -350,7 +350,7 @@ it.each([true, false])(
     await expect
       .element(
         screen.getByRole("combobox", {
-          name: canList ? "ACP 运行实例所属项目" : "ACP 提供方所属项目",
+          name: canList ? "ACP 原生会话所属项目" : "ACP 模型服务所属项目",
         }),
       )
       .toHaveTextContent("Antigravity");
@@ -359,7 +359,7 @@ it.each([true, false])(
       .toHaveValue("https://api.example.test/v1");
 
     await screen.setProjects([]);
-    await expect.element(screen.getByRole("button", { name: "列出提供方" })).toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "列出模型服务" })).toBeDisabled();
     await expect
       .element(screen.getByRole("textbox", { name: "google 基础 URL" }))
       .not.toBeInTheDocument();
@@ -375,14 +375,14 @@ it("ignores a late listing after project replacement", async () => {
     }),
   );
   await using screen = await renderSection();
-  await screen.click("列出运行实例");
+  await screen.click("列出原生会话");
   await screen.setProjects([replacement]);
   await act(async () =>
     finish({ _tag: "Success", value: { sessions: [session], nextCursor: "old-page" } }),
   );
   await expect.element(screen.getByText(session.title)).not.toBeInTheDocument();
   await expect.element(screen.getByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
-  await expect.element(screen.getByRole("button", { name: "列出运行实例" })).toBeEnabled();
+  await expect.element(screen.getByRole("button", { name: "列出原生会话" })).toBeEnabled();
 });
 
 it.each(["Save", "Disable"])("does not refetch the old project after a late %s", async (action) => {
@@ -398,13 +398,13 @@ it.each(["Save", "Disable"])("does not refetch the old project after a late %s",
     })),
   );
   await using screen = await renderSection();
-  await screen.click("列出提供方");
+  await screen.click("列出模型服务");
   await screen.click(actionLabel(action));
   expect(command).toHaveBeenCalledOnce();
   await screen.setProjects([replacement]);
   await act(async () => finish());
   expect(commands.listProviders).toHaveBeenCalledOnce();
-  await expect.element(screen.getByRole("button", { name: "列出提供方" })).toBeEnabled();
+  await expect.element(screen.getByRole("button", { name: "列出模型服务" })).toBeEnabled();
 });
 
 it.each(["Delete", "停用"])(
@@ -418,7 +418,7 @@ it.each(["Delete", "停用"])(
       }),
     );
     await using screen = await renderSection();
-    await screen.click(action === "Delete" ? "列出运行实例" : "列出提供方");
+    await screen.click(action === "Delete" ? "列出原生会话" : "列出模型服务");
     await screen.click(actionLabel(action));
     await screen.setProjects([replacement]);
     await act(async () => finish(true));
@@ -440,7 +440,7 @@ it("keeps logout pending across project replacement and clears replacement sessi
   await using screen = await renderSection();
   await screen.click("退出登录");
   await screen.setProjects([replacement]);
-  await screen.click("列出运行实例");
+  await screen.click("列出原生会话");
   await expect.element(screen.getByText(session.title)).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "正在退出登录" })).toBeDisabled();
   await screen.click("正在退出登录");

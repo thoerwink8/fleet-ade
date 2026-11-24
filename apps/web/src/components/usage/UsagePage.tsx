@@ -1264,12 +1264,12 @@ function UsageProviderFilter({
   const visible = PROVIDER_ORDER.filter((provider) => !hiddenProviders.has(provider));
   const label =
     visible.length === PROVIDER_ORDER.length
-      ? "所有提供方"
+      ? "所有智能体"
       : visible.length === 0
-        ? "没有提供方"
+        ? "没有智能体"
         : visible.length === 1
           ? PROVIDER_PRESENTATION[visible[0]!].label
-          : `${visible.length} 个提供方`;
+          : `${visible.length} 个智能体`;
 
   return (
     <Menu>
@@ -1286,7 +1286,7 @@ function UsageProviderFilter({
           closeOnClick={false}
           onCheckedChange={(checked) => onChange(checked ? [] : PROVIDER_ORDER)}
         >
-          所有提供方
+          所有智能体
         </MenuCheckboxItem>
         <MenuSeparator />
         {PROVIDER_ORDER.map((provider) => (

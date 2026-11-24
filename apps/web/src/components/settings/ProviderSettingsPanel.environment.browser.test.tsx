@@ -253,7 +253,7 @@ describe("EnvironmentProviderSettings routing", () => {
     await setup();
     await setProviders([provider()]);
     await using _screen = await render(panel({ targetInstanceId: customId }));
-    await expect.element(page.getByText("此提供方实例在这台电脑上已不可用。")).toBeVisible();
+    await expect.element(page.getByText("此智能体在这台电脑上已不可用。")).toBeVisible();
     expect(state.updateSettings).not.toHaveBeenCalled();
   });
 
@@ -397,7 +397,7 @@ describe("EnvironmentProviderSettings instance removal", () => {
     };
     await setProviders([provider()]);
     await using _screen = await render(panel({ targetInstanceId: codexId }));
-    const reset = page.getByRole("button", { name: "将 Codex 提供方设置 恢复为默认值" });
+    const reset = page.getByRole("button", { name: "将 Codex 智能体设置 恢复为默认值" });
     await userEvent.click(reset);
 
     expect(state.mutateProviderInstance).not.toHaveBeenCalled();
@@ -429,10 +429,10 @@ describe("EnvironmentProviderSettings instance removal", () => {
     };
     await setProviders([{ ...provider(), instanceId: antigravityId, driver: antigravity }]);
     await using _screen = await render(panel({ targetInstanceId: antigravityId }));
-    await userEvent.click(page.getByRole("button", { name: /将 .* 提供方设置 恢复为默认值/ }));
+    await userEvent.click(page.getByRole("button", { name: /将 .* 智能体设置 恢复为默认值/ }));
 
     expect(state.confirm).toHaveBeenCalledWith(expect.stringContaining("它也会被停用。"), {
-      title: "把这个提供方恢复为默认？",
+      title: "把这个智能体恢复为默认？",
       confirmLabel: "恢复默认",
       variant: "destructive",
     });
@@ -448,7 +448,7 @@ describe("EnvironmentProviderSettings instance removal", () => {
       },
     };
     await using _screen = await render(panel({ targetInstanceId: customId }));
-    const remove = page.getByRole("button", { name: `删除实例 ${customId}` });
+    const remove = page.getByRole("button", { name: `移除智能体 ${customId}` });
     await userEvent.click(remove);
 
     expect(state.mutateProviderInstance).not.toHaveBeenCalled();
@@ -469,7 +469,7 @@ describe("EnvironmentProviderSettings health check interval", () => {
   it("commits interval drafts and allows retrying rejected edits", async () => {
     await setup();
     await using _screen = await render(panel());
-    const input = page.getByRole("textbox", { name: "提供方健康检查间隔（秒）" });
+    const input = page.getByRole("textbox", { name: "智能体健康检查间隔（秒）" });
 
     await userEvent.type(input, "{ArrowUp}{ArrowDown}");
     expect(
@@ -510,7 +510,7 @@ describe("EnvironmentProviderSettings health check interval", () => {
   it("restores the saved interval when a cleared field loses focus", async () => {
     await setup();
     await using _screen = await render(panel());
-    const input = page.getByRole("textbox", { name: "提供方健康检查间隔（秒）" });
+    const input = page.getByRole("textbox", { name: "智能体健康检查间隔（秒）" });
 
     await userEvent.type(input, "{Backspace}{Backspace}{Backspace}");
     await userEvent.tab();

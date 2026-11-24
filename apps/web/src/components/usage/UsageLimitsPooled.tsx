@@ -591,7 +591,7 @@ export function UsageLimitsPooled({
   return (
     <div className="flex flex-col gap-8">
       {pools.length === 0 && notices.length === 0 && externalLinks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">选中的电脑上没有提供方报告订阅限制。</p>
+        <p className="text-sm text-muted-foreground">选中的电脑上没有智能体报告订阅限制。</p>
       ) : null}
       <SegmentPopoverContext value={segmentPopover}>
         {pools.map((pool) => (

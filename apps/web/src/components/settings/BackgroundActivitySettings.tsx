@@ -194,14 +194,14 @@ function BackgroundActivityAdvancedDialog({
 
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-row font-medium">提供方状态检查间隔</div>
+                <div className="text-row font-medium">智能体状态检查间隔</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  刷新提供方的可用状态、版本和认证状态。模型目录是否更新取决于“提供方更新检查”设置。
+                  刷新智能体的可用状态、版本和认证状态。模型目录是否更新取决于“智能体更新检查”设置。
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="提供方状态检查间隔"
+                  label="智能体状态检查间隔"
                   value={providerHealthRefreshIntervalSeconds}
                   min={0}
                   step={PROVIDER_HEALTH_INTERVAL_STEP_SECONDS}
@@ -349,7 +349,7 @@ export function BackgroundActivitySettingsRow() {
         <span className="inline-flex items-center gap-1.5">
           {searchableSetting("background-activity").title}
           <PolicyTooltip>
-            Git 刷新和提供方状态检测等后台任务达到各自间隔后，是否运行由此共享策略决定。
+            Git 刷新和智能体状态检测等后台任务达到各自间隔后，是否运行由此共享策略决定。
           </PolicyTooltip>
         </span>
       }

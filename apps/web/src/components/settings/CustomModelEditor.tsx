@@ -321,7 +321,7 @@ export function CustomModelEditor({
         </div>
         {draft.descriptors.length === 0 ? (
           <p className="text-xs text-muted-foreground/70">
-            没有自定义选项。输入框使用提供方的默认选项。
+            没有自定义选项。输入框使用智能体的默认选项。
           </p>
         ) : null}
         {draft.descriptors.map(renderDescriptor)}

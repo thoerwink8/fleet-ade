@@ -8,14 +8,14 @@ import {
 } from "./AddProviderInstanceDialog.logic";
 
 describe("resolveWizardNavigation", () => {
-  const invalidId = { instanceIdError: "请输入实例 ID。" };
+  const invalidId = { instanceIdError: "请输入智能体 ID。" };
 
   // regression: #2813 the wizard advanced past an invalid instance id
   it("blocks Next from Identity to Config while the instance id is invalid", () => {
     expect(resolveWizardNavigation(1, 2, 3, invalidId)).toEqual({
       kind: "blocked",
       step: 1,
-      error: "请输入实例 ID。",
+      error: "请输入智能体 ID。",
     });
   });
 
@@ -23,7 +23,7 @@ describe("resolveWizardNavigation", () => {
     expect(resolveWizardNavigation(0, 2, 3, invalidId)).toEqual({
       kind: "blocked",
       step: 1,
-      error: "请输入实例 ID。",
+      error: "请输入智能体 ID。",
     });
   });
 });

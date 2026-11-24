@@ -11,8 +11,8 @@ function SettingsProvidersRoute() {
     return (
       <p className="p-8 text-sm text-muted-foreground">
         {scope.kind === "environment"
-          ? `重新连接 ${scope.label} 以设置其提供方。`
-          : "连接一台电脑以设置其提供方。"}
+          ? `重新连接 ${scope.label} 以设置其智能体。`
+          : "连接一台电脑以设置其智能体。"}
       </p>
     );
   }

@@ -189,7 +189,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
           </div>
         ) : (
           <span className="text-sm text-muted-foreground">
-            {mixedModel ? "各不相同" : "没有可用的提供方"}
+            {mixedModel ? "各不相同" : "没有可用的智能体"}
           </span>
         )
       }
@@ -249,7 +249,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["fallbackModelSelection"]}
       mixed={mixedFallback}
       {...searchableSetting("fallback-model")}
-      description="默认模型的提供方额度耗尽时，新会话使用此模型。"
+      description="默认模型的智能体额度耗尽时，新会话使用此模型。"
       resetAction={
         mixedFallback || settings.fallbackModelSelection !== null ? (
           <SettingResetButton
@@ -310,7 +310,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             ) : null}
           </div>
         ) : (
-          <span className="text-sm text-muted-foreground">没有可用的提供方</span>
+          <span className="text-sm text-muted-foreground">没有可用的智能体</span>
         )
       }
     />

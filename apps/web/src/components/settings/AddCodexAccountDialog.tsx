@@ -91,7 +91,7 @@ export function AddCodexAccountDialog({
       <WizardPopup size="wide">
         <WizardHeader
           title={instanceId ? displayName : "添加 ChatGPT 账户"}
-          description="每个账户都有独立的 Codex 实例和登录信息。请在登录页面选择另一个账户。"
+          description="每个账户都有独立的 Codex 智能体和登录信息。请在登录页面选择另一个账户。"
         />
         <WizardPanel>
           {instanceId ? (
@@ -111,7 +111,7 @@ export function AddCodexAccountDialog({
             >
               <SettingsRow
                 title="账户名称"
-                description="显示在提供方列表和模型选择器中。"
+                description="显示在智能体列表和模型选择器中。"
                 control={
                   <Input
                     aria-label="账户名称"

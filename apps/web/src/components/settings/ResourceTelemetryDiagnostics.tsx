@@ -108,7 +108,7 @@ function categoryLabel(category: ResourceTelemetryProcessCategory): string {
     case "server-child":
       return "后台服务子进程";
     case "provider-root":
-      return "提供方";
+      return "智能体";
     case "terminal-root":
       return "终端";
     case "electron-main":
@@ -1006,7 +1006,7 @@ function ResourceTelemetryDiagnosticsBody({
                 Fleet ADE 系统资源占用
               </div>
               <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
-                后台服务、提供方、终端、桌面进程和监测器自身的实时原生统计。
+                后台服务、智能体、终端、桌面进程和监测器自身的实时原生统计。
               </p>
             </div>
             <div className="flex items-center gap-2 text-3xs text-muted-foreground/65">

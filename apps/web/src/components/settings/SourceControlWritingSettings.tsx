@@ -313,7 +313,7 @@ export function SourceControlWritingSettingsSection() {
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {usesDedicatedModel && !canEnableDedicatedModel ? (
-                  <span className="text-sm text-muted-foreground">没有可用的文本生成提供方。</span>
+                  <span className="text-sm text-muted-foreground">没有可用的文本生成器。</span>
                 ) : null}
                 {usesDedicatedModel && canEnableDedicatedModel ? (
                   <ProviderModelPicker

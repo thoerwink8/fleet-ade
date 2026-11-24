@@ -434,7 +434,7 @@ export function ProviderEnvironmentSection(props: {
   return (
     <SettingsRow
       title="变量"
-      description="各实例的 API 密钥、基础 URL 和其他 CLI 设置。"
+      description="各智能体的 API 密钥、基础 URL 和其他 CLI 设置。"
       control={
         <Button type="button" size="sm" variant="outline" onClick={addVariable}>
           <PlusIcon className="size-3" />
@@ -1178,7 +1178,7 @@ export function ProviderInstanceCard({
             variant="ghost-destructive"
             disabled={readOnly}
             onClick={onDelete}
-            aria-label={`删除实例 ${instanceId}`}
+            aria-label={`移除智能体 ${instanceId}`}
           >
             <Trash2Icon />
           </Button>
@@ -1243,11 +1243,11 @@ export function ProviderInstanceCard({
     />
   ) : (
     <SettingsRow
-      title="驱动"
+      title="类型"
       description={
         <span>
-          此实例使用 <code className="text-foreground">{String(instance.driver)}</code>
-          ，当前构建不提供该驱动。它的配置会保留。
+          此智能体使用 <code className="text-foreground">{String(instance.driver)}</code>
+          ，当前构建不支持该类型。它的配置会保留。
         </span>
       }
     />
@@ -1280,7 +1280,7 @@ export function ProviderInstanceCard({
                 className="min-w-0 flex-1 @min-[32rem]/settings-row:w-56"
                 value={instance.displayName ?? ""}
                 onCommit={updateDisplayName}
-                placeholder={driverOption?.label ?? "实例标签"}
+                placeholder={driverOption?.label ?? "智能体标签"}
                 spellCheck={false}
               />
             </div>

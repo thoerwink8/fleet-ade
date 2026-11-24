@@ -46,7 +46,7 @@ const ITEMS: ReadonlyArray<SettingsSearchItem> = [
   },
   {
     id: "providers",
-    title: "智能体提供方",
+    title: "智能体",
     to: "/settings/providers",
     searchTerms: ["claude codex agents"],
   },
@@ -209,7 +209,7 @@ describe("searchSettings", () => {
       ["工作树位置", "storage-worktrees-location"],
       ["产物与日志", "storage-artifacts"],
       ["立即删除", "storage-delete-now"],
-      ["智能体提供方", "providers"],
+      ["智能体", "providers"],
       ["运行中发送", "follow-up-behavior"],
     ] as const) {
       expect(searchSettings(title)[0]?.id, title).toBe(id);

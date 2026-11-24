@@ -47,7 +47,7 @@ export function SecretsSettingsPanel() {
     <>
       {candidates.length > 1 && environment !== null ? (
         <div className="flex min-w-0 items-center gap-1.5 px-3 text-sm text-muted-foreground sm:px-4">
-          <span className="shrink-0">凭据提供方所属电脑</span>
+          <span className="shrink-0">密钥来源所属电脑</span>
           <Select
             value={environment.environmentId}
             onValueChange={(next) => {
@@ -95,7 +95,7 @@ export function SecretsSettingsPanel() {
       environment.serverConfig.secretProviderSettings !== true ? (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            请先更新 {environment.label} 上的 Fleet ADE，才能管理它的凭据提供方。
+            请先更新 {environment.label} 上的 Fleet ADE，才能管理它的密钥来源。
           </p>
         </SettingsSection>
       ) : connected && environment !== null ? (
@@ -103,7 +103,7 @@ export function SecretsSettingsPanel() {
       ) : (
         <SettingsSection {...searchableSetting("secret-providers")}>
           <p className="px-4 py-3 text-sm text-muted-foreground">
-            连接一台电脑，即可管理其提供方变量使用的凭据提供方。
+            连接一台电脑，即可管理其智能体变量使用的密钥来源。
           </p>
         </SettingsSection>
       )}
@@ -135,10 +135,7 @@ function EnvironmentSecretProviders({
   return (
     <SettingsSection {...searchableSetting("secret-providers")}>
       {entries.length === 0 ? (
-        <SettingsRow
-          title="尚未配置凭据提供方。"
-          description="此版本没有可添加的凭据提供方类型。"
-        />
+        <SettingsRow title="尚未配置密钥来源。" description="此版本没有可添加的密钥来源类型。" />
       ) : (
         entries.map(([id, config]) => (
           <SettingsRow
@@ -146,7 +143,7 @@ function EnvironmentSecretProviders({
             title={<span className="min-w-0 wrap-anywhere">{config.label}</span>}
             description={
               builtInSecretProviderDefinitions.find(config.kind)?.label ??
-              `不支持的提供方（${config.kind}）`
+              `不支持的密钥来源（${config.kind}）`
             }
             control={
               !readOnly ? (
@@ -197,7 +194,7 @@ function RemoveSecretProviderButton({
                 onConfirm();
               }}
             >
-              移除提供方
+              移除密钥来源
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

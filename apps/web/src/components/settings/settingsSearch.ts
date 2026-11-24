@@ -673,7 +673,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   ...KEYBINDING_SEARCH_ITEMS,
   {
     id: "providers",
-    title: "智能体提供方",
+    title: "智能体",
     to: "/settings/providers",
     searchTerms: [
       "agents cli codex claude grok antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume",
@@ -681,7 +681,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "usage-providers",
-    title: "用量数据提供方",
+    title: "用量来源",
     to: "/settings/providers",
     searchTerms: [
       "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
@@ -884,7 +884,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "secret-providers",
-    title: "凭据提供方",
+    title: "密钥来源",
     to: "/settings/connections",
     searchTerms: ["vault credentials api key"],
     secretsFeatureOnly: true,

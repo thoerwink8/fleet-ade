@@ -75,12 +75,12 @@ const FEATURED_DRIVER_OPTIONS = DRIVER_OPTIONS.filter((option) => option.feature
 const MORE_DRIVER_OPTIONS = DRIVER_OPTIONS.filter((option) => option.featured === false);
 const EMPTY_CONFIG_DRAFT: Record<string, unknown> = {};
 function validateInstanceId(id: string, existing: ReadonlySet<string>): string | null {
-  if (id.length === 0) return "请输入实例 ID。";
-  if (id.length > 64) return "实例 ID 不能超过 64 个字符。";
+  if (id.length === 0) return "请输入智能体 ID。";
+  if (id.length > 64) return "智能体 ID 不能超过 64 个字符。";
   if (!INSTANCE_ID_PATTERN.test(id)) {
-    return "实例 ID 必须以字母开头，只能包含字母、数字、“-”或“_”。";
+    return "智能体 ID 必须以字母开头，只能包含字母、数字、“-”或“_”。";
   }
-  if (existing.has(id)) return `名为“${id}”的实例已存在。`;
+  if (existing.has(id)) return `名为“${id}”的智能体已存在。`;
   return null;
 }
 
@@ -410,7 +410,7 @@ export function AddProviderInstanceDialog({
       setIsSaving(false);
       toastManager.add({
         type: "error",
-        title: "无法添加提供方实例",
+        title: "无法添加智能体",
         description: error instanceof Error ? error.message : "设置更新失败。",
       });
       return;
@@ -424,8 +424,8 @@ export function AddProviderInstanceDialog({
     }
     toastManager.add({
       type: "success",
-      title: "已添加提供方实例",
-      description: `已添加 ${driverOption.label} 实例“${instanceId}”。`,
+      title: "已添加智能体",
+      description: `已添加 ${driverOption.label} 智能体“${instanceId}”。`,
     });
     onOpenChange(false);
   };
@@ -444,8 +444,8 @@ export function AddProviderInstanceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <WizardPopup size="wide">
         <WizardHeader
-          title="添加提供方"
-          description={<>在 {environmentLabel} 上添加账号或配置提供方。</>}
+          title="添加智能体"
+          description={<>在 {environmentLabel} 上添加账号或配置智能体。</>}
         >
           {isAcpRegistry ? (
             <AddProviderInstanceWizardSteps
@@ -484,7 +484,7 @@ export function AddProviderInstanceDialog({
                   id="add-instance-driver-label"
                   className="text-row font-medium text-foreground"
                 >
-                  提供方
+                  智能体
                 </div>
                 <ProviderOptionGrid
                   options={FEATURED_DRIVER_OPTIONS}
@@ -515,7 +515,7 @@ export function AddProviderInstanceDialog({
                         value={driver}
                         disabled={isPreparingRegistryAgent}
                         onValueChange={selectDriver}
-                        aria-label="更多提供方"
+                        aria-label="更多智能体"
                       />
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <div aria-hidden className="flex-1 border-t border-border/70" />
@@ -633,7 +633,7 @@ export function AddProviderInstanceDialog({
                 <SettingsRow
                   title={<label htmlFor="add-provider-label">标签</label>}
                   description={
-                    <span id="add-provider-label-description">显示在提供方列表中。</span>
+                    <span id="add-provider-label-description">显示在智能体列表中。</span>
                   }
                   control={
                     <Input
@@ -648,7 +648,7 @@ export function AddProviderInstanceDialog({
                   }
                 />
                 <SettingsRow
-                  title={<label htmlFor="add-provider-instance-id">实例 ID</label>}
+                  title={<label htmlFor="add-provider-instance-id">智能体 ID</label>}
                   description={
                     <span id="add-provider-instance-id-description">字母、数字、“-”或“_”。</span>
                   }
@@ -710,7 +710,7 @@ export function AddProviderInstanceDialog({
               ) : !isAcpRegistry && wizardStep === 2 ? (
                 <div className="grid gap-2">
                   <p className="text-sm text-muted-foreground">
-                    此驱动无需额外配置，可以直接添加实例。
+                    此智能体无需额外配置，可以直接添加。
                   </p>
                 </div>
               ) : null}
@@ -755,7 +755,11 @@ export function AddProviderInstanceDialog({
                   disabled={isSaving || !canManageProviders}
                   onClick={() => void handleSave()}
                 >
-                  {isSaving ? "正在添加…" : isAcpRegistry && !isLocalAcp ? "继续登录" : "添加实例"}
+                  {isSaving
+                    ? "正在添加…"
+                    : isAcpRegistry && !isLocalAcp
+                      ? "继续登录"
+                      : "添加智能体"}
                 </Button>
               )}
             </WizardFooter>
