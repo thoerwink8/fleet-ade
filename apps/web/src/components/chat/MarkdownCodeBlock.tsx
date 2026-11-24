@@ -63,7 +63,7 @@ export function MarkdownCodeBlockFrame({
   return (
     <Wrapper
       dir="ltr"
-      className="chat-markdown-codeblock my-[0.65rem] text-start overflow-hidden rounded-lg border border-border/70 bg-secondary leading-normal dark:border-transparent dark:bg-input/32"
+      className="chat-markdown-codeblock my-[0.65rem] text-start overflow-hidden pointer-coarse:overflow-visible rounded-lg border border-border/70 bg-secondary leading-normal dark:border-transparent dark:bg-input/32"
       data-language={language}
       data-wrap={wrapped ? "true" : "false"}
     >
@@ -202,7 +202,7 @@ export function MarkdownCodeBlock({
   if (diagram) {
     return (
       <div className="my-[0.65rem] border border-transparent" data-language={language}>
-        <div className="flex items-center justify-end gap-0.5 pt-1.5 pr-1.5 select-none">
+        <div className="ade-touch-row ade-touch-row--gap-5 flex items-center justify-end gap-0.5 pointer-coarse:gap-5 pt-1.5 pr-1.5 select-none">
           {viewToggle}
           {copyButton}
         </div>
@@ -219,7 +219,11 @@ export function MarkdownCodeBlock({
       wrapped={wrapped}
       headerProps={THREAD_FIND_IGNORE_PROPS}
       actions={
-        <span className="flex items-center gap-0.5" role="toolbar" aria-label="代码块操作">
+        <span
+          className="ade-touch-row ade-touch-row--gap-5 flex items-center gap-0.5 pointer-coarse:gap-5"
+          role="toolbar"
+          aria-label="代码块操作"
+        >
           {canWrap ? (
             <Tooltip>
               <TooltipTrigger

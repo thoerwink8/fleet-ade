@@ -84,7 +84,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
 
   return (
     <div
-      className="flex h-full shrink-0 items-center gap-1 [-webkit-app-region:no-drag]"
+      className="ade-touch-row ade-touch-row--gap-3 flex h-full shrink-0 items-center gap-1 pointer-coarse:gap-3 [-webkit-app-region:no-drag]"
       data-panel-layout-controls
     >
       {showThreadPanelControl ? threadPanelControl : null}

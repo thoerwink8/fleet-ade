@@ -77,7 +77,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
             />
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="ade-touch-row ade-touch-row--gap-5 flex shrink-0 items-center gap-1 pointer-coarse:gap-5">
           {hasDirectories && (
             <Tooltip>
               <TooltipTrigger

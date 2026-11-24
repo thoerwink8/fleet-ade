@@ -456,7 +456,7 @@ function QueuedMessage(props: {
           <TooltipPopup className="max-w-96 whitespace-pre-wrap">{props.previewText}</TooltipPopup>
         ) : null}
       </Tooltip>
-      <span className="flex shrink-0 items-center gap-0.5">
+      <span className="ade-touch-row ade-touch-row--gap-2 flex shrink-0 items-center gap-0.5 pointer-coarse:gap-2">
         {attribution === "agent" &&
         senderRef &&
         // Only an environment this client is connected to can open the sender's thread there.

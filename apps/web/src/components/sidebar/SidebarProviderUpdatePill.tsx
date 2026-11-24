@@ -141,7 +141,7 @@ export function SidebarProviderUpdatePill() {
 
   return (
     <div
-      className={`group/provider-update relative flex min-h-7 w-full shrink-0 items-center overflow-hidden rounded-lg text-2xs leading-4 font-medium transform-gpu transition-all duration-180 ease-drawer will-change-transform ${
+      className={`group/provider-update relative flex min-h-7 w-full shrink-0 items-center rounded-lg text-2xs leading-4 font-medium transform-gpu transition-all duration-180 ease-drawer will-change-transform ${
         PROVIDER_UPDATE_PILL_STYLES[displayedView.tone]
       } ${
         exitingKey === displayedView.key
@@ -151,17 +151,21 @@ export function SidebarProviderUpdatePill() {
     >
       {showDismissProgress ? (
         <div
-          key={displayedView.key}
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-y-0 left-0 w-full origin-left scale-x-0 transition-transform duration-(--provider-update-pill-dismiss-ms) ease-linear starting:scale-x-100 border-r border-current/15 inset-shadow-2xs inset-shadow-white/8 ${
-            PROVIDER_UPDATE_PILL_PROGRESS_STYLES[displayedView.tone]
-          }`}
-          style={
-            {
-              "--provider-update-pill-dismiss-ms": `${dismissAfterVisibleMs}ms`,
-            } as CSSProperties
-          }
-        />
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg"
+        >
+          <div
+            key={displayedView.key}
+            className={`absolute inset-y-0 left-0 w-full origin-left scale-x-0 transition-transform duration-(--provider-update-pill-dismiss-ms) ease-linear starting:scale-x-100 border-r border-current/15 inset-shadow-2xs inset-shadow-white/8 ${
+              PROVIDER_UPDATE_PILL_PROGRESS_STYLES[displayedView.tone]
+            }`}
+            style={
+              {
+                "--provider-update-pill-dismiss-ms": `${dismissAfterVisibleMs}ms`,
+              } as CSSProperties
+            }
+          />
+        </div>
       ) : null}
       <div className="pointer-events-none absolute inset-0 rounded-lg transition-colors" />
       <Tooltip>
@@ -196,7 +200,7 @@ export function SidebarProviderUpdatePill() {
               <button
                 type="button"
                 aria-label="忽略提供方更新提示"
-                className={`relative z-[1] mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${DISMISS_BUTTON_TOUCH_TARGET}`}
+                className={`ade-touch-target relative z-[1] mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${DISMISS_BUTTON_TOUCH_TARGET}`}
                 onClick={() => startExit(displayedView.key, null, displayedView.key)}
               >
                 <XIcon className="size-3.5 shrink-0" />

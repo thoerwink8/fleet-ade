@@ -100,7 +100,7 @@ export function SidebarUpdateCapsule({
           <button
             type="button"
             className={cn(
-              "relative inline-flex shrink-0 cursor-pointer items-center justify-center pr-3 pl-1.5 text-xs underline decoration-muted-foreground/60 underline-offset-3 hover:decoration-current",
+              "ade-touch-target relative inline-flex shrink-0 cursor-pointer items-center justify-center pr-3 pl-1.5 text-xs underline decoration-muted-foreground/60 underline-offset-3 hover:decoration-current",
               ACTION_BUTTON_TOUCH_TARGET,
             )}
             onClick={runAction}

@@ -271,7 +271,7 @@ const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   };
 
   return (
-    <SidebarMenu ref={attachSidebarToolbar} className="flex-row items-center">
+    <SidebarMenu ref={attachSidebarToolbar} touchRow="gap-3" className="flex-row items-center">
       {isOnUtilityPage ? (
         <SidebarMenuItem className="min-w-0 flex-1">
           <SidebarMenuButton onClick={handleBackClick}>

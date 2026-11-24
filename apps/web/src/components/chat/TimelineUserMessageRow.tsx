@@ -782,7 +782,12 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
           {formatChatTimestampTooltip(row.message.createdAt, ctx.timestampFormat)}
         </TooltipPopup>
       </Tooltip>
-      <div className={cn("flex items-center gap-0.5", floatActions && "flex-wrap justify-end")}>
+      <div
+        className={cn(
+          "ade-touch-row ade-touch-row--gap-4 flex items-center gap-0.5 pointer-coarse:gap-4",
+          floatActions && "flex-wrap justify-end",
+        )}
+      >
         {typeof revertTurnCount === "number" && (
           <RevertUserMessageButton turnCount={revertTurnCount} messageId={row.message.id} />
         )}

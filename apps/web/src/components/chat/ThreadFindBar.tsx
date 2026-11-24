@@ -101,27 +101,29 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
               重试
             </Button>
           ) : null}
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label="上一个匹配项"
-            disabled={navigationDisabled}
-            onClick={props.onPrevious}
-          >
-            <ChevronUpIcon />
-          </Button>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label="下一个匹配项"
-            disabled={navigationDisabled}
-            onClick={props.onNext}
-          >
-            <ChevronDownIcon />
-          </Button>
-          <Button size="icon-xs" variant="ghost" aria-label="关闭查找" onClick={props.onClose}>
-            <XIcon />
-          </Button>
+          <span className="ade-touch-row ade-touch-row--gap-1 flex items-center gap-0.5 pointer-coarse:gap-1">
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label="上一个匹配项"
+              disabled={navigationDisabled}
+              onClick={props.onPrevious}
+            >
+              <ChevronUpIcon />
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label="下一个匹配项"
+              disabled={navigationDisabled}
+              onClick={props.onNext}
+            >
+              <ChevronDownIcon />
+            </Button>
+            <Button size="icon-xs" variant="ghost" aria-label="关闭查找" onClick={props.onClose}>
+              <XIcon />
+            </Button>
+          </span>
         </InputGroupAddon>
       </InputGroup>
     </div>

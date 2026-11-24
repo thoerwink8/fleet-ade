@@ -126,7 +126,7 @@ export function SidebarHeaderActions({
     : "新建会话";
 
   return (
-    <div className="flex shrink-0 items-center">
+    <div className="ade-touch-row ade-touch-row--gap-3 flex shrink-0 items-center pointer-coarse:gap-3">
       {hasProjects ? (
         <span ref={projectScopeAnchorRef} className="flex">
           <Menu>
@@ -222,10 +222,6 @@ function SidebarHeaderIconButton({
         }
       >
         {children}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-        />
       </TooltipTrigger>
       <TooltipPopup side="top">{tooltip}</TooltipPopup>
     </Tooltip>

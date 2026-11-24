@@ -478,12 +478,15 @@ export function ComposerRestingImagePreviews({
   const counts = getRestingComposerImagePreviewCounts(images.length);
   const visibleImages = images.slice(0, counts.visibleCount);
   return (
-    <div data-chat-composer-resting-images="true" className="flex shrink-0 items-center gap-1 ps-1">
+    <div
+      data-chat-composer-resting-images="true"
+      className="ade-touch-row ade-touch-row--gap-1 flex shrink-0 items-center gap-1 ps-1"
+    >
       {visibleImages.map((image) => (
         <button
           key={image.id}
           type="button"
-          className="relative size-7 shrink-0 cursor-zoom-in overflow-hidden rounded-md border border-border/70 bg-muted/60"
+          className="ade-touch-target ade-touch-target--bordered relative size-7 shrink-0 cursor-zoom-in rounded-md border border-border/70 bg-muted/60"
           aria-label={`预览 ${image.name}`}
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => {
@@ -491,44 +494,46 @@ export function ComposerRestingImagePreviews({
             if (preview) onExpandImage(preview);
           }}
         >
-          {image.previewUrl ? (
-            <ComposerImageThumbnail
-              file={image.file}
-              alt=""
-              className="size-full object-cover"
-              fallback={
-                isHeicImageFile({ name: image.name, type: image.mimeType }) ? (
-                  <AttachmentImage
-                    name={image.name}
-                    mimeType={image.mimeType}
-                    src={image.previewUrl}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <PierreEntryIcon
-                    pathValue={image.name}
-                    kind="file"
-                    theme={resolvedTheme}
-                    className="m-auto size-3.5"
-                  />
-                )
-              }
-            />
-          ) : (
-            <PierreEntryIcon
-              pathValue={image.name}
-              kind="file"
-              theme={resolvedTheme}
-              className="m-auto size-3.5"
-            />
-          )}
+          <span className="flex size-full items-center justify-center overflow-hidden rounded-[inherit]">
+            {image.previewUrl ? (
+              <ComposerImageThumbnail
+                file={image.file}
+                alt=""
+                className="size-full object-cover"
+                fallback={
+                  isHeicImageFile({ name: image.name, type: image.mimeType }) ? (
+                    <AttachmentImage
+                      name={image.name}
+                      mimeType={image.mimeType}
+                      src={image.previewUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <PierreEntryIcon
+                      pathValue={image.name}
+                      kind="file"
+                      theme={resolvedTheme}
+                      className="m-auto size-3.5"
+                    />
+                  )
+                }
+              />
+            ) : (
+              <PierreEntryIcon
+                pathValue={image.name}
+                kind="file"
+                theme={resolvedTheme}
+                className="m-auto size-3.5"
+              />
+            )}
+          </span>
         </button>
       ))}
       {counts.overflowCount > 0 ? (
         <button
           type="button"
-          className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-muted/60 font-medium text-secondary-label text-xs tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+          className="ade-touch-target ade-touch-target--bordered flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/70 bg-muted/60 font-medium text-secondary-label text-xs tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
           aria-label={`显示另外 ${String(counts.overflowCount)} 张图片附件`}
           onPointerDown={(event) => event.preventDefault()}
           onClick={onShowMore}

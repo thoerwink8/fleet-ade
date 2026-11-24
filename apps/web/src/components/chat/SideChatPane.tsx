@@ -143,18 +143,20 @@ export default function SideChatPane(props: {
             {bringBackBlockedReason ?? "把这段侧聊附加到主会话的下一条消息中。"}
           </TooltipPopup>
         </Tooltip>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label="删除侧聊"
-          disabled={!canOperate || shell === null || deleting}
-          onClick={() => void deleteSideChat()}
-        >
-          <Trash2Icon />
-        </Button>
-        <Button variant="ghost" size="icon-xs" aria-label="关闭侧聊" onClick={props.onClose}>
-          <XIcon />
-        </Button>
+        <span className="ade-touch-row ade-touch-row--gap-3 flex items-center gap-1 pointer-coarse:gap-3">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="删除侧聊"
+            disabled={!canOperate || shell === null || deleting}
+            onClick={() => void deleteSideChat()}
+          >
+            <Trash2Icon />
+          </Button>
+          <Button variant="ghost" size="icon-xs" aria-label="关闭侧聊" onClick={props.onClose}>
+            <XIcon />
+          </Button>
+        </span>
       </div>
       {shell === null ? (
         snapshotLoaded ? (

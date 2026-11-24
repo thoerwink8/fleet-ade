@@ -72,7 +72,7 @@ export function HtmlRenderDialog(props: {
           </div>
           <div className="mt-2 flex min-w-0 items-center justify-center gap-3 text-xs text-white/80">
             <span className="truncate">{title}</span>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="ade-touch-row ade-touch-row--gap-3 flex shrink-0 items-center gap-1 pointer-coarse:gap-3">
               <Button
                 aria-label="缩小"
                 size="icon-sm"
