@@ -20,6 +20,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { AsyncResult, Atom } from "effect/reactivity";
 
+import { appAtomRegistry } from "../rpc/atomRegistry";
 import { formatEnvironmentQueryError } from "./query";
 import { terminalEnvironment } from "./terminal";
 import { environmentSession, sessionHasScope, useEnvironmentScope } from "./session";
@@ -237,4 +238,27 @@ export function useThreadRunningTerminalIds(input: {
 }): ReadonlyArray<string> {
   const sessions = useKnownTerminalSessions(input);
   return selectRunningSubprocessTerminalIds(sessions ?? []);
+}
+
+/** `running` is null when the terminal list has not loaded, so nothing says the terminal is idle. */
+export function resolveTerminalCloseTargets(
+  sessions: ReadonlyArray<KnownTerminalSession> | null,
+  terminals: ReadonlyArray<{ readonly terminalId: string; readonly label: string }>,
+): ReadonlyArray<{ readonly label: string; readonly running: boolean | null }> {
+  const runningIds =
+    sessions === null ? null : new Set(selectRunningSubprocessTerminalIds(sessions));
+  return terminals.map(({ terminalId, label }) => ({
+    label,
+    running: runningIds === null ? null : runningIds.has(terminalId),
+  }));
+}
+
+export function readTerminalCloseTargets(
+  threadRef: { readonly environmentId: EnvironmentId; readonly threadId: ThreadId },
+  terminals: ReadonlyArray<{ readonly terminalId: string; readonly label: string }>,
+) {
+  return resolveTerminalCloseTargets(
+    appAtomRegistry.get(knownTerminalSessionsAtom(threadRef.environmentId, threadRef.threadId)),
+    terminals,
+  );
 }

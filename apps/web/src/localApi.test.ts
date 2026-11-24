@@ -20,6 +20,7 @@ vi.mock("./contextMenuFallback", () => ({
 
 vi.mock("./confirmDialog", () => ({
   requestConfirmDialog: requestConfirmDialogMock,
+  requestConfirmDialogWithCheckbox: vi.fn(),
 }));
 
 function createLocalStorageStub(): Storage {
@@ -69,6 +70,11 @@ describe("LocalApi", () => {
     requestConfirmDialogMock.mockReturnValue(undefined);
     const { createLocalApi } = await import("./localApi");
 
-    await expect(createLocalApi().dialogs.confirm("Delete this thread?")).resolves.toBe(false);
+    await expect(
+      createLocalApi().dialogs.confirm("Delete this thread?", {
+        title: "删除这个会话？",
+        confirmLabel: "删除",
+      }),
+    ).resolves.toBe(false);
   });
 });

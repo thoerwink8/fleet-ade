@@ -1,0 +1,52 @@
+[data-slot="select-trigger"] {
+  user-select: none;
+}
+
+[data-slot="select-trigger"]:not(.fa-select--ghost) {
+  color: var(--fa-fg);
+}
+
+[data-slot="select-trigger"]:focus-visible {
+  outline: var(--fa-bw-focus) solid var(--fa-focus-ring);
+  outline-offset: var(--fa-bw-focus);
+}
+
+[data-slot="select-trigger"]:is([data-disabled], [aria-disabled="true"]) {
+  opacity: 1;
+  color: var(--fa-fg-muted);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* The library paints an accent border on every open select; ghost stays borderless. */
+[data-slot="select-trigger"].fa-select--ghost[aria-expanded="true"] {
+  border-color: transparent;
+}
+
+/* Palettes point --fa-hover at the accent surface. Item highlight stays a neutral wash. */
+[data-slot="select-item"] {
+  --fa-hover: color-mix(in srgb, var(--fa-fg) 5%, transparent);
+}
+
+[data-slot="select-item"]:not([data-selected]) .tick {
+  visibility: hidden;
+}
+
+/* The highlight fill marks the row. An outside ring is clipped by the popup scroller. */
+[data-slot="select-item"]:focus-visible {
+  outline: none;
+}
+
+@media (pointer: coarse) {
+  [data-slot="select-trigger"] {
+    position: relative;
+  }
+
+  /* Ghost is 28px, so the inset follows the trigger. --fa-ctrl would stop it at 40px. */
+  [data-slot="select-trigger"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block: calc((100% - 44px) / 2);
+  }
+}

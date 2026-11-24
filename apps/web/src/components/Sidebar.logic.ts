@@ -618,10 +618,6 @@ export async function deleteSelectedThreadEntries<
   return { deletedThreadKeys, firstFailure };
 }
 
-export function batchDeleteConfirmText(count: number): string {
-  return [`删除 ${count} 个会话？`, "删除不可恢复。", "想留着的请改用归档。"].join("\n");
-}
-
 function batchItemFailureLines(
   items: ReadonlyArray<{ readonly status: string; readonly title: string }>,
 ): string[] {

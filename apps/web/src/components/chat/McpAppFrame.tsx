@@ -1,4 +1,4 @@
-import type { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
+import type { ConfirmDialogOptions, EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import {
   makeMcpAppHost,
   McpAppHostRefusal,
@@ -255,9 +255,12 @@ export function McpAppFrame(props: {
       };
     };
     // Return inline so approvals stay visible above the app.
-    const ask = async (message: string) => {
+    const ask = async (
+      message: string,
+      copy: Pick<ConfirmDialogOptions, "title" | "confirmLabel">,
+    ) => {
       flushSync(() => setDisplayMode("inline"));
-      const approved = await requestConfirmDialog(message);
+      const approved = await requestConfirmDialog(message, copy);
       if (approved === undefined) {
         throw new McpAppHostRefusal({ message: "Fleet ADE 无法在这里请求批准。" });
       }
@@ -283,6 +286,7 @@ export function McpAppFrame(props: {
         if (!info.value.readOnly) {
           const approved = await ask(
             `Allow ${app.server} to run ${info.value.title ?? name}?\n${JSON.stringify(args, null, 2)}`,
+            { title: "允许这个应用运行工具？", confirmLabel: "允许" },
           );
           if (approved !== true) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
         }
@@ -311,7 +315,10 @@ export function McpAppFrame(props: {
       sendMessage: async (text) => {
         const send = readLive().props.onSendMessage;
         if (send === undefined) throw new McpAppHostRefusal({ message: "这里没有消息。" });
-        const approved = await ask(`Send this message from ${app.server}?\n${text}`);
+        const approved = await ask(`Send this message from ${app.server}?\n${text}`, {
+          title: "让这个应用代你发送消息？",
+          confirmLabel: "发送",
+        });
         if (approved !== true) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
         await send(text);
       },
@@ -346,7 +353,10 @@ export function McpAppFrame(props: {
       },
       downloadFile: async (files) => {
         const names = files.map((file) => file.name).join(", ");
-        const approved = await ask(`要保存来自 ${names} 的 ${app.server} 吗？`);
+        const approved = await ask(`${app.server} 想把 ${names} 保存到这台设备。`, {
+          title: "保存应用提供的文件？",
+          confirmLabel: "保存",
+        });
         if (approved !== true) throw new McpAppHostRefusal({ message: "用户已拒绝。" });
         for (const file of files) {
           let bytes: Uint8Array | undefined;

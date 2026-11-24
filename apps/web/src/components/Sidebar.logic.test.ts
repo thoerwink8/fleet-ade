@@ -9,7 +9,6 @@ import {
   shouldCreateNewThreadInCurrentProject,
   deleteSelectedThreadEntries,
   applyThreadBatch,
-  batchDeleteConfirmText,
   getFallbackThreadIdAfterDelete,
   attentionDismissVisitedAt,
   hasUnseenCompletion,
@@ -160,7 +159,6 @@ describe("applyThreadBatch", () => {
           },
         }),
     });
-    expect(batchDeleteConfirmText(2)).toBe("删除 2 个会话？\n删除不可恢复。\n想留着的请改用归档。");
     expect([...outcome.prunedKeys]).toEqual(["idle-key"]);
     expect(outcome.failures).toEqual(["Running 正在跑，未删除"]);
   });

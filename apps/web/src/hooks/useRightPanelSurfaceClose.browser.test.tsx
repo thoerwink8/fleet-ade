@@ -7,13 +7,13 @@ import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useRightPanelSurfaceClose } from "./useRightPanelSurfaceClose";
 
 const fixture = vi.hoisted(() => ({
-  confirm: (_labels: readonly string[]): Promise<boolean> => Promise.resolve(false),
+  confirm: (_targets: readonly unknown[]): Promise<boolean> => Promise.resolve(false),
   allowed: new Set<string>(),
   sessions: new Map<string, string>(),
   failClose: false,
 }));
 vi.mock("../lib/terminalCloseConfirm", () => ({
-  confirmTerminalClose: (labels: readonly string[]) => fixture.confirm(labels),
+  confirmTerminalClose: (targets: readonly unknown[]) => fixture.confirm(targets),
 }));
 vi.mock("../state/session", () => ({
   useEnvironmentScope: (id: string) => fixture.allowed.has(id),
@@ -24,7 +24,10 @@ vi.mock("../state/entities", () => ({
   useProject: () => null,
   readThreadShell: () => null,
 }));
-vi.mock("../state/terminalSessions", () => ({ useKnownTerminalSessions: () => null }));
+vi.mock("../state/terminalSessions", () => ({
+  useKnownTerminalSessions: () => null,
+  readTerminalCloseTargets: () => [],
+}));
 vi.mock("../composerDraftStore", async () => {
   const Schema = await import("effect/Schema");
   return {

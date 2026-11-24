@@ -835,8 +835,8 @@ function DiagnosticsSettingsBody() {
       let confirmed = false;
       try {
         confirmed = await ensureLocalApi().dialogs.confirm(
-          `向进程 ${pid} 发送 SIGKILL？进程无法拦截此信号。`,
-          { variant: "destructive" },
+          "进程会被立刻终止且无法拦截，它里面未保存的数据会丢失。",
+          { title: `强制结束进程 ${pid}？`, confirmLabel: "强制结束", variant: "destructive" },
         );
       } catch (error) {
         clearSignaling();

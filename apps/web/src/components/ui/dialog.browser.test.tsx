@@ -3,7 +3,11 @@ import { createRef } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
-import { requestConfirmDialog, resetConfirmDialogForTests } from "~/confirmDialog";
+import {
+  requestConfirmDialog,
+  requestConfirmDialogWithCheckbox,
+  resetConfirmDialogForTests,
+} from "~/confirmDialog";
 import "~/index.css";
 import { act, render } from "../../../test/render";
 import { ConfirmDialogHost } from "../ConfirmDialogHost";
@@ -26,16 +30,94 @@ useMode(modeRgb);
 useMode(modeOklch);
 const toRgb = converter("rgb");
 
+describe("confirm dialog host", () => {
+  it.each([
+    {
+      name: "a destructive delete",
+      message: "它的所有消息会被永久删除，无法恢复。",
+      options: { title: "删除这个会话？", confirmLabel: "删除", variant: "destructive" },
+    },
+    {
+      name: "a plain action",
+      message: "之后可以取消归档。",
+      options: { title: "归档这个会话？", confirmLabel: "归档" },
+    },
+    {
+      name: "a renamed cancel",
+      message: "会话已经删除。",
+      options: {
+        title: "同时删除这个工作树？",
+        confirmLabel: "删除工作树",
+        cancelLabel: "保留工作树",
+        variant: "destructive",
+      },
+    },
+  ] as const)(
+    "shows the caller's title and button text for $name and cancels without confirming",
+    async ({ message, options }) => {
+      resetConfirmDialogForTests();
+      await using _screen = await render(<ConfirmDialogHost />);
+      let confirmation: Promise<boolean> | undefined;
+      await act(() => {
+        confirmation = requestConfirmDialog(message, options);
+      });
+      const cancelLabel = "cancelLabel" in options ? options.cancelLabel : "取消";
+
+      await expect.element(page.getByRole("alertdialog")).toBeVisible();
+      const dialogText = page.getByRole("alertdialog").element().textContent;
+      expect(dialogText).toContain(options.title);
+      expect(dialogText).toContain(message);
+      await expect
+        .element(page.getByRole("button", { name: options.confirmLabel, exact: true }))
+        .toBeVisible();
+      await expect
+        .element(page.getByRole("button", { name: cancelLabel, exact: true }))
+        .toHaveFocus();
+      await userEvent.click(page.getByRole("button", { name: cancelLabel, exact: true }));
+      await expect(confirmation).resolves.toBe(false);
+    },
+  );
+
+  it("treats Escape as cancel and returns the checkbox state with a confirmation", async () => {
+    resetConfirmDialogForTests();
+    await using _screen = await render(<ConfirmDialogHost />);
+    let escaped: Promise<{ confirmed: boolean; checked: boolean }> | undefined;
+    await act(() => {
+      escaped = requestConfirmDialogWithCheckbox("会丢失改动。", {
+        title: "删除这个会话？",
+        confirmLabel: "删除",
+        variant: "destructive",
+        checkbox: { label: "同时删除它的工作树" },
+      });
+    });
+    await userEvent.click(page.getByRole("checkbox", { name: "同时删除它的工作树" }));
+    await userEvent.keyboard("{Escape}");
+    await expect(escaped).resolves.toEqual({ confirmed: false, checked: true });
+
+    let confirmed: Promise<{ confirmed: boolean; checked: boolean }> | undefined;
+    await act(() => {
+      confirmed = requestConfirmDialogWithCheckbox("会丢失改动。", {
+        title: "删除这个会话？",
+        confirmLabel: "删除",
+        variant: "destructive",
+        checkbox: { label: "同时删除它的工作树" },
+      });
+    });
+    await userEvent.click(page.getByRole("button", { name: "删除", exact: true }));
+    await expect(confirmed).resolves.toEqual({ confirmed: true, checked: false });
+  });
+});
+
 describe("dialog initial focus", () => {
   it.each([
-    { label: "generic", options: undefined, focused: "取消", confirmed: false },
+    { label: "generic", options: {}, focused: "取消", confirmed: false },
     {
       label: "destructive opt-in",
       options: { variant: "destructive", initialFocus: "confirm" },
       focused: "取消",
       confirmed: false,
     },
-    { label: "opt-in", options: { initialFocus: "confirm" }, focused: "确认", confirmed: true },
+    { label: "opt-in", options: { initialFocus: "confirm" }, focused: "继续", confirmed: true },
   ] as const)(
     "focuses $focused for a $label confirmation",
     async ({ options, focused, confirmed }) => {
@@ -43,7 +125,11 @@ describe("dialog initial focus", () => {
       await using _screen = await render(<ConfirmDialogHost />);
       let confirmation: Promise<boolean> | undefined;
       await act(() => {
-        confirmation = requestConfirmDialog("Continue?", options);
+        confirmation = requestConfirmDialog("Continue?", {
+          title: "继续吗？",
+          confirmLabel: "继续",
+          ...options,
+        });
       });
 
       await expect.element(page.getByRole("button", { name: focused, exact: true })).toHaveFocus();

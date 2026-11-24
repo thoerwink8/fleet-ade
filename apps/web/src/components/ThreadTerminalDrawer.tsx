@@ -77,7 +77,7 @@ import { confirmTerminalClose } from "~/lib/terminalCloseConfirm";
 import { useClientSettings } from "../hooks/useSettings";
 import { getFileMetadataQueryAtom } from "../hooks/useFileMetadata";
 import { FileMetadataThreadContext } from "../hooks/FileMetadataThreadProvider";
-import { attachedTerminalSessionAtom } from "../state/terminalSessions";
+import { attachedTerminalSessionAtom, readTerminalCloseTargets } from "../state/terminalSessions";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { serverEnvironment } from "../state/server";
 import { readEnvironmentScope } from "../state/session";
@@ -1539,11 +1539,13 @@ export default function ThreadTerminalDrawer({
   const confirmCloseTerminal = (terminalId: string) => {
     if (!canOperateTerminal) return;
     const label = terminalLabelById.get(terminalId) ?? getTerminalLabel(terminalId);
-    void confirmTerminalClose([label]).then((confirmed) => {
-      if (confirmed && readEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope)) {
-        onCloseTerminal(terminalId, threadRef);
-      }
-    });
+    void confirmTerminalClose(readTerminalCloseTargets(threadRef, [{ terminalId, label }])).then(
+      (confirmed) => {
+        if (confirmed && readEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope)) {
+          onCloseTerminal(terminalId, threadRef);
+        }
+      },
+    );
   };
 
   const handleResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {

@@ -43,6 +43,8 @@ export type ThreadToastData = {
   onClose?: (() => void) | undefined;
   dismissAfterVisibleMs?: number;
   hideCopyButton?: boolean;
+  /** Tells apart errors that share a title and wording but are not the same failure (e.g. two sessions). */
+  dedupeKey?: string;
   additionalActions?: ReadonlyArray<{
     id: string;
     props: ComponentPropsWithoutRef<"button">;
@@ -79,7 +81,10 @@ type ToastManagerEvent = Parameters<ToastManagerListener>[0];
  * durations: action toasts get ACTION_TOAST_DEFAULT_TIMEOUT_MS, the rest inherit the
  * provider timeout. An explicit per-toast `timeout` always wins.
  */
-function createBufferedToastManager(): BaseToastManager {
+// Open error toasts by failure key. Toasts() prunes it against the live list, since an unmounted provider drops its toasts silently.
+const openErrorToastIds = new Map<string, string>();
+
+function createBufferedToastManager(dedupeErrors: boolean): BaseToastManager {
   const manager = Toast.createToastManager<ThreadToastData>();
   const listeners = new Set<ToastManagerListener>();
   const pending: ToastManagerEvent[] = [];
@@ -93,10 +98,39 @@ function createBufferedToastManager(): BaseToastManager {
   return {
     ...manager,
     add(options) {
-      const timeout =
-        options.timeout ??
-        (hasVisibleToastAction(options.actionProps) ? ACTION_TOAST_DEFAULT_TIMEOUT_MS : undefined);
-      return manager.add(timeout === undefined ? options : { ...options, timeout });
+      const timeout = resolveToastTimeout(options);
+      const resolved = timeout === undefined ? options : { ...options, timeout };
+      if (!dedupeErrors || resolved.type !== "error" || typeof resolved.title !== "string") {
+        return manager.add(resolved);
+      }
+      // The same failure again (same title, session and wording) replaces the open one, so repeats
+      // do not pile up. A different wording is a different failure, e.g. another computer or session.
+      const key = JSON.stringify([
+        resolved.title,
+        resolved.data?.threadRef?.environmentId ?? null,
+        resolved.data?.threadRef?.threadId ?? resolved.data?.threadId ?? null,
+        typeof resolved.description === "string" ? resolved.description : null,
+        resolved.data?.dedupeKey ?? null,
+      ]);
+      const tracked = {
+        ...resolved,
+        onClose: () => {
+          openErrorToastIds.delete(key);
+          resolved.onClose?.();
+        },
+        onRemove: () => {
+          openErrorToastIds.delete(key);
+          resolved.onRemove?.();
+        },
+      };
+      const openId = openErrorToastIds.get(key);
+      if (openId !== undefined) {
+        manager.update(openId, tracked);
+        return openId;
+      }
+      const id = manager.add(tracked);
+      openErrorToastIds.set(key, id);
+      return id;
     },
     update(id, updates) {
       // `never` collapses the per-toast data generic our wrapper does not read.
@@ -116,21 +150,43 @@ function createBufferedToastManager(): BaseToastManager {
 
 const ACTION_TOAST_DEFAULT_TIMEOUT_MS = 8_000;
 const TOAST_DEFAULT_TIMEOUT_MS = 4_000;
+/** Base UI keeps a toast with timeout 0 until someone closes or replaces it. */
+const TOAST_STICKY_TIMEOUT_MS = 0;
 
-function withResolvedTimeout<
-  T extends { readonly timeout?: number | undefined; readonly actionProps?: unknown },
->(prevToast: { readonly timeout?: number | undefined }, updates: T): T {
-  if (updates.timeout !== undefined || prevToast.timeout !== undefined) {
-    return updates;
-  }
-  if (!hasVisibleToastAction(updates.actionProps)) {
-    return updates;
-  }
-  return { ...updates, timeout: ACTION_TOAST_DEFAULT_TIMEOUT_MS };
+type ToastTimeoutInput = {
+  readonly timeout?: number | undefined;
+  readonly type?: string | undefined;
+  readonly actionProps?: unknown;
+};
+
+// An error stays until dismissed or replaced; the rest time out, longer when they carry an action.
+function resolveToastTimeout(toast: ToastTimeoutInput): number | undefined {
+  if (toast.timeout !== undefined) return toast.timeout;
+  if (toast.type === "error") return TOAST_STICKY_TIMEOUT_MS;
+  return hasVisibleToastAction(toast.actionProps) ? ACTION_TOAST_DEFAULT_TIMEOUT_MS : undefined;
 }
 
-const toastManager = createBufferedToastManager();
-const anchoredToastManager = createBufferedToastManager();
+function withResolvedTimeout<T extends ToastTimeoutInput>(
+  prevToast: ToastTimeoutInput,
+  updates: T,
+): T {
+  if (updates.timeout !== undefined) return updates;
+  const prevStickyError =
+    prevToast.type === "error" && prevToast.timeout === TOAST_STICKY_TIMEOUT_MS;
+  if (prevToast.timeout !== undefined && !prevStickyError) return updates;
+  const timeout = resolveToastTimeout({
+    type: updates.type ?? prevToast.type,
+    actionProps: updates.actionProps,
+  });
+  if (timeout !== undefined) return { ...updates, timeout };
+  // An error that turns into something else gives up its sticky timeout.
+  return prevStickyError && updates.type !== undefined
+    ? { ...updates, timeout: TOAST_DEFAULT_TIMEOUT_MS }
+    : updates;
+}
+
+const toastManager = createBufferedToastManager(true);
+const anchoredToastManager = createBufferedToastManager(false);
 type ToastId = ReturnType<typeof toastManager.add>;
 const threadToastVisibleTimeoutRemainingMs = new Map<ToastId, number>();
 
@@ -625,6 +681,9 @@ function Toasts({ position }: { position: ToastPosition }) {
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- prunes the module-level remaining-time map of toasts the manager has dropped
   useEffect(() => {
     const activeToastIds = new Set(toasts.map((toast) => toast.id));
+    for (const [key, toastId] of openErrorToastIds) {
+      if (!activeToastIds.has(toastId)) openErrorToastIds.delete(key);
+    }
     for (const toastId of threadToastVisibleTimeoutRemainingMs.keys()) {
       if (!activeToastIds.has(toastId)) {
         threadToastVisibleTimeoutRemainingMs.delete(toastId);

@@ -577,7 +577,23 @@ export interface DesktopBridge {
 
 export type ConfirmDialogVariant = "default" | "destructive";
 
+export interface ConfirmDialogCheckbox {
+  readonly label: string;
+  readonly defaultChecked?: boolean;
+}
+
+export interface ConfirmDialogChoice {
+  readonly confirmed: boolean;
+  readonly checked: boolean;
+}
+
 export interface ConfirmDialogOptions {
+  /** One concrete question, e.g. “删除这个会话？”. */
+  readonly title: string;
+  /** The verb the confirm button performs, e.g. “删除”. */
+  readonly confirmLabel: string;
+  /** Defaults to “取消”; name the alternative when cancelling is not a no-op. */
+  readonly cancelLabel?: string;
   readonly variant?: ConfirmDialogVariant;
   /** Which button takes focus on open. Defaults to Cancel; destructive confirms always keep Cancel. */
   readonly initialFocus?: "confirm" | "cancel";
@@ -586,7 +602,13 @@ export interface ConfirmDialogOptions {
 export interface LocalApi {
   dialogs: {
     pickFolder: (options?: PickFolderOptions) => Promise<string | null>;
-    confirm: (message: string, options?: ConfirmDialogOptions) => Promise<boolean>;
+    /** `message` is the body: what happens and whether it can be undone. */
+    confirm: (message: string, options: ConfirmDialogOptions) => Promise<boolean>;
+    /** Like `confirm`, with one checkbox whose state comes back with the answer. */
+    confirmWithCheckbox: (
+      message: string,
+      options: ConfirmDialogOptions & { readonly checkbox: ConfirmDialogCheckbox },
+    ) => Promise<ConfirmDialogChoice>;
   };
   shell: {
     openExternal: (url: string) => Promise<void>;

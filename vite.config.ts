@@ -76,7 +76,7 @@ const RESTRICTED_UI_VARIANT_PATTERNS = [
     group: ["**/components/ui/*", "**/ui/*", "./ui/*"],
     importNames: ["buttonVariants", "toggleVariants", "badgeVariants", "selectTriggerVariants"],
     message:
-      "Render the components/ui export instead of borrowing its class recipe (render={<Button …/>}, SelectButton, ToggleGroup).",
+      "Render the components/ui export instead of borrowing its class recipe (render={<Button …/>}, ToggleGroup).",
   },
   {
     group: ["@fleet/design/react", "@fleet/design/react/*"],
