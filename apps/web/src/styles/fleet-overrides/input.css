@@ -8,7 +8,7 @@
 }
 
 .fa-input[data-size="lg"]:not(textarea) {
-  height: 34px;
+  height: var(--fa-ctrl-lg);
 }
 
 /* Grouped frames grow with their content: callers force inner input heights (for example h-9 sm:h-8), and the frame must wrap them instead of clipping them. */
@@ -22,40 +22,47 @@
   min-height: var(--fa-ctrl-sm);
 }
 
+.fa-input--group:has([data-size="lg"]) {
+  min-height: var(--fa-ctrl-lg);
+}
+
 .fa-input--group .fa-input__control {
   height: auto;
   align-self: stretch;
 }
 
-/* Narrow viewports (< 640px / sm) keep taller touch-friendly heights without shrinking mobile controls. */
+/* Narrow viewports (< 640px / sm) keep taller touch-friendly heights on the 4px grid. */
 @media (max-width: 639.98px) {
   .fa-input:not(textarea):not(.fa-input--group) {
-    height: 34px;
+    height: 36px;
   }
   .fa-input[data-size="sm"]:not(textarea) {
-    height: 30px;
+    height: var(--fa-ctrl);
   }
   .fa-input[data-size="compact"]:not(textarea) {
-    height: 28px;
+    height: var(--fa-ctrl-sm);
   }
   .fa-input[data-size="lg"]:not(textarea) {
-    height: 38px;
+    height: var(--fa-ctrl-lg);
   }
   .fa-input--group {
-    min-height: 34px;
+    min-height: 36px;
   }
   .fa-input--group:has([data-size="sm"]) {
-    min-height: 30px;
+    min-height: var(--fa-ctrl);
   }
   .fa-input--group:has([data-size="compact"]) {
-    min-height: 28px;
+    min-height: var(--fa-ctrl-sm);
+  }
+  .fa-input--group:has([data-size="lg"]) {
+    min-height: var(--fa-ctrl-lg);
   }
 }
 
 /* Textarea adopts .fa-input surface/border/focus/invalid/disabled rules while growing with content. */
 textarea.fa-input {
   height: auto;
-  min-height: 70px;
+  min-height: 72px;
   max-height: calc(var(--spacing) * 64);
   padding: calc(var(--spacing) * 1.5 - 1px) calc(var(--spacing) * 3 - 1px);
   field-sizing: content;
@@ -63,24 +70,24 @@ textarea.fa-input {
 }
 
 textarea.fa-input[data-size="sm"] {
-  min-height: 66px;
+  min-height: 68px;
   padding: calc(var(--spacing) * 1 - 1px) calc(var(--spacing) * 2.5 - 1px);
 }
 
 textarea.fa-input[data-size="lg"] {
-  min-height: 74px;
+  min-height: 76px;
   padding: calc(var(--spacing) * 2 - 1px) calc(var(--spacing) * 3 - 1px);
 }
 
 @media (max-width: 639.98px) {
   textarea.fa-input {
-    min-height: 82px;
+    min-height: 84px;
   }
   textarea.fa-input[data-size="sm"] {
-    min-height: 78px;
+    min-height: 80px;
   }
   textarea.fa-input[data-size="lg"] {
-    min-height: 86px;
+    min-height: 88px;
   }
 }
 .fa-input--group:has(textarea),
@@ -102,7 +109,7 @@ textarea.fa-input[data-size="lg"] {
 
 .fa-input--group textarea {
   padding: calc(var(--spacing) * 3 - 1px) calc(var(--spacing) * 3 - 1px);
-  min-height: 82px;
+  min-height: 84px;
   max-height: calc(var(--spacing) * 64);
   field-sizing: content;
   resize: none;
@@ -111,7 +118,7 @@ textarea.fa-input[data-size="lg"] {
 
 @media (max-width: 639.98px) {
   .fa-input--group textarea {
-    min-height: 94px;
+    min-height: 96px;
   }
 }
 

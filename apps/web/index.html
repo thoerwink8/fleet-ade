@@ -6,26 +6,26 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#18181b" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       (() => {
         const LIGHT_BACKGROUND = "#ffffff";
-        const DARK_BACKGROUND = "#000000";
+        const DARK_BACKGROUND = "#18181b";
         const THEME_FOLLOW_SYSTEM_STORAGE_KEY = "t3code:theme-follow-system";
         const THEME_APPEARANCE_MODE_STORAGE_KEY = "t3code:theme-appearance-mode";
         const SPLASH_COLORS = {
           light: {
             background: "#ffffff",
-            foreground: "#262626",
-            accent: "#4f46e5",
+            foreground: "#1b1b1f",
+            accent: "#2c5bd8",
           },
           dark: {
-            background: "#000000",
-            foreground: "#f5f5f5",
-            accent: "#818cf8",
+            background: "#18181b",
+            foreground: "#ececee",
+            accent: "#7c9cf5",
           },
         };
         // Keep this small boot-time copy in sync with the built-in palettes so
@@ -154,15 +154,15 @@
       }
 
       body {
-        background: #ffffff;
-        color: #262626;
+        background: var(--app-chrome-background, #ffffff);
+        color: var(--contrast-foreground, #1b1b1f);
         font-family:
           -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
       }
 
       html.dark body {
-        background: #000000;
-        color: #f5f5f5;
+        background: var(--app-chrome-background, #18181b);
+        color: var(--contrast-foreground, #ececee);
       }
 
       #boot-shell {
@@ -181,22 +181,6 @@
         color: var(--boot-foreground);
       }
 
-      #boot-shell-card {
-        position: relative;
-        z-index: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 96px;
-        height: 96px;
-      }
-
-      #boot-shell-logo {
-        width: 64px;
-        height: 64px;
-        object-fit: contain;
-      }
-
       /* App CSS locks body and #root scrolling once main loads, so the error screen scrolls itself. */
       #boot-shell:has(> #boot-error) {
         height: 100%;
@@ -205,7 +189,7 @@
       }
 
       #boot-error {
-        --boot-error-fg: #262626;
+        --boot-error-fg: #1b1b1f;
         --boot-error-bg: #ffffff;
         --boot-error-line: color-mix(in srgb, currentColor 12%, transparent);
         display: flex;
@@ -219,10 +203,9 @@
       }
 
       html.dark #boot-error {
-        --boot-error-fg: #f5f5f5;
-        --boot-error-bg: #000000;
+        --boot-error-fg: #ececee;
+        --boot-error-bg: #18181b;
       }
-
       html[data-theme-selected="true"] #boot-error {
         --boot-error-fg: var(--boot-foreground);
         --boot-error-bg: var(--boot-background);
@@ -402,11 +385,7 @@
   </head>
   <body>
     <div id="root">
-      <div id="boot-shell">
-        <div id="boot-shell-card" aria-label="Fleet ADE splash screen">
-          <img id="boot-shell-logo" src="/apple-touch-icon.png" alt="Fleet ADE" />
-        </div>
-      </div>
+      <div id="boot-shell"></div>
     </div>
     <script type="module" src="/src/bootstrap.ts"></script>
   </body>

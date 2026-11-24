@@ -214,8 +214,8 @@ describe("index.html boot script", () => {
       expect(boot.theme).toBe("dark");
       expect(boot.themeId).toBeUndefined();
       expect(boot.themeSelected).toBeUndefined();
-      expect(boot.backgroundColor).toBe("#000000");
-      expect(boot.metaContent).toBe("#000000");
+      expect(boot.backgroundColor).toBe("#18181b");
+      expect(boot.metaContent).toBe("#18181b");
     }
   });
 
@@ -228,5 +228,22 @@ describe("index.html boot script", () => {
     const dark = runBootScript({ storageThrows: true, prefersDark: true });
     expect(dark.isDark).toBe(true);
     expect(dark.theme).toBe("dark");
+  });
+
+  it("paints #18181b dark and #ffffff light initial boot shell rules matching --fa-bg without the old T3 icon", () => {
+    expect(bootScript).toContain('DARK_BACKGROUND = "#18181b"');
+    expect(bootScript).toContain('foreground: "#1b1b1f"');
+    expect(bootScript).toContain('foreground: "#ececee"');
+    expect(indexHtml).toContain("background: var(--app-chrome-background, #ffffff);");
+    expect(indexHtml).toContain("background: var(--app-chrome-background, #18181b);");
+    expect(indexHtml).toContain("color: var(--contrast-foreground, #1b1b1f);");
+    expect(indexHtml).toContain("color: var(--contrast-foreground, #ececee);");
+    expect(indexHtml).not.toContain('id="boot-shell-logo"');
+    const light = runBootScript({ storage: {}, prefersDark: false });
+    expect(light.backgroundColor).toBe("#ffffff");
+    expect(light.metaContent).toBe("#ffffff");
+    const dark = runBootScript({ storage: {}, prefersDark: true });
+    expect(dark.backgroundColor).toBe("#18181b");
+    expect(dark.metaContent).toBe("#18181b");
   });
 });

@@ -716,3 +716,84 @@ describe("sidebar thread settle", () => {
     expect(router.state.location.pathname).toBe("/local/thread-x");
   });
 });
+
+describe("sidebar current row neutral selection", () => {
+  it("uses neutral --fa-selected without a blue border and keeps hover and focus-visible distinct", async () => {
+    using stack = new DisposableStack();
+    const style = document.createElement("style");
+    style.textContent = appCss;
+    document.head.append(style);
+    stack.defer(() => style.remove());
+
+    const activeProject = project("active");
+    const threadCurrent = threadShell(activeProject.id, 0);
+    const threadOther = threadShell(activeProject.id, 1);
+    const currentRef: ScopedThreadRef = {
+      environmentId: activeProject.environmentId,
+      threadId: threadCurrent.id,
+    };
+    vi.mocked(useProjects).mockReturnValue([activeProject]);
+    vi.mocked(useQuietThreadShells).mockReturnValue([threadCurrent, threadOther]);
+    vi.mocked(useThreadRouteTarget).mockReturnValue({ kind: "server", threadRef: currentRef });
+    vi.mocked(useHandleNewThread).mockReturnValue({
+      activeDraftThread: null,
+      activeThread: null,
+      defaultProjectRef: {
+        environmentId: activeProject.environmentId,
+        projectId: activeProject.id,
+      },
+      defaultProjectFallbackReady: true,
+      handleNewThread: vi.fn().mockResolvedValue(null),
+      routeDraftId: null,
+      routeThreadRef: currentRef,
+    });
+
+    const root = document.documentElement;
+    stack.defer(() => {
+      root.classList.remove("dark");
+      delete root.dataset.theme;
+    });
+
+    await using screen = await render(
+      <SidebarProvider>
+        <Sidebar routeReveal={{ observedKey: null, pendingKey: null }} />
+      </SidebarProvider>,
+    );
+
+    const currentRow = screen.container.querySelector<HTMLElement>(
+      `[data-sidebar-row="${activeProject.environmentId}:${threadCurrent.id}"]`,
+    )!;
+    const otherRow = screen.container.querySelector<HTMLElement>(
+      `[data-sidebar-row="${activeProject.environmentId}:${threadOther.id}"]`,
+    )!;
+    const probe = document.createElement("div");
+    document.body.append(probe);
+    stack.defer(() => probe.remove());
+
+    for (const appearance of ["light", "dark"] as const) {
+      root.classList.toggle("dark", appearance === "dark");
+      root.dataset.theme = appearance;
+      probe.style.backgroundColor = "var(--fa-selected)";
+      const expectedSelectedBg = getComputedStyle(probe).backgroundColor;
+      const currentStyle = getComputedStyle(currentRow);
+      const otherStyle = getComputedStyle(otherRow);
+
+      expect(currentStyle.backgroundColor, `${appearance} current row bg`).toBe(expectedSelectedBg);
+      expect(currentStyle.borderTopColor, `${appearance} current row border`).toBe(
+        "rgba(0, 0, 0, 0)",
+      );
+      expect(otherStyle.backgroundColor, `${appearance} idle row bg`).toBe("rgba(0, 0, 0, 0)");
+      expect(currentStyle.backgroundColor).not.toBe(otherStyle.backgroundColor);
+    }
+
+    await userEvent.hover(currentRow);
+    expect(getComputedStyle(currentRow).backgroundImage).toContain("linear-gradient");
+
+    await userEvent.unhover(currentRow);
+    await userEvent.keyboard("{Tab}");
+    currentRow.focus();
+    await expect.element(currentRow).toHaveFocus();
+    expect(currentRow.matches(":focus-visible"), "keyboard focus ring marker").toBe(true);
+    expect(getComputedStyle(currentRow).boxShadow).not.toBe("none");
+  });
+});
