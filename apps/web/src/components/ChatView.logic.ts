@@ -908,18 +908,37 @@ export class RewindCancelledError extends Schema.TaggedError<RewindCancelledErro
 
 export const isRewindCancelledError = Schema.is(RewindCancelledError);
 
+/** The held rewind went away and nothing completed: queued and cancelled look the same. */
+class RewindNotCompletedError extends Schema.TaggedError<RewindNotCompletedError>()(
+  "RewindNotCompletedError",
+  {},
+) {
+  override get message(): string {
+    return "回退没有完成，可能已被取消。可以重新回退。";
+  }
+}
+
+/** Time a queued rollback gets to land once the held rewind is gone, before it counts as lost. */
+export const REWIND_SETTLE_MS = 5_000;
+/** Same, when files are restored too: that step is slower. */
+export const REWIND_SETTLE_WITH_FILES_MS = 30_000;
+
 /**
  * Waits for the `thread.stop-and-rollback` this client sent: completed id, this request's stored
- * failure, or `signal`. Once ended it listens to nothing, so a late outcome is ignored. No
- * deadline while the rewind is held for the run to stop; other stretches end at `timeoutMs`.
+ * failure, or `signal`. No deadline while held; once held then gone, `settleMs`; never held,
+ * `timeoutMs`. Once ended it listens to nothing.
  */
 export function waitForRollbackOutcome(
   threadRef: ScopedThreadRef,
   requestId: CommandId,
   send: () => Promise<void>,
-  options: { readonly signal?: AbortSignal; readonly timeoutMs?: number } = {},
+  options: {
+    readonly signal?: AbortSignal;
+    readonly timeoutMs?: number;
+    readonly settleMs?: number;
+  } = {},
 ): Promise<void> {
-  const { signal, timeoutMs = 120_000 } = options;
+  const { signal, timeoutMs = 120_000, settleMs = REWIND_SETTLE_MS } = options;
   const threadAtom = environmentThreadDetails.stateAtom(threadRef);
   return new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -935,15 +954,17 @@ export function waitForRollbackOutcome(
       else resolve();
     };
     const onAbort = () => finish(new RewindCancelledError());
+    let wasHeld = false;
     const armTimeout = (held: boolean) => {
       if (held) {
+        wasHeld = true;
         if (timeout !== undefined) globalThis.clearTimeout(timeout);
         timeout = undefined;
         return;
       }
-      timeout ??= globalThis.setTimeout(() => {
-        finish(new Error("等待会话回退超时。"));
-      }, timeoutMs);
+      timeout ??= wasHeld
+        ? globalThis.setTimeout(() => finish(new RewindNotCompletedError()), settleMs)
+        : globalThis.setTimeout(() => finish(new Error("等待会话回退超时。")), timeoutMs);
     };
     const inspect = () => {
       const projection = Option.getOrNull(appAtomRegistry.get(threadAtom).data);

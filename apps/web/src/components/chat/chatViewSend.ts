@@ -40,6 +40,8 @@ import {
   readFileAsDataUrl,
   prepareRevertedMessageAttachments,
   isRewindCancelledError,
+  REWIND_SETTLE_MS,
+  REWIND_SETTLE_WITH_FILES_MS,
   waitForRevertedMessage,
   waitForRollbackOutcome,
 } from "../ChatView.logic";
@@ -230,7 +232,10 @@ export async function rewindToMessage(input: {
           });
           if (result._tag === "Failure") throw squashAtomCommandFailure(result);
         },
-        { signal: stopAndRollback.signal },
+        {
+          signal: stopAndRollback.signal,
+          settleMs: input.restoreFiles ? REWIND_SETTLE_WITH_FILES_MS : REWIND_SETTLE_MS,
+        },
       );
     } else
       await waitForRevertedMessage(input.routeThreadRef, input.turnCount, commandId, async () => {

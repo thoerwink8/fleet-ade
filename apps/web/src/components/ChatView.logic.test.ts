@@ -1513,6 +1513,72 @@ describe("waitForRollbackOutcome", () => {
     await waiting;
   });
 
+  describe("when the held rewind disappears without a result", () => {
+    const held = { requestId, turnCount: 1, restoreFiles: false, requestedAt: now };
+    afterEach(() => vi.useRealTimers());
+
+    it("ends within the settle window instead of the long timeout, and says it did not finish", async () => {
+      vi.useFakeTimers();
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        settleMs: 5_000,
+      });
+      const result = waiting.then(
+        () => "completed",
+        (error: Error) => error.message,
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      setThread(handle, { pendingRollback: held });
+      // Another client cancels: the held rewind is simply gone.
+      setThread(handle, { pendingRollback: null });
+      await vi.advanceTimersByTimeAsync(4_999);
+      let outcome = "pending";
+      void result.then((value) => {
+        outcome = value;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(outcome).toBe("pending");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toBe("回退没有完成，可能已被取消。可以重新回退。");
+    });
+
+    it("still completes when the queued rollback lands inside the settle window", async () => {
+      vi.useFakeTimers();
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        settleMs: 5_000,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      setThread(handle, { pendingRollback: held });
+      setThread(handle, { pendingRollback: null });
+      await vi.advanceTimersByTimeAsync(2_000);
+      setThread(handle, { rollbackCompletedRequestId: requestId });
+      await expect(waiting).resolves.toBeUndefined();
+    });
+
+    it("keeps the long timeout when the rewind was never seen held", async () => {
+      vi.useFakeTimers();
+      projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        settleMs: 5_000,
+        timeoutMs: 120_000,
+      });
+      const result = waiting.then(
+        () => "completed",
+        (error: Error) => error.message,
+      );
+      await vi.advanceTimersByTimeAsync(119_999);
+      let outcome = "pending";
+      void result.then((value) => {
+        outcome = value;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(outcome).toBe("pending");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toBe("等待会话回退超时。");
+    });
+  });
+
   it("stops quietly when cancelled and ignores a completion that arrives later", async () => {
     const handle = projectionAtom();
     const controller = new AbortController();
