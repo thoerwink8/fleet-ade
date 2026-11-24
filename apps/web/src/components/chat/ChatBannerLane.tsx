@@ -43,6 +43,9 @@ interface LaneItem {
 export function ChatBannerLane(props: {
   environmentId: EnvironmentId;
   fleetEngineFailure: FleetEngineFailure | null;
+  fleetEngineRetrying?: boolean;
+  onRetryFleetEngine: () => void;
+  onOpenFleetConnectionsSettings: () => void;
   onDismissFleetEngineFailure: () => void;
   providerStatus: ServerProvider | null;
   providerStatusDismissalKey: string | null;
@@ -57,6 +60,9 @@ export function ChatBannerLane(props: {
 }) {
   const {
     fleetEngineFailure,
+    fleetEngineRetrying = false,
+    onRetryFleetEngine,
+    onOpenFleetConnectionsSettings,
     onDismissFleetEngineFailure,
     providerStatus,
     providerStatusDismissalKey,
@@ -80,10 +86,25 @@ export function ChatBannerLane(props: {
         <Alert variant="error" controlAlignment="first-line">
           <CircleAlertIcon />
           <AlertTitle>{fleetEngineFailure.title}</AlertTitle>
-          <AlertDescription>{fleetEngineFailure.description}</AlertDescription>
+          <AlertDescription>
+            <span>{fleetEngineFailure.description}</span>
+            <span className="ade-touch-row ade-touch-row--gap-2 flex flex-wrap items-center gap-2">
+              <Button
+                disabled={fleetEngineRetrying}
+                onClick={onRetryFleetEngine}
+                size="sm"
+                variant="secondary"
+              >
+                {fleetEngineRetrying ? "正在重试…" : "重试"}
+              </Button>
+              <Button onClick={onOpenFleetConnectionsSettings} size="sm" variant="ghost">
+                去 设置 → 连接 查看
+              </Button>
+            </span>
+          </AlertDescription>
           <AlertAction>
             <Button
-              aria-label="关闭引擎故障提示"
+              aria-label="关闭机群服务故障提示"
               onClick={onDismissFleetEngineFailure}
               size="icon-sm"
               variant="ghost-muted"

@@ -43,9 +43,25 @@ export interface ProviderInstanceEntry {
   readonly models: ReadonlyArray<ServerProviderModel>;
 }
 
-/** Disabled instances may retain ready status until reconciliation. */
+/** Disabled, uninstalled, unavailable, or logged-out instances are not ready for automatic selection. */
 export function isProviderInstancePickerReady(entry: ProviderInstanceEntry): boolean {
-  return entry.enabled && entry.isAvailable && entry.status === "ready";
+  return (
+    entry.enabled &&
+    entry.installed &&
+    entry.isAvailable &&
+    entry.status === "ready" &&
+    entry.snapshot.auth.status !== "unauthenticated"
+  );
+}
+
+function isProviderInstanceUsableForDefault(entry: ProviderInstanceEntry): boolean {
+  return (
+    entry.enabled &&
+    entry.installed &&
+    entry.isAvailable &&
+    entry.status !== "error" &&
+    entry.snapshot.auth.status !== "unauthenticated"
+  );
 }
 
 export function isProviderInstancePickerVisible(entry: ProviderInstanceEntry): boolean {
@@ -211,6 +227,16 @@ export function getDefaultProviderInstanceModel(
 const isSelectableProviderInstanceEntry = (entry: ProviderInstanceEntry): boolean =>
   entry.enabled && entry.isAvailable;
 
+const pickPreferredSelectableEntry = (
+  entries: ReadonlyArray<ProviderInstanceEntry>,
+): ProviderInstanceEntry | undefined =>
+  entries.find(
+    (entry) =>
+      isProviderInstancePickerReady(entry) && entry.snapshot.auth.status === "authenticated",
+  ) ??
+  entries.find(isProviderInstancePickerReady) ??
+  entries.find(isProviderInstanceUsableForDefault);
+
 export function resolveSelectableProviderInstanceEntry(
   entries: ReadonlyArray<ProviderInstanceEntry>,
   instanceId: ProviderInstanceId | undefined,
@@ -222,7 +248,7 @@ export function resolveSelectableProviderInstanceEntry(
     }
   }
   return (
-    entries.find(isProviderInstancePickerReady) ??
+    pickPreferredSelectableEntry(entries) ??
     entries.find((entry) => isSelectableProviderInstanceEntry(entry) && entry.status !== "error")
   );
 }
@@ -248,16 +274,53 @@ export function resolveDefaultProviderModelSelection(
 
 export function resolveProjectDefaultProviderModelSelection(
   providers: ReadonlyArray<ServerProvider>,
-  settings: ServerSettings,
+  settings: Pick<ServerSettings, "providerInstances" | "projectSettingsOverrides">,
   projectId: ProjectId | null,
 ): ModelSelection | null {
   const entries = providerInstanceEntriesFor(providers, settings, projectId);
-  // Matches resolveComposerProviderSelection: the first driver group wins before any other.
+  const firstDriverEntries = entries.filter(
+    (candidate) => candidate.driverKind === entries[0]?.driverKind,
+  );
+  // Matches resolveComposerProviderSelection: the first driver group wins when it has a usable agent.
   const entry =
-    resolveSelectableProviderInstanceEntry(
-      entries.filter((candidate) => candidate.driverKind === entries[0]?.driverKind),
-      undefined,
-    ) ?? resolveSelectableProviderInstanceEntry(entries, undefined);
+    pickPreferredSelectableEntry(firstDriverEntries) ??
+    pickPreferredSelectableEntry(entries) ??
+    resolveSelectableProviderInstanceEntry(firstDriverEntries, undefined) ??
+    resolveSelectableProviderInstanceEntry(entries, undefined);
   const model = entry ? getDefaultProviderInstanceModel(providers, entry.instanceId) : undefined;
   return entry && model ? { instanceId: entry.instanceId, model } : null;
+}
+
+export function resolveNewSessionDefaultModelSelection(input: {
+  readonly defaultSelection: ModelSelection | null;
+  readonly providers: ReadonlyArray<ServerProvider>;
+  readonly settings: Pick<ServerSettings, "providerInstances" | "projectSettingsOverrides">;
+  readonly projectId: ProjectId | null;
+}): ModelSelection | null {
+  if (input.providers.length === 0) {
+    return input.defaultSelection;
+  }
+  const entries = providerInstanceEntriesFor(input.providers, input.settings, input.projectId);
+  if (input.defaultSelection !== null) {
+    const requested = entries.find(
+      (entry) => entry.instanceId === input.defaultSelection?.instanceId,
+    );
+    if (requested && isProviderInstanceUsableForDefault(requested)) {
+      return input.defaultSelection;
+    }
+  }
+  const usableFallback = pickPreferredSelectableEntry(entries);
+  if (usableFallback) {
+    const model = getDefaultProviderInstanceModel(input.providers, usableFallback.instanceId);
+    if (model) {
+      return {
+        instanceId: usableFallback.instanceId,
+        model,
+      };
+    }
+  }
+  return (
+    input.defaultSelection ??
+    resolveProjectDefaultProviderModelSelection(input.providers, input.settings, input.projectId)
+  );
 }

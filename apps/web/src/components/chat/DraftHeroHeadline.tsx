@@ -52,7 +52,10 @@ import { InlineButton } from "../ui/button";
 import { DraftProjectName } from "./DraftProjectName";
 import { DraftHeroProjectHeading } from "./DraftHeroProjectHeading";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { resolveProjectDefaultProviderModelSelection } from "../../providerInstances";
+import {
+  resolveNewSessionDefaultModelSelection,
+  resolveProjectDefaultProviderModelSelection,
+} from "../../providerInstances";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
 
 const ADD_PROJECT_VALUE = "add-project";
@@ -209,22 +212,32 @@ export function DraftHeroHeadline({
         (environment) => environment.environmentId === project.environmentId,
       )?.serverConfig;
       const environmentSettings = environmentConfig?.settings;
-      const defaultSelection = environmentSettings
+      const configuredDefaultSelection = environmentSettings
         ? resolveProjectSettings(environmentSettings, project.id, project).settings
             .defaultModelSelection
         : project.defaultModelSelection;
+      const projectProviders = providersByEnvironment.get(project.environmentId) ?? [];
+      const defaultSelection =
+        configuredDefaultSelection !== null && environmentSettings
+          ? resolveNewSessionDefaultModelSelection({
+              defaultSelection: configuredDefaultSelection,
+              providers: projectProviders,
+              settings: environmentSettings,
+              projectId: project.id,
+            })
+          : configuredDefaultSelection;
       const fallbackResolution = resolveNewThreadModelSelection({
         defaultSelection:
           defaultSelection ??
           (useComposerDraftStore.getState().stickyActiveProvider !== null || !environmentSettings
             ? null
             : resolveProjectDefaultProviderModelSelection(
-                providersByEnvironment.get(project.environmentId) ?? [],
+                projectProviders,
                 environmentSettings,
                 project.id,
               )),
         fallbackSelection: environmentSettings?.fallbackModelSelection ?? null,
-        providers: providersByEnvironment.get(project.environmentId) ?? [],
+        providers: projectProviders,
         ...(environmentSettings ? { settings: environmentSettings } : {}),
         projectId: project.id,
         now: Date.now(),
