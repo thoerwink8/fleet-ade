@@ -221,7 +221,7 @@ export function resolveQuickAction(
       label: "提交",
       disabled: true,
       kind: "show_hint",
-      hint: `推送或创建 ${terminology.singular} 前，请先创建并检出一个引用。`,
+      hint: `推送或创建 ${terminology.singular} 前，请先创建并检出一个分支。`,
     };
   }
 
@@ -282,7 +282,7 @@ export function resolveQuickAction(
 
   if (isDiverged) {
     return {
-      label: "同步引用",
+      label: "同步分支",
       disabled: true,
       kind: "show_hint",
       hint: "分支已与上游分叉。请先变基或合并。",
@@ -347,19 +347,19 @@ export function resolveDefaultBranchActionDialogCopy(input: {
   terminology: ChangeRequestTerminology;
 }): DefaultBranchActionDialogCopy {
   const branchLabel = input.branchName;
-  const suffix = `（引用“${branchLabel}”）。你可以继续在这个引用上操作，也可以新建一个功能引用并在那里执行同样的操作。`;
+  const suffix = `（分支“${branchLabel}”）。你可以继续在这个分支上操作，也可以新建一个功能分支并在那里执行同样的操作。`;
   const { terminology } = input;
 
   if (input.action === "push" || input.action === "commit_push") {
     if (input.includesCommit) {
       return {
-        title: "提交并推送到默认引用？",
+        title: "提交并推送到默认分支？",
         description: `此操作会提交并推送改动${suffix}`,
         continueLabel: `提交并推送到 ${branchLabel}`,
       };
     }
     return {
-      title: "推送到默认引用？",
+      title: "推送到默认分支？",
       description: `此操作会推送本地提交${suffix}`,
       continueLabel: `推送到 ${branchLabel}`,
     };
@@ -367,13 +367,13 @@ export function resolveDefaultBranchActionDialogCopy(input: {
 
   if (input.includesCommit) {
     return {
-      title: `在默认引用上提交、推送并创建 ${terminology.shortLabel}？`,
+      title: `在默认分支上提交、推送并创建 ${terminology.shortLabel}？`,
       description: `此操作会提交、推送并创建${terminology.singular}${suffix}`,
       continueLabel: `提交、推送并创建 ${terminology.shortLabel}`,
     };
   }
   return {
-    title: `在默认引用上推送并创建 ${terminology.shortLabel}？`,
+    title: `在默认分支上推送并创建 ${terminology.shortLabel}？`,
     description: `此操作会推送本地提交并创建${terminology.singular}${suffix}`,
     continueLabel: `推送并创建 ${terminology.shortLabel}`,
   };

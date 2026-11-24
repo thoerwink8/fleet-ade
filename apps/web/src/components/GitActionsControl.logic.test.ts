@@ -213,7 +213,7 @@ describe("when: the ref is on GitLab", () => {
       includesCommit: false,
       terminology: sourceControlClients.get("gitlab").changeRequest,
     });
-    assert.equal(copy.title, "在默认引用上推送并创建 change request？");
+    assert.equal(copy.title, "在默认分支上推送并创建 change request？");
     assert.include(copy.description, "并创建change request");
   });
 });

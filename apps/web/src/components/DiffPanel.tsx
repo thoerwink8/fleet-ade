@@ -1066,7 +1066,7 @@ export default function DiffPanel({
                 className="w-72 min-w-0 max-w-[calc(100vw-1rem)] overflow-hidden"
               >
                 <ComboboxSearchInput
-                  placeholder="搜索引用…"
+                  placeholder="搜索分支或标签…"
                   value={baseRefQuery}
                   onChange={(event) => setBaseRefQuery(event.target.value)}
                 />
@@ -1077,7 +1077,7 @@ export default function DiffPanel({
                     <span className="text-right">远端</span>
                   </div>
                 </div>
-                <ComboboxEmpty>没有匹配的引用。</ComboboxEmpty>
+                <ComboboxEmpty>没有匹配的分支或标签。</ComboboxEmpty>
                 <ComboboxList className="max-h-64 min-w-0 overflow-x-hidden">
                   <ComboboxItem
                     className="w-full min-w-0 grid-cols-[1rem_minmax(0,1fr)]"

@@ -239,7 +239,7 @@ export function usePaginatedBranches(target: VcsRefTarget) {
           const cause = Cause.squash(failed.cause);
           return cause instanceof Error && cause.message.trim().length > 0
             ? cause.message
-            : "无法加载引用。";
+            : "无法加载分支。";
         })()
       : null;
   const refresh = () => {
