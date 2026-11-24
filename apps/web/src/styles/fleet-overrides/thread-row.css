@@ -1,0 +1,114 @@
+/* Sidebar thread rows use @fleet/design's .fa-trow. Rules here are only what that file does not
+   cover: unread weight, the rename field, the always-visible woke button, touch hit areas,
+   and the details surface. */
+
+/* The preview marks unread rows with is-unread, but thread-row.css leaves .t at weight 400. */
+.fa-trow.ade-trow--unread .t {
+  font-weight: 500;
+}
+
+.fa-trow .ade-trow-rename {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: 400 14px/20px var(--fa-font-sans);
+  outline: none;
+}
+
+.fa-trow .t.ade-trow-title-pending {
+  opacity: 0.55;
+}
+
+/* The dot's ring should match the sidebar surface. The library leaves --fa-ring to the list. */
+.fa-trow {
+  --fa-ring: var(--sidebar);
+}
+
+/* .fa-icon-btn is 28px. thread-row.css sizes it to 24px only inside .acts. */
+.fa-trow .end > .fa-icon-btn {
+  width: var(--fa-ctrl-xs);
+  height: var(--fa-ctrl-xs);
+}
+
+.fa-trow .pr .ade-trow-pr {
+  width: auto;
+  height: 16px;
+  min-width: 16px;
+  padding: 0;
+  gap: var(--fa-space-1);
+  color: var(--fa-fg-muted);
+  font: 400 12px/16px var(--fa-font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-trow.ade-trow--file {
+  outline: var(--fa-bw-1) solid var(--fa-accent);
+  outline-offset: -1px;
+}
+
+.fa-trow.ade-trow--drag {
+  background-color: var(--fa-selected);
+}
+
+/* Details card. .fa-tip is the 4px hint; this is the solid 12px overlay. */
+.ade-pop-panel.fa-tip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-2);
+  width: min(320px, calc(100vw - 32px));
+  max-width: min(320px, calc(100vw - 32px));
+  padding: var(--fa-space-4);
+  border: var(--fa-bw-1) solid var(--fa-border);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-overlay);
+  color: var(--fa-fg);
+  font: 400 14px/20px var(--fa-font-sans);
+  text-wrap: wrap;
+  box-shadow: var(--fa-shadow-overlay);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.ade-thread-details__title {
+  overflow: hidden;
+  font: 500 14px/20px var(--fa-font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Desktop hover shows the card. Touch has no hover: the details button is the entry. */
+.fa-trow .ade-trow-details {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .fa-trow .acts {
+    display: inline-flex;
+  }
+
+  .fa-trow:hover .tm,
+  .fa-trow:focus-within .tm {
+    display: inline;
+  }
+
+  .fa-trow .ade-trow-details {
+    display: inline-flex;
+  }
+
+  .fa-trow .fa-icon-btn {
+    position: relative;
+  }
+
+  .fa-trow .fa-icon-btn::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+}

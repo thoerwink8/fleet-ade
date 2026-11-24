@@ -2,7 +2,7 @@ import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environ
 import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
-import { cdp, page } from "vite-plus/test/browser";
+import { cdp, page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 import { render } from "../../../test/render";
@@ -293,6 +293,31 @@ function SidebarTouchHarness(props?: {
   );
 }
 
+function expectRowActionTarget(button: HTMLElement) {
+  button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const style = getComputedStyle(button);
+  const label = button.getAttribute("aria-label") ?? button.tagName;
+  expect(parseFloat(style.width), `${label} painted width`).toBe(24);
+  expect(parseFloat(style.height), `${label} painted height`).toBe(24);
+  const hit = getComputedStyle(button, "::after");
+  expect(parseFloat(hit.width), `${label} hit width`).toBeGreaterThanOrEqual(44);
+  expect(parseFloat(hit.height), `${label} hit height`).toBeGreaterThanOrEqual(44);
+  const rect = button.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  expect(document.elementFromPoint(cx, cy), `${label} elementFromPoint`).toBe(button);
+}
+
+function isEffectivelyHidden(button: HTMLElement): boolean {
+  for (let node: HTMLElement | null = button; node !== null; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+      return true;
+    }
+  }
+  return false;
+}
+
 function expectPointHitsButton(button: Element) {
   button.scrollIntoView({ block: "nearest", inline: "nearest" });
   const rect = button.getBoundingClientRect();
@@ -421,12 +446,19 @@ describe("sidebar mobile touch targets", () => {
       'button[aria-label="立即唤醒会话"]',
     )!;
 
-    const allTargets = [
+    const chromeTargets = [
       screen.container.querySelector('button[aria-label="切换主侧边栏"]')!,
       screen.container.querySelector('button[aria-label="更多"]')!,
       screen.container.querySelector('button[aria-label="新建会话"]')!,
       screen.container.querySelector('button[aria-label="清除会话搜索"]')!,
       draftDiscard,
+      screen.container.querySelector('button[title="Unpin fleet-ade"]')!,
+      screen.container.querySelector('button[aria-label="设置"]')!,
+      screen.container.querySelector('button[aria-label="PR"]')!,
+      screen.container.querySelector('button[aria-label="用量"]')!,
+      screen.container.querySelector('button[aria-label="机群"]')!,
+    ];
+    const rowTargets = [
       cardUnpin,
       cardDiscardDraft,
       cardSnooze,
@@ -439,16 +471,15 @@ describe("sidebar mobile touch targets", () => {
       slimSettle,
       slimUnsettle,
       slimUnsnooze,
-      screen.container.querySelector('button[title="Unpin fleet-ade"]')!,
-      screen.container.querySelector('button[aria-label="设置"]')!,
-      screen.container.querySelector('button[aria-label="PR"]')!,
-      screen.container.querySelector('button[aria-label="用量"]')!,
-      screen.container.querySelector('button[aria-label="机群"]')!,
     ];
 
-    for (const target of allTargets) {
+    for (const target of chromeTargets) {
       expect(target).not.toBeNull();
       expectPointHitsButton(target);
+    }
+    for (const target of rowTargets) {
+      expect(target).not.toBeNull();
+      expectRowActionTarget(target);
     }
 
     const rowTargetPairs: Array<[HTMLElement, HTMLButtonElement[]]> = [
@@ -548,9 +579,26 @@ describe("sidebar mobile touch targets", () => {
       'button[aria-label="设置"]',
     )!;
 
+    for (const button of [
+      cardUnpin,
+      cardSnooze,
+      cardSettle,
+      cardUnsettle,
+      slimSettle,
+      slimUnsettle,
+      slimUnsnooze,
+    ]) {
+      expect(isEffectivelyHidden(button), button.getAttribute("aria-label") ?? undefined).toBe(
+        true,
+      );
+    }
+
+    await userEvent.hover(cardRow);
     expect(Math.round(cardUnpin.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(cardSnooze.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(cardSettle.getBoundingClientRect().height)).toBe(24);
+    await userEvent.hover(settledCardRow);
+    expect(Math.round(cardUnsettle.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(clearSearch.getBoundingClientRect().width)).toBe(24);
     expect(Math.round(clearSearch.getBoundingClientRect().height)).toBe(24);
     expect(Math.round(projectPin.getBoundingClientRect().width)).toBe(24);
@@ -559,6 +607,8 @@ describe("sidebar mobile touch targets", () => {
     expect(Math.round(settingsButton.getBoundingClientRect().height)).toBe(28);
 
     // Without hover on desktop, hover-revealed row actions remain hidden and non-clickable.
+    await userEvent.unhover(cardRow);
+    await userEvent.unhover(settledCardRow);
     for (const button of [
       draftDiscard,
       cardSnooze,
@@ -568,16 +618,15 @@ describe("sidebar mobile touch targets", () => {
       slimUnsettle,
       slimUnsnooze,
     ]) {
-      const style = getComputedStyle(button);
-      const wrapper = button.parentElement;
-      const effectiveOpacity =
-        style.opacity === "0" || (wrapper !== null && getComputedStyle(wrapper).opacity === "0");
-      expect(effectiveOpacity).toBe(true);
-      expect(style.pointerEvents).toBe("none");
+      expect(isEffectivelyHidden(button), button.getAttribute("aria-label") ?? undefined).toBe(
+        true,
+      );
       const rect = button.getBoundingClientRect();
-      expect(
-        document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
-      ).not.toBe(button);
+      if (rect.width > 0 && rect.height > 0) {
+        expect(
+          document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2),
+        ).not.toBe(button);
+      }
     }
   });
 });
