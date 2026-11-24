@@ -1,3 +1,4 @@
+import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { EnvironmentId, ProjectId, ProviderInstanceId, RunId, ThreadId } from "@t3tools/contracts";
 import { Profiler, useSyncExternalStore, type ReactNode } from "react";
@@ -6,8 +7,10 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 import { act, render } from "../../../test/render";
+import { DraftId, useComposerDraftStore } from "../../composerDraftStore";
 import { makeThreadFixture } from "../../test-fixtures";
 import { applyThemePalette, EMBER_THEME, GROVE_THEME } from "../../themePalette";
+import { SidebarDraftBlock } from "./SidebarDraftBlock";
 import { SortableThreadRow } from "./SidebarThreadRow";
 import { TooltipProvider } from "../ui/tooltip";
 
@@ -174,8 +177,40 @@ function probeColor(variable: string): string {
   return color;
 }
 
+function seedDraftRows(
+  entries: ReadonlyArray<{
+    readonly id: string;
+    readonly prompt: string;
+    readonly createdAt?: string;
+  }>,
+) {
+  const initial = useComposerDraftStore.getState();
+  useComposerDraftStore.setState({
+    draftsByThreadKey: {},
+    draftThreadsByThreadKey: {},
+    logicalProjectDraftThreadKeyByLogicalProjectKey: {},
+  });
+  const projectRef = scopeProjectRef(environmentId, projectId);
+  const store = useComposerDraftStore.getState();
+  for (const entry of entries) {
+    const draftId = DraftId.make(entry.id);
+    store.setProjectDraftThreadId(projectRef, draftId, {
+      threadId: ThreadId.make(`${entry.id}-thread`),
+      ...(entry.createdAt ? { createdAt: entry.createdAt } : {}),
+    });
+    store.setPrompt(draftId, entry.prompt);
+  }
+  return {
+    [Symbol.dispose]() {
+      useComposerDraftStore.setState(initial, true);
+    },
+  };
+}
+
 describe("sidebar thread row density", () => {
   it("paints a 32px one-line row and a 52px needs-you row at 390 and 1280", async () => {
+    using _draftStore = seedDraftRows([{ id: "draft-density", prompt: "草稿单行对齐检查" }]);
+    const projectKey = `${environmentId}:${projectId}`;
     const running = thread("running", "排查登录超时", {
       runtime: {
         status: "running",
@@ -200,6 +235,14 @@ describe("sidebar thread row density", () => {
     await using screen = await render(
       <Host>
         <ul>
+          <SidebarDraftBlock
+            projectByKey={new Map()}
+            projectDisplayNameByKey={new Map([[projectKey, "fleet-ade"]])}
+            scopedProjectKeys={null}
+            routeDraftId={null}
+            onNavigateToDraft={() => {}}
+            onDraftContextMenu={() => {}}
+          />
           <SortableThreadRow {...rowProps("idle", "普通会话")} />
           <SortableThreadRow
             {...rowProps("running", "排查登录超时", {
@@ -226,6 +269,9 @@ describe("sidebar thread row density", () => {
       </Host>,
     );
 
+    const draft = screen.container.querySelector<HTMLElement>(
+      '[data-sidebar-row="draft:draft-density"]',
+    )!;
     const idle = screen.container.querySelector<HTMLElement>('[data-sidebar-row="local:idle"]')!;
     const approval = screen.container.querySelector<HTMLElement>(
       '[data-sidebar-row="local:approval"]',
@@ -239,20 +285,38 @@ describe("sidebar thread row density", () => {
 
     const measure = () => {
       const idleStyle = getComputedStyle(idle);
+      const draftStyle = getComputedStyle(draft);
       const title = getComputedStyle(idle.querySelector(".t")!);
+      const draftTitle = getComputedStyle(draft.querySelector(".t")!);
       const time = getComputedStyle(idle.querySelector(".tm")!);
+      const draftTime = getComputedStyle(draft.querySelector(".tm")!);
+      const draftBadge = draft.querySelector<HTMLElement>('[data-slot="badge"]')!;
+      const draftBadgeStyle = getComputedStyle(draftBadge);
       const unreadTitle = getComputedStyle(unreadRow.querySelector(".t")!);
       const reason = getComputedStyle(approval.querySelector(".s")!);
       expect(idle.getBoundingClientRect().height).toBe(32);
+      expect(draft.getBoundingClientRect().height).toBe(32);
       expect(approval.getBoundingClientRect().height).toBe(52);
       expect(title.fontSize).toBe("14px");
       expect(title.fontWeight).toBe("400");
+      expect(draftTitle.fontSize).toBe("14px");
+      expect(Number(draftTitle.fontWeight)).toBeLessThanOrEqual(500);
+      expect(draftTitle.fontWeight).toBe("400");
+      expect(draftTitle.whiteSpace).toBe("nowrap");
+      expect(draftTitle.textOverflow).toBe("ellipsis");
       expect(unreadTitle.fontWeight).toBe("500");
       expect(title.whiteSpace).toBe("nowrap");
       expect(title.textOverflow).toBe("ellipsis");
       expect(time.fontSize).toBe("12px");
       expect(time.fontVariantNumeric).toContain("tabular-nums");
       expect(time.color).toBe(probeColor("--fa-fg-muted"));
+      expect(draftTime.fontSize).toBe("12px");
+      expect(draftTime.fontVariantNumeric).toContain("tabular-nums");
+      expect(draftTime.color).toBe(probeColor("--fa-fg-muted"));
+      expect(draftBadge.textContent).toBe("草稿");
+      expect(draftBadgeStyle.fontSize).toBe("12px");
+      expect(Number(draftBadgeStyle.fontWeight)).toBeLessThanOrEqual(500);
+      expect(draftBadgeStyle.height).toBe("20px");
       expect(reason.fontSize).toBe("12px");
       expect(reason.color).toBe(probeColor("--fa-fg-muted"));
       expect(reason.whiteSpace).toBe("nowrap");
@@ -261,7 +325,12 @@ describe("sidebar thread row density", () => {
       expect(idleStyle.boxShadow).toBe("none");
       expect(px(idleStyle.borderTopLeftRadius)).toBeLessThanOrEqual(8);
       expect(idleStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+      expect(draftStyle.borderTopWidth).toBe("0px");
+      expect(draftStyle.boxShadow).toBe("none");
+      expect(px(draftStyle.borderTopLeftRadius)).toBeLessThanOrEqual(8);
+      expect(draftStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
       expect(getComputedStyle(idle.querySelector(".lead")!).width).toBe("16px");
+      expect(getComputedStyle(draft.querySelector(".lead")!).width).toBe("16px");
       expect(getComputedStyle(runningRow.querySelector(".fa-dot")!).backgroundColor).toBe(
         probeColor("--fa-success"),
       );
@@ -276,6 +345,7 @@ describe("sidebar thread row density", () => {
     await page.viewport(390, 844);
     measure();
     expect(idle.getBoundingClientRect().height).toBe(wide);
+    expect(draft.getBoundingClientRect().height).toBe(wide);
     expect(approval.getBoundingClientRect().height).toBe(52);
   });
 
@@ -391,9 +461,22 @@ describe("sidebar thread row density", () => {
   });
 
   it("follows selected, hover, and mark colors in the default theme, Grove, and Ember", async () => {
+    using _draftStore = seedDraftRows([
+      { id: "draft-current", prompt: "当前草稿", createdAt: "2026-03-10T12:00:00.000Z" },
+      { id: "draft-hover", prompt: "悬停草稿", createdAt: "2026-03-10T11:00:00.000Z" },
+    ]);
+    const projectKey = `${environmentId}:${projectId}`;
     await using screen = await render(
       <Host>
         <ul>
+          <SidebarDraftBlock
+            projectByKey={new Map()}
+            projectDisplayNameByKey={new Map([[projectKey, "fleet-ade"]])}
+            scopedProjectKeys={null}
+            routeDraftId="draft-current"
+            onNavigateToDraft={() => {}}
+            onDraftContextMenu={() => {}}
+          />
           <SortableThreadRow {...rowProps("current", "当前", {}, { isActive: true })} />
           <SortableThreadRow
             {...rowProps("work", "运行", {
@@ -424,6 +507,12 @@ describe("sidebar thread row density", () => {
       </Host>,
     );
     const root = document.documentElement;
+    const draftCurrent = screen.container.querySelector<HTMLElement>(
+      '[data-sidebar-row="draft:draft-current"]',
+    )!;
+    const draftHover = screen.container.querySelector<HTMLElement>(
+      '[data-sidebar-row="draft:draft-hover"]',
+    )!;
     const current = screen.container.querySelector<HTMLElement>(
       '[data-sidebar-row="local:current"]',
     )!;
@@ -449,15 +538,25 @@ describe("sidebar thread row density", () => {
           if (theme.id === "default") applyThemePalette(appearance, appearance);
           else theme.apply(appearance);
           const selected = getComputedStyle(current).backgroundColor;
+          const draftSelected = getComputedStyle(draftCurrent).backgroundColor;
           const running = getComputedStyle(work.querySelector(".fa-dot")!).backgroundColor;
           const error = getComputedStyle(bad.querySelector(".fa-dot")!).backgroundColor;
           expect(selected, `${theme.id} ${appearance} selected`).toBe(probeColor("--fa-selected"));
+          expect(draftSelected, `${theme.id} ${appearance} draft selected`).toBe(
+            probeColor("--fa-selected"),
+          );
           expect(running, `${theme.id} ${appearance} running`).toBe(probeColor("--fa-success"));
           expect(error, `${theme.id} ${appearance} error`).toBe(probeColor("--fa-danger"));
           await userEvent.hover(work);
           const hoverImage = getComputedStyle(work).backgroundImage;
           expect(hoverImage, `${theme.id} ${appearance} hover`).toContain("linear-gradient");
           await userEvent.unhover(work);
+          await userEvent.hover(draftHover);
+          const draftHoverImage = getComputedStyle(draftHover).backgroundImage;
+          expect(draftHoverImage, `${theme.id} ${appearance} draft hover`).toContain(
+            "linear-gradient",
+          );
+          await userEvent.unhover(draftHover);
         }
       }
     } finally {
