@@ -4,14 +4,13 @@ import { XIcon } from "lucide-react";
 import { type ComponentProps, createContext, type ReactNode, use, useRef, useState } from "react";
 import { cn } from "~/lib/utils";
 import { Button, type ButtonVariant } from "~/components/ui/button";
-import {
-  DIALOG_BACKDROP_CLASS,
-  DIALOG_MEDIA_BACKDROP_CLASS,
-  DIALOG_MEDIA_POPUP_CLASS,
-  DIALOG_MOBILE_SHEET_CLASS,
-  DIALOG_POPUP_CLASS,
-} from "~/components/ui/dialog-styles";
+import { DIALOG_BACKDROP_BASE_CLASS, DIALOG_POPUP_BASE_CLASS } from "~/components/ui/dialog-styles";
 import { ScrollArea } from "~/components/ui/scroll-area";
+
+const DIALOG_MEDIA_BACKDROP_CLASS = `${DIALOG_BACKDROP_BASE_CLASS} bg-black/75`;
+const DIALOG_MEDIA_POPUP_CLASS = `${DIALOG_POPUP_BASE_CLASS} max-h-[92vh] w-auto max-w-[92vw] overflow-visible rounded-none`;
+const DIALOG_MOBILE_SHEET_CLASS =
+  "max-sm:max-w-none max-sm:rounded-none max-sm:border-x-0 max-sm:border-t max-sm:border-b-0 max-sm:opacity-[calc(1-min(var(--nested-dialogs),1))] max-sm:data-ending-style:translate-y-4 max-sm:data-starting-style:translate-y-4";
 
 const ControlledOpenContext = createContext<boolean | undefined>(undefined);
 
@@ -41,7 +40,7 @@ function Dialog<Payload>(props: DialogPrimitive.Root.Props<Payload>) {
   );
 }
 
-function useDialogActionInitialFocus() {
+function useDialogActionInitialFocus(cancelSlot?: string) {
   const popupRef = useRef<HTMLDivElement>(null);
   const initialFocus = (openType: string) => {
     // Match Base UI: touch opens focus the popup to avoid opening the virtual keyboard.
@@ -49,7 +48,13 @@ function useDialogActionInitialFocus() {
     return (
       popupRef.current?.querySelector<HTMLElement>(
         '[data-slot="dialog-action"]:not(:disabled):not([aria-disabled="true"])',
-      ) ?? true
+      ) ??
+      (cancelSlot !== undefined
+        ? popupRef.current?.querySelector<HTMLElement>(
+            `[data-slot="${cancelSlot}"]:not(:disabled):not([aria-disabled="true"])`,
+          )
+        : undefined) ??
+      true
     );
   };
   return { popupRef, initialFocus };
@@ -74,7 +79,8 @@ function DialogBackdrop({
     <DialogPrimitive.Backdrop
       forceRender
       className={cn(
-        variant === "media" ? DIALOG_MEDIA_BACKDROP_CLASS : DIALOG_BACKDROP_CLASS,
+        "fa-backdrop",
+        variant === "media" ? DIALOG_MEDIA_BACKDROP_CLASS : DIALOG_BACKDROP_BASE_CLASS,
         className,
       )}
       data-slot="dialog-backdrop"
@@ -114,7 +120,7 @@ function DialogPopup({
     render: (
       <DialogPrimitive.Popup
         className={cn(
-          variant === "media" ? DIALOG_MEDIA_POPUP_CLASS : DIALOG_POPUP_CLASS,
+          variant === "media" ? DIALOG_MEDIA_POPUP_CLASS : `fa-dialog ${DIALOG_POPUP_BASE_CLASS}`,
           "row-start-2 text-popover-foreground",
           variant === "default" && "max-h-full max-w-lg",
           bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
@@ -167,7 +173,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 p-6 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-3 max-sm:pb-4",
+        "flex flex-col gap-2 p-[var(--fa-space-5)] pb-[var(--fa-space-3)] max-sm:pb-[var(--fa-space-4)]",
         className,
       )}
       data-slot="dialog-header"
@@ -176,19 +182,16 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+// `variant` stays in the API: fleet dialogs have no banded footer, so both values render identically.
 function DialogFooter({
   className,
-  variant = "default",
+  variant: _variant,
   ...props
-}: React.ComponentProps<"div"> & {
-  variant?: "default" | "bare";
-}) {
+}: React.ComponentProps<"div"> & { variant?: "default" | "bare" }) {
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 px-6 sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
-        variant === "default" && "border-t bg-muted/72 py-4",
-        variant === "bare" && "py-4",
+        "fa-dialog__foot flex flex-col-reverse gap-2 px-[var(--fa-space-5)] py-[var(--fa-space-4)] sm:flex-row",
         className,
       )}
       data-slot="dialog-footer"
@@ -200,7 +203,7 @@ function DialogFooter({
 function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
   return (
     <DialogPrimitive.Title
-      className={cn("wrap-anywhere font-semibold text-dialog-title", className)}
+      className={cn("wrap-anywhere", className)}
       data-slot="dialog-title"
       {...props}
     />
@@ -209,11 +212,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
 
 function DialogDescription({ className, ...props }: DialogPrimitive.Description.Props) {
   return (
-    <DialogPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
-      data-slot="dialog-description"
-      {...props}
-    />
+    <DialogPrimitive.Description className={className} data-slot="dialog-description" {...props} />
   );
 }
 
@@ -226,7 +225,7 @@ function DialogPanel({
     <ScrollArea scrollFade={scrollFade}>
       <div
         className={cn(
-          "space-y-4 p-6 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-1 in-[[data-slot=dialog-popup]:has([data-slot=dialog-footer]:not(.border-t))]:pb-1",
+          "space-y-4 p-[var(--fa-space-5)] in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-[var(--fa-space-1)] in-[[data-slot=dialog-popup]:has([data-slot=dialog-footer])]:pb-[var(--fa-space-1)]",
           className,
         )}
         data-slot="dialog-panel"
@@ -255,4 +254,5 @@ export {
   DialogDescription,
   DialogPanel,
   DialogViewport,
+  DIALOG_MOBILE_SHEET_CLASS,
 };

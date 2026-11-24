@@ -2,14 +2,11 @@ import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog
 import { useRender } from "@base-ui/react/use-render";
 
 import { cn } from "~/lib/utils";
-import {
-  DIALOG_BACKDROP_CLASS,
-  DIALOG_MOBILE_SHEET_CLASS,
-  DIALOG_POPUP_CLASS,
-} from "~/components/ui/dialog-styles";
+import { DIALOG_BACKDROP_BASE_CLASS, DIALOG_POPUP_BASE_CLASS } from "~/components/ui/dialog-styles";
 import {
   ControlledOpenContext,
   DialogAction,
+  DIALOG_MOBILE_SHEET_CLASS,
   renderRetainedPopup,
   useDialogActionInitialFocus,
 } from "~/components/ui/dialog";
@@ -28,7 +25,7 @@ function AlertDialogBackdrop({ className, ...props }: AlertDialogPrimitive.Backd
   return (
     <AlertDialogPrimitive.Backdrop
       forceRender
-      className={cn(DIALOG_BACKDROP_CLASS, className)}
+      className={cn("fa-backdrop", DIALOG_BACKDROP_BASE_CLASS, className)}
       data-slot="alert-dialog-backdrop"
       {...props}
     />
@@ -57,13 +54,13 @@ function AlertDialogPopup({
   bottomStickOnMobile?: boolean;
   portalContainer?: AlertDialogPrimitive.Portal.Props["container"];
 }) {
-  const { popupRef, initialFocus } = useDialogActionInitialFocus();
+  const { popupRef, initialFocus } = useDialogActionInitialFocus("alert-dialog-close");
   const popup = useRender({
     ref: popupRef,
     render: (
       <AlertDialogPrimitive.Popup
         className={cn(
-          DIALOG_POPUP_CLASS,
+          `fa-dialog ${DIALOG_POPUP_BASE_CLASS}`,
           "row-start-2 max-h-full max-w-lg text-popover-foreground",
           bottomStickOnMobile && DIALOG_MOBILE_SHEET_CLASS,
           className,
@@ -91,7 +88,7 @@ function AlertDialogHeader({ className, ...props }: React.ComponentProps<"div">)
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-col gap-2 p-6 text-center max-sm:pb-4 sm:text-left",
+        "flex min-h-0 flex-col gap-2 p-[var(--fa-space-5)] pb-[var(--fa-space-4)] text-center sm:text-left",
         className,
       )}
       data-slot="alert-dialog-header"
@@ -100,9 +97,10 @@ function AlertDialogHeader({ className, ...props }: React.ComponentProps<"div">)
   );
 }
 
+// `variant` stays in the API: fleet dialogs have no banded footer, so both values render identically.
 function AlertDialogFooter({
   className,
-  variant = "default",
+  variant: _variant,
   ...props
 }: React.ComponentProps<"div"> & {
   variant?: "default" | "bare";
@@ -110,9 +108,7 @@ function AlertDialogFooter({
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 px-6 sm:flex-row sm:justify-end sm:rounded-b-[calc(var(--radius-2xl)-1px)]",
-        variant === "default" && "border-t bg-muted/72 py-4",
-        variant === "bare" && "pb-6",
+        "fa-dialog__foot flex flex-col-reverse gap-2 px-[var(--fa-space-5)] pb-[var(--fa-space-6)] pt-[var(--fa-space-4)] sm:flex-row",
         className,
       )}
       data-slot="alert-dialog-footer"
@@ -124,7 +120,7 @@ function AlertDialogFooter({
 function AlertDialogTitle({ className, ...props }: AlertDialogPrimitive.Title.Props) {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("wrap-anywhere shrink-0 font-semibold text-dialog-title", className)}
+      className={cn("wrap-anywhere shrink-0", className)}
       data-slot="alert-dialog-title"
       {...props}
     />
@@ -135,7 +131,7 @@ function AlertDialogDescription({ className, ...props }: AlertDialogPrimitive.De
   return (
     <AlertDialogPrimitive.Description
       className={cn(
-        "wrap-anywhere max-h-[min(24rem,60dvh)] min-h-0 overflow-y-auto overscroll-contain text-muted-foreground text-sm select-text",
+        "wrap-anywhere max-h-[min(24rem,60dvh)] min-h-0 overflow-y-auto overscroll-contain select-text",
         className,
       )}
       data-slot="alert-dialog-description"
