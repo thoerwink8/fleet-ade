@@ -87,6 +87,11 @@ import { EnvironmentRow, useEnvironmentTransportLabel } from "./EnvironmentRow";
 import { SettingsGroup } from "./SettingsGroup";
 import { settingsScopeEnvironmentLabel, settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
 import {
+  requestScheduledTaskDelete,
+  useScheduledTaskDeleteHidden,
+} from "./scheduledTaskDeleteUndoClient";
+import { withoutPendingScheduledTaskDeletes } from "./scheduledTaskDeleteUndo";
+import {
   SCHEDULED_TASK_TEMPLATES,
   WEBHOOK_SIGNATURE_DEFAULTS,
   applyScheduledTaskTemplate,
@@ -554,6 +559,7 @@ function ScheduledTaskEnvironmentList({
   readonly onEdit: (environmentId: EnvironmentId, task: ScheduledTask) => void;
 }) {
   const { scope, environments } = useSettingsScope();
+  const hiddenDeletes = useScheduledTaskDeleteHidden();
   const connectedIds = environments.flatMap((environment) =>
     environment.connection.phase === "connected" && environment.serverConfig !== null
       ? [environment.environmentId]
@@ -568,9 +574,15 @@ function ScheduledTaskEnvironmentList({
       environment,
       connected: index >= 0,
       timeZone: data?.timeZone,
-      tasks: data?.tasks.filter((task) =>
-        matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
-      ),
+      tasks: data
+        ? withoutPendingScheduledTaskDeletes(
+            data.tasks.filter((task) =>
+              matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
+            ),
+            hiddenDeletes,
+            environment.environmentId,
+          )
+        : undefined,
       error: query?._tag === "Failure" ? formatEnvironmentQueryError(query.cause) : null,
     };
   });
@@ -703,6 +715,7 @@ function ScheduledTaskEnvironmentSection({
   readonly onEdit: (environmentId: EnvironmentId, task: ScheduledTask) => void;
 }) {
   const { scope } = useSettingsScope();
+  const hiddenDeletes = useScheduledTaskDeleteHidden();
   const connected =
     environment.connection.phase === "connected" && environment.serverConfig !== null;
   const tasksQuery = useEnvironmentQuery(
@@ -713,9 +726,15 @@ function ScheduledTaskEnvironmentSection({
         })
       : null,
   );
-  const tasks = tasksQuery.data?.tasks.filter((task) =>
-    matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
-  );
+  const tasks = tasksQuery.data
+    ? withoutPendingScheduledTaskDeletes(
+        tasksQuery.data.tasks.filter((task) =>
+          matchesScheduledTaskScope(scope, environment.environmentId, task.projectId),
+        ),
+        hiddenDeletes,
+        environment.environmentId,
+      )
+    : undefined;
   const linkedTask = tasks?.find((task) => task.id === taskId);
   return (
     <SettingsSection
@@ -795,18 +814,13 @@ function ScheduledTaskRow({
   const run = useAtomCommand(serverEnvironment.runScheduledTaskNow, {
     label: "scheduled task run now",
   });
-  const remove = useAtomCommand(serverEnvironment.deleteScheduledTask, {
-    label: "scheduled task delete",
-  });
-  const act = async (action: "toggle" | "run" | "delete") => {
+  const act = async (action: "toggle" | "run") => {
     if (busy || !readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
     setBusy(true);
     const result =
       action === "toggle"
         ? await toggle({ environmentId, input: { id: task.id, enabled: !task.enabled } })
-        : action === "run"
-          ? await run({ environmentId, input: { id: task.id } })
-          : await remove({ environmentId, input: { id: task.id } });
+        : await run({ environmentId, input: { id: task.id } });
     setBusy(false);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
       toastManager.add(
@@ -885,7 +899,12 @@ function ScheduledTaskRow({
                 </MenuItem>
               )}
               <MenuSeparator />
-              <MenuItem onClick={() => void act("delete")}>
+              <MenuItem
+                onClick={() => {
+                  if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
+                  requestScheduledTaskDelete(environmentId, task);
+                }}
+              >
                 <Trash2Icon />
                 删除
               </MenuItem>
