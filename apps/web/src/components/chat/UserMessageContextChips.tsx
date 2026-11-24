@@ -171,7 +171,7 @@ function UserMessagePreviewAnnotationDetails(props: {
         </div>
       )}
       <div className="min-w-0 px-3 py-2.5">
-        <div className="text-message-foreground text-meta font-semibold">
+        <div className="text-message-foreground text-meta font-medium">
           {props.record.pageTitle?.trim() || props.record.pageUrl || "预览标注"}
         </div>
         {props.record.comment ? (
@@ -236,7 +236,7 @@ function UserMessageElementDetails({
   return (
     <div className="max-w-full overflow-hidden rounded-lg border border-border/70 bg-background/70">
       <div className="border-b border-border/70 px-3 py-2.5">
-        <div className="truncate text-message-foreground text-meta font-semibold">
+        <div className="truncate text-message-foreground text-meta font-medium">
           {record.pageTitle?.trim() || record.pageUrl}
         </div>
         <div className="mt-0.5 truncate text-secondary-label text-3xs">{record.pageUrl}</div>
@@ -564,7 +564,7 @@ function UserMessageReviewCommentCard({ comment }: { comment: ReviewCommentConte
   return (
     <div className="space-y-2 rounded-lg border border-border/70 bg-background/70 p-3">
       <div className="space-y-1">
-        <div className="text-meta font-semibold text-foreground">
+        <div className="text-meta font-medium text-foreground">
           {formatWorkspaceRelativePath(comment.filePath, ctx.workspaceRoot)}
         </div>
         <div className="text-2xs text-muted-foreground">

@@ -51,10 +51,10 @@ import {
 import { inferReviewCommentFenceLanguage, type ReviewCommentContext } from "~/reviewCommentContext";
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
-  merge: "Merge",
+  merge: "合并",
   squash: "压缩并合并",
   rebase: "变基并合并",
-  "fast-forward": "Fast-forward merge",
+  "fast-forward": "快进合并",
 };
 
 const MERGE_CONFIRM_COPY: Record<
@@ -801,7 +801,7 @@ export function buildPullRequestTimeline(
       id: "created",
       at: detail.createdAt,
       kind: "opened" as const,
-      title: `opened this ${term}`,
+      title: `发起了这个 ${term}`,
       body: null,
       markdown: false,
       url: null,
@@ -932,7 +932,9 @@ function reviewThreadContext(
     startIndex: lineIndex,
     endIndex: lineIndex,
     rangeLabel:
-      thread.line === null ? "文件" : `L${thread.line}${thread.side === "left" ? " (before)" : ""}`,
+      thread.line === null
+        ? "文件"
+        : `L${thread.line}${thread.side === "left" ? "（修改前）" : ""}`,
     // Strip bot bookkeeping comments before bounding finding text.
     text: bounded(
       thread.comments

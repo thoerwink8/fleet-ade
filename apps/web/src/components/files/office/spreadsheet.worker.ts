@@ -43,7 +43,7 @@ const loadFonts = sheetFonts();
 
 serveWorker<SheetMethods>({
   open: async (input) => {
-    if (state.opened) throw new Error("The worker already holds a workbook");
+    if (state.opened) throw new Error("后台工作线程已持有一个工作簿");
 
     await initWasm();
 
@@ -77,7 +77,7 @@ serveWorker<SheetMethods>({
     // One sheet that fails to open leaves the others readable: go back to the sheet on show.
     attempt(() => show(opened, current));
 
-    throw new Error(`Sheet ${input.sheet} could not open`);
+    throw new Error(`工作表 ${input.sheet} 无法打开`);
   },
   resize: (input) => {
     const opened = active(input.sheet);
@@ -87,7 +87,7 @@ serveWorker<SheetMethods>({
       input.index > (input.axis === "row" ? lastCell.row : lastCell.col) ||
       !Number.isFinite(input.delta)
     )
-      throw new Error("Invalid track resize");
+      throw new Error("行列尺寸调整无效");
     const rect = opened.workbook.cellRect(
       input.sheet,
       input.axis === "row" ? input.index : 0,
@@ -193,7 +193,7 @@ serveWorker<SheetMethods>({
 });
 
 function required() {
-  if (!state.opened) throw new Error("The worker holds no workbook");
+  if (!state.opened) throw new Error("后台工作线程没有打开工作簿");
 
   return state.opened;
 }

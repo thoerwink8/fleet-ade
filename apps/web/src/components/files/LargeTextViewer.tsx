@@ -130,7 +130,7 @@ export default function LargeTextViewer(props: {
         }
       });
       engine.addEventListener("error", () => {
-        copyPending.current?.reject(new Error("The text viewer stopped."));
+        copyPending.current?.reject(new Error("文本查看器已停止。"));
         copyPending.current = null;
         setError("无法加载文本查看器。请关闭文件后重试。");
       });
@@ -184,7 +184,7 @@ export default function LargeTextViewer(props: {
     } else startWorker();
     return () => {
       controller.abort();
-      copyPending.current?.reject(new Error("Preview closed."));
+      copyPending.current?.reject(new Error("预览已关闭。"));
       copyPending.current = null;
       worker.current?.terminate();
       worker.current = null;
@@ -200,7 +200,7 @@ export default function LargeTextViewer(props: {
           return;
         }
         if (copyPending.current) {
-          reject(new Error("Another copy is in progress."));
+          reject(new Error("另一个复制正在进行中。"));
           return;
         }
         copyPending.current = { resolve, reject };
@@ -224,7 +224,7 @@ export default function LargeTextViewer(props: {
           ? `${countLabel(Math.max(0, meta.count - 1), "行")} · ${countLabel(meta.count ? meta.columns : 0, "列")}`
           : countLabel(meta.count, "行")}
         {meta.complete && meta.sizeBytes !== undefined
-          ? ` · ${meta.sizeBytes === 0 ? "0 bytes" : formatAttachmentSize(meta.sizeBytes)}`
+          ? ` · ${meta.sizeBytes === 0 ? "0 字节" : formatAttachmentSize(meta.sizeBytes)}`
           : " · 正在索引…"}
       </div>
       {!meta.complete ? (

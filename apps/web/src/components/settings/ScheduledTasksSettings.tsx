@@ -963,7 +963,7 @@ function WebhookDeliveriesDialog({
     >
       <DialogPopup className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Deliveries · {task.title}</DialogTitle>
+          <DialogTitle>投递记录 · {task.title}</DialogTitle>
           <DialogDescription>此任务 webhook URL 最近收到的请求。</DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -1056,8 +1056,7 @@ function WebhookDeliveriesDialog({
                     ) : null}
                     {delivery.missingFields.length > 0 ? (
                       <span className="text-muted-foreground">
-                        {delivery.missingFields.length} empty placeholder
-                        {delivery.missingFields.length === 1 ? "" : "s"}
+                        {delivery.missingFields.length} 个空占位符
                       </span>
                     ) : null}
                   </button>
@@ -1122,7 +1121,7 @@ function WebhookEndpointField({
   const { address: url, copyable, note } = webhookAddress(endpoint, httpBaseUrl);
   const rotateUrl = async () => {
     const confirmed =
-      (await requestConfirmDialog("Rotate this webhook URL?\nThe current URL stops working.", {
+      (await requestConfirmDialog("更换此 webhook URL？\n当前 URL 将失效。", {
         title: "更换这个 webhook URL？",
         confirmLabel: "更换",
         variant: "destructive",
@@ -1167,7 +1166,7 @@ function WebhookEndpointField({
           disabled={rotating || !canRotate}
           onClick={() => void rotateUrl()}
         >
-          Rotate
+          更换
         </Button>
       </div>
       {note !== null ? <p className="text-xs text-muted-foreground">{note}</p> : null}
@@ -2021,7 +2020,7 @@ function ScheduledTaskEditorForm({
                           <SelectValue>{draft.signatureEncoding}</SelectValue>
                         </SelectTrigger>
                         <SelectPopup>
-                          <SelectItem value="hex">hex</SelectItem>
+                          <SelectItem value="hex">十六进制</SelectItem>
                           <SelectItem value="base64">base64</SelectItem>
                         </SelectPopup>
                       </Select>

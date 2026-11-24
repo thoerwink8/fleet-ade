@@ -3,6 +3,7 @@ import { Undo2Icon } from "lucide-react";
 import { useState } from "react";
 
 import {
+  threadUndoNoticeSummary,
   threadUndoLabel,
   undoLatestThreadAction,
   useThreadUndoNotice,
@@ -19,11 +20,7 @@ export function SidebarThreadUndoNotice() {
   // Settled shows a toast with its own undo button, so omit the footer copy to avoid two Undo actions.
   const footerNotice = notice?.action === "Settled" ? null : notice;
   // Short enough to fit beside the utility icons; screen readers hear the full summary.
-  const summary = footerNotice
-    ? footerNotice.count === 1
-      ? footerNotice.action
-      : `${footerNotice.action} ${footerNotice.count}`
-    : null;
+  const summary = footerNotice ? threadUndoNoticeSummary(footerNotice) : null;
 
   // Keeps the last text on screen while it fades out, then unmounts on transitionend.
   const [shownSummary, setShownSummary] = useState(summary);
@@ -57,7 +54,7 @@ export function SidebarThreadUndoNotice() {
             <span>{threadUndoLabel(keybindings)}</span>
           </span>
         </InlineButton>
-        <span>{text},</span>
+        <span>{text}，</span>
       </div>
     </SidebarMenuItem>
   );

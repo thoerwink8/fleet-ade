@@ -66,7 +66,7 @@ const priceTargetsAtom = Atom.make((get): readonly UsagePriceTarget[] =>
           : null,
       unavailable:
         environment.connection.phase !== "connected"
-          ? "Offline"
+          ? "离线"
           : settings === null
             ? "价格未加载"
             : access === "pending"
@@ -461,7 +461,7 @@ export function UsagePriceOverrides({
                             {row.removed ? null : alias !== "" ? (
                               <TableCell colSpan={4} className="whitespace-normal">
                                 <span className="break-all text-muted-foreground">
-                                  Counted as {alias}
+                                  按 {alias} 计费
                                 </span>
                               </TableCell>
                             ) : (

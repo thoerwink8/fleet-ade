@@ -144,7 +144,7 @@ async function confirmProviderInstanceRemoval(
   copy: Pick<ConfirmDialogOptions, "title" | "confirmLabel">,
   consequence = "",
 ): Promise<boolean> {
-  const message = `${question}\nIts saved settings, including any custom binary path, will be removed.${consequence}`;
+  const message = `${question}\n其已保存的设置（包括自定义二进制路径）将被移除。${consequence}`;
   const confirmed = await settlePromise(() =>
     ensureLocalApi().dialogs.confirm(message, { ...copy, variant: "destructive" }),
   );
@@ -822,7 +822,7 @@ export function EnvironmentProviderSettings({
   const deleteInstance = useStableCallback(
     async (instanceId: ProviderInstanceId, instance: ProviderInstanceConfig) => {
       const confirmed = await confirmProviderInstanceRemoval(
-        `Remove the ${providerInstanceName(instance)} provider instance?`,
+        `移除 ${providerInstanceName(instance)} 智能体？`,
         { title: "删除这个提供方实例？", confirmLabel: "删除" },
       );
       if (!confirmed) return;
@@ -868,9 +868,9 @@ export function EnvironmentProviderSettings({
       resolveProviderInstanceEnabled(instance) &&
       !resolveProviderInstanceEnabled({ driver: driverKind });
     const confirmed = await confirmProviderInstanceRemoval(
-      `Reset the ${providerInstanceName(instance)} provider to its defaults?`,
+      `将 ${providerInstanceName(instance)} 智能体重置为默认值？`,
       { title: "把这个提供方恢复为默认？", confirmLabel: "恢复默认" },
-      turnsOff ? " It will also be turned off." : "",
+      turnsOff ? " 它也会被停用。" : "",
     );
     if (!confirmed) return;
     const result = await persistProviderInstance({ operation: "remove", instanceId });

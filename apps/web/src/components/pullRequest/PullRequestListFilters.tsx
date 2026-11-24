@@ -315,7 +315,7 @@ function PullRequestAuthorChoices({
               <span className="min-w-0 flex-1 truncate">{option.actor.login}</span>
               {option.mergedCount > 0 ? (
                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {option.mergedCount} merges loaded
+                  已加载 {option.mergedCount} 个已合并 PR
                 </span>
               ) : null}
             </span>

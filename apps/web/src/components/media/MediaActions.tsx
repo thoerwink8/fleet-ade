@@ -157,7 +157,7 @@ export function MediaActions({
 
       const action = await api.contextMenu.show(items, position);
       if (!action) return;
-      failureTitle = `Could not ${items.find((item) => item.id === action)?.label.toLowerCase() ?? "complete media action"}`;
+      failureTitle = `无法${items.find((item) => item.id === action)?.label ?? "完成媒体操作"}`;
       const text =
         action === "copy-full-path" && reference?.kind === "file"
           ? reference.path

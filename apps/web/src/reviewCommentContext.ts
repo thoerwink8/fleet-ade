@@ -72,7 +72,7 @@ export function buildFileReviewComment(input: {
   return {
     id: input.id,
     sectionId: `file:${input.filePath}`,
-    sectionTitle: "File comment",
+    sectionTitle: "文件评论",
     filePath: input.filePath,
     startIndex: startLine - 1,
     endIndex: endLine - 1,
@@ -439,7 +439,7 @@ function formatDiffReviewRangeLabel(lines: ReadonlyArray<DiffReviewLine>): strin
   const firstNumber = firstLine.newLineNumber ?? firstLine.oldLineNumber;
   const lastNumber = lastLine.newLineNumber ?? lastLine.oldLineNumber;
   if (firstNumber === null || lastNumber === null) {
-    return lines.length === 1 ? "line" : `${lines.length} lines`;
+    return lines.length === 1 ? "1 行" : `${lines.length} 行`;
   }
 
   const firstMarker = getDiffChangeMarker(firstLine.change).trim();

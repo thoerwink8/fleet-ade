@@ -37,7 +37,7 @@ export function ThreadDetailsSection({
       >
         <h3
           id={headingId}
-          className="min-w-0 truncate text-meta font-semibold text-muted-foreground select-none"
+          className="min-w-0 truncate text-meta font-medium text-muted-foreground select-none"
         >
           {title}
         </h3>

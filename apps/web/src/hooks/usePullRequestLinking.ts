@@ -56,7 +56,7 @@ export function usePullRequestLinking(environmentId: EnvironmentId | null | unde
       threadRef.environmentId !== environmentId ||
       (linked && !canLink(url))
     )
-      throw new Error("The pull request is not available in this environment.");
+      throw new Error("这个 PR 在当前电脑上不可用。");
     const mutation = planThreadPullRequestMutation({
       capabilities: appAtomRegistry.get(environmentServerConfigsAtom).get(threadRef.environmentId)
         ?.environment.capabilities,
@@ -64,13 +64,12 @@ export function usePullRequestLinking(environmentId: EnvironmentId | null | unde
       reference: { ...parsed, url },
       linked,
     });
-    if (mutation === null)
-      throw new Error("This environment does not support linking this pull request.");
+    if (mutation === null) throw new Error("当前电脑不支持关联这个 PR。");
     const result = await (mutation.type === "thread.pull-request.link"
       ? link({ environmentId: threadRef.environmentId, input: mutation.input })
       : unlink({ environmentId: threadRef.environmentId, input: mutation.input }));
     if (result._tag === "Failure") {
-      if (isAtomCommandInterrupted(result)) throw new Error("Link update interrupted.");
+      if (isAtomCommandInterrupted(result)) throw new Error("关联更新已中断。");
       throw squashAtomCommandFailure(result);
     }
   };

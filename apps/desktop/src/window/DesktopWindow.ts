@@ -42,7 +42,7 @@ class ContextMenuImageCopyError extends Schema.TaggedError<ContextMenuImageCopyE
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Could not copy the context-menu image.";
+    return "无法复制右键菜单的图片。";
   }
 }
 // Match --workspace-topbar-height in apps/web/src/index.css; native macOS buttons stay 14 points at any zoom.

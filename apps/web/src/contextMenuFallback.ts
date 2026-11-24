@@ -447,7 +447,7 @@ export function showContextMenuFallback<T extends string>(
 
         if (item.header === true) {
           const header = document.createElement("div");
-          header.className = "px-2 py-1.5 font-semibold text-muted-foreground text-meta";
+          header.className = "px-2 py-1.5 font-medium text-muted-foreground text-meta";
           header.textContent = item.label;
           inner.appendChild(header);
           continue;

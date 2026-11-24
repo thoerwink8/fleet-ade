@@ -50,7 +50,7 @@ export function Calendar({
   const defaultClassNames = {
     button_next: buttonClassNames,
     button_previous: buttonClassNames,
-    caption_label: "text-base sm:text-row font-semibold flex items-center gap-2 h-full",
+    caption_label: "text-base sm:text-row font-medium flex items-center gap-2 h-full",
     day: "size-(--cell-size) text-sm py-px",
     day_button: cn(
       buttonClassNames,
@@ -60,7 +60,7 @@ export function Calendar({
     dropdown_root:
       "relative has-focus:border-ring has-focus:ring-ring/50 has-focus:ring-[3px] has-focus:ring-inset border border-input shadow-xs/5 rounded-lg px-[calc(--spacing(3)-1px)] h-9 sm:h-8 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-me-1",
     dropdowns:
-      "w-full flex items-center text-base sm:text-row justify-center h-(--cell-size) gap-1.5 *:[span]:font-semibold",
+      "w-full flex items-center text-base sm:text-row justify-center h-(--cell-size) gap-1.5 *:[span]:font-medium",
     hidden: "invisible",
     month: "w-full",
     month_caption:

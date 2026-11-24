@@ -334,7 +334,7 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
                 new ProviderDriverError({
                   driver: DRIVER,
                   instanceId,
-                  detail: `Failed to probe Codex skills for '${cwd}'`,
+                  detail: `无法探测 '${cwd}' 的 Codex 技能`,
                   cause,
                 }),
             ),

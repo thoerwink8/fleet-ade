@@ -18,8 +18,7 @@ export function getComposerPromptLengthValidationMessage(prompt: string): string
   const excessCharacters = inputLength - PROVIDER_SEND_TURN_MAX_INPUT_CHARS;
   if (excessCharacters <= 0) return null;
 
-  const characterLabel = excessCharacters === 1 ? "character" : "characters";
-  return `Prompt is ${excessCharacters.toLocaleString("en-US")} ${characterLabel} over the ${PROVIDER_SEND_TURN_MAX_INPUT_CHARS.toLocaleString("en-US")}-character limit. Shorten or split it before sending.`;
+  return `提示词比 ${PROVIDER_SEND_TURN_MAX_INPUT_CHARS.toLocaleString("zh-CN")} 字符的上限多了 ${excessCharacters.toLocaleString("zh-CN")} 个字符。发送前请缩短或拆分。`;
 }
 
 export function getComposerSubmissionValidationMessage(

@@ -69,7 +69,7 @@ registerCustomTheme(
   READABLE_LIGHT_THEME_NAME,
   async () => {
     const base = await getResolvedOrResolveTheme("pierre-light", "highlights");
-    if (!base.zed) throw new Error("pierre-light has no Highlights palette");
+    if (!base.zed) throw new Error("pierre-light 没有 Highlights 调色板");
     return withReadableSyntax(base.zed);
   },
   "zed",

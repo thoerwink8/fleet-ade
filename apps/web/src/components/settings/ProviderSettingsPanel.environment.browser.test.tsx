@@ -431,10 +431,11 @@ describe("EnvironmentProviderSettings instance removal", () => {
     await using _screen = await render(panel({ targetInstanceId: antigravityId }));
     await userEvent.click(page.getByRole("button", { name: /将 .* 提供方设置 恢复为默认值/ }));
 
-    expect(state.confirm).toHaveBeenCalledWith(
-      expect.stringContaining("It will also be turned off."),
-      { title: "把这个提供方恢复为默认？", confirmLabel: "恢复默认", variant: "destructive" },
-    );
+    expect(state.confirm).toHaveBeenCalledWith(expect.stringContaining("它也会被停用。"), {
+      title: "把这个提供方恢复为默认？",
+      confirmLabel: "恢复默认",
+      variant: "destructive",
+    });
     expect(state.mutateProviderInstance).not.toHaveBeenCalled();
   });
 

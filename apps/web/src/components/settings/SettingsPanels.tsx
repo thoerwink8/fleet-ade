@@ -103,12 +103,12 @@ const TIMESTAMP_FORMAT_LABELS = {
 };
 
 const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
-  stacked: "Stacked",
-  split: "Split",
+  stacked: "上下堆叠",
+  split: "左右并排",
 };
 
 const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
-  direct: "Direct",
+  direct: "直接退出",
   hold: "长按",
   "double-click": "按两次",
 };
@@ -875,7 +875,7 @@ const TOOL_CALL_VISIBILITY_LABELS: Record<ToolCallVisibility, string> = {
   showAll: "全部显示",
   hideSuccessful: "隐藏成功的调用",
   hideAll: "全部隐藏",
-  zen: "Zen",
+  zen: "极简",
 };
 
 const isToolCallVisibility = Schema.is(ToolCallVisibility);

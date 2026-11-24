@@ -60,7 +60,7 @@ function BreadcrumbLabel(props: {
           <span
             className={cn(
               "block max-w-40 truncate rounded-sm px-0.5",
-              props.current ? "font-semibold text-foreground" : "text-muted-foreground",
+              props.current ? "font-medium text-foreground" : "text-muted-foreground",
             )}
           />
         }

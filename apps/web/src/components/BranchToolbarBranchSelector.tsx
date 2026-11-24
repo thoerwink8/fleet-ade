@@ -639,7 +639,7 @@ export function BranchToolbarBranchSelector({
             <SourceControlIcon className="size-3.5 shrink-0 text-muted-foreground" />
             <span className="flex min-w-0 flex-col items-start">
               <span className="truncate font-medium">
-                Checkout {sourceControlPresentation.terminology.singular}
+                检出 {sourceControlPresentation.terminology.singular}
               </span>
               <span className="truncate text-muted-foreground text-xs">{prReference}</span>
             </span>

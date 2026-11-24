@@ -222,7 +222,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         sourceThreadId: input.sourceThreadId,
         targetThreadId,
         runId: input.runId,
-        title: `${activeThread.title} fork`,
+        title: `${activeThread.title}（分叉）`,
       },
     });
     if (result._tag === "Failure") {

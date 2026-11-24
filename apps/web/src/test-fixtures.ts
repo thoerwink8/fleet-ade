@@ -179,7 +179,7 @@ export function makeStreamingTimelineFixture(text = "") {
       type: "command_execution",
       status: "failed",
       input: "vp test",
-      output: "Test failed",
+      output: "测试失败",
       exitCode: 1,
     },
     {
@@ -205,7 +205,7 @@ export function makeStreamingTimelineFixture(text = "") {
       type: "dynamic_tool",
       toolName: "read_file",
       input: { path: "/repo/src/index.ts" },
-      output: "Contents",
+      output: "文件内容",
     },
     {
       ...base("live-assistant-item", runId, 7),

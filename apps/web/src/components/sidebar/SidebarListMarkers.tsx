@@ -153,7 +153,7 @@ export function SidebarSectionHeader(props: {
       ) : (
         <div
           data-sidebar-row={`shelf:${shelf}`}
-          className="flex h-6 w-full items-center gap-2 rounded-md px-2 text-left text-meta font-semibold text-secondary-label"
+          className="flex h-6 w-full items-center gap-2 rounded-md px-2 text-left text-meta font-medium text-secondary-label"
         >
           <span aria-hidden className="flex shrink-0">
             <InboxIcon className="size-3.5 text-muted-foreground" />

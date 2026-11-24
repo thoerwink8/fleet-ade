@@ -16,6 +16,7 @@ function syntaxTokenStyle(token: SyntaxToken): CSSProperties {
   return {
     ...(token.color ? { color: token.color } : {}),
     ...(fontStyle & 1 ? { fontStyle: "italic" } : {}),
+    // oxlint-disable-next-line t3code/max-font-weight -- Shiki syntax highlighting bold token renders user/agent code content.
     ...(fontStyle & 2 ? { fontWeight: 700 } : {}),
     ...(fontStyle & 4 ? { textDecoration: "underline" } : {}),
   };

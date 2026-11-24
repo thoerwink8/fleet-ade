@@ -440,7 +440,7 @@ function ProjectDetail({
           return members.map((member) => (
             <SettingsRow
               key={member.physicalProjectKey}
-              title={member.environmentLabel ?? "环境"}
+              title={member.environmentLabel ?? "电脑"}
               description={member.workspaceRoot}
               control={checkoutControls(member)}
             />
@@ -451,7 +451,7 @@ function ProjectDetail({
         const environment = environmentById.get(environmentId);
         const labels = environment
           ? settingsScopeEnvironmentLabels(environment, environments)
-          : { primary: firstMember.environmentLabel ?? "Environment", secondary: environmentId };
+          : { primary: firstMember.environmentLabel ?? "电脑", secondary: environmentId };
         return (
           <SettingsRow
             key={environmentId}

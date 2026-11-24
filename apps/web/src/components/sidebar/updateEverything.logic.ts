@@ -254,15 +254,11 @@ export function getUpdateEverythingToastView(result: UpdateEverythingResult): {
   readonly description?: string;
 } | null {
   const parts = [
-    countLabel(result.updatedServers, "server"),
-    countLabel(result.updatedProviders, "provider"),
+    countLabel(result.updatedServers, "台电脑"),
+    countLabel(result.updatedProviders, "个智能体"),
   ].filter((part) => part !== null);
   const restarting =
-    result.restarting.length === 0
-      ? []
-      : [
-          `${joinList(result.restarting)} ${result.restarting.length === 1 ? "is" : "are"} still restarting.`,
-        ];
+    result.restarting.length === 0 ? [] : [`${joinList(result.restarting)} 仍在重启。`];
   if (result.failures.length === 0) {
     if (parts.length === 0) return null;
     return {
@@ -299,12 +295,12 @@ export interface UpdateEverythingRow {
 }
 
 function countLabel(count: number, noun: string): string | null {
-  return count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`;
+  return count === 0 ? null : `${count} ${noun}`;
 }
 
 function joinList(parts: ReadonlyArray<string>): string {
-  if (parts.length <= 2) return parts.join(" and ");
-  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+  if (parts.length <= 2) return parts.join("和");
+  return `${parts.slice(0, -1).join("、")}和${parts.at(-1)}`;
 }
 
 /** One row per machine, combining server and provider updates. */
@@ -319,7 +315,7 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
     0,
   );
   const summary = `更新 ${joinList(
-    [countLabel(plan.servers.length, "server"), countLabel(providerCount, "provider")].filter(
+    [countLabel(plan.servers.length, "台电脑"), countLabel(providerCount, "个智能体")].filter(
       (part) => part !== null,
     ),
   )}`;

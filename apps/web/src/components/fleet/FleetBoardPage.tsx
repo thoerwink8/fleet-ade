@@ -624,7 +624,7 @@ export function FleetBoardPage() {
                       aria-label={group.name}
                       className="flex min-w-0 flex-col"
                     >
-                      <div className="flex items-center gap-2 px-2 text-meta font-semibold text-secondary-label">
+                      <div className="flex items-center gap-2 px-2 text-meta font-medium text-secondary-label">
                         <MachineIcon
                           serverConfig={serverConfigs.get(group.environmentId as EnvironmentId)}
                         />

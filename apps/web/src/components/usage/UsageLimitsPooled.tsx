@@ -63,7 +63,7 @@ function AccountChip({ email }: { readonly email: string }) {
     <span
       role="img"
       aria-label={`账户 ${accountInitials(email)}`}
-      className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-3xs leading-none font-semibold"
+      className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-3xs leading-none font-medium"
       style={{ backgroundColor: `oklch(0.85 0.08 ${hue})`, color: `oklch(0.35 0.1 ${hue})` }}
     >
       {accountInitials(email)}
@@ -159,7 +159,7 @@ function SegmentPopover({
   return (
     <div className="flex w-72 max-w-[calc(100vw-3rem)] flex-col gap-2.5 text-xs">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="flex items-center gap-2 text-row font-semibold text-foreground">
+        <span className="flex items-center gap-2 text-row font-medium text-foreground">
           <AccountAvatar account={account} />
           <span className="truncate">
             {account.displayName ?? providerClients.get(account.driver)?.label ?? account.driver}
@@ -189,9 +189,9 @@ function SegmentPopover({
             {resetsIn ? ` · ${resetsIn}` : ""}
           </Row>
         ) : null}
-        {timeLeft !== null ? <Row label="匀速进度">{timeLeft}% left by now</Row> : null}
+        {timeLeft !== null ? <Row label="匀速进度">此刻应还剩 {timeLeft}%</Row> : null}
         {reset && reset.restoresPercent > 0 ? (
-          <Row label="恢复">+{reset.restoresPercent}% of pool</Row>
+          <Row label="恢复">+{reset.restoresPercent}%（占额度池）</Row>
         ) : null}
       </div>
       {choices.length > 0 && redeem ? (
@@ -403,9 +403,7 @@ function SegmentTriggers({
           ) : null}
           {/* A single-account bar repeats the headline percentage. */}
           {showAccountName ? (
-            <span className="shrink-0 font-semibold text-foreground tabular-nums">
-              {remaining}%
-            </span>
+            <span className="shrink-0 font-medium text-foreground tabular-nums">{remaining}%</span>
           ) : null}
           {resetsIn || credits ? (
             <span className="ms-auto flex min-w-0 items-center gap-1.5 overflow-hidden rounded-sm bg-background/85 px-1.5 py-0.5 text-2xs whitespace-nowrap text-foreground tabular-nums">
@@ -417,7 +415,7 @@ function SegmentTriggers({
                       ·
                     </span>
                   ) : null}
-                  <span aria-hidden className="inline-flex items-center gap-0.5 font-semibold">
+                  <span aria-hidden className="inline-flex items-center gap-0.5 font-medium">
                     <TicketIcon className="size-3" aria-hidden />
                     {credits}
                   </span>
@@ -455,7 +453,7 @@ function LegendRow({
       className="min-w-0 @2xl/pool:hidden"
     >
       <AccountName account={account} className="min-w-0 truncate font-medium text-foreground" />
-      <span className="shrink-0 font-semibold text-foreground tabular-nums">{remaining}%</span>
+      <span className="shrink-0 font-medium text-foreground tabular-nums">{remaining}%</span>
       <span className="ms-auto flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground tabular-nums">
         {resetsIn ? `↻ ${resetsIn}` : ""}
         {credits ? (
@@ -463,14 +461,12 @@ function LegendRow({
             {resetsIn ? <span aria-hidden>·</span> : null}
             <span
               aria-hidden
-              className="inline-flex items-center gap-0.5 font-semibold text-foreground"
+              className="inline-flex items-center gap-0.5 font-medium text-foreground"
             >
               <TicketIcon className="size-3" aria-hidden />
               {credits}
             </span>
-            <span className="sr-only">
-              {credits} reset {credits === 1 ? "credit" : "credits"} banked
-            </span>
+            <span className="sr-only">攒了 {credits} 次重置额度</span>
           </>
         ) : null}
       </span>
@@ -532,10 +528,10 @@ function PoolWindowCard({
     <div className="grid items-center gap-x-6 gap-y-3 rounded-lg border border-border/60 p-4 md:grid-cols-[11rem_minmax(0,1fr)]">
       <div className="flex flex-col gap-1">
         {label !== null ? (
-          <span className="text-row font-semibold text-foreground">{label ?? pool.label}</span>
+          <span className="text-row font-medium text-foreground">{label ?? pool.label}</span>
         ) : null}
         <span className="flex items-baseline gap-2">
-          <span className="text-3xl font-semibold text-foreground tabular-nums">
+          <span className="text-3xl font-medium text-foreground tabular-nums">
             {pool.remainingPercent}%
           </span>
           <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
@@ -563,7 +559,7 @@ function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: nu
   const windows = displayLimitWindows(pool);
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="flex items-center gap-2 text-row font-semibold text-foreground">
+      <h2 className="flex items-center gap-2 text-row font-medium text-foreground">
         <ProviderInstanceIcon
           driverKind={pool.driver}
           displayName={label}
@@ -627,7 +623,7 @@ export function UsageLimitsPooled({
               <OpenAI className="size-5 shrink-0" aria-hidden="true" />
             ) : null}
             <div className="min-w-0 space-y-1">
-              <h2 className="text-row font-semibold">{link.label}</h2>
+              <h2 className="text-row font-medium">{link.label}</h2>
               <p className="text-xs break-words text-muted-foreground">
                 {link.accounts.join(", ")}
               </p>

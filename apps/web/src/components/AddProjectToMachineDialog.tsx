@@ -233,7 +233,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           <DialogPanel>
             <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="flex min-w-0 items-center gap-1.5 text-row font-semibold">
+                <span className="flex min-w-0 items-center gap-1.5 text-row font-medium">
                   <EnvironmentMachineIcon
                     kind={resolveEnvironmentMachineKind(source?.serverConfig ?? null)}
                     className="size-3.5 shrink-0"
@@ -251,9 +251,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                   <ArrowRightIcon className="-ms-1 size-3.5" aria-hidden />
                 </span>
                 <span>
-                  {selectedFiles.size === 0
-                    ? "无文件"
-                    : `+ ${selectedFiles.size} ${selectedFiles.size === 1 ? "file" : "files"}`}
+                  {selectedFiles.size === 0 ? "无文件" : `+ ${selectedFiles.size} 个文件`}
                 </span>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
@@ -283,7 +281,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     </SelectPopup>
                   </Select>
                 ) : (
-                  <span className="flex min-w-0 items-center gap-1.5 text-row font-semibold">
+                  <span className="flex min-w-0 items-center gap-1.5 text-row font-medium">
                     {target ? (
                       <EnvironmentMachineIcon kind={target.machine} className="size-3.5 shrink-0" />
                     ) : null}
@@ -315,7 +313,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${id}-path`}>Folder on {target?.label ?? "另一台机器"}</Label>
+              <Label htmlFor={`${id}-path`}>{target?.label ?? "另一台机器"}上的文件夹</Label>
               <Input
                 id={`${id}-path`}
                 value={destinationPath}

@@ -393,7 +393,7 @@ function RightPanelEmptyState(props: {
       )}
     >
       <div className="w-full max-w-xs py-6">
-        <h3 className="mb-3 text-center text-row font-semibold text-foreground">打开面板</h3>
+        <h3 className="mb-3 text-center text-row font-medium text-foreground">打开面板</h3>
         <div className="flex flex-col gap-0.5">
           {actions.map((action) =>
             action.available ? (

@@ -24,7 +24,7 @@ export function StandalonePageHeader({
         <span className="text-lg font-medium tracking-tight text-foreground">Fleet ADE</span>
         {context ? <span className="text-sm">{context}</span> : null}
       </div>
-      <h1 className="mt-6 text-xl leading-tight font-semibold">{title}</h1>
+      <h1 className="mt-6 text-xl leading-tight font-medium">{title}</h1>
       <p className="mt-2 text-sm text-muted-foreground">{description}</p>
     </>
   );

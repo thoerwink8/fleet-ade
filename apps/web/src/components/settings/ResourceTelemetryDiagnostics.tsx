@@ -179,7 +179,7 @@ function SourceStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-3xs font-semibold uppercase tracking-widest",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-3xs font-medium uppercase tracking-widest",
         tone === "neutral" && "border-border/70 bg-muted/45 text-muted-foreground",
         tone === "default" && "border-success/25 bg-success/10 text-success-foreground",
         tone === "warning" && "border-warning/30 bg-warning/10 text-warning-foreground",
@@ -228,7 +228,7 @@ function IconStat({
 }) {
   return (
     <div className="group min-w-0 px-4 py-4 sm:px-5">
-      <div className="flex items-center gap-2 text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+      <div className="flex items-center gap-2 text-3xs font-medium uppercase tracking-widest text-muted-foreground/70">
         <span className="text-muted-foreground/55 transition-colors group-hover:text-foreground/65">
           {icon}
         </span>
@@ -236,7 +236,7 @@ function IconStat({
       </div>
       <div
         className={cn(
-          "mt-2.5 truncate font-mono text-2xl font-semibold tracking-tighter tabular-nums text-foreground",
+          "mt-2.5 truncate font-mono text-2xl font-medium tracking-tighter tabular-nums text-foreground",
           tone === "warning" && "text-warning-foreground",
           tone === "danger" && "text-destructive",
         )}
@@ -263,11 +263,11 @@ function AggregateCard({
     <div className="relative overflow-hidden border-t border-border/60 px-4 py-4 first:border-t-0 md:border-t-0 md:border-l md:first:border-l-0 sm:px-5">
       <span className={cn("absolute inset-x-5 top-0 h-0.5 rounded-full opacity-75", accentClass)} />
       <div className="flex items-center justify-between gap-3">
-        <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground/75">
+        <div className="text-3xs font-medium uppercase tracking-widest text-muted-foreground/75">
           {label}
         </div>
         <div className="rounded-md bg-muted/55 px-1.5 py-0.5 font-mono text-3xs tabular-nums text-muted-foreground/70">
-          {aggregate.processCount} {aggregate.processCount === 1 ? "process" : "processes"}
+          {aggregate.processCount} 个进程
         </div>
       </div>
       <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -283,7 +283,7 @@ function AggregateCard({
 function MetricPair({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground/45">
+      <div className="text-3xs font-medium uppercase tracking-widest text-muted-foreground/45">
         {label}
       </div>
       <div className="truncate font-mono text-xs font-medium tabular-nums text-foreground/90">
@@ -300,7 +300,7 @@ function HealthSource({ label, health }: { label: string; health: ResourceTeleme
   return (
     <div className="flex items-start justify-between gap-4 border-t border-border/50 py-3 first:border-t-0">
       <div className="min-w-0">
-        <div className="text-row font-semibold text-foreground">{label}</div>
+        <div className="text-row font-medium text-foreground">{label}</div>
         <div className="mt-1 text-2xs leading-relaxed text-muted-foreground/65">
           {expectedInBrowser
             ? "在桌面应用内打开此页面时可用。"
@@ -576,17 +576,17 @@ function ProcessTable({
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-3xs uppercase tracking-widest text-muted-foreground/65">
             <tr>
-              <th className="px-4 py-2 font-semibold sm:pl-5">进程</th>
-              <th className="px-3 py-2 font-semibold">分类</th>
-              <th className="px-3 py-2 text-right font-semibold">CPU</th>
-              <th className="px-3 py-2 text-right font-semibold">CPU 时间</th>
-              <th className="px-3 py-2 text-right font-semibold">内存</th>
-              <th className="px-3 py-2 text-right font-semibold">每秒读取</th>
-              <th className="px-3 py-2 text-right font-semibold">每秒写入</th>
-              <th className="px-3 py-2 text-right font-semibold">累计读取</th>
-              <th className="px-3 py-2 text-right font-semibold">累计写入</th>
-              <th className="px-3 py-2 text-right font-semibold">PID</th>
-              <th className="px-2 py-2 text-right font-semibold sm:pr-4">结束</th>
+              <th className="px-4 py-2 font-medium sm:pl-5">进程</th>
+              <th className="px-3 py-2 font-medium">分类</th>
+              <th className="px-3 py-2 text-right font-medium">CPU</th>
+              <th className="px-3 py-2 text-right font-medium">CPU 时间</th>
+              <th className="px-3 py-2 text-right font-medium">内存</th>
+              <th className="px-3 py-2 text-right font-medium">每秒读取</th>
+              <th className="px-3 py-2 text-right font-medium">每秒写入</th>
+              <th className="px-3 py-2 text-right font-medium">累计读取</th>
+              <th className="px-3 py-2 text-right font-medium">累计写入</th>
+              <th className="px-3 py-2 text-right font-medium">PID</th>
+              <th className="px-2 py-2 text-right font-medium sm:pr-4">结束</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -680,15 +680,15 @@ function HistoryProcessTable({
           </colgroup>
           <thead className="sticky top-0 z-10 border-b border-border/60 bg-card text-3xs uppercase tracking-widest text-muted-foreground/65">
             <tr>
-              <th className="px-4 py-2 font-semibold sm:pl-5">进程</th>
-              <th className="px-3 py-2 font-semibold">分类</th>
-              <th className="px-3 py-2 text-right font-semibold">CPU 时间</th>
-              <th className="px-3 py-2 text-right font-semibold">峰值 CPU</th>
-              <th className="px-3 py-2 text-right font-semibold">峰值内存</th>
-              <th className="px-3 py-2 text-right font-semibold">读取</th>
-              <th className="px-3 py-2 text-right font-semibold">写入</th>
-              <th className="px-3 py-2 text-right font-semibold">样本数</th>
-              <th className="px-3 py-2 text-right font-semibold sm:pr-5">PID</th>
+              <th className="px-4 py-2 font-medium sm:pl-5">进程</th>
+              <th className="px-3 py-2 font-medium">分类</th>
+              <th className="px-3 py-2 text-right font-medium">CPU 时间</th>
+              <th className="px-3 py-2 text-right font-medium">峰值 CPU</th>
+              <th className="px-3 py-2 text-right font-medium">峰值内存</th>
+              <th className="px-3 py-2 text-right font-medium">读取</th>
+              <th className="px-3 py-2 text-right font-medium">写入</th>
+              <th className="px-3 py-2 text-right font-medium">样本数</th>
+              <th className="px-3 py-2 text-right font-medium sm:pr-5">PID</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -762,12 +762,12 @@ function AttributionTable({ entries }: { entries: ReadonlyArray<ResourceAttribut
         </colgroup>
         <thead className="border-b border-border/60 text-3xs uppercase tracking-widest text-muted-foreground/65">
           <tr>
-            <th className="px-4 py-2 font-semibold sm:pl-5">组件</th>
-            <th className="px-3 py-2 font-semibold">操作</th>
-            <th className="px-3 py-2 text-right font-semibold">逻辑读取</th>
-            <th className="px-3 py-2 text-right font-semibold">逻辑写入</th>
-            <th className="px-3 py-2 text-right font-semibold">次数</th>
-            <th className="px-3 py-2 text-right font-semibold sm:pr-5">时间</th>
+            <th className="px-4 py-2 font-medium sm:pl-5">组件</th>
+            <th className="px-3 py-2 font-medium">操作</th>
+            <th className="px-3 py-2 text-right font-medium">逻辑读取</th>
+            <th className="px-3 py-2 text-right font-medium">逻辑写入</th>
+            <th className="px-3 py-2 text-right font-medium">次数</th>
+            <th className="px-3 py-2 text-right font-medium sm:pr-5">时间</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/50">
@@ -1002,7 +1002,7 @@ function ResourceTelemetryDiagnosticsBody({
         <div className="overflow-hidden rounded-[inherit]">
           <div className="flex flex-col gap-3 border-b border-border/60 bg-linear-to-r from-muted/45 via-muted/20 to-transparent px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div>
-              <div className="text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+              <div className="text-3xs font-medium uppercase tracking-widest text-muted-foreground/70">
                 Fleet ADE 系统资源占用
               </div>
               <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
@@ -1058,7 +1058,7 @@ function ResourceTelemetryDiagnosticsBody({
               icon={<GaugeIcon className="size-3.5" />}
               label="CPU 速度上限"
               value={
-                snapshot ? (speedLimit === null ? "Unknown" : `${speedLimit.toFixed(0)}%`) : "..."
+                snapshot ? (speedLimit === null ? "未知" : `${speedLimit.toFixed(0)}%`) : "..."
               }
               detail={snapshot ? `温度状态：${snapshot.power.thermalState}` : undefined}
               tone={speedLimit !== null && speedLimit < 80 ? "warning" : "default"}
@@ -1106,7 +1106,7 @@ function ResourceTelemetryDiagnosticsBody({
       >
         <div className="grid overflow-hidden rounded-[inherit] md:grid-cols-2 md:divide-x md:divide-border/60">
           <div className="px-4 py-4 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+            <div className="mb-3 flex items-center gap-2 text-3xs font-medium uppercase tracking-widest text-muted-foreground/70">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <BatteryIcon className="size-3.5" />
               </span>
@@ -1117,36 +1117,36 @@ function ResourceTelemetryDiagnosticsBody({
                 <DetailRow
                   label="电源来源"
                   value={booleanStateLabel(snapshot.power.onBattery, {
-                    true: "Battery",
+                    true: "电池",
                     false: "外接电源",
                   })}
                 />
                 <DetailRow
                   label="低电量模式"
                   value={booleanStateLabel(snapshot.power.lowPowerMode, {
-                    true: "Enabled",
-                    false: "Disabled",
+                    true: "已启用",
+                    false: "已关闭",
                   })}
                 />
                 <DetailRow
                   label="闲置"
                   value={`${booleanStateLabel(snapshot.power.idle, {
-                    true: "Idle",
-                    false: "Active",
+                    true: "闲置",
+                    false: "活跃",
                   })}${
                     snapshot.power.idleSeconds === null
                       ? ""
-                      : ` · ${Math.round(snapshot.power.idleSeconds)}s`
+                      : ` · ${Math.round(snapshot.power.idleSeconds)} 秒`
                   }`}
                 />
                 <DetailRow
                   label="会话"
                   value={
                     snapshot.power.suspended
-                      ? "Suspended"
+                      ? "已挂起"
                       : booleanStateLabel(snapshot.power.locked, {
-                          true: "Locked",
-                          false: "Unlocked",
+                          true: "已锁定",
+                          false: "未锁定",
                         })
                   }
                 />
@@ -1163,7 +1163,7 @@ function ResourceTelemetryDiagnosticsBody({
               </>
             ) : (
               <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-5">
-                <div className="text-row font-semibold text-foreground">未连接桌面主机状态信号</div>
+                <div className="text-row font-medium text-foreground">未连接桌面主机状态信号</div>
                 <p className="mt-1.5 max-w-sm text-2xs leading-relaxed text-muted-foreground/70">
                   电源、闲置、锁定和温度状态由桌面主机提供。当前浏览器会话中的进程遥测仍正常运行。
                 </p>
@@ -1171,7 +1171,7 @@ function ResourceTelemetryDiagnosticsBody({
             )}
           </div>
           <div className="border-t border-border/60 px-4 py-4 md:border-t-0 sm:px-5">
-            <div className="mb-3 flex items-center gap-2 text-3xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+            <div className="mb-3 flex items-center gap-2 text-3xs font-medium uppercase tracking-widest text-muted-foreground/70">
               <span className="flex size-6 items-center justify-center rounded-md bg-muted/60">
                 <GaugeIcon className="size-3.5" />
               </span>
@@ -1187,7 +1187,7 @@ function ResourceTelemetryDiagnosticsBody({
                 />
                 <DetailRow
                   label="进程扫描"
-                  value={`${snapshot.health.retainedProcessCount}/${snapshot.health.scannedProcessCount} retained`}
+                  value={`${snapshot.health.retainedProcessCount}/${snapshot.health.scannedProcessCount} 已保留`}
                 />
                 <DetailRow
                   label="无法访问"

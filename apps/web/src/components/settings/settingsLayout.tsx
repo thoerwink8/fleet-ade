@@ -222,7 +222,7 @@ export function SettingsSectionHeader({
       className={cn("flex min-h-6 items-center justify-between gap-4 px-1", className)}
     >
       <div className="flex min-w-0 items-center gap-1">
-        <Heading className="flex min-h-6 items-center gap-2 text-dialog-title font-semibold text-foreground">
+        <Heading className="flex min-h-6 items-center gap-2 text-dialog-title font-medium text-foreground">
           {icon}
           {title}
         </Heading>
@@ -499,7 +499,7 @@ export function SettingsRow({
       <div className="flex flex-col gap-2 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_auto] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-6">
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex min-h-5 items-center gap-1.5">
-            <h3 className="text-row font-semibold text-foreground">{title}</h3>
+            <h3 className="text-row font-medium text-foreground">{title}</h3>
             {renderedInheritance ? (
               <span
                 className={cn(

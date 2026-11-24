@@ -1070,7 +1070,7 @@ export default function DiffPanel({
                   value={baseRefQuery}
                   onChange={(event) => setBaseRefQuery(event.target.value)}
                 />
-                <div className="grid shrink-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 border-b border-border/70 ps-3 pe-6.5 pt-2 pb-1.5 text-meta font-semibold text-muted-foreground uppercase tracking-wide">
+                <div className="grid shrink-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 border-b border-border/70 ps-3 pe-6.5 pt-2 pb-1.5 text-meta font-medium text-muted-foreground uppercase tracking-wide">
                   <span aria-hidden="true" />
                   <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem] items-center">
                     <span>分支</span>
@@ -1268,9 +1268,7 @@ export default function DiffPanel({
               <FlaskConicalOffIcon className="size-3.5" />
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {hideTestFiles
-                ? `Show ${testFileCount} hidden test ${testFileCount === 1 ? "file" : "files"}`
-                : "隐藏测试文件"}
+              {hideTestFiles ? `显示 ${testFileCount} 个隐藏的测试文件` : "隐藏测试文件"}
             </TooltipPopup>
           </Tooltip>
         )}
