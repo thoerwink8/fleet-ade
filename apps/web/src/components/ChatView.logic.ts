@@ -15,6 +15,7 @@ import type { SetStateAction } from "react";
 import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3tools/shared/model";
 import { getProviderModelCapabilities } from "../providerModels";
 import { RewindFailureError } from "./chat/revertConfirm.logic";
+import { classifyRewindOutcome, hasActiveRun } from "./chat/stopAndRewind.logic";
 import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
@@ -892,6 +893,107 @@ export async function waitForRevertedMessage(
         accepted = true;
         inspect();
       }, finish);
+  });
+}
+
+/** The person cancelled the rewind this client was waiting on; nothing should be shown. */
+export class RewindCancelledError extends Schema.TaggedError<RewindCancelledError>()(
+  "RewindCancelledError",
+  {},
+) {
+  override get message(): string {
+    return "回退已取消。";
+  }
+}
+
+export const isRewindCancelledError = Schema.is(RewindCancelledError);
+
+/** The held rewind went away and nothing completed: queued and cancelled look the same. */
+class RewindNotCompletedError extends Schema.TaggedError<RewindNotCompletedError>()(
+  "RewindNotCompletedError",
+  {},
+) {
+  override get message(): string {
+    return "回退没有完成，可能已被取消。可以重新回退。";
+  }
+}
+
+/** Time a queued rollback gets to land once the held rewind is gone, before it counts as lost. */
+export const REWIND_SETTLE_MS = 20_000;
+/** Same, when files are restored too: that step is slower. */
+export const REWIND_SETTLE_WITH_FILES_MS = 60_000;
+
+/**
+ * Waits for the `thread.stop-and-rollback` this client sent: completed id, this request's stored
+ * failure, or `signal`. No deadline while held. Held then gone: at once if a run is still active
+ * (the server only queues a rollback after the run settled, so it was cancelled), else `settleMs`.
+ * Never held: `timeoutMs`. Once ended it listens to nothing.
+ */
+export function waitForRollbackOutcome(
+  threadRef: ScopedThreadRef,
+  requestId: CommandId,
+  send: () => Promise<void>,
+  options: {
+    readonly signal?: AbortSignal;
+    readonly timeoutMs?: number;
+    readonly settleMs?: number;
+  } = {},
+): Promise<void> {
+  const { signal, timeoutMs = 120_000, settleMs = REWIND_SETTLE_MS } = options;
+  const threadAtom = environmentThreadDetails.stateAtom(threadRef);
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let unsubscribe = () => {};
+    let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const finish = (error?: unknown) => {
+      if (settled) return;
+      settled = true;
+      if (timeout !== undefined) globalThis.clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
+      unsubscribe();
+      if (error !== undefined) reject(error);
+      else resolve();
+    };
+    const onAbort = () => finish(new RewindCancelledError());
+    let wasHeld = false;
+    const armTimeout = (held: boolean, runActive: boolean) => {
+      if (held) {
+        wasHeld = true;
+        if (timeout !== undefined) globalThis.clearTimeout(timeout);
+        timeout = undefined;
+        return;
+      }
+      if (wasHeld && runActive) return finish(new RewindNotCompletedError());
+      timeout ??= wasHeld
+        ? globalThis.setTimeout(() => finish(new RewindNotCompletedError()), settleMs)
+        : globalThis.setTimeout(() => finish(new Error("等待会话回退超时。")), timeoutMs);
+    };
+    const inspect = () => {
+      const projection = Option.getOrNull(appAtomRegistry.get(threadAtom).data);
+      if (!projection) return;
+      const outcome = classifyRewindOutcome(projection.thread, requestId);
+      if (outcome.kind === "completed") return finish();
+      if (outcome.kind === "failed") {
+        return finish(
+          new RewindFailureError({
+            rawMessage: outcome.message,
+            ...(outcome.code === undefined ? {} : { code: outcome.code }),
+          }),
+        );
+      }
+      armTimeout(
+        projection.thread.pendingRollback?.requestId === requestId,
+        hasActiveRun(projection.runs),
+      );
+    };
+    if (signal?.aborted === true) {
+      finish(new RewindCancelledError());
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+    unsubscribe = appAtomRegistry.subscribe(threadAtom, inspect);
+    armTimeout(false, false);
+    Promise.resolve().then(send).then(inspect, finish);
   });
 }
 
