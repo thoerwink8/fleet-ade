@@ -170,7 +170,7 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
                 ? props.triggerKind === "skill" || props.triggerKind === "slash-command"
                   ? "正在搜索项目技能…"
                   : props.triggerKind === "pull-request"
-                    ? "正在查找 pull request…"
+                    ? "正在查找 PR…"
                     : "正在搜索项目文件…"
                 : (props.emptyStateText ??
                   (props.triggerKind === "skill"

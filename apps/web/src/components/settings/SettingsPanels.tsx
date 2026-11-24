@@ -1065,7 +1065,7 @@ function PullRequestLinksOpenInAppSetting() {
   return (
     <SettingsRow
       {...searchableSetting("pull-request-links-open-in-app")}
-      description="点击 pull request 链接时在 Fleet ADE 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
+      description="点击 PR 链接时在 Fleet ADE 中打开。关闭后会像其他链接一样，在 Git 托管平台上打开。"
       resetAction={
         openInApp ? null : (
           <SettingResetButton
@@ -1155,7 +1155,7 @@ export function DiffsSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("default-diff-file-state")}
-          description="打开差异或 pull request 的“代码”标签页时，文件默认展开还是折叠。"
+          description="打开差异或 PR 的“代码”标签页时，文件默认展开还是折叠。"
           resetAction={
             settings.diffFilesCollapsed !== DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed ? (
               <SettingResetButton
@@ -1197,7 +1197,7 @@ export function DiffsSettingsPanel() {
       <SettingsSection id="pull-requests" title="PR">
         <SettingsRow
           {...searchableSetting("proactive-panels")}
-          description="优先打开关联的 pull request；否则在改动至少 3 个文件或 50 行时打开“改动”面板。"
+          description="优先打开关联的 PR；否则在改动至少 3 个文件或 50 行时打开“改动”面板。"
           resetAction={
             settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled ? (
               <SettingResetButton
@@ -1492,7 +1492,7 @@ export function ThreadsSettingsPanel() {
             serverScoped
             settingKeys={["sidebarAutoSettleOnMerge"]}
             {...searchableSetting("auto-settle-merged-threads")}
-            description="Pull request 合并后将会话标为完成。已关闭的 pull request 仍会自动标为完成。"
+            description="PR 合并后将会话标为完成。已关闭的 PR 仍会自动标为完成。"
             resetAction={
               settings.sidebarAutoSettleOnMerge !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
@@ -1569,7 +1569,7 @@ export function ThreadsSettingsPanel() {
               serverScoped
               settingKeys={["sidebarAutoSettleKeepPullRequests"]}
               title="保留有关联 PR 的会话"
-              description="闲置不会让有 pull request 的会话标为完成，但合并和关闭仍会自动标为完成。"
+              description="闲置不会让有 PR 的会话标为完成，但合并和关闭仍会自动标为完成。"
               control={
                 <ScopedSwitch
                   settingKeys={["sidebarAutoSettleKeepPullRequests"]}

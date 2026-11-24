@@ -410,17 +410,17 @@ export function useComposerMenuItems({
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "这个项目无法使用 pull request。";
+        return "这个项目无法使用 PR。";
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "无法读取这个项目的 pull request。";
+        return "无法读取这个项目的 PR。";
       }
       return composerTrigger?.query
-        ? `没有匹配 ${composerTrigger.query} 的 pull request。`
-        : "这个仓库中没有 pull request。";
+        ? `没有匹配 ${composerTrigger.query} 的 PR。`
+        : "这个仓库中没有 PR。";
     }
     return composerTriggerKind === "path" ? "没有匹配的文件或文件夹。" : "没有匹配的命令。";
   })();

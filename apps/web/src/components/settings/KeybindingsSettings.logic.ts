@@ -433,7 +433,7 @@ const COMMAND_LABELS: Readonly<Record<string, string>> = {
   "rightPanel.toggleMaximized": "右侧面板：最大化或还原",
   "rightPanel.close": "右侧面板：关闭",
   "view.reopenClosed": "重新打开已关闭的标签页",
-  "pullRequest.copyNumber": "拉取请求：复制编号",
+  "pullRequest.copyNumber": "PR：复制编号",
   "diff.toggle": "差异：开关",
   "commandPalette.toggle": "命令面板：开关",
   "filePicker.toggle": "文件选择器：开关",

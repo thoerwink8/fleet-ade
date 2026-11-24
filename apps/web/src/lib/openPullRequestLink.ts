@@ -252,7 +252,7 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "无法打开 pull request 链接",
+          title: "无法打开 PR 链接",
           description: error instanceof Error ? error.message : "发生错误。",
         }),
       );

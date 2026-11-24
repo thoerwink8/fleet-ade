@@ -59,7 +59,7 @@ export function resolveThreadReferenceCopyTarget(input: {
         kind: "pull-request",
         value: pullRequestUrl,
         description: pullRequestUrl,
-        clipboardTarget: "pull request link",
+        clipboardTarget: "PR 链接",
         successTitle: "已复制 PR 链接",
         failureTitle: "无法复制 PR 链接",
       }

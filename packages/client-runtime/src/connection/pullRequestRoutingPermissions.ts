@@ -99,7 +99,7 @@ export class PullRequestRoutingPermissions extends Context.Reference<{
       Effect.fail(
         new ConnectionBlockedError({
           reason: "unsupported",
-          detail: "此客户端无法使用 pull request 路由偏好设置。",
+          detail: "此客户端无法使用 PR 路由偏好设置。",
         }),
       ),
     forget: () => Effect.void,

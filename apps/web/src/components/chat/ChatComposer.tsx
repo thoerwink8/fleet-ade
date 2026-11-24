@@ -3345,7 +3345,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {composerSuggestionsVisible && composerMenuItems.length === 0
                   ? isComposerMenuLoading
                     ? composerTriggerKind === "pull-request"
-                      ? "正在查找 pull request…"
+                      ? "正在查找 PR…"
                       : composerTriggerKind === "skill" || composerTriggerKind === "slash-command"
                         ? "正在搜索项目技能…"
                         : "正在搜索项目文件…"
