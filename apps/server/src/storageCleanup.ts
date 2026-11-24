@@ -729,9 +729,7 @@ const make = Effect.gen(function* () {
     const index = yield* read(["rev-parse", "--git-path", "index"]);
     if (index === null) return true;
     if (yield* fs.exists(`${path.resolve(cwd, index.stdout.trim())}.lock`))
-      return yield* failure(
-        "Git index is locked. Status will resume when the index lock is removed.",
-      );
+      return yield* failure("Git 索引已锁定。解除索引锁后会继续检查状态。");
     // Detached HEAD exits 1; full refs avoid shortening when a tag shares the branch name.
     const head = yield* read(["symbolic-ref", "--quiet", "HEAD"], 1);
     if (head === null) return true;
@@ -1203,7 +1201,7 @@ const make = Effect.gen(function* () {
                 SETTLE_SCRIPT_GRACE_MS,
           )
         )
-          return keep(waitForStop("刚刚收尾"));
+          return keep(waitForStop("刚刚完成"));
         const old =
           !deleted &&
           settings.worktreeAfterDays !== null &&
@@ -1231,21 +1229,21 @@ const make = Effect.gen(function* () {
             ? `inactive for ${Math.floor((now - activityAt) / DAY_MS)} of ${settings.worktreeAfterDays} days`
             : settings.worktreeSettledAfterDays !== null
               ? settledFor === null
-                ? "尚未收尾"
+                ? "尚未完成"
                 : `settled for ${settledDays} of ${settings.worktreeSettledAfterDays} days`
               : settings.worktreeOnMerge
                 ? "not merged"
                 : unchangedApplies
                   ? "有超出默认分支的提交"
                   : settings.worktreeUnchanged
-                    ? "尚未收尾"
+                    ? "尚未完成"
                     : "没有适用的规则";
         // Only Git-based rules can make a not-yet-due worktree eligible, so skip Git otherwise.
         if (!eligible && !unchangedApplies && !settings.worktreeOnMerge) return keep(notDueReason);
         const pathReason = yield* worktreePathReason(worktreePath);
         if (pathReason !== null) return keep(pathReason);
         if (yield* containsProjectRoot(worktreePaths, [project, ...snapshot.projects]))
-          return keep("包含项目工作副本");
+          return keep("包含项目工作树");
         if (yield* branchChanged(worktreePath, thread.branch)) return keep("仓库或分支已更改");
         const changes = yield* localChangesReason(worktreePath, settings);
         if (changes !== null) return keep(changes);
@@ -1352,7 +1350,7 @@ const make = Effect.gen(function* () {
         const blockedSinceCheck = Effect.fnUntraced(function* () {
           const latestProjects = yield* projectStore.listShells();
           if (yield* containsProjectRoot(worktreePaths, [project, ...latestProjects]))
-            return "包含项目工作副本";
+            return "包含项目工作树";
           const bindings = yield* projections.getThreadWorktreePaths({ includeArchived: true });
           const bindingKeys = yield* Effect.forEach(bindings, (binding) =>
             canonical(binding.worktreePath),
@@ -1421,7 +1419,7 @@ const make = Effect.gen(function* () {
               !Equal.equals(latestSettlement?.settledAt, settledThread?.settledAt) ||
               !Equal.equals(latestSettlement?.updatedAt, settledThread?.updatedAt)
             )
-              return "检查后父会话的收尾状态已更改";
+              return "检查后父会话的完成状态已更改";
           }
           // Sessions can outlive their run and can be shared across app threads.
           const sessionRows = yield* sql<{ payload_json: string }>`
@@ -1437,7 +1435,7 @@ const make = Effect.gen(function* () {
               (yield* occupies(worktreePaths, session.cwd)) &&
               (yield* providerSessions.isLive(session.id))
             )
-              return waitForStop("提供方会话仍未关闭");
+              return waitForStop("智能体会话仍未关闭");
           }
           return null;
         });

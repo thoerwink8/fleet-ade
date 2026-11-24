@@ -279,7 +279,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
       const failed = yield* phase(harness.auth, "failed");
       assert.include(
         failed.message ?? "",
-        "Antigravity 无法连接 Google。请检查此机器的网络连接后重新登录。",
+        "Antigravity 无法连接 Google。请检查此电脑的网络连接后重新登录。",
       );
     }),
   );
@@ -345,7 +345,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("AntigravityAuth"
       yield* TestClock.adjust("210 seconds");
       const failed = yield* phase(harness.auth, "failed");
       assert.notMatch(failed.message ?? "", blamesNetwork);
-      assert.match(failed.message ?? "", /没有响应|无法在这台机器上运行/);
+      assert.match(failed.message ?? "", /没有响应|无法在这台电脑上运行/);
     }),
   );
 
