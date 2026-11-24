@@ -5,6 +5,8 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 
+import { applyThemePalette } from "~/themePalette";
+import { Button } from "../ui/button";
 import { render } from "../../../test/render";
 import { ComposerBanner } from "./ComposerBanner";
 import {
@@ -148,4 +150,203 @@ it("opens the details of a long notice right above its button", async () => {
     expect(gap).toBeGreaterThanOrEqual(0);
     expect(gap).toBeLessThan(8);
   });
+});
+
+function resolvedColor(value: string): string {
+  const probe = document.createElement("span");
+  probe.style.color = value;
+  document.body.append(probe);
+  const color = getComputedStyle(probe).color;
+  probe.remove();
+  return color;
+}
+
+function colorAlpha(value: string): number {
+  const probe = document.createElement("span");
+  probe.style.backgroundColor = value;
+  document.body.append(probe);
+  const color = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+  const channels = color.match(/[\d.]+/g)?.map(Number) ?? [];
+  return channels.length >= 4 ? channels[3]! : 1;
+}
+
+function tokenPx(name: string): number {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+}
+
+const THEMES = [
+  { id: "system", dark: false, label: "default light" },
+  { id: "system", dark: true, label: "default dark" },
+  { id: "grove", dark: false, label: "grove light" },
+  { id: "grove", dark: true, label: "grove dark" },
+  { id: "ember", dark: false, label: "ember light" },
+  { id: "ember", dark: true, label: "ember dark" },
+] as const;
+
+function errorNotice(title: string): ComposerBannerStackItem {
+  return {
+    id: title,
+    variant: "error",
+    icon: <InfoIcon />,
+    title,
+    description: "The environment stopped answering.",
+    actions: <Button size="strip">重试</Button>,
+    dismissLabel: "关闭警告",
+    onDismiss: () => undefined,
+  };
+}
+
+it("paints an opaque neutral surface, with tone only on the mark", async () => {
+  const root = document.documentElement;
+  const hadDark = root.classList.contains("dark");
+  const previousTheme = root.dataset.theme;
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  await using _restore = {
+    [Symbol.asyncDispose]: async () => {
+      root.classList.toggle("dark", hadDark);
+      if (previousTheme === undefined) delete root.dataset.theme;
+      else root.dataset.theme = previousTheme;
+      applyThemePalette("system", hadDark ? "dark" : "light");
+      await page.viewport(viewport.width, viewport.height);
+    },
+  };
+
+  await using screen = await render(
+    <ComposerBannerStack items={[errorNotice("Offline"), notice("Branch changed")]} />,
+  );
+  const radius = tokenPx("--fa-radius-lg");
+  const smallControl = tokenPx("--fa-ctrl-sm");
+  expect(radius).toBe(12);
+  expect(smallControl).toBe(28);
+
+  for (const width of [390, 1280]) {
+    await page.viewport(width, 800);
+    for (const theme of THEMES) {
+      const appearance = theme.dark ? "dark" : "light";
+      root.classList.toggle("dark", theme.dark);
+      root.dataset.theme = appearance;
+      applyThemePalette(theme.id, appearance);
+      const where = `${width}px ${theme.label}`;
+      const banner = screen.container.querySelector<HTMLElement>("[data-variant='error']");
+      if (!banner) throw new Error(`missing banner at ${where}`);
+      const paint = getComputedStyle(banner);
+      const edge = getComputedStyle(banner, "::before");
+      expect(colorAlpha(paint.backgroundColor), where).toBe(1);
+      expect(paint.backgroundImage, where).toBe("none");
+      expect(paint.backdropFilter || "none", where).toBe("none");
+      expect(paint.getPropertyValue("-webkit-backdrop-filter") || "none", where).toBe("none");
+      expect(paint.willChange, where).toBe("auto");
+      expect(paint.borderTopWidth, where).toBe("1px");
+      expect(parseFloat(paint.borderTopLeftRadius), where).toBe(radius);
+      expect(parseFloat(paint.borderBottomLeftRadius), where).toBe(0);
+      expect(edge.borderTopWidth, where).toBe("1px");
+      expect(edge.backdropFilter || "none", where).toBe("none");
+      expect(edge.getPropertyValue("-webkit-backdrop-filter") || "none", where).toBe("none");
+      expect(edge.backgroundImage, where).toBe("none");
+
+      const title = banner.querySelector(".ade-composer-banner-title");
+      const description = banner.querySelector(".ade-composer-banner-secondary");
+      const icon = banner.querySelector("[data-slot='composer-banner-icon']");
+      if (!title || !description || !icon) throw new Error(`missing banner text at ${where}`);
+      const titlePaint = getComputedStyle(title);
+      const descriptionPaint = getComputedStyle(description);
+      expect(parseFloat(titlePaint.fontSize), where).toBe(14);
+      expect(Number(titlePaint.fontWeight), where).toBeLessThanOrEqual(500);
+      expect(titlePaint.color, where).toBe(resolvedColor("var(--fa-fg)"));
+      expect(parseFloat(descriptionPaint.fontSize), where).toBe(14);
+      expect(Number(descriptionPaint.fontWeight), where).toBeLessThanOrEqual(500);
+      expect(descriptionPaint.color, where).toBe(resolvedColor("var(--fa-fg-muted)"));
+      expect(getComputedStyle(icon).color, where).toBe(resolvedColor("var(--fa-danger)"));
+      expect(getComputedStyle(icon).color, where).not.toBe(titlePaint.color);
+
+      for (const side of ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"] as const) {
+        expect(parseFloat(paint[side]) % 4, `${where} ${side}`).toBe(0);
+      }
+      for (const button of banner.querySelectorAll<HTMLElement>("[data-slot='button']")) {
+        expect(Math.round(button.getBoundingClientRect().height), where).toBe(smallControl);
+      }
+    }
+  }
+
+  expect(screen.getByRole("button", { name: "关闭警告" }).element()).toBeTruthy();
+  const neutral = screen.container.querySelector<HTMLElement>("[data-variant='default']");
+  const error = screen.container.querySelector<HTMLElement>("[data-variant='error']");
+  if (!neutral || !error) throw new Error("missing stacked banners");
+  expect(getComputedStyle(neutral).backgroundColor).toBe(getComputedStyle(error).backgroundColor);
+  expect(getComputedStyle(neutral).borderTopWidth).toBe("0px");
+  expect(parseFloat(getComputedStyle(neutral).borderTopLeftRadius)).toBe(0);
+  expect(getComputedStyle(neutral, "::before").borderTopWidth).toBe("0px");
+  expect(parseFloat(getComputedStyle(error).borderTopLeftRadius)).toBe(radius);
+});
+
+it("meets the composer without a gap at phone and desktop widths", async () => {
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  await using _viewport = {
+    [Symbol.asyncDispose]: () => page.viewport(viewport.width, viewport.height),
+  };
+  const host = document.createElement("div");
+  await using screen = await render(
+    <div>
+      <ComposerBanner.Dock>
+        <ComposerBanner.Column>
+          <ComposerBannerStack items={[]} />
+        </ComposerBanner.Column>
+      </ComposerBanner.Dock>
+      <div data-testid="composer" className="h-20" />
+    </div>,
+    { container: host },
+  );
+
+  function joined(items: readonly ComposerBannerStackItem[]) {
+    return (
+      <div>
+        <ComposerBanner.Dock>
+          <ComposerBanner.Column>
+            <ComposerBannerStack items={items} />
+          </ComposerBanner.Column>
+        </ComposerBanner.Dock>
+        <div data-testid="composer" className="h-20" />
+      </div>
+    );
+  }
+
+  for (const width of [390, 1280]) {
+    await page.viewport(width, 800);
+    host.style.width = `${width}px`;
+    await screen.rerender(joined([]));
+    const emptyTop = screen.getByTestId("composer").element().getBoundingClientRect().top;
+
+    await screen.rerender(joined([errorNotice("Offline")]));
+    const banner = screen.container.querySelector<HTMLElement>("[data-slot='composer-banner']");
+    if (!banner) throw new Error(`missing banner at ${width}`);
+    const bannerRect = banner.getBoundingClientRect();
+    const oneTop = screen.getByTestId("composer").element().getBoundingClientRect().top;
+    const shift = oneTop - emptyTop;
+    expect(shift, `${width}px one banner`).toBeGreaterThan(0);
+    expect(shift, `${width}px one banner`).toBeLessThanOrEqual(bannerRect.height);
+    const overlap = bannerRect.bottom - oneTop;
+    expect(overlap, `${width}px seam`).toBeGreaterThanOrEqual(1);
+    expect(overlap, `${width}px seam`).toBeLessThan(bannerRect.height);
+
+    await screen.rerender(joined([errorNotice("Offline"), notice("Branch changed")]));
+    const banners = [
+      ...screen.container.querySelectorAll<HTMLElement>("[data-slot='composer-banner']"),
+    ];
+    expect(banners, `${width}px stack`).toHaveLength(2);
+    const [first, second] = banners as [HTMLElement, HTMLElement];
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+    const join = firstRect.bottom - secondRect.top;
+    expect(join, `${width}px stack`).toBeGreaterThanOrEqual(1);
+    expect(join, `${width}px stack`).toBeLessThan(firstRect.height);
+    expect(getComputedStyle(second).borderTopWidth, `${width}px stack`).toBe("0px");
+    expect(parseFloat(getComputedStyle(second).borderTopLeftRadius), `${width}px stack`).toBe(0);
+    const stackedShift =
+      screen.getByTestId("composer").element().getBoundingClientRect().top - emptyTop;
+    expect(stackedShift, `${width}px two banners`).toBeGreaterThan(shift);
+    expect(stackedShift, `${width}px two banners`).toBeLessThanOrEqual(
+      firstRect.height + secondRect.height,
+    );
+  }
 });
