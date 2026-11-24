@@ -130,7 +130,9 @@ function SelectPopup({
 function SelectItem({
   className,
   children,
-  hideIndicator = false,
+  // Kept so call sites compile. The popup no longer overlays the selected row on the
+  // trigger, so the check is the only sign of the current value and always renders.
+  hideIndicator: _hideIndicator = false,
   ...props
 }: SelectPrimitive.Item.Props & {
   hideIndicator?: boolean;
@@ -150,11 +152,9 @@ function SelectItem({
       >
         {children}
       </SelectPrimitive.ItemText>
-      {!hideIndicator && (
-        <SelectPrimitive.ItemIndicator className="tick" keepMounted>
-          <CheckIcon aria-hidden="true" className="fa-ic size-4" />
-        </SelectPrimitive.ItemIndicator>
-      )}
+      <SelectPrimitive.ItemIndicator className="tick" keepMounted>
+        <CheckIcon aria-hidden="true" className="fa-ic size-4" />
+      </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   );
 }

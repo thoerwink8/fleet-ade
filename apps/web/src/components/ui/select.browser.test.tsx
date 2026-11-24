@@ -16,7 +16,10 @@ function BasicSelect({ onSelect }: { onSelect?: (value: string | null) => void }
         <SelectValue />
       </SelectTrigger>
       <SelectPopup>
-        <SelectItem value="alpha">Alpha</SelectItem>
+        {/* Many call sites pass hideIndicator; the selected row must still show its check. */}
+        <SelectItem hideIndicator value="alpha">
+          Alpha
+        </SelectItem>
         <SelectItem value="bravo">Bravo</SelectItem>
         <SelectItem value="charlie">Charlie</SelectItem>
       </SelectPopup>
