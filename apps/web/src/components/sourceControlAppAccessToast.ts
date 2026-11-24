@@ -28,7 +28,7 @@ export async function suggestAppAccessForRemote(
     title: `让 ${target.appSignIn.appName} 访问 ${owner}`,
     description: `该处尚未安装此应用，因此对 ${target.input.repository} 的 GitHub 请求会使用你自己的登录身份，受较低的速率限制。`,
     actionProps: {
-      children: "Install",
+      children: "安装",
       onClick: () => {
         toastManager.close(id);
         window.open(target.appSignIn.installUrl, "_blank", "noopener,noreferrer");

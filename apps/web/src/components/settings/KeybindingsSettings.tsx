@@ -1228,7 +1228,7 @@ function NewKeybindingSettingsRow(props: NewKeybindingProps) {
       title="新建快捷键"
       description={
         <span className="flex h-6 items-center gap-1.5">
-          <span className="text-xs leading-none text-muted-foreground/70">When</span>
+          <span className="text-xs leading-none text-muted-foreground/70">仅当</span>
           <NewKeybindingWhen draft={draft} variables={variables} />
         </span>
       }

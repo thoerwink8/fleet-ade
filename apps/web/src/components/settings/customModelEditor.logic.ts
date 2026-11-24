@@ -166,18 +166,18 @@ export function validateDraft(draft: CustomModelDraft): string | null {
   for (const [index, descriptor] of draft.descriptors.entries()) {
     const position = `选项 ${index + 1}`;
     const id = descriptor.id.trim();
-    if (!id) return `${position} needs an id.`;
-    if (seenIds.has(id)) return `${position}: id "${id}" is used twice.`;
+    if (!id) return `${position} 需要一个 id。`;
+    if (seenIds.has(id)) return `${position}：id“${id}”被使用了两次。`;
     seenIds.add(id);
-    if (!descriptor.label.trim()) return `${position} needs a label.`;
+    if (!descriptor.label.trim()) return `${position} 需要一个标签。`;
     if (descriptor.type !== "select") continue;
-    if (descriptor.choices.length === 0) return `${position} needs at least one choice.`;
+    if (descriptor.choices.length === 0) return `${position} 至少需要一个选项。`;
     const seenChoices = new Set<string>();
     for (const choice of descriptor.choices) {
       const choiceId = choice.id.trim();
-      if (!choiceId) return `${position} has a choice without a value.`;
+      if (!choiceId) return `${position} 有一个没有值的选项。`;
       if (seenChoices.has(choiceId)) {
-        return `${position}: choice "${choiceId}" is used twice.`;
+        return `${position}：选项“${choiceId}”被使用了两次。`;
       }
       seenChoices.add(choiceId);
     }

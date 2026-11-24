@@ -98,7 +98,7 @@ export function WizardSteps({
                 "bg-card text-foreground shadow-xs ring-1 ring-inset ring-black/5 hover:bg-card dark:shadow-none dark:ring-white/5",
             )}
             aria-current={index === currentStep ? "step" : undefined}
-            aria-label={`${step}, step ${index + 1}${index < currentStep && summaries?.[index] ? `, ${summaries?.[index]}` : ""}`}
+            aria-label={`${step}，第 ${index + 1} 步${index < currentStep && summaries?.[index] ? `，${summaries?.[index]}` : ""}`}
             onClick={onStepChange ? () => onStepChange(index) : undefined}
           >
             <span

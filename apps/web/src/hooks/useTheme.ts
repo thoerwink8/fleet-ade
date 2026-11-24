@@ -47,7 +47,7 @@ export class ThemeStorageError extends Schema.TaggedError<ThemeStorageError>()(
   },
 ) {
   override get message(): string {
-    return `Failed to ${this.operation} theme preference for ${this.storageKey}.`;
+    return `无法对主题偏好项 ${this.storageKey} 执行 ${this.operation}。`;
   }
 }
 
@@ -61,7 +61,7 @@ export class DesktopThemeSyncError extends Schema.TaggedError<DesktopThemeSyncEr
   },
 ) {
   override get message(): string {
-    return `Failed to sync the ${this.theme} theme to the desktop shell.`;
+    return `无法把 ${this.theme} 主题同步到桌面外壳。`;
   }
 }
 

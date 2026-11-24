@@ -18,7 +18,7 @@ export class DesktopApplicationMenuActionError extends Schema.TaggedError<Deskto
   },
 ) {
   override get message(): string {
-    return `Desktop menu action "${this.action}" failed.`;
+    return `桌面菜单操作“${this.action}”失败。`;
   }
 }
 

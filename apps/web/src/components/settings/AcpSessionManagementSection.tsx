@@ -442,7 +442,7 @@ function InstanceSessionManagement(
                   disabled={!canRead || loading || projectId === null}
                   onClick={() => void loadSessions()}
                 >
-                  {loading ? "Loading" : sessions.length === 0 ? "列出运行实例" : "刷新"}
+                  {loading ? "正在加载" : sessions.length === 0 ? "列出运行实例" : "刷新"}
                 </Button>
               </>
             ) : null}
@@ -515,7 +515,7 @@ function InstanceSessionManagement(
                 disabled={!canRead || loading}
                 onClick={() => void loadSessions(nextCursor)}
               >
-                {loading ? "Loading" : "加载更多"}
+                {loading ? "正在加载" : "加载更多"}
               </Button>
             ) : null}
           </>
@@ -540,7 +540,7 @@ function InstanceSessionManagement(
               }
               onClick={() => void loadProviders()}
             >
-              {loadingProviders ? "Loading" : providers.length === 0 ? "列出提供方" : "刷新"}
+              {loadingProviders ? "正在加载" : providers.length === 0 ? "列出提供方" : "刷新"}
             </Button>
           </div>
 
@@ -589,7 +589,7 @@ function InstanceSessionManagement(
                           {provider.providerId}
                         </p>
                         <p className="text-3xs text-muted-foreground">
-                          {provider.current === null ? "Disabled" : "已配置"}
+                          {provider.current === null ? "已停用" : "已配置"}
                           {provider.required ? " · 必需" : ""}
                         </p>
                       </div>

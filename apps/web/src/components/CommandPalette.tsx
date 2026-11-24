@@ -3028,8 +3028,8 @@ function OpenCommandPaletteDialog(props: {
         id={submitButtonId}
         label={isCreatingNewProject ? "正在创建" : "创建"}
         shortcutLabel={createShortcutLabel}
-        ariaLabel={`Create (${createShortcutLabel})`}
-        tooltip={`Create (${createShortcutLabel})`}
+        ariaLabel={`创建（${createShortcutLabel}）`}
+        tooltip={`创建（${createShortcutLabel}）`}
         disabled={!canSubmitNewProject}
         onSubmit={() => {
           void submitNewProject();
@@ -3040,8 +3040,8 @@ function OpenCommandPaletteDialog(props: {
         id={submitButtonId}
         label={isRemoteProjectPending ? "运行中" : remoteProjectButtonLabel}
         shortcutLabel="Enter"
-        ariaLabel={`${remoteProjectButtonLabel ?? "Continue"} (Enter)`}
-        tooltip={`${remoteProjectButtonLabel ?? "Continue"} (Enter)`}
+        ariaLabel={`${remoteProjectButtonLabel ?? "继续"}（Enter）`}
+        tooltip={`${remoteProjectButtonLabel ?? "继续"}（Enter）`}
         disabled={!canSubmitRemoteProjectFlow}
         onSubmit={() => {
           void submitAddProjectCloneFlow();

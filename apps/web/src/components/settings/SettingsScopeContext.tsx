@@ -117,6 +117,6 @@ export function useOptionalSettingsScope() {
 
 export function useSettingsScope() {
   const scope = useOptionalSettingsScope();
-  if (scope === null) throw new Error("Settings scope must be read inside SettingsScopeProvider.");
+  if (scope === null) throw new Error("必须在 SettingsScopeProvider 内读取设置范围。");
   return scope;
 }

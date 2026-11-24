@@ -171,7 +171,7 @@ export function scheduleDraftErrors(draft: DraftState) {
     if (value.trim() && !isWebhookDedupeTemplate(value.trim()))
       errors.push({
         title: "webhook 设置无效",
-        description: `${label} must contain a valid request placeholder.`,
+        description: `${label} 必须包含有效的请求占位符。`,
       });
   }
   const window = draft.coalesceWindowSeconds.trim();
@@ -190,9 +190,9 @@ export function webhookDeliveryLabel(delivery: {
   if (delivery.outcome === "accepted") return delivery.pendingWindow ? "已开始合并窗口" : "已运行";
   const labels: Record<string, string> = {
     dispatch_failed: "运行失败",
-    duplicate: "Duplicate",
-    coalesced: "Coalesced",
-    filtered: "Filtered",
+    duplicate: "重复",
+    coalesced: "已合并",
+    filtered: "已过滤",
     rejected_signature: "签名无效",
     disabled: "任务已暂停",
     rate_limited: "已限流",

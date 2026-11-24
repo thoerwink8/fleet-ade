@@ -52,10 +52,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
     composer.terminalContexts.length +
     composer.previewAnnotations.length +
     composer.reviewComments.length;
-  const preview =
-    promptPreview.length > 0
-      ? promptPreview
-      : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
+  const preview = promptPreview.length > 0 ? promptPreview : `${attachmentCount} 个附件`;
   const accessibility = resolveSidebarRowAccessibility({
     title: preview,
     statusLabel: "未发送的草稿",

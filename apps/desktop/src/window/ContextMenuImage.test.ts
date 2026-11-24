@@ -120,7 +120,7 @@ it.each([
   "blob:https://example.com/image",
   "https://user:pass@example.com/image.png",
 ])("rejects unsupported or credential-bearing URLs: %s", async (srcURL) => {
-  await expect(copyImage({ srcURL })).rejects.toThrow("Unsupported image URL");
+  await expect(copyImage({ srcURL })).rejects.toThrow("不支持的图片 URL");
   expect(native.fetch).not.toHaveBeenCalled();
   expect(native.write).not.toHaveBeenCalled();
 });
@@ -132,7 +132,7 @@ it("cancels responses whose declared size exceeds the limit", async () => {
       headers: { "content-length": String(32 * 1024 * 1024 + 1) },
     }),
   );
-  await expect(copyImage()).rejects.toThrow("size limit");
+  await expect(copyImage()).rejects.toThrow("大小限制");
   expect(cancel).toHaveBeenCalled();
   expect(native.createFromBuffer).not.toHaveBeenCalled();
 });
@@ -150,7 +150,7 @@ it("cancels oversized streams without a content-length", async () => {
       }),
     ),
   );
-  await expect(copyImage()).rejects.toThrow("size limit");
+  await expect(copyImage()).rejects.toThrow("大小限制");
   expect(cancel).toHaveBeenCalled();
   expect(native.write).not.toHaveBeenCalled();
 });
@@ -166,7 +166,7 @@ it("rejects large decoded dimensions before image allocation", async () => {
   oversizedPng.writeUInt32BE(4096, 16);
   oversizedPng.writeUInt32BE(4096, 20);
   native.fetch.mockResolvedValue(new Response(Uint8Array.from(oversizedPng)));
-  await expect(copyImage()).rejects.toThrow("size limit");
+  await expect(copyImage()).rejects.toThrow("大小限制");
   expect(native.createFromBuffer).not.toHaveBeenCalled();
   expect(native.image.toPNG).not.toHaveBeenCalled();
   expect(native.write).not.toHaveBeenCalled();
@@ -174,7 +174,7 @@ it("rejects large decoded dimensions before image allocation", async () => {
 
 it("preserves the clipboard when the encoded PNG exceeds the limit", async () => {
   native.image.toPNG.mockReturnValueOnce(Buffer.alloc(32 * 1024 * 1024 + 1));
-  await expect(copyImage()).rejects.toThrow("size limit");
+  await expect(copyImage()).rejects.toThrow("大小限制");
   expect(native.write).not.toHaveBeenCalled();
 });
 

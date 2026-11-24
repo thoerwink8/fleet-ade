@@ -22,7 +22,7 @@ export async function copyContextMenuImage(
     url.password ||
     (url.protocol === "data:" && params.srcURL.length > MAX_IMAGE_BYTES * 3)
   ) {
-    throw new Error("Unsupported image URL");
+    throw new Error("不支持的图片 URL");
   }
   const fetchImage = url.protocol === "data:" ? globalThis.fetch : Electron.net.fetch;
   const response = await fetchImage(url.href, {
@@ -32,9 +32,9 @@ export async function copyContextMenuImage(
   });
   if (!response.ok || Number(response.headers.get("content-length")) > MAX_IMAGE_BYTES) {
     await response.body?.cancel();
-    throw new Error("Image request failed or exceeded the size limit");
+    throw new Error("图片请求失败或超出大小限制");
   }
-  if (!response.body) throw new Error("Image response has no body");
+  if (!response.body) throw new Error("图片响应没有内容");
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -46,7 +46,7 @@ export async function copyContextMenuImage(
       byteLength += chunk.value.byteLength;
       if (byteLength > MAX_IMAGE_BYTES) {
         await reader.cancel();
-        throw new Error("Image exceeded the size limit");
+        throw new Error("图片超出大小限制");
       }
       chunks.push(chunk.value);
     }
@@ -62,7 +62,7 @@ export async function copyContextMenuImage(
     dimensions.height <= 0 ||
     dimensions.width * dimensions.height > MAX_IMAGE_BYTES / 4
   ) {
-    throw new Error("Image dimensions exceed the size limit");
+    throw new Error("图片尺寸超出大小限制");
   }
   if (contents.isDestroyed() || frame.isDestroyed()) return;
   const image = Electron.nativeImage.createFromBuffer(bytes);
@@ -75,14 +75,14 @@ export async function copyContextMenuImage(
           const bitmap = await createImageBitmap(new Blob([source]));
           try {
             if (bitmap.width <= 0 || bitmap.height <= 0 || bitmap.width * bitmap.height > ${MAX_IMAGE_BYTES / 4}) {
-              throw new Error("Image dimensions exceed the size limit");
+              throw new Error("图片尺寸超出大小限制");
             }
             const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
             const context = canvas.getContext("2d");
-            if (!context) throw new Error("Image could not be decoded");
+            if (!context) throw new Error("无法解码图片");
             context.drawImage(bitmap, 0, 0);
             const output = await canvas.convertToBlob({ type: "image/png" });
-            if (output.size > ${MAX_IMAGE_BYTES}) throw new Error("PNG exceeded the size limit");
+            if (output.size > ${MAX_IMAGE_BYTES}) throw new Error("PNG 超出大小限制");
             return await output.arrayBuffer();
           } finally {
             bitmap.close();
@@ -90,12 +90,12 @@ export async function copyContextMenuImage(
         })()`,
       },
     ]);
-    if (!(decoded instanceof ArrayBuffer)) throw new Error("Image could not be decoded");
+    if (!(decoded instanceof ArrayBuffer)) throw new Error("无法解码图片");
     png = Buffer.from(decoded);
   } else {
     png = image.toPNG();
   }
-  if (png.byteLength > MAX_IMAGE_BYTES) throw new Error("PNG exceeded the size limit");
+  if (png.byteLength > MAX_IMAGE_BYTES) throw new Error("PNG 超出大小限制");
   if (contents.isDestroyed() || frame.isDestroyed()) return;
   await Electron.clipboard.write([
     new Electron.ClipboardItem({

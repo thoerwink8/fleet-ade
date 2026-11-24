@@ -207,7 +207,7 @@ export function nextTurnDetailAnnouncement(
         const cut = cutText(message.text, MESSAGE_MAX_LENGTH);
         return cut === null
           ? markdownPlainText(message.text)
-          : `${markdownPlainText(cut)} More in the thread.`;
+          : `${markdownPlainText(cut)} 会话中还有更多内容。`;
       })
       .filter((text) => text !== "")
       .map((text) => `${MESSAGE_AUTHOR}: ${text}`),

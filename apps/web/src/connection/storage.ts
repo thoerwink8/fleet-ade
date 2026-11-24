@@ -122,16 +122,14 @@ function persistenceError(
 ) {
   return new Persistence.ConnectionPersistenceError({
     operation,
-    message: `Could not ${operation.replaceAll("-", " ")}: ${String(cause)}`,
+    message: `无法完成连接存储操作「${operation}」：${String(cause)}`,
   });
 }
 
 const openDatabase = Effect.fn("web.connectionStorage.openDatabase")(function* () {
   return yield* Effect.callback<IDBDatabase, ConnectionTransientError>((resume) => {
     if (typeof indexedDB === "undefined") {
-      resume(
-        Effect.fail(catalogError("open", "IndexedDB is unavailable in this browser context.")),
-      );
+      resume(Effect.fail(catalogError("open", "此浏览器环境不支持 IndexedDB。")));
       return;
     }
     try {
@@ -159,7 +157,7 @@ const openDatabase = Effect.fn("web.connectionStorage.openDatabase")(function* (
         }
       });
       request.addEventListener("error", () => {
-        resume(Effect.fail(catalogError("open", request.error ?? "Unknown IndexedDB error")));
+        resume(Effect.fail(catalogError("open", request.error ?? "未知的 IndexedDB 错误")));
       });
       request.addEventListener("success", () => {
         resume(Effect.succeed(request.result));
@@ -243,7 +241,7 @@ function readDatabaseValueOnConnection(database: IDBDatabase, storeName: string,
     try {
       const request = database.transaction(storeName, "readonly").objectStore(storeName).get(key);
       request.addEventListener("error", () => {
-        resume(Effect.fail(catalogError("read", request.error ?? "Unknown IndexedDB read error")));
+        resume(Effect.fail(catalogError("read", request.error ?? "未知的 IndexedDB 读取错误")));
       });
       request.addEventListener("success", () => {
         resume(Effect.succeed(request.result));
@@ -266,7 +264,7 @@ function writeDatabaseValueOnConnection(
       // Commit failures can fire abort without error; every failed write fires abort.
       transaction.addEventListener("abort", () => {
         resume(
-          Effect.fail(catalogError("write", transaction.error ?? "Unknown IndexedDB write error")),
+          Effect.fail(catalogError("write", transaction.error ?? "未知的 IndexedDB 写入错误")),
         );
       });
       transaction.addEventListener("complete", () => {
@@ -289,9 +287,7 @@ function removeDatabaseValueOnConnection(
       const transaction = database.transaction(storeName, "readwrite");
       transaction.addEventListener("abort", () => {
         resume(
-          Effect.fail(
-            catalogError("remove", transaction.error ?? "Unknown IndexedDB remove error"),
-          ),
+          Effect.fail(catalogError("remove", transaction.error ?? "未知的 IndexedDB 删除错误")),
         );
       });
       transaction.addEventListener("complete", () => {
@@ -314,9 +310,7 @@ function removeDatabaseValuesInRangeOnConnection(
       const transaction = database.transaction(storeName, "readwrite");
       transaction.addEventListener("abort", () => {
         resume(
-          Effect.fail(
-            catalogError("remove", transaction.error ?? "Unknown IndexedDB cursor error"),
-          ),
+          Effect.fail(catalogError("remove", transaction.error ?? "未知的 IndexedDB 游标错误")),
         );
       });
       transaction.addEventListener("complete", () => {
@@ -324,9 +318,7 @@ function removeDatabaseValuesInRangeOnConnection(
       });
       const request = transaction.objectStore(storeName).openCursor(range);
       request.addEventListener("error", () => {
-        resume(
-          Effect.fail(catalogError("remove", request.error ?? "Unknown IndexedDB cursor error")),
-        );
+        resume(Effect.fail(catalogError("remove", request.error ?? "未知的 IndexedDB 游标错误")));
       });
       request.addEventListener("success", () => {
         const cursor = request.result;
@@ -360,7 +352,7 @@ function saveQueryOnConnection(
       const transaction = database.transaction(QUERY_STORE_NAME, "readwrite");
       transaction.addEventListener("abort", () => {
         resume(
-          Effect.fail(catalogError("write", transaction.error ?? "Unknown IndexedDB write error")),
+          Effect.fail(catalogError("write", transaction.error ?? "未知的 IndexedDB 写入错误")),
         );
       });
       transaction.addEventListener("complete", () => {

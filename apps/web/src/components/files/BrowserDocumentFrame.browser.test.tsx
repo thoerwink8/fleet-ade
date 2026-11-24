@@ -52,7 +52,7 @@ describe("HtmlRenderDocument", () => {
 
     await page.frameLocator(screen.getByTitle("Swatches")).getByAltText("Green").click();
 
-    const viewer = page.getByRole("dialog", { name: "展开 图片 preview" });
+    const viewer = page.getByRole("dialog", { name: "展开 图片 预览" });
     await expect.element(viewer.getByAltText("Green")).toBeVisible();
     await expect.element(viewer.getByRole("button", { name: "下一个媒体" })).toBeVisible();
     await expect.element(viewer.getByRole("button", { name: "上一个媒体" })).toBeVisible();

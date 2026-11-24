@@ -236,7 +236,7 @@ function OpenContentSearchDialog(props: {
           ) : search.invalidRegex ? (
             <span className="text-destructive">正则表达式无效</span>
           ) : (
-            `${matches.length.toLocaleString("zh-CN")}${search.truncated ? "+" : ""} results in ${fileCount.toLocaleString("zh-CN")} files`
+            `${matches.length.toLocaleString("zh-CN")}${search.truncated ? "+" : ""} 条结果，涉及 ${fileCount.toLocaleString("zh-CN")} 个文件`
           )}
         </div>
       ) : null}
