@@ -5,13 +5,21 @@ import * as Schema from "effect/Schema";
 import { ExecutionEnvironmentCapabilities } from "./environment.ts";
 import { FleetClaim } from "./fleetClaims.ts";
 import { FleetSummaryReportInput, phaseFromSessionRun } from "./fleetSummary.ts";
-import { ORCHESTRATION_V2_WS_METHODS, OrchestrationV2AppThreadJson } from "./orchestrationV2.ts";
+import {
+  ORCHESTRATION_V2_WS_METHODS,
+  OrchestrationV2AppThreadJson,
+  THREAD_TRASH_RETENTION_MS,
+} from "./orchestrationV2.ts";
 import { WS_METHODS, WsRpcGroup } from "./rpc.ts";
 
 const decodeThread = Schema.decodeUnknownSync(OrchestrationV2AppThreadJson);
 const decodeCapabilities = Schema.decodeUnknownSync(ExecutionEnvironmentCapabilities);
 
 describe("WebSocket RPC contracts", () => {
+  it("keeps recoverable thread deletion at seven days", () => {
+    expect(THREAD_TRASH_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1_000);
+  });
+
   it("decodes legacy fleet payloads without added fields", () => {
     const claim = {
       fleetId: "fleet-1",
@@ -91,6 +99,20 @@ describe("WebSocket RPC contracts", () => {
         threadId: "thread-1",
       },
       { type: "thread.stop", commandId: "stop-1", threadId: "thread-1" },
+      { type: "thread.restore", commandId: "restore-1", threadId: "thread-1" },
+      { type: "thread.purge", commandId: "purge-1", threadId: "thread-1" },
+      {
+        type: "thread.batch",
+        commandId: "batch-restore-1",
+        operation: "restore",
+        threadIds: ["thread-1"],
+      },
+      {
+        type: "thread.batch",
+        commandId: "batch-purge-1",
+        operation: "purge",
+        threadIds: ["thread-1"],
+      },
     ]) {
       expect(Exit.isSuccess(decode(command))).toBe(true);
     }
@@ -136,6 +158,12 @@ describe("WebSocket RPC contracts", () => {
       threadStop: true,
     });
     expect(capabilities.threadStopAndRollback).toBeUndefined();
+    expect(capabilities.threadTrash).toBeUndefined();
+  });
+
+  it("registers the recently deleted read RPC", () => {
+    const request = WsRpcGroup.requests.get(ORCHESTRATION_V2_WS_METHODS.getRecentlyDeleted);
+    expect(request).toBeDefined();
   });
 
   it("lets the server pick a new worktree's folder", () => {

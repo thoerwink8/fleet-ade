@@ -8,6 +8,8 @@ import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as PeerLinkRequests from "./peer/PeerLinkRequests.ts";
 import * as PeerLinks from "./peer/PeerLinks.ts";
 
+import * as DateTime from "effect/DateTime";
+
 import * as Duration from "effect/Duration";
 import * as Base64 from "effect/encoding/Base64";
 import * as Effect from "effect/Effect";
@@ -1946,6 +1948,20 @@ export const layerWsRpc = (
           ),
         [ORCHESTRATION_V2_WS_METHODS.getArchivedShellSnapshot]: (_input) =>
           getOrchestrationV2ArchivedShellSnapshot,
+        [ORCHESTRATION_V2_WS_METHODS.getRecentlyDeleted]: (_input) =>
+          Effect.all({
+            items: threadManagement.listRecentlyDeleted(),
+            snapshotSequence: applicationEvents.latestApplicationSequence,
+            now: DateTime.now,
+          }).pipe(
+            Effect.mapError(
+              (cause) =>
+                new OrchestrationV2GetShellSnapshotError({
+                  message: "Failed to load recently deleted threads",
+                  cause,
+                }),
+            ),
+          ),
         [ORCHESTRATION_V2_WS_METHODS.getThreadFamily]: (input) =>
           readOmittableShellRows({ familyOf: input.threadId }, "无法加载这个会话的关联会话"),
         [ORCHESTRATION_V2_WS_METHODS.getThreadLinkMetadata]: (input) =>

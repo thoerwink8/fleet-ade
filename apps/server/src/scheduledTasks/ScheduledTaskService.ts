@@ -915,7 +915,17 @@ export const layer = Layer.effect(
             AND thread_id IS NULL AND thread_mode != 'new_thread'
         `;
         const shell = yield* threadManagement.getThreadShell(threadId);
-        if (shell === null || shell.deletedAt != null) yield* deleteForThread(threadId);
+        if (shell === null) {
+          yield* deleteForThread(threadId);
+        } else if (shell.deletedAt != null) {
+          const [trash] = yield* sql<{ readonly present: number }>`
+            SELECT EXISTS (
+              SELECT 1 FROM orchestration_v2_projection_thread_trash
+              WHERE thread_id = ${threadId}
+            ) AS present
+          `;
+          if (trash?.present !== 1) yield* deleteForThread(threadId);
+        }
       },
       Effect.catchCause((cause) =>
         Effect.logWarning("Could not bind a scheduled task to its first thread.", cause),

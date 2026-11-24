@@ -29,6 +29,7 @@ import * as CheckpointService from "./CheckpointService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
 import * as EffectWorker from "./EffectWorker.ts";
+import * as ResourceCleanupService from "./ResourceCleanupService.ts";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as ProviderTurnControlService from "./ProviderTurnControlService.ts";
@@ -375,6 +376,38 @@ it.effect("does not report an answer whose last delivery attempt is interrupted"
     }).pipe(Effect.provide(layer));
     assert.isTrue(Exit.hasInterrupts(exit));
     assert.equal(yield* Ref.get(reported), 0);
+  }),
+);
+
+it.effect("forwards terminal cleanup keepHistory to the resource cleanup service", () =>
+  Effect.gen(function* () {
+    const calls = yield* Ref.make<ReadonlyArray<boolean | undefined>>([]);
+    const layer = layerExecutorFor({ events: yield* Ref.make<ReadonlyArray<string>>([]) }).pipe(
+      Layer.provide(
+        Layer.mock(ResourceCleanupService.ResourceCleanupService)({
+          cleanupTerminals: (_threadId, keepHistory) =>
+            Ref.update(calls, (all) => [...all, keepHistory]),
+        }),
+      ),
+    );
+    yield* Effect.gen(function* () {
+      const executor = yield* EffectWorker.OrchestrationEffectExecutorV2;
+      const effect = restartEffect(yield* DateTime.now, { type: "detach" });
+      yield* executor.execute(
+        { ...effect, id: "effect:cleanup:default", request: { type: "terminal.cleanup" } },
+        { willRetry: false },
+      );
+      yield* executor.execute(
+        {
+          ...effect,
+          id: "effect:cleanup:keep",
+          request: { type: "terminal.cleanup", keepHistory: true },
+        },
+        { willRetry: false },
+      );
+    }).pipe(Effect.provide(layer));
+
+    assert.deepEqual(yield* Ref.get(calls), [undefined, true]);
   }),
 );
 

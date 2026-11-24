@@ -283,6 +283,7 @@ export const make = Effect.gen(function* () {
       shellThreadFamilies: true,
       shellOlderSettled: true,
       threadBatchCommands: true,
+      threadTrash: true,
     },
   };
 

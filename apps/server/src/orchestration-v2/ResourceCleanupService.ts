@@ -23,7 +23,10 @@ export class ResourceCleanupError extends Schema.TaggedError<ResourceCleanupErro
 
 export class ResourceCleanupService extends Context.Reference<{
   readonly cleanupScheduledTasks: (threadId: ThreadId) => Effect.Effect<void, ResourceCleanupError>;
-  readonly cleanupTerminals: (threadId: string) => Effect.Effect<void, ResourceCleanupError>;
+  readonly cleanupTerminals: (
+    threadId: string,
+    keepHistory?: boolean,
+  ) => Effect.Effect<void, ResourceCleanupError>;
   /** Old thread-deletion events still reference this; previews are gone, so it is a no-op. */
   readonly cleanupPreviews: (threadId: string) => Effect.Effect<void, ResourceCleanupError>;
   readonly cleanupAttachments: (
@@ -60,9 +63,10 @@ export const layer = Layer.effect(
       }),
       cleanupTerminals: Effect.fn("ResourceCleanupService.cleanupTerminals")(function (
         threadId: string,
+        keepHistory?: boolean,
       ) {
         return terminals
-          .close({ threadId, deleteHistory: true })
+          .close({ threadId, deleteHistory: keepHistory !== true })
           .pipe(
             Effect.mapError(
               (cause) => new ResourceCleanupError({ operation: "terminal", threadId, cause }),
