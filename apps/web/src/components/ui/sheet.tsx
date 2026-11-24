@@ -15,9 +15,8 @@ function Sheet<Payload>(props: SheetPrimitive.Root.Props<Payload>) {
 
 const SheetPortal = SheetPrimitive.Portal;
 
-// A sheet opened from inside a z-50 route modal has to sit above it. Docked sheets stay at --z-sheet (46).
+// A sheet opened from inside a z-50 route modal has to sit above it; docked sheets stay at --z-sheet (46).
 type SheetLayer = "base" | "nested";
-const SHEET_NESTED_LAYER_CLASS = "z-[60]";
 
 function SheetBackdrop({
   className,
@@ -26,11 +25,8 @@ function SheetBackdrop({
 }: SheetPrimitive.Backdrop.Props & { layer?: SheetLayer }) {
   return (
     <SheetPrimitive.Backdrop
-      className={cn(
-        "fixed inset-0 bg-background/60 backdrop-blur-xs transition-all duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0",
-        layer === "nested" ? SHEET_NESTED_LAYER_CLASS : "z-(--z-sheet)",
-        className,
-      )}
+      className={cn("ade-sheet-backdrop", className)}
+      data-layer={layer}
       data-slot="sheet-backdrop"
       {...props}
     />
@@ -50,17 +46,11 @@ function SheetViewport({
 }) {
   return (
     <SheetPrimitive.Viewport
-      className={cn(
-        "fixed inset-0 grid",
-        layer === "nested" ? SHEET_NESTED_LAYER_CLASS : "z-(--z-sheet)",
-        side === "bottom" && "grid grid-rows-[1fr_auto] pt-12",
-        side === "top" && "grid grid-rows-[auto_1fr] pb-12",
-        side === "left" && "flex justify-start",
-        side === "right" && "flex justify-end",
-        variant === "inset" && "sm:p-4",
-        className,
-      )}
+      className={cn("ade-sheet-viewport", className)}
+      data-layer={layer}
+      data-side={side}
       data-slot="sheet-viewport"
+      data-variant={variant}
       {...props}
     />
   );
@@ -94,33 +84,17 @@ function SheetPopup({
   return (
     <SheetPortal keepMounted={keepMounted}>
       <SheetBackdrop
+        data-instant={instant ? "" : undefined}
         layer={layer}
-        className={
-          instant
-            ? "transition-none! data-ending-style:opacity-100! data-starting-style:opacity-100!"
-            : undefined
-        }
         style={transitionStyle}
       />
       <SheetViewport side={side} variant={variant} layer={layer}>
         <SheetPrimitive.Popup
-          className={cn(
-            "relative flex max-h-full min-h-0 w-full min-w-0 flex-col bg-popover not-dark:bg-clip-padding text-popover-foreground shadow-lg/5 transition-[opacity,translate] duration-200 ease-in-out will-change-transform before:pointer-events-none before:absolute before:inset-0 before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:opacity-0 data-starting-style:opacity-0 max-sm:before:hidden dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
-            side === "bottom" &&
-              "row-start-2 border-t data-ending-style:translate-y-8 data-starting-style:translate-y-8",
-            side === "top" &&
-              "data-ending-style:-translate-y-8 data-starting-style:-translate-y-8 border-b",
-            side === "left" &&
-              "data-ending-style:-translate-x-8 data-starting-style:-translate-x-8 w-[calc(100%-(--spacing(12)))] max-w-md border-e",
-            side === "right" &&
-              "col-start-2 w-[calc(100%-(--spacing(12)))] max-w-md border-s data-ending-style:translate-x-8 data-starting-style:translate-x-8",
-            variant === "inset" &&
-              "before:hidden sm:rounded-2xl sm:border sm:before:rounded-[calc(var(--radius-2xl)-1px)] sm:**:data-[slot=sheet-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
-            instant &&
-              "transition-none! will-change-auto! data-ending-style:translate-x-0! data-starting-style:translate-x-0! data-ending-style:translate-y-0! data-starting-style:translate-y-0! data-ending-style:opacity-100! data-starting-style:opacity-100!",
-            className,
-          )}
+          className={cn("fa-drawer ade-sheet-popup", className)}
+          data-instant={instant ? "" : undefined}
+          data-side={side}
           data-slot="sheet-popup"
+          data-variant={variant}
           render={keepMounted ? undefined : renderRetainedPopup}
           style={{ ...transitionStyle, ...style }}
           {...props}
@@ -142,22 +116,13 @@ function SheetPopup({
 }
 
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-2 p-6 in-[[data-slot=sheet-popup]:has([data-slot=sheet-panel])]:pb-3 max-sm:pb-4",
-        className,
-      )}
-      data-slot="sheet-header"
-      {...props}
-    />
-  );
+  return <div className={cn("ade-sheet-header", className)} data-slot="sheet-header" {...props} />;
 }
 
 function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
   return (
     <SheetPrimitive.Title
-      className={cn("font-semibold text-dialog-title", className)}
+      className={cn("ade-sheet-title font-semibold text-dialog-title", className)}
       data-slot="sheet-title"
       {...props}
     />
@@ -172,7 +137,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       className={cn(
-        "text-muted-foreground",
+        "ade-sheet-description",
         size === "prose" ? "text-prose" : "text-sm",
         className,
       )}
