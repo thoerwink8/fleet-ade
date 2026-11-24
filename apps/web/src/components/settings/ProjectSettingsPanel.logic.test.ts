@@ -135,8 +135,9 @@ describe("project removal confirmation", () => {
       ],
     });
     expect(plan.projectThreads).toHaveLength(3);
+    expect(plan.confirmationTitle).toBe("移除“仓库”这个条目并删除它的 1 个会话？");
     expect(plan.confirmationMessage).toBe(
-      'Remove checkout "仓库" and delete its 1 thread?\n路径：/work/repo\n环境：本地\n这些会话及所有已归档会话将从 Fleet ADE 中删除。提供方会话会保留。\n此项目组中的其他条目不受影响。\n此操作无法撤销。',
+      "路径：/work/repo\n环境：本地\n这些会话及所有已归档会话将从 Fleet ADE 中删除。提供方会话会保留。\n此项目组中的其他条目不受影响。\n此操作无法撤销。",
     );
   });
 

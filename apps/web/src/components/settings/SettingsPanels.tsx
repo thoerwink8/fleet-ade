@@ -272,8 +272,8 @@ export function useSettingsRestore(onRestored?: () => void) {
     if (changedSettingLabels.length === 0) return;
     const api = readLocalApi();
     const confirmed = await (api ?? ensureLocalApi()).dialogs.confirm(
-      ["恢复默认设置？", `将重置：${changedSettingLabels.join(", ")}。`].join("\n"),
-      { variant: "destructive" },
+      `将重置：${changedSettingLabels.join("、")}。`,
+      { title: "恢复默认设置？", confirmLabel: "恢复默认", variant: "destructive" },
     );
     if (!confirmed) return;
 

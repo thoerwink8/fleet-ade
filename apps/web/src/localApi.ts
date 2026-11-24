@@ -1,6 +1,6 @@
-import type { ConfirmDialogOptions, ContextMenuItem, LocalApi } from "@t3tools/contracts";
+import type { ContextMenuItem, LocalApi } from "@t3tools/contracts";
 
-import { requestConfirmDialog } from "./confirmDialog";
+import { requestConfirmDialog, requestConfirmDialogWithCheckbox } from "./confirmDialog";
 import { dismissContextMenu, showContextMenuFallback } from "./contextMenuFallback";
 import { readBrowserClientSettings, writeBrowserClientSettings } from "./clientPersistenceStorage";
 
@@ -13,8 +13,16 @@ export function createLocalApi(): LocalApi {
         if (!window.desktopBridge) return null;
         return window.desktopBridge.pickFolder(options);
       },
-      confirm: async (message, options?: ConfirmDialogOptions) => {
+      confirm: async (message, options) => {
         return requestConfirmDialog(message, options) ?? false;
+      },
+      confirmWithCheckbox: async (message, options) => {
+        return (
+          (await requestConfirmDialogWithCheckbox(message, options)) ?? {
+            confirmed: false,
+            checked: false,
+          }
+        );
       },
     },
     shell: {

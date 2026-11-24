@@ -4,7 +4,9 @@ import { render, stubGlobal } from "../../../test/render";
 
 const state = vi.hoisted(() => ({
   navigate: vi.fn(async (): Promise<void> => undefined),
-  confirm: vi.fn(async (_message: string) => true),
+  confirm: vi.fn(
+    async (_message: string, _options: { title: string; confirmLabel: string }) => true,
+  ),
   connectPairing: vi.fn(async (_input: { pairingUrl: string }) => ({ _tag: "Success" })),
   localEnvironmentDisabled: false,
 }));
@@ -85,7 +87,8 @@ it("adds the backend from a pairing link after the user confirms its host", asyn
     expect(state.connectPairing).toHaveBeenCalledExactlyOnceWith({ pairingUrl }),
   );
   expect(state.confirm).toHaveBeenCalledExactlyOnceWith(
-    "要添加位于 https://vps.example.com 的后端吗？",
+    "添加后会在这台设备上保存配对信息，可以随时在设置里移除。",
+    { title: "添加位于 https://vps.example.com 的后端？", confirmLabel: "添加" },
   );
   expect(state.navigate).not.toHaveBeenCalled();
 });

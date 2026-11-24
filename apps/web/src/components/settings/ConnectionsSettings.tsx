@@ -652,9 +652,12 @@ function ConnectionsSettingsContent({
 
   const handleRemoveSavedBackend = async (environment: EnvironmentPresentation) => {
     const confirmed = await requestConfirmDialog(
-      `从此设备移除 ${environment.label}？
-这会删除这里保存的配对信息、凭据和缓存的会话。若要保留这些内容，请关闭连接。`,
-      { variant: "destructive" },
+      "这会删除这里保存的配对信息、凭据和缓存的会话。若只是暂时不用，请改为关闭连接。",
+      {
+        title: `从此设备移除“${environment.label}”？`,
+        confirmLabel: "移除",
+        variant: "destructive",
+      },
     );
     if (confirmed === true) await removeSavedBackend(environment);
   };

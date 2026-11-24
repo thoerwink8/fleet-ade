@@ -42,7 +42,8 @@ const state = vi.hoisted(() => ({
   }[],
   requests: [] as { action: string; environmentId: string; input: { threadId?: string } }[],
   localEffects: [] as string[],
-  confirm: vi.fn<(message: string) => Promise<boolean>>(),
+  confirm: vi.fn<(message: string, options: unknown) => Promise<boolean>>(),
+  confirmChecked: true,
   toasts: [] as string[],
   afterRequest: undefined as ((action: string) => void) | undefined,
   sessionLookupFails: false,
@@ -169,7 +170,15 @@ vi.mock("../lib/composerDraftUploads", () => ({
     state.localEffects.push(`release-uploads:${ref.threadId}`),
 }));
 vi.mock("../localApi", () => ({
-  readLocalApi: () => ({ dialogs: { confirm: state.confirm } }),
+  readLocalApi: () => ({
+    dialogs: {
+      confirm: state.confirm,
+      confirmWithCheckbox: async (message: string, options: unknown) => ({
+        confirmed: await state.confirm(message, options),
+        checked: state.confirmChecked,
+      }),
+    },
+  }),
 }));
 vi.mock("../threadRoutes", () => ({
   resolveThreadRouteRef: () => null,
@@ -277,6 +286,7 @@ beforeEach(() => {
   state.requests = [];
   state.localEffects = [];
   state.confirm.mockReset().mockResolvedValue(true);
+  state.confirmChecked = true;
   state.toasts = [];
   state.afterRequest = undefined;
   state.sessionLookupFails = false;
@@ -344,8 +354,8 @@ describe("thread action permissions", () => {
     state.confirm.mockResolvedValue(false);
     await useThreadActions().confirmAndDeleteThread(target, "Archived release notes");
     expect(state.confirm).toHaveBeenCalledWith(
-      "删除会话“Archived release notes”？\n这将永久清除此会话的对话历史。",
-      { variant: "destructive" },
+      "“Archived release notes”的所有消息和记录会被永久删除，无法恢复。想保留的话请改用归档。",
+      { title: "删除这个会话？", confirmLabel: "删除", variant: "destructive" },
     );
     expect(state.requests).toEqual([]);
   });
@@ -441,6 +451,42 @@ describe("thread action permissions", () => {
     expect(state.localEffects).not.toContain("clear-draft:fork");
   });
 
+  it.each([
+    { name: "cancelled", confirmed: false, checked: true, actions: [] as string[] },
+    { name: "left unchecked", confirmed: true, checked: false, actions: ["stopSession", "delete"] },
+    {
+      name: "checked",
+      confirmed: true,
+      checked: true,
+      actions: ["stopSession", "delete", "removeWorktree", "refreshStatus"],
+    },
+  ])(
+    "asks once about the thread and its worktree; $name",
+    async ({ confirmed, checked, actions }) => {
+      state.scopes
+        .get(secondary)!
+        .add(AuthOrchestrationOperateScope)
+        .add(AuthSourceControlWriteScope);
+      state.threads[0]!.worktreePath = "/worktrees/thread";
+      state.confirm.mockResolvedValue(confirmed);
+      state.confirmChecked = checked;
+      const result = await useThreadActions().deleteThread(target, {
+        confirmDeletion: { threadTitle: "Thread", always: false },
+      });
+      expect(result._tag).toBe("Success");
+      expect(state.confirm).toHaveBeenCalledOnce();
+      expect(state.confirm).toHaveBeenCalledWith(
+        expect.stringContaining("thread"),
+        expect.objectContaining({
+          title: "删除这个会话？",
+          confirmLabel: "删除",
+          checkbox: { label: "同时删除它的工作树" },
+        }),
+      );
+      expect(state.requests.map((request) => request.action)).toEqual(actions);
+    },
+  );
+
   it("does not request worktree removal after its grant is revoked during delete", async () => {
     state.scopes
       .get(secondary)!
@@ -450,7 +496,9 @@ describe("thread action permissions", () => {
     state.afterRequest = () => state.scopes.get(secondary)!.delete(AuthSourceControlWriteScope);
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      const result = await useThreadActions().deleteThread(target);
+      const result = await useThreadActions().deleteThread(target, {
+        confirmDeletion: { threadTitle: "Thread", always: false },
+      });
       expect(result._tag).toBe("Success");
       expect(state.requests.map((request) => request.action)).toEqual(["stopSession", "delete"]);
       expect(state.toasts).toContain("无法删除工作树");

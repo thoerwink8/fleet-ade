@@ -7,6 +7,11 @@ import {
   moveThreadContextDrag as moveThreadContextDragGhost,
 } from "./chat/threadContextDrag";
 import { discardComposerDraft } from "../lib/discardComposerDraft";
+import {
+  batchArchiveConfirmCopy,
+  batchDeleteConfirmCopy,
+  threadArchiveConfirmCopy,
+} from "../lib/threadConfirmCopy";
 import { requestCustomSnooze } from "./CustomSnoozeDialog";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
@@ -165,7 +170,6 @@ import {
   buildBulkTitleRegenerationContextMenuItem,
   buildBulkUnpinContextMenuItem,
   applyThreadBatch,
-  batchDeleteConfirmText,
   filterSidebarProjectScopeItems,
   firstValidTimestampMs,
   isSidebarNestedLinkClick,
@@ -2594,8 +2598,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       };
       if (clicked.value === "archive" || clicked.value === "unarchive") {
         if (clicked.value === "archive" && confirmThreadArchive) {
+          const copy = batchArchiveConfirmCopy(count);
           const confirmed = await settlePromise(() =>
-            api.dialogs.confirm(`归档 ${count} 个会话？`),
+            api.dialogs.confirm(copy.message, copy.options),
           );
           if (confirmed._tag === "Failure" || !confirmed.value) return;
         }
@@ -2604,8 +2609,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       }
       if (clicked.value !== "delete") return;
       if (confirmThreadDelete) {
+        const copy = batchDeleteConfirmCopy(count);
         const confirmed = await settlePromise(() =>
-          api.dialogs.confirm(batchDeleteConfirmText(count), { variant: "destructive" }),
+          api.dialogs.confirm(copy.message, copy.options),
         );
         if (confirmed._tag === "Failure" || !confirmed.value) return;
       }
@@ -2947,8 +2953,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             return;
           case "archive": {
             if (confirmThreadArchive) {
+              const copy = threadArchiveConfirmCopy(thread.title);
               const confirmed = await settlePromise(() =>
-                api.dialogs.confirm(`归档会话“${thread.title}”？`),
+                api.dialogs.confirm(copy.message, copy.options),
               );
               if (confirmed._tag === "Failure" || !confirmed.value) return;
             }
@@ -2972,16 +2979,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             return;
           }
           case "delete": {
-            if (confirmThreadDelete) {
-              const confirmed = await settlePromise(() =>
-                api.dialogs.confirm(
-                  [`删除会话“${thread.title}”？`, "这将永久清除此会话的对话历史。"].join("\n"),
-                  { variant: "destructive" },
-                ),
-              );
-              if (confirmed._tag === "Failure" || !confirmed.value) return;
-            }
-            const result = await deleteThread(threadRef);
+            const result = await deleteThread(threadRef, {
+              confirmDeletion: { threadTitle: thread.title, always: confirmThreadDelete },
+            });
             if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
               const error = squashAtomCommandFailure(result);
               toastManager.add(

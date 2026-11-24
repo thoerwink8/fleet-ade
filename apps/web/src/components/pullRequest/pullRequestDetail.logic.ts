@@ -57,6 +57,42 @@ export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, st
   "fast-forward": "Fast-forward merge",
 };
 
+const MERGE_CONFIRM_COPY: Record<
+  PullRequestMergeMethod,
+  { readonly confirmLabel: string; readonly describe: (number: number) => string }
+> = {
+  merge: {
+    confirmLabel: "合并",
+    describe: (number) => `保留 #${number} 的每个提交，并新增一个合并提交。`,
+  },
+  squash: {
+    confirmLabel: "压缩并合并",
+    describe: (number) => `把 #${number} 的所有提交压成一个再合并。`,
+  },
+  rebase: {
+    confirmLabel: "变基并合并",
+    describe: (number) => `把 #${number} 的提交逐个接到目标分支后面，不新增合并提交。`,
+  },
+  "fast-forward": {
+    confirmLabel: "快进合并",
+    describe: (number) => `把目标分支直接移到 #${number} 的最新提交，不新增合并提交。`,
+  },
+};
+
+export function pullRequestMergeConfirmCopy(input: {
+  readonly method: PullRequestMergeMethod;
+  readonly number: number;
+}) {
+  const copy = MERGE_CONFIRM_COPY[input.method];
+  return {
+    title: `合并 #${input.number}？`,
+    description: `${copy.describe(input.number)}合并后无法在这里撤销。`,
+    confirmLabel: copy.confirmLabel,
+    /** Hover text for the row button, so the method reads as an action rather than a code. */
+    rowTooltip: copy.describe(input.number),
+  };
+}
+
 export function allowsSinglePullRequestMerge(input: {
   supportsStackActions: boolean;
   hasStack: boolean;

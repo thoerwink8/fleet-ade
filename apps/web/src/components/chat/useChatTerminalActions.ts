@@ -29,6 +29,7 @@ import {
   useRightPanelStore,
 } from "../../rightPanelStore";
 import { confirmTerminalClose } from "../../lib/terminalCloseConfirm";
+import { readTerminalCloseTargets } from "../../state/terminalSessions";
 import { findReusableProjectScriptTerminal } from "../../lib/projectScriptTerminal";
 import { type TerminalContextSelection } from "../../lib/terminalContext";
 import {
@@ -355,10 +356,14 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
     focusActivePanelTerminal(target);
   };
   const closePanelTerminalStable = useStableCallback(closePanelTerminal);
+  const closeTargetsFor = (terminalId: string, label: string) =>
+    activeThreadRef
+      ? readTerminalCloseTargets(activeThreadRef, [{ terminalId, label }])
+      : [{ label, running: null }];
   const requestCloseTerminal = (terminalId: string) => {
     if (!hasTerminalWriteAccess()) return;
     const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
-    void confirmTerminalClose([label]).then((confirmed) => {
+    void confirmTerminalClose(closeTargetsFor(terminalId, label)).then((confirmed) => {
       if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
         closeTerminal(terminalId);
       }
@@ -368,7 +373,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   const requestClosePanelTerminal = (terminalId: string) => {
     if (!hasTerminalWriteAccess()) return;
     const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
-    void confirmTerminalClose([label]).then((confirmed) => {
+    void confirmTerminalClose(closeTargetsFor(terminalId, label)).then((confirmed) => {
       if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
         closePanelTerminal(terminalId);
       }

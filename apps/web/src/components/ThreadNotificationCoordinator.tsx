@@ -172,8 +172,11 @@ export function startThreadNotifications(
         type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
         title,
         description: thread.title,
+        // Needs-you notices stay until the thread is handled or the user closes them.
+        ...(kind === "completion" ? {} : { timeout: 0 }),
         data: {
           hideCopyButton: true,
+          dedupeKey: toastKey,
           leadingIcon:
             kind === "completion" ? (
               <CircleCheckIcon aria-hidden className="size-4 text-success-foreground" />
@@ -307,6 +310,11 @@ export function startThreadNotifications(
     entry.previous = next;
     entry.gate.retain(new Set(next.keys()));
     for (const [prior, state] of changed) {
+      // The request the toast announced was answered or replaced, so the toast has done its job.
+      if (prior?.attention != null && prior.attention !== state.attention) {
+        const handled = threadKey({ environmentId, threadId: state.thread.id });
+        closeToasts((key) => key === handled);
+      }
       entry.gate.observe(state.thread.id, prior, state, {
         archived: state.thread.archivedAt !== null,
         quiet: state.raw.latestRunStopRequested === true,

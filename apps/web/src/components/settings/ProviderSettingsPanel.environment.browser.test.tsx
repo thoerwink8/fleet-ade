@@ -433,9 +433,7 @@ describe("EnvironmentProviderSettings instance removal", () => {
 
     expect(state.confirm).toHaveBeenCalledWith(
       expect.stringContaining("It will also be turned off."),
-      {
-        variant: "destructive",
-      },
+      { title: "把这个提供方恢复为默认？", confirmLabel: "恢复默认", variant: "destructive" },
     );
     expect(state.mutateProviderInstance).not.toHaveBeenCalled();
   });

@@ -245,8 +245,8 @@ function InstanceSessionManagement(
     if (projectId === null || deletingSessionId !== null || session.importedThreadId !== null)
       return;
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `永久删除原生 ACP 运行实例“${session.title ?? session.sessionId}”？`,
-      { variant: "destructive" },
+      `“${session.title ?? session.sessionId}”是 ACP 的原生运行实例，删除后无法恢复。`,
+      { title: "永久删除这个运行实例？", confirmLabel: "删除", variant: "destructive" },
     );
     if (
       generation !== projectGeneration.current ||
@@ -350,8 +350,8 @@ function InstanceSessionManagement(
     if (projectId === null || savingProviderId !== null || loadingProviders || provider.required)
       return;
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      `停用 ACP 提供方“${provider.providerId}”？`,
-      { variant: "destructive" },
+      `“${provider.providerId}”会被停用，停用后不能再使用它。`,
+      { title: "停用这个 ACP 提供方？", confirmLabel: "停用", variant: "destructive" },
     );
     if (
       generation !== projectGeneration.current ||

@@ -1123,6 +1123,8 @@ function WebhookEndpointField({
   const rotateUrl = async () => {
     const confirmed =
       (await requestConfirmDialog("Rotate this webhook URL?\nThe current URL stops working.", {
+        title: "更换这个 webhook URL？",
+        confirmLabel: "更换",
         variant: "destructive",
       })) ?? window.confirm("更换此 webhook URL？当前 URL 将失效。");
     if (!confirmed) return;
@@ -1465,8 +1467,11 @@ function ScheduledTaskEditorForm({
     if (saving || !canOperate) return;
     if (draft.title.trim().length > 0 || draft.prompt.trim().length > 0) {
       const confirmed =
-        (await requestConfirmDialog("覆盖当前填写的内容？")) ??
-        window.confirm("覆盖当前填写的内容？");
+        (await requestConfirmDialog("套用模板会替换你已经填写的标题和提示词。", {
+          title: "覆盖当前填写的内容？",
+          confirmLabel: "覆盖",
+          variant: "destructive",
+        })) ?? window.confirm("覆盖当前填写的内容？");
       if (!confirmed) return;
     }
     setDraft((current) => applyScheduledTaskTemplate(current, template));

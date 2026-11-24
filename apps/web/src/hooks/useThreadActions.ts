@@ -17,6 +17,7 @@ import {
 import {
   AuthOrchestrationOperateScope,
   AuthSourceControlWriteScope,
+  type ConfirmDialogOptions,
   EnvironmentAuthorizationError,
   EnvironmentId,
   type ScopedThreadRef,
@@ -43,6 +44,11 @@ import { useNewThreadHandler } from "./useHandleNewThread";
 import { refreshArchivedThreadsForEnvironment } from "../lib/archivedThreadsState";
 import { releaseComposerDraftUploads } from "../lib/composerDraftUploads";
 import { announce } from "../lib/announce";
+import {
+  batchWorktreeDeleteConfirmCopy,
+  threadDeleteConfirmCopy,
+  threadUnpinConfirmCopy,
+} from "../lib/threadConfirmCopy";
 import { readLocalApi } from "../localApi";
 import {
   readEnvironmentServerConfigLoaded,
@@ -186,16 +192,15 @@ export class ThreadActiveReorderUnsupportedError extends Schema.TaggedError<Thre
 async function requestThreadUnpinConfirmation(input: {
   enabled: boolean;
   title: string;
-  confirm: ((message: string) => Promise<boolean>) | null;
+  confirm: ((message: string, options: ConfirmDialogOptions) => Promise<boolean>) | null;
 }) {
   const { confirm } = input;
   if (!input.enabled || confirm === null) {
     return AsyncResult.success(true);
   }
 
-  return settlePromise(() =>
-    confirm([`取消置顶会话“${input.title}”？`, "这会将会话移出置顶区域。"].join("\n")),
-  );
+  const copy = threadUnpinConfirmCopy(input.title);
+  return settlePromise(() => confirm(copy.message, copy.options));
 }
 
 export async function navigateAfterThreadDeletion(navigate: () => Promise<void>) {
@@ -458,12 +463,29 @@ export function useThreadActions() {
 
   const deleteThread = async (
     target: ScopedThreadRef,
-    opts: { deletedThreadKeys?: ReadonlySet<string> } = {},
+    opts: {
+      deletedThreadKeys?: ReadonlySet<string>;
+      /** Asks inside the delete, so one dialog covers the thread and its worktree; cancelling deletes nothing. */
+      confirmDeletion?: { readonly threadTitle: string; readonly always: boolean };
+    } = {},
   ) => {
     const permissionFailure = threadOperationFailure(target);
     if (permissionFailure) return permissionFailure;
     const resolved = resolveThreadTarget(target);
     if (!resolved) {
+      if (opts.confirmDeletion?.always) {
+        const localApi = readLocalApi();
+        if (localApi) {
+          const copy = threadDeleteConfirmCopy(opts.confirmDeletion.threadTitle, null);
+          const confirmation = await settlePromise(() =>
+            localApi.dialogs.confirm(copy.message, copy.options),
+          );
+          if (confirmation._tag === "Failure") return confirmation;
+          if (!confirmation.value) return AsyncResult.success(undefined);
+          const revokedFailure = threadOperationFailure(target);
+          if (revokedFailure) return revokedFailure;
+        }
+      }
       let threads = readEnvironmentThreadRefs(target.environmentId).flatMap((ref) => {
         const shell = readThreadShell(ref);
         return shell === null ? [] : [{ id: shell.id, lineage: shell.lineage }];
@@ -570,22 +592,32 @@ export function useThreadActions() {
     const automaticWorktreeCleanup = environmentSettings
       ? resolveWorktreeCleanup(environmentSettings, thread.projectId).worktreeOnDelete
       : false;
-    if (canDeleteWorktree && localApi && !automaticWorktreeCleanup) {
+    const askAboutWorktree = canDeleteWorktree && !automaticWorktreeCleanup;
+    const deletion = opts.confirmDeletion;
+    if (localApi && deletion && (deletion.always || askAboutWorktree)) {
+      const copy = threadDeleteConfirmCopy(
+        deletion.threadTitle,
+        askAboutWorktree
+          ? { displayPath: displayWorktreePath ?? orphanedWorktreePath ?? "" }
+          : null,
+      );
       const confirmationResult = await settlePromise(() =>
-        localApi.dialogs.confirm(
-          [
-            "此会话是唯一关联到该工作树的会话：",
-            displayWorktreePath ?? orphanedWorktreePath,
-            "",
-            "同时删除工作树？",
-          ].join("\n"),
-          { variant: "destructive" },
-        ),
+        copy.checkbox
+          ? localApi.dialogs.confirmWithCheckbox(copy.message, {
+              ...copy.options,
+              checkbox: copy.checkbox,
+            })
+          : localApi.dialogs
+              .confirm(copy.message, copy.options)
+              .then((confirmed) => ({ confirmed, checked: false })),
       );
       if (confirmationResult._tag === "Failure") {
         return confirmationResult;
       }
-      shouldDeleteWorktree = confirmationResult.value;
+      if (!confirmationResult.value.confirmed) return AsyncResult.success(undefined);
+      const revokedFailure = threadOperationFailure(target);
+      if (revokedFailure) return revokedFailure;
+      shouldDeleteWorktree = confirmationResult.value.checked;
     }
 
     if (thread.runtime !== null) {
@@ -871,15 +903,10 @@ export function useThreadActions() {
       }
       refreshArchivedThreadsForEnvironment(environmentId);
       if (pendingConfirm.length > 0 && localApi != null) {
-        const confirmed = await localApi.dialogs.confirm(
-          [
-            `这些会话独占 ${pendingConfirm.length} 个工作树：`,
-            ...pendingConfirm.map((entry) => entry.displayPath ?? entry.path),
-            "",
-            "同时删除工作树？",
-          ].join("\n"),
-          { variant: "destructive" },
+        const copy = batchWorktreeDeleteConfirmCopy(
+          pendingConfirm.map((entry) => entry.displayPath ?? entry.path),
         );
+        const confirmed = await localApi.dialogs.confirm(copy.message, copy.options);
         if (confirmed) {
           worktreeRemovals.push(
             ...pendingConfirm.map((removal) => ({ environmentId, ...removal })),
@@ -1180,7 +1207,7 @@ export function useThreadActions() {
     const confirmationResult = await requestThreadUnpinConfirmation({
       enabled: confirmThreadUnpin,
       title: resolved?.thread.title ?? "this thread",
-      confirm: localApi ? (message) => localApi.dialogs.confirm(message) : null,
+      confirm: localApi ? (message, options) => localApi.dialogs.confirm(message, options) : null,
     });
     if (confirmationResult._tag === "Failure") {
       return confirmationResult;
@@ -1309,26 +1336,13 @@ export function useThreadActions() {
   const confirmAndDeleteThread = async (target: ScopedThreadRef, knownTitle?: string) => {
     const permissionFailure = threadOperationFailure(target);
     if (permissionFailure) return permissionFailure;
-    const localApi = readLocalApi();
     const resolved = resolveThreadTarget(target);
-
-    if (confirmThreadDelete && localApi) {
-      const title = resolved?.thread.title ?? knownTitle ?? "this thread";
-      const confirmationResult = await settlePromise(() =>
-        localApi.dialogs.confirm(
-          [`删除会话“${title}”？`, "这将永久清除此会话的对话历史。"].join("\n"),
-          { variant: "destructive" },
-        ),
-      );
-      if (confirmationResult._tag === "Failure") {
-        return confirmationResult;
-      }
-      if (!confirmationResult.value) {
-        return AsyncResult.success(undefined);
-      }
-    }
-
-    return deleteThread(target);
+    return deleteThread(target, {
+      confirmDeletion: {
+        threadTitle: resolved?.thread.title ?? knownTitle ?? "这个会话",
+        always: confirmThreadDelete,
+      },
+    });
   };
 
   return {

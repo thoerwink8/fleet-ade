@@ -6,24 +6,37 @@ export function isTerminalCloseConfirmPending(): boolean {
   return pendingConfirmations > 0;
 }
 
+/** `running` is null when it is not known; an unknown terminal is asked about. */
+export interface TerminalCloseTarget {
+  readonly label: string;
+  readonly running: boolean | null;
+}
+
+function quoted(labels: readonly string[]): string {
+  return labels.map((label) => `“${label}”`).join("、");
+}
+
 export async function confirmTerminalClose(
-  labels: readonly [string, ...string[]],
+  terminals: readonly TerminalCloseTarget[],
 ): Promise<boolean> {
+  const busy = terminals.filter((terminal) => terminal.running !== false);
+  if (busy.length === 0) return true;
   const localApi = readLocalApi();
   if (!localApi) return true;
+  const known = busy.every((terminal) => terminal.running === true);
+  const only = terminals.length === 1;
+  const pronoun = busy.length === 1 ? "它" : "它们";
+  const scope = only ? "里面" : "其中";
+  const description = known
+    ? `${scope}还在运行 ${quoted(busy.map((terminal) => terminal.label))}，关掉会终止${pronoun}，终端里的历史输出也会清除。`
+    : `${scope}可能还有程序在运行，关掉会终止${pronoun}，终端里的历史输出也会清除。`;
   pendingConfirmations += 1;
   try {
-    return await localApi.dialogs.confirm(
-      labels.length === 1
-        ? [`关闭终端“${labels[0]}”？`, "这会停止正在运行的进程并清除其历史记录。"].join("\n")
-        : [
-            `关闭 ${labels.length} 个终端？`,
-            `这会停止它们正在运行的进程并清除其历史记录：${labels
-              .map((label) => `"${label}"`)
-              .join(", ")}。`,
-          ].join("\n"),
-      { variant: "destructive" },
-    );
+    return await localApi.dialogs.confirm(description, {
+      title: only ? "关闭这个终端？" : `关闭 ${terminals.length} 个终端？`,
+      confirmLabel: "终止并关闭",
+      variant: "destructive",
+    });
   } catch {
     return false;
   } finally {

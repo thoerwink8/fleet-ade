@@ -20,6 +20,7 @@ import {
   buildAskAboutPullRequestHandoff,
   buildExplainPullRequestHandoff,
   buildResolveConflictsPrompt,
+  pullRequestMergeConfirmCopy,
   resolveThreadPanelPullRequestAction,
   buildPullRequestCommentContext,
   buildFixFindingHandoff,
@@ -1889,5 +1890,36 @@ describe("readableFailure", () => {
     expect(readableFailure(new Error("Branch is protected."), "请重试。")).toBe(
       "Branch is protected.",
     );
+  });
+});
+
+describe("pullRequestMergeConfirmCopy", () => {
+  it.each([
+    {
+      method: "merge",
+      confirmLabel: "合并",
+      sentence: "保留 #12 的每个提交，并新增一个合并提交。",
+    },
+    {
+      method: "squash",
+      confirmLabel: "压缩并合并",
+      sentence: "把 #12 的所有提交压成一个再合并。",
+    },
+    {
+      method: "rebase",
+      confirmLabel: "变基并合并",
+      sentence: "把 #12 的提交逐个接到目标分支后面，不新增合并提交。",
+    },
+    {
+      method: "fast-forward",
+      confirmLabel: "快进合并",
+      sentence: "把目标分支直接移到 #12 的最新提交，不新增合并提交。",
+    },
+  ] as const)("describes $method in plain words without the method code", (row) => {
+    const copy = pullRequestMergeConfirmCopy({ method: row.method, number: 12 });
+    expect(copy.title).toBe("合并 #12？");
+    expect(copy.confirmLabel).toBe(row.confirmLabel);
+    expect(copy.description).toBe(`${row.sentence}合并后无法在这里撤销。`);
+    expect(copy.description).not.toContain(row.method === "merge" ? "merge" : row.method);
   });
 });

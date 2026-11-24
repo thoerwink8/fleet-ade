@@ -7,6 +7,7 @@ import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
 import { useThreadTerminalActions } from "../components/terminal/useThreadTerminalActions";
 import { confirmTerminalClose } from "../lib/terminalCloseConfirm";
+import { readTerminalCloseTargets } from "../state/terminalSessions";
 import { focusPanelTerminalAfterClose } from "../lib/terminalFocus";
 import {
   selectThreadRightPanelState,
@@ -96,14 +97,14 @@ export function useRightPanelSurfaceClose(input: {
       finishClose([surface]);
       return;
     }
-    const otherLabels = surface.terminalIds
-      .filter((terminalId) => terminalId !== surface.activeTerminalId)
-      .map(labelFor);
-    void confirmTerminalClose([labelFor(surface.activeTerminalId), ...otherLabels]).then(
-      (confirmed) => {
-        if (confirmed) finishClose([surface]);
-      },
-    );
+    void confirmTerminalClose(
+      readTerminalCloseTargets(
+        threadRef,
+        surface.terminalIds.map((terminalId) => ({ terminalId, label: labelFor(terminalId) })),
+      ),
+    ).then((confirmed) => {
+      if (confirmed) finishClose([surface]);
+    });
   });
   const closeOtherSurfaces = useStableCallback((surface: RightPanelSurface) =>
     closeSurfaces(surfaces.filter((entry) => entry.id !== surface.id)),
