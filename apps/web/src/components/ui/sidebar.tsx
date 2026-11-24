@@ -30,7 +30,8 @@ const SIDEBAR_WIDTH = "264px";
 const SIDEBAR_WIDTH_MOBILE = "min(28rem, calc(100vw - var(--fa-space-12, 3rem)))";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_RESIZE_DEFAULT_MIN_WIDTH = 16 * 16;
-const SIDEBAR_TITLEBAR_CONTROL_SIZE = "max-sm:[--workspace-titlebar-control-size:--spacing(8)]";
+const SIDEBAR_TITLEBAR_CONTROL_SIZE =
+  "max-sm:[--workspace-titlebar-control-size:--spacing(8)] pointer-coarse:[--workspace-titlebar-control-size:--spacing(8)]";
 
 type SidebarContextProps = {
   state: ResponsiveSidebarState;

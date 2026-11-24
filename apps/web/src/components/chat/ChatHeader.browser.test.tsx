@@ -1,6 +1,6 @@
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
-import { page, userEvent } from "vite-plus/test/browser";
+import { cdp, page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 
@@ -23,8 +23,11 @@ vi.mock(import("~/hooks/useThreadActionMenu"), () => ({
   useThreadActionMenu: () => ({ openMenu, closeMenu: () => {} }),
 }));
 
+import { cn } from "~/lib/utils";
+import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { render, stubGlobal } from "../../../test/render";
 import { PopoverCreateHandle } from "../ui/popover";
+import { SidebarProvider, SidebarTrigger } from "../ui/sidebar";
 import { ChatHeader } from "./ChatHeader";
 import { ThreadHeaderContext } from "./ThreadHeaderMeta";
 
@@ -120,4 +123,138 @@ it("shows percent and cost on desktop, omits cost when absent, and hides cost su
     .element(screen.getByRole("button", { name: "上下文已用 19.3%，打开会话详情" }))
     .toBeVisible();
   expect(document.querySelector("[data-thread-header-cost]")).toBeNull();
+});
+
+async function emulatePointer(options: {
+  width: number;
+  height: number;
+  pointer: "coarse" | "fine";
+}): Promise<AsyncDisposable> {
+  const previous = { width: window.innerWidth, height: window.innerHeight };
+  const session = cdp();
+  const isTouch = options.pointer === "coarse";
+  const cleanup = async () => {
+    await session.send("Emulation.setEmulatedMedia", { features: [] });
+    await session.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await session.send("Emulation.clearDeviceMetricsOverride");
+    await page.viewport(previous.width, previous.height);
+  };
+  try {
+    await page.viewport(options.width, options.height);
+    await session.send("Emulation.setDeviceMetricsOverride", {
+      width: options.width,
+      height: options.height,
+      deviceScaleFactor: isTouch ? 2 : 1,
+      mobile: isTouch,
+    });
+    await session.send("Emulation.setTouchEmulationEnabled", {
+      enabled: isTouch,
+      ...(isTouch ? { maxTouchPoints: 5 } : {}),
+    });
+    await session.send("Emulation.setEmulatedMedia", {
+      features: isTouch
+        ? [
+            { name: "pointer", value: "coarse" },
+            { name: "hover", value: "none" },
+          ]
+        : [
+            { name: "pointer", value: "fine" },
+            { name: "hover", value: "hover" },
+          ],
+    });
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+  return { [Symbol.asyncDispose]: cleanup };
+}
+
+function headerWithSidebarTrigger() {
+  const environmentId = EnvironmentId.make("environment");
+  return (
+    <SidebarProvider defaultOpen={false}>
+      <div className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center">
+        <SidebarTrigger
+          touchTarget="compact"
+          className="pointer-events-auto"
+          aria-label="切换主侧边栏"
+        />
+      </div>
+      <header
+        data-chat-header
+        className={cn(
+          "relative flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] w-full shrink-0 items-center pl-(--workspace-gutter-start) pr-(--workspace-gutter-end)",
+          COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
+        )}
+      >
+        <ChatHeader
+          activeThreadEnvironmentId={environmentId}
+          activeThreadId={ThreadId.make("thread")}
+          activeThreadTitle="会话标题"
+          isServerThread
+          activeProject={{
+            id: ProjectId.make("project-1"),
+            environmentId,
+            title: "fleet-ade",
+            workspaceRoot: "/work/fleet-ade",
+            repositoryIdentity: null,
+            defaultModelSelection: null,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            scripts: [],
+          }}
+          parentThreadLink={{ threadId: ThreadId.make("parent"), title: "父会话" }}
+          onOpenThread={() => {}}
+          rightPanelOpen={false}
+          onNewThreadInProject={() => {}}
+        />
+      </header>
+    </SidebarProvider>
+  );
+}
+
+it("expands breadcrumb touch hit areas vertically to 44px without overlapping the sidebar trigger", async () => {
+  {
+    await using _pointer = await emulatePointer({ width: 390, height: 844, pointer: "coarse" });
+    await using screen = await render(headerWithSidebarTrigger());
+    await vi.waitFor(() => expect(window.matchMedia("(pointer: coarse)").matches).toBe(true));
+
+    const trigger = screen.getByRole("button", { name: "切换主侧边栏" }).element();
+    const projectBtn = screen.getByRole("button", { name: "在 fleet-ade 中新建会话" }).element();
+    const parentBtn = screen.getByRole("button", { name: "打开父会话：父会话" }).element();
+    const titleBtn = screen.getByRole("button", { name: "会话标题 的会话操作" }).element();
+
+    for (const button of [projectBtn, parentBtn, titleBtn]) {
+      const rect = button.getBoundingClientRect();
+      const afterStyle = getComputedStyle(button, "::after");
+      const cx = rect.left + rect.width / 2;
+      expect(rect.height).toBeLessThanOrEqual(28);
+      expect(Number.parseFloat(afterStyle.minHeight)).toBeGreaterThanOrEqual(44);
+      expect(document.elementFromPoint(cx, rect.top - 8)).toBe(button);
+      expect(document.elementFromPoint(cx, rect.bottom + 8)).toBe(button);
+    }
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const triggerAfterWidth = Number.parseFloat(getComputedStyle(trigger, "::after").minWidth);
+    const triggerHitRight = triggerRect.left + triggerRect.width / 2 + triggerAfterWidth / 2;
+    const projectRect = projectBtn.getBoundingClientRect();
+    const projectCy = projectRect.top + projectRect.height / 2;
+    const triggerCy = triggerRect.top + triggerRect.height / 2;
+
+    expect(projectRect.left).toBeGreaterThanOrEqual(triggerHitRight);
+    expect(document.elementFromPoint(projectRect.left + 1, projectCy)).toBe(projectBtn);
+    expect(document.elementFromPoint(projectRect.left + 1, projectRect.top - 8)).toBe(projectBtn);
+    expect(document.elementFromPoint(triggerRect.right + 4, triggerCy)).toBe(trigger);
+  }
+
+  {
+    await using _pointer = await emulatePointer({ width: 1280, height: 800, pointer: "fine" });
+    await using screen = await render(headerWithSidebarTrigger());
+    await vi.waitFor(() => expect(window.matchMedia("(pointer: fine)").matches).toBe(true));
+
+    for (const name of ["在 fleet-ade 中新建会话", "打开父会话：父会话", "会话标题 的会话操作"]) {
+      const button = screen.getByRole("button", { name }).element();
+      expect(getComputedStyle(button, "::after").content).toBe("none");
+    }
+  }
 });

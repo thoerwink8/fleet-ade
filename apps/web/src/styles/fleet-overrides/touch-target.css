@@ -25,6 +25,10 @@
     transform: translate(-50%, -50%);
   }
 
+  .ade-touch-target--y::after {
+    min-width: 0;
+  }
+
   .fa-btn,
   [data-slot="toggle"],
   [data-slot="composer-control"],

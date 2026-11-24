@@ -116,6 +116,10 @@
   --workspace-gutter-start: calc(env(safe-area-inset-left) + var(--workspace-gutter));
   --workspace-gutter-end: calc(env(safe-area-inset-right) + var(--workspace-gutter));
 
+  @media (pointer: coarse) {
+    --workspace-titlebar-control-gap: 0.5rem;
+  }
+
   @variant sm {
     --workspace-controls-left: calc(env(safe-area-inset-left) + 0.75rem);
     --workspace-titlebar-control-gap: 0.75rem;
