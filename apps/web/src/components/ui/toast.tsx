@@ -43,6 +43,8 @@ export type ThreadToastData = {
   onClose?: (() => void) | undefined;
   dismissAfterVisibleMs?: number;
   hideCopyButton?: boolean;
+  /** Tells apart errors that share a title and wording but are not the same failure (e.g. two sessions). */
+  dedupeKey?: string;
   additionalActions?: ReadonlyArray<{
     id: string;
     props: ComponentPropsWithoutRef<"button">;
@@ -101,11 +103,14 @@ function createBufferedToastManager(dedupeErrors: boolean): BaseToastManager {
       if (!dedupeErrors || resolved.type !== "error" || typeof resolved.title !== "string") {
         return manager.add(resolved);
       }
-      // The same failure again replaces the open one, so repeated errors do not pile up.
+      // The same failure again (same title, session and wording) replaces the open one, so repeats
+      // do not pile up. A different wording is a different failure, e.g. another computer or session.
       const key = JSON.stringify([
         resolved.title,
         resolved.data?.threadRef?.environmentId ?? null,
         resolved.data?.threadRef?.threadId ?? resolved.data?.threadId ?? null,
+        typeof resolved.description === "string" ? resolved.description : null,
+        resolved.data?.dedupeKey ?? null,
       ]);
       const tracked = {
         ...resolved,

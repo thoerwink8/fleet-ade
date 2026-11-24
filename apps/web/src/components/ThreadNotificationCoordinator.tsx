@@ -176,6 +176,7 @@ export function startThreadNotifications(
         ...(kind === "completion" ? {} : { timeout: 0 }),
         data: {
           hideCopyButton: true,
+          dedupeKey: toastKey,
           leadingIcon:
             kind === "completion" ? (
               <CircleCheckIcon aria-hidden className="size-4 text-success-foreground" />

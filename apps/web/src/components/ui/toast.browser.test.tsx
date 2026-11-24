@@ -161,13 +161,12 @@ describe("toastManager", () => {
     using _timers = fakeTimers();
 
     const first = await act(() =>
-      toastManager.add({ type: "error", title: "无法重复提交", description: "第一次" }),
+      toastManager.add({ type: "error", title: "无法重复提交", description: "连接超时" }),
     );
     const second = await act(() =>
-      toastManager.add({ type: "error", title: "无法重复提交", description: "第二次" }),
+      toastManager.add({ type: "error", title: "无法重复提交", description: "连接超时" }),
     );
     expect(second).toBe(first);
-    await expect.element(page.getByText("第二次")).toBeInTheDocument();
     expect(page.getByRole("dialog", { name: "无法重复提交" }).elements()).toHaveLength(1);
 
     await act(() => {
@@ -175,6 +174,38 @@ describe("toastManager", () => {
     });
     await act(() => vi.advanceTimersByTime(4_000));
     await expect.element(page.getByRole("dialog", { name: "已提交" })).not.toBeInTheDocument();
+  });
+
+  it("keeps two errors that share a title but describe different failures", async () => {
+    await using _screen = await render(<ToastProvider>{null}</ToastProvider>);
+
+    const first = await act(() =>
+      toastManager.add({ type: "error", title: "会话失败", description: "会话甲" }),
+    );
+    const second = await act(() =>
+      toastManager.add({ type: "error", title: "会话失败", description: "会话乙" }),
+    );
+    expect(second).not.toBe(first);
+    await expect.element(page.getByText("会话甲")).toBeInTheDocument();
+    await expect.element(page.getByText("会话乙")).toBeInTheDocument();
+
+    const sameWordingA = await act(() =>
+      toastManager.add({
+        type: "error",
+        title: "会话失败",
+        description: "新建会话",
+        data: { dedupeKey: "a" },
+      }),
+    );
+    const sameWordingB = await act(() =>
+      toastManager.add({
+        type: "error",
+        title: "会话失败",
+        description: "新建会话",
+        data: { dedupeKey: "b" },
+      }),
+    );
+    expect(sameWordingB).not.toBe(sameWordingA);
   });
 });
 
