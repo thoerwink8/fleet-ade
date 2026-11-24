@@ -281,7 +281,7 @@ export function branchMismatchBannerItem(input: {
     variant: "info",
     icon: <GitBranchIcon />,
     title: (
-      <span className="flex min-w-0 items-baseline gap-1.5">
+      <span className="flex min-w-0 items-baseline gap-2">
         <span className="shrink-0 font-normal text-muted-foreground">分支已从以下分支切换：</span>
         <Tooltip>
           <TooltipTrigger
@@ -299,7 +299,12 @@ export function branchMismatchBannerItem(input: {
       </span>
     ),
     actions: (
-      <Button size="xs" variant="ghost" disabled={input.restoreDisabled} onClick={input.onRestore}>
+      <Button
+        size="strip"
+        variant="ghost"
+        disabled={input.restoreDisabled}
+        onClick={input.onRestore}
+      >
         {input.restoring ? "正在恢复…" : "恢复分支"}
       </Button>
     ),

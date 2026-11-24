@@ -1,0 +1,68 @@
+/* Joins the composer, whose cap is 12px (--fa-radius-lg). The bottom stays
+   square and slides under that cap, so the visible corners match it.
+   A free-standing strip stays 8px because it does not share an edge. */
+.ade-composer-banner {
+  background-color: var(--fa-panel);
+  background-image: none;
+  border: 1px solid var(--fa-border);
+  border-radius: var(--fa-radius-lg) var(--fa-radius-lg) 0 0;
+  box-shadow: none;
+  color: var(--fa-fg);
+  font-family: var(--fa-font-sans, var(--font-sans));
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.ade-composer-banner[data-composer-banner-surface="detached"] {
+  border-radius: var(--fa-radius-lg);
+}
+
+/* Under the fill: join selectors clear this border without a second visible line. */
+.ade-composer-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border: 1px solid var(--fa-border);
+  border-radius: inherit;
+  background: none;
+  background-image: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.ade-composer-banner-title {
+  color: var(--fa-fg);
+  font-weight: 500;
+}
+
+.ade-composer-banner-secondary {
+  color: var(--fa-fg-muted);
+  font-weight: 400;
+}
+
+.ade-composer-banner[data-variant="default"] [data-slot="composer-banner-icon"],
+.ade-composer-banner:not([data-variant]) [data-slot="composer-banner-icon"] {
+  color: var(--fa-fg-muted);
+}
+
+.ade-composer-banner[data-variant="error"] [data-slot="composer-banner-icon"] {
+  color: var(--fa-danger);
+}
+
+.ade-composer-banner[data-variant="warning"] [data-slot="composer-banner-icon"] {
+  color: var(--fa-warning);
+}
+
+.ade-composer-banner[data-variant="info"] [data-slot="composer-banner-icon"] {
+  color: var(--fa-info);
+}
+
+.ade-composer-banner[data-variant="success"] [data-slot="composer-banner-icon"] {
+  color: var(--fa-success);
+}

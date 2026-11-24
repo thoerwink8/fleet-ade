@@ -34,7 +34,7 @@ function AccountSummary({ account }: { readonly account: UsageLimitsReport["acco
           ariaLabel="切换账户标签显示"
           revealTooltip="点击显示账户"
           hideTooltip="点击隐藏账户"
-          className="max-w-full truncate align-bottom font-sans text-xs leading-normal"
+          className="max-w-full truncate align-bottom font-sans text-sm"
         />
       ) : (
         label
@@ -89,7 +89,7 @@ export function modelFallbackBannerItem({
     title: `正在使用 ${fallbackModelName}`,
     description: `${defaultProviderName} 的用量已用完${resetsAt ? ` · ${formatUpcomingTimestamp(resetsAt, timestampFormat)} 重置` : ""}`,
     actions: (
-      <Button size="xs" variant="ghost" onClick={onUseDefault}>
+      <Button size="strip" variant="ghost" onClick={onUseDefault}>
         使用 {defaultModelName}
       </Button>
     ),
@@ -108,7 +108,7 @@ function UsageLimitsBannerBody({
   const now = Date.parse(report.createdAt);
   return (
     <ComposerBanner.Scroll>
-      <ComposerBanner.Body className="flex flex-col gap-2 pt-1 pb-1.5 pe-2">
+      <ComposerBanner.Body className="flex flex-col gap-2 pt-1 pb-2 pe-2">
         {report.accounts.map((account) => {
           const resetCreditInput =
             account.resetCreditInput ??
@@ -118,12 +118,12 @@ function UsageLimitsBannerBody({
           return (
             <div key={account.id} className="flex min-w-0 flex-col gap-1">
               {report.accounts.length > 1 ? (
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="truncate text-sm text-muted-foreground">
                   <AccountSummary account={account} />
                 </span>
               ) : null}
               {notice ? (
-                <span className="text-xs text-muted-foreground">{notice}</span>
+                <span className="text-sm text-muted-foreground">{notice}</span>
               ) : (
                 <LimitWindows
                   compact
@@ -155,7 +155,7 @@ function UsageLimitsBannerBody({
           );
         })}
         {report.notices.map((notice) => (
-          <span key={notice} className="text-xs text-muted-foreground">
+          <span key={notice} className="text-sm text-muted-foreground">
             {notice}
           </span>
         ))}

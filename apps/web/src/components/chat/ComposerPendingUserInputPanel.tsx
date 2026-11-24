@@ -203,7 +203,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
         render={<ComposerBanner.Row render={<button type="button" />} />}
         title={isCollapsed ? "显示问题及其选项" : "隐藏问题及其选项"}
         data-pending-user-input-toggle={isCollapsed ? "collapsed" : "expanded"}
-        className="px-4 py-1.5"
+        className="px-4 py-1"
       >
         <ComposerBanner.Content>
           <span
@@ -255,16 +255,16 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
       </CollapsibleTrigger>
       <CollapsiblePanel>
         <ComposerBanner.Scroll>
-          <ComposerBanner.Body className="ps-6 pe-4 pb-1 wrap-anywhere sm:ps-5.5">
+          <ComposerBanner.Body className="pe-4 pb-1 wrap-anywhere">
             <ChatMarkdown
               text={activeQuestion.question}
               cwd={cwd}
               threadRef={threadRef}
               lineBreaks
-              className={cn("pt-0.5 text-foreground/85", questionTextAlign)}
+              className={cn("pt-1 text-foreground", questionTextAlign)}
             />
             {/* Rows span the header row's width so the radios align with the question text and the shortcut column sits under the dismiss button. */}
-            <div className="-ms-2 mt-1.5 sm:-ms-1.5">
+            <div className="-ms-2 mt-2">
               {activeQuestion.options.map((option, index) => {
                 const optionValue = option.value ?? option.label;
                 const isOptimisticallySelected =
@@ -274,8 +274,8 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
                   isOptimisticallySelected || draftSelectedOptions?.[index] === true;
                 const className = cn(
                   questionTextAlign,
-                  "group flex w-full items-start gap-2.5 rounded-md bg-transparent py-1.5 ps-2 sm:ps-1.5 outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/25",
-                  isSelected ? "text-foreground" : "text-foreground/70 hover:bg-muted/30",
+                  "group flex w-full items-start gap-2 rounded-lg bg-transparent py-2 ps-2 outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/25",
+                  isSelected ? "text-foreground" : "text-muted-foreground hover:bg-muted/30",
                   (disabled || isResponding) && "opacity-50 cursor-not-allowed",
                   !disabled && !isResponding && "cursor-pointer",
                 );
@@ -289,8 +289,8 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
                         <OptionRadio checked={isSelected} />
                       )}
                     </span>
-                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                      <span className="text-row font-semibold" dir={textDirection(option.label)}>
+                    <div className="min-w-0 flex-1 flex flex-col gap-1">
+                      <span className="text-row font-medium" dir={textDirection(option.label)}>
                         {option.label}
                       </span>
                       {option.description && option.description !== option.label ? (
@@ -303,7 +303,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
                       ) : null}
                     </div>
                     {index < 9 ? (
-                      <span className="flex h-5 w-7 shrink-0 items-center justify-center sm:w-6">
+                      <span className="flex h-5 w-7 shrink-0 items-center justify-center">
                         <Kbd>{index + 1}</Kbd>
                       </span>
                     ) : null}
@@ -329,7 +329,7 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
                         cwd={cwd}
                         threadRef={threadRef}
                         lineBreaks
-                        className="ps-9 pe-2 pb-1.5 text-xs text-foreground/70 sm:ps-8"
+                        className="ps-8 pe-2 pb-2 text-sm text-muted-foreground"
                       />
                     ) : null}
                   </div>

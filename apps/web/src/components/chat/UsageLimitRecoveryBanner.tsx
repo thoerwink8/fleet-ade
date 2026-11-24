@@ -87,7 +87,7 @@ export function usageLimitRecoveryBannerItem(props: RecoveryProps): ComposerBann
     actions: (
       <>
         {recoveryActions}
-        <ChatGptUsageButton size="xs" variant="ghost" />
+        <ChatGptUsageButton size="strip" variant="ghost" />
       </>
     ),
   };
@@ -134,10 +134,16 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
   // Inline errors would widen the actions column and crush the title.
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
-      <InlineButton touchTarget="padded" disabled={pending} onClick={() => void toggle("resume")}>
+      <InlineButton
+        size="strip"
+        touchTarget="padded"
+        disabled={pending}
+        onClick={() => void toggle("resume")}
+      >
         {pending ? "正在保存…" : scheduled ? "取消自动继续" : "重置后自动继续"}
       </InlineButton>
       <InlineButton
+        size="strip"
         touchTarget="padded"
         disabled={pending || (!snoozed && resetPassed)}
         onClick={() => void toggle("snooze")}

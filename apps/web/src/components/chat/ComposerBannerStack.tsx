@@ -140,7 +140,7 @@ export function NoticeText({
             render={
               <Button
                 ref={detailsRef}
-                size="icon-xs"
+                size="icon-strip"
                 variant="ghost-muted"
                 aria-label={detailsLabel}
                 className="flex-none"
@@ -187,7 +187,7 @@ function NoticeCard({
             detailsLabel={
               typeof item.title === "string" ? `显示完整标题：${item.title}` : "显示标题详情"
             }
-            className="min-w-0 truncate font-semibold leading-7 sm:leading-6"
+            className="ade-composer-banner-title min-w-0 truncate leading-5"
           >
             {item.title}
           </NoticeText>
@@ -196,7 +196,7 @@ function NoticeCard({
               detailsLabel={
                 typeof item.title === "string" ? `显示详情：${item.title}` : "显示提示详情"
               }
-              className="w-0 min-w-0 grow truncate text-muted-foreground @max-[400px]:sr-only"
+              className="ade-composer-banner-secondary w-0 min-w-0 grow truncate @max-[400px]:sr-only"
             >
               {item.description}
             </NoticeText>

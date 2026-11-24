@@ -88,7 +88,7 @@ export function useAutoBalanceUpdateBanner(
     title: (
       <Popover>
         <PopoverTrigger
-          render={<InlineButton />}
+          render={<InlineButton size="strip" />}
           className="max-w-full"
           aria-label={`${title}。查看机器`}
         >
@@ -124,6 +124,7 @@ export function useAutoBalanceUpdateBanner(
       running === 0 && targets.length > 0 ? (
         <ServerUpdatesAction
           targets={targets}
+          size="strip"
           variant="ghost"
           label={
             failed > 0
