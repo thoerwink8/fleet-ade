@@ -24,6 +24,7 @@
 @import "@fleet/design/styles/details-panel.css" layer(fleet);
 @import "@fleet/design/styles/tool-call-fold.css" layer(fleet);
 @import "./styles/fleet-overrides/sheet.css" layer(fleet);
+@import "./styles/fleet-overrides/popup.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));

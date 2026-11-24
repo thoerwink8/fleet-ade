@@ -422,7 +422,6 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
         {...(docked
           ? { side: "top" as const, collisionAvoidance: { side: "shift", align: "shift" } as const }
           : {})}
-        className="before:hidden"
         padding="none"
         touchBackdrop
       >
