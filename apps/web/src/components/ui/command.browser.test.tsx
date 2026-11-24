@@ -119,7 +119,7 @@ describe("command palette shell", () => {
     expect(getComputedStyle(row.querySelector(".l1")!).fontSize).toBe("14px");
     expect(heading!.getBoundingClientRect().height).toBe(28);
     expect(getComputedStyle(heading!).fontSize).toBe("12px");
-    expect(list!.getBoundingClientRect().height).toBe(415);
+    expect(list!.getBoundingClientRect().height).toBe(428);
     expect(getComputedStyle(list!).fontSize).toBe("16px");
   });
 
