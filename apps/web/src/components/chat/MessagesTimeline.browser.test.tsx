@@ -767,12 +767,18 @@ describe("MessagesTimeline messages", () => {
       />,
     );
     await vi.waitFor(() => expect(screen.text()).toContain("Turn 118:"));
+    const viewport = props.listRef.current!.getScrollableNode()!;
+    // The tail text can paint before the list has a scroll range and has settled at the end.
+    await vi.waitFor(() => {
+      expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+      expect(viewport.scrollTop).toBeGreaterThan(0);
+      expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBeLessThan(2);
+    });
     using _timers = fakeTimers();
     const turnsInDomOrder = () =>
       [...screen.container.querySelectorAll("h3")].map((heading) =>
         Number(/Turn (\d+):/.exec(heading.parentElement?.textContent ?? "")?.[1]),
       );
-    const viewport = props.listRef.current!.getScrollableNode()!;
 
     const scroll = async (by: number) => {
       for (let step = 0; step < 40; step++) {
@@ -793,7 +799,13 @@ describe("MessagesTimeline messages", () => {
       vi.advanceTimersByTime(300);
     });
     await scroll(300);
-    expect(turnsInDomOrder().filter((turn) => turn > 0 && turn < 100).length).toBeGreaterThan(0);
+    // LegendList mounts the scrolled window on a later animation frame than the 16ms step.
+    await vi.waitFor(async () => {
+      await act(() => {
+        vi.advanceTimersByTime(16);
+      });
+      expect(turnsInDomOrder().filter((turn) => turn > 0 && turn < 100).length).toBeGreaterThan(0);
+    });
     await scroll(-300);
 
     await act(() => vi.advanceTimersByTime(300));
