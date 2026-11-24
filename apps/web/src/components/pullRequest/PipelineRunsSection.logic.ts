@@ -30,7 +30,7 @@ export const PIPELINE_STATUS_BADGE = {
   claimed: "secondary",
   session: "info",
   "pr-open": "info",
-  checks: "warning",
+  checks: "info",
   verify: "info",
   mergeable: "success",
   merged: "success",
