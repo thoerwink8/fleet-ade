@@ -391,6 +391,8 @@ function rollbackCodeMessage(code: OrchestrationV2RollbackFailureCode): string {
       return SHARED_WORKSPACE_RESTORE_MESSAGE;
     case "provider-cannot-rollback":
       return "This provider cannot roll back the conversation.";
+    case "provider-cannot-interrupt":
+      return "This provider cannot stop a running turn, so it cannot rewind one.";
     case "provider-turn-unavailable":
       return "The provider turn for that checkpoint is unavailable.";
     case "provider-turn-active":
@@ -13855,6 +13857,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const ensureProviderCanRollback = Effect.fn("Orchestrator.ensureProviderCanRollback")(function* (
     command: OrchestrationV2ServerCommand,
     thread: OrchestrationV2AppThread,
+    options?: { readonly mustInterrupt?: boolean },
   ) {
     const capabilities = yield* providerAdapters.get(thread.modelSelection.instanceId).pipe(
       Effect.flatMap((adapter) => adapter.getCapabilities()),
@@ -13884,6 +13887,26 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             }),
         ),
       );
+    // thread.stop only logs a refused interrupt, which would leave the rewind waiting for ever.
+    if (options?.mustInterrupt === true) {
+      yield* commandPolicy
+        .ensureInterrupt({
+          commandId: command.commandId,
+          threadId: thread.id,
+          providerInstanceId: thread.modelSelection.instanceId,
+          capabilities,
+        })
+        .pipe(
+          Effect.mapError(
+            () =>
+              new OrchestratorRollbackRejectedError({
+                commandId: command.commandId,
+                threadId: thread.id,
+                code: "provider-cannot-interrupt",
+              }),
+          ),
+        );
+    }
   });
 
   const dispatchThreadStopAndRollback = Effect.fn("Orchestrator.dispatchThreadStopAndRollback")(
@@ -13918,7 +13941,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             code: "target-invalid",
           });
         }
-        yield* ensureProviderCanRollback(command, projection.thread);
+        yield* ensureProviderCanRollback(command, projection.thread, { mustInterrupt: true });
         if (command.restoreFiles !== false) {
           const root = projection.nodes.find((node) => node.id === activeRun.rootNodeId);
           const scope = projection.checkpointScopes.find(
@@ -13949,7 +13972,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           }
         }
         // Same interrupt and held queue as thread.stop. The rollback waits for a later command.
-        yield* dispatchThreadStop(
+        const cancelUnsettledEffects = yield* dispatchThreadStop(
           { type: "thread.stop", commandId: command.commandId, threadId: command.threadId },
           events,
           effects,
@@ -13977,7 +14000,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             updatedAt: now,
           },
         });
-        return;
+        // A run stopped before its provider turn started must not start afterwards.
+        return cancelUnsettledEffects;
       }
       const checkpoint = checkpointForTurnCount(projection.checkpoints, command.turnCount);
       if (checkpoint === undefined) {
@@ -14059,6 +14083,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       })
       .pipe(mapDispatchError(command));
     const pending = projection.thread.pendingRollback;
+    if (projection.thread.deletedAt !== null) return;
     if (pending == null || pending.requestId !== command.requestId) return;
     // `waiting` still has a capture in flight. A rollback enqueued now would run before it.
     if (projection.runs.some(isActiveRun)) return;
@@ -15432,7 +15457,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         cancelUnsettledEffects = yield* dispatchThreadStop(command, events, effects);
         break;
       case "thread.stop-and-rollback":
-        yield* dispatchThreadStopAndRollback(command, events, effects);
+        cancelUnsettledEffects = yield* dispatchThreadStopAndRollback(command, events, effects);
         break;
       case "thread.pending-rollback.cancel":
         yield* dispatchPendingRollbackCancel(command, events);

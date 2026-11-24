@@ -121,7 +121,16 @@ describe("WebSocket RPC contracts", () => {
     });
     expect(thread.pendingRollback).toBeUndefined();
     expect(thread.rollbackCompletedRequestId).toBeUndefined();
-    expect(thread.rollbackFailure?.reason).toBeUndefined();
+    expect(thread.rollbackFailure?.code).toBeUndefined();
+    // Codes written before stop-and-rewind still decode beside the new ones.
+    for (const code of ["git-index-locked", "rollback-failed", "target-invalid"]) {
+      expect(
+        decodeThread({
+          ...JSON.parse(JSON.stringify(thread)),
+          rollbackFailure: { requestId: "rollback-1", message: "failed", code },
+        }).rollbackFailure?.code,
+      ).toBe(code);
+    }
     const capabilities = decodeCapabilities({
       repositoryIdentity: true,
       threadStop: true,

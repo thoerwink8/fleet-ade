@@ -41,10 +41,19 @@ import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter"
 const instanceId = ProviderInstanceId.make("codex");
 const modelSelection = { instanceId, model: "gpt-5.1-codex" };
 const driver = ProviderDriverKind.make("codex");
+let providerCanInterrupt = true;
 const adapter = {
   instanceId,
   driver,
-  getCapabilities: () => Effect.succeed(CodexProviderCapabilitiesV2),
+  getCapabilities: () =>
+    Effect.succeed(
+      providerCanInterrupt
+        ? CodexProviderCapabilitiesV2
+        : {
+            ...CodexProviderCapabilitiesV2,
+            turns: { ...CodexProviderCapabilitiesV2.turns, supportsInterrupt: false },
+          },
+    ),
   planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" as const }),
   openSession: () => Effect.die("Runs here never reach a provider"),
 } as ProviderAdapter.ProviderAdapterV2["Service"];
@@ -138,7 +147,40 @@ it.effect(
       assert.isNull(projection.thread.rollbackFailure);
       assert.notInclude(yield* effectTypes(threadId), "provider-thread.rollback:pending");
       assert.notInclude(yield* effectTypes(threadId), "provider-thread.rollback:succeeded");
+      // Same as thread.stop: a run stopped before its provider turn started never starts it.
+      assert.include(yield* effectTypes(threadId), "provider-turn.start:cancelled");
     }).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("refuses to wait for a stop the provider cannot perform", () =>
+  Effect.gen(function* () {
+    const orchestrator = yield* Orchestrator.OrchestratorV2;
+    const threadId = ThreadId.make("thread:stop-rewind-no-interrupt");
+    yield* createThread(threadId);
+    yield* send(threadId, "work");
+    providerCanInterrupt = false;
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        providerCanInterrupt = true;
+      }),
+    );
+    const refused = yield* orchestrator
+      .dispatch({
+        type: "thread.stop-and-rollback",
+        commandId: CommandId.make("stop-rewind-no-interrupt"),
+        threadId,
+        turnCount: 0,
+        restoreFiles: false,
+      })
+      .pipe(Effect.flip);
+    assert.equal(refused._tag, "OrchestratorRollbackRejectedError");
+    if (refused._tag === "OrchestratorRollbackRejectedError") {
+      assert.equal(refused.code, "provider-cannot-interrupt");
+    }
+    const projection = yield* orchestrator.getThreadProjection(threadId);
+    assert.isNull(projection.thread.pendingRollback ?? null);
+    assert.isFalse(projection.turnItems.some((item) => item.type === "run_interrupt_request"));
+  }).pipe(Effect.provide(layerTest)),
 );
 
 it.effect(
@@ -248,7 +290,11 @@ it.effect(
 
       const projection = yield* orchestrator.getThreadProjection(threadId);
       assert.isNull(projection.thread.pendingRollback);
-      assert.equal(projection.thread.rollbackCompletedRequestId !== undefined, true);
+      // The client waits on the id it sent, not on an internal resume id.
+      assert.equal(
+        projection.thread.rollbackCompletedRequestId,
+        projection.thread.rollbackRequestId,
+      );
       assert.ok(projection.runs.some((candidate) => candidate.status === "rolled_back"));
       const queued = projection.runs.find((candidate) => candidate.status === "queued");
       assert.equal(queued?.queueHeld, true);
@@ -499,7 +545,7 @@ it.effect("records a typed failure when the target is gone after the turn settle
     });
     yield* orchestrator.resumePendingRollbacks;
     const projection = yield* orchestrator.getThreadProjection(threadId);
-    assert.equal(projection.thread.rollbackFailure?.reason, "target-invalid");
+    assert.equal(projection.thread.rollbackFailure?.code, "target-invalid");
     assert.isNull(projection.thread.pendingRollback);
     assert.equal(projection.runs[0]?.status, "interrupted");
     assert.equal(projection.messages.length, before.messages.length);
@@ -565,7 +611,7 @@ it.effect(
         .pipe(Effect.flip);
       assert.equal(files._tag, "OrchestratorRollbackRejectedError");
       if (files._tag === "OrchestratorRollbackRejectedError") {
-        assert.equal(files.reason, "checkpoint-missing");
+        assert.equal(files.code, "checkpoint-missing");
       }
       assert.deepEqual(
         yield* outbox.listByCommandId(CommandId.make("stop-rewind-missing-files")),
@@ -621,7 +667,7 @@ it.effect(
         .pipe(Effect.flip);
       assert.equal(sendAgain._tag, "OrchestratorRollbackRejectedError");
       if (sendAgain._tag === "OrchestratorRollbackRejectedError") {
-        assert.equal(sendAgain.reason, "pending-rollback");
+        assert.equal(sendAgain.code, "pending-rollback");
       }
       const second = yield* orchestrator
         .dispatch({
@@ -634,7 +680,7 @@ it.effect(
         .pipe(Effect.flip);
       assert.equal(second._tag, "OrchestratorRollbackRejectedError");
       if (second._tag === "OrchestratorRollbackRejectedError") {
-        assert.equal(second.reason, "rollback-already-pending");
+        assert.equal(second.code, "rollback-already-pending");
       }
       const stopped = yield* orchestrator.dispatch({
         type: "thread.stop",
@@ -985,7 +1031,7 @@ it.effect(
         yield* TestClock.adjust("30 seconds");
       }
       const failed = yield* orchestrator.getThreadProjection(threadId);
-      assert.equal(failed.thread.rollbackFailure?.reason, "interrupt-unresponsive");
+      assert.equal(failed.thread.rollbackFailure?.code, "interrupt-unresponsive");
       assert.equal(
         failed.thread.rollbackFailure?.message,
         "The agent did not stop. Force stop it, then rewind.",

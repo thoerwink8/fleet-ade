@@ -475,6 +475,7 @@ export const OrchestrationV2RollbackFailureCode = Schema.Literals([
   "target-invalid",
   "checkpoint-missing",
   "provider-cannot-rollback",
+  "provider-cannot-interrupt",
   "provider-turn-unavailable",
   "provider-turn-active",
   "interrupt-unresponsive",

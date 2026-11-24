@@ -436,14 +436,17 @@ export const layer: Layer.Layer<
             );
           const events: Array<OrchestrationV2DomainEvent> = [];
           if (input.commandId !== undefined) {
+            // Read under the lock: the provider rollback above is slow, and `context.thread`
+            // would write back an edit made while it ran.
+            const current = yield* projections.getThread(input.threadId);
             events.push(
               yield* makeEvent({
                 type: "thread.metadata-updated",
                 threadId: input.threadId,
-                providerInstanceId: context.thread.providerInstanceId,
+                providerInstanceId: current.providerInstanceId,
                 occurredAt: now,
                 payload: {
-                  ...context.thread,
+                  ...current,
                   pendingRollback: null,
                   rollbackFailure: null,
                   rollbackCompletedRequestId: input.commandId,
