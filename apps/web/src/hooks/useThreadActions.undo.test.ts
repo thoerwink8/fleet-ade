@@ -7,12 +7,14 @@ import { threadEnvironment } from "../state/threads";
 import { toastManager } from "../components/ui/toast";
 import { useThreadUndoNotice } from "./showThreadUndoNotice";
 import { announce } from "../lib/announce";
+import { useThreadSelectionStore } from "../threadSelectionStore";
 
 const commands = vi.hoisted(() => ({
   pin: vi.fn(),
   unpin: vi.fn(),
   archive: vi.fn(),
   unarchive: vi.fn(),
+  batch: vi.fn(),
   delete: vi.fn(),
   settle: vi.fn(),
   unsettle: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock("../uiStateStore", () => ({ useUiStateStore: () => vi.fn() }));
 vi.mock("../lib/announce", () => ({ announce: vi.fn(), cancelAnnouncement: vi.fn() }));
 vi.mock("../lib/archivedThreadsState", () => ({ refreshArchivedThreadsForEnvironment: vi.fn() }));
 const threadShell = vi.hoisted(() => ({
+  id: "thread",
   title: "会话",
   pinOrderKey: "a0",
   pinnedAt: null as string | null,
@@ -68,10 +71,18 @@ const threadShell = vi.hoisted(() => ({
 }));
 // Archived rows have no loaded shell, so deleting one takes the unresolved path.
 const shellLoaded = vi.hoisted(() => ({ current: true }));
+type MockShell = typeof threadShell & { archivedAt?: string | null };
+const shellsByKey = vi.hoisted(() => new Map<string, MockShell>());
 vi.mock("../state/entities", async (original) => ({
   ...(await original<typeof import("../state/entities")>()),
   readEnvironmentServerConfigLoaded: () => true,
-  readThreadShell: () => (shellLoaded.current ? threadShell : null),
+  readThreadShell: (ref: { environmentId: string; threadId: string }) => {
+    if (!shellLoaded.current) return null;
+    if (shellsByKey.size > 0) {
+      return shellsByKey.get(`${ref.environmentId}:${ref.threadId}`) ?? null;
+    }
+    return threadShell;
+  },
 }));
 vi.mock("../state/use-atom-command", () => ({
   useAtomCommand: (command: unknown) => {
@@ -84,6 +95,8 @@ vi.mock("../state/use-atom-command", () => ({
         return commands.archive;
       case threadEnvironment.unarchive:
         return commands.unarchive;
+      case threadEnvironment.batch:
+        return commands.batch;
       case threadEnvironment.delete:
         return commands.delete;
       case threadEnvironment.settle:
@@ -121,6 +134,8 @@ beforeEach(() => {
   threadShell.pinnedAt = null;
   threadShell.snoozedUntil = null;
   shellLoaded.current = true;
+  shellsByKey.clear();
+  useThreadSelectionStore.getState().setVisibleThreadKeys([]);
 });
 afterEach(() => {
   vi.runAllTimers();
@@ -211,8 +226,10 @@ describe("unpin Undo", () => {
 });
 
 describe("archive Undo", () => {
-  it("unarchives and returns to the thread when archiving left it", async () => {
+  it("shows a unified archive toast, unarchives, and returns to the thread when archiving left it", async () => {
     const add = vi.spyOn(toastManager, "add").mockReturnValue("toast");
+    vi.spyOn(toastManager, "update").mockImplementation(() => {});
+    vi.spyOn(toastManager, "close").mockImplementation(() => {});
     router.state.matches[0]!.params = {
       environmentId: target.environmentId,
       threadId: target.threadId,
@@ -220,7 +237,13 @@ describe("archive Undo", () => {
     const actions = useThreadActions();
     await actions.archiveThread(target);
     expect(useThreadUndoNotice.getState().notice).toMatchObject({ action: "Archived", count: 1 });
-    expect(add).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "success",
+        title: "已归档「会话」",
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
     await currentUndo()();
     expect(commands.unarchive).toHaveBeenCalledExactlyOnceWith({
       environmentId: target.environmentId,
@@ -232,6 +255,215 @@ describe("archive Undo", () => {
         params: { environmentId: target.environmentId, threadId: target.threadId },
       }),
     );
+  });
+
+  it("navigates to the next or previous sidebar thread when archiving the active thread, or draft when empty", async () => {
+    vi.spyOn(toastManager, "add").mockReturnValue("toast");
+    vi.spyOn(toastManager, "update").mockImplementation(() => {});
+    vi.spyOn(toastManager, "close").mockImplementation(() => {});
+    const envId = EnvironmentId.make("undo-env");
+    const ids = [ThreadId.make("t-1"), ThreadId.make("t-2"), ThreadId.make("t-3")] as const;
+    for (const [index, id] of ids.entries()) {
+      shellsByKey.set(`${envId}:${id}`, {
+        ...threadShell,
+        id,
+        title: `会话 ${index + 1}`,
+        environmentId: envId,
+        archivedAt: null,
+      });
+    }
+    useThreadSelectionStore.getState().setVisibleThreadKeys(ids.map((id) => `${envId}:${id}`));
+
+    // Middle thread -> advances to next (t-3).
+    router.state.location.href = "/undo-env/t-2";
+    router.state.matches[0]!.params = { environmentId: envId, threadId: ids[1] };
+    await useThreadActions().archiveThread({ environmentId: envId, threadId: ids[1] });
+    expect(router.navigate).toHaveBeenLastCalledWith({
+      to: "/$environmentId/$threadId",
+      params: { environmentId: envId, threadId: ids[2] },
+    });
+    await currentUndo()();
+    expect(router.navigate).toHaveBeenLastCalledWith({
+      to: "/$environmentId/$threadId",
+      params: { environmentId: envId, threadId: ids[1] },
+    });
+
+    // Last thread -> falls back to previous (t-2).
+    router.navigate.mockClear();
+    router.state.location.href = "/undo-env/t-3";
+    router.state.matches[0]!.params = { environmentId: envId, threadId: ids[2] };
+    await useThreadActions().archiveThread({ environmentId: envId, threadId: ids[2] });
+    expect(router.navigate).toHaveBeenLastCalledWith({
+      to: "/$environmentId/$threadId",
+      params: { environmentId: envId, threadId: ids[1] },
+    });
+
+    // Only thread left -> falls back to new draft.
+    useThreadSelectionStore.getState().setVisibleThreadKeys([`${envId}:${ids[0]}`]);
+    router.navigate.mockClear();
+    router.state.location.href = "/undo-env/t-1";
+    router.state.matches[0]!.params = { environmentId: envId, threadId: ids[0] };
+    await useThreadActions().archiveThread({ environmentId: envId, threadId: ids[0] });
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(router.state.location.href).toBe("/draft/project");
+  });
+
+  it("shows batch count for archiveThreads, restores all on Undo, and restores only succeeded rows on partial failure", async () => {
+    const add = vi.spyOn(toastManager, "add").mockReturnValue("batch-toast");
+    vi.spyOn(toastManager, "update").mockImplementation(() => {});
+    vi.spyOn(toastManager, "close").mockImplementation(() => {});
+    const envId = EnvironmentId.make("undo-env");
+    const ids = [
+      ThreadId.make("t-1"),
+      ThreadId.make("t-2"),
+      ThreadId.make("t-3"),
+      ThreadId.make("t-4"),
+    ] as const;
+    for (const [index, id] of ids.entries()) {
+      shellsByKey.set(`${envId}:${id}`, {
+        ...threadShell,
+        id,
+        title: `会话 ${index + 1}`,
+        environmentId: envId,
+        pinnedAt: index === 0 ? "2026-01-01T00:00:00.000Z" : null,
+        archivedAt: null,
+      });
+    }
+    useThreadSelectionStore.getState().setVisibleThreadKeys(ids.map((id) => `${envId}:${id}`));
+
+    // Full batch (3 threads), including currently viewed t-1 -> advances to t-4.
+    commands.batch.mockResolvedValueOnce({
+      _tag: "Success",
+      value: {
+        batch: {
+          operation: "archive",
+          items: [
+            { threadId: ids[0], status: "applied" },
+            { threadId: ids[1], status: "applied" },
+            { threadId: ids[2], status: "applied" },
+          ],
+        },
+      },
+    });
+    router.state.location.href = "/undo-env/t-1";
+    router.state.matches[0]!.params = { environmentId: envId, threadId: ids[0] };
+    const actions = useThreadActions();
+    const fullOutcome = await actions.archiveThreads([
+      { environmentId: envId, id: ids[0], title: "会话 1" },
+      { environmentId: envId, id: ids[1], title: "会话 2" },
+      { environmentId: envId, id: ids[2], title: "会话 3" },
+    ]);
+    expect([...fullOutcome.archivedKeys]).toEqual([
+      `${envId}:${ids[0]}`,
+      `${envId}:${ids[1]}`,
+      `${envId}:${ids[2]}`,
+    ]);
+    expect(fullOutcome.failures).toEqual([]);
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "success",
+        title: "已归档 3 个会话",
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
+    expect(router.navigate).toHaveBeenLastCalledWith({
+      to: "/$environmentId/$threadId",
+      params: { environmentId: envId, threadId: ids[3] },
+    });
+
+    router.navigate.mockClear();
+    await currentUndo()();
+    expect(commands.unarchive).toHaveBeenCalledTimes(3);
+    expect(commands.pin).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledTimes(1);
+    expect(router.navigate).toHaveBeenCalledWith({
+      to: "/$environmentId/$threadId",
+      params: { environmentId: envId, threadId: ids[0] },
+    });
+
+    // Partial failure: t-1 & t-3 applied, t-2 running, t-4 already_target.
+    add.mockClear();
+    commands.unarchive.mockClear();
+    commands.batch.mockResolvedValueOnce({
+      _tag: "Success",
+      value: {
+        batch: {
+          operation: "archive",
+          items: [
+            { threadId: ids[0], status: "applied" },
+            { threadId: ids[1], status: "running" },
+            { threadId: ids[2], status: "applied" },
+            { threadId: ids[3], status: "already_target" },
+          ],
+        },
+      },
+    });
+    const partial = await actions.archiveThreads(
+      ids.map((id, index) => ({ environmentId: envId, id, title: `会话 ${index + 1}` })),
+    );
+    expect([...partial.archivedKeys]).toEqual([`${envId}:${ids[0]}`, `${envId}:${ids[2]}`]);
+    expect([...partial.prunedKeys]).toEqual([
+      `${envId}:${ids[0]}`,
+      `${envId}:${ids[2]}`,
+      `${envId}:${ids[3]}`,
+    ]);
+    expect(partial.failures).toEqual(["会话 2 正在运行，未归档"]);
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ title: "已归档 2 个会话" }));
+    await currentUndo()();
+    expect(commands.unarchive).toHaveBeenCalledTimes(2);
+    expect(commands.unarchive).toHaveBeenCalledWith({
+      environmentId: envId,
+      input: { threadId: ids[0] },
+    });
+    expect(commands.unarchive).toHaveBeenCalledWith({
+      environmentId: envId,
+      input: { threadId: ids[2] },
+    });
+
+    // Single applied + 1 failed -> singular titled toast.
+    add.mockClear();
+    commands.unarchive.mockClear();
+    commands.batch.mockResolvedValueOnce({
+      _tag: "Success",
+      value: {
+        batch: {
+          operation: "archive",
+          items: [
+            { threadId: ids[0], status: "applied" },
+            { threadId: ids[1], status: "rejected" },
+          ],
+        },
+      },
+    });
+    const oneOk = await actions.archiveThreads([
+      { environmentId: envId, id: ids[0], title: "会话 1" },
+      { environmentId: envId, id: ids[1], title: "会话 2" },
+    ]);
+    expect([...oneOk.archivedKeys]).toEqual([`${envId}:${ids[0]}`]);
+    expect(oneOk.failures).toEqual(["会话 2 未归档"]);
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ title: "已归档「会话 1」" }));
+    await currentUndo()();
+    expect(commands.unarchive).toHaveBeenCalledExactlyOnceWith({
+      environmentId: envId,
+      input: { threadId: ids[0] },
+    });
+
+    // Zero applied -> no undo toast.
+    add.mockClear();
+    commands.batch.mockResolvedValueOnce({
+      _tag: "Success",
+      value: {
+        batch: {
+          operation: "archive",
+          items: [{ threadId: ids[1], status: "running" }],
+        },
+      },
+    });
+    const zeroOk = await actions.archiveThreads([
+      { environmentId: envId, id: ids[1], title: "会话 2" },
+    ]);
+    expect([...zeroOk.archivedKeys]).toEqual([]);
+    expect(add).not.toHaveBeenCalled();
   });
 });
 
@@ -283,6 +515,7 @@ describe("delete navigation", () => {
 describe("settle and snooze Undo", () => {
   it("shows a settle undo toast, un-settles from it, and closes it after a manual un-settle", async () => {
     const add = vi.spyOn(toastManager, "add").mockReturnValue("toast");
+    vi.spyOn(toastManager, "update").mockImplementation(() => {});
     const close = vi.spyOn(toastManager, "close").mockImplementation(() => {});
     const actions = useThreadActions();
     await actions.settleThread(target);
@@ -290,7 +523,7 @@ describe("settle and snooze Undo", () => {
     expect(add).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         type: "success",
-        title: "已标为完成",
+        title: "已标为完成「会话」",
         actionProps: expect.objectContaining({ children: "撤销" }),
       }),
     );
@@ -340,17 +573,41 @@ describe("settle and snooze Undo", () => {
     expect(commands.pin).not.toHaveBeenCalled();
   });
 
-  // regression: #12972 the sidebar undo notice must reverse a snooze
+  // regression: #12972 the undo notice must reverse a snooze via the unified toast
   it("wakes the thread from the snooze notice", async () => {
     const add = vi.spyOn(toastManager, "add").mockReturnValue("toast");
+    vi.spyOn(toastManager, "update").mockImplementation(() => {});
+    vi.spyOn(toastManager, "close").mockImplementation(() => {});
     const actions = useThreadActions();
     await actions.snoozeThread(target, "2100-01-01T00:00:00.000Z");
     expect(useThreadUndoNotice.getState().notice).toMatchObject({ action: "Snoozed", count: 1 });
-    expect(add).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "success",
+        title: "已暂缓「会话」",
+        actionProps: expect.objectContaining({ children: "撤销" }),
+      }),
+    );
     await currentUndo()();
     expect(commands.unsnooze).toHaveBeenCalledExactlyOnceWith({
       environmentId: target.environmentId,
       input: { threadId: target.threadId, reason: "user" },
+    });
+  });
+
+  it("restores the prior snoozedUntil when re-snoozing an already-snoozed thread", async () => {
+    vi.spyOn(toastManager, "add").mockReturnValue("toast");
+    vi.spyOn(toastManager, "update").mockImplementation(() => {});
+    vi.spyOn(toastManager, "close").mockImplementation(() => {});
+    const previousSnooze = "2098-05-01T09:00:00.000Z";
+    threadShell.snoozedUntil = previousSnooze;
+    await useThreadActions().snoozeThread(target, "2100-01-01T00:00:00.000Z");
+    commands.snooze.mockClear();
+    await currentUndo()();
+    expect(commands.unsnooze).not.toHaveBeenCalled();
+    expect(commands.snooze).toHaveBeenCalledExactlyOnceWith({
+      environmentId: target.environmentId,
+      input: { threadId: target.threadId, snoozedUntil: previousSnooze },
     });
   });
 });

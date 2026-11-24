@@ -156,10 +156,10 @@ shortcut; assign one in **Settings → General → Keybindings**.
 `thread.regenerateTitle` generates a new title for the focused thread, like
 **Regenerate title** in the thread menu. It has no default shortcut.
 
-`thread.undo` (`mod+z` by default) reverses the actions shown in the notice at the
-bottom of the sidebar, such as unpin, mark complete, snooze, archive, or discarding a
-draft. Consecutive
-actions of the same kind undo together. The notice remains available for five
+`thread.undo` (`mod+z` by default) reverses the actions shown in the undo
+notification, such as unpinning, marking complete, snoozing, archiving (including
+batch archive), dismissing from attention, or discarding a draft. Consecutive
+actions of the same kind undo together. The notice remains available for eight
 seconds after the latest action. Right after an action, the shortcut works even
 in a text field such as the composer. Once you type or press another key, the
 field gets its own undo back. Terminals always keep their native shortcut.

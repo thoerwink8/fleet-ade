@@ -7,27 +7,6 @@ export interface ConfirmCopy {
 
 const WORKTREE_CHECKBOX_LABEL = "同时删除它的工作树";
 
-export function threadArchiveConfirmCopy(title: string): ConfirmCopy {
-  return {
-    message: `“${title}”会移到「已归档」，之后可以在设置里取消归档。`,
-    options: { title: "归档这个会话？", confirmLabel: "归档" },
-  };
-}
-
-export function batchArchiveConfirmCopy(count: number): ConfirmCopy {
-  return {
-    message: "它们会移到「已归档」，之后可以在设置里取消归档。",
-    options: { title: `归档 ${count} 个会话？`, confirmLabel: "归档" },
-  };
-}
-
-export function threadUnpinConfirmCopy(title: string): ConfirmCopy {
-  return {
-    message: `“${title}”会移出置顶区域，可以随时再置顶。`,
-    options: { title: "取消置顶这个会话？", confirmLabel: "取消置顶" },
-  };
-}
-
 export function threadDeleteConfirmCopy(
   title: string,
   worktree: { readonly displayPath: string } | null,

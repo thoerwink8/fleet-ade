@@ -225,10 +225,7 @@ let heldUndoKey: string | null = null;
 // Undoes the thread actions in the sidebar's notice. Settings and Usage own
 // mod+z while open. Captured so mod+z reaches it before the composer's own
 // undo handler consumes the key.
-function registerThreadUndoCommands(
-  router: AnyRouter,
-  readSidebarVisible: () => boolean,
-): () => void {
+function registerThreadUndoCommands(router: AnyRouter): () => void {
   const threadSidebarShown = () => !isAppModalPage(router.state.location.pathname);
   const unregister = registerCommands(
     {},
@@ -254,10 +251,8 @@ function registerThreadUndoCommands(
               terminalFocus: isTerminalFocused(),
               rightPanelFocus: isRightPanelFocused(),
               ...readRoutePanelsOpen(router),
-              // A collapsed sidebar hides the notice, so text fields keep their own undo.
-              editableFocus:
-                isEditableFocused(event.target) &&
-                !(readSidebarVisible() && threadUndoClaimsShortcut()),
+              // The undo toast stays visible even when the sidebar is collapsed.
+              editableFocus: isEditableFocused(event.target) && !threadUndoClaimsShortcut(),
               modelPickerOpen: isModelPickerOpen(),
             },
           },
@@ -287,14 +282,9 @@ function registerThreadUndoCommands(
 }
 
 /** Keyboard and menu commands that live as long as the app shell. */
-function registerAppShellCommands(router: AnyRouter, shellElement: Element): () => void {
-  // The provider mirrors the visibility it renders onto its wrapper, so the
-  // committed state is readable when a key arrives.
-  const readSidebarVisible = () =>
-    shellElement.closest('[data-slot="sidebar-wrapper"]')?.getAttribute("data-sidebar-state") ===
-    "expanded";
+function registerAppShellCommands(router: AnyRouter): () => void {
   const disposers = [
-    registerThreadUndoCommands(router, readSidebarVisible),
+    registerThreadUndoCommands(router),
     registerNavigationHistoryCommands(router),
     registerWorkspaceFocusCommands(router),
     registerPullRequestsEscapeCommand(router),
@@ -368,7 +358,7 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
   // once so re-renders never re-register them.
   const [appShellCommandsRef] = useState(
     () => (node: HTMLDivElement | null) =>
-      node === null ? undefined : registerAppShellCommands(router, node),
+      node === null ? undefined : registerAppShellCommands(router),
   );
 
   return (
