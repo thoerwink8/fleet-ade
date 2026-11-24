@@ -815,7 +815,7 @@ export function ChatSettingsPanel() {
         <SettingsRow
           {...searchableSetting("follow-up-behavior")}
           description={
-            "智能体运行时发消息默认执行此操作：「排队」会等当前这一轮做完再发；「立即发送」会立刻发给智能体，会打断当前这一轮。" +
+            "智能体运行时发消息默认执行此操作：「排队」会等当前这一轮结束后再发；「立即发送」会立刻发给智能体，会打断当前这一轮。" +
             (settings.sendShortcut === "mod-enter-multiline"
               ? `单行提示词按 ${modifierLabel}+Enter、多行提示词按 ${modifierLabel}+Shift+Enter，可改用另一种方式。`
               : `按 ${modifierLabel}${settings.sendShortcut === "mod-enter" ? "+Shift" : ""}+Enter 可改用另一种方式。`)
@@ -1430,8 +1430,8 @@ export function ThreadsSettingsPanel() {
           {...searchableSetting("max-concurrent-sessions")}
           description={
             startupLimit === undefined
-              ? "按电脑内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会排队，此设置立即生效。"
-              : `按电脑内存估计上限；留空表示设置不限制。这台电脑的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会排队，此设置立即生效。`
+              ? "按电脑内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会等空位，此设置立即生效。"
+              : `按电脑内存估计上限；留空表示设置不限制。这台电脑的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会等空位，此设置立即生效。`
           }
           control={
             <DraftInput

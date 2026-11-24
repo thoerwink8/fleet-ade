@@ -214,7 +214,7 @@ export function CollapsedComposerStopAction({
 }
 
 function describeActiveTurnAction(action: "queue" | "steer" | "restart"): string {
-  return action === "queue" ? "排队，等这一轮做完再发" : "立即发送，会打断当前这一轮";
+  return action === "queue" ? "排队，等这一轮结束后再发" : "立即发送，会打断当前这一轮";
 }
 
 export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
