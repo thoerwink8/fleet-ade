@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
-import { converter } from "culori/fn";
+import { converter, modeOklch, modeRgb, useMode } from "culori/fn";
 import { useState } from "react";
 
 import "~/index.css";
 import { render } from "../../../test/render";
-import { applyThemePalette, GROVE_THEME } from "../../themePalette";
+import { applyThemePalette, EMBER_THEME, GROVE_THEME } from "../../themePalette";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "./collapsible";
 import { Sheet, SheetDescription, SheetHeader, SheetPopup, SheetTitle } from "./sheet";
 
+useMode(modeRgb);
+useMode(modeOklch);
 const toRgb = converter("rgb");
 
 function resolved(variable: string): string {
@@ -130,7 +132,7 @@ describe("Sheet", () => {
     }
   });
 
-  it("paints themed popup/backdrop surfaces with >= 4.5 text contrast in every mode", async () => {
+  it("paints solid overlay surface without backdrop-filter or will-change and >= 4.5 text contrast", async () => {
     const root = document.documentElement;
     const restore = {
       datasetTheme: root.dataset.theme,
@@ -152,15 +154,24 @@ describe("Sheet", () => {
         ["system", "dark"],
         [GROVE_THEME.id, "light"],
         [GROVE_THEME.id, "dark"],
+        [EMBER_THEME.id, "light"],
+        [EMBER_THEME.id, "dark"],
       ] as const) {
         applyThemePalette(theme, appearance);
         root.classList.toggle("dark", appearance === "dark");
         root.dataset.theme = appearance;
         await vi.waitFor(() => {
-          const popupBg = getComputedStyle(popup).backgroundColor;
-          const backdropBg = getComputedStyle(backdrop).backgroundColor;
+          const popupStyle = getComputedStyle(popup);
+          const backdropStyle = getComputedStyle(backdrop);
+          const popupBg = popupStyle.backgroundColor;
           expect(popupBg, `${theme}/${appearance} popup`).toBe(resolved("--fa-overlay"));
-          expect(backdropBg, `${theme}/${appearance} backdrop`).toBe(resolved("--fa-scrim"));
+          expect(toRgb(popupBg)?.alpha ?? 1, `${theme}/${appearance} solid popup`).toBe(1);
+          expect(popupStyle.backdropFilter, `${theme}/${appearance} popup blur`).toBe("none");
+          expect(popupStyle.willChange, `${theme}/${appearance} popup willChange`).toBe("auto");
+          expect(backdropStyle.backgroundColor, `${theme}/${appearance} backdrop`).toBe(
+            resolved("--fa-scrim"),
+          );
+          expect(backdropStyle.backdropFilter, `${theme}/${appearance} backdrop blur`).toBe("none");
           expect(
             contrastRatio(getComputedStyle(title).color, popupBg),
             `${theme}/${appearance} title contrast`,

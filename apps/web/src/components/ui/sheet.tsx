@@ -25,7 +25,7 @@ function SheetBackdrop({
 }: SheetPrimitive.Backdrop.Props & { layer?: SheetLayer }) {
   return (
     <SheetPrimitive.Backdrop
-      className={cn("fa-sheet-backdrop", className)}
+      className={cn("ade-sheet-backdrop", className)}
       data-layer={layer}
       data-slot="sheet-backdrop"
       {...props}
@@ -46,7 +46,7 @@ function SheetViewport({
 }) {
   return (
     <SheetPrimitive.Viewport
-      className={cn("fa-sheet-viewport", className)}
+      className={cn("ade-sheet-viewport", className)}
       data-layer={layer}
       data-side={side}
       data-slot="sheet-viewport"
@@ -90,7 +90,7 @@ function SheetPopup({
       />
       <SheetViewport side={side} variant={variant} layer={layer}>
         <SheetPrimitive.Popup
-          className={cn("fa-drawer fa-sheet-popup", className)}
+          className={cn("fa-drawer ade-sheet-popup", className)}
           data-instant={instant ? "" : undefined}
           data-side={side}
           data-slot="sheet-popup"
@@ -116,13 +116,13 @@ function SheetPopup({
 }
 
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("fa-sheet-header", className)} data-slot="sheet-header" {...props} />;
+  return <div className={cn("ade-sheet-header", className)} data-slot="sheet-header" {...props} />;
 }
 
 function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
   return (
     <SheetPrimitive.Title
-      className={cn("fa-sheet-title font-semibold text-dialog-title", className)}
+      className={cn("ade-sheet-title font-semibold text-dialog-title", className)}
       data-slot="sheet-title"
       {...props}
     />
@@ -136,7 +136,11 @@ function SheetDescription({
 }: SheetPrimitive.Description.Props & { size?: "default" | "prose" }) {
   return (
     <SheetPrimitive.Description
-      className={cn("fa-sheet-description", size === "prose" ? "text-prose" : "text-sm", className)}
+      className={cn(
+        "ade-sheet-description",
+        size === "prose" ? "text-prose" : "text-sm",
+        className,
+      )}
       data-slot="sheet-description"
       {...props}
     />

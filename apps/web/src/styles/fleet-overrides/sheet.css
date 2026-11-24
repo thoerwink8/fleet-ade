@@ -1,63 +1,65 @@
 /* Sheet adopts fleet-design's drawer/backdrop tokens and extends them to all four
-   sides, inset, and layer variants. .fa-sheet-popup pairs with fleet's .fa-drawer
+   sides, inset, and layer variants. .ade-sheet-popup pairs with fleet's .fa-drawer
    look but overrides its left-only positioning; Base UI Dialog owns mount state,
    the hidden attribute on closed keepMounted popups, and the starting/ending
    transition attributes. */
 
-.fa-sheet-backdrop {
+.ade-sheet-backdrop {
   position: fixed;
   inset: 0;
   z-index: var(--z-sheet);
   background: var(--fa-scrim);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition: opacity var(--fa-dur-base) var(--fa-ease-out);
 }
 
-.fa-sheet-backdrop[data-starting-style],
-.fa-sheet-backdrop[data-ending-style] {
+.ade-sheet-backdrop[data-starting-style],
+.ade-sheet-backdrop[data-ending-style] {
   opacity: 0;
 }
 
-.fa-sheet-backdrop[data-layer="nested"] {
+.ade-sheet-backdrop[data-layer="nested"] {
   z-index: 60;
 }
 
-.fa-sheet-viewport {
+.ade-sheet-viewport {
   position: fixed;
   inset: 0;
   z-index: var(--z-sheet);
   display: flex;
 }
 
-.fa-sheet-viewport[data-layer="nested"] {
+.ade-sheet-viewport[data-layer="nested"] {
   z-index: 60;
 }
 
-.fa-sheet-viewport[data-side="top"] {
+.ade-sheet-viewport[data-side="top"] {
   flex-direction: column;
   padding-bottom: var(--fa-space-12);
 }
 
-.fa-sheet-viewport[data-side="bottom"] {
+.ade-sheet-viewport[data-side="bottom"] {
   flex-direction: column;
   justify-content: flex-end;
   padding-top: var(--fa-space-12);
 }
 
-.fa-sheet-viewport[data-side="left"] {
+.ade-sheet-viewport[data-side="left"] {
   justify-content: flex-start;
 }
 
-.fa-sheet-viewport[data-side="right"] {
+.ade-sheet-viewport[data-side="right"] {
   justify-content: flex-end;
 }
 
 @media (min-width: 640px) {
-  .fa-sheet-viewport[data-variant="inset"] {
+  .ade-sheet-viewport[data-variant="inset"] {
     padding: var(--fa-space-4);
   }
 }
 
-.fa-drawer.fa-sheet-popup {
+.fa-drawer.ade-sheet-popup {
   position: relative;
   top: auto;
   bottom: auto;
@@ -76,105 +78,105 @@
   color: var(--fa-fg);
   border: 0 solid var(--fa-border);
   box-shadow: var(--fa-shadow-overlay);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transform: none;
   transition:
     opacity var(--fa-dur-base) var(--fa-ease-out),
     translate var(--fa-dur-base) var(--fa-ease-out);
-  will-change: transform;
 }
 
-.fa-drawer.fa-sheet-popup[data-side="left"] {
+.fa-drawer.ade-sheet-popup[data-side="left"] {
   width: calc(100% - var(--fa-space-12));
-  max-width: 28rem;
+  max-width: 448px;
   border-inline-end-width: var(--fa-bw-1);
 }
 
-.fa-drawer.fa-sheet-popup[data-side="right"] {
+.fa-drawer.ade-sheet-popup[data-side="right"] {
   width: calc(100% - var(--fa-space-12));
-  max-width: 28rem;
+  max-width: 448px;
   border-inline-start-width: var(--fa-bw-1);
 }
 
-.fa-drawer.fa-sheet-popup[data-side="top"] {
+.fa-drawer.ade-sheet-popup[data-side="top"] {
   border-bottom-width: var(--fa-bw-1);
 }
 
-.fa-drawer.fa-sheet-popup[data-side="bottom"] {
+.fa-drawer.ade-sheet-popup[data-side="bottom"] {
   border-top-width: var(--fa-bw-1);
 }
 
-.fa-drawer.fa-sheet-popup[data-starting-style],
-.fa-drawer.fa-sheet-popup[data-ending-style] {
+.fa-drawer.ade-sheet-popup[data-starting-style],
+.fa-drawer.ade-sheet-popup[data-ending-style] {
   opacity: 0;
   box-shadow: none;
 }
 
-.fa-drawer.fa-sheet-popup[data-side="left"]:is([data-starting-style], [data-ending-style]) {
+.fa-drawer.ade-sheet-popup[data-side="left"]:is([data-starting-style], [data-ending-style]) {
   translate: calc(-1 * var(--fa-space-8)) 0;
 }
 
-.fa-drawer.fa-sheet-popup[data-side="right"]:is([data-starting-style], [data-ending-style]) {
+.fa-drawer.ade-sheet-popup[data-side="right"]:is([data-starting-style], [data-ending-style]) {
   translate: var(--fa-space-8) 0;
 }
 
-.fa-drawer.fa-sheet-popup[data-side="top"]:is([data-starting-style], [data-ending-style]) {
+.fa-drawer.ade-sheet-popup[data-side="top"]:is([data-starting-style], [data-ending-style]) {
   translate: 0 calc(-1 * var(--fa-space-8));
 }
 
-.fa-drawer.fa-sheet-popup[data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
+.fa-drawer.ade-sheet-popup[data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
   translate: 0 var(--fa-space-8);
 }
 
 @media (min-width: 640px) {
-  .fa-drawer.fa-sheet-popup[data-variant="inset"] {
+  .fa-drawer.ade-sheet-popup[data-variant="inset"] {
     border-radius: var(--fa-radius-lg);
     border-width: var(--fa-bw-1);
   }
 }
 
 /* transitionDurationMs=0 callers (sidebar, right panel) skip the slide entirely. */
-.fa-drawer.fa-sheet-popup[data-instant],
-.fa-sheet-backdrop[data-instant] {
+.fa-drawer.ade-sheet-popup[data-instant],
+.ade-sheet-backdrop[data-instant] {
   transition: none;
-  will-change: auto;
 }
 
-.fa-drawer.fa-sheet-popup[data-instant]:is([data-starting-style], [data-ending-style]) {
+.fa-drawer.ade-sheet-popup[data-instant]:is([data-starting-style], [data-ending-style]) {
   translate: 0 0;
   opacity: 1;
 }
 
-.fa-sheet-backdrop[data-instant]:is([data-starting-style], [data-ending-style]) {
+.ade-sheet-backdrop[data-instant]:is([data-starting-style], [data-ending-style]) {
   opacity: 1;
 }
 
-.fa-sheet-header {
+.ade-sheet-header {
   display: flex;
   flex-direction: column;
   gap: var(--fa-space-2);
   padding: var(--fa-space-6);
 }
-.fa-sheet-popup:has([data-slot="sheet-panel"]) .fa-sheet-header {
+.ade-sheet-popup:has([data-slot="sheet-panel"]) .ade-sheet-header {
   padding-bottom: var(--fa-space-3);
 }
 @media (max-width: 639.98px) {
-  .fa-sheet-header {
+  .ade-sheet-header {
     padding-bottom: var(--fa-space-4);
   }
 }
 
-.fa-sheet-title {
+.ade-sheet-title {
   color: var(--fa-fg);
 }
 
 /* Muted-on-overlay is under 4.5:1 in Grove/Ember; blend toward fg so description
    text reaches WCAG 4.5 in every theme. */
-.fa-sheet-description {
+.ade-sheet-description {
   color: color-mix(in oklab, var(--fa-fg-muted) 65%, var(--fa-fg));
 }
 
 /* Closed keepMounted popups stay in the DOM behind [hidden]; the shadow would
    still paint if display ever changed, so clear it like fleet's closed drawer. */
-.fa-drawer.fa-sheet-popup[hidden] {
+.fa-drawer.ade-sheet-popup[hidden] {
   box-shadow: none;
 }
