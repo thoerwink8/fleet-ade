@@ -1,6 +1,6 @@
 import {
   PrimaryConnectionTarget,
-  RelayConnectionTarget,
+  BearerConnectionTarget,
   SshConnectionTarget,
 } from "@t3tools/client-runtime/connection";
 import { buildRemoteOpenUrl, EnvironmentId } from "@t3tools/contracts";
@@ -66,10 +66,10 @@ describe("resolveRemoteOpenState", () => {
 
   it("keeps exec behavior for the environment that owns the desktop's T3 home", () => {
     // With Local environment off, a background service on this machine can own the
-    // desktop's home and still be reached through T3 Connect.
+    // desktop's home and still be reached through a tunnel.
     expect(
       resolveRemoteOpenState({
-        target: new RelayConnectionTarget({ environmentId, label: "sol" }),
+        target: new BearerConnectionTarget({ environmentId, label: "sol", connectionId: "remote" }),
         sshTarget: null,
         isDesktopRenderer: true,
         remoteOpenTargets: TAILSCALE_TARGETS,
@@ -81,7 +81,7 @@ describe("resolveRemoteOpenState", () => {
   it("uses deep links for other environments when the desktop home has its own", () => {
     expect(
       resolveRemoteOpenState({
-        target: new RelayConnectionTarget({ environmentId, label: "sol" }),
+        target: new BearerConnectionTarget({ environmentId, label: "sol", connectionId: "remote" }),
         sshTarget: null,
         isDesktopRenderer: true,
         remoteOpenTargets: TAILSCALE_TARGETS,
@@ -149,7 +149,11 @@ describe("resolveRemoteOpenState", () => {
 
   it("uses the advertised login username in editor links over a relay", () => {
     const state = resolveRemoteOpenState({
-      target: new RelayConnectionTarget({ environmentId, label: "服务器" }),
+      target: new BearerConnectionTarget({
+        environmentId,
+        label: "服务器",
+        connectionId: "remote",
+      }),
       sshTarget: null,
       isDesktopRenderer: false,
       remoteOpenTargets: [
@@ -168,7 +172,11 @@ describe("resolveRemoteOpenState", () => {
     for (const remoteOpenTargets of [[], undefined] as const) {
       expect(
         resolveRemoteOpenState({
-          target: new RelayConnectionTarget({ environmentId, label: "sol" }),
+          target: new BearerConnectionTarget({
+            environmentId,
+            label: "sol",
+            connectionId: "remote",
+          }),
           sshTarget: null,
           isDesktopRenderer: false,
           remoteOpenTargets,

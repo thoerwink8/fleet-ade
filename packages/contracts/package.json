@@ -18,10 +18,6 @@
     "./pipeline": {
       "types": "./src/pipeline.ts",
       "import": "./src/pipeline.ts"
-    },
-    "./relay": {
-      "types": "./src/relay.ts",
-      "import": "./src/relay.ts"
     }
   },
   "scripts": {

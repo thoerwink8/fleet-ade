@@ -22,18 +22,17 @@ export interface ThreadReferenceCopyTarget {
 }
 
 /**
- * A link that opens the thread from anywhere, through `hostedAppUrl`, this build's hosted app. It
- * pastes back as a chip into any composer whose agent reads that thread's machine.
+ * A link that opens the thread on this server. It pastes back as a chip into any composer whose
+ * agent reads that thread's machine.
  */
 export function threadChipCopyTarget(
   threadRef: ScopedThreadRef,
   title: string,
-  hostedAppUrl?: string,
 ): ThreadReferenceCopyTarget {
   const record = threadContextRecord(threadRef, title);
   return {
     kind: "thread",
-    value: hostedThreadLink(threadRef, hostedAppUrl),
+    value: hostedThreadLink(threadRef),
     description: record.title,
     fragment: { version: 1, source: { environmentId: threadRef.environmentId }, records: [record] },
     clipboardTarget: "thread",
@@ -49,7 +48,6 @@ export function resolveThreadReferenceCopyTarget(input: {
   readonly openPanelPullRequestUrl?: string | null | undefined;
   readonly pullRequests?: ReadonlyArray<ThreadPullRequestLink> | undefined;
   readonly linkedPullRequestUrl?: string | null;
-  readonly hostedAppUrl?: string | undefined;
 }): ThreadReferenceCopyTarget | null {
   if (input.openPanelPullRequestUrl === null) return null;
   const pullRequestUrl =
@@ -65,5 +63,5 @@ export function resolveThreadReferenceCopyTarget(input: {
         successTitle: "已复制 PR 链接",
         failureTitle: "无法复制 PR 链接",
       }
-    : threadChipCopyTarget(input.threadRef, input.title, input.hostedAppUrl);
+    : threadChipCopyTarget(input.threadRef, input.title);
 }

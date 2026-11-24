@@ -38,7 +38,7 @@ export function LinkMachineBadge({ machine }: { readonly machine: LinkableMachin
   if (machine.connected) return null;
   return (
     <Badge variant="outline" size="sm">
-      {machine.connectOnly ? "T3 Connect" : "未连接"}
+      未连接
     </Badge>
   );
 }
@@ -52,7 +52,7 @@ function MachineName({ machine }: { readonly machine: LinkableMachine }) {
   );
 }
 
-/** The user's other machines, including those on their T3 Connect account, then an address. */
+/** The user's other machines, then an address. */
 export function LinkMachineSelect({
   machines,
   value,

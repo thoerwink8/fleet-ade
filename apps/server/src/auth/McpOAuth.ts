@@ -32,7 +32,6 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import { HttpServerRequest } from "effect/http";
 
-import { hostedAppUrlConfig } from "../cloud/publicConfig.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import type * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
@@ -209,7 +208,7 @@ export class McpOAuth extends Context.Service<
       readonly urls: McpOAuthUrls;
       readonly request: AuthMcpAuthorizationRequest;
     }) => Effect.Effect<AuthorizationRequest, McpOAuthPageError | McpOAuthRedirectError>;
-    /** A browser cookie session, or a T3 Connect session from the hosted app, that may approve. */
+    /** A browser cookie or bearer session that may approve. */
     readonly approvingSession: (
       request: HttpServerRequest.HttpServerRequest,
       authorization: AuthorizationRequest,
@@ -612,7 +611,6 @@ export const layerMcpClientAuthenticator = Layer.effect(
     const environmentId = yield* environment.getEnvironmentId;
     const peerClient = yield* PeerMcpClient.PeerMcpClient;
     const digester = yield* Digest.Digest;
-    const hostedAppUrl = yield* hostedAppUrlConfig.pipe(Effect.option);
     const identities = yield* Ref.make(new Map<string, EnvironmentId>());
     return McpHttpServer.McpClientAuthenticator.of({
       authenticate: Effect.fn("McpHttpServer.McpClientAuthenticator.authenticate")(
@@ -690,9 +688,6 @@ export const layerMcpClientAuthenticator = Layer.effect(
                     access: client.access,
                     linked: client.peerLink,
                     ...(provenId === undefined ? {} : { environmentId: provenId }),
-                    ...(Option.isSome(hostedAppUrl) && !client.peerLink
-                      ? { hostedAppUrl: hostedAppUrl.value }
-                      : {}),
                   },
                   capabilities: new Set<McpInvocationContext.McpCapability>([
                     "orchestration",

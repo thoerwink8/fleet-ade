@@ -2,7 +2,6 @@ import {
   BearerConnectionCredential,
   BearerConnectionProfile,
   BearerConnectionTarget,
-  RelayConnectionTarget,
   SshConnectionProfile,
   SshConnectionTarget,
 } from "@t3tools/client-runtime/connection";
@@ -299,15 +298,8 @@ const migrateSavedEnvironmentRecords = Effect.fn(
   const credentials: Array<RuntimeConnectionCatalogDocumentType["credentials"][number]> = [];
 
   for (const record of records) {
-    if (record.relayManaged !== undefined) {
-      targets.push(
-        new RelayConnectionTarget({
-          environmentId: record.environmentId,
-          label: record.label,
-        }),
-      );
-      continue;
-    }
+    // T3 Connect environments have no route left to migrate.
+    if (record.relayManaged !== undefined) continue;
 
     if (record.desktopSsh !== undefined) {
       const id = connectionId("ssh", record.environmentId);

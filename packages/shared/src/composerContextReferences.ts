@@ -107,37 +107,31 @@ export function threadLinkContextReferences(
   title: (ref: ScopedThreadRef) => string | undefined,
   accept: (record: ThreadContextRecord) => ComposerContextId | undefined = (record) =>
     record.contextId,
-  hostedOrigin?: string | null,
 ): { readonly text: string; readonly records: ReadonlyArray<ThreadContextRecord> } {
   const records = new Map<ComposerContextId, ThreadContextRecord>();
-  const rewritten = replaceThreadLinks(
-    text,
-    (link, label) => {
-      if (link.environmentId === null) return undefined;
-      const candidates = threadLinkCandidates(link, link.environmentId);
-      const record =
-        copied.find(
-          (candidate): candidate is ThreadContextRecord =>
-            candidate.kind === "thread" &&
-            "threadId" in candidate &&
-            candidates.some(
-              (ref) =>
-                ref.environmentId === candidate.environmentId &&
-                ref.threadId === candidate.threadId,
-            ),
-        ) ??
-        candidates.flatMap((ref) => {
-          const known = title(ref);
-          return known === undefined ? [] : [threadContextRecord(ref, known)];
-        })[0] ??
-        threadContextRecord(candidates[0]!, label?.trim() || "Thread");
-      const contextId = accept(record);
-      if (contextId === undefined) return undefined;
-      records.set(record.contextId, record);
-      return formatComposerContextReference({ ...record, contextId });
-    },
-    hostedOrigin,
-  );
+  const rewritten = replaceThreadLinks(text, (link, label) => {
+    if (link.environmentId === null) return undefined;
+    const candidates = threadLinkCandidates(link, link.environmentId);
+    const record =
+      copied.find(
+        (candidate): candidate is ThreadContextRecord =>
+          candidate.kind === "thread" &&
+          "threadId" in candidate &&
+          candidates.some(
+            (ref) =>
+              ref.environmentId === candidate.environmentId && ref.threadId === candidate.threadId,
+          ),
+      ) ??
+      candidates.flatMap((ref) => {
+        const known = title(ref);
+        return known === undefined ? [] : [threadContextRecord(ref, known)];
+      })[0] ??
+      threadContextRecord(candidates[0]!, label?.trim() || "Thread");
+    const contextId = accept(record);
+    if (contextId === undefined) return undefined;
+    records.set(record.contextId, record);
+    return formatComposerContextReference({ ...record, contextId });
+  });
   return { text: rewritten, records: [...records.values()] };
 }
 

@@ -24,7 +24,7 @@ export type ThreadGuestMessage = typeof ThreadGuestMessage.Type;
 
 export const ThreadGuestShare = Schema.Struct({
   id: GuestShareId,
-  /** The T3 Connect tunnel hostname the link pointed at. */
+  /** The tunnel hostname the link pointed at. */
   host: TrimmedNonEmptyString,
   createdAt: IsoDateTime,
   expiresAt: IsoDateTime,

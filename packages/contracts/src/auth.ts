@@ -44,8 +44,10 @@ const AuthReviewWriteScope = "review:write" as const;
 const AuthPreviewOperateScope = "preview:operate" as const;
 export const AuthAccessReadScope = "access:read" as const;
 export const AuthAccessWriteScope = "access:write" as const;
-export const AuthRelayReadScope = "relay:read" as const;
-export const AuthRelayWriteScope = "relay:write" as const;
+/** Retained for decoding existing credentials; grants no current RPC access. */
+const AuthRelayReadScope = "relay:read" as const;
+/** Retained for decoding existing credentials; grants no current RPC access. */
+const AuthRelayWriteScope = "relay:write" as const;
 export const AuthEnvironmentScope = Schema.Literals([
   AuthOrchestrationReadScope,
   AuthOrchestrationOperateScope,
@@ -70,7 +72,12 @@ export const AuthEnvironmentScopes = Schema.Array(AuthEnvironmentScope);
 export type AuthEnvironmentScopes = typeof AuthEnvironmentScopes.Type;
 
 export const AuthGrantScope = Schema.Literals(
-  AuthEnvironmentScope.literals.filter((scope) => scope !== AuthReviewWriteScope),
+  AuthEnvironmentScope.literals.filter(
+    (scope) =>
+      scope !== AuthReviewWriteScope &&
+      scope !== AuthRelayReadScope &&
+      scope !== AuthRelayWriteScope,
+  ),
 );
 export type AuthGrantScope = typeof AuthGrantScope.Type;
 export const AuthGrantScopes = Schema.Array(AuthGrantScope);
@@ -159,10 +166,8 @@ export const AuthStandardClientScopes = [
   AuthSourceControlWriteScope,
   AuthFilesystemReadScope,
   AuthFilesystemWriteScope,
-  AuthRelayReadScope,
   AuthAccessReadScope,
   AuthAccessWriteScope,
-  AuthRelayWriteScope,
 ] as const;
 
 export const AuthTokenExchangeGrantType =

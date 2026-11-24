@@ -73,7 +73,6 @@ const clientLaunchHarness = (input: {
   readonly launched: Array<ThreadLaunch.ThreadLaunchInput>;
   readonly workspaceRoot?: string;
   readonly checkWorktreeBase?: ThreadLaunch.ThreadLaunchService["Service"]["checkWorktreeBase"];
-  readonly hostedAppUrl?: string;
   readonly linked?: boolean;
   /** A linked session whose coordinator identity was never proven. */
   readonly unprovenLink?: boolean;
@@ -114,7 +113,6 @@ const clientLaunchHarness = (input: {
         sessionId: "session-1",
         label: "Claude Code",
         access: input.runtimeModeCeiling,
-        hostedAppUrl: input.hostedAppUrl,
         ...(input.linked ? { linked: true } : {}),
         ...(input.linked && !input.unprovenLink ? { environmentId: "coordinator" } : {}),
       },
@@ -197,17 +195,15 @@ it.effect(
           readonly runtimeMode?: RuntimeMode;
           readonly targeted?: false;
           readonly overrideModel?: ModelSelection;
-          readonly hostedAppUrl?: string;
         },
       ) {
-        const { targeted, overrideModel, hostedAppUrl, ...input } = params;
+        const { targeted, overrideModel, ...input } = params;
         const launched: Array<ThreadLaunch.ThreadLaunchInput> = [];
         const { projectId, modelSelection, dependencies } = clientLaunchHarness({
           runtimeModeCeiling,
           defaultRuntimeMode,
           launched,
           ...(overrideModel === undefined ? {} : { overrideModel }),
-          ...(hostedAppUrl === undefined ? {} : { hostedAppUrl }),
         });
         const toolkit = yield* ProjectToolkit.pipe(
           Effect.provide(
@@ -236,11 +232,10 @@ it.effect(
 
       const aboveCeiling = yield* launchWith("auto-accept-edits", "full-access", {
         title: "修复",
-        hostedAppUrl: "https://t3.example.com",
       });
       expect(aboveCeiling.launched[0]?.runtimeMode).toBe("auto-accept-edits");
       expect(aboveCeiling.result).toMatchObject({
-        link: `https://t3.example.com/threads/environment/${encodeURIComponent(aboveCeiling.launched[0]?.threadId ?? "")}`,
+        link: `[修复](t3-thread://v2/environment/${aboveCeiling.launched[0]?.threadId})`,
       });
 
       const requested = yield* launchWith("full-access", "approval-required", {

@@ -21,7 +21,6 @@ import { AddProjectToMachineDialogHost } from "../components/AddProjectToMachine
 import { ConfirmDialogHost } from "../components/ConfirmDialogHost";
 import { DevReplayHost } from "../components/DevReplayHost";
 import { FirstRunGate } from "../components/onboarding/FirstRunGate";
-import { RelayClientInstallDialog } from "../components/cloud/RelayClientInstallDialog";
 import { SshPasswordPromptDialog } from "../components/desktop/SshPasswordPromptDialog";
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
 import { DesktopWebLinkCoordinator } from "../components/desktop/DesktopWebLinkCoordinator";
@@ -131,7 +130,6 @@ function RootRouteBranch() {
         <DesktopWebLinkCoordinator />
       ) : null}
       {isElectron ? <RunningThreadKeepAlive /> : null}
-      <RelayClientInstallDialog />
       <SshPasswordPromptDialog />
       <ShortcutCheatsheetDialog />
       <ReopenClosedViewShortcut />

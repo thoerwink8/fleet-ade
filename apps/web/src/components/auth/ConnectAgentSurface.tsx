@@ -376,7 +376,7 @@ function ConnectAgentHeading({
 }
 
 /** One access level in a radio group; `description` replaces the level's own, null hides it. */
-export function AccessOption({
+function AccessOption({
   access,
   selected,
   disabledReason,

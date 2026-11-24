@@ -6,7 +6,6 @@ import {
   ProviderInstanceId,
   ThreadId,
 } from "@t3tools/contracts";
-import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as NodeNet from "node:net";
@@ -50,10 +49,6 @@ it.effect("startup and opening a session do not contact their hosts", () =>
       if (isBannedHost(host)) hits.push(host);
     });
     yield* Effect.gen(function* () {
-      const config = yield* Effect.promise(() => import("./cloud/publicConfig.ts"));
-      const emptyConfig = ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }));
-      yield* config.hostedAppUrlConfig.pipe(Effect.provide(emptyConfig), Effect.exit);
-
       const [
         { CodexProviderCapabilitiesV2 },
         { OrchestratorV2 },

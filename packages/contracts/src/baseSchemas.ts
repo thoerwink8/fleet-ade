@@ -224,6 +224,20 @@ export const ForwardCompatibleUnionArray = <
     ),
   );
 
+const tagLiterals = (field: {
+  readonly literal?: unknown;
+  readonly literals?: ReadonlyArray<unknown>;
+  readonly schema?: { readonly literal?: unknown; readonly literals?: ReadonlyArray<unknown> };
+  readonly ast?: { readonly literal?: unknown; readonly literals?: ReadonlyArray<unknown> };
+}): ReadonlyArray<unknown> => {
+  if (field.literals !== undefined) return [...field.literals];
+  if (field.literal !== undefined) return [field.literal];
+  // Tagged classes nest the literal under the field schema.
+  const nested = field.schema ?? field.ast;
+  if (nested?.literals !== undefined) return [...nested.literals];
+  return [nested?.literal];
+};
+
 const knownTags = (
   members: ReadonlyArray<Schema.Top & { readonly fields: object }>,
   tag: string,
@@ -231,9 +245,12 @@ const knownTags = (
   const tags = new Set<string>();
   for (const member of members) {
     const field = (member.fields as Record<string, unknown>)[tag] as
-      | { readonly literal?: unknown; readonly literals?: ReadonlyArray<unknown> }
+      | Parameters<typeof tagLiterals>[0]
       | undefined;
-    for (const literal of field?.literals ?? [field?.literal]) {
+    if (field === undefined) {
+      throw new Error(`Every ForwardCompatibleUnion member needs a string literal ${tag}.`);
+    }
+    for (const literal of tagLiterals(field)) {
       if (typeof literal !== "string") {
         throw new Error(`Every ForwardCompatibleUnion member needs a string literal ${tag}.`);
       }

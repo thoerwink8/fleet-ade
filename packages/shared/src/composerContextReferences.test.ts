@@ -561,7 +561,6 @@ describe("threadContextRecord", () => {
 });
 
 describe("threadLinkContextReferences", () => {
-  const hosted = "https://app.example.invalid";
   const thread = (environmentId: string, threadId: string) => ({
     environmentId: EnvironmentId.make(environmentId),
     threadId: ThreadId.make(threadId),
@@ -572,14 +571,12 @@ describe("threadLinkContextReferences", () => {
   it("makes a chip of a copied link, a v2 link, and a labeled link, titled here", () => {
     const pasted = threadLinkContextReferences(
       [
-        "https://app.example.invalid/threads/env-1/t1",
+        "t3-thread://v2/env-1/t1",
         "<t3-thread://v2/env-1/t2>",
-        "[Written](https://app.example.invalid/threads/env-2/t3)",
+        "[Written](t3-thread://v2/env-2/t3)",
       ].join(" "),
       [],
       ({ threadId }) => (threadId === "t3" ? undefined : `Title ${threadId}`),
-      undefined,
-      hosted,
     );
     expect(pasted.text).toBe(
       [
@@ -598,36 +595,27 @@ describe("threadLinkContextReferences", () => {
   it("prefers the record the copy carried, and names an unknown thread plainly", () => {
     const copied = threadContextRecord(thread("env-1", "t1"), "Copied title");
     const pasted = threadLinkContextReferences(
-      "https://app.example.invalid/threads/env-1/t1 https://app.example.invalid/threads/env-9/t9",
+      "t3-thread://v2/env-1/t1 t3-thread://v2/env-9/t9",
       [copied],
       () => "Here",
-      undefined,
-      hosted,
     );
     expect(pasted.records).toEqual([copied, threadContextRecord(thread("env-9", "t9"), "Here")]);
     expect(
-      threadLinkContextReferences(
-        "https://app.example.invalid/threads/env-9/t9",
-        [],
-        () => undefined,
-        undefined,
-        hosted,
-      ).records,
+      threadLinkContextReferences("t3-thread://v2/env-9/t9", [], () => undefined).records,
     ).toEqual([threadContextRecord(thread("env-9", "t9"), "Thread")]);
   });
 
   it("keeps links it may not chip, v1 links, and links in code as written", () => {
     const text = [
-      "https://app.example.invalid/threads/elsewhere/t1",
+      "t3-thread://v2/elsewhere/t1",
       "[Old](t3-thread://v1/t2)",
-      "`https://app.example.invalid/threads/env-1/t3`",
+      "`t3-thread://v2/env-1/t3`",
     ].join(" ");
     const pasted = threadLinkContextReferences(
       text,
       [],
       () => "Title",
       () => undefined,
-      hosted,
     );
     expect(pasted).toEqual({ text, records: [] });
   });

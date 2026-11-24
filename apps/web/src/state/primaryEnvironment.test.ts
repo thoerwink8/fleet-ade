@@ -2,7 +2,7 @@ import { isClientHostEnvironment } from "./clientHostEnvironment";
 import {
   PrimaryConnectionTarget,
   SshConnectionTarget,
-  RelayConnectionTarget,
+  BearerConnectionTarget,
 } from "@t3tools/client-runtime/connection";
 import { EnvironmentId } from "@t3tools/contracts";
 import { expect, it } from "vite-plus/test";
@@ -29,7 +29,7 @@ it("recognizes the desktop host service and direct browser loopback, excluding r
   expect(isClientHostEnvironment(REMOTE, null, null, true)).toBe(false);
   for (const target of [
     new SshConnectionTarget({ environmentId: REMOTE, label: "SSH", connectionId: "ssh-1" }),
-    new RelayConnectionTarget({ environmentId: REMOTE, label: "Relay" }),
+    new BearerConnectionTarget({ environmentId: REMOTE, label: "Relay", connectionId: "remote" }),
   ]) {
     expect(isClientHostEnvironment(REMOTE, "service", target, true)).toBe(false);
   }

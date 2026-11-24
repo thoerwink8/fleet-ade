@@ -135,7 +135,6 @@ describe("searchSettings", () => {
 
   it("hides settings whose controls are unavailable", () => {
     const available = filterAvailableSettingsSearchItems({
-      hasCloudPublicConfig: false,
       hasEnvironment: false,
       hasProviderSettingsEnvironment: false,
       canManageLocalBackend: false,
@@ -151,7 +150,6 @@ describe("searchSettings", () => {
       "provider-health-check-interval",
       "source-control-writer-model",
       "source-control-writing-style",
-      "t3-connect",
       "hold-webhooks-while-offline",
       "tailscale-https",
       "wsl-backend",
@@ -165,7 +163,6 @@ describe("searchSettings", () => {
 
   it("finds linked environments on a remote host without local maintenance access", () => {
     const availability = {
-      hasCloudPublicConfig: false,
       hasEnvironment: true,
       hasProviderSettingsEnvironment: true,
       canManageLocalBackend: false,
@@ -276,7 +273,6 @@ describe("auto-settlement search availability", () => {
     const availability = getThreadAutoSettlementSearchAvailability(environments);
     expect(availability.eligibleEnvironmentIds).toEqual([capable.environmentId]);
     const items = filterAvailableSettingsSearchItems({
-      hasCloudPublicConfig: false,
       hasEnvironment: true,
       hasProviderSettingsEnvironment: true,
       canManageLocalBackend: false,
