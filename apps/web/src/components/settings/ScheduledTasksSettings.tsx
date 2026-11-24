@@ -1435,6 +1435,7 @@ function ScheduledTaskEditorDialog({
     )
     .sort((left, right) => Number(right.pinnedAt != null) - Number(left.pinnedAt != null));
   const submissionPending = useRef(false);
+  const fieldsRef = useRef<HTMLFieldSetElement>(null);
   const editingTaskMissing =
     draft.editingId !== null &&
     tasksQuery.data !== null &&
@@ -1483,7 +1484,7 @@ function ScheduledTaskEditorDialog({
       toastManager.add({
         type: "info",
         title: "未保存的修改已保留",
-        description: "下次打开时可以继续编辑。",
+        description: "刷新或关闭页面前，再次打开这个编辑框可以继续编辑。",
       });
     }
     onClose();
@@ -1635,7 +1636,17 @@ function ScheduledTaskEditorDialog({
         if (!open && !saving) handleDismiss();
       }}
     >
-      <DialogPopup className="max-w-xl">
+      <DialogPopup
+        className="max-w-xl"
+        initialFocus={(openType) =>
+          // A restored draft shows a Discard button first in tab order; keep Enter and Space away from it.
+          restoredFromDraft && openType !== "touch"
+            ? (fieldsRef.current?.querySelector<HTMLElement>(
+                "#scheduled-task-title:not(:disabled)",
+              ) ?? true)
+            : true
+        }
+      >
         <DialogHeader>
           <DialogTitle>{draft.editingId ? "编辑任务" : "新建任务"}</DialogTitle>
           <DialogDescription>
@@ -1666,7 +1677,7 @@ function ScheduledTaskEditorDialog({
             </div>
           ) : null}
           {/* Fieldsets default to min-width: min-content, which lets one wide control widen the form past the dialog. */}
-          <fieldset disabled={saving} className="min-w-0 space-y-5">
+          <fieldset ref={fieldsRef} disabled={saving} className="min-w-0 space-y-5">
             {!connected ? (
               <p className="text-sm text-destructive">请重新连接此环境后再保存。</p>
             ) : null}
