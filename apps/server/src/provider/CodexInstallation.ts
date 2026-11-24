@@ -849,7 +849,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
               if (candidate.startsWith(`${realManaged.value}${path.sep}`))
                 return yield* installationError(
                   "remove",
-                  "有智能体账号使用了托管 Codex 内的自定义路径。请先清除该路径再移除。",
+                  "有账号使用了托管 Codex 内的自定义路径。请先清除该路径再移除。",
                 );
             }
           }
