@@ -90,7 +90,12 @@ function PopoverPopup({
           className={cn(
             "relative flex h-(--popup-height,auto) w-(--popup-width,auto) origin-(--transform-origin) outline-none transition-[width,height,scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
             variant !== "panel" && "fa-pop",
-            variant !== "panel" && (padding === "none" ? "ade-pop--flush" : "fa-pop--pad"),
+            // default is the library card padding (16); compact and tooltip-style hints keep the base
+            // popup padding (8), the same inset as a menu.
+            variant !== "panel" &&
+              (padding === "none"
+                ? "ade-pop--flush"
+                : padding === "default" && !tooltipStyle && "fa-pop--pad"),
             // Electron drag hit-testing ignores z-index; popups over a drag region would swallow hover.
             "[-webkit-app-region:no-drag]",
             tooltipStyle && "w-fit text-balance text-xs",

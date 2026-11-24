@@ -232,6 +232,34 @@ describe("popup surfaces", () => {
     }
   });
 
+  it("insets compact popovers and tooltip-style hints by 8px like a menu, and default by 16px", async () => {
+    await using _screen = await render(
+      <>
+        <Popover>
+          <PopoverTrigger>Compact</PopoverTrigger>
+          <PopoverPopup padding="compact">Compact body</PopoverPopup>
+        </Popover>
+        <Popover>
+          <PopoverTrigger>Hint</PopoverTrigger>
+          <PopoverPopup tooltipStyle>Hint body</PopoverPopup>
+        </Popover>
+      </>,
+    );
+    for (const [trigger, body] of [
+      ["Compact", "Compact body"],
+      ["Hint", "Hint body"],
+    ] as const) {
+      await userEvent.click(page.getByRole("button", { name: trigger }));
+      const popup = page
+        .getByText(body)
+        .element()
+        .closest<HTMLElement>("[data-slot=popover-popup]")!;
+      await expect.element(page.getByText(body)).toBeVisible();
+      expectLibrarySurface(popup, "fa-pop", 8);
+      await userEvent.keyboard("{Escape}");
+    }
+  });
+
   it("keeps an edge-to-edge popover flush and a panel out of the popup surface", async () => {
     await using _screen = await render(
       <>
