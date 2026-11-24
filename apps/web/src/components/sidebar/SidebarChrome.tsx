@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { shortcutLabelForCommand } from "../../keybindings";
+import { useVisibleShortcutLabel } from "../../hooks/useKeyboardShortcutHints";
 import {
   navigateHistory,
   useCanNavigateHistory,
@@ -140,9 +141,11 @@ function HistoryNavigationButton({
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const enabled = useCanNavigateHistory(direction);
   const label = direction === "back" ? "后退" : "前进";
-  const shortcutLabel = shortcutLabelForCommand(
-    keybindings,
-    direction === "back" ? "navigation.back" : "navigation.forward",
+  const shortcutLabel = useVisibleShortcutLabel(
+    shortcutLabelForCommand(
+      keybindings,
+      direction === "back" ? "navigation.back" : "navigation.forward",
+    ),
   );
   const Icon = direction === "back" ? ArrowLeftIcon : ArrowRightIcon;
   return (

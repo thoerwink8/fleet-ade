@@ -56,6 +56,7 @@ import {
 
 import { isElectron } from "~/env";
 import type { RightPanelSurface } from "~/rightPanelStore";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { cn } from "~/lib/utils";
 import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings";
 import { readLocalApi } from "~/localApi";
@@ -260,6 +261,7 @@ function RightPanelEmptyState(props: {
   sideChatDisabledReason: string | null;
 }) {
   const [highlight, setHighlight] = useState(-1);
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
 
   const actions = [
     {
@@ -415,7 +417,7 @@ function RightPanelEmptyState(props: {
                 >
                   {actionIcon(action, "size-4")}
                   <span className={cn("min-w-0 flex-1 truncate")}>{action.label}</span>
-                  <Kbd>{action.shortcut}</Kbd>
+                  {hideKeyboardHints ? null : <Kbd>{action.shortcut}</Kbd>}
                 </button>
               </div>
             ) : (
@@ -442,7 +444,7 @@ function RightPanelEmptyState(props: {
                         {action.disabledReason}
                       </span>
                     </span>
-                    <Kbd>{action.shortcut}</Kbd>
+                    {hideKeyboardHints ? null : <Kbd>{action.shortcut}</Kbd>}
                   </button>
                 }
               />

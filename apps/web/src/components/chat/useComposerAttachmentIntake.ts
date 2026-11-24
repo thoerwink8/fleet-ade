@@ -45,6 +45,7 @@ import {
   inheritComposerImageThumbnail,
   prepareImageForAttachment,
 } from "../../lib/imageCompression";
+import { shouldHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { requestConfirmDialog } from "~/confirmDialog";
 import { toastManager } from "../ui/toast";
 import { type RefObject, useRef } from "react";
@@ -232,10 +233,13 @@ export function useComposerAttachmentIntake(input: {
       }
       if (options?.source?._tag === "pasted-text" && storedFiles.length > 0) {
         const attached = storedFiles[0]!;
+        const sizeLabel = formatAttachmentSize(attached.sizeBytes);
         toastManager.add({
           type: "info",
           title: `大段粘贴内容已作为 ${attached.name} 附加`,
-          description: `${formatAttachmentSize(attached.sizeBytes)} · 按 ${isMacPlatform(navigator.platform) ? "⌘⇧V" : "Ctrl+Shift+V"} 可将大段内容直接粘贴到正文中。`,
+          description: shouldHideKeyboardShortcutHints()
+            ? sizeLabel
+            : `${sizeLabel} · 按 ${isMacPlatform(navigator.platform) ? "⌘⇧V" : "Ctrl+Shift+V"} 可将大段内容直接粘贴到正文中。`,
           data: { hideCopyButton: true },
         });
       }

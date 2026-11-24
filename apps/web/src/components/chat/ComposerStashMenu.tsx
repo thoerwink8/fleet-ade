@@ -2,6 +2,7 @@ import { BookmarkIcon, FileIcon, FileTextIcon } from "lucide-react";
 import { memo, useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
 
+import { useVisibleShortcutLabel } from "~/hooks/useKeyboardShortcutHints";
 import { RelativeTime } from "../RelativeTime";
 import { cn } from "~/lib/utils";
 import { type PromptStashEntry } from "../../promptStashStore";
@@ -38,6 +39,7 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
   onClose: () => void;
 }) {
   const { entries, stashShortcutLabel, composerFormRef, onRestore, onDelete, onClose } = props;
+  const visibleStashShortcutLabel = useVisibleShortcutLabel(stashShortcutLabel);
   const [highlightedId, setHighlightedId] = useState<string | null>(entries[0]?.id ?? null);
 
   const highlightedEntry = entries.find((entry) => entry.id === highlightedId) ?? entries[0];
@@ -152,8 +154,8 @@ export const ComposerStashMenu = memo(function ComposerStashMenu(props: {
               <ComposerBanner.Icon />
               <ComposerBanner.Content className="text-muted-foreground">
                 还没有暂存内容。
-                {stashShortcutLabel
-                  ? ` 在输入框有提示词时按 ${stashShortcutLabel} 即可暂存。`
+                {visibleStashShortcutLabel
+                  ? ` 在输入框有提示词时按 ${visibleStashShortcutLabel} 即可暂存。`
                   : null}
               </ComposerBanner.Content>
             </ComposerBanner.Row>

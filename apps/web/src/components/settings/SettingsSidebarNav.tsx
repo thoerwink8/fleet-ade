@@ -17,6 +17,7 @@ import {
 import { resolveEventKeys } from "@t3tools/shared/keybindings";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
+import { useHideKeyboardShortcutHints } from "../../hooks/useKeyboardShortcutHints";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Kbd } from "../ui/kbd";
@@ -83,6 +84,7 @@ function SettingsSectionIcon({ to }: { to: SettingsPath }) {
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const navArea = workspaceAreaProps("settings-nav", 0, "设置分类");
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const navigate = useNavigate();
   const currentHash = useLocation({ select: (location) => location.hash });
   const isSettingsIndex = isSettingsIndexPath(pathname);
@@ -250,8 +252,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 >
                   <XIcon className="size-3" />
                 </Button>
-              ) : (
-                <span className="max-md:hidden pointer-coarse:hidden">
+              ) : hideKeyboardHints ? null : (
+                <span className="max-md:hidden">
                   <Kbd>/</Kbd>
                 </span>
               )}

@@ -30,6 +30,7 @@ import {
 } from "@t3tools/shared/usageMerge";
 
 import { cn } from "../../lib/utils";
+import { useHideKeyboardShortcutHints } from "../../hooks/useKeyboardShortcutHints";
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { resolveHour12 } from "../../timestampFormat";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
@@ -178,10 +179,12 @@ function UsageModelDialogHost({
 export function UsagePage() {
   const [preferences, setPreferences] = useState(readUsagePagePreferences);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const hour12 = usePrimarySettings((settings) => resolveHour12(settings.timestampFormat));
   const shortcutTitle = (
     option: (typeof METRIC_OPTIONS)[number] | (typeof WINDOW_OPTIONS)[number],
   ) => {
+    if (hideKeyboardHints) return option.label;
     const shortcut = shortcutLabelForCommand(keybindings, option.command, {
       context: { usagePageOpen: true },
     });

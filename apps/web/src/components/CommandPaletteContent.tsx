@@ -1,15 +1,12 @@
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode, type RefObject } from "react";
 
-import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useHideKeyboardShortcutHints } from "../hooks/useKeyboardShortcutHints";
 import { Command, CommandFooter, CommandInput, CommandPanel } from "./ui/command";
 import { Kbd, KbdGroup } from "./ui/kbd";
 
 export function useHideCommandPaletteKeyboardHints(): boolean {
-  const isCoarsePointer = useMediaQuery({ pointer: "coarse" });
-  const lacksHover = useMediaQuery("(hover: none)");
-  const isMobileViewport = useMediaQuery("max-sm");
-  return isCoarsePointer || lacksHover || isMobileViewport;
+  return useHideKeyboardShortcutHints();
 }
 
 /**

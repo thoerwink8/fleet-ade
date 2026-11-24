@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Kbd } from "../ui/kbd";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { useVisibleShortcutLabel } from "~/hooks/useKeyboardShortcutHints";
 import { cn } from "~/lib/utils";
 import { modelPickerModelKey } from "./modelPickerKeys";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
@@ -34,6 +35,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
   disabledReason?: string | null;
   onToggleFavorite: (instanceId: ProviderInstanceId, slug: string) => void;
 }) {
+  const jumpLabel = useVisibleShortcutLabel(props.jumpLabel);
   const model = {
     slug: props.slug,
     name: props.name,
@@ -132,7 +134,7 @@ export const ModelListRow = memo(function ModelListRow(props: {
             {props.isFavorite ? "取消收藏" : "添加到收藏"}
           </TooltipPopup>
         </Tooltip>
-        {props.jumpLabel ? <Kbd>{props.jumpLabel}</Kbd> : null}
+        {jumpLabel ? <Kbd>{jumpLabel}</Kbd> : null}
       </div>
     </ComboboxItem>
   );

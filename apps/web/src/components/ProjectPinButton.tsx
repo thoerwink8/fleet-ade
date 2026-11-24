@@ -4,6 +4,7 @@ import type { KeyboardEvent } from "react";
 
 import { resolveShortcutCommand } from "../keybindings";
 
+import { useVisibleShortcutLabel } from "~/hooks/useKeyboardShortcutHints";
 import { cn } from "~/lib/utils";
 import { Button } from "./ui/button";
 
@@ -32,6 +33,7 @@ export function ProjectPinButton(props: {
   readonly shortcutLabel?: string | null;
 }) {
   const action = `${props.pinned ? "Unpin" : "Pin"} ${props.name}`;
+  const visibleShortcutLabel = useVisibleShortcutLabel(props.shortcutLabel);
   return (
     <span
       className={cn(
@@ -45,7 +47,7 @@ export function ProjectPinButton(props: {
         variant="ghost-muted"
         tabIndex={-1}
         aria-hidden="true"
-        title={props.shortcutLabel ? `${action} (${props.shortcutLabel})` : action}
+        title={visibleShortcutLabel ? `${action} (${visibleShortcutLabel})` : action}
         onPointerDown={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {

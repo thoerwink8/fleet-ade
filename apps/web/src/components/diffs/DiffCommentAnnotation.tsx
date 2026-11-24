@@ -2,6 +2,7 @@ import { MessageCircle, Trash2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "~/components/ui/button";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import {
   PullRequestMarkdownTextarea,
   type PullRequestCompletionScope,
@@ -50,6 +51,7 @@ export function DiffCommentAnnotation({
   completionScope = null,
 }: DiffCommentAnnotationProps) {
   const [localDraftText, setLocalDraftText] = useState("");
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const displayedText = kind === "draft" && !onTextChange ? localDraftText : text;
   const trimmedText = displayedText.trim();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -127,7 +129,11 @@ export function DiffCommentAnnotation({
         }}
       />
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
-        <span className="mr-auto text-3xs text-muted-foreground/70">⌘/Ctrl + Enter 发送</span>
+        {hideKeyboardHints ? (
+          <span className="mr-auto" />
+        ) : (
+          <span className="mr-auto text-3xs text-muted-foreground/70">⌘/Ctrl + Enter 发送</span>
+        )}
         <Button variant="ghost-muted" size="xs" onClick={onCancel}>
           取消
         </Button>

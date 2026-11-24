@@ -148,6 +148,7 @@ import {
   ComposerContextActionsContext,
   composerContextRecordsFromDraft,
 } from "../composerContextPresentation";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import {
   collectInlineContextIds,
@@ -563,6 +564,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onRemoveEditingQueuedAttachment,
   } = props;
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   const composerDraftTargetKey = composerTargetKey(composerDraftTarget);
   const {
     heldRequestIds,
@@ -3289,13 +3291,17 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   <ComposerStashMenu
                     composerFormRef={composerFormRef}
                     entries={stashQueue}
-                    stashShortcutLabel={shortcutLabelForCommand(keybindings, "composer.stash", {
-                      context: {
-                        terminalFocus: false,
-                        terminalOpen,
-                        modelPickerOpen: false,
-                      },
-                    })}
+                    stashShortcutLabel={
+                      hideKeyboardHints
+                        ? null
+                        : shortcutLabelForCommand(keybindings, "composer.stash", {
+                            context: {
+                              terminalFocus: false,
+                              terminalOpen,
+                              modelPickerOpen: false,
+                            },
+                          })
+                    }
                     onRestore={restoreStashEntryStable}
                     onDelete={deleteStashEntryStable}
                     onClose={() => setIsStashMenuOpen(false)}
@@ -3412,7 +3418,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                                 }))
                     }
                     placeholderSuffix={
-                      offeredPromptSuggestion !== null ? (
+                      offeredPromptSuggestion !== null && !hideKeyboardHints ? (
                         <span className="ml-2 inline-flex align-[1px]">
                           <Kbd variant="outline">⇥ Tab</Kbd>
                         </span>
@@ -3491,7 +3497,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     runId={activeThread?.runtime?.activeRunId ?? null}
                     followUpBehavior={followUpBehavior}
                     canSteer={canSteer}
+<<<<<<< HEAD
                     alternateShortcutLabel={alternateShortcutLabel}
+=======
+                    alternateShortcutLabel={
+                      hideKeyboardHints
+                        ? null
+                        : shortcutLabelForCommand(keybindings, "composer.sendAlternate", {
+                            context: {
+                              composerFocus: true,
+                              draftThreadRoute: routeKind === "draft",
+                              turnRunning: true,
+                              composerRequiresModifier: composerRequiresModifier(
+                                settings.sendShortcut,
+                                prompt,
+                              ),
+                            },
+                          })
+                    }
+>>>>>>> ca86ab2fb9 (feat(web): unify touch keyboard shortcut hint hiding)
                     isSendBusy={isSendBusy}
                     sendDisabledReason={primaryActionSendDisabledReason}
                     isEnvironmentUnavailable={primaryActionEnvironmentUnavailable}

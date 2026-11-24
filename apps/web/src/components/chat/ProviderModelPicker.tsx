@@ -18,6 +18,7 @@ import { ModelEsque, getDisplayModelName, getTriggerDisplayModelName } from "./p
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { ComposerControl, type ComposerControlSize } from "./ComposerControl";
 import { takeOpenTarget, useComposerMenuProps } from "./composerEventScope";
+import { useVisibleShortcutLabel } from "~/hooks/useKeyboardShortcutHints";
 import { shortcutLabelForCommand } from "../../keybindings";
 
 /** Holds the page still behind the open picker; its lifetime is the popup element's. */
@@ -196,9 +197,11 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
     window.requestAnimationFrame(() => focusEffort("levels"));
   };
 
-  const shortcutLabel = props.keybindings
-    ? shortcutLabelForCommand(props.keybindings, "modelPicker.toggle")
-    : null;
+  const shortcutLabel = useVisibleShortcutLabel(
+    props.keybindings
+      ? shortcutLabelForCommand(props.keybindings, "modelPicker.toggle")
+      : null,
+  );
   const selectedEntries = props.selectedModels?.map((selection) => {
     const entry = props.instanceEntries.find(
       (candidate) => candidate.instanceId === selection.instanceId,

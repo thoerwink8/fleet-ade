@@ -1,6 +1,7 @@
 import type { RuntimeMode } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 
+import { useVisibleShortcutLabel } from "../hooks/useKeyboardShortcutHints";
 import { shortcutLabelForCommand } from "../keybindings";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { ComposerControl } from "./chat/ComposerControl";
@@ -20,9 +21,8 @@ export function ComposerContextPermissions(props: {
   supportedRuntimeModes: ReadonlyArray<RuntimeMode> | undefined;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
-  const shortcutLabel = shortcutLabelForCommand(
-    useAtomValue(primaryServerKeybindingsAtom),
-    "composer.mode",
+  const shortcutLabel = useVisibleShortcutLabel(
+    shortcutLabelForCommand(useAtomValue(primaryServerKeybindingsAtom), "composer.mode"),
   );
   const { mode, modes } = resolveCompatibleRuntimeMode(
     props.runtimeMode,

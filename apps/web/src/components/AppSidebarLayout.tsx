@@ -27,6 +27,7 @@ import {
   resolveShortcutCommand,
   shortcutLabelForCommand,
 } from "../keybindings";
+import { useVisibleShortcutLabel } from "../hooks/useKeyboardShortcutHints";
 import { isEditableFocused } from "../lib/editableFocus";
 import { isRightPanelFocused } from "../lib/rightPanelFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
@@ -315,9 +316,11 @@ function SidebarControl({ showSidebar }: { readonly showSidebar: boolean }) {
   const isSidebarVisible = useSidebarVisibility();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
   const stageBackdropVariant = useSidebarStageBackdropVariant(environmentIdentificationMode);
-  const shortcutLabel = shortcutLabelForCommand(keybindings, "sidebar.toggle", {
-    context: { usagePageOpen },
-  });
+  const shortcutLabel = useVisibleShortcutLabel(
+    shortcutLabelForCommand(keybindings, "sidebar.toggle", {
+      context: { usagePageOpen },
+    }),
+  );
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window keydown listener that toggles the sidebar on its shortcut
   useEffect(() => {

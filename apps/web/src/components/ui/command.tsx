@@ -3,6 +3,7 @@ import { SearchIcon } from "lucide-react";
 import { useRef } from "react";
 import type * as React from "react";
 import { cn } from "~/lib/utils";
+import { useHideKeyboardShortcutHints } from "~/hooks/useKeyboardShortcutHints";
 import { useNativeTitlebarHeight } from "~/lib/windowControlsOverlay";
 import {
   Autocomplete,
@@ -213,6 +214,8 @@ function CommandItem({
 }
 
 function CommandShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
+  if (hideKeyboardHints) return null;
   return (
     <kbd
       className={cn(

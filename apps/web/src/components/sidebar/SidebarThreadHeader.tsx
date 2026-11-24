@@ -15,6 +15,10 @@ import {
 } from "react";
 
 import { cn } from "~/lib/utils";
+import {
+  useHideKeyboardShortcutHints,
+  useVisibleShortcutLabel,
+} from "~/hooks/useKeyboardShortcutHints";
 import { Button } from "../ui/button";
 import { Kbd } from "../ui/kbd";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
@@ -44,6 +48,7 @@ export function SidebarThreadHeader({
   activeSearchResultIndex,
   onClearSearch,
 }: SidebarThreadHeaderProps) {
+  const visibleSearchShortcutLabel = useVisibleShortcutLabel(searchShortcutLabel);
   const resultsVisible = isSearching && searchResultCount > 0;
   // Shrinking results can remove the active option; never leave aria-activedescendant pointing at it.
   const activeResultExists = resultsVisible && activeSearchResultIndex < searchResultCount;
@@ -84,8 +89,8 @@ export function SidebarThreadHeader({
         >
           <XIcon className="size-3" />
         </Button>
-      ) : searchShortcutLabel ? (
-        <Kbd variant="outline">{searchShortcutLabel}</Kbd>
+      ) : visibleSearchShortcutLabel ? (
+        <Kbd variant="outline">{visibleSearchShortcutLabel}</Kbd>
       ) : null}
     </div>
   );
@@ -121,8 +126,13 @@ export function SidebarHeaderActions({
   newThreadInProjectShortcutLabel,
   showNewThreadInProjectHint,
 }: SidebarHeaderActionsProps) {
-  const newThreadLabel = newThreadShortcutLabel
-    ? `新建会话（${newThreadShortcutLabel}）`
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
+  const visibleNewThreadShortcutLabel = hideKeyboardHints ? null : newThreadShortcutLabel;
+  const visibleNewThreadInProjectShortcutLabel = hideKeyboardHints
+    ? null
+    : newThreadInProjectShortcutLabel;
+  const newThreadLabel = visibleNewThreadShortcutLabel
+    ? `新建会话（${visibleNewThreadShortcutLabel}）`
     : "新建会话";
 
   return (
@@ -172,12 +182,14 @@ export function SidebarHeaderActions({
       <SidebarHeaderIconButton
         label="新建会话"
         tooltip={
-          showNewThreadInProjectHint ? (
+          showNewThreadInProjectHint && !hideKeyboardHints ? (
             <span className="flex flex-col gap-0.5">
               <span>{newThreadLabel}</span>
               <span className="text-muted-foreground">
                 在当前项目中新建会话：Shift+单击
-                {newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}
+                {visibleNewThreadInProjectShortcutLabel
+                  ? ` (${visibleNewThreadInProjectShortcutLabel})`
+                  : ""}
               </span>
             </span>
           ) : (

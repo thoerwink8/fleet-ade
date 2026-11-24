@@ -1,5 +1,6 @@
 import type { ProjectScript, ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { SettingsIcon } from "lucide-react";
+import { useHideKeyboardShortcutHints } from "../../hooks/useKeyboardShortcutHints";
 import { shortcutLabelForCommand } from "../../keybindings";
 import { commandForProjectScript } from "../../projectScripts";
 import { ScriptIcon } from "../projectScriptEditor";
@@ -17,6 +18,7 @@ export function ProjectActionsList({
   disabled: boolean;
   onEdit: (script: ProjectScript) => void;
 }) {
+  const hideKeyboardHints = useHideKeyboardShortcutHints();
   if (scripts.length === 0)
     return (
       <p className="px-3 py-2 text-base text-muted-foreground sm:px-4 sm:text-sm">尚未配置操作。</p>
@@ -51,7 +53,7 @@ export function ProjectActionsList({
         description={<code className="block max-w-full truncate font-mono">{script.command}</code>}
         control={
           <>
-            {shortcutLabel ? (
+            {!hideKeyboardHints && shortcutLabel ? (
               <span className="text-xs text-muted-foreground">{shortcutLabel}</span>
             ) : null}
             <span className="flex shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
