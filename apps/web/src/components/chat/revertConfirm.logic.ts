@@ -98,7 +98,7 @@ const ROLLBACK_FAILURE_PRESENTATIONS: Readonly<
     action: "dismiss",
   },
   "provider-turn-active": {
-    message: "智能体还在收尾这一轮，暂时不能回退。请稍等几秒后重试。",
+    message: "智能体还没完全结束这一轮，暂时不能回退。请稍等几秒后重试。",
     action: "retry",
   },
   "interrupt-unresponsive": {
@@ -141,9 +141,12 @@ export function countRollbackTurns(
 export function describeRevertConfirm(input: {
   readonly availability: RevertRestoreAvailability;
   readonly removedTurnCount: number;
+  /** The agent is running, so it is stopped first. The prompt may not come back if this tab closes. */
+  readonly whileRunning?: boolean;
 }): RevertConfirmPresentation {
-  const baseDescription =
-    input.removedTurnCount > 0
+  const baseDescription = input.whileRunning
+    ? "智能体正在运行，会先停止这一轮，再回退到这条消息之前。"
+    : input.removedTurnCount > 0
       ? `将删除从这条消息起的 ${input.removedTurnCount} 轮会话记录，并把这条消息的提示词和附件放回输入框。`
       : "会话将回退到这条消息之前，这条消息的提示词和附件会回到输入框。";
 

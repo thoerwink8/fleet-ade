@@ -99,6 +99,20 @@ describe("describeRevertConfirm", () => {
   });
 });
 
+describe("describeRevertConfirm while running", () => {
+  it("says the agent is stopped first and does not promise the prompt comes back", () => {
+    for (const availability of [
+      { status: "ready" },
+      { status: "blocked", reason: "checkpoint-missing" },
+      { status: "unavailable" },
+    ] as const) {
+      const view = describeRevertConfirm({ availability, removedTurnCount: 2, whileRunning: true });
+      expect(view.description).toContain("先停止");
+      expect(view.description).not.toContain("输入框");
+    }
+  });
+});
+
 describe("countRollbackTurns", () => {
   it("counts only settled runs strictly after the target turn ordinal", () => {
     const runs = [

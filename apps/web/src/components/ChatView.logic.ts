@@ -897,12 +897,16 @@ export async function waitForRevertedMessage(
 }
 
 /** The person cancelled the rewind this client was waiting on; nothing should be shown. */
-export class RewindCancelledError extends Error {
-  override name = "RewindCancelledError";
-  constructor() {
-    super("回退已取消。");
+export class RewindCancelledError extends Schema.TaggedError<RewindCancelledError>()(
+  "RewindCancelledError",
+  {},
+) {
+  override get message(): string {
+    return "回退已取消。";
   }
 }
+
+export const isRewindCancelledError = Schema.is(RewindCancelledError);
 
 /**
  * Waits for the `thread.stop-and-rollback` this client sent: completed id, this request's stored

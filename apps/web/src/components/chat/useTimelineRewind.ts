@@ -2,7 +2,7 @@ import type { EnvironmentThreadShell, ThreadStructure } from "@t3tools/client-ru
 import type { ComposerThreadTarget } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import type { SessionPhase } from "../../types";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import {
   AuthOrchestrationOperateScope,
@@ -29,6 +29,7 @@ import { orchestrationEnvironment } from "../../state/orchestration";
 import { waitForThreadShell } from "../../state/entities";
 import { openRevertConfirm } from "./ChatOverlayHosts";
 import { countRollbackTurns, type RevertRestoreAvailability } from "./revertConfirm.logic";
+import { resolveRewindRoute } from "./stopAndRewind.logic";
 import { assetEnvironment } from "../../state/assets";
 import { readEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -48,6 +49,10 @@ interface TimelineRewindInput {
   readonly isSendBusy: boolean;
   readonly isRevertingCheckpoint: boolean;
   readonly supportsConversationRollback: boolean;
+  /** The server stops a running thread and rewinds it in one command. */
+  readonly supportsStopAndRollback: boolean;
+  /** A rewind is waiting on this thread for its run to stop. */
+  readonly hasPendingRollback: boolean;
   readonly activeEnvironmentUnavailable: boolean;
   readonly activeEnvironmentUnavailableLabel: string | null;
   readonly promptRef: { current: string };
@@ -73,6 +78,8 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     isSendBusy,
     isRevertingCheckpoint,
     supportsConversationRollback,
+    supportsStopAndRollback,
+    hasPendingRollback,
     activeEnvironmentUnavailable,
     activeEnvironmentUnavailableLabel,
     promptRef,
@@ -97,6 +104,17 @@ export function useTimelineRewind(input: TimelineRewindInput) {
   const revertThreadCheckpoint = useOrchestrationCommand(threadEnvironment.revertCheckpoint, {
     reportFailure: false,
   });
+  const stopAndRollbackThread = useOrchestrationCommand(threadEnvironment.stopAndRollback, {
+    reportFailure: false,
+  });
+  const cancelPendingRollbackCommand = useOrchestrationCommand(
+    threadEnvironment.cancelPendingRollback,
+    { reportFailure: false },
+  );
+  // The wait of the rewind this client started, so Cancel can end it without a message.
+  const rewindAbortRef = useRef<AbortController | null>(null);
+  // True while this client waits on a rewind that stops a running thread first.
+  const [stopRewindActive, setStopRewindActive] = useState(false);
   const forkThreadFromRun = useAtomCommand(threadEnvironment.forkFromRun, {
     reportFailure: false,
   });
@@ -128,10 +146,17 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       );
       return;
     }
-    if (phase === "running" || isSendBusy) {
-      setThreadError(activeThread.id, "正在运行，请先停止再回退。");
+    const route = resolveRewindRoute({
+      runActive: phase === "running",
+      sendBusy: isSendBusy,
+      supportsStopAndRollback,
+      pendingRollback: hasPendingRollback,
+    });
+    if (route.kind === "blocked") {
+      setThreadError(activeThread.id, route.message);
       return;
     }
+    const whileRunning = route.kind === "stop-and-rollback";
     if (restoreFiles === undefined) {
       if (pendingPrecheckRef.current?.messageId === messageId) return;
       const precheckId = (pendingPrecheckRef.current?.id ?? 0) + 1;
@@ -163,6 +188,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         messageId,
         availability,
         removedTurnCount,
+        whileRunning,
       });
       return;
     }
@@ -171,6 +197,9 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       rewindingThreadKeys: new Set(store.rewindingThreadKeys).add(routeThreadKey),
     }));
     setThreadError(activeThread.id, null);
+    const abort = whileRunning ? new AbortController() : null;
+    rewindAbortRef.current = abort;
+    setStopRewindActive(whileRunning);
     const rewind = await rewindToMessage({
       message,
       environmentId,
@@ -183,8 +212,15 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       draftTarget: composerDraftTarget,
       composerHasPendingAttachments: composerRef.current?.hasPendingAttachments() === true,
       createAssetUrl: createAttachmentAssetUrl,
+      ...(abort === null
+        ? {}
+        : { stopAndRollback: { send: stopAndRollbackThread, signal: abort.signal } }),
       revertThreadCheckpoint,
     });
+    if (rewindAbortRef.current === abort) {
+      rewindAbortRef.current = null;
+      setStopRewindActive(false);
+    }
     useComposerDraftStore.setState((store) => {
       const remaining = new Set(store.rewindingThreadKeys);
       remaining.delete(routeThreadKey);
@@ -194,6 +230,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       setThreadError(activeThread.id, rewind.error);
       return;
     }
+    if (rewind.cancelled === true) return;
     if (currentRouteThreadKeyRef.current === routeThreadKey) {
       const nextPrompt = rewind.prompt;
       promptRef.current = nextPrompt;
@@ -208,6 +245,24 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     void onRevertToTurnCount(turnCount, messageId, restoreFiles);
   };
   const onConfirmRevertStable = useStableCallback(onConfirmRevert);
+
+  const onCancelRollback = async () => {
+    if (!activeThread) return;
+    // End our own wait first, so an outcome that lands after Cancel shows nothing.
+    rewindAbortRef.current?.abort();
+    const result = await cancelPendingRollbackCommand({
+      environmentId,
+      input: { threadId: activeThread.id },
+    });
+    if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+      const error = squashAtomCommandFailure(result);
+      setThreadError(
+        activeThread.id,
+        error instanceof Error ? error.message : "无法取消回退。请重试。",
+      );
+    }
+  };
+  const onCancelRollbackStable = useStableCallback(onCancelRollback);
 
   const onForkFromRun = async (input: {
     readonly sourceThreadId: ThreadId;
@@ -254,6 +309,8 @@ export function useTimelineRewind(input: TimelineRewindInput) {
   };
   const onRevertTimelineTurnStable = useStableCallback(onRevertTimelineTurn);
   return {
+    stopRewindActive,
+    onCancelRollbackStable,
     onConfirmRevertStable,
     onForkFromRunStable,
     onRevertTimelineTurnStable,

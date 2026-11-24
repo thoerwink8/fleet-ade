@@ -39,7 +39,9 @@ import {
   type ComposerSendSnapshot,
   readFileAsDataUrl,
   prepareRevertedMessageAttachments,
+  isRewindCancelledError,
   waitForRevertedMessage,
+  waitForRollbackOutcome,
 } from "../ChatView.logic";
 import { readPreparedConnection } from "../../state/session";
 import { recallableComposerPrompt } from "./composerPromptHistory";
@@ -164,6 +166,15 @@ export async function rewindToMessage(input: {
   readonly createAssetUrl: Parameters<
     typeof prepareRevertedMessageAttachments
   >[0]["createAssetUrl"];
+  /** Set when the thread is running: one command stops it and rewinds it. */
+  readonly stopAndRollback?: {
+    readonly send: (value: {
+      environmentId: EnvironmentId;
+      input: { commandId: CommandId; threadId: ThreadId; turnCount: number; restoreFiles: boolean };
+    }) => Promise<AtomCommandResult<unknown, unknown>>;
+    /** Aborted when the person cancels; the wait then ends without an error or a prompt. */
+    readonly signal: AbortSignal;
+  };
   readonly revertThreadCheckpoint: (value: {
     environmentId: EnvironmentId;
     input: {
@@ -176,8 +187,9 @@ export async function rewindToMessage(input: {
     };
   }) => Promise<AtomCommandResult<unknown, unknown>>;
 }): Promise<
-  | { readonly error: string; readonly prompt?: never }
-  | { readonly error: null; readonly prompt: string }
+  | { readonly error: string; readonly prompt?: never; readonly cancelled?: never }
+  | { readonly error: null; readonly prompt: string; readonly cancelled?: never }
+  | { readonly error: null; readonly cancelled: true; readonly prompt?: never }
 > {
   const { message, environmentId, draftTarget } = input;
   try {
@@ -201,21 +213,41 @@ export async function rewindToMessage(input: {
       throw new Error("回退前请在输入框中为这条消息的附件腾出位置。");
     }
     const commandId = CommandId.make(randomUUID());
-    await waitForRevertedMessage(input.routeThreadRef, input.turnCount, commandId, async () => {
-      const result = await input.revertThreadCheckpoint({
-        environmentId,
-        input: {
-          commandId,
-          threadId: input.threadId,
-          turnCount: input.turnCount,
-          restoreFiles: input.restoreFiles,
-          ...(input.checkpoint === undefined
-            ? {}
-            : { checkpointId: input.checkpoint.id, scopeId: input.checkpoint.scopeId }),
+    const stopAndRollback = input.stopAndRollback;
+    if (stopAndRollback !== undefined) {
+      await waitForRollbackOutcome(
+        input.routeThreadRef,
+        commandId,
+        async () => {
+          const result = await stopAndRollback.send({
+            environmentId,
+            input: {
+              commandId,
+              threadId: input.threadId,
+              turnCount: input.turnCount,
+              restoreFiles: input.restoreFiles,
+            },
+          });
+          if (result._tag === "Failure") throw squashAtomCommandFailure(result);
         },
+        { signal: stopAndRollback.signal },
+      );
+    } else
+      await waitForRevertedMessage(input.routeThreadRef, input.turnCount, commandId, async () => {
+        const result = await input.revertThreadCheckpoint({
+          environmentId,
+          input: {
+            commandId,
+            threadId: input.threadId,
+            turnCount: input.turnCount,
+            restoreFiles: input.restoreFiles,
+            ...(input.checkpoint === undefined
+              ? {}
+              : { checkpointId: input.checkpoint.id, scopeId: input.checkpoint.scopeId }),
+          },
+        });
+        if (result._tag === "Failure") throw squashAtomCommandFailure(result);
       });
-      if (result._tag === "Failure") throw squashAtomCommandFailure(result);
-    });
     const currentPrompt = store.getComposerDraft(draftTarget)?.prompt ?? "";
     const restoredPrompt = recallableComposerPrompt(message.text);
     const nextPrompt =
@@ -245,6 +277,7 @@ export async function rewindToMessage(input: {
     store.addFiles(draftTarget, restoredFiles, { allowDuplicates: true });
     return { error: null, prompt: nextPrompt };
   } catch (error) {
+    if (isRewindCancelledError(error)) return { error: null, cancelled: true };
     return { error: formatRollbackFailureMessage(error) };
   }
 }
