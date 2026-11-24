@@ -1,5 +1,5 @@
-/* NumberField composes the grouped input frame; its steppers sit inside the frame
-   rather than adding their own boxes. */
+/* NumberField composes the grouped input frame. Its steppers sit inside the frame
+   rather than adding their own boxes, and the input keeps a width so it stays typeable. */
 .ade-number-field-group {
   gap: 0;
   padding: 0;
