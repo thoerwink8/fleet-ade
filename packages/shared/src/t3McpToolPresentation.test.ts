@@ -49,6 +49,9 @@ describe("resolveT3McpToolDefinition", () => {
     expect(resolveT3McpToolDefinition("t3_thread_transfer", { action: "unknown" })).toBe(
       resolveT3McpToolDefinition("t3_thread_transfer"),
     );
+    expect(resolveT3McpToolPresentation("t3_queue_promote_to_steer")?.displayName).toBe(
+      "立即发送排队消息",
+    );
   });
 });
 

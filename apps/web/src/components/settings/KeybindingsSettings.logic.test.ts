@@ -10,6 +10,7 @@ import { resolveShortcutCommand } from "../../keybindings";
 import {
   buildKeybindingRows,
   buildWhenVariableOptions,
+  commandLabel,
   keybindingConflictLabels,
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
@@ -305,5 +306,13 @@ describe("KeybindingsSettings.logic", () => {
     );
 
     expect(rows.map((row) => row.conflicts)).toEqual([[], []]);
+  });
+
+  it("uses unified queue and immediate-send labels for follow-up keybinding commands", () => {
+    expect(commandLabel("composer.sendAlternate")).toBe(
+      "输入框：用另一种方式发送（排队／立即发送）",
+    );
+    expect(commandLabel("thread.steerQueuedMessage")).toBe("排队：立即发送第一条排队消息");
+    expect(commandLabel("thread.editQueuedMessage")).toBe("排队：编辑最后一条排队消息");
   });
 });

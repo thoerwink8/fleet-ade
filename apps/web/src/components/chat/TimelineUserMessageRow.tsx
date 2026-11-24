@@ -1042,14 +1042,14 @@ function UserMessageIntentMarker({
         }
       >
         <Redo2Icon aria-hidden="true" className="size-3" />
-        {unread ? "引导 · 等待读取" : "引导"}
+        {unread ? "立即发送 · 等待读取" : "立即发送"}
       </TooltipTrigger>
       <TooltipPopup side="top">
         {unread
-          ? "正在等待智能体读取。它会在步骤之间读取引导消息，也就是正在运行的命令结束之后。"
+          ? "正在等待智能体读取。智能体会在正在运行的命令结束之后读取这条立即发送的消息。"
           : intent === "promoted_queued_to_steer"
-            ? "原本在排队，随后改为引导当前这一轮"
-            : "引导了当前这一轮"}
+            ? "原本在排队，随后改为立即发送"
+            : "已立即发送至当前这一轮"}
       </TooltipPopup>
     </Tooltip>
   );

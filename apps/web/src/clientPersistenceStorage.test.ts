@@ -78,4 +78,23 @@ describe("clientPersistenceStorage", () => {
     expect(readBrowserClientSettings()).toEqual(settings);
     expect(write).not.toHaveBeenCalled();
   });
+
+  it("migrates a saved steer once, then keeps a later steer choice", async () => {
+    const testWindow = getTestWindow();
+    const { readBrowserClientSettings, writeBrowserClientSettings } =
+      await import("./clientPersistenceStorage");
+    const key = "t3code:client-settings:v1";
+
+    testWindow.localStorage.setItem(key, JSON.stringify({ wordWrap: false }));
+    expect(readBrowserClientSettings()?.followUpBehavior).toBe("queue");
+
+    testWindow.localStorage.setItem(key, JSON.stringify({ followUpBehavior: "steer" }));
+    const migrated = readBrowserClientSettings();
+    expect(migrated?.followUpBehavior).toBe("queue");
+    expect(migrated?.followUpBehaviorMigrated).toBe(true);
+
+    writeBrowserClientSettings({ ...migrated!, followUpBehavior: "steer" });
+    expect(readBrowserClientSettings()?.followUpBehavior).toBe("steer");
+    expect(readBrowserClientSettings()?.followUpBehavior).toBe("steer");
+  });
 });

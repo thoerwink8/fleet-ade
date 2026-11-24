@@ -164,7 +164,7 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_queue_cancel: tool(["取消", "正在取消", "已请求取消", "排队执行"], "queue-cancel"),
   t3_queue_reorder: tool(["调整顺序", "正在调整顺序", "已调整顺序", "排队执行"], "queue-reorder"),
   t3_queue_promote_to_steer: tool(
-    ["插话发送", "正在插话发送", "已请求插话发送", "排队消息"],
+    ["立即发送", "正在立即发送", "已请求立即发送", "排队消息"],
     "queue-steer",
   ),
   t3_pending_request_list: tool(["列出", "正在列出", "已列出", "待处理问题"], "question-list"),

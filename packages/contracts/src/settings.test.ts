@@ -13,6 +13,8 @@ import {
   ClientSettingsPatch,
   ClaudeSettings,
   BUILTIN_COMMANDER_INSTRUCTIONS,
+  DEFAULT_CLIENT_SETTINGS,
+  migrateClientSettings,
   DEFAULT_SERVER_SETTINGS,
   globalIdleCompaction,
   idleCompactionPatch,
@@ -725,5 +727,44 @@ describe("retired snapshot settings", () => {
       expect(decodeClientSettingsPatch(client)).not.toHaveProperty(key);
     }
     expect(decoded.timestampFormat).toBe("24-hour");
+  });
+});
+
+describe("ClientSettings follow-up behavior", () => {
+  const read = (raw: unknown) => migrateClientSettings(decodeClientSettings(raw));
+
+  it("defaults to queue and marks the default as migrated", () => {
+    expect(DEFAULT_CLIENT_SETTINGS.followUpBehavior).toBe("queue");
+    expect(DEFAULT_CLIENT_SETTINGS.followUpBehaviorMigrated).toBe(true);
+    expect(decodeClientSettingsPatch({})).not.toHaveProperty("followUpBehavior");
+  });
+
+  it("turns an unmarked saved steer into queue and marks it", () => {
+    const migrated = read({ followUpBehavior: "steer", wordWrap: false });
+    expect(migrated.followUpBehavior).toBe("queue");
+    expect(migrated.followUpBehaviorMigrated).toBe(true);
+    expect(migrated.wordWrap).toBe(false);
+  });
+
+  it("gives settings without the key queue, and keeps a saved queue", () => {
+    expect(read({}).followUpBehavior).toBe("queue");
+    expect(read({ wordWrap: false }).followUpBehavior).toBe("queue");
+    expect(read({ followUpBehavior: "queue" }).followUpBehavior).toBe("queue");
+  });
+
+  it("keeps a steer the user chose after migration", () => {
+    const afterChoice = {
+      ...read({ followUpBehavior: "steer" }),
+      followUpBehavior: "steer" as const,
+    };
+    expect(migrateClientSettings(decodeClientSettings(afterChoice)).followUpBehavior).toBe("steer");
+  });
+
+  it("migrates only once", () => {
+    const once = read({ followUpBehavior: "steer" });
+    expect(migrateClientSettings(once)).toBe(once);
+    expect(migrateClientSettings({ ...once, followUpBehavior: "steer" }).followUpBehavior).toBe(
+      "steer",
+    );
   });
 });

@@ -297,8 +297,8 @@ export function summarizeT3ToolCalls(
       break;
     case "queue-steer":
       label = phrase(
-        "已请求插话发送",
-        "插话发送",
+        "已请求立即发送",
+        "立即发送",
         quantity(countEntities(entityIds("queuedRunId")), "条", "排队消息"),
       );
       break;

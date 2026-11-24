@@ -211,7 +211,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut ? ["发送快捷键"] : []),
     ...(settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior
-      ? ["追加消息行为"]
+      ? ["运行中发送（排队／立即发送）"]
       : []),
     ...(settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility
       ? ["聊天中的工具调用"]
@@ -811,19 +811,19 @@ export function ChatSettingsPanel() {
         </AdvancedSettings>
       </SettingsSection>
 
-      <SettingsSection id="follow-ups" title="追加消息">
+      <SettingsSection id="follow-ups" title="运行中发送">
         <SettingsRow
           {...searchableSetting("follow-up-behavior")}
           description={
-            "智能体运行时，可以把追加消息加入队列，或用它引导当前执行。" +
+            "智能体运行时发消息默认执行此操作：「排队」会等当前这一轮做完再发；「立即发送」会立刻发给智能体，会打断当前这一轮。" +
             (settings.sendShortcut === "mod-enter-multiline"
-              ? `单行提示词按 ${modifierLabel} + Enter、多行提示词按 ${modifierLabel} + Shift + Enter，可对单条消息使用相反的方式。`
-              : `按 ${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""} + Enter 可对单条消息使用相反的方式。`)
+              ? `单行提示词按 ${modifierLabel}+Enter、多行提示词按 ${modifierLabel}+Shift+Enter，可改用另一种方式。`
+              : `按 ${modifierLabel}${settings.sendShortcut === "mod-enter" ? "+Shift" : ""}+Enter 可改用另一种方式。`)
           }
           resetAction={
             settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior ? (
               <SettingResetButton
-                label="追加消息行为"
+                label="运行中发送（排队／立即发送）"
                 onClick={() =>
                   updateSettings({
                     followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
@@ -841,14 +841,18 @@ export function ChatSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="追加消息行为">
+              <SelectTrigger
+                size="sm"
+                className="w-auto min-w-0"
+                aria-label="运行中发送（排队／立即发送）"
+              >
                 <SelectValue>
-                  {settings.followUpBehavior === "queue" ? "加入队列" : "引导当前执行"}
+                  {settings.followUpBehavior === "queue" ? "排队" : "立即发送"}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem value="queue">加入队列</SelectItem>
-                <SelectItem value="steer">引导当前执行</SelectItem>
+                <SelectItem value="queue">排队</SelectItem>
+                <SelectItem value="steer">立即发送</SelectItem>
               </SelectPopup>
             </Select>
           }

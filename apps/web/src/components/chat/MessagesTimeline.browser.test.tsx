@@ -593,12 +593,21 @@ describe("MessagesTimeline messages", () => {
     const focus = createWorkspaceFocusController(document);
     using _focus = { [Symbol.dispose]: focus.dispose };
     const viewport = props.listRef.current!.getScrollableNode()!;
-    await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(0));
-    const atEnd = viewport.scrollTop;
+    await vi.waitFor(() => {
+      expect(viewport.scrollTop).toBeGreaterThan(0);
+      expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBeLessThan(2);
+      expect(
+        page
+          .getByText(/Turn 39:/)
+          .element()
+          .checkVisibility({ opacityProperty: true }),
+      ).toBe(true);
+    });
     page.getByRole("button", { name: "发送" }).element().focus();
     await userEvent.keyboard("{F6}");
     focus.move(-1);
     expect(viewport).toHaveAttribute("data-workspace-keyboard-focus");
+    const atEnd = viewport.scrollTop;
     await userEvent.keyboard("{PageUp}");
     await vi.waitFor(() => expect(viewport.scrollTop).toBeLessThan(atEnd));
   });
