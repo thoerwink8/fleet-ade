@@ -629,7 +629,7 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   const threadStatusLine =
     activeLatestRun?.status === "queued" ||
     (activeThread?.runtime?.status === "starting" && activeThread.runtime.awaitingSlot === true) ? (
-      <ThreadStatusLine icon={<AlarmClockIcon />} label="排队" />
+      <ThreadStatusLine icon={<AlarmClockIcon />} label="等空位" />
     ) : activeThreadSnoozed ? (
       limitRecoveryHoldsSnooze ? null : (
         <ThreadStatusLine
