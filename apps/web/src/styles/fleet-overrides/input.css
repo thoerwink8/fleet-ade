@@ -57,6 +57,12 @@
   .fa-input--group:has([data-size="lg"]) {
     min-height: var(--fa-ctrl-lg);
   }
+
+  /* iOS Safari zooms the page on focus when a field's type is under 16px. */
+  .fa-input,
+  .fa-input__control {
+    font-size: 16px;
+  }
 }
 
 /* Textarea adopts .fa-input surface/border/focus/invalid/disabled rules while growing with content. */

@@ -50,6 +50,7 @@ describe("Menu", () => {
     const item = page.getByRole("menuitem", { name: "First item" }).element();
 
     expect(item.getBoundingClientRect().height, "narrow item height").toBe(32);
+    expect(getComputedStyle(item).fontSize, "narrow item type").toBe("14px");
     expect(getComputedStyle(popupElement).padding, "popup padding").toBe("8px");
 
     await page.viewport(1280, 800);

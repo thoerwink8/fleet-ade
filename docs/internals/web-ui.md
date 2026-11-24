@@ -33,7 +33,8 @@ library's density table and type scale (`--fa-ctrl-*`, `--fa-row-*`, `.fa-captio
 - Under `pointer: coarse`, stretch the hit area to at least 44px with an `::after` and leave the
   painted height alone. The library does not do this; growing the control to 44px would change
   the desktop metrics. Text inputs are the exception: below 640px the box is 36px, on the 4px
-  grid and taller than the library's 32px field. The type stays 14px.
+  grid and taller than the library's 32px field, with 16px type, because iOS Safari zooms the
+  page on focus when a field's type is under 16px.
 - A clickable list row is 32, 52, or 72px for one, two, or three lines (`--fa-row-1`, `--fa-row-2`,
   `--fa-row-3`). A row you cannot click is 24px. A table body row is 40px.
 - Sizes and spacing are multiples of 4. A clickable row keeps a 2px transparent seam

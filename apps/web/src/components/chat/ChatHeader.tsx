@@ -329,7 +329,7 @@ export const ChatHeader = memo(function ChatHeader({
               autoFocus
               dir="auto"
               aria-label="会话标题"
-              className="min-w-0 flex-1 rounded-sm bg-transparent text-title font-semibold text-foreground outline-none ring-1 ring-inset ring-ring/50 focus:ring-ring"
+              className="min-w-0 flex-1 rounded-sm bg-transparent text-base font-semibold text-foreground outline-none ring-1 ring-inset ring-ring/50 focus:ring-ring sm:text-title"
               defaultValue={renamingTitle}
               onBlur={(event) => {
                 if (renameCommittedRef.current) return;
