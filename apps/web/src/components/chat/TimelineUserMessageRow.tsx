@@ -1073,6 +1073,7 @@ function RevertUserMessageButton({
   const label = revertButtonLabel({
     isWorking: activity.isWorking,
     isRevertingCheckpoint: activity.isRevertingCheckpoint,
+    canRewindWhileWorking: activity.canRewindWhileWorking,
   });
 
   return (
@@ -1082,7 +1083,10 @@ function RevertUserMessageButton({
           type="button"
           size="icon-sm"
           variant="ghost"
-          disabled={activity.isRevertingCheckpoint || activity.isWorking}
+          disabled={
+            activity.isRevertingCheckpoint ||
+            (activity.isWorking && !activity.canRewindWhileWorking)
+          }
           onClick={() => ctx.onRevertToTurnCount(turnCount, messageId)}
           aria-label={label}
         >

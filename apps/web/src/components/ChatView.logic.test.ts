@@ -61,6 +61,7 @@ import {
   deriveLockedProvider,
   hasServerAcknowledgedLocalDispatch,
   waitForRevertedMessage,
+  waitForRollbackOutcome,
 } from "./ChatView.logic";
 
 const environmentId = EnvironmentId.make("environment-local");
@@ -1438,5 +1439,178 @@ describe("Open in for the host environment", () => {
         }),
       ).toBe(visible);
     }
+  });
+});
+
+describe("waitForRollbackOutcome", () => {
+  const threadRef = { environmentId: EnvironmentId.make("env-1"), threadId: ThreadId.make("t") };
+  const requestId = CommandId.make("stop-and-rollback-1");
+
+  function projectionAtom() {
+    const projection = makeThreadProjectionFixture();
+    const state = Atom.make({ data: Option.some(projection) });
+    vi.spyOn(environmentThreadDetails, "stateAtom").mockReturnValue(state as never);
+    return { state, projection };
+  }
+  const setThread = (handle: ReturnType<typeof projectionAtom>, patch: Record<string, unknown>) =>
+    appAtomRegistry.set(handle.state, {
+      data: Option.some({
+        ...handle.projection,
+        thread: { ...handle.projection.thread, ...patch },
+      } as never),
+    });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("resolves only when the completed id is the one this client sent", async () => {
+    const handle = projectionAtom();
+    let outcome = "pending";
+    const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}).then(
+      () => {
+        outcome = "completed";
+      },
+      (error: Error) => {
+        outcome = error.message;
+      },
+    );
+    await Promise.resolve();
+    setThread(handle, { rollbackCompletedRequestId: CommandId.make("someone-else") });
+    await Promise.resolve();
+    expect(outcome).toBe("pending");
+    setThread(handle, { rollbackCompletedRequestId: requestId });
+    await waiting;
+    expect(outcome).toBe("completed");
+  });
+
+  it("rejects with the stored code when this request fails", async () => {
+    const handle = projectionAtom();
+    const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {});
+    await Promise.resolve();
+    setThread(handle, {
+      rollbackFailure: { requestId, message: "no snapshot", code: "checkpoint-missing" },
+    });
+    await expect(waiting).rejects.toMatchObject({ code: "checkpoint-missing" });
+  });
+
+  it("keeps waiting through an unanswered stop while the rewind is held", async () => {
+    const handle = projectionAtom();
+    let settled = false;
+    const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}).finally(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    setThread(handle, {
+      pendingRollback: { requestId, turnCount: 1, restoreFiles: true, requestedAt: now },
+      rollbackFailure: { requestId, message: "x", code: "interrupt-unresponsive" },
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    setThread(handle, {
+      pendingRollback: null,
+      rollbackFailure: null,
+      rollbackCompletedRequestId: requestId,
+    });
+    await waiting;
+  });
+
+  describe("when the held rewind disappears without a result", () => {
+    const held = { requestId, turnCount: 1, restoreFiles: false, requestedAt: now };
+    afterEach(() => vi.useRealTimers());
+
+    it("ends within the settle window instead of the long timeout, and says it did not finish", async () => {
+      vi.useFakeTimers();
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        settleMs: 5_000,
+      });
+      const result = waiting.then(
+        () => "completed",
+        (error: Error) => error.message,
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      setThread(handle, { pendingRollback: held });
+      // Another client cancels: the held rewind is simply gone.
+      setThread(handle, { pendingRollback: null });
+      await vi.advanceTimersByTimeAsync(4_999);
+      let outcome = "pending";
+      void result.then((value) => {
+        outcome = value;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(outcome).toBe("pending");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toBe("回退没有完成，可能已被取消。可以重新回退。");
+    });
+
+    it("ends at once when the held rewind goes while a run is still active, since it was cancelled", async () => {
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {});
+      await Promise.resolve();
+      appAtomRegistry.set(handle.state, {
+        data: Option.some({
+          ...handle.projection,
+          runs: [{ status: "running" }],
+          thread: { ...handle.projection.thread, pendingRollback: held },
+        } as never),
+      });
+      appAtomRegistry.set(handle.state, {
+        data: Option.some({
+          ...handle.projection,
+          runs: [{ status: "running" }],
+          thread: { ...handle.projection.thread, pendingRollback: null },
+        } as never),
+      });
+      await expect(waiting).rejects.toMatchObject({ _tag: "RewindNotCompletedError" });
+    });
+
+    it("still completes when the queued rollback lands inside the settle window", async () => {
+      vi.useFakeTimers();
+      const handle = projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        settleMs: 5_000,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      setThread(handle, { pendingRollback: held });
+      setThread(handle, { pendingRollback: null });
+      await vi.advanceTimersByTimeAsync(2_000);
+      setThread(handle, { rollbackCompletedRequestId: requestId });
+      await expect(waiting).resolves.toBeUndefined();
+    });
+
+    it("keeps the long timeout when the rewind was never seen held", async () => {
+      vi.useFakeTimers();
+      projectionAtom();
+      const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+        settleMs: 5_000,
+        timeoutMs: 120_000,
+      });
+      const result = waiting.then(
+        () => "completed",
+        (error: Error) => error.message,
+      );
+      await vi.advanceTimersByTimeAsync(119_999);
+      let outcome = "pending";
+      void result.then((value) => {
+        outcome = value;
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(outcome).toBe("pending");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toBe("等待会话回退超时。");
+    });
+  });
+
+  it("stops quietly when cancelled and ignores a completion that arrives later", async () => {
+    const handle = projectionAtom();
+    const controller = new AbortController();
+    const waiting = waitForRollbackOutcome(threadRef, requestId, async () => {}, {
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+    controller.abort();
+    await expect(waiting).rejects.toMatchObject({ name: "RewindCancelledError" });
+    // Nothing is listening any more: a late completion or failure changes nothing.
+    setThread(handle, { rollbackCompletedRequestId: requestId });
+    setThread(handle, { rollbackFailure: { requestId, message: "late" } });
   });
 });
