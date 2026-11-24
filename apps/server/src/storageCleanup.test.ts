@@ -2475,6 +2475,7 @@ describe("storage cleanup reports and local file policies", () => {
       runCleanupTest(
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
           const storeDir = yield* fs.makeTempDirectoryScoped({ prefix: "pnpm-store-" });
           const statted: string[] = [];
           const { service, worktree, setPolicy } = yield* cleanupFixture().pipe(
@@ -2497,7 +2498,7 @@ describe("storage cleanup reports and local file policies", () => {
             }),
           );
           setPolicy("tracked-changes");
-          const nodeModules = `${worktree}/node_modules`;
+          const nodeModules = path.join(worktree, "node_modules");
           yield* fs.makeDirectory(`${nodeModules}/.pnpm/pkg@1.0.0`, { recursive: true });
           yield* fs.makeDirectory(`${nodeModules}/.vite`);
           yield* fs.writeFileString(
@@ -2524,7 +2525,7 @@ describe("storage cleanup reports and local file policies", () => {
           );
           const report = yield* service.runNow;
           expect(report.entries[0]).toMatchObject({ outcome: "removed", bytes });
-          expect(statted.includes(`${nodeModules}/.pnpm/pkg@1.0.0/index.js`)).toBe(
+          expect(statted.includes(path.join(nodeModules, ".pnpm", "pkg@1.0.0", "index.js"))).toBe(
             store !== "same-device",
           );
         }),
@@ -2775,6 +2776,8 @@ describe("storage cleanup reports and local file policies", () => {
         expect(yield* fs.readFileString(`${worktree}/tracked.txt`)).toBe("original\n");
         yield* fs.remove(`${index.trim()}.lock`);
         const gitFile = yield* fs.readFileString(`${worktree}/.git`);
+        // Git marks this file hidden on Windows, and opening a hidden file to truncate it fails.
+        yield* fs.remove(`${worktree}/.git`);
         yield* fs.writeFileString(`${worktree}/.git`, "gitdir: /missing-git-directory\n");
         expect((yield* service.runNow).entries[0]).toMatchObject(changed);
         yield* fs.writeFileString(`${worktree}/.git`, gitFile);
