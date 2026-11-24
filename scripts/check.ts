@@ -155,6 +155,7 @@ const steps: Step[] = [
   vpStep("fmt", ["fmt", "--check", "--no-error-on-unmatched-pattern"]),
   vpStep("lint", ["lint", "--report-unused-disable-directives"]),
   nodeStep("ui-no-english", ["scripts/ui-no-english.ts"]),
+  nodeStep("ui-no-old-terms", ["scripts/ui-no-old-terms.ts"]),
   vpStep("typecheck", ["run", "-r", "--cache", "--concurrency-limit", "4", "typecheck"]),
   vpStep("ensure-electron", ["run", "--filter", "@t3tools/desktop", "ensure:electron"]),
   nodeStep("chromium", [
