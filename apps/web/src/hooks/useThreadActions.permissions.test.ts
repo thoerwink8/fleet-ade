@@ -110,6 +110,7 @@ vi.mock("../state/threads", () => ({
     [
       "archive",
       "unarchive",
+      "batch",
       "delete",
       "settle",
       "unsettle",
@@ -201,7 +202,6 @@ vi.mock("./useSettings", () => ({
     select({
       sidebarThreadSortOrder: "createdAt",
       confirmThreadDelete: true,
-      confirmThreadUnpin: true,
     }),
 }));
 
@@ -323,7 +323,7 @@ describe("thread action permissions", () => {
     },
   );
 
-  it.each(["confirmAndDeleteThread", "confirmAndUnpinThread"] as const)(
+  it.each(["confirmAndDeleteThread"] as const)(
     "%s blocks a forbidden confirmation",
     async (action) => {
       await useThreadActions()[action](target);
@@ -332,7 +332,7 @@ describe("thread action permissions", () => {
     },
   );
 
-  it.each(["confirmAndDeleteThread", "confirmAndUnpinThread"] as const)(
+  it.each(["confirmAndDeleteThread"] as const)(
     "%s rechecks after the confirmation",
     async (action) => {
       state.scopes.get(secondary)!.add(AuthOrchestrationOperateScope);

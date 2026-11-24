@@ -23,7 +23,6 @@ import {
 import { titleRegenerationToast } from "../components/threadTitleRegenerationToast";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { copyThreadReference } from "../lib/copyThreadReference";
-import { threadArchiveConfirmCopy } from "../lib/threadConfirmCopy";
 import { exportThreadMarkdown } from "../lib/exportThreadMarkdown";
 import { threadChipCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { threadEnvironment } from "../state/threads";
@@ -81,7 +80,7 @@ export function useThreadActionMenu(input: {
     snoozeThread,
     unsnoozeThread,
     pinThread,
-    confirmAndUnpinThread,
+    unpinThread,
     markCommanderThread,
     unmarkCommanderThread,
     setThreadAutoSettle,
@@ -95,7 +94,6 @@ export function useThreadActionMenu(input: {
   });
   const handleNewThread = useNewThreadHandler();
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
-  const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
     onCopy: ({ path }) => {
@@ -239,7 +237,7 @@ export function useThreadActionMenu(input: {
           await reportFailure("无法置顶会话", () => pinThread(threadRef));
           return;
         case "unpin": {
-          await reportFailure("无法取消置顶会话", () => confirmAndUnpinThread(threadRef));
+          await reportFailure("无法取消置顶会话", () => unpinThread(threadRef));
           return;
         }
         case "mark-commander":
@@ -269,7 +267,7 @@ export function useThreadActionMenu(input: {
           return;
         }
         case "mark-unread":
-          markThreadUnread(threadRef);
+          void markThreadUnread(threadRef);
           return;
         case "turn-into-project": {
           const result = await turnThreadIntoProject(threadRef);
@@ -323,13 +321,6 @@ export function useThreadActionMenu(input: {
           copyThreadIdToClipboard(thread.id, { threadId: thread.id });
           return;
         case "archive": {
-          if (confirmThreadArchive) {
-            const copy = threadArchiveConfirmCopy(thread.title);
-            const confirmed = await settlePromise(() =>
-              api.dialogs.confirm(copy.message, copy.options),
-            );
-            if (confirmed._tag === "Failure" || !confirmed.value) return;
-          }
           let didArchive = false;
           const result = await archiveThread(threadRef, {
             onArchived: () => {

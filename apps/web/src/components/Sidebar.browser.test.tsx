@@ -717,7 +717,7 @@ describe("sidebar thread settle", () => {
     });
     expect(router.state.location.pathname).toBe("/local/thread-x");
 
-    await expect.element(page.getByText("已标为完成")).toBeVisible();
+    await expect.element(page.getByText("已标为完成「会话 X」")).toBeVisible();
     const undoButton = page.getByRole("button", { name: "撤销" });
     await expect.element(undoButton).toBeVisible();
     await userEvent.click(undoButton);
