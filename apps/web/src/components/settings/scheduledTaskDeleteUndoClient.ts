@@ -56,17 +56,6 @@ function browserStorage() {
 let controller: ScheduledTaskDeleteUndo | null = null;
 let resumed = false;
 
-function failureText(error: unknown): string {
-  const detail = error instanceof Error ? error.message.trim() : "";
-  const reason =
-    detail.length === 0
-      ? "删除没有完成，任务还在。"
-      : detail.endsWith("。")
-        ? detail
-        : `${detail}。`;
-  return `${reason}重新打开后会再试。`;
-}
-
 function getController(): ScheduledTaskDeleteUndo | null {
   if (typeof window === "undefined") return null;
   if (controller !== null) return controller;
@@ -102,11 +91,11 @@ function getController(): ScheduledTaskDeleteUndo | null {
         },
       };
     },
-    onDeleteFailed: (record, error) => {
+    onDeleteFailed: (record) => {
       toastManager.add({
         type: "error",
         title: "无法删除定时任务",
-        description: `${failureText(error)}重新打开后会再试。`,
+        description: "没能删除这个任务。重新打开后会再试，也可以先撤销。",
         timeout: 8_000,
         actionProps: {
           children: "撤销",

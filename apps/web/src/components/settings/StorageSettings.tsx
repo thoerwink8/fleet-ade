@@ -58,6 +58,7 @@ import {
 } from "./useScopedSettings";
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
 import {
+  STORAGE_CLEANUP_NOTHING_TO_DELETE,
   runStorageCleanupIfConfirmed,
   storageCleanupAmounts,
   storageCleanupButtonLabel,
@@ -528,6 +529,11 @@ function CleanupSection() {
       return;
     }
     const amounts = storageCleanupAmounts(previews);
+    if (amounts.length === 0 && failures.length === 0) {
+      // Nothing to list, so there is nothing to ask about.
+      setPhase({ kind: "done", message: STORAGE_CLEANUP_NOTHING_TO_DELETE });
+      return;
+    }
     setPhase({
       kind: "confirm",
       amounts,
@@ -633,6 +639,9 @@ function CleanupSection() {
               <AlertDialogDescription>
                 {phase.dialog.disabledReason ?? "将按当前的清理规则删除下面这些内容。"}
               </AlertDialogDescription>
+              {phase.dialog.notice !== null ? (
+                <p className="text-sm text-muted-foreground">{phase.dialog.notice}</p>
+              ) : null}
               {phase.amounts.length > 0 ? (
                 <ul className="space-y-2 text-sm">
                   {phase.amounts.map((amount) => (

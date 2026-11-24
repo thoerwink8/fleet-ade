@@ -1,4 +1,7 @@
 export const SCHEDULED_TASK_UNDO_MS = 8_000;
+/** A delete that cannot reach the server (still connecting, or offline) is tried again. */
+export const SCHEDULED_TASK_DELETE_RETRY_MS = 4_000;
+export const SCHEDULED_TASK_DELETE_ATTEMPTS = 5;
 
 export type ScheduledTaskDeleteRecord = {
   readonly environmentId: string;
@@ -17,6 +20,10 @@ function isScheduledTaskDeleteHidden(
   taskId: string,
 ): boolean {
   return hidden.has(scheduledTaskDeleteKey(environmentId, taskId));
+}
+
+function sameRecord(a: ScheduledTaskDeleteRecord, b: ScheduledTaskDeleteRecord): boolean {
+  return a.environmentId === b.environmentId && a.taskId === b.taskId;
 }
 
 export function withoutPendingScheduledTaskDeletes<T extends { readonly id: string }>(
@@ -41,7 +48,7 @@ export type ScheduledTaskDeleteUndo = {
   subscribe(listener: () => void): () => void;
   request(input: { environmentId: string; taskId: string; title: string }): void;
   undo(environmentId: string, taskId: string): boolean;
-  /** Finish every delete the previous page left behind. */
+  /** Finish every delete another page left behind, once its window has passed. */
   resume(): void;
   /** Finish now. Used when the page is going away and the notice cannot stay. */
   commitAll(): void;
@@ -63,11 +70,12 @@ export function createScheduledTaskDeleteUndo(deps: {
     record: ScheduledTaskDeleteRecord,
     undo: () => void,
   ) => { close(): void };
-  readonly onDeleteFailed?: (record: ScheduledTaskDeleteRecord, error: unknown) => void;
+  readonly onDeleteFailed?: (record: ScheduledTaskDeleteRecord) => void;
 }): ScheduledTaskDeleteUndo {
   const pending = new Map<string, ScheduledTaskDeleteRecord>();
   const committed = new Set<string>();
   const committing = new Set<string>();
+  const attempts = new Map<string, number>();
   const timers = new Map<string, () => void>();
   const notices = new Map<string, { close(): void }>();
   const listeners = new Set<() => void>();
@@ -101,25 +109,48 @@ export function createScheduledTaskDeleteUndo(deps: {
     void deps.deleteTask(record).then(
       () => {
         committing.delete(key);
+        attempts.delete(key);
         if (!pending.has(key)) return;
         pending.delete(key);
         committed.add(key);
         persist();
         publish();
       },
-      (error: unknown) => {
+      () => {
         committing.delete(key);
         // Keep the stored delete. A dropped connection must not bring the task back on reload.
         if (!pending.has(key)) return;
-        deps.onDeleteFailed?.(record, error);
+        const tried = (attempts.get(key) ?? 0) + 1;
+        if (tried < SCHEDULED_TASK_DELETE_ATTEMPTS) {
+          attempts.set(key, tried);
+          timers.set(
+            key,
+            deps.schedule(() => commit(record), SCHEDULED_TASK_DELETE_RETRY_MS),
+          );
+          return;
+        }
+        attempts.delete(key);
+        deps.onDeleteFailed?.(record);
       },
     );
   };
 
-  const arm = (record: ScheduledTaskDeleteRecord) => {
+  const arm = (record: ScheduledTaskDeleteRecord, fromStorage: boolean) => {
     const key = scheduledTaskDeleteKey(record.environmentId, record.taskId);
     cancelTimer(key);
-    const cancel = deps.schedule(() => commit(record), Math.max(0, record.deleteAt - deps.now()));
+    const cancel = deps.schedule(
+      () => {
+        // Another page owns a record this page only found in storage. If that page took the
+        // delete back, the record is gone and the task stays.
+        if (fromStorage && !deps.storage.read().some((stored) => sameRecord(stored, record))) {
+          pending.delete(key);
+          publish();
+          return;
+        }
+        commit(record);
+      },
+      Math.max(0, record.deleteAt - deps.now()),
+    );
     timers.set(key, cancel);
   };
 
@@ -148,12 +179,13 @@ export function createScheduledTaskDeleteUndo(deps: {
         api.undo(input.environmentId, input.taskId);
       });
       if (notice) notices.set(key, notice);
-      arm(record);
+      arm(record, false);
     },
     undo(environmentId, taskId) {
       const key = scheduledTaskDeleteKey(environmentId, taskId);
       if (committing.has(key) || !pending.has(key)) return false;
       pending.delete(key);
+      attempts.delete(key);
       cancelTimer(key);
       closeNotice(key);
       persist();
@@ -166,7 +198,8 @@ export function createScheduledTaskDeleteUndo(deps: {
         if (pending.has(key) || committed.has(key) || committing.has(key)) continue;
         pending.set(key, record);
         publish();
-        commit(record);
+        // A record still inside its window belongs to a page that may be open. Wait for it.
+        arm(record, true);
       }
     },
     commitAll() {

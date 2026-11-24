@@ -4,6 +4,7 @@ import { formatBytes } from "../../lib/formatBytes";
 
 const STORAGE_CLEANUP_CONFIRM_TITLE = "删除这些内容？";
 const STORAGE_CLEANUP_CONFIRM_VERB = "删除";
+export const STORAGE_CLEANUP_NOTHING_TO_DELETE = "按当前规则，没有要删除的内容。";
 
 const CATEGORY_LABEL = {
   worktree: "工作树",
@@ -56,6 +57,8 @@ export type StorageCleanupConfirmState = {
   readonly confirmLabel: string;
   readonly confirmDisabled: boolean;
   readonly disabledReason: string | null;
+  /** Shown above the list when some items could not be checked but others can be removed. */
+  readonly notice: string | null;
   readonly totalBytes: number;
 };
 
@@ -65,29 +68,23 @@ export function storageCleanupConfirmState(input: {
 }): StorageCleanupConfirmState {
   const totalBytes = storageCleanupListedTotal(input.amounts);
   const failure = input.failures.find((reason) => reason.trim().length > 0) ?? null;
-  if (failure !== null) {
-    return {
-      title: STORAGE_CLEANUP_CONFIRM_TITLE,
-      confirmLabel: STORAGE_CLEANUP_CONFIRM_VERB,
-      confirmDisabled: true,
-      disabledReason: failure,
-      totalBytes,
-    };
-  }
   if (input.amounts.length === 0) {
     return {
       title: STORAGE_CLEANUP_CONFIRM_TITLE,
       confirmLabel: STORAGE_CLEANUP_CONFIRM_VERB,
       confirmDisabled: true,
-      disabledReason: "按当前规则，没有要删除的内容。",
+      disabledReason: failure ?? STORAGE_CLEANUP_NOTHING_TO_DELETE,
+      notice: null,
       totalBytes: 0,
     };
   }
+  // One item that cannot be checked must not stop the rest from being cleaned.
   return {
     title: STORAGE_CLEANUP_CONFIRM_TITLE,
     confirmLabel: STORAGE_CLEANUP_CONFIRM_VERB,
     confirmDisabled: false,
     disabledReason: null,
+    notice: failure === null ? null : `有内容无法检查，不在下面的列表里：${failure}`,
     totalBytes,
   };
 }

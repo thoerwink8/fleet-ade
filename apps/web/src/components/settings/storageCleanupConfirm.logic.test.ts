@@ -39,6 +39,16 @@ describe("storage cleanup confirmation", () => {
     expect(state.totalBytes).toBe(0);
   });
 
+  it("a failure to check one item does not block removing the rest", () => {
+    const amounts = storageCleanupAmounts([{ environmentLabel: null, categories }]);
+    const state = storageCleanupConfirmState({ amounts, failures: ["读不了目录"] });
+    expect(state.confirmDisabled).toBe(false);
+    expect(state.notice).toContain("读不了目录");
+    const none = storageCleanupConfirmState({ amounts: [], failures: ["读不了目录"] });
+    expect(none.confirmDisabled).toBe(true);
+    expect(none.disabledReason).toBe("读不了目录");
+  });
+
   it("cancel removes nothing", async () => {
     const run = vi.fn(async () => undefined);
     const state = storageCleanupConfirmState({
