@@ -31,6 +31,17 @@ function px(value: string) {
   return Number.parseFloat(value);
 }
 
+function luminance(color: string) {
+  const { r, g, b } = toRgb(color)!;
+  const linear = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const sorted = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (sorted[0]! + 0.05) / (sorted[1]! + 0.05);
+}
+
 function surfaceProbe(className: string) {
   const probe = document.createElement("div");
   probe.className = className;
@@ -368,6 +379,38 @@ describe("popup surfaces", () => {
         ember light background=oklch(0.936659 0.002879 29.96) border=oklch(0.870631 0.013204 39.431) borderWidth=1px
         ember dark background=oklch(0.401111 0.014308 34.896) border=oklch(0.44099 0.040202 48.807) borderWidth=1px"
       `);
+    } finally {
+      applyThemePalette("system", "light");
+      root.classList.remove("dark");
+      delete root.dataset.theme;
+    }
+  });
+
+  it("keeps popup and row text at 4.5:1 contrast across default, Grove, and Ember in light and dark", async () => {
+    const root = document.documentElement;
+    try {
+      await using screen = await render(<FilterCombobox />);
+      await userEvent.click(screen.getByRole("combobox", { name: "Pick" }));
+      const enabled = page.getByRole("option", { name: "Alpha" }).element();
+      const popup = enabled.closest<HTMLElement>("[data-slot=combobox-popup]")!;
+      for (const themeId of ["system", GROVE_THEME.id, EMBER_THEME.id] as const) {
+        for (const appearance of ["light", "dark"] as const) {
+          root.classList.toggle("dark", appearance === "dark");
+          root.dataset.theme = appearance;
+          applyThemePalette(themeId, appearance);
+          const popupStyle = getComputedStyle(popup);
+          const label = `${themeId} ${appearance}`;
+          expect(
+            contrastRatio(popupStyle.color, popupStyle.backgroundColor),
+            `${label} popup text (${popupStyle.color} on ${popupStyle.backgroundColor})`,
+          ).toBeGreaterThanOrEqual(4.5);
+          const rowColor = getComputedStyle(enabled).color;
+          expect(
+            contrastRatio(rowColor, popupStyle.backgroundColor),
+            `${label} row text (${rowColor} on ${popupStyle.backgroundColor})`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     } finally {
       applyThemePalette("system", "light");
       root.classList.remove("dark");
