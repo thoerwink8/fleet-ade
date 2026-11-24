@@ -75,9 +75,9 @@ type ToastManagerListener = Parameters<BaseToastManager[" subscribe"]>[0];
 type ToastManagerEvent = Parameters<ToastManagerListener>[0];
 
 /**
- * base-ui's manager drops events while no provider is subscribed. App services raise toasts
- * from before the first render (and while the root error view replaces the providers), so hold
- * those until a provider listens.
+ * Buffers manager events until a provider subscribes, and fills fleet-design's default
+ * durations: action toasts get ACTION_TOAST_DEFAULT_TIMEOUT_MS, the rest inherit the
+ * provider timeout. An explicit per-toast `timeout` always wins.
  */
 function createBufferedToastManager(): BaseToastManager {
   const manager = Toast.createToastManager<ThreadToastData>();
@@ -92,6 +92,18 @@ function createBufferedToastManager(): BaseToastManager {
   });
   return {
     ...manager,
+    add(options) {
+      const timeout =
+        options.timeout ??
+        (hasVisibleToastAction(options.actionProps) ? ACTION_TOAST_DEFAULT_TIMEOUT_MS : undefined);
+      return manager.add(timeout === undefined ? options : { ...options, timeout });
+    },
+    update(id, updates) {
+      // `never` collapses the per-toast data generic our wrapper does not read.
+      return manager.update(id, (prev) =>
+        withResolvedTimeout(prev, typeof updates === "function" ? updates(prev as never) : updates),
+      );
+    },
     " subscribe"(listener) {
       listeners.add(listener);
       for (const event of pending.splice(0)) listener(event);
@@ -100,6 +112,21 @@ function createBufferedToastManager(): BaseToastManager {
       };
     },
   };
+}
+
+const ACTION_TOAST_DEFAULT_TIMEOUT_MS = 8_000;
+const TOAST_DEFAULT_TIMEOUT_MS = 4_000;
+
+function withResolvedTimeout<
+  T extends { readonly timeout?: number | undefined; readonly actionProps?: unknown },
+>(prevToast: { readonly timeout?: number | undefined }, updates: T): T {
+  if (updates.timeout !== undefined || prevToast.timeout !== undefined) {
+    return updates;
+  }
+  if (!hasVisibleToastAction(updates.actionProps)) {
+    return updates;
+  }
+  return { ...updates, timeout: ACTION_TOAST_DEFAULT_TIMEOUT_MS };
 }
 
 const toastManager = createBufferedToastManager();
@@ -113,6 +140,15 @@ const TOAST_ICONS = {
   loading: Spinner,
   success: CircleCheckIcon,
   warning: TriangleAlertIcon,
+} as const;
+
+// fleet toast marks color the default type icon; loading stays neutral.
+const TOAST_MARK_CLASSES = {
+  error: "m-danger",
+  info: "m-info",
+  loading: "opacity-80",
+  success: "m-success",
+  warning: "m-warning",
 } as const;
 
 const ERROR_DESCRIPTION_CLAMP_MIN_CHARS = 180;
@@ -297,6 +333,7 @@ type ToastIconComponent = (typeof TOAST_ICONS)[keyof typeof TOAST_ICONS];
 
 interface ToastBodyDescriptor {
   readonly Icon: ToastIconComponent | null | undefined;
+  readonly iconClassName: string | null;
   readonly stackedActionLayout: boolean;
   readonly actionVariant: NonNullable<ThreadToastData["actionVariant"]>;
   readonly secondaryActionVariant: NonNullable<ThreadToastData["secondaryActionVariant"]>;
@@ -332,6 +369,9 @@ function deriveToastBodyDescriptor(toast: {
   const inlineContentEndPad = hasTrailingControls ? "pr-6" : "pr-3.5";
   return {
     Icon,
+    iconClassName: toast.type
+      ? (TOAST_MARK_CLASSES[toast.type as keyof typeof TOAST_MARK_CLASSES] ?? null)
+      : null,
     stackedActionLayout,
     actionVariant,
     secondaryActionVariant,
@@ -351,6 +391,7 @@ interface ToastBodyContentProps extends ToastBodyDescriptor {
 function ToastBodyContent({
   stackedActionLayout,
   Icon,
+  iconClassName,
   copyErrorText,
   actionProps,
   actionVariant,
@@ -389,10 +430,13 @@ function ToastBodyContent({
             </div>
           ) : Icon ? (
             <div
-              className="[&>svg]:h-lh [&>svg]:w-4 [&_svg]:pointer-events-none [&_svg]:shrink-0"
+              className={cn(
+                "[&>svg]:h-lh [&>svg]:w-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+                iconClassName,
+              )}
               data-slot="toast-icon"
             >
-              <Icon className="in-data-[type=error]:text-destructive in-data-[type=info]:text-info in-data-[type=success]:text-success in-data-[type=warning]:text-warning in-data-[type=loading]:opacity-80" />
+              <Icon />
             </div>
           ) : null}
           <Toast.Title className="min-w-0 wrap-break-word font-semibold" data-slot="toast-title" />
@@ -553,9 +597,14 @@ function ThreadToastVisibleAutoDismiss({
   return null;
 }
 
-function ToastProvider({ children, position = "top-right", ...props }: ToastProviderProps) {
+function ToastProvider({
+  children,
+  position = "top-right",
+  timeout = TOAST_DEFAULT_TIMEOUT_MS,
+  ...props
+}: ToastProviderProps) {
   return (
-    <Toast.Provider toastManager={toastManager} {...props}>
+    <Toast.Provider timeout={timeout} toastManager={toastManager} {...props}>
       {children}
       <Toasts position={position} />
     </Toast.Provider>
@@ -611,7 +660,7 @@ function Toasts({ position }: { position: ToastPosition }) {
           return (
             <Toast.Root
               className={cn(
-                "dropdown-surface absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-lg text-popover-foreground shadow-xl shadow-black/25 [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
+                "fa-toast absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none text-popover-foreground [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
                 "data-[position*=right]:right-0 data-[position*=right]:left-auto",
                 "data-[position*=left]:right-auto data-[position*=left]:left-0",
                 "data-[position*=center]:right-0 data-[position*=center]:left-0",
@@ -711,9 +760,13 @@ function Toasts({ position }: { position: ToastPosition }) {
   );
 }
 
-function AnchoredToastProvider({ children, ...props }: Toast.Provider.Props) {
+function AnchoredToastProvider({
+  children,
+  timeout = TOAST_DEFAULT_TIMEOUT_MS,
+  ...props
+}: Toast.Provider.Props) {
   return (
-    <Toast.Provider toastManager={anchoredToastManager} {...props}>
+    <Toast.Provider timeout={timeout} toastManager={anchoredToastManager} {...props}>
       {children}
       <AnchoredToasts />
     </Toast.Provider>
@@ -749,7 +802,7 @@ function AnchoredToasts() {
               >
                 <Toast.Root
                   className={cn(
-                    "dropdown-surface relative overflow-visible text-balance text-popover-foreground text-xs shadow-xl shadow-black/25 transition-[scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
+                    "fa-toast relative overflow-visible text-balance text-popover-foreground text-xs transition-[scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0",
                     tooltipStyle ? "rounded-md" : "rounded-lg",
                   )}
                   data-slot="toast-popup"
