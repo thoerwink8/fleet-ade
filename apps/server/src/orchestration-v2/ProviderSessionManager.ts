@@ -1378,7 +1378,7 @@ export const layerWithOptions = (
                     ...(input.detail === undefined ? {} : { detail: input.detail }),
                     releasedProviderThreads,
                     releasedAt,
-                    closeOrphanedRuns: input.reason !== "server_shutdown" && subscriberCount === 0,
+                    closeOrphanedRuns: input.reason === "runtime_error" && subscriberCount === 0,
                     ...detachedThread,
                   };
                   const recorded = yield* Effect.exit(

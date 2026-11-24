@@ -50,7 +50,7 @@ export function assertClaudeResultIsErrorOutput(
   if (errorItem?.type !== "error") throw new Error("expected error item");
   assert.equal(errorItem.failure.message, AUTH_FAILURE_TEXT);
   assert.equal(errorItem.failure.code, "api_error_401");
-  assert.equal(errorItem.failure.class, "provider_error");
+  assert.equal(errorItem.failure.class, "auth_error");
 
   const run1AssistantTexts = projection.turnItems.flatMap((item) =>
     item.runId === failedRun?.id && item.type === "assistant_message" ? [item.text] : [],
