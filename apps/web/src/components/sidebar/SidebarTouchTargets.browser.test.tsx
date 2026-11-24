@@ -300,12 +300,38 @@ function expectRowActionTarget(button: HTMLElement) {
   expect(parseFloat(style.width), `${label} painted width`).toBe(24);
   expect(parseFloat(style.height), `${label} painted height`).toBe(24);
   const hit = getComputedStyle(button, "::after");
-  expect(parseFloat(hit.width), `${label} hit width`).toBeGreaterThanOrEqual(44);
+  const visibleSiblings = button.parentElement
+    ? [...button.parentElement.children].filter(
+        (child) => getComputedStyle(child).display !== "none",
+      ).length
+    : 1;
+  expect(parseFloat(hit.width), `${label} hit width`).toBeGreaterThanOrEqual(
+    visibleSiblings > 1 ? 32 : 44,
+  );
   expect(parseFloat(hit.height), `${label} hit height`).toBeGreaterThanOrEqual(44);
   const rect = button.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
   expect(document.elementFromPoint(cx, cy), `${label} elementFromPoint`).toBe(button);
+  // ::after is 44px tall in CSS and clipped at the 32px content-visibility:auto row lane so
+  // stacked rows do not steal taps from neighbors.
+  expect(document.elementFromPoint(cx, rect.top - 3), `${label} top hit`).toBe(button);
+  expect(document.elementFromPoint(cx, rect.bottom + 3), `${label} bottom hit`).toBe(button);
+}
+
+function expectAdjacentTargetsDoNotOverlap(buttons: HTMLButtonElement[]) {
+  for (let index = 0; index < buttons.length - 1; index += 1) {
+    const left = buttons[index]!;
+    const right = buttons[index + 1]!;
+    const leftRect = left.getBoundingClientRect();
+    const rightRect = right.getBoundingClientRect();
+    const midX = (leftRect.right + rightRect.left) / 2;
+    const cy = leftRect.top + leftRect.height / 2;
+    const leftName = left.getAttribute("aria-label") ?? "left";
+    const rightName = right.getAttribute("aria-label") ?? "right";
+    expect(document.elementFromPoint(midX - 1, cy), `${leftName} before midpoint`).toBe(left);
+    expect(document.elementFromPoint(midX + 1, cy), `${rightName} after midpoint`).toBe(right);
+  }
 }
 
 function isEffectivelyHidden(button: HTMLElement): boolean {
@@ -415,6 +441,9 @@ describe("sidebar mobile touch targets", () => {
     const draftDiscard = draftRow.querySelector<HTMLButtonElement>(
       'button[aria-label="丢弃草稿"]',
     )!;
+    const draftDetails = draftRow.querySelector<HTMLButtonElement>(
+      'button[aria-label="草稿详情"]',
+    )!;
     const cardUnpin = cardRow.querySelector<HTMLButtonElement>(
       'button[aria-label="取消置顶会话"]',
     )!;
@@ -423,6 +452,7 @@ describe("sidebar mobile touch targets", () => {
     )!;
     const cardSnooze = cardRow.querySelector<HTMLButtonElement>('button[aria-label="暂缓会话"]')!;
     const cardSettle = cardRow.querySelector<HTMLButtonElement>('button[aria-label="收尾会话"]')!;
+    const cardDetails = cardRow.querySelector<HTMLButtonElement>('button[aria-label="会话详情"]')!;
     const cardUnsettle = settledCardRow.querySelector<HTMLButtonElement>(
       'button[aria-label="取消会话收尾"]',
     )!;
@@ -435,10 +465,15 @@ describe("sidebar mobile touch targets", () => {
     const cardWokeSettle = wokeCardRow.querySelector<HTMLButtonElement>(
       'button[aria-label="收尾会话"]',
     )!;
+    const cardWokeDetails = wokeCardRow.querySelector<HTMLButtonElement>(
+      'button[aria-label="会话详情"]',
+    )!;
     const slimUnpin = slimRow.querySelector<HTMLButtonElement>(
       'button[aria-label="取消置顶会话"]',
     )!;
+    const slimSnooze = slimRow.querySelector<HTMLButtonElement>('button[aria-label="暂缓会话"]')!;
     const slimSettle = slimRow.querySelector<HTMLButtonElement>('button[aria-label="收尾会话"]')!;
+    const slimDetails = slimRow.querySelector<HTMLButtonElement>('button[aria-label="会话详情"]')!;
     const slimUnsettle = slimSettledRow.querySelector<HTMLButtonElement>(
       'button[aria-label="取消会话收尾"]',
     )!;
@@ -451,7 +486,6 @@ describe("sidebar mobile touch targets", () => {
       screen.container.querySelector('button[aria-label="更多"]')!,
       screen.container.querySelector('button[aria-label="新建会话"]')!,
       screen.container.querySelector('button[aria-label="清除会话搜索"]')!,
-      draftDiscard,
       screen.container.querySelector('button[title="取消置顶 fleet-ade"]')!,
       screen.container.querySelector('button[aria-label="设置"]')!,
       screen.container.querySelector('button[aria-label="PR"]')!,
@@ -459,16 +493,22 @@ describe("sidebar mobile touch targets", () => {
       screen.container.querySelector('button[aria-label="机群"]')!,
     ];
     const rowTargets = [
+      draftDiscard,
+      draftDetails,
       cardUnpin,
       cardDiscardDraft,
       cardSnooze,
       cardSettle,
+      cardDetails,
       cardUnsettle,
       cardAckWoke,
       cardWokeSnooze,
       cardWokeSettle,
+      cardWokeDetails,
       slimUnpin,
+      slimSnooze,
       slimSettle,
+      slimDetails,
       slimUnsettle,
       slimUnsnooze,
     ];
@@ -482,12 +522,28 @@ describe("sidebar mobile touch targets", () => {
       expectRowActionTarget(target);
     }
 
+    expectAdjacentTargetsDoNotOverlap([draftDiscard, draftDetails]);
+    expectAdjacentTargetsDoNotOverlap([
+      cardUnpin,
+      cardDiscardDraft,
+      cardSnooze,
+      cardSettle,
+      cardDetails,
+    ]);
+    expectAdjacentTargetsDoNotOverlap([
+      cardAckWoke,
+      cardWokeSnooze,
+      cardWokeSettle,
+      cardWokeDetails,
+    ]);
+    expectAdjacentTargetsDoNotOverlap([slimUnpin, slimSnooze, slimSettle, slimDetails]);
+
     const rowTargetPairs: Array<[HTMLElement, HTMLButtonElement[]]> = [
-      [draftRow, [draftDiscard]],
-      [cardRow, [cardUnpin, cardDiscardDraft, cardSnooze, cardSettle]],
+      [draftRow, [draftDiscard, draftDetails]],
+      [cardRow, [cardUnpin, cardDiscardDraft, cardSnooze, cardSettle, cardDetails]],
       [settledCardRow, [cardUnsettle]],
-      [wokeCardRow, [cardAckWoke, cardWokeSnooze, cardWokeSettle]],
-      [slimRow, [slimUnpin, slimSettle]],
+      [wokeCardRow, [cardAckWoke, cardWokeSnooze, cardWokeSettle, cardWokeDetails]],
+      [slimRow, [slimUnpin, slimSnooze, slimSettle, slimDetails]],
       [slimSettledRow, [slimUnsettle]],
       [slimSnoozedRow, [slimUnsnooze]],
     ];
@@ -580,6 +636,7 @@ describe("sidebar mobile touch targets", () => {
     )!;
 
     for (const button of [
+      draftDiscard,
       cardUnpin,
       cardSnooze,
       cardSettle,
@@ -592,6 +649,11 @@ describe("sidebar mobile touch targets", () => {
         true,
       );
     }
+
+    await userEvent.hover(draftRow);
+    expect(Math.round(draftDiscard.getBoundingClientRect().height)).toBe(24);
+    expect(getComputedStyle(draftDiscard, "::after").content).toBe("none");
+    await userEvent.unhover(draftRow);
 
     await userEvent.hover(cardRow);
     expect(Math.round(cardUnpin.getBoundingClientRect().height)).toBe(24);

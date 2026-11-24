@@ -13,15 +13,14 @@ const MAX_LOCATE_ATTEMPTS = 40;
 /** Skip ahead of fast writers; only the tail is displayed. */
 const MAX_READ_BYTES = 256 * 1024;
 
-/** Claude Code's per-user temp root, or none where it has no uid (Windows). */
+/** Claude Code's temp root: `{base}/claude-{uid}` on Unix, `{base}/claude` on Windows. */
 export function claudeTaskOutputRoot(
   environment: Readonly<Record<string, string | undefined>> | undefined,
   path: Path.Path,
   cwd: string | null,
   platform: NodeJS.Platform,
-): string | undefined {
+): string {
   const uid = process.getuid?.();
-  if (uid === undefined) return undefined;
   // Claude Code's macOS build falls back to /tmp and ignores the TMPDIR that
   // launchd always sets. Its other builds use `os.tmpdir()`, which reads these
   // from the environment it was launched with. A relative value is relative
@@ -29,9 +28,13 @@ export function claudeTaskOutputRoot(
   const fallback =
     platform === "darwin"
       ? "/tmp"
-      : environment?.TMPDIR || environment?.TMP || environment?.TEMP || "/tmp";
+      : platform === "win32"
+        ? environment?.TEMP || environment?.TMP || environment?.TMPDIR || "/tmp"
+        : environment?.TMPDIR || environment?.TMP || environment?.TEMP || "/tmp";
   const base = environment?.CLAUDE_CODE_TMPDIR?.trim() || fallback;
-  return path.resolve(cwd ?? ".", base, `claude-${uid}`);
+  // %TEMP% is already per-user, so the Windows directory is `claude`, not `claude-{uid}`.
+  const directory = platform === "win32" || uid === undefined ? "claude" : `claude-${uid}`;
+  return path.resolve(cwd ?? ".", base, directory);
 }
 
 const locate = Effect.fn("ClaudeTaskOutputTail.locate")(function* (input: {
