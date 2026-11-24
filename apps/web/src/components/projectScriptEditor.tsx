@@ -472,7 +472,7 @@ function ProjectScriptEditorForm({
                 onKeyDown={captureKeybinding}
               />
               <p className="text-xs text-muted-foreground">
-                按下快捷键。按退格键清除。快捷键在整个环境中生效。使用同一操作的项目共用该快捷键。
+                按下快捷键。按退格键清除。快捷键在整台电脑中生效。使用同一操作的项目共用该快捷键。
               </p>
             </div>
             <div className="space-y-1.5">

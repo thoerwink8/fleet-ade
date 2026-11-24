@@ -42,7 +42,7 @@ export function serverUpdateStageLabel(stage: ServerUpdateStage): string {
   return UPDATE_STAGE_LABELS[stage];
 }
 
-const CROSS_TRACK_NOTE = "请在服务器所在机器上手动切换更新通道";
+const CROSS_TRACK_NOTE = "请在后台服务所在电脑上手动切换更新通道";
 
 /** Hosts refuse a Stable/Nightly crossing outside a track switch, which checks the database first. */
 function refusedCrossing(
@@ -64,7 +64,7 @@ function CrossTrackNote() {
 }
 
 function updateFailureMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "服务器更新失败。";
+  return error instanceof Error ? error.message : "后台服务更新失败。";
 }
 
 export interface ServerUpdateTarget {
@@ -269,7 +269,7 @@ export function ServerUpdateAction({
   if (desktopAppInstall || selfUpdate === "desktop-managed") {
     return (
       <span className="text-muted-foreground text-xs">
-        请在那台机器上更新桌面应用以更新此服务器。
+        请在那台电脑上更新桌面应用以更新此后台服务。
       </span>
     );
   }

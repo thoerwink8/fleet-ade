@@ -162,8 +162,8 @@ export function useComposerStash(input: {
     if (filesToVerify.some((file) => file.environmentId !== environmentId)) {
       toastManager.add({
         type: "error",
-        title: "暂存的文件属于另一个环境",
-        description: "请在收到这些文件的环境中恢复这条提示词。",
+        title: "暂存的文件属于另一台电脑",
+        description: "请在收到这些文件的电脑上恢复这条提示词。",
       });
       return;
     }

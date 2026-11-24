@@ -37,7 +37,7 @@ export function planProjectRemoval<
     ...(singleMember
       ? [
           `路径：${singleMember.workspaceRoot}`,
-          ...(singleMember.environmentLabel ? [`环境：${singleMember.environmentLabel}`] : []),
+          ...(singleMember.environmentLabel ? [`电脑：${singleMember.environmentLabel}`] : []),
         ]
       : [`将移除 ${members.length} 个已分组的项目条目。`]),
     ...(threadCount > 0

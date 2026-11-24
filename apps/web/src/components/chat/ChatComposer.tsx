@@ -724,7 +724,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (questionAttachmentTarget &&
     !supportsQuestionAttachments &&
     (composerImages.length > 0 || composerFiles.length > 0)
-      ? "请更新此服务器，才能在回答问题时发送文件"
+      ? "请更新后台服务，才能在回答问题时发送文件"
       : null) ??
     fileCapabilityBlockReason ??
     (supportsAttachmentUploads
@@ -2516,7 +2516,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (target === "remote") {
       toastManager.add({
         type: "error",
-        title: "只有在本机运行的服务器上才能引用文件夹",
+        title: "只有在本机运行的后台服务上才能引用文件夹",
       });
       return;
     }
@@ -2663,7 +2663,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             isEnvironmentRequestInvalidError(error) &&
             error.reason === "thread_transcript_too_large"
               ? "这个会话超出了附件大小限制，请换一个较短的会话。"
-              : "请确认它所在的环境已连接且为最新版本，然后重试。",
+              : "请确认它所在的电脑已连接且为最新版本，然后重试。",
         });
       }
       toastManager.close(loadingToast);

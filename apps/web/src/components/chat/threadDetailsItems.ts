@@ -2,7 +2,7 @@ import type { ClientSettings } from "@t3tools/contracts";
 
 // Ids are stored in client settings, so never rename one.
 export const THREAD_DETAILS_ITEMS = [
-  { id: "environment", label: "环境与工作树", defaultVisible: true },
+  { id: "environment", label: "电脑与工作树", defaultVisible: true },
   { id: "openIn", label: "在编辑器中打开", defaultVisible: true },
   { id: "scripts", label: "项目脚本", defaultVisible: true },
   { id: "branch", label: "分支与 PR", defaultVisible: true },

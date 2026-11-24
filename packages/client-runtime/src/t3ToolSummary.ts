@@ -354,22 +354,22 @@ export function summarizeT3ToolCalls(
       label = phrase("已克隆", "克隆", quantity(countEntities(entityIds("cwd")), "个", "仓库"));
       break;
     case "environment-read":
-      label = phrase("已查看", "查看", `环境偏好设置 ${times}`);
+      label = phrase("已查看", "查看", `电脑偏好设置 ${times}`);
       break;
     case "environment-update":
-      label = phrase("已更新", "更新", `环境偏好设置 ${times}`);
+      label = phrase("已更新", "更新", `电脑偏好设置 ${times}`);
       break;
     case "environment-links":
-      label = phrase("已列出", "列出", `已关联环境 ${times}`);
+      label = phrase("已列出", "列出", `已关联电脑 ${times}`);
       break;
     case "environment-link":
-      label = phrase("已请求关联", "请求关联", quantity(selected.length, "个", "环境"));
+      label = phrase("已请求关联", "请求关联", quantity(selected.length, "台", "电脑"));
       break;
     case "environment-unlink":
       label = phrase(
         "已移除",
         "移除",
-        quantity(countEntities(entityIds("environmentId")), "个", "已关联环境"),
+        quantity(countEntities(entityIds("environmentId")), "台", "已关联电脑"),
       );
       break;
     case "attachment-prepare":

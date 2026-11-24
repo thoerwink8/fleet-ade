@@ -49,7 +49,7 @@ export function resolveEnvironmentOptionLabel(input: {
       if (!label) return false;
       return !GENERIC_LOCAL_ENVIRONMENT_LABELS.has(label.toLowerCase());
     });
-    return preferredLocalLabel ?? "此设备";
+    return preferredLocalLabel ?? "本机";
   }
 
   return runtimeLabel ?? savedLabel ?? input.environmentId;

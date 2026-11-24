@@ -585,7 +585,7 @@ export function createPullRequestEnvironmentAtoms<R, E>(
     const prepared = yield* SubscriptionRef.get(supervisor.prepared);
     if (Option.isNone(prepared)) {
       return yield* new EnvironmentHttpConnectionNotReadyError({
-        message: "环境 HTTP 连接尚未就绪。",
+        message: "电脑 HTTP 连接尚未就绪。",
       });
     }
     return yield* loader.load(prepared.value, input);

@@ -112,7 +112,7 @@ function UpdateEverythingDialogContent({
   return (
     <>
       <AlertDialogHeader className="shrink-0">
-        <AlertDialogTitle>{`要更新 ${updating.length} 台机器吗？`}</AlertDialogTitle>
+        <AlertDialogTitle>{`要更新 ${updating.length} 台电脑吗？`}</AlertDialogTitle>
         <AlertDialogDescription>
           {version !== null ? (
             <>
@@ -129,7 +129,7 @@ function UpdateEverythingDialogContent({
           {/* Machine names truncate first. Provider lists wrap between names, never inside one. */}
           <div className="grid grid-cols-[minmax(4rem,max-content)_max-content_minmax(min-content,1fr)_max-content] gap-x-4 text-sm">
             <div className="col-span-full grid grid-cols-subgrid border-b pb-1.5 text-muted-foreground text-xs">
-              <span>机器</span>
+              <span>电脑</span>
               <span>Fleet ADE</span>
               <span>智能体提供方</span>
               <span />

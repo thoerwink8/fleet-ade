@@ -1057,7 +1057,7 @@ export function threadAttentionSubtitleText(input: {
   readonly attention: ThreadAttention;
   readonly attentionOffline: boolean | undefined;
 }): string {
-  if (isThreadAttentionRowDisabled(input)) return "环境已断线，连上后处理";
+  if (isThreadAttentionRowDisabled(input)) return "电脑已断线，连上后处理";
   return threadAttentionActionText(input.attention.category);
 }
 

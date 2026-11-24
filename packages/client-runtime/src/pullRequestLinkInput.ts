@@ -83,7 +83,7 @@ export function resolveLinkPullRequestInput(input: {
   const url = sourceControlClients.parseChangeRequestUrl(parsed)?.link;
   if (url !== undefined) {
     if (!input.hasProject({ ...url, url: parsed })) {
-      return { error: `此环境中没有项目能读取 ${url.host}/${url.repository}。` };
+      return { error: `这台电脑上没有项目能读取 ${url.host}/${url.repository}。` };
     }
     return {
       link: {

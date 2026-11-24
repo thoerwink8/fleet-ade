@@ -376,7 +376,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             ? "立即发送"
             : "发送消息";
   const submitStatus = isEnvironmentUnavailable
-    ? "环境已断开"
+    ? "电脑已断开"
     : (sendDisabledReason ??
       (isPreparingWorktree
         ? "正在准备工作树"

@@ -411,7 +411,7 @@ function DelegatedFromRow(props: {
             title={title}
             hint={
               environment === null
-                ? `由 ${label ?? "已关联的环境"} 委派。连接后即可打开父会话。`
+                ? `由 ${label ?? "已关联的电脑"} 委派。连接后即可打开父会话。`
                 : `打开 ${environment.label} 上的父智能体`
             }
           />

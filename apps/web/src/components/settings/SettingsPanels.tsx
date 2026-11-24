@@ -151,7 +151,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(settings.environmentIdentificationMode !==
     DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode
-      ? ["环境标识"]
+      ? ["电脑标识"]
       : []),
     ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat ? ["时间格式"] : []),
     ...(settings.notificationMode !== DEFAULT_UNIFIED_SETTINGS.notificationMode
@@ -247,7 +247,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? ["添加项目的起始目录"]
       : []),
     ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
-      ? ["克隆到主机文件夹"]
+      ? ["克隆到域名文件夹"]
       : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
       ? ["取消置顶确认"]
@@ -432,7 +432,7 @@ export function GeneralSettingsPanel() {
       <SettingsSection id="sidebar" title={"侧边栏"}>
         <SettingsRow
           {...setting("project-grouping")}
-          description={"将不同环境中的相同仓库合并显示。"}
+          description={"将不同电脑上的相同仓库合并显示。"}
           resetAction={
             settings.sidebarProjectGroupingMode !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
@@ -1397,7 +1397,7 @@ export function ThreadsSettingsPanel() {
           resetAction={
             settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
               <SettingResetButton
-                label="克隆到主机文件夹"
+                label="克隆到域名文件夹"
                 onClick={() =>
                   updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
                 }
@@ -1409,7 +1409,7 @@ export function ThreadsSettingsPanel() {
               settingKeys={["ghqCloneLayout"]}
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label="克隆到主机文件夹"
+              aria-label="克隆到域名文件夹"
             />
           }
         />
@@ -1430,8 +1430,8 @@ export function ThreadsSettingsPanel() {
           {...searchableSetting("max-concurrent-sessions")}
           description={
             startupLimit === undefined
-              ? "按机器内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。"
-              : `按机器内存估计上限；留空表示设置不限制。此环境的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连服务器的上限。超过上限的会话会排队，此设置立即生效。`
+              ? "按电脑内存估计上限；留空表示设置不限制。启动参数或环境变量另设上限时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会排队，此设置立即生效。"
+              : `按电脑内存估计上限；留空表示设置不限制。这台电脑的启动上限是 ${startupLimit}，同时设置时取较小值。远程连接时修改的是所连电脑的上限。超过上限的会话会排队，此设置立即生效。`
           }
           control={
             <DraftInput
@@ -1607,7 +1607,7 @@ export function ThreadsSettingsPanel() {
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                请连接一个环境以选择其文本生成模型。
+                请连接一台电脑以选择其文本生成模型。
               </span>
             ) : !hasTextGenerationProvider ? (
               <span className="text-sm text-muted-foreground">没有可用的文本生成提供方。</span>
@@ -1789,8 +1789,8 @@ export function MaintenanceSettingsPanel() {
           {...searchableSetting("continue-threads-after-server-update")}
           serverScoped
           settingKeys={["continueThreadsAfterServerUpdate"]}
-          description="在所选环境中，更新、崩溃或机器重启后自动继续被中断的会话。"
-          status={!hasServerTargets ? "所有选中的已连接环境都必须支持重启后继续。" : undefined}
+          description="在所选电脑上，更新、崩溃或电脑重启后自动继续被中断的会话。"
+          status={!hasServerTargets ? "所有选中的已连接电脑都必须支持重启后继续。" : undefined}
           resetAction={
             hasServerTargets &&
             settings.continueThreadsAfterServerUpdate !==
@@ -1860,8 +1860,8 @@ export function MaintenanceSettingsPanel() {
           {...searchableSetting("diagnostics")}
           description={
             isEnvironmentScope
-              ? "查看此环境的进程、资源占用和日志。"
-              : "逐个查看各环境的进程、资源占用和日志。"
+              ? "查看这台电脑的进程、资源占用和日志。"
+              : "逐个查看各台电脑的进程、资源占用和日志。"
           }
           control={
             <Button

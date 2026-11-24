@@ -60,7 +60,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
       value: environmentValue(env.environmentId),
       label: env.label,
     })),
-    ...(onAddToMachine ? [{ value: ADD_MACHINE_VALUE, label: "添加到另一台机器" }] : []),
+    ...(onAddToMachine ? [{ value: ADD_MACHINE_VALUE, label: "添加到另一台电脑" }] : []),
   ];
 
   // Match the xs control's height and padding: the composer strip has no min-height,
@@ -162,7 +162,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
             <SelectItem value={ADD_MACHINE_VALUE}>
               <span className={ADD_TO_MACHINE_LABEL_CLASS}>
                 <PlusIcon aria-hidden="true" className="size-3" />
-                添加到另一台机器
+                添加到另一台电脑
               </span>
             </SelectItem>
           ) : null}

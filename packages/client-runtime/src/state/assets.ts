@@ -84,7 +84,7 @@ export type AssetUrlState =
       readonly fileRevision?: string;
     };
 
-export const MISSING_FILE_ACCESS_MESSAGE = "此连接无法读取主机文件。请使用新链接重新配对后查看。";
+export const MISSING_FILE_ACCESS_MESSAGE = "此连接无法读取电脑文件。请使用新链接重新配对后查看。";
 
 export function blockedAssetUrlState(
   resource: AssetResource | null,

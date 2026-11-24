@@ -84,7 +84,7 @@ function withoutDeferredPullRequests(value: DeferredShellSnapshot): Orchestratio
   return snapshot;
 }
 
-const SHELL_SYNCHRONIZATION_ERROR_MESSAGE = "无法同步环境数据。";
+const SHELL_SYNCHRONIZATION_ERROR_MESSAGE = "无法同步电脑数据。";
 
 /**
  * Replay does not refresh the older-settled cut, rows that left the newest window, or

@@ -366,7 +366,7 @@ it("shows a delegated-from thread's full title in its tooltip even when its envi
     expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(longTitle),
   );
   expect(document.querySelector('[data-slot="tooltip-popup"]')?.textContent).toContain(
-    "由 已关联的环境 委派。连接后即可打开父会话。",
+    "由 已关联的电脑 委派。连接后即可打开父会话。",
   );
 
   await row.click({ force: true });

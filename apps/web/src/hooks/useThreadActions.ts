@@ -92,7 +92,7 @@ export class ThreadSettlementUnsupportedError extends Schema.TaggedError<ThreadS
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持收尾。请更新服务器后再使用“收尾”。";
+    return "这台电脑的后台服务尚不支持收尾。请更新后台服务后再使用“收尾”。";
   }
 }
 
@@ -104,7 +104,7 @@ export class ThreadSnoozeUnsupportedError extends Schema.TaggedError<ThreadSnooz
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持暂缓。请更新服务器后再使用“暂缓”。";
+    return "这台电脑的后台服务尚不支持暂缓。请更新后台服务后再使用“暂缓”。";
   }
 }
 
@@ -137,7 +137,7 @@ export class ThreadAutoSettleOptOutUnsupportedError extends Schema.TaggedError<T
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持按会话关闭自动收尾。请更新服务器后再使用该功能。";
+    return "这台电脑的后台服务尚不支持按会话关闭自动收尾。请更新后台服务后再使用该功能。";
   }
 }
 
@@ -149,7 +149,7 @@ export class ThreadPinningUnsupportedError extends Schema.TaggedError<ThreadPinn
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持置顶。请更新服务器后再使用“置顶”。";
+    return "这台电脑的后台服务尚不支持置顶。请更新后台服务后再使用“置顶”。";
   }
 }
 
@@ -161,7 +161,7 @@ export class ThreadCommanderUnsupportedError extends Schema.TaggedError<ThreadCo
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持指挥会话标记。请更新服务器后再使用“标成指挥”。";
+    return "这台电脑的后台服务尚不支持指挥会话标记。请更新后台服务后再使用“标成指挥”。";
   }
 }
 
@@ -173,7 +173,7 @@ export class ThreadPinReorderUnsupportedError extends Schema.TaggedError<ThreadP
   },
 ) {
   override get message(): string {
-    return "此环境的服务器尚不支持重新排列置顶会话。请更新服务器后再调整置顶顺序。";
+    return "这台电脑的后台服务尚不支持重新排列置顶会话。请更新后台服务后再调整置顶顺序。";
   }
 }
 
@@ -185,7 +185,7 @@ export class ThreadActiveReorderUnsupportedError extends Schema.TaggedError<Thre
   },
 ) {
   override get message(): string {
-    return "请更新此环境的服务器，以重新排列活动会话。";
+    return "请更新这台电脑的后台服务，以重新排列活动会话。";
   }
 }
 

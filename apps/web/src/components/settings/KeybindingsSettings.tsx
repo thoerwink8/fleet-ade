@@ -1507,7 +1507,7 @@ export function KeybindingsSettingsPanel() {
       {!canWriteSettings ? (
         <p className="text-xs text-muted-foreground">
           {connectedEnvironments.length === 0
-            ? "请连接一个环境以修改快捷键。"
+            ? "请连接一台电脑以修改快捷键。"
             : "此连接可查看快捷键，但无权修改。"}
         </p>
       ) : null}

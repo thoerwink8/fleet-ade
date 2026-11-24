@@ -416,7 +416,7 @@ describe("sidebar attention offline rows", () => {
     expect(getComputedStyle(failedRow).opacity).toBe("1");
     expect(failedRow.className).toContain("cursor-default");
     expect(failedRow.getAttribute("aria-disabled")).toBe("true");
-    expect(failedRow.textContent).toContain("环境已断线，连上后处理");
+    expect(failedRow.textContent).toContain("电脑已断线，连上后处理");
     await userEvent.click(failedRow, { force: true });
     expect(screen.router?.state.location.pathname).toBe("/local/thread-1");
     failedRow.focus();

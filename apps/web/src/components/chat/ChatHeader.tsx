@@ -395,7 +395,7 @@ export const ChatHeader = memo(function ChatHeader({
                 来源 {activeThreadLinkOrigin}
               </TooltipTrigger>
               <TooltipPopup side="top">
-                由关联环境上的智能体在 {activeThreadLinkOrigin} 发起。
+                由关联电脑上的智能体在 {activeThreadLinkOrigin} 发起。
               </TooltipPopup>
             </Tooltip>
           ) : null}

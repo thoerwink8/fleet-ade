@@ -145,7 +145,7 @@ export const makePullRequestRoutingPermissions = Effect.fn("makePullRequestRouti
           return Effect.fail(
             new ConnectionBlockedError({
               reason: "configuration",
-              detail: "此环境没有已保存的连接端点。",
+              detail: "这台电脑没有已保存的连接端点。",
             }),
           );
         return update((current) => [

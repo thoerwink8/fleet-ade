@@ -213,8 +213,8 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
       toastManager.add({
         type: "warning",
         id: "load-balancing-attachments",
-        title: "请把附件留在这台机器上",
-        description: "选择自动分配前请先移除附件，再在选中的机器上重新添加。",
+        title: "请把附件留在这台电脑上",
+        description: "选择自动分配前请先移除附件，再在选中的电脑上重新添加。",
       });
       return;
     }
@@ -233,7 +233,7 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
     ? draftThread?.loadBalancedEnvironmentId
       ? "自动分配"
       : loadBalancing.pending
-        ? "正在检查机器…"
+        ? "正在检查电脑…"
         : loadBalancing.failed
           ? "自动分配不可用"
           : "自动分配"
@@ -325,7 +325,7 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
       return;
     }
     const switchMachine = async () => {
-      const project = await openScratchProject(target.environmentId, "无法切换机器");
+      const project = await openScratchProject(target.environmentId, "无法切换电脑");
       if (project) retarget(project);
     };
     setBusyEnvironmentChange(request);

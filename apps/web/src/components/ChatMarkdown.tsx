@@ -638,7 +638,7 @@ function useChatMarkdownState({
     }
     if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) {
       return Promise.resolve(
-        AsyncResult.failure<void, Error>(Cause.fail(new Error("此连接无法在这个环境中显示文件。"))),
+        AsyncResult.failure<void, Error>(Cause.fail(new Error("此连接无法在这台电脑上显示文件。"))),
       );
     }
     return openInEditor({

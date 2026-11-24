@@ -1838,10 +1838,10 @@ describe("resolveThreadAttention", () => {
     );
 
     expect(threadAttentionSubtitleText({ attention: blocking, attentionOffline: true })).toBe(
-      "环境已断线，连上后处理",
+      "电脑已断线，连上后处理",
     );
     expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: true })).toBe(
-      "环境已断线，连上后处理",
+      "电脑已断线，连上后处理",
     );
     expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: false })).toBe(
       "上一轮出错了，点开处理",

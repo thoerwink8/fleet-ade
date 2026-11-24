@@ -61,7 +61,7 @@ async function completeProviderAuth(delivery: ProviderAuthDelivery): Promise<voi
     toastManager.add({
       type: "error",
       title: "ChatGPT 登录未能完成",
-      description: "请重新连接环境后重试。",
+      description: "请重新连接电脑后重试。",
     });
   }
 }

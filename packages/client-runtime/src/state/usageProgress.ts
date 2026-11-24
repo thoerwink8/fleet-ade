@@ -66,7 +66,7 @@ export function usageProgress(
           ? "正在更新…"
           : waiting.length === 1
             ? `正在更新 ${waiting[0]!.label}…`
-            : `正在更新 ${waiting.length} 个环境…`,
+            : `正在更新 ${waiting.length} 台电脑…`,
   };
 }
 

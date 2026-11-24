@@ -29,7 +29,7 @@ export function environmentMismatchError(input: {
 }): ConnectionBlockedError {
   return new ConnectionBlockedError({
     reason: "configuration",
-    detail: `已连接的环境 ${input.actual} 与 ${input.expected} 不一致。`,
+    detail: `已连接的电脑 ${input.actual} 与 ${input.expected} 不一致。`,
   });
 }
 
@@ -40,7 +40,7 @@ export function mapRemoteEnvironmentError(
     case "EnvironmentAuthInvalidError":
       return new ConnectionBlockedError({
         reason: "authentication",
-        detail: "环境凭据无效。",
+        detail: "电脑凭据无效。",
         traceId: error.traceId,
         hop: "server",
       });
@@ -48,21 +48,21 @@ export function mapRemoteEnvironmentError(
     case "EnvironmentOperationForbiddenError":
       return new ConnectionBlockedError({
         reason: "permission",
-        detail: "环境凭据未授予所需的访问权限。",
+        detail: "电脑凭据未授予所需的访问权限。",
         traceId: error.traceId,
         hop: "server",
       });
     case "EnvironmentRequestInvalidError":
       return new ConnectionBlockedError({
         reason: "configuration",
-        detail: "环境拒绝了身份验证请求。",
+        detail: "电脑拒绝了身份验证请求。",
         traceId: error.traceId,
         hop: "server",
       });
     case "EnvironmentResourceNotFoundError":
       return new ConnectionBlockedError({
         reason: "configuration",
-        detail: "找不到环境端点。",
+        detail: "找不到电脑端点。",
         traceId: error.traceId,
         hop: "server",
       });
@@ -81,7 +81,7 @@ export function mapRemoteEnvironmentError(
     case "EnvironmentInternalError":
       return new ConnectionTransientError({
         reason: "remote-unavailable",
-        detail: "环境无法授权此连接。",
+        detail: "电脑无法授权此连接。",
         traceId: error.traceId,
         hop: "server",
       });

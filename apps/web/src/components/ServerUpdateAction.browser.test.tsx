@@ -183,7 +183,7 @@ describe("ServerUpdateAction", () => {
   it("does not offer a CLI relaunch for a desktop-hosted server", async () => {
     using _state = setup();
     await using screen = await renderAction({ selfUpdate: null, desktopAppInstall: true });
-    expect(screen.container.textContent).toContain("请在那台机器上更新桌面应用");
+    expect(screen.container.textContent).toContain("请在那台电脑上更新桌面应用");
     expect(button(screen)).toBeUndefined();
     expect(testState.clipboard).not.toHaveBeenCalled();
   });
