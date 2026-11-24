@@ -2929,7 +2929,7 @@ it.effect("asks on its own for a repository a search could not vouch for", () =>
       {
         projectId: "p2" as ProjectId,
         projectTitle: "docs",
-        message: "无法读取 acme/docs。",
+        message: "acme/docs could not be read.",
       },
     ]);
     assert.deepStrictEqual(
