@@ -283,9 +283,9 @@ describe("auto-settlement search availability", () => {
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: availability.eligibleEnvironmentIds.length > 0,
     });
-    expect(searchSettings("自动收尾", items).map((item) => item.id)).toEqual([
-      "auto-settle-inactive-threads",
+    expect(searchSettings("自动标为完成", items).map((item) => item.id)).toEqual([
       "days-before-auto-settle",
+      "auto-settle-inactive-threads",
       "auto-settle-merged-threads",
     ]);
     expect(searchSettings("保留有关联 PR", items).map((item) => item.id)).toContain(

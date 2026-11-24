@@ -128,7 +128,7 @@ export function parseNewThreadLink(search: string): PromptLinkResult<NewThreadLi
   if (pr !== null) {
     const pullRequest = parsePromptLinkPullRequest(pr);
     if (pullRequest === null) {
-      return { ok: false, error: "此链接指向的 pull request Fleet ADE 无法识别。" };
+      return { ok: false, error: "此链接指向的 PR Fleet ADE 无法识别。" };
     }
     return { ok: true, value: { kind: "pull-request", pullRequest, prompt: prompt.value } };
   }

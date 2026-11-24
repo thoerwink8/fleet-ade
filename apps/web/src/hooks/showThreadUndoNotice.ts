@@ -30,7 +30,7 @@ type UndoNotice = {
 export const useThreadUndoNotice = create<{ notice: UndoNotice | null }>(() => ({ notice: null }));
 
 const ACTION_TEXT = {
-  Settled: { label: "已收尾", verb: "已收尾", noun: "会话", undone: "已取消完成" },
+  Settled: { label: "已标为完成", verb: "已标为完成", noun: "会话", undone: "已取消完成" },
   Snoozed: { label: "已暂缓", verb: "已暂缓", noun: "会话", undone: "已取消暂缓" },
   Unpinned: { label: "已取消置顶", verb: "已取消置顶", noun: "会话", undone: "已重新置顶" },
   Archived: { label: "已归档", verb: "已归档", noun: "会话", undone: "已取消归档" },

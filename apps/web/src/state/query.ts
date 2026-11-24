@@ -22,7 +22,7 @@ export function formatEnvironmentQueryError(cause: Cause.Cause<unknown>): string
   const error = Cause.squash(cause);
   return error instanceof Error && error.message.trim().length > 0
     ? error.message
-    : "环境请求失败。";
+    : "电脑请求失败。";
 }
 
 function queryUpdatedAt(result: AsyncResult.AsyncResult<unknown, unknown>): number {

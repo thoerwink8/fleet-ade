@@ -130,7 +130,7 @@ function showWorkspaceContextMenu(event: ReactMouseEvent, workspacePath: string)
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "复制路径失败",
+              title: "无法复制路径",
               description: error instanceof Error ? error.message : "发生错误。",
             }),
           );
@@ -367,7 +367,7 @@ const RunContextSelector = memo(function RunContextSelector({
                   <MenuSubTrigger>
                     <span className={ADD_TO_MACHINE_LABEL_CLASS}>
                       <PlusIcon className="size-3" />
-                      <span className="min-w-0 truncate">添加到另一台机器</span>
+                      <span className="min-w-0 truncate">添加到另一台电脑</span>
                     </span>
                   </MenuSubTrigger>
                   <MenuSubPopup {...(!isPanel ? composerFloatingLayerProps : {})}>
@@ -390,7 +390,7 @@ const RunContextSelector = memo(function RunContextSelector({
           </>
         ) : null}
         <MenuGroup>
-          <MenuGroupLabel>工作区</MenuGroupLabel>
+          <MenuGroupLabel>目录</MenuGroupLabel>
           <MenuRadioGroup
             value={effectiveEnvMode}
             onValueChange={(value) => {

@@ -516,7 +516,7 @@ describe("attachmentUploadQueue", () => {
       await awaitAttachmentUploads([file.id]);
       expect(readAttachmentUpload(file.id)).toMatchObject({
         status: "failed",
-        reason: "无法验证已上传的文件。请在服务器重新连接后重试。",
+        reason: "无法验证已上传的文件。请在电脑重新连接后重试。",
       });
       expect(useComposerDraftStore.getState().getComposerDraft(draftId)?.files).toMatchObject([
         {

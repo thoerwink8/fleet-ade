@@ -113,7 +113,7 @@ export function useNewProject() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "打开项目失败",
+          title: "无法打开项目",
           description: `${errorMessage(error)} 等这个客户端跟上后，它会出现在侧边栏。`,
         }),
       );
@@ -124,7 +124,7 @@ export function useNewProject() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "打开项目失败",
+          title: "无法打开项目",
           description: errorMessage(error),
         }),
       );

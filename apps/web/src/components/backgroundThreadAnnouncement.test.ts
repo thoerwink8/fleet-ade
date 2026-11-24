@@ -63,10 +63,10 @@ describe("nextBackgroundThreadAnnouncement", () => {
         { threads: [login({ runId: RunId.make("run-3"), runStatus: "interrupted" })] },
       ]),
     ).toEqual([
-      "待批准: Fix login redirect",
-      "需要你的输入: Fix login redirect",
+      "等你批准: Fix login redirect",
+      "等你回答: Fix login redirect",
       "已完成: Fix login redirect",
-      "失败: Fix login redirect",
+      "出错了: Fix login redirect",
       "已停止: Fix login redirect",
     ]);
   });
@@ -92,7 +92,7 @@ describe("nextBackgroundThreadAnnouncement", () => {
         { threads: [login({ request: "approval", requestId: "request-1" })] },
         { threads: [login({ request: "approval", requestId: "request-2" })] },
       ]),
-    ).toEqual(["待批准: Fix login redirect", "待批准: Fix login redirect"]);
+    ).toEqual(["等你批准: Fix login redirect", "等你批准: Fix login redirect"]);
   });
 
   it("doesn't call a thread stopped when a queued message is cancelled while it works", () => {
@@ -136,7 +136,7 @@ describe("nextBackgroundThreadAnnouncement", () => {
           open: "env:login",
         },
       ]),
-    ).toEqual(["需要你的输入: Update docs"]);
+    ).toEqual(["等你回答: Update docs"]);
   });
 
   it("keeps a snoozed thread quiet, even after it wakes", () => {
@@ -155,7 +155,7 @@ describe("nextBackgroundThreadAnnouncement", () => {
         { threads: [login(), docs()] },
         { threads: [login({ runStatus: "completed" }), docs({ request: "approval" })] },
       ]),
-    ).toEqual(["已完成: Fix login redirect. 待批准: Update docs"]);
+    ).toEqual(["已完成: Fix login redirect. 等你批准: Update docs"]);
   });
 });
 
@@ -184,6 +184,6 @@ describe("resolveBackgroundThreadRequest", () => {
         { threads: [login(childApproval("question-2"))] },
         { threads: [login(childApproval(null))] },
       ]),
-    ).toEqual(["待批准: Fix login redirect"]);
+    ).toEqual(["等你批准: Fix login redirect"]);
   });
 });

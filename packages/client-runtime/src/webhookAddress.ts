@@ -18,7 +18,7 @@ export function webhookAddress(
     return {
       address: endpoint.path,
       copyable: false,
-      note: "连接此环境后可获取地址。",
+      note: "连接这台电脑后可获取地址。",
     };
   }
   const url = new URL(endpoint.path, httpBaseUrl);
@@ -27,6 +27,6 @@ export function webhookAddress(
     copyable: true,
     note: isLocalLoopbackHost(url.hostname)
       ? "只有本机可以访问此地址。"
-      : "只要能连接此环境的地址（例如通过 Tailscale 或你自己的代理）即可使用。",
+      : "只要能连接这台电脑的地址（例如通过 Tailscale 或你自己的代理）即可使用。",
   };
 }

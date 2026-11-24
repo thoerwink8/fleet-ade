@@ -347,8 +347,8 @@ describe("resolveSidebarThreadStatus", () => {
 
   it("titles the window with live work and requests only", () => {
     const cases = [
-      [{ ...idle, hasPendingApprovals: true, runtime }, "待批准"],
-      [{ ...idle, hasPendingUserInput: true }, "需要你的输入"],
+      [{ ...idle, hasPendingApprovals: true, runtime }, "等你批准"],
+      [{ ...idle, hasPendingUserInput: true }, "等你回答"],
       [{ ...idle, runtime: { ...runtime, status: "preparing" as const } }, "运行中"],
       [{ ...idle, runtime }, "运行中"],
       [{ ...idle, runtime, blockedOnThreadWait: true }, "运行中"],
@@ -553,7 +553,7 @@ describe("resolveThreadStatusPill", () => {
           },
         },
       }),
-    ).toMatchObject({ label: "已完成", pulse: false });
+    ).toMatchObject({ label: "有新结果", pulse: false });
   });
 
   it("shows failed, not completed, when the unseen run failed", () => {
@@ -572,7 +572,7 @@ describe("resolveThreadStatusPill", () => {
           },
         },
       }),
-    ).toMatchObject({ label: "失败", pulse: false });
+    ).toMatchObject({ label: "出错了", pulse: false });
   });
 
   it("shows failed, not plan ready, when a plan run proposed a plan and then failed", () => {
@@ -586,7 +586,7 @@ describe("resolveThreadStatusPill", () => {
           runtime: { ...baseThread.runtime, status: "failed", activeRunId: null },
         },
       }),
-    ).toMatchObject({ label: "失败" });
+    ).toMatchObject({ label: "出错了" });
   });
 
   it("drops the failed pill once the failure has been seen", () => {
@@ -971,14 +971,14 @@ describe("unseen completion with background work", () => {
       task: { kind: "command" },
       status: "ready",
       receded: false,
-      pill: "已完成",
+      pill: "有新结果",
     },
     {
       roster: "dev server watchdog",
       task: { kind: "monitor" },
       status: "ready",
       receded: false,
-      pill: "已完成",
+      pill: "有新结果",
     },
     {
       roster: "awaited command",
@@ -1838,10 +1838,10 @@ describe("resolveThreadAttention", () => {
     );
 
     expect(threadAttentionSubtitleText({ attention: blocking, attentionOffline: true })).toBe(
-      "环境已断线，连上后处理",
+      "电脑已断线，连上后处理",
     );
     expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: true })).toBe(
-      "环境已断线，连上后处理",
+      "电脑已断线，连上后处理",
     );
     expect(threadAttentionSubtitleText({ attention: failed, attentionOffline: false })).toBe(
       "上一轮出错了，点开处理",

@@ -6,10 +6,10 @@ export type ThreadActivityStatus = "working" | "approval" | "input" | "idle";
 /** Background threads say these too, so a status sounds the same wherever it's heard. */
 export const THREAD_STATUS_TEXT = {
   working: "运行中",
-  approval: "待批准",
-  input: "需要你的输入",
+  approval: "等你批准",
+  input: "等你回答",
   done: "已完成",
-  failed: "失败",
+  failed: "出错了",
   stopped: "已停止",
 } as const;
 

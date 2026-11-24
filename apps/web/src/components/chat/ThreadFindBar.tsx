@@ -46,7 +46,7 @@ export function ThreadFindBar(props: ThreadFindBarProps) {
     label = props.counting ? "1/…" : formatThreadFindCount(props.activeIndex, props.matchCount);
   }
   if (props.status === "loading") label = "正在搜索…";
-  if (props.status === "error") label = "搜索失败";
+  if (props.status === "error") label = "无法搜索";
   const navigationDisabled =
     props.matchCount === 0 || props.status === "loading" || props.counting === true;
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {

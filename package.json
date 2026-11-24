@@ -23,6 +23,7 @@
     "check": "node scripts/check.ts",
     "check:changed": "node scripts/check-changed.ts",
     "ui:no-english": "node scripts/ui-no-english.ts",
+    "ui:no-old-terms": "node scripts/ui-no-old-terms.ts",
     "report:renders": "node scripts/render-metrics.ts",
     "lint": "vp lint --report-unused-disable-directives",
     "knip": "knip --preprocessor ./scripts/knip-schemas.ts",

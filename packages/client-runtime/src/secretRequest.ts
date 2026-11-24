@@ -19,9 +19,9 @@ export type SecretRequestItem = Extract<
 /** A `file` request lets the agent's commands read the value, so its card must not promise more. */
 export const secretRequestPrivacyNote = (item: Pick<SecretRequestItem, "delivery">) =>
   item.delivery === "file"
-    ? "不会出现在对话中，而是存放在一个私密文件里，此智能体的命令可在 24 小时内读取"
+    ? "不会出现在会话中，而是存放在一个私密文件里，此智能体的命令可在 24 小时内读取"
     : "安全存储，绝不会展示给智能体";
-export const SECRET_REQUEST_DEFAULT_PLACEHOLDER = "粘贴凭据";
+export const SECRET_REQUEST_DEFAULT_PLACEHOLDER = "粘贴密钥";
 
 // Backticks, <angle brackets> and markdown link targets (balanced parentheses allowed) keep their
 // exact text; a bare link drops trailing sentence punctuation.

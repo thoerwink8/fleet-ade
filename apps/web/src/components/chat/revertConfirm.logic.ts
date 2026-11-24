@@ -80,7 +80,7 @@ export function describeRevertConfirm(input: {
 }): RevertConfirmPresentation {
   const baseDescription =
     input.removedTurnCount > 0
-      ? `将移除从这条消息起的 ${input.removedTurnCount} 轮会话记录，并把这条消息的提示词和附件放回输入框。`
+      ? `将删除从这条消息起的 ${input.removedTurnCount} 轮会话记录，并把这条消息的提示词和附件放回输入框。`
       : "会话将回退到这条消息之前，这条消息的提示词和附件会回到输入框。";
 
   switch (input.availability.status) {

@@ -724,7 +724,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     (questionAttachmentTarget &&
     !supportsQuestionAttachments &&
     (composerImages.length > 0 || composerFiles.length > 0)
-      ? "请更新此服务器，才能在回答问题时发送文件"
+      ? "请更新后台服务，才能在回答问题时发送文件"
       : null) ??
     fileCapabilityBlockReason ??
     (supportsAttachmentUploads
@@ -2516,7 +2516,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (target === "remote") {
       toastManager.add({
         type: "error",
-        title: "只有在本机运行的服务器上才能引用文件夹",
+        title: "只有在本机运行的后台服务上才能引用文件夹",
       });
       return;
     }
@@ -2610,7 +2610,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onInsertRejected: () => {
       toastManager.add({
         type: "error",
-        title: "无法添加到对话",
+        title: "无法添加到会话",
         description: "输入框正忙，请在就绪后重试。",
       });
     },
@@ -2663,7 +2663,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             isEnvironmentRequestInvalidError(error) &&
             error.reason === "thread_transcript_too_large"
               ? "这个会话超出了附件大小限制，请换一个较短的会话。"
-              : "请确认它所在的环境已连接且为最新版本，然后重试。",
+              : "请确认它所在的电脑已连接且为最新版本，然后重试。",
         });
       }
       toastManager.close(loadingToast);
@@ -2953,7 +2953,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           toastManager.add({
             type: "info",
             title: "终端输出无法添加到问题回答中。",
-            description: "先回答或关闭问题，再将其添加到聊天中。",
+            description: "先回答或关闭问题，再将其添加到会话中。",
           });
           return;
         }
@@ -3345,10 +3345,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {composerSuggestionsVisible && composerMenuItems.length === 0
                   ? isComposerMenuLoading
                     ? composerTriggerKind === "pull-request"
-                      ? "正在查找 pull request…"
+                      ? "正在查找 PR…"
                       : composerTriggerKind === "skill" || composerTriggerKind === "slash-command"
-                        ? "正在搜索工作区技能…"
-                        : "正在搜索工作区文件…"
+                        ? "正在搜索项目技能…"
+                        : "正在搜索项目文件…"
                     : composerMenuEmptyState
                   : ""}
               </div>

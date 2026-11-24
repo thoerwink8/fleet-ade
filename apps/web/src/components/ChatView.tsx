@@ -1516,7 +1516,7 @@ export default function ChatView(props: ChatViewProps) {
   const downloadFileAttachment = async (attachment: ChatFileAttachment) => {
     const connection = readPreparedConnection(environmentId);
     if (!connection) {
-      toastManager.add({ type: "error", title: "环境未连接。" });
+      toastManager.add({ type: "error", title: "电脑未连接。" });
       return;
     }
 
@@ -1859,7 +1859,7 @@ export default function ChatView(props: ChatViewProps) {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThread.id,
-        error instanceof Error ? error.message : "无法中断当前这一轮。",
+        error instanceof Error ? error.message : "无法停止当前这一轮。",
       );
     }
   };
@@ -1880,7 +1880,7 @@ export default function ChatView(props: ChatViewProps) {
     if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
       toastManager.add({
         type: "error",
-        title: "无法添加到对话",
+        title: "无法添加到会话",
         description: "输入框正忙，请在就绪后重试。",
       });
       return;
@@ -2828,7 +2828,7 @@ export default function ChatView(props: ChatViewProps) {
         : serverConfig === null
           ? "侧聊尚未就绪，请稍后重试。"
           : serverConfig.environment.capabilities.sideChats !== true
-            ? "请更新此环境的 Fleet ADE 服务器后再使用侧聊。"
+            ? "请更新这台电脑上的 Fleet ADE 后台服务后再使用侧聊。"
             : sideChatsOffered && !isServerThread
               ? "发送第一条消息后才能开始侧聊。"
               : sideChat.available &&
@@ -3743,9 +3743,9 @@ export default function ChatView(props: ChatViewProps) {
                                   !canOperateThread
                                     ? "此连接无法修改会话。"
                                     : isEnvironmentChanging
-                                      ? "正在准备机器"
+                                      ? "正在准备电脑"
                                       : isRevertingCheckpoint
-                                        ? "正在回退对话"
+                                        ? "正在回退会话"
                                         : feedbackUploading
                                           ? "正在发送反馈"
                                           : threadDetailLoading

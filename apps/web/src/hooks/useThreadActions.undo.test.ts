@@ -290,7 +290,7 @@ describe("settle and snooze Undo", () => {
     expect(add).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         type: "success",
-        title: "已收尾",
+        title: "已标为完成",
         actionProps: expect.objectContaining({ children: "撤销" }),
       }),
     );

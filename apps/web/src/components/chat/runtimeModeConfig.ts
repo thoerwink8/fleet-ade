@@ -23,7 +23,7 @@ export const runtimeModeConfig: Record<
   },
   auto: {
     label: "自动",
-    description: "支持此模式的提供方会自动批准常规操作，其他提供方仍会询问。",
+    description: "支持此模式的智能体会自动批准常规操作，其他智能体仍会询问。",
     icon: ShieldCheckIcon,
   },
   "full-access": {

@@ -20,7 +20,8 @@ function describeUnavailableInstance(entry: ProviderInstanceEntry): string {
   if (entry.status === "ready" && entry.isAvailable) {
     return label;
   }
-  const kind = entry.status === "error" ? "不可用" : entry.status === "warning" ? "受限" : "未就绪";
+  const kind =
+    entry.status === "error" ? "不可用" : entry.status === "warning" ? "部分可用" : "未就绪";
   const msg = entry.snapshot.message?.trim();
   return msg ? `${label}：${kind}。${msg}` : `${label}：${kind}。`;
 }
@@ -70,7 +71,7 @@ export const ModelPickerSidebar = memo(function ModelPickerSidebar(props: {
     <Toolbar.Root
       className="w-11 shrink-0 overflow-hidden bg-muted/30"
       data-model-picker-sidebar="true"
-      aria-label="智能体提供方"
+      aria-label="智能体"
       orientation="vertical"
       onKeyDown={(event) => {
         if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;

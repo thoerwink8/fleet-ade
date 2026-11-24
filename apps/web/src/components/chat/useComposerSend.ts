@@ -473,7 +473,7 @@ export function useComposerSend(input: ComposerSendInput) {
         ...stackedThreadToast({
           type: "warning",
           title: "未连接：消息没有发送",
-          description: "正在重新连接环境，连接后请重试。",
+          description: "正在重新连接电脑，连接后请重试。",
         }),
         id: `chat-send-environment-unavailable:${toastSlot}`,
       });
@@ -553,7 +553,7 @@ export function useComposerSend(input: ComposerSendInput) {
             branch: activeThreadBranch,
           });
     if (multipleModelBlock === "server-outdated") {
-      setThreadError(activeThread.id, "请先更新此服务器，再同时启动多个模型。");
+      setThreadError(activeThread.id, "请先更新后台服务，再同时启动多个模型。");
       return;
     }
     if (multipleModelBlock === "needs-new-git-thread") {
@@ -611,12 +611,12 @@ export function useComposerSend(input: ComposerSendInput) {
     if (strandedThread) {
       const owner =
         readEnvironmentPresentation(strandedThread.environmentId)?.entry.target.label ??
-        "它所在的机器";
+        "它所在的电脑";
       toastManager.add(
         stackedThreadToast({
           type: "warning",
-          title: "附加的会话在另一台机器上",
-          description: `这台机器上的智能体无法读取“${strandedThread.title}”。请移除它，或切回 ${owner} 再发送。`,
+          title: "附加的会话在另一台电脑上",
+          description: `这台电脑上的智能体无法读取“${strandedThread.title}”。请移除它，或切回 ${owner} 再发送。`,
         }),
       );
       return;
@@ -1430,7 +1430,7 @@ export function useComposerSend(input: ComposerSendInput) {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: submissionIntent === "background" ? "后台任务失败" : "无法开始会话",
+              title: submissionIntent === "background" ? "无法运行后台任务" : "无法开始会话",
               description: error instanceof Error ? error.message : "无法发送消息。",
               actionProps: {
                 children: "打开草稿",

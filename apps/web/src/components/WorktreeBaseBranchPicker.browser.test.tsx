@@ -61,7 +61,7 @@ describe("WorktreeBaseBranchPicker", () => {
       await userEvent.click(screen.getByRole("combobox"));
       let query = "";
       for (const char of "main") {
-        await userEvent.type(page.getByPlaceholder("搜索引用…"), char);
+        await userEvent.type(page.getByPlaceholder("搜索分支…"), char);
         query += char;
         mocks.resolvedQueries.add(query);
         await screen.rerender(picker());

@@ -79,7 +79,7 @@ export function useAutoBalanceUpdateBanner(
   const count = running || failed || machines.length;
   const status = running ? "running" : failed ? "failed" : "idle";
   const prefix = running ? "正在更新" : failed ? "无法更新" : "可更新";
-  const title = `${prefix} ${count} 台机器`;
+  const title = `${prefix} ${count} 台电脑`;
   return {
     id: `auto-balance-server-updates-${dismissedNotices.size}`,
     variant: failed ? "error" : "default",
@@ -90,7 +90,7 @@ export function useAutoBalanceUpdateBanner(
         <PopoverTrigger
           render={<InlineButton />}
           className="max-w-full"
-          aria-label={`${title}。查看机器`}
+          aria-label={`${title}。查看电脑`}
         >
           <span className="min-w-0 truncate">{title}</span>
         </PopoverTrigger>
@@ -110,7 +110,7 @@ export function useAutoBalanceUpdateBanner(
                   <div className="text-muted-foreground">
                     {machine.connected
                       ? `可以更新到 ${machine.targetVersion}`
-                      : "重新连接这台机器后才能更新"}
+                      : "重新连接这台电脑后才能更新"}
                   </div>
                 )}
               </div>
@@ -119,7 +119,7 @@ export function useAutoBalanceUpdateBanner(
         </PopoverPopup>
       </Popover>
     ),
-    description: manual > 0 ? `${manual} 台机器需要手动更新` : undefined,
+    description: manual > 0 ? `${manual} 台电脑需要手动更新` : undefined,
     actions:
       running === 0 && targets.length > 0 ? (
         <ServerUpdatesAction
@@ -131,7 +131,7 @@ export function useAutoBalanceUpdateBanner(
               ? "重试"
               : targets.length === machines.length
                 ? "全部更新"
-                : `更新 ${targets.length} 台机器`
+                : `更新 ${targets.length} 台电脑`
           }
         />
       ) : undefined,

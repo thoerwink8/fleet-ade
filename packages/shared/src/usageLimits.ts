@@ -759,7 +759,7 @@ export function formatResetsIn(
 
 export const USAGE_LIMITS_COMMAND = {
   name: "usage-limits",
-  description: "查看此提供方的用量限制",
+  description: "查看此智能体的用量限制",
 } satisfies ServerProviderSlashCommand;
 
 export function isUsageLimitsCommand(prompt: string): boolean {

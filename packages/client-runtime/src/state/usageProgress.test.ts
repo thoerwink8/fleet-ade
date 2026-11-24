@@ -57,7 +57,7 @@ describe("usageProgress", () => {
     const waiting = [environment("a", { isPending: true }), environment("b", { isPending: true })];
     expect(usageProgress(waiting, options)).toEqual({
       dimmed: true,
-      label: "正在更新 2 个环境…",
+      label: "正在更新 2 台电脑…",
     });
     expect(
       usageProgress([environment("a"), ...waiting.slice(1), environment("c")], options),
@@ -82,7 +82,7 @@ describe("usageProgress", () => {
         [partway, environment("b", { isPending: true, summary: summary(["grok", "antigravity"]) })],
         options,
       ),
-    ).toEqual({ dimmed: false, label: "正在更新 2 个提供方…" });
+    ).toEqual({ dimmed: false, label: "正在更新 2 个智能体…" });
     expect(usageProgress([{ ...partway, isPending: false }], options)).toEqual({
       dimmed: false,
       label: null,

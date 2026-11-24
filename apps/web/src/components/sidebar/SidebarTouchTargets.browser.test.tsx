@@ -239,7 +239,7 @@ function SidebarTouchHarness(props?: {
           <SortableThreadRow
             {...makeRowProps({
               id: "card-settled",
-              title: "已收尾会话",
+              title: "已完成会话",
               variant: "card",
               variantAction: "unsettle",
               isPinned: false,
@@ -248,7 +248,7 @@ function SidebarTouchHarness(props?: {
           <SortableThreadRow
             {...makeRowProps({
               id: "card-woke",
-              title: "已唤醒会话",
+              title: "暂缓结束会话",
               variant: "card",
               variantAction: "settle",
               isPinned: false,
@@ -267,7 +267,7 @@ function SidebarTouchHarness(props?: {
           <SortableThreadRow
             {...makeRowProps({
               id: "slim-settled",
-              title: "紧凑行已收尾会话",
+              title: "紧凑行已完成会话",
               variant: "slim",
               variantAction: "unsettle",
               isPinned: false,
@@ -451,19 +451,19 @@ describe("sidebar mobile touch targets", () => {
       'button[aria-label="丢弃草稿"]',
     )!;
     const cardSnooze = cardRow.querySelector<HTMLButtonElement>('button[aria-label="暂缓会话"]')!;
-    const cardSettle = cardRow.querySelector<HTMLButtonElement>('button[aria-label="收尾会话"]')!;
+    const cardSettle = cardRow.querySelector<HTMLButtonElement>('button[aria-label="标为完成"]')!;
     const cardDetails = cardRow.querySelector<HTMLButtonElement>('button[aria-label="会话详情"]')!;
     const cardUnsettle = settledCardRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="取消会话收尾"]',
+      'button[aria-label="取消完成"]',
     )!;
     const cardAckWoke = wokeCardRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="忽略已唤醒通知"]',
+      'button[aria-label="忽略暂缓结束提示"]',
     )!;
     const cardWokeSnooze = wokeCardRow.querySelector<HTMLButtonElement>(
       'button[aria-label="暂缓会话"]',
     )!;
     const cardWokeSettle = wokeCardRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="收尾会话"]',
+      'button[aria-label="标为完成"]',
     )!;
     const cardWokeDetails = wokeCardRow.querySelector<HTMLButtonElement>(
       'button[aria-label="会话详情"]',
@@ -472,13 +472,13 @@ describe("sidebar mobile touch targets", () => {
       'button[aria-label="取消置顶会话"]',
     )!;
     const slimSnooze = slimRow.querySelector<HTMLButtonElement>('button[aria-label="暂缓会话"]')!;
-    const slimSettle = slimRow.querySelector<HTMLButtonElement>('button[aria-label="收尾会话"]')!;
+    const slimSettle = slimRow.querySelector<HTMLButtonElement>('button[aria-label="标为完成"]')!;
     const slimDetails = slimRow.querySelector<HTMLButtonElement>('button[aria-label="会话详情"]')!;
     const slimUnsettle = slimSettledRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="取消会话收尾"]',
+      'button[aria-label="取消完成"]',
     )!;
     const slimUnsnooze = slimSnoozedRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="立即唤醒会话"]',
+      'button[aria-label="取消暂缓"]',
     )!;
 
     const chromeTargets = [
@@ -560,7 +560,7 @@ describe("sidebar mobile touch targets", () => {
     const rowLabelChecks: Array<[HTMLElement, RegExp, HTMLButtonElement[]]> = [
       [cardRow, relativeTimePattern, [cardDiscardDraft, cardSnooze, cardSettle]],
       [settledCardRow, relativeTimePattern, [cardUnsettle]],
-      [wokeCardRow, /^已唤醒$/, [cardWokeSnooze, cardWokeSettle]],
+      [wokeCardRow, /^暂缓结束$/, [cardWokeSnooze, cardWokeSettle]],
       [slimRow, relativeTimePattern, [slimSettle]],
       [slimSettledRow, relativeTimePattern, [slimUnsettle]],
       [slimSnoozedRow, /^2h$/, [slimUnsnooze]],
@@ -614,16 +614,16 @@ describe("sidebar mobile touch targets", () => {
       'button[aria-label="取消置顶会话"]',
     )!;
     const cardSnooze = cardRow.querySelector<HTMLButtonElement>('button[aria-label="暂缓会话"]')!;
-    const cardSettle = cardRow.querySelector<HTMLButtonElement>('button[aria-label="收尾会话"]')!;
+    const cardSettle = cardRow.querySelector<HTMLButtonElement>('button[aria-label="标为完成"]')!;
     const cardUnsettle = settledCardRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="取消会话收尾"]',
+      'button[aria-label="取消完成"]',
     )!;
-    const slimSettle = slimRow.querySelector<HTMLButtonElement>('button[aria-label="收尾会话"]')!;
+    const slimSettle = slimRow.querySelector<HTMLButtonElement>('button[aria-label="标为完成"]')!;
     const slimUnsettle = slimSettledRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="取消会话收尾"]',
+      'button[aria-label="取消完成"]',
     )!;
     const slimUnsnooze = slimSnoozedRow.querySelector<HTMLButtonElement>(
-      'button[aria-label="立即唤醒会话"]',
+      'button[aria-label="取消暂缓"]',
     )!;
     const clearSearch = screen.container.querySelector<HTMLButtonElement>(
       'button[aria-label="清除会话搜索"]',

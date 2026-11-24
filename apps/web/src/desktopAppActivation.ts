@@ -60,7 +60,7 @@ export async function handleDesktopAppActivationRequest(
 ): Promise<DesktopAppActivationResponse> {
   const target = dependencies.getTarget();
   if (target === null) {
-    return failure(request.requestId, "environment-unavailable", "桌面应用的主本地环境未连接。");
+    return failure(request.requestId, "environment-unavailable", "桌面应用的主本地电脑未连接。");
   }
 
   const requestPlatform = desktopPlatformToEnvironmentOs(request.platform);
@@ -68,7 +68,7 @@ export async function handleDesktopAppActivationRequest(
     return failure(
       request.requestId,
       "platform-mismatch",
-      `该命令路径适用于 ${requestPlatform}，但桌面应用的主环境是 ${target.platform}。不支持跨平台路径映射。`,
+      `该命令路径适用于 ${requestPlatform}，但桌面应用的主电脑是 ${target.platform}。不支持跨平台路径映射。`,
     );
   }
 

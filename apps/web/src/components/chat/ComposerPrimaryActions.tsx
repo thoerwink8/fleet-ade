@@ -157,7 +157,7 @@ function StopGenerationButton({
               onStopRequested();
               onInterrupt();
             }}
-            aria-label={stopPhase === "pending" ? "正在停止" : "停止生成"}
+            aria-label={stopPhase === "pending" ? "正在停止" : "停止"}
           />
         }
       >
@@ -165,7 +165,7 @@ function StopGenerationButton({
           <rect x="2" y="2" width="8" height="8" rx="1.5" />
         </svg>
       </TooltipTrigger>
-      <TooltipPopup>{stopPhase === "pending" ? "正在停止…" : "中断"}</TooltipPopup>
+      <TooltipPopup>{stopPhase === "pending" ? "正在停止…" : "停止"}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -214,7 +214,7 @@ export function CollapsedComposerStopAction({
 }
 
 function describeActiveTurnAction(action: "queue" | "steer" | "restart"): string {
-  return action === "queue" ? "排队，等这一轮做完再发" : "立即发送，会打断当前这一轮";
+  return action === "queue" ? "排队，等这一轮结束后再发" : "立即发送，会打断当前这一轮";
 }
 
 export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
@@ -376,7 +376,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
             ? "立即发送"
             : "发送消息";
   const submitStatus = isEnvironmentUnavailable
-    ? "环境已断开"
+    ? "电脑已断开"
     : (sendDisabledReason ??
       (isPreparingWorktree
         ? "正在准备工作树"

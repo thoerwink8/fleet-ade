@@ -274,7 +274,7 @@ it.each(["hasPendingApprovals", "hasPendingUserInput"] as const)(
     state.shells.set("one", waiting("turn-1", "request-1"));
     state.shells.set("one", waiting("turn-2", "request-1"));
     state.shells.set("one", waiting("turn-2", "request-2"));
-    const title = flag === "hasPendingApprovals" ? "需要批准" : "需要输入";
+    const title = flag === "hasPendingApprovals" ? "等你批准" : "等你回答";
     expect(TestNotification.sent.map(({ title }) => title)).toEqual([title, title]);
   },
 );
@@ -389,16 +389,16 @@ it.each(["hasPendingApprovals", "hasPendingUserInput"] as const)(
     state.shells.set("one", shell(completed, asking, offline, done));
 
     expect(TestNotification.sent.map(({ title }) => title)).toEqual([
-      "需要批准",
+      "等你批准",
       "会话已完成",
-      flag === "hasPendingApprovals" ? "需要批准" : "需要输入",
+      flag === "hasPendingApprovals" ? "等你批准" : "等你回答",
     ]);
     state.shells.set("one", { ...shell(completed, asking, offline, done), status: "cached" });
     state.shells.set("one", shell(completed, asking, offline, done));
     expect(TestNotification.sent.map(({ title }) => title)).toEqual([
-      "需要批准",
+      "等你批准",
       "会话已完成",
-      flag === "hasPendingApprovals" ? "需要批准" : "需要输入",
+      flag === "hasPendingApprovals" ? "等你批准" : "等你回答",
     ]);
   },
 );

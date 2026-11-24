@@ -69,7 +69,7 @@ function NativeChildWorkContent(props: {
           <p className="text-sm text-muted-foreground">加载中</p>
         ) : children.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            提供方没有记录这次调用启动了哪些子智能体。
+            智能体没有记录这次调用启动了哪些子智能体。
           </p>
         ) : (
           children.map((child) => <NativeChild key={child.conversationId} child={child} />)

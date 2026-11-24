@@ -164,7 +164,7 @@ export function sortAddProjectProviderSources(
 const READY: AddProjectRemoteSourceReadinessEntry = { ready: true, hint: null };
 const UNAVAILABLE: AddProjectRemoteSourceReadinessEntry = {
   ready: false,
-  hint: "无法获取提供方状态。请打开“版本控制”设置并重新扫描。",
+  hint: "无法获取托管平台状态。请打开“版本控制”设置并重新扫描。",
 };
 
 export function buildAddProjectRemoteSourceReadiness(

@@ -53,7 +53,7 @@ export function ThreadContextChip(props: {
       />
       <TooltipPopup side="top">
         {props.unreadable
-          ? "它在另一台机器上，本机的智能体读不到它。请移除它，或切回那台机器再发送。"
+          ? "它在另一台电脑上，本机的智能体读不到它。请移除它，或切回那台电脑再发送。"
           : "打开会话"}
       </TooltipPopup>
     </Tooltip>

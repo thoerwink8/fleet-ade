@@ -61,11 +61,11 @@ export function WorktreeBaseBranchPicker({
   const statusText =
     branches.error ??
     (branches.isPending && branches.data === null
-      ? "正在加载引用…"
+      ? "正在加载分支…"
       : branches.isFetchingNextPage
-        ? "正在加载更多引用…"
+        ? "正在加载更多分支…"
         : hasNextPage
-          ? `显示 ${branches.refs.length} / ${branches.data?.totalCount} 个引用`
+          ? `显示 ${branches.refs.length} / ${branches.data?.totalCount} 个分支`
           : null);
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
