@@ -72,8 +72,8 @@ function contrastRatio(first: string, second: string): number {
 
 const engineFailure: FleetEngineFailure = {
   kind: "unreachable",
-  title: "引擎不可用",
-  description: "连不上引擎，请检查引擎是否已启动。",
+  title: "连不上机群服务",
+  description: "机群服务没有响应，请重试，或去 设置 → 连接 查看。",
 };
 
 function warningProvider(message = "连接在路由上"): ServerProvider {
@@ -112,6 +112,8 @@ function LaneHarness({
       <ChatBannerLane
         environmentId={environmentId}
         fleetEngineFailure={engine}
+        onRetryFleetEngine={() => undefined}
+        onOpenFleetConnectionsSettings={() => undefined}
         onDismissFleetEngineFailure={() => undefined}
         providerStatus={providerStatus}
         providerStatusDismissalKey={getProviderStatusDismissalKey("env-banner", providerStatus)}
@@ -145,8 +147,8 @@ describe("alert fleet styling", () => {
       await using screen = await render(
         <Alert variant="error" controlAlignment="first-line">
           <CircleAlertIcon />
-          <AlertTitle>引擎不可用</AlertTitle>
-          <AlertDescription>连不上引擎，请检查引擎是否已启动。</AlertDescription>
+          <AlertTitle>连不上机群服务</AlertTitle>
+          <AlertDescription>机群服务没有响应，请重试，或去 设置 → 连接 查看。</AlertDescription>
         </Alert>,
       );
 
@@ -235,7 +237,9 @@ describe("chat banner lane", () => {
     expect(timeline.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(strip.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(getComputedStyle(strip).position).toBe("static");
-    expect(screen.container.textContent).toContain("连不上引擎，请检查引擎是否已启动。");
+    expect(screen.container.textContent).toContain(
+      "机群服务没有响应，请重试，或去 设置 → 连接 查看。",
+    );
   });
 
   it("takes no space once every banner is dismissed", async () => {
@@ -266,8 +270,8 @@ describe("chat banner lane", () => {
     await userEvent.click(summary);
     expect(lane.querySelectorAll('[data-slot="alert"]')).toHaveLength(3);
     const text = lane.textContent!;
-    expect(text.indexOf("这一轮失败了。")).toBeLessThan(text.indexOf("引擎不可用"));
-    expect(text.indexOf("引擎不可用")).toBeLessThan(text.indexOf("提供方 Codex 状态"));
+    expect(text.indexOf("这一轮失败了。")).toBeLessThan(text.indexOf("连不上机群服务"));
+    expect(text.indexOf("连不上机群服务")).toBeLessThan(text.indexOf("提供方 Codex 状态"));
     expect(screen.getByRole("button", { name: "收起" })).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "收起" }));

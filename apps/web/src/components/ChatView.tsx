@@ -120,12 +120,13 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { orchestrationV2WorktreePending } from "@t3tools/shared/orchestrationV2ThreadError";
 import { resolveThreadReferenceCopyTarget } from "@t3tools/client-runtime/thread-reference";
 import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
-import { useAtomValue, useAtomSet } from "@effect/atom-react";
+import { useAtomValue } from "@effect/atom-react";
 import {
-  dismissedFleetEngineFailureAtom,
   reconcileFleetEngineFailureDismissal,
   resolveFleetEngineFailure,
+  retryFleetEngineStatus,
   shouldShowFleetEngineFailure,
+  useFleetEngineFailureDismissal,
   useFleetEngineStatus,
 } from "~/state/fleetEngine";
 import { type SetStateAction, use, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -193,6 +194,7 @@ import { isInSideChatPane, type SideChatParentPanel } from "~/lib/sideChatPane";
 import {
   NO_PROVIDER_MODEL_SELECTION,
   providerInstanceEntriesFor,
+  resolveNewSessionDefaultModelSelection,
   resolveProjectDefaultProviderModelSelection,
   shouldShowInstanceBadge,
 } from "../providerInstances";
@@ -777,24 +779,36 @@ export default function ChatView(props: ChatViewProps) {
     }
   }
   const nowMinute = useNowMinute();
-  const draftDefaultModelSelection = draftThread
+  const draftConfiguredDefaultModelSelection = draftThread
     ? resolveProjectSettings(
         settings,
         fallbackDraftProject?.id ?? null,
         fallbackDraftProject ?? undefined,
       ).settings.defaultModelSelection
     : null;
+  const draftProviders = draftThread
+    ? (providersByEnvironment.get(draftThread.environmentId) ?? [])
+    : [];
+  const draftDefaultModelSelection =
+    draftThread && draftConfiguredDefaultModelSelection !== null
+      ? resolveNewSessionDefaultModelSelection({
+          defaultSelection: draftConfiguredDefaultModelSelection,
+          providers: draftProviders,
+          settings,
+          projectId: draftThread.projectId,
+        })
+      : null;
   const draftModelResolution = draftThread
     ? resolveNewThreadModelSelection({
         defaultSelection:
           draftDefaultModelSelection ??
           resolveProjectDefaultProviderModelSelection(
-            providersByEnvironment.get(draftThread.environmentId) ?? [],
+            draftProviders,
             settings,
             draftThread.projectId,
           ),
         fallbackSelection: settings.fallbackModelSelection,
-        providers: providersByEnvironment.get(draftThread.environmentId) ?? [],
+        providers: draftProviders,
         settings,
         projectId: draftThread.projectId,
         now: Date.parse(`${nowMinute}:00Z`),
@@ -1090,7 +1104,9 @@ export default function ChatView(props: ChatViewProps) {
   const activeProjectDefaultModelSelection =
     !isServerThread && draftFallback
       ? draftFallback.selection
-      : activeProjectSettings.settings.defaultModelSelection;
+      : !isServerThread
+        ? draftDefaultModelSelection
+        : activeProjectSettings.settings.defaultModelSelection;
   const handleNewThreadInActiveProject = () => {
     startNewThreadForProject(activeProjectRef, handleNewThread);
   };
@@ -1934,24 +1950,29 @@ export default function ChatView(props: ChatViewProps) {
     isServerThread && supportsThreadPullRequests && visiblePullRequestCount > 0;
   const fleetEngineHealth = useFleetEngineStatus(environmentId);
   const fleetEngineFailure = resolveFleetEngineFailure(fleetEngineHealth);
-  const dismissedFleetEngineFailureKind = useAtomValue(
-    dismissedFleetEngineFailureAtom(environmentId),
-  );
-  const dismissFleetEngineFailure = useAtomSet(dismissedFleetEngineFailureAtom(environmentId));
+  const [dismissedFleetEngineFailureKind, setDismissedFleetEngineFailureKind] =
+    useFleetEngineFailureDismissal(environmentId);
   const shownFleetEngineFailure = shouldShowFleetEngineFailure(
     fleetEngineFailure,
     dismissedFleetEngineFailureKind,
   )
     ? fleetEngineFailure
     : null;
+  const retryFleetEngineStable = useStableCallback(() => {
+    retryFleetEngineStatus(environmentId);
+  });
+  const openFleetConnectionsSettingsStable = useStableCallback(() => {
+    void navigate({ to: "/settings/connections" });
+  });
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- a successful poll ends the failure period that its dismissal covers
   useEffect(() => {
     const dismissed = reconcileFleetEngineFailureDismissal(
       fleetEngineHealth,
       dismissedFleetEngineFailureKind,
     );
-    if (dismissed !== dismissedFleetEngineFailureKind) dismissFleetEngineFailure(dismissed);
-  }, [dismissedFleetEngineFailureKind, dismissFleetEngineFailure, fleetEngineHealth]);
+    if (dismissed !== dismissedFleetEngineFailureKind)
+      setDismissedFleetEngineFailureKind(dismissed);
+  }, [dismissedFleetEngineFailureKind, setDismissedFleetEngineFailureKind, fleetEngineHealth]);
   // The thread's own change request, placed against the project it belongs to. Without a
   // project there is nothing to resolve it against, so the caller falls back to the browser.
   const activeProjectRepository = sourceControlClients.repositorySelector(
@@ -3466,9 +3487,12 @@ export default function ChatView(props: ChatViewProps) {
                   <div className="relative z-10">
                     <ChatBannerLane
                       fleetEngineFailure={shownFleetEngineFailure}
+                      fleetEngineRetrying={fleetEngineHealth.isRetrying}
+                      onRetryFleetEngine={retryFleetEngineStable}
+                      onOpenFleetConnectionsSettings={openFleetConnectionsSettingsStable}
                       onDismissFleetEngineFailure={() => {
                         if (fleetEngineFailure !== null)
-                          dismissFleetEngineFailure(fleetEngineFailure.kind);
+                          setDismissedFleetEngineFailureKind(fleetEngineFailure.kind);
                       }}
                       environmentId={activeThread.environmentId}
                       providerStatus={visibleProviderStatus}

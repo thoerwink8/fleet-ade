@@ -14,6 +14,8 @@ import {
   getDefaultProviderInstanceModel,
   isProviderInstancePickerReady,
   resolveDefaultProviderModelSelection,
+  resolveNewSessionDefaultModelSelection,
+  resolveProjectDefaultProviderModelSelection,
   resolveSelectableProviderInstance,
   shouldShowInstanceBadge,
 } from "./providerInstances";
@@ -22,10 +24,12 @@ function provider(input: {
   provider: ProviderDriverKind;
   instanceId: string;
   enabled?: boolean;
+  installed?: boolean;
   availability?: ServerProvider["availability"];
   displayName?: string;
   accentColor?: string;
   status?: ServerProvider["status"];
+  auth?: ServerProvider["auth"];
   models?: ServerProvider["models"];
   supportsTextGeneration?: boolean;
 }): ServerProvider {
@@ -38,11 +42,11 @@ function provider(input: {
     ...(input.displayName ? { displayName: input.displayName } : {}),
     ...(input.accentColor ? { accentColor: input.accentColor } : {}),
     enabled: input.enabled ?? true,
-    installed: true,
+    installed: input.installed ?? true,
     version: null,
     status: input.status ?? "ready",
     ...(input.availability ? { availability: input.availability } : {}),
-    auth: { status: "authenticated" },
+    auth: input.auth ?? { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
     models: input.models ?? [],
     slashCommands: [],
@@ -589,5 +593,111 @@ describe("provider icon metadata", () => {
     expect(restoredEntry?.acpRegistryAgentId).toBe("swe-agent");
     expect(restoredEntry?.acpRegistryIconUrl).toBe(iconUrl);
     expect(restoredEntry?.enabled).toBe(true);
+  });
+});
+
+describe("resolveNewSessionDefaultModelSelection", () => {
+  it("keeps the settings default when usable and falls back to the first logged-in agent otherwise", () => {
+    const settings = {
+      providerInstances: {},
+      projectSettingsOverrides: {},
+    };
+    const unauthenticatedCodex = provider({
+      provider: ProviderDriverKind.make("codex"),
+      instanceId: "codex",
+      status: "warning",
+      auth: { status: "unauthenticated" },
+      models: [model("gpt-5.4", false, true)],
+    });
+    const notInstalledCodex = provider({
+      provider: ProviderDriverKind.make("codex"),
+      instanceId: "codex",
+      installed: false,
+      status: "warning",
+      auth: { status: "unknown" },
+      models: [model("gpt-5.4", false, true)],
+    });
+    const authenticatedClaude = provider({
+      provider: ProviderDriverKind.make("claudeAgent"),
+      instanceId: "claudeAgent",
+      status: "ready",
+      auth: { status: "authenticated" },
+      models: [model("claude-opus-4-6", false, true)],
+    });
+    const authenticatedCodex = provider({
+      provider: ProviderDriverKind.make("codex"),
+      instanceId: "codex",
+      status: "ready",
+      auth: { status: "authenticated" },
+      models: [model("gpt-5.4", false, true)],
+    });
+
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: {
+          instanceId: ProviderInstanceId.make("codex"),
+          model: "gpt-5.4",
+        },
+        providers: [unauthenticatedCodex, authenticatedClaude],
+        settings,
+        projectId: null,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("claudeAgent"),
+      model: "claude-opus-4-6",
+    });
+
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: {
+          instanceId: ProviderInstanceId.make("codex"),
+          model: "gpt-5.4",
+        },
+        providers: [notInstalledCodex, authenticatedClaude],
+        settings,
+        projectId: null,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("claudeAgent"),
+      model: "claude-opus-4-6",
+    });
+
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: {
+          instanceId: ProviderInstanceId.make("codex"),
+          model: "custom-codex",
+        },
+        providers: [authenticatedCodex, authenticatedClaude],
+        settings,
+        projectId: null,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("codex"),
+      model: "custom-codex",
+    });
+
+    expect(
+      resolveProjectDefaultProviderModelSelection(
+        [unauthenticatedCodex, authenticatedClaude],
+        settings,
+        null,
+      ),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("claudeAgent"),
+      model: "claude-opus-4-6",
+    });
+
+    expect(
+      resolveNewSessionDefaultModelSelection({
+        defaultSelection: null,
+        providers: [unauthenticatedCodex, notInstalledCodex],
+        settings,
+        projectId: null,
+      }),
+    ).toEqual({
+      instanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5.4",
+    });
   });
 });
