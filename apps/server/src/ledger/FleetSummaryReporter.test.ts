@@ -519,6 +519,16 @@ it.effect(
         yield* reporter.handle(fakeEvent(threadId, "run.updated"));
         expect((yield* snapshot()).rows).toEqual([]);
 
+        yield* reporter.trackAdhoc(threadId, EnvironmentId.make("coordinator"));
+        yield* TestClock.adjust("5 seconds");
+        expect((yield* snapshot()).rows).toHaveLength(1);
+        yield* reporter.handle(fakeEvent(threadId, "thread.deleted"));
+        expect((yield* snapshot()).rows).toHaveLength(1);
+        yield* reporter.handle(fakeEvent(threadId, "thread.purged"));
+        expect((yield* snapshot()).rows).toEqual([]);
+        yield* reporter.handle(fakeEvent(threadId, "run.updated"));
+        expect((yield* snapshot()).rows).toEqual([]);
+
         // Registration itself publishes an existing shell without waiting for another event.
         yield* reporter.trackAdhoc(threadId, EnvironmentId.make("coordinator"));
         yield* TestClock.adjust("30 seconds");

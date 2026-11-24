@@ -420,7 +420,7 @@ const make = Effect.gen(function* () {
 
   const handle = Effect.fnUntraced(
     function* (event: OrchestrationV2DomainEvent) {
-      if (event.type === "thread.deleted" || event.type === "thread.archived") {
+      if (event.type === "thread.archived" || event.type === "thread.purged") {
         yield* untrack(event.threadId);
       } else {
         yield* sendLane.withPermits(1)(

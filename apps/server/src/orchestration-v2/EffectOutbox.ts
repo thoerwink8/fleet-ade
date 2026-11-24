@@ -110,6 +110,7 @@ export const OrchestrationEffectRequestV2 = Schema.Union([
   }),
   Schema.Struct({
     type: Schema.Literal("terminal.cleanup"),
+    keepHistory: Schema.optional(Schema.Boolean),
   }),
   Schema.Struct({
     type: Schema.Literal("preview.cleanup"),
