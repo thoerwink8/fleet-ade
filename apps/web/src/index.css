@@ -8,6 +8,8 @@
 @import "@fleet/design/styles/tooltip.css" layer(fleet);
 @import "@fleet/design/styles/input.css" layer(fleet);
 @import "./styles/fleet-overrides/input.css" layer(fleet);
+@import "@fleet/design/styles/segmented-control.css" layer(fleet);
+@import "./styles/fleet-overrides/segmented.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
