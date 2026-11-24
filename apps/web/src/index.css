@@ -16,6 +16,8 @@
 @import "./styles/fleet-overrides/toast.css" layer(fleet);
 @import "@fleet/design/styles/menu.css" layer(fleet);
 @import "./styles/fleet-overrides/menu.css" layer(fleet);
+@import "@fleet/design/styles/select.css" layer(fleet);
+@import "./styles/fleet-overrides/select.css" layer(fleet);
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));
