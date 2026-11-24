@@ -19,6 +19,8 @@ import {
   ProviderInstanceId,
   RunId,
   SourceControlRepositoryError,
+  ORCHESTRATION_V2_WS_METHODS,
+  TrimmedNonEmptyString,
   WS_METHODS,
   WsRpcGroup,
   WsServerRefreshProvidersRpc,
@@ -2388,4 +2390,63 @@ it.effect("ACP session RPCs list a thread missing its history and repair it on i
     assert.deepEqual(imported, { threadId: pending, imported: true });
     assert.deepEqual(repaired, [pending]);
   }).pipe(Effect.provide(EventSink.layer.pipe(Layer.provideMerge(acpStores)))),
+);
+
+it.effect("orchestration.getRecentlyDeleted returns items with server time and sequence", () =>
+  Effect.gen(function* () {
+    const threadId = ThreadId.make("thread:recently-deleted");
+    const projectId = ProjectId.make("project:recently-deleted");
+    const deletedAt = DateTime.makeUnsafe("2026-11-20T00:00:00.000Z");
+    const item = {
+      threadId,
+      projectId,
+      projectTitle: TrimmedNonEmptyString.make("Trash project"),
+      title: TrimmedNonEmptyString.make("Old thread"),
+      deletedAt,
+      purgeAt: DateTime.makeUnsafe("2026-11-27T00:00:00.000Z"),
+      archived: true,
+      sideChatCount: 2,
+      worktreePath: null,
+    } as const;
+    const dependencies = Layer.mergeAll(
+      layerUnusedConfigRpcServices,
+      Layer.fresh(layerConfigSources),
+      Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({ namedProjectsRoot: "/unused" }),
+      Layer.mock(ScratchThreadPromotion.ScratchThreadPromotion)({}),
+      Layer.mock(ServerEnvironment.ServerEnvironment)({}),
+      Layer.mock(EnvironmentAuth.EnvironmentAuth)({}),
+      Layer.mock(UsageLimitSources.UsageLimitSources)({ current: Effect.succeed([]) }),
+      Layer.mock(ExternalLauncher.ExternalLauncher)({}),
+      Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({}),
+      Layer.mock(DirectEndpoints.DirectEndpoints)({}),
+      Layer.mock(ProviderRegistry.ProviderRegistry)({}),
+      Layer.mock(ThreadManagement.ThreadManagementService)({
+        listRecentlyDeleted: () => Effect.succeed([item]),
+      }),
+      Layer.mock(OrchestrationEventStore.OrchestrationEventStore)({
+        latestApplicationSequence: Effect.succeed(41),
+      }),
+    );
+    const client = yield* RpcTest.makeClient(WsRpcGroup).pipe(
+      Effect.provide(
+        layerWsRpc(
+          {
+            sessionId: AuthSessionId.make("recently-deleted"),
+            subject: "recently-deleted",
+            method: "browser-session-cookie",
+            scopes: [],
+          },
+          { secretReferences: true },
+        ).pipe(
+          Layer.provide(dependencies),
+          Layer.merge(RpcAuthorization.layer([AuthOrchestrationReadScope])),
+        ),
+      ),
+    );
+    const result = yield* client[ORCHESTRATION_V2_WS_METHODS.getRecentlyDeleted]({});
+    assert.equal(result.snapshotSequence, 41);
+    assert.lengthOf(result.items, 1);
+    assert.deepEqual(result.items[0], item);
+    assert.ok(DateTime.isUtc(result.now));
+  }),
 );

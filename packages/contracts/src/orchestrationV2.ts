@@ -92,6 +92,17 @@ import {
 } from "./providerRuntime.ts";
 import { ThreadTokenUsageSnapshot } from "./providerRuntime.ts";
 
+export const THREAD_TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1_000;
+
+export const OrchestrationV2ThreadTrashFailureCode = Schema.Literals([
+  "thread-not-deleted",
+  "thread-not-recoverable",
+  "cascade-member",
+  "project-deleted",
+]);
+export type OrchestrationV2ThreadTrashFailureCode =
+  typeof OrchestrationV2ThreadTrashFailureCode.Type;
+
 export const OrchestrationV2Actor = Schema.Literals(["user", "agent", "system"]);
 export type OrchestrationV2Actor = typeof OrchestrationV2Actor.Type;
 
@@ -2019,7 +2030,8 @@ export const OrchestrationV2DomainEvent = Schema.Union([
     type: Schema.Literals([
       "thread.archived",
       "thread.unarchived",
-      "thread.deleted",
+      "thread.restored",
+      "thread.purged",
       "thread.settled",
       "thread.unsettled",
       "thread.snoozed",
@@ -2043,6 +2055,12 @@ export const OrchestrationV2DomainEvent = Schema.Union([
       "thread.guest-share-updated",
     ]),
     payload: OrchestrationV2AppThread,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2EventBase.fields,
+    type: Schema.Literal("thread.deleted"),
+    payload: OrchestrationV2AppThread,
+    cascadeRootId: Schema.optional(ThreadId),
   }),
   Schema.Struct({
     ...OrchestrationV2EventBase.fields,
@@ -2977,7 +2995,8 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
     type: Schema.Literals([
       "thread.archived",
       "thread.unarchived",
-      "thread.deleted",
+      "thread.restored",
+      "thread.purged",
       "thread.settled",
       "thread.unsettled",
       "thread.snoozed",
@@ -3001,6 +3020,12 @@ export const OrchestrationV2DomainEventJson = Schema.Union([
       "thread.guest-share-updated",
     ]),
     payload: OrchestrationV2AppThreadJson,
+  }),
+  Schema.Struct({
+    ...OrchestrationV2JsonEventBaseFields,
+    type: Schema.Literal("thread.deleted"),
+    payload: OrchestrationV2AppThreadJson,
+    cascadeRootId: Schema.optional(ThreadId),
   }),
   Schema.Struct({
     ...OrchestrationV2JsonEventBaseFields,
@@ -3185,6 +3210,16 @@ export const OrchestrationV2Command = Schema.Union([
     onlyIfUnused: Schema.optional(Schema.Boolean),
   }),
   Schema.Struct({
+    type: Schema.Literal("thread.restore"),
+    commandId: CommandId,
+    threadId: ThreadId,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("thread.purge"),
+    commandId: CommandId,
+    threadId: ThreadId,
+  }),
+  Schema.Struct({
     type: Schema.Literal("thread.settle"),
     commandId: CommandId,
     threadId: ThreadId,
@@ -3283,7 +3318,14 @@ export const OrchestrationV2Command = Schema.Union([
   Schema.Struct({
     type: Schema.Literal("thread.batch"),
     commandId: CommandId,
-    operation: Schema.Literals(["archive", "unarchive", "delete", "mark-unread"]),
+    operation: Schema.Literals([
+      "archive",
+      "unarchive",
+      "delete",
+      "restore",
+      "purge",
+      "mark-unread",
+    ]),
     threadIds: Schema.Array(ThreadId).check(Schema.isMinLength(1), Schema.isMaxLength(100)),
     /** Delete only threads with no runs and no messages. */
     onlyIfUnused: Schema.optional(Schema.Boolean),
@@ -3858,6 +3900,7 @@ export const ORCHESTRATION_V2_WS_METHODS = {
   searchThread: "orchestration.searchThread",
   searchThreadStream: "orchestration.searchThreadStream",
   getArchivedShellSnapshot: "orchestration.getArchivedShellSnapshot",
+  getRecentlyDeleted: "orchestration.getRecentlyDeleted",
   getThreadFamily: "orchestration.getThreadFamily",
   getThreadTitles: "orchestration.getThreadTitles",
   getThreadLinkMetadata: "orchestration.getThreadLinkMetadata",
@@ -3926,6 +3969,26 @@ export const OrchestrationV2ArchivedShellSnapshot = Schema.Struct({
 });
 export type OrchestrationV2ArchivedShellSnapshot = typeof OrchestrationV2ArchivedShellSnapshot.Type;
 
+export const OrchestrationV2RecentlyDeletedThread = Schema.Struct({
+  threadId: ThreadId,
+  projectId: ProjectId,
+  projectTitle: TrimmedNonEmptyString,
+  title: TrimmedNonEmptyString,
+  deletedAt: Schema.DateTimeUtc,
+  purgeAt: Schema.DateTimeUtc,
+  archived: Schema.Boolean,
+  sideChatCount: NonNegativeInt,
+  worktreePath: Schema.NullOr(Schema.String),
+});
+export type OrchestrationV2RecentlyDeletedThread = typeof OrchestrationV2RecentlyDeletedThread.Type;
+
+export const OrchestrationV2RecentlyDeleted = Schema.Struct({
+  snapshotSequence: NonNegativeInt,
+  now: Schema.DateTimeUtc,
+  items: Schema.Array(OrchestrationV2RecentlyDeletedThread),
+});
+export type OrchestrationV2RecentlyDeleted = typeof OrchestrationV2RecentlyDeleted.Type;
+
 export const OrchestrationV2ThreadLaunchInput = Schema.Struct({
   commandId: CommandId,
   creationSource: Schema.optional(OrchestrationV2CreationSource),
@@ -3970,10 +4033,11 @@ export type OrchestrationV2BatchThreadItemStatus = typeof OrchestrationV2BatchTh
 export const OrchestrationV2BatchThreadItemResult = Schema.Struct({
   threadId: ThreadId,
   status: OrchestrationV2BatchThreadItemStatus,
+  reason: Schema.optional(OrchestrationV2ThreadTrashFailureCode),
 });
 export type OrchestrationV2BatchThreadItemResult = typeof OrchestrationV2BatchThreadItemResult.Type;
 export const OrchestrationV2BatchThreadResult = Schema.Struct({
-  operation: Schema.Literals(["archive", "unarchive", "delete", "mark-unread"]),
+  operation: Schema.Literals(["archive", "unarchive", "delete", "restore", "purge", "mark-unread"]),
   items: Schema.Array(OrchestrationV2BatchThreadItemResult),
   appliedCount: NonNegativeInt,
   rejectedCount: NonNegativeInt,
@@ -4256,7 +4320,9 @@ export class OrchestrationV2DispatchCommandError extends Schema.TaggedError<Orch
     commandType: Schema.String,
     message: Schema.String,
     detail: Schema.optional(Schema.String),
-    code: Schema.optional(OrchestrationV2RollbackFailureCode),
+    code: Schema.optional(
+      Schema.Union([OrchestrationV2RollbackFailureCode, OrchestrationV2ThreadTrashFailureCode]),
+    ),
     cause: Schema.optional(Schema.Defect()),
   },
 ) {}
@@ -4606,6 +4672,10 @@ export const OrchestrationV2RpcSchemas = {
   getArchivedShellSnapshot: {
     input: Schema.Struct({}),
     output: OrchestrationV2ArchivedShellSnapshot,
+  },
+  getRecentlyDeleted: {
+    input: Schema.Struct({}),
+    output: OrchestrationV2RecentlyDeleted,
   },
   getThreadFamily: {
     input: OrchestrationV2GetThreadFamilyInput,

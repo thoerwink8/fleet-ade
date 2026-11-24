@@ -1,5 +1,6 @@
 import {
   OrchestrationV2RollbackFailureCode,
+  OrchestrationV2ThreadTrashFailureCode,
   PROVIDER_DISPLAY_NAMES,
   type ProviderDriverKind,
 } from "@t3tools/contracts";
@@ -137,14 +138,18 @@ function collectErrorMessages(value: unknown, seen: Set<unknown>): ReadonlyArray
   return message === undefined ? nested : [message, ...nested];
 }
 
-const isRollbackFailureCode = Schema.is(OrchestrationV2RollbackFailureCode);
+const isDispatchErrorCode = Schema.is(
+  Schema.Union([OrchestrationV2RollbackFailureCode, OrchestrationV2ThreadTrashFailureCode]),
+);
 
-export function dispatchErrorCode(cause: unknown): OrchestrationV2RollbackFailureCode | undefined {
+export function dispatchErrorCode(
+  cause: unknown,
+): OrchestrationV2RollbackFailureCode | OrchestrationV2ThreadTrashFailureCode | undefined {
   const seen = new Set<unknown>();
   let value = cause;
   while (Predicate.isObject(value) && !seen.has(value)) {
     seen.add(value);
-    if ("code" in value && isRollbackFailureCode(value.code)) return value.code;
+    if ("code" in value && isDispatchErrorCode(value.code)) return value.code;
     value = value.cause;
   }
   return undefined;

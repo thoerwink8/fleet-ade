@@ -322,10 +322,20 @@ export const make = Effect.gen(function* () {
     const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
     const projects = new Map(projectShells.map((project) => [project.id, project]));
     // Merge events resweep all candidates because unlinked threads settle through branch lookup.
-    const candidates = threads.filter(
+    const eligible = threads.filter(
       (thread) =>
         (automaticSettlementEnabled || thread.lineage.relationshipToParent === "subagent") &&
         isAutoSettlementCandidate(thread, nowMs),
+    );
+    const candidates = yield* Effect.filter(
+      eligible,
+      (thread) => {
+        const parentThreadId = thread.lineage.parentThreadId;
+        return thread.lineage.relationshipToParent !== "subagent" || parentThreadId === null
+          ? Effect.succeed(true)
+          : projections.isThreadInTrash(parentThreadId).pipe(Effect.map((inTrash) => !inTrash));
+      },
+      { concurrency: 8 },
     );
 
     // Runs per candidate thread, thousands per sweep on busy servers; the sweep owns the span.

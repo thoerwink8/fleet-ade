@@ -69,7 +69,12 @@ const factsFor = (
 });
 
 const storedEvent = (
-  type: "thread.deleted" | "thread.metadata-updated" | "run.updated",
+  type:
+    | "thread.deleted"
+    | "thread.restored"
+    | "thread.purged"
+    | "thread.metadata-updated"
+    | "run.updated",
   threadId: ThreadId,
   sequence: number,
 ): OrchestrationV2StoredEvent => ({
@@ -289,6 +294,58 @@ it.effect.each([
         assert.strictEqual(detail.threadId, child);
         assert.ok(Option.isNone(yield* Queue.poll(updates)));
       }
+    }).pipe(
+      Effect.provide(
+        workerLayer(
+          events,
+          getThreadShell,
+          seedProjectionThread(child, parent).pipe(Effect.orDie),
+          ready,
+        ),
+      ),
+    );
+  }),
+);
+
+it.effect("rebuilds a soft-deleted child summary on restore and drops it on purge", () =>
+  Effect.gen(function* () {
+    const events = yield* Queue.unbounded<OrchestrationV2StoredEvent>();
+    const ready = yield* Deferred.make<void>();
+    const processed = yield* Ref.make(0);
+    const parent = ThreadId.make("thread:lifecycle-parent");
+    const child = ThreadId.make("thread:lifecycle-child");
+    const marker = ThreadId.make("thread:lifecycle-marker");
+    const shell = {
+      ...liveThreadShell(child),
+      lineage: {
+        parentThreadId: parent,
+        rootThreadId: parent,
+        relationshipToParent: "subagent" as const,
+      },
+    };
+    const getThreadShell: ProjectionStore.ProjectionStoreV2Shape["getThreadShell"] = (id) =>
+      id === marker
+        ? Ref.updateAndGet(processed, (count) => count + 1).pipe(Effect.as(null))
+        : Effect.succeed(shell);
+    yield* Effect.gen(function* () {
+      yield* Deferred.await(ready);
+      const internal = yield* ChildSessionSummaryInternal;
+      const service = yield* ChildSessionSummary;
+      yield* internal.note(factsFor(child, parent, 0));
+      yield* Queue.offer(events, storedEvent("thread.deleted", child, 1));
+      yield* Queue.offer(events, storedEvent("thread.metadata-updated", marker, 2));
+      yield* Ref.get(processed).pipe(Effect.repeat({ until: (count) => count === 1 }));
+      assert.strictEqual(yield* service.detail({ threadId: child }), null);
+
+      yield* Queue.offer(events, storedEvent("thread.restored", child, 3));
+      yield* Queue.offer(events, storedEvent("thread.metadata-updated", marker, 4));
+      yield* Ref.get(processed).pipe(Effect.repeat({ until: (count) => count === 2 }));
+      assert.strictEqual((yield* service.detail({ threadId: child }))?.threadId, child);
+
+      yield* Queue.offer(events, storedEvent("thread.purged", child, 5));
+      yield* Queue.offer(events, storedEvent("thread.metadata-updated", marker, 6));
+      yield* Ref.get(processed).pipe(Effect.repeat({ until: (count) => count === 3 }));
+      assert.strictEqual(yield* service.detail({ threadId: child }), null);
     }).pipe(
       Effect.provide(
         workerLayer(
@@ -900,6 +957,89 @@ it.effect(
         }).pipe(Effect.provide(appLayer));
       }),
     ),
+);
+
+it.effect("rebuilds a remote child summary on restore and drops it on purge", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fleetContext = yield* FleetSummary.layerForTest().pipe(Layer.build);
+      const fleetSummary = Context.get(fleetContext, FleetSummary.FleetSummary);
+      const parent = ThreadId.make("thread:remote-lifecycle-parent");
+      const remoteEnv = EnvironmentId.make("env-remote-lifecycle");
+      const remoteChild = ThreadId.make("thread:remote-lifecycle-child");
+      const events = yield* Queue.unbounded<OrchestrationV2DomainEvent>();
+      const database = SqlitePersistence.layerMemory;
+      const seeded = Layer.effectDiscard(
+        seedParentAndRemoteSubagent({
+          parentThreadId: parent,
+          remoteEnvId: remoteEnv,
+          remoteThreadId: remoteChild,
+          label: "Linux Box",
+          title: "Restore remote parser",
+          prompt: "Keep the remote parser running",
+          subagentId: NodeId.make("node:remote-lifecycle"),
+          startedAt: "2026-11-24T00:00:01.000Z",
+        }).pipe(Effect.orDie),
+      ).pipe(Layer.provide(database));
+      const appLayer = Layer.mergeAll(
+        ChildSessionSummary.layer,
+        ChildSessionSummary.layerRemoteWorker.pipe(
+          Layer.provide(ChildSessionSummary.layer),
+          Layer.provide(Layer.succeed(FleetSummary.FleetSummary, fleetSummary)),
+          Layer.provide(
+            Layer.mock(Orchestrator.OrchestratorV2)({
+              streamDomainEvents: Stream.fromQueue(events),
+            }),
+          ),
+        ),
+      ).pipe(Layer.provide(Layer.merge(database, seeded)));
+
+      yield* Effect.gen(function* () {
+        const service = yield* ChildSessionSummary;
+        const updates = yield* Queue.unbounded<ChildSummaryStreamEvent>();
+        yield* service.subscribe(parent).pipe(
+          Stream.runForEach((event) => Queue.offer(updates, event)),
+          Effect.forkScoped({ startImmediately: true }),
+        );
+        yield* fleetSummary.report(remoteEnv, {
+          type: "upsert-adhoc",
+          threadId: remoteChild,
+          title: "Restore remote parser",
+          sessionRun: "running",
+          reason: "running",
+          needsYou: false,
+          lastProgress: "Running parser tests",
+        });
+        yield* takeUpsertMatching(updates, (event) => event.row.threadId === remoteChild);
+
+        const lifecycle = (type: "thread.deleted" | "thread.restored" | "thread.purged") =>
+          Queue.offer(events, {
+            id: EventId.make(`event:${type}`),
+            threadId: parent,
+            type,
+            occurredAt: DateTime.makeUnsafe(0),
+            payload: liveThreadShell(parent),
+          } as OrchestrationV2DomainEvent);
+        yield* lifecycle("thread.deleted");
+        const deleted = yield* Queue.take(updates);
+        assert.strictEqual(deleted._tag, "deleted");
+        assert.strictEqual(yield* service.detail({ threadId: remoteChild }), null);
+
+        yield* lifecycle("thread.restored");
+        const restored = yield* takeUpsertMatching(
+          updates,
+          (event) => event.row.threadId === remoteChild,
+        );
+        assert.strictEqual(restored.environmentId, remoteEnv);
+        assert.strictEqual(restored.activity, "Running parser tests");
+
+        yield* lifecycle("thread.purged");
+        const purged = yield* Queue.take(updates);
+        assert.strictEqual(purged._tag, "deleted");
+        assert.strictEqual(yield* service.detail({ threadId: remoteChild }), null);
+      }).pipe(Effect.provide(appLayer));
+    }),
+  ),
 );
 
 it.effect(
