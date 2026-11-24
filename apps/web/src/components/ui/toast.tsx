@@ -162,10 +162,12 @@ function errorDescriptionClampClass(type: unknown, description: unknown): string
   return "line-clamp-4";
 }
 
+// One-line toasts follow fleet-design: 8px vertical padding inside the 40px minimum (border included).
+const TOAST_INLINE_CONTENT_CLASS = "min-h-[calc(var(--fa-ctrl-lg)-var(--fa-bw-1)*2)] py-2";
 const toastCornerDismissClass = "absolute z-20 -top-1.5 -right-1.5";
 const toastCornerOrbClass = cn(
-  "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border/60 bg-popover/92 text-muted-foreground shadow-sm outline-none backdrop-blur-sm",
-  "transition-[color,background-color,box-shadow] hover:bg-popover hover:text-foreground",
+  "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border/60 bg-popover text-muted-foreground outline-none",
+  "transition-[color,background-color,box-shadow] hover:bg-accent hover:text-foreground",
   "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
 );
 
@@ -366,7 +368,7 @@ function deriveToastBodyDescriptor(toast: {
     hasVisibleToastAction(toast.actionProps) ||
     hasAdditionalActions ||
     hasSecondaryAction;
-  const inlineContentEndPad = hasTrailingControls ? "pr-6" : "pr-3.5";
+  const inlineContentEndPad = hasTrailingControls ? "pr-6" : "pr-3";
   return {
     Icon,
     iconClassName: toast.type
@@ -411,13 +413,13 @@ function ToastBodyContent({
     <>
       <div
         className={cn(
-          "flex min-h-0 min-w-0 flex-col gap-0.5",
+          "flex min-h-0 min-w-0 flex-col gap-1",
           stackedActionLayout ? "pr-5" : "flex-1",
         )}
       >
         <div
           className={cn(
-            "flex min-w-0 gap-2",
+            "flex min-w-0 gap-3",
             !stackedActionLayout && !hasTrailingControls && "pr-6",
           )}
         >
@@ -439,7 +441,7 @@ function ToastBodyContent({
               <Icon />
             </div>
           ) : null}
-          <Toast.Title className="min-w-0 wrap-break-word font-semibold" data-slot="toast-title" />
+          <Toast.Title className="min-w-0 wrap-break-word font-medium" data-slot="toast-title" />
         </div>
         <ToastDescriptionAndExpandable
           toastData={toastData}
@@ -450,7 +452,7 @@ function ToastBodyContent({
       {hasTrailingControls ? (
         <div
           className={cn(
-            "flex items-center gap-1.5",
+            "flex items-center gap-2",
             stackedActionLayout ? "w-full justify-end" : "shrink-0",
           )}
         >
@@ -460,7 +462,7 @@ function ToastBodyContent({
               {...props}
               className={className}
               key={id}
-              size="xs"
+              size="sm"
               type="button"
               variant={secondaryActionVariant}
             />
@@ -469,14 +471,14 @@ function ToastBodyContent({
             <Button
               {...secondaryActionRest}
               className={secondaryActionClassName}
-              size="xs"
+              size="sm"
               type="button"
               variant={secondaryActionVariant}
             />
           ) : null}
           {hasVisibleToastAction(actionProps) ? (
             <Toast.Action
-              className={cn(buttonVariants({ size: "xs", variant: actionVariant }), "shrink-0")}
+              className={cn(buttonVariants({ size: "sm", variant: actionVariant }), "shrink-0")}
               data-slot="toast-action"
             >
               {actionProps?.children}
@@ -736,10 +738,14 @@ function Toasts({ position }: { position: ToastPosition }) {
                 className={cn(
                   // overflow-x:clip preserves visible vertical overflow; hidden would force overflow-y:auto
                   // and clip detail panels.
-                  "pointer-events-auto min-h-0 overflow-y-visible pl-3.5 text-sm transition-opacity duration-250 [overflow-x:clip] data-expanded:opacity-100",
+                  "pointer-events-auto min-h-0 overflow-y-visible pl-3 text-sm transition-opacity duration-250 [overflow-x:clip] data-expanded:opacity-100",
                   stackedActionLayout
-                    ? "flex flex-col gap-2 py-2.5 pr-3.5"
-                    : cn("py-3", "flex items-center justify-between gap-1.5", inlineContentEndPad),
+                    ? "flex flex-col gap-2 py-2 pr-3"
+                    : cn(
+                        TOAST_INLINE_CONTENT_CLASS,
+                        "flex items-center justify-between gap-2",
+                        inlineContentEndPad,
+                      ),
                   hideCollapsedContent &&
                     "not-data-expanded:pointer-events-none not-data-expanded:opacity-0",
                 )}
@@ -833,12 +839,12 @@ function AnchoredToasts() {
                       </div>
                       <Toast.Content
                         className={cn(
-                          "pointer-events-auto min-h-0 overflow-y-visible pl-3.5 text-sm [overflow-x:clip]",
+                          "pointer-events-auto min-h-0 overflow-y-visible pl-3 text-sm [overflow-x:clip]",
                           stackedActionLayout
-                            ? "flex flex-col gap-2 py-2.5 pr-3.5"
+                            ? "flex flex-col gap-2 py-2 pr-3"
                             : cn(
-                                "py-3",
-                                "flex items-center justify-between gap-1.5",
+                                TOAST_INLINE_CONTENT_CLASS,
+                                "flex items-center justify-between gap-2",
                                 inlineContentEndPad,
                               ),
                         )}

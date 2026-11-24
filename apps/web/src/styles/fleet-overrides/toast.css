@@ -15,3 +15,9 @@
 .fa-toast[data-limited] {
   display: block;
 }
+
+/* Grove and Ember define --error for fills; their toast surface is lighter than the page,
+   so the error icon uses the palette's foreground variant to stay legible. */
+html[data-theme-id]:not([data-theme-id=""]) .fa-toast .m-danger {
+  color: var(--error-foreground);
+}

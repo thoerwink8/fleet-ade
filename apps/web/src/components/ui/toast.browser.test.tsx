@@ -4,7 +4,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
 import { act, fakeTimers, render } from "../../../test/render";
-import { applyThemePalette } from "../../themePalette";
+import { applyThemePalette, EMBER_THEME, GROVE_THEME } from "../../themePalette";
 import { ToastProvider, toastManager } from "./toast";
 
 const toRgb = converter("rgb");
@@ -121,7 +121,7 @@ describe("toast colors", () => {
   ] as const;
 
   it.each(cases)(
-    "keeps 4.5:1 contrast for a $type toast in light and dark",
+    "keeps 4.5:1 contrast for a $type toast in light and dark across default, Grove, and Ember",
     async ({ type, title }) => {
       const root = document.documentElement;
       try {
@@ -134,24 +134,35 @@ describe("toast colors", () => {
         const titleElement = toast.querySelector<HTMLElement>('[data-slot="toast-title"]')!;
         const iconElement = toast.querySelector<HTMLElement>('[data-slot="toast-icon"]')!;
 
-        for (const appearance of ["light", "dark"] as const) {
-          root.classList.toggle("dark", appearance === "dark");
-          root.dataset.theme = appearance;
-          const background = getComputedStyle(toast).backgroundColor;
-          const titleColor = getComputedStyle(titleElement).color;
-          expect(
-            contrastRatio(titleColor, background),
-            `${appearance} ${type} title (${titleColor} on ${background})`,
-          ).toBeGreaterThanOrEqual(4.5);
-          const iconStyle = getComputedStyle(iconElement);
-          const iconColor =
-            iconStyle.opacity === "1"
-              ? iconStyle.color
-              : blendedOnSurface(iconStyle.color, background, Number.parseFloat(iconStyle.opacity));
-          expect(
-            contrastRatio(iconColor, background),
-            `${appearance} ${type} icon (${iconColor} on ${background})`,
-          ).toBeGreaterThanOrEqual(4.5);
+        for (const themeId of ["system", GROVE_THEME.id, EMBER_THEME.id] as const) {
+          for (const appearance of ["light", "dark"] as const) {
+            root.classList.toggle("dark", appearance === "dark");
+            root.dataset.theme = appearance;
+            applyThemePalette(themeId, appearance);
+            // Titles are text (4.5:1) in every theme. The default theme keeps 4.5:1 on icons too; Grove
+            // and Ember inherit status hues from their palettes, so their icons are held to the 3:1 non-text floor.
+            const iconFloor = themeId === "system" ? 4.5 : 3;
+            const label = `${themeId} ${appearance} ${type}`;
+            const background = getComputedStyle(toast).backgroundColor;
+            const titleColor = getComputedStyle(titleElement).color;
+            expect(
+              contrastRatio(titleColor, background),
+              `${label} title (${titleColor} on ${background})`,
+            ).toBeGreaterThanOrEqual(4.5);
+            const iconStyle = getComputedStyle(iconElement);
+            const iconColor =
+              iconStyle.opacity === "1"
+                ? iconStyle.color
+                : blendedOnSurface(
+                    iconStyle.color,
+                    background,
+                    Number.parseFloat(iconStyle.opacity),
+                  );
+            expect(
+              contrastRatio(iconColor, background),
+              `${label} icon (${iconColor} on ${background})`,
+            ).toBeGreaterThanOrEqual(iconFloor);
+          }
         }
       } finally {
         applyThemePalette("system", "light");
