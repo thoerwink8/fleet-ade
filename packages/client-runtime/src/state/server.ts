@@ -1229,6 +1229,11 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverRunStorageCleanup,
       concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
     }),
+    previewStorageCleanup: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:preview-storage-cleanup",
+      tag: WS_METHODS.serverPreviewStorageCleanup,
+      concurrency: { mode: "singleFlight", key: ({ environmentId }) => environmentId },
+    }),
     databaseStorage,
     databaseCompactionRecommendations,
     reclaimDatabaseSpace: createEnvironmentRpcCommand(runtime, {
