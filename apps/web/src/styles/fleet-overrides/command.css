@@ -1,0 +1,32 @@
+/* .fa-input's frame, focus ring, and Grove/Ember fill outrank .fa-cmd__in input.
+   The search field stays the library's borderless control inside the 48px row. */
+.fa-cmd__in .fa-input,
+.fa-cmd__in .fa-input:hover,
+.fa-cmd__in .fa-input:focus,
+.fa-cmd__in .fa-input:focus-visible {
+  height: 100%;
+  min-height: 0;
+  padding-block: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-cmd__in
+  .fa-input:not(:disabled):not([data-disabled]):not([aria-disabled="true"]):not(
+    :has(.fa-input__control:disabled)
+  ),
+:is(html[data-theme-id="grove"], html[data-theme-id="ember"])
+  .fa-cmd__in
+  .fa-input:not(:disabled):not([data-disabled]):not([aria-disabled="true"]):not(
+    :has(.fa-input__control:disabled)
+  ):is(:hover, :focus, :focus-visible) {
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}

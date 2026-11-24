@@ -119,6 +119,27 @@ describe("CommandPalette open intents", () => {
     await expect.element(page.getByPlaceholder("搜索…")).toHaveFocus();
     await expect.element(page.getByRole("option").first()).toHaveAttribute("data-highlighted");
     await expect.element(page.getByRole("option").nth(1)).not.toHaveAttribute("data-highlighted");
+
+    await userEvent.keyboard("{Backspace}");
+    await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
+  });
+
+  it("closes on Esc and returns focus to the opener", async () => {
+    setup();
+    await using _screen = await render(
+      <CommandPalette>
+        <button type="button">回到这里</button>
+      </CommandPalette>,
+    );
+    const opener = page.getByRole("button", { name: "回到这里" });
+    opener.element().focus();
+    openCommandPalette({});
+    await expect.element(page.getByPlaceholder("搜索命令、项目和会话…")).toHaveFocus();
+    await userEvent.keyboard("速查");
+    await expect.element(page.getByRole("option", { name: /快捷键速查/ })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await expect.element(page.getByRole("dialog", { name: "命令面板" })).not.toBeInTheDocument();
+    await expect.element(opener).toHaveFocus();
   });
 
   it("opens a search intent with its query in the focused input", async () => {

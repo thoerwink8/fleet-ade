@@ -15,7 +15,7 @@ import {
   AutocompleteListHeading,
   AutocompleteListVirtualized,
 } from "~/components/ui/autocomplete";
-import { DIALOG_BACKDROP_CLASS, DIALOG_POPUP_CLASS } from "~/components/ui/dialog-styles";
+import { COMMAND_POPUP_CLASS, DIALOG_BACKDROP_BASE_CLASS } from "~/components/ui/dialog-styles";
 import { Button } from "~/components/ui/button";
 
 const CommandDialog = CommandDialogPrimitive.Root;
@@ -29,7 +29,12 @@ function CommandDialogTrigger(props: CommandDialogPrimitive.Trigger.Props) {
 function CommandDialogBackdrop({ className, ...props }: CommandDialogPrimitive.Backdrop.Props) {
   return (
     <CommandDialogPrimitive.Backdrop
-      className={cn(DIALOG_BACKDROP_CLASS, "data-ending-style:pointer-events-none", className)}
+      className={cn(
+        "fa-backdrop",
+        DIALOG_BACKDROP_BASE_CLASS,
+        "data-ending-style:pointer-events-none",
+        className,
+      )}
       data-slot="command-dialog-backdrop"
       {...props}
     />
@@ -73,8 +78,8 @@ function CommandDialogPopup({
           initialFocus={() => popupRef.current?.querySelector("input") ?? true}
           ref={popupRef}
           className={cn(
-            DIALOG_POPUP_CLASS,
-            "pointer-events-auto max-h-[70vh] max-w-xl text-foreground data-ending-style:pointer-events-none",
+            COMMAND_POPUP_CLASS,
+            "pointer-events-auto max-h-[70vh] text-foreground data-ending-style:pointer-events-none",
             className,
           )}
           data-slot="command-dialog-popup"
@@ -109,16 +114,15 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof AutocompleteInput>) {
   return (
-    <div className="px-[var(--command-shell-inset)] py-1.5 [&_[data-slot=autocomplete-start-addon]]:ps-[calc(var(--command-shell-inset)+0.0625rem)]">
+    <div className="fa-cmd__in min-h-0" data-slot="command-input-row">
       <AutocompleteInput
         autoFocus
         className={cn(
-          "border-transparent! bg-transparent! shadow-none before:hidden has-focus-visible:ring-0 placeholder:text-placeholder *:data-[slot=autocomplete-input]:ps-9! sm:*:data-[slot=autocomplete-input]:ps-[calc(var(--command-shell-inset)+1.5rem)]!",
+          "h-full border-0 bg-transparent shadow-none *:data-[slot=autocomplete-input]:ps-9!",
           className,
         )}
         placeholder={placeholder}
-        size="lg"
-        startAddon={<SearchIcon className="translate-x-0.5 text-icon-muted" />}
+        startAddon={<SearchIcon className="text-icon-muted" />}
         {...props}
       />
     </div>
@@ -224,10 +228,7 @@ function CommandShortcut({ className, ...props }: React.ComponentProps<"kbd">) {
 function CommandFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn(
-        "relative flex items-center justify-between gap-2 rounded-b-[calc(var(--radius-2xl)-1px)] border-t border-foreground/[0.07] bg-foreground/[0.025] px-[var(--command-content-inset)] py-2.5 font-normal text-row text-muted-foreground [&_[data-slot=kbd-group]]:font-sans [&_[data-slot=kbd]]:bg-foreground/[0.08] [&_[data-slot=kbd]]:text-foreground [&_[data-slot=kbd]]:ring-0",
-        className,
-      )}
+      className={cn("fa-cmd__foot justify-between", className)}
       data-slot="command-footer"
       {...props}
     />
