@@ -37,3 +37,67 @@
     font-size: 16px;
   }
 }
+
+/* The 2px seam that makes a one-line command row --fa-row-1 lives in row.css on
+   .fa-item as well. Importing that file would repaint menus and selects. */
+.fa-cmd__row {
+  position: relative;
+  width: 100%;
+  border-block: var(--fa-space-row-seam) solid transparent;
+  background-clip: padding-box;
+}
+
+button.fa-cmd__row {
+  border-inline: 0;
+  font: inherit;
+  text-align: start;
+  color: inherit;
+}
+
+/* Library data-active is the stronger selected fill. The moving highlight
+   (keyboard or the palette's own active flag) uses the same wash as hover.
+   A checked row keeps the selected fill until it is the highlighted one. */
+.fa-cmd__row[data-highlighted]:not([aria-disabled="true"]),
+.fa-cmd__row[data-palette-active]:not([aria-disabled="true"]) {
+  background-image: linear-gradient(var(--fa-hover), var(--fa-hover));
+}
+
+.fa-cmd__row[aria-checked="true"]:not([aria-disabled="true"]):not([data-highlighted]):not(
+    [data-palette-active]
+  ) {
+  background-color: var(--fa-selected);
+  background-image: none;
+}
+
+/* The library leaves data-active paintable on a disabled row and only clears
+   that one attribute. Arrow keys skip disabled rows; this clears a highlight
+   if one still lands. */
+.fa-cmd__row[aria-disabled="true"][data-highlighted],
+.fa-cmd__row[aria-disabled="true"][data-palette-active] {
+  background-color: transparent;
+  background-image: none;
+}
+
+/* Project icon previews are 32px. The library lead column is 16 and would clip them. */
+.fa-cmd__row.has-lead:has(.size-8) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.fa-cmd__row.has-lead:has(.size-8) > .lead {
+  height: auto;
+  min-height: 20px;
+  align-self: center;
+}
+
+@media (pointer: coarse) {
+  /* Center a 44px box on the row. Negative inset is measured from the padding
+     edge, inside the 2px seam, so it comes out short of 44. */
+  .fa-cmd__row::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+}

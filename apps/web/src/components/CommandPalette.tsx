@@ -3183,11 +3183,11 @@ function OpenCommandPaletteDialog(props: {
         />
       ) : null}
       {browseAccessError ? (
-        <div role="alert" className="px-4 py-3 text-sm text-muted-foreground">
+        <div role="alert" className="fa-cmd__empty">
           {browseAccessError}
         </div>
       ) : isBrowsePending && browseResult === null ? (
-        <div role="status" className="px-4 py-3 text-sm text-muted-foreground">
+        <div role="status" className="fa-cmd__empty">
           正在加载文件夹…
         </div>
       ) : null}

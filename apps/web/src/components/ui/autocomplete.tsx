@@ -116,20 +116,29 @@ function AutocompletePopup({
   );
 }
 
-// Command palette rows pass data-slot="command-item" and still use the previous metrics.
-// This slice does not restyle that palette. Base UI's prop type omits data-* keys.
+// Base UI's prop type omits data-* keys. The composer's "/" menu still uses
+// CommandItem; it keeps the previous metrics and does not follow palette rows.
 function readDataSlot(props: object) {
   const value = (props as Record<string, unknown>)["data-slot"];
   return typeof value === "string" ? value : undefined;
 }
+
+function isComposerCommandItem(props: object) {
+  return "data-composer-item-id" in props;
+}
+
 const COMMAND_ITEM_CLASS_NAME =
   "flex min-h-8 cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base outline-none hover:bg-accent data-disabled:pointer-events-none data-selected:bg-accent/50 data-selected:text-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground [&[data-highlighted][data-selected]]:bg-accent [&[data-highlighted][data-selected]]:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-row [&_svg:not([class*='text-'])]:text-muted-foreground";
 
 function AutocompleteItem({ className, children, ...props }: AutocompletePrimitive.Item.Props) {
   const commandItem = readDataSlot(props) === "command-item";
+  const composerItem = commandItem && isComposerCommandItem(props);
   return (
     <AutocompletePrimitive.Item
-      className={cn(commandItem ? COMMAND_ITEM_CLASS_NAME : "fa-item", className)}
+      className={cn(
+        composerItem ? COMMAND_ITEM_CLASS_NAME : commandItem ? undefined : "fa-item",
+        className,
+      )}
       data-slot="autocomplete-item"
       {...props}
     >
@@ -148,13 +157,10 @@ function AutocompleteGroup({ className, ...props }: AutocompletePrimitive.Group.
   );
 }
 
-const COMMAND_GROUP_LABEL_CLASS_NAME = "px-2 py-1.5 font-semibold text-muted-foreground text-meta";
-
 function AutocompleteGroupLabel({ className, ...props }: AutocompletePrimitive.GroupLabel.Props) {
-  const commandLabel = readDataSlot(props) === "command-group-label";
   return (
     <AutocompletePrimitive.GroupLabel
-      className={cn(commandLabel ? COMMAND_GROUP_LABEL_CLASS_NAME : "fa-glabel", className)}
+      className={cn("fa-glabel", className)}
       data-slot="autocomplete-group-label"
       {...props}
     />
@@ -162,10 +168,9 @@ function AutocompleteGroupLabel({ className, ...props }: AutocompletePrimitive.G
 }
 
 function AutocompleteListHeading({ className, ...props }: React.ComponentProps<"div">) {
-  const commandLabel = readDataSlot(props) === "command-group-label";
   return (
     <div
-      className={cn(commandLabel ? COMMAND_GROUP_LABEL_CLASS_NAME : "fa-glabel", className)}
+      className={cn("fa-glabel", className)}
       data-slot="autocomplete-group-label"
       role="presentation"
       {...props}
