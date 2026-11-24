@@ -851,20 +851,8 @@ export function ChatSettingsPanel() {
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem value="queue">
-                  <span className="flex max-w-64 flex-col gap-0.5 py-0.5 whitespace-normal">
-                    <span className="font-medium text-foreground">排队</span>
-                    <span className="text-meta text-muted-foreground">等当前这一轮做完再发。</span>
-                  </span>
-                </SelectItem>
-                <SelectItem value="steer">
-                  <span className="flex max-w-64 flex-col gap-0.5 py-0.5 whitespace-normal">
-                    <span className="font-medium text-foreground">立即发送</span>
-                    <span className="text-meta text-muted-foreground">
-                      立刻发给智能体，会打断当前这一轮。
-                    </span>
-                  </span>
-                </SelectItem>
+                <SelectItem value="queue">排队</SelectItem>
+                <SelectItem value="steer">立即发送</SelectItem>
               </SelectPopup>
             </Select>
           }
