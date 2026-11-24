@@ -329,6 +329,19 @@ export function storageCleanupPullRequestMerged(
   );
 }
 
+/** Bytes a file frees when removed: allocated blocks, so sparse files count what they use. */
+export function storageCleanupAllocatedBytes(
+  stat: Pick<FileSystem.File.Info, "size" | "blocks">,
+  isWindows: boolean,
+): number {
+  // Node reports blocks as 0 on Windows, which would count every file as empty.
+  if (isWindows) return Number(stat.size);
+  return Option.match(stat.blocks, {
+    onNone: () => Number(stat.size),
+    onSome: (blocks) => Number(blocks * 512n),
+  });
+}
+
 export class StorageCleanup extends Context.Service<
   StorageCleanup,
   {
@@ -480,11 +493,7 @@ const make = Effect.gen(function* () {
             }
             // Removing a shared hardlink leaves its blocks allocated.
             if (stat.type !== "File" || Option.getOrElse(stat.nlink, () => 1n) !== 1n) return empty;
-            const bytes = Option.match(stat.blocks, {
-              onNone: () => Number(stat.size),
-              onSome: (blocks) => Number(blocks * 512n),
-            });
-            return { ...empty, bytes };
+            return { ...empty, bytes: storageCleanupAllocatedBytes(stat, isWindows) };
           }),
           { concurrency: "unbounded" },
         );

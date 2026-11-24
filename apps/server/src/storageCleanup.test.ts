@@ -1,5 +1,6 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as ByteSize from "effect/ByteSize";
 import * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -309,14 +310,30 @@ describe("merged pull request cleanup", () => {
   });
 });
 
+describe("storageCleanupAllocatedBytes", () => {
+  const stat = (size: number, blocks: Option.Option<number>) => ({
+    size: ByteSize.bytes(size),
+    blocks: Option.map(blocks, BigInt),
+  });
+  it.each([
+    [
+      "counts allocated blocks, not length, for a sparse file",
+      stat(1_000_000, Option.some(8)),
+      false,
+      4096,
+    ],
+    ["counts blocks for a file with a partial last block", stat(100, Option.some(8)), false, 4096],
+    ["keeps an empty file at zero", stat(0, Option.some(0)), false, 0],
+    ["falls back to length when blocks are unknown", stat(100, Option.none()), false, 100],
+    ["uses length where blocks is always 0", stat(100, Option.some(0)), true, 100],
+  ] as const)("%s", (_name, info, isWindows, expected) => {
+    expect(StorageCleanup.storageCleanupAllocatedBytes(info, isWindows)).toBe(expected);
+  });
+});
+
 const allocatedBytes = (fs: FileSystem.FileSystem, file: string) =>
-  fs.stat(file).pipe(
-    Effect.map((stat) =>
-      Option.getOrElse(
-        Option.map(stat.blocks, (blocks) => Number(blocks) * 512),
-        () => Number(stat.size),
-      ),
-    ),
+  Effect.all([fs.stat(file), HostProcess.isWindows]).pipe(
+    Effect.map(([stat, isWindows]) => StorageCleanup.storageCleanupAllocatedBytes(stat, isWindows)),
   );
 
 const cleanupFixture = (
