@@ -109,8 +109,8 @@ describe("DesktopClientSettings", () => {
         yield* settings.set(clientSettings);
 
         assert.equal(
-          yield* fileSystem.readLink(environment.clientSettingsPath),
-          linkedSettingsPath,
+          (yield* fileSystem.readLink(environment.clientSettingsPath)).replaceAll("\\", "/"),
+          linkedSettingsPath.replaceAll("\\", "/"),
         );
         assert.deepEqual(
           yield* decodeClientSettingsJson(yield* fileSystem.readFileString(linkedSettingsPath)),
@@ -213,6 +213,37 @@ describe("DesktopClientSettings", () => {
         assert.isTrue(Option.isSome(persisted));
         if (Option.isSome(persisted)) {
           assert.equal(persisted.value.timestampFormat, "24-hour");
+          assert.equal(persisted.value.followUpBehavior, "queue");
+        }
+      }),
+    ),
+  );
+
+  it.effect("migrates a saved steer to queue once, then keeps a later steer choice", () =>
+    withClientSettings(
+      Effect.gen(function* () {
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fileSystem = yield* FileSystem.FileSystem;
+        const settings = yield* DesktopClientSettings.DesktopClientSettings;
+        yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
+        yield* fileSystem.writeFileString(
+          environment.clientSettingsPath,
+          `${JSON.stringify({ followUpBehavior: "steer", wordWrap: false })}
+`,
+        );
+
+        const migrated = yield* settings.get;
+        assert.isTrue(Option.isSome(migrated));
+        if (!Option.isSome(migrated)) return;
+        assert.equal(migrated.value.followUpBehavior, "queue");
+        assert.isTrue(migrated.value.followUpBehaviorMigrated);
+        assert.isFalse(migrated.value.wordWrap);
+
+        yield* settings.set({ ...migrated.value, followUpBehavior: "steer" });
+        for (let read = 0; read < 2; read += 1) {
+          const again = yield* settings.get;
+          assert.isTrue(Option.isSome(again));
+          if (Option.isSome(again)) assert.equal(again.value.followUpBehavior, "steer");
         }
       }),
     ),

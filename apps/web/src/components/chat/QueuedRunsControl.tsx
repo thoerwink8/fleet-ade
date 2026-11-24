@@ -227,13 +227,13 @@ export function QueuedRunsControl({
 
   return (
     <section
-      aria-label={`${items.length} queued message${items.length === 1 ? "" : "s"}`}
+      aria-label={`${items.length} 条排队消息`}
       data-thread-queue="true"
       // Anchors the sr-only live region; unanchored, it escapes the timeline scroller and makes the chat column scroll.
       className="relative mx-auto flex w-full max-w-(--chat-content-max-width) flex-col gap-2 pb-4"
     >
       <span className="sr-only" aria-live="polite">
-        {items.length} queued
+        {items.length} 条排队
       </span>
       <ol className="flex flex-col gap-2" id={queueListId}>
         {visibleItems.map((item, position) => {
@@ -353,7 +353,7 @@ export function QueuedRunsControl({
                       >
                         撤回
                       </TooltipTrigger>
-                      <TooltipPopup>从队列中移除</TooltipPopup>
+                      <TooltipPopup>撤回排队消息</TooltipPopup>
                     </Tooltip>
                   </>
                 )}

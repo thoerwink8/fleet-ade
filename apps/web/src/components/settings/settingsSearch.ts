@@ -520,9 +520,11 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "follow-up-behavior",
-    title: "追加消息行为",
+    title: "运行中发送（排队／立即发送）",
     to: "/settings/threads",
-    searchTerms: ["queue steer running turn send default behavior composer"],
+    searchTerms: [
+      "排队 立即发送 运行中 发送 打断 queue steer running turn send default behavior composer",
+    ],
   },
   {
     id: "provider-update-checks",

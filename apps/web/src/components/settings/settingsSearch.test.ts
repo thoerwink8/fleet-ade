@@ -210,8 +210,12 @@ describe("searchSettings", () => {
       ["产物与日志", "storage-artifacts"],
       ["立即删除", "storage-delete-now"],
       ["智能体提供方", "providers"],
+      ["运行中发送", "follow-up-behavior"],
     ] as const) {
       expect(searchSettings(title)[0]?.id, title).toBe(id);
+    }
+    for (const query of ["排队", "立即发送", "steer"]) {
+      expect(searchSettings(query).map((item) => item.id)).toContain("follow-up-behavior");
     }
   });
 
