@@ -39,6 +39,7 @@ import { toolCallDiff } from "../lib/toolCallDiff";
 import { useCheckpointDiff, useTurnItemDetail } from "~/state/queries";
 import { revisionedQuery } from "~/state/revisionedQuery";
 import { cn } from "~/lib/utils";
+import { presentVersionControlError } from "./versionControlError.logic";
 import {
   resolveToolCallDiffTarget,
   selectThreadBranchBaseRef,
@@ -419,6 +420,9 @@ export default function DiffPanel({
         })
       : null,
   );
+  const branchCommitsErrorPresentation = branchCommitsQuery.error
+    ? presentVersionControlError(branchCommitsQuery.failure, "加载分支提交")
+    : null;
   const branchCommits = openCommitMenu ?? branchCommitsQuery.data;
   const activeThreadRefreshKey = routeThreadRef
     ? `${routeThreadRef.environmentId}:${routeThreadRef.threadId}`
@@ -501,11 +505,15 @@ export default function DiffPanel({
     selectedPatchQuery.isPending &&
     (selectedPatchQuery.data === null ||
       (isGitSelection && preview?.incomplete === true && selectedGitSource?.files?.length === 0));
-  const selectedPatchError = toolCallSelection
-    ? toolCallDetail.error
+  const selectedPatchFailure = toolCallSelection
+    ? toolCallDetail.failure
     : selectedTurn
-      ? activeCheckpointDiff.error
-      : branchDiffPreview.error;
+      ? activeCheckpointDiff.failure
+      : branchDiffPreview.failure;
+  const selectedPatchErrorPresentation = selectedPatchFailure
+    ? presentVersionControlError(selectedPatchFailure, "加载差异")
+    : null;
+  const selectedPatchError = selectedPatchErrorPresentation?.description ?? null;
   const hasResolvedPatch = typeof selectedPatch === "string";
   const hasNoNetChanges =
     hasResolvedPatch &&
@@ -990,8 +998,10 @@ export default function DiffPanel({
                     );
                   })}
                 </DropdownMenuRadioGroup>
-                {branchCommitsQuery.error ? (
-                  <DropdownMenuItem disabled>{branchCommitsQuery.error}</DropdownMenuItem>
+                {branchCommitsErrorPresentation ? (
+                  <DropdownMenuItem disabled>
+                    {`${branchCommitsErrorPresentation.title}\n${branchCommitsErrorPresentation.description}`}
+                  </DropdownMenuItem>
                 ) : !canReadFiles ? (
                   <DropdownMenuItem disabled>
                     {fileAccess.isPending
@@ -1342,7 +1352,12 @@ export default function DiffPanel({
             )}
             {selectedPatchError && !renderablePatch && (
               <div className="px-3">
-                <p className="mb-2 text-2xs text-error/80">{selectedPatchError}</p>
+                <p className="mb-1 text-2xs font-medium text-error/80">
+                  {selectedPatchErrorPresentation?.title}
+                </p>
+                <p className="mb-2 whitespace-pre-wrap text-2xs text-error/80">
+                  {selectedPatchError}
+                </p>
               </div>
             )}
             {!renderablePatch && toolCallPreview && toolCallPreview.content.length > 0 ? (

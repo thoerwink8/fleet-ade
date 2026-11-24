@@ -53,6 +53,10 @@ import { Label } from "./ui/label";
 import { MiddleTruncate } from "./ui/middle-truncate";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "./ui/select";
 import { Toggle, ToggleGroup } from "./ui/toggle-group";
+import {
+  presentVersionControlError,
+  type VersionControlErrorToastPresentation,
+} from "./versionControlError.logic";
 
 interface AddProjectToMachineRequest {
   readonly projectRef: ScopedProjectRef;
@@ -139,7 +143,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
     .reduce((total, file) => total + file.byteLength, 0);
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<VersionControlErrorToastPresentation | null>(null);
 
   // The project or every target can vanish while the dialog is open. Submitting
   // before the file list loads would silently skip the default .env copies.
@@ -181,7 +185,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
   const submit = async () => {
     if (!project || !target || submitting) return;
     if (destinationPath.trim().length === 0) {
-      setError("请选择另一台电脑上的文件夹。");
+      setError({ title: "无法开始克隆", description: "请选择另一台电脑上的文件夹。" });
       return;
     }
     setSubmitting(true);
@@ -203,7 +207,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
       close();
       openClonedProject(scopeProjectRef(target.environmentId, projectId));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法开始克隆。");
+      setError(presentVersionControlError(cause, "开始克隆"));
       setSubmitting(false);
     }
   };
@@ -379,7 +383,14 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
               </div>
             ) : null}
 
-            {error ? <p className="text-destructive-foreground text-sm">{error}</p> : null}
+            {error ? (
+              <div className="text-destructive-foreground text-sm">
+                <p className="font-medium">{error.title}</p>
+                {error.description.length > 0 ? (
+                  <p className="mt-0.5 whitespace-pre-wrap">{error.description}</p>
+                ) : null}
+              </div>
+            ) : null}
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>

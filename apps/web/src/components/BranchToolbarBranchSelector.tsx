@@ -54,6 +54,7 @@ import {
   sanitizeNewRefName,
   shouldIncludeBranchPickerItem,
 } from "./BranchToolbar.logic";
+import { presentVersionControlError } from "./versionControlError.logic";
 import {
   ThreadPullRequestBadgeControl,
   resolveDisplayedThreadPr,
@@ -485,8 +486,7 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法切换分支",
-            description: toBranchActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
+            ...presentVersionControlError(squashAtomCommandFailure(checkoutResult), "切换分支"),
           }),
         );
       }
@@ -524,8 +524,10 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "无法创建并切换分支",
-            description: toBranchActionErrorMessage(squashAtomCommandFailure(createBranchResult)),
+            ...presentVersionControlError(
+              squashAtomCommandFailure(createBranchResult),
+              "创建并切换分支",
+            ),
           }),
         );
       }

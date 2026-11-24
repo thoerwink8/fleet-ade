@@ -141,7 +141,8 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
   );
   if (started._tag === "Failure") {
     setFileCopy(requestedKey, null);
-    throw new Error(failureMessage(started));
+    const error = squashAtomCommandFailure(started);
+    throw error instanceof Error ? error : new Error("发生错误。");
   }
   // The server clones for the existing project when one already owns the empty destination.
   const { projectId } = started.value;

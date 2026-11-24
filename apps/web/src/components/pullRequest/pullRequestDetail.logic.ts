@@ -48,6 +48,7 @@ import {
   visibleThreadPullRequests,
 } from "@t3tools/client-runtime/thread-pull-requests";
 
+import { describeVersionControlError } from "../versionControlError.logic";
 import { inferReviewCommentFenceLanguage, type ReviewCommentContext } from "~/reviewCommentContext";
 
 export const PULL_REQUEST_MERGE_METHOD_LABELS: Record<PullRequestMergeMethod, string> = {
@@ -1341,8 +1342,6 @@ export function isPullRequestNotFound(failure: unknown): boolean {
   return isPullRequestOperationError(failure) && failure.reason === "not-found";
 }
 
-const OPERATION_PREFIX = /^Pull request operation \w+ failed:\s*/iu;
-
 const HOST_LABELS = sourceControlClients.definitions
   .map((definition) => definition.label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
   .join("|");
@@ -1356,9 +1355,14 @@ const TOOL_NOISE = [
 const FAILURE_DETAIL_MAX_LENGTH = 320;
 
 export function readableFailure(failure: unknown, hint: string): string {
-  const raw =
-    failure instanceof Error ? failure.message : typeof failure === "string" ? failure : "";
-  const detail = raw.replace(OPERATION_PREFIX, "").trim();
+  const raw = isPullRequestOperationError(failure)
+    ? failure.detail
+    : failure instanceof Error
+      ? failure.message
+      : typeof failure === "string"
+        ? failure
+        : "";
+  const detail = raw.trim();
   if (detail.length === 0 || TOOL_NOISE.some((pattern) => pattern.test(detail))) return hint;
   const bounded =
     detail.length <= FAILURE_DETAIL_MAX_LENGTH
@@ -1371,9 +1375,10 @@ const isGitCommandError = Schema.is(GitCommandError);
 
 export function checkoutFailureDescription(failure: unknown): string {
   const description = isGitCommandError(failure)
-    ? failure.reason === undefined
-      ? failure.detail
-      : `${failure.detail} (${failure.reason})`
+    ? (() => {
+        const { nextStep, detail } = describeVersionControlError(failure);
+        return [nextStep, detail].filter(Boolean).join("\n\n");
+      })()
     : failure;
   return readableFailure(description, "请确认该分支仍然存在且未在其他位置检出，然后重试。");
 }

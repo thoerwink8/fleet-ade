@@ -18,6 +18,7 @@ import { sourceControlEnvironment } from "../../state/sourceControl";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button, InlineButton } from "../ui/button";
 import { Spinner } from "../ui/spinner";
+import { presentVersionControlError } from "../versionControlError.logic";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 
 type SignInState =
@@ -27,8 +28,8 @@ type SignInState =
   | { readonly status: "failed"; readonly message: string };
 
 const failureMessage = (cause: Cause.Cause<unknown>) => {
-  const error = Cause.squash(cause);
-  return error instanceof Error ? error.message : String(error);
+  const presentation = presentVersionControlError(Cause.squash(cause), "登录");
+  return `${presentation.title}：${presentation.description}`;
 };
 
 const expiryTime = (expiresAt: number) =>

@@ -8,6 +8,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { useDebouncedValue } from "@tanstack/react-pacer";
+import { presentVersionControlError } from "./versionControlError.logic";
 import { useRef, useState } from "react";
 
 import {
@@ -61,6 +62,11 @@ function pullRequestStatusTone(state: string | undefined): string {
     default:
       return "text-muted-foreground";
   }
+}
+function versionControlErrorMessage(error: unknown, fallbackAction: string): string {
+  const { title, description } = presentVersionControlError(error, fallbackAction);
+  // Resolution failures are already flattened to text upstream; keep the original text.
+  return typeof error === "string" ? `${title}\n${error}` : `${title}\n${description}`;
 }
 
 export function PullRequestThreadDialog({
@@ -153,9 +159,7 @@ export function PullRequestThreadDialog({
         preparePullRequestThreadAction.resetError();
       } else {
         const error = squashAtomCommandFailure(result);
-        setPrepareErrorMessage(
-          error instanceof Error ? error.message : `无法准备 ${terminology.singular} 会话。`,
-        );
+        setPrepareErrorMessage(versionControlErrorMessage(error, "准备 PR 会话"));
       }
       return;
     }
@@ -181,12 +185,10 @@ export function PullRequestThreadDialog({
     validationMessage ??
     prepareErrorMessage ??
     (resolvedPullRequest === null && pullRequestResolution.error
-      ? pullRequestResolution.error
-      : preparePullRequestThreadAction.error instanceof Error
-        ? preparePullRequestThreadAction.error.message
-        : preparePullRequestThreadAction.error
-          ? `无法准备 ${terminology.singular} 会话。`
-          : null);
+      ? versionControlErrorMessage(pullRequestResolution.error, "加载 PR")
+      : preparePullRequestThreadAction.error
+        ? versionControlErrorMessage(preparePullRequestThreadAction.error, "准备 PR 会话")
+        : null);
 
   return (
     <Dialog

@@ -65,6 +65,7 @@ import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { buildThreadRouteParams, resolveThreadRouteRef } from "../threadRoutes";
 import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "../worktreeCleanup";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
+import { presentVersionControlError } from "../components/versionControlError.logic";
 import { useClientSettings } from "./useSettings";
 import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 import { showThreadUndoNotice } from "./showThreadUndoNotice";
@@ -726,7 +727,10 @@ export function useThreadActions() {
     if (cleanupFailure) {
       const removalFailed = removeResult._tag === "Failure";
       const error = squashAtomCommandFailure(cleanupFailure);
-      const message = error instanceof Error ? error.message : "发生错误。";
+      const presentation = presentVersionControlError(
+        error,
+        removalFailed ? "删除工作树" : "刷新 Git 状态",
+      );
       console.error("Worktree cleanup failed after thread deletion", {
         threadId: threadRef.threadId,
         projectCwd: threadProject.workspaceRoot,
@@ -736,10 +740,10 @@ export function useThreadActions() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: removalFailed ? "无法删除工作树" : "工作树已删除，但无法刷新 Git 状态",
+          title: presentation.title,
           description: removalFailed
-            ? `无法删除 ${displayWorktreePath ?? orphanedWorktreePath}。${message}`
-            : message,
+            ? `无法删除 ${displayWorktreePath ?? orphanedWorktreePath}。${presentation.description}`
+            : presentation.description,
         }),
       );
       // Cleanup has its own toast; reporting its failure would falsely imply deletion failed.
@@ -968,14 +972,15 @@ export function useThreadActions() {
             : null;
       if (cleanupFailure) {
         const error = squashAtomCommandFailure(cleanupFailure);
+        const presentation = presentVersionControlError(
+          error,
+          removeResult._tag === "Failure" ? "删除工作树" : "刷新 Git 状态",
+        );
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title:
-              removeResult._tag === "Failure"
-                ? "无法删除工作树"
-                : "工作树已删除，但无法刷新 Git 状态",
-            description: error instanceof Error ? error.message : "发生错误。",
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }

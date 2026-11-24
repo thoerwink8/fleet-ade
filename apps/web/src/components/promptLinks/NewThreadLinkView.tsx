@@ -47,6 +47,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { SidebarInset } from "../ui/sidebar";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { suggestAppAccessForRemote } from "../sourceControlAppAccessToast";
+import { presentVersionControlError } from "../versionControlError.logic";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { placeLinkedPrompt, warnAboutHiddenCharacters } from "./linkedPrompt";
 
@@ -231,12 +232,12 @@ export function NewThreadLinkView({ link }: { readonly link: NewThreadLink }) {
     });
     if (result._tag === "Failure") {
       if (!isAtomCommandInterrupted(result)) {
-        const error = squashAtomCommandFailure(result);
+        const presentation = presentVersionControlError(squashAtomCommandFailure(result), "克隆");
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "克隆失败",
-            description: error instanceof Error ? error.message : "发生错误。",
+            title: presentation.title,
+            description: presentation.description,
           }),
         );
       }
