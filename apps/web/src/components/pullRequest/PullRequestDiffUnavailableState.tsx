@@ -28,7 +28,7 @@ export function PullRequestDiffUnavailableState({
 
   return (
     <Empty size="compact" className="min-h-full" role="status">
-      <EmptyMedia variant="icon">
+      <EmptyMedia variant="warning">
         <TriangleAlertIcon aria-hidden />
       </EmptyMedia>
       <EmptyHeader>
@@ -50,7 +50,7 @@ export function PullRequestDiffUnavailableState({
         </Button>
       </div>
       <details className="w-full max-w-lg text-xs text-muted-foreground">
-        <summary className="mx-auto w-fit cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+        <summary className="mx-auto w-fit text-sm cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
           技术详情
         </summary>
         <pre className="scrollbar-gutter-both mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">

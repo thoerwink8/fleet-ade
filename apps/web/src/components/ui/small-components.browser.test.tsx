@@ -39,6 +39,9 @@ describe("Empty, Label, and NumberField", () => {
               <EmptyDescription>Add an item to continue.</EmptyDescription>
             </EmptyHeader>
           </Empty>
+          <EmptyMedia variant="warning" data-testid="warning-media">
+            <CircleAlertIcon />
+          </EmptyMedia>
           <div className="grid gap-2">
             <Label>Normal label</Label>
             <Label aria-disabled="true">Disabled label</Label>
@@ -132,6 +135,11 @@ describe("Empty, Label, and NumberField", () => {
           ).toBeLessThanOrEqual(500);
           expect(descriptionStyle.color, `${themeId} description color`).toBe(muted);
           expect(getComputedStyle(media).color, `${themeId} media color`).toBe(muted);
+          const warningMedia = screen.container.querySelector('[data-testid="warning-media"]')!;
+          expect(getComputedStyle(warningMedia).color, `${themeId} warning media color`).toBe(
+            resolvedColor("--warning"),
+          );
+          expect(getComputedStyle(warningMedia).color).not.toBe(muted);
           expect(getComputedStyle(normalLabel).color, `${themeId} label color`).toBe(fg);
           expect(getComputedStyle(disabledLabel).color, `${themeId} disabled label color`).toBe(
             muted,

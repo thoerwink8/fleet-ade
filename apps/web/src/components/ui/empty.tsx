@@ -38,14 +38,18 @@ function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
 
 function EmptyMedia({
   className,
-  variant: _variant,
+  variant = "icon",
   ...props
-}: React.ComponentProps<"div"> & { variant?: "icon" }) {
+}: React.ComponentProps<"div"> & { variant?: "icon" | "warning" }) {
   return (
     <div
-      className={cn("fa-muted mb-4 flex shrink-0 items-center justify-center", className)}
+      className={cn(
+        "mb-4 flex shrink-0 items-center justify-center",
+        variant === "warning" ? "text-warning" : "fa-muted",
+        className,
+      )}
       data-slot="empty-media"
-      data-variant="icon"
+      data-variant={variant}
       {...props}
     />
   );
