@@ -3470,7 +3470,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   showMobilePendingAnswerActions && "hidden sm:flex",
                 )}
               >
-                {composerAttachButton ? <div className="me-1">{composerAttachButton}</div> : null}
+                {composerAttachButton ? (
+                  <div className="me-1 pointer-coarse:me-2">{composerAttachButton}</div>
+                ) : null}
                 <div
                   data-chat-composer-actions="right"
                   data-chat-composer-transition-actions="true"

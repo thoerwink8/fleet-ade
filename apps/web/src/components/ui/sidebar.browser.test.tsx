@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import "~/index.css";
 
 import { render } from "../../../test/render";
+import { Dialog } from "./dialog";
 import {
   Sidebar,
   SidebarInset,
@@ -263,6 +264,38 @@ it("caps mobile drawer width to leave a scrim strip that closes the drawer, bloc
   await userEvent.keyboard("{Escape}");
   await expect.element(sheetMounted).toHaveTextContent("false");
   await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
+});
+
+it("still draws the scrim when the app shell sits inside another dialog tree", async () => {
+  const prev = { width: window.innerWidth, height: window.innerHeight };
+  await page.viewport(390, 844);
+  await using _viewport = {
+    [Symbol.asyncDispose]: () => page.viewport(prev.width, prev.height),
+  };
+
+  await using screen = await render(
+    <Dialog open={false}>
+      <SidebarProvider>
+        <Sidebar>
+          <span>Drawer contents</span>
+        </Sidebar>
+        <SidebarInset>
+          <SidebarTrigger />
+        </SidebarInset>
+      </SidebarProvider>
+    </Dialog>,
+    { router: false /* no routes involved */ },
+  );
+
+  await userEvent.click(
+    screen.container.querySelector<HTMLButtonElement>('[data-slot="sidebar-trigger"]')!,
+  );
+  const backdrop = await vi.waitFor(() => {
+    const element = document.querySelector<HTMLElement>('[data-slot="sheet-backdrop"]');
+    expect(element).not.toBeNull();
+    return element!;
+  });
+  expect(document.elementFromPoint(window.innerWidth - 16, 340)).toBe(backdrop);
 });
 
 it("opens the mobile sheet without a transition while panel animations are off", async () => {
