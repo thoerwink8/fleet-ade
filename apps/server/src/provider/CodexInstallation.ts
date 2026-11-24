@@ -769,7 +769,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
         if (!release && installedVersion === null) {
           return yield* installationError(
             "start",
-            `OpenAI 没有发布适用于 ${platform}-${arch} 的 Codex 运行时。请使用受支持的远程环境或自定义可执行文件。`,
+            `OpenAI 没有发布适用于 ${platform}-${arch} 的 Codex 运行时。请使用受支持的远程电脑或自定义可执行文件。`,
           );
         }
         const operationId = yield* random.uuidV4();
@@ -849,7 +849,7 @@ export const makeCodexInstallation = Effect.fn("makeCodexInstallation")(function
               if (candidate.startsWith(`${realManaged.value}${path.sep}`))
                 return yield* installationError(
                   "remove",
-                  "有提供方实例使用了托管 Codex 内的自定义路径。请先清除该路径再移除。",
+                  "有账号使用了托管 Codex 内的自定义路径。请先清除该路径再移除。",
                 );
             }
           }
