@@ -93,6 +93,7 @@ import {
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
@@ -1581,6 +1582,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
   const eventSink = yield* EventSinkV2;
   const commandReceipts = yield* CommandReceiptStoreV2;
   const idAllocator = yield* IdAllocator.IdAllocatorV2;
+  const random = yield* SecureRandom.SecureRandom;
   const projects = yield* ProjectStore.ProjectStoreV2;
   const projectionStore = yield* ProjectionStoreV2;
   const effectOutbox = yield* EffectOutbox.EffectOutboxV2;
@@ -13608,6 +13610,17 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         ["providerThreads", "checkpoints", "checkpointScopes", "runs", "providerTurns", "attempts"],
         { turnItemTypes: [], messageRoles: ["user"] },
       );
+      if (
+        projection.thread.pendingRollback != null &&
+        projection.thread.pendingRollback.requestId !== command.commandId
+      ) {
+        return yield* new OrchestratorRollbackRejectedError({
+          commandId: command.commandId,
+          threadId: command.threadId,
+          code: "rollback-already-pending",
+        });
+      }
+
       const providerThread = projection.providerThreads.find(
         (candidate) => candidate.id === projection.thread.activeProviderThreadId,
       );
@@ -16459,10 +16472,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         const thread = yield* projectionStore.getThread(threadId);
         const pending = thread.pendingRollback;
         if (pending == null) return false;
+        const resumeId = yield* random.uuidV4();
         const result = yield* dispatchWithReceipt({
           type: "checkpoint.rollback.resume",
+          // Each sweep is its own command: an earlier no-op receipt must not replay
+          // onto a later sweep after the thread actually settles.
           commandId: CommandId.make(
-            `server:checkpoint.rollback.resume:${threadId}:${pending.requestId}:startup`,
+            `server:checkpoint.rollback.resume:${threadId}:${pending.requestId}:${resumeId}`,
           ),
           threadId,
           requestId: pending.requestId,
@@ -16760,6 +16776,7 @@ export const layer: Layer.Layer<
   | ProviderSwitchServiceV2
   | ProjectionStoreV2
   | RuntimePolicyV2
+  | SecureRandom.SecureRandom
   | ServerSettings.ServerSettingsService
   | ThreadForkServiceV2
 > = Layer.effect(OrchestratorV2, makeOrchestrator()).pipe(
