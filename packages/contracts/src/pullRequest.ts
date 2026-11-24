@@ -856,6 +856,8 @@ export class PullRequestOperationError extends Schema.TaggedError<PullRequestOpe
   }
 
   override get message(): string {
-    return `拉取请求操作 ${this.operation} 失败：${this.detail}`;
+    // apps/web strips this English prefix in pullRequestDetail.logic.ts `OPERATION_PREFIX`;
+    // keeping it English lets the client show only `detail`. `detail` itself is translated.
+    return `Pull request operation ${this.operation} failed: ${this.detail}`;
   }
 }
