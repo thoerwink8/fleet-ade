@@ -1,18 +1,9 @@
 .fa-btn {
-  position: relative;
   flex-shrink: 0;
-  /* Theme switches toggle data-theme synchronously; skip transitions so contrast settles in one tick. */
-  transition: none;
 }
 
 .fa-btn svg {
-  flex-shrink: 0;
   pointer-events: none;
-}
-
-.fa-btn svg:not([class*="size-"]) {
-  width: var(--fa-space-4);
-  height: var(--fa-space-4);
 }
 
 .fa-btn.ade-btn--multiline {
@@ -113,17 +104,8 @@ html[data-theme="dark"]
   background-color: color-mix(in srgb, var(--warning) 24%, transparent);
 }
 
-/* Expand pointer:coarse hit area without changing visual dimensions; compact stays 32px inside bars. */
+/* @fleet/design gives every .fa-btn a centred 44px ::after on a coarse pointer; a compact button in a bar keeps 32px. */
 @media (pointer: coarse) {
-  .fa-btn::after {
-    content: "";
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    min-width: 44px;
-    min-height: 44px;
-  }
-
   .fa-btn.ade-btn--touch-compact::after {
     min-width: var(--fa-ctrl);
     min-height: var(--fa-ctrl);
@@ -135,33 +117,6 @@ html[data-theme="dark"]
     width: var(--fa-ctrl);
     height: var(--fa-ctrl);
   }
-}
-
-/* Match @fleet/design [disabled] appearance on non-button render targets that use data-disabled or aria-disabled. */
-.fa-btn:is([data-disabled], [aria-disabled="true"]) {
-  cursor: not-allowed;
-  background-color: transparent;
-  background-image: none;
-  border-color: var(--fa-border);
-  color: var(--fa-fg-muted);
-}
-
-.fa-btn:not(.fa-btn--primary, .fa-btn--danger, .fa-btn--secondary, .fa-btn--danger-secondary):is(
-    [data-disabled],
-    [aria-disabled="true"]
-  ) {
-  border-color: transparent;
-}
-
-.fa-btn:is([data-disabled], [aria-disabled="true"]):is(
-    :hover,
-    :active,
-    :focus-visible,
-    [aria-expanded="true"],
-    [aria-pressed="true"]
-  ) {
-  background-image: none;
-  color: var(--fa-fg-muted);
 }
 
 /* These themes map --fa-hover to an opaque accent, which would paint over a danger
